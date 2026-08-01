@@ -1,0 +1,306 @@
+/* ---------------------------------------------------
+   Eva Maskalenko — Portfolio
+   Deep Winter: black base, petrol accent, sharp edges
+--------------------------------------------------- */
+
+:root {
+  --black:        #060707;
+  --black-raised: #0c0e0e;
+  --line:         #232727;
+  --line-strong:  #34393a;
+  --ink:          #e9ecec;
+  --ink-dim:      #8b9494;
+  --ink-faint:    #565f5f;
+  --petrol:       #1c6b6b;
+  --petrol-bright:#2fa3a3;
+
+  --serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --mono:  "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--black);
+}
+
+body {
+  background: var(--black);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--petrol);
+  color: var(--black);
+}
+
+/* ---------------------------------------------------
+   Hero
+--------------------------------------------------- */
+
+.hero {
+  position: relative;
+  min-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8vw 6vw 6vw;
+  border-bottom: 1px solid var(--line);
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 6vw;
+  width: 1px;
+  height: 100%;
+  background: var(--line);
+}
+
+.hero__index {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--petrol-bright);
+  margin-bottom: 2.5rem;
+  padding-left: 1.5rem;
+}
+
+.hero__name {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(3.2rem, 10vw, 8rem);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  padding-left: 1.5rem;
+  text-transform: uppercase;
+  font-variation-settings: "opsz" 144;
+}
+
+.hero__statement {
+  font-family: var(--mono);
+  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+  color: var(--ink-dim);
+  max-width: 34rem;
+  margin: 2.5rem 0 0 1.5rem;
+  line-height: 1.7;
+}
+
+.hero__meta {
+  margin: 3rem 0 0 1.5rem;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.hero__meta .dot {
+  color: var(--petrol);
+}
+
+/* ---------------------------------------------------
+   Section label
+--------------------------------------------------- */
+
+.section-label {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 4rem 6vw 2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-label__number {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--petrol-bright);
+  letter-spacing: 0.14em;
+}
+
+.section-label__title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------
+   Project grid
+--------------------------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.specimen {
+  position: relative;
+  padding: 2.75rem 2rem 2rem;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.grid .specimen:nth-child(3n) {
+  border-right: none;
+}
+
+.specimen:hover {
+  background: var(--black-raised);
+  border-color: var(--line-strong);
+}
+
+.specimen:hover .specimen__title {
+  color: var(--petrol-bright);
+}
+
+.specimen__tag {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 1.75rem;
+}
+
+.specimen__year {
+  color: var(--petrol-bright);
+}
+
+.specimen__title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  color: var(--ink);
+  margin-bottom: 1rem;
+  transition: color 0.15s ease;
+}
+
+.specimen__desc {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-faint);
+  flex-grow: 1;
+}
+
+.specimen__index {
+  margin-top: 1.5rem;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+/* ---------------------------------------------------
+   Footer
+--------------------------------------------------- */
+
+.footer {
+  padding: 4rem 6vw 3rem;
+}
+
+.footer__rule {
+  height: 1px;
+  background: var(--line);
+  margin-bottom: 3rem;
+}
+
+.footer__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.footer__label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--petrol);
+  margin-bottom: 0.75rem;
+}
+
+.footer__link {
+  font-size: 13px;
+  color: var(--ink-dim);
+  border-bottom: 1px solid transparent;
+}
+
+.footer__link:not(.footer__link--muted):hover {
+  color: var(--petrol-bright);
+  border-bottom-color: var(--petrol-bright);
+}
+
+.footer__link--muted {
+  color: var(--ink-faint);
+}
+
+/* ---------------------------------------------------
+   Responsive
+--------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .grid .specimen:nth-child(3n) {
+    border-right: 1px solid var(--line);
+  }
+  .grid .specimen:nth-child(2n) {
+    border-right: none;
+  }
+  .footer__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .hero {
+    padding: 20vw 6vw 10vw;
+  }
+  .hero::before {
+    display: none;
+  }
+  .hero__index,
+  .hero__name,
+  .hero__statement,
+  .hero__meta {
+    padding-left: 0;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .grid .specimen {
+    border-right: none !important;
+  }
+  .footer__grid {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+}
