@@ -112,36 +112,49 @@
     { t: 0.88, side: 1 }
   ];
   var FUZZ_SPAN = 0.07;
+  var FUZZ_LOOPS = 2.2;
 
-  function fuzzyFilamentPath() {
-    var top = YARN.top, bottom = YARN.bottom, cx = YARN.cx;
-    var steps = 220;
-    var pts = [];
-    for (var i = 0; i <= steps; i++) {
-      var t = i / steps;
-      var y = lerp(top, bottom, t);
-      var cluster = null;
-      for (var c = 0; c < FUZZ_CLUSTERS.length; c++) {
-        var cl = FUZZ_CLUSTERS[c];
-        if (Math.abs(t - cl.t) <= FUZZ_SPAN / 2) { cluster = cl; break; }
-      }
-      var x;
-      if (cluster) {
-        var lt = (t - (cluster.t - FUZZ_SPAN / 2)) / FUZZ_SPAN;
-        var loops = 2.2;
-        var angle = lt * Math.PI * 2 * loops + cluster.t * 40;
-        // radius breathes once per revolution (reads as distinct loops)
-        // plus a small high-frequency wobble on top for fuzz, not scribble
-        var rr = 10 * (0.55 + 0.45 * Math.sin(lt * Math.PI * loops + cluster.t * 10))
-               + 1.1 * Math.sin(lt * Math.PI * 9 + cluster.t * 7);
-        x = cx + cluster.side * 26 + rr * Math.cos(angle);
-        y = y + rr * Math.sin(angle) * 0.48;
-      } else {
-        x = cx + Math.sin(t * 46 + 1.3) * 1.6 + Math.sin(t * 17 + 4.1) * 1.1;
-      }
-      pts.push(x.toFixed(2) + ',' + y.toFixed(2));
+  // Local angle/position for the fuzzy filament at parameter t (0..1).
+  // Shared by the path sampler and the depth (front/back) function below,
+  // so the two stay in lockstep.
+  function fuzzyClusterAt(t) {
+    for (var c = 0; c < FUZZ_CLUSTERS.length; c++) {
+      var cl = FUZZ_CLUSTERS[c];
+      if (Math.abs(t - cl.t) <= FUZZ_SPAN / 2) return cl;
     }
-    return 'M' + pts.join(' L');
+    return null;
+  }
+
+  function fuzzySample(t) {
+    var cx = YARN.cx;
+    var y = lerp(YARN.top, YARN.bottom, t);
+    var cluster = fuzzyClusterAt(t);
+    var x;
+    if (cluster) {
+      var lt = (t - (cluster.t - FUZZ_SPAN / 2)) / FUZZ_SPAN;
+      var angle = lt * Math.PI * 2 * FUZZ_LOOPS + cluster.t * 40;
+      // radius breathes once per revolution (reads as distinct loops)
+      // plus a small high-frequency wobble on top for fuzz, not scribble
+      var rr = 10 * (0.55 + 0.45 * Math.sin(lt * Math.PI * FUZZ_LOOPS + cluster.t * 10))
+             + 1.1 * Math.sin(lt * Math.PI * 9 + cluster.t * 7);
+      x = cx + cluster.side * 26 + rr * Math.cos(angle);
+      y = y + rr * Math.sin(angle) * 0.48;
+    } else {
+      x = cx + Math.sin(t * 46 + 1.3) * 1.6 + Math.sin(t * 17 + 4.1) * 1.1;
+    }
+    return [x, y];
+  }
+
+  // cos-sign of the same angle used above: >=0 means this stretch of the
+  // filament is nearer the viewer than the core (render in front of it),
+  // <0 means it's on the far side (render behind it). Straight stretches
+  // between clusters aren't wrapping around anything, so they stay front.
+  function fuzzyDepth(t) {
+    var cluster = fuzzyClusterAt(t);
+    if (!cluster) return 1;
+    var lt = (t - (cluster.t - FUZZ_SPAN / 2)) / FUZZ_SPAN;
+    var angle = lt * Math.PI * 2 * FUZZ_LOOPS + cluster.t * 40;
+    return Math.cos(angle);
   }
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
@@ -149,6 +162,38 @@
     var el = document.createElementNS(SVG_NS, tag);
     for (var k in attrs) el.setAttribute(k, attrs[k]);
     return el;
+  }
+
+  // Splits t in [0,1] into runs where sign(fn(t)) stays constant — used to
+  // find where a strand/wrap crosses from front to behind (or back again).
+  function computeSignRanges(fn, steps) {
+    steps = steps || 500;
+    var ranges = [];
+    var prevT = 0;
+    var prevFront = fn(0) >= 0;
+    for (var i = 1; i <= steps; i++) {
+      var t = i / steps;
+      var front = fn(t) >= 0;
+      if (front !== prevFront) {
+        ranges.push({ t0: prevT, t1: t, front: prevFront });
+        prevT = t;
+        prevFront = front;
+      }
+    }
+    ranges.push({ t0: prevT, t1: 1, front: prevFront });
+    return ranges;
+  }
+
+  // Builds a path 'd' string sampling sampleFn(t) -> [x,y] across [t0,t1].
+  function arcPath(sampleFn, t0, t1, minPoints) {
+    var n = Math.max(minPoints || 4, Math.round((t1 - t0) * 260));
+    var parts = [];
+    for (var i = 0; i <= n; i++) {
+      var t = t0 + (t1 - t0) * (i / n);
+      var p = sampleFn(t);
+      parts.push(p[0].toFixed(2) + ',' + p[1].toFixed(2));
+    }
+    return 'M' + parts.join(' L');
   }
 
   /* ---------------------------------------------------
@@ -199,21 +244,47 @@
 
   function buildPlied(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
-    var a = svgEl('path', {
-      d: wavePath({ amp: 0, freq: 2.4, phase: 0 }),
-      fill: 'none', stroke: 'var(--ink)', 'stroke-width': 5,
-      'stroke-linecap': 'round', class: 'js-strand-a'
+    var freq = 2.4, finalAmp = 13, duration = 1100;
+    var colorA = 'var(--ink)', colorB = 'var(--petrol-bright)';
+
+    function angleA(t) { return 2 * Math.PI * freq * t; }
+    function sampleStrand(strand, t, amp) {
+      var angle = strand === 'A' ? angleA(t) : angleA(t) + Math.PI;
+      var y = lerp(YARN.top, YARN.bottom, t);
+      var x = YARN.cx + amp * Math.sin(angle);
+      return [x, y];
+    }
+
+    // B is exactly opposite phase to A, so at any point exactly one of
+    // them is nearer the viewer. That strand paints on top for this run.
+    var ranges = computeSignRanges(function (t) { return Math.cos(angleA(t)); });
+
+    var segs = ranges.map(function (r) {
+      var backStrand = r.front ? 'B' : 'A';
+      var frontStrand = r.front ? 'A' : 'B';
+      var backEl = svgEl('path', {
+        fill: 'none', stroke: backStrand === 'A' ? colorA : colorB,
+        'stroke-width': 5, 'stroke-linecap': 'round'
+      });
+      var frontEl = svgEl('path', {
+        fill: 'none', stroke: frontStrand === 'A' ? colorA : colorB,
+        'stroke-width': 5, 'stroke-linecap': 'round'
+      });
+      svg.appendChild(backEl);
+      svg.appendChild(frontEl);
+      return { t0: r.t0, t1: r.t1, backStrand: backStrand, frontStrand: frontStrand, backEl: backEl, frontEl: frontEl };
     });
-    var b = svgEl('path', {
-      d: wavePath({ amp: 0, freq: 2.4, phase: Math.PI }),
-      fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 5,
-      'stroke-linecap': 'round', class: 'js-strand-b'
-    });
-    svg.appendChild(a); svg.appendChild(b);
+
+    function render(amp) {
+      segs.forEach(function (seg) {
+        seg.backEl.setAttribute('d', arcPath(function (t) { return sampleStrand(seg.backStrand, t, amp); }, seg.t0, seg.t1));
+        seg.frontEl.setAttribute('d', arcPath(function (t) { return sampleStrand(seg.frontStrand, t, amp); }, seg.t0, seg.t1));
+      });
+    }
+    render(0);
     stage.appendChild(svg);
 
-    var duration = 1100, freq = 2.4, finalAmp = 13, raf = null;
-
+    var raf = null;
     return {
       duration: duration,
       play: function () {
@@ -222,8 +293,7 @@
         function frame(now) {
           var t = Math.min(1, (now - start) / duration);
           var amp = lerp(0, finalAmp, easeInOutCubic(t));
-          a.setAttribute('d', wavePath({ amp: amp, freq: freq, phase: 0 }));
-          b.setAttribute('d', wavePath({ amp: amp, freq: freq, phase: Math.PI }));
+          render(amp);
           if (t < 1) raf = requestAnimationFrame(frame);
         }
         raf = requestAnimationFrame(frame);
@@ -237,14 +307,35 @@
       d: 'M60,34 L60,226', fill: 'none', stroke: 'var(--ink-dim)',
       'stroke-width': 14, 'stroke-linecap': 'round', class: 'js-core'
     });
-    var wrap = svgEl('path', {
-      d: wavePath({ amp: 15, freq: 5.5 }), fill: 'none',
-      stroke: 'var(--petrol-bright)', 'stroke-width': 3.5,
-      'stroke-linecap': 'round', class: 'js-wrap'
+
+    var freq = 5.5, amp = 15;
+    function angle(t) { return 2 * Math.PI * freq * t; }
+    function sample(t) {
+      var y = lerp(YARN.top, YARN.bottom, t);
+      var x = YARN.cx + amp * Math.sin(angle(t));
+      return [x, y];
+    }
+    // Same helix-depth logic as the wrap texture below: cos >= 0 means
+    // this stretch of the wrap is nearer the viewer than the core.
+    var ranges = computeSignRanges(function (t) { return Math.cos(angle(t)); });
+    var wrapDuration = 900, wrapDelay = 300;
+
+    var segs = ranges.map(function (r) {
+      var el = svgEl('path', {
+        d: arcPath(sample, r.t0, r.t1),
+        fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 3.5,
+        'stroke-linecap': 'round'
+      });
+      return { el: el, t0: r.t0, t1: r.t1, front: r.front };
     });
-    svg.appendChild(core); svg.appendChild(wrap);
+
+    // behind the core first, then the core itself, then the segments that
+    // pass in front of it — so the wrap visibly alternates over/under
+    segs.forEach(function (s) { if (!s.front) svg.appendChild(s.el); });
+    svg.appendChild(core);
+    segs.forEach(function (s) { if (s.front) svg.appendChild(s.el); });
+    segs.forEach(function (s) { resetDraw(s.el); });
     stage.appendChild(svg);
-    resetDraw(wrap);
 
     return {
       duration: 1250,
@@ -252,8 +343,12 @@
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
-        resetDraw(wrap);
-        playDraw(wrap, 900, 300);
+        segs.forEach(function (s) {
+          resetDraw(s.el);
+          var delay = wrapDelay + s.t0 * wrapDuration;
+          var dur = Math.max(60, (s.t1 - s.t0) * wrapDuration);
+          playDraw(s.el, dur, delay);
+        });
       }
     };
   }
@@ -284,18 +379,28 @@
       'stroke-width': 11, 'stroke-linecap': 'round', class: 'js-core'
     });
 
-    var wrap = svgEl('path', {
-      d: fuzzyFilamentPath(), fill: 'none',
-      stroke: 'var(--petrol-bright)', 'stroke-width': 2.2,
-      'stroke-linecap': 'round', 'stroke-linejoin': 'round',
-      class: 'js-wrap', filter: 'url(#' + filterId + ')'
+    svg.appendChild(defs);
+
+    var wrapDuration = 950, wrapDelay = 300;
+    var ranges = computeSignRanges(fuzzyDepth, 600);
+
+    var segs = ranges.map(function (r) {
+      var el = svgEl('path', {
+        d: arcPath(fuzzySample, r.t0, r.t1),
+        fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 2.2,
+        'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+        filter: 'url(#' + filterId + ')'
+      });
+      return { el: el, t0: r.t0, t1: r.t1, front: r.front };
     });
 
-    svg.appendChild(defs);
+    // behind the core first, then the core, then the segments in front —
+    // matters mainly inside each tangle, where the loop crosses itself
+    segs.forEach(function (s) { if (!s.front) svg.appendChild(s.el); });
     svg.appendChild(core);
-    svg.appendChild(wrap);
+    segs.forEach(function (s) { if (s.front) svg.appendChild(s.el); });
+    segs.forEach(function (s) { resetDraw(s.el); });
     stage.appendChild(svg);
-    resetDraw(wrap);
 
     // Jitters the turbulence seed/frequency while the wrap draws on, so the
     // fuzzy texture visibly trembles as it travels the path — settles back
@@ -324,9 +429,13 @@
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
-        resetDraw(wrap);
-        playDraw(wrap, 950, 300);
-        shake(300 + 950);
+        segs.forEach(function (s) {
+          resetDraw(s.el);
+          var delay = wrapDelay + s.t0 * wrapDuration;
+          var dur = Math.max(60, (s.t1 - s.t0) * wrapDuration);
+          playDraw(s.el, dur, delay);
+        });
+        shake(wrapDelay + wrapDuration);
       }
     };
   }
