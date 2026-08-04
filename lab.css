@@ -147,7 +147,7 @@
 }
 
 .js-direction-letter {
-  font-family: 'Shantell Sans', var(--mono);
+  font-family: 'Montserrat', var(--mono);
   font-weight: 700;
   font-size: 150px;
   fill: var(--ink);
