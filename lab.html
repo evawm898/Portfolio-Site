@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab — Eva Maskalenko</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body id="top">
+
+<header class="project-header">
+  <a href="index.html" class="project-header__back">&larr; Index</a>
+  <div class="project-header__index">Lab &mdash; unlisted</div>
+</header>
+
+<main class="lab-main">
+
+  <div class="lab-intro">
+    <p class="lab-intro__text">Working sandbox, not linked from the live site or any nav menu. Each piece below lives in its own named section &mdash; reference it by heading or slug when it's ready to move into the real site.</p>
+  </div>
+
+  <!-- ============================================================
+       COMPONENT: Yarn Construction
+       slug: yarn-construction
+  ============================================================= -->
+  <section id="yarn-construction" class="lab-section" data-lab-section>
+    <div class="section-label">
+      <span class="section-label__number">#yarn-construction</span>
+      <h2 class="section-label__title">Yarn Construction</h2>
+    </div>
+    <p class="lab-section__desc">Four structural approaches to yarn assembly. Plays automatically once, the first time it scrolls into view &mdash; after that, hover a type to replay it on its own.</p>
+
+    <div class="yarn-grid" data-yarn-grid>
+
+      <div class="yarn-panel" data-yarn="single">
+        <div class="yarn-panel__stage" data-yarn-stage></div>
+        <div class="yarn-panel__label" data-yarn-label>Single Yarn</div>
+        <div class="yarn-panel__caption">Unplied strand</div>
+      </div>
+
+      <div class="yarn-panel" data-yarn="plied">
+        <div class="yarn-panel__stage" data-yarn-stage></div>
+        <div class="yarn-panel__label" data-yarn-label>Plied Yarn</div>
+        <div class="yarn-panel__caption">Two strands, twisted</div>
+      </div>
+
+      <div class="yarn-panel" data-yarn="core-spun">
+        <div class="yarn-panel__stage" data-yarn-stage></div>
+        <div class="yarn-panel__label" data-yarn-label>Core-Spun Yarn</div>
+        <div class="yarn-panel__caption">Spandex core, wrapped</div>
+      </div>
+
+      <div class="yarn-panel" data-yarn="drawn-covered">
+        <div class="yarn-panel__stage" data-yarn-stage></div>
+        <div class="yarn-panel__label" data-yarn-label>Drawn Covered Yarn</div>
+        <div class="yarn-panel__caption">Filament, air-covered</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Add the next lab component below this line. Wrap it in its
+       own <section id="your-slug" class="lab-section"> so it can
+       be referenced by name later.
+  ============================================================= -->
+  <div class="lab-more-note">More components land here as they're built.</div>
+
+</main>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------------------------------------------------
+     geometry helpers
+  --------------------------------------------------- */
+  var YARN = { top: 34, bottom: 226, cx: 60 };
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  function wavePath(opts) {
+    var amp = opts.amp, freq = opts.freq, phase = opts.phase || 0, n = opts.n || 56;
+    var pts = [];
+    for (var i = 0; i <= n; i++) {
+      var t = i / n;
+      var y = lerp(YARN.top, YARN.bottom, t);
+      var x = YARN.cx + amp * Math.sin(2 * Math.PI * freq * t + phase);
+      pts.push(x.toFixed(2) + ',' + y.toFixed(2));
+    }
+    return 'M' + pts.join(' L');
+  }
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(SVG_NS, tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  /* ---------------------------------------------------
+     stroke-dasharray / dashoffset draw-on helpers
+  --------------------------------------------------- */
+  function resetDraw(path) {
+    var len = path.dataset.len;
+    if (!len) { len = path.getTotalLength(); path.dataset.len = len; }
+    path.style.transition = 'none';
+    path.style.strokeDasharray = len + ' ' + len;
+    path.style.strokeDashoffset = len;
+    path.getBoundingClientRect(); // force reflow so the next transition isn't skipped
+    path.style.transition = '';
+  }
+
+  function playDraw(path, duration, delay) {
+    path.style.transition = 'stroke-dashoffset ' + duration + 'ms cubic-bezier(.4,.1,.2,1) ' + (delay || 0) + 'ms';
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { path.style.strokeDashoffset = '0'; });
+    });
+  }
+
+  /* ---------------------------------------------------
+     panel builders — each returns { play(), duration }
+  --------------------------------------------------- */
+  var uid = 0;
+
+  function buildSingle(stage) {
+    var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
+    var strand = svgEl('path', {
+      d: wavePath({ amp: 10, freq: 0.9 }),
+      fill: 'none', stroke: 'var(--ink)', 'stroke-width': 6,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      class: 'js-strand'
+    });
+    svg.appendChild(strand);
+    stage.appendChild(svg);
+
+    return {
+      duration: 700,
+      play: function () {
+        strand.classList.remove('is-settling');
+        strand.getBoundingClientRect();
+        strand.classList.add('is-settling');
+      }
+    };
+  }
+
+  function buildPlied(stage) {
+    var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
+    var a = svgEl('path', {
+      d: wavePath({ amp: 0, freq: 2.4, phase: 0 }),
+      fill: 'none', stroke: 'var(--ink)', 'stroke-width': 5,
+      'stroke-linecap': 'round', class: 'js-strand-a'
+    });
+    var b = svgEl('path', {
+      d: wavePath({ amp: 0, freq: 2.4, phase: Math.PI }),
+      fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 5,
+      'stroke-linecap': 'round', class: 'js-strand-b'
+    });
+    svg.appendChild(a); svg.appendChild(b);
+    stage.appendChild(svg);
+
+    var duration = 1100, freq = 2.4, finalAmp = 13, raf = null;
+
+    return {
+      duration: duration,
+      play: function () {
+        if (raf) cancelAnimationFrame(raf);
+        var start = performance.now();
+        function frame(now) {
+          var t = Math.min(1, (now - start) / duration);
+          var amp = lerp(0, finalAmp, easeInOutCubic(t));
+          a.setAttribute('d', wavePath({ amp: amp, freq: freq, phase: 0 }));
+          b.setAttribute('d', wavePath({ amp: amp, freq: freq, phase: Math.PI }));
+          if (t < 1) raf = requestAnimationFrame(frame);
+        }
+        raf = requestAnimationFrame(frame);
+      }
+    };
+  }
+
+  function buildCoreSpun(stage) {
+    var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
+    var core = svgEl('path', {
+      d: 'M60,34 L60,226', fill: 'none', stroke: 'var(--ink-dim)',
+      'stroke-width': 14, 'stroke-linecap': 'round', class: 'js-core'
+    });
+    var wrap = svgEl('path', {
+      d: wavePath({ amp: 15, freq: 5.5 }), fill: 'none',
+      stroke: 'var(--petrol-bright)', 'stroke-width': 3.5,
+      'stroke-linecap': 'round', class: 'js-wrap'
+    });
+    svg.appendChild(core); svg.appendChild(wrap);
+    stage.appendChild(svg);
+    resetDraw(wrap);
+
+    return {
+      duration: 1250,
+      play: function () {
+        core.classList.remove('is-appearing');
+        core.getBoundingClientRect();
+        core.classList.add('is-appearing');
+        resetDraw(wrap);
+        playDraw(wrap, 900, 300);
+      }
+    };
+  }
+
+  function buildDrawnCovered(stage) {
+    uid++;
+    var clipId = 'wrapReveal-' + uid;
+    var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
+
+    var core = svgEl('path', {
+      d: 'M60,34 L60,226', fill: 'none', stroke: 'var(--ink-dim)',
+      'stroke-width': 11, 'stroke-linecap': 'round', class: 'js-core'
+    });
+
+    var wrapD = wavePath({ amp: 19, freq: 3.1, phase: 0.3 });
+
+    // A dashed stroke can't be "drawn on" with dashoffset directly — the
+    // pattern just shifts phase, it doesn't reveal length. So the reveal
+    // is done with a clipPath: a solid draw-on path acts as a mask, and
+    // the actual dashed line is only visible where that mask has drawn.
+    var defs = svgEl('defs', {});
+    var clipPath = svgEl('clipPath', { id: clipId, clipPathUnits: 'userSpaceOnUse' });
+    var mask = svgEl('path', {
+      d: wrapD, fill: 'none', stroke: '#000',
+      'stroke-width': 8, 'stroke-linecap': 'round', class: 'js-wrap-mask'
+    });
+    clipPath.appendChild(mask);
+    defs.appendChild(clipPath);
+
+    var wrapGroup = svgEl('g', { 'clip-path': 'url(#' + clipId + ')' });
+    var wrapVisible = svgEl('path', {
+      d: wrapD, fill: 'none', stroke: 'var(--petrol-bright)',
+      'stroke-width': 3, 'stroke-linecap': 'round',
+      'stroke-dasharray': '5 4', opacity: '0.85'
+    });
+    wrapGroup.appendChild(wrapVisible);
+
+    svg.appendChild(defs);
+    svg.appendChild(core);
+    svg.appendChild(wrapGroup);
+    stage.appendChild(svg);
+    resetDraw(mask);
+
+    return {
+      duration: 1350,
+      play: function () {
+        core.classList.remove('is-appearing');
+        core.getBoundingClientRect();
+        core.classList.add('is-appearing');
+        resetDraw(mask);
+        playDraw(mask, 1050, 300);
+      }
+    };
+  }
+
+  /* ---------------------------------------------------
+     wire up panels
+  --------------------------------------------------- */
+  var BUILDERS = {
+    'single': buildSingle,
+    'plied': buildPlied,
+    'core-spun': buildCoreSpun,
+    'drawn-covered': buildDrawnCovered
+  };
+  var ORDER = ['single', 'plied', 'core-spun', 'drawn-covered'];
+
+  var grid = document.querySelector('[data-yarn-grid]');
+  if (!grid) return;
+
+  var controllers = {};
+  var playing = {};
+  var hasAutoPlayed = false;
+
+  var panels = grid.querySelectorAll('.yarn-panel');
+  panels.forEach(function (panel) {
+    var type = panel.dataset.yarn;
+    var stage = panel.querySelector('[data-yarn-stage]');
+    controllers[type] = BUILDERS[type](stage);
+  });
+
+  function play(type) {
+    if (playing[type]) return;
+    var panel = grid.querySelector('[data-yarn="' + type + '"]');
+    var label = panel.querySelector('[data-yarn-label]');
+    var controller = controllers[type];
+
+    playing[type] = true;
+    panel.classList.add('is-playing');
+    label.classList.add('is-active');
+    controller.play();
+
+    setTimeout(function () {
+      playing[type] = false;
+      panel.classList.remove('is-playing');
+      label.classList.remove('is-active');
+    }, controller.duration + 60);
+  }
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting && !hasAutoPlayed) {
+        hasAutoPlayed = true;
+        ORDER.forEach(function (type, i) {
+          setTimeout(function () { play(type); }, i * 150);
+        });
+        io.disconnect();
+      }
+    });
+  }, { threshold: 0.35 });
+  io.observe(grid);
+
+  panels.forEach(function (panel) {
+    panel.addEventListener('mouseenter', function () {
+      if (!hasAutoPlayed) return; // hover-replay only kicks in after the initial autoplay
+      play(panel.dataset.yarn);
+    });
+  });
+
+})();
+</script>
+
+</body>
+</html>
