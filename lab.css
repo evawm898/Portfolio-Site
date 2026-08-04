@@ -147,7 +147,7 @@
 }
 
 .js-direction-letter {
-  font-family: var(--mono);
+  font-family: 'Shantell Sans', var(--mono);
   font-weight: 700;
   font-size: 150px;
   fill: var(--ink);
@@ -155,7 +155,7 @@
 }
 
 .js-direction-letter.is-shown {
-  animation: letterFadeOut 2300ms cubic-bezier(.2,.7,.3,1) both;
+  animation: letterFadeOut 6900ms cubic-bezier(.2,.7,.3,1) both;
 }
 
 /* Opacity only handles the hold + fade-out; the top-down reveal itself is
