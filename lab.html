@@ -574,32 +574,67 @@
     stage.appendChild(svg);
 
     var wrapDuration = 850, wrapDelay = 300;
-    var wipeDuration = 2250, letterDuration = 6900;
-    var wipeRaf = null;
+    var wipeDuration = 2250, holdDuration = 2760;
+    var fadeDuration = 1932, fadeDurationFast = fadeDuration / 2;
+    var wipeRaf = null, fadeTimer = null, isHovering = false;
+
+    function setLetterOpacity(value, duration) {
+      letter.style.transition = 'opacity ' + duration + 'ms ease';
+      letter.getBoundingClientRect(); // force reflow so re-triggers still transition
+      letter.style.opacity = String(value);
+    }
+
+    // Hovering holds the letter open indefinitely; only once the mouse
+    // actually leaves does it fade — at twice the normal fade speed.
+    function scheduleFadeUnlessHovering() {
+      if (fadeTimer) clearTimeout(fadeTimer);
+      fadeTimer = setTimeout(function () {
+        fadeTimer = null;
+        if (!isHovering) setLetterOpacity(0, fadeDuration);
+      }, holdDuration);
+    }
 
     return {
-      duration: wrapDelay + wrapDuration + letterDuration + 60,
+      duration: wrapDelay + wrapDuration + holdDuration + fadeDuration + 60,
       play: function () {
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
         revealLayer(wrap, wrapDuration, wrapDelay);
 
-        letter.classList.remove('is-shown');
+        if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+        letter.style.transition = 'none';
+        letter.style.opacity = '0';
         letter.getBoundingClientRect();
         clipRect.setAttribute('height', 0);
 
         setTimeout(function () {
-          letter.classList.add('is-shown');
+          letter.style.transition = 'none';
+          letter.style.opacity = '1';
+          letter.getBoundingClientRect();
           if (wipeRaf) cancelAnimationFrame(wipeRaf);
           var start = performance.now();
           function frame(now) {
             var t = Math.min(1, (now - start) / wipeDuration);
             clipRect.setAttribute('height', String(260 * easeInOutCubic(t)));
-            if (t < 1) wipeRaf = requestAnimationFrame(frame);
+            if (t < 1) {
+              wipeRaf = requestAnimationFrame(frame);
+            } else if (!isHovering) {
+              scheduleFadeUnlessHovering();
+            }
           }
           wipeRaf = requestAnimationFrame(frame);
         }, wrapDelay + wrapDuration);
+      },
+      onHoverStart: function () {
+        isHovering = true;
+        if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+        setLetterOpacity(1, 200); // bring it back if it was mid-fade
+      },
+      onHoverEnd: function () {
+        isHovering = false;
+        if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+        setLetterOpacity(0, fadeDurationFast);
       }
     };
   }
@@ -756,9 +791,16 @@
     coveredIo.observe(coveredGrid);
 
     coveredItems.forEach(function (item) {
+      var type = item.dataset.covered;
       item.addEventListener('mouseenter', function () {
+        var controller = coveredControllers[type];
+        if (controller.onHoverStart) controller.onHoverStart();
         if (!coveredAutoPlayed) return;
-        playCovered(item.dataset.covered);
+        playCovered(type);
+      });
+      item.addEventListener('mouseleave', function () {
+        var controller = coveredControllers[type];
+        if (controller.onHoverEnd) controller.onHoverEnd();
       });
     });
   }

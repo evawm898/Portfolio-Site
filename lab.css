@@ -146,24 +146,14 @@
   100% { opacity: 1; transform: scaleY(1); }
 }
 
+/* Opacity is driven entirely by JS (inline style + transition) so it can
+   react to hover in real time — hold/fade timing lives in lab.html */
 .js-direction-letter {
   font-family: 'Montserrat', var(--mono);
   font-weight: 700;
   font-size: 150px;
   fill: var(--ink);
   opacity: 0;
-}
-
-.js-direction-letter.is-shown {
-  animation: letterFadeOut 6900ms cubic-bezier(.2,.7,.3,1) both;
-}
-
-/* Opacity only handles the hold + fade-out; the top-down reveal itself is
-   driven by JS directly setting the clip rect's height (see lab.html) */
-@keyframes letterFadeOut {
-  0%   { opacity: 1; }
-  72%  { opacity: 1; }
-  100% { opacity: 0; }
 }
 
 /* ---------------------------------------------------
@@ -213,7 +203,8 @@
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.covered-mini.is-playing {
+.covered-mini.is-playing,
+.covered-mini:hover {
   border-color: var(--line-strong);
   background: var(--black-raised);
 }
@@ -245,7 +236,8 @@
   transition: color 0.2s ease;
 }
 
-.covered-mini__dir.is-active {
+.covered-mini__dir.is-active,
+.covered-mini:hover .covered-mini__dir {
   color: var(--petrol-bright);
   font-weight: 600;
 }
