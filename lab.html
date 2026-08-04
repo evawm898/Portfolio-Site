@@ -134,7 +134,7 @@
         // plus a small high-frequency wobble on top for fuzz, not scribble
         var rr = 10 * (0.55 + 0.45 * Math.sin(lt * Math.PI * loops + cluster.t * 10))
                + 1.1 * Math.sin(lt * Math.PI * 9 + cluster.t * 7);
-        x = cx + cluster.side * 17 + rr * Math.cos(angle);
+        x = cx + cluster.side * 26 + rr * Math.cos(angle);
         y = y + rr * Math.sin(angle) * 0.48;
       } else {
         x = cx + Math.sin(t * 46 + 1.3) * 1.6 + Math.sin(t * 17 + 4.1) * 1.1;
