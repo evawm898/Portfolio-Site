@@ -102,6 +102,44 @@
     return 'M' + pts.join(' L');
   }
 
+  // A mostly-straight filament that snags into a fuzzy tangled knot at a
+  // few points along its length — the "air covered" look of loose fiber
+  // caught in loops, rather than a clean helix.
+  var FUZZ_CLUSTERS = [
+    { t: 0.12, side: -1 },
+    { t: 0.38, side: 1 },
+    { t: 0.63, side: -1 },
+    { t: 0.88, side: 1 }
+  ];
+  var FUZZ_SPAN = 0.07;
+
+  function fuzzyFilamentPath() {
+    var top = YARN.top, bottom = YARN.bottom, cx = YARN.cx;
+    var steps = 220;
+    var pts = [];
+    for (var i = 0; i <= steps; i++) {
+      var t = i / steps;
+      var y = lerp(top, bottom, t);
+      var cluster = null;
+      for (var c = 0; c < FUZZ_CLUSTERS.length; c++) {
+        var cl = FUZZ_CLUSTERS[c];
+        if (Math.abs(t - cl.t) <= FUZZ_SPAN / 2) { cluster = cl; break; }
+      }
+      var x;
+      if (cluster) {
+        var lt = (t - (cluster.t - FUZZ_SPAN / 2)) / FUZZ_SPAN;
+        var angle = lt * Math.PI * 2 * 2.6 + cluster.t * 40;
+        var rr = 11 * (0.4 + 0.6 * Math.abs(Math.sin(lt * Math.PI * 3.2 + cluster.t * 12)));
+        x = cx + cluster.side * 5 + rr * Math.cos(angle);
+        y = y + rr * Math.sin(angle) * 0.5;
+      } else {
+        x = cx + Math.sin(t * 46 + 1.3) * 1.6 + Math.sin(t * 17 + 4.1) * 1.1;
+      }
+      pts.push(x.toFixed(2) + ',' + y.toFixed(2));
+    }
+    return 'M' + pts.join(' L');
+  }
+
   var SVG_NS = 'http://www.w3.org/2000/svg';
   function svgEl(tag, attrs) {
     var el = document.createElementNS(SVG_NS, tag);
@@ -218,51 +256,73 @@
 
   function buildDrawnCovered(stage) {
     uid++;
-    var clipId = 'wrapReveal-' + uid;
+    var filterId = 'fuzzFilter-' + uid;
     var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
+
+    // Fuzzy/hairy stroke texture: turbulence displaces the line's own
+    // rendering, so the reveal (dashoffset) and the fuzz (filter) are
+    // independent and compose naturally.
+    var defs = svgEl('defs', {});
+    var filter = svgEl('filter', { id: filterId, x: '-60%', y: '-60%', width: '220%', height: '220%' });
+    var turbulence = svgEl('feTurbulence', {
+      type: 'fractalNoise', baseFrequency: '0.9 0.4', numOctaves: '2', seed: '3', result: 'noise'
+    });
+    var displace = svgEl('feDisplacementMap', {
+      'in': 'SourceGraphic', in2: 'noise', scale: '2.6',
+      xChannelSelector: 'R', yChannelSelector: 'G'
+    });
+    filter.appendChild(turbulence);
+    filter.appendChild(displace);
+    defs.appendChild(filter);
 
     var core = svgEl('path', {
       d: 'M60,34 L60,226', fill: 'none', stroke: 'var(--ink-dim)',
       'stroke-width': 11, 'stroke-linecap': 'round', class: 'js-core'
     });
 
-    var wrapD = wavePath({ amp: 19, freq: 3.1, phase: 0.3 });
-
-    // A dashed stroke can't be "drawn on" with dashoffset directly — the
-    // pattern just shifts phase, it doesn't reveal length. So the reveal
-    // is done with a clipPath: a solid draw-on path acts as a mask, and
-    // the actual dashed line is only visible where that mask has drawn.
-    var defs = svgEl('defs', {});
-    var clipPath = svgEl('clipPath', { id: clipId, clipPathUnits: 'userSpaceOnUse' });
-    var mask = svgEl('path', {
-      d: wrapD, fill: 'none', stroke: '#000',
-      'stroke-width': 8, 'stroke-linecap': 'round', class: 'js-wrap-mask'
+    var wrap = svgEl('path', {
+      d: fuzzyFilamentPath(), fill: 'none',
+      stroke: 'var(--petrol-bright)', 'stroke-width': 2.2,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      class: 'js-wrap', filter: 'url(#' + filterId + ')'
     });
-    clipPath.appendChild(mask);
-    defs.appendChild(clipPath);
-
-    var wrapGroup = svgEl('g', { 'clip-path': 'url(#' + clipId + ')' });
-    var wrapVisible = svgEl('path', {
-      d: wrapD, fill: 'none', stroke: 'var(--petrol-bright)',
-      'stroke-width': 3, 'stroke-linecap': 'round',
-      'stroke-dasharray': '5 4', opacity: '0.85'
-    });
-    wrapGroup.appendChild(wrapVisible);
 
     svg.appendChild(defs);
     svg.appendChild(core);
-    svg.appendChild(wrapGroup);
+    svg.appendChild(wrap);
     stage.appendChild(svg);
-    resetDraw(mask);
+    resetDraw(wrap);
+
+    // Jitters the turbulence seed/frequency while the wrap draws on, so the
+    // fuzzy texture visibly trembles as it travels the path — settles back
+    // to a resting texture once the reveal finishes.
+    var shakeTimer = null;
+    function shake(duration) {
+      if (shakeTimer) clearInterval(shakeTimer);
+      var elapsed = 0, step = 90;
+      shakeTimer = setInterval(function () {
+        elapsed += step;
+        turbulence.setAttribute('seed', String(Math.floor(Math.random() * 1000)));
+        turbulence.setAttribute('baseFrequency',
+          (0.75 + Math.random() * 0.35).toFixed(2) + ' ' + (0.3 + Math.random() * 0.25).toFixed(2));
+        if (elapsed >= duration) {
+          clearInterval(shakeTimer);
+          shakeTimer = null;
+          turbulence.setAttribute('seed', '3');
+          turbulence.setAttribute('baseFrequency', '0.9 0.4');
+        }
+      }, step);
+    }
 
     return {
-      duration: 1350,
+      duration: 1300,
       play: function () {
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
-        resetDraw(mask);
-        playDraw(mask, 1050, 300);
+        resetDraw(wrap);
+        playDraw(wrap, 950, 300);
+        shake(300 + 950);
       }
     };
   }
