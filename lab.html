@@ -539,16 +539,35 @@
     svg.appendChild(core);
     appendGroup(svg, wrap.segs, true);
     wrap.segs.forEach(function (s) { resetDraw(s.el); });
+
+    // Once the wrap finishes, the twist direction's own letter flashes
+    // over the diagram — a direct "this is what S/Z looks like" callout,
+    // skewed to lean the same way the twist does.
+    var skew = dir >= 0 ? -14 : 14;
+    var letter = svgEl('text', {
+      x: 60, y: 130, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+      class: 'js-flash-letter',
+      transform: 'translate(60,130) skewX(' + skew + ') translate(-60,-130)'
+    });
+    letter.textContent = dir >= 0 ? 'Z' : 'S';
+    svg.appendChild(letter);
+
     stage.appendChild(svg);
 
-    var wrapDuration = 850, wrapDelay = 300;
+    var wrapDuration = 850, wrapDelay = 300, flashDuration = 750;
     return {
-      duration: wrapDelay + wrapDuration + 60,
+      duration: wrapDelay + wrapDuration + flashDuration + 60,
       play: function () {
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
         revealLayer(wrap, wrapDuration, wrapDelay);
+
+        letter.classList.remove('is-flashing');
+        letter.getBoundingClientRect();
+        setTimeout(function () {
+          letter.classList.add('is-flashing');
+        }, wrapDelay + wrapDuration);
       }
     };
   }

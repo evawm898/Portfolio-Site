@@ -146,6 +146,30 @@
   100% { opacity: 1; transform: scaleY(1); }
 }
 
+.js-flash-letter {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 168px;
+  fill: var(--petrol-bright);
+  opacity: 0;
+  paint-order: stroke;
+  stroke: var(--black);
+  stroke-width: 3px;
+}
+
+.js-flash-letter.is-flashing {
+  animation: letterFlash 750ms ease-out both;
+}
+
+@keyframes letterFlash {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  30%  { opacity: 0.1; }
+  46%  { opacity: 1; }
+  68%  { opacity: 0.08; }
+  100% { opacity: 0; }
+}
+
 /* ---------------------------------------------------
    Covered yarn — twist direction (SCY / DCY)
 --------------------------------------------------- */
