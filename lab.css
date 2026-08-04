@@ -147,6 +147,99 @@
 }
 
 /* ---------------------------------------------------
+   Covered yarn — twist direction (SCY / DCY)
+--------------------------------------------------- */
+
+.covered-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.covered-panel {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 2.5rem 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.covered-grid .covered-panel:last-child {
+  border-right: none;
+}
+
+.covered-panel__label {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  margin-bottom: 2rem;
+}
+
+.covered-mini-row {
+  display: flex;
+  gap: 2.5rem;
+  justify-content: center;
+}
+
+.covered-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.covered-mini.is-playing {
+  border-color: var(--line-strong);
+  background: var(--black-raised);
+}
+
+.covered-mini__stage {
+  width: 100%;
+  max-width: 74px;
+  aspect-ratio: 120 / 260;
+}
+
+.covered-mini--wide .covered-mini__stage {
+  max-width: 110px;
+}
+
+.covered-mini__stage svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.covered-mini__dir {
+  margin-top: 1rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  transition: color 0.2s ease;
+}
+
+.covered-mini__dir.is-active {
+  color: var(--petrol-bright);
+  font-weight: 600;
+}
+
+.covered-panel__caption {
+  margin-top: 1.75rem;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ---------------------------------------------------
    Responsive
 --------------------------------------------------- */
 
@@ -167,6 +260,12 @@
     grid-template-columns: 1fr;
   }
   .yarn-grid .yarn-panel {
+    border-right: none !important;
+  }
+  .covered-grid {
+    grid-template-columns: 1fr;
+  }
+  .covered-grid .covered-panel {
     border-right: none !important;
   }
 }

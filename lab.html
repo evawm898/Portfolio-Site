@@ -68,6 +68,48 @@
   </section>
 
   <!-- ============================================================
+       COMPONENT: Covered Yarn — Twist Direction
+       slug: covered-yarn-twist
+  ============================================================= -->
+  <section id="covered-yarn-twist" class="lab-section" data-lab-section>
+    <div class="section-label">
+      <span class="section-label__number">#covered-yarn-twist</span>
+      <h2 class="section-label__title">Covered Yarn &mdash; Twist Direction</h2>
+    </div>
+    <p class="lab-section__desc">Single covered yarn (SCY) in both twist directions, and double covered yarn (DCY), where the inner layer wraps Z before the outer layer wraps S over it. Plays once on scroll into view; hover a diagram to replay it.</p>
+
+    <div class="covered-grid" data-covered-grid>
+
+      <div class="covered-panel" data-covered-panel="scy">
+        <div class="covered-panel__label">SCY</div>
+        <div class="covered-mini-row">
+          <div class="covered-mini" data-covered="scy-s">
+            <div class="covered-mini__stage" data-covered-stage></div>
+            <div class="covered-mini__dir" data-covered-dir>S</div>
+          </div>
+          <div class="covered-mini" data-covered="scy-z">
+            <div class="covered-mini__stage" data-covered-stage></div>
+            <div class="covered-mini__dir" data-covered-dir>Z</div>
+          </div>
+        </div>
+        <div class="covered-panel__caption">SCY is Single Covered Yarn</div>
+      </div>
+
+      <div class="covered-panel" data-covered-panel="dcy">
+        <div class="covered-panel__label">DCY</div>
+        <div class="covered-mini-row covered-mini-row--single">
+          <div class="covered-mini covered-mini--wide" data-covered="dcy">
+            <div class="covered-mini__stage" data-covered-stage></div>
+            <div class="covered-mini__dir" data-covered-dir>Z &rarr; S</div>
+          </div>
+        </div>
+        <div class="covered-panel__caption">DCY is Double Covered Yarn</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
        Add the next lab component below this line. Wrap it in its
        own <section id="your-slug" class="lab-section"> so it can
        be referenced by name later.
@@ -441,6 +483,111 @@
   }
 
   /* ---------------------------------------------------
+     covered yarn (SCY / DCY) — shared wrap-layer helpers
+  --------------------------------------------------- */
+
+  // One spiral wrap layer around the core: freq/amp shape it, dir flips
+  // the twist direction (+1 / -1 reads as Z / S — see buildScyMini/buildDcy).
+  function buildWrapLayer(opts) {
+    var freq = opts.freq, amp = opts.amp, dir = opts.dir || 1, phase = opts.phase || 0;
+    function angle(t) { return dir * 2 * Math.PI * freq * t + phase; }
+    function sample(t) {
+      var y = lerp(YARN.top, YARN.bottom, t);
+      var x = YARN.cx + amp * Math.sin(angle(t));
+      return [x, y];
+    }
+    var ranges = computeSignRanges(function (t) { return Math.cos(angle(t)); });
+    var segs = ranges.map(function (r) {
+      var el = svgEl('path', {
+        d: arcPath(sample, r.t0, r.t1),
+        fill: 'none', stroke: opts.color, 'stroke-width': opts.width,
+        'stroke-linecap': 'round'
+      });
+      return { el: el, t0: r.t0, t1: r.t1, front: r.front };
+    });
+    return { segs: segs };
+  }
+
+  function appendGroup(svg, segs, wantFront) {
+    segs.forEach(function (s) { if (s.front === wantFront) svg.appendChild(s.el); });
+  }
+
+  function revealLayer(layer, duration, baseDelay) {
+    layer.segs.forEach(function (s) {
+      resetDraw(s.el);
+      var delay = baseDelay + s.t0 * duration;
+      var dur = Math.max(60, (s.t1 - s.t0) * duration);
+      playDraw(s.el, dur, delay);
+    });
+  }
+
+  function makeCore(width) {
+    return svgEl('path', {
+      d: 'M60,34 L60,226', fill: 'none', stroke: 'var(--ink-dim)',
+      'stroke-width': width, 'stroke-linecap': 'round', class: 'js-core'
+    });
+  }
+
+  // Single covered yarn, one direction — same shape as the core-spun
+  // component above, parameterized so the S/Z pair can share this.
+  function buildScyMini(stage, dir) {
+    var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
+    var core = makeCore(14);
+    var wrap = buildWrapLayer({ freq: 5.5, amp: 15, dir: dir, color: 'var(--petrol-bright)', width: 3.5 });
+
+    appendGroup(svg, wrap.segs, false);
+    svg.appendChild(core);
+    appendGroup(svg, wrap.segs, true);
+    wrap.segs.forEach(function (s) { resetDraw(s.el); });
+    stage.appendChild(svg);
+
+    var wrapDuration = 850, wrapDelay = 300;
+    return {
+      duration: wrapDelay + wrapDuration + 60,
+      play: function () {
+        core.classList.remove('is-appearing');
+        core.getBoundingClientRect();
+        core.classList.add('is-appearing');
+        revealLayer(wrap, wrapDuration, wrapDelay);
+      }
+    };
+  }
+
+  // Double covered yarn: an inner Z-twist layer wraps first, then an outer
+  // S-twist layer wraps over both the core and the finished inner layer.
+  function buildDcy(stage) {
+    var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
+    var core = makeCore(10);
+    var inner = buildWrapLayer({ freq: 6.5, amp: 9, dir: 1, color: 'var(--petrol)', width: 2.4 });
+    var outer = buildWrapLayer({ freq: 3.4, amp: 17, dir: -1, color: 'var(--petrol-bright)', width: 3.2 });
+
+    // furthest back to nearest: outer-back, inner-back, core, inner-front, outer-front
+    appendGroup(svg, outer.segs, false);
+    appendGroup(svg, inner.segs, false);
+    svg.appendChild(core);
+    appendGroup(svg, inner.segs, true);
+    appendGroup(svg, outer.segs, true);
+
+    inner.segs.forEach(function (s) { resetDraw(s.el); });
+    outer.segs.forEach(function (s) { resetDraw(s.el); });
+    stage.appendChild(svg);
+
+    var innerDuration = 750, innerDelay = 300, gap = 150, outerDuration = 900;
+    var outerDelay = innerDelay + innerDuration + gap;
+
+    return {
+      duration: outerDelay + outerDuration + 60,
+      play: function () {
+        core.classList.remove('is-appearing');
+        core.getBoundingClientRect();
+        core.classList.add('is-appearing');
+        revealLayer(inner, innerDuration, innerDelay);
+        revealLayer(outer, outerDuration, outerDelay);
+      }
+    };
+  }
+
+  /* ---------------------------------------------------
      wire up panels
   --------------------------------------------------- */
   var BUILDERS = {
@@ -502,6 +649,68 @@
       play(panel.dataset.yarn);
     });
   });
+
+  /* ---------------------------------------------------
+     wire up covered-yarn (SCY / DCY) panels
+  --------------------------------------------------- */
+  var coveredGrid = document.querySelector('[data-covered-grid]');
+  if (coveredGrid) {
+    var COVERED_BUILDERS = {
+      'scy-s': function (stage) { return buildScyMini(stage, -1); },
+      'scy-z': function (stage) { return buildScyMini(stage, 1); },
+      'dcy': buildDcy
+    };
+    var COVERED_ORDER = ['scy-s', 'scy-z', 'dcy'];
+
+    var coveredControllers = {};
+    var coveredPlaying = {};
+    var coveredAutoPlayed = false;
+
+    var coveredItems = coveredGrid.querySelectorAll('[data-covered]');
+    coveredItems.forEach(function (item) {
+      var type = item.dataset.covered;
+      var stage = item.querySelector('[data-covered-stage]');
+      coveredControllers[type] = COVERED_BUILDERS[type](stage);
+    });
+
+    function playCovered(type) {
+      if (coveredPlaying[type]) return;
+      var item = coveredGrid.querySelector('[data-covered="' + type + '"]');
+      var dirLabel = item.querySelector('[data-covered-dir]');
+      var controller = coveredControllers[type];
+
+      coveredPlaying[type] = true;
+      item.classList.add('is-playing');
+      dirLabel.classList.add('is-active');
+      controller.play();
+
+      setTimeout(function () {
+        coveredPlaying[type] = false;
+        item.classList.remove('is-playing');
+        dirLabel.classList.remove('is-active');
+      }, controller.duration + 60);
+    }
+
+    var coveredIo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && !coveredAutoPlayed) {
+          coveredAutoPlayed = true;
+          COVERED_ORDER.forEach(function (type, i) {
+            setTimeout(function () { playCovered(type); }, i * 200);
+          });
+          coveredIo.disconnect();
+        }
+      });
+    }, { threshold: 0.35 });
+    coveredIo.observe(coveredGrid);
+
+    coveredItems.forEach(function (item) {
+      item.addEventListener('mouseenter', function () {
+        if (!coveredAutoPlayed) return;
+        playCovered(item.dataset.covered);
+      });
+    });
+  }
 
 })();
 </script>
