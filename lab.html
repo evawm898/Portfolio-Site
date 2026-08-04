@@ -531,6 +531,7 @@
   // Single covered yarn, one direction — same shape as the core-spun
   // component above, parameterized so the S/Z pair can share this.
   function buildScyMini(stage, dir) {
+    uid++;
     var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
     var core = makeCore(14);
     var wrap = buildWrapLayer({ freq: 5.5, amp: 15, dir: dir, color: 'var(--petrol-bright)', width: 3.5 });
@@ -540,13 +541,28 @@
     appendGroup(svg, wrap.segs, true);
     wrap.segs.forEach(function (s) { resetDraw(s.el); });
 
-    // Once the wrap finishes, the twist direction's own letter flashes
+    // Once the wrap finishes, the twist direction's own letter appears
     // over the diagram — a direct "this is what S/Z looks like" callout,
-    // skewed to lean the same way the twist does.
+    // skewed to lean the same way the twist does. Its fill is a diagonal
+    // hatch (same lean as the twist) rather than a flat color, so the
+    // glyph itself reads as fiber/thread rather than plain type.
+    var patternId = 'yarnHatch-' + uid;
+    var hatchAngle = dir >= 0 ? 45 : -45;
+    var defs = svgEl('defs', {});
+    var pattern = svgEl('pattern', {
+      id: patternId, patternUnits: 'userSpaceOnUse',
+      width: 7, height: 7, patternTransform: 'rotate(' + hatchAngle + ')'
+    });
+    pattern.appendChild(svgEl('rect', { width: 7, height: 7, fill: 'var(--petrol)' }));
+    pattern.appendChild(svgEl('line', { x1: 0, y1: 0, x2: 0, y2: 7, stroke: 'var(--petrol-bright)', 'stroke-width': 3 }));
+    defs.appendChild(pattern);
+    svg.appendChild(defs);
+
     var skew = dir >= 0 ? -14 : 14;
     var letter = svgEl('text', {
       x: 60, y: 130, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-      class: 'js-flash-letter',
+      class: 'js-direction-letter',
+      fill: 'url(#' + patternId + ')',
       transform: 'translate(60,130) skewX(' + skew + ') translate(-60,-130)'
     });
     letter.textContent = dir >= 0 ? 'Z' : 'S';
@@ -554,19 +570,19 @@
 
     stage.appendChild(svg);
 
-    var wrapDuration = 850, wrapDelay = 300, flashDuration = 750;
+    var wrapDuration = 850, wrapDelay = 300, letterDuration = 1300;
     return {
-      duration: wrapDelay + wrapDuration + flashDuration + 60,
+      duration: wrapDelay + wrapDuration + letterDuration + 60,
       play: function () {
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
         revealLayer(wrap, wrapDuration, wrapDelay);
 
-        letter.classList.remove('is-flashing');
+        letter.classList.remove('is-shown');
         letter.getBoundingClientRect();
         setTimeout(function () {
-          letter.classList.add('is-flashing');
+          letter.classList.add('is-shown');
         }, wrapDelay + wrapDuration);
       }
     };
