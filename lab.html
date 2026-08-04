@@ -516,41 +516,6 @@
     return { segs: segs };
   }
 
-  // Smooth eased interpolation through explicit (u, x) keyframes, u in
-  // [0,1]. Used to trace an actual letter skeleton rather than a sine.
-  function interpKeyframes(u, kf) {
-    if (u <= kf[0][0]) return kf[0][1];
-    if (u >= kf[kf.length - 1][0]) return kf[kf.length - 1][1];
-    for (var i = 0; i < kf.length - 1; i++) {
-      if (u >= kf[i][0] && u <= kf[i + 1][0]) {
-        var lt = (u - kf[i][0]) / (kf[i + 1][0] - kf[i][0]);
-        var eased = lt * lt * (3 - 2 * lt);
-        return lerp(kf[i][1], kf[i + 1][1], eased);
-      }
-    }
-    return kf[kf.length - 1][1];
-  }
-
-  // Letter skeletons as (local progress, x offset) keyframes, top to
-  // bottom. Z approximates its bars as steep-but-short diagonals (this
-  // system can only draw curves that are single-valued in y). S is
-  // naturally top-to-bottom already, so its curve is exact.
-  var Z_SHAPE = [[0, -0.3], [0.11, 1], [0.22, 1], [0.55, -1], [0.83, -1], [0.94, 0.95], [1, 0.3]];
-  var S_SHAPE = [[0, 0.25], [0.18, 0.95], [0.37, 0], [0.63, -0.95], [0.82, -0.2], [1, 0.15]];
-
-  // 0 -> 1 -> 0 with a flat plateau at 1 (only the outer `rampFraction` of
-  // halfWidth eases in/out) — a single peaked bump would only ever reach
-  // full weight for an instant, never giving the letter shape a clean,
-  // uncontaminated stretch to read clearly in.
-  function bump(t, center, halfWidth, rampFraction) {
-    var d = Math.abs(t - center);
-    if (d > halfWidth) return 0;
-    var ramp = halfWidth * (rampFraction == null ? 0.3 : rampFraction);
-    if (d <= halfWidth - ramp) return 1;
-    var u = (d - (halfWidth - ramp)) / ramp;
-    return 0.5 * (1 + Math.cos(u * Math.PI));
-  }
-
   function appendGroup(svg, segs, wantFront) {
     segs.forEach(function (s) { if (s.front === wantFront) svg.appendChild(s.el); });
   }
@@ -571,60 +536,42 @@
     });
   }
 
-  // Single covered yarn, one direction. The wrap is the same coil the
-  // whole way down, but partway through it morphs — briefly — from its
-  // regular sine into an explicit S or Z skeleton, bigger and bolder,
-  // then eases back into the regular coil. Drawn along the yarn as one
-  // continuous stroke, not a separate letter sitting on top of it.
+  // Single covered yarn, one direction: a plain coil around the core,
+  // and once it finishes, a bold solid S/Z fades in on top of it (and
+  // fades back out) to call out the twist direction.
   function buildScyMini(stage, dir) {
     var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
     var core = makeCore(14);
-
-    var freq = 5.5;
-    var baseAmp = 15, letterScale = 38;
-    var baseWidth = 3.5, letterWidth = 7.5;
-    var letterCenter = 0.5, letterHalf = 0.17;
-    var letterRamp = 0.22; // fraction of letterHalf spent easing in/out
-    var shape = dir >= 0 ? Z_SHAPE : S_SHAPE;
-
-    function angle(t) { return dir * 2 * Math.PI * freq * t; }
-    function weight(t) { return bump(t, letterCenter, letterHalf, letterRamp); }
-    function sampleX(t) {
-      var w = weight(t);
-      var sineX = baseAmp * Math.sin(angle(t));
-      if (w <= 0) return sineX;
-      var u = (t - (letterCenter - letterHalf)) / (2 * letterHalf);
-      var letterX = letterScale * interpKeyframes(u, shape);
-      return lerp(sineX, letterX, w);
-    }
-    // Inside the letter's core plateau, force it to render as a single
-    // unbroken stroke (front) instead of weaving through the core — a
-    // bold uninterrupted brushstroke, matching the reference letters.
-    function depthFn(t) {
-      if (weight(t) > 0.9) return 1;
-      return Math.cos(angle(t));
-    }
-
-    var wrap = buildWrapLayer({
-      freq: freq, dir: dir, color: 'var(--petrol-bright)',
-      sampleX: sampleX, depthFn: depthFn,
-      width: function (t) { return baseWidth + weight(t) * (letterWidth - baseWidth); }
-    });
+    var wrap = buildWrapLayer({ freq: 5.5, amp: 15, dir: dir, color: 'var(--petrol-bright)', width: 3.5 });
 
     appendGroup(svg, wrap.segs, false);
     svg.appendChild(core);
     appendGroup(svg, wrap.segs, true);
     wrap.segs.forEach(function (s) { resetDraw(s.el); });
+
+    var letter = svgEl('text', {
+      x: 60, y: 130, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+      class: 'js-direction-letter'
+    });
+    letter.textContent = dir >= 0 ? 'Z' : 'S';
+    svg.appendChild(letter);
+
     stage.appendChild(svg);
 
-    var wrapDuration = 1050, wrapDelay = 300;
+    var wrapDuration = 850, wrapDelay = 300, letterDuration = 1300;
     return {
-      duration: wrapDelay + wrapDuration + 60,
+      duration: wrapDelay + wrapDuration + letterDuration + 60,
       play: function () {
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
         revealLayer(wrap, wrapDuration, wrapDelay);
+
+        letter.classList.remove('is-shown');
+        letter.getBoundingClientRect();
+        setTimeout(function () {
+          letter.classList.add('is-shown');
+        }, wrapDelay + wrapDuration);
       }
     };
   }
