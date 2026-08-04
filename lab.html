@@ -549,16 +549,34 @@
     appendGroup(svg, wrap.segs, true);
     wrap.segs.forEach(function (s) { resetDraw(s.el); });
 
+    // Top-down wipe reveal via an SVG clipPath rect, its height driven
+    // directly by rAF (CSS clip-path percentages/transforms on an SVG
+    // <text> proved unreliable to animate in testing — this is fully
+    // JS-controlled instead). The letter's own opacity, via CSS, only
+    // handles the hold + fade-out at the end.
+    uid++;
+    var clipId = 'letterWipe-' + uid;
+    var defs = svgEl('defs', {});
+    var clipPath = svgEl('clipPath', { id: clipId, clipPathUnits: 'userSpaceOnUse' });
+    var clipRect = svgEl('rect', { x: 0, y: 0, width: 120, height: 0 });
+    clipPath.appendChild(clipRect);
+    defs.appendChild(clipPath);
+    svg.appendChild(defs);
+
     var letter = svgEl('text', {
       x: 60, y: 130, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-      class: 'js-direction-letter'
+      class: 'js-direction-letter',
+      'clip-path': 'url(#' + clipId + ')'
     });
     letter.textContent = dir >= 0 ? 'Z' : 'S';
     svg.appendChild(letter);
 
     stage.appendChild(svg);
 
-    var wrapDuration = 850, wrapDelay = 300, letterDuration = 1300;
+    var wrapDuration = 850, wrapDelay = 300;
+    var wipeDuration = 420, letterDuration = 1300;
+    var wipeRaf = null;
+
     return {
       duration: wrapDelay + wrapDuration + letterDuration + 60,
       play: function () {
@@ -569,8 +587,18 @@
 
         letter.classList.remove('is-shown');
         letter.getBoundingClientRect();
+        clipRect.setAttribute('height', 0);
+
         setTimeout(function () {
           letter.classList.add('is-shown');
+          if (wipeRaf) cancelAnimationFrame(wipeRaf);
+          var start = performance.now();
+          function frame(now) {
+            var t = Math.min(1, (now - start) / wipeDuration);
+            clipRect.setAttribute('height', String(260 * easeInOutCubic(t)));
+            if (t < 1) wipeRaf = requestAnimationFrame(frame);
+          }
+          wipeRaf = requestAnimationFrame(frame);
         }, wrapDelay + wrapDuration);
       }
     };

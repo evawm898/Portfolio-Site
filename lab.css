@@ -147,9 +147,9 @@
 }
 
 .js-direction-letter {
-  font-family: var(--serif);
+  font-family: var(--mono);
   font-weight: 700;
-  font-size: 168px;
+  font-size: 150px;
   fill: var(--ink);
   opacity: 0;
   paint-order: stroke;
@@ -158,13 +158,13 @@
 }
 
 .js-direction-letter.is-shown {
-  animation: letterReveal 1300ms cubic-bezier(.2,.7,.3,1) both;
+  animation: letterFadeOut 1300ms cubic-bezier(.2,.7,.3,1) both;
 }
 
-/* Quick fade in, a settled hold, then a slower fade back out — no pulsing */
-@keyframes letterReveal {
-  0%   { opacity: 0; }
-  18%  { opacity: 1; }
+/* Opacity only handles the hold + fade-out; the top-down reveal itself is
+   driven by JS directly setting the clip rect's height (see lab.html) */
+@keyframes letterFadeOut {
+  0%   { opacity: 1; }
   72%  { opacity: 1; }
   100% { opacity: 0; }
 }
