@@ -152,13 +152,10 @@
   font-size: 150px;
   fill: var(--ink);
   opacity: 0;
-  paint-order: stroke;
-  stroke: var(--black);
-  stroke-width: 4px;
 }
 
 .js-direction-letter.is-shown {
-  animation: letterFadeOut 1300ms cubic-bezier(.2,.7,.3,1) both;
+  animation: letterFadeOut 2300ms cubic-bezier(.2,.7,.3,1) both;
 }
 
 /* Opacity only handles the hold + fade-out; the top-down reveal itself is
