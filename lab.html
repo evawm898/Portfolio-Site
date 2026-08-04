@@ -488,24 +488,67 @@
 
   // One spiral wrap layer around the core: freq/amp shape it, dir flips
   // the twist direction (+1 / -1 reads as Z / S — see buildScyMini/buildDcy).
+  // amp and width may be constants or functions of t. Pass sampleX(t) to
+  // override the horizontal offset entirely (e.g. to morph part of the
+  // coil into an explicit letter shape) — depth/front-back still comes
+  // from the underlying sine's angle, so the weave stays consistent.
   function buildWrapLayer(opts) {
-    var freq = opts.freq, amp = opts.amp, dir = opts.dir || 1, phase = opts.phase || 0;
+    var freq = opts.freq, dir = opts.dir || 1, phase = opts.phase || 0;
+    var ampFn = typeof opts.amp === 'function' ? opts.amp : function () { return opts.amp; };
+    var widthFn = typeof opts.width === 'function' ? opts.width : function () { return opts.width; };
     function angle(t) { return dir * 2 * Math.PI * freq * t + phase; }
+    var xFn = opts.sampleX || function (t) { return ampFn(t) * Math.sin(angle(t)); };
+    var depthFn = opts.depthFn || function (t) { return Math.cos(angle(t)); };
     function sample(t) {
       var y = lerp(YARN.top, YARN.bottom, t);
-      var x = YARN.cx + amp * Math.sin(angle(t));
-      return [x, y];
+      return [YARN.cx + xFn(t), y];
     }
-    var ranges = computeSignRanges(function (t) { return Math.cos(angle(t)); });
+    var ranges = computeSignRanges(depthFn);
     var segs = ranges.map(function (r) {
+      var midT = (r.t0 + r.t1) / 2;
       var el = svgEl('path', {
         d: arcPath(sample, r.t0, r.t1),
-        fill: 'none', stroke: opts.color, 'stroke-width': opts.width,
+        fill: 'none', stroke: opts.color, 'stroke-width': widthFn(midT),
         'stroke-linecap': 'round'
       });
       return { el: el, t0: r.t0, t1: r.t1, front: r.front };
     });
     return { segs: segs };
+  }
+
+  // Smooth eased interpolation through explicit (u, x) keyframes, u in
+  // [0,1]. Used to trace an actual letter skeleton rather than a sine.
+  function interpKeyframes(u, kf) {
+    if (u <= kf[0][0]) return kf[0][1];
+    if (u >= kf[kf.length - 1][0]) return kf[kf.length - 1][1];
+    for (var i = 0; i < kf.length - 1; i++) {
+      if (u >= kf[i][0] && u <= kf[i + 1][0]) {
+        var lt = (u - kf[i][0]) / (kf[i + 1][0] - kf[i][0]);
+        var eased = lt * lt * (3 - 2 * lt);
+        return lerp(kf[i][1], kf[i + 1][1], eased);
+      }
+    }
+    return kf[kf.length - 1][1];
+  }
+
+  // Letter skeletons as (local progress, x offset) keyframes, top to
+  // bottom. Z approximates its bars as steep-but-short diagonals (this
+  // system can only draw curves that are single-valued in y). S is
+  // naturally top-to-bottom already, so its curve is exact.
+  var Z_SHAPE = [[0, -0.3], [0.11, 1], [0.22, 1], [0.55, -1], [0.83, -1], [0.94, 0.95], [1, 0.3]];
+  var S_SHAPE = [[0, 0.25], [0.18, 0.95], [0.37, 0], [0.63, -0.95], [0.82, -0.2], [1, 0.15]];
+
+  // 0 -> 1 -> 0 with a flat plateau at 1 (only the outer `rampFraction` of
+  // halfWidth eases in/out) — a single peaked bump would only ever reach
+  // full weight for an instant, never giving the letter shape a clean,
+  // uncontaminated stretch to read clearly in.
+  function bump(t, center, halfWidth, rampFraction) {
+    var d = Math.abs(t - center);
+    if (d > halfWidth) return 0;
+    var ramp = halfWidth * (rampFraction == null ? 0.3 : rampFraction);
+    if (d <= halfWidth - ramp) return 1;
+    var u = (d - (halfWidth - ramp)) / ramp;
+    return 0.5 * (1 + Math.cos(u * Math.PI));
   }
 
   function appendGroup(svg, segs, wantFront) {
@@ -528,62 +571,60 @@
     });
   }
 
-  // Single covered yarn, one direction — same shape as the core-spun
-  // component above, parameterized so the S/Z pair can share this.
+  // Single covered yarn, one direction. The wrap is the same coil the
+  // whole way down, but partway through it morphs — briefly — from its
+  // regular sine into an explicit S or Z skeleton, bigger and bolder,
+  // then eases back into the regular coil. Drawn along the yarn as one
+  // continuous stroke, not a separate letter sitting on top of it.
   function buildScyMini(stage, dir) {
-    uid++;
     var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
     var core = makeCore(14);
-    var wrap = buildWrapLayer({ freq: 5.5, amp: 15, dir: dir, color: 'var(--petrol-bright)', width: 3.5 });
+
+    var freq = 5.5;
+    var baseAmp = 15, letterScale = 38;
+    var baseWidth = 3.5, letterWidth = 7.5;
+    var letterCenter = 0.5, letterHalf = 0.17;
+    var letterRamp = 0.22; // fraction of letterHalf spent easing in/out
+    var shape = dir >= 0 ? Z_SHAPE : S_SHAPE;
+
+    function angle(t) { return dir * 2 * Math.PI * freq * t; }
+    function weight(t) { return bump(t, letterCenter, letterHalf, letterRamp); }
+    function sampleX(t) {
+      var w = weight(t);
+      var sineX = baseAmp * Math.sin(angle(t));
+      if (w <= 0) return sineX;
+      var u = (t - (letterCenter - letterHalf)) / (2 * letterHalf);
+      var letterX = letterScale * interpKeyframes(u, shape);
+      return lerp(sineX, letterX, w);
+    }
+    // Inside the letter's core plateau, force it to render as a single
+    // unbroken stroke (front) instead of weaving through the core — a
+    // bold uninterrupted brushstroke, matching the reference letters.
+    function depthFn(t) {
+      if (weight(t) > 0.9) return 1;
+      return Math.cos(angle(t));
+    }
+
+    var wrap = buildWrapLayer({
+      freq: freq, dir: dir, color: 'var(--petrol-bright)',
+      sampleX: sampleX, depthFn: depthFn,
+      width: function (t) { return baseWidth + weight(t) * (letterWidth - baseWidth); }
+    });
 
     appendGroup(svg, wrap.segs, false);
     svg.appendChild(core);
     appendGroup(svg, wrap.segs, true);
     wrap.segs.forEach(function (s) { resetDraw(s.el); });
-
-    // Once the wrap finishes, the twist direction's own letter appears
-    // over the diagram — a direct "this is what S/Z looks like" callout,
-    // skewed to lean the same way the twist does. Its fill is a diagonal
-    // hatch (same lean as the twist) rather than a flat color, so the
-    // glyph itself reads as fiber/thread rather than plain type.
-    var patternId = 'yarnHatch-' + uid;
-    var hatchAngle = dir >= 0 ? 45 : -45;
-    var defs = svgEl('defs', {});
-    var pattern = svgEl('pattern', {
-      id: patternId, patternUnits: 'userSpaceOnUse',
-      width: 7, height: 7, patternTransform: 'rotate(' + hatchAngle + ')'
-    });
-    pattern.appendChild(svgEl('rect', { width: 7, height: 7, fill: 'var(--petrol)' }));
-    pattern.appendChild(svgEl('line', { x1: 0, y1: 0, x2: 0, y2: 7, stroke: 'var(--petrol-bright)', 'stroke-width': 3 }));
-    defs.appendChild(pattern);
-    svg.appendChild(defs);
-
-    var skew = dir >= 0 ? -14 : 14;
-    var letter = svgEl('text', {
-      x: 60, y: 130, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-      class: 'js-direction-letter',
-      fill: 'url(#' + patternId + ')',
-      transform: 'translate(60,130) skewX(' + skew + ') translate(-60,-130)'
-    });
-    letter.textContent = dir >= 0 ? 'Z' : 'S';
-    svg.appendChild(letter);
-
     stage.appendChild(svg);
 
-    var wrapDuration = 850, wrapDelay = 300, letterDuration = 1300;
+    var wrapDuration = 1050, wrapDelay = 300;
     return {
-      duration: wrapDelay + wrapDuration + letterDuration + 60,
+      duration: wrapDelay + wrapDuration + 60,
       play: function () {
         core.classList.remove('is-appearing');
         core.getBoundingClientRect();
         core.classList.add('is-appearing');
         revealLayer(wrap, wrapDuration, wrapDelay);
-
-        letter.classList.remove('is-shown');
-        letter.getBoundingClientRect();
-        setTimeout(function () {
-          letter.classList.add('is-shown');
-        }, wrapDelay + wrapDuration);
       }
     };
   }
