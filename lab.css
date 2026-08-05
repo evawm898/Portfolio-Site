@@ -261,10 +261,13 @@
 
 .venn {
   padding: 0 6vw;
+  display: flex;
+  justify-content: center;
 }
 
 .venn__svg {
   width: 100%;
+  max-width: 460px;
   height: auto;
   display: block;
   overflow: visible;
