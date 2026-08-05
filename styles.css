@@ -18,6 +18,17 @@
   --mono:  "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
+/* On small screens, lighten the muted text tones — the same dimness
+   that reads fine on a desktop display loses too much contrast on
+   mobile. Every rule keys off these two custom properties, so this
+   alone lightens body copy, captions, and labels sitewide. */
+@media (max-width: 600px) {
+  :root {
+    --ink-dim:   #a7afaf;
+    --ink-faint: #7d8686;
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
