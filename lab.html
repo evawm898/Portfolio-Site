@@ -227,6 +227,40 @@
     return ranges;
   }
 
+  // Rendered arc length of sampleFn over [t0,t1] (coarse, a handful of
+  // samples is plenty — only used to size-check slivers, not to draw).
+  function arcLength(sampleFn, t0, t1, steps) {
+    steps = steps || 6;
+    var len = 0, prev = sampleFn(t0);
+    for (var i = 1; i <= steps; i++) {
+      var p = sampleFn(t0 + (t1 - t0) * i / steps);
+      var dx = p[0] - prev[0], dy = p[1] - prev[1];
+      len += Math.sqrt(dx * dx + dy * dy);
+      prev = p;
+    }
+    return len;
+  }
+
+  // A crossing range shorter than ~the stroke width renders as a dot
+  // (round linecap) rather than a visible sliver of coil — fold those
+  // into whichever neighboring range they're smaller than into.
+  function mergeTinySegments(ranges, sampleFn, minPixelLen) {
+    var merged = true;
+    while (merged && ranges.length > 1) {
+      merged = false;
+      for (var j = 0; j < ranges.length; j++) {
+        if (arcLength(sampleFn, ranges[j].t0, ranges[j].t1) < minPixelLen) {
+          if (j === 0) { ranges[1].t0 = ranges[j].t0; }
+          else { ranges[j - 1].t1 = ranges[j].t1; }
+          ranges.splice(j, 1);
+          merged = true;
+          break;
+        }
+      }
+    }
+    return ranges;
+  }
+
   // Builds a path 'd' string sampling sampleFn(t) -> [x,y] across [t0,t1].
   function arcPath(sampleFn, t0, t1, minPoints) {
     var n = Math.max(minPoints || 4, Math.round((t1 - t0) * 260));
@@ -253,7 +287,11 @@
   }
 
   function playDraw(path, duration, delay) {
-    path.style.transition = 'stroke-dashoffset ' + duration + 'ms cubic-bezier(.4,.1,.2,1) ' + (delay || 0) + 'ms';
+    // Fast-start easing: a slow-starting curve here means every segment
+    // lingers at a near-zero drawn length right as it begins, which
+    // (with round linecap) reads as a stray dot rather than a growing
+    // stroke — especially with many short segments revealing at once.
+    path.style.transition = 'stroke-dashoffset ' + duration + 'ms cubic-bezier(.15,.6,.25,1) ' + (delay || 0) + 'ms';
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { path.style.strokeDashoffset = '0'; });
     });
@@ -505,12 +543,18 @@
       return [YARN.cx + xFn(t), y];
     }
     var ranges = computeSignRanges(depthFn);
+    ranges = mergeTinySegments(ranges, sample, 6);
     var segs = ranges.map(function (r) {
       var midT = (r.t0 + r.t1) / 2;
       var el = svgEl('path', {
         d: arcPath(sample, r.t0, r.t1),
         fill: 'none', stroke: opts.color, 'stroke-width': widthFn(midT),
-        'stroke-linecap': 'round'
+        // butt, not round: a hidden (zero-length-dash) segment with a
+        // round linecap still renders as a filled dot — the linecap
+        // itself has radius. Segments meet end-to-end at shared points,
+        // so butt caps at those joints are imperceptible; only the very
+        // top/bottom of the whole coil loses its rounding, which is fine.
+        'stroke-linecap': 'butt'
       });
       return { el: el, t0: r.t0, t1: r.t1, front: r.front };
     });
@@ -645,7 +689,7 @@
   function buildDcy(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
     var core = makeCore(10);
-    var inner = buildWrapLayer({ freq: 8, amp: 9, dir: 1, color: 'var(--petrol)', width: 3.5 });
+    var inner = buildWrapLayer({ freq: 16, amp: 9, dir: 1, color: 'var(--petrol)', width: 3.5 });
     var outer = buildWrapLayer({ freq: 5, amp: 17, dir: -1, color: 'var(--petrol-bright)', width: 4.5 });
 
     // furthest back to nearest: outer-back, inner-back, core, inner-front, outer-front
