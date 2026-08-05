@@ -645,8 +645,8 @@
   function buildDcy(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 120 260', class: 'yarn-panel__svg' });
     var core = makeCore(10);
-    var inner = buildWrapLayer({ freq: 6.5, amp: 9, dir: 1, color: 'var(--petrol)', width: 2.4 });
-    var outer = buildWrapLayer({ freq: 3.4, amp: 17, dir: -1, color: 'var(--petrol-bright)', width: 3.2 });
+    var inner = buildWrapLayer({ freq: 8, amp: 9, dir: 1, color: 'var(--petrol)', width: 3.5 });
+    var outer = buildWrapLayer({ freq: 5, amp: 17, dir: -1, color: 'var(--petrol-bright)', width: 4.5 });
 
     // furthest back to nearest: outer-back, inner-back, core, inner-front, outer-front
     appendGroup(svg, outer.segs, false);
@@ -659,7 +659,7 @@
     outer.segs.forEach(function (s) { resetDraw(s.el); });
     stage.appendChild(svg);
 
-    var innerDuration = 750, innerDelay = 300, gap = 150, outerDuration = 900;
+    var innerDuration = 750, innerDelay = 300, gap = 150, outerDuration = 1800;
     var outerDelay = innerDelay + innerDuration + gap;
 
     return {
