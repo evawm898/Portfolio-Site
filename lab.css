@@ -259,15 +259,41 @@
    Venn diagram — Functional Fibers / E-Textiles / Wearables
 --------------------------------------------------- */
 
-.venn {
+.venn-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem 2.5rem;
   padding: 0 6vw;
+}
+
+.venn-layout .lab-section__desc {
+  padding: 0;
+  margin: 0;
+  max-width: 380px;
+  flex: 1 1 300px;
+}
+
+.venn-layout .venn {
+  padding: 0;
+  flex: 1 1 520px;
+  min-width: 0;
   display: flex;
   justify-content: center;
 }
 
+@media (max-width: 860px) {
+  .venn-layout {
+    flex-direction: column;
+  }
+  .venn-layout .lab-section__desc {
+    max-width: 100%;
+  }
+}
+
 .venn__svg {
   width: 100%;
-  max-width: min(900px, 80vh);
+  max-width: min(1000px, 85vh);
   height: auto;
   display: block;
   overflow: visible;
