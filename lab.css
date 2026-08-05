@@ -293,7 +293,7 @@
 
 .venn__svg {
   width: 100%;
-  max-width: min(1438px, 122.19vh);
+  max-width: min(1500px, 119vh);
   height: auto;
   display: block;
   overflow: visible;
