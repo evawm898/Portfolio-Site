@@ -409,7 +409,10 @@
       var el = svgEl('path', {
         d: arcPath(sample, r.t0, r.t1),
         fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 3.5,
-        'stroke-linecap': 'round'
+        // butt, not round: a hidden segment's dash sits right on the
+        // dasharray pattern's on/off boundary, and round linecap renders
+        // that degenerate zero-length dash as a stray filled dot.
+        'stroke-linecap': 'butt'
       });
       return { el: el, t0: r.t0, t1: r.t1, front: r.front };
     });
@@ -473,7 +476,9 @@
       var el = svgEl('path', {
         d: arcPath(fuzzySample, r.t0, r.t1),
         fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 2.2,
-        'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+        // butt, not round — see buildCoreSpun for why (hidden segments
+        // otherwise render as a stray filled dot)
+        'stroke-linecap': 'butt', 'stroke-linejoin': 'round',
         filter: 'url(#' + filterId + ')'
       });
       return { el: el, t0: r.t0, t1: r.t1, front: r.front };
