@@ -131,6 +131,7 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
   function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
   function wavePath(opts) {
     var amp = opts.amp, freq = opts.freq, phase = opts.phase || 0, n = opts.n || 56;
@@ -616,7 +617,7 @@
           var start = performance.now();
           function frame(now) {
             var t = Math.min(1, (now - start) / wipeDuration);
-            clipRect.setAttribute('height', String(260 * easeInOutCubic(t)));
+            clipRect.setAttribute('height', String(260 * easeOutCubic(t)));
             if (t < 1) {
               wipeRaf = requestAnimationFrame(frame);
             } else if (!isHovering) {
