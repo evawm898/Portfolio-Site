@@ -124,6 +124,10 @@
 (function () {
   'use strict';
 
+  // Touch devices don't have hover, so the hover-to-replay interaction
+  // below never fires there — on those devices, a tap restarts instead.
+  var isTouchDevice = window.matchMedia('(hover: none)').matches;
+
   /* ---------------------------------------------------
      geometry helpers
   --------------------------------------------------- */
@@ -779,6 +783,11 @@
       if (!hasAutoPlayed) return; // hover-replay only kicks in after the initial autoplay
       play(panel.dataset.yarn);
     });
+    panel.addEventListener('click', function () {
+      if (!isTouchDevice) return; // desktop already gets this via hover
+      if (!hasAutoPlayed) return;
+      play(panel.dataset.yarn);
+    });
   });
 
   /* ---------------------------------------------------
@@ -846,6 +855,11 @@
       item.addEventListener('mouseleave', function () {
         var controller = coveredControllers[type];
         if (controller.onHoverEnd) controller.onHoverEnd();
+      });
+      item.addEventListener('click', function () {
+        if (!isTouchDevice) return; // desktop already gets this via hover
+        if (!coveredAutoPlayed) return;
+        playCovered(type);
       });
     });
   }
