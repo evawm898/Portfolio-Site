@@ -958,65 +958,98 @@
   // used to bring pads back on top after a builder adds its own layers.
   function bringToFront(svg, el) { svg.appendChild(el); }
 
+  // Conductive yarn is the one pathway that has to read as knitted-in,
+  // not printed/stitched/bonded on — so unlike the other five panels, its
+  // swatch is a knit lattice of interlocking loops rather than the shared
+  // grid texture. rx/ry are sized so each row overlaps the one above it,
+  // and later rows are appended after (so they paint in front of) earlier
+  // ones — a plain-knit face reads with each course sitting slightly in
+  // front of the course below it.
+  var KNIT_COLS = 7, KNIT_ROWS = 5, KNIT_MID_ROW = 2;
+  var KNIT_COL_W = SWATCH.w / KNIT_COLS, KNIT_ROW_H = SWATCH.h / KNIT_ROWS;
+  var KNIT_RX = KNIT_COL_W * 0.46, KNIT_RY = KNIT_ROW_H * 0.72;
+
+  function knitLoopCenter(col, row) {
+    return [SWATCH.x + KNIT_COL_W * (col + 0.5), SWATCH.y + KNIT_ROW_H * (row + 0.5)];
+  }
+
   function buildConductiveYarn(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var base = buildSwatchBase(svg, { verticals: false });
-
-    // the ordinary yarn row the conductive one will replace
-    var fadeRow = svgEl('line', {
-      x1: SWATCH.x, y1: SWATCH.midY, x2: SWATCH.x + SWATCH.w, y2: SWATCH.midY,
-      stroke: 'var(--ink-faint)', 'stroke-width': 2
+    var frame = svgEl('rect', {
+      x: SWATCH.x, y: SWATCH.y, width: SWATCH.w, height: SWATCH.h, rx: 3,
+      fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5,
+      class: 'circuit-fabric'
     });
-    svg.appendChild(fadeRow);
+    svg.appendChild(frame);
 
-    var amp = 10, freq = 4.2;
-    function sample(t) {
-      var x = lerp(SWATCH.left, SWATCH.right, t);
-      var y = SWATCH.midY + amp * Math.sin(2 * Math.PI * freq * t);
-      return [x, y];
+    var knitGroup = svgEl('g', { class: 'js-knit-zoom' });
+    knitGroup.style.transformBox = 'fill-box';
+    knitGroup.style.transformOrigin = 'center';
+    knitGroup.style.opacity = '0';
+    knitGroup.style.transform = 'scale(0.82)';
+    svg.appendChild(knitGroup);
+
+    var rowsEls = [];
+    for (var row = 0; row < KNIT_ROWS; row++) {
+      var rowEls = [];
+      for (var col = 0; col < KNIT_COLS; col++) {
+        var c = knitLoopCenter(col, row);
+        var el = svgEl('ellipse', {
+          cx: c[0], cy: c[1], rx: KNIT_RX, ry: KNIT_RY,
+          fill: 'var(--black-raised)', stroke: 'var(--ink-dim)', 'stroke-width': 1.6
+        });
+        el.style.transformBox = 'fill-box';
+        el.style.transformOrigin = 'center';
+        knitGroup.appendChild(el);
+        rowEls.push(el);
+      }
+      rowsEls.push(rowEls);
     }
-    function depth(t) { return Math.sin(2 * Math.PI * freq * t); } // >=0 over, <0 under
 
-    var ranges = mergeTinySegments(computeSignRanges(depth, 300), sample, 4);
-    var yarnSegs = ranges.map(function (r) {
-      var el = svgEl('path', {
-        d: arcPath(sample, r.t0, r.t1),
-        fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 5,
-        'stroke-linecap': 'butt', 'stroke-linejoin': 'round'
-      });
-      return { el: el, t0: r.t0, t1: r.t1, front: r.front };
-    });
-
-    var vGroup = svgEl('g', {});
-    base.verticalXs.forEach(function (x) {
-      vGroup.appendChild(svgEl('line', { x1: x, y1: SWATCH.y, x2: x, y2: SWATCH.y + SWATCH.h, stroke: 'var(--line)', 'stroke-width': 0.75, opacity: 0.55 }));
-    });
-
-    // under-segments, then the warp lines, then over-segments, then pads —
-    // so the yarn visibly passes behind/in front of each vertical it crosses
-    yarnSegs.forEach(function (s) { if (!s.front) svg.appendChild(s.el); });
-    svg.appendChild(vGroup);
-    yarnSegs.forEach(function (s) { if (s.front) svg.appendChild(s.el); });
-    bringToFront(svg, base.padLeft);
-    bringToFront(svg, base.padRight);
-    yarnSegs.forEach(function (s) { resetDraw(s.el); });
+    var padLeft = svgEl('circle', { cx: SWATCH.x, cy: SWATCH.midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
+    var padRight = svgEl('circle', { cx: SWATCH.x + SWATCH.w, cy: SWATCH.midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
+    svg.appendChild(padLeft);
+    svg.appendChild(padRight);
     stage.appendChild(svg);
 
-    return {
-      duration: 1400,
-      play: function () {
-        fadeRow.style.transition = 'none';
-        fadeRow.style.opacity = '1';
-        fadeRow.getBoundingClientRect();
-        fadeRow.style.transition = 'opacity 350ms ease';
-        fadeRow.style.opacity = '0.15';
+    var midRowEls = rowsEls[KNIT_MID_ROW];
+    var zoomDuration = 450, zoomToKnitGap = 250, stitchStagger = 130, stitchPop = 320, stitchSettle = 220;
 
-        yarnSegs.forEach(function (s) {
-          resetDraw(s.el);
-          var delay = 380 + s.t0 * 950;
-          var dur = Math.max(60, (s.t1 - s.t0) * 950);
-          playDraw(s.el, dur, delay);
+    return {
+      duration: zoomDuration + zoomToKnitGap + (KNIT_COLS - 1) * stitchStagger + stitchPop + stitchSettle + 100,
+      play: function () {
+        // establishing shot: the whole lattice zooms/fades into view
+        knitGroup.style.transition = 'none';
+        knitGroup.style.opacity = '0';
+        knitGroup.style.transform = 'scale(0.82)';
+        knitGroup.getBoundingClientRect();
+        knitGroup.style.transition = 'opacity ' + zoomDuration + 'ms ease, transform ' + zoomDuration + 'ms cubic-bezier(.2,.7,.3,1.1)';
+        knitGroup.style.opacity = '1';
+        knitGroup.style.transform = 'scale(1)';
+
+        midRowEls.forEach(function (el) {
+          el.style.transition = 'none';
+          el.style.stroke = 'var(--ink-dim)';
+          el.style.strokeWidth = '1.6';
+          el.style.transform = 'scale(1)';
         });
+
+        // then the conductive yarn knits into the middle row, left to right
+        setTimeout(function () {
+          midRowEls.forEach(function (el, i) {
+            setTimeout(function () {
+              el.style.transition = 'stroke ' + stitchPop + 'ms ease, stroke-width ' + stitchPop + 'ms ease, transform ' + stitchPop + 'ms cubic-bezier(.3,1.4,.4,1)';
+              el.getBoundingClientRect();
+              el.style.stroke = 'var(--petrol-bright)';
+              el.style.strokeWidth = '2.2';
+              el.style.transform = 'scale(1.08)';
+              setTimeout(function () {
+                el.style.transition = 'transform ' + stitchSettle + 'ms ease';
+                el.style.transform = 'scale(1)';
+              }, stitchPop);
+            }, i * stitchStagger);
+          });
+        }, zoomDuration + zoomToKnitGap);
       }
     };
   }
