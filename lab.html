@@ -1341,6 +1341,14 @@
           var lenBase = Number(traceBase.dataset.len);
           var lenHi = Number(traceHighlight.dataset.len);
 
+          // Both nozzles (the top-down one and the one on the folded-up
+          // front face) track the identical t every frame, not just the
+          // top one with the front one patched in once at the end — the
+          // front face starts becoming geometrically visible as soon as
+          // the scene begins rotating (well before the camera settles
+          // into the held 3/4 view), so a front nozzle only updated on
+          // pass completion sat frozen at its start-of-pass position for
+          // most of the pan, reading as disconnected from the trace.
           function runPass(fromT, toT, dur, onDone) {
             var start = performance.now();
             if (raf) cancelAnimationFrame(raf);
@@ -1349,6 +1357,7 @@
               var t = fromT + (toT - fromT) * raw;
               var p = sample(t);
               nozzle.setAttribute('transform', 'translate(' + p[0].toFixed(2) + ',' + p[1].toFixed(2) + ')');
+              frontNozzle.setAttribute('transform', 'translate(' + p[0].toFixed(2) + ',112)');
               traceBase.style.strokeDashoffset = String(lenBase * (1 - t));
               traceHighlight.style.strokeDashoffset = String(lenHi * (1 - t));
               if (raw < 1) raf = requestAnimationFrame(frame);
@@ -1361,9 +1370,7 @@
           runPass(0, cutT, passDuration * cutT, function () {
             // 2. the pace slows as the camera pans down and around to the
             // 3/4 view — both run for the same stretch of time, together
-            runPass(cutT, cutT + slowSpan, PAN_STAGE1_DUR + PAN_STAGE2_DUR, function (tNow) {
-              frontNozzle.setAttribute('transform', 'translate(' + sample(tNow)[0].toFixed(2) + ',112)');
-            });
+            runPass(cutT, cutT + slowSpan, PAN_STAGE1_DUR + PAN_STAGE2_DUR);
             panToSideView(scene, cameraGroup, function onHold() {
               // camera has arrived — the needle is caught mid-dispense
               frontBead.style.transition = 'opacity 250ms ease';
