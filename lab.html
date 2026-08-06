@@ -559,7 +559,7 @@
         if (raf) cancelAnimationFrame(raf);
         var start = performance.now();
         function frame(now) {
-          var t = Math.min(1, (now - start) / duration);
+          var t = Math.max(0, Math.min(1, (now - start) / duration));
           var amp = lerp(0, finalAmp, easeInOutCubic(t));
           render(amp);
           if (t < 1) raf = requestAnimationFrame(frame);
@@ -852,7 +852,7 @@
           if (wipeRaf) cancelAnimationFrame(wipeRaf);
           var start = performance.now();
           function frame(now) {
-            var t = Math.min(1, (now - start) / wipeDuration);
+            var t = Math.max(0, Math.min(1, (now - start) / wipeDuration));
             clipRect.setAttribute('height', String(260 * easeOutCubic(t)));
             if (t < 1) {
               wipeRaf = requestAnimationFrame(frame);
@@ -989,43 +989,76 @@
   }
 
   /* ---------------------------------------------------
-     shared "cut to a 3/4 side view" detail insets — printed ink, embedded
+     shared "smooth pan to a 3/4 side view" rig — printed ink, embedded
      wire, and laminated trace each pause mid-sequence to show a
      mechanism the top-down view can't: the nozzle actually touching the
      fabric, the wire sitting inside its channel, the press closing on
-     the layer stack. The main swatch fades down while the inset fades
-     up over it, holds, then reverses.
+     the layer stack. Rather than cutting to a separate inset, the
+     camera itself pans there: two faces (a normal top-down SVG and a
+     thin "front wall" SVG hinged along the fabric's bottom edge) share
+     one CSS 3D space, so rotating that shared scene reads as one
+     continuous move — down to a near-side angle, then around to a 3/4
+     view — instead of a hard cut between two drawings.
   --------------------------------------------------- */
-  function buildSideInset(svg, populate) {
-    var g = svgEl('g', {});
-    g.style.opacity = '0';
-    var panel = svgEl('rect', {
-      x: 46, y: 34, width: 148, height: 72, rx: 4,
-      fill: 'var(--black)', stroke: 'var(--line-strong)', 'stroke-width': 1.25
-    });
-    g.appendChild(panel);
-    var content = svgEl('g', {});
-    g.appendChild(content);
-    populate(content);
-    svg.appendChild(g);
-    return g;
+  function build3DStage(stage) {
+    var stage3d = document.createElement('div');
+    stage3d.className = 'circuit-3d-stage';
+    var scene = document.createElement('div');
+    scene.className = 'circuit-3d-scene';
+    var topFace = document.createElement('div');
+    topFace.className = 'circuit-3d-face circuit-3d-face--top';
+    var frontFace = document.createElement('div');
+    frontFace.className = 'circuit-3d-face circuit-3d-face--front';
+    var topSvg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+    var frontSvg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+    topFace.appendChild(topSvg);
+    frontFace.appendChild(frontSvg);
+    scene.appendChild(topFace);
+    scene.appendChild(frontFace);
+    stage3d.appendChild(scene);
+    stage.appendChild(stage3d);
+    return { topSvg: topSvg, frontSvg: frontSvg, scene: scene };
   }
 
-  // fades the main view down, fades the inset up, holds, then reverses —
-  // calls onDone once the main view is back to full opacity
-  function cutToSideInset(inset, mainGroup, holdDur, fadeDur, onDone) {
-    mainGroup.style.transition = 'opacity ' + fadeDur + 'ms ease';
-    mainGroup.style.opacity = '0.15';
-    inset.style.transition = 'opacity ' + fadeDur + 'ms ease';
-    inset.getBoundingClientRect();
-    inset.style.opacity = '1';
+  var PAN_STAGE1_DUR = 550, PAN_STAGE1_RX = 82;
+  var PAN_STAGE2_DUR = 500, PAN_REST_RX = 58, PAN_REST_RY = -22;
+  var PAN_HOLD = 750, PAN_REVERSE_DUR = 700;
+  var PAN_TOTAL = PAN_STAGE1_DUR + PAN_STAGE2_DUR + PAN_HOLD + PAN_REVERSE_DUR;
+
+  function resetScenePan(scene) {
+    scene.style.transition = 'none';
+    scene.style.transform = 'rotateX(0deg) rotateY(0deg)';
+  }
+
+  // pans from the top-down rest angle down to near-side-on, then around
+  // to a settled 3/4 view (onHold fires once there), holds, then reverses
+  // the whole move — onDone fires once it's flat again
+  // topFace fades down alongside the rotation (not a hard cut — it's
+  // timed to the same rotation) so the front face is never fighting the
+  // top face's opaque fabric rect for the depth sort at near-coplanar
+  // angles; it's back at full opacity by the time the pan reverses home.
+  function panToSideView(scene, topFace, onHold, onDone) {
+    scene.getBoundingClientRect();
+    scene.style.transition = 'transform ' + PAN_STAGE1_DUR + 'ms ease-in-out';
+    scene.style.transform = 'rotateX(' + PAN_STAGE1_RX + 'deg) rotateY(0deg)';
+    topFace.style.transition = 'opacity ' + PAN_STAGE1_DUR + 'ms ease-in-out';
+    topFace.style.opacity = '0.35';
     setTimeout(function () {
-      inset.style.transition = 'opacity ' + fadeDur + 'ms ease';
-      inset.style.opacity = '0';
-      mainGroup.style.transition = 'opacity ' + fadeDur + 'ms ease';
-      mainGroup.style.opacity = '1';
-      if (onDone) setTimeout(onDone, fadeDur);
-    }, fadeDur + holdDur);
+      scene.style.transition = 'transform ' + PAN_STAGE2_DUR + 'ms ease-in-out';
+      scene.style.transform = 'rotateX(' + PAN_REST_RX + 'deg) rotateY(' + PAN_REST_RY + 'deg)';
+      topFace.style.transition = 'opacity ' + PAN_STAGE2_DUR + 'ms ease-in-out';
+      topFace.style.opacity = '0.12';
+      setTimeout(function () {
+        if (onHold) onHold();
+        setTimeout(function () {
+          scene.style.transition = 'transform ' + PAN_REVERSE_DUR + 'ms ease-in-out';
+          scene.style.transform = 'rotateX(0deg) rotateY(0deg)';
+          topFace.style.transition = 'opacity ' + PAN_REVERSE_DUR + 'ms ease-in-out';
+          topFace.style.opacity = '1';
+          setTimeout(function () { if (onDone) onDone(); }, PAN_REVERSE_DUR);
+        }, PAN_HOLD);
+      }, PAN_STAGE2_DUR);
+    }, PAN_STAGE1_DUR);
   }
 
   // Conductive yarn is the one pathway that has to read as knitted-in,
@@ -1153,7 +1186,7 @@
     function wipeRow(clipRect, duration) {
       var start = performance.now();
       function frame(now) {
-        var t = Math.min(1, (now - start) / duration);
+        var t = Math.max(0, Math.min(1, (now - start) / duration));
         clipRect.setAttribute('width', String(SWATCH.w * easeOutCubic(t)));
         if (t < 1) requestAnimationFrame(frame);
       }
@@ -1225,8 +1258,10 @@
   // through the pass we cut to a close side-on inset so the needle
   // actually touching the fabric and dispensing reads unmistakably.
   function buildPrintedInk(stage) {
-    var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var cameraGroup = buildCameraGroup(svg);
+    var faces = build3DStage(stage);
+    var topSvg = faces.topSvg, frontSvg = faces.frontSvg, scene = faces.scene;
+
+    var cameraGroup = buildCameraGroup(topSvg);
     var base = buildSwatchBase(cameraGroup);
 
     // serpentine path, starting and ending exactly on the pads
@@ -1260,22 +1295,23 @@
     bringToFront(cameraGroup, base.padLeft);
     bringToFront(cameraGroup, base.padRight);
 
-    // side-view inset: the needle close on the fabric, actually dispensing
-    var inset = buildSideInset(svg, function (content) {
-      content.appendChild(svgEl('rect', { x: 56, y: 80, width: 128, height: 10, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-      content.appendChild(svgEl('rect', { x: 110, y: 38, width: 20, height: 26, rx: 3, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-      content.appendChild(svgEl('path', { d: 'M116,64 L124,64 L121,80 L119,80 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
-      content.appendChild(svgEl('circle', { cx: 120, cy: 80, r: 3.2, fill: 'var(--petrol-bright)' }));
-    });
+    // front face: the fabric edge-on, with the same dispenser hovering at
+    // whatever x it had reached when the camera panned down to see it
+    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x, y: 112, width: SWATCH.w, height: 8, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    var frontNozzle = svgEl('g', {});
+    frontNozzle.appendChild(svgEl('rect', { x: -7, y: -24, width: 14, height: 18, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    frontNozzle.appendChild(svgEl('path', { d: 'M-3,-6 L3,-6 L1.2,0 L-1.2,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
+    var frontBead = svgEl('circle', { cx: 0, cy: 0, r: 2.6, fill: 'var(--petrol-bright)' });
+    frontNozzle.appendChild(frontBead);
+    frontSvg.appendChild(frontNozzle);
 
-    stage.appendChild(svg);
-
-    var passDuration = 1100, cutT = 0.48;
-    var CUT_FADE = 280, CUT_HOLD = 900, SETTLE_DELAY = 150, SETTLE_DUR = 400;
+    var passDuration = 1100, cutT = 0.42, slowSpan = 0.12;
+    var SETTLE_DELAY = 150, SETTLE_DUR = 400;
     var raf = null;
 
     function resetToStart() {
       resetCamera(cameraGroup);
+      resetScenePan(scene);
       resetDraw(traceBase);
       resetDraw(traceHighlight);
       traceHighlight.style.transition = 'none';
@@ -1284,13 +1320,14 @@
       nozzle.style.opacity = '0';
       var p0 = sample(0);
       nozzle.setAttribute('transform', 'translate(' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) + ')');
-      inset.style.transition = 'none';
-      inset.style.opacity = '0';
+      frontNozzle.setAttribute('transform', 'translate(' + p0[0].toFixed(2) + ',112)');
+      frontBead.style.transition = 'none';
+      frontBead.style.opacity = '0';
     }
     resetToStart();
 
     return {
-      duration: CAMERA_LEAD + passDuration + CUT_FADE * 2 + CUT_HOLD + SETTLE_DELAY + SETTLE_DUR + 150,
+      duration: CAMERA_LEAD + passDuration * cutT + PAN_TOTAL + passDuration * (1 - cutT - slowSpan) + 260 + SETTLE_DELAY + SETTLE_DUR + 150,
       play: function () {
         resetToStart();
         cameraGroup.getBoundingClientRect();
@@ -1304,29 +1341,39 @@
           var lenBase = Number(traceBase.dataset.len);
           var lenHi = Number(traceHighlight.dataset.len);
 
-          function runPass(fromT, toT, onDone) {
+          function runPass(fromT, toT, dur, onDone) {
             var start = performance.now();
-            var dur = passDuration * (toT - fromT);
             if (raf) cancelAnimationFrame(raf);
             function frame(now) {
-              var raw = Math.min(1, (now - start) / dur);
+              var raw = Math.max(0, Math.min(1, (now - start) / dur));
               var t = fromT + (toT - fromT) * raw;
               var p = sample(t);
               nozzle.setAttribute('transform', 'translate(' + p[0].toFixed(2) + ',' + p[1].toFixed(2) + ')');
               traceBase.style.strokeDashoffset = String(lenBase * (1 - t));
               traceHighlight.style.strokeDashoffset = String(lenHi * (1 - t));
               if (raw < 1) raf = requestAnimationFrame(frame);
-              else if (onDone) onDone();
+              else if (onDone) onDone(t);
             }
             raf = requestAnimationFrame(frame);
           }
 
-          // 1. dispense the first part of the pass
-          runPass(0, cutT, function () {
-            // 2. cut to the side view — the needle actually touching down
-            cutToSideInset(inset, cameraGroup, CUT_HOLD, CUT_FADE, function () {
-              // 3. cut back and finish the pass
-              runPass(cutT, 1, function () {
+          // 1. dispense at normal speed
+          runPass(0, cutT, passDuration * cutT, function () {
+            // 2. the pace slows as the camera pans down and around to the
+            // 3/4 view — both run for the same stretch of time, together
+            runPass(cutT, cutT + slowSpan, PAN_STAGE1_DUR + PAN_STAGE2_DUR, function (tNow) {
+              frontNozzle.setAttribute('transform', 'translate(' + sample(tNow)[0].toFixed(2) + ',112)');
+            });
+            panToSideView(scene, cameraGroup, function onHold() {
+              // camera has arrived — the needle is caught mid-dispense
+              frontBead.style.transition = 'opacity 250ms ease';
+              frontBead.getBoundingClientRect();
+              frontBead.style.opacity = '1';
+            }, function onDone() {
+              // 3. pan back, then finish the pass at normal speed
+              frontBead.style.transition = 'opacity 200ms ease';
+              frontBead.style.opacity = '0';
+              runPass(cutT + slowSpan, 1, passDuration * (1 - cutT - slowSpan), function () {
                 nozzle.style.transition = 'opacity 260ms ease';
                 nozzle.style.opacity = '0';
                 setTimeout(function () {
@@ -1473,7 +1520,7 @@
           if (raf) cancelAnimationFrame(raf);
           var start = performance.now();
           function frame(now) {
-            var t = Math.min(1, (now - start) / duration);
+            var t = Math.max(0, Math.min(1, (now - start) / duration));
             var x = lerp(SWATCH.left, SWATCH.right, t);
             var lift = Math.abs(Math.sin(t * Math.PI * stitchCount));
             needle.setAttribute('transform', 'translate(' + x.toFixed(2) + ',' + (SWATCH.midY - lift * 18).toFixed(2) + ')');
@@ -1498,8 +1545,10 @@
   }
 
   function buildEmbeddedWire(stage) {
-    var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var cameraGroup = buildCameraGroup(svg);
+    var faces = build3DStage(stage);
+    var topSvg = faces.topSvg, frontSvg = faces.frontSvg, scene = faces.scene;
+
+    var cameraGroup = buildCameraGroup(topSvg);
     var base = buildSwatchBase(cameraGroup);
 
     var channelTop = svgEl('path', {
@@ -1532,30 +1581,27 @@
     bringToFront(cameraGroup, base.padRight);
     resetCamera(cameraGroup);
 
-    // side-view inset: the wire actually sitting inside the channel,
-    // sandwiched between the two fabric layers that form it
-    var inset = buildSideInset(svg, function (content) {
-      content.appendChild(svgEl('rect', { x: 56, y: 40, width: 128, height: 8, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-      content.appendChild(svgEl('rect', { x: 56, y: 76, width: 128, height: 8, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-      content.appendChild(svgEl('path', { d: 'M64,60 L176,60', stroke: 'var(--ink-dim)', 'stroke-width': 7, 'stroke-linecap': 'round', fill: 'none' }));
-      content.appendChild(svgEl('path', { d: 'M64,60 L176,60', stroke: 'var(--petrol-bright)', 'stroke-width': 2.6, 'stroke-linecap': 'round', fill: 'none' }));
-    });
-    inset.style.transition = 'none';
-    inset.style.opacity = '0';
-
-    stage.appendChild(svg);
-
-    var CUT_FADE = 280, CUT_HOLD = 900;
+    // front face: the wire sandwiched between the two fabric layers that
+    // form its channel, seen edge-on. This face gets its own taller,
+    // zoomed-in viewBox (independent of topSvg's) — the cross-section is
+    // physically thin, so confining it to the same 240x140 frame as the
+    // top-down view left it reading as a near-invisible hairline at the
+    // settled pan angle. A shorter viewBox makes the same content fill
+    // far more of the face.
+    frontSvg.setAttribute('viewBox', '0 0 240 70');
+    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x, y: 8, width: SWATCH.w, height: 16, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x, y: 46, width: SWATCH.w, height: 16, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    frontSvg.appendChild(svgEl('path', { d: 'M' + SWATCH.left + ',35 L' + SWATCH.right + ',35', stroke: 'var(--ink-dim)', 'stroke-width': 16, 'stroke-linecap': 'round', fill: 'none' }));
+    frontSvg.appendChild(svgEl('path', { d: 'M' + SWATCH.left + ',35 L' + SWATCH.right + ',35', stroke: 'var(--petrol-bright)', 'stroke-width': 6, 'stroke-linecap': 'round', fill: 'none' }));
 
     return {
-      duration: CAMERA_LEAD + 1800 + CUT_FADE * 2 + CUT_HOLD + 150,
+      duration: CAMERA_LEAD + 1800 + PAN_TOTAL + 150,
       play: function () {
         resetCamera(cameraGroup);
+        resetScenePan(scene);
         cameraGroup.getBoundingClientRect();
         playCameraZoomIn(cameraGroup);
 
-        inset.style.transition = 'none';
-        inset.style.opacity = '0';
         channelTop.style.transition = 'none';
         channelBottom.style.transition = 'none';
         channelTop.style.opacity = '0';
@@ -1588,9 +1634,9 @@
               channelTop.style.opacity = '0.15';
               channelBottom.style.opacity = '0.15';
 
-              // cut to the side view to show the channel clearly
+              // pan around to the side to show the channel clearly
               setTimeout(function () {
-                cutToSideInset(inset, cameraGroup, CUT_HOLD, CUT_FADE);
+                panToSideView(scene, cameraGroup);
               }, 500);
             }, 750);
           }, 350);
@@ -1600,8 +1646,10 @@
   }
 
   function buildLaminatedTrace(stage) {
-    var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var cameraGroup = buildCameraGroup(svg);
+    var faces = build3DStage(stage);
+    var topSvg = faces.topSvg, frontSvg = faces.frontSvg, scene = faces.scene;
+
+    var cameraGroup = buildCameraGroup(topSvg);
     var base = buildSwatchBase(cameraGroup);
 
     var layerDefs = [
@@ -1629,43 +1677,42 @@
     bringToFront(cameraGroup, base.padRight);
     resetCamera(cameraGroup);
 
-    // side-view inset: the heat press actually closing on the layer stack
-    var inset = buildSideInset(svg, function (content) {
-      content.appendChild(svgEl('rect', { x: 70, y: 57, width: 100, height: 4, fill: 'var(--ink-faint)' }));
-      content.appendChild(svgEl('rect', { x: 70, y: 61, width: 100, height: 3, fill: 'var(--petrol-bright)' }));
-      content.appendChild(svgEl('rect', { x: 70, y: 64, width: 100, height: 4, fill: 'var(--ink-faint)' }));
-      var top = svgEl('rect', { x: 60, y: 26, width: 120, height: 10, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1, class: 'js-platen-top' });
-      var bot = svgEl('rect', { x: 60, y: 84, width: 120, height: 10, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1, class: 'js-platen-bottom' });
-      top.style.transformBox = 'fill-box';
-      bot.style.transformBox = 'fill-box';
-      content.appendChild(top);
-      content.appendChild(bot);
-    });
-    inset.style.transition = 'none';
-    inset.style.opacity = '0';
-    var platenTop = inset.querySelector('.js-platen-top');
-    var platenBottom = inset.querySelector('.js-platen-bottom');
-
-    stage.appendChild(svg);
+    // front face: the heat press closing onto the layer stack, seen from
+    // the side — platens start apart, close until they touch the stack's
+    // edges (not cover it), then release. This face gets its own taller,
+    // zoomed-in viewBox (independent of topSvg's) — the stack is
+    // physically thin, so confining it to the same 240x140 frame as the
+    // top-down view left it reading as a near-invisible hairline at the
+    // settled pan angle. A shorter viewBox makes the same content fill
+    // far more of the face.
+    frontSvg.setAttribute('viewBox', '0 0 240 70');
+    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x + 20, y: 8, width: SWATCH.w - 40, height: 10, fill: 'var(--ink-faint)' }));
+    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x + 20, y: 18, width: SWATCH.w - 40, height: 10, fill: 'var(--petrol-bright)' }));
+    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x + 20, y: 28, width: SWATCH.w - 40, height: 10, fill: 'var(--ink-faint)' }));
+    var platenTop = svgEl('rect', { x: SWATCH.x + 10, y: -10, width: SWATCH.w - 20, height: 10, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
+    var platenBottom = svgEl('rect', { x: SWATCH.x + 10, y: 46, width: SWATCH.w - 20, height: 10, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
+    platenTop.style.transformBox = 'fill-box';
+    platenBottom.style.transformBox = 'fill-box';
+    frontSvg.appendChild(platenTop);
+    frontSvg.appendChild(platenBottom);
 
     var LAYER_STAGGER = 260, LAYER_SETTLE_GAP = 500;
-    var CUT_FADE = 280, PLATEN_CLOSE_WAIT = 280, PLATEN_CLOSE_DUR = 400, PLATEN_HOLD = 500, PLATEN_RELEASE_DUR = 350, RELEASE_TO_FADEOUT = 400;
-    var FRAME_PRESS_WAIT = 260, CROSS_SHOW_DUR = 300, CROSS_HOLD = 650, CROSS_HIDE_DUR = 500;
+    var PLATEN_CLOSE_DUR = 380, PLATEN_HOLD = 200, PLATEN_RELEASE_DUR = 320;
+    var FRAME_PRESS_WAIT = 200, CROSS_SHOW_DUR = 300, CROSS_HOLD = 550, CROSS_HIDE_DUR = 500;
 
     var settleTime = layers.length * LAYER_STAGGER + LAYER_SETTLE_GAP;
-    var cutTotal = PLATEN_CLOSE_WAIT + PLATEN_HOLD + RELEASE_TO_FADEOUT + CUT_FADE + FRAME_PRESS_WAIT + CROSS_SHOW_DUR + CROSS_HOLD + CROSS_HIDE_DUR;
+    var tailTotal = FRAME_PRESS_WAIT + CROSS_SHOW_DUR + CROSS_HOLD + CROSS_HIDE_DUR;
 
     return {
-      duration: CAMERA_LEAD + settleTime + cutTotal + 150,
+      duration: CAMERA_LEAD + settleTime + PAN_TOTAL + tailTotal + 150,
       play: function () {
         resetCamera(cameraGroup);
+        resetScenePan(scene);
         cameraGroup.getBoundingClientRect();
         playCameraZoomIn(cameraGroup);
 
         crossTicks.style.transition = 'none';
         crossTicks.style.opacity = '0';
-        inset.style.transition = 'none';
-        inset.style.opacity = '0';
         platenTop.style.transition = 'none';
         platenTop.style.transform = 'translateY(0)';
         platenBottom.style.transition = 'none';
@@ -1684,54 +1731,39 @@
             }, i * LAYER_STAGGER);
           });
 
-          // cut to the side view right as the press closes on the stack
+          // pan around to the side right as the press closes on the stack
           setTimeout(function () {
-            cameraGroup.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
-            cameraGroup.style.opacity = '0.15';
-            inset.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
-            inset.getBoundingClientRect();
-            inset.style.opacity = '1';
-
-            setTimeout(function () {
+            panToSideView(scene, cameraGroup, function onHold() {
               platenTop.style.transition = 'transform ' + PLATEN_CLOSE_DUR + 'ms cubic-bezier(.4,0,.2,1)';
               platenBottom.style.transition = 'transform ' + PLATEN_CLOSE_DUR + 'ms cubic-bezier(.4,0,.2,1)';
               platenTop.getBoundingClientRect();
               // close to just touch the stack's edges, not cover it — the
               // whole point of this shot is that the layers stay visible
-              platenTop.style.transform = 'translateY(21px)';
-              platenBottom.style.transform = 'translateY(-16px)';
+              platenTop.style.transform = 'translateY(8px)';
+              platenBottom.style.transform = 'translateY(-8px)';
 
               setTimeout(function () {
                 platenTop.style.transition = 'transform ' + PLATEN_RELEASE_DUR + 'ms ease';
                 platenBottom.style.transition = 'transform ' + PLATEN_RELEASE_DUR + 'ms ease';
                 platenTop.style.transform = 'translateY(0)';
                 platenBottom.style.transform = 'translateY(0)';
+              }, PLATEN_CLOSE_DUR + PLATEN_HOLD);
+            }, function onDone() {
+              // back on the main view, give the swatch its own quick
+              // press-pulse to echo what we just saw from the side
+              base.frame.classList.remove('is-pressing');
+              base.frame.getBoundingClientRect();
+              base.frame.classList.add('is-pressing');
 
+              setTimeout(function () {
+                crossTicks.style.transition = 'opacity ' + CROSS_SHOW_DUR + 'ms ease';
+                crossTicks.style.opacity = '1';
                 setTimeout(function () {
-                  inset.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
-                  inset.style.opacity = '0';
-                  cameraGroup.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
-                  cameraGroup.style.opacity = '1';
-
-                  // back on the main view, give the swatch its own quick
-                  // press-pulse to echo what we just saw from the side
-                  setTimeout(function () {
-                    base.frame.classList.remove('is-pressing');
-                    base.frame.getBoundingClientRect();
-                    base.frame.classList.add('is-pressing');
-
-                    setTimeout(function () {
-                      crossTicks.style.transition = 'opacity ' + CROSS_SHOW_DUR + 'ms ease';
-                      crossTicks.style.opacity = '1';
-                      setTimeout(function () {
-                        crossTicks.style.transition = 'opacity ' + CROSS_HIDE_DUR + 'ms ease';
-                        crossTicks.style.opacity = '0';
-                      }, CROSS_HOLD);
-                    }, FRAME_PRESS_WAIT);
-                  }, CUT_FADE);
-                }, RELEASE_TO_FADEOUT);
-              }, PLATEN_HOLD);
-            }, PLATEN_CLOSE_WAIT);
+                  crossTicks.style.transition = 'opacity ' + CROSS_HIDE_DUR + 'ms ease';
+                  crossTicks.style.opacity = '0';
+                }, CROSS_HOLD);
+              }, FRAME_PRESS_WAIT);
+            });
           }, settleTime);
         }, CAMERA_LEAD);
       }
