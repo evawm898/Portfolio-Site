@@ -1128,13 +1128,22 @@
     resetToStart();
 
     function wipeRow(clipRect, duration) {
+      // Guard is scoped to the element itself (not a shared var) because
+      // two independent wipeRow calls run concurrently here (row 1 and
+      // row 0, staggered) -- a single shared raf id would make the
+      // second call's cancel-before-start wrongly kill the first row's
+      // still-running loop instead of only guarding against a re-entrant
+      // call for that same clipRect (e.g. a replay stacking on top of
+      // one already in flight).
+      if (clipRect._wipeRaf) cancelAnimationFrame(clipRect._wipeRaf);
       var start = performance.now();
       function frame(now) {
         var t = Math.max(0, Math.min(1, (now - start) / duration));
         clipRect.setAttribute('width', String(SWATCH.w * easeOutCubic(t)));
-        if (t < 1) requestAnimationFrame(frame);
+        if (t < 1) clipRect._wipeRaf = requestAnimationFrame(frame);
+        else clipRect._wipeRaf = null;
       }
-      requestAnimationFrame(frame);
+      clipRect._wipeRaf = requestAnimationFrame(frame);
     }
 
     var afterZoomIn = 50 + ZOOM_IN_DUR + GAP1;
