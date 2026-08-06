@@ -1700,103 +1700,320 @@
     };
   }
 
+  // =====================================================================
+  // Embedded wire -- self-contained animation module.
+  //
+  // Separate from printed ink's module: doesn't call any of ink's local
+  // helpers, doesn't share any DOM/CSS class with it. Everything this
+  // needs is defined inside buildEmbeddedWire itself.
+  //
+  // Concept: a fabric swatch with two vertical slits cut into it, and a
+  // raised, translucent tunnel spanning the space between them. A wire
+  // travels in a straight line from a pad on the left, through the left
+  // slit, the length of the tunnel, out the right slit, to a pad on the
+  // right.
+  //
+  // Camera: three flat faces -- the fabric/wire base, the tunnel's top
+  // surface, and the tunnel's near-side wall -- share exactly one
+  // rotating parent (`scene`). Each face's own position relative to
+  // `scene` is a fixed, unchanging transform (a translateZ lift for the
+  // tunnel top, a translateZ+rotateX(90deg) fold for the tunnel wall);
+  // the only thing that ever changes over time is `scene`'s own
+  // rotateX/rotateY, written directly every requestAnimationFrame tick.
+  // Since every face's position is fixed relative to that one shared
+  // ancestor, they rotate together by construction -- there's no
+  // mechanism by which one could drift relative to another, because
+  // none of them has its own independent rotation to drift with.
+  //
+  // The sequence is four explicit, sequential rAF-driven phases (tilt
+  // around world X to a side view, rotate 45deg further around world Y,
+  // hold, then reverse the same two phases in the same order) rather
+  // than one blended diagonal move -- matching "rotate around X... then
+  // continue rotating around Y" as two distinct, readable stages. Each
+  // phase is its own small rAF loop over a single rotating number
+  // (reusing one generic animateValue helper); nothing is ever handed
+  // to a CSS `transition`.
   function buildEmbeddedWire(stage) {
-    var faces = build3DStage(stage);
-    var topSvg = faces.topSvg, frontSvg = faces.frontSvg, scene = faces.scene;
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    function el(tag, attrs) {
+      var e = document.createElementNS(SVG_NS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+    function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
-    var cameraGroup = buildCameraGroup(topSvg);
-    var base = buildSwatchBase(cameraGroup);
+    // ---- geometry: 240x140 canvas, swatch centered within it so the
+    // scene's default rotation pivot (its own center) lands on the
+    // tunnel, not some off-center part of the stage ----
+    var SW = { x: 20, y: 30, w: 200, h: 80 };
+    var midY = SW.y + SW.h / 2; // 70
+    var padL = SW.x + 4, padR = SW.x + SW.w - 4; // 24, 216
 
-    var channelTop = svgEl('path', {
-      d: 'M' + SWATCH.x + ',' + (SWATCH.midY - 12) + ' L' + (SWATCH.x + SWATCH.w) + ',' + (SWATCH.midY - 12),
-      stroke: 'var(--ink-faint)', 'stroke-width': 1, 'stroke-dasharray': '4 4', fill: 'none'
+    // The wire's own visible length at each slit determines the slit's
+    // length -- per spec, each slit is exactly double that.
+    var WIRE_VIS_LEN = 10;
+    var SLIT_LEN = WIRE_VIS_LEN * 2; // 20
+
+    // Tunnel: spans between the two slits. TUNNEL_HALF_W is its
+    // footprint half-width on the fabric (and therefore its cross-
+    // section depth once tilted); TUNNEL_H is how far it's raised above
+    // the fabric (translateZ, in px).
+    var leftSlitX = SW.x + 50, rightSlitX = SW.x + SW.w - 50; // 70, 170
+    var TUNNEL_HALF_W = 11;
+    var TUNNEL_H = 18;
+
+    // ---- DOM: one stage > one 3D scene > three faces, all fixed
+    // relative to that one scene. ----
+    var stageEl = document.createElement('div');
+    stageEl.className = 'wire3d-stage';
+    var scene = document.createElement('div');
+    scene.className = 'wire3d-scene';
+
+    var baseFace = document.createElement('div');
+    baseFace.className = 'wire3d-face wire3d-face--flat';
+    var baseSvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+    baseFace.appendChild(baseSvg);
+
+    var topFace = document.createElement('div');
+    topFace.className = 'wire3d-face wire3d-face--flat';
+    topFace.style.transform = 'translateZ(' + TUNNEL_H + 'px)';
+    var topSvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+    topFace.appendChild(topSvg);
+
+    // The front wall's fold hinge sits at the tunnel's near edge
+    // (midY + TUNNEL_HALF_W) expressed as a percentage down the shared
+    // 140-tall canvas -- that's the line where this wall meets the
+    // fabric. translateZ before rotateX (not after) is required: applied
+    // after, it would push along the face's own already-rotated local Z
+    // axis instead of the shared pre-rotation space, and the wall would
+    // end up in the wrong place (this exact ordering mistake, and why it
+    // matters, is documented at length in printed ink's git history).
+    var hingeY = midY + TUNNEL_HALF_W; // 81
+    var hingePct = (hingeY / 140 * 100).toFixed(2) + '%';
+    var frontFace = document.createElement('div');
+    frontFace.className = 'wire3d-face wire3d-face--front';
+    frontFace.style.transformOrigin = '50% ' + hingePct;
+    frontFace.style.transform = 'translateZ(3px) rotateX(90deg)';
+    // Same shared 0 0 240 140 frame as the other two faces (no separate
+    // viewBox/letterboxing here) -- the wall's own rect is placed
+    // directly in that frame below, flush against the hinge line with
+    // nothing straddling it (see note at the rect itself for why that
+    // matters).
+    var frontSvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+    frontFace.appendChild(frontSvg);
+
+    scene.appendChild(baseFace);
+    scene.appendChild(topFace);
+    scene.appendChild(frontFace);
+    stageEl.appendChild(scene);
+    stage.appendChild(stageEl);
+
+    // ---- base face: fabric, two slits, two pads, the wire's full path ----
+    var camera = el('g', {});
+    camera.style.transformBox = 'fill-box';
+    camera.style.transformOrigin = 'center';
+    baseSvg.appendChild(camera);
+
+    camera.appendChild(el('rect', {
+      x: SW.x, y: SW.y, width: SW.w, height: SW.h, rx: 3,
+      fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5
+    }));
+
+    var weave = el('g', { opacity: 0.5 });
+    [46, 62, 78, 94].forEach(function (y) {
+      weave.appendChild(el('line', { x1: SW.x, y1: y, x2: SW.x + SW.w, y2: y, stroke: 'var(--line)', 'stroke-width': 0.75 }));
     });
-    var channelBottom = svgEl('path', {
-      d: 'M' + SWATCH.x + ',' + (SWATCH.midY + 12) + ' L' + (SWATCH.x + SWATCH.w) + ',' + (SWATCH.midY + 12),
-      stroke: 'var(--ink-faint)', 'stroke-width': 1, 'stroke-dasharray': '4 4', fill: 'none'
+    [40, 60, 80, 100, 120, 140, 160, 180, 200].forEach(function (x) {
+      weave.appendChild(el('line', { x1: x, y1: SW.y, x2: x, y2: SW.y + SW.h, stroke: 'var(--line)', 'stroke-width': 0.75 }));
     });
-    channelTop.style.opacity = '0';
-    channelBottom.style.opacity = '0';
-    cameraGroup.appendChild(channelTop);
-    cameraGroup.appendChild(channelBottom);
+    camera.appendChild(weave);
 
-    var wireOuter = svgEl('path', {
-      d: 'M' + SWATCH.left + ',' + SWATCH.midY + ' L' + SWATCH.right + ',' + SWATCH.midY,
-      stroke: 'var(--ink-dim)', 'stroke-width': 7, 'stroke-linecap': 'round', fill: 'none'
+    // slits: vertical cuts, fill matching the page background so they
+    // read as gaps rather than solid marks
+    [leftSlitX, rightSlitX].forEach(function (sx) {
+      camera.appendChild(el('rect', {
+        x: sx - 1.5, y: midY - SLIT_LEN / 2, width: 3, height: SLIT_LEN, rx: 1.5,
+        fill: 'var(--black)', stroke: 'var(--line-strong)', 'stroke-width': 1
+      }));
     });
-    var wireInner = svgEl('path', {
-      d: 'M' + SWATCH.left + ',' + SWATCH.midY + ' L' + SWATCH.right + ',' + SWATCH.midY,
-      stroke: 'var(--petrol-bright)', 'stroke-width': 2.6, 'stroke-linecap': 'round', fill: 'none'
-    });
-    cameraGroup.appendChild(wireOuter);
-    cameraGroup.appendChild(wireInner);
-    resetDraw(wireOuter);
-    resetDraw(wireInner);
 
-    bringToFront(cameraGroup, base.padLeft);
-    bringToFront(cameraGroup, base.padRight);
-    resetCamera(cameraGroup);
+    camera.appendChild(el('circle', { cx: padL, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    camera.appendChild(el('circle', { cx: padR, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
 
-    // front face: the wire sandwiched between the two fabric layers that
-    // form its channel, seen edge-on. This face gets its own taller,
-    // zoomed-in viewBox (independent of topSvg's) — the cross-section is
-    // physically thin, so confining it to the same 240x140 frame as the
-    // top-down view left it reading as a near-invisible hairline at the
-    // settled pan angle. A shorter viewBox makes the same content fill
-    // far more of the face.
-    frontSvg.setAttribute('viewBox', '0 0 240 70');
-    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x, y: 8, width: SWATCH.w, height: 16, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x, y: 46, width: SWATCH.w, height: 16, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    frontSvg.appendChild(svgEl('path', { d: 'M' + SWATCH.left + ',35 L' + SWATCH.right + ',35', stroke: 'var(--ink-dim)', 'stroke-width': 16, 'stroke-linecap': 'round', fill: 'none' }));
-    frontSvg.appendChild(svgEl('path', { d: 'M' + SWATCH.left + ',35 L' + SWATCH.right + ',35', stroke: 'var(--petrol-bright)', 'stroke-width': 6, 'stroke-linecap': 'round', fill: 'none' }));
+    // wire: one straight path, pad to pad, drawn on with the same
+    // stroke-dasharray/dashoffset technique used everywhere else on this
+    // page
+    var wirePathD = 'M' + padL.toFixed(2) + ',' + midY.toFixed(2) + ' L' + padR.toFixed(2) + ',' + midY.toFixed(2);
+    var wireOuter = el('path', { d: wirePathD, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': 6, 'stroke-linecap': 'round' });
+    var wireInner = el('path', { d: wirePathD, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 2.4, 'stroke-linecap': 'round' });
+    camera.appendChild(wireOuter);
+    camera.appendChild(wireInner);
+
+    function primeDraw(path) {
+      var len = path.dataset.len;
+      if (!len) { len = path.getTotalLength(); path.dataset.len = len; }
+      path.style.transition = 'none';
+      path.style.strokeDasharray = len + ' ' + len;
+      path.style.strokeDashoffset = len;
+      path.getBoundingClientRect();
+      path.style.transition = '';
+    }
+    primeDraw(wireOuter);
+    primeDraw(wireInner);
+
+    // ---- tunnel top face: the raised surface, translucent so the wire
+    // reads through it from directly overhead too ----
+    topSvg.appendChild(el('rect', {
+      x: leftSlitX, y: midY - TUNNEL_HALF_W, width: rightSlitX - leftSlitX, height: TUNNEL_HALF_W * 2, rx: 4,
+      fill: 'var(--petrol-bright)', stroke: 'var(--line-strong)', 'stroke-width': 1
+    }));
+    topFace.style.opacity = '0.45';
+
+    // ---- tunnel front wall: the near-side wall, revealed once the
+    // camera tilts toward a side view. Its rect sits flush against the
+    // hinge line (hingeY, the tunnel's near edge) and extends entirely
+    // toward smaller y from there -- it must NOT straddle the hinge:
+    // a rect straddling a fold line gets torn into two pieces that swing
+    // in opposite directions during the fold, which is what produced an
+    // earlier version of this wall rendering as a rectangle floating
+    // detached below the fabric instead of a wall rising from it.
+    var WALL_H = TUNNEL_H;
+    frontSvg.appendChild(el('rect', {
+      x: leftSlitX, y: hingeY - WALL_H, width: rightSlitX - leftSlitX, height: WALL_H, rx: 3,
+      fill: 'var(--petrol-bright)', stroke: 'var(--line-strong)', 'stroke-width': 1
+    }));
+    frontFace.style.opacity = '0.45';
+
+    // ---- timing ----
+    var ZOOM_DUR = 450, ZOOM_GAP = 90, LEAD = ZOOM_DUR + ZOOM_GAP;
+    var passDuration = 1000, cutT = 0.3, slowSpan = 0.4;
+
+    // Four sequential phases: tilt to side view (world X), rotate further
+    // (world Y), hold, then the same two phases reversed in the same
+    // order. REST_RX/REST_RY (defined below) is the settled 3/4-ish
+    // angle the camera holds at.
+    var PHASE_X_DUR = 700, PHASE_Y_DUR = 550;
+    var HOLD = 700;
+    var PHASE_Y_BACK_DUR = 500, PHASE_X_BACK_DUR = 650;
+    var CAMERA_TOTAL = PHASE_X_DUR + PHASE_Y_DUR + HOLD + PHASE_Y_BACK_DUR + PHASE_X_BACK_DUR;
+
+    // REST_RX_CLAMP: explicit ceiling on rotateX, as a backstop against
+    // the ghosting/mirroring behavior documented on .circuit-3d-face--top
+    // (see lab.css) -- the flat faces here carry the same
+    // backface-visibility:hidden fix, so this clamp is a belt-and-braces
+    // limit rather than the only thing preventing it. REST_RX itself
+    // sits well under this regardless.
+    //
+    // REST_RX/REST_RY: chosen empirically, not just "X tilt, then 45deg
+    // of Y" taken literally at face value -- a full 74deg X tilt plus a
+    // 45deg Y turn compounds to foreshorten both visible dimensions of
+    // the fabric plane at once, collapsing the whole scene into an
+    // unreadable diagonal sliver under this stage's perspective (tested
+    // directly, screenshots compared side by side). 55/-42 is the
+    // combination that actually reads as "tilted to a side angle, then
+    // turned further" -- fabric, tunnel top, wall and both pads all
+    // stay legible -- while still moving substantially toward both a
+    // side view and a lengthwise view, matching the spirit of the spec.
+    var REST_RX_CLAMP = 82;
+    var REST_RX = 55, REST_RY = -42;
+
+    var rotRaf = null;
+    // One rAF loop animates a single number from `from` to `to` over
+    // `dur`, calling onFrame(value) every tick and onDone() once at the
+    // end -- the shared building block for all four camera phases,
+    // so "the same stages, reversed" really is the same code called with
+    // swapped from/to, not a separately-authored mirror.
+    function animateValue(from, to, dur, onFrame, onDone) {
+      var start = performance.now();
+      if (rotRaf) cancelAnimationFrame(rotRaf);
+      function frame(now) {
+        var raw = Math.max(0, Math.min(1, (now - start) / dur));
+        var k = easeInOutCubic(raw);
+        onFrame(from + (to - from) * k);
+        if (raw < 1) rotRaf = requestAnimationFrame(frame);
+        else if (onDone) onDone();
+      }
+      rotRaf = requestAnimationFrame(frame);
+    }
+
+    var curRX = 0, curRY = 0;
+    function applyRotation() {
+      var rx = Math.min(curRX, REST_RX_CLAMP);
+      scene.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + curRY.toFixed(2) + 'deg)';
+    }
+
+    var raf = null;
+    function resetToStart() {
+      camera.style.transition = 'none';
+      camera.style.transform = 'scale(0.72)';
+      scene.style.transition = 'none';
+      curRX = 0; curRY = 0;
+      applyRotation();
+      primeDraw(wireOuter);
+      primeDraw(wireInner);
+    }
+    resetToStart();
 
     return {
-      duration: CAMERA_LEAD + 1800 + PAN_TOTAL + 150,
+      duration: LEAD + passDuration * cutT + CAMERA_TOTAL + passDuration * (1 - cutT - slowSpan) + 150 + 400 + 150,
       play: function () {
-        resetCamera(cameraGroup);
-        resetScenePan(scene);
-        cameraGroup.getBoundingClientRect();
-        playCameraZoomIn(cameraGroup);
-
-        channelTop.style.transition = 'none';
-        channelBottom.style.transition = 'none';
-        channelTop.style.opacity = '0';
-        channelBottom.style.opacity = '0';
-        base.frame.style.transition = 'none';
-        base.frame.style.fillOpacity = '1';
+        resetToStart();
+        camera.getBoundingClientRect();
+        camera.style.transition = 'transform ' + ZOOM_DUR + 'ms cubic-bezier(.25,.7,.3,1.05)';
+        camera.style.transform = 'scale(1)';
 
         setTimeout(function () {
-          channelTop.getBoundingClientRect();
-          channelTop.style.transition = 'opacity 250ms ease';
-          channelBottom.style.transition = 'opacity 250ms ease';
-          channelTop.style.opacity = '0.6';
-          channelBottom.style.opacity = '0.6';
+          var lenOuter = Number(wireOuter.dataset.len);
+          var lenInner = Number(wireInner.dataset.len);
 
-          setTimeout(function () {
-            resetDraw(wireOuter);
-            resetDraw(wireInner);
-            playDraw(wireOuter, 700, 0);
-            playDraw(wireInner, 700, 0);
+          // Drives the wire's reveal off a single t every frame --
+          // there's only one wire path, so there's nothing for a second
+          // one to drift out of sync with.
+          function runPass(fromT, toT, dur, onDone) {
+            var start = performance.now();
+            if (raf) cancelAnimationFrame(raf);
+            function frame(now) {
+              var raw = Math.max(0, Math.min(1, (now - start) / dur));
+              var t = fromT + (toT - fromT) * raw;
+              wireOuter.style.strokeDashoffset = String(lenOuter * (1 - t));
+              wireInner.style.strokeDashoffset = String(lenInner * (1 - t));
+              if (raw < 1) raf = requestAnimationFrame(frame);
+              else if (onDone) onDone(t);
+            }
+            raf = requestAnimationFrame(frame);
+          }
 
-            base.frame.getBoundingClientRect();
-            base.frame.style.transition = 'fill-opacity 350ms ease';
-            base.frame.style.fillOpacity = '0.35';
+          // 1. wire enters through the left slit at normal speed, camera
+          // flat overhead
+          runPass(0, cutT, passDuration * cutT, function () {
+            // wire keeps moving (slower, never frozen) through the
+            // entire camera move below -- one continuous slow pass
+            // spanning all four rotation phases plus the hold
+            runPass(cutT, cutT + slowSpan, CAMERA_TOTAL);
 
-            setTimeout(function () {
-              base.frame.style.transition = 'fill-opacity 400ms ease';
-              base.frame.style.fillOpacity = '1';
-              channelTop.style.transition = 'opacity 500ms ease';
-              channelBottom.style.transition = 'opacity 500ms ease';
-              channelTop.style.opacity = '0.15';
-              channelBottom.style.opacity = '0.15';
-
-              // pan around to the side to show the channel clearly
-              setTimeout(function () {
-                panToSideView(scene, cameraGroup);
-              }, 500);
-            }, 750);
-          }, 350);
-        }, CAMERA_LEAD);
+            // 2. tilt around world X to a side view
+            animateValue(0, REST_RX, PHASE_X_DUR, function (v) { curRX = v; applyRotation(); }, function () {
+              // 3. continue rotating 45deg further around world Y
+              animateValue(0, REST_RY, PHASE_Y_DUR, function (v) { curRY = v; applyRotation(); }, function () {
+                setTimeout(function () {
+                  // 4. reverse the same two stages, in the same order
+                  animateValue(REST_RY, 0, PHASE_Y_BACK_DUR, function (v) { curRY = v; applyRotation(); }, function () {
+                    animateValue(REST_RX, 0, PHASE_X_BACK_DUR, function (v) { curRX = v; applyRotation(); }, function () {
+                      // 5. camera fully overhead again -- finish the
+                      // wire's travel out the right slit at normal speed
+                      runPass(cutT + slowSpan, 1, passDuration * (1 - cutT - slowSpan), function () {
+                        setTimeout(function () {
+                          wireInner.style.transition = 'opacity 400ms ease';
+                          wireInner.style.opacity = '0.55';
+                        }, 150);
+                      });
+                    });
+                  });
+                }, HOLD);
+              });
+            });
+          });
+        }, LEAD);
       }
     };
   }
