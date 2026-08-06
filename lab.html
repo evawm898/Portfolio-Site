@@ -1141,56 +1141,137 @@
     };
   }
 
+  // Printed ink needs to read unmistakably as screen printing onto the
+  // fabric, not just a line drawing itself: a screen frame descends over
+  // the print zone, the squeegee drags ink through it left to right, then
+  // the frame lifts away to reveal the trace. The ink itself is a wide
+  // translucent band (not a thin stroke) so the fabric's own weave stays
+  // visible through it, on the surface, the way real screen ink sits on
+  // top of a textile rather than replacing it.
   function buildPrintedInk(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
     var base = buildSwatchBase(svg);
 
-    var tracePath = svgEl('path', {
-      d: 'M' + SWATCH.left + ',' + SWATCH.midY + ' L' + SWATCH.right + ',' + SWATCH.midY,
-      fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 4,
-      'stroke-linecap': 'round', class: 'js-ink-trace'
+    var inkX = SWATCH.left, inkW = SWATCH.right - SWATCH.left;
+    var inkY = SWATCH.midY - 9, inkH = 18;
+
+    uid++;
+    var clipId = 'inkWipe-' + uid;
+    var defs = svgEl('defs', {});
+    var clipRect = svgEl('rect', { x: inkX, y: inkY, width: 0, height: inkH });
+    var clipPath = svgEl('clipPath', { id: clipId, clipPathUnits: 'userSpaceOnUse' });
+    clipPath.appendChild(clipRect);
+    defs.appendChild(clipPath);
+    svg.appendChild(defs);
+
+    // wide translucent band, clipped to reveal left-to-right as it's
+    // squeegeed on — fill-opacity stays well under 1 even once "cured" so
+    // the weave underneath is never fully hidden
+    var inkBand = svgEl('rect', {
+      x: inkX, y: inkY, width: inkW, height: inkH, rx: 2,
+      fill: 'var(--petrol-bright)', class: 'js-ink-band',
+      'clip-path': 'url(#' + clipId + ')'
     });
-    svg.appendChild(tracePath);
-    resetDraw(tracePath);
+    svg.appendChild(inkBand);
+
+    // screen frame: descends over the print zone before the pass, lifts
+    // away after — a dashed border plus a faint mesh crosshatch is enough
+    // to read as a printing screen without competing with the ink itself
+    var screenPad = 5;
+    var screenGroup = svgEl('g', { class: 'js-screen' });
+    screenGroup.style.transformBox = 'fill-box';
+    screenGroup.style.transformOrigin = 'center';
+    var meshClipId = clipId + '-mesh';
+    var meshClipPath = svgEl('clipPath', { id: meshClipId });
+    meshClipPath.appendChild(svgEl('rect', { x: inkX - screenPad, y: inkY - screenPad, width: inkW + screenPad * 2, height: inkH + screenPad * 2, rx: 3 }));
+    defs.appendChild(meshClipPath);
+    var meshGroup = svgEl('g', { 'clip-path': 'url(#' + meshClipId + ')', opacity: 0.35 });
+    for (var mx = inkX - screenPad - inkH; mx < inkX + inkW + screenPad; mx += 9) {
+      meshGroup.appendChild(svgEl('line', {
+        x1: mx, y1: inkY + inkH + screenPad, x2: mx + inkH + screenPad * 2, y2: inkY - screenPad,
+        stroke: 'var(--ink-faint)', 'stroke-width': 0.6
+      }));
+    }
+    screenGroup.appendChild(meshGroup);
+    screenGroup.appendChild(svgEl('rect', {
+      x: inkX - screenPad, y: inkY - screenPad, width: inkW + screenPad * 2, height: inkH + screenPad * 2, rx: 3,
+      fill: 'none', stroke: 'var(--line-strong)', 'stroke-width': 1, 'stroke-dasharray': '3 3'
+    }));
+    svg.appendChild(screenGroup);
 
     var head = svgEl('g', {});
-    head.appendChild(svgEl('rect', { x: -3, y: -16, width: 6, height: 32, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    head.setAttribute('transform', 'translate(' + SWATCH.left + ',' + SWATCH.midY + ')');
+    head.appendChild(svgEl('rect', { x: -3, y: -13, width: 7, height: 26, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     head.style.opacity = '0';
     svg.appendChild(head);
+
     bringToFront(svg, base.padLeft);
     bringToFront(svg, base.padRight);
     stage.appendChild(svg);
 
-    var travelDuration = 900, raf = null;
-    return {
-      duration: travelDuration + 500,
-      play: function () {
-        resetDraw(tracePath);
-        tracePath.classList.remove('is-cured');
-        var len = Number(tracePath.dataset.len);
-        head.style.transition = 'none';
-        head.style.opacity = '1';
-        head.setAttribute('transform', 'translate(' + SWATCH.left + ',' + SWATCH.midY + ')');
-        head.getBoundingClientRect();
+    var SCREEN_DUR = 350, GAP1 = 150, travelDuration = 900, GAP2 = 200, LIFT_DUR = 350, CURE_DELAY = 150, CURE_DUR = 400;
+    var raf = null;
 
-        if (raf) cancelAnimationFrame(raf);
-        var start = performance.now();
-        function frame(now) {
-          var t = Math.min(1, (now - start) / travelDuration);
-          var x = lerp(SWATCH.left, SWATCH.right, t);
-          head.setAttribute('transform', 'translate(' + x.toFixed(2) + ',' + SWATCH.midY + ')');
-          tracePath.style.transition = 'none';
-          tracePath.style.strokeDashoffset = String(len * (1 - t));
-          if (t < 1) {
-            raf = requestAnimationFrame(frame);
-          } else {
-            head.style.transition = 'opacity 300ms ease';
-            head.style.opacity = '0';
-            setTimeout(function () { tracePath.classList.add('is-cured'); }, 80);
+    function resetToStart() {
+      screenGroup.style.transition = 'none';
+      screenGroup.style.opacity = '0';
+      screenGroup.style.transform = 'translateY(-22px)';
+      inkBand.classList.remove('is-cured');
+      inkBand.style.transition = 'none';
+      inkBand.style.fillOpacity = '0.55';
+      clipRect.setAttribute('width', 0);
+      head.style.transition = 'none';
+      head.style.opacity = '0';
+      head.setAttribute('transform', 'translate(' + inkX + ',' + SWATCH.midY + ')');
+    }
+    resetToStart();
+
+    return {
+      duration: SCREEN_DUR + GAP1 + travelDuration + GAP2 + LIFT_DUR + CURE_DELAY + CURE_DUR + 100,
+      play: function () {
+        resetToStart();
+        screenGroup.getBoundingClientRect();
+
+        // 1. the screen descends onto the fabric
+        screenGroup.style.transition = 'opacity ' + SCREEN_DUR + 'ms ease, transform ' + SCREEN_DUR + 'ms cubic-bezier(.25,.7,.3,1.1)';
+        screenGroup.style.opacity = '1';
+        screenGroup.style.transform = 'translateY(0)';
+
+        // 2. the squeegee drags ink through it, left to right
+        setTimeout(function () {
+          head.style.transition = 'none';
+          head.style.opacity = '1';
+          head.getBoundingClientRect();
+
+          if (raf) cancelAnimationFrame(raf);
+          var start = performance.now();
+          function frame(now) {
+            var t = Math.min(1, (now - start) / travelDuration);
+            var x = lerp(inkX, SWATCH.right, t);
+            head.setAttribute('transform', 'translate(' + x.toFixed(2) + ',' + SWATCH.midY + ')');
+            clipRect.setAttribute('width', String(inkW * t));
+            if (t < 1) {
+              raf = requestAnimationFrame(frame);
+            } else {
+              head.style.transition = 'opacity 300ms ease';
+              head.style.opacity = '0';
+
+              // 3. the screen lifts away to reveal the printed trace
+              setTimeout(function () {
+                screenGroup.style.transition = 'opacity ' + LIFT_DUR + 'ms ease, transform ' + LIFT_DUR + 'ms ease';
+                screenGroup.style.opacity = '0';
+                screenGroup.style.transform = 'translateY(-22px)';
+
+                // 4. the ink cures — still translucent enough to show the weave under it
+                setTimeout(function () {
+                  inkBand.style.transition = 'fill-opacity ' + CURE_DUR + 'ms ease';
+                  inkBand.getBoundingClientRect();
+                  inkBand.classList.add('is-cured');
+                }, LIFT_DUR + CURE_DELAY);
+              }, GAP2);
+            }
           }
-        }
-        raf = requestAnimationFrame(frame);
+          raf = requestAnimationFrame(frame);
+        }, SCREEN_DUR + GAP1);
       }
     };
   }
