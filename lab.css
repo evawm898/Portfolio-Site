@@ -353,12 +353,6 @@
   100% { transform: scaleY(1); }
 }
 
-/* printed ink — band looks wet (semi-transparent, weave shows through)
-   until it cures; even cured it stays under full opacity on purpose */
-.js-ink-band.is-cured {
-  fill-opacity: 0.88;
-}
-
 /* metal coating — grows in from a small seed point */
 .js-coating {
   transform-box: fill-box;

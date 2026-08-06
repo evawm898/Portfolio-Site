@@ -958,6 +958,76 @@
   // used to bring pads back on top after a builder adds its own layers.
   function bringToFront(svg, el) { svg.appendChild(el); }
 
+  /* ---------------------------------------------------
+     shared "start zoomed out, push in" establishing shot — every panel
+     opens on it now, not just conductive yarn. Builders append their
+     content to the returned group instead of directly to the svg (pass
+     it to buildSwatchBase too), reset it via resetCamera(), then wrap
+     their existing play() body in setTimeout(..., CAMERA_LEAD) so the
+     zoom finishes before the construction sequence starts.
+  --------------------------------------------------- */
+  var CAMERA_ZOOM_OUT = 0.72, CAMERA_ZOOM_DUR = 450, CAMERA_ZOOM_GAP = 90;
+  var CAMERA_LEAD = CAMERA_ZOOM_DUR + CAMERA_ZOOM_GAP;
+
+  function buildCameraGroup(svg) {
+    var g = svgEl('g', {});
+    g.style.transformBox = 'fill-box';
+    g.style.transformOrigin = 'center';
+    svg.appendChild(g);
+    return g;
+  }
+
+  function resetCamera(cameraGroup) {
+    cameraGroup.style.transition = 'none';
+    cameraGroup.style.transform = 'scale(' + CAMERA_ZOOM_OUT + ')';
+  }
+
+  function playCameraZoomIn(cameraGroup) {
+    cameraGroup.getBoundingClientRect();
+    cameraGroup.style.transition = 'transform ' + CAMERA_ZOOM_DUR + 'ms cubic-bezier(.25,.7,.3,1.05)';
+    cameraGroup.style.transform = 'scale(1)';
+  }
+
+  /* ---------------------------------------------------
+     shared "cut to a 3/4 side view" detail insets — printed ink, embedded
+     wire, and laminated trace each pause mid-sequence to show a
+     mechanism the top-down view can't: the nozzle actually touching the
+     fabric, the wire sitting inside its channel, the press closing on
+     the layer stack. The main swatch fades down while the inset fades
+     up over it, holds, then reverses.
+  --------------------------------------------------- */
+  function buildSideInset(svg, populate) {
+    var g = svgEl('g', {});
+    g.style.opacity = '0';
+    var panel = svgEl('rect', {
+      x: 46, y: 34, width: 148, height: 72, rx: 4,
+      fill: 'var(--black)', stroke: 'var(--line-strong)', 'stroke-width': 1.25
+    });
+    g.appendChild(panel);
+    var content = svgEl('g', {});
+    g.appendChild(content);
+    populate(content);
+    svg.appendChild(g);
+    return g;
+  }
+
+  // fades the main view down, fades the inset up, holds, then reverses —
+  // calls onDone once the main view is back to full opacity
+  function cutToSideInset(inset, mainGroup, holdDur, fadeDur, onDone) {
+    mainGroup.style.transition = 'opacity ' + fadeDur + 'ms ease';
+    mainGroup.style.opacity = '0.15';
+    inset.style.transition = 'opacity ' + fadeDur + 'ms ease';
+    inset.getBoundingClientRect();
+    inset.style.opacity = '1';
+    setTimeout(function () {
+      inset.style.transition = 'opacity ' + fadeDur + 'ms ease';
+      inset.style.opacity = '0';
+      mainGroup.style.transition = 'opacity ' + fadeDur + 'ms ease';
+      mainGroup.style.opacity = '1';
+      if (onDone) setTimeout(onDone, fadeDur);
+    }, fadeDur + holdDur);
+  }
+
   // Conductive yarn is the one pathway that has to read as knitted-in,
   // not printed/stitched/bonded on — so unlike the other five panels, its
   // swatch is a knit lattice of actual horseshoe-shaped loops (a rounded
@@ -1148,142 +1218,138 @@
   // translucent band (not a thin stroke) so the fabric's own weave stays
   // visible through it, on the surface, the way real screen ink sits on
   // top of a textile rather than replacing it.
+  // Printed ink is a direct-write dispense, not screen printing: a nozzle
+  // needle rides a serpentine path from pad to pad, extruding a raised
+  // bead of paste behind it (a bright base stroke plus a thin lighter
+  // highlight running down its center, rather than a flat line). Partway
+  // through the pass we cut to a close side-on inset so the needle
+  // actually touching the fabric and dispensing reads unmistakably.
   function buildPrintedInk(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var base = buildSwatchBase(svg);
+    var cameraGroup = buildCameraGroup(svg);
+    var base = buildSwatchBase(cameraGroup);
 
-    var inkX = SWATCH.left, inkW = SWATCH.right - SWATCH.left;
-    var inkY = SWATCH.midY - 9, inkH = 18;
-
-    uid++;
-    var clipId = 'inkWipe-' + uid;
-    var defs = svgEl('defs', {});
-    var clipRect = svgEl('rect', { x: inkX, y: inkY, width: 0, height: inkH });
-    var clipPath = svgEl('clipPath', { id: clipId, clipPathUnits: 'userSpaceOnUse' });
-    clipPath.appendChild(clipRect);
-    defs.appendChild(clipPath);
-    svg.appendChild(defs);
-
-    // wide translucent band, clipped to reveal left-to-right as it's
-    // squeegeed on — fill-opacity stays well under 1 even once "cured" so
-    // the weave underneath is never fully hidden
-    var inkBand = svgEl('rect', {
-      x: inkX, y: inkY, width: inkW, height: inkH, rx: 2,
-      fill: 'var(--petrol-bright)', class: 'js-ink-band',
-      'clip-path': 'url(#' + clipId + ')'
-    });
-    svg.appendChild(inkBand);
-
-    // screen frame: descends over the print zone before the pass, lifts
-    // away after — a dashed border plus a faint mesh crosshatch is enough
-    // to read as a printing screen without competing with the ink itself
-    var screenPad = 5;
-    var screenGroup = svgEl('g', { class: 'js-screen' });
-    screenGroup.style.transformBox = 'fill-box';
-    screenGroup.style.transformOrigin = 'center';
-    var meshClipId = clipId + '-mesh';
-    var meshClipPath = svgEl('clipPath', { id: meshClipId });
-    meshClipPath.appendChild(svgEl('rect', { x: inkX - screenPad, y: inkY - screenPad, width: inkW + screenPad * 2, height: inkH + screenPad * 2, rx: 3 }));
-    defs.appendChild(meshClipPath);
-    var meshGroup = svgEl('g', { 'clip-path': 'url(#' + meshClipId + ')', opacity: 0.35 });
-    for (var mx = inkX - screenPad - inkH; mx < inkX + inkW + screenPad; mx += 9) {
-      meshGroup.appendChild(svgEl('line', {
-        x1: mx, y1: inkY + inkH + screenPad, x2: mx + inkH + screenPad * 2, y2: inkY - screenPad,
-        stroke: 'var(--ink-faint)', 'stroke-width': 0.6
-      }));
+    // serpentine path, starting and ending exactly on the pads
+    var amp = 24, lobes = 3;
+    function sample(t) {
+      var x = lerp(SWATCH.left, SWATCH.right, t);
+      var y = SWATCH.midY + amp * Math.sin(2 * Math.PI * lobes * t);
+      return [x, y];
     }
-    screenGroup.appendChild(meshGroup);
-    screenGroup.appendChild(svgEl('rect', {
-      x: inkX - screenPad, y: inkY - screenPad, width: inkW + screenPad * 2, height: inkH + screenPad * 2, rx: 3,
-      fill: 'none', stroke: 'var(--line-strong)', 'stroke-width': 1, 'stroke-dasharray': '3 3'
-    }));
-    svg.appendChild(screenGroup);
+    var pathD = arcPath(sample, 0, 1, 160);
 
-    var head = svgEl('g', {});
-    head.appendChild(svgEl('rect', { x: -3, y: -13, width: 7, height: 26, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    head.style.opacity = '0';
-    svg.appendChild(head);
+    var traceBase = svgEl('path', {
+      d: pathD, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 5,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    });
+    var traceHighlight = svgEl('path', {
+      d: pathD, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.4,
+      'stroke-linecap': 'round', class: 'js-ink-highlight'
+    });
+    cameraGroup.appendChild(traceBase);
+    cameraGroup.appendChild(traceHighlight);
+    resetDraw(traceBase);
+    resetDraw(traceHighlight);
 
-    bringToFront(svg, base.padLeft);
-    bringToFront(svg, base.padRight);
+    // dispenser: a small cartridge body over a tapered needle tip
+    var nozzle = svgEl('g', {});
+    nozzle.appendChild(svgEl('rect', { x: -5, y: -22, width: 10, height: 16, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    nozzle.appendChild(svgEl('path', { d: 'M-3,-6 L3,-6 L1,4 L-1,4 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
+    cameraGroup.appendChild(nozzle);
+
+    bringToFront(cameraGroup, base.padLeft);
+    bringToFront(cameraGroup, base.padRight);
+
+    // side-view inset: the needle close on the fabric, actually dispensing
+    var inset = buildSideInset(svg, function (content) {
+      content.appendChild(svgEl('rect', { x: 56, y: 80, width: 128, height: 10, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+      content.appendChild(svgEl('rect', { x: 110, y: 38, width: 20, height: 26, rx: 3, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+      content.appendChild(svgEl('path', { d: 'M116,64 L124,64 L121,80 L119,80 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
+      content.appendChild(svgEl('circle', { cx: 120, cy: 80, r: 3.2, fill: 'var(--petrol-bright)' }));
+    });
+
     stage.appendChild(svg);
 
-    var SCREEN_DUR = 350, GAP1 = 150, travelDuration = 900, GAP2 = 200, LIFT_DUR = 350, CURE_DELAY = 150, CURE_DUR = 400;
+    var passDuration = 1100, cutT = 0.48;
+    var CUT_FADE = 280, CUT_HOLD = 900, SETTLE_DELAY = 150, SETTLE_DUR = 400;
     var raf = null;
 
     function resetToStart() {
-      screenGroup.style.transition = 'none';
-      screenGroup.style.opacity = '0';
-      screenGroup.style.transform = 'translateY(-22px)';
-      inkBand.classList.remove('is-cured');
-      inkBand.style.transition = 'none';
-      inkBand.style.fillOpacity = '0.55';
-      clipRect.setAttribute('width', 0);
-      head.style.transition = 'none';
-      head.style.opacity = '0';
-      head.setAttribute('transform', 'translate(' + inkX + ',' + SWATCH.midY + ')');
+      resetCamera(cameraGroup);
+      resetDraw(traceBase);
+      resetDraw(traceHighlight);
+      traceHighlight.style.transition = 'none';
+      traceHighlight.style.opacity = '0.4';
+      nozzle.style.transition = 'none';
+      nozzle.style.opacity = '0';
+      var p0 = sample(0);
+      nozzle.setAttribute('transform', 'translate(' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) + ')');
+      inset.style.transition = 'none';
+      inset.style.opacity = '0';
     }
     resetToStart();
 
     return {
-      duration: SCREEN_DUR + GAP1 + travelDuration + GAP2 + LIFT_DUR + CURE_DELAY + CURE_DUR + 100,
+      duration: CAMERA_LEAD + passDuration + CUT_FADE * 2 + CUT_HOLD + SETTLE_DELAY + SETTLE_DUR + 150,
       play: function () {
         resetToStart();
-        screenGroup.getBoundingClientRect();
+        cameraGroup.getBoundingClientRect();
+        playCameraZoomIn(cameraGroup);
 
-        // 1. the screen descends onto the fabric
-        screenGroup.style.transition = 'opacity ' + SCREEN_DUR + 'ms ease, transform ' + SCREEN_DUR + 'ms cubic-bezier(.25,.7,.3,1.1)';
-        screenGroup.style.opacity = '1';
-        screenGroup.style.transform = 'translateY(0)';
-
-        // 2. the squeegee drags ink through it, left to right
         setTimeout(function () {
-          head.style.transition = 'none';
-          head.style.opacity = '1';
-          head.getBoundingClientRect();
+          nozzle.style.transition = 'none';
+          nozzle.style.opacity = '1';
+          nozzle.getBoundingClientRect();
 
-          if (raf) cancelAnimationFrame(raf);
-          var start = performance.now();
-          function frame(now) {
-            var t = Math.min(1, (now - start) / travelDuration);
-            var x = lerp(inkX, SWATCH.right, t);
-            head.setAttribute('transform', 'translate(' + x.toFixed(2) + ',' + SWATCH.midY + ')');
-            clipRect.setAttribute('width', String(inkW * t));
-            if (t < 1) {
-              raf = requestAnimationFrame(frame);
-            } else {
-              head.style.transition = 'opacity 300ms ease';
-              head.style.opacity = '0';
+          var lenBase = Number(traceBase.dataset.len);
+          var lenHi = Number(traceHighlight.dataset.len);
 
-              // 3. the screen lifts away to reveal the printed trace
-              setTimeout(function () {
-                screenGroup.style.transition = 'opacity ' + LIFT_DUR + 'ms ease, transform ' + LIFT_DUR + 'ms ease';
-                screenGroup.style.opacity = '0';
-                screenGroup.style.transform = 'translateY(-22px)';
-
-                // 4. the ink cures — still translucent enough to show the weave under it
-                setTimeout(function () {
-                  inkBand.style.transition = 'fill-opacity ' + CURE_DUR + 'ms ease';
-                  inkBand.getBoundingClientRect();
-                  inkBand.classList.add('is-cured');
-                }, LIFT_DUR + CURE_DELAY);
-              }, GAP2);
+          function runPass(fromT, toT, onDone) {
+            var start = performance.now();
+            var dur = passDuration * (toT - fromT);
+            if (raf) cancelAnimationFrame(raf);
+            function frame(now) {
+              var raw = Math.min(1, (now - start) / dur);
+              var t = fromT + (toT - fromT) * raw;
+              var p = sample(t);
+              nozzle.setAttribute('transform', 'translate(' + p[0].toFixed(2) + ',' + p[1].toFixed(2) + ')');
+              traceBase.style.strokeDashoffset = String(lenBase * (1 - t));
+              traceHighlight.style.strokeDashoffset = String(lenHi * (1 - t));
+              if (raw < 1) raf = requestAnimationFrame(frame);
+              else if (onDone) onDone();
             }
+            raf = requestAnimationFrame(frame);
           }
-          raf = requestAnimationFrame(frame);
-        }, SCREEN_DUR + GAP1);
+
+          // 1. dispense the first part of the pass
+          runPass(0, cutT, function () {
+            // 2. cut to the side view — the needle actually touching down
+            cutToSideInset(inset, cameraGroup, CUT_HOLD, CUT_FADE, function () {
+              // 3. cut back and finish the pass
+              runPass(cutT, 1, function () {
+                nozzle.style.transition = 'opacity 260ms ease';
+                nozzle.style.opacity = '0';
+                setTimeout(function () {
+                  traceHighlight.style.transition = 'opacity ' + SETTLE_DUR + 'ms ease';
+                  traceHighlight.style.opacity = '0.2';
+                }, SETTLE_DELAY);
+              });
+            });
+          });
+        }, CAMERA_LEAD);
       }
     };
   }
 
   function buildMetalCoated(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var base = buildSwatchBase(svg);
+    var cameraGroup = buildCameraGroup(svg);
+    var base = buildSwatchBase(cameraGroup);
 
     var dots = [[70, 50], [110, 90], [150, 58], [130, 70], [90, 66]].map(function (p) {
       var el = svgEl('circle', { cx: p[0], cy: p[1], r: 2.2, fill: 'var(--petrol-bright)' });
       el.style.opacity = '0';
-      svg.appendChild(el);
+      cameraGroup.appendChild(el);
       return el;
     });
 
@@ -1292,53 +1358,61 @@
       fill: 'rgba(47,163,163,0.22)', class: 'js-coating'
     });
     coating.style.opacity = '0';
-    svg.appendChild(coating);
+    cameraGroup.appendChild(coating);
 
     var netLines = ['M40,50 L90,90', 'M70,40 L140,100', 'M120,45 L190,95', 'M60,100 L160,45'].map(function (d) {
       var el = svgEl('path', { d: d, stroke: 'var(--petrol-bright)', 'stroke-width': 1, fill: 'none' });
       el.style.opacity = '0';
-      svg.appendChild(el);
+      cameraGroup.appendChild(el);
       return el;
     });
 
-    bringToFront(svg, base.padLeft);
-    bringToFront(svg, base.padRight);
+    bringToFront(cameraGroup, base.padLeft);
+    bringToFront(cameraGroup, base.padRight);
+    resetCamera(cameraGroup);
     stage.appendChild(svg);
 
     return {
-      duration: 1700,
+      duration: CAMERA_LEAD + 1700,
       play: function () {
-        dots.forEach(function (d, i) {
-          d.style.transition = 'none';
-          d.style.opacity = '0';
-          d.getBoundingClientRect();
-          d.style.transition = 'opacity 250ms ease';
-          setTimeout(function () { d.style.opacity = '1'; }, i * 90);
-        });
+        resetCamera(cameraGroup);
+        cameraGroup.getBoundingClientRect();
+        playCameraZoomIn(cameraGroup);
 
-        var dotsDone = dots.length * 90 + 250;
         setTimeout(function () {
-          coating.classList.remove('is-growing');
-          coating.style.transition = 'none';
-          coating.style.opacity = '0';
-          coating.getBoundingClientRect();
-          coating.classList.add('is-growing');
-        }, dotsDone);
+          dots.forEach(function (d, i) {
+            d.style.transition = 'none';
+            d.style.opacity = '0';
+            d.getBoundingClientRect();
+            d.style.transition = 'opacity 250ms ease';
+            setTimeout(function () { d.style.opacity = '1'; }, i * 90);
+          });
 
-        var coatDone = dotsDone + 500;
-        netLines.forEach(function (l, i) {
+          var dotsDone = dots.length * 90 + 250;
           setTimeout(function () {
-            l.style.transition = 'opacity 400ms ease';
-            l.style.opacity = '0.4';
-          }, coatDone + i * 140);
-        });
+            coating.classList.remove('is-growing');
+            coating.style.transition = 'none';
+            coating.style.opacity = '0';
+            coating.getBoundingClientRect();
+            coating.classList.add('is-growing');
+          }, dotsDone);
+
+          var coatDone = dotsDone + 500;
+          netLines.forEach(function (l, i) {
+            setTimeout(function () {
+              l.style.transition = 'opacity 400ms ease';
+              l.style.opacity = '0.4';
+            }, coatDone + i * 140);
+          });
+        }, CAMERA_LEAD);
       }
     };
   }
 
   function buildSewnTrace(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var base = buildSwatchBase(svg);
+    var cameraGroup = buildCameraGroup(svg);
+    var base = buildSwatchBase(cameraGroup);
 
     uid++;
     var clipId = 'stitchWipe-' + uid;
@@ -1355,7 +1429,7 @@
       'stroke-linecap': 'round', 'stroke-dasharray': '9 7',
       'clip-path': 'url(#' + clipId + ')'
     });
-    svg.appendChild(stitchLine);
+    cameraGroup.appendChild(stitchLine);
 
     var underLine = svgEl('path', {
       d: 'M' + SWATCH.left + ',' + (SWATCH.midY + 14) + ' L' + SWATCH.right + ',' + (SWATCH.midY + 14),
@@ -1364,58 +1438,69 @@
       'clip-path': 'url(#' + clipId + ')'
     });
     underLine.style.opacity = '0';
-    svg.appendChild(underLine);
+    cameraGroup.appendChild(underLine);
 
     var needle = svgEl('g', {});
     needle.appendChild(svgEl('line', { x1: 0, y1: -36, x2: 0, y2: 0, stroke: 'var(--ink)', 'stroke-width': 1.6, 'stroke-linecap': 'round' }));
     needle.appendChild(svgEl('ellipse', { cx: 0, cy: -30, rx: 1.6, ry: 3, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1 }));
     needle.style.opacity = '0';
-    svg.appendChild(needle);
+    cameraGroup.appendChild(needle);
 
-    bringToFront(svg, base.padLeft);
-    bringToFront(svg, base.padRight);
+    bringToFront(cameraGroup, base.padLeft);
+    bringToFront(cameraGroup, base.padRight);
+    resetCamera(cameraGroup);
     stage.appendChild(svg);
 
     var duration = 1100, stitchCount = 7, raf = null;
     return {
-      duration: duration + 700,
+      duration: CAMERA_LEAD + duration + 700,
       play: function () {
+        resetCamera(cameraGroup);
+        cameraGroup.getBoundingClientRect();
+        playCameraZoomIn(cameraGroup);
+
         clipRect.setAttribute('width', 0);
         needle.style.transition = 'none';
-        needle.style.opacity = '1';
+        needle.style.opacity = '0';
         underLine.style.transition = 'none';
         underLine.style.opacity = '0';
-        needle.getBoundingClientRect();
 
-        if (raf) cancelAnimationFrame(raf);
-        var start = performance.now();
-        function frame(now) {
-          var t = Math.min(1, (now - start) / duration);
-          var x = lerp(SWATCH.left, SWATCH.right, t);
-          var lift = Math.abs(Math.sin(t * Math.PI * stitchCount));
-          needle.setAttribute('transform', 'translate(' + x.toFixed(2) + ',' + (SWATCH.midY - lift * 18).toFixed(2) + ')');
-          clipRect.setAttribute('width', String(SWATCH.w * t));
-          if (t < 1) {
-            raf = requestAnimationFrame(frame);
-          } else {
-            needle.style.transition = 'opacity 250ms ease';
-            needle.style.opacity = '0';
-            underLine.style.transition = 'opacity 300ms ease';
-            underLine.style.opacity = '0.35';
-            setTimeout(function () {
-              underLine.style.transition = 'opacity 500ms ease';
-              underLine.style.opacity = '0.12';
-            }, 700);
+        setTimeout(function () {
+          needle.style.transition = 'none';
+          needle.style.opacity = '1';
+          needle.getBoundingClientRect();
+
+          if (raf) cancelAnimationFrame(raf);
+          var start = performance.now();
+          function frame(now) {
+            var t = Math.min(1, (now - start) / duration);
+            var x = lerp(SWATCH.left, SWATCH.right, t);
+            var lift = Math.abs(Math.sin(t * Math.PI * stitchCount));
+            needle.setAttribute('transform', 'translate(' + x.toFixed(2) + ',' + (SWATCH.midY - lift * 18).toFixed(2) + ')');
+            clipRect.setAttribute('width', String(SWATCH.w * t));
+            if (t < 1) {
+              raf = requestAnimationFrame(frame);
+            } else {
+              needle.style.transition = 'opacity 250ms ease';
+              needle.style.opacity = '0';
+              underLine.style.transition = 'opacity 300ms ease';
+              underLine.style.opacity = '0.35';
+              setTimeout(function () {
+                underLine.style.transition = 'opacity 500ms ease';
+                underLine.style.opacity = '0.12';
+              }, 700);
+            }
           }
-        }
-        raf = requestAnimationFrame(frame);
+          raf = requestAnimationFrame(frame);
+        }, CAMERA_LEAD);
       }
     };
   }
 
   function buildEmbeddedWire(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var base = buildSwatchBase(svg);
+    var cameraGroup = buildCameraGroup(svg);
+    var base = buildSwatchBase(cameraGroup);
 
     var channelTop = svgEl('path', {
       d: 'M' + SWATCH.x + ',' + (SWATCH.midY - 12) + ' L' + (SWATCH.x + SWATCH.w) + ',' + (SWATCH.midY - 12),
@@ -1427,8 +1512,8 @@
     });
     channelTop.style.opacity = '0';
     channelBottom.style.opacity = '0';
-    svg.appendChild(channelTop);
-    svg.appendChild(channelBottom);
+    cameraGroup.appendChild(channelTop);
+    cameraGroup.appendChild(channelBottom);
 
     var wireOuter = svgEl('path', {
       d: 'M' + SWATCH.left + ',' + SWATCH.midY + ' L' + SWATCH.right + ',' + SWATCH.midY,
@@ -1438,57 +1523,86 @@
       d: 'M' + SWATCH.left + ',' + SWATCH.midY + ' L' + SWATCH.right + ',' + SWATCH.midY,
       stroke: 'var(--petrol-bright)', 'stroke-width': 2.6, 'stroke-linecap': 'round', fill: 'none'
     });
-    svg.appendChild(wireOuter);
-    svg.appendChild(wireInner);
+    cameraGroup.appendChild(wireOuter);
+    cameraGroup.appendChild(wireInner);
     resetDraw(wireOuter);
     resetDraw(wireInner);
 
-    bringToFront(svg, base.padLeft);
-    bringToFront(svg, base.padRight);
+    bringToFront(cameraGroup, base.padLeft);
+    bringToFront(cameraGroup, base.padRight);
+    resetCamera(cameraGroup);
+
+    // side-view inset: the wire actually sitting inside the channel,
+    // sandwiched between the two fabric layers that form it
+    var inset = buildSideInset(svg, function (content) {
+      content.appendChild(svgEl('rect', { x: 56, y: 40, width: 128, height: 8, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+      content.appendChild(svgEl('rect', { x: 56, y: 76, width: 128, height: 8, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+      content.appendChild(svgEl('path', { d: 'M64,60 L176,60', stroke: 'var(--ink-dim)', 'stroke-width': 7, 'stroke-linecap': 'round', fill: 'none' }));
+      content.appendChild(svgEl('path', { d: 'M64,60 L176,60', stroke: 'var(--petrol-bright)', 'stroke-width': 2.6, 'stroke-linecap': 'round', fill: 'none' }));
+    });
+    inset.style.transition = 'none';
+    inset.style.opacity = '0';
+
     stage.appendChild(svg);
 
+    var CUT_FADE = 280, CUT_HOLD = 900;
+
     return {
-      duration: 1800,
+      duration: CAMERA_LEAD + 1800 + CUT_FADE * 2 + CUT_HOLD + 150,
       play: function () {
+        resetCamera(cameraGroup);
+        cameraGroup.getBoundingClientRect();
+        playCameraZoomIn(cameraGroup);
+
+        inset.style.transition = 'none';
+        inset.style.opacity = '0';
         channelTop.style.transition = 'none';
         channelBottom.style.transition = 'none';
         channelTop.style.opacity = '0';
         channelBottom.style.opacity = '0';
-        channelTop.getBoundingClientRect();
-        channelTop.style.transition = 'opacity 250ms ease';
-        channelBottom.style.transition = 'opacity 250ms ease';
-        channelTop.style.opacity = '0.6';
-        channelBottom.style.opacity = '0.6';
-
         base.frame.style.transition = 'none';
         base.frame.style.fillOpacity = '1';
 
         setTimeout(function () {
-          resetDraw(wireOuter);
-          resetDraw(wireInner);
-          playDraw(wireOuter, 700, 0);
-          playDraw(wireInner, 700, 0);
-
-          base.frame.getBoundingClientRect();
-          base.frame.style.transition = 'fill-opacity 350ms ease';
-          base.frame.style.fillOpacity = '0.35';
+          channelTop.getBoundingClientRect();
+          channelTop.style.transition = 'opacity 250ms ease';
+          channelBottom.style.transition = 'opacity 250ms ease';
+          channelTop.style.opacity = '0.6';
+          channelBottom.style.opacity = '0.6';
 
           setTimeout(function () {
-            base.frame.style.transition = 'fill-opacity 400ms ease';
-            base.frame.style.fillOpacity = '1';
-            channelTop.style.transition = 'opacity 500ms ease';
-            channelBottom.style.transition = 'opacity 500ms ease';
-            channelTop.style.opacity = '0.15';
-            channelBottom.style.opacity = '0.15';
-          }, 750);
-        }, 350);
+            resetDraw(wireOuter);
+            resetDraw(wireInner);
+            playDraw(wireOuter, 700, 0);
+            playDraw(wireInner, 700, 0);
+
+            base.frame.getBoundingClientRect();
+            base.frame.style.transition = 'fill-opacity 350ms ease';
+            base.frame.style.fillOpacity = '0.35';
+
+            setTimeout(function () {
+              base.frame.style.transition = 'fill-opacity 400ms ease';
+              base.frame.style.fillOpacity = '1';
+              channelTop.style.transition = 'opacity 500ms ease';
+              channelBottom.style.transition = 'opacity 500ms ease';
+              channelTop.style.opacity = '0.15';
+              channelBottom.style.opacity = '0.15';
+
+              // cut to the side view to show the channel clearly
+              setTimeout(function () {
+                cutToSideInset(inset, cameraGroup, CUT_HOLD, CUT_FADE);
+              }, 500);
+            }, 750);
+          }, 350);
+        }, CAMERA_LEAD);
       }
     };
   }
 
   function buildLaminatedTrace(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var base = buildSwatchBase(svg);
+    var cameraGroup = buildCameraGroup(svg);
+    var base = buildSwatchBase(cameraGroup);
 
     var layerDefs = [
       { fill: 'var(--ink-faint)', y: 38, h: 6 },   // adhesive
@@ -1500,7 +1614,7 @@
       rect.style.opacity = '0';
       rect.style.transformBox = 'fill-box';
       rect.style.transform = 'translateY(-70px)';
-      svg.appendChild(rect);
+      cameraGroup.appendChild(rect);
       return rect;
     });
 
@@ -1509,46 +1623,117 @@
       crossTicks.appendChild(svgEl('rect', { x: 116, y: t.y, width: 8, height: 5, fill: t.c }));
     });
     crossTicks.style.opacity = '0';
-    svg.appendChild(crossTicks);
+    cameraGroup.appendChild(crossTicks);
 
-    bringToFront(svg, base.padLeft);
-    bringToFront(svg, base.padRight);
+    bringToFront(cameraGroup, base.padLeft);
+    bringToFront(cameraGroup, base.padRight);
+    resetCamera(cameraGroup);
+
+    // side-view inset: the heat press actually closing on the layer stack
+    var inset = buildSideInset(svg, function (content) {
+      content.appendChild(svgEl('rect', { x: 70, y: 57, width: 100, height: 4, fill: 'var(--ink-faint)' }));
+      content.appendChild(svgEl('rect', { x: 70, y: 61, width: 100, height: 3, fill: 'var(--petrol-bright)' }));
+      content.appendChild(svgEl('rect', { x: 70, y: 64, width: 100, height: 4, fill: 'var(--ink-faint)' }));
+      var top = svgEl('rect', { x: 60, y: 26, width: 120, height: 10, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1, class: 'js-platen-top' });
+      var bot = svgEl('rect', { x: 60, y: 84, width: 120, height: 10, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1, class: 'js-platen-bottom' });
+      top.style.transformBox = 'fill-box';
+      bot.style.transformBox = 'fill-box';
+      content.appendChild(top);
+      content.appendChild(bot);
+    });
+    inset.style.transition = 'none';
+    inset.style.opacity = '0';
+    var platenTop = inset.querySelector('.js-platen-top');
+    var platenBottom = inset.querySelector('.js-platen-bottom');
+
     stage.appendChild(svg);
 
+    var LAYER_STAGGER = 260, LAYER_SETTLE_GAP = 500;
+    var CUT_FADE = 280, PLATEN_CLOSE_WAIT = 280, PLATEN_CLOSE_DUR = 400, PLATEN_HOLD = 500, PLATEN_RELEASE_DUR = 350, RELEASE_TO_FADEOUT = 400;
+    var FRAME_PRESS_WAIT = 260, CROSS_SHOW_DUR = 300, CROSS_HOLD = 650, CROSS_HIDE_DUR = 500;
+
+    var settleTime = layers.length * LAYER_STAGGER + LAYER_SETTLE_GAP;
+    var cutTotal = PLATEN_CLOSE_WAIT + PLATEN_HOLD + RELEASE_TO_FADEOUT + CUT_FADE + FRAME_PRESS_WAIT + CROSS_SHOW_DUR + CROSS_HOLD + CROSS_HIDE_DUR;
+
     return {
-      duration: 2000,
+      duration: CAMERA_LEAD + settleTime + cutTotal + 150,
       play: function () {
+        resetCamera(cameraGroup);
+        cameraGroup.getBoundingClientRect();
+        playCameraZoomIn(cameraGroup);
+
         crossTicks.style.transition = 'none';
         crossTicks.style.opacity = '0';
+        inset.style.transition = 'none';
+        inset.style.opacity = '0';
+        platenTop.style.transition = 'none';
+        platenTop.style.transform = 'translateY(0)';
+        platenBottom.style.transition = 'none';
+        platenBottom.style.transform = 'translateY(0)';
 
-        layers.forEach(function (rect, i) {
-          rect.style.transition = 'none';
-          rect.style.opacity = '0';
-          rect.style.transform = 'translateY(-70px)';
-          rect.getBoundingClientRect();
-          setTimeout(function () {
-            rect.style.transition = 'transform 500ms cubic-bezier(.25,.7,.3,1.1), opacity 300ms ease';
-            rect.style.opacity = '1';
-            rect.style.transform = 'translateY(0)';
-          }, i * 260);
-        });
-
-        var settleTime = layers.length * 260 + 500;
         setTimeout(function () {
-          base.frame.classList.remove('is-pressing');
-          base.frame.getBoundingClientRect();
-          base.frame.classList.add('is-pressing');
-        }, settleTime);
+          layers.forEach(function (rect, i) {
+            rect.style.transition = 'none';
+            rect.style.opacity = '0';
+            rect.style.transform = 'translateY(-70px)';
+            rect.getBoundingClientRect();
+            setTimeout(function () {
+              rect.style.transition = 'transform 500ms cubic-bezier(.25,.7,.3,1.1), opacity 300ms ease';
+              rect.style.opacity = '1';
+              rect.style.transform = 'translateY(0)';
+            }, i * LAYER_STAGGER);
+          });
 
-        var pressDone = settleTime + 260;
-        setTimeout(function () {
-          crossTicks.style.transition = 'opacity 300ms ease';
-          crossTicks.style.opacity = '1';
+          // cut to the side view right as the press closes on the stack
           setTimeout(function () {
-            crossTicks.style.transition = 'opacity 500ms ease';
-            crossTicks.style.opacity = '0';
-          }, 650);
-        }, pressDone);
+            cameraGroup.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
+            cameraGroup.style.opacity = '0.15';
+            inset.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
+            inset.getBoundingClientRect();
+            inset.style.opacity = '1';
+
+            setTimeout(function () {
+              platenTop.style.transition = 'transform ' + PLATEN_CLOSE_DUR + 'ms cubic-bezier(.4,0,.2,1)';
+              platenBottom.style.transition = 'transform ' + PLATEN_CLOSE_DUR + 'ms cubic-bezier(.4,0,.2,1)';
+              platenTop.getBoundingClientRect();
+              // close to just touch the stack's edges, not cover it — the
+              // whole point of this shot is that the layers stay visible
+              platenTop.style.transform = 'translateY(21px)';
+              platenBottom.style.transform = 'translateY(-16px)';
+
+              setTimeout(function () {
+                platenTop.style.transition = 'transform ' + PLATEN_RELEASE_DUR + 'ms ease';
+                platenBottom.style.transition = 'transform ' + PLATEN_RELEASE_DUR + 'ms ease';
+                platenTop.style.transform = 'translateY(0)';
+                platenBottom.style.transform = 'translateY(0)';
+
+                setTimeout(function () {
+                  inset.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
+                  inset.style.opacity = '0';
+                  cameraGroup.style.transition = 'opacity ' + CUT_FADE + 'ms ease';
+                  cameraGroup.style.opacity = '1';
+
+                  // back on the main view, give the swatch its own quick
+                  // press-pulse to echo what we just saw from the side
+                  setTimeout(function () {
+                    base.frame.classList.remove('is-pressing');
+                    base.frame.getBoundingClientRect();
+                    base.frame.classList.add('is-pressing');
+
+                    setTimeout(function () {
+                      crossTicks.style.transition = 'opacity ' + CROSS_SHOW_DUR + 'ms ease';
+                      crossTicks.style.opacity = '1';
+                      setTimeout(function () {
+                        crossTicks.style.transition = 'opacity ' + CROSS_HIDE_DUR + 'ms ease';
+                        crossTicks.style.opacity = '0';
+                      }, CROSS_HOLD);
+                    }, FRAME_PRESS_WAIT);
+                  }, CUT_FADE);
+                }, RELEASE_TO_FADEOUT);
+              }, PLATEN_HOLD);
+            }, PLATEN_CLOSE_WAIT);
+          }, settleTime);
+        }, CAMERA_LEAD);
       }
     };
   }
