@@ -252,6 +252,133 @@
 }
 
 /* ---------------------------------------------------
+   Textile circuit construction — six build methods
+--------------------------------------------------- */
+
+.circuit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.circuit-panel {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 2.25rem 1.25rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.circuit-grid .circuit-panel:nth-child(3n) {
+  border-right: none;
+}
+
+.circuit-grid .circuit-panel:nth-child(n+4) {
+  border-bottom: none;
+}
+
+.circuit-panel.is-playing {
+  border-color: var(--line-strong);
+  background: var(--black-raised);
+}
+
+.circuit-panel__index {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--petrol-bright);
+  margin-bottom: 0.75rem;
+}
+
+.circuit-panel__stage {
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 240 / 140;
+}
+
+.circuit-panel__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.circuit-panel__label {
+  margin-top: 1.5rem;
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink);
+  transition: color 0.2s ease;
+}
+
+.circuit-panel__label.is-active {
+  color: var(--petrol-bright);
+  font-weight: 600;
+}
+
+.circuit-panel__sublabel {
+  margin-top: 0.3rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+}
+
+.circuit-panel__caption {
+  margin-top: 0.9rem;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+/* shared fabric-swatch base */
+.circuit-fabric {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: fill-opacity 300ms ease;
+}
+
+.circuit-fabric.is-pressing {
+  animation: circuitPress 380ms ease-in-out;
+}
+
+@keyframes circuitPress {
+  0%   { transform: scaleY(1); }
+  45%  { transform: scaleY(0.9); }
+  100% { transform: scaleY(1); }
+}
+
+/* printed ink — trace looks "wet" until it cures */
+.js-ink-trace {
+  opacity: 0.7;
+  transition: opacity 400ms ease;
+}
+
+.js-ink-trace.is-cured {
+  opacity: 1;
+}
+
+/* metal coating — grows in from a small seed point */
+.js-coating {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.js-coating.is-growing {
+  animation: coatingGrow 550ms cubic-bezier(.2, .8, .3, 1) both;
+}
+
+@keyframes coatingGrow {
+  0%   { opacity: 0; transform: scale(0.25); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ---------------------------------------------------
    Responsive
 --------------------------------------------------- */
 
@@ -365,6 +492,21 @@
   .yarn-grid .yarn-panel:nth-child(2n) {
     border-right: none;
   }
+  .circuit-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .circuit-grid .circuit-panel:nth-child(3n) {
+    border-right: 1px solid var(--line);
+  }
+  .circuit-grid .circuit-panel:nth-child(2n) {
+    border-right: none;
+  }
+  .circuit-grid .circuit-panel:nth-child(n+4) {
+    border-bottom: 1px solid var(--line);
+  }
+  .circuit-grid .circuit-panel:nth-child(n+5) {
+    border-bottom: none;
+  }
 }
 
 @media (max-width: 560px) {
@@ -379,5 +521,15 @@
   }
   .covered-grid .covered-panel {
     border-right: none !important;
+  }
+  .circuit-grid {
+    grid-template-columns: 1fr;
+  }
+  .circuit-grid .circuit-panel {
+    border-right: none !important;
+    border-bottom: 1px solid var(--line) !important;
+  }
+  .circuit-grid .circuit-panel:last-child {
+    border-bottom: none !important;
   }
 }
