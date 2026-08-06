@@ -1369,15 +1369,25 @@
     primeDraw(traceBase);
     primeDraw(traceHighlight);
 
-    // Dispenser: a small cartridge body over a tapered needle tip. The
-    // tip's very point sits at the group's own origin (0,0) -- the
-    // nozzle's transform translates that origin to sample(t) every
-    // frame, so the tip lands exactly on the trace's centerline rather
-    // than hovering above or below the line it's dispensing. Appended
-    // last, so it paints over the fabric and trace at every angle.
+    // Dispenser: a small cartridge body over a tapered needle tip, plus a
+    // bright bead sitting exactly at the tip. The tip's very point (and
+    // the bead) sit at the group's own origin (0,0) -- the nozzle's
+    // transform translates that origin to sample(t) every frame, so both
+    // land exactly on the trace's centerline rather than hovering above
+    // or below the line it's dispensing. The bead matters visually: the
+    // needle taper connecting the (clearly visible) cartridge body down
+    // to the trace is thin, and at render size that thin connector reads
+    // as a gap, making the solid cartridge look like it's floating above
+    // the line rather than sitting on it. The bead is small but bright
+    // and color-matched to the trace, drawn last so it's the very
+    // topmost pixel at the tip -- it's the unambiguous "ink is coming
+    // out exactly here, on the trace" anchor. Appended last as a group,
+    // so the whole dispenser paints over the fabric and trace at every
+    // angle.
     var nozzle = el('g', {});
     nozzle.appendChild(el('rect', { x: -5, y: -26, width: 10, height: 16, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     nozzle.appendChild(el('path', { d: 'M-3,-10 L3,-10 L1,0 L-1,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
+    nozzle.appendChild(el('circle', { cx: 0, cy: 0, r: 2.2, fill: 'var(--petrol-bright)' }));
     camera.appendChild(nozzle);
 
     // ---- timing ----
