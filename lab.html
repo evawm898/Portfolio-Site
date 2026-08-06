@@ -1334,6 +1334,52 @@
     var INK_HOLD = 1100, INK_REVERSE_DUR = 1100;
     var INK_PAN_TOTAL = INK_TILT_DUR + INK_HOLD + INK_REVERSE_DUR;
 
+    // The tilt-in swings past the rest angle toward something reading as
+    // near side-on before easing back — same idea as a CSS overshoot
+    // easing curve, but driven frame-by-frame instead of through
+    // `transition: transform ... cubic-bezier(...)`. That CSS version
+    // reproduced a mirrored ghost trace/nozzle partway through the pan on
+    // at least one real browser, even though neither a static transform
+    // at the exact peak angle (81.5deg/-30.9deg) nor a full frame-by-frame
+    // capture of the live transition reproduced it here — which points at
+    // the CSS transition/compositor path itself as the trigger, not the
+    // angle values reached. Interpolating it ourselves and writing
+    // `scene.style.transform` directly each frame sidesteps that path
+    // entirely. TILT_PEAK_RX_CLAMP is a hard, explicit ceiling on top of
+    // that: the curve below (bezier control points 0.2, 2.2, 0.5, 1) has
+    // a natural peak around 77deg — comfortably under the clamp — so the
+    // clamp is a backstop that should never actually engage, not the
+    // thing doing the shaping.
+    var TILT_PEAK_RX_CLAMP = 79;
+
+    function tiltBezierY(t, x1, y1, x2, y2) {
+      function xOf(s) { return 3 * (1 - s) * (1 - s) * s * x1 + 3 * (1 - s) * s * s * x2 + s * s * s; }
+      function yOf(s) { return 3 * (1 - s) * (1 - s) * s * y1 + 3 * (1 - s) * s * s * y2 + s * s * s; }
+      var lo = 0, hi = 1, s = 0.5;
+      for (var i = 0; i < 24; i++) {
+        s = (lo + hi) / 2;
+        if (xOf(s) < t) lo = s; else hi = s;
+      }
+      return yOf(s);
+    }
+
+    var tiltRaf = null;
+    function runTilt(toRX, toRY, dur, onDone) {
+      var start = performance.now();
+      if (tiltRaf) cancelAnimationFrame(tiltRaf);
+      scene.style.transition = 'none';
+      function frame(now) {
+        var raw = Math.max(0, Math.min(1, (now - start) / dur));
+        var eased = tiltBezierY(raw, 0.2, 2.2, 0.5, 1);
+        var rx = Math.min(toRX * eased, TILT_PEAK_RX_CLAMP);
+        var ry = toRY * eased;
+        scene.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg)';
+        if (raw < 1) tiltRaf = requestAnimationFrame(frame);
+        else if (onDone) onDone();
+      }
+      tiltRaf = requestAnimationFrame(frame);
+    }
+
     function resetToStart() {
       resetCamera(cameraGroup);
       resetScenePan(scene);
@@ -1389,21 +1435,13 @@
             // reverses.
             runPass(cutT, cutT + slowSpan, INK_PAN_TOTAL);
 
-            // Still one continuous transition, not a second chained one —
-            // but an overshoot easing curve instead of plain ease-in-out,
-            // so the motion visibly swings past the final 58deg/-22deg
-            // rest angle toward something reading as near side-on
-            // (~81deg, peaking around a third of the way through) before
-            // easing back down into the settled 3/4 angle. The curve's
-            // endpoint is still exactly (1,1) like any transition timing
-            // function, so it still lands precisely on INK_REST_RX/RY —
-            // this only reshapes the path getting there, not where it
-            // ends up or when.
-            scene.getBoundingClientRect();
-            scene.style.transition = 'transform ' + INK_TILT_DUR + 'ms cubic-bezier(0.15, 2.4, 0.45, 1)';
-            scene.style.transform = 'rotateX(' + INK_REST_RX + 'deg) rotateY(' + INK_REST_RY + 'deg)';
-
-            setTimeout(function () {
+            // Still one continuous move, not a second chained stage —
+            // just driven frame-by-frame (runTilt) instead of through a
+            // CSS transition, so the overshoot swing toward near side-on
+            // is fully our own interpolation rather than the browser's
+            // transition/compositor path. Lands exactly on
+            // INK_REST_RX/RY at the end either way.
+            runTilt(INK_REST_RX, INK_REST_RY, INK_TILT_DUR, function () {
               setTimeout(function () {
                 // 3. pan back, then finish the pass at normal speed so
                 // the completed trace resolves promptly
@@ -1420,7 +1458,7 @@
                   });
                 }, INK_REVERSE_DUR);
               }, INK_HOLD);
-            }, INK_TILT_DUR);
+            });
           });
         }, CAMERA_LEAD);
       }
