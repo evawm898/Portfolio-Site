@@ -359,6 +359,42 @@
   transform: translateZ(4px) rotateX(90deg);
 }
 
+/* Printed conductive ink's own 3D stage — deliberately separate from
+   .circuit-3d-* above. That shared rig is a two-face hinge built for
+   wire/laminated, which genuinely need a second, folded face to reveal
+   a cross-section. Ink has no cross-section to reveal — its 3/4 view is
+   just the same single swatch viewed from an angle — so it gets its own
+   single-face rig here. Keeping it as its own named class (rather than
+   reusing .circuit-3d-face) means a future change to the hinge rig can
+   never accidentally affect ink, and vice versa. */
+.ink3d-stage {
+  width: 100%;
+  height: 100%;
+  perspective: 420px;
+}
+
+.ink3d-scene {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transform-origin: 50% 50%;
+}
+
+.ink3d-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  /* There's only one face here, so this isn't hiding a second plane's
+     backside from bleeding through anything — it's just the correct,
+     literal behavior for a single tilted plane: past edge-on it should
+     read as gone, not as a mirrored duplicate of itself. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 .circuit-panel__label {
   margin-top: 1.5rem;
   font-family: var(--serif);

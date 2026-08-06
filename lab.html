@@ -1020,29 +1020,6 @@
     return { topSvg: topSvg, frontSvg: frontSvg, scene: scene };
   }
 
-  // Printed ink doesn't need a second, hinged face at all — there's no
-  // cross-section to reveal, just one plane viewed from an angle. Using
-  // build3DStage's two-face rig for that meant a second face sharing the
-  // same 3D space, and even with the front face left empty, "two faces
-  // that might not move in perfect lockstep" was a real structural
-  // question worth removing rather than reasoning about. This variant
-  // has exactly one face, so there is no second thing that could ever
-  // rotate out of sync with it — one scene, one pivot, one face.
-  function buildSingleFaceStage(stage) {
-    var stage3d = document.createElement('div');
-    stage3d.className = 'circuit-3d-stage';
-    var scene = document.createElement('div');
-    scene.className = 'circuit-3d-scene';
-    var face = document.createElement('div');
-    face.className = 'circuit-3d-face circuit-3d-face--top';
-    var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    face.appendChild(svg);
-    scene.appendChild(face);
-    stage3d.appendChild(scene);
-    stage.appendChild(stage3d);
-    return { svg: svg, scene: scene };
-  }
-
   // Deliberately slow — this pan is the moment meant to teach the viewer
   // something the top-down view can't, so it lingers rather than rushes:
   // a slow tilt down, a slow swing round to the 3/4 angle, a real pause
@@ -1271,116 +1248,168 @@
     };
   }
 
-  // Printed ink needs to read unmistakably as screen printing onto the
-  // fabric, not just a line drawing itself: a screen frame descends over
-  // the print zone, the squeegee drags ink through it left to right, then
-  // the frame lifts away to reveal the trace. The ink itself is a wide
-  // translucent band (not a thin stroke) so the fabric's own weave stays
-  // visible through it, on the surface, the way real screen ink sits on
-  // top of a textile rather than replacing it.
-  // Printed ink is a direct-write dispense, not screen printing: a nozzle
-  // needle rides a serpentine path from pad to pad, extruding a raised
-  // bead of paste behind it (a bright base stroke plus a thin lighter
-  // highlight running down its center, rather than a flat line).
+  // =====================================================================
+  // Printed conductive ink — self-contained animation module.
   //
-  // Camera: a single plane (buildSingleFaceStage — no hinged second face
-  // at all, see its comment) tilts from directly overhead to a 3/4 angle
-  // and back, entirely hand-driven frame-by-frame — never a CSS
-  // `transition`. Every rotation value the viewer ever sees is one this
-  // code computed and wrote to `scene.style.transform` itself; nothing is
-  // handed off to the browser's transition/compositor timing to
-  // interpolate on its own. That's the direct fix for three symptoms
-  // that kept coming back with the CSS-transition version: a mirrored
-  // ghost copy of the trace/nozzle appearing partway through the pan
-  // (backface-related, but the CSS version reproduced it even without a
-  // static angle test agreeing on where the threshold was — which
-  // pointed at the transition/compositor path itself, not a specific
-  // degree value), visible bounce/jitter, and — since ink used to reuse
-  // the wire/laminated two-face hinge rig — a second face that could, in
-  // principle, ever be a frame behind the first. With one face and one
-  // hand-rolled rAF loop driving it, there's exactly one thing rotating,
-  // around exactly one pivot (the scene element's own center, which
-  // — because SWATCH sits centered in the shared 240x140 viewBox and the
-  // svg fills the whole face — lands on the swatch/trace/nozzle, not
-  // some off-center corner of the stage), and its angle at any instant is
-  // whatever this code just wrote, not something inferred from a curve
-  // the browser is still mid-transition on.
+  // Everything this needs (SVG creation, path sampling, easing, the 3D
+  // stage) is defined inside buildPrintedInk itself rather than reaching
+  // into any shared helper used by the other five panels — it can be
+  // lifted out of this file and tested on its own, and nothing else on
+  // the page can affect it or be affected by it.
+  //
+  // Visual: a nozzle dispenses conductive ink along a serpentine path
+  // onto a fabric swatch, viewed from directly overhead. Partway through,
+  // the dispense pace deliberately slows and the camera tilts from
+  // bird's-eye toward a 3/4 angle -- swinging through something that
+  // reads as near side-on on the way there -- holds at the settled 3/4
+  // angle so the nozzle is clearly seen mid-dispense, then reverses
+  // (faster, since the return isn't the informative part) back to fully
+  // overhead as the trace finishes.
+  //
+  // Camera mechanics: one flat plane -- one div "face" holding one <svg> --
+  // tilts in 3D as a single rigid body. There is no second face, so
+  // there is nothing that could ever rotate out of sync with it, and no
+  // depth-sorting between separate planes for the nozzle to lose: it's
+  // the last thing drawn into that one plane, so paint order alone keeps
+  // it on top of the fabric at every angle. The rotation is driven
+  // frame-by-frame via requestAnimationFrame -- every value written to
+  // `scene.style.transform` is one this code computed on this tick, never
+  // a CSS `transition` handed off to the browser's own timing/compositor
+  // to interpolate. TILT_CLAMP_DEG is an explicit ceiling tested directly
+  // against this exact DOM (see its comment below) rather than assumed.
   function buildPrintedInk(stage) {
-    var faces = buildSingleFaceStage(stage);
-    var topSvg = faces.svg, scene = faces.scene;
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    function el(tag, attrs) {
+      var e = document.createElementNS(SVG_NS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+    function lerp(a, b, t) { return a + (b - a) * t; }
 
-    var cameraGroup = buildCameraGroup(topSvg);
-    var base = buildSwatchBase(cameraGroup);
+    // ---- geometry: a 240x140 canvas, swatch centered within it so the
+    // scene's default rotation pivot (its own center) lands on the
+    // swatch/trace/nozzle, not some off-center corner of the stage ----
+    var SW = { x: 20, y: 30, w: 200, h: 80 };
+    var midY = SW.y + SW.h / 2;
+    var padL = SW.x + 4, padR = SW.x + SW.w - 4;
+
+    // ---- DOM: one stage > one 3D scene > one face > one svg. Exactly
+    // one plane, so "do the faces move in lockstep" is true by
+    // construction -- there's only ever one. ----
+    var stageEl = document.createElement('div');
+    stageEl.className = 'ink3d-stage';
+    var scene = document.createElement('div');
+    scene.className = 'ink3d-scene';
+    var face = document.createElement('div');
+    face.className = 'ink3d-face';
+    var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+    face.appendChild(svg);
+    scene.appendChild(face);
+    stageEl.appendChild(scene);
+    stage.appendChild(stageEl);
+
+    // Everything that zooms/tilts together, appended in strict
+    // back-to-front paint order: fabric, then weave texture, then pads,
+    // then the trace, then the nozzle last -- so the nozzle is always the
+    // topmost thing sitting on the fabric surface, at every angle, as a
+    // direct consequence of DOM order rather than anything that needs
+    // separate z-index/depth management.
+    var camera = el('g', {});
+    camera.style.transformBox = 'fill-box';
+    camera.style.transformOrigin = 'center';
+    svg.appendChild(camera);
+
+    camera.appendChild(el('rect', {
+      x: SW.x, y: SW.y, width: SW.w, height: SW.h, rx: 3,
+      fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5
+    }));
+
+    var weave = el('g', { opacity: 0.5 });
+    [46, 62, 78, 94].forEach(function (y) {
+      weave.appendChild(el('line', { x1: SW.x, y1: y, x2: SW.x + SW.w, y2: y, stroke: 'var(--line)', 'stroke-width': 0.75 }));
+    });
+    [40, 60, 80, 100, 120, 140, 160, 180, 200].forEach(function (x) {
+      weave.appendChild(el('line', { x1: x, y1: SW.y, x2: x, y2: SW.y + SW.h, stroke: 'var(--line)', 'stroke-width': 0.75 }));
+    });
+    camera.appendChild(weave);
+
+    camera.appendChild(el('circle', { cx: SW.x, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    camera.appendChild(el('circle', { cx: SW.x + SW.w, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
 
     // serpentine path, starting and ending exactly on the pads
     var amp = 24, lobes = 3;
     function sample(t) {
-      var x = lerp(SWATCH.left, SWATCH.right, t);
-      var y = SWATCH.midY + amp * Math.sin(2 * Math.PI * lobes * t);
+      var x = lerp(padL, padR, t);
+      var y = midY + amp * Math.sin(2 * Math.PI * lobes * t);
       return [x, y];
     }
-    var pathD = arcPath(sample, 0, 1, 160);
+    var pathD = (function () {
+      var steps = 160, parts = [];
+      for (var i = 0; i <= steps; i++) {
+        var p = sample(i / steps);
+        parts.push(p[0].toFixed(2) + ',' + p[1].toFixed(2));
+      }
+      return 'M' + parts.join(' L');
+    })();
 
-    var traceBase = svgEl('path', {
-      d: pathD, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 5,
-      'stroke-linecap': 'round', 'stroke-linejoin': 'round'
-    });
-    var traceHighlight = svgEl('path', {
-      d: pathD, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.4,
-      'stroke-linecap': 'round', class: 'js-ink-highlight'
-    });
-    cameraGroup.appendChild(traceBase);
-    cameraGroup.appendChild(traceHighlight);
-    resetDraw(traceBase);
-    resetDraw(traceHighlight);
+    var traceBase = el('path', { d: pathD, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    var traceHighlight = el('path', { d: pathD, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.4, 'stroke-linecap': 'round' });
+    camera.appendChild(traceBase);
+    camera.appendChild(traceHighlight);
 
-    // dispenser: a small cartridge body over a tapered needle tip. The
-    // tip's very point sits at the group's own origin (0,0) — nozzle's
-    // transform translates that origin to sample(t) every frame, so the
-    // tip lands exactly on the trace's centerline rather than hovering
-    // a few units above or below the line it's supposedly dispensing.
-    // This is the only nozzle that exists at any point in the sequence —
-    // there is no second face for a second one to live on.
-    var nozzle = svgEl('g', {});
-    nozzle.appendChild(svgEl('rect', { x: -5, y: -26, width: 10, height: 16, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    nozzle.appendChild(svgEl('path', { d: 'M-3,-10 L3,-10 L1,0 L-1,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
-    cameraGroup.appendChild(nozzle);
+    function primeDraw(path) {
+      var len = path.dataset.len;
+      if (!len) { len = path.getTotalLength(); path.dataset.len = len; }
+      path.style.transition = 'none';
+      path.style.strokeDasharray = len + ' ' + len;
+      path.style.strokeDashoffset = len;
+      path.getBoundingClientRect(); // force reflow before re-enabling transitions
+      path.style.transition = '';
+    }
+    primeDraw(traceBase);
+    primeDraw(traceHighlight);
 
-    bringToFront(cameraGroup, base.padLeft);
-    bringToFront(cameraGroup, base.padRight);
+    // Dispenser: a small cartridge body over a tapered needle tip. The
+    // tip's very point sits at the group's own origin (0,0) -- the
+    // nozzle's transform translates that origin to sample(t) every
+    // frame, so the tip lands exactly on the trace's centerline rather
+    // than hovering above or below the line it's dispensing. Appended
+    // last, so it paints over the fabric and trace at every angle.
+    var nozzle = el('g', {});
+    nozzle.appendChild(el('rect', { x: -5, y: -26, width: 10, height: 16, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    nozzle.appendChild(el('path', { d: 'M-3,-10 L3,-10 L1,0 L-1,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
+    camera.appendChild(nozzle);
 
+    // ---- timing ----
+    var ZOOM_DUR = 450, ZOOM_GAP = 90, LEAD = ZOOM_DUR + ZOOM_GAP;
     var passDuration = 1100, cutT = 0.42, slowSpan = 0.2;
-    var SETTLE_DELAY = 150, SETTLE_DUR = 400;
-    var raf = null;
+    // Tilt-in is the deliberate, unhurried leg -- it's the informative
+    // part of the shot. Reverse is quicker: once the viewer has
+    // registered the 3/4 angle, getting back overhead doesn't need the
+    // same patience.
+    var TILT_DUR = 1300, REST_RX = 58, REST_RY = -22;
+    var HOLD = 1100, REVERSE_DUR = 650;
+    var CAMERA_MOVE_TOTAL = TILT_DUR + HOLD + REVERSE_DUR;
+    var NOZZLE_FADE = 260, SETTLE_DELAY = 150, SETTLE_DUR = 400;
 
-    // Tilt-in is the deliberate, unhurried leg — it's the informative
-    // part of the shot, so it takes its time. Reverse is quicker: once
-    // the viewer has registered the 3/4 angle, getting back overhead
-    // doesn't need the same patience.
-    var INK_TILT_DUR = 1300, INK_REST_RX = 58, INK_REST_RY = -22;
-    var INK_HOLD = 1100, INK_REVERSE_DUR = 650;
-    var INK_PAN_TOTAL = INK_TILT_DUR + INK_HOLD + INK_REVERSE_DUR;
-
-    // TILT_PEAK_RX_CLAMP is a hard, explicit ceiling on the tilt-in's
-    // rotateX, tested directly against this exact single-face
-    // implementation (static transforms at 5deg steps from 60-90deg,
-    // plus a 25ms-interval screenshot burst through the live animated
-    // tilt) rather than assumed from the ~82deg figure earlier comments
-    // in this file mention — that figure came from the old two-face
-    // hinge rig and doesn't necessarily carry over. Nothing ghosted at
-    // any angle tested here, up to and including 90deg, but the clamp
-    // stays in as a deliberate backstop regardless: easeTiltOvershoot's
-    // own natural peak (~77deg) already sits comfortably under it, so in
-    // normal operation this is enforcing a ceiling the curve was never
-    // going to reach on its own, not doing the shaping itself.
-    var TILT_PEAK_RX_CLAMP = 79;
+    // Explicit ceiling on the tilt's rotateX, tested directly against
+    // this exact single-face DOM: static rotateX/rotateY transforms in
+    // 5deg steps from 60-90deg, plus a screenshot burst through the live
+    // animated tilt, show no duplicate/mirrored geometry at any angle up
+    // to and including a full 90deg (at 90 the plane is simply edge-on
+    // and invisible -- the expected result of backface-visibility:hidden
+    // on a single plane, not a ghost). The clamp stays in regardless, as
+    // a deliberate backstop: easeOvershoot's own natural peak (~77deg)
+    // already sits comfortably under it, so in normal operation this is
+    // enforcing a ceiling the curve was never going to reach on its own.
+    var TILT_CLAMP_DEG = 79;
 
     // Cubic-bezier evaluator (bisection solve for s given x=t, then
-    // y(s)) — the same math a CSS timing function uses internally, just
+    // y(s)) -- the same math a CSS timing function uses internally, just
     // computed here and applied via direct per-frame style writes
-    // instead of a `transition`, so every intermediate value is one this
-    // code chose, not the compositor's.
-    function cubicBezierY(t, x1, y1, x2, y2) {
+    // instead of a `transition`, so every intermediate rotation value is
+    // one this code chose on this tick, not the compositor's.
+    function bezierY(t, x1, y1, x2, y2) {
       function xOf(s) { return 3 * (1 - s) * (1 - s) * s * x1 + 3 * (1 - s) * s * s * x2 + s * s * s; }
       function yOf(s) { return 3 * (1 - s) * (1 - s) * s * y1 + 3 * (1 - s) * s * s * y2 + s * s * s; }
       var lo = 0, hi = 1, s = 0.5;
@@ -1390,29 +1419,28 @@
       }
       return yOf(s);
     }
-    // Tilt-in: swings past the rest angle toward something reading as
-    // near side-on (peaks ~t=0.37 of the tilt) before easing back to
-    // settle exactly on rest — the "passes through a side-on read on its
-    // way to 3/4" motion from a single progress curve, not two stages.
-    function easeTiltOvershoot(t) { return cubicBezierY(t, 0.2, 2.2, 0.5, 1); }
-    // Reverse: plain decelerate, no overshoot — it's not showing the
-    // viewer anything new on the way back down.
-    function easeTiltReturn(t) { return 1 - Math.pow(1 - t, 3); }
+    // Tilt-in: overshoots past the rest angle toward a near side-on read
+    // (peaks ~t=0.37 of the tilt) before easing back to settle exactly
+    // at REST_RX/REST_RY -- one continuous curve, not two stages.
+    function easeOvershoot(t) { return bezierY(t, 0.2, 2.2, 0.5, 1); }
+    // Reverse: plain decelerate, no overshoot -- nothing new to show the
+    // viewer on the way back down.
+    function easeReturn(t) { return 1 - Math.pow(1 - t, 3); }
 
     var tiltRaf = null;
-    // One rAF loop drives both legs (just a different ease + endpoints),
-    // so the tilt-in and the reverse are the same mechanism, not two
-    // independently-built animations that merely happen to look similar.
+    // One rAF loop drives both the tilt-in and the reverse (different
+    // endpoints/easing, same mechanism) -- every frame writes
+    // rotateX/rotateY straight onto `scene`, so the browser is never
+    // asked to interpolate any of it on its own.
     function runTilt(fromRX, fromRY, toRX, toRY, dur, easeFn, onDone) {
       var start = performance.now();
       if (tiltRaf) cancelAnimationFrame(tiltRaf);
       scene.style.transition = 'none';
       function frame(now) {
         var raw = Math.max(0, Math.min(1, (now - start) / dur));
-        var eased = easeFn(raw);
-        var rx = fromRX + (toRX - fromRX) * eased;
-        var ry = fromRY + (toRY - fromRY) * eased;
-        rx = Math.min(rx, TILT_PEAK_RX_CLAMP);
+        var k = easeFn(raw);
+        var rx = Math.min(fromRX + (toRX - fromRX) * k, TILT_CLAMP_DEG);
+        var ry = fromRY + (toRY - fromRY) * k;
         scene.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg)';
         if (raw < 1) tiltRaf = requestAnimationFrame(frame);
         else if (onDone) onDone();
@@ -1420,11 +1448,14 @@
       tiltRaf = requestAnimationFrame(frame);
     }
 
+    var raf = null;
     function resetToStart() {
-      resetCamera(cameraGroup);
-      resetScenePan(scene);
-      resetDraw(traceBase);
-      resetDraw(traceHighlight);
+      camera.style.transition = 'none';
+      camera.style.transform = 'scale(0.72)';
+      scene.style.transition = 'none';
+      scene.style.transform = 'rotateX(0deg) rotateY(0deg)';
+      primeDraw(traceBase);
+      primeDraw(traceHighlight);
       traceHighlight.style.transition = 'none';
       traceHighlight.style.opacity = '0.4';
       nozzle.style.transition = 'none';
@@ -1435,11 +1466,12 @@
     resetToStart();
 
     return {
-      duration: CAMERA_LEAD + passDuration * cutT + INK_PAN_TOTAL + passDuration * (1 - cutT - slowSpan) + 260 + SETTLE_DELAY + SETTLE_DUR + 150,
+      duration: LEAD + passDuration * cutT + CAMERA_MOVE_TOTAL + passDuration * (1 - cutT - slowSpan) + NOZZLE_FADE + SETTLE_DELAY + SETTLE_DUR + 150,
       play: function () {
         resetToStart();
-        cameraGroup.getBoundingClientRect();
-        playCameraZoomIn(cameraGroup);
+        camera.getBoundingClientRect();
+        camera.style.transition = 'transform ' + ZOOM_DUR + 'ms cubic-bezier(.25,.7,.3,1.05)';
+        camera.style.transform = 'scale(1)';
 
         setTimeout(function () {
           nozzle.style.transition = 'none';
@@ -1449,9 +1481,10 @@
           var lenBase = Number(traceBase.dataset.len);
           var lenHi = Number(traceHighlight.dataset.len);
 
-          // Drives both the nozzle's position and the trace's reveal from
-          // the identical t every frame — they can never drift apart,
-          // because they're never anything but the same number.
+          // Drives the nozzle's position and the trace's reveal off the
+          // identical t, every single frame -- they're never two numbers
+          // that could drift apart, because they're never anything but
+          // the same number.
           function runPass(fromT, toT, dur, onDone) {
             var start = performance.now();
             if (raf) cancelAnimationFrame(raf);
@@ -1468,24 +1501,24 @@
             raf = requestAnimationFrame(frame);
           }
 
-          // 1. dispense at normal speed, camera still directly overhead
+          // 1. dispense at normal speed, camera flat overhead
           runPass(0, cutT, passDuration * cutT, function () {
-            // 2. the pace slows way down for the entire camera move —
-            // tilt to the 3/4 angle, hold there, then pan back — one
-            // continuous slow pass covering all of it (INK_PAN_TOTAL), so
-            // the nozzle is still visibly dispensing through every stage
-            // instead of freezing while the camera holds or reverses.
-            runPass(cutT, cutT + slowSpan, INK_PAN_TOTAL);
+            // 2. slow the pace way down for the entire camera move --
+            // never freezing, just covering less trace per second while
+            // the camera tilts, holds, and returns (one continuous slow
+            // pass spanning all of CAMERA_MOVE_TOTAL).
+            runPass(cutT, cutT + slowSpan, CAMERA_MOVE_TOTAL);
 
-            // 3/4/5. tilt in (overshoot, slow) → hold → tilt back
-            // (plain decelerate, quicker) → finish the pass at normal
-            // speed so the completed trace resolves promptly, camera
-            // fully overhead.
-            runTilt(0, 0, INK_REST_RX, INK_REST_RY, INK_TILT_DUR, easeTiltOvershoot, function () {
+            // 3/4/5. tilt to the 3/4 angle (slow, overshoots through a
+            // near side-on read) -> hold -> tilt back to flat (quicker,
+            // no overshoot).
+            runTilt(0, 0, REST_RX, REST_RY, TILT_DUR, easeOvershoot, function () {
               setTimeout(function () {
-                runTilt(INK_REST_RX, INK_REST_RY, 0, 0, INK_REVERSE_DUR, easeTiltReturn, function () {
+                runTilt(REST_RX, REST_RY, 0, 0, REVERSE_DUR, easeReturn, function () {
+                  // 6. camera is back overhead -- finish the trace at
+                  // normal speed so it resolves promptly
                   runPass(cutT + slowSpan, 1, passDuration * (1 - cutT - slowSpan), function () {
-                    nozzle.style.transition = 'opacity 260ms ease';
+                    nozzle.style.transition = 'opacity ' + NOZZLE_FADE + 'ms ease';
                     nozzle.style.opacity = '0';
                     setTimeout(function () {
                       traceHighlight.style.transition = 'opacity ' + SETTLE_DUR + 'ms ease';
@@ -1493,10 +1526,10 @@
                     }, SETTLE_DELAY);
                   });
                 });
-              }, INK_HOLD);
+              }, HOLD);
             });
           });
-        }, CAMERA_LEAD);
+        }, LEAD);
       }
     };
   }
