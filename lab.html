@@ -1261,9 +1261,23 @@
   // highlight running down its center, rather than a flat line). Partway
   // through the pass we cut to a close side-on inset so the needle
   // actually touching the fabric and dispensing reads unmistakably.
+  // Printed ink shows a single tilted plane, not a folded cross-section:
+  // unlike wire/laminated, there's nothing "inside" the fabric to reveal
+  // here — the point of the 3/4 view is just to see the same nozzle and
+  // trace from an angle, matching the reference photo. Reusing the
+  // wire/laminated two-face hinge rig for that meant a second, separate
+  // nozzle icon living on the folded-up front face — even fully synced
+  // and correctly positioned, it was a second real element occupying its
+  // own screen position while the top one was also (however faintly)
+  // still visible, and it read as a duplicate. So ink doesn't use the
+  // front face at all: the single top plane (trace, nozzle, everything)
+  // just rotates as one rigid body to a moderate angle and back — one
+  // nozzle, one trace, the whole time, and since that angle never
+  // approaches edge-on, there's no backface/foreshortening-to-nothing
+  // to worry about either.
   function buildPrintedInk(stage) {
     var faces = build3DStage(stage);
-    var topSvg = faces.topSvg, frontSvg = faces.frontSvg, scene = faces.scene;
+    var topSvg = faces.topSvg, scene = faces.scene;
 
     var cameraGroup = buildCameraGroup(topSvg);
     var base = buildSwatchBase(cameraGroup);
@@ -1295,6 +1309,9 @@
     // transform translates that origin to sample(t) every frame, so the
     // tip lands exactly on the trace's centerline rather than hovering
     // a few units above or below the line it's supposedly dispensing.
+    // This is the only nozzle ink has — it rotates along with the rest
+    // of cameraGroup when the plane tilts, so it's never redrawn as a
+    // separate element on a separate face.
     var nozzle = svgEl('g', {});
     nozzle.appendChild(svgEl('rect', { x: -5, y: -26, width: 10, height: 16, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     nozzle.appendChild(svgEl('path', { d: 'M-3,-10 L3,-10 L1,0 L-1,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
@@ -1303,19 +1320,19 @@
     bringToFront(cameraGroup, base.padLeft);
     bringToFront(cameraGroup, base.padRight);
 
-    // front face: the fabric edge-on, with the same dispenser hovering at
-    // whatever x it had reached when the camera panned down to see it
-    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x, y: 112, width: SWATCH.w, height: 8, rx: 2, fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    var frontNozzle = svgEl('g', {});
-    frontNozzle.appendChild(svgEl('rect', { x: -7, y: -24, width: 14, height: 18, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    frontNozzle.appendChild(svgEl('path', { d: 'M-3,-6 L3,-6 L1.2,0 L-1.2,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
-    var frontBead = svgEl('circle', { cx: 0, cy: 0, r: 2.6, fill: 'var(--petrol-bright)' });
-    frontNozzle.appendChild(frontBead);
-    frontSvg.appendChild(frontNozzle);
-
     var passDuration = 1100, cutT = 0.42, slowSpan = 0.2;
     var SETTLE_DELAY = 150, SETTLE_DUR = 400;
     var raf = null;
+
+    // A single continuous tilt to the 3/4 angle and a single continuous
+    // tilt back — never a separate "swing through a full side view"
+    // stage — so the plane, trace, and nozzle stay legible the entire
+    // time instead of ever passing through edge-on, and there's exactly
+    // one easing curve each way with no seam for the motion to visibly
+    // kink at.
+    var INK_TILT_DUR = 1300, INK_REST_RX = 58, INK_REST_RY = -22;
+    var INK_HOLD = 1100, INK_REVERSE_DUR = 1100;
+    var INK_PAN_TOTAL = INK_TILT_DUR + INK_HOLD + INK_REVERSE_DUR;
 
     function resetToStart() {
       resetCamera(cameraGroup);
@@ -1328,14 +1345,11 @@
       nozzle.style.opacity = '0';
       var p0 = sample(0);
       nozzle.setAttribute('transform', 'translate(' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) + ')');
-      frontNozzle.setAttribute('transform', 'translate(' + p0[0].toFixed(2) + ',112)');
-      frontBead.style.transition = 'none';
-      frontBead.style.opacity = '0';
     }
     resetToStart();
 
     return {
-      duration: CAMERA_LEAD + passDuration * cutT + PAN_TOTAL + passDuration * (1 - cutT - slowSpan) + 260 + SETTLE_DELAY + SETTLE_DUR + 150,
+      duration: CAMERA_LEAD + passDuration * cutT + INK_PAN_TOTAL + passDuration * (1 - cutT - slowSpan) + 260 + SETTLE_DELAY + SETTLE_DUR + 150,
       play: function () {
         resetToStart();
         cameraGroup.getBoundingClientRect();
@@ -1349,14 +1363,6 @@
           var lenBase = Number(traceBase.dataset.len);
           var lenHi = Number(traceHighlight.dataset.len);
 
-          // Both nozzles (the top-down one and the one on the folded-up
-          // front face) track the identical t every frame, not just the
-          // top one with the front one patched in once at the end — the
-          // front face starts becoming geometrically visible as soon as
-          // the scene begins rotating (well before the camera settles
-          // into the held 3/4 view), so a front nozzle only updated on
-          // pass completion sat frozen at its start-of-pass position for
-          // most of the pan, reading as disconnected from the trace.
           function runPass(fromT, toT, dur, onDone) {
             var start = performance.now();
             if (raf) cancelAnimationFrame(raf);
@@ -1365,7 +1371,6 @@
               var t = fromT + (toT - fromT) * raw;
               var p = sample(t);
               nozzle.setAttribute('transform', 'translate(' + p[0].toFixed(2) + ',' + p[1].toFixed(2) + ')');
-              frontNozzle.setAttribute('transform', 'translate(' + p[0].toFixed(2) + ',112)');
               traceBase.style.strokeDashoffset = String(lenBase * (1 - t));
               traceHighlight.style.strokeDashoffset = String(lenHi * (1 - t));
               if (raw < 1) raf = requestAnimationFrame(frame);
@@ -1376,51 +1381,36 @@
 
           // 1. dispense at normal speed, camera still directly overhead
           runPass(0, cutT, passDuration * cutT, function () {
-            // 2. the pace slows way down for the entire camera move — tilt
-            // to a side view, swing round to the 3/4 angle, hold there,
-            // then pan back — one continuous slow pass covering all of
-            // it (PAN_TOTAL), so the nozzle is still visibly dispensing
-            // through every stage instead of freezing while the camera
-            // holds or reverses.
-            runPass(cutT, cutT + slowSpan, PAN_TOTAL);
+            // 2. the pace slows way down for the entire camera move —
+            // tilt to the 3/4 angle, hold there, then pan back — one
+            // continuous slow pass covering all of it (INK_PAN_TOTAL),
+            // so the nozzle is still visibly dispensing through every
+            // stage instead of freezing while the camera holds or
+            // reverses.
+            runPass(cutT, cutT + slowSpan, INK_PAN_TOTAL);
 
-            // the front-face bead reads as "still dispensing" for as
-            // long as that view has anything to show — on for the whole
-            // pan, not just flashed on during the hold
-            frontBead.style.transition = 'opacity 300ms ease';
-            frontBead.getBoundingClientRect();
-            frontBead.style.opacity = '1';
+            scene.getBoundingClientRect();
+            scene.style.transition = 'transform ' + INK_TILT_DUR + 'ms ease-in-out';
+            scene.style.transform = 'rotateX(' + INK_REST_RX + 'deg) rotateY(' + INK_REST_RY + 'deg)';
 
-            // only one nozzle should ever read as "the" nozzle: the
-            // top-down one fades fully out as the tilt begins (rather
-            // than just dimming to cameraGroup's shared 0.12 floor,
-            // which still left it faintly but distractingly visible
-            // right as the front-face one was becoming prominent), then
-            // fades back in timed to the reverse pan so it's there again
-            // once the camera is back overhead.
-            nozzle.style.transition = 'opacity ' + PAN_STAGE1_DUR + 'ms ease-in-out';
-            nozzle.getBoundingClientRect();
-            nozzle.style.opacity = '0';
-
-            panToSideView(scene, cameraGroup, function onHold() {
+            setTimeout(function () {
               setTimeout(function () {
-                nozzle.style.transition = 'opacity ' + PAN_REVERSE_DUR + 'ms ease-in-out';
-                nozzle.style.opacity = '1';
-              }, PAN_HOLD);
-            }, function onDone() {
-              // 3. camera is back overhead — finish the pass at normal
-              // speed so the completed trace resolves promptly
-              frontBead.style.transition = 'opacity 250ms ease';
-              frontBead.style.opacity = '0';
-              runPass(cutT + slowSpan, 1, passDuration * (1 - cutT - slowSpan), function () {
-                nozzle.style.transition = 'opacity 260ms ease';
-                nozzle.style.opacity = '0';
+                // 3. pan back, then finish the pass at normal speed so
+                // the completed trace resolves promptly
+                scene.style.transition = 'transform ' + INK_REVERSE_DUR + 'ms ease-in-out';
+                scene.style.transform = 'rotateX(0deg) rotateY(0deg)';
                 setTimeout(function () {
-                  traceHighlight.style.transition = 'opacity ' + SETTLE_DUR + 'ms ease';
-                  traceHighlight.style.opacity = '0.2';
-                }, SETTLE_DELAY);
-              });
-            });
+                  runPass(cutT + slowSpan, 1, passDuration * (1 - cutT - slowSpan), function () {
+                    nozzle.style.transition = 'opacity 260ms ease';
+                    nozzle.style.opacity = '0';
+                    setTimeout(function () {
+                      traceHighlight.style.transition = 'opacity ' + SETTLE_DUR + 'ms ease';
+                      traceHighlight.style.opacity = '0.2';
+                    }, SETTLE_DELAY);
+                  });
+                }, INK_REVERSE_DUR);
+              }, INK_HOLD);
+            }, INK_TILT_DUR);
           });
         }, CAMERA_LEAD);
       }
