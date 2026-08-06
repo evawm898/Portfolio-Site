@@ -252,7 +252,9 @@
 }
 
 /* ---------------------------------------------------
-   Textile circuit construction — six build methods
+   Textile circuit construction — five build methods (a sixth,
+   laminated flexible trace, has its own standalone showcase section
+   further down — see .lamtrace-showcase)
 --------------------------------------------------- */
 
 .circuit-grid {
@@ -272,6 +274,15 @@
 }
 
 .circuit-grid .circuit-panel:nth-child(3n) {
+  border-right: none;
+}
+
+/* Five panels in a 3-column grid leaves the last one alone in its row
+   (row 2 is just panels 4-5, no panel 6) -- without this it would keep
+   a border-right dividing it from an empty grid cell instead of reading
+   as the end of its row. Written as :last-child rather than a fixed
+   nth-child count so it stays correct if a panel is ever added back. */
+.circuit-grid .circuit-panel:last-child {
   border-right: none;
 }
 
@@ -424,6 +435,32 @@
   line-height: 1.5;
 }
 
+/* Laminated flexible trace's standalone showcase -- a single large
+   centered stage rather than a grid tile, so the animation's five-part
+   construction (fabric, two TPU films, traces, heat press) has room to
+   read clearly. Reuses .circuit-panel__svg for the inner <svg> itself
+   (pure layout, no animation state), same as every other pathway. */
+.lamtrace-showcase {
+  padding: 1rem 6vw 3.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lamtrace-showcase__stage {
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 240 / 140;
+}
+
+.lamtrace-showcase__caption {
+  margin-top: 1.75rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
 /* shared fabric-swatch base */
 .circuit-fabric {
   transform-box: fill-box;
@@ -567,6 +604,9 @@
     border-right: 1px solid var(--line);
   }
   .circuit-grid .circuit-panel:nth-child(2n) {
+    border-right: none;
+  }
+  .circuit-grid .circuit-panel:last-child {
     border-right: none;
   }
   .circuit-grid .circuit-panel:nth-child(n+4) {

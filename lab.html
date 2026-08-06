@@ -235,9 +235,9 @@
   <section id="textile-circuit-construction" class="lab-section" data-lab-section>
     <div class="section-label">
       <span class="section-label__number">#textile-circuit-construction</span>
-      <h2 class="section-label__title">Six Ways to Build a Textile Circuit</h2>
+      <h2 class="section-label__title">Five Ways to Build a Textile Circuit</h2>
     </div>
-    <p class="lab-section__desc">Six approaches to putting a conductive pathway into fabric, each starting from the same plain swatch with a connection point on either side. Plays once on scroll into view &mdash; hover a swatch to replay it.</p>
+    <p class="lab-section__desc">Five approaches to putting a conductive pathway into fabric, each starting from the same plain swatch with a connection point on either side. Plays once on scroll into view &mdash; hover a swatch to replay it. (A sixth approach, laminated flexible trace, gets its own closer look below.)</p>
 
     <div class="circuit-grid" data-circuit-grid>
 
@@ -281,14 +281,31 @@
         <div class="circuit-panel__caption">Channel opens &rarr; wire feeds through &rarr; textile encloses it</div>
       </div>
 
-      <div class="circuit-panel" data-circuit="laminated-trace">
-        <span class="circuit-panel__index">06</span>
-        <div class="circuit-panel__stage" data-circuit-stage></div>
-        <div class="circuit-panel__label" data-circuit-label>Laminated flexible trace</div>
-        <div class="circuit-panel__sublabel">A thin conductive layer is bonded to the textile</div>
-        <div class="circuit-panel__caption">Preformed conductive traces bonded onto fabric using TPU and heat</div>
-      </div>
+    </div>
+  </section>
 
+  <!-- ============================================================
+       COMPONENT: Laminated Flexible Trace
+       slug: laminated-flexible-trace
+
+       Split out from the grid above into its own standalone showcase
+       (rather than a small grid tile) because this pathway has the most
+       physical construction to actually see: five distinct components
+       (fabric, two TPU films, preformed traces, heat press) assembling
+       in a fixed order, then bonding under heat and pressure. A tile
+       sized the same as its five siblings above didn't leave room to
+       read that construction clearly.
+  ============================================================= -->
+  <section id="laminated-flexible-trace" class="lab-section" data-lab-section>
+    <div class="section-label">
+      <span class="section-label__number">#laminated-flexible-trace</span>
+      <h2 class="section-label__title">Laminated Flexible Trace</h2>
+    </div>
+    <p class="lab-section__desc">A closer look at the sixth approach: preformed conductive traces, sandwiched between two thin TPU films and bonded onto the fabric surface under heat and pressure. Plays once on scroll into view &mdash; hover to replay it.</p>
+
+    <div class="lamtrace-showcase">
+      <div class="lamtrace-showcase__stage" data-lamtrace-stage></div>
+      <div class="lamtrace-showcase__caption">Fabric &rarr; TPU &rarr; conductive traces &rarr; TPU &rarr; heat press</div>
     </div>
   </section>
 
@@ -2458,10 +2475,9 @@
       'printed-ink': buildPrintedInk,
       'metal-coated': buildMetalCoated,
       'sewn-trace': buildSewnTrace,
-      'embedded-wire': buildEmbeddedWire,
-      'laminated-trace': buildLaminatedTrace
+      'embedded-wire': buildEmbeddedWire
     };
-    var CIRCUIT_ORDER = ['conductive-yarn', 'printed-ink', 'metal-coated', 'sewn-trace', 'embedded-wire', 'laminated-trace'];
+    var CIRCUIT_ORDER = ['conductive-yarn', 'printed-ink', 'metal-coated', 'sewn-trace', 'embedded-wire'];
 
     var circuitControllers = {};
     var circuitPlaying = {};
@@ -2516,6 +2532,48 @@
         if (!circuitAutoPlayed) return;
         playCircuit(type);
       });
+    });
+  }
+
+  /* ---------------------------------------------------
+     laminated flexible trace — standalone showcase, wired up the
+     same way as the circuit grid above (autoplay once on scroll into
+     view, hover/tap to replay) but scoped to just this one section
+     rather than a staggered group of panels.
+  --------------------------------------------------- */
+  var lamtraceSection = document.getElementById('laminated-flexible-trace');
+  if (lamtraceSection) {
+    var lamtraceStage = lamtraceSection.querySelector('[data-lamtrace-stage]');
+    var lamtraceController = buildLaminatedTrace(lamtraceStage);
+    var lamtracePlaying = false;
+    var lamtraceAutoPlayed = false;
+
+    function playLamtrace() {
+      if (lamtracePlaying) return;
+      lamtracePlaying = true;
+      lamtraceController.play();
+      setTimeout(function () { lamtracePlaying = false; }, lamtraceController.duration + 60);
+    }
+
+    var lamtraceIo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && !lamtraceAutoPlayed) {
+          lamtraceAutoPlayed = true;
+          playLamtrace();
+          lamtraceIo.disconnect();
+        }
+      });
+    }, { threshold: 0.3 });
+    lamtraceIo.observe(lamtraceSection);
+
+    lamtraceSection.addEventListener('mouseenter', function () {
+      if (!lamtraceAutoPlayed) return;
+      playLamtrace();
+    });
+    lamtraceSection.addEventListener('click', function () {
+      if (!isTouchDevice) return; // desktop already gets this via hover
+      if (!lamtraceAutoPlayed) return;
+      playLamtrace();
     });
   }
 
