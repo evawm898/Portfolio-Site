@@ -960,34 +960,37 @@
 
   // Conductive yarn is the one pathway that has to read as knitted-in,
   // not printed/stitched/bonded on — so unlike the other five panels, its
-  // swatch is a knit lattice of actual loop shapes (an open hook: two legs
-  // rising into a rounded arch) rather than the shared grid texture. Later
-  // rows are appended after (so they paint in front of) earlier ones — a
-  // plain-knit face reads with each course sitting slightly in front of,
-  // and hooked through, the course below it.
+  // swatch is a knit lattice of actual closed loop shapes (an interlocking
+  // "eye": a pointed top and bottom, bulging sides) rather than the shared
+  // grid texture. Loops are filled with the fabric's own background color
+  // so the loop painted later genuinely occludes the one behind it where
+  // they overlap, instead of just outlines crossing.
+  //
+  // Knitting grows the fabric bottom to top: the two bottom-most physical
+  // rows (4 and 3) are already there when the panel starts, the middle row
+  // (2) is the conductive course knit in live, and the two rows above it
+  // (1 then 0) are the ones still to come — so DOM/paint order goes
+  // bottom-to-top too (4, 3, 2, 1, 0), the same order the courses were
+  // actually made in, each new course painting in front of the one below.
   var KNIT_COLS = 7, KNIT_ROWS = 5, KNIT_MID_ROW = 2;
   var KNIT_COL_W = SWATCH.w / KNIT_COLS, KNIT_ROW_H = SWATCH.h / KNIT_ROWS;
-  var KNIT_HALF_W = KNIT_COL_W * 0.42, KNIT_ARCH_H = KNIT_ROW_H * 0.62, KNIT_LEG_DROP = KNIT_ROW_H * 0.28;
+  var KNIT_HALF_W = KNIT_COL_W * 0.52, KNIT_HALF_H = KNIT_ROW_H * 0.8;
+  var KNIT_PAINT_ORDER = [4, 3, 2, 1, 0]; // bottom to top = knit order
 
   function knitColX(col) { return SWATCH.x + KNIT_COL_W * (col + 0.5); }
-  // Baselines spaced a full row-height apart, offset so the first row's
-  // arch sits right at the fabric's top edge and the last row's legs land
-  // right at the bottom edge — with archH this much shorter than a row,
-  // consecutive rows now read as clearly separate courses (with just a
-  // sliver of overlap for the hooked-through look) instead of stacking
-  // almost directly on top of each other.
-  function knitRowBaseY(row) { return SWATCH.y + KNIT_ARCH_H + KNIT_ROW_H * row; }
+  function knitRowY(row) { return SWATCH.y + KNIT_ROW_H * (row + 0.5); }
 
-  // One loop: rises as an open hook from a bottom-left leg, over a rounded
-  // arch, back down to a bottom-right leg — legs dip slightly past the row
-  // baseline so the next course visually hooks through them.
-  function knitLoopPath(cx, rowBaseY) {
-    var topY = rowBaseY - KNIT_ARCH_H, botY = rowBaseY + KNIT_LEG_DROP;
-    var lx = cx - KNIT_HALF_W, rx = cx + KNIT_HALF_W;
-    var shoulderY = (rowBaseY - KNIT_ARCH_H * 0.12).toFixed(2);
-    return 'M' + lx.toFixed(2) + ',' + botY.toFixed(2) +
-      ' C ' + lx.toFixed(2) + ',' + shoulderY + ' ' + (cx - KNIT_HALF_W * 0.52).toFixed(2) + ',' + topY.toFixed(2) + ' ' + cx.toFixed(2) + ',' + topY.toFixed(2) +
-      ' C ' + (cx + KNIT_HALF_W * 0.52).toFixed(2) + ',' + topY.toFixed(2) + ' ' + rx.toFixed(2) + ',' + shoulderY + ' ' + rx.toFixed(2) + ',' + botY.toFixed(2);
+  // A single closed loop: a pointed-oval "eye" outline, traced as two
+  // bulging arcs meeting at a point top and bottom.
+  function knitLoopPath(cx, cy) {
+    var hw = KNIT_HALF_W, hh = KNIT_HALF_H;
+    var topY = (cy - hh).toFixed(2), botY = (cy + hh).toFixed(2);
+    var upperY = (cy - hh * 0.55).toFixed(2), lowerY = (cy + hh * 0.55).toFixed(2);
+    var cRight = (cx + hw * 0.62).toFixed(2), cLeft = (cx - hw * 0.62).toFixed(2);
+    var cxs = cx.toFixed(2);
+    return 'M' + cxs + ',' + topY +
+      ' C ' + cRight + ',' + upperY + ' ' + cRight + ',' + lowerY + ' ' + cxs + ',' + botY +
+      ' C ' + cLeft + ',' + lowerY + ' ' + cLeft + ',' + upperY + ' ' + cxs + ',' + topY + ' Z';
   }
 
   function buildConductiveYarn(stage) {
@@ -1004,10 +1007,9 @@
     });
     cameraGroup.appendChild(frame);
 
-    // rows 0-1: already knitted, always present. row 2 (mid): the
-    // conductive course, knit in live. rows 3-4: wipe in afterward to
-    // complete the swatch. Each row lives in its own <g> so rows 3/4 can
-    // be revealed with a left-to-right clip-path wipe.
+    // build each row's group up front (indexed by physical row 0-4), then
+    // append the groups to the SVG in knit order so paint order matches
+    // the order the courses were actually made in
     var rowGroups = [], rowEls = [];
     for (var row = 0; row < KNIT_ROWS; row++) {
       var g = svgEl('g', {});
@@ -1015,37 +1017,38 @@
       for (var col = 0; col < KNIT_COLS; col++) {
         var stroke = row === KNIT_MID_ROW ? 'var(--petrol-bright)' : 'var(--ink-dim)';
         var el = svgEl('path', {
-          d: knitLoopPath(knitColX(col), knitRowBaseY(row)),
-          fill: 'none', stroke: stroke, 'stroke-width': row === KNIT_MID_ROW ? 2.3 : 2,
-          'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+          d: knitLoopPath(knitColX(col), knitRowY(row)),
+          fill: 'var(--black-raised)', stroke: stroke, 'stroke-width': row === KNIT_MID_ROW ? 2 : 1.7,
+          'stroke-linejoin': 'round'
         });
         el.style.transformBox = 'fill-box';
         el.style.transformOrigin = 'center';
         g.appendChild(el);
         els.push(el);
       }
-      cameraGroup.appendChild(g);
       rowGroups.push(g);
       rowEls.push(els);
     }
+    KNIT_PAINT_ORDER.forEach(function (row) { cameraGroup.appendChild(rowGroups[row]); });
 
-    // clip-path wipes for rows 3 and 4
+    // clip-path wipes for rows 1 and 0 (the two courses still to come,
+    // above the conductive row)
     uid++;
-    var clipId3 = 'knitWipe-' + uid;
+    var clipId1 = 'knitWipe-' + uid;
     uid++;
-    var clipId4 = 'knitWipe-' + uid;
+    var clipId0 = 'knitWipe-' + uid;
     var defs = svgEl('defs', {});
-    var clipRect3 = svgEl('rect', { x: SWATCH.x, y: SWATCH.y, width: 0, height: SWATCH.h });
-    var clipRect4 = svgEl('rect', { x: SWATCH.x, y: SWATCH.y, width: 0, height: SWATCH.h });
-    var clipPath3 = svgEl('clipPath', { id: clipId3, clipPathUnits: 'userSpaceOnUse' });
-    var clipPath4 = svgEl('clipPath', { id: clipId4, clipPathUnits: 'userSpaceOnUse' });
-    clipPath3.appendChild(clipRect3);
-    clipPath4.appendChild(clipRect4);
-    defs.appendChild(clipPath3);
-    defs.appendChild(clipPath4);
+    var clipRect1 = svgEl('rect', { x: SWATCH.x, y: SWATCH.y, width: 0, height: SWATCH.h });
+    var clipRect0 = svgEl('rect', { x: SWATCH.x, y: SWATCH.y, width: 0, height: SWATCH.h });
+    var clipPath1 = svgEl('clipPath', { id: clipId1, clipPathUnits: 'userSpaceOnUse' });
+    var clipPath0 = svgEl('clipPath', { id: clipId0, clipPathUnits: 'userSpaceOnUse' });
+    clipPath1.appendChild(clipRect1);
+    clipPath0.appendChild(clipRect0);
+    defs.appendChild(clipPath1);
+    defs.appendChild(clipPath0);
     svg.insertBefore(defs, svg.firstChild);
-    rowGroups[3].setAttribute('clip-path', 'url(#' + clipId3 + ')');
-    rowGroups[4].setAttribute('clip-path', 'url(#' + clipId4 + ')');
+    rowGroups[1].setAttribute('clip-path', 'url(#' + clipId1 + ')');
+    rowGroups[0].setAttribute('clip-path', 'url(#' + clipId0 + ')');
 
     var padLeft = svgEl('circle', { cx: SWATCH.x, cy: SWATCH.midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
     var padRight = svgEl('circle', { cx: SWATCH.x + SWATCH.w, cy: SWATCH.midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
@@ -1067,8 +1070,8 @@
         el.style.opacity = '0';
         el.style.transform = 'scale(0.4)';
       });
-      clipRect3.setAttribute('width', 0);
-      clipRect4.setAttribute('width', 0);
+      clipRect1.setAttribute('width', 0);
+      clipRect0.setAttribute('width', 0);
     }
     resetToStart();
 
@@ -1090,7 +1093,8 @@
     return {
       duration: afterWipes + ZOOM_OUT_DUR + 150,
       play: function () {
-        // 1. start zoomed out on the half-knitted swatch
+        // 1. start zoomed out on the half-knitted swatch (bottom two
+        // courses already made)
         resetToStart();
         cameraGroup.getBoundingClientRect();
 
@@ -1116,10 +1120,11 @@
           });
         }, afterZoomIn);
 
-        // 4. the remaining rows wipe in to complete the swatch
+        // 4. the next two courses wipe in, bottom to top, to complete the
+        // swatch (row 1 first, then row 0 above it)
         setTimeout(function () {
-          wipeRow(clipRect3, ROW_WIPE_DUR);
-          setTimeout(function () { wipeRow(clipRect4, ROW_WIPE_DUR); }, ROW_WIPE_STAGGER);
+          wipeRow(clipRect1, ROW_WIPE_DUR);
+          setTimeout(function () { wipeRow(clipRect0, ROW_WIPE_DUR); }, ROW_WIPE_STAGGER);
         }, afterRowKnit);
 
         // 5. pull back out to the finished pathway
