@@ -1391,7 +1391,23 @@
             frontBead.getBoundingClientRect();
             frontBead.style.opacity = '1';
 
-            panToSideView(scene, cameraGroup, null, function onDone() {
+            // only one nozzle should ever read as "the" nozzle: the
+            // top-down one fades fully out as the tilt begins (rather
+            // than just dimming to cameraGroup's shared 0.12 floor,
+            // which still left it faintly but distractingly visible
+            // right as the front-face one was becoming prominent), then
+            // fades back in timed to the reverse pan so it's there again
+            // once the camera is back overhead.
+            nozzle.style.transition = 'opacity ' + PAN_STAGE1_DUR + 'ms ease-in-out';
+            nozzle.getBoundingClientRect();
+            nozzle.style.opacity = '0';
+
+            panToSideView(scene, cameraGroup, function onHold() {
+              setTimeout(function () {
+                nozzle.style.transition = 'opacity ' + PAN_REVERSE_DUR + 'ms ease-in-out';
+                nozzle.style.opacity = '1';
+              }, PAN_HOLD);
+            }, function onDone() {
               // 3. camera is back overhead — finish the pass at normal
               // speed so the completed trace resolves promptly
               frontBead.style.transition = 'opacity 250ms ease';

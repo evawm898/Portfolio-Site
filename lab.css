@@ -331,6 +331,23 @@
   overflow: visible;
 }
 
+.circuit-3d-face--top {
+  /* Without this, the top face rotating past edge-on doesn't just
+     disappear — the browser keeps painting it, mirrored, as if you
+     could see through to its back. That mirrored repaint is what read
+     as a second, flipped copy of the trace and nozzle during the
+     pan-down: at ~82deg it sits right at that edge, and small
+     interpolation/rounding during the transition was enough to tip it
+     across the threshold for a frame or two. Hiding its true backface
+     removes that ghost outright. (The front face is deliberately left
+     alone here — the fold that makes it readable at the settled 3/4
+     angle relies on the browser rendering what it calls that face's
+     "back", so hiding backfaces there would hide the face itself.)
+  */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 .circuit-3d-face--front {
   transform-origin: 50% 78.57%;
   /* translateZ has to come BEFORE the rotation here — applied after,
