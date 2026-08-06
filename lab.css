@@ -320,9 +320,7 @@
    cross-section to reveal — it's just the same single swatch viewed
    from an angle — so it gets its own single-face rig here rather than
    a hinged two-face one. Kept as its own named class so a future change
-   to another pathway's rig (or removal of one, as happened when
-   laminated-trace moved to a fixed overhead camera) can never
-   accidentally affect ink. */
+   to another pathway's rig can never accidentally affect ink. */
 .ink3d-stage {
   width: 100%;
   height: 100%;
@@ -402,6 +400,47 @@
      there). Deliberately no backface-visibility here: this face's
      legibility once folded up to vertical relies on the browser
      rendering what it calls its "back". */
+}
+
+/* Laminated flexible trace's own 3D stage — six stacked, parallel
+   faces (fabric, lower TPU, trace, upper TPU, press, heat effect)
+   under one rotating .laminatedTrace-scene. Every face's only
+   transform is its own translateZ, so at rest (rotateX 0) they all
+   overlap in the same footprint — a true top-down read — and as the
+   scene rotates around X, those translateZ offsets project into
+   vertical screen separation, revealing the stack from the side.
+   Separate from .ink3d-* and .wire3d-* above: its own class names so a
+   future change to this rig can never ripple into either of those. */
+.laminatedTrace-stage {
+  width: 100%;
+  height: 100%;
+  /* Wider than ink/wire's rigs -- this rig's Z range (see Z_*_REST in
+     the JS) runs much deeper, to make the side view read at all, and a
+     tighter perspective would visibly distort the layers' relative
+     scale even while sitting flat in the top-down view. */
+  perspective: 1400px;
+}
+
+.laminatedTrace-scene {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transform-origin: 50% 50%;
+}
+
+.laminatedTrace-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  /* Every face stays parallel to the scene's own rotation (only a
+     translateZ separates them) — hiding the true backface stops a
+     face from rendering as a mirrored ghost of itself, should the
+     scene ever be pushed past edge-on. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .circuit-panel__label {

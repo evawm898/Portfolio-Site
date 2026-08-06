@@ -1968,33 +1968,47 @@
   }
 
   // =====================================================================
-  // Laminated flexible trace -- self-contained animation module.
+  // Laminated flexible trace -- self-contained animation module, built
+  // fresh. Shares no code, transform, or DOM element with any earlier
+  // version of this module or with the ink/wire pathways above it.
   //
-  // Separate from every other pathway's module: doesn't call any shared
-  // helper (svgEl, SWATCH, buildCameraGroup, buildSwatchBase, build3DStage,
-  // panToSideView, ...), doesn't share DOM/CSS classes, doesn't reuse
-  // printed-ink's nozzle/trace-draw code or embedded-wire's tunnel/camera-
-  // rotation code. Everything this needs is defined inside
-  // buildLaminatedTrace itself.
+  // Concept: a preformed, already-complete conductive trace -- never
+  // drawn, dispensed, extruded, or reshaped by this animation -- is
+  // sandwiched between two thin TPU films and bonded onto a fabric
+  // swatch under a heat press. Construction order: fabric -> lower TPU
+  // -> preformed trace -> upper TPU -> heat press -> bonded result.
   //
-  // Camera: fully overhead, fixed, for the entire sequence. There is no
-  // rotateX/rotateY/perspective anywhere in this module -- nothing here
-  // benefits from an angled view, so unlike ink/wire there's no "scene"
-  // to rotate at all. The textile itself never moves, scales, or
-  // rotates; only the two TPU films, the trace group, the press, and the
-  // heat/pressure effect layer animate, and only via translate/opacity/
-  // filter (drop-shadow), never a change to any element's underlying
-  // geometry.
+  // TPU geometry: both TPU shapes are one constant-radius buffer around
+  // the trace's own centerline (buildBufferPath walks the same sampled
+  // points used to draw the trace, offsets left/right by the normal at
+  // each sample, and closes the two rails with a true circular arc --
+  // radius exactly equal to the offset distance -- at each end, which
+  // is an exact rounded cap rather than an approximation). The lower
+  // and upper TPU paths reuse the identical `d` string: same footprint,
+  // by construction, not by coincidence.
   //
-  // Every physical component (textile, lower TPU, trace group, upper
-  // TPU, press, heat/pressure effect) is built exactly once and kept for
-  // the module's lifetime. play() and the reduced-motion path both work
-  // by calling the same pure render(p) function, which sets every
-  // animatable property from p alone -- there is no incremental/stateful
-  // animation logic anywhere, so replaying (hover) or resetting can never
-  // leave a stray duplicate, ghost, or stale value behind: render(0)
-  // always produces exactly the same DOM state regardless of what render
-  // value came before it.
+  // Camera: a single rotating parent (`scene`) holds one flat face per
+  // physical layer (fabric, lower TPU, trace, upper TPU, press, heat
+  // effect). Every face's only transform is its own translateZ -- fixed
+  // for the four material layers (aside from a small, shared narrowing
+  // once the press bonds them), animated only for the press as it
+  // travels down and back up. No face ever carries its own rotation.
+  // The one number that changes over time is `scene`'s own rotateX,
+  // written directly from a requestAnimationFrame loop every frame
+  // (never handed to a CSS transition) -- which is why every face
+  // necessarily rotates in lockstep: none of them has an independent
+  // rotation to drift out of sync with. Positive rotateX is the only
+  // rotation ever applied (no Y, no Z, ever) and it never exceeds
+  // REST_RX -- comfortably short of edge-on -- so layer order stays
+  // legible at every point in the sequence.
+  //
+  // Everything (geometry, the six persistent faces, the render(p)
+  // function) is built exactly once per call and kept for the module's
+  // lifetime. play() and the reduced-motion path both work by calling
+  // that same pure render(p) -- every animatable property is a function
+  // of p alone, so replaying (hover) can never leave a stray duplicate,
+  // ghost, or stale value behind: render(0) always reproduces exactly
+  // the same DOM state, no matter what render value came before it.
   function buildLaminatedTrace(stage) {
     var SVG_NS = 'http://www.w3.org/2000/svg';
     function el(tag, attrs) {
@@ -2009,14 +2023,14 @@
     function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
     // Local progress within [a, b] of the shared timeline, clamped --
-    // 0 before the phase starts, 1 once it's finished, in between while
-    // it's running. Every phase's visuals are a pure function of this.
+    // 0 before a phase starts, 1 once it's finished. Every phase's
+    // visuals are a pure function of this.
     function phaseT(p, range) { return clamp01((p - range[0]) / (range[1] - range[0])); }
 
     // Eases 0->1 over the first `holdAt` fraction of a phase's local
     // progress, then holds at 1 for the remainder -- gives every
-    // entrance phase an explicit "settle, then hold" beat instead of
-    // motion filling the whole phase.
+    // entrance an explicit "settle, then hold" beat instead of motion
+    // filling the whole phase.
     function settle(localT, holdAt, easeFn) {
       if (localT >= holdAt) return 1;
       return easeFn(clamp01(localT / holdAt));
@@ -2027,111 +2041,195 @@
       return 'drop-shadow(0px ' + dy.toFixed(1) + 'px ' + blur.toFixed(1) + 'px rgba(0,0,0,' + alpha.toFixed(3) + '))';
     }
 
+    function pathFromPoints(pts) {
+      var d = '';
+      for (var i = 0; i < pts.length; i++) {
+        d += (i === 0 ? 'M' : ' L') + pts[i].x.toFixed(2) + ',' + pts[i].y.toFixed(2);
+      }
+      return d;
+    }
+
+    // A constant-radius buffer around a polyline: offsets every sample
+    // left/right by `margin` along its local normal, then closes the
+    // two rails with a true circular arc (radius exactly `margin`) at
+    // each end -- exact, not approximate, since every point on that arc
+    // is by construction `margin` away from the centerline's own
+    // endpoint. Reads smooth through the trace's curves because it's
+    // sampled exactly as densely as the centerline itself.
+    function buildBufferPath(pts, margin) {
+      var n = pts.length;
+      var left = [], right = [];
+      for (var i = 0; i < n; i++) {
+        var p0 = pts[Math.max(0, i - 1)], p1 = pts[Math.min(n - 1, i + 1)];
+        var tx = p1.x - p0.x, ty = p1.y - p0.y;
+        var len = Math.sqrt(tx * tx + ty * ty) || 1;
+        tx /= len; ty /= len;
+        var nx = -ty, ny = tx;
+        left.push({ x: pts[i].x + nx * margin, y: pts[i].y + ny * margin });
+        right.push({ x: pts[i].x - nx * margin, y: pts[i].y - ny * margin });
+      }
+      var d = 'M' + left[0].x.toFixed(2) + ',' + left[0].y.toFixed(2);
+      for (var j = 1; j < n; j++) d += ' L' + left[j].x.toFixed(2) + ',' + left[j].y.toFixed(2);
+      d += ' A' + margin.toFixed(2) + ',' + margin.toFixed(2) + ' 0 0 1 ' + right[n - 1].x.toFixed(2) + ',' + right[n - 1].y.toFixed(2);
+      for (var k = n - 2; k >= 0; k--) d += ' L' + right[k].x.toFixed(2) + ',' + right[k].y.toFixed(2);
+      d += ' A' + margin.toFixed(2) + ',' + margin.toFixed(2) + ' 0 0 1 ' + left[0].x.toFixed(2) + ',' + left[0].y.toFixed(2);
+      d += ' Z';
+      return d;
+    }
+
     // ---- geometry: same 240x140 canvas as every other panel ----
     var SW = { x: 20, y: 30, w: 200, h: 80 };
     var midY = SW.y + SW.h / 2; // 70
 
-    // Lamination footprint -- inset from the swatch edges on every side
-    // so bare, untreated fabric stays visible all around it.
-    var ZONE = { x: 52, y: 42, w: 136, h: 56, rx: 6 };
+    // The trace's own preformed centerline, computed once and never
+    // touched again by anything below. Tapers flat at both ends
+    // (taper -> 0) so it lands on its pads as a straight lead-in rather
+    // than an abrupt kink, and so the buffer's end caps sit on a
+    // straight, not curving, approach. A single gentle lobe (LOBES=1)
+    // keeps curvature low enough that the TPU_MARGIN buffer below never
+    // pinches or self-crosses on the concave side of a bend.
+    var TRACE_X0 = 68, TRACE_X1 = 172, AMP = 14, LOBES = 1, N = 48;
+    var tracePts = [];
+    for (var i = 0; i <= N; i++) {
+      var t = i / N;
+      var x = lerp(TRACE_X0, TRACE_X1, t);
+      var taper = Math.sin(t * Math.PI);
+      var y = midY + Math.sin(t * Math.PI * 2 * LOBES) * AMP * taper;
+      tracePts.push({ x: x, y: y });
+    }
+    var TRACE_D = pathFromPoints(tracePts);
 
-    // Press platen -- slightly larger than the zone, per spec.
-    var PRESS = { x: ZONE.x - 9, y: ZONE.y - 9, w: ZONE.w + 18, h: ZONE.h + 18, rx: 9 };
+    // TPU footprint -- one buffer path, reused verbatim for both the
+    // lower and upper film so "same footprint" is true by construction,
+    // not by keeping two numbers in sync by hand.
+    var TPU_MARGIN = 9;
+    var TPU_D = buildBufferPath(tracePts, TPU_MARGIN);
 
-    // ---- DOM: one flat <svg>, no 3D wrapper of any kind ----
-    var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    stage.appendChild(svg);
+    // Lamination zone / press platen -- derived from the trace's own
+    // bounding box plus the TPU margin plus a further pad for the
+    // platen itself, so it can never drift out of sync with the
+    // geometry it's meant to cover.
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    tracePts.forEach(function (p) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    });
+    var ZONE = { x: minX - TPU_MARGIN, y: minY - TPU_MARGIN, w: (maxX - minX) + TPU_MARGIN * 2, h: (maxY - minY) + TPU_MARGIN * 2 };
+    var PRESS_PAD = 9;
+    var PRESS = { x: ZONE.x - PRESS_PAD, y: ZONE.y - PRESS_PAD, w: ZONE.w + PRESS_PAD * 2, h: ZONE.h + PRESS_PAD * 2, rx: 9 };
 
-    var defs = el('defs', {});
-    svg.appendChild(defs);
+    // ---- DOM: one stage > one rotating scene > six stacked faces, each
+    // a flat plane offset only by its own translateZ. No face is ever
+    // rotated on its own -- rotation only ever happens on `scene`. ----
+    var stageEl = document.createElement('div');
+    stageEl.className = 'laminatedTrace-stage';
+    var scene = document.createElement('div');
+    scene.className = 'laminatedTrace-scene';
+    stageEl.appendChild(scene);
+    stage.appendChild(stageEl);
 
-    // Animation-specific IDs only -- unique to this module, never a bare
-    // generic name, so they can never collide with another pathway's defs.
-    var pulseGrad = el('linearGradient', { id: 'lamtrace-pulse-grad', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
-    pulseGrad.appendChild(el('stop', { offset: '0%', 'stop-color': 'var(--petrol-bright)', 'stop-opacity': '0' }));
-    pulseGrad.appendChild(el('stop', { offset: '50%', 'stop-color': 'var(--petrol-bright)', 'stop-opacity': '0.6' }));
-    pulseGrad.appendChild(el('stop', { offset: '100%', 'stop-color': 'var(--petrol-bright)', 'stop-opacity': '0' }));
-    defs.appendChild(pulseGrad);
+    function makeFace(z, extraClass) {
+      var face = document.createElement('div');
+      face.className = 'laminatedTrace-face' + (extraClass ? ' ' + extraClass : '');
+      face.style.transform = 'translateZ(' + z + 'px)';
+      var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+      face.appendChild(svg);
+      scene.appendChild(face);
+      return { face: face, svg: svg };
+    }
 
-    var zoneClip = el('clipPath', { id: 'lamtrace-zone-clip' });
-    zoneClip.appendChild(el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: ZONE.rx }));
-    defs.appendChild(zoneClip);
+    // Stack heights (px) at rest, and once bonded (the gaps compress
+    // once the press holds). Order never changes -- only how close
+    // together the layers sit.
+    // These are deliberately large relative to the swatch itself (not
+    // a literal-scale material thickness) -- at a rotation short of
+    // edge-on, a flat layer's own footprint never fully collapses to a
+    // hairline the way it would at a true 90deg profile, so the gap
+    // between two layers has to outrun each layer's own foreshortened
+    // silhouette height for a visible seam to appear between them,
+    // rather than the two silhouettes just overlapping.
+    var Z_FABRIC = 0;
+    var Z_LOWER_REST = 54, Z_LOWER_BOND = 22;
+    var Z_TRACE_REST = 86, Z_TRACE_BOND = 35;
+    var Z_UPPER_REST = 118, Z_UPPER_BOND = 48;
+    // Idle Z is deliberately restrained, not "as far away as possible" --
+    // at REST_RX this is already projected most of the way to sin(),
+    // and a much larger value would carry the (still-fading-in) press
+    // outside the stage's own frame during its descent.
+    var Z_PRESS_IDLE = 220;
+    var PRESS_CLEARANCE = 30;
 
-    // Whole-scene wrapper -- only ever touched by the reduced-motion
-    // fade-in; normal playback never sets its opacity/transform at all.
-    var root = el('g', {});
-    svg.appendChild(root);
+    // fabric, lower TPU, trace, upper TPU, press, heat effect -- built
+    // and appended exactly once, in that exact order, and never
+    // reordered or duplicated for the module's lifetime.
+    var fabric = makeFace(Z_FABRIC, 'laminatedTrace-face--fabric');
+    var lowerTpu = makeFace(Z_LOWER_REST);
+    var trace = makeFace(Z_TRACE_REST);
+    var upperTpu = makeFace(Z_UPPER_REST);
+    var press = makeFace(Z_PRESS_IDLE);
+    // Heat's own depth has no independent rest value -- render(p) sets
+    // it every frame relative to the press's current position (see
+    // "heat effect" below), so its starting value here is irrelevant
+    // and immediately overwritten by the first render(0) call.
+    var heat = makeFace(0);
 
-    // ---- 1. textile base -- fixed forever: position, scale, rotation
-    // and orientation never change, for the entire sequence ----
-    var textile = el('g', {});
-    root.appendChild(textile);
-    textile.appendChild(el('rect', {
+    // ---- 1. fabric -- fixed forever: position, scale and orientation
+    // never change, for the entire sequence ----
+    var fabricG = el('g', { class: 'laminatedTrace-fabric' });
+    fabricG.appendChild(el('rect', {
       x: SW.x, y: SW.y, width: SW.w, height: SW.h, rx: 3,
       fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5
     }));
-    var weave = el('g', { opacity: 0.55 });
+    var weave = el('g', { class: 'laminatedTrace-weave', opacity: 0.55 });
     [46, 62, 78, 94].forEach(function (y) {
       weave.appendChild(el('line', { x1: SW.x, y1: y, x2: SW.x + SW.w, y2: y, stroke: 'var(--line)', 'stroke-width': 0.75 }));
     });
     [40, 60, 80, 100, 120, 140, 160, 180, 200].forEach(function (x) {
       weave.appendChild(el('line', { x1: x, y1: SW.y, x2: x, y2: SW.y + SW.h, stroke: 'var(--line)', 'stroke-width': 0.75 }));
     });
-    textile.appendChild(weave);
+    fabricG.appendChild(weave);
+    fabric.svg.appendChild(fabricG);
 
-    // ---- 2. lower TPU film ----
-    var lowerTPU = el('g', {});
-    root.appendChild(lowerTPU);
-    var lowerRect = el('rect', {
-      x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: ZONE.rx,
-      fill: 'var(--ink)', 'fill-opacity': '0.12', stroke: 'var(--ink-dim)', 'stroke-opacity': '0.6', 'stroke-width': 1
+    // ---- 2 & 4. TPU films -- identical footprint, fixed 20% fill
+    // opacity for the entire sequence. Only the wrapping <g>'s own
+    // opacity (entrance fade) ever animates; the shape's own
+    // fill-opacity is set once, here, and never touched again --
+    // it can never become opaque, disappear, or read as a liquid. ----
+    function buildTpuLayer(faceSvg, extraClass) {
+      var g = el('g', { class: 'laminatedTrace-tpu ' + extraClass });
+      g.appendChild(el('path', {
+        d: TPU_D, fill: 'var(--ink)', 'fill-opacity': '0.2',
+        stroke: 'var(--ink-dim)', 'stroke-opacity': '0.55', 'stroke-width': 1
+      }));
+      faceSvg.appendChild(g);
+      return g;
+    }
+    var lowerTpuG = buildTpuLayer(lowerTpu.svg, 'laminatedTrace-lowerTpu');
+    var upperTpuG = buildTpuLayer(upperTpu.svg, 'laminatedTrace-upperTpu');
+
+    // ---- 3. preformed conductive trace -- one continuous path, placed
+    // as a single complete unit. It is never drawn on with a stroke-
+    // dasharray reveal, never grows from an end, and never changes
+    // shape or width -- TRACE_D is fixed above and only this wrapping
+    // <g>'s transform/opacity/filter ever change. ----
+    var traceG = el('g', { class: 'laminatedTrace-conductor' });
+    traceG.appendChild(el('path', { d: TRACE_D, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    traceG.appendChild(el('path', { d: TRACE_D, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    // A single closing accent -- one soft pulse of brightness through
+    // the already-bonded trace, opacity-only, never a second path that
+    // grows or travels. Not an electrical-current animation.
+    var tracePulse = el('path', { d: TRACE_D, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'laminatedTrace-pulse' });
+    tracePulse.style.opacity = '0';
+    traceG.appendChild(tracePulse);
+    [TRACE_X0, TRACE_X1].forEach(function (px) {
+      traceG.appendChild(el('rect', { x: px - 4.5, y: midY - 4.5, width: 9, height: 9, rx: 2, fill: 'var(--petrol-bright)', stroke: 'var(--ink-dim)', 'stroke-width': 0.75, class: 'laminatedTrace-pad' }));
     });
-    lowerTPU.appendChild(lowerRect);
+    trace.svg.appendChild(traceG);
 
-    // ---- 3. flexible conductive traces -- one continuous, preformed
-    // path used for the complete animation. Only traceGroup's transform/
-    // opacity/filter ever change; the path data (TRACE_D) is computed
-    // once, right here, and never touched again. ----
-    var TRACE_X0 = ZONE.x + 6, TRACE_X1 = ZONE.x + ZONE.w - 6;
-    var TRACE_D = (function buildTraceD() {
-      var amp = 15, lobes = 2.5, N = 48, d = '';
-      for (var i = 0; i <= N; i++) {
-        var t = i / N;
-        var x = lerp(TRACE_X0, TRACE_X1, t);
-        var taper = Math.sin(t * Math.PI); // 0 at both ends, 1 at the middle --
-        // tapers the wave's amplitude to flat lead-ins at each pad instead
-        // of an abrupt kink.
-        var y = midY + Math.sin(t * Math.PI * 2 * lobes) * amp * taper;
-        d += (i === 0 ? 'M' : ' L') + x.toFixed(2) + ',' + y.toFixed(2);
-      }
-      return d;
-    })();
-
-    var traceGroup = el('g', {});
-    root.appendChild(traceGroup);
-    var traceOuter = el('path', { d: TRACE_D, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
-    var traceInner = el('path', { d: TRACE_D, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
-    traceGroup.appendChild(traceOuter);
-    traceGroup.appendChild(traceInner);
-    // Connection pads -- part of the trace's own preformed geometry, not
-    // a separate component, so they placed/settle together with it.
-    traceGroup.appendChild(el('rect', { x: TRACE_X0 - 5, y: midY - 5, width: 10, height: 10, rx: 2, fill: 'var(--petrol-bright)' }));
-    traceGroup.appendChild(el('rect', { x: TRACE_X1 - 5, y: midY - 5, width: 10, height: 10, rx: 2, fill: 'var(--petrol-bright)' }));
-
-    // ---- 4. upper TPU film -- same footprint as the lower one ----
-    var upperTPU = el('g', {});
-    root.appendChild(upperTPU);
-    var upperRect = el('rect', {
-      x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: ZONE.rx,
-      fill: 'var(--ink)', 'fill-opacity': '0.10', stroke: 'var(--ink-dim)', 'stroke-opacity': '0.5', 'stroke-width': 1
-    });
-    upperTPU.appendChild(upperRect);
-
-    // ---- 5. heat-press platen -- outline + technical corner brackets
-    // only, never a solid fill, so it can never fully hide the
-    // construction beneath it. ----
-    var pressGroup = el('g', {});
-    root.appendChild(pressGroup);
+    // ---- 5. heat press -- outline + corner brackets only, never a
+    // solid fill, so it can never hide the construction beneath it.
+    // Starts fully transparent; only opacity and translateZ animate. ----
+    var pressGroup = el('g', { class: 'laminatedTrace-press' });
     pressGroup.appendChild(el('rect', { x: PRESS.x, y: PRESS.y, width: PRESS.w, height: PRESS.h, rx: PRESS.rx, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.25 }));
     var BR = 9;
     [[PRESS.x, PRESS.y, 1, 1], [PRESS.x + PRESS.w, PRESS.y, -1, 1], [PRESS.x, PRESS.y + PRESS.h, 1, -1], [PRESS.x + PRESS.w, PRESS.y + PRESS.h, -1, -1]].forEach(function (c) {
@@ -2141,166 +2239,181 @@
         fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.5
       }));
     });
+    press.svg.appendChild(pressGroup);
+    press.face.style.opacity = '0';
 
-    // ---- 6. heat/pressure effect -- one persistent group, clipped to
-    // the lamination zone so the glow/pulse never bleeds past it ----
-    var effectGroup = el('g', { 'clip-path': 'url(#lamtrace-zone-clip)' });
-    root.appendChild(effectGroup);
-    var glow = el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, fill: 'var(--petrol-bright)', 'fill-opacity': '0' });
-    effectGroup.appendChild(glow);
-    var pulseBand = el('rect', { y: ZONE.y, width: ZONE.w * 0.55, height: ZONE.h, fill: 'url(#lamtrace-pulse-grad)' });
-    pulseBand.style.opacity = '0';
-    effectGroup.appendChild(pulseBand);
+    // ---- 6. heat/pressure effect -- glow + shimmer lines, clipped to
+    // the lamination zone so it never bleeds past it. Petrol/off-white
+    // only, deliberately: no flame, smoke, steam or spark imagery. ----
+    var heatDefs = el('defs', {});
+    var heatClipId = 'laminatedTrace-zone-clip';
+    var heatClip = el('clipPath', { id: heatClipId });
+    heatClip.appendChild(el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: 6 }));
+    heatDefs.appendChild(heatClip);
+    heat.svg.appendChild(heatDefs);
 
-    // Pressure ticks -- short marks along the press's own perimeter that
-    // creep inward and fade during the hold. Live outside the zone clip
-    // (they start beyond it, at the press's edge) so they're never cut
-    // off before their inward travel even begins.
-    var ticksGroup = el('g', {});
-    root.appendChild(ticksGroup);
-    var TICK_LEN = 7, TICK_INSET = 2;
-    var TICK_DEFS = [];
-    [0.32, 0.68].forEach(function (f) {
-      TICK_DEFS.push({ x1: PRESS.x + PRESS.w * f, y1: PRESS.y + TICK_INSET, x2: PRESS.x + PRESS.w * f, y2: PRESS.y + TICK_INSET + TICK_LEN, nx: 0, ny: 1 });
-      TICK_DEFS.push({ x1: PRESS.x + PRESS.w * f, y1: PRESS.y + PRESS.h - TICK_INSET, x2: PRESS.x + PRESS.w * f, y2: PRESS.y + PRESS.h - TICK_INSET - TICK_LEN, nx: 0, ny: -1 });
-    });
-    [0.32, 0.68].forEach(function (f) {
-      TICK_DEFS.push({ x1: PRESS.x + TICK_INSET, y1: PRESS.y + PRESS.h * f, x2: PRESS.x + TICK_INSET + TICK_LEN, y2: PRESS.y + PRESS.h * f, nx: 1, ny: 0 });
-      TICK_DEFS.push({ x1: PRESS.x + PRESS.w - TICK_INSET, y1: PRESS.y + PRESS.h * f, x2: PRESS.x + PRESS.w - TICK_INSET - TICK_LEN, y2: PRESS.y + PRESS.h * f, nx: -1, ny: 0 });
-    });
-    var ticks = TICK_DEFS.map(function (t) {
-      var line = el('line', { x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2, stroke: 'var(--petrol-bright)', 'stroke-width': 1.5, 'stroke-linecap': 'round' });
+    var heatGroup = el('g', { class: 'laminatedTrace-heat', 'clip-path': 'url(#' + heatClipId + ')' });
+    var heatGlow = el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, fill: 'var(--petrol-bright)', 'fill-opacity': '0' });
+    heatGroup.appendChild(heatGlow);
+    var SHIMMER_ROWS = [0.28, 0.5, 0.72];
+    var shimmerLines = SHIMMER_ROWS.map(function (f, idx) {
+      var sy = ZONE.y + ZONE.h * f;
+      var d = '', sn = 10;
+      for (var si = 0; si <= sn; si++) {
+        var sx = ZONE.x + (ZONE.w * si) / sn;
+        var wy = sy + Math.sin(si * 1.3 + idx * 2) * 2.2;
+        d += (si === 0 ? 'M' : ' L') + sx.toFixed(2) + ',' + wy.toFixed(2);
+      }
+      var line = el('path', { d: d, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1, 'stroke-linecap': 'round', class: 'laminatedTrace-shimmer' });
       line.style.opacity = '0';
-      ticksGroup.appendChild(line);
-      return { el: line, def: t };
+      heatGroup.appendChild(line);
+      return line;
     });
+    heat.svg.appendChild(heatGroup);
 
     // ---- timeline: one normalized progress value drives every visual
-    // property below. Percentages match the spec's suggested relative
-    // comprehension beats exactly. ----
+    // property below. Durations noted in ms; PH holds the equivalent
+    // fractions of TOTAL_DURATION. ----
+    //   establish     500ms   fabric only, hold
+    //   lowerTpu      900ms   lower TPU settles on
+    //   trace        1000ms   preformed trace settles on
+    //   upperTpu      900ms   upper TPU settles on
+    //   holdStack     900ms   comprehension beat, unbonded stack
+    //   rotateToSide  750ms   camera: top-down -> side (X only)
+    //   holdSide      650ms   hold in side view
+    //   pressDown     600ms   press descends, vertical only
+    //   pressHold    1000ms   heat + pressure, gaps close
+    //   pressUp       550ms   press lifts, heat clears completely
+    //   rotateBack    650ms   camera: side -> top-down (X only)
+    //   finished      800ms   bonded laminate, one accent pulse
+    var TOTAL_DURATION = 9200;
     var PH = {
-      establish: [0.00, 0.10],
-      lowerTPU: [0.10, 0.27],
-      traces: [0.27, 0.44],
-      upperTPU: [0.44, 0.60],
-      holdStack: [0.60, 0.68],
-      pressDown: [0.68, 0.77],
-      pressHold: [0.77, 0.88],
-      pressUp: [0.88, 0.94],
-      finished: [0.94, 1.00]
+      establish:    [0.0000, 0.0543],
+      lowerTpu:     [0.0543, 0.1522],
+      trace:        [0.1522, 0.2609],
+      upperTpu:     [0.2609, 0.3587],
+      holdStack:    [0.3587, 0.4565],
+      rotateToSide: [0.4565, 0.5380],
+      holdSide:     [0.5380, 0.6087],
+      pressDown:    [0.6087, 0.6739],
+      pressHold:    [0.6739, 0.7826],
+      pressUp:      [0.7826, 0.8424],
+      rotateBack:   [0.8424, 0.9130],
+      finished:     [0.9130, 1.0000]
     };
+    // Short of a literal edge-on 90deg, but steep enough that each
+    // layer's own footprint compresses far more than the gaps between
+    // layers do -- see the Z_*_REST comment above for why that's the
+    // condition that actually produces a readable side view here.
+    var REST_RX = 78;
 
-    // Shared "moving in from above, then settling" numbers for the two
-    // TPU films and the trace group -- a short vertical screen-space
-    // offset (never a horizontal slide), a soft shadow that shrinks as
-    // it lands, and a fade from fully invisible up to full opacity.
-    // Opacity starts at exactly 0, not just "reduced" -- before a
-    // layer's own phase begins (tPhase clamped to 0), it must not be
-    // visible at all ("No TPU, conductive traces, or heat press should
-    // be visible yet" during the establish step); the climb from 0 to 1
-    // as `s` eases up is itself what reads as "reduced opacity while
-    // moving," without needing a separate floor value. All three layers
-    // share this shape; only the trace's own settle uses a slower
-    // easing curve (see below) per the spec's explicit "slow down the
-    // final part of placement" instruction.
-    var MOVE_OFFSET = -15;
+    var MOVE_OFFSET = -14;
     var MOVE_SHADOW = { dy: 6, blur: 7, alpha: 0.4 };
     var REST_SHADOW = { dy: 1, blur: 1.5, alpha: 0.12 };
 
-    function placementLayer(el2, tPhase, holdAt, easeFn) {
-      var s = settle(tPhase, holdAt, easeFn);
-      el2.style.transform = 'translate(0px,' + lerp(MOVE_OFFSET, 0, s).toFixed(2) + 'px)';
-      el2.style.opacity = lerp(0, 1, s).toFixed(3);
-      var dy = lerp(MOVE_SHADOW.dy, REST_SHADOW.dy, s);
-      var blur = lerp(MOVE_SHADOW.blur, REST_SHADOW.blur, s);
-      var alpha = lerp(MOVE_SHADOW.alpha, REST_SHADOW.alpha, s);
-      return { dy: dy, blur: blur, alpha: alpha };
+    // Entrance "settle": a short screen-space drop + shrinking shadow +
+    // fade on the layer's own wrapping <g>. Never touches the shape's
+    // own fill-opacity, its geometry, or the face div's translateZ.
+    function applySettle(g, localT, holdAt, easeFn) {
+      var s = settle(localT, holdAt, easeFn);
+      g.setAttribute('transform', 'translate(0,' + lerp(MOVE_OFFSET, 0, s).toFixed(2) + ')');
+      g.style.opacity = lerp(0, 1, s).toFixed(3);
+      g.style.filter = shadow(lerp(MOVE_SHADOW.dy, REST_SHADOW.dy, s), lerp(MOVE_SHADOW.blur, REST_SHADOW.blur, s), lerp(MOVE_SHADOW.alpha, REST_SHADOW.alpha, s));
     }
 
     function render(p) {
-      // -- lower TPU: placement, then shadow further clears as bonding
-      // progresses ("the lower TPU shadow disappears") --
-      var tLower = phaseT(p, PH.lowerTPU);
-      var lowerState = placementLayer(lowerTPU, tLower, 0.65, easeOutCubic);
-      var bonded = easeInOutCubic(phaseT(p, PH.pressHold));
-      lowerTPU.style.filter = shadow(lerp(lowerState.dy, 0, bonded), lerp(lowerState.blur, 0, bonded), lowerState.alpha * (1 - bonded));
-      lowerRect.setAttribute('fill-opacity', lerp(0.12, 0.20, bonded).toFixed(3));
-      lowerRect.setAttribute('stroke-opacity', lerp(0.6, 0.85, bonded).toFixed(3));
+      // -- camera: X-axis only, single shared pivot (scene's own
+      // center -- see .laminatedTrace-scene's transform-origin in
+      // lab.css). Rotates in exactly two windows, held flat or held at
+      // REST_RX everywhere else; the final else below is a plain
+      // literal 0, not an eased value, so the rest state is always
+      // exactly 0deg, never a float that merely rounds to it. --
+      var rx;
+      if (p < PH.rotateToSide[0]) rx = 0;
+      else if (p < PH.rotateToSide[1]) rx = lerp(0, REST_RX, easeInOutCubic(phaseT(p, PH.rotateToSide)));
+      else if (p < PH.rotateBack[0]) rx = REST_RX;
+      else if (p < PH.rotateBack[1]) rx = lerp(REST_RX, 0, easeInOutCubic(phaseT(p, PH.rotateBack)));
+      else rx = 0;
+      scene.style.transform = 'rotateX(' + rx.toFixed(3) + 'deg)';
 
-      // -- traces: same placement language, deliberately slower tail --
-      var tTrace = phaseT(p, PH.traces);
-      var traceState = placementLayer(traceGroup, tTrace, 0.75, easeOutQuint);
-      traceGroup.style.filter = shadow(lerp(traceState.dy, 0, bonded), lerp(traceState.blur, 0, bonded), traceState.alpha * 0.85 * (1 - bonded));
+      // -- lower TPU: settle, then the gap to the fabric quietly closes
+      // once the press holds (fabric, trace and pressure never move --
+      // only how tightly the stack sits together does). --
+      applySettle(lowerTpuG, phaseT(p, PH.lowerTpu), 0.7, easeOutCubic);
+      var bond = easeInOutCubic(phaseT(p, PH.pressHold));
+      lowerTpu.face.style.transform = 'translateZ(' + lerp(Z_LOWER_REST, Z_LOWER_BOND, bond).toFixed(2) + 'px)';
 
-      // -- upper TPU: placement, then bonds down the same way as lower --
-      var tUpper = phaseT(p, PH.upperTPU);
-      var upperState = placementLayer(upperTPU, tUpper, 0.65, easeOutCubic);
-      upperTPU.style.filter = shadow(lerp(upperState.dy, 0, bonded), lerp(upperState.blur, 0, bonded), upperState.alpha * (1 - bonded));
-      upperRect.setAttribute('fill-opacity', lerp(0.10, 0.16, bonded).toFixed(3));
-      upperRect.setAttribute('stroke-opacity', lerp(0.5, 0.8, bonded).toFixed(3));
+      // -- trace: same settle language, deliberately slower final tail --
+      applySettle(traceG, phaseT(p, PH.trace), 0.8, easeOutQuint);
+      trace.face.style.transform = 'translateZ(' + lerp(Z_TRACE_REST, Z_TRACE_BOND, bond).toFixed(2) + 'px)';
 
-      // -- heat press: opacity + shadow only, position and scale never
-      // change. Lowers (0.68-0.77), holds through the bond (0.77-0.88),
-      // lifts (0.88-0.94), then is fully gone -- exactly 0 opacity and
-      // no filter, never a faint leftover. --
-      var pressOpacity = 0, pDy = 0, pBlur = 0, pAlpha = 0;
-      if (p >= PH.pressDown[0] && p < PH.pressUp[0]) {
-        var down = easeInOutCubic(phaseT(p, PH.pressDown));
-        pressOpacity = lerp(0, 1, down);
-        pDy = lerp(9, 1, down);
-        pBlur = lerp(11, 2, down);
-        pAlpha = lerp(0.3, 0.5, down);
-      } else if (p >= PH.pressUp[0] && p < PH.finished[0]) {
-        var up = easeInOutCubic(phaseT(p, PH.pressUp));
-        pressOpacity = lerp(1, 0, up);
-        pDy = lerp(1, 9, up);
-        pBlur = lerp(2, 11, up);
-        pAlpha = lerp(0.5, 0, up);
-      }
-      pressGroup.style.opacity = pressOpacity.toFixed(3);
-      pressGroup.style.filter = shadow(pDy, pBlur, pAlpha);
+      // -- upper TPU: settle, bonds down the same way as lower --
+      applySettle(upperTpuG, phaseT(p, PH.upperTpu), 0.7, easeOutCubic);
+      var upperZ = lerp(Z_UPPER_REST, Z_UPPER_BOND, bond);
+      upperTpu.face.style.transform = 'translateZ(' + upperZ.toFixed(2) + 'px)';
 
-      // -- heat/pressure effect: glow rises and falls across hold+lift,
-      // plus a small closing emphasis pulse once fully finished --
-      var glowOpacity = 0;
-      if (p >= PH.pressHold[0] && p < PH.pressUp[1]) {
-        var gt = (p - PH.pressHold[0]) / (PH.pressUp[1] - PH.pressHold[0]);
-        glowOpacity = Math.sin(clamp01(gt) * Math.PI) * 0.15;
-      } else if (p >= PH.finished[0]) {
-        var ft = phaseT(p, PH.finished);
-        glowOpacity = Math.sin(ft * Math.PI) * 0.08;
-      }
-      glow.setAttribute('fill-opacity', glowOpacity.toFixed(3));
-
-      // sweeping pulse band + inward pressure ticks -- both confined to
-      // the pressHold phase only, matching "while the press remains down"
-      var holdT = phaseT(p, PH.pressHold);
-      var holdActive = p >= PH.pressHold[0] && p < PH.pressHold[1];
-      if (holdActive) {
-        var fade = Math.min(1, holdT / 0.15, (1 - holdT) / 0.15);
-        pulseBand.style.opacity = fade.toFixed(3);
-        var sweepT = (holdT * 1.4) % 1;
-        pulseBand.setAttribute('x', lerp(ZONE.x - ZONE.w * 0.55, ZONE.x + ZONE.w, sweepT).toFixed(2));
+      // -- heat press: travels only in Z, never X/Y, so it can only
+      // ever read as a level, vertical move. Follows the compressing
+      // stack's own top surface down through the hold, then lifts
+      // clear and fades out completely before the camera ever rotates
+      // back toward top-down. --
+      var pressZ = Z_PRESS_IDLE, pressOpacity = 0;
+      if (p < PH.pressDown[0]) {
+        pressZ = Z_PRESS_IDLE; pressOpacity = 0;
+      } else if (p < PH.pressDown[1]) {
+        var dT = easeInOutCubic(phaseT(p, PH.pressDown));
+        pressZ = lerp(Z_PRESS_IDLE, Z_UPPER_REST + PRESS_CLEARANCE, dT);
+        // Fades in alongside the descent itself (not a quick early
+        // snap-to-full) -- it's already moving by the time it's fully
+        // opaque, rather than popping into view while still distant.
+        pressOpacity = dT;
+      } else if (p < PH.pressUp[0]) {
+        pressZ = upperZ + PRESS_CLEARANCE;
+        pressOpacity = 1;
+      } else if (p < PH.pressUp[1]) {
+        var uT = easeInOutCubic(phaseT(p, PH.pressUp));
+        pressZ = lerp(upperZ + PRESS_CLEARANCE, Z_PRESS_IDLE, uT);
+        pressOpacity = lerp(1, 0, uT);
       } else {
-        pulseBand.style.opacity = '0';
+        pressZ = Z_PRESS_IDLE; pressOpacity = 0;
       }
-      ticks.forEach(function (item) {
-        if (!holdActive) { item.el.style.opacity = '0'; return; }
-        var dist = 9 * holdT;
-        item.el.style.opacity = (Math.sin(holdT * Math.PI) * 0.85).toFixed(3);
-        item.el.style.transform = 'translate(' + (item.def.nx * dist).toFixed(2) + 'px,' + (item.def.ny * dist).toFixed(2) + 'px)';
+      press.face.style.transform = 'translateZ(' + pressZ.toFixed(2) + 'px)';
+      press.face.style.opacity = pressOpacity.toFixed(3);
+
+      // -- heat effect: ramps in before contact, holds through the
+      // press hold, fades out completely as the press clears -- gone
+      // before the camera ever starts rotating back. Its own depth
+      // tracks just under the press's current position every frame, so
+      // it always reads as radiating down from wherever the platen
+      // actually is, rather than sitting at a fixed height of its own. --
+      heat.face.style.transform = 'translateZ(' + (pressZ - 8).toFixed(2) + 'px)';
+      var heatRampStart = lerp(PH.pressDown[0], PH.pressDown[1], 0.6);
+      var heatT = 0;
+      if (p >= heatRampStart && p < PH.pressHold[1]) {
+        heatT = clamp01((p - heatRampStart) / (PH.pressHold[1] - heatRampStart));
+      } else if (p >= PH.pressHold[1] && p < PH.pressUp[1]) {
+        heatT = clamp01(1 - phaseT(p, PH.pressUp));
+      }
+      heatGlow.setAttribute('fill-opacity', (heatT * 0.16).toFixed(3));
+      shimmerLines.forEach(function (line, idx) {
+        var flicker = 0.5 + 0.5 * Math.sin(p * 46 + idx * 2.1);
+        line.style.opacity = (heatT * 0.45 * flicker).toFixed(3);
       });
+
+      // -- finished accent: one soft pulse through the bonded trace,
+      // not a separate electrical-current animation. --
+      var fT = phaseT(p, PH.finished);
+      tracePulse.style.opacity = (Math.sin(clamp01(fT) * Math.PI) * 0.5).toFixed(3);
     }
 
-    var TOTAL_DURATION = 7200;
-    var REDUCED_DURATION = 500;
+    var REDUCED_DURATION = 550;
     var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
     var raf = null;
     function resetToStart() {
       if (raf) { cancelAnimationFrame(raf); raf = null; }
-      root.style.transition = 'none';
-      root.style.opacity = '1';
+      stageEl.style.transition = 'none';
+      stageEl.style.opacity = '1';
       render(0);
     }
     resetToStart();
@@ -2310,15 +2423,15 @@
       play: function () {
         resetToStart();
         if (REDUCED) {
-          // Simplified path: jump straight to the finished, bonded
-          // state and fade the whole diagram in -- no layer travel, no
-          // press movement, but the same instructional end result.
+          // Simplified path: no rotation, no repeated heat shimmer --
+          // jump straight to the finished, bonded, top-down state and
+          // fade the whole diagram in.
           render(1);
-          root.style.transition = 'none';
-          root.style.opacity = '0';
-          root.getBoundingClientRect();
-          root.style.transition = 'opacity ' + REDUCED_DURATION + 'ms ease';
-          root.style.opacity = '1';
+          stageEl.style.transition = 'none';
+          stageEl.style.opacity = '0';
+          stageEl.getBoundingClientRect();
+          stageEl.style.transition = 'opacity ' + REDUCED_DURATION + 'ms ease';
+          stageEl.style.opacity = '1';
           return;
         }
         var start = performance.now();
@@ -2326,6 +2439,7 @@
           var raw = Math.max(0, Math.min(1, (now - start) / TOTAL_DURATION));
           render(raw);
           if (raw < 1) raf = requestAnimationFrame(frame);
+          else raf = null;
         }
         raf = requestAnimationFrame(frame);
       }
