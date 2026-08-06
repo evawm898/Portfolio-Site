@@ -284,9 +284,9 @@
       <div class="circuit-panel" data-circuit="laminated-trace">
         <span class="circuit-panel__index">06</span>
         <div class="circuit-panel__stage" data-circuit-stage></div>
-        <div class="circuit-panel__label" data-circuit-label>Laminated conductive trace</div>
+        <div class="circuit-panel__label" data-circuit-label>Laminated flexible trace</div>
         <div class="circuit-panel__sublabel">A thin conductive layer is bonded to the textile</div>
-        <div class="circuit-panel__caption">Layers assemble &rarr; heat and pressure bond them &rarr; trace is enclosed</div>
+        <div class="circuit-panel__caption">Preformed conductive traces bonded onto fabric using TPU and heat</div>
       </div>
 
     </div>
@@ -986,83 +986,6 @@
     cameraGroup.getBoundingClientRect();
     cameraGroup.style.transition = 'transform ' + CAMERA_ZOOM_DUR + 'ms cubic-bezier(.25,.7,.3,1.05)';
     cameraGroup.style.transform = 'scale(1)';
-  }
-
-  /* ---------------------------------------------------
-     shared "smooth pan to a 3/4 side view" rig — printed ink, embedded
-     wire, and laminated trace each pause mid-sequence to show a
-     mechanism the top-down view can't: the nozzle actually touching the
-     fabric, the wire sitting inside its channel, the press closing on
-     the layer stack. Rather than cutting to a separate inset, the
-     camera itself pans there: two faces (a normal top-down SVG and a
-     thin "front wall" SVG hinged along the fabric's bottom edge) share
-     one CSS 3D space, so rotating that shared scene reads as one
-     continuous move — down to a near-side angle, then around to a 3/4
-     view — instead of a hard cut between two drawings.
-  --------------------------------------------------- */
-  function build3DStage(stage) {
-    var stage3d = document.createElement('div');
-    stage3d.className = 'circuit-3d-stage';
-    var scene = document.createElement('div');
-    scene.className = 'circuit-3d-scene';
-    var topFace = document.createElement('div');
-    topFace.className = 'circuit-3d-face circuit-3d-face--top';
-    var frontFace = document.createElement('div');
-    frontFace.className = 'circuit-3d-face circuit-3d-face--front';
-    var topSvg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var frontSvg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    topFace.appendChild(topSvg);
-    frontFace.appendChild(frontSvg);
-    scene.appendChild(topFace);
-    scene.appendChild(frontFace);
-    stage3d.appendChild(scene);
-    stage.appendChild(stage3d);
-    return { topSvg: topSvg, frontSvg: frontSvg, scene: scene };
-  }
-
-  // Deliberately slow — this pan is the moment meant to teach the viewer
-  // something the top-down view can't, so it lingers rather than rushes:
-  // a slow tilt down, a slow swing round to the 3/4 angle, a real pause
-  // to register that angle, then an equally unhurried pan back.
-  var PAN_STAGE1_DUR = 850, PAN_STAGE1_RX = 82;
-  var PAN_STAGE2_DUR = 750, PAN_REST_RX = 58, PAN_REST_RY = -22;
-  var PAN_HOLD = 1100, PAN_REVERSE_DUR = 900;
-  var PAN_TOTAL = PAN_STAGE1_DUR + PAN_STAGE2_DUR + PAN_HOLD + PAN_REVERSE_DUR;
-
-  function resetScenePan(scene) {
-    scene.style.transition = 'none';
-    scene.style.transform = 'rotateX(0deg) rotateY(0deg)';
-  }
-
-  // pans from the top-down rest angle down to near-side-on, then around
-  // to a settled 3/4 view (onHold fires once there), holds, then reverses
-  // the whole move — onDone fires once it's flat again
-  // topFace fades down alongside the rotation (not a hard cut — it's
-  // timed to the same rotation) so the front face is never fighting the
-  // top face's opaque fabric rect for the depth sort at near-coplanar
-  // angles; it's back at full opacity by the time the pan reverses home.
-  function panToSideView(scene, topFace, onHold, onDone) {
-    scene.getBoundingClientRect();
-    scene.style.transition = 'transform ' + PAN_STAGE1_DUR + 'ms ease-in-out';
-    scene.style.transform = 'rotateX(' + PAN_STAGE1_RX + 'deg) rotateY(0deg)';
-    topFace.style.transition = 'opacity ' + PAN_STAGE1_DUR + 'ms ease-in-out';
-    topFace.style.opacity = '0.35';
-    setTimeout(function () {
-      scene.style.transition = 'transform ' + PAN_STAGE2_DUR + 'ms ease-in-out';
-      scene.style.transform = 'rotateX(' + PAN_REST_RX + 'deg) rotateY(' + PAN_REST_RY + 'deg)';
-      topFace.style.transition = 'opacity ' + PAN_STAGE2_DUR + 'ms ease-in-out';
-      topFace.style.opacity = '0.12';
-      setTimeout(function () {
-        if (onHold) onHold();
-        setTimeout(function () {
-          scene.style.transition = 'transform ' + PAN_REVERSE_DUR + 'ms ease-in-out';
-          scene.style.transform = 'rotateX(0deg) rotateY(0deg)';
-          topFace.style.transition = 'opacity ' + PAN_REVERSE_DUR + 'ms ease-in-out';
-          topFace.style.opacity = '1';
-          setTimeout(function () { if (onDone) onDone(); }, PAN_REVERSE_DUR);
-        }, PAN_HOLD);
-      }, PAN_STAGE2_DUR);
-    }, PAN_STAGE1_DUR);
   }
 
   // Conductive yarn is the one pathway that has to read as knitted-in,
@@ -1898,8 +1821,8 @@
     var CAMERA_TOTAL = PHASE_X_DUR + PHASE_Y_DUR + HOLD + PHASE_Y_BACK_DUR + PHASE_X_BACK_DUR;
 
     // REST_RX_CLAMP: explicit ceiling on rotateX, as a backstop against
-    // the ghosting/mirroring behavior documented on .circuit-3d-face--top
-    // (see lab.css) -- the flat faces here carry the same
+    // the ghosting/mirroring behavior documented on .wire3d-face--flat
+    // (see lab.css) -- the flat faces here carry that same
     // backface-visibility:hidden fix, so this clamp is a belt-and-braces
     // limit rather than the only thing preventing it. REST_RX itself
     // sits well under this regardless.
@@ -2018,127 +1941,367 @@
     };
   }
 
+  // =====================================================================
+  // Laminated flexible trace -- self-contained animation module.
+  //
+  // Separate from every other pathway's module: doesn't call any shared
+  // helper (svgEl, SWATCH, buildCameraGroup, buildSwatchBase, build3DStage,
+  // panToSideView, ...), doesn't share DOM/CSS classes, doesn't reuse
+  // printed-ink's nozzle/trace-draw code or embedded-wire's tunnel/camera-
+  // rotation code. Everything this needs is defined inside
+  // buildLaminatedTrace itself.
+  //
+  // Camera: fully overhead, fixed, for the entire sequence. There is no
+  // rotateX/rotateY/perspective anywhere in this module -- nothing here
+  // benefits from an angled view, so unlike ink/wire there's no "scene"
+  // to rotate at all. The textile itself never moves, scales, or
+  // rotates; only the two TPU films, the trace group, the press, and the
+  // heat/pressure effect layer animate, and only via translate/opacity/
+  // filter (drop-shadow), never a change to any element's underlying
+  // geometry.
+  //
+  // Every physical component (textile, lower TPU, trace group, upper
+  // TPU, press, heat/pressure effect) is built exactly once and kept for
+  // the module's lifetime. play() and the reduced-motion path both work
+  // by calling the same pure render(p) function, which sets every
+  // animatable property from p alone -- there is no incremental/stateful
+  // animation logic anywhere, so replaying (hover) or resetting can never
+  // leave a stray duplicate, ghost, or stale value behind: render(0)
+  // always produces exactly the same DOM state regardless of what render
+  // value came before it.
   function buildLaminatedTrace(stage) {
-    var faces = build3DStage(stage);
-    var topSvg = faces.topSvg, frontSvg = faces.frontSvg, scene = faces.scene;
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    function el(tag, attrs) {
+      var e = document.createElementNS(SVG_NS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function clamp01(t) { return Math.max(0, Math.min(1, t)); }
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+    function easeOutQuint(t) { return 1 - Math.pow(1 - t, 5); }
+    function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
-    var cameraGroup = buildCameraGroup(topSvg);
-    var base = buildSwatchBase(cameraGroup);
+    // Local progress within [a, b] of the shared timeline, clamped --
+    // 0 before the phase starts, 1 once it's finished, in between while
+    // it's running. Every phase's visuals are a pure function of this.
+    function phaseT(p, range) { return clamp01((p - range[0]) / (range[1] - range[0])); }
 
-    var layerDefs = [
-      { fill: 'var(--ink-faint)', y: 38, h: 6 },   // adhesive
-      { fill: 'var(--petrol-bright)', y: 48, h: 5 }, // conductive foil trace
-      { fill: 'var(--ink-faint)', y: 58, h: 6 }    // cover / adhesive
-    ];
-    var layers = layerDefs.map(function (d) {
-      var rect = svgEl('rect', { x: 30, y: d.y, width: 180, height: d.h, rx: 1.5, fill: d.fill });
-      rect.style.opacity = '0';
-      rect.style.transformBox = 'fill-box';
-      rect.style.transform = 'translateY(-70px)';
-      cameraGroup.appendChild(rect);
-      return rect;
+    // Eases 0->1 over the first `holdAt` fraction of a phase's local
+    // progress, then holds at 1 for the remainder -- gives every
+    // entrance phase an explicit "settle, then hold" beat instead of
+    // motion filling the whole phase.
+    function settle(localT, holdAt, easeFn) {
+      if (localT >= holdAt) return 1;
+      return easeFn(clamp01(localT / holdAt));
+    }
+
+    function shadow(dy, blur, alpha) {
+      if (alpha <= 0.002) return 'none';
+      return 'drop-shadow(0px ' + dy.toFixed(1) + 'px ' + blur.toFixed(1) + 'px rgba(0,0,0,' + alpha.toFixed(3) + '))';
+    }
+
+    // ---- geometry: same 240x140 canvas as every other panel ----
+    var SW = { x: 20, y: 30, w: 200, h: 80 };
+    var midY = SW.y + SW.h / 2; // 70
+
+    // Lamination footprint -- inset from the swatch edges on every side
+    // so bare, untreated fabric stays visible all around it.
+    var ZONE = { x: 52, y: 42, w: 136, h: 56, rx: 6 };
+
+    // Press platen -- slightly larger than the zone, per spec.
+    var PRESS = { x: ZONE.x - 9, y: ZONE.y - 9, w: ZONE.w + 18, h: ZONE.h + 18, rx: 9 };
+
+    // ---- DOM: one flat <svg>, no 3D wrapper of any kind ----
+    var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+    stage.appendChild(svg);
+
+    var defs = el('defs', {});
+    svg.appendChild(defs);
+
+    // Animation-specific IDs only -- unique to this module, never a bare
+    // generic name, so they can never collide with another pathway's defs.
+    var pulseGrad = el('linearGradient', { id: 'lamtrace-pulse-grad', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
+    pulseGrad.appendChild(el('stop', { offset: '0%', 'stop-color': 'var(--petrol-bright)', 'stop-opacity': '0' }));
+    pulseGrad.appendChild(el('stop', { offset: '50%', 'stop-color': 'var(--petrol-bright)', 'stop-opacity': '0.6' }));
+    pulseGrad.appendChild(el('stop', { offset: '100%', 'stop-color': 'var(--petrol-bright)', 'stop-opacity': '0' }));
+    defs.appendChild(pulseGrad);
+
+    var zoneClip = el('clipPath', { id: 'lamtrace-zone-clip' });
+    zoneClip.appendChild(el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: ZONE.rx }));
+    defs.appendChild(zoneClip);
+
+    // Whole-scene wrapper -- only ever touched by the reduced-motion
+    // fade-in; normal playback never sets its opacity/transform at all.
+    var root = el('g', {});
+    svg.appendChild(root);
+
+    // ---- 1. textile base -- fixed forever: position, scale, rotation
+    // and orientation never change, for the entire sequence ----
+    var textile = el('g', {});
+    root.appendChild(textile);
+    textile.appendChild(el('rect', {
+      x: SW.x, y: SW.y, width: SW.w, height: SW.h, rx: 3,
+      fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5
+    }));
+    var weave = el('g', { opacity: 0.55 });
+    [46, 62, 78, 94].forEach(function (y) {
+      weave.appendChild(el('line', { x1: SW.x, y1: y, x2: SW.x + SW.w, y2: y, stroke: 'var(--line)', 'stroke-width': 0.75 }));
+    });
+    [40, 60, 80, 100, 120, 140, 160, 180, 200].forEach(function (x) {
+      weave.appendChild(el('line', { x1: x, y1: SW.y, x2: x, y2: SW.y + SW.h, stroke: 'var(--line)', 'stroke-width': 0.75 }));
+    });
+    textile.appendChild(weave);
+
+    // ---- 2. lower TPU film ----
+    var lowerTPU = el('g', {});
+    root.appendChild(lowerTPU);
+    var lowerRect = el('rect', {
+      x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: ZONE.rx,
+      fill: 'var(--ink)', 'fill-opacity': '0.12', stroke: 'var(--ink-dim)', 'stroke-opacity': '0.6', 'stroke-width': 1
+    });
+    lowerTPU.appendChild(lowerRect);
+
+    // ---- 3. flexible conductive traces -- one continuous, preformed
+    // path used for the complete animation. Only traceGroup's transform/
+    // opacity/filter ever change; the path data (TRACE_D) is computed
+    // once, right here, and never touched again. ----
+    var TRACE_X0 = ZONE.x + 6, TRACE_X1 = ZONE.x + ZONE.w - 6;
+    var TRACE_D = (function buildTraceD() {
+      var amp = 15, lobes = 2.5, N = 48, d = '';
+      for (var i = 0; i <= N; i++) {
+        var t = i / N;
+        var x = lerp(TRACE_X0, TRACE_X1, t);
+        var taper = Math.sin(t * Math.PI); // 0 at both ends, 1 at the middle --
+        // tapers the wave's amplitude to flat lead-ins at each pad instead
+        // of an abrupt kink.
+        var y = midY + Math.sin(t * Math.PI * 2 * lobes) * amp * taper;
+        d += (i === 0 ? 'M' : ' L') + x.toFixed(2) + ',' + y.toFixed(2);
+      }
+      return d;
+    })();
+
+    var traceGroup = el('g', {});
+    root.appendChild(traceGroup);
+    var traceOuter = el('path', { d: TRACE_D, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    var traceInner = el('path', { d: TRACE_D, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    traceGroup.appendChild(traceOuter);
+    traceGroup.appendChild(traceInner);
+    // Connection pads -- part of the trace's own preformed geometry, not
+    // a separate component, so they placed/settle together with it.
+    traceGroup.appendChild(el('rect', { x: TRACE_X0 - 5, y: midY - 5, width: 10, height: 10, rx: 2, fill: 'var(--petrol-bright)' }));
+    traceGroup.appendChild(el('rect', { x: TRACE_X1 - 5, y: midY - 5, width: 10, height: 10, rx: 2, fill: 'var(--petrol-bright)' }));
+
+    // ---- 4. upper TPU film -- same footprint as the lower one ----
+    var upperTPU = el('g', {});
+    root.appendChild(upperTPU);
+    var upperRect = el('rect', {
+      x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: ZONE.rx,
+      fill: 'var(--ink)', 'fill-opacity': '0.10', stroke: 'var(--ink-dim)', 'stroke-opacity': '0.5', 'stroke-width': 1
+    });
+    upperTPU.appendChild(upperRect);
+
+    // ---- 5. heat-press platen -- outline + technical corner brackets
+    // only, never a solid fill, so it can never fully hide the
+    // construction beneath it. ----
+    var pressGroup = el('g', {});
+    root.appendChild(pressGroup);
+    pressGroup.appendChild(el('rect', { x: PRESS.x, y: PRESS.y, width: PRESS.w, height: PRESS.h, rx: PRESS.rx, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.25 }));
+    var BR = 9;
+    [[PRESS.x, PRESS.y, 1, 1], [PRESS.x + PRESS.w, PRESS.y, -1, 1], [PRESS.x, PRESS.y + PRESS.h, 1, -1], [PRESS.x + PRESS.w, PRESS.y + PRESS.h, -1, -1]].forEach(function (c) {
+      var cx = c[0], cy = c[1], sx = c[2], sy = c[3];
+      pressGroup.appendChild(el('path', {
+        d: 'M' + cx + ',' + (cy + sy * BR) + ' L' + cx + ',' + cy + ' L' + (cx + sx * BR) + ',' + cy,
+        fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.5
+      }));
     });
 
-    var crossTicks = svgEl('g', {});
-    [{ y: 38, c: 'var(--ink-faint)' }, { y: 48, c: 'var(--petrol-bright)' }, { y: 58, c: 'var(--ink-faint)' }].forEach(function (t) {
-      crossTicks.appendChild(svgEl('rect', { x: 116, y: t.y, width: 8, height: 5, fill: t.c }));
+    // ---- 6. heat/pressure effect -- one persistent group, clipped to
+    // the lamination zone so the glow/pulse never bleeds past it ----
+    var effectGroup = el('g', { 'clip-path': 'url(#lamtrace-zone-clip)' });
+    root.appendChild(effectGroup);
+    var glow = el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, fill: 'var(--petrol-bright)', 'fill-opacity': '0' });
+    effectGroup.appendChild(glow);
+    var pulseBand = el('rect', { y: ZONE.y, width: ZONE.w * 0.55, height: ZONE.h, fill: 'url(#lamtrace-pulse-grad)' });
+    pulseBand.style.opacity = '0';
+    effectGroup.appendChild(pulseBand);
+
+    // Pressure ticks -- short marks along the press's own perimeter that
+    // creep inward and fade during the hold. Live outside the zone clip
+    // (they start beyond it, at the press's edge) so they're never cut
+    // off before their inward travel even begins.
+    var ticksGroup = el('g', {});
+    root.appendChild(ticksGroup);
+    var TICK_LEN = 7, TICK_INSET = 2;
+    var TICK_DEFS = [];
+    [0.32, 0.68].forEach(function (f) {
+      TICK_DEFS.push({ x1: PRESS.x + PRESS.w * f, y1: PRESS.y + TICK_INSET, x2: PRESS.x + PRESS.w * f, y2: PRESS.y + TICK_INSET + TICK_LEN, nx: 0, ny: 1 });
+      TICK_DEFS.push({ x1: PRESS.x + PRESS.w * f, y1: PRESS.y + PRESS.h - TICK_INSET, x2: PRESS.x + PRESS.w * f, y2: PRESS.y + PRESS.h - TICK_INSET - TICK_LEN, nx: 0, ny: -1 });
     });
-    crossTicks.style.opacity = '0';
-    cameraGroup.appendChild(crossTicks);
+    [0.32, 0.68].forEach(function (f) {
+      TICK_DEFS.push({ x1: PRESS.x + TICK_INSET, y1: PRESS.y + PRESS.h * f, x2: PRESS.x + TICK_INSET + TICK_LEN, y2: PRESS.y + PRESS.h * f, nx: 1, ny: 0 });
+      TICK_DEFS.push({ x1: PRESS.x + PRESS.w - TICK_INSET, y1: PRESS.y + PRESS.h * f, x2: PRESS.x + PRESS.w - TICK_INSET - TICK_LEN, y2: PRESS.y + PRESS.h * f, nx: -1, ny: 0 });
+    });
+    var ticks = TICK_DEFS.map(function (t) {
+      var line = el('line', { x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2, stroke: 'var(--petrol-bright)', 'stroke-width': 1.5, 'stroke-linecap': 'round' });
+      line.style.opacity = '0';
+      ticksGroup.appendChild(line);
+      return { el: line, def: t };
+    });
 
-    bringToFront(cameraGroup, base.padLeft);
-    bringToFront(cameraGroup, base.padRight);
-    resetCamera(cameraGroup);
+    // ---- timeline: one normalized progress value drives every visual
+    // property below. Percentages match the spec's suggested relative
+    // comprehension beats exactly. ----
+    var PH = {
+      establish: [0.00, 0.10],
+      lowerTPU: [0.10, 0.27],
+      traces: [0.27, 0.44],
+      upperTPU: [0.44, 0.60],
+      holdStack: [0.60, 0.68],
+      pressDown: [0.68, 0.77],
+      pressHold: [0.77, 0.88],
+      pressUp: [0.88, 0.94],
+      finished: [0.94, 1.00]
+    };
 
-    // front face: the heat press closing onto the layer stack, seen from
-    // the side — platens start apart, close until they touch the stack's
-    // edges (not cover it), then release. This face gets its own taller,
-    // zoomed-in viewBox (independent of topSvg's) — the stack is
-    // physically thin, so confining it to the same 240x140 frame as the
-    // top-down view left it reading as a near-invisible hairline at the
-    // settled pan angle. A shorter viewBox makes the same content fill
-    // far more of the face.
-    frontSvg.setAttribute('viewBox', '0 0 240 70');
-    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x + 20, y: 8, width: SWATCH.w - 40, height: 10, fill: 'var(--ink-faint)' }));
-    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x + 20, y: 18, width: SWATCH.w - 40, height: 10, fill: 'var(--petrol-bright)' }));
-    frontSvg.appendChild(svgEl('rect', { x: SWATCH.x + 20, y: 28, width: SWATCH.w - 40, height: 10, fill: 'var(--ink-faint)' }));
-    var platenTop = svgEl('rect', { x: SWATCH.x + 10, y: -10, width: SWATCH.w - 20, height: 10, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
-    var platenBottom = svgEl('rect', { x: SWATCH.x + 10, y: 46, width: SWATCH.w - 20, height: 10, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 });
-    platenTop.style.transformBox = 'fill-box';
-    platenBottom.style.transformBox = 'fill-box';
-    frontSvg.appendChild(platenTop);
-    frontSvg.appendChild(platenBottom);
+    // Shared "moving in from above, then settling" numbers for the two
+    // TPU films and the trace group -- a short vertical screen-space
+    // offset (never a horizontal slide), a soft shadow that shrinks as
+    // it lands, and a fade from fully invisible up to full opacity.
+    // Opacity starts at exactly 0, not just "reduced" -- before a
+    // layer's own phase begins (tPhase clamped to 0), it must not be
+    // visible at all ("No TPU, conductive traces, or heat press should
+    // be visible yet" during the establish step); the climb from 0 to 1
+    // as `s` eases up is itself what reads as "reduced opacity while
+    // moving," without needing a separate floor value. All three layers
+    // share this shape; only the trace's own settle uses a slower
+    // easing curve (see below) per the spec's explicit "slow down the
+    // final part of placement" instruction.
+    var MOVE_OFFSET = -15;
+    var MOVE_SHADOW = { dy: 6, blur: 7, alpha: 0.4 };
+    var REST_SHADOW = { dy: 1, blur: 1.5, alpha: 0.12 };
 
-    var LAYER_STAGGER = 260, LAYER_SETTLE_GAP = 500;
-    var PLATEN_CLOSE_DUR = 380, PLATEN_HOLD = 200, PLATEN_RELEASE_DUR = 320;
-    var FRAME_PRESS_WAIT = 200, CROSS_SHOW_DUR = 300, CROSS_HOLD = 550, CROSS_HIDE_DUR = 500;
+    function placementLayer(el2, tPhase, holdAt, easeFn) {
+      var s = settle(tPhase, holdAt, easeFn);
+      el2.style.transform = 'translate(0px,' + lerp(MOVE_OFFSET, 0, s).toFixed(2) + 'px)';
+      el2.style.opacity = lerp(0, 1, s).toFixed(3);
+      var dy = lerp(MOVE_SHADOW.dy, REST_SHADOW.dy, s);
+      var blur = lerp(MOVE_SHADOW.blur, REST_SHADOW.blur, s);
+      var alpha = lerp(MOVE_SHADOW.alpha, REST_SHADOW.alpha, s);
+      return { dy: dy, blur: blur, alpha: alpha };
+    }
 
-    var settleTime = layers.length * LAYER_STAGGER + LAYER_SETTLE_GAP;
-    var tailTotal = FRAME_PRESS_WAIT + CROSS_SHOW_DUR + CROSS_HOLD + CROSS_HIDE_DUR;
+    function render(p) {
+      // -- lower TPU: placement, then shadow further clears as bonding
+      // progresses ("the lower TPU shadow disappears") --
+      var tLower = phaseT(p, PH.lowerTPU);
+      var lowerState = placementLayer(lowerTPU, tLower, 0.65, easeOutCubic);
+      var bonded = easeInOutCubic(phaseT(p, PH.pressHold));
+      lowerTPU.style.filter = shadow(lerp(lowerState.dy, 0, bonded), lerp(lowerState.blur, 0, bonded), lowerState.alpha * (1 - bonded));
+      lowerRect.setAttribute('fill-opacity', lerp(0.12, 0.20, bonded).toFixed(3));
+      lowerRect.setAttribute('stroke-opacity', lerp(0.6, 0.85, bonded).toFixed(3));
+
+      // -- traces: same placement language, deliberately slower tail --
+      var tTrace = phaseT(p, PH.traces);
+      var traceState = placementLayer(traceGroup, tTrace, 0.75, easeOutQuint);
+      traceGroup.style.filter = shadow(lerp(traceState.dy, 0, bonded), lerp(traceState.blur, 0, bonded), traceState.alpha * 0.85 * (1 - bonded));
+
+      // -- upper TPU: placement, then bonds down the same way as lower --
+      var tUpper = phaseT(p, PH.upperTPU);
+      var upperState = placementLayer(upperTPU, tUpper, 0.65, easeOutCubic);
+      upperTPU.style.filter = shadow(lerp(upperState.dy, 0, bonded), lerp(upperState.blur, 0, bonded), upperState.alpha * (1 - bonded));
+      upperRect.setAttribute('fill-opacity', lerp(0.10, 0.16, bonded).toFixed(3));
+      upperRect.setAttribute('stroke-opacity', lerp(0.5, 0.8, bonded).toFixed(3));
+
+      // -- heat press: opacity + shadow only, position and scale never
+      // change. Lowers (0.68-0.77), holds through the bond (0.77-0.88),
+      // lifts (0.88-0.94), then is fully gone -- exactly 0 opacity and
+      // no filter, never a faint leftover. --
+      var pressOpacity = 0, pDy = 0, pBlur = 0, pAlpha = 0;
+      if (p >= PH.pressDown[0] && p < PH.pressUp[0]) {
+        var down = easeInOutCubic(phaseT(p, PH.pressDown));
+        pressOpacity = lerp(0, 1, down);
+        pDy = lerp(9, 1, down);
+        pBlur = lerp(11, 2, down);
+        pAlpha = lerp(0.3, 0.5, down);
+      } else if (p >= PH.pressUp[0] && p < PH.finished[0]) {
+        var up = easeInOutCubic(phaseT(p, PH.pressUp));
+        pressOpacity = lerp(1, 0, up);
+        pDy = lerp(1, 9, up);
+        pBlur = lerp(2, 11, up);
+        pAlpha = lerp(0.5, 0, up);
+      }
+      pressGroup.style.opacity = pressOpacity.toFixed(3);
+      pressGroup.style.filter = shadow(pDy, pBlur, pAlpha);
+
+      // -- heat/pressure effect: glow rises and falls across hold+lift,
+      // plus a small closing emphasis pulse once fully finished --
+      var glowOpacity = 0;
+      if (p >= PH.pressHold[0] && p < PH.pressUp[1]) {
+        var gt = (p - PH.pressHold[0]) / (PH.pressUp[1] - PH.pressHold[0]);
+        glowOpacity = Math.sin(clamp01(gt) * Math.PI) * 0.15;
+      } else if (p >= PH.finished[0]) {
+        var ft = phaseT(p, PH.finished);
+        glowOpacity = Math.sin(ft * Math.PI) * 0.08;
+      }
+      glow.setAttribute('fill-opacity', glowOpacity.toFixed(3));
+
+      // sweeping pulse band + inward pressure ticks -- both confined to
+      // the pressHold phase only, matching "while the press remains down"
+      var holdT = phaseT(p, PH.pressHold);
+      var holdActive = p >= PH.pressHold[0] && p < PH.pressHold[1];
+      if (holdActive) {
+        var fade = Math.min(1, holdT / 0.15, (1 - holdT) / 0.15);
+        pulseBand.style.opacity = fade.toFixed(3);
+        var sweepT = (holdT * 1.4) % 1;
+        pulseBand.setAttribute('x', lerp(ZONE.x - ZONE.w * 0.55, ZONE.x + ZONE.w, sweepT).toFixed(2));
+      } else {
+        pulseBand.style.opacity = '0';
+      }
+      ticks.forEach(function (item) {
+        if (!holdActive) { item.el.style.opacity = '0'; return; }
+        var dist = 9 * holdT;
+        item.el.style.opacity = (Math.sin(holdT * Math.PI) * 0.85).toFixed(3);
+        item.el.style.transform = 'translate(' + (item.def.nx * dist).toFixed(2) + 'px,' + (item.def.ny * dist).toFixed(2) + 'px)';
+      });
+    }
+
+    var TOTAL_DURATION = 7200;
+    var REDUCED_DURATION = 500;
+    var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+    var raf = null;
+    function resetToStart() {
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      root.style.transition = 'none';
+      root.style.opacity = '1';
+      render(0);
+    }
+    resetToStart();
 
     return {
-      duration: CAMERA_LEAD + settleTime + PAN_TOTAL + tailTotal + 150,
+      duration: REDUCED ? REDUCED_DURATION : TOTAL_DURATION,
       play: function () {
-        resetCamera(cameraGroup);
-        resetScenePan(scene);
-        cameraGroup.getBoundingClientRect();
-        playCameraZoomIn(cameraGroup);
-
-        crossTicks.style.transition = 'none';
-        crossTicks.style.opacity = '0';
-        platenTop.style.transition = 'none';
-        platenTop.style.transform = 'translateY(0)';
-        platenBottom.style.transition = 'none';
-        platenBottom.style.transform = 'translateY(0)';
-
-        setTimeout(function () {
-          layers.forEach(function (rect, i) {
-            rect.style.transition = 'none';
-            rect.style.opacity = '0';
-            rect.style.transform = 'translateY(-70px)';
-            rect.getBoundingClientRect();
-            setTimeout(function () {
-              rect.style.transition = 'transform 500ms cubic-bezier(.25,.7,.3,1.1), opacity 300ms ease';
-              rect.style.opacity = '1';
-              rect.style.transform = 'translateY(0)';
-            }, i * LAYER_STAGGER);
-          });
-
-          // pan around to the side right as the press closes on the stack
-          setTimeout(function () {
-            panToSideView(scene, cameraGroup, function onHold() {
-              platenTop.style.transition = 'transform ' + PLATEN_CLOSE_DUR + 'ms cubic-bezier(.4,0,.2,1)';
-              platenBottom.style.transition = 'transform ' + PLATEN_CLOSE_DUR + 'ms cubic-bezier(.4,0,.2,1)';
-              platenTop.getBoundingClientRect();
-              // close to just touch the stack's edges, not cover it — the
-              // whole point of this shot is that the layers stay visible
-              platenTop.style.transform = 'translateY(8px)';
-              platenBottom.style.transform = 'translateY(-8px)';
-
-              setTimeout(function () {
-                platenTop.style.transition = 'transform ' + PLATEN_RELEASE_DUR + 'ms ease';
-                platenBottom.style.transition = 'transform ' + PLATEN_RELEASE_DUR + 'ms ease';
-                platenTop.style.transform = 'translateY(0)';
-                platenBottom.style.transform = 'translateY(0)';
-              }, PLATEN_CLOSE_DUR + PLATEN_HOLD);
-            }, function onDone() {
-              // back on the main view, give the swatch its own quick
-              // press-pulse to echo what we just saw from the side
-              base.frame.classList.remove('is-pressing');
-              base.frame.getBoundingClientRect();
-              base.frame.classList.add('is-pressing');
-
-              setTimeout(function () {
-                crossTicks.style.transition = 'opacity ' + CROSS_SHOW_DUR + 'ms ease';
-                crossTicks.style.opacity = '1';
-                setTimeout(function () {
-                  crossTicks.style.transition = 'opacity ' + CROSS_HIDE_DUR + 'ms ease';
-                  crossTicks.style.opacity = '0';
-                }, CROSS_HOLD);
-              }, FRAME_PRESS_WAIT);
-            });
-          }, settleTime);
-        }, CAMERA_LEAD);
+        resetToStart();
+        if (REDUCED) {
+          // Simplified path: jump straight to the finished, bonded
+          // state and fade the whole diagram in -- no layer travel, no
+          // press movement, but the same instructional end result.
+          render(1);
+          root.style.transition = 'none';
+          root.style.opacity = '0';
+          root.getBoundingClientRect();
+          root.style.transition = 'opacity ' + REDUCED_DURATION + 'ms ease';
+          root.style.opacity = '1';
+          return;
+        }
+        var start = performance.now();
+        function frame(now) {
+          var raw = Math.max(0, Math.min(1, (now - start) / TOTAL_DURATION));
+          render(raw);
+          if (raw < 1) raf = requestAnimationFrame(frame);
+        }
+        raf = requestAnimationFrame(frame);
       }
     };
   }

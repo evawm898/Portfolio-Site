@@ -305,68 +305,13 @@
   display: block;
 }
 
-/* shared "smooth pan to a 3/4 side view" rig — two faces hinged along
-   the fabric's bottom edge (110/140 = 78.57% down the shared viewBox),
-   sharing one 3D space so rotating the scene reads as a single camera
-   move rather than a cut between two separate drawings */
-.circuit-3d-stage {
-  width: 100%;
-  height: 100%;
-  perspective: 420px;
-}
-
-.circuit-3d-scene {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  transform-style: preserve-3d;
-}
-
-.circuit-3d-face {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-  overflow: visible;
-}
-
-.circuit-3d-face--top {
-  /* Without this, the top face rotating past edge-on doesn't just
-     disappear — the browser keeps painting it, mirrored, as if you
-     could see through to its back. That mirrored repaint is what read
-     as a second, flipped copy of the trace and nozzle during the
-     pan-down: at ~82deg it sits right at that edge, and small
-     interpolation/rounding during the transition was enough to tip it
-     across the threshold for a frame or two. Hiding its true backface
-     removes that ghost outright. (The front face is deliberately left
-     alone here — the fold that makes it readable at the settled 3/4
-     angle relies on the browser rendering what it calls that face's
-     "back", so hiding backfaces there would hide the face itself.)
-  */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.circuit-3d-face--front {
-  transform-origin: 50% 78.57%;
-  /* translateZ has to come BEFORE the rotation here — applied after,
-     it pushes along the face's own (now-rotated) local Z axis, which
-     is a different direction than intended. Pushing first, in the
-     shared pre-rotation space, is what actually nudges this face
-     toward the camera enough to win the depth sort against the top
-     face's opaque fabric rect at the settled 3/4 angle. */
-  transform: translateZ(4px) rotateX(90deg);
-}
-
-/* Printed conductive ink's own 3D stage — deliberately separate from
-   .circuit-3d-* above. That shared rig is a two-face hinge built for
-   wire/laminated, which genuinely need a second, folded face to reveal
-   a cross-section. Ink has no cross-section to reveal — its 3/4 view is
-   just the same single swatch viewed from an angle — so it gets its own
-   single-face rig here. Keeping it as its own named class (rather than
-   reusing .circuit-3d-face) means a future change to the hinge rig can
-   never accidentally affect ink, and vice versa. */
+/* Printed conductive ink's own 3D stage. Ink's 3/4 view has no
+   cross-section to reveal — it's just the same single swatch viewed
+   from an angle — so it gets its own single-face rig here rather than
+   a hinged two-face one. Kept as its own named class so a future change
+   to another pathway's rig (or removal of one, as happened when
+   laminated-trace moved to a fixed overhead camera) can never
+   accidentally affect ink. */
 .ink3d-stage {
   width: 100%;
   height: 100%;
@@ -395,14 +340,13 @@
   -webkit-backface-visibility: hidden;
 }
 
-/* Embedded wire's own 3D stage — separate from both .circuit-3d-* and
-   .ink3d-* above. Three faces this time (fabric/wire base, tunnel top,
-   tunnel front wall), but the principle is the same as the other two
-   rigs: every face is a child of one shared rotating .wire3d-scene, and
-   only that scene's own transform ever changes over time, so all three
-   faces move in lockstep by construction. Kept as its own named class
-   rather than reusing .circuit-3d-face so a future change to either
-   older rig can never accidentally ripple into this one. */
+/* Embedded wire's own 3D stage — separate from .ink3d-* above. Three
+   faces this time (fabric/wire base, tunnel top, tunnel front wall),
+   but the principle is the same: every face is a child of one shared
+   rotating .wire3d-scene, and only that scene's own transform ever
+   changes over time, so all three faces move in lockstep by
+   construction. Kept as its own named class so a future change to
+   another pathway's rig can never accidentally ripple into this one. */
 .wire3d-stage {
   width: 100%;
   height: 100%;
@@ -432,9 +376,11 @@
 
 .wire3d-face--flat {
   /* Base face and tunnel-top face both stay parallel to the scene's own
-     rotation (only a translateZ lift separates them) — same "past
-     edge-on it should disappear, not repaint mirrored" case documented
-     on .circuit-3d-face--top above, so they get the same fix. */
+     rotation (only a translateZ lift separates them). Without this, a
+     face rotating past edge-on doesn't just disappear — the browser
+     keeps painting it, mirrored, as if you could see through to its
+     back, which reads as a ghost duplicate. Hiding the true backface
+     removes that outright. */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
@@ -442,9 +388,9 @@
 .wire3d-face--front {
   /* transform-origin/transform are set per-instance in JS (the fold
      hinge's exact position depends on the tunnel geometry computed
-     there). Deliberately no backface-visibility here, matching
-     .circuit-3d-face--front: this face's legibility once folded up to
-     vertical relies on the browser rendering what it calls its "back". */
+     there). Deliberately no backface-visibility here: this face's
+     legibility once folded up to vertical relies on the browser
+     rendering what it calls its "back". */
 }
 
 .circuit-panel__label {
@@ -483,16 +429,6 @@
   transform-box: fill-box;
   transform-origin: center;
   transition: fill-opacity 300ms ease;
-}
-
-.circuit-fabric.is-pressing {
-  animation: circuitPress 380ms ease-in-out;
-}
-
-@keyframes circuitPress {
-  0%   { transform: scaleY(1); }
-  45%  { transform: scaleY(0.9); }
-  100% { transform: scaleY(1); }
 }
 
 /* metal coating — grows in from a small seed point */
