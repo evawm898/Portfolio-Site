@@ -1514,8 +1514,14 @@
 
     var X_leftSlit = midX - CFG.SLIT_SPACING / 2;
     var X_rightSlit = midX + CFG.SLIT_SPACING / 2;
+    // The wire's own path starts exactly at the left slit -- not before
+    // it -- so nothing is ever revealed outside the tunnel structure.
+    // It still extends WIRE_LEAD past the right slit on exit, per spec
+    // ("wire completes travel through right slit, extends slightly
+    // beyond"), which is a one-sided choice and deliberately so: this
+    // is where the wire's own reveal starts, not a symmetric margin.
     var WIRE_LEAD = 20;
-    var X_wireStart = X_leftSlit - WIRE_LEAD;
+    var X_wireStart = X_leftSlit;
     var X_wireEnd = X_rightSlit + WIRE_LEAD;
 
     // Solves for the CSS rotateX fold angle (phiDeg) and the rib's own
@@ -1761,7 +1767,7 @@
       }
       return d;
     }
-    function renderArchCaps(riseAmount, opacity, tiltDeg, yawDeg, wireProgress) {
+    function renderArchCaps(riseAmount, opacity, tiltDeg, yawDeg, wireProgress, archFade, fabricFade) {
       var stageWidthPx = stageEl.getBoundingClientRect().width || 240;
       var localPts = archCapLocalPoints(riseAmount);
       archCapNearPath.setAttribute('d', archCapD(X_leftSlit, localPts, tiltDeg, yawDeg, stageWidthPx));
@@ -1771,19 +1777,20 @@
       // silhouette stops working (near the through-tunnel yaw), but
       // redundant clutter layered on top of that same rib silhouette in
       // top-down/side view, where the ribs already read fine on their
-      // own. Faded in step with how far into the yaw pivot the camera
-      // currently is, so it only actually appears once it's needed.
-      var yawStrength = Math.abs(yawDeg) / CFG.THROUGH_TUNNEL_YAW;
-      var capOpacity = (Math.max(opacity, 0.85) * riseAmount * yawStrength).toFixed(3);
+      // own. archFade (see computeFadeMultipliers) brings it in only
+      // once the fabric/ribs have started fading out, as one continuous
+      // crossfade rather than either overlapping clutter or a visible
+      // gap.
+      var capOpacity = (Math.max(opacity, 0.85) * riseAmount * archFade).toFixed(3);
       archCapNearPath.style.opacity = capOpacity;
       archCapFarPath.style.opacity = capOpacity;
 
-      // Wire indicator: only ramps in right at the very end of the
-      // pivot (unlike the caps' own, more gradual fade), since the real
-      // wire's rendering only actually collapses within a couple of
-      // degrees of dead-on -- everywhere short of that, the real wire
-      // already reads fine on its own and this stays fully transparent.
-      var wireIndicatorStrength = clamp01((yawStrength - 0.85) / 0.15);
+      // Wire indicator: exactly complementary to the real wire's own
+      // fabricFade-driven fade (see render()), so the handoff between
+      // "the real wire, rendered in the 3D scene" and "this marker for
+      // that same wire" is a clean crossfade with no window where both
+      // or neither are visible.
+      var wireIndicatorStrength = 1 - fabricFade;
       if (wireIndicatorStrength > 0) {
         var tipX = lerp(X_wireStart, X_wireEnd, clamp01(wireProgress));
         var proj = projectPoint(tipX, midY, CFG.WIRE_DIAMETER, tiltDeg, yawDeg, stageWidthPx);
@@ -1801,13 +1808,19 @@
         ' L' + X_rightSlit.toFixed(2) + ',' + midY.toFixed(2) +
         ' Z';
     }
-    function renderTunnel(riseAmount, opacity) {
+    function renderTunnel(riseAmount, opacity, fabricFade) {
       ribs.forEach(function (rib) {
         rib.path.setAttribute('d', ribBandD(rib.peakLen, riseAmount));
         // Fill dims to the 50% cutaway; the outline stays strong so the
         // arch is still clearly readable as a shape, not just a haze.
         rib.path.style.fillOpacity = opacity.toFixed(3);
         rib.path.style.strokeOpacity = Math.max(opacity, 0.85).toFixed(3);
+        // fabricFade, separately, is the crossfade-out ahead of the
+        // through-tunnel yaw -- see where computeFadeMultipliers is
+        // built. Applied to the whole face rather than folded into the
+        // fill/stroke opacity above so it stays a clean multiplier
+        // regardless of the 50% cutaway state.
+        rib.face.style.opacity = fabricFade.toFixed(3);
       });
     }
 
@@ -1829,10 +1842,14 @@
     }
     primeDash(wireOuter);
     primeDash(wireInner);
-    function renderWire(t) {
+    function renderWire(t, opacity) {
       var offset = wireLen * (1 - clamp01(t));
       wireOuter.style.strokeDashoffset = String(offset);
       wireInner.style.strokeDashoffset = String(offset);
+      if (opacity !== undefined) {
+        wireOuter.style.opacity = opacity.toFixed(3);
+        wireInner.style.opacity = opacity.toFixed(3);
+      }
     }
 
     // ---- timeline: percentages match the spec's own suggested
@@ -1915,6 +1932,25 @@
       return { tiltX: tiltX, yawY: yawY };
     }
 
+    // The fabric plane and the ribs both go edge-on as yaw approaches
+    // 90deg, and this rendering engine doesn't do that cleanly -- well
+    // short of exactly 90deg it's already a thin, distorted diagonal
+    // sliver, not a smooth fade (confirmed directly, screenshotted
+    // through the pivot). Rather than let the viewer see that
+    // in-between state, fabricFade explicitly dims the real geometry to
+    // fully transparent *before* it gets there, and archFade brings the
+    // billboarded arch overlay in to replace it -- overlapping in the
+    // middle so it reads as one continuous crossfade, never a gap where
+    // nothing is visible and never the raw geometric collapse itself.
+    // Both are pure functions of the current yaw, so they run
+    // identically forward (pivotToTunnel) and in reverse (pivotBack).
+    function computeFadeMultipliers(yawDeg) {
+      var yawFrac = clamp01(Math.abs(yawDeg) / CFG.THROUGH_TUNNEL_YAW);
+      var fabricFade = 1 - easeInOutCubic(clamp01((yawFrac - 0.45) / 0.25));
+      var archFade = easeInOutCubic(clamp01((yawFrac - 0.50) / 0.30));
+      return { fabricFade: fabricFade, archFade: archFade };
+    }
+
     function computeTunnelState(p) {
       var riseAmount;
       if (p < PH.tunnelRise[0]) riseAmount = 0;
@@ -1939,15 +1975,18 @@
       // rotateZ never appears anywhere in this expression.
       scene.style.transform = 'rotateY(' + cam.yawY.toFixed(3) + 'deg) rotateX(' + cam.tiltX.toFixed(3) + 'deg)';
 
+      var fade = computeFadeMultipliers(cam.yawY);
+      fabric.face.style.opacity = fade.fabricFade.toFixed(3);
+
       renderSlit(leftSlitEl, X_leftSlit, computeSlitOpen(p, 'left'));
       renderSlit(rightSlitEl, X_rightSlit, computeSlitOpen(p, 'right'));
 
       var tunnelState = computeTunnelState(p);
-      renderTunnel(tunnelState.riseAmount, tunnelState.opacity);
+      renderTunnel(tunnelState.riseAmount, tunnelState.opacity, fade.fabricFade);
       var wireProgress = computeWireProgress(p);
-      renderArchCaps(tunnelState.riseAmount, tunnelState.opacity, cam.tiltX, cam.yawY, wireProgress);
+      renderArchCaps(tunnelState.riseAmount, tunnelState.opacity, cam.tiltX, cam.yawY, wireProgress, fade.archFade, fade.fabricFade);
 
-      renderWire(wireProgress);
+      renderWire(wireProgress, fade.fabricFade);
     }
 
     function computeSlitOpen(p, which) {
@@ -1967,14 +2006,15 @@
     var REDUCED_DURATION = 3200;
     function renderReduced(rp) {
       scene.style.transform = 'rotateY(0deg) rotateX(0deg)';
+      fabric.face.style.opacity = '1';
       var slitsT = easeInOutCubic(clamp01(rp / 0.22));
       renderSlit(leftSlitEl, X_leftSlit, slitsT);
       renderSlit(rightSlitEl, X_rightSlit, slitsT);
       var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
-      renderTunnel(clamp01(riseT), 0.5);
+      renderTunnel(clamp01(riseT), 0.5, 1);
       var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
-      renderArchCaps(clamp01(riseT), 0.5, 0, 0, wireT);
-      renderWire(wireT);
+      renderArchCaps(clamp01(riseT), 0.5, 0, 0, wireT, 0, 1);
+      renderWire(wireT, 1);
     }
 
     var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
