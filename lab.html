@@ -2148,10 +2148,17 @@
     // between two layers has to outrun each layer's own foreshortened
     // silhouette height for a visible seam to appear between them,
     // rather than the two silhouettes just overlapping.
+    // BOND values are how tightly the stack sits once the press has
+    // held long enough to bond it -- each gap (fabric-to-lower,
+    // lower-to-trace, trace-to-upper) closes by 20% more than before:
+    // new_reduction = old_reduction * 1.2, new_bond_gap = rest_gap -
+    // new_reduction. REST values (and therefore the press's own travel
+    // depth) are untouched -- only how far the layers settle toward
+    // each other changes.
     var Z_FABRIC = 0;
-    var Z_LOWER_REST = 54, Z_LOWER_BOND = 22;
-    var Z_TRACE_REST = 86, Z_TRACE_BOND = 35;
-    var Z_UPPER_REST = 118, Z_UPPER_BOND = 48;
+    var Z_LOWER_REST = 54, Z_LOWER_BOND = 15.6;
+    var Z_TRACE_REST = 86, Z_TRACE_BOND = 24.8;
+    var Z_UPPER_REST = 118, Z_UPPER_BOND = 34.0;
     // Idle Z is deliberately restrained, not "as far away as possible" --
     // at REST_RX this is already projected most of the way to sin(),
     // and a much larger value would carry the (still-fading-in) press
@@ -2274,10 +2281,11 @@
     // ---- timeline: one normalized progress value drives every visual
     // property below. Durations noted in ms; PH holds the equivalent
     // fractions of TOTAL_DURATION. Every phase besides pressHold keeps
-    // its original absolute duration -- pressHold alone was lengthened
-    // (1000ms -> 1900ms) so the pause at full press depth actually
-    // reads before the lift begins, and every later phase's boundary
-    // simply shifts later by that same added 900ms. ----
+    // its original absolute duration -- pressHold alone was doubled
+    // again (1900ms -> 3800ms, having already grown once from an
+    // original 1000ms) so the pause at full press depth reads as an
+    // even more deliberate stop, and every later phase's boundary
+    // simply shifts later by that same added 1900ms. ----
     //   establish     500ms   fabric only, hold
     //   lowerTpu      900ms   lower TPU settles on
     //   trace        1000ms   preformed trace settles on
@@ -2286,24 +2294,24 @@
     //   rotateToSide  750ms   camera: top-down -> side (X only)
     //   holdSide      650ms   hold in side view
     //   pressDown     600ms   press descends, vertical only
-    //   pressHold    1900ms   full depth reached; heat glow holds; gaps close
+    //   pressHold    3800ms   full depth reached; heat glow holds; gaps close
     //   pressUp       550ms   press lifts, heat clears completely
     //   rotateBack    650ms   camera: side -> top-down (X only)
     //   finished      800ms   bonded laminate, one accent pulse
-    var TOTAL_DURATION = 10100;
+    var TOTAL_DURATION = 12000;
     var PH = {
-      establish:    [0.0000, 0.0495],
-      lowerTpu:     [0.0495, 0.1386],
-      trace:        [0.1386, 0.2376],
-      upperTpu:     [0.2376, 0.3267],
-      holdStack:    [0.3267, 0.4158],
-      rotateToSide: [0.4158, 0.4901],
-      holdSide:     [0.4901, 0.5545],
-      pressDown:    [0.5545, 0.6139],
-      pressHold:    [0.6139, 0.8020],
-      pressUp:      [0.8020, 0.8564],
-      rotateBack:   [0.8564, 0.9208],
-      finished:     [0.9208, 1.0000]
+      establish:    [0.0000, 0.0417],
+      lowerTpu:     [0.0417, 0.1167],
+      trace:        [0.1167, 0.2000],
+      upperTpu:     [0.2000, 0.2750],
+      holdStack:    [0.2750, 0.3500],
+      rotateToSide: [0.3500, 0.4125],
+      holdSide:     [0.4125, 0.4667],
+      pressDown:    [0.4667, 0.5167],
+      pressHold:    [0.5167, 0.8333],
+      pressUp:      [0.8333, 0.8792],
+      rotateBack:   [0.8792, 0.9333],
+      finished:     [0.9333, 1.0000]
     };
     // Short of a literal edge-on 90deg, but steep enough that each
     // layer's own footprint compresses far more than the gaps between
@@ -2405,10 +2413,14 @@
         var tOut = clamp01((PH.pressHold[1] - p) / HEAT_FADE);
         heatT = Math.min(easeOutCubic(tIn), easeOutCubic(tOut));
       }
-      heatGlow.setAttribute('fill-opacity', (heatT * 0.16).toFixed(3));
+      // Brightness only, not timing or color: peak glow/shimmer opacity
+      // raised (0.16 -> 0.36 glow, 0.45 -> 0.6 shimmer) so the hold
+      // reads clearly as heat rather than a faint tint. Still the same
+      // petrol-bright fill/stroke and the same heatT gate above.
+      heatGlow.setAttribute('fill-opacity', (heatT * 0.36).toFixed(3));
       shimmerLines.forEach(function (line, idx) {
         var flicker = 0.5 + 0.5 * Math.sin(p * 46 + idx * 2.1);
-        line.style.opacity = (heatT * 0.45 * flicker).toFixed(3);
+        line.style.opacity = (heatT * 0.6 * flicker).toFixed(3);
       });
 
       // -- finished accent: one soft pulse through the bonded trace,
