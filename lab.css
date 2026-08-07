@@ -494,6 +494,16 @@
   width: 100%;
   height: 100%;
   perspective: 1800px;
+  position: relative;
+}
+
+/* The through-tunnel arch caps are drawn here, as flat, JS-projected
+   2D paths — a sibling of .embeddedWire-scene, not a child, so they
+   never enter its 3D transform hierarchy at all. See the JS comment
+   where they're built for why. Sits on top in normal DOM paint order;
+   never intercepts hover/click, same as every other face here. */
+.embeddedWire-overlay {
+  pointer-events: none;
 }
 
 .embeddedWire-scene {
