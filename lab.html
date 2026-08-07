@@ -2291,12 +2291,12 @@
 
     // ---- timeline: one normalized progress value drives every visual
     // property below. Durations noted in ms; PH holds the equivalent
-    // fractions of TOTAL_DURATION. Three phases changed from their
-    // prior values, everything else keeps its original absolute
-    // duration and simply shifts later:
-    //   pressHold  3800ms -> 7600ms  (doubled again, deliberate stop)
-    //   holdSide    650ms ->  325ms  (halved -- separate from pressHold)
-    //   holdStack   900ms ->  450ms  (halved -- the pre-rotation beat)
+    // fractions of TOTAL_DURATION. Two phases changed from their prior
+    // values, everything else keeps its original absolute duration and
+    // simply shifts later:
+    //   pressDown   600ms ->  350ms  (faster descent -- was reading slow)
+    //   pressHold  7600ms -> 9600ms  (a couple more beats lingering at
+    //                                 full depth before the lift)
     //   establish     500ms   fabric only, hold
     //   lowerTpu      900ms   lower TPU settles on
     //   trace        1000ms   preformed trace settles on
@@ -2304,26 +2304,26 @@
     //   holdStack     450ms   comprehension beat, unbonded stack
     //   rotateToSide  750ms   camera: top-down -> side (X only)
     //   holdSide      325ms   hold in side view
-    //   pressDown     600ms   press descends, vertical only
-    //   pressHold    7600ms   full depth reached; heat glow holds; gaps close
+    //   pressDown     350ms   press descends, vertical only
+    //   pressHold    9600ms   full depth reached; heat glow holds; gaps close
     //   pressUp       550ms   press lifts, heat clears completely
     //   rotateBack    650ms   camera: side -> top-down (X only)
     //   finished      800ms   bonded laminate, one accent pulse
-    //   TOTAL        15025ms
-    var TOTAL_DURATION = 15025;
+    //   TOTAL        16775ms
+    var TOTAL_DURATION = 16775;
     var PH = {
-      establish:    [0.0000, 0.0333],
-      lowerTpu:     [0.0333, 0.0932],
-      trace:        [0.0932, 0.1597],
-      upperTpu:     [0.1597, 0.2196],
-      holdStack:    [0.2196, 0.2496],
-      rotateToSide: [0.2496, 0.2995],
-      holdSide:     [0.2995, 0.3211],
-      pressDown:    [0.3211, 0.3611],
-      pressHold:    [0.3611, 0.8669],
-      pressUp:      [0.8669, 0.9035],
-      rotateBack:   [0.9035, 0.9468],
-      finished:     [0.9468, 1.0000]
+      establish:    [0.0000, 0.0298],
+      lowerTpu:     [0.0298, 0.0835],
+      trace:        [0.0835, 0.1431],
+      upperTpu:     [0.1431, 0.1967],
+      holdStack:    [0.1967, 0.2235],
+      rotateToSide: [0.2235, 0.2683],
+      holdSide:     [0.2683, 0.2876],
+      pressDown:    [0.2876, 0.3085],
+      pressHold:    [0.3085, 0.8808],
+      pressUp:      [0.8808, 0.9136],
+      rotateBack:   [0.9136, 0.9523],
+      finished:     [0.9523, 1.0000]
     };
     // Short of a literal edge-on 90deg, but steep enough that each
     // layer's own footprint compresses far more than the gaps between
