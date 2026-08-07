@@ -35,7 +35,7 @@
   // configured" message instead of trying (and failing) to call it.
   // -------------------------------------------------------------------
   const CONFIG = {
-    API_BASE_URL: "",
+    API_BASE_URL: "https://textile-gauge-reader-api.onrender.com",
   };
 
   const STEPS = ["upload", "calibrate", "roi", "orientation", "analyze", "results"];
@@ -43,8 +43,9 @@
   const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
   const MIN_ROI_NATURAL_PX = 40;
   const HANDLE_HIT_RADIUS = 10; // display px
-  const HEALTH_CHECK_TIMEOUT_MS = 8000;
-  const ANALYZE_TIMEOUT_MS = 60000; // generous: free-tier hosts can cold-start slowly
+  const HEALTH_CHECK_TIMEOUT_MS = 10000; // per-attempt; Render free tier can be slow even once awake
+  const HEALTH_CHECK_RETRY_DELAYS_MS = [4000, 8000, 15000, 20000]; // backoff while the service cold-starts
+  const ANALYZE_TIMEOUT_MS = 75000; // generous: free-tier hosts can cold-start slowly
 
   const WALE_COLOR = "#2fa3a3";   // matches --petrol-bright
   const COURSE_COLOR = "#c98a4b"; // matches --tgr-course
@@ -125,6 +126,26 @@
     serviceStatusRetry.hidden = mode !== "offline";
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function pingHealthOnce() {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/health`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Bumped on every call to checkServiceHealth() so a fresh check (e.g. the
+  // user clicking Retry) supersedes any still-waiting automatic retry loop
+  // instead of the two racing to update the status pill.
+  let healthCheckGeneration = 0;
+
   async function checkServiceHealth() {
     if (!CONFIG.API_BASE_URL) {
       state.serviceOnline = false;
@@ -134,21 +155,45 @@
       );
       return;
     }
+
+    const generation = ++healthCheckGeneration;
     setServiceStatus("checking", "Checking analysis service…");
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
-      const res = await fetch(`${CONFIG.API_BASE_URL}/health`, { signal: controller.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      state.serviceOnline = true;
-      setServiceStatus("online", "Analysis service is online.");
-    } catch (err) {
-      state.serviceOnline = false;
-      setServiceStatus(
-        "offline",
-        "Analysis service is unavailable right now (it may be waking up from a cold start — try again in a bit)."
-      );
+
+    // Render's free tier can take up to ~60s to wake a sleeping instance.
+    // Rather than declaring "unavailable" after one quick timeout (which
+    // would be wrong almost every time the service has been idle), retry
+    // with backoff and keep the status pill showing a clear "waking up"
+    // state — never a bare failure — until we've given it a fair chance.
+    const totalAttempts = HEALTH_CHECK_RETRY_DELAYS_MS.length + 1;
+    for (let attempt = 0; attempt < totalAttempts; attempt++) {
+      if (generation !== healthCheckGeneration) return; // superseded by a newer check
+
+      try {
+        await pingHealthOnce();
+        if (generation !== healthCheckGeneration) return;
+        state.serviceOnline = true;
+        setServiceStatus("online", "Analysis service is online.");
+        return;
+      } catch (err) {
+        const isLastAttempt = attempt === totalAttempts - 1;
+        if (generation !== healthCheckGeneration) return;
+
+        if (isLastAttempt) {
+          state.serviceOnline = false;
+          setServiceStatus(
+            "offline",
+            "Analysis service is still unavailable after waiting for a possible cold start — it may genuinely be down. Try Retry, or try again shortly."
+          );
+          return;
+        }
+
+        const delay = HEALTH_CHECK_RETRY_DELAYS_MS[attempt];
+        setServiceStatus(
+          "checking",
+          `Waking up analysis service (Render free-tier cold start can take up to a minute)… retrying in ${Math.round(delay / 1000)}s.`
+        );
+        await sleep(delay);
+      }
     }
   }
 
