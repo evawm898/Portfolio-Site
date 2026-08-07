@@ -2155,23 +2155,27 @@
       return { face: face, svg: svg };
     }
 
-    // Deliberately large relative to the swatch itself, same reasoning
-    // as the laminated-trace rig: at a rotation short of edge-on, a
-    // flat layer's own footprint never fully collapses to a hairline,
-    // so the gap between layers has to outrun each layer's own
-    // foreshortened silhouette for a visible seam to appear at all.
-    // The trace layer is a thin stroke rather than a filled shape
-    // though, so it needs far less clearance off the fabric than the
-    // nozzle needs off the trace. Kept well short of what a fully
-    // separated read alone would need, though: at REST_RX the gap
-    // itself becomes visible apparent height (Zgap * sin(REST_RX)), and
-    // the nozzle icon is also now a tall side-profile silhouette in its
-    // own right (see nozzleSideG) rather than a small flat plan-view
-    // icon -- stacking both would read as the dispenser floating
-    // disconnected above the work instead of actively printing onto it.
+    // Z_FABRIC/Z_TRACE keep the "deliberately large relative to the
+    // swatch" gap the laminated-trace rig also relies on: at a rotation
+    // short of edge-on, a flat layer's own footprint never fully
+    // collapses to a hairline, so the gap between layers has to outrun
+    // each layer's own foreshortened silhouette for a visible seam to
+    // appear at all.
+    //
+    // Z_NOZZLE is deliberately kept tight against the trace instead --
+    // the nozzle icon is now a tall side-profile silhouette in its own
+    // right (see nozzleSideG), not a small flat plan-view icon, so its
+    // own height already reads as separation once tilted. A large Z gap
+    // on top of that reads as the dispenser floating disconnected above
+    // the work rather than actively printing onto it, so this sits
+    // closer to the trace than the fabric-to-trace gap does -- close
+    // enough that Z_NOZZLE < Z_TRACE, which is a deliberate departure
+    // from this module's usual "larger Z stacks above" convention: the
+    // nozzle's own silhouette (not translateZ order) is what carries the
+    // visual "above the trace" read at REST_RX.
     var Z_FABRIC = 0;
     var Z_TRACE = 32;
-    var Z_NOZZLE = 52;
+    var Z_NOZZLE = 20;
     var NOZZLE_LIFT = 12;
 
     // fabric, trace, nozzle -- built and appended exactly once, in
@@ -2290,17 +2294,22 @@
     // local origin, same convention as nozzleG, so both sit exactly on
     // the trace regardless of which is currently visible.
     var nozzleSideG = el('g', { class: 'printedInk-nozzleSide' });
-    // barrel
-    nozzleSideG.appendChild(el('rect', { x: -6, y: -27, width: 12, height: 16, rx: 2.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     // cap / plunger knob
-    nozzleSideG.appendChild(el('rect', { x: -3.5, y: -31, width: 7, height: 5, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    nozzleSideG.appendChild(el('rect', { x: -3, y: -30, width: 6, height: 4.5, rx: 1, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    // barrel -- a plain rectangle, straight sides top to bottom, no
+    // taper. A funnel narrowing to the needle read as "squashed" rather
+    // than "tapered" once foreshortened by the tilt; a straight barrel
+    // with a short, separately-straight spout below it (rather than one
+    // continuously narrowing shape) reads as distinct barrel/tip parts
+    // at any tilt.
+    nozzleSideG.appendChild(el('rect', { x: -5, y: -25.5, width: 10, height: 19, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     // glossy barrel highlight, purely decorative
-    nozzleSideG.appendChild(el('line', { x1: -3, y1: -25, x2: -3, y2: -14, stroke: 'var(--line)', 'stroke-width': 1, opacity: 0.5 }));
-    // funnel, barrel base down to the needle
-    nozzleSideG.appendChild(el('path', { d: 'M-6,-11 L6,-11 L1.8,-3 L-1.8,-3 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    nozzleSideG.appendChild(el('line', { x1: -2.7, y1: -24, x2: -2.7, y2: -9, stroke: 'var(--line)', 'stroke-width': 1, opacity: 0.5 }));
+    // straight spout, barrel base down to the needle
+    nozzleSideG.appendChild(el('rect', { x: -2, y: -6.5, width: 4, height: 4.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     // needle
-    nozzleSideG.appendChild(el('rect', { x: -1, y: -3, width: 2, height: 3.4, fill: 'var(--line-strong)' }));
-    var beadSide = el('circle', { cx: 0, cy: 0.4, r: 2.4, fill: 'var(--petrol-bright)', class: 'printedInk-bead' });
+    nozzleSideG.appendChild(el('rect', { x: -0.7, y: -2, width: 1.4, height: 2.4, fill: 'var(--line-strong)' }));
+    var beadSide = el('circle', { cx: 0, cy: 0.6, r: 2.4, fill: 'var(--petrol-bright)', class: 'printedInk-bead' });
     nozzleSideG.appendChild(beadSide);
     nozzle.svg.appendChild(nozzleSideG);
 
