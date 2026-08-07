@@ -53,7 +53,6 @@
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 8;
   const WHEEL_ZOOM_SENSITIVITY = 0.01;
-  const PAN_CLAMP_SLACK_PX = 80; // let the image edge get nudged past the viewer edge by this much
 
   // --- DOM refs -----------------------------------------------------
   const stepEls = Object.fromEntries(
@@ -315,13 +314,23 @@
   }
 
   function clampPan() {
+    // Generous bound, recomputed fresh every call (so it's automatically
+    // correct across zoom changes, image loads, and viewer resizes,
+    // since img.clientWidth/Height already reflect all three): exactly
+    // enough that ANY point in the image -- not just "some point stays
+    // visible somewhere," but literally the leftmost/rightmost/top/
+    // bottom-most pixel -- can be panned all the way to the viewer's
+    // center at the current zoom level. #stage sits flex-centered in
+    // #viewer at pan=0, so its rendered edges start equidistant from
+    // center by exactly half its own on-screen size; reaching the
+    // center from either edge takes a shift of that same half-size, in
+    // either direction. That's the whole bound: no separate viewport
+    // term needed, and it scales naturally with the image's own
+    // displayed size at any zoom rather than a fixed pixel allowance.
     if (!state.naturalWidth) return;
-    const viewerRect = viewer.getBoundingClientRect();
     const z = state.view.zoom;
-    const renderedW = img.clientWidth * z;
-    const renderedH = img.clientHeight * z;
-    const maxPanX = Math.max(0, (renderedW - viewerRect.width) / 2) + PAN_CLAMP_SLACK_PX;
-    const maxPanY = Math.max(0, (renderedH - viewerRect.height) / 2) + PAN_CLAMP_SLACK_PX;
+    const maxPanX = (img.clientWidth * z) / 2;
+    const maxPanY = (img.clientHeight * z) / 2;
     state.view.panX = clamp(state.view.panX, -maxPanX, maxPanX);
     state.view.panY = clamp(state.view.panY, -maxPanY, maxPanY);
   }
@@ -331,8 +340,22 @@
   function zoomBy(factor, clientX, clientY) {
     if (!state.naturalWidth) return;
     const rect = canvas.getBoundingClientRect();
-    const cx = clientX != null ? clientX : rect.left + rect.width / 2;
-    const cy = clientY != null ? clientY : rect.top + rect.height / 2;
+    let cx = clientX;
+    let cy = clientY;
+    if (cx == null || cy == null) {
+      // Default to the viewer's own stable (untransformed) center, not
+      // the canvas's -- the canvas moves with the current pan/zoom
+      // transform, and its rendered center always corresponds to the
+      // same fixed content-space point (the image's own natural
+      // center), regardless of how far you've panned. Using that as the
+      // zoom-button anchor would silently drift the pan on every click
+      // once you're no longer centered. Anchoring on the viewer's
+      // center instead keeps whatever is *currently* centered in the
+      // viewport centered as you zoom via the buttons.
+      const viewerRect = viewer.getBoundingClientRect();
+      cx = viewerRect.left + viewerRect.width / 2;
+      cy = viewerRect.top + viewerRect.height / 2;
+    }
     const oldZoom = state.view.zoom;
     const contentX = (cx - rect.left) / oldZoom;
     const contentY = (cy - rect.top) / oldZoom;
@@ -1131,19 +1154,42 @@
   // --- Detection Details (harmonic-candidate diagnostics) ----------------
 
   function detectionAxisBlock(label, axis) {
-    const candidatesHtml = (axis.candidates_px || [])
-      .map((c) => {
-        // Candidates are the raw 0.5x/1x/2x harmonic values; spacing_px can be
-        // a refined average of detected positions, so match loosely (15%)
-        // rather than requiring near-exact equality.
-        const isSelected = axis.spacing_px != null && Math.abs(c - axis.spacing_px) < Math.max(0.5, axis.spacing_px * 0.15);
-        return `<span class="tgr-debug-candidate${isSelected ? " is-selected" : ""}">${c.toFixed(1)}px</span>`;
-      })
-      .join("");
+    const details = axis.candidate_details || [];
+    let candidatesHtml;
+    if (details.length) {
+      // Rich per-candidate diagnostics: period, harmonic relationship to
+      // the raw autocorrelation estimate, normalized wales(or courses)/in
+      // at this request's calibration, and (wale axis only, currently)
+      // the fold-consistency structural score that distinguishes a
+      // complete-loop repeat from a leg/sub-feature. `selected` comes
+      // straight from the backend's own decision, not a fuzzy re-match.
+      candidatesHtml = details
+        .map((d) => {
+          const perInch = d.per_inch != null ? `${d.per_inch.toFixed(2)}/in` : "";
+          const fold = d.fold_consistency != null ? `fold ${d.fold_consistency.toFixed(2)}` : "";
+          const meta = [d.harmonic, perInch, fold].filter(Boolean).join(" · ");
+          return (
+            `<span class="tgr-debug-candidate${d.selected ? " is-selected" : ""}">` +
+            `<span class="tgr-debug-candidate__px">${d.period_px.toFixed(1)}px</span>` +
+            `<span class="tgr-debug-candidate__meta">${escapeHtml(meta)}</span>` +
+            `</span>`
+          );
+        })
+        .join("");
+    } else {
+      // Fallback for a response without candidate_details (shouldn't
+      // normally happen, but keeps this panel working defensively).
+      candidatesHtml = (axis.candidates_px || [])
+        .map((c) => {
+          const isSelected = axis.spacing_px != null && Math.abs(c - axis.spacing_px) < Math.max(0.5, axis.spacing_px * 0.15);
+          return `<span class="tgr-debug-candidate${isSelected ? " is-selected" : ""}"><span class="tgr-debug-candidate__px">${c.toFixed(1)}px</span></span>`;
+        })
+        .join("");
+    }
     const corrected = (axis.selected_reason || "").includes("corrected");
     return `
       <div class="tgr-debug-axis">
-        <div class="tgr-debug-axis__title">${escapeHtml(label)} candidates considered</div>
+        <div class="tgr-debug-axis__title">${escapeHtml(label)} period candidates</div>
         <div class="tgr-debug-axis__candidates">${candidatesHtml || "<span class=\"tgr-debug-candidate\">none</span>"}</div>
         <div class="tgr-debug-axis__reason${corrected ? " is-corrected" : ""}">${escapeHtml(axis.selected_reason || "—")}</div>
       </div>`;

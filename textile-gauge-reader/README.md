@@ -28,7 +28,7 @@ a multiplier doesn't fix this — it's a difference in what the algorithm
 is actually locking onto, and would produce a different, uncorrectable
 error on a different photo.
 
-The pipeline (`ALGORITHM_VERSION` `cv-clahe-sobel-autocorr-loopcenter-density-v0.3`)
+The pipeline (`ALGORITHM_VERSION` `cv-clahe-sobel-autocorr-loopcenter-density-foldpair-v0.4`)
 addresses this with a second, independent signal: an approximate 2D
 loop-center detector (a Difference-of-Gaussians blob response tuned to
 loop scale, since a genuine loop center is a compact, roughly isotropic
@@ -64,11 +64,56 @@ against the actual knit structure — success means the overlay lines line
 up with real complete loops, not just that the final numbers look
 plausible.
 
-This is a heuristic V0.3 improvement, not full loop segmentation, and
+**v0.4 adds a fourth check, scoped to the wale axis only**, after a real
+jersey photo showed wale count still roughly doubled (~9.55 predicted vs.
+~5 actual wales/in) even with v0.3's density check in place. On that
+photo the loop-center *detector itself* was apparently finding one blob
+per V-shaped loop's **leg**, not one per complete loop — so its scale,
+its pitch, and the density it implies were all biased the same
+(too-fine) direction together, and cross-checking three mutually-
+correlated signals against each other doesn't catch a bias they all
+share. v0.4's **fold-consistency** check is decoupled from that whole
+loop-center pipeline: it stacks the wale-direction 1D signal into
+consecutive chunks at each candidate period and measures how similar
+those chunks are to each other. A genuine complete-loop repeat
+reproduces nearly the same waveform shape every period (chunks
+correlate strongly); a period that instead isolates one leg of a V
+alternates between the two, structurally different, legs — so its
+chunks correlate poorly, even though plain autocorrelation can show
+just as strong a peak there (autocorrelation only measures energy at a
+lag, not whether the repeated unit is the same shape each time). A
+candidate fold-consistency flags as self-inconsistent is excluded from
+ever being selected — including by the v0.3 density check, which could
+otherwise "confirm" it right back using loop-center counts that
+inherited the same bias. This is deliberately scoped to wale only
+(course periodicity doesn't have a V-leg-symmetry failure mode, and this
+keeps course detection completely unchanged) and is grounded directly in
+loop anatomy — a face-knit V's two legs are the specific structural
+feature it's checking for, not a generic signal-processing trick.
+Fold-consistency scores per candidate are also exposed in **Detection
+Details**, alongside the harmonic relationship and normalized
+wales(courses)/in at the current calibration.
+
+This is a heuristic V0.4 improvement, not full loop segmentation, and
 it isn't assumed to be "solved" — see
 [Ground Truth / Correction System](#ground-truth--correction-system)
 for how to build an evaluation set against real photos and decide
 whether/how to tune it further.
+
+### Image viewer pan/zoom
+
+The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/
+pinch, or the +/− buttons, centered on the cursor/viewport). Pan/zoom is
+a pure view-layer CSS transform on the image+canvas wrapper — it never
+touches the stored ROI, calibration points, or detected positions, which
+stay in original-image pixel coordinates throughout, so overlays remain
+exactly registered at any pan/zoom level. The pan range is recomputed on
+every zoom change, image load, and viewer resize, and is deliberately
+generous: exactly enough that any pixel in the image can be panned to
+the viewer's center at the current zoom (half the image's current
+on-screen size in each direction from its default centered position) —
+not just the older, much tighter "nudge the edge past the boundary by a
+fixed slack" bound.
 
 ## Two deployments of the same idea
 

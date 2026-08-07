@@ -533,16 +533,29 @@
 .tgr-debug-candidate {
   font-family: var(--mono);
   font-size: 11px;
-  padding: 0.15rem 0.45rem;
+  padding: 0.2rem 0.5rem;
   border-radius: 3px;
   border: 1px solid var(--line);
   color: var(--ink-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  line-height: 1.35;
 }
 .tgr-debug-candidate.is-selected {
   border-color: var(--petrol-bright);
   color: var(--petrol-bright);
   font-weight: 600;
 }
+.tgr-debug-candidate__px { font-weight: 600; }
+.tgr-debug-candidate__meta {
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+  text-transform: none;
+}
+.tgr-debug-candidate.is-selected .tgr-debug-candidate__meta { color: inherit; opacity: 0.8; }
 .tgr-debug-axis__reason {
   color: var(--ink-dim);
   line-height: 1.5;

@@ -24,6 +24,20 @@ class AreaMm(BaseModel):
     height_mm: float
 
 
+class CandidateOut(BaseModel):
+    """
+    One harmonic period candidate considered for an axis, with the
+    evidence used to judge it -- lets a human (or a future tuning pass)
+    see *why* a period was picked, not just what was picked.
+    """
+
+    period_px: float
+    per_inch: Optional[float] = None  # same period, converted with this request's calibration
+    harmonic: str  # "0.5x" / "1x" / "2x" relative to the raw autocorrelation estimate
+    fold_consistency: Optional[float] = None  # structural score; None where not computed (course axis)
+    selected: bool = False
+
+
 class AxisOut(BaseModel):
     spacing_px: Optional[float] = None
     spacing_mm: Optional[float] = None
@@ -40,6 +54,7 @@ class AxisOut(BaseModel):
     # the true loop-to-loop repeat rather than a sub-feature.
     candidates_px: List[float] = Field(default_factory=list)
     selected_reason: str = ""
+    candidate_details: List[CandidateOut] = Field(default_factory=list)
 
 
 class AnalyzeResponse(BaseModel):

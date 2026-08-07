@@ -19,6 +19,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +38,7 @@ from .schemas import (
     AnalyzeResponse,
     AreaMm,
     AxisOut,
+    CandidateOut,
     Orientation,
     RoiOut,
     Unit,
@@ -124,6 +126,15 @@ def health_legacy() -> dict:
     return {"status": "ok"}
 
 
+def _period_px_to_per_inch(period_px: float, pixels_per_mm: float) -> Optional[float]:
+    if pixels_per_mm <= 0:
+        return None
+    spacing_mm = period_px / pixels_per_mm
+    if spacing_mm <= 0:
+        return None
+    return round(MM_PER_INCH / spacing_mm, 3)
+
+
 def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
     spacing_mm = None
     per_inch = None
@@ -140,6 +151,16 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
         message=axis.message,
         candidates_px=axis.candidates_px,
         selected_reason=axis.selected_reason,
+        candidate_details=[
+            CandidateOut(
+                period_px=d.period_px,
+                per_inch=_period_px_to_per_inch(d.period_px, pixels_per_mm),
+                harmonic=d.harmonic,
+                fold_consistency=d.fold_consistency,
+                selected=d.selected,
+            )
+            for d in getattr(axis, "candidate_details", [])
+        ],
     )
 
 

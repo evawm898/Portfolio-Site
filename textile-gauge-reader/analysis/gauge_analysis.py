@@ -61,13 +61,29 @@ being measured.
      sub-loop harmonic, and we look at whether that axis's OWN
      already-computed 0.5x/1x/2x candidates contain a value that
      resolves the mismatch — never an invented multiplier.
-  8. Final overlay/position marks come from clustering the loop-center
+  8. Wale axis only, one further structural check ("fold-consistency"):
+     stack the wale-direction signal into consecutive chunks at each
+     candidate period and measure how similar those chunks are to each
+     other. A genuine complete-loop repeat reproduces nearly the same
+     waveform shape every period, so its chunks correlate strongly. A
+     period that instead isolates one leg of a V-shaped loop misaligns —
+     consecutive "repeats" at that spacing are actually the alternating
+     LEFT and RIGHT legs of the true loop (structurally different, often
+     opposite gradient polarity) — so they correlate poorly with each
+     other, even though plain autocorrelation can show just as strong a
+     peak there (autocorrelation only measures energy at a lag, not
+     whether the repeated unit is the same shape each time). This is
+     scoped to the wale axis only — see `analyze_gauge` — since it's the
+     axis a face-knit V-shape's bilateral leg symmetry specifically
+     confuses; course-row periodicity doesn't have that failure mode and
+     is deliberately left untouched by it.
+  9. Final overlay/position marks come from clustering the loop-center
      points at the reconciled period when there's enough of that
      evidence; otherwise fall back to peak-picking on the 1D signal
      (as before, just tuned to the reconciled period).
-  9. A confidence score blends autocorrelation strength, spacing
-     consistency, peak count, and whether structural (loop-center and/or
-     density) evidence was available to validate the choice.
+  10. A confidence score blends autocorrelation strength, spacing
+      consistency, peak count, and whether structural (loop-center and/or
+      density) evidence was available to validate the choice.
 
 This module deliberately never invents a result: if the signal is too
 weak, too short, or too noisy to support a periodicity estimate, the
@@ -98,7 +114,7 @@ Direction = Literal["horizontal", "vertical"]  # which image axis a quantity is 
 # saved ground-truth correction record so later analysis can tell which
 # algorithm version a given prediction came from — e.g. to check whether a
 # tuning change actually reduced systematic error, not just re-labeled it.
-ALGORITHM_VERSION = "cv-clahe-sobel-autocorr-loopcenter-density-v0.3"
+ALGORITHM_VERSION = "cv-clahe-sobel-autocorr-loopcenter-density-foldpair-v0.4"
 
 # --- Tunable constants -------------------------------------------------
 
@@ -113,6 +129,23 @@ MAX_LOOP_CENTERS = 2000              # cap for pairwise-distance cost and respon
 HARMONIC_MATCH_LOG_TOLERANCE = 0.35  # ~1.4x wiggle room when matching a candidate to loop-center pitch
 MIN_CENTER_CONSISTENCY = 0.5         # min (1 - CV) of nearest-neighbor spacings to trust loop-center pitch
 DENSITY_MISMATCH_LOG_THRESHOLD = 0.35  # ~1.4x wiggle room before wale*course cell area vs. loop density counts as a real conflict
+FOLD_CONSISTENCY_MIN_TRUST = 0.55    # a candidate must reach at least this to count as "a genuine repeat"
+FOLD_CONSISTENCY_MARGIN = 0.15       # ...and beat the raw estimate's own score by at least this to override it
+
+
+@dataclass
+class CandidateInfo:
+    """
+    One harmonic candidate considered for an axis's period, with the
+    evidence used to judge it — exposed via the API so a human (or a
+    future tuning pass) can see *why* a period was picked, not just what
+    was picked. See AxisResult.candidate_details.
+    """
+
+    period_px: float
+    harmonic: str  # "0.5x" / "1x" / "2x" relative to the raw autocorrelation estimate
+    fold_consistency: Optional[float]  # None when not computed for this axis (course, currently)
+    selected: bool
 
 
 @dataclass
@@ -127,6 +160,9 @@ class AxisResult:
     # every harmonic candidate considered, and why the final one was picked.
     candidates_px: List[float] = field(default_factory=list)
     selected_reason: str = ""
+    # Richer per-candidate diagnostics (harmonic relationship, structural
+    # score, which one was selected) — see CandidateInfo.
+    candidate_details: List[CandidateInfo] = field(default_factory=list)
 
 
 @dataclass
@@ -262,7 +298,14 @@ def analyze_gauge(
     wale_p_centers = _trusted_center_pitch(loop_centers, wale_center_axis, wale_band_px)
     course_p_centers = _trusted_center_pitch(loop_centers, course_center_axis, course_band_px)
 
-    wale = _analyze_direction(wale_signal, p0_wale, wale_p_centers, loop_centers, wale_center_axis)
+    # Fold-consistency (V-leg-pairing structural check) is scoped to the
+    # wale axis only: it targets the specific failure mode of a face-knit
+    # V-shape's bilateral leg symmetry fooling plain autocorrelation.
+    # Course-row periodicity doesn't have that failure mode, and this
+    # keeps course detection completely unchanged.
+    wale = _analyze_direction(
+        wale_signal, p0_wale, wale_p_centers, loop_centers, wale_center_axis, use_fold_consistency=True
+    )
     course = _analyze_direction(course_signal, p0_course, course_p_centers, loop_centers, course_center_axis)
 
     wale, course = _cross_check_density(
@@ -533,6 +576,58 @@ def _estimate_pitch_from_centers(
     return median, consistency
 
 
+def _fold_consistency(signal: np.ndarray, period: float, min_plausible: float) -> float:
+    """
+    Stack `signal` into consecutive chunks of length `period` and measure
+    how self-similar those chunks are to each other (mean pairwise
+    correlation between consecutive chunks).
+
+    A genuine structural repeat (one complete V-loop) reproduces nearly
+    the same waveform shape every period, so its chunks correlate
+    strongly. A period that instead isolates one leg of a V misaligns:
+    consecutive "repeats" at that spacing are actually the alternating
+    LEFT and RIGHT legs of the true loop — structurally different shapes,
+    typically opposite gradient polarity — so they correlate poorly with
+    each other, even though the coarse autocorrelation can still show a
+    strong peak there (autocorrelation only measures energy at a lag, not
+    whether the repeated unit is structurally the same each time).
+
+    Returns a score in [0, 1] (negative correlation — literally
+    mirror-opposite shapes, the classic leg-vs-leg case — maps to 0). 0.0
+    if there isn't enough signal to say anything.
+    """
+    if period < min_plausible or period <= 0 or signal.size == 0:
+        return 0.0
+    n_chunks = int(len(signal) // period)
+    if n_chunks < 3:
+        return 0.0
+    chunks = []
+    for i in range(n_chunks):
+        start = int(round(i * period))
+        end = int(round(start + period))
+        if end > len(signal):
+            break
+        chunk = signal[start:end]
+        if len(chunk) >= 3:
+            chunks.append(chunk)
+    if len(chunks) < 3:
+        return 0.0
+    target_len = min(len(c) for c in chunks)
+    if target_len < 3:
+        return 0.0
+    chunks = [c[:target_len] for c in chunks]
+    correlations = []
+    for a, b in zip(chunks[:-1], chunks[1:]):
+        if np.std(a) < 1e-9 or np.std(b) < 1e-9:
+            continue
+        r = float(np.corrcoef(a, b)[0, 1])
+        if not math.isnan(r):
+            correlations.append(r)
+    if not correlations:
+        return 0.0
+    return float(np.clip(float(np.mean(correlations)), 0.0, 1.0))
+
+
 @dataclass
 class _PeriodDecision:
     period: Optional[float]
@@ -540,10 +635,31 @@ class _PeriodDecision:
     reason: str
     corrected: bool   # True if the final period differs from the raw autocorrelation estimate
     validated: bool    # True if independent loop-center evidence was actually available/used
+    candidate_details: List[CandidateInfo] = field(default_factory=list)
+
+
+def _labeled_candidates(p0: float, min_plausible: float) -> List[Tuple[float, str]]:
+    """The 0.5x/1x/2x harmonic family for p0, each tagged with its harmonic
+    label, deduplicated by rounded value (first label wins), filtered to
+    plausible spacings, and sorted ascending. This is the one place that
+    generates candidates — every override elsewhere only ever picks among
+    these, never invents a value."""
+    specs = [(p0 / 2.0, "0.5x"), (p0, "1x"), (p0 * 2.0, "2x")]
+    seen = {}
+    for value, label_ in specs:
+        if value < min_plausible:
+            continue
+        key = round(value, 3)
+        if key not in seen:
+            seen[key] = label_
+    return sorted((value, label_) for value, label_ in seen.items())
 
 
 def _reconcile_period(
-    p0: Optional[float], p_centers: Optional[float], min_plausible: float
+    p0: Optional[float],
+    p_centers: Optional[float],
+    min_plausible: float,
+    signal: Optional[np.ndarray] = None,
 ) -> _PeriodDecision:
     """
     Decide the final period for one direction, given:
@@ -553,28 +669,86 @@ def _reconcile_period(
       - p_centers: an independent estimate from loop-center nearest-
         neighbor spacing (harmonic-free evidence for the *complete loop*
         repeat, when available).
+      - signal: when given, enables the fold-consistency structural check
+        (see `_fold_consistency`) as a second, differently-grounded vote.
+        Passed only for the wale axis (see `analyze_gauge`) — course
+        periodicity doesn't have the V-leg-symmetry failure mode this
+        targets, and this keeps course detection byte-for-byte unchanged.
 
     Rather than trusting p0's strongest autocorrelation peak outright,
     explicitly evaluate 0.5x / 1x / 2x of it and prefer whichever
-    candidate the loop-center evidence actually supports.
+    candidate the available structural evidence actually supports.
     """
     if p0 is None and p_centers is None:
         return _PeriodDecision(None, [], "no periodicity detected", False, False)
 
     if p0 is None:
+        period = round(p_centers, 3)
         return _PeriodDecision(
             p_centers,
-            [round(p_centers, 3)],
+            [period],
             "no autocorrelation period found; used loop-center spacing directly",
             False,
             True,
+            [CandidateInfo(period, "1x", None, True)],
         )
 
-    candidates = sorted({round(c, 3) for c in (p0 / 2.0, p0, p0 * 2.0) if c >= min_plausible})
-    if not candidates:
-        candidates = [round(p0, 3)]
+    labeled = _labeled_candidates(p0, min_plausible)
+    if not labeled:
+        labeled = [(round(p0, 3), "1x")]
+    candidates = [c for c, _ in labeled]
+    harmonic_of = dict(labeled)
+
+    fold_scores: dict = {}
+    if signal is not None:
+        fold_scores = {c: _fold_consistency(signal, c, min_plausible) for c in candidates}
+
+    p0_key = min(candidates, key=lambda c: abs(c - round(p0, 3)))
+
+    # The single most fold-consistent candidate (a genuine complete-loop
+    # repeat should reproduce nearly the same waveform shape every period;
+    # a leg-locked period alternates between the two, structurally
+    # different, legs and correlates poorly with itself). Only trusted
+    # as a *candidate* for overriding something else if it clears an
+    # absolute bar — a weak best-of-three shouldn't override anything.
+    best_fold_candidate = None
+    best_fold_score = None
+    if fold_scores and len(candidates) > 1:
+        cand = max(candidates, key=lambda c: fold_scores[c])
+        if fold_scores[cand] >= FOLD_CONSISTENCY_MIN_TRUST:
+            best_fold_candidate, best_fold_score = cand, fold_scores[cand]
+
+    def _fold_override_for(current: float) -> Optional[float]:
+        """Whichever candidate fold-consistency prefers over `current`,
+        if it clearly beats `current`'s own score — evaluated fresh at
+        each decision point (against p0 with no loop-center evidence,
+        or against whatever loop-center evidence separately picked),
+        never just once against the raw estimate. That distinction is
+        what catches the loop-center pipeline itself "confirming" a
+        leg-locked period (see the p_centers branch below)."""
+        if best_fold_candidate is None or best_fold_candidate == current:
+            return None
+        if best_fold_score - fold_scores.get(current, 0.0) >= FOLD_CONSISTENCY_MARGIN:
+            return best_fold_candidate
+        return None
+
+    def _details(selected: float) -> List[CandidateInfo]:
+        return [
+            CandidateInfo(c, harmonic_of[c], fold_scores.get(c), c == selected) for c in candidates
+        ]
 
     if p_centers is None or p_centers < min_plausible:
+        fold_override = _fold_override_for(p0_key)
+        if fold_override is not None:
+            reason = (
+                f"autocorrelation period ({p0:.1f}px) was structurally inconsistent with itself "
+                f"across repeats (fold-consistency {fold_scores[p0_key]:.2f}) — consistent with "
+                f"isolating one leg of a V-shaped loop rather than the complete loop; corrected to "
+                f"{fold_override:.1f}px (fold-consistency {fold_scores[fold_override]:.2f}), the "
+                f"candidate whose repeats actually look like each other"
+            )
+            corrected = abs(math.log(fold_override / p0)) > 0.05
+            return _PeriodDecision(fold_override, candidates, reason, corrected, True, _details(fold_override))
         return _PeriodDecision(
             p0,
             candidates,
@@ -582,14 +756,37 @@ def _reconcile_period(
             "(may be a harmonic — treat with caution)",
             False,
             False,
+            _details(p0_key),
         )
 
     # Pick whichever harmonic candidate is closest to the loop-center
     # pitch on a log scale (harmonics are multiplicative, not additive).
-    best = min(candidates, key=lambda c: abs(math.log(c / p_centers)))
+    p_centers_pick = min(candidates, key=lambda c: abs(math.log(c / p_centers)))
+    best = p_centers_pick
+
+    # The loop-center detection scale is itself seeded from p0 (see
+    # analyze_gauge), so on some real photos it inherits the same
+    # too-fine bias it's meant to catch — loop-center evidence can end up
+    # "confirming" a leg-locked period. Check fold-consistency against
+    # whatever loop-center evidence just picked (not against p0 — that
+    # comparison was already tried above and can trivially agree with p0
+    # while still being wrong once p_centers pulls `best` somewhere else).
+    fold_override = _fold_override_for(p_centers_pick)
+    overridden_by_fold = fold_override is not None
+    if overridden_by_fold:
+        best = fold_override
+
     corrected = abs(math.log(best / p0)) > 0.05  # >5% off p0 counts as "not the raw estimate"
 
-    if not corrected:
+    if overridden_by_fold:
+        reason = (
+            f"loop-center evidence pointed to {p_centers_pick:.1f}px, but that period was "
+            f"structurally inconsistent with itself across repeats (fold-consistency "
+            f"{fold_scores.get(p_centers_pick, 0.0):.2f}) — likely the loop-center detector "
+            f"inherited the same leg-scale bias it was meant to catch; corrected to {best:.1f}px "
+            f"instead (fold-consistency {fold_scores[best]:.2f})"
+        )
+    elif not corrected:
         reason = (
             f"autocorrelation period ({p0:.1f}px) matches loop-center spacing "
             f"({p_centers:.1f}px) — treated as the full-loop repeat"
@@ -614,7 +811,7 @@ def _reconcile_period(
                 f"loop-center spacing ({p_centers:.1f}px)"
             )
 
-    return _PeriodDecision(best, candidates, reason, corrected, True)
+    return _PeriodDecision(best, candidates, reason, corrected, True, _details(best))
 
 
 def _cluster_positions(coords: np.ndarray, period: float) -> List[float]:
@@ -667,6 +864,7 @@ def _finalize_axis(
     candidates_px: List[float],
     selected_reason: str,
     structural_score: float,
+    candidate_details: Optional[List[CandidateInfo]] = None,
 ) -> AxisResult:
     """
     Turn a chosen period into the actual reported AxisResult: overlay
@@ -723,6 +921,7 @@ def _finalize_axis(
         message=message,
         candidates_px=candidates_px,
         selected_reason=f"{selected_reason} (positions from {position_source})",
+        candidate_details=candidate_details or [],
     )
 
 
@@ -732,8 +931,11 @@ def _analyze_direction(
     p_centers: Optional[float],
     loop_centers: np.ndarray,
     center_axis_index: int,
+    use_fold_consistency: bool = False,
 ) -> AxisResult:
-    decision = _reconcile_period(p0, p_centers, MIN_PLAUSIBLE_SPACING_PX)
+    decision = _reconcile_period(
+        p0, p_centers, MIN_PLAUSIBLE_SPACING_PX, signal=signal if use_fold_consistency else None
+    )
 
     if decision.period is None:
         return AxisResult(
@@ -761,6 +963,7 @@ def _analyze_direction(
         decision.candidates,
         decision.reason,
         structural_score,
+        decision.candidate_details,
     )
 
 
@@ -816,8 +1019,18 @@ def _cross_check_density(
         ("wale", wale, course.spacing_px),
         ("course", course, wale.spacing_px),
     ):
+        # Where fold-consistency data exists (wale axis), a candidate it
+        # already flagged as structurally inconsistent with itself (i.e.
+        # likely one leg of a V, not a complete loop) is excluded outright
+        # -- density agreeing with loop-center counts that inherited the
+        # same leg-scale bias shouldn't be able to talk this back into a
+        # candidate direct structural evidence already rejected.
+        fold_lookup = {d.period_px: d.fold_consistency for d in axis_result.candidate_details}
         for candidate in axis_result.candidates_px:
             if abs(candidate - axis_result.spacing_px) < 1e-6:
+                continue
+            fold_score = fold_lookup.get(candidate)
+            if fold_score is not None and fold_score < FOLD_CONSISTENCY_MIN_TRUST:
                 continue
             trial_cell_area = candidate * other_spacing
             if trial_cell_area <= 0:
@@ -854,11 +1067,25 @@ def _cross_check_density(
         updated = _finalize_axis(
             candidate, wale_signal, loop_centers, wale_center_axis, wale_p_centers,
             wale.candidates_px, note, structural_score=0.75,
+            candidate_details=_reselect_candidate(wale.candidate_details, candidate),
         )
         return updated, course
     else:
         updated = _finalize_axis(
             candidate, course_signal, loop_centers, course_center_axis, course_p_centers,
             course.candidates_px, note, structural_score=0.75,
+            candidate_details=_reselect_candidate(course.candidate_details, candidate),
         )
         return wale, updated
+
+
+def _reselect_candidate(details: List[CandidateInfo], new_period: float) -> List[CandidateInfo]:
+    """Return a copy of `details` with `selected` flipped to whichever
+    entry matches `new_period` — used when a later stage (density
+    cross-check) picks a different candidate than the per-axis
+    reconciliation did, so the diagnostics stay consistent with the
+    actual final answer."""
+    return [
+        CandidateInfo(d.period_px, d.harmonic, d.fold_consistency, abs(d.period_px - new_period) < 1e-6)
+        for d in details
+    ]
