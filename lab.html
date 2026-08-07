@@ -2289,17 +2289,19 @@
     // local origin, same convention as nozzleG, so both sit exactly on
     // the trace regardless of which is currently visible.
     var nozzleSideG = el('g', { class: 'printedInk-nozzleSide' });
-    // cap / plunger knob
-    nozzleSideG.appendChild(el('rect', { x: -3, y: -30, width: 6, height: 4.5, rx: 1, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    // cap / plunger knob -- sits flush on top of the barrel, so it
+    // shifts up in lockstep whenever the barrel's own height changes.
+    nozzleSideG.appendChild(el('rect', { x: -3, y: -36, width: 6, height: 4.5, rx: 1, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     // barrel -- a plain rectangle, straight sides top to bottom, no
     // taper. A funnel narrowing to the needle read as "squashed" rather
     // than "tapered" once foreshortened by the tilt; a straight barrel
     // with a short, separately-straight spout below it (rather than one
     // continuously narrowing shape) reads as distinct barrel/tip parts
-    // at any tilt.
-    nozzleSideG.appendChild(el('rect', { x: -5, y: -25.5, width: 10, height: 19, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    // at any tilt. Bottom edge stays flush with the spout above the
+    // needle -- height changes grow it upward, away from the ink point.
+    nozzleSideG.appendChild(el('rect', { x: -5, y: -31.5, width: 10, height: 25, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     // glossy barrel highlight, purely decorative
-    nozzleSideG.appendChild(el('line', { x1: -2.7, y1: -24, x2: -2.7, y2: -9, stroke: 'var(--line)', 'stroke-width': 1, opacity: 0.5 }));
+    nozzleSideG.appendChild(el('line', { x1: -2.7, y1: -30, x2: -2.7, y2: -9, stroke: 'var(--line)', 'stroke-width': 1, opacity: 0.5 }));
     // straight spout, barrel base down to the needle
     nozzleSideG.appendChild(el('rect', { x: -2, y: -6.5, width: 4, height: 4.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
     // needle
