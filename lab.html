@@ -2155,27 +2155,22 @@
       return { face: face, svg: svg };
     }
 
-    // Z_FABRIC/Z_TRACE keep the "deliberately large relative to the
-    // swatch" gap the laminated-trace rig also relies on: at a rotation
-    // short of edge-on, a flat layer's own footprint never fully
-    // collapses to a hairline, so the gap between layers has to outrun
-    // each layer's own foreshortened silhouette for a visible seam to
-    // appear at all.
-    //
-    // Z_NOZZLE is deliberately kept tight against the trace instead --
-    // the nozzle icon is now a tall side-profile silhouette in its own
-    // right (see nozzleSideG), not a small flat plan-view icon, so its
-    // own height already reads as separation once tilted. A large Z gap
-    // on top of that reads as the dispenser floating disconnected above
-    // the work rather than actively printing onto it, so this sits
-    // closer to the trace than the fabric-to-trace gap does -- close
-    // enough that Z_NOZZLE < Z_TRACE, which is a deliberate departure
-    // from this module's usual "larger Z stacks above" convention: the
-    // nozzle's own silhouette (not translateZ order) is what carries the
-    // visual "above the trace" read at REST_RX.
+    // Deliberately large relative to the swatch itself, same reasoning
+    // as the laminated-trace rig: at a rotation short of edge-on, a
+    // flat layer's own footprint never fully collapses to a hairline,
+    // so the gap between layers has to outrun each layer's own
+    // foreshortened silhouette for a visible seam to appear at all.
+    // The trace layer is a thin stroke rather than a filled shape
+    // though, so it needs far less clearance off the fabric than the
+    // nozzle needs off the trace. Kept short of what a fully separated
+    // read alone would need, though: the nozzle icon is also now a tall
+    // side-profile silhouette in its own right (see nozzleSideG) rather
+    // than a small flat plan-view icon -- too large a gap on top of
+    // that reads as the dispenser floating disconnected above the work
+    // instead of actively printing onto it.
     var Z_FABRIC = 0;
     var Z_TRACE = 32;
-    var Z_NOZZLE = 20;
+    var Z_NOZZLE = 35;
     var NOZZLE_LIFT = 12;
 
     // fabric, trace, nozzle -- built and appended exactly once, in
