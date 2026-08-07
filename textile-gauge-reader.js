@@ -50,6 +50,11 @@
   const WALE_COLOR = "#0f7d7d";   // matches --petrol-bright
   const COURSE_COLOR = "#a56b2e"; // matches --tgr-course
 
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 8;
+  const WHEEL_ZOOM_SENSITIVITY = 0.01;
+  const PAN_CLAMP_SLACK_PX = 80; // let the image edge get nudged past the viewer edge by this much
+
   // --- DOM refs -----------------------------------------------------
   const stepEls = Object.fromEntries(
     [...document.querySelectorAll(".tgr-step")].map((el) => [el.dataset.step, el])
@@ -58,11 +63,22 @@
     [...document.querySelectorAll(".tgr-step-panel")].map((el) => [el.dataset.panel, el])
   );
 
+  const viewer = document.getElementById("viewer");
   const viewerEmpty = document.getElementById("viewerEmpty");
   const stage = document.getElementById("stage");
   const img = document.getElementById("sourceImage");
   const canvas = document.getElementById("overlay");
   const ctx = canvas.getContext("2d");
+
+  const zoomControls = document.getElementById("zoomControls");
+  const zoomOutBtn = document.getElementById("zoomOutBtn");
+  const zoomInBtn = document.getElementById("zoomInBtn");
+  const zoomResetBtn = document.getElementById("zoomResetBtn");
+  const zoomLevelEl = document.getElementById("zoomLevel");
+
+  const panelEl = document.getElementById("panel");
+  const panelToggle = document.getElementById("panelToggle");
+  const appEl = document.querySelector(".tgr-app");
 
   const fileInput = document.getElementById("fileInput");
   const dropzone = document.getElementById("dropzone");
@@ -134,6 +150,8 @@
     },
     roi: null, // {x, y, width, height} in natural coords
     roiDrag: null, // active drag interaction descriptor
+    view: { zoom: 1, panX: 0, panY: 0 }, // image viewer pan/zoom, in display (unscaled) px
+    panDrag: null, // active viewer-pan drag descriptor
     orientation: "vertical",
     result: null,
     serviceOnline: null, // null = unknown/not configured, true/false once checked
@@ -233,6 +251,7 @@
       chip.classList.toggle("is-active", s === step);
       chip.classList.toggle("is-done", STEPS.indexOf(s) < STEPS.indexOf(step));
     }
+    updateZoomUI(); // pan-cursor affordance depends on the step (roi/calibrate reserve plain drag)
     render();
   }
 
@@ -261,9 +280,169 @@
   }
 
   function eventToDisplayPoint(evt) {
+    // canvas.getBoundingClientRect() reflects the CSS transform applied by
+    // applyViewTransform() below (pan + zoom), so dividing back out by the
+    // current zoom recovers the same "display px" space naturalToDisplay/
+    // displayToNatural already work in — everything downstream (ROI drag,
+    // calibration clicks, overlay drawing) needs no zoom-awareness at all.
     const rect = canvas.getBoundingClientRect();
-    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    const zoom = state.view.zoom || 1;
+    return { x: (evt.clientX - rect.left) / zoom, y: (evt.clientY - rect.top) / zoom };
   }
+
+  // --- Viewer pan / zoom --------------------------------------------------
+  //
+  // Implemented as a single CSS transform (translate then scale, in that
+  // order, with transform-origin pinned to 0 0) on #stage — the element
+  // that already wraps both the image and the overlay canvas, so they
+  // always move and scale together with zero extra bookkeeping. Only the
+  // *rendered* pixels move; img.clientWidth (what getScale()/
+  // naturalToDisplay/displayToNatural are built on) never changes, so
+  // every other coordinate transform in this file is entirely unaware
+  // zoom exists.
+
+  function applyViewTransform() {
+    stage.style.transform = `translate(${state.view.panX}px, ${state.view.panY}px) scale(${state.view.zoom})`;
+    updateZoomUI();
+  }
+
+  function updateZoomUI() {
+    zoomLevelEl.textContent = `${Math.round(state.view.zoom * 100)}%`;
+    zoomOutBtn.disabled = state.view.zoom <= MIN_ZOOM + 1e-6;
+    zoomInBtn.disabled = state.view.zoom >= MAX_ZOOM - 1e-6;
+    const pannable = state.view.zoom > MIN_ZOOM + 1e-6;
+    canvas.classList.toggle("is-pannable", pannable && state.currentStep !== "calibrate" && state.currentStep !== "roi");
+  }
+
+  function clampPan() {
+    if (!state.naturalWidth) return;
+    const viewerRect = viewer.getBoundingClientRect();
+    const z = state.view.zoom;
+    const renderedW = img.clientWidth * z;
+    const renderedH = img.clientHeight * z;
+    const maxPanX = Math.max(0, (renderedW - viewerRect.width) / 2) + PAN_CLAMP_SLACK_PX;
+    const maxPanY = Math.max(0, (renderedH - viewerRect.height) / 2) + PAN_CLAMP_SLACK_PX;
+    state.view.panX = clamp(state.view.panX, -maxPanX, maxPanX);
+    state.view.panY = clamp(state.view.panY, -maxPanY, maxPanY);
+  }
+
+  // Zoom by `factor`, keeping the content under (clientX, clientY) — or the
+  // viewer's own center, if omitted — visually fixed on screen.
+  function zoomBy(factor, clientX, clientY) {
+    if (!state.naturalWidth) return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = clientX != null ? clientX : rect.left + rect.width / 2;
+    const cy = clientY != null ? clientY : rect.top + rect.height / 2;
+    const oldZoom = state.view.zoom;
+    const contentX = (cx - rect.left) / oldZoom;
+    const contentY = (cy - rect.top) / oldZoom;
+    const newZoom = clamp(oldZoom * factor, MIN_ZOOM, MAX_ZOOM);
+    if (newZoom === oldZoom) return;
+    state.view.panX += (oldZoom - newZoom) * contentX;
+    state.view.panY += (oldZoom - newZoom) * contentY;
+    state.view.zoom = newZoom;
+    clampPan();
+    applyViewTransform();
+  }
+
+  function resetView() {
+    state.view = { zoom: 1, panX: 0, panY: 0 };
+    applyViewTransform();
+  }
+
+  function onViewerWheel(evt) {
+    if (!state.naturalWidth) return;
+    evt.preventDefault();
+    if (evt.ctrlKey) {
+      // Pinch-to-zoom on trackpads is synthesized by the browser as wheel
+      // events with ctrlKey set; a plain Ctrl+scroll does the same thing
+      // intentionally, matching the common zoom convention elsewhere.
+      const factor = Math.exp(-evt.deltaY * WHEEL_ZOOM_SENSITIVITY);
+      zoomBy(factor, evt.clientX, evt.clientY);
+    } else {
+      // Plain two-finger scroll (or a mouse wheel) pans instead, matching
+      // how map/image viewers usually treat an un-modified scroll gesture.
+      state.view.panX -= evt.deltaX;
+      state.view.panY -= evt.deltaY;
+      clampPan();
+      applyViewTransform();
+    }
+  }
+  viewer.addEventListener("wheel", onViewerWheel, { passive: false });
+
+  zoomInBtn.addEventListener("click", () => zoomBy(1.4));
+  zoomOutBtn.addEventListener("click", () => zoomBy(1 / 1.4));
+  zoomResetBtn.addEventListener("click", resetView);
+
+  // Click-drag panning. On the "roi"/"calibrate" steps, plain left-drag
+  // already means something (draw/move/resize a rectangle, or place a
+  // calibration point), so panning there is gated behind a modifier
+  // (middle-click, or Alt+left-click) to avoid stealing that gesture.
+  // On every other step, a plain left-drag pans directly -- that's the
+  // step where you're actually inspecting the image/results, and "the
+  // image should be positionable" applies most directly there.
+  function isPanTrigger(evt) {
+    if (evt.button === 1) return true; // middle-click always pans
+    if (evt.button !== 0) return false;
+    if (evt.altKey) return true; // Alt+left-drag always pans
+    return state.currentStep !== "roi" && state.currentStep !== "calibrate";
+  }
+
+  canvas.addEventListener("pointerdown", (evt) => {
+    if (!isPanTrigger(evt)) return;
+    evt.preventDefault();
+    canvas.setPointerCapture(evt.pointerId);
+    state.panDrag = { pointerId: evt.pointerId, lastX: evt.clientX, lastY: evt.clientY };
+    canvas.classList.add("is-panning");
+  });
+  canvas.addEventListener("pointermove", (evt) => {
+    if (!state.panDrag || evt.pointerId !== state.panDrag.pointerId) return;
+    const dx = evt.clientX - state.panDrag.lastX;
+    const dy = evt.clientY - state.panDrag.lastY;
+    state.panDrag.lastX = evt.clientX;
+    state.panDrag.lastY = evt.clientY;
+    state.view.panX += dx;
+    state.view.panY += dy;
+    clampPan();
+    applyViewTransform();
+  });
+  function endPanDrag(evt) {
+    if (!state.panDrag || evt.pointerId !== state.panDrag.pointerId) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.panDrag = null;
+    canvas.classList.remove("is-panning");
+  }
+  canvas.addEventListener("pointerup", endPanDrag);
+  canvas.addEventListener("pointercancel", endPanDrag);
+
+  // --- Collapsible results panel ------------------------------------------
+
+  let panelCollapsed = false;
+  panelToggle.addEventListener("click", () => {
+    panelCollapsed = !panelCollapsed;
+    appEl.classList.toggle("is-panel-collapsed", panelCollapsed);
+    panelToggle.textContent = panelCollapsed ? "›" : "‹"; // › / ‹
+    panelToggle.setAttribute("aria-label", panelCollapsed ? "Expand panel" : "Collapse panel");
+    panelToggle.setAttribute("aria-expanded", String(!panelCollapsed));
+    // The viewer's available width changes as the panel collapses/expands;
+    // the ResizeObserver on #stage picks that up too, but nudge it
+    // immediately (and again after the CSS transition finishes) so the
+    // overlay doesn't lag a frame behind during the animation.
+    requestAnimationFrame(() => {
+      syncCanvasSize();
+      clampPan();
+      render();
+    });
+    appEl.addEventListener(
+      "transitionend",
+      () => {
+        syncCanvasSize();
+        clampPan();
+        render();
+      },
+      { once: true }
+    );
+  });
 
   // --- Canvas sizing / resize handling -----------------------------------
 
@@ -279,11 +458,13 @@
 
   const resizeObserver = new ResizeObserver(() => {
     syncCanvasSize();
+    clampPan();
     render();
   });
   resizeObserver.observe(stage);
   window.addEventListener("resize", () => {
     syncCanvasSize();
+    clampPan();
     render();
   });
 
@@ -469,12 +650,14 @@
       state.naturalHeight = img.naturalHeight;
       viewerEmpty.hidden = true;
       stage.hidden = false;
+      zoomControls.hidden = false;
       // Reset any prior interaction state for a fresh image.
       state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null };
       state.roi = null;
       state.result = null;
       resetCalibrationUI();
       resetRoiUI();
+      resetView();
       syncCanvasSize();
       goToStep("calibrate");
     };
@@ -624,6 +807,8 @@
   // --- Pointer interaction (calibration clicks + ROI drag) --------------
 
   canvas.addEventListener("pointerdown", (evt) => {
+    if (state.panDrag) return; // the viewer-pan listener above already claimed this gesture
+
     if (state.currentStep === "calibrate") {
       if (state.cal.points.length >= 2) return; // must Redo first
       const pt = displayToNatural(eventToDisplayPoint(evt));
@@ -1226,6 +1411,8 @@
     fileInput.value = "";
     img.src = "";
     stage.hidden = true;
+    zoomControls.hidden = true;
+    resetView();
     viewerEmpty.hidden = false;
     unitSelect.value = "cm";
     document.querySelector('input[name="orientation"][value="vertical"]').checked = true;

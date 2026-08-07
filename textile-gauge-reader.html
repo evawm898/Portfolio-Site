@@ -43,6 +43,7 @@
 
   <!-- Left: step panel -->
   <aside class="tgr-panel" id="panel">
+    <button type="button" id="panelToggle" class="tgr-panel-toggle" aria-label="Collapse panel" aria-expanded="true">&lsaquo;</button>
 
     <ol class="tgr-steps" id="steps">
       <li class="tgr-step" data-step="upload">1. Upload Image</li>
@@ -222,6 +223,12 @@
     <div class="tgr-viewer__stage" id="stage" hidden>
       <img id="sourceImage" alt="Uploaded textile" draggable="false">
       <canvas id="overlay"></canvas>
+    </div>
+    <div class="tgr-zoom-controls" id="zoomControls" hidden title="Drag to reposition &middot; scroll to pan &middot; Ctrl/pinch-scroll or +/&minus; to zoom">
+      <button type="button" id="zoomOutBtn" class="tgr-zoom-controls__btn" aria-label="Zoom out">&minus;</button>
+      <span class="tgr-zoom-controls__level" id="zoomLevel">100%</span>
+      <button type="button" id="zoomInBtn" class="tgr-zoom-controls__btn" aria-label="Zoom in">+</button>
+      <button type="button" id="zoomResetBtn" class="tgr-zoom-controls__reset" aria-label="Reset zoom and position">Reset</button>
     </div>
   </section>
 

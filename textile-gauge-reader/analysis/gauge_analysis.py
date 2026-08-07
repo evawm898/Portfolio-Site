@@ -48,13 +48,26 @@ being measured.
      actually supports, rather than trusting the strongest
      autocorrelation peak blindly. Every candidate considered and the
      reason for the final choice are reported for diagnostics.
-  7. Final overlay/position marks come from clustering the loop-center
+  7. Cross-check with loop density (2D, whole-ROI): the loop-center
+     detection scale in step 5 is itself seeded from the coarse
+     autocorrelation period, so on real photos it can inherit the very
+     harmonic bias it's supposed to catch — both "independent" signals
+     agree on the same wrong (typically too-fine) period. Loop DENSITY
+     is a separate, harder-to-fool invariant: N genuine loop centers
+     spread across an ROI of area A should occupy roughly N x
+     (wale_pitch x course_pitch) of that area, one repeat cell per
+     loop. If the reconciled wale/course pitches imply a cell far
+     smaller than that, one axis is very likely still locked onto a
+     sub-loop harmonic, and we look at whether that axis's OWN
+     already-computed 0.5x/1x/2x candidates contain a value that
+     resolves the mismatch — never an invented multiplier.
+  8. Final overlay/position marks come from clustering the loop-center
      points at the reconciled period when there's enough of that
      evidence; otherwise fall back to peak-picking on the 1D signal
      (as before, just tuned to the reconciled period).
-  8. A confidence score blends autocorrelation strength, spacing
-     consistency, peak count, and whether structural (loop-center)
-     evidence was available to validate the choice.
+  9. A confidence score blends autocorrelation strength, spacing
+     consistency, peak count, and whether structural (loop-center and/or
+     density) evidence was available to validate the choice.
 
 This module deliberately never invents a result: if the signal is too
 weak, too short, or too noisy to support a periodicity estimate, the
@@ -85,7 +98,7 @@ Direction = Literal["horizontal", "vertical"]  # which image axis a quantity is 
 # saved ground-truth correction record so later analysis can tell which
 # algorithm version a given prediction came from — e.g. to check whether a
 # tuning change actually reduced systematic error, not just re-labeled it.
-ALGORITHM_VERSION = "cv-clahe-sobel-autocorr-loopcenter-v0.2"
+ALGORITHM_VERSION = "cv-clahe-sobel-autocorr-loopcenter-density-v0.3"
 
 # --- Tunable constants -------------------------------------------------
 
@@ -99,6 +112,7 @@ MIN_LOOP_CENTERS_FOR_EVIDENCE = 4    # below this, loop-center evidence is too t
 MAX_LOOP_CENTERS = 2000              # cap for pairwise-distance cost and response payload size
 HARMONIC_MATCH_LOG_TOLERANCE = 0.35  # ~1.4x wiggle room when matching a candidate to loop-center pitch
 MIN_CENTER_CONSISTENCY = 0.5         # min (1 - CV) of nearest-neighbor spacings to trust loop-center pitch
+DENSITY_MISMATCH_LOG_THRESHOLD = 0.35  # ~1.4x wiggle room before wale*course cell area vs. loop density counts as a real conflict
 
 
 @dataclass
@@ -245,8 +259,24 @@ def analyze_gauge(
     wale_band_px = max(3.0, 0.4 * (p0_course or p0_wale or 10.0))
     course_band_px = max(3.0, 0.4 * (p0_wale or p0_course or 10.0))
 
-    wale = _analyze_direction(wale_signal, p0_wale, loop_centers, wale_center_axis, wale_band_px)
-    course = _analyze_direction(course_signal, p0_course, loop_centers, course_center_axis, course_band_px)
+    wale_p_centers = _trusted_center_pitch(loop_centers, wale_center_axis, wale_band_px)
+    course_p_centers = _trusted_center_pitch(loop_centers, course_center_axis, course_band_px)
+
+    wale = _analyze_direction(wale_signal, p0_wale, wale_p_centers, loop_centers, wale_center_axis)
+    course = _analyze_direction(course_signal, p0_course, course_p_centers, loop_centers, course_center_axis)
+
+    wale, course = _cross_check_density(
+        wale,
+        course,
+        loop_centers=loop_centers,
+        wale_center_axis=wale_center_axis,
+        course_center_axis=course_center_axis,
+        wale_p_centers=wale_p_centers,
+        course_p_centers=course_p_centers,
+        wale_signal=wale_signal,
+        course_signal=course_signal,
+        roi_area=float(w * h),
+    )
 
     # Translate positions from ROI-local coordinates to full-image coordinates.
     if wale_center_axis == 0:
@@ -609,43 +639,46 @@ def _cluster_positions(coords: np.ndarray, period: float) -> List[float]:
     return [float(np.mean(g)) for g in groups]
 
 
-def _analyze_direction(
+def _trusted_center_pitch(
+    loop_centers: np.ndarray, center_axis_index: int, band_tolerance_px: float
+) -> Optional[float]:
+    """
+    Loop-center nearest-neighbor pitch along one axis, gated by
+    consistency. A median exists even for pure noise (over-detected
+    spurious texture, not real loop heads) — only trust it as structural
+    evidence if the neighbor spacings that produced it actually agree
+    with each other. Otherwise this would "correct" an already-good
+    autocorrelation estimate using noise.
+    """
+    if loop_centers.shape[0] < MIN_LOOP_CENTERS_FOR_EVIDENCE:
+        return None
+    median, consistency = _estimate_pitch_from_centers(loop_centers, center_axis_index, band_tolerance_px)
+    if median is not None and consistency >= MIN_CENTER_CONSISTENCY:
+        return median
+    return None
+
+
+def _finalize_axis(
+    period: float,
     signal: np.ndarray,
-    p0: Optional[float],
     loop_centers: np.ndarray,
     center_axis_index: int,
-    band_tolerance_px: float,
+    p_centers: Optional[float],
+    candidates_px: List[float],
+    selected_reason: str,
+    structural_score: float,
 ) -> AxisResult:
-    p_centers = None
-    if loop_centers.shape[0] >= MIN_LOOP_CENTERS_FOR_EVIDENCE:
-        median, consistency = _estimate_pitch_from_centers(loop_centers, center_axis_index, band_tolerance_px)
-        # A median exists even for pure noise (over-detected spurious
-        # texture, not real loop heads) — only trust it as structural
-        # evidence if the neighbor spacings that produced it actually
-        # agree with each other. Otherwise this would "correct" an
-        # already-good autocorrelation estimate using noise.
-        if median is not None and consistency >= MIN_CENTER_CONSISTENCY:
-            p_centers = median
-
-    decision = _reconcile_period(p0, p_centers, MIN_PLAUSIBLE_SPACING_PX)
-
-    if decision.period is None:
-        return AxisResult(
-            spacing_px=None,
-            positions_px=[],
-            confidence=0.0,
-            message="No reliable periodicity detected along this axis.",
-            candidates_px=decision.candidates,
-            selected_reason=decision.reason,
-        )
-
-    period = decision.period
-
+    """
+    Turn a chosen period into the actual reported AxisResult: overlay
+    positions, refined spacing, and a confidence score. Shared by the
+    normal per-axis reconciliation path and by `_cross_check_density`,
+    which can pick a different (but still axis-plausible) period after
+    the fact.
+    """
     # Prefer positions clustered directly from loop-center evidence
     # (grounded in actual detected loop features, satisfying "one marker
     # per complete loop repeat") when there's enough of it; otherwise
-    # fall back to peak-picking on the 1D signal, tuned to the
-    # reconciled period.
+    # fall back to peak-picking on the 1D signal, tuned to the period.
     if p_centers is not None:
         positions = _cluster_positions(loop_centers[:, center_axis_index], period)
         position_source = "loop-center clustering"
@@ -667,17 +700,8 @@ def _analyze_direction(
 
     # Coarse autocorrelation "strength" is still informative (a very weak
     # peak means the whole signal was marginal), so blend it in, but
-    # weight structural (loop-center) validation explicitly: confirmed
-    # agreement scores highest, an unvalidated raw estimate scores
-    # lowest, since it might be sitting on an uncorrected harmonic.
+    # weight structural validation explicitly via the caller-supplied score.
     _, autocorr_strength = _autocorrelation_spacing(signal)
-    if decision.validated and not decision.corrected:
-        structural_score = 1.0
-    elif decision.validated and decision.corrected:
-        structural_score = 0.85
-    else:
-        structural_score = 0.55
-
     confidence = float(
         np.clip(
             0.4 * autocorr_strength + 0.25 * spacing_consistency + 0.15 * peak_count_score + 0.2 * structural_score,
@@ -689,7 +713,7 @@ def _analyze_direction(
     message = ""
     if len(positions) < MIN_PEAKS_FOR_GOOD_CONFIDENCE:
         message = "Few repeating loops detected; spacing estimate is low-confidence."
-    elif not decision.validated:
+    elif structural_score < 0.6:
         message = "Could not independently confirm this against loop-center evidence; treat with caution."
 
     return AxisResult(
@@ -697,6 +721,144 @@ def _analyze_direction(
         positions_px=positions,
         confidence=round(confidence, 3),
         message=message,
-        candidates_px=decision.candidates,
-        selected_reason=f"{decision.reason} (positions from {position_source})",
+        candidates_px=candidates_px,
+        selected_reason=f"{selected_reason} (positions from {position_source})",
     )
+
+
+def _analyze_direction(
+    signal: np.ndarray,
+    p0: Optional[float],
+    p_centers: Optional[float],
+    loop_centers: np.ndarray,
+    center_axis_index: int,
+) -> AxisResult:
+    decision = _reconcile_period(p0, p_centers, MIN_PLAUSIBLE_SPACING_PX)
+
+    if decision.period is None:
+        return AxisResult(
+            spacing_px=None,
+            positions_px=[],
+            confidence=0.0,
+            message="No reliable periodicity detected along this axis.",
+            candidates_px=decision.candidates,
+            selected_reason=decision.reason,
+        )
+
+    if decision.validated and not decision.corrected:
+        structural_score = 1.0
+    elif decision.validated and decision.corrected:
+        structural_score = 0.85
+    else:
+        structural_score = 0.55
+
+    return _finalize_axis(
+        decision.period,
+        signal,
+        loop_centers,
+        center_axis_index,
+        p_centers,
+        decision.candidates,
+        decision.reason,
+        structural_score,
+    )
+
+
+def _cross_check_density(
+    wale: AxisResult,
+    course: AxisResult,
+    loop_centers: np.ndarray,
+    wale_center_axis: int,
+    course_center_axis: int,
+    wale_p_centers: Optional[float],
+    course_p_centers: Optional[float],
+    wale_signal: np.ndarray,
+    course_signal: np.ndarray,
+    roi_area: float,
+) -> Tuple[AxisResult, AxisResult]:
+    """
+    Second, genuinely independent structural constraint: whole-ROI loop
+    DENSITY. N detected loop centers spread across an ROI of area A should
+    occupy roughly N x (wale_pitch x course_pitch) of that area — one
+    repeat cell per loop. This exists because the per-axis check in
+    `_reconcile_period` isn't fully independent of the harmonic error it's
+    meant to catch: the loop-center detection *scale* is itself seeded
+    from the coarse autocorrelation period (see `analyze_gauge`), so on
+    real photos both signals can end up agreeing on the same wrong
+    (typically too-fine, "half a loop") period. Density doesn't share that
+    dependency, so it can catch cases the per-axis check alone missed.
+
+    If the reconciled cell area is a clear mismatch against density, look
+    at whether either axis's OWN already-computed 0.5x/1x/2x candidates
+    contains a value that resolves it — never an invented multiplier, and
+    never a value that axis's own harmonic analysis hadn't already
+    flagged as plausible.
+    """
+    n = loop_centers.shape[0]
+    if n < MIN_LOOP_CENTERS_FOR_EVIDENCE or wale.spacing_px is None or course.spacing_px is None or roi_area <= 0:
+        return wale, course
+
+    expected_cell_area = roi_area / n
+    actual_cell_area = wale.spacing_px * course.spacing_px
+    if expected_cell_area <= 0 or actual_cell_area <= 0:
+        return wale, course
+
+    log_ratio = math.log(actual_cell_area / expected_cell_area)
+    if abs(log_ratio) < DENSITY_MISMATCH_LOG_THRESHOLD:
+        return wale, course  # cell area already plausible given loop density
+
+    # Try each axis's own candidates (never the other axis's, never an
+    # arbitrary value) as a replacement for that axis's current pick,
+    # holding the other axis fixed, and find the best fix *within each
+    # axis independently* first.
+    per_axis_best: dict = {}  # which -> (abs_log_ratio, candidate)
+    for which, axis_result, other_spacing in (
+        ("wale", wale, course.spacing_px),
+        ("course", course, wale.spacing_px),
+    ):
+        for candidate in axis_result.candidates_px:
+            if abs(candidate - axis_result.spacing_px) < 1e-6:
+                continue
+            trial_cell_area = candidate * other_spacing
+            if trial_cell_area <= 0:
+                continue
+            trial_log_ratio = abs(math.log(trial_cell_area / expected_cell_area))
+            current = per_axis_best.get(which)
+            if current is None or trial_log_ratio < current[0]:
+                per_axis_best[which] = (trial_log_ratio, candidate)
+
+    candidates_by_axis = {
+        which: (ratio, cand) for which, (ratio, cand) in per_axis_best.items() if ratio < DENSITY_MISMATCH_LOG_THRESHOLD
+    }
+    if not candidates_by_axis:
+        return wale, course  # nothing among the axes' own candidates actually helps
+
+    # Both axes independently resolving the mismatch about equally well is
+    # inherently ambiguous from density alone (the product is symmetric in
+    # wale/course) — break the tie by adjusting whichever axis was already
+    # less trusted going in, rather than an arbitrary axis-checked-first bias.
+    if len(candidates_by_axis) == 2 and abs(candidates_by_axis["wale"][0] - candidates_by_axis["course"][0]) < 0.02:
+        which = "wale" if wale.confidence <= course.confidence else "course"
+    else:
+        which = min(candidates_by_axis, key=lambda w: candidates_by_axis[w][0])
+
+    _, candidate = candidates_by_axis[which]
+    note = (
+        f"Density cross-check corrected this to {candidate:.1f}px: the previously reconciled "
+        f"wale x course cell area didn't match how many loop centers were actually detected "
+        f"across the ROI, and {candidate:.1f}px is a harmonic candidate this axis's own "
+        f"autocorrelation already considered."
+    )
+
+    if which == "wale":
+        updated = _finalize_axis(
+            candidate, wale_signal, loop_centers, wale_center_axis, wale_p_centers,
+            wale.candidates_px, note, structural_score=0.75,
+        )
+        return updated, course
+    else:
+        updated = _finalize_axis(
+            candidate, course_signal, loop_centers, course_center_axis, course_p_centers,
+            course.candidates_px, note, structural_score=0.75,
+        )
+        return wale, updated

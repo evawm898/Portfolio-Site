@@ -28,7 +28,7 @@ a multiplier doesn't fix this — it's a difference in what the algorithm
 is actually locking onto, and would produce a different, uncorrectable
 error on a different photo.
 
-The current pipeline (`ALGORITHM_VERSION` `cv-clahe-sobel-autocorr-loopcenter-v0.2`)
+The pipeline (`ALGORITHM_VERSION` `cv-clahe-sobel-autocorr-loopcenter-density-v0.3`)
 addresses this with a second, independent signal: an approximate 2D
 loop-center detector (a Difference-of-Gaussians blob response tuned to
 loop scale, since a genuine loop center is a compact, roughly isotropic
@@ -39,15 +39,32 @@ is used — never an arbitrary multiplier, and only when the loop-center
 evidence itself is internally consistent enough to trust (a noisy/
 over-detected point cloud is recognized as such and ignored, falling
 back to the autocorrelation estimate rather than "correcting" a
-plausibly-already-right answer with garbage). Every candidate
-considered and why the final one was picked is exposed via the
-**Detection Details** panel on the Results screen (see below), along
-with an optional **Show loop centers** overlay toggle so you can
-visually check the detector against the actual knit structure — success
-means the overlay lines line up with real complete loops, not just that
-the final numbers look plausible.
+plausibly-already-right answer with garbage).
 
-This is a heuristic V0.2 improvement, not full loop segmentation, and
+**v0.3 adds a third check**, after a real photo showed the first two
+signals could still both be fooled together: the loop-center detector's
+*scale* is itself seeded from the coarse autocorrelation period, so on
+some real fabric that "independent" evidence isn't fully independent — it
+can inherit the exact same too-fine harmonic lock the check was supposed
+to catch, and confidently confirm a wrong answer (e.g. reporting twice
+the true wale count, each half of a real wale counted as its own). v0.3
+cross-checks whole-ROI loop **density**: N detected loop centers spread
+across an ROI of area A should occupy roughly `N × (wale_pitch ×
+course_pitch)` of that area, one repeat cell per loop — a constraint that
+doesn't share the scale-seeding dependency. When the reconciled cell area
+doesn't match that, it looks at whether either axis's own already-computed
+0.5x/1x/2x candidates contains a value that resolves the mismatch (never a
+value that axis's own harmonic analysis hadn't already flagged as
+plausible, and never the other axis's candidate set). Every candidate
+considered and why the final one was picked — including a density
+correction, when one happens — is exposed via the **Detection Details**
+panel on the Results screen (see below), along with an optional **Show
+loop centers** overlay toggle so you can visually check the detector
+against the actual knit structure — success means the overlay lines line
+up with real complete loops, not just that the final numbers look
+plausible.
+
+This is a heuristic V0.3 improvement, not full loop segmentation, and
 it isn't assumed to be "solved" — see
 [Ground Truth / Correction System](#ground-truth--correction-system)
 for how to build an evaluation set against real photos and decide
