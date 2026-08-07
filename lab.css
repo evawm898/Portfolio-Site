@@ -484,10 +484,14 @@
 /* Embedded wire's own 3D stage — a fabric face, a wire face, and
    TUNNEL_RIB_COUNT tunnel "rib" faces (fanned out at their own fixed
    fold angles, solved in the JS) under one rotating
-   .embeddedWire-scene. Unlike the printedInk rig above, this scene's
-   rotation is deliberately a single rotateX — orbiting the camera
-   around the tunnel's own length axis, top-down to near-edge-on
-   profile and back — never rotateY or rotateZ. */
+   .embeddedWire-scene. The scene's rotation is a single coupled
+   rotateY(yaw) + rotateX(tilt) orbit, both driven off one shared
+   progress value (never rotateZ, never independently re-eased) —
+   top-down to a near-edge-on cross-section profile and back. See the
+   JS module header comment for why both axes are needed: the tunnel
+   runs along X, and only a yaw component reorients the viewing
+   direction to run parallel to that axis, which is what exposes the
+   arch's own Y/Z cross-section as an on-screen shape. */
 .embeddedWire-stage {
   width: 100%;
   height: 100%;
