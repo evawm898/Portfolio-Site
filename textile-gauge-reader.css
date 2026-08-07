@@ -176,12 +176,32 @@
 }
 
 .tgr-panel {
+  /* Non-scrolling shell: only exists to anchor the toggle tab (below) so
+     it never scrolls away, and to size/position the actually-scrolling
+     content wrapper (.tgr-panel__scroll). */
   position: relative;
   background: var(--black);
+  font-family: var(--mono);
+  /* Grid items default to min-height:auto, which stops them shrinking
+     below their content's height -- so without this, tall step content
+     (e.g. Results) grows the panel itself (and the whole page) instead
+     of clipping at the grid row height and letting .tgr-panel__scroll
+     handle it internally. */
+  min-height: 0;
+}
+
+.tgr-panel__scroll {
+  /* Fill the available row height to match the viewer's height when this
+     step's content is short (so the two columns read as one balanced
+     panel) -- but never grow past a viewport-relative cap, so genuinely
+     long content (Results, with its grid + detection details + verify
+     section all stacked) scrolls internally instead of growing the grid
+     row (and therefore the whole page) without bound. */
+  height: 100%;
+  max-height: calc(100vh - 180px);
   padding: 1.25rem 1.5rem;
   overflow-y: auto;
   overflow-x: hidden;
-  font-family: var(--mono);
 }
 
 /* Everything except the toggle tab itself disappears when collapsed —
@@ -191,9 +211,16 @@
 }
 
 .tgr-panel-toggle {
+  /* Positioned against .tgr-panel (which doesn't scroll), vertically
+     centered in the panel's own height -- not the scrolling content
+     above -- so it stays reachable at a consistent spot no matter how
+     long the current step's content is or how far it's scrolled
+     (e.g. Results, with its results grid + detection details + verify
+     section all stacked in the scrolling area below it). */
   position: absolute;
-  top: 1.1rem;
+  top: 50%;
   right: -14px;
+  transform: translateY(-50%);
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -217,7 +244,7 @@
 .tgr-app.is-panel-collapsed .tgr-panel-toggle {
   right: auto;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .tgr-steps {
