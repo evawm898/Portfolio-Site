@@ -1,0 +1,29 @@
+# Render Blueprint for the AI Textile Gauge Reader backend.
+#
+# This deploys ONLY the FastAPI/OpenCV analysis API from
+# textile-gauge-reader/ — the frontend (textile-gauge-reader.html/.css/.js
+# at the repo root) is static and stays on the portfolio site's own host
+# (GitHub Pages / Netlify), calling this API cross-origin.
+#
+# To use: in the Render dashboard, "New +" -> "Blueprint", point it at
+# this GitHub repo. Render will read this file and propose the service
+# below. You can also skip the blueprint and configure the same settings
+# by hand when creating a plain "Web Service" — see
+# textile-gauge-reader/README.md for the manual steps.
+services:
+  - type: web
+    name: textile-gauge-reader-api
+    runtime: python
+    plan: free
+    rootDir: textile-gauge-reader
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ALLOWED_ORIGINS
+        # Comma-separated list, no spaces, no trailing slashes. Update this
+        # to the real portfolio origin(s) once known, e.g.:
+        #   https://evamaskalenko.com,https://eva-maskalenko.netlify.app
+        value: "*"
+    healthCheckPath: /health

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Runtime data: the ground-truth corrections SQLite DB and any opted-in
+# saved images. Never committed — export via /corrections/export.csv or
+# /corrections/export.json instead.
+data/

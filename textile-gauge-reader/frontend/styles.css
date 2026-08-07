@@ -1,0 +1,324 @@
+:root {
+  --bg: #14161a;
+  --panel-bg: #1c1f25;
+  --panel-border: #2b2f37;
+  --text: #e9eaec;
+  --text-dim: #9aa0a8;
+  --accent: #5fb3ff;
+  --accent-dim: #2c5a7d;
+  --ok: #4fd18b;
+  --warn: #e8b93f;
+  --error: #f16565;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+.app-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  letter-spacing: -0.01em;
+}
+.app-header__subtitle {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1px;
+  background: var(--panel-border);
+  min-height: calc(100vh - 78px);
+}
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: var(--panel-bg);
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+.steps {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.step {
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+}
+.step.is-active {
+  color: var(--text);
+  background: var(--accent-dim);
+  font-weight: 600;
+}
+.step.is-done {
+  color: var(--ok);
+}
+
+.step-panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.status {
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.error {
+  color: var(--error);
+  font-size: 0.85rem;
+  background: rgba(241, 101, 101, 0.1);
+  border: 1px solid rgba(241, 101, 101, 0.3);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.warning {
+  color: var(--warn);
+  font-size: 0.85rem;
+  background: rgba(232, 185, 63, 0.1);
+  border: 1px solid rgba(232, 185, 63, 0.3);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 2px dashed var(--panel-border);
+  border-radius: 8px;
+  padding: 2rem 1rem;
+  margin-top: 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  transition: border-color 0.15s, color 0.15s;
+}
+.dropzone:hover, .dropzone.is-dragover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.field-row label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.field-row input[type="number"] {
+  flex: 1;
+  min-width: 0;
+}
+
+input[type="number"], select {
+  background: #0f1114;
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+input[type="number"]:focus, select:focus {
+  outline: 1px solid var(--accent);
+}
+
+.radio-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+.radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+.radio-option:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(95, 179, 255, 0.06);
+}
+.radio-option input { margin-top: 0.2rem; }
+
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  background: var(--accent);
+  color: #0b1a26;
+  border: none;
+  padding: 0.55rem 1rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn--secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+}
+.btn--secondary:hover { border-color: var(--text-dim); }
+
+.summary {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.summary li {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed var(--panel-border);
+  padding-bottom: 0.35rem;
+}
+.summary li span:first-child { color: var(--text-dim); }
+.summary li span:last-child { font-family: var(--mono); }
+
+.results-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+.result-card {
+  background: #0f1114;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.result-card--primary {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.75rem;
+}
+.result-card--primary .result-card__block { flex: 1; }
+.result-card__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-bottom: 0.15rem;
+}
+.result-card__value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--accent);
+  line-height: 1.1;
+}
+.result-card--primary .result-card__value { font-size: 2rem; }
+.result-card__sub {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-top: 0.2rem;
+}
+.confidence-bar {
+  height: 4px;
+  background: var(--panel-border);
+  border-radius: 2px;
+  margin-top: 0.4rem;
+  overflow: hidden;
+}
+.confidence-bar__fill {
+  height: 100%;
+  background: var(--ok);
+}
+.confidence-bar__fill.is-low { background: var(--error); }
+.confidence-bar__fill.is-mid { background: var(--warn); }
+
+.viewer {
+  background: #0b0c0e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 400px;
+  padding: 1rem;
+}
+.viewer__empty {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+}
+.viewer__stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  line-height: 0;
+}
+.viewer__stage[hidden] {
+  /* The [hidden] attribute selector and .viewer__stage class selector have
+     equal specificity, so without this the class rule above (added later
+     in the cascade) would win and defeat `hidden`. */
+  display: none;
+}
+.viewer__stage img {
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  display: block;
+  user-select: none;
+}
+.viewer__stage canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
