@@ -231,6 +231,95 @@ a {
 }
 
 /* ---------------------------------------------------
+   Field Notes grid — same whole-card-is-a-link pattern as .specimen
+   above, kept as its own class rather than reused directly since a
+   note card has no year/affiliation tag and needs an explicit "this is
+   clickable" affordance (.note-card__cta) instead. Two columns, not
+   three: notes carry longer, denser titles (one runs to 54 characters)
+   than the project grid's, and the narrower three-column tile didn't
+   leave enough room for that title to read comfortably.
+--------------------------------------------------- */
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.note-card {
+  position: relative;
+  padding: 2.75rem 2.5rem 2.25rem;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.notes-grid .note-card:nth-child(2n) {
+  border-right: none;
+}
+
+.notes-grid .note-card:nth-child(n+3) {
+  border-bottom: none;
+}
+
+.note-card:hover {
+  background: var(--black-raised);
+  border-color: var(--line-strong);
+}
+
+.note-card:hover .note-card__title {
+  color: var(--petrol-bright);
+}
+
+.note-card__index {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  margin-bottom: 1.25rem;
+}
+
+.note-card__title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.5rem;
+  line-height: 1.3;
+  color: var(--ink);
+  margin-bottom: 0.85rem;
+  overflow-wrap: break-word;
+  transition: color 0.15s ease;
+}
+
+.note-card__desc {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-faint);
+  flex-grow: 1;
+}
+
+/* Explicit clickability cue -- a whole-card link already gets a hover
+   state, but that's invisible at a glance and absent entirely on touch,
+   so the card also says outright that it's a link, not just a label. */
+.note-card__cta {
+  display: block;
+  margin-top: 1.5rem;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+  transition: color 0.15s ease;
+}
+
+.note-card:hover .note-card__cta {
+  color: var(--petrol-bright);
+}
+
+/* ---------------------------------------------------
    Footer
 --------------------------------------------------- */
 
@@ -290,6 +379,22 @@ a {
   }
   .footer__grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  /* Notes grid starts at only two columns (see .notes-grid above), so
+     there's no separate "tablet" tier worth keeping -- it goes straight
+     to one column here, the same width tier where the long "Untangling
+     Functional Fibers..." title most needs the room. */
+  .notes-grid {
+    grid-template-columns: 1fr;
+  }
+  .note-card {
+    border-right: none !important;
+  }
+  .notes-grid .note-card:nth-child(n+3) {
+    border-bottom: 1px solid var(--line);
+  }
+  .notes-grid .note-card:last-child {
+    border-bottom: none;
   }
 }
 
@@ -376,6 +481,19 @@ a {
   letter-spacing: -0.01em;
   max-width: 24ch;
   text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+
+/* Short introductory sentence between a page's title and its body —
+   used by Field Notes pages, which have one-sentence framing the
+   project detail pages don't need. */
+.project__lede {
+  font-family: var(--mono);
+  font-size: clamp(0.95rem, 1.4vw, 1.05rem);
+  color: var(--ink-dim);
+  max-width: 42rem;
+  margin-top: 1.5rem;
+  line-height: 1.7;
 }
 
 .project__body {
