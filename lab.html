@@ -2162,11 +2162,17 @@
     // foreshortened silhouette for a visible seam to appear at all.
     // The trace layer is a thin stroke rather than a filled shape
     // though, so it needs far less clearance off the fabric than the
-    // nozzle needs off the trace.
+    // nozzle needs off the trace. Kept well short of what a fully
+    // separated read alone would need, though: at REST_RX the gap
+    // itself becomes visible apparent height (Zgap * sin(REST_RX)), and
+    // the nozzle icon is also now a tall side-profile silhouette in its
+    // own right (see nozzleSideG) rather than a small flat plan-view
+    // icon -- stacking both would read as the dispenser floating
+    // disconnected above the work instead of actively printing onto it.
     var Z_FABRIC = 0;
     var Z_TRACE = 32;
-    var Z_NOZZLE = 92;
-    var NOZZLE_LIFT = 16;
+    var Z_NOZZLE = 52;
+    var NOZZLE_LIFT = 12;
 
     // fabric, trace, nozzle -- built and appended exactly once, in
     // that exact order, and never reordered or duplicated for the
@@ -2272,6 +2278,32 @@
     nozzleG.appendChild(bead);
     nozzle.svg.appendChild(nozzleG);
 
+    // Purpose-built side profile of the same dispenser, shown only
+    // during the side-view hold (crossfaded against nozzleG above by
+    // camera tilt, in render()) -- a plan-view "arrow" silhouette and a
+    // profile silhouette are two genuinely different shapes for the
+    // same 3D object, and no single flat icon reads well as both at
+    // once. This one never rotates to the path tangent -- a real
+    // gantry-mounted dispenser stays upright and just translates, the
+    // same reasoning the reference footage this was drawn from shows --
+    // applyPathProgress only ever translates it. Tip/bead sits at the
+    // local origin, same convention as nozzleG, so both sit exactly on
+    // the trace regardless of which is currently visible.
+    var nozzleSideG = el('g', { class: 'printedInk-nozzleSide' });
+    // barrel
+    nozzleSideG.appendChild(el('rect', { x: -6, y: -27, width: 12, height: 16, rx: 2.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    // cap / plunger knob
+    nozzleSideG.appendChild(el('rect', { x: -3.5, y: -31, width: 7, height: 5, rx: 1.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    // glossy barrel highlight, purely decorative
+    nozzleSideG.appendChild(el('line', { x1: -3, y1: -25, x2: -3, y2: -14, stroke: 'var(--line)', 'stroke-width': 1, opacity: 0.5 }));
+    // funnel, barrel base down to the needle
+    nozzleSideG.appendChild(el('path', { d: 'M-6,-11 L6,-11 L1.8,-3 L-1.8,-3 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    // needle
+    nozzleSideG.appendChild(el('rect', { x: -1, y: -3, width: 2, height: 3.4, fill: 'var(--line-strong)' }));
+    var beadSide = el('circle', { cx: 0, cy: 0.4, r: 2.4, fill: 'var(--petrol-bright)', class: 'printedInk-bead' });
+    nozzleSideG.appendChild(beadSide);
+    nozzle.svg.appendChild(nozzleSideG);
+
     // Nozzle position/orientation and the trace's reveal are driven
     // from this one function, called with the one shared progress
     // value -- there is no separate nozzle timeline anywhere.
@@ -2310,6 +2342,9 @@
       // below, not here, so it can ease out rather than snap to 0.
 
       nozzleG.setAttribute('transform', 'translate(' + pt.x.toFixed(2) + ',' + pt.y.toFixed(2) + ') rotate(' + angleDeg.toFixed(2) + ')');
+      // Never rotated to the tangent, unlike nozzleG above -- see where
+      // nozzleSideG is built for why.
+      nozzleSideG.setAttribute('transform', 'translate(' + pt.x.toFixed(2) + ',' + pt.y.toFixed(2) + ')');
     }
 
     function applyCamera(rx) {
@@ -2365,8 +2400,15 @@
       else rx = 0;
       applyCamera(rx);
 
-      // -- nozzle fade-in during the brief appear beat --
-      nozzleG.style.opacity = easeOutCubic(phaseT(p, PH.appear)).toFixed(3);
+      // -- nozzle fade-in during the brief appear beat, then crossfaded
+      // between the plan-view icon and the side-profile icon by how far
+      // into the tilt the camera currently is -- a pure function of rx,
+      // so it arrives and leaves in exact lockstep with the tilt itself
+      // rather than on its own separate timing. --
+      var appearT = easeOutCubic(phaseT(p, PH.appear));
+      var sideStrength = rx / REST_RX;
+      nozzleG.style.opacity = (appearT * (1 - sideStrength)).toFixed(3);
+      nozzleSideG.style.opacity = (appearT * sideStrength).toFixed(3);
 
       // -- nozzle position/orientation + trace reveal, both from the
       // same pathProgress value --
@@ -2394,6 +2436,9 @@
       applyCamera(0);
       nozzle.face.style.transform = 'translateZ(' + Z_NOZZLE + 'px)';
       nozzleG.style.opacity = Math.min(1, rp / 0.15).toFixed(3);
+      // Camera never tilts here, so the side-profile icon never earns
+      // any of the crossfade above -- stays fully transparent.
+      nozzleSideG.style.opacity = '0';
       applyPathProgress(easeInOutCubic(clamp01(rp)));
       if (rp >= 1) traceWet.style.opacity = '0';
     }
