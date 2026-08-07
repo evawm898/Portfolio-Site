@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Textile Gauge Reader</title>
+<meta name="description" content="Experimental computer-vision tool for measuring knitted textile gauge from photographs.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2314161a'/%3E%3Cpath d='M6 10h20M6 16h20M6 22h20M11 6v20M21 6v20' stroke='%235fb3ff' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>AI Textile Gauge Reader</h1>
+  <p class="app-header__subtitle">Experimental computer-vision gauge measurement &mdash; V0 (traditional CV, no AI model)</p>
+</header>
+
+<main class="app">
+
+  <!-- Left: step panel -->
+  <aside class="panel" id="panel">
+
+    <ol class="steps" id="steps">
+      <li class="step" data-step="upload">1. Upload Image</li>
+      <li class="step" data-step="calibrate">2. Calibrate Scale</li>
+      <li class="step" data-step="roi">3. Select Measurement Area</li>
+      <li class="step" data-step="orientation">4. Select Orientation</li>
+      <li class="step" data-step="analyze">5. Analyze</li>
+      <li class="step" data-step="results">6. Results</li>
+    </ol>
+
+    <!-- Step 1: Upload -->
+    <section class="step-panel" data-panel="upload">
+      <h2>Upload a textile photo</h2>
+      <p class="hint">JPG, PNG, or WEBP. Max 15&nbsp;MB. Photograph the fabric flat and in focus, with a ruler or object of known size visible if possible.</p>
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <span id="dropzoneLabel">Click to choose a file, or drag one here</span>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+      </label>
+      <p class="error" id="uploadError" hidden></p>
+    </section>
+
+    <!-- Step 2: Calibrate -->
+    <section class="step-panel" data-panel="calibrate" hidden>
+      <h2>Calibrate scale</h2>
+      <p class="hint">Click two points on the image that span a <strong>known physical distance</strong> (e.g. two marks on a ruler).</p>
+      <p class="status" id="calStatus">Click the first point.</p>
+      <div class="field-row">
+        <label for="knownDistance">Known distance</label>
+        <input type="number" id="knownDistance" min="0" step="any" placeholder="e.g. 50">
+        <select id="unitSelect">
+          <option value="mm">mm</option>
+          <option value="cm" selected>cm</option>
+          <option value="in">in</option>
+        </select>
+      </div>
+      <p class="hint" id="ppmPreview"></p>
+      <div class="button-row">
+        <button id="calRedo" class="btn btn--secondary" type="button">Redo Points</button>
+        <button id="calConfirm" class="btn" type="button" disabled>Confirm Calibration</button>
+      </div>
+      <p class="error" id="calError" hidden></p>
+    </section>
+
+    <!-- Step 3: ROI -->
+    <section class="step-panel" data-panel="roi" hidden>
+      <h2>Select measurement area</h2>
+      <p class="hint">Click and drag a rectangle over a clean, flat, representative part of the textile. Drag the handles to adjust it.</p>
+      <p class="status" id="roiStatus">Draw a rectangle on the image.</p>
+      <div class="button-row">
+        <button id="roiClear" class="btn btn--secondary" type="button">Clear</button>
+        <button id="roiConfirm" class="btn" type="button" disabled>Confirm Area</button>
+      </div>
+    </section>
+
+    <!-- Step 4: Orientation -->
+    <section class="step-panel" data-panel="orientation" hidden>
+      <h2>Wale orientation</h2>
+      <p class="hint">Wales are the vertical columns of stitches formed by the knitting direction. In this photo, do wales run vertically or horizontally?</p>
+      <div class="radio-row">
+        <label class="radio-option">
+          <input type="radio" name="orientation" value="vertical" checked>
+          <span>Wales run <strong>vertically</strong> ↕ (courses run horizontally)</span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="orientation" value="horizontal">
+          <span>Wales run <strong>horizontally</strong> ↔ (courses run vertically)</span>
+        </label>
+      </div>
+      <div class="button-row">
+        <button id="orientationConfirm" class="btn" type="button">Continue</button>
+      </div>
+    </section>
+
+    <!-- Step 5: Analyze -->
+    <section class="step-panel" data-panel="analyze" hidden>
+      <h2>Ready to analyze</h2>
+      <ul class="summary" id="analyzeSummary"></ul>
+      <div class="button-row">
+        <button id="analyzeBack" class="btn btn--secondary" type="button">Back</button>
+        <button id="analyzeBtn" class="btn" type="button">Analyze</button>
+      </div>
+      <p class="status" id="analyzeStatus" hidden></p>
+      <p class="error" id="analyzeError" hidden></p>
+    </section>
+
+    <!-- Step 6: Results -->
+    <section class="step-panel" data-panel="results" hidden>
+      <h2>Results</h2>
+      <div class="results-grid" id="resultsGrid"></div>
+      <div id="resultsWarning" class="warning" hidden></div>
+      <div class="button-row">
+        <button id="resetBtn" class="btn" type="button">Reset / Analyze Another Image</button>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- Right: image viewer -->
+  <section class="viewer" id="viewer">
+    <div class="viewer__empty" id="viewerEmpty">No image loaded yet</div>
+    <div class="viewer__stage" id="stage" hidden>
+      <img id="sourceImage" alt="Uploaded textile" draggable="false">
+      <canvas id="overlay"></canvas>
+    </div>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

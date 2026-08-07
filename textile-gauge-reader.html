@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Textile Gauge Reader (Experimental) — Eva Maskalenko</title>
+<meta name="description" content="Experimental computer-vision lab tool for estimating knitted-textile gauge (wales/courses per inch) from a photograph.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="textile-gauge-reader.css">
+</head>
+<body>
+
+<header class="tgr-topbar">
+  <a href="index.html" class="tgr-topbar__back">&larr; Portfolio</a>
+  <span class="tgr-topbar__tag">Experimental &middot; Unlisted &middot; V0</span>
+</header>
+
+<div class="tgr-intro">
+  <p class="tgr-intro__eyebrow">Computer-Vision Lab</p>
+  <h1 class="tgr-intro__title">AI Textile Gauge Reader</h1>
+  <p class="tgr-intro__desc">
+    An experimental tool for estimating knitted-textile gauge — wales and courses per inch —
+    from a single photograph. This version (V0) uses only traditional computer vision
+    (local contrast normalization, edge/texture enhancement, 1D signal projection,
+    autocorrelation, and peak detection) &mdash; no AI/ML model. It is not linked from the
+    main portfolio; you're seeing it because you have the direct URL.
+  </p>
+  <div class="tgr-service-status" id="serviceStatus">
+    <span class="tgr-service-status__dot" id="serviceStatusDot"></span>
+    <span id="serviceStatusText">Checking analysis service&hellip;</span>
+    <button type="button" id="serviceStatusRetry" class="tgr-link-btn" hidden>Retry</button>
+  </div>
+</div>
+
+<main class="tgr-app">
+
+  <!-- Left: step panel -->
+  <aside class="tgr-panel" id="panel">
+
+    <ol class="tgr-steps" id="steps">
+      <li class="tgr-step" data-step="upload">1. Upload Image</li>
+      <li class="tgr-step" data-step="calibrate">2. Calibrate Scale</li>
+      <li class="tgr-step" data-step="roi">3. Select Measurement Area</li>
+      <li class="tgr-step" data-step="orientation">4. Select Orientation</li>
+      <li class="tgr-step" data-step="analyze">5. Analyze</li>
+      <li class="tgr-step" data-step="results">6. Results</li>
+    </ol>
+
+    <!-- Step 1: Upload -->
+    <section class="tgr-step-panel" data-panel="upload">
+      <h2>Upload a textile photo</h2>
+      <p class="tgr-hint">JPG, PNG, or WEBP. Max 15&nbsp;MB. Photograph the fabric flat and in focus, with a ruler or object of known size visible if possible.</p>
+      <label class="tgr-dropzone" id="dropzone" for="fileInput">
+        <span id="dropzoneLabel">Click to choose a file, or drag one here</span>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+      </label>
+      <p class="tgr-error" id="uploadError" hidden></p>
+    </section>
+
+    <!-- Step 2: Calibrate -->
+    <section class="tgr-step-panel" data-panel="calibrate" hidden>
+      <h2>Calibrate scale</h2>
+      <p class="tgr-hint">Click two points on the image that span a <strong>known physical distance</strong> (e.g. two marks on a ruler).</p>
+      <p class="tgr-status" id="calStatus">Click the first point.</p>
+      <div class="tgr-field-row">
+        <label for="knownDistance">Known distance</label>
+        <input type="number" id="knownDistance" min="0" step="any" placeholder="e.g. 50">
+        <select id="unitSelect">
+          <option value="mm">mm</option>
+          <option value="cm" selected>cm</option>
+          <option value="in">in</option>
+        </select>
+      </div>
+      <p class="tgr-hint" id="ppmPreview"></p>
+      <div class="tgr-button-row">
+        <button id="calRedo" class="tgr-btn tgr-btn--secondary" type="button">Redo Points</button>
+        <button id="calConfirm" class="tgr-btn" type="button" disabled>Confirm Calibration</button>
+      </div>
+      <p class="tgr-error" id="calError" hidden></p>
+    </section>
+
+    <!-- Step 3: ROI -->
+    <section class="tgr-step-panel" data-panel="roi" hidden>
+      <h2>Select measurement area</h2>
+      <p class="tgr-hint">Click and drag a rectangle over a clean, flat, representative part of the textile. Drag the handles to adjust it.</p>
+      <p class="tgr-status" id="roiStatus">Draw a rectangle on the image.</p>
+      <div class="tgr-button-row">
+        <button id="roiClear" class="tgr-btn tgr-btn--secondary" type="button">Clear</button>
+        <button id="roiConfirm" class="tgr-btn" type="button" disabled>Confirm Area</button>
+      </div>
+    </section>
+
+    <!-- Step 4: Orientation -->
+    <section class="tgr-step-panel" data-panel="orientation" hidden>
+      <h2>Wale orientation</h2>
+      <p class="tgr-hint">Wales are the vertical columns of stitches formed by the knitting direction. In this photo, do wales run vertically or horizontally?</p>
+      <div class="tgr-radio-row">
+        <label class="tgr-radio-option">
+          <input type="radio" name="orientation" value="vertical" checked>
+          <span>Wales run <strong>vertically</strong> ↕ (courses run horizontally)</span>
+        </label>
+        <label class="tgr-radio-option">
+          <input type="radio" name="orientation" value="horizontal">
+          <span>Wales run <strong>horizontally</strong> ↔ (courses run vertically)</span>
+        </label>
+      </div>
+      <div class="tgr-button-row">
+        <button id="orientationConfirm" class="tgr-btn" type="button">Continue</button>
+      </div>
+    </section>
+
+    <!-- Step 5: Analyze -->
+    <section class="tgr-step-panel" data-panel="analyze" hidden>
+      <h2>Ready to analyze</h2>
+      <ul class="tgr-summary" id="analyzeSummary"></ul>
+      <div class="tgr-button-row">
+        <button id="analyzeBack" class="tgr-btn tgr-btn--secondary" type="button">Back</button>
+        <button id="analyzeBtn" class="tgr-btn" type="button">Analyze</button>
+      </div>
+      <p class="tgr-status" id="analyzeStatus" hidden></p>
+      <p class="tgr-error" id="analyzeError" hidden></p>
+    </section>
+
+    <!-- Step 6: Results -->
+    <section class="tgr-step-panel" data-panel="results" hidden>
+      <h2>Results</h2>
+      <div class="tgr-results-grid" id="resultsGrid"></div>
+      <div id="resultsWarning" class="tgr-warning" hidden></div>
+
+      <label class="tgr-checkbox-option tgr-show-centers-toggle">
+        <input type="checkbox" id="showLoopCentersCheck">
+        <span>Show loop centers (debug)</span>
+      </label>
+
+      <details class="tgr-debug-panel" id="detectionDetailsPanel">
+        <summary>Detection Details</summary>
+        <p class="tgr-hint">
+          What the detector actually locked onto for each axis: every harmonic
+          period candidate it considered (typically half / full / double the raw
+          edge-signal estimate) and why the final one was picked. A "corrected"
+          reason means the raw estimate looked like it was following a sub-loop
+          feature (e.g. one leg of a V) or a doubled repeat, and loop-center
+          evidence was used to fix it — use "Show loop centers" above to check
+          that visually against the actual knit structure.
+        </p>
+        <div id="detectionDetailsContent"></div>
+      </details>
+
+      <div class="tgr-verify" id="verifySection">
+        <h3 class="tgr-verify__title">Verify Measurement</h3>
+        <p class="tgr-hint">
+          Optional: record the true gauge for this sample. This builds a labeled
+          dataset for evaluating the algorithm later — it does <strong>not</strong>
+          change the algorithm automatically.
+        </p>
+
+        <div class="tgr-verify__predicted" id="verifyPredictedSummary"></div>
+
+        <div class="tgr-field-row">
+          <label for="actualWpi">Actual wales / inch</label>
+          <input type="number" id="actualWpi" min="0" step="any" placeholder="e.g. 8.0">
+        </div>
+        <div class="tgr-field-row">
+          <label for="actualCpi">Actual courses / inch</label>
+          <input type="number" id="actualCpi" min="0" step="any" placeholder="e.g. 6.0">
+        </div>
+
+        <details class="tgr-verify__roi-count">
+          <summary>Or count stitches in the selected area instead</summary>
+          <div class="tgr-field-row">
+            <label for="actualWaleCount">Actual wale count in ROI</label>
+            <input type="number" id="actualWaleCount" min="0" step="1" placeholder="e.g. 46">
+          </div>
+          <div class="tgr-field-row">
+            <label for="actualCourseCount">Actual course count in ROI</label>
+            <input type="number" id="actualCourseCount" min="0" step="1" placeholder="e.g. 50">
+          </div>
+          <p class="tgr-hint" id="roiCountHint"></p>
+        </details>
+
+        <div class="tgr-checkbox-row">
+          <label class="tgr-checkbox-option">
+            <input type="checkbox" id="calCorrectCheck" checked>
+            <span>Scale calibration is correct</span>
+          </label>
+          <label class="tgr-checkbox-option">
+            <input type="checkbox" id="orientationCorrectCheck" checked>
+            <span>Wale/course orientation is correct</span>
+          </label>
+          <label class="tgr-checkbox-option">
+            <input type="checkbox" id="saveImageCheck">
+            <span>Save image for algorithm development</span>
+          </label>
+        </div>
+
+        <div class="tgr-button-row">
+          <button id="saveCorrectionBtn" class="tgr-btn" type="button" disabled>Save Correction</button>
+        </div>
+        <p class="tgr-status" id="correctionStatus" hidden></p>
+        <p class="tgr-error" id="correctionError" hidden></p>
+
+        <div class="tgr-comparison" id="correctionComparison" hidden></div>
+      </div>
+
+      <div class="tgr-button-row">
+        <button id="resetBtn" class="tgr-btn" type="button">Reset / Analyze Another Image</button>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- Right: image viewer -->
+  <section class="tgr-viewer" id="viewer">
+    <div class="tgr-viewer__empty" id="viewerEmpty">No image loaded yet</div>
+    <div class="tgr-viewer__stage" id="stage" hidden>
+      <img id="sourceImage" alt="Uploaded textile" draggable="false">
+      <canvas id="overlay"></canvas>
+    </div>
+  </section>
+
+</main>
+
+<footer class="tgr-footer">
+  <p>V0 &middot; traditional computer vision only, no AI/ML model &middot; images are processed in memory and never stored &middot; not indexed, not linked from the main site</p>
+  <p id="correctionExportRow" class="tgr-footer__export" hidden>
+    Ground-truth correction data:
+    <a id="exportCsvLink" href="#" target="_blank" rel="noopener">Export CSV</a>
+    &middot;
+    <a id="exportJsonLink" href="#" target="_blank" rel="noopener">Export JSON</a>
+  </p>
+</footer>
+
+<script src="textile-gauge-reader.js"></script>
+</body>
+</html>
