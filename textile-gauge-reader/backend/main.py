@@ -1,8 +1,14 @@
 """
-FastAPI application: serves the static frontend and exposes the
-/analyze API. All actual image-processing logic lives in the
+FastAPI application: exposes the /analyze API (and, for local
+full-stack development, also serves the bundled static frontend in
+../frontend). All actual image-processing logic lives in the
 `analysis` package — this file only handles HTTP concerns (validation,
 request parsing, translating results to JSON).
+
+In production this backend is deployed standalone (e.g. on Render) and
+called from a separately-hosted static frontend (the portfolio site),
+so CORS is configurable via the ALLOWED_ORIGINS environment variable —
+see the module-level comment below.
 
 Uploaded images are processed entirely in memory and are never written
 to disk.
@@ -10,9 +16,10 @@ to disk.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from analysis import analyze_gauge
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
 
-from .image_io import ImageValidationError, decode_image, validate_upload
+from .image_io import MAX_UPLOAD_BYTES, ImageValidationError, decode_image, validate_upload
 from .schemas import (
     MM_PER_INCH,
     UNIT_TO_MM,
@@ -43,19 +50,54 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Permissive CORS for local development (frontend is served from the same
-# origin in normal use, but this keeps `uvicorn --reload` + separate dev
-# servers convenient without any auth surface to worry about).
+# --- CORS -----------------------------------------------------------
+# ALLOWED_ORIGINS is a comma-separated list of origins allowed to call
+# this API from the browser, e.g.:
+#   ALLOWED_ORIGINS=https://evamaskalenko.com,https://eva-maskalenko.netlify.app
+# Defaults to "*" (any origin) so local development and first deploys
+# work out of the box. There are no cookies/credentials involved, so a
+# wildcard is safe here — tighten it once the frontend's real domain is
+# known by setting the env var on Render.
+_origins_env = os.environ.get("ALLOWED_ORIGINS", "*").strip()
+_allow_origins = ["*"] if _origins_env == "*" else [o.strip() for o in _origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- Request size guard ------------------------------------------------
+# Belt-and-suspenders alongside the in-route upload-size validation:
+# reject oversized requests by Content-Length before we spend any effort
+# parsing the multipart body.
+_MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 1024 * 1024  # allow ~1MB of multipart/form overhead
+
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > _MAX_REQUEST_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"success": False, "message": "Request body is too large."},
+                )
+        except ValueError:
+            pass
+    return await call_next(request)
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok"}
+
 
 @app.get("/api/health")
-def health() -> dict:
+def health_legacy() -> dict:
+    """Kept for backward compatibility with the original local-dev frontend."""
     return {"status": "ok"}
 
 
@@ -192,8 +234,14 @@ async def analyze(
     return JSONResponse(status_code=200, content=response.model_dump())
 
 
-# --- Static frontend ----------------------------------------------------
-# Mounted last / at the root so it acts as a catch-all without shadowing
-# the API routes registered above (Starlette matches routes in the order
-# they were added).
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+# --- Static frontend (local full-stack dev only) -----------------------
+# The production frontend is the standalone page on the portfolio site
+# (textile-gauge-reader.html + .css + .js at the repo root), which calls
+# this API cross-origin. This mount just keeps `uvicorn backend.main:app`
+# useful for local development without a separate static server. Mounted
+# last / at the root so it acts as a catch-all without shadowing the API
+# routes registered above (Starlette matches routes in the order they
+# were added). Guarded in case a deployment doesn't include the
+# frontend/ directory.
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

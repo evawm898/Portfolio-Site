@@ -302,6 +302,12 @@ input[type="number"]:focus, select:focus {
   max-height: calc(100vh - 120px);
   line-height: 0;
 }
+.viewer__stage[hidden] {
+  /* The [hidden] attribute selector and .viewer__stage class selector have
+     equal specificity, so without this the class rule above (added later
+     in the cascade) would win and defeat `hidden`. */
+  display: none;
+}
 .viewer__stage img {
   max-width: 100%;
   max-height: calc(100vh - 120px);
