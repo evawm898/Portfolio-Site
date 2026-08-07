@@ -235,9 +235,9 @@
   <section id="textile-circuit-construction" class="lab-section" data-lab-section>
     <div class="section-label">
       <span class="section-label__number">#textile-circuit-construction</span>
-      <h2 class="section-label__title">Four Ways to Build a Textile Circuit</h2>
+      <h2 class="section-label__title">Three Ways to Build a Textile Circuit</h2>
     </div>
-    <p class="lab-section__desc">Four approaches to putting a conductive pathway into fabric, each starting from the same plain swatch with a connection point on either side. Plays once on scroll into view &mdash; hover a swatch to replay it. (Two more &mdash; conductive printed ink and laminated flexible trace &mdash; get their own closer look below.)</p>
+    <p class="lab-section__desc">Three approaches to putting a conductive pathway into fabric, each starting from the same plain swatch with a connection point on either side. Plays once on scroll into view &mdash; hover a swatch to replay it. (Three more &mdash; conductive printed ink, laminated flexible trace, and embedded wire &mdash; get their own closer look below.)</p>
 
     <div class="circuit-grid" data-circuit-grid>
 
@@ -263,14 +263,6 @@
         <div class="circuit-panel__label" data-circuit-label>Sewn conductive trace</div>
         <div class="circuit-panel__sublabel">Conductive thread is stitched through the textile</div>
         <div class="circuit-panel__caption">Needle penetrates &rarr; thread loops through &rarr; stitched pathway grows</div>
-      </div>
-
-      <div class="circuit-panel" data-circuit="embedded-wire">
-        <span class="circuit-panel__index">04</span>
-        <div class="circuit-panel__stage" data-circuit-stage></div>
-        <div class="circuit-panel__label" data-circuit-label>Embedded wire</div>
-        <div class="circuit-panel__sublabel">An insulated wire is routed through the textile</div>
-        <div class="circuit-panel__caption">Channel opens &rarr; wire feeds through &rarr; textile encloses it</div>
       </div>
 
     </div>
@@ -321,6 +313,29 @@
     <div class="lamtrace-showcase">
       <div class="lamtrace-showcase__stage" data-lamtrace-stage></div>
       <div class="lamtrace-showcase__caption">Fabric &rarr; TPU &rarr; conductive traces &rarr; TPU &rarr; heat press</div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       COMPONENT: Embedded Wire
+       slug: embedded-wire
+
+       Split out from the grid above into its own standalone showcase,
+       for the same reason printed ink and laminated flexible trace
+       were: this pathway needs room for a held side view AND a full
+       90deg pivot to look straight through the tunnel, which a tile
+       sized the same as its three remaining siblings couldn't fit.
+  ============================================================= -->
+  <section id="embedded-wire" class="lab-section" data-lab-section>
+    <div class="section-label">
+      <span class="section-label__number">#embedded-wire</span>
+      <h2 class="section-label__title">Embedded Wire</h2>
+    </div>
+    <p class="lab-section__desc">A closer look at the fourth approach: an insulated wire is routed through a raised textile channel formed directly from the fabric. Plays once on scroll into view &mdash; hover to replay it.</p>
+
+    <div class="embeddedWire-showcase">
+      <div class="embeddedWire-showcase__stage" data-embeddedwire-stage></div>
+      <div class="embeddedWire-showcase__caption">An insulated wire is routed through a raised textile channel.</div>
     </div>
   </section>
 
@@ -1368,39 +1383,74 @@
     };
   }
 
+  /* ============================================================
+     EDIT EMBEDDED WIRE / TUNNEL CONFIGURATION HERE
+     ------------------------------------------------------------
+     The tunnel's shape, the two slit openings, the wire's diameter,
+     and both camera angles all derive from this one object -- change
+     a value here rather than hunting for coordinates elsewhere.
+     Changing SLIT_SPACING moves both slits, the tunnel's span, and
+     the wire's tunnel-crossing path together automatically.
+  ============================================================= */
+  var EMBEDDED_WIRE_CONFIG = {
+    SLIT_LENGTH: 26,              // vertical extent of each slit opening
+    SLIT_SPACING: 92,             // distance between the two slit centers
+    SLIT_WIDTH: 3,                // visual gap width of each cut, fully open
+    TUNNEL_HEIGHT: 34,            // peak dome height above the fabric plane
+    TUNNEL_WIDTH: 30,             // arch cross-section span, edge to edge
+    WIRE_DIAMETER: 4,
+    SIDE_VIEW_ANGLE: 50,          // X-axis tilt used for both the side and through-tunnel views
+    // Y-axis pivot magnitude for the through-tunnel view. Kept short of a
+    // mathematically exact 90deg on purpose: verified directly (isolated
+    // test cases, nothing app-specific) that this rendering engine paints
+    // an EXACTLY edge-on rotateY(90deg) plane as literally nothing -- not
+    // a hairline, not even a round-cap dot, fully skipped -- and that the
+    // margin stays extremely thin all the way to 89deg. 83deg is still
+    // functionally "straight through the tunnel" (the camera's line of
+    // sight is within 7deg of dead-parallel to the tunnel axis, which
+    // reads as looking through it, not across it) while landing well
+    // clear of that cliff, so the opening, the wire and the far mouth all
+    // render with real, legible size instead of a near-invisible sliver.
+    THROUGH_TUNNEL_YAW: 83
+  };
+
   // =====================================================================
-  // Embedded wire -- self-contained animation module.
+  // Embedded wire / embedded trace -- self-contained animation module,
+  // built fresh. Shares no code, transform, DOM element, or animation
+  // state with any earlier version of this module or with the printed-
+  // ink/laminated-trace pathways elsewhere on this page.
   //
-  // Separate from printed ink's module: doesn't call any of ink's local
-  // helpers, doesn't share any DOM/CSS class with it. Everything this
-  // needs is defined inside buildEmbeddedWire itself.
+  // Concept: two slits are cut into a fabric swatch; the fabric between
+  // them is lifted into a smooth domed tunnel; a wire threads through
+  // the left slit, along the tunnel's interior, and out the right slit.
   //
-  // Concept: a fabric swatch with two vertical slits cut into it, and a
-  // raised, translucent tunnel spanning the space between them. A wire
-  // travels in a straight line from a pad on the left, through the left
-  // slit, the length of the tunnel, out the right slit, to a pad on the
-  // right.
+  // Tunnel geometry: the dome is approximated by TUNNEL_RIB_COUNT flat
+  // "rib" faces fanned out around a shared hinge line (the tunnel's own
+  // centerline, at the fabric's surface). Each rib's *pre-fold* shape is
+  // flat and 2D -- a band whose far edge follows a sine bump along the
+  // tunnel's length (zero at both slits, maximum at the midpoint) -- and
+  // is then folded to a fixed angle via a static rotateX (see
+  // buildRibFold, which solves for the exact fold angle and band length
+  // that lands each rib's peak exactly on the TUNNEL_WIDTH/TUNNEL_HEIGHT
+  // ellipse). No rib ever moves independently once built; only the
+  // shared bump-scale (while the tunnel is rising) and shared opacity
+  // (while the camera is in profile) change per frame, applied
+  // identically to every rib.
   //
-  // Camera: three flat faces -- the fabric/wire base, the tunnel's top
-  // surface, and the tunnel's near-side wall -- share exactly one
-  // rotating parent (`scene`). Each face's own position relative to
-  // `scene` is a fixed, unchanging transform (a translateZ lift for the
-  // tunnel top, a translateZ+rotateX(90deg) fold for the tunnel wall);
-  // the only thing that ever changes over time is `scene`'s own
-  // rotateX/rotateY, written directly every requestAnimationFrame tick.
-  // Since every face's position is fixed relative to that one shared
-  // ancestor, they rotate together by construction -- there's no
-  // mechanism by which one could drift relative to another, because
-  // none of them has its own independent rotation to drift with.
-  //
-  // The sequence is four explicit, sequential rAF-driven phases (tilt
-  // around world X to a side view, rotate 45deg further around world Y,
-  // hold, then reverse the same two phases in the same order) rather
-  // than one blended diagonal move -- matching "rotate around X... then
-  // continue rotating around Y" as two distinct, readable stages. Each
-  // phase is its own small rAF loop over a single rotating number
-  // (reusing one generic animateValue helper); nothing is ever handed
-  // to a CSS `transition`.
+  // Camera: cameraTiltX (X-axis) and cameraYawY (Y-axis) are two
+  // explicit, independent numbers written to one shared `scene` every
+  // frame via requestAnimationFrame -- never a CSS transition, never
+  // rotateZ. `scene.style.transform` is always
+  // 'rotateY(cameraYawY) rotateX(cameraTiltX)': the X tilt is the inner
+  // (rightmost) transform, applied first and left untouched by whatever
+  // the Y yaw does afterward, which is what lets the yaw hold "the same
+  // side-view tilt" constant while sweeping horizontally -- and, because
+  // rotateX never changes a point's own X coordinate, a pure Y yaw of
+  // 90deg on this geometry reliably reorients the tunnel's own length
+  // axis (world X) to point straight along the view direction, which is
+  // exactly "look through the tunnel." Fabric, ribs, and wire are all
+  // children of this one `scene` -- there is no second pivot, and
+  // nothing is ever rotated independently of it.
   function buildEmbeddedWire(stage) {
     var SVG_NS = 'http://www.w3.org/2000/svg';
     function el(tag, attrs) {
@@ -1408,280 +1458,380 @@
       for (var k in attrs) e.setAttribute(k, attrs[k]);
       return e;
     }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function clamp01(t) { return Math.max(0, Math.min(1, t)); }
     function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+    function phaseT(p, range) { return clamp01((p - range[0]) / (range[1] - range[0])); }
+    function bumpX(t) { return Math.sin(Math.PI * clamp01(t)); }
 
-    // ---- geometry: 240x140 canvas, swatch centered within it so the
-    // scene's default rotation pivot (its own center) lands on the
-    // tunnel, not some off-center part of the stage ----
+    var CFG = EMBEDDED_WIRE_CONFIG;
+
+    // ---- geometry: same 240x140 canvas as every other panel ----
     var SW = { x: 20, y: 30, w: 200, h: 80 };
-    var midY = SW.y + SW.h / 2; // 70
-    var padL = SW.x + 4, padR = SW.x + SW.w - 4; // 24, 216
+    var midX = SW.x + SW.w / 2;
+    var midY = SW.y + SW.h / 2;
 
-    // The wire's own visible length at each slit determines the slit's
-    // length -- per spec, each slit is exactly double that.
-    var WIRE_VIS_LEN = 10;
-    var SLIT_LEN = WIRE_VIS_LEN * 2; // 20
+    var X_leftSlit = midX - CFG.SLIT_SPACING / 2;
+    var X_rightSlit = midX + CFG.SLIT_SPACING / 2;
+    var WIRE_LEAD = 20;
+    var X_wireStart = X_leftSlit - WIRE_LEAD;
+    var X_wireEnd = X_rightSlit + WIRE_LEAD;
 
-    // Tunnel: spans between the two slits. TUNNEL_HALF_W is its
-    // footprint half-width on the fabric (and therefore its cross-
-    // section depth once tilted); TUNNEL_H is how far it's raised above
-    // the fabric (translateZ, in px).
-    var leftSlitX = SW.x + 50, rightSlitX = SW.x + SW.w - 50; // 70, 170
-    var TUNNEL_HALF_W = 11;
-    var TUNNEL_H = 18;
+    // Solves for the CSS rotateX fold angle (phiDeg) and the rib's own
+    // pre-fold band length (peakLen) that, once folded, land the rib's
+    // outer edge exactly on the TUNNEL_WIDTH/TUNNEL_HEIGHT ellipse at
+    // eccentric angle thetaDeg. A single rotateX fold traces a straight
+    // radial line, not an ellipse, so phiDeg generally isn't thetaDeg
+    // itself -- this is the standard eccentric-angle correction that
+    // makes it land on the right point anyway.
+    function solveRibFold(thetaDeg, halfWidth, height) {
+      var theta = thetaDeg * Math.PI / 180;
+      var targetY = halfWidth * Math.cos(theta);
+      var targetZ = height * Math.sin(theta);
+      // Negated: a positive rotateX on this face folds the band's local
+      // "up" (the bump toward smaller SVG y) away from the viewer, behind
+      // the opaque fabric plane -- confirmed empirically (an unnegated
+      // fold rendered the whole dome invisible, fully occluded, at every
+      // nonzero angle). Negating phi folds it toward the viewer instead,
+      // in front of the fabric, which is the raised side we want.
+      var phiRad = Math.atan2(-targetZ, targetY);
+      var peakLen = Math.sqrt(targetY * targetY + targetZ * targetZ);
+      return { phiDeg: phiRad * 180 / Math.PI, peakLen: peakLen };
+    }
 
-    // ---- DOM: one stage > one 3D scene > three faces, all fixed
-    // relative to that one scene. ----
+    var TUNNEL_RIB_COUNT = 7;
+    var ribDefs = [];
+    for (var ri = 0; ri < TUNNEL_RIB_COUNT; ri++) {
+      var thetaDeg = (ri + 0.5) * (180 / TUNNEL_RIB_COUNT);
+      ribDefs.push(solveRibFold(thetaDeg, CFG.TUNNEL_WIDTH / 2, CFG.TUNNEL_HEIGHT));
+    }
+    // Two fixed length-samples, just inside each slit -- the two tunnel
+    // mouths the through-tunnel view needs a visible ring at.
+    var RING_STATION_TS = [0.14, 0.86];
+
+    // ---- DOM: one stage > one rotating scene > fabric face, N rib
+    // faces, and one wire face. No face ever carries the scene's own
+    // rotation -- every face's transform is either absent (fabric, at
+    // the base plane) or a fixed, one-time value (each rib's fold, the
+    // wire's small constant lift). ----
     var stageEl = document.createElement('div');
-    stageEl.className = 'wire3d-stage';
+    stageEl.className = 'embeddedWire-stage';
     var scene = document.createElement('div');
-    scene.className = 'wire3d-scene';
-
-    var baseFace = document.createElement('div');
-    baseFace.className = 'wire3d-face wire3d-face--flat';
-    var baseSvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    baseFace.appendChild(baseSvg);
-
-    var topFace = document.createElement('div');
-    topFace.className = 'wire3d-face wire3d-face--flat';
-    topFace.style.transform = 'translateZ(' + TUNNEL_H + 'px)';
-    var topSvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    topFace.appendChild(topSvg);
-
-    // The front wall's fold hinge sits at the tunnel's near edge
-    // (midY + TUNNEL_HALF_W) expressed as a percentage down the shared
-    // 140-tall canvas -- that's the line where this wall meets the
-    // fabric. translateZ before rotateX (not after) is required: applied
-    // after, it would push along the face's own already-rotated local Z
-    // axis instead of the shared pre-rotation space, and the wall would
-    // end up in the wrong place (this exact ordering mistake, and why it
-    // matters, is documented at length in printed ink's git history).
-    var hingeY = midY + TUNNEL_HALF_W; // 81
-    var hingePct = (hingeY / 140 * 100).toFixed(2) + '%';
-    var frontFace = document.createElement('div');
-    frontFace.className = 'wire3d-face wire3d-face--front';
-    frontFace.style.transformOrigin = '50% ' + hingePct;
-    frontFace.style.transform = 'translateZ(3px) rotateX(90deg)';
-    // Same shared 0 0 240 140 frame as the other two faces (no separate
-    // viewBox/letterboxing here) -- the wall's own rect is placed
-    // directly in that frame below, flush against the hinge line with
-    // nothing straddling it (see note at the rect itself for why that
-    // matters).
-    var frontSvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    frontFace.appendChild(frontSvg);
-
-    scene.appendChild(baseFace);
-    scene.appendChild(topFace);
-    scene.appendChild(frontFace);
+    scene.className = 'embeddedWire-scene embeddedWire-camera';
     stageEl.appendChild(scene);
     stage.appendChild(stageEl);
 
-    // ---- base face: fabric, two slits, two pads, the wire's full path ----
-    var camera = el('g', {});
-    camera.style.transformBox = 'fill-box';
-    camera.style.transformOrigin = 'center';
-    baseSvg.appendChild(camera);
+    function makeFace(extraClass) {
+      var face = document.createElement('div');
+      face.className = 'embeddedWire-face' + (extraClass ? ' ' + extraClass : '');
+      var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+      face.appendChild(svg);
+      scene.appendChild(face);
+      return { face: face, svg: svg };
+    }
 
-    camera.appendChild(el('rect', {
+    // ---- 1. fabric -- fixed forever: position, scale and orientation
+    // never change. Holds the two slit openings too, since they're cuts
+    // in this same flat plane, not raised geometry of their own. ----
+    var fabric = makeFace();
+    var fabricG = el('g', { class: 'embeddedWire-fabric' });
+    fabricG.appendChild(el('rect', {
       x: SW.x, y: SW.y, width: SW.w, height: SW.h, rx: 3,
       fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5
     }));
-
-    var weave = el('g', { opacity: 0.5 });
+    var weave = el('g', { opacity: 0.55 });
     [46, 62, 78, 94].forEach(function (y) {
       weave.appendChild(el('line', { x1: SW.x, y1: y, x2: SW.x + SW.w, y2: y, stroke: 'var(--line)', 'stroke-width': 0.75 }));
     });
     [40, 60, 80, 100, 120, 140, 160, 180, 200].forEach(function (x) {
       weave.appendChild(el('line', { x1: x, y1: SW.y, x2: x, y2: SW.y + SW.h, stroke: 'var(--line)', 'stroke-width': 0.75 }));
     });
-    camera.appendChild(weave);
+    fabricG.appendChild(weave);
+    fabric.svg.appendChild(fabricG);
 
-    // slits: vertical cuts, fill matching the page background so they
-    // read as gaps rather than solid marks
-    [leftSlitX, rightSlitX].forEach(function (sx) {
-      camera.appendChild(el('rect', {
-        x: sx - 1.5, y: midY - SLIT_LEN / 2, width: 3, height: SLIT_LEN, rx: 1.5,
-        fill: 'var(--black)', stroke: 'var(--line-strong)', 'stroke-width': 1
-      }));
+    // Slits -- rendered as gaps (fill matches the page background) that
+    // grow from a zero-height sliver at the centerline out to their
+    // full SLIT_LENGTH, reading as a cut opening rather than a printed
+    // line. Left cuts slightly ahead of right, with some overlap.
+    function makeSlit(extraClass) {
+      var r = el('rect', { rx: 1.5, fill: 'var(--black)', stroke: 'var(--line-strong)', 'stroke-width': 1, class: 'embeddedWire-slit ' + extraClass });
+      fabricG.appendChild(r);
+      return r;
+    }
+    var leftSlitEl = makeSlit('embeddedWire-leftSlit');
+    var rightSlitEl = makeSlit('embeddedWire-rightSlit');
+    function renderSlit(rectEl, x, openAmount) {
+      var h = CFG.SLIT_LENGTH * openAmount;
+      rectEl.setAttribute('x', (x - CFG.SLIT_WIDTH / 2).toFixed(2));
+      rectEl.setAttribute('y', (midY - h / 2).toFixed(2));
+      rectEl.setAttribute('width', CFG.SLIT_WIDTH);
+      rectEl.setAttribute('height', h.toFixed(2));
+    }
+
+    // ---- 2. tunnel -- TUNNEL_RIB_COUNT persistent rib faces, each
+    // folded once at build time to its solved angle and never rotated
+    // again individually. Only the shared bump-scale (tunnel rising)
+    // and shared opacity (camera in profile) ever change, applied
+    // identically to all of them every frame. ----
+    var ribs = ribDefs.map(function (def) {
+      var rib = makeFace('embeddedWire-tunnelRib');
+      rib.face.style.transform = 'rotateX(' + def.phiDeg.toFixed(3) + 'deg)';
+      var path = el('path', {
+        d: '', fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1,
+        class: 'embeddedWire-tunnel'
+      });
+      rib.svg.appendChild(path);
+      // Ring marks: one dot, planted at this rib's own already-solved
+      // fold point, at two fixed stations near each mouth of the tunnel.
+      // A long rib's own length runs exactly along the tunnel's axis, so
+      // once the camera yaws 90deg to look straight through that axis,
+      // any THIN shape drawn along or across that rib -- a stroke, a
+      // filled band, the rib itself -- forshortens to exactly zero
+      // rasterizable width and disappears outright (confirmed directly:
+      // even a plain rotateY(90deg) rectangle with no other geometry
+      // renders as nothing at all in this rendering engine, not even a
+      // hairline, unlike 89deg which still shows a visible sliver).
+      // A round dot is the one shape immune to that: it has no "along"
+      // direction to collapse, so seven of them (one per rib, all
+      // sharing that rib's own correct fold) at a single fixed X sample
+      // stay visible through the pivot and outline the tunnel's actual
+      // cross-section -- giving the through-tunnel view a near opening
+      // and a smaller, receding far opening instead of nothing.
+      var ringMarks = RING_STATION_TS.map(function (t) {
+        var mark = el('circle', { r: 2.1, fill: 'var(--petrol-bright)', stroke: 'none', opacity: 0 });
+        rib.svg.appendChild(mark);
+        return { el: mark, t: t };
+      });
+      return { face: rib.face, path: path, peakLen: def.peakLen, ringMarks: ringMarks };
+    });
+    // A couple of short texture strokes on the tallest ribs only (the
+    // ones actually facing the viewer in most states) -- enough to read
+    // as fabric, without needing per-rib weave lines on all seven.
+    var textureRibs = [Math.floor(TUNNEL_RIB_COUNT / 2)];
+    textureRibs.forEach(function (idx) {
+      var t1 = el('path', { d: '', fill: 'none', stroke: 'var(--line)', 'stroke-width': 0.6, opacity: 0.6 });
+      ribs[idx].face.querySelector('svg').appendChild(t1);
+      ribs[idx].texture = t1;
     });
 
-    camera.appendChild(el('circle', { cx: padL, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    camera.appendChild(el('circle', { cx: padR, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-
-    // wire: one straight path, pad to pad, drawn on with the same
-    // stroke-dasharray/dashoffset technique used everywhere else on this
-    // page
-    var wirePathD = 'M' + padL.toFixed(2) + ',' + midY.toFixed(2) + ' L' + padR.toFixed(2) + ',' + midY.toFixed(2);
-    var wireOuter = el('path', { d: wirePathD, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': 6, 'stroke-linecap': 'round' });
-    var wireInner = el('path', { d: wirePathD, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 2.4, 'stroke-linecap': 'round' });
-    camera.appendChild(wireOuter);
-    camera.appendChild(wireInner);
-
-    function primeDraw(path) {
-      var len = path.dataset.len;
-      if (!len) { len = path.getTotalLength(); path.dataset.len = len; }
-      path.style.transition = 'none';
-      path.style.strokeDasharray = len + ' ' + len;
-      path.style.strokeDashoffset = len;
-      path.getBoundingClientRect();
-      path.style.transition = '';
-    }
-    primeDraw(wireOuter);
-    primeDraw(wireInner);
-
-    // ---- tunnel top face: the raised surface, translucent so the wire
-    // reads through it from directly overhead too ----
-    topSvg.appendChild(el('rect', {
-      x: leftSlitX, y: midY - TUNNEL_HALF_W, width: rightSlitX - leftSlitX, height: TUNNEL_HALF_W * 2, rx: 4,
-      fill: 'var(--petrol-bright)', stroke: 'var(--line-strong)', 'stroke-width': 1
-    }));
-    topFace.style.opacity = '0.45';
-
-    // ---- tunnel front wall: the near-side wall, revealed once the
-    // camera tilts toward a side view. Its rect sits flush against the
-    // hinge line (hingeY, the tunnel's near edge) and extends entirely
-    // toward smaller y from there -- it must NOT straddle the hinge:
-    // a rect straddling a fold line gets torn into two pieces that swing
-    // in opposite directions during the fold, which is what produced an
-    // earlier version of this wall rendering as a rectangle floating
-    // detached below the fabric instead of a wall rising from it.
-    var WALL_H = TUNNEL_H;
-    frontSvg.appendChild(el('rect', {
-      x: leftSlitX, y: hingeY - WALL_H, width: rightSlitX - leftSlitX, height: WALL_H, rx: 3,
-      fill: 'var(--petrol-bright)', stroke: 'var(--line-strong)', 'stroke-width': 1
-    }));
-    frontFace.style.opacity = '0.45';
-
-    // ---- timing ----
-    var ZOOM_DUR = 450, ZOOM_GAP = 90, LEAD = ZOOM_DUR + ZOOM_GAP;
-    var passDuration = 1000, cutT = 0.3, slowSpan = 0.4;
-
-    // Four sequential phases: tilt to side view (world X), rotate further
-    // (world Y), hold, then the same two phases reversed in the same
-    // order. REST_RX/REST_RY (defined below) is the settled 3/4-ish
-    // angle the camera holds at.
-    var PHASE_X_DUR = 700, PHASE_Y_DUR = 550;
-    var HOLD = 700;
-    var PHASE_Y_BACK_DUR = 500, PHASE_X_BACK_DUR = 650;
-    var CAMERA_TOTAL = PHASE_X_DUR + PHASE_Y_DUR + HOLD + PHASE_Y_BACK_DUR + PHASE_X_BACK_DUR;
-
-    // REST_RX_CLAMP: explicit ceiling on rotateX, as a backstop against
-    // the ghosting/mirroring behavior documented on .wire3d-face--flat
-    // (see lab.css) -- the flat faces here carry that same
-    // backface-visibility:hidden fix, so this clamp is a belt-and-braces
-    // limit rather than the only thing preventing it. REST_RX itself
-    // sits well under this regardless.
-    //
-    // REST_RX/REST_RY: chosen empirically, not just "X tilt, then 45deg
-    // of Y" taken literally at face value -- a full 74deg X tilt plus a
-    // 45deg Y turn compounds to foreshorten both visible dimensions of
-    // the fabric plane at once, collapsing the whole scene into an
-    // unreadable diagonal sliver under this stage's perspective (tested
-    // directly, screenshots compared side by side). 55/-42 is the
-    // combination that actually reads as "tilted to a side angle, then
-    // turned further" -- fabric, tunnel top, wall and both pads all
-    // stay legible -- while still moving substantially toward both a
-    // side view and a lengthwise view, matching the spirit of the spec.
-    var REST_RX_CLAMP = 82;
-    var REST_RX = 55, REST_RY = -42;
-
-    var rotRaf = null;
-    // One rAF loop animates a single number from `from` to `to` over
-    // `dur`, calling onFrame(value) every tick and onDone() once at the
-    // end -- the shared building block for all four camera phases,
-    // so "the same stages, reversed" really is the same code called with
-    // swapped from/to, not a separately-authored mirror.
-    function animateValue(from, to, dur, onFrame, onDone) {
-      var start = performance.now();
-      if (rotRaf) cancelAnimationFrame(rotRaf);
-      function frame(now) {
-        var raw = Math.max(0, Math.min(1, (now - start) / dur));
-        var k = easeInOutCubic(raw);
-        onFrame(from + (to - from) * k);
-        if (raw < 1) rotRaf = requestAnimationFrame(frame);
-        else if (onDone) onDone();
+    function ribBandD(peakLen, scale) {
+      var n = 20, d = '';
+      for (var i = 0; i <= n; i++) {
+        var t = i / n;
+        var x = lerp(X_leftSlit, X_rightSlit, t);
+        var y = midY - peakLen * scale * bumpX(t);
+        d += (i === 0 ? 'M' : ' L') + x.toFixed(2) + ',' + y.toFixed(2);
       }
-      rotRaf = requestAnimationFrame(frame);
+      d += ' Z';
+      return d;
+    }
+    // A single ring mark's position: this rib's own peak point, in its
+    // own local (pre-fold) plane, at one fixed length-sample t.
+    function spokePoint(peakLen, scale, t) {
+      var x = lerp(X_leftSlit, X_rightSlit, t);
+      var y = midY - peakLen * scale * bumpX(t);
+      return { x: x, y: y };
+    }
+    function renderTunnel(riseAmount, opacity, ringStrength) {
+      ribs.forEach(function (rib) {
+        rib.path.setAttribute('d', ribBandD(rib.peakLen, riseAmount));
+        rib.path.style.opacity = opacity.toFixed(3);
+        if (rib.texture) {
+          rib.texture.setAttribute('d', ribBandD(rib.peakLen * 0.55, riseAmount));
+          rib.texture.style.opacity = (0.6 * opacity).toFixed(3);
+        }
+        // Kept at full strength independent of the walls' 50% opacity --
+        // deliberately, these are the marks that keep the tunnel's own
+        // cross-section legible once the walls fade and the camera has
+        // yawed edge-on to them (see the comment where they're built).
+        rib.ringMarks.forEach(function (mark) {
+          var pt = spokePoint(rib.peakLen, riseAmount, mark.t);
+          mark.el.setAttribute('cx', pt.x.toFixed(2));
+          mark.el.setAttribute('cy', pt.y.toFixed(2));
+          mark.el.style.opacity = (ringStrength * riseAmount).toFixed(3);
+        });
+      });
     }
 
-    var curRX = 0, curRY = 0;
-    function applyRotation() {
-      var rx = Math.min(curRX, REST_RX_CLAMP);
-      scene.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + curRY.toFixed(2) + 'deg)';
+    // ---- 3. wire -- one continuous path, one measurement path driving
+    // both its own reveal and (were it curved) its own tangent. Lifted
+    // a small constant height off the base fabric plane; it never
+    // changes shape, and there is only ever this one wire. ----
+    var wire = makeFace();
+    wire.face.style.transform = 'translateZ(' + CFG.WIRE_DIAMETER.toFixed(2) + 'px)';
+    var WIRE_D = 'M' + X_wireStart.toFixed(2) + ',' + midY.toFixed(2) + ' L' + X_wireEnd.toFixed(2) + ',' + midY.toFixed(2);
+    var wireOuter = el('path', { d: WIRE_D, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': CFG.WIRE_DIAMETER + 2, 'stroke-linecap': 'round', class: 'embeddedWire-wire' });
+    var wireInner = el('path', { d: WIRE_D, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': CFG.WIRE_DIAMETER, 'stroke-linecap': 'round', class: 'embeddedWire-wire' });
+    wire.svg.appendChild(wireOuter);
+    wire.svg.appendChild(wireInner);
+    var wireLen = wireOuter.getTotalLength();
+    function primeDash(p) {
+      p.style.strokeDasharray = wireLen + ' ' + wireLen;
+      p.style.strokeDashoffset = String(wireLen);
     }
+    primeDash(wireOuter);
+    primeDash(wireInner);
+    function renderWire(t) {
+      var offset = wireLen * (1 - clamp01(t));
+      wireOuter.style.strokeDashoffset = String(offset);
+      wireInner.style.strokeDashoffset = String(offset);
+    }
+
+    // ---- timeline: percentages match the spec's own suggested
+    // comprehension beats directly (already normalized 0..1). ----
+    var TOTAL_DURATION = 10800;
+    var PH = {
+      establish:     [0.00, 0.10],
+      slits:         [0.10, 0.18],
+      tunnelRise:    [0.18, 0.28],
+      wireApproach:  [0.28, 0.40],
+      rotateToSide:  [0.40, 0.52],
+      sideHold:      [0.52, 0.60],
+      pivotToTunnel: [0.60, 0.70],
+      throughHold:   [0.70, 0.78],
+      pivotBack:     [0.78, 0.86],
+      rotateToTop:   [0.86, 0.94],
+      finish:        [0.94, 1.00]
+    };
+
+    // wireProgress checkpoints: continuous, always-forward mapping from
+    // the master timeline to wire travel -- flat only before the wire
+    // begins (p < wireApproach start), never flat again after that, so
+    // it keeps moving through every camera phase that follows,
+    // including both pivots and both holds.
+    var WIRE_CHECKPOINTS = [
+      [0.00, 0],
+      [PH.wireApproach[0], 0],
+      [PH.wireApproach[1], 0.18],
+      [PH.rotateToSide[1], 0.32],
+      [PH.sideHold[1], 0.42],
+      [PH.pivotToTunnel[1], 0.55],
+      [PH.throughHold[1], 0.68],
+      [PH.pivotBack[1], 0.80],
+      [PH.rotateToTop[1], 0.92],
+      [1.00, 1.00]
+    ];
+    function computeWireProgress(p) {
+      for (var i = 0; i < WIRE_CHECKPOINTS.length - 1; i++) {
+        var a = WIRE_CHECKPOINTS[i], b = WIRE_CHECKPOINTS[i + 1];
+        if (p <= b[0] || i === WIRE_CHECKPOINTS.length - 2) {
+          var span = b[0] - a[0];
+          var localT = span <= 0 ? 1 : (p - a[0]) / span;
+          return lerp(a[1], b[1], easeInOutCubic(clamp01(localT)));
+        }
+      }
+      return 1;
+    }
+
+    function computeCamera(p) {
+      var tiltX;
+      if (p < PH.rotateToSide[0]) tiltX = 0;
+      else if (p < PH.rotateToSide[1]) tiltX = lerp(0, CFG.SIDE_VIEW_ANGLE, easeInOutCubic(phaseT(p, PH.rotateToSide)));
+      else if (p < PH.rotateToTop[0]) tiltX = CFG.SIDE_VIEW_ANGLE;
+      else if (p < PH.rotateToTop[1]) tiltX = lerp(CFG.SIDE_VIEW_ANGLE, 0, easeInOutCubic(phaseT(p, PH.rotateToTop)));
+      else tiltX = 0;
+
+      var yawY;
+      if (p < PH.pivotToTunnel[0]) yawY = 0;
+      else if (p < PH.pivotToTunnel[1]) yawY = lerp(0, CFG.THROUGH_TUNNEL_YAW, easeInOutCubic(phaseT(p, PH.pivotToTunnel)));
+      else if (p < PH.pivotBack[0]) yawY = CFG.THROUGH_TUNNEL_YAW;
+      else if (p < PH.pivotBack[1]) yawY = lerp(CFG.THROUGH_TUNNEL_YAW, 0, easeInOutCubic(phaseT(p, PH.pivotBack)));
+      else yawY = 0;
+
+      return { tiltX: tiltX, yawY: yawY };
+    }
+
+    function computeTunnelState(p) {
+      var riseAmount;
+      if (p < PH.tunnelRise[0]) riseAmount = 0;
+      else if (p < PH.tunnelRise[1]) riseAmount = easeInOutCubic(phaseT(p, PH.tunnelRise));
+      else riseAmount = 1;
+
+      var opacity;
+      if (p < PH.rotateToSide[0]) opacity = 1;
+      else if (p < PH.rotateToSide[1]) opacity = lerp(1, 0.5, easeInOutCubic(phaseT(p, PH.rotateToSide)));
+      else if (p < PH.rotateToTop[0]) opacity = 0.5;
+      else if (p < PH.rotateToTop[1]) opacity = lerp(0.5, 1, easeInOutCubic(phaseT(p, PH.rotateToTop)));
+      else opacity = 1;
+
+      return { riseAmount: riseAmount, opacity: opacity };
+    }
+
+    function render(p) {
+      var cam = computeCamera(p);
+      // cameraTiltX is the inner (rightmost) transform -- applied first,
+      // and never itself touched by cameraYawY -- which is what keeps
+      // "the same side tilt" genuinely constant while the yaw sweeps.
+      // rotateZ never appears anywhere in this expression.
+      scene.style.transform = 'rotateY(' + cam.yawY.toFixed(3) + 'deg) rotateX(' + cam.tiltX.toFixed(3) + 'deg)';
+
+      renderSlit(leftSlitEl, X_leftSlit, computeSlitOpen(p, 'left'));
+      renderSlit(rightSlitEl, X_rightSlit, computeSlitOpen(p, 'right'));
+
+      // Ring marks (see where they're built) only earn their keep once
+      // the yaw has actually turned the tunnel's own length edge-on to
+      // the camera -- tied directly to how far into that yaw we are, so
+      // they arrive and leave with exactly the same pivot that makes the
+      // long ribs stop reading as a dome and start reading as a line.
+      var ringStrength = Math.abs(cam.yawY) / CFG.THROUGH_TUNNEL_YAW;
+
+      var tunnelState = computeTunnelState(p);
+      renderTunnel(tunnelState.riseAmount, tunnelState.opacity, ringStrength);
+
+      renderWire(computeWireProgress(p));
+    }
+
+    function computeSlitOpen(p, which) {
+      var span = PH.slits[1] - PH.slits[0];
+      var range = which === 'left'
+        ? [PH.slits[0], PH.slits[0] + span * 0.65]
+        : [PH.slits[0] + span * 0.35, PH.slits[1]];
+      return easeInOutCubic(phaseT(p, range));
+    }
+
+    // Reduced motion: no rotation, ever (cameraTiltX/cameraYawY both
+    // stay 0) -- instead the tunnel is held at a permanent 50% "cutaway"
+    // opacity from the start, so the wire threading through it stays
+    // visible from directly overhead without needing the orbit. Slits,
+    // tunnel rise, and wire travel still play out for real, just faster
+    // and with the camera never leaving top-down.
+    var REDUCED_DURATION = 3200;
+    function renderReduced(rp) {
+      scene.style.transform = 'rotateY(0deg) rotateX(0deg)';
+      var slitsT = easeInOutCubic(clamp01(rp / 0.22));
+      renderSlit(leftSlitEl, X_leftSlit, slitsT);
+      renderSlit(rightSlitEl, X_rightSlit, slitsT);
+      var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
+      renderTunnel(clamp01(riseT), 0.5, 0);
+      var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
+      renderWire(wireT);
+    }
+
+    var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
     var raf = null;
     function resetToStart() {
-      camera.style.transition = 'none';
-      camera.style.transform = 'scale(0.72)';
-      scene.style.transition = 'none';
-      curRX = 0; curRY = 0;
-      applyRotation();
-      primeDraw(wireOuter);
-      primeDraw(wireInner);
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      stageEl.style.transition = 'none';
+      stageEl.style.opacity = '1';
+      if (REDUCED) renderReduced(0); else render(0);
     }
     resetToStart();
 
     return {
-      duration: LEAD + passDuration * cutT + CAMERA_TOTAL + passDuration * (1 - cutT - slowSpan) + 150 + 400 + 150,
+      duration: REDUCED ? REDUCED_DURATION : TOTAL_DURATION,
       play: function () {
         resetToStart();
-        camera.getBoundingClientRect();
-        camera.style.transition = 'transform ' + ZOOM_DUR + 'ms cubic-bezier(.25,.7,.3,1.05)';
-        camera.style.transform = 'scale(1)';
-
-        setTimeout(function () {
-          var lenOuter = Number(wireOuter.dataset.len);
-          var lenInner = Number(wireInner.dataset.len);
-
-          // Drives the wire's reveal off a single t every frame --
-          // there's only one wire path, so there's nothing for a second
-          // one to drift out of sync with.
-          function runPass(fromT, toT, dur, onDone) {
-            var start = performance.now();
-            if (raf) cancelAnimationFrame(raf);
-            function frame(now) {
-              var raw = Math.max(0, Math.min(1, (now - start) / dur));
-              var t = fromT + (toT - fromT) * raw;
-              wireOuter.style.strokeDashoffset = String(lenOuter * (1 - t));
-              wireInner.style.strokeDashoffset = String(lenInner * (1 - t));
-              if (raw < 1) raf = requestAnimationFrame(frame);
-              else if (onDone) onDone(t);
-            }
-            raf = requestAnimationFrame(frame);
-          }
-
-          // 1. wire enters through the left slit at normal speed, camera
-          // flat overhead
-          runPass(0, cutT, passDuration * cutT, function () {
-            // wire keeps moving (slower, never frozen) through the
-            // entire camera move below -- one continuous slow pass
-            // spanning all four rotation phases plus the hold
-            runPass(cutT, cutT + slowSpan, CAMERA_TOTAL);
-
-            // 2. tilt around world X to a side view
-            animateValue(0, REST_RX, PHASE_X_DUR, function (v) { curRX = v; applyRotation(); }, function () {
-              // 3. continue rotating 45deg further around world Y
-              animateValue(0, REST_RY, PHASE_Y_DUR, function (v) { curRY = v; applyRotation(); }, function () {
-                setTimeout(function () {
-                  // 4. reverse the same two stages, in the same order
-                  animateValue(REST_RY, 0, PHASE_Y_BACK_DUR, function (v) { curRY = v; applyRotation(); }, function () {
-                    animateValue(REST_RX, 0, PHASE_X_BACK_DUR, function (v) { curRX = v; applyRotation(); }, function () {
-                      // 5. camera fully overhead again -- finish the
-                      // wire's travel out the right slit at normal speed
-                      runPass(cutT + slowSpan, 1, passDuration * (1 - cutT - slowSpan), function () {
-                        setTimeout(function () {
-                          wireInner.style.transition = 'opacity 400ms ease';
-                          wireInner.style.opacity = '0.55';
-                        }, 150);
-                      });
-                    });
-                  });
-                }, HOLD);
-              });
-            });
-          });
-        }, LEAD);
+        var dur = REDUCED ? REDUCED_DURATION : TOTAL_DURATION;
+        var renderFn = REDUCED ? renderReduced : render;
+        var start = performance.now();
+        function frame(now) {
+          var raw = Math.max(0, Math.min(1, (now - start) / dur));
+          renderFn(raw);
+          if (raw < 1) raf = requestAnimationFrame(frame);
+          else raf = null;
+        }
+        raf = requestAnimationFrame(frame);
       }
     };
   }
@@ -2732,10 +2882,9 @@
     var CIRCUIT_BUILDERS = {
       'conductive-yarn': buildConductiveYarn,
       'metal-coated': buildMetalCoated,
-      'sewn-trace': buildSewnTrace,
-      'embedded-wire': buildEmbeddedWire
+      'sewn-trace': buildSewnTrace
     };
-    var CIRCUIT_ORDER = ['conductive-yarn', 'metal-coated', 'sewn-trace', 'embedded-wire'];
+    var CIRCUIT_ORDER = ['conductive-yarn', 'metal-coated', 'sewn-trace'];
 
     var circuitControllers = {};
     var circuitPlaying = {};
@@ -2876,6 +3025,50 @@
       if (!isTouchDevice) return; // desktop already gets this via hover
       if (!lamtraceAutoPlayed) return;
       playLamtrace();
+    });
+  }
+
+  /* ---------------------------------------------------
+     embedded wire — standalone showcase, wired up the same way as
+     the circuit grid above (autoplay once on scroll into view,
+     hover/tap to replay) but scoped to just this one section rather
+     than a staggered group of panels. Entirely separate variables
+     from every other section's wiring above -- no shared playing/
+     autoplay state, no shared IntersectionObserver.
+  --------------------------------------------------- */
+  var embeddedWireSection = document.getElementById('embedded-wire');
+  if (embeddedWireSection) {
+    var embeddedWireStage = embeddedWireSection.querySelector('[data-embeddedwire-stage]');
+    var embeddedWireController = buildEmbeddedWire(embeddedWireStage);
+    var embeddedWirePlaying = false;
+    var embeddedWireAutoPlayed = false;
+
+    function playEmbeddedWire() {
+      if (embeddedWirePlaying) return;
+      embeddedWirePlaying = true;
+      embeddedWireController.play();
+      setTimeout(function () { embeddedWirePlaying = false; }, embeddedWireController.duration + 60);
+    }
+
+    var embeddedWireIo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && !embeddedWireAutoPlayed) {
+          embeddedWireAutoPlayed = true;
+          playEmbeddedWire();
+          embeddedWireIo.disconnect();
+        }
+      });
+    }, { threshold: 0.3 });
+    embeddedWireIo.observe(embeddedWireSection);
+
+    embeddedWireSection.addEventListener('mouseenter', function () {
+      if (!embeddedWireAutoPlayed) return;
+      playEmbeddedWire();
+    });
+    embeddedWireSection.addEventListener('click', function () {
+      if (!isTouchDevice) return; // desktop already gets this via hover
+      if (!embeddedWireAutoPlayed) return;
+      playEmbeddedWire();
     });
   }
 
