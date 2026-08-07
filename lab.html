@@ -1473,26 +1473,20 @@
   // children of this one `scene` -- there is no second pivot, and
   // nothing in it is ever rotated independently of it.
   //
-  // The through-tunnel arch, though, is NOT drawn in `scene` at all.
-  // Every face in `scene` whose own plane contains the tunnel's X axis
-  // (the flat fabric; every rib, since a fold around X never removes X
-  // from that face's plane) goes edge-on and this rendering engine
-  // paints an exactly-edge-on plane as nothing, confirmed directly in
-  // isolation -- not a rendering choice, a hard floor. An arch cross-
-  // section drawn perpendicular to X doesn't have that problem, but
-  // nesting it inside `scene` with its own counter-rotating fold to
-  // face the camera hit a second, independent wall: transform-origin
-  // mismatches between nested rotated elements make "which point does a
-  // rotation pivot around" and "where does the translated result end
-  // up" impossible to fully untangle by hand for more than one non-
-  // trivial rotation stacked on another (confirmed directly: a working
-  // rotation formula still landed the arch a couple hundred px from the
-  // tunnel). So the arch caps (and, right at the one yaw where the real
-  // wire hits the same edge-on collapse, a small marker for that same
-  // wire) are a flat 2D overlay, a sibling of `scene` rather than a
-  // child of it, positioned every frame by literally replaying the same
-  // rotation + perspective-divide math `scene` itself uses, in plain
-  // JS, against known 3D points -- see where projectPoint is built.
+  // The through-tunnel cross-section, though, is NOT drawn in `scene`
+  // at all. Every face in `scene` whose own plane contains the tunnel's
+  // X axis (the flat fabric; every rib, since a fold around X never
+  // removes X from that face's plane) goes edge-on and this rendering
+  // engine paints an exactly-edge-on plane as nothing, confirmed
+  // directly in isolation -- not a rendering choice, a hard floor. So
+  // the cross-section (baseline + arch, and, right at the one yaw where
+  // the real wire hits that same edge-on collapse, a small marker for
+  // that same wire) is a flat 2D overlay, a sibling of `scene` rather
+  // than a child of it -- and, unlike an earlier version of this
+  // overlay, fixed, plain-SVG geometry rather than anything re-derived
+  // from `scene`'s own rotation: it needs to read as a genuinely
+  // orthographic technical section, not a perspective-correct billboard,
+  // so it never reads camera tilt/yaw at all -- see where it's built.
   function buildEmbeddedWire(stage) {
     var SVG_NS = 'http://www.w3.org/2000/svg';
     function el(tag, attrs) {
@@ -1652,152 +1646,127 @@
     crestRib.path.setAttribute('stroke', 'var(--petrol-bright)');
     crestRib.path.setAttribute('stroke-width', 1.4);
 
-    // ---- end-cap arch outlines -- one at each slit, facing straight
-    // down the tunnel's own axis. The ribs above read as a dome only
-    // from angles where their fold is oblique to the camera; looked at
-    // dead end-on (through-tunnel view) their fill collapses to bare
-    // radial lines, same as any flat surface viewed exactly edge-on --
-    // and this is true of *any* CSS-3D-nested attempt to draw the cap,
-    // not just the ribs' own construction (confirmed directly: a face
-    // whose own fixed fold is meant to counteract the scene's live yaw
-    // does land the arch out of its collapsed state, but a transform-
-    // origin/pivot mismatch between that face and the scene it's nested
-    // inside put it position-shifted away from the tunnel by a couple
-    // hundred pixels, not simply rotated wrong -- and nested CSS
-    // transforms give no clean way to separate "which face's origin a
-    // rotation pivots around" from "where the translated result ends
-    // up" once more than one non-trivial rotation is stacked).
+    // ---- fixed cross-section overlay -- the target frame at the
+    // through-tunnel hold (yaw≈90deg) needs to read as a clean,
+    // orthographic technical section: one flat fabric baseline, one
+    // smooth symmetric arch rising out of it, the wire centered in the
+    // open cavity beneath. The live 3D geometry above (fabric + ribs)
+    // can't deliver that: viewed dead end-on, a CSS-3D-folded plane
+    // collapses to a bare radial line, same as any flat surface exactly
+    // edge-on (confirmed directly, screenshotted through the pivot),
+    // and short of that exact angle it's a thin, perspective-distorted
+    // diagonal sliver, not the clean silhouette this view needs.
     //
-    // So this cap does not live in the `scene` 3D hierarchy at all. It's
-    // a flat 2D overlay, drawn by literally replaying the same math the
-    // CSS engine itself uses for `scene` (perspective division around
-    // the same transform-origin, the same rotateY(yaw) rotateX(tilt))
-    // in plain JS against the arch's known 3D points, then drawing the
-    // 2D result directly. That sidesteps every nested-transform pitfall
-    // above by construction -- there's only one rotation in the whole
-    // computation, applied once, with an origin chosen explicitly by
-    // this code rather than inherited implicitly from two different
-    // elements' box models. Verified against the real DOM: projecting
-    // the wire's own midpoint through this same function lands within a
-    // few px of where getScreenCTM() reports the actual wire midpoint
-    // rendering on screen at an arbitrary mid-pivot camera state.
+    // An earlier version of this overlay was a perspective-projected
+    // "billboard" -- an arch shape re-anchored every frame to a 3D point
+    // run through the same rotateY(yaw) rotateX(tilt) + perspective
+    // divide the CSS engine itself applies to `scene`. That still left
+    // real perspective distortion in the result (near/far anchors
+    // scaling and separating differently by depth), which reads as an
+    // oblique 3/4 view rather than the straight-on, non-perspective
+    // section this frame needs. This version drops that anchoring
+    // entirely: the whole cross-section -- baseline, arch, wire marker
+    // -- is fixed, plain-SVG geometry, built once, right here, in the
+    // panel's own 2D coordinate space. It never reads camera tilt/yaw at
+    // all, so there's no perspective, no scale change, and no drift as
+    // the camera moves -- only its opacity animates, fading in as the
+    // real geometry fades out (see computeFadeMultipliers) and back out
+    // as it fades back in, so the two swap places as one continuous
+    // crossfade rather than either overlapping clutter or a visible
+    // gap. Same reasoning as before for living outside the `scene` 3D
+    // hierarchy entirely -- a sibling of `scene`, never touched by its
+    // rotation -- just without inheriting any of the projection math
+    // that hierarchy needs for everything else it draws.
     var overlaySvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
     var overlayEl = document.createElement('div');
     overlayEl.className = 'embeddedWire-face embeddedWire-overlay';
     overlayEl.appendChild(overlaySvg);
     stageEl.appendChild(overlayEl);
-    var archCapNearPath = el('path', { d: '', fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 1.6, 'stroke-linecap': 'round' });
-    var archCapFarPath = el('path', { d: '', fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 1.6, 'stroke-linecap': 'round' });
-    overlaySvg.appendChild(archCapFarPath);
-    overlaySvg.appendChild(archCapNearPath);
+
+    // Baseline sits low in the panel with generous headroom above for
+    // the arch's peak; half-width/height chosen to read clearly at this
+    // panel's own fixed size without crowding the swatch's rounded
+    // corners -- deliberately NOT tied to TUNNEL_WIDTH/TUNNEL_HEIGHT
+    // (the real ribs' own, much smaller, dimensions), since this is a
+    // dedicated explanatory diagram, not a projection of those ribs.
+    var CROSS_BASE_Y = 96;
+    var CROSS_ARCH_H = 52;
+    var CROSS_HALF_W = 78;
+    var crossFootL = { x: midX - CROSS_HALF_W, y: CROSS_BASE_Y };
+    var crossFootR = { x: midX + CROSS_HALF_W, y: CROSS_BASE_Y };
+
+    // One flat line, extending past both arch feet on either side --
+    // "the normal fabric collapsed to a single line," per spec,
+    // continuous with the arch's own base edge rather than a separate
+    // detached stroke (same Y, same stroke color/weight as the arch).
+    var crossBaseline = el('line', {
+      x1: (SW.x + 8).toFixed(2), y1: CROSS_BASE_Y,
+      x2: (SW.x + SW.w - 8).toFixed(2), y2: CROSS_BASE_Y,
+      stroke: 'var(--line-strong)', 'stroke-width': 2, 'stroke-linecap': 'round'
+    });
+    overlaySvg.appendChild(crossBaseline);
+
+    // The arch: a closed half-sine hill from foot to foot, filled (so
+    // it reads as the same solid raised textile the ribs represent,
+    // dimmed to the ~50% cutaway at the hold so the wire stays visible
+    // through it) and stroked at full strength so its outline stays
+    // crisp even through that cutaway. One primary shape, one smooth
+    // curve, feet planted exactly on the baseline.
+    var CROSS_ARCH_SEGMENTS = 32;
+    var archD = 'M' + crossFootL.x.toFixed(2) + ',' + crossFootL.y.toFixed(2);
+    for (var csI = 1; csI <= CROSS_ARCH_SEGMENTS; csI++) {
+      var csT = csI / CROSS_ARCH_SEGMENTS;
+      var csX = lerp(crossFootL.x, crossFootR.x, csT);
+      var csY = CROSS_BASE_Y - CROSS_ARCH_H * Math.sin(Math.PI * csT);
+      archD += ' L' + csX.toFixed(2) + ',' + csY.toFixed(2);
+    }
+    archD += ' Z';
+    var crossArch = el('path', {
+      d: archD, fill: 'var(--black-raised)', stroke: 'var(--line-strong)',
+      'stroke-width': 2, 'stroke-linejoin': 'round'
+    });
+    overlaySvg.appendChild(crossArch);
+
     // The wire itself is drawn once, in the CSS-3D `scene`, and stays
-    // exactly one wire everywhere -- this is not a second one. It's a
-    // marker for the SAME wire's own already-computed position, for the
-    // one narrow window (yaw at/near 90deg) where the real wire's own
-    // rendering happens to hit the identical edge-on collapse the ribs
-    // and fabric do (confirmed directly), and is also, independently,
-    // the geometrically correct thing to show there regardless: a
-    // straight length of wire viewed exactly end-on, down its own axis,
-    // legitimately projects to a single point, not a line -- the same
-    // reason a drinking straw's own length disappears when you sight
-    // straight through it. Only ever visible while the yaw is near that
-    // same angle (see renderArchCaps), so it never doubles the real
-    // wire during any view where that one already reads correctly.
-    var wireIndicator = el('circle', { r: 2.2, fill: 'var(--petrol-bright)', stroke: 'none', opacity: 0 });
+    // exactly one wire everywhere -- this is not a second one. This is a
+    // marker for that same wire, shown only in the narrow window where
+    // the real wire's own rendering hits the edge-on collapse described
+    // above (see renderCrossSection), so it never doubles the real wire
+    // during any view where that one already reads correctly. Drawn as
+    // a short centered bar rather than the real wire's own round
+    // profile: end-on, a straight wire's length legitimately projects
+    // to a single point (the same reason a drinking straw's own length
+    // disappears sighted straight through it), and a bare point reads
+    // far less clearly here than a bar sized to the cavity it sits in.
+    // Fixed in place, same as the arch/baseline above -- it marks "the
+    // wire is in here," not a literal tracked position along the
+    // tunnel's length, which has no meaning viewed straight down that
+    // same axis.
+    var CROSS_WIRE_W = 44;
+    var CROSS_WIRE_H = 11;
+    var CROSS_WIRE_Y = CROSS_BASE_Y - 18;
+    var wireIndicator = el('rect', {
+      x: (midX - CROSS_WIRE_W / 2).toFixed(2), y: (CROSS_WIRE_Y - CROSS_WIRE_H / 2).toFixed(2),
+      width: CROSS_WIRE_W, height: CROSS_WIRE_H, rx: CROSS_WIRE_H / 2,
+      fill: 'var(--petrol-bright)', stroke: 'none', opacity: 0
+    });
     overlaySvg.appendChild(wireIndicator);
 
-    // Perspective divide, replaying exactly what `perspective: 1800px` +
-    // `scene`'s own rotateY(yaw) rotateX(tilt) around its centered
-    // transform-origin do to a 3D point -- see solveRibFold's own header
-    // comment for the same rotateX derivation this reuses for the tilt
-    // half of this rotation. STAGE_PERSPECTIVE_PX must match .embeddedWire-stage's
-    // own `perspective` value in lab.css. Returns the projected screen
-    // point AND the perspective scale factor at that depth (1/w) --
-    // points nearer the camera get a bigger factor, same as the ribs
-    // and fabric already appear larger/smaller by depth under the same
-    // real perspective.
-    var STAGE_PERSPECTIVE_PX = 1800;
-    function projectPoint(wx, wy, wz, tiltDeg, yawDeg, stageWidthPx) {
-      var svgToPx = stageWidthPx / 240;
-      var dSvg = STAGE_PERSPECTIVE_PX / svgToPx;
-      var t = tiltDeg * Math.PI / 180, y = yawDeg * Math.PI / 180;
-      var xc = wx - midX, yc = wy - midY, zc = wz;
-      var y1 = yc * Math.cos(t) - zc * Math.sin(t);
-      var z1 = yc * Math.sin(t) + zc * Math.cos(t);
-      var x2 = xc * Math.cos(y) + z1 * Math.sin(y);
-      var z2 = -xc * Math.sin(y) + z1 * Math.cos(y);
-      var w = 1 - z2 / dSvg;
-      return { x: midX + x2 / w, y: midY + y1 / w, scale: 1 / w };
-    }
-    // The arch cap is drawn as a billboard: only its ANCHOR point (the
-    // slit's own midpoint, at fabric level) is run through the real
-    // rotation above, to find where it lands on screen and how big
-    // things at that depth should read. The arch's own shape is then
-    // drawn directly in fixed, always-upright (u, v) offsets from that
-    // anchor -- never itself rotated by yaw or tilt. Rotating the shape
-    // through the same matrix as everything else was tried first and
-    // rejected: since the tunnel axis this cap needs to face is also
-    // the axis the yaw sweeps the view onto, by yaw=90deg the arch's
-    // own "up" and "across" directions had swapped with the screen's,
-    // so the dome rendered on its side instead of upright (confirmed
-    // directly, screenshotted at several yaw values through the pivot).
-    // A billboard sidesteps that entirely: this open, symmetric outline
-    // has no "correct" facing to preserve through the rotation, only a
-    // correct on-screen size and position, which the anchor still
-    // carries faithfully.
-    function archCapLocalPoints(scale) {
-      var n = 24, pts = [];
-      var halfW = CFG.TUNNEL_WIDTH / 2;
-      for (var i = 0; i <= n; i++) {
-        var t = i / n;
-        pts.push({
-          u: -halfW + halfW * 2 * t,
-          v: -CFG.TUNNEL_HEIGHT * scale * Math.sin(Math.PI * t)
-        });
-      }
-      return pts;
-    }
-    function archCapD(x, localPts, tiltDeg, yawDeg, stageWidthPx) {
-      var anchor = projectPoint(x, midY, 0, tiltDeg, yawDeg, stageWidthPx);
-      var d = '';
-      for (var i = 0; i < localPts.length; i++) {
-        var sx = anchor.x + localPts[i].u * anchor.scale;
-        var sy = anchor.y + localPts[i].v * anchor.scale;
-        d += (i === 0 ? 'M' : ' L') + sx.toFixed(2) + ',' + sy.toFixed(2);
-      }
-      return d;
-    }
-    function renderArchCaps(riseAmount, opacity, tiltDeg, yawDeg, wireProgress, archFade, fabricFade) {
-      var stageWidthPx = stageEl.getBoundingClientRect().width || 240;
-      var localPts = archCapLocalPoints(riseAmount);
-      archCapNearPath.setAttribute('d', archCapD(X_leftSlit, localPts, tiltDeg, yawDeg, stageWidthPx));
-      archCapFarPath.setAttribute('d', archCapD(X_rightSlit, localPts, tiltDeg, yawDeg, stageWidthPx));
-      // Being a billboard, this cap reads as an upright dome regardless
-      // of camera state -- useful right where the ribs' own dome
-      // silhouette stops working (near the through-tunnel yaw), but
-      // redundant clutter layered on top of that same rib silhouette in
-      // top-down/side view, where the ribs already read fine on their
-      // own. archFade (see computeFadeMultipliers) brings it in only
-      // once the fabric/ribs have started fading out, as one continuous
-      // crossfade rather than either overlapping clutter or a visible
-      // gap.
-      var capOpacity = (Math.max(opacity, 0.85) * riseAmount * archFade).toFixed(3);
-      archCapNearPath.style.opacity = capOpacity;
-      archCapFarPath.style.opacity = capOpacity;
+    // Per-frame: opacity only -- see the header comment above for why
+    // nothing here needs to touch position or size.
+    function renderCrossSection(cutawayOpacity, archFade, fabricFade) {
+      var fillOp = (cutawayOpacity * archFade).toFixed(3);
+      var strokeOp = (Math.max(cutawayOpacity, 0.85) * archFade).toFixed(3);
+      crossArch.style.fillOpacity = fillOp;
+      crossArch.style.strokeOpacity = strokeOp;
+      crossBaseline.style.opacity = strokeOp;
 
       // Wire indicator: exactly complementary to the real wire's own
       // fabricFade-driven fade (see render()), so the handoff between
       // "the real wire, rendered in the 3D scene" and "this marker for
       // that same wire" is a clean crossfade with no window where both
       // or neither are visible.
-      var wireIndicatorStrength = 1 - fabricFade;
-      if (wireIndicatorStrength > 0) {
-        var tipX = lerp(X_wireStart, X_wireEnd, clamp01(wireProgress));
-        var proj = projectPoint(tipX, midY, CFG.WIRE_DIAMETER, tiltDeg, yawDeg, stageWidthPx);
-        wireIndicator.setAttribute('cx', proj.x.toFixed(2));
-        wireIndicator.setAttribute('cy', proj.y.toFixed(2));
-      }
-      wireIndicator.style.opacity = (wireIndicatorStrength * riseAmount).toFixed(3);
+      wireIndicator.style.opacity = (1 - fabricFade).toFixed(3);
     }
 
     function ribBandD(peakLen, scale) {
@@ -1984,7 +1953,7 @@
       var tunnelState = computeTunnelState(p);
       renderTunnel(tunnelState.riseAmount, tunnelState.opacity, fade.fabricFade);
       var wireProgress = computeWireProgress(p);
-      renderArchCaps(tunnelState.riseAmount, tunnelState.opacity, cam.tiltX, cam.yawY, wireProgress, fade.archFade, fade.fabricFade);
+      renderCrossSection(tunnelState.opacity, fade.archFade, fade.fabricFade);
 
       renderWire(wireProgress, fade.fabricFade);
     }
@@ -2013,7 +1982,7 @@
       var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
       renderTunnel(clamp01(riseT), 0.5, 1);
       var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
-      renderArchCaps(clamp01(riseT), 0.5, 0, 0, wireT, 0, 1);
+      renderCrossSection(0.5, 0, 1);
       renderWire(wireT, 1);
     }
 
