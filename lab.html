@@ -2257,10 +2257,21 @@
     var heatClip = el('clipPath', { id: heatClipId });
     heatClip.appendChild(el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, rx: 6 }));
     heatDefs.appendChild(heatClip);
+    // Gaussian blur on the glow rect only (not the shimmer lines, which
+    // stay crisp) -- a generous filter region (-50%/200%) so the blur
+    // kernel itself is never clipped before the zone clip-path above
+    // gets a chance to cut it at the lamination zone's own edge.
+    var heatBlurId = 'laminatedTrace-heat-blur';
+    var heatBlur = el('filter', { id: heatBlurId, x: '-50%', y: '-50%', width: '200%', height: '200%' });
+    heatBlur.appendChild(el('feGaussianBlur', { 'in': 'SourceGraphic', stdDeviation: '3.5' }));
+    heatDefs.appendChild(heatBlur);
     heat.svg.appendChild(heatDefs);
 
     var heatGroup = el('g', { class: 'laminatedTrace-heat', 'clip-path': 'url(#' + heatClipId + ')' });
-    var heatGlow = el('rect', { x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, fill: 'var(--petrol-bright)', 'fill-opacity': '0' });
+    var heatGlow = el('rect', {
+      x: ZONE.x, y: ZONE.y, width: ZONE.w, height: ZONE.h, fill: 'var(--petrol-bright)', 'fill-opacity': '0',
+      filter: 'url(#' + heatBlurId + ')'
+    });
     heatGroup.appendChild(heatGlow);
     var SHIMMER_ROWS = [0.28, 0.5, 0.72];
     var shimmerLines = SHIMMER_ROWS.map(function (f, idx) {
@@ -2280,38 +2291,37 @@
 
     // ---- timeline: one normalized progress value drives every visual
     // property below. Durations noted in ms; PH holds the equivalent
-    // fractions of TOTAL_DURATION. Every phase besides pressHold keeps
-    // its original absolute duration -- pressHold alone was doubled
-    // again (1900ms -> 3800ms, having already grown once from an
-    // original 1000ms) so the pause at full press depth reads as an
-    // even more deliberate stop, and every later phase's boundary
-    // simply shifts later by that same added 1900ms. ----
+    // fractions of TOTAL_DURATION. One phase changed from its prior
+    // value, everything else keeps its original absolute duration and
+    // simply shifts earlier to match:
+    //   pressHold  9600ms -> 2500ms  (set explicitly, not scaled)
     //   establish     500ms   fabric only, hold
     //   lowerTpu      900ms   lower TPU settles on
     //   trace        1000ms   preformed trace settles on
     //   upperTpu      900ms   upper TPU settles on
-    //   holdStack     900ms   comprehension beat, unbonded stack
+    //   holdStack     450ms   comprehension beat, unbonded stack
     //   rotateToSide  750ms   camera: top-down -> side (X only)
-    //   holdSide      650ms   hold in side view
-    //   pressDown     600ms   press descends, vertical only
-    //   pressHold    3800ms   full depth reached; heat glow holds; gaps close
+    //   holdSide      325ms   hold in side view
+    //   pressDown     350ms   press descends, vertical only
+    //   pressHold    2500ms   full depth reached; heat glow holds; gaps close
     //   pressUp       550ms   press lifts, heat clears completely
     //   rotateBack    650ms   camera: side -> top-down (X only)
     //   finished      800ms   bonded laminate, one accent pulse
-    var TOTAL_DURATION = 12000;
+    //   TOTAL         9675ms
+    var TOTAL_DURATION = 9675;
     var PH = {
-      establish:    [0.0000, 0.0417],
-      lowerTpu:     [0.0417, 0.1167],
-      trace:        [0.1167, 0.2000],
-      upperTpu:     [0.2000, 0.2750],
-      holdStack:    [0.2750, 0.3500],
-      rotateToSide: [0.3500, 0.4125],
-      holdSide:     [0.4125, 0.4667],
-      pressDown:    [0.4667, 0.5167],
-      pressHold:    [0.5167, 0.8333],
-      pressUp:      [0.8333, 0.8792],
-      rotateBack:   [0.8792, 0.9333],
-      finished:     [0.9333, 1.0000]
+      establish:    [0.0000, 0.0517],
+      lowerTpu:     [0.0517, 0.1447],
+      trace:        [0.1447, 0.2481],
+      upperTpu:     [0.2481, 0.3411],
+      holdStack:    [0.3411, 0.3876],
+      rotateToSide: [0.3876, 0.4651],
+      holdSide:     [0.4651, 0.4987],
+      pressDown:    [0.4987, 0.5349],
+      pressHold:    [0.5349, 0.7933],
+      pressUp:      [0.7933, 0.8501],
+      rotateBack:   [0.8501, 0.9173],
+      finished:     [0.9173, 1.0000]
     };
     // Short of a literal edge-on 90deg, but steep enough that each
     // layer's own footprint compresses far more than the gaps between
@@ -2414,13 +2424,15 @@
         heatT = Math.min(easeOutCubic(tIn), easeOutCubic(tOut));
       }
       // Brightness only, not timing or color: peak glow/shimmer opacity
-      // raised (0.16 -> 0.36 glow, 0.45 -> 0.6 shimmer) so the hold
-      // reads clearly as heat rather than a faint tint. Still the same
-      // petrol-bright fill/stroke and the same heatT gate above.
-      heatGlow.setAttribute('fill-opacity', (heatT * 0.36).toFixed(3));
+      // raised again (0.36 -> 0.72 glow, 0.6 -> 1.0 shimmer) so the
+      // hold reads even more clearly as heat. Still the same
+      // petrol-bright fill/stroke and the same heatT gate above --
+      // clamped to 1 since heatT/flicker are themselves already
+      // bounded to [0,1] and a 1.0 multiplier leaves no headroom.
+      heatGlow.setAttribute('fill-opacity', clamp01(heatT * 0.72).toFixed(3));
       shimmerLines.forEach(function (line, idx) {
         var flicker = 0.5 + 0.5 * Math.sin(p * 46 + idx * 2.1);
-        line.style.opacity = (heatT * 0.6 * flicker).toFixed(3);
+        line.style.opacity = clamp01(heatT * 1.0 * flicker).toFixed(3);
       });
 
       // -- finished accent: one soft pulse through the bonded trace,
