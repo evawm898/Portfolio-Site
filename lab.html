@@ -2349,8 +2349,12 @@
 
       nozzleG.setAttribute('transform', 'translate(' + pt.x.toFixed(2) + ',' + pt.y.toFixed(2) + ') rotate(' + angleDeg.toFixed(2) + ')');
       // Never rotated to the tangent, unlike nozzleG above -- see where
-      // nozzleSideG is built for why.
-      nozzleSideG.setAttribute('transform', 'translate(' + pt.x.toFixed(2) + ',' + pt.y.toFixed(2) + ')');
+      // nozzleSideG is built for why. scale(1.15) is applied after the
+      // translate, so it scales around the icon's own local origin (the
+      // tip/bead, per the convention noted where nozzleSideG is built)
+      // rather than the SVG's origin -- the tip stays anchored exactly
+      // on the trace at any size.
+      nozzleSideG.setAttribute('transform', 'translate(' + pt.x.toFixed(2) + ',' + pt.y.toFixed(2) + ') scale(1.15)');
     }
 
     function applyCamera(rx) {
