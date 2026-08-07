@@ -2273,7 +2273,11 @@
 
     // ---- timeline: one normalized progress value drives every visual
     // property below. Durations noted in ms; PH holds the equivalent
-    // fractions of TOTAL_DURATION. ----
+    // fractions of TOTAL_DURATION. Every phase besides pressHold keeps
+    // its original absolute duration -- pressHold alone was lengthened
+    // (1000ms -> 1900ms) so the pause at full press depth actually
+    // reads before the lift begins, and every later phase's boundary
+    // simply shifts later by that same added 900ms. ----
     //   establish     500ms   fabric only, hold
     //   lowerTpu      900ms   lower TPU settles on
     //   trace        1000ms   preformed trace settles on
@@ -2282,24 +2286,24 @@
     //   rotateToSide  750ms   camera: top-down -> side (X only)
     //   holdSide      650ms   hold in side view
     //   pressDown     600ms   press descends, vertical only
-    //   pressHold    1000ms   heat + pressure, gaps close
+    //   pressHold    1900ms   full depth reached; heat glow holds; gaps close
     //   pressUp       550ms   press lifts, heat clears completely
     //   rotateBack    650ms   camera: side -> top-down (X only)
     //   finished      800ms   bonded laminate, one accent pulse
-    var TOTAL_DURATION = 9200;
+    var TOTAL_DURATION = 10100;
     var PH = {
-      establish:    [0.0000, 0.0543],
-      lowerTpu:     [0.0543, 0.1522],
-      trace:        [0.1522, 0.2609],
-      upperTpu:     [0.2609, 0.3587],
-      holdStack:    [0.3587, 0.4565],
-      rotateToSide: [0.4565, 0.5380],
-      holdSide:     [0.5380, 0.6087],
-      pressDown:    [0.6087, 0.6739],
-      pressHold:    [0.6739, 0.7826],
-      pressUp:      [0.7826, 0.8424],
-      rotateBack:   [0.8424, 0.9130],
-      finished:     [0.9130, 1.0000]
+      establish:    [0.0000, 0.0495],
+      lowerTpu:     [0.0495, 0.1386],
+      trace:        [0.1386, 0.2376],
+      upperTpu:     [0.2376, 0.3267],
+      holdStack:    [0.3267, 0.4158],
+      rotateToSide: [0.4158, 0.4901],
+      holdSide:     [0.4901, 0.5545],
+      pressDown:    [0.5545, 0.6139],
+      pressHold:    [0.6139, 0.8020],
+      pressUp:      [0.8020, 0.8564],
+      rotateBack:   [0.8564, 0.9208],
+      finished:     [0.9208, 1.0000]
     };
     // Short of a literal edge-on 90deg, but steep enough that each
     // layer's own footprint compresses far more than the gaps between
@@ -2380,19 +2384,26 @@
       press.face.style.transform = 'translateZ(' + pressZ.toFixed(2) + 'px)';
       press.face.style.opacity = pressOpacity.toFixed(3);
 
-      // -- heat effect: ramps in before contact, holds through the
-      // press hold, fades out completely as the press clears -- gone
-      // before the camera ever starts rotating back. Its own depth
-      // tracks just under the press's current position every frame, so
-      // it always reads as radiating down from wherever the platen
+      // -- heat effect: off for the entire descent, so it never reads
+      // as present before contact -- turns on only once the press has
+      // actually reached full depth (PH.pressHold's own start, which is
+      // exactly where pressDown ends), stays on at full strength for
+      // the whole hold, and turns off right as the press begins
+      // lifting (PH.pressHold's end, exactly where pressUp begins).
+      // HEAT_FADE is a short in/out taper purely so the on/off isn't a
+      // single-frame snap -- it's a small fraction of the hold's own
+      // (now-lengthened) duration, so "stays visible for the entire
+      // hold" still holds in any practical sense. Its own depth tracks
+      // just under the press's current position every frame, so it
+      // always reads as radiating down from wherever the platen
       // actually is, rather than sitting at a fixed height of its own. --
       heat.face.style.transform = 'translateZ(' + (pressZ - 8).toFixed(2) + 'px)';
-      var heatRampStart = lerp(PH.pressDown[0], PH.pressDown[1], 0.6);
+      var HEAT_FADE = 0.02;
       var heatT = 0;
-      if (p >= heatRampStart && p < PH.pressHold[1]) {
-        heatT = clamp01((p - heatRampStart) / (PH.pressHold[1] - heatRampStart));
-      } else if (p >= PH.pressHold[1] && p < PH.pressUp[1]) {
-        heatT = clamp01(1 - phaseT(p, PH.pressUp));
+      if (p >= PH.pressHold[0] && p < PH.pressHold[1]) {
+        var tIn = clamp01((p - PH.pressHold[0]) / HEAT_FADE);
+        var tOut = clamp01((PH.pressHold[1] - p) / HEAT_FADE);
+        heatT = Math.min(easeOutCubic(tIn), easeOutCubic(tOut));
       }
       heatGlow.setAttribute('fill-opacity', (heatT * 0.16).toFixed(3));
       shimmerLines.forEach(function (line, idx) {
