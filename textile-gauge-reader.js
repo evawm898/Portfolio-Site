@@ -47,8 +47,8 @@
   const HEALTH_CHECK_RETRY_DELAYS_MS = [4000, 8000, 15000, 20000]; // backoff while the service cold-starts
   const ANALYZE_TIMEOUT_MS = 75000; // generous: free-tier hosts can cold-start slowly
 
-  const WALE_COLOR = "#2fa3a3";   // matches --petrol-bright
-  const COURSE_COLOR = "#c98a4b"; // matches --tgr-course
+  const WALE_COLOR = "#0f7d7d";   // matches --petrol-bright
+  const COURSE_COLOR = "#a56b2e"; // matches --tgr-course
 
   // --- DOM refs -----------------------------------------------------
   const stepEls = Object.fromEntries(
@@ -370,7 +370,7 @@
     ctx.setLineDash(editable ? [] : [6, 4]);
     ctx.strokeRect(tl.x, tl.y, w, h);
     ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(47,163,163,0.1)";
+    ctx.fillStyle = "rgba(15,125,125,0.1)";
     ctx.fillRect(tl.x, tl.y, w, h);
 
     if (editable) {
@@ -666,7 +666,11 @@
     const drag = state.roiDrag;
 
     if (drag.mode === "create") {
-      state.roi = normalizeRect(drag.anchor, natPt);
+      let target = natPt;
+      if (evt.shiftKey) {
+        target = squareSnappedPoint(drag.anchor, natPt);
+      }
+      state.roi = normalizeRect(drag.anchor, target);
     } else if (drag.mode === "move") {
       const dx = natPt.x - drag.startNatural.x;
       const dy = natPt.y - drag.startNatural.y;
@@ -688,11 +692,46 @@
       if (drag.handle.includes("r")) x2 = natPt.x;
       if (drag.handle.includes("t")) y1 = natPt.y;
       if (drag.handle.includes("b")) y2 = natPt.y;
+
+      if (evt.shiftKey) {
+        // Anchor at the corner OPPOSITE the one being dragged, and force
+        // the dragged corner to the same distance on both axes (clamped to
+        // whatever room is actually available toward the image edge) so
+        // the area stays square instead of just constraining afterward.
+        const fixedX = drag.handle.includes("l") ? x2 : x1;
+        const fixedY = drag.handle.includes("t") ? y2 : y1;
+        const movingX = drag.handle.includes("l") ? x1 : x2;
+        const movingY = drag.handle.includes("t") ? y1 : y2;
+        const snapped = squareSnappedPoint({ x: fixedX, y: fixedY }, { x: movingX, y: movingY });
+        if (drag.handle.includes("l")) x1 = snapped.x;
+        else x2 = snapped.x;
+        if (drag.handle.includes("t")) y1 = snapped.y;
+        else y2 = snapped.y;
+      }
+
       state.roi = normalizeRect({ x: x1, y: y1 }, { x: x2, y: y2 });
     }
     updateRoiUI();
     render();
   });
+
+  // Given a fixed anchor point and the raw (mouse-driven) opposite point,
+  // return the opposite point adjusted so |dx| == |dy| (a square), using
+  // whichever delta is larger and clamping to how much room is actually
+  // available toward the image edge in that direction — so the square
+  // never gets silently cropped back into a non-square by the ROI's own
+  // later clamping.
+  function squareSnappedPoint(anchor, raw) {
+    const dx = raw.x - anchor.x;
+    const dy = raw.y - anchor.y;
+    const maxXSide = dx >= 0 ? state.naturalWidth - anchor.x : anchor.x;
+    const maxYSide = dy >= 0 ? state.naturalHeight - anchor.y : anchor.y;
+    const side = Math.min(Math.max(Math.abs(dx), Math.abs(dy)), maxXSide, maxYSide);
+    return {
+      x: anchor.x + Math.sign(dx || 1) * side,
+      y: anchor.y + Math.sign(dy || 1) * side,
+    };
+  }
 
   function endRoiDrag(evt) {
     if (state.roiDrag && canvas.hasPointerCapture(evt.pointerId)) {

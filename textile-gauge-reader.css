@@ -1,21 +1,35 @@
 /* ---------------------------------------------------
    AI Textile Gauge Reader — experimental lab page
-   Reuses the portfolio's Deep Winter tokens (--black, --ink,
-   --petrol, --mono, --serif from styles.css) and adds a small
-   set of lab-specific tokens for things the base site has no
-   equivalent for (a second accent to tell wale/course lines
-   apart, confidence-bar colors, error/warning tones).
+   Reuses the portfolio's token *names* (--black, --ink, --petrol,
+   --mono, --serif — same variables styles.css defines) but redefines
+   their values here to a light theme, specific to this page. Loading
+   after styles.css, this block wins the cascade for every rule on this
+   page — both the shared .tgr-topbar/.tgr-intro-style rules and the
+   ones below — without touching styles.css or any other (still dark)
+   portfolio page. Also adds a small set of lab-specific tokens for
+   things the base site has no equivalent for (a second accent to tell
+   wale/course lines apart, confidence-bar colors, error/warning tones).
 --------------------------------------------------- */
 
 :root {
+  --black:         #ffffff;
+  --black-raised:  #f3f3f1;
+  --line:          #d9d9d5;
+  --line-strong:   #b7b7b1;
+  --ink:           #16181a;
+  --ink-dim:       #565e60;
+  --ink-faint:     #7c8385;
+  --petrol:        #1c6b6b;
+  --petrol-bright: #0f7d7d;
+
   --tgr-panel-bg:    var(--black-raised);
-  --tgr-course:      #c98a4b;   /* warm rust — distinct from petrol, stays in-palette */
+  --tgr-course:      #a56b2e;   /* warm rust — distinct from petrol, stays in-palette */
   --tgr-error:       #c1524c;
-  --tgr-error-bg:    rgba(193, 82, 76, 0.1);
-  --tgr-error-border:rgba(193, 82, 76, 0.35);
-  --tgr-warn-bg:     rgba(201, 138, 75, 0.1);
-  --tgr-warn-border: rgba(201, 138, 75, 0.35);
-  --tgr-ok-dot:      #4fb87a;
+  --tgr-error-bg:    rgba(193, 82, 76, 0.08);
+  --tgr-error-border:rgba(193, 82, 76, 0.3);
+  --tgr-warn-bg:     rgba(165, 107, 46, 0.08);
+  --tgr-warn-border: rgba(165, 107, 46, 0.3);
+  --tgr-ok-dot:      #2f9e5e;
 }
 
 /* ---------------------------------------------------
@@ -298,7 +312,7 @@
 }
 .tgr-radio-option:has(input:checked) {
   border-color: var(--petrol-bright);
-  background: rgba(47, 163, 163, 0.06);
+  background: rgba(15, 125, 125, 0.07);
   color: var(--ink);
 }
 .tgr-radio-option input { margin-top: 0.2rem; }
