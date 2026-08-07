@@ -5,8 +5,53 @@ An experimental computer-vision tool for measuring knitted-textile gauge
 
 **V0 uses classical computer vision only** — grayscale conversion, local
 contrast normalization (CLAHE), Sobel edge/texture enhancement, 1D signal
-projection, autocorrelation, and peak detection. There is no AI/ML model
-in this version.
+projection, autocorrelation, loop-center blob detection, and harmonic
+disambiguation. There is no AI/ML model in this version.
+
+## What "gauge" means here (and a real bug this fixed)
+
+A **wale** is a vertical column of complete, intermeshed knit loops;
+wales-per-inch is the horizontal center-to-center spacing between
+adjacent columns. A **course** is a horizontal row of complete loops;
+courses-per-inch is the vertical center-to-center spacing between
+adjacent rows. Critically, that spacing has to be measured between
+*complete loop repeats* — not between a loop's two legs, one yarn edge
+and its own opposite edge, or any other sub-feature of a single loop.
+
+Pure 1D edge/autocorrelation analysis has no notion of "loop" at all —
+just "some periodic edge pattern" — so it's structurally vulnerable to
+locking onto a harmonic of the true repeat: typically half of it (e.g.
+one leg of a face-knit loop's V-shape, which produces its own regular
+edge every half-loop) or, less commonly, double it (skipping every
+other loop). Relabeling the output ("wales" ↔ "courses") or hard-coding
+a multiplier doesn't fix this — it's a difference in what the algorithm
+is actually locking onto, and would produce a different, uncorrectable
+error on a different photo.
+
+The current pipeline (`ALGORITHM_VERSION` `cv-clahe-sobel-autocorr-loopcenter-v0.2`)
+addresses this with a second, independent signal: an approximate 2D
+loop-center detector (a Difference-of-Gaussians blob response tuned to
+loop scale, since a genuine loop center is a compact, roughly isotropic
+highlight, unlike a loop's more elongated, edge-like legs). For each
+axis, the coarse autocorrelation period is checked against its 0.5x/1x/2x
+harmonics, and whichever one the loop-center evidence actually supports
+is used — never an arbitrary multiplier, and only when the loop-center
+evidence itself is internally consistent enough to trust (a noisy/
+over-detected point cloud is recognized as such and ignored, falling
+back to the autocorrelation estimate rather than "correcting" a
+plausibly-already-right answer with garbage). Every candidate
+considered and why the final one was picked is exposed via the
+**Detection Details** panel on the Results screen (see below), along
+with an optional **Show loop centers** overlay toggle so you can
+visually check the detector against the actual knit structure — success
+means the overlay lines line up with real complete loops, not just that
+the final numbers look plausible.
+
+This is a heuristic V0.2 improvement, not full loop segmentation, and
+it isn't assumed to be "solved" — see
+[Ground Truth / Correction System](#ground-truth--correction-system)
+for how to build an evaluation set against real photos and decide
+whether/how to tune it further.
 
 ## Two deployments of the same idea
 
@@ -46,7 +91,11 @@ configured" message instead of crashing or silently failing.
    estimates with confidence scores.
 6. **Results** — wales/inch and courses/inch are shown prominently, along
    with spacing in mm, analyzed area size, and detected wale/course
-   positions drawn back over the image.
+   positions drawn back over the image. A collapsible **Detection
+   Details** panel shows every harmonic period candidate considered per
+   axis and why the final one was picked; a **Show loop centers**
+   checkbox overlays the detector's approximate 2D loop-center points so
+   you can visually check them against the real knit structure.
 7. **Verify Measurement** (optional) — enter the true gauge for this
    sample (directly, or via a stitch count over the ROI) to save a
    labeled ground-truth record for later evaluation. See
@@ -144,10 +193,13 @@ instead exercise the production frontend against a local backend, open
 
 Returns JSON with `pixels_per_mm`, `wale`/`course` objects (each with
 `spacing_px`, `spacing_mm`, `per_inch`, `positions_px`, `confidence`,
-`message`), `analyzed_area_px`, `analyzed_area_mm`, and `roi`. Validation
-failures (bad file type, oversized upload, degenerate calibration,
-out-of-bounds ROI) come back as `success: false` with a clear `message`
-and an appropriate 4xx status — never a fabricated result.
+`message`, plus the harmonic-disambiguation diagnostics `candidates_px`
+and `selected_reason`), `analyzed_area_px`, `analyzed_area_mm`, `roi`,
+`algorithm_version`, and `loop_centers_px` (approximate 2D loop-center
+points for the debug overlay). Validation failures (bad file type,
+oversized upload, degenerate calibration, out-of-bounds ROI) come back
+as `success: false` with a clear `message` and an appropriate 4xx
+status — never a fabricated result.
 
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.
@@ -313,6 +365,15 @@ sqlite3 textile-gauge-reader/data/corrections.db "select * from corrections;"
   guessing).
 - No AI/ML model is used in V0; this is a placeholder for a future,
   more robust detector.
+- The loop-center detector is a heuristic blob response (compact,
+  loop-scale brightness maxima), not trained loop segmentation. It can
+  still miss loops in poor lighting/focus or on fabrics whose loop heads
+  aren't the most locally prominent feature; when its evidence is too
+  thin or internally inconsistent to trust, the axis falls back to the
+  autocorrelation-only estimate with a message saying so — check
+  Detection Details and Show Loop Centers on any result you're not sure
+  about, rather than assuming a number without a "corrected" reason is
+  automatically right.
 - Ground-truth corrections are collected but never applied automatically
   — tuning the algorithm from that data is a deliberate, separate step.
 - Correction storage is a single SQLite file with no auth in front of

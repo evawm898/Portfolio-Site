@@ -1,7 +1,7 @@
 """Pydantic request/response models for the API layer."""
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,15 @@ class AxisOut(BaseModel):
     positions_px: List[float] = Field(default_factory=list)
     confidence: float = 0.0
     message: str = ""
+    # Detection-details diagnostics: every harmonic period candidate
+    # considered (typically 0.5x/1x/2x of the coarse autocorrelation
+    # estimate) and a human-readable explanation of which one was picked
+    # and why — e.g. confirmed against loop-center evidence, corrected up
+    # from a leg/sub-loop harmonic, or fell back with no independent
+    # validation available. Lets a human confirm the detector locked onto
+    # the true loop-to-loop repeat rather than a sub-feature.
+    candidates_px: List[float] = Field(default_factory=list)
+    selected_reason: str = ""
 
 
 class AnalyzeResponse(BaseModel):
@@ -44,6 +53,11 @@ class AnalyzeResponse(BaseModel):
     wale: AxisOut = Field(default_factory=AxisOut)
     course: AxisOut = Field(default_factory=AxisOut)
     algorithm_version: Optional[str] = None
+    # Approximate 2D knit-loop-center points (full-image pixel
+    # coordinates) for the optional "show loop centers" diagnostic
+    # overlay — lets a human visually confirm what the detector is
+    # treating as one complete loop, not just trust the final numbers.
+    loop_centers_px: List[Tuple[float, float]] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):

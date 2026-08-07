@@ -138,6 +138,8 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
         positions_px=axis.positions_px,
         confidence=axis.confidence,
         message=axis.message,
+        candidates_px=axis.candidates_px,
+        selected_reason=axis.selected_reason,
     )
 
 
@@ -254,6 +256,7 @@ async def analyze(
         wale=_axis_to_out(result.wale, pixels_per_mm),
         course=_axis_to_out(result.course, pixels_per_mm),
         algorithm_version=ALGORITHM_VERSION,
+        loop_centers_px=result.loop_centers_px,
     )
     return JSONResponse(status_code=200, content=response.model_dump())
 

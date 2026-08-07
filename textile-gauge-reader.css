@@ -404,6 +404,68 @@
 .tgr-confidence-bar__fill.is-mid { background: var(--tgr-course); }
 
 /* ---------------------------------------------------
+   Debug / diagnostics (loop centers, detection details)
+--------------------------------------------------- */
+
+.tgr-show-centers-toggle {
+  margin-top: 0.85rem;
+}
+
+.tgr-debug-panel {
+  margin-top: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+}
+.tgr-debug-panel summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+}
+.tgr-debug-panel summary:hover { color: var(--ink); }
+.tgr-debug-panel[open] summary { margin-bottom: 0.5rem; }
+
+.tgr-debug-axis {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--line);
+  font-size: 12px;
+}
+.tgr-debug-axis:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.tgr-debug-axis__title {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 0.3rem;
+}
+.tgr-debug-axis__candidates {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.tgr-debug-candidate {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+}
+.tgr-debug-candidate.is-selected {
+  border-color: var(--petrol-bright);
+  color: var(--petrol-bright);
+  font-weight: 600;
+}
+.tgr-debug-axis__reason {
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+.tgr-debug-axis__reason.is-corrected { color: var(--tgr-course); }
+
+/* ---------------------------------------------------
    Verify Measurement (ground-truth correction)
 --------------------------------------------------- */
 

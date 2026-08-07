@@ -134,6 +134,25 @@
       <div class="tgr-results-grid" id="resultsGrid"></div>
       <div id="resultsWarning" class="tgr-warning" hidden></div>
 
+      <label class="tgr-checkbox-option tgr-show-centers-toggle">
+        <input type="checkbox" id="showLoopCentersCheck">
+        <span>Show loop centers (debug)</span>
+      </label>
+
+      <details class="tgr-debug-panel" id="detectionDetailsPanel">
+        <summary>Detection Details</summary>
+        <p class="tgr-hint">
+          What the detector actually locked onto for each axis: every harmonic
+          period candidate it considered (typically half / full / double the raw
+          edge-signal estimate) and why the final one was picked. A "corrected"
+          reason means the raw estimate looked like it was following a sub-loop
+          feature (e.g. one leg of a V) or a doubled repeat, and loop-center
+          evidence was used to fix it — use "Show loop centers" above to check
+          that visually against the actual knit structure.
+        </p>
+        <div id="detectionDetailsContent"></div>
+      </details>
+
       <div class="tgr-verify" id="verifySection">
         <h3 class="tgr-verify__title">Verify Measurement</h3>
         <p class="tgr-hint">

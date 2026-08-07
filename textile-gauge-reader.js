@@ -91,6 +91,8 @@
   const resultsGrid = document.getElementById("resultsGrid");
   const resultsWarning = document.getElementById("resultsWarning");
   const resetBtn = document.getElementById("resetBtn");
+  const showLoopCentersCheck = document.getElementById("showLoopCentersCheck");
+  const detectionDetailsContent = document.getElementById("detectionDetailsContent");
 
   const serviceStatusEl = document.getElementById("serviceStatus");
   const serviceStatusDot = document.getElementById("serviceStatusDot");
@@ -394,6 +396,22 @@
 
     drawAxisLines(result.wale.positions_px, waleIsVertical, WALE_COLOR, roiTop, roiBottom);
     drawAxisLines(result.course.positions_px, !waleIsVertical, COURSE_COLOR, roiTop, roiBottom);
+
+    if (showLoopCentersCheck.checked && result.loop_centers_px && result.loop_centers_px.length) {
+      drawLoopCenters(result.loop_centers_px);
+    }
+  }
+
+  function drawLoopCenters(centers) {
+    ctx.fillStyle = "#e9ecec";
+    ctx.globalAlpha = 0.85;
+    for (const [cx, cy] of centers) {
+      const p = naturalToDisplay({ x: cx, y: cy });
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 
   function drawAxisLines(positions, isVertical, color, roiTop, roiBottom) {
@@ -881,9 +899,38 @@
       resultsWarning.hidden = true;
     }
 
+    renderDetectionDetails(r);
     initVerifySection(r);
     render();
   }
+
+  // --- Detection Details (harmonic-candidate diagnostics) ----------------
+
+  function detectionAxisBlock(label, axis) {
+    const candidatesHtml = (axis.candidates_px || [])
+      .map((c) => {
+        // Candidates are the raw 0.5x/1x/2x harmonic values; spacing_px can be
+        // a refined average of detected positions, so match loosely (15%)
+        // rather than requiring near-exact equality.
+        const isSelected = axis.spacing_px != null && Math.abs(c - axis.spacing_px) < Math.max(0.5, axis.spacing_px * 0.15);
+        return `<span class="tgr-debug-candidate${isSelected ? " is-selected" : ""}">${c.toFixed(1)}px</span>`;
+      })
+      .join("");
+    const corrected = (axis.selected_reason || "").includes("corrected");
+    return `
+      <div class="tgr-debug-axis">
+        <div class="tgr-debug-axis__title">${escapeHtml(label)} candidates considered</div>
+        <div class="tgr-debug-axis__candidates">${candidatesHtml || "<span class=\"tgr-debug-candidate\">none</span>"}</div>
+        <div class="tgr-debug-axis__reason${corrected ? " is-corrected" : ""}">${escapeHtml(axis.selected_reason || "—")}</div>
+      </div>`;
+  }
+
+  function renderDetectionDetails(result) {
+    detectionDetailsContent.innerHTML =
+      detectionAxisBlock("Wale", result.wale) + detectionAxisBlock("Course", result.course);
+  }
+
+  showLoopCentersCheck.addEventListener("change", () => render());
 
   // --- Verify Measurement (ground-truth correction) ---------------------
 
@@ -1150,6 +1197,8 @@
     correctionComparison.innerHTML = "";
     correctionError.hidden = true;
     correctionStatus.hidden = true;
+    detectionDetailsContent.innerHTML = "";
+    showLoopCentersCheck.checked = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     goToStep("upload");
   });
