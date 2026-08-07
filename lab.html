@@ -235,9 +235,9 @@
   <section id="textile-circuit-construction" class="lab-section" data-lab-section>
     <div class="section-label">
       <span class="section-label__number">#textile-circuit-construction</span>
-      <h2 class="section-label__title">Five Ways to Build a Textile Circuit</h2>
+      <h2 class="section-label__title">Four Ways to Build a Textile Circuit</h2>
     </div>
-    <p class="lab-section__desc">Five approaches to putting a conductive pathway into fabric, each starting from the same plain swatch with a connection point on either side. Plays once on scroll into view &mdash; hover a swatch to replay it. (A sixth approach, laminated flexible trace, gets its own closer look below.)</p>
+    <p class="lab-section__desc">Four approaches to putting a conductive pathway into fabric, each starting from the same plain swatch with a connection point on either side. Plays once on scroll into view &mdash; hover a swatch to replay it. (Two more &mdash; conductive printed ink and laminated flexible trace &mdash; get their own closer look below.)</p>
 
     <div class="circuit-grid" data-circuit-grid>
 
@@ -249,16 +249,8 @@
         <div class="circuit-panel__caption">Yarn enters &rarr; loops or interlaces &rarr; pathway is formed</div>
       </div>
 
-      <div class="circuit-panel" data-circuit="printed-ink">
-        <span class="circuit-panel__index">02</span>
-        <div class="circuit-panel__stage" data-circuit-stage></div>
-        <div class="circuit-panel__label" data-circuit-label>Printed conductive ink</div>
-        <div class="circuit-panel__sublabel">Deposited onto the textile surface</div>
-        <div class="circuit-panel__caption">Ink is deposited &rarr; line takes shape &rarr; trace is completed</div>
-      </div>
-
       <div class="circuit-panel" data-circuit="metal-coated">
-        <span class="circuit-panel__index">03</span>
+        <span class="circuit-panel__index">02</span>
         <div class="circuit-panel__stage" data-circuit-stage></div>
         <div class="circuit-panel__label" data-circuit-label>Metal-coated fabric</div>
         <div class="circuit-panel__sublabel">Fibers or fabric are coated with a conductive metal</div>
@@ -266,7 +258,7 @@
       </div>
 
       <div class="circuit-panel" data-circuit="sewn-trace">
-        <span class="circuit-panel__index">04</span>
+        <span class="circuit-panel__index">03</span>
         <div class="circuit-panel__stage" data-circuit-stage></div>
         <div class="circuit-panel__label" data-circuit-label>Sewn conductive trace</div>
         <div class="circuit-panel__sublabel">Conductive thread is stitched through the textile</div>
@@ -274,13 +266,36 @@
       </div>
 
       <div class="circuit-panel" data-circuit="embedded-wire">
-        <span class="circuit-panel__index">05</span>
+        <span class="circuit-panel__index">04</span>
         <div class="circuit-panel__stage" data-circuit-stage></div>
         <div class="circuit-panel__label" data-circuit-label>Embedded wire</div>
         <div class="circuit-panel__sublabel">An insulated wire is routed through the textile</div>
         <div class="circuit-panel__caption">Channel opens &rarr; wire feeds through &rarr; textile encloses it</div>
       </div>
 
+    </div>
+  </section>
+
+  <!-- ============================================================
+       COMPONENT: Conductive Printed Ink
+       slug: printed-conductive-ink
+
+       Split out from the grid above into its own standalone showcase,
+       for the same reason laminated flexible trace was: this pathway
+       needs room to show the nozzle actually dispensing ink onto the
+       textile surface -- including a held side view -- that a tile
+       sized the same as its four remaining siblings couldn't fit.
+  ============================================================= -->
+  <section id="printed-conductive-ink" class="lab-section" data-lab-section>
+    <div class="section-label">
+      <span class="section-label__number">#printed-conductive-ink</span>
+      <h2 class="section-label__title">Conductive Printed Ink</h2>
+    </div>
+    <p class="lab-section__desc">A closer look at the second approach: conductive ink is deposited directly onto the textile surface. Plays once on scroll into view &mdash; hover to replay it.</p>
+
+    <div class="printedInk-showcase">
+      <div class="printedInk-showcase__stage" data-printedink-stage></div>
+      <div class="printedInk-showcase__caption">Conductive ink is deposited directly onto the textile surface.</div>
     </div>
   </section>
 
@@ -1197,302 +1212,6 @@
     };
   }
 
-  // =====================================================================
-  // Printed conductive ink — self-contained animation module.
-  //
-  // Everything this needs (SVG creation, path sampling, easing, the 3D
-  // stage) is defined inside buildPrintedInk itself rather than reaching
-  // into any shared helper used by the other five panels — it can be
-  // lifted out of this file and tested on its own, and nothing else on
-  // the page can affect it or be affected by it.
-  //
-  // Visual: a nozzle dispenses conductive ink along a serpentine path
-  // onto a fabric swatch, viewed from directly overhead. Partway through,
-  // the dispense pace deliberately slows and the camera tilts from
-  // bird's-eye toward a 3/4 angle -- swinging through something that
-  // reads as near side-on on the way there -- holds at the settled 3/4
-  // angle so the nozzle is clearly seen mid-dispense, then reverses
-  // (faster, since the return isn't the informative part) back to fully
-  // overhead as the trace finishes.
-  //
-  // Camera mechanics: one flat plane -- one div "face" holding one <svg> --
-  // tilts in 3D as a single rigid body. There is no second face, so
-  // there is nothing that could ever rotate out of sync with it, and no
-  // depth-sorting between separate planes for the nozzle to lose: it's
-  // the last thing drawn into that one plane, so paint order alone keeps
-  // it on top of the fabric at every angle. The rotation is driven
-  // frame-by-frame via requestAnimationFrame -- every value written to
-  // `scene.style.transform` is one this code computed on this tick, never
-  // a CSS `transition` handed off to the browser's own timing/compositor
-  // to interpolate. TILT_CLAMP_DEG is an explicit ceiling tested directly
-  // against this exact DOM (see its comment below) rather than assumed.
-  function buildPrintedInk(stage) {
-    var SVG_NS = 'http://www.w3.org/2000/svg';
-    function el(tag, attrs) {
-      var e = document.createElementNS(SVG_NS, tag);
-      for (var k in attrs) e.setAttribute(k, attrs[k]);
-      return e;
-    }
-    function lerp(a, b, t) { return a + (b - a) * t; }
-
-    // ---- geometry: a 240x140 canvas, swatch centered within it so the
-    // scene's default rotation pivot (its own center) lands on the
-    // swatch/trace/nozzle, not some off-center corner of the stage ----
-    var SW = { x: 20, y: 30, w: 200, h: 80 };
-    var midY = SW.y + SW.h / 2;
-    var padL = SW.x + 4, padR = SW.x + SW.w - 4;
-
-    // ---- DOM: one stage > one 3D scene > one face > one svg. Exactly
-    // one plane, so "do the faces move in lockstep" is true by
-    // construction -- there's only ever one. ----
-    var stageEl = document.createElement('div');
-    stageEl.className = 'ink3d-stage';
-    var scene = document.createElement('div');
-    scene.className = 'ink3d-scene';
-    var face = document.createElement('div');
-    face.className = 'ink3d-face';
-    var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    face.appendChild(svg);
-    scene.appendChild(face);
-    stageEl.appendChild(scene);
-    stage.appendChild(stageEl);
-
-    // Everything that zooms/tilts together, appended in strict
-    // back-to-front paint order: fabric, then weave texture, then pads,
-    // then the trace, then the nozzle last -- so the nozzle is always the
-    // topmost thing sitting on the fabric surface, at every angle, as a
-    // direct consequence of DOM order rather than anything that needs
-    // separate z-index/depth management.
-    var camera = el('g', {});
-    camera.style.transformBox = 'fill-box';
-    camera.style.transformOrigin = 'center';
-    svg.appendChild(camera);
-
-    camera.appendChild(el('rect', {
-      x: SW.x, y: SW.y, width: SW.w, height: SW.h, rx: 3,
-      fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5
-    }));
-
-    var weave = el('g', { opacity: 0.5 });
-    [46, 62, 78, 94].forEach(function (y) {
-      weave.appendChild(el('line', { x1: SW.x, y1: y, x2: SW.x + SW.w, y2: y, stroke: 'var(--line)', 'stroke-width': 0.75 }));
-    });
-    [40, 60, 80, 100, 120, 140, 160, 180, 200].forEach(function (x) {
-      weave.appendChild(el('line', { x1: x, y1: SW.y, x2: x, y2: SW.y + SW.h, stroke: 'var(--line)', 'stroke-width': 0.75 }));
-    });
-    camera.appendChild(weave);
-
-    camera.appendChild(el('circle', { cx: SW.x, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    camera.appendChild(el('circle', { cx: SW.x + SW.w, cy: midY, r: 5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-
-    // serpentine path, starting and ending exactly on the pads
-    var amp = 24, lobes = 3;
-    function sample(t) {
-      var x = lerp(padL, padR, t);
-      var y = midY + amp * Math.sin(2 * Math.PI * lobes * t);
-      return [x, y];
-    }
-    var pathD = (function () {
-      var steps = 160, parts = [];
-      for (var i = 0; i <= steps; i++) {
-        var p = sample(i / steps);
-        parts.push(p[0].toFixed(2) + ',' + p[1].toFixed(2));
-      }
-      return 'M' + parts.join(' L');
-    })();
-
-    var traceBase = el('path', { d: pathD, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
-    var traceHighlight = el('path', { d: pathD, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.4, 'stroke-linecap': 'round' });
-    camera.appendChild(traceBase);
-    camera.appendChild(traceHighlight);
-
-    function primeDraw(path) {
-      var len = path.dataset.len;
-      if (!len) { len = path.getTotalLength(); path.dataset.len = len; }
-      path.style.transition = 'none';
-      path.style.strokeDasharray = len + ' ' + len;
-      path.style.strokeDashoffset = len;
-      path.getBoundingClientRect(); // force reflow before re-enabling transitions
-      path.style.transition = '';
-    }
-    primeDraw(traceBase);
-    primeDraw(traceHighlight);
-
-    // Dispenser: a small cartridge body over a tapered needle tip, plus a
-    // bright bead sitting exactly at the tip. The tip's very point (and
-    // the bead) sit at the group's own origin (0,0) -- the nozzle's
-    // transform translates that origin to sample(t) every frame, so both
-    // land exactly on the trace's centerline rather than hovering above
-    // or below the line it's dispensing. The bead matters visually: the
-    // needle taper connecting the (clearly visible) cartridge body down
-    // to the trace is thin, and at render size that thin connector reads
-    // as a gap, making the solid cartridge look like it's floating above
-    // the line rather than sitting on it. The bead is small but bright
-    // and color-matched to the trace, drawn last so it's the very
-    // topmost pixel at the tip -- it's the unambiguous "ink is coming
-    // out exactly here, on the trace" anchor. Appended last as a group,
-    // so the whole dispenser paints over the fabric and trace at every
-    // angle.
-    var nozzle = el('g', {});
-    nozzle.appendChild(el('rect', { x: -5, y: -26, width: 10, height: 16, rx: 2, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-    nozzle.appendChild(el('path', { d: 'M-3,-10 L3,-10 L1,0 L-1,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
-    nozzle.appendChild(el('circle', { cx: 0, cy: 0, r: 2.2, fill: 'var(--petrol-bright)' }));
-    camera.appendChild(nozzle);
-
-    // ---- timing ----
-    var ZOOM_DUR = 450, ZOOM_GAP = 90, LEAD = ZOOM_DUR + ZOOM_GAP;
-    var passDuration = 1100, cutT = 0.42, slowSpan = 0.2;
-    // Tilt-in is the deliberate, unhurried leg -- it's the informative
-    // part of the shot. Reverse is quicker: once the viewer has
-    // registered the 3/4 angle, getting back overhead doesn't need the
-    // same patience.
-    var TILT_DUR = 1300, REST_RX = 58, REST_RY = -22;
-    var HOLD = 1100, REVERSE_DUR = 650;
-    var CAMERA_MOVE_TOTAL = TILT_DUR + HOLD + REVERSE_DUR;
-    var NOZZLE_FADE = 260, SETTLE_DELAY = 150, SETTLE_DUR = 400;
-
-    // Explicit ceiling on the tilt's rotateX, tested directly against
-    // this exact single-face DOM: static rotateX/rotateY transforms in
-    // 5deg steps from 60-90deg, plus a screenshot burst through the live
-    // animated tilt, show no duplicate/mirrored geometry at any angle up
-    // to and including a full 90deg (at 90 the plane is simply edge-on
-    // and invisible -- the expected result of backface-visibility:hidden
-    // on a single plane, not a ghost). The clamp stays in regardless, as
-    // a deliberate backstop: easeOvershoot's own natural peak (~77deg)
-    // already sits comfortably under it, so in normal operation this is
-    // enforcing a ceiling the curve was never going to reach on its own.
-    var TILT_CLAMP_DEG = 79;
-
-    // Cubic-bezier evaluator (bisection solve for s given x=t, then
-    // y(s)) -- the same math a CSS timing function uses internally, just
-    // computed here and applied via direct per-frame style writes
-    // instead of a `transition`, so every intermediate rotation value is
-    // one this code chose on this tick, not the compositor's.
-    function bezierY(t, x1, y1, x2, y2) {
-      function xOf(s) { return 3 * (1 - s) * (1 - s) * s * x1 + 3 * (1 - s) * s * s * x2 + s * s * s; }
-      function yOf(s) { return 3 * (1 - s) * (1 - s) * s * y1 + 3 * (1 - s) * s * s * y2 + s * s * s; }
-      var lo = 0, hi = 1, s = 0.5;
-      for (var i = 0; i < 24; i++) {
-        s = (lo + hi) / 2;
-        if (xOf(s) < t) lo = s; else hi = s;
-      }
-      return yOf(s);
-    }
-    // Tilt-in: overshoots past the rest angle toward a near side-on read
-    // (peaks ~t=0.37 of the tilt) before easing back to settle exactly
-    // at REST_RX/REST_RY -- one continuous curve, not two stages.
-    function easeOvershoot(t) { return bezierY(t, 0.2, 2.2, 0.5, 1); }
-    // Reverse: plain decelerate, no overshoot -- nothing new to show the
-    // viewer on the way back down.
-    function easeReturn(t) { return 1 - Math.pow(1 - t, 3); }
-
-    var tiltRaf = null;
-    // One rAF loop drives both the tilt-in and the reverse (different
-    // endpoints/easing, same mechanism) -- every frame writes
-    // rotateX/rotateY straight onto `scene`, so the browser is never
-    // asked to interpolate any of it on its own.
-    function runTilt(fromRX, fromRY, toRX, toRY, dur, easeFn, onDone) {
-      var start = performance.now();
-      if (tiltRaf) cancelAnimationFrame(tiltRaf);
-      scene.style.transition = 'none';
-      function frame(now) {
-        var raw = Math.max(0, Math.min(1, (now - start) / dur));
-        var k = easeFn(raw);
-        var rx = Math.min(fromRX + (toRX - fromRX) * k, TILT_CLAMP_DEG);
-        var ry = fromRY + (toRY - fromRY) * k;
-        scene.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg)';
-        if (raw < 1) tiltRaf = requestAnimationFrame(frame);
-        else if (onDone) onDone();
-      }
-      tiltRaf = requestAnimationFrame(frame);
-    }
-
-    var raf = null;
-    function resetToStart() {
-      camera.style.transition = 'none';
-      camera.style.transform = 'scale(0.72)';
-      scene.style.transition = 'none';
-      scene.style.transform = 'rotateX(0deg) rotateY(0deg)';
-      primeDraw(traceBase);
-      primeDraw(traceHighlight);
-      traceHighlight.style.transition = 'none';
-      traceHighlight.style.opacity = '0.4';
-      nozzle.style.transition = 'none';
-      nozzle.style.opacity = '0';
-      var p0 = sample(0);
-      nozzle.setAttribute('transform', 'translate(' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) + ')');
-    }
-    resetToStart();
-
-    return {
-      duration: LEAD + passDuration * cutT + CAMERA_MOVE_TOTAL + passDuration * (1 - cutT - slowSpan) + NOZZLE_FADE + SETTLE_DELAY + SETTLE_DUR + 150,
-      play: function () {
-        resetToStart();
-        camera.getBoundingClientRect();
-        camera.style.transition = 'transform ' + ZOOM_DUR + 'ms cubic-bezier(.25,.7,.3,1.05)';
-        camera.style.transform = 'scale(1)';
-
-        setTimeout(function () {
-          nozzle.style.transition = 'none';
-          nozzle.style.opacity = '1';
-          nozzle.getBoundingClientRect();
-
-          var lenBase = Number(traceBase.dataset.len);
-          var lenHi = Number(traceHighlight.dataset.len);
-
-          // Drives the nozzle's position and the trace's reveal off the
-          // identical t, every single frame -- they're never two numbers
-          // that could drift apart, because they're never anything but
-          // the same number.
-          function runPass(fromT, toT, dur, onDone) {
-            var start = performance.now();
-            if (raf) cancelAnimationFrame(raf);
-            function frame(now) {
-              var raw = Math.max(0, Math.min(1, (now - start) / dur));
-              var t = fromT + (toT - fromT) * raw;
-              var p = sample(t);
-              nozzle.setAttribute('transform', 'translate(' + p[0].toFixed(2) + ',' + p[1].toFixed(2) + ')');
-              traceBase.style.strokeDashoffset = String(lenBase * (1 - t));
-              traceHighlight.style.strokeDashoffset = String(lenHi * (1 - t));
-              if (raw < 1) raf = requestAnimationFrame(frame);
-              else if (onDone) onDone(t);
-            }
-            raf = requestAnimationFrame(frame);
-          }
-
-          // 1. dispense at normal speed, camera flat overhead
-          runPass(0, cutT, passDuration * cutT, function () {
-            // 2. slow the pace way down for the entire camera move --
-            // never freezing, just covering less trace per second while
-            // the camera tilts, holds, and returns (one continuous slow
-            // pass spanning all of CAMERA_MOVE_TOTAL).
-            runPass(cutT, cutT + slowSpan, CAMERA_MOVE_TOTAL);
-
-            // 3/4/5. tilt to the 3/4 angle (slow, overshoots through a
-            // near side-on read) -> hold -> tilt back to flat (quicker,
-            // no overshoot).
-            runTilt(0, 0, REST_RX, REST_RY, TILT_DUR, easeOvershoot, function () {
-              setTimeout(function () {
-                runTilt(REST_RX, REST_RY, 0, 0, REVERSE_DUR, easeReturn, function () {
-                  // 6. camera is back overhead -- finish the trace at
-                  // normal speed so it resolves promptly
-                  runPass(cutT + slowSpan, 1, passDuration * (1 - cutT - slowSpan), function () {
-                    nozzle.style.transition = 'opacity ' + NOZZLE_FADE + 'ms ease';
-                    nozzle.style.opacity = '0';
-                    setTimeout(function () {
-                      traceHighlight.style.transition = 'opacity ' + SETTLE_DUR + 'ms ease';
-                      traceHighlight.style.opacity = '0.2';
-                    }, SETTLE_DELAY);
-                  });
-                });
-              }, HOLD);
-            });
-          });
-        }, LEAD);
-      }
-    };
-  }
-
   function buildMetalCoated(stage) {
     var svg = svgEl('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
     var cameraGroup = buildCameraGroup(svg);
@@ -1963,6 +1682,388 @@
             });
           });
         }, LEAD);
+      }
+    };
+  }
+
+  /* ============================================================
+     EDIT PRINTED INK PATH HERE
+     ------------------------------------------------------------
+     Every preset is a plain SVG path `d` string, authored in the
+     same 240x140 canvas every other panel on this page uses (the
+     fabric swatch spans x 20-220, y 30-110, so keep new paths
+     comfortably inside that box). PRINTED_INK_ACTIVE_PATH picks
+     which preset actually renders -- only one is ever mounted.
+
+     Nothing below this block hard-codes a coordinate from the path:
+     nozzle position, its tangent/orientation, the deposited-trace
+     reveal, the dispensing bead, and even the two contact pads are
+     all derived at runtime from whichever `d` string is active here,
+     via getTotalLength()/getPointAtLength(). Swapping the active
+     preset -- or editing a preset's `d` string directly -- is the
+     only change needed to print a different shape; nozzle logic,
+     camera logic, trace-reveal logic and timing are all untouched.
+  ============================================================= */
+  var PRINTED_INK_PATHS = {
+    // Default: a gentle two-lobe serpentine -- smooth curves, no
+    // self-intersections, enough travel to read the dispensing
+    // motion clearly.
+    serpentine: 'M40,70 C64,36 88,104 112,70 C136,36 160,104 184,70 L200,70',
+    // A straight pad-to-pad run -- useful for sanity-checking the
+    // nozzle/trace mechanics against the simplest possible path.
+    straight: 'M40,70 L200,70',
+    // A simple right-angle circuit-style run, gently rounded at each
+    // turn -- demonstrates the architecture isn't tied to smooth
+    // curves specifically.
+    circuitA: 'M40,50 L92,50 Q100,50 100,58 L100,82 Q100,90 108,90 L152,90 Q160,90 160,82 L160,58 Q160,50 168,50 L200,50'
+  };
+  var PRINTED_INK_ACTIVE_PATH = 'serpentine';
+
+  // =====================================================================
+  // Conductive printed ink -- self-contained animation module, built
+  // fresh. Shares no code, transform, DOM element, or animation state
+  // with any earlier version of this module or with the laminated-
+  // trace/embedded-wire pathways elsewhere on this page -- every
+  // helper, every id/class, and every persistent element used below
+  // is defined and created inside buildPrintedInk itself.
+  //
+  // Core idea: the nozzle IS the leading edge of the trace. There is
+  // exactly one shared progress value (pathProgress, 0..1) computed
+  // once per frame; the nozzle's position/orientation and the trace's
+  // stroke-dashoffset reveal are both read off the identical
+  // getPointAtLength()/getTotalLength() call against the identical
+  // path element (`measurePath`), so the nozzle tip and the trace's
+  // growing end are mathematically the same point on every frame --
+  // never two numbers that could drift apart.
+  //
+  // Camera: a single rotating parent (`scene`) holds three flat faces
+  // (fabric, trace, nozzle), each offset only by its own translateZ
+  // (fabric at 0, the thin deposited ink just above it, the nozzle
+  // hovering well above that -- so the side view reads exactly as
+  // nozzle-above-bead-above-ink-above-fabric). No face ever carries
+  // its own rotation; the only number that changes over time is
+  // `scene`'s own rotateX, written directly from a requestAnimationFrame
+  // loop every frame (never a CSS transition). Positive rotateX only
+  // -- no Y, no Z, ever -- and it never reaches REST_RX's full 90deg,
+  // so layer order and orientation stay legible throughout.
+  //
+  // Camera vs. path progress are deliberately two separate functions
+  // of two separate inputs: pathProgress is a function of elapsed
+  // time (via the PH phase schedule below), and the camera's rotateX
+  // is a function of pathProgress itself (via fixed 0.25/0.45/0.60/
+  // 0.78 thresholds), never of raw time or of any literal path
+  // coordinate. Swapping PRINTED_INK_ACTIVE_PATH for a longer or
+  // shorter path changes nothing about when the camera moves, because
+  // pathProgress is always normalized 0..1 regardless of the active
+  // path's actual length.
+  function buildPrintedInk(stage) {
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    function el(tag, attrs) {
+      var e = document.createElementNS(SVG_NS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function clamp01(t) { return Math.max(0, Math.min(1, t)); }
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+    function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+    function phaseT(p, range) { return clamp01((p - range[0]) / (range[1] - range[0])); }
+
+    var PRINTED_INK_D = PRINTED_INK_PATHS[PRINTED_INK_ACTIVE_PATH];
+
+    // ---- geometry: same 240x140 canvas as every other panel ----
+    var SW = { x: 20, y: 30, w: 200, h: 80 };
+
+    // ---- DOM: one stage > one rotating scene > three stacked faces,
+    // each a flat plane offset only by its own translateZ. No face is
+    // ever rotated on its own -- rotation only ever happens on
+    // `scene`, which doubles as "the camera" (hence the extra class). ----
+    var stageEl = document.createElement('div');
+    stageEl.className = 'printedInk-stage';
+    var scene = document.createElement('div');
+    scene.className = 'printedInk-scene printedInk-camera';
+    stageEl.appendChild(scene);
+    stage.appendChild(stageEl);
+
+    function makeFace(z) {
+      var face = document.createElement('div');
+      face.className = 'printedInk-face';
+      face.style.transform = 'translateZ(' + z + 'px)';
+      var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
+      face.appendChild(svg);
+      scene.appendChild(face);
+      return { face: face, svg: svg };
+    }
+
+    // Deliberately large relative to the swatch itself, same reasoning
+    // as the laminated-trace rig: at a rotation short of edge-on, a
+    // flat layer's own footprint never fully collapses to a hairline,
+    // so the gap between layers has to outrun each layer's own
+    // foreshortened silhouette for a visible seam to appear at all.
+    // The trace layer is a thin stroke rather than a filled shape
+    // though, so it needs far less clearance off the fabric than the
+    // nozzle needs off the trace.
+    var Z_FABRIC = 0;
+    var Z_TRACE = 32;
+    var Z_NOZZLE = 92;
+    var NOZZLE_LIFT = 16;
+
+    // fabric, trace, nozzle -- built and appended exactly once, in
+    // that exact order, and never reordered or duplicated for the
+    // module's lifetime. Exactly one of each, always.
+    var fabric = makeFace(Z_FABRIC);
+    var trace = makeFace(Z_TRACE);
+    var nozzle = makeFace(Z_NOZZLE);
+
+    // ---- 1. fabric -- fixed forever: position, scale and orientation
+    // never change, for the entire sequence ----
+    var fabricG = el('g', { class: 'printedInk-fabric' });
+    fabricG.appendChild(el('rect', {
+      x: SW.x, y: SW.y, width: SW.w, height: SW.h, rx: 3,
+      fill: 'var(--black-raised)', stroke: 'var(--line-strong)', 'stroke-width': 1.5
+    }));
+    var weave = el('g', { opacity: 0.55 });
+    [46, 62, 78, 94].forEach(function (y) {
+      weave.appendChild(el('line', { x1: SW.x, y1: y, x2: SW.x + SW.w, y2: y, stroke: 'var(--line)', 'stroke-width': 0.75 }));
+    });
+    [40, 60, 80, 100, 120, 140, 160, 180, 200].forEach(function (x) {
+      weave.appendChild(el('line', { x1: x, y1: SW.y, x2: x, y2: SW.y + SW.h, stroke: 'var(--line)', 'stroke-width': 0.75 }));
+    });
+    fabricG.appendChild(weave);
+    fabric.svg.appendChild(fabricG);
+
+    // ---- 2. conductive trace -- one continuous path (PRINTED_INK_D),
+    // never touched again after creation. `measurePath` is the single
+    // source of truth for every position query below (getTotalLength/
+    // getPointAtLength); traceInner shares its exact `d`, so revealing
+    // both by the identical dashoffset always terminates them at the
+    // identical point -- there is no second, independently-tracked
+    // trace geometry anywhere in this module. ----
+    var traceG = el('g', { class: 'printedInk-trace' });
+    var measurePath = el('path', {
+      d: PRINTED_INK_D, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-width': 6,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    });
+    var traceInner = el('path', {
+      d: PRINTED_INK_D, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-width': 3,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    });
+    // Short trailing highlight, resampled from the same path each
+    // frame -- the "freshly deposited" sheen right behind the tip.
+    // Never a second independent trace: its own `d` is always a short
+    // sub-span of the identical measurePath geometry.
+    var traceWet = el('path', {
+      d: '', fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2, 'stroke-linecap': 'round'
+    });
+    traceWet.style.opacity = '0';
+    traceG.appendChild(measurePath);
+    traceG.appendChild(traceInner);
+    traceG.appendChild(traceWet);
+    trace.svg.appendChild(traceG);
+
+    var totalLen = measurePath.getTotalLength();
+    function primeDash(path) {
+      path.style.strokeDasharray = totalLen + ' ' + totalLen;
+      path.style.strokeDashoffset = String(totalLen);
+    }
+    primeDash(measurePath);
+    primeDash(traceInner);
+
+    // Contact pads -- derived from the path's own endpoints
+    // (getPointAtLength(0) / (totalLen)) rather than separately
+    // hard-coded coordinates, so they can never drift out of sync
+    // with wherever PRINTED_INK_D actually starts/ends.
+    var padStart = measurePath.getPointAtLength(0);
+    var padEnd = measurePath.getPointAtLength(totalLen);
+    [padStart, padEnd].forEach(function (p) {
+      traceG.appendChild(el('rect', {
+        x: p.x - 4.5, y: p.y - 4.5, width: 9, height: 9, rx: 2,
+        fill: 'var(--petrol-bright)', stroke: 'var(--ink-dim)', 'stroke-width': 0.75
+      }));
+    });
+
+    // Resamples a short span of measurePath into a fresh `d` string --
+    // used only for the wet trailing highlight, never for the nozzle
+    // or the main trace reveal.
+    function sampleSpan(fromT, toT) {
+      var n = 8, d = '';
+      for (var i = 0; i <= n; i++) {
+        var tt = fromT + (toT - fromT) * (i / n);
+        var pt = measurePath.getPointAtLength(totalLen * clamp01(tt));
+        d += (i === 0 ? 'M' : ' L') + pt.x.toFixed(2) + ',' + pt.y.toFixed(2);
+      }
+      return d;
+    }
+
+    // ---- 3. nozzle + single dispensing bead -- exactly one of each,
+    // built once. "Forward" in the nozzle's own local space is +x
+    // (tip/bead at the origin, body trailing toward -x); rotating the
+    // whole group by the path's local tangent angle aligns that
+    // forward axis with the actual direction of travel every frame. ----
+    var nozzleG = el('g', { class: 'printedInk-nozzle' });
+    // Deliberately chunky rather than pen-thin -- a long, narrow
+    // silhouette reads fine top-down but tends to compress into an
+    // illegible sliver once the 3D tilt foreshortens it at an angle,
+    // regardless of exact rotation. A shorter, taller body survives
+    // that compression and still reads as a dispenser at every angle.
+    nozzleG.appendChild(el('rect', { x: -17, y: -8, width: 11, height: 16, rx: 2.5, fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+    nozzleG.appendChild(el('path', { d: 'M-6,-4.5 L-6,4.5 L0,0 Z', fill: 'var(--ink-dim)', stroke: 'var(--line-strong)', 'stroke-width': 0.6 }));
+    var bead = el('circle', { cx: 0, cy: 0, r: 2.6, fill: 'var(--petrol-bright)', class: 'printedInk-bead' });
+    nozzleG.appendChild(bead);
+    nozzle.svg.appendChild(nozzleG);
+
+    // Nozzle position/orientation and the trace's reveal are driven
+    // from this one function, called with the one shared progress
+    // value -- there is no separate nozzle timeline anywhere.
+    var WET_SPAN = 0.035;
+    // The nozzle orients toward the path's local tangent, but only
+    // partially (see NOZZLE_TANGENT_WEIGHT) -- the full tangent angle
+    // reads fine top-down, but on a wavy path it can swing steeply
+    // enough that, combined with the 3D tilt's own foreshortening in
+    // side view, the nozzle would periodically compress into a near-
+    // illegible sliver. Damping the angle keeps it responsive to
+    // direction of travel without ever swinging that far.
+    var NOZZLE_TANGENT_WEIGHT = 0.55;
+    function applyPathProgress(t) {
+      t = clamp01(t);
+      var lenAt = totalLen * t;
+      var pt = measurePath.getPointAtLength(lenAt);
+      var epsLen = Math.max(1.5, totalLen * 0.015);
+      var backLen = Math.max(0, lenAt - epsLen);
+      var angleDeg = 0;
+      if (lenAt > backLen) {
+        var ptBack = measurePath.getPointAtLength(backLen);
+        angleDeg = Math.atan2(pt.y - ptBack.y, pt.x - ptBack.x) * 180 / Math.PI * NOZZLE_TANGENT_WEIGHT;
+      }
+
+      var dashLen = totalLen - lenAt;
+      measurePath.style.strokeDashoffset = String(dashLen);
+      traceInner.style.strokeDashoffset = String(dashLen);
+
+      if (t > 0.001 && t < 1) {
+        traceWet.setAttribute('d', sampleSpan(Math.max(0, t - WET_SPAN), t));
+        traceWet.style.opacity = '0.55';
+      } else if (t <= 0.001) {
+        traceWet.style.opacity = '0';
+      }
+      // t >= 1 (fully printed) is handled by render()'s own fade-out
+      // below, not here, so it can ease out rather than snap to 0.
+
+      nozzleG.setAttribute('transform', 'translate(' + pt.x.toFixed(2) + ',' + pt.y.toFixed(2) + ') rotate(' + angleDeg.toFixed(2) + ')');
+    }
+
+    function applyCamera(rx) {
+      scene.style.transform = 'rotateX(' + rx.toFixed(3) + 'deg)';
+    }
+
+    // ---- timeline: one normalized progress value (p) drives
+    // pathProgress via the phase schedule below; pathProgress alone
+    // then drives the camera via the fixed thresholds in render(). ----
+    //   appear         300ms   nozzle fades in at the path start
+    //   printA        1400ms   top-down print,  pathProgress 0    -> 0.25
+    //   printB        1600ms   rotate to side,  pathProgress 0.25 -> 0.45 (slower)
+    //   printC        2200ms   side-view hold,  pathProgress 0.45 -> 0.60 (slowest)
+    //   printD        1300ms   rotate to top,   pathProgress 0.60 -> 0.78
+    //   printE        1200ms   finish overhead, pathProgress 0.78 -> 1.00
+    //   holdFinished   700ms   hold on the completed trace, slight lift
+    //   TOTAL         8700ms
+    var TOTAL_DURATION = 8700;
+    var PH = {
+      appear:       [0.0000, 0.0345],
+      printA:       [0.0345, 0.1954],
+      printB:       [0.1954, 0.3793],
+      printC:       [0.3793, 0.6322],
+      printD:       [0.6322, 0.7816],
+      printE:       [0.7816, 0.9195],
+      holdFinished: [0.9195, 1.0000]
+    };
+    // Short of a literal edge-on 90deg. Unlike laminated trace's large
+    // filled panels, everything here is a thin stroke or a small icon,
+    // so it doesn't need nearly as steep a tilt to read as separated
+    // -- and staying shallower keeps the fabric plane itself, and the
+    // small nozzle icon, from compressing into illegibility.
+    var REST_RX = 58;
+
+    function render(p) {
+      // -- path progress: a function of elapsed time alone --
+      var pathProgress;
+      if (p < PH.appear[1]) pathProgress = 0;
+      else if (p < PH.printA[1]) pathProgress = lerp(0, 0.25, easeInOutCubic(phaseT(p, PH.printA)));
+      else if (p < PH.printB[1]) pathProgress = lerp(0.25, 0.45, easeInOutCubic(phaseT(p, PH.printB)));
+      else if (p < PH.printC[1]) pathProgress = lerp(0.45, 0.60, easeInOutCubic(phaseT(p, PH.printC)));
+      else if (p < PH.printD[1]) pathProgress = lerp(0.60, 0.78, easeInOutCubic(phaseT(p, PH.printD)));
+      else if (p < PH.printE[1]) pathProgress = lerp(0.78, 1.00, easeInOutCubic(phaseT(p, PH.printE)));
+      else pathProgress = 1.0;
+
+      // -- camera: a function of pathProgress alone, never of `p` or
+      // of any literal path coordinate -- see the module comment. --
+      var rx;
+      if (pathProgress < 0.25) rx = 0;
+      else if (pathProgress < 0.45) rx = lerp(0, REST_RX, easeInOutCubic((pathProgress - 0.25) / 0.20));
+      else if (pathProgress < 0.60) rx = REST_RX;
+      else if (pathProgress < 0.78) rx = lerp(REST_RX, 0, easeInOutCubic((pathProgress - 0.60) / 0.18));
+      else rx = 0;
+      applyCamera(rx);
+
+      // -- nozzle fade-in during the brief appear beat --
+      nozzleG.style.opacity = easeOutCubic(phaseT(p, PH.appear)).toFixed(3);
+
+      // -- nozzle position/orientation + trace reveal, both from the
+      // same pathProgress value --
+      applyPathProgress(pathProgress);
+
+      // -- once fully printed: the wet highlight settles away and the
+      // nozzle lifts slightly. Both are gated on pathProgress >= 1, so
+      // neither can ever happen while ink is still being deposited. --
+      if (pathProgress >= 1) {
+        var doneT = easeOutCubic(phaseT(p, PH.holdFinished));
+        traceWet.style.opacity = (0.55 * (1 - doneT)).toFixed(3);
+        nozzle.face.style.transform = 'translateZ(' + (Z_NOZZLE + NOZZLE_LIFT * doneT).toFixed(2) + 'px)';
+      } else {
+        nozzle.face.style.transform = 'translateZ(' + Z_NOZZLE + 'px)';
+      }
+    }
+
+    // Reduced-motion path reuses the identical applyPathProgress/
+    // applyCamera primitives (never a separate, divergent nozzle/trace
+    // implementation) -- it just skips the rotation entirely (camera
+    // pinned at 0) and drives pathProgress through one short, single
+    // eased pass instead of the multi-phase schedule above.
+    var REDUCED_DURATION = 2200;
+    function renderReduced(rp) {
+      applyCamera(0);
+      nozzle.face.style.transform = 'translateZ(' + Z_NOZZLE + 'px)';
+      nozzleG.style.opacity = Math.min(1, rp / 0.15).toFixed(3);
+      applyPathProgress(easeInOutCubic(clamp01(rp)));
+      if (rp >= 1) traceWet.style.opacity = '0';
+    }
+
+    var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+    var raf = null;
+    function resetToStart() {
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      stageEl.style.transition = 'none';
+      stageEl.style.opacity = '1';
+      nozzle.face.style.transform = 'translateZ(' + Z_NOZZLE + 'px)';
+      if (REDUCED) renderReduced(0); else render(0);
+    }
+    resetToStart();
+
+    return {
+      duration: REDUCED ? REDUCED_DURATION : TOTAL_DURATION,
+      play: function () {
+        resetToStart();
+        var dur = REDUCED ? REDUCED_DURATION : TOTAL_DURATION;
+        var renderFn = REDUCED ? renderReduced : render;
+        var start = performance.now();
+        function frame(now) {
+          var raw = Math.max(0, Math.min(1, (now - start) / dur));
+          renderFn(raw);
+          if (raw < 1) raf = requestAnimationFrame(frame);
+          else raf = null;
+        }
+        raf = requestAnimationFrame(frame);
       }
     };
   }
@@ -2630,12 +2731,11 @@
   if (circuitGrid) {
     var CIRCUIT_BUILDERS = {
       'conductive-yarn': buildConductiveYarn,
-      'printed-ink': buildPrintedInk,
       'metal-coated': buildMetalCoated,
       'sewn-trace': buildSewnTrace,
       'embedded-wire': buildEmbeddedWire
     };
-    var CIRCUIT_ORDER = ['conductive-yarn', 'printed-ink', 'metal-coated', 'sewn-trace', 'embedded-wire'];
+    var CIRCUIT_ORDER = ['conductive-yarn', 'metal-coated', 'sewn-trace', 'embedded-wire'];
 
     var circuitControllers = {};
     var circuitPlaying = {};
@@ -2690,6 +2790,50 @@
         if (!circuitAutoPlayed) return;
         playCircuit(type);
       });
+    });
+  }
+
+  /* ---------------------------------------------------
+     conductive printed ink — standalone showcase, wired up the same
+     way as the circuit grid above (autoplay once on scroll into view,
+     hover/tap to replay) but scoped to just this one section rather
+     than a staggered group of panels. Entirely separate variables
+     from every other section's wiring below -- no shared playing/
+     autoplay state, no shared IntersectionObserver.
+  --------------------------------------------------- */
+  var printedInkSection = document.getElementById('printed-conductive-ink');
+  if (printedInkSection) {
+    var printedInkStage = printedInkSection.querySelector('[data-printedink-stage]');
+    var printedInkController = buildPrintedInk(printedInkStage);
+    var printedInkPlaying = false;
+    var printedInkAutoPlayed = false;
+
+    function playPrintedInk() {
+      if (printedInkPlaying) return;
+      printedInkPlaying = true;
+      printedInkController.play();
+      setTimeout(function () { printedInkPlaying = false; }, printedInkController.duration + 60);
+    }
+
+    var printedInkIo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && !printedInkAutoPlayed) {
+          printedInkAutoPlayed = true;
+          playPrintedInk();
+          printedInkIo.disconnect();
+        }
+      });
+    }, { threshold: 0.3 });
+    printedInkIo.observe(printedInkSection);
+
+    printedInkSection.addEventListener('mouseenter', function () {
+      if (!printedInkAutoPlayed) return;
+      playPrintedInk();
+    });
+    printedInkSection.addEventListener('click', function () {
+      if (!isTouchDevice) return; // desktop already gets this via hover
+      if (!printedInkAutoPlayed) return;
+      playPrintedInk();
     });
   }
 

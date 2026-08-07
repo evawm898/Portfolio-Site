@@ -443,6 +443,44 @@
   -webkit-backface-visibility: hidden;
 }
 
+/* Conductive printed ink's own 3D stage — three stacked, parallel
+   faces (fabric, deposited trace, nozzle) under one rotating
+   .printedInk-scene, same principle as .laminatedTrace-* above but a
+   fully separate rig: its own class names, its own perspective, no
+   shared state with either the laminated-trace or embedded-wire rigs.
+   At rest (rotateX 0) all three faces overlap in the same footprint —
+   a true top-down read — and as the scene rotates around X those
+   translateZ offsets project into vertical screen separation, putting
+   the nozzle visibly above the ink, and the ink visibly above the
+   fabric. */
+.printedInk-stage {
+  width: 100%;
+  height: 100%;
+  perspective: 1000px;
+}
+
+.printedInk-scene {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transform-origin: 50% 50%;
+}
+
+.printedInk-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  /* Every face stays parallel to the scene's own rotation (only a
+     translateZ separates them) — hiding the true backface stops a
+     face from rendering as a mirrored ghost of itself, should the
+     scene ever be pushed past edge-on. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 .circuit-panel__label {
   margin-top: 1.5rem;
   font-family: var(--serif);
@@ -493,6 +531,33 @@
 }
 
 .lamtrace-showcase__caption {
+  margin-top: 1.75rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+/* Conductive printed ink's standalone showcase -- same layout pattern
+   as .lamtrace-showcase above (single large centered stage, own class
+   names, no shared state) so the nozzle/bead/side-view mechanics have
+   room to read clearly. Reuses .circuit-panel__svg for the inner
+   <svg> itself (pure layout, no animation state), same as every other
+   pathway on this page. */
+.printedInk-showcase {
+  padding: 1rem 6vw 3.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.printedInk-showcase__stage {
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 240 / 140;
+}
+
+.printedInk-showcase__caption {
   margin-top: 1.75rem;
   font-family: var(--mono);
   font-size: 11px;
