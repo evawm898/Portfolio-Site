@@ -43,8 +43,30 @@ class AnalyzeResponse(BaseModel):
     orientation: Optional[Orientation] = None
     wale: AxisOut = Field(default_factory=AxisOut)
     course: AxisOut = Field(default_factory=AxisOut)
+    algorithm_version: Optional[str] = None
 
 
 class ErrorResponse(BaseModel):
     success: bool = False
     message: str
+
+
+class CorrectionOut(BaseModel):
+    """
+    What the frontend needs to render the "Predicted -> Actual" comparison
+    right after a correction is saved. The full record (ROI, calibration,
+    detected positions, etc.) is persisted server-side regardless — this
+    is just the display-relevant subset.
+    """
+
+    success: bool = True
+    id: str
+    created_at: str
+    predicted_wales_per_inch: Optional[float] = None
+    predicted_courses_per_inch: Optional[float] = None
+    actual_wales_per_inch: Optional[float] = None
+    actual_courses_per_inch: Optional[float] = None
+    wale_percent_error: Optional[float] = None
+    course_percent_error: Optional[float] = None
+    algorithm_version: str
+    image_saved: bool = False

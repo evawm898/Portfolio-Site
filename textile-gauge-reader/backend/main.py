@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
@@ -24,9 +25,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from analysis import analyze_gauge
+from analysis import ALGORITHM_VERSION, analyze_gauge
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
+from storage import corrections_store
 
+from .corrections_api import router as corrections_router
 from .image_io import MAX_UPLOAD_BYTES, ImageValidationError, decode_image, validate_upload
 from .schemas import (
     MM_PER_INCH,
@@ -44,10 +47,25 @@ logger = logging.getLogger("textile_gauge_reader")
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Deliberately not called at module import time: importing this module
+    # (e.g. from tooling or a test suite) shouldn't have disk side effects.
+    # (Table creation itself is also guaranteed on every DB connection in
+    # storage/corrections_store.py, so this isn't the only thing standing
+    # between a fresh checkout and a working /corrections endpoint — but
+    # doing it once up front means the first request isn't the one paying
+    # for it.)
+    corrections_store.init_db()
+    yield
+
+
 app = FastAPI(
     title="AI Textile Gauge Reader",
     description="Estimate knitted-textile gauge (wales/inch, courses/inch) from a photograph.",
     version="0.1.0",
+    lifespan=_lifespan,
 )
 
 # --- CORS -----------------------------------------------------------
@@ -67,6 +85,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ground-truth correction system: /corrections (save), /corrections
+# (list), /corrections/export.{csv,json}. See backend/corrections_api.py
+# and storage/corrections_store.py.
+app.include_router(corrections_router)
 
 # --- Request size guard ------------------------------------------------
 # Belt-and-suspenders alongside the in-route upload-size validation:
@@ -230,6 +253,7 @@ async def analyze(
         orientation=orientation,
         wale=_axis_to_out(result.wale, pixels_per_mm),
         course=_axis_to_out(result.course, pixels_per_mm),
+        algorithm_version=ALGORITHM_VERSION,
     )
     return JSONResponse(status_code=200, content=response.model_dump())
 

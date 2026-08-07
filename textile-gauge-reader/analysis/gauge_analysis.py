@@ -34,6 +34,14 @@ from scipy.ndimage import uniform_filter1d
 
 Orientation = Literal["vertical", "horizontal"]
 
+# Identifies which revision of this algorithm produced a given result.
+# Bump this whenever the pipeline logic below changes meaningfully (new
+# enhancement step, different peak-detection tuning, etc). Stored on every
+# saved ground-truth correction record so later analysis can tell which
+# algorithm version a given prediction came from — e.g. to check whether a
+# tuning change actually reduced systematic error, not just re-labeled it.
+ALGORITHM_VERSION = "cv-clahe-sobel-autocorr-v0.1"
+
 # --- Tunable constants -------------------------------------------------
 
 MIN_ROI_DIM_PX = 40          # smallest ROI edge we'll attempt to analyze

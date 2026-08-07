@@ -47,7 +47,11 @@ configured" message instead of crashing or silently failing.
 6. **Results** — wales/inch and courses/inch are shown prominently, along
    with spacing in mm, analyzed area size, and detected wale/course
    positions drawn back over the image.
-7. **Reset** — clear everything and analyze another image.
+7. **Verify Measurement** (optional) — enter the true gauge for this
+   sample (directly, or via a stitch count over the ROI) to save a
+   labeled ground-truth record for later evaluation. See
+   [Ground Truth / Correction System](#ground-truth--correction-system).
+8. **Reset** — clear everything and analyze another image.
 
 ## Architecture
 
@@ -59,14 +63,20 @@ textile-gauge-reader/                 (this directory — backend only)
 ├── backend/                 # FastAPI app — HTTP/validation only, no CV logic
 │   ├── __init__.py
 │   ├── main.py              # POST /analyze, GET /health, CORS, upload-size guard
+│   ├── corrections_api.py   # POST/GET /corrections, export.csv, export.json
 │   ├── image_io.py          # Upload validation & in-memory decoding
 │   └── schemas.py           # Pydantic request/response models
+├── storage/                 # Ground-truth persistence — no web/HTTP deps
+│   ├── __init__.py
+│   └── corrections_store.py # SQLite: save/list/export correction records
 ├── frontend/                # Local-dev-only copy of the UI (same-origin, no CORS needed)
 │   ├── index.html
 │   ├── styles.css
 │   └── app.js
 ├── tests/
-│   └── test_gauge_analysis.py
+│   ├── test_gauge_analysis.py
+│   └── test_corrections_api.py
+├── data/                    # Gitignored: corrections.db + opted-in images, created at runtime
 └── requirements.txt
 
 ../textile-gauge-reader.html   (production frontend — portfolio repo root)
@@ -79,9 +89,12 @@ Key architectural rules this project follows:
 - **Analysis is decoupled from the web layer.** `analysis/gauge_analysis.py`
   only imports `cv2`/`numpy`/`scipy` and operates on plain arrays — it has
   no knowledge of FastAPI, uploads, or HTTP.
-- **No images are persisted to disk, ever.** Uploads are decoded directly
-  from the in-memory request bytes (`cv2.imdecode`) and never written to
-  the filesystem, in local dev or in production.
+- **No images are persisted to disk by default.** Uploads are decoded
+  directly from the in-memory request bytes (`cv2.imdecode`) and never
+  written to the filesystem during analysis. The one exception is opt-in:
+  the "Save image for algorithm development" checkbox in Verify
+  Measurement, off by default — see
+  [Ground Truth / Correction System](#ground-truth--correction-system).
 - **Coordinates are tracked in original-image pixel space.** The frontend
   stores calibration points, the ROI, and (after analysis) detected wale
   and course positions all in *natural image* pixel coordinates, and
@@ -138,6 +151,10 @@ and an appropriate 4xx status — never a fabricated result.
 
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.
+
+`POST /corrections`, `GET /corrections`, `GET /corrections/export.csv`,
+`GET /corrections/export.json` — the ground-truth correction system, see
+[below](#ground-truth--correction-system).
 
 ### Tests
 
@@ -205,8 +222,87 @@ the duration of a single request.
   start"). The frontend's health check and Analyze error handling both
   account for this with a generous timeout and a clear retry message
   rather than treating a slow cold start as a crash.
-- Nothing is written to disk on the server — uploaded images exist only
-  as in-memory arrays for the duration of the request.
+- Nothing from `/analyze` is written to disk on the server — uploaded
+  images exist only as in-memory arrays for the duration of the request.
+  The one place anything touches disk is the opt-in ground-truth
+  correction system — see
+  [Ground Truth / Correction System](#ground-truth--correction-system),
+  including the important caveat about Render's ephemeral disk.
+
+## Ground Truth / Correction System
+
+After a prediction, the Results screen has a **Verify Measurement**
+section where you can record the true gauge for that sample. This
+builds a labeled dataset for evaluating (and later, deliberately —
+never automatically) tuning the detection algorithm. It never changes
+analysis behavior on its own.
+
+**What you can enter:**
+- Actual wales/inch and courses/inch, directly, **or**
+- Actual wale/course counts within the ROI — the app converts these to
+  per-inch values using the ROI's calibrated physical dimensions
+  (auto-filling the fields above; you can still edit them by hand
+  afterward).
+- Two checkboxes: whether the scale calibration and the wale/course
+  orientation were correct for this sample.
+- An opt-in "Save image for algorithm development" checkbox, **off by
+  default**.
+
+Saving shows an immediate **Predicted → Actual** comparison with signed
+percent error for both axes (`(predicted - actual) / actual × 100`).
+
+**What gets stored** (one row per saved correction): a unique sample ID,
+an image identifier (filename + size + a SHA-256 hash computed in the
+browser — the image itself isn't uploaded unless you opt in), ROI
+coordinates and physical dimensions, pixels-per-mm, orientation, every
+predicted value (spacing, per-inch, confidence, detected positions for
+both axes), your entered/derived actual values, both percent errors,
+the calibration/orientation-correct flags, and the algorithm version
+(`analysis.gauge_analysis.ALGORITHM_VERSION`) that produced the
+prediction — so later analysis can tell which pipeline revision a given
+row came from.
+
+### Where it's stored
+
+A SQLite database at `textile-gauge-reader/data/corrections.db`
+(created automatically on first use). If you opted into saving an
+image, it's written alongside at `textile-gauge-reader/data/images/`.
+Both are gitignored — never committed.
+
+**Important if the backend is deployed on Render's free tier: this disk
+is ephemeral.** Render wipes local disk on every redeploy (and possibly
+on other lifecycle events depending on plan). Anything in `data/` will
+be lost the next time you push a change that redeploys the service.
+Locally (`uvicorn backend.main:app`), the SQLite file persists normally
+on your machine like any other local file.
+
+**Practical mitigation for now:** export the dataset (see below)
+periodically, and definitely right before pushing any change that will
+trigger a Render redeploy. The real long-term fix, if this needs to
+survive redeploys unattended, is a Render persistent disk (paid) or an
+external database — out of scope for this pass, which is focused on
+collecting the first batch of ground truth.
+
+### Exporting
+
+Two ways to get the data out:
+
+1. **From the page itself** — scroll to the footer of
+   `textile-gauge-reader.html`. Once a backend URL is configured, it
+   shows "Export CSV" / "Export JSON" links that download everything
+   saved so far.
+2. **Directly from the API** (useful for scripting/automation):
+   ```bash
+   curl -O -J https://<your-backend>.onrender.com/corrections/export.csv
+   curl -O -J https://<your-backend>.onrender.com/corrections/export.json
+   ```
+   `GET /corrections` (no `export.` prefix) returns the same data as
+   plain JSON without download headers, if you just want to inspect it.
+
+Locally, you can also just open the SQLite file directly:
+```bash
+sqlite3 textile-gauge-reader/data/corrections.db "select * from corrections;"
+```
 
 ## Known V0 limitations
 
@@ -217,3 +313,8 @@ the duration of a single request.
   guessing).
 - No AI/ML model is used in V0; this is a placeholder for a future,
   more robust detector.
+- Ground-truth corrections are collected but never applied automatically
+  — tuning the algorithm from that data is a deliberate, separate step.
+- Correction storage is a single SQLite file with no auth in front of
+  the save/export endpoints — fine for a personal experiment on an
+  unlisted page, not intended as a public-facing data collection system.

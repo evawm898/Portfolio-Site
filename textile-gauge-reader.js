@@ -97,11 +97,31 @@
   const serviceStatusText = document.getElementById("serviceStatusText");
   const serviceStatusRetry = document.getElementById("serviceStatusRetry");
 
+  // Verify Measurement / ground-truth correction
+  const verifyPredictedSummary = document.getElementById("verifyPredictedSummary");
+  const actualWpiInput = document.getElementById("actualWpi");
+  const actualCpiInput = document.getElementById("actualCpi");
+  const actualWaleCountInput = document.getElementById("actualWaleCount");
+  const actualCourseCountInput = document.getElementById("actualCourseCount");
+  const roiCountHint = document.getElementById("roiCountHint");
+  const calCorrectCheck = document.getElementById("calCorrectCheck");
+  const orientationCorrectCheck = document.getElementById("orientationCorrectCheck");
+  const saveImageCheck = document.getElementById("saveImageCheck");
+  const saveCorrectionBtn = document.getElementById("saveCorrectionBtn");
+  const correctionStatus = document.getElementById("correctionStatus");
+  const correctionError = document.getElementById("correctionError");
+  const correctionComparison = document.getElementById("correctionComparison");
+  const correctionExportRow = document.getElementById("correctionExportRow");
+  const exportCsvLink = document.getElementById("exportCsvLink");
+  const exportJsonLink = document.getElementById("exportJsonLink");
+
   // --- App state ------------------------------------------------------
   const state = {
     currentStep: "upload",
     file: null,
     objectUrl: null,
+    imageHashPromise: null, // SHA-256 of the uploaded file, computed client-side so we can
+                             // identify a sample later without ever uploading/storing the image
     naturalWidth: 0,
     naturalHeight: 0,
     cal: {
@@ -397,6 +417,12 @@
     ctx.globalAlpha = 1;
   }
 
+  async function computeFileHash(file) {
+    const buf = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
   // --- Step 1: Upload ---------------------------------------------------
 
   function handleFile(file) {
@@ -415,6 +441,10 @@
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     state.objectUrl = URL.createObjectURL(file);
     state.file = file;
+    // Compute a content hash in the background so a later ground-truth
+    // correction can identify this exact sample without ever uploading or
+    // storing the image itself. Non-blocking: only awaited at save time.
+    state.imageHashPromise = computeFileHash(file).catch(() => null);
 
     img.onload = () => {
       state.naturalWidth = img.naturalWidth;
@@ -851,13 +881,254 @@
       resultsWarning.hidden = true;
     }
 
+    initVerifySection(r);
     render();
+  }
+
+  // --- Verify Measurement (ground-truth correction) ---------------------
+
+  function initVerifySection(result) {
+    const rows = [
+      ["Predicted wales/in", result.wale.per_inch != null ? result.wale.per_inch.toFixed(2) : "—"],
+      ["Predicted courses/in", result.course.per_inch != null ? result.course.per_inch.toFixed(2) : "—"],
+      ["Wale spacing", result.wale.spacing_mm != null ? `${result.wale.spacing_mm.toFixed(2)} mm` : "—"],
+      ["Course spacing", result.course.spacing_mm != null ? `${result.course.spacing_mm.toFixed(2)} mm` : "—"],
+      ["Wale confidence", `${Math.round(result.wale.confidence * 100)}%`],
+      ["Course confidence", `${Math.round(result.course.confidence * 100)}%`],
+    ];
+    verifyPredictedSummary.innerHTML = rows
+      .map(
+        ([k, v]) =>
+          `<div class="tgr-verify__predicted-row"><span>${escapeHtml(k)}</span><span>${escapeHtml(v)}</span></div>`
+      )
+      .join("");
+
+    actualWpiInput.value = "";
+    actualCpiInput.value = "";
+    actualWaleCountInput.value = "";
+    actualCourseCountInput.value = "";
+    roiCountHint.textContent = "";
+    calCorrectCheck.checked = true;
+    orientationCorrectCheck.checked = true;
+    saveImageCheck.checked = false;
+    correctionError.hidden = true;
+    correctionStatus.hidden = true;
+    correctionComparison.hidden = true;
+    correctionComparison.innerHTML = "";
+    updateSaveCorrectionButton();
+  }
+
+  function getRoiExtentsMm() {
+    if (!state.result || !state.result.analyzed_area_mm) return null;
+    const { width_mm, height_mm } = state.result.analyzed_area_mm;
+    return state.orientation === "vertical"
+      ? { waleExtentMm: width_mm, courseExtentMm: height_mm }
+      : { waleExtentMm: height_mm, courseExtentMm: width_mm };
+  }
+
+  function derivePerInchFromCount(count, extentMm) {
+    if (!(count > 0) || !(extentMm > 0)) return null;
+    return count / (extentMm / 25.4);
+  }
+
+  function handleRoiCountInput() {
+    const extents = getRoiExtentsMm();
+    if (!extents) return;
+    const waleCount = parseInt(actualWaleCountInput.value, 10);
+    const courseCount = parseInt(actualCourseCountInput.value, 10);
+    const hints = [];
+
+    if (waleCount > 0) {
+      const derived = derivePerInchFromCount(waleCount, extents.waleExtentMm);
+      if (derived != null) {
+        actualWpiInput.value = derived.toFixed(3);
+        hints.push(`${waleCount} wales / ${extents.waleExtentMm.toFixed(1)}mm ≈ ${derived.toFixed(2)}/in`);
+      }
+    }
+    if (courseCount > 0) {
+      const derived = derivePerInchFromCount(courseCount, extents.courseExtentMm);
+      if (derived != null) {
+        actualCpiInput.value = derived.toFixed(3);
+        hints.push(`${courseCount} courses / ${extents.courseExtentMm.toFixed(1)}mm ≈ ${derived.toFixed(2)}/in`);
+      }
+    }
+    roiCountHint.textContent = hints.join("  ·  ");
+    updateSaveCorrectionButton();
+  }
+
+  function updateSaveCorrectionButton() {
+    const wpi = parseFloat(actualWpiInput.value);
+    const cpi = parseFloat(actualCpiInput.value);
+    saveCorrectionBtn.disabled = !(wpi > 0 && cpi > 0);
+  }
+
+  actualWaleCountInput.addEventListener("input", handleRoiCountInput);
+  actualCourseCountInput.addEventListener("input", handleRoiCountInput);
+  actualWpiInput.addEventListener("input", updateSaveCorrectionButton);
+  actualCpiInput.addEventListener("input", updateSaveCorrectionButton);
+
+  function deltaClass(pct) {
+    const a = Math.abs(pct);
+    if (a < 10) return "is-good";
+    if (a < 25) return "is-mid";
+    return "is-bad";
+  }
+
+  function comparisonRow(label, predicted, actual, pctError) {
+    if (predicted == null || actual == null) return "";
+    const deltaHtml =
+      pctError != null
+        ? `<span class="tgr-comparison__delta ${deltaClass(pctError)}">(${pctError > 0 ? "+" : ""}${pctError.toFixed(1)}%)</span>`
+        : "";
+    return `
+      <div class="tgr-comparison__row">
+        <span class="tgr-comparison__label">${escapeHtml(label)}</span>
+        <span class="tgr-comparison__values">${predicted.toFixed(2)} → ${actual.toFixed(2)} ${deltaHtml}</span>
+      </div>`;
+  }
+
+  function renderCorrectionComparison(data) {
+    const rows =
+      comparisonRow("Wales/in", data.predicted_wales_per_inch, data.actual_wales_per_inch, data.wale_percent_error) +
+      comparisonRow(
+        "Courses/in",
+        data.predicted_courses_per_inch,
+        data.actual_courses_per_inch,
+        data.course_percent_error
+      );
+    correctionComparison.innerHTML = `
+      <div class="tgr-comparison__title">Predicted → Actual</div>
+      ${rows}
+      <div class="tgr-comparison__id">Sample ID: ${escapeHtml(data.id)}${data.image_saved ? " · image saved" : ""}</div>`;
+    correctionComparison.hidden = false;
+  }
+
+  saveCorrectionBtn.addEventListener("click", async () => {
+    if (!state.result || !state.roi) return;
+    correctionError.hidden = true;
+    correctionComparison.hidden = true;
+    correctionStatus.hidden = false;
+    correctionStatus.textContent = "Saving…";
+    saveCorrectionBtn.disabled = true;
+
+    try {
+      if (!CONFIG.API_BASE_URL) {
+        throw new Error("Analysis service is not configured yet, so corrections can't be saved.");
+      }
+
+      const r = state.result;
+      const fd = new FormData();
+      fd.append("roi_x", state.roi.x);
+      fd.append("roi_y", state.roi.y);
+      fd.append("roi_width_px", state.roi.width);
+      fd.append("roi_height_px", state.roi.height);
+      fd.append("roi_width_mm", r.analyzed_area_mm.width_mm);
+      fd.append("roi_height_mm", r.analyzed_area_mm.height_mm);
+      fd.append("pixels_per_mm", r.pixels_per_mm);
+      fd.append("orientation", state.orientation);
+      if (r.wale.spacing_px != null) fd.append("predicted_wale_spacing_px", r.wale.spacing_px);
+      if (r.course.spacing_px != null) fd.append("predicted_course_spacing_px", r.course.spacing_px);
+      if (r.wale.spacing_mm != null) fd.append("predicted_wale_spacing_mm", r.wale.spacing_mm);
+      if (r.course.spacing_mm != null) fd.append("predicted_course_spacing_mm", r.course.spacing_mm);
+      if (r.wale.per_inch != null) fd.append("predicted_wales_per_inch", r.wale.per_inch);
+      if (r.course.per_inch != null) fd.append("predicted_courses_per_inch", r.course.per_inch);
+      fd.append("predicted_wale_confidence", r.wale.confidence);
+      fd.append("predicted_course_confidence", r.course.confidence);
+      fd.append("detected_wale_positions", JSON.stringify(r.wale.positions_px || []));
+      fd.append("detected_course_positions", JSON.stringify(r.course.positions_px || []));
+
+      const waleCount = parseInt(actualWaleCountInput.value, 10);
+      const courseCount = parseInt(actualCourseCountInput.value, 10);
+      if (waleCount > 0) fd.append("actual_wale_count", waleCount);
+      if (courseCount > 0) fd.append("actual_course_count", courseCount);
+
+      const wpi = parseFloat(actualWpiInput.value);
+      const cpi = parseFloat(actualCpiInput.value);
+      if (!(wpi > 0) || !(cpi > 0)) {
+        throw new Error("Enter actual wales/in and courses/in (directly or via stitch counts) before saving.");
+      }
+      fd.append("actual_wales_per_inch", wpi);
+      fd.append("actual_courses_per_inch", cpi);
+
+      fd.append("calibration_correct", calCorrectCheck.checked);
+      fd.append("orientation_correct", orientationCorrectCheck.checked);
+      fd.append("algorithm_version", r.algorithm_version || "unknown");
+
+      if (state.file) {
+        fd.append("image_filename", state.file.name);
+        fd.append("image_size_bytes", state.file.size);
+      }
+      let hash = null;
+      try {
+        hash = state.imageHashPromise ? await state.imageHashPromise : null;
+      } catch {
+        hash = null;
+      }
+      if (hash) fd.append("image_sha256", hash);
+
+      const saveImg = saveImageCheck.checked;
+      fd.append("save_image", saveImg);
+      if (saveImg && state.file) {
+        fd.append("file", state.file);
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+      let res;
+      try {
+        res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+      }
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || `Could not save correction (HTTP ${res.status}).`);
+      }
+
+      correctionStatus.hidden = true;
+      renderCorrectionComparison(data);
+    } catch (err) {
+      correctionStatus.hidden = true;
+      if (err && err.name === "AbortError") {
+        correctionError.textContent =
+          "Saving timed out. The analysis service may be waking up from a cold start — try again shortly.";
+      } else if (err instanceof TypeError) {
+        correctionError.textContent =
+          "Could not reach the analysis service to save this correction. Try again shortly.";
+      } else {
+        correctionError.textContent = (err && err.message) || "Could not save correction. Please try again.";
+      }
+      correctionError.hidden = false;
+    } finally {
+      updateSaveCorrectionButton();
+    }
+  });
+
+  function setupExportLinks() {
+    if (!CONFIG.API_BASE_URL) {
+      correctionExportRow.hidden = true;
+      return;
+    }
+    exportCsvLink.href = `${CONFIG.API_BASE_URL}/corrections/export.csv`;
+    exportJsonLink.href = `${CONFIG.API_BASE_URL}/corrections/export.json`;
+    correctionExportRow.hidden = false;
   }
 
   resetBtn.addEventListener("click", () => {
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     state.file = null;
     state.objectUrl = null;
+    state.imageHashPromise = null;
     state.naturalWidth = 0;
     state.naturalHeight = 0;
     state.cal = { points: [], knownDistance: null, unit: "cm", pixelsPerMm: null };
@@ -874,6 +1145,11 @@
     document.querySelector('input[name="orientation"][value="vertical"]').checked = true;
     resetCalibrationUI();
     resetRoiUI();
+    verifyPredictedSummary.innerHTML = "";
+    correctionComparison.hidden = true;
+    correctionComparison.innerHTML = "";
+    correctionError.hidden = true;
+    correctionStatus.hidden = true;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     goToStep("upload");
   });
@@ -881,4 +1157,5 @@
   // --- Init ---------------------------------------------------------
   goToStep("upload");
   checkServiceHealth();
+  setupExportLinks();
 })();

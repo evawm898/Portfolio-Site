@@ -133,6 +133,63 @@
       <h2>Results</h2>
       <div class="tgr-results-grid" id="resultsGrid"></div>
       <div id="resultsWarning" class="tgr-warning" hidden></div>
+
+      <div class="tgr-verify" id="verifySection">
+        <h3 class="tgr-verify__title">Verify Measurement</h3>
+        <p class="tgr-hint">
+          Optional: record the true gauge for this sample. This builds a labeled
+          dataset for evaluating the algorithm later — it does <strong>not</strong>
+          change the algorithm automatically.
+        </p>
+
+        <div class="tgr-verify__predicted" id="verifyPredictedSummary"></div>
+
+        <div class="tgr-field-row">
+          <label for="actualWpi">Actual wales / inch</label>
+          <input type="number" id="actualWpi" min="0" step="any" placeholder="e.g. 8.0">
+        </div>
+        <div class="tgr-field-row">
+          <label for="actualCpi">Actual courses / inch</label>
+          <input type="number" id="actualCpi" min="0" step="any" placeholder="e.g. 6.0">
+        </div>
+
+        <details class="tgr-verify__roi-count">
+          <summary>Or count stitches in the selected area instead</summary>
+          <div class="tgr-field-row">
+            <label for="actualWaleCount">Actual wale count in ROI</label>
+            <input type="number" id="actualWaleCount" min="0" step="1" placeholder="e.g. 46">
+          </div>
+          <div class="tgr-field-row">
+            <label for="actualCourseCount">Actual course count in ROI</label>
+            <input type="number" id="actualCourseCount" min="0" step="1" placeholder="e.g. 50">
+          </div>
+          <p class="tgr-hint" id="roiCountHint"></p>
+        </details>
+
+        <div class="tgr-checkbox-row">
+          <label class="tgr-checkbox-option">
+            <input type="checkbox" id="calCorrectCheck" checked>
+            <span>Scale calibration is correct</span>
+          </label>
+          <label class="tgr-checkbox-option">
+            <input type="checkbox" id="orientationCorrectCheck" checked>
+            <span>Wale/course orientation is correct</span>
+          </label>
+          <label class="tgr-checkbox-option">
+            <input type="checkbox" id="saveImageCheck">
+            <span>Save image for algorithm development</span>
+          </label>
+        </div>
+
+        <div class="tgr-button-row">
+          <button id="saveCorrectionBtn" class="tgr-btn" type="button" disabled>Save Correction</button>
+        </div>
+        <p class="tgr-status" id="correctionStatus" hidden></p>
+        <p class="tgr-error" id="correctionError" hidden></p>
+
+        <div class="tgr-comparison" id="correctionComparison" hidden></div>
+      </div>
+
       <div class="tgr-button-row">
         <button id="resetBtn" class="tgr-btn" type="button">Reset / Analyze Another Image</button>
       </div>
@@ -153,6 +210,12 @@
 
 <footer class="tgr-footer">
   <p>V0 &middot; traditional computer vision only, no AI/ML model &middot; images are processed in memory and never stored &middot; not indexed, not linked from the main site</p>
+  <p id="correctionExportRow" class="tgr-footer__export" hidden>
+    Ground-truth correction data:
+    <a id="exportCsvLink" href="#" target="_blank" rel="noopener">Export CSV</a>
+    &middot;
+    <a id="exportJsonLink" href="#" target="_blank" rel="noopener">Export JSON</a>
+  </p>
 </footer>
 
 <script src="textile-gauge-reader.js"></script>
