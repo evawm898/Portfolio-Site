@@ -1387,8 +1387,8 @@
      EDIT EMBEDDED WIRE / TUNNEL CONFIGURATION HERE
      ------------------------------------------------------------
      The tunnel's shape, the two slit openings, the wire's diameter,
-     and both camera angles all derive from this one object -- change
-     a value here rather than hunting for coordinates elsewhere.
+     and the camera's profile angle all derive from this one object --
+     change a value here rather than hunting for coordinates elsewhere.
      Changing SLIT_SPACING moves both slits, the tunnel's span, and
      the wire's tunnel-crossing path together automatically.
   ============================================================= */
@@ -1399,30 +1399,15 @@
     TUNNEL_HEIGHT: 34,            // peak dome height above the fabric plane
     TUNNEL_WIDTH: 30,             // arch cross-section span, edge to edge
     WIRE_DIAMETER: 4,
-    SIDE_VIEW_ANGLE: 50,          // X-axis tilt held through the side view
-    // X-axis tilt held through the through-tunnel hold -- deliberately
-    // smaller than SIDE_VIEW_ANGLE. That tilt's own rotation axis is the
-    // tunnel's length axis, which is exactly the axis the yaw sweeps the
-    // view direction onto -- so by the time yaw reaches 90deg, the same
-    // tilt that reads as "pitch" in the side view reads as pure in-plane
-    // "roll" instead, and holding it at the full SIDE_VIEW_ANGLE spins
-    // the arch into a lopsided hook rather than an upright dome
-    // (confirmed directly). A small residual keeps a slight "looking
-    // down into it" quality without meaningfully skewing the arch.
-    THROUGH_TUNNEL_TILT: 12,
-    // Y-axis pivot magnitude for the through-tunnel view: a true 90deg,
-    // camera's line of sight exactly parallel to the tunnel/wire axis.
-    // The flat fabric plane and the CSS-3D-folded ribs (whose own planes
-    // both contain the tunnel's X axis) go edge-on and effectively
-    // disappear at exactly this angle -- verified directly, this
-    // rendering engine paints a plane rotated to a mathematically exact
-    // rotateY(90deg) as nothing at all, not even a hairline. That's put
-    // to use rather than fought: it's exactly the fabric/rib fade the
-    // through-tunnel view wants anyway, so only the wire and the
-    // separately-projected arch-cap outlines (see where those are
-    // built -- they don't live in this rotating hierarchy at all, so
-    // they're never subject to that collapse) carry the view.
-    THROUGH_TUNNEL_YAW: 90
+    // The single camera angle this whole module ever uses -- rotateX
+    // only, never rotateY/rotateZ. Deliberately short of a true 90deg:
+    // at that exact angle a CSS-3D face rotated mathematically edge-on
+    // to the camera can render as nothing at all, not even a hairline
+    // (a rendering-engine floor, not a choice). 82-87 is the usable
+    // range; the browser doesn't visibly distinguish this shallow a
+    // difference, so it's tuned for "reads as edge-on" rather than any
+    // exact target.
+    PROFILE_ANGLE: 84
   };
 
   // =====================================================================
@@ -1454,39 +1439,26 @@
   // identically to every rib. The center rib's own peak is the straight
   // crest line connecting the two slit midpoints -- the tunnel/wire axis.
   //
-  // Camera: cameraTiltX (X-axis) and cameraYawY (Y-axis) are two
-  // explicit, independent numbers written to one shared `scene` every
-  // frame via requestAnimationFrame -- never a CSS transition, never
-  // rotateZ. `scene.style.transform` is always
-  // 'rotateY(cameraYawY) rotateX(cameraTiltX)': the X tilt is the inner
-  // (rightmost) transform, applied first, and because rotateX never
-  // changes a point's own X coordinate, a pure Y yaw of 90deg on this
-  // geometry reliably reorients the tunnel's own length axis (world X)
-  // to point straight along the view direction -- exactly "look through
-  // the tunnel." cameraTiltX itself eases down to a smaller
-  // THROUGH_TUNNEL_TILT as the yaw approaches that 90deg (see
-  // computeCamera): its own rotation axis is the tunnel's length axis,
-  // which is exactly the axis the yaw is sweeping the view onto, so by
-  // yaw=90deg the "same" tilt has stopped being a pitch and become a
-  // pure in-plane roll, and holding it at the full side-view angle
-  // skews the arch instead of tipping it. Fabric, ribs, and wire are all
-  // children of this one `scene` -- there is no second pivot, and
-  // nothing in it is ever rotated independently of it.
+  // Camera: exactly one number, cameraAngle, written to the shared
+  // `scene` every frame via requestAnimationFrame -- never a CSS
+  // transition, never rotateY, never rotateZ.
+  // `scene.style.transform` is always 'rotateX(cameraAngle)'. Fabric,
+  // ribs, and wire are all children of this one `scene` and rotate
+  // rigidly together -- there is no second pivot, nothing is ever
+  // rotated independently, and the geometry itself is never reshaped
+  // during the rotation (see computeTunnelState/renderTunnel: only
+  // opacity changes there, never the ribs' own `d`).
   //
-  // The through-tunnel cross-section, though, is NOT drawn in `scene`
-  // at all. Every face in `scene` whose own plane contains the tunnel's
-  // X axis (the flat fabric; every rib, since a fold around X never
-  // removes X from that face's plane) goes edge-on and this rendering
-  // engine paints an exactly-edge-on plane as nothing, confirmed
-  // directly in isolation -- not a rendering choice, a hard floor. So
-  // the cross-section (baseline + arch, and, right at the one yaw where
-  // the real wire hits that same edge-on collapse, a small marker for
-  // that same wire) is a flat 2D overlay, a sibling of `scene` rather
-  // than a child of it -- and, unlike an earlier version of this
-  // overlay, fixed, plain-SVG geometry rather than anything re-derived
-  // from `scene`'s own rotation: it needs to read as a genuinely
-  // orthographic technical section, not a perspective-correct billboard,
-  // so it never reads camera tilt/yaw at all -- see where it's built.
+  // Because every rib's own fixed fold (see solveRibFold) is ALSO a
+  // rotateX, nested directly inside this same rotateX `scene`, the two
+  // compose by simple angle addition -- rotateX(cameraAngle) *
+  // rotateX(rib.phiDeg) is exactly rotateX(cameraAngle + rib.phiDeg) at
+  // that rib's own local geometry, since rotations about the same axis
+  // commute. That's what makes a single camera number a rigid rotation
+  // of the *whole* fanned structure around the tunnel's own length axis
+  // (world X), not an independent per-rib effect -- cameraAngle is
+  // physically "orbit the camera around the tunnel," never anything
+  // reshaping the tunnel itself.
   function buildEmbeddedWire(stage) {
     var SVG_NS = 'http://www.w3.org/2000/svg';
     function el(tag, attrs) {
@@ -1646,129 +1618,10 @@
     crestRib.path.setAttribute('stroke', 'var(--petrol-bright)');
     crestRib.path.setAttribute('stroke-width', 1.4);
 
-    // ---- fixed cross-section overlay -- the target frame at the
-    // through-tunnel hold (yaw≈90deg) needs to read as a clean,
-    // orthographic technical section: one flat fabric baseline, one
-    // smooth symmetric arch rising out of it, the wire centered in the
-    // open cavity beneath. The live 3D geometry above (fabric + ribs)
-    // can't deliver that: viewed dead end-on, a CSS-3D-folded plane
-    // collapses to a bare radial line, same as any flat surface exactly
-    // edge-on (confirmed directly, screenshotted through the pivot),
-    // and short of that exact angle it's a thin, perspective-distorted
-    // diagonal sliver, not the clean silhouette this view needs.
-    //
-    // An earlier version of this overlay was a perspective-projected
-    // "billboard" -- an arch shape re-anchored every frame to a 3D point
-    // run through the same rotateY(yaw) rotateX(tilt) + perspective
-    // divide the CSS engine itself applies to `scene`. That still left
-    // real perspective distortion in the result (near/far anchors
-    // scaling and separating differently by depth), which reads as an
-    // oblique 3/4 view rather than the straight-on, non-perspective
-    // section this frame needs. This version drops that anchoring
-    // entirely: the whole cross-section -- baseline, arch, wire marker
-    // -- is fixed, plain-SVG geometry, built once, right here, in the
-    // panel's own 2D coordinate space. It never reads camera tilt/yaw at
-    // all, so there's no perspective, no scale change, and no drift as
-    // the camera moves -- only its opacity animates, fading in as the
-    // real geometry fades out (see computeFadeMultipliers) and back out
-    // as it fades back in, so the two swap places as one continuous
-    // crossfade rather than either overlapping clutter or a visible
-    // gap. Same reasoning as before for living outside the `scene` 3D
-    // hierarchy entirely -- a sibling of `scene`, never touched by its
-    // rotation -- just without inheriting any of the projection math
-    // that hierarchy needs for everything else it draws.
-    var overlaySvg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
-    var overlayEl = document.createElement('div');
-    overlayEl.className = 'embeddedWire-face embeddedWire-overlay';
-    overlayEl.appendChild(overlaySvg);
-    stageEl.appendChild(overlayEl);
-
-    // Baseline sits low in the panel with generous headroom above for
-    // the arch's peak; half-width/height chosen to read clearly at this
-    // panel's own fixed size without crowding the swatch's rounded
-    // corners -- deliberately NOT tied to TUNNEL_WIDTH/TUNNEL_HEIGHT
-    // (the real ribs' own, much smaller, dimensions), since this is a
-    // dedicated explanatory diagram, not a projection of those ribs.
-    var CROSS_BASE_Y = 96;
-    var CROSS_ARCH_H = 52;
-    var CROSS_HALF_W = 78;
-    var crossFootL = { x: midX - CROSS_HALF_W, y: CROSS_BASE_Y };
-    var crossFootR = { x: midX + CROSS_HALF_W, y: CROSS_BASE_Y };
-
-    // One flat line, extending past both arch feet on either side --
-    // "the normal fabric collapsed to a single line," per spec,
-    // continuous with the arch's own base edge rather than a separate
-    // detached stroke (same Y, same stroke color/weight as the arch).
-    var crossBaseline = el('line', {
-      x1: (SW.x + 8).toFixed(2), y1: CROSS_BASE_Y,
-      x2: (SW.x + SW.w - 8).toFixed(2), y2: CROSS_BASE_Y,
-      stroke: 'var(--line-strong)', 'stroke-width': 2, 'stroke-linecap': 'round'
-    });
-    overlaySvg.appendChild(crossBaseline);
-
-    // The arch: a closed half-sine hill from foot to foot, filled (so
-    // it reads as the same solid raised textile the ribs represent,
-    // dimmed to the ~50% cutaway at the hold so the wire stays visible
-    // through it) and stroked at full strength so its outline stays
-    // crisp even through that cutaway. One primary shape, one smooth
-    // curve, feet planted exactly on the baseline.
-    var CROSS_ARCH_SEGMENTS = 32;
-    var archD = 'M' + crossFootL.x.toFixed(2) + ',' + crossFootL.y.toFixed(2);
-    for (var csI = 1; csI <= CROSS_ARCH_SEGMENTS; csI++) {
-      var csT = csI / CROSS_ARCH_SEGMENTS;
-      var csX = lerp(crossFootL.x, crossFootR.x, csT);
-      var csY = CROSS_BASE_Y - CROSS_ARCH_H * Math.sin(Math.PI * csT);
-      archD += ' L' + csX.toFixed(2) + ',' + csY.toFixed(2);
-    }
-    archD += ' Z';
-    var crossArch = el('path', {
-      d: archD, fill: 'var(--black-raised)', stroke: 'var(--line-strong)',
-      'stroke-width': 2, 'stroke-linejoin': 'round'
-    });
-    overlaySvg.appendChild(crossArch);
-
-    // The wire itself is drawn once, in the CSS-3D `scene`, and stays
-    // exactly one wire everywhere -- this is not a second one. This is a
-    // marker for that same wire, shown only in the narrow window where
-    // the real wire's own rendering hits the edge-on collapse described
-    // above (see renderCrossSection), so it never doubles the real wire
-    // during any view where that one already reads correctly. Drawn as
-    // a short centered bar rather than the real wire's own round
-    // profile: end-on, a straight wire's length legitimately projects
-    // to a single point (the same reason a drinking straw's own length
-    // disappears sighted straight through it), and a bare point reads
-    // far less clearly here than a bar sized to the cavity it sits in.
-    // Fixed in place, same as the arch/baseline above -- it marks "the
-    // wire is in here," not a literal tracked position along the
-    // tunnel's length, which has no meaning viewed straight down that
-    // same axis.
-    var CROSS_WIRE_W = 44;
-    var CROSS_WIRE_H = 11;
-    var CROSS_WIRE_Y = CROSS_BASE_Y - 18;
-    var wireIndicator = el('rect', {
-      x: (midX - CROSS_WIRE_W / 2).toFixed(2), y: (CROSS_WIRE_Y - CROSS_WIRE_H / 2).toFixed(2),
-      width: CROSS_WIRE_W, height: CROSS_WIRE_H, rx: CROSS_WIRE_H / 2,
-      fill: 'var(--petrol-bright)', stroke: 'none', opacity: 0
-    });
-    overlaySvg.appendChild(wireIndicator);
-
-    // Per-frame: opacity only -- see the header comment above for why
-    // nothing here needs to touch position or size.
-    function renderCrossSection(cutawayOpacity, archFade, fabricFade) {
-      var fillOp = (cutawayOpacity * archFade).toFixed(3);
-      var strokeOp = (Math.max(cutawayOpacity, 0.85) * archFade).toFixed(3);
-      crossArch.style.fillOpacity = fillOp;
-      crossArch.style.strokeOpacity = strokeOp;
-      crossBaseline.style.opacity = strokeOp;
-
-      // Wire indicator: exactly complementary to the real wire's own
-      // fabricFade-driven fade (see render()), so the handoff between
-      // "the real wire, rendered in the 3D scene" and "this marker for
-      // that same wire" is a clean crossfade with no window where both
-      // or neither are visible.
-      wireIndicator.style.opacity = (1 - fabricFade).toFixed(3);
-    }
-
+    // No separate cross-section overlay -- the profile view is the same
+    // rib geometry above, rigidly rotated by the one shared camera
+    // number (see computeCamera/render). Only opacity ever changes here
+    // per frame, never the ribs' own `d`.
     function ribBandD(peakLen, scale) {
       var y = midY - peakLen * scale;
       return 'M' + X_leftSlit.toFixed(2) + ',' + midY.toFixed(2) +
@@ -1777,19 +1630,14 @@
         ' L' + X_rightSlit.toFixed(2) + ',' + midY.toFixed(2) +
         ' Z';
     }
-    function renderTunnel(riseAmount, opacity, fabricFade) {
+    function renderTunnel(riseAmount, cutawayOpacity) {
       ribs.forEach(function (rib) {
         rib.path.setAttribute('d', ribBandD(rib.peakLen, riseAmount));
-        // Fill dims to the 50% cutaway; the outline stays strong so the
+        // Fill dims to the 50% cutaway at the profile hold so the wire
+        // stays visible through it; the outline stays strong so the
         // arch is still clearly readable as a shape, not just a haze.
-        rib.path.style.fillOpacity = opacity.toFixed(3);
-        rib.path.style.strokeOpacity = Math.max(opacity, 0.85).toFixed(3);
-        // fabricFade, separately, is the crossfade-out ahead of the
-        // through-tunnel yaw -- see where computeFadeMultipliers is
-        // built. Applied to the whole face rather than folded into the
-        // fill/stroke opacity above so it stays a clean multiplier
-        // regardless of the 50% cutaway state.
-        rib.face.style.opacity = fabricFade.toFixed(3);
+        rib.path.style.fillOpacity = cutawayOpacity.toFixed(3);
+        rib.path.style.strokeOpacity = Math.max(cutawayOpacity, 0.85).toFixed(3);
       });
     }
 
@@ -1811,48 +1659,42 @@
     }
     primeDash(wireOuter);
     primeDash(wireInner);
-    function renderWire(t, opacity) {
+    // Always fully opaque -- one persistent element, rotating rigidly
+    // with the rest of `scene`, visible throughout every phase (top-down,
+    // rotating, profile hold, and back). No marker, no second wire, no
+    // fade tied to camera state.
+    function renderWire(t) {
       var offset = wireLen * (1 - clamp01(t));
       wireOuter.style.strokeDashoffset = String(offset);
       wireInner.style.strokeDashoffset = String(offset);
-      if (opacity !== undefined) {
-        wireOuter.style.opacity = opacity.toFixed(3);
-        wireInner.style.opacity = opacity.toFixed(3);
-      }
     }
 
-    // ---- timeline: percentages match the spec's own suggested
-    // comprehension beats directly (already normalized 0..1). ----
+    // ---- timeline: one simple camera path, top-down -> profile ->
+    // top-down (section 10 of the spec this implements). ----
     var TOTAL_DURATION = 10800;
     var PH = {
-      establish:     [0.00, 0.10],
-      slits:         [0.10, 0.18],
-      tunnelRise:    [0.18, 0.28],
-      wireApproach:  [0.28, 0.40],
-      rotateToSide:  [0.40, 0.52],
-      sideHold:      [0.52, 0.60],
-      pivotToTunnel: [0.60, 0.70],
-      throughHold:   [0.70, 0.78],
-      pivotBack:     [0.78, 0.86],
-      rotateToTop:   [0.86, 0.94],
-      finish:        [0.94, 1.00]
+      establish:       [0.00, 0.08],
+      slits:           [0.08, 0.16],
+      tunnelRise:      [0.16, 0.26],
+      wireApproach:    [0.26, 0.38],
+      rotateToProfile: [0.38, 0.55],
+      profileHold:     [0.55, 0.70],
+      rotateBack:      [0.70, 0.87],
+      finish:          [0.87, 1.00]
     };
 
     // wireProgress checkpoints: continuous, always-forward mapping from
     // the master timeline to wire travel -- flat only before the wire
     // begins (p < wireApproach start), never flat again after that, so
-    // it keeps moving through every camera phase that follows,
-    // including both pivots and both holds.
+    // it keeps moving through every camera phase that follows: rotating
+    // into profile, the profile hold, and rotating back.
     var WIRE_CHECKPOINTS = [
       [0.00, 0],
       [PH.wireApproach[0], 0],
-      [PH.wireApproach[1], 0.18],
-      [PH.rotateToSide[1], 0.32],
-      [PH.sideHold[1], 0.42],
-      [PH.pivotToTunnel[1], 0.55],
-      [PH.throughHold[1], 0.68],
-      [PH.pivotBack[1], 0.80],
-      [PH.rotateToTop[1], 0.92],
+      [PH.wireApproach[1], 0.20],
+      [PH.rotateToProfile[1], 0.42],
+      [PH.profileHold[1], 0.65],
+      [PH.rotateBack[1], 0.85],
       [1.00, 1.00]
     ];
     function computeWireProgress(p) {
@@ -1867,57 +1709,14 @@
       return 1;
     }
 
+    // The one and only camera value: 0 -> PROFILE_ANGLE -> 0, rotateX
+    // only. No yaw, no roll, no independently-eased second axis.
     function computeCamera(p) {
-      var tiltX;
-      if (p < PH.rotateToSide[0]) tiltX = 0;
-      else if (p < PH.rotateToSide[1]) tiltX = lerp(0, CFG.SIDE_VIEW_ANGLE, easeInOutCubic(phaseT(p, PH.rotateToSide)));
-      else if (p < PH.pivotToTunnel[0]) tiltX = CFG.SIDE_VIEW_ANGLE;
-      // The X-axis this tilt rotates about is the tunnel's own length
-      // axis -- exactly the axis the yaw is sweeping the view direction
-      // onto. So as yaw approaches 90deg, "tilt" stops being a pitch
-      // (revealing height) and starts being a roll (spinning the image
-      // in-plane, since its axis has become the view axis itself) --
-      // confirmed directly: holding tiltX at the full SIDE_VIEW_ANGLE
-      // all the way through the pivot rendered the arch as a lopsided
-      // hook, not an upright dome, at yaw=90. Easing tilt down toward a
-      // small residual elevation in step with the yaw ramp (and back up
-      // in step with the reverse ramp) keeps the arch reading upright at
-      // the through-tunnel hold while still tipping down a little, not
-      // snapping to a flat, uninflected head-on square view.
-      else if (p < PH.pivotToTunnel[1]) tiltX = lerp(CFG.SIDE_VIEW_ANGLE, CFG.THROUGH_TUNNEL_TILT, easeInOutCubic(phaseT(p, PH.pivotToTunnel)));
-      else if (p < PH.pivotBack[0]) tiltX = CFG.THROUGH_TUNNEL_TILT;
-      else if (p < PH.pivotBack[1]) tiltX = lerp(CFG.THROUGH_TUNNEL_TILT, CFG.SIDE_VIEW_ANGLE, easeInOutCubic(phaseT(p, PH.pivotBack)));
-      else if (p < PH.rotateToTop[0]) tiltX = CFG.SIDE_VIEW_ANGLE;
-      else if (p < PH.rotateToTop[1]) tiltX = lerp(CFG.SIDE_VIEW_ANGLE, 0, easeInOutCubic(phaseT(p, PH.rotateToTop)));
-      else tiltX = 0;
-
-      var yawY;
-      if (p < PH.pivotToTunnel[0]) yawY = 0;
-      else if (p < PH.pivotToTunnel[1]) yawY = lerp(0, CFG.THROUGH_TUNNEL_YAW, easeInOutCubic(phaseT(p, PH.pivotToTunnel)));
-      else if (p < PH.pivotBack[0]) yawY = CFG.THROUGH_TUNNEL_YAW;
-      else if (p < PH.pivotBack[1]) yawY = lerp(CFG.THROUGH_TUNNEL_YAW, 0, easeInOutCubic(phaseT(p, PH.pivotBack)));
-      else yawY = 0;
-
-      return { tiltX: tiltX, yawY: yawY };
-    }
-
-    // The fabric plane and the ribs both go edge-on as yaw approaches
-    // 90deg, and this rendering engine doesn't do that cleanly -- well
-    // short of exactly 90deg it's already a thin, distorted diagonal
-    // sliver, not a smooth fade (confirmed directly, screenshotted
-    // through the pivot). Rather than let the viewer see that
-    // in-between state, fabricFade explicitly dims the real geometry to
-    // fully transparent *before* it gets there, and archFade brings the
-    // billboarded arch overlay in to replace it -- overlapping in the
-    // middle so it reads as one continuous crossfade, never a gap where
-    // nothing is visible and never the raw geometric collapse itself.
-    // Both are pure functions of the current yaw, so they run
-    // identically forward (pivotToTunnel) and in reverse (pivotBack).
-    function computeFadeMultipliers(yawDeg) {
-      var yawFrac = clamp01(Math.abs(yawDeg) / CFG.THROUGH_TUNNEL_YAW);
-      var fabricFade = 1 - easeInOutCubic(clamp01((yawFrac - 0.45) / 0.25));
-      var archFade = easeInOutCubic(clamp01((yawFrac - 0.50) / 0.30));
-      return { fabricFade: fabricFade, archFade: archFade };
+      if (p < PH.rotateToProfile[0]) return 0;
+      if (p < PH.rotateToProfile[1]) return lerp(0, CFG.PROFILE_ANGLE, easeInOutCubic(phaseT(p, PH.rotateToProfile)));
+      if (p < PH.rotateBack[0]) return CFG.PROFILE_ANGLE;
+      if (p < PH.rotateBack[1]) return lerp(CFG.PROFILE_ANGLE, 0, easeInOutCubic(phaseT(p, PH.rotateBack)));
+      return 0;
     }
 
     function computeTunnelState(p) {
@@ -1926,36 +1725,31 @@
       else if (p < PH.tunnelRise[1]) riseAmount = easeInOutCubic(phaseT(p, PH.tunnelRise));
       else riseAmount = 1;
 
+      // Cutaway opacity: normal (1) at top-down, dims to 0.5 as the
+      // camera rotates toward the profile so the wire stays visible
+      // through the raised tunnel, holds there through the profile
+      // hold, and restores to 1 as the camera rotates back. Tied only
+      // to the same camera phases -- never a separate schedule.
       var opacity;
-      if (p < PH.rotateToSide[0]) opacity = 1;
-      else if (p < PH.rotateToSide[1]) opacity = lerp(1, 0.5, easeInOutCubic(phaseT(p, PH.rotateToSide)));
-      else if (p < PH.rotateToTop[0]) opacity = 0.5;
-      else if (p < PH.rotateToTop[1]) opacity = lerp(0.5, 1, easeInOutCubic(phaseT(p, PH.rotateToTop)));
+      if (p < PH.rotateToProfile[0]) opacity = 1;
+      else if (p < PH.rotateToProfile[1]) opacity = lerp(1, 0.5, easeInOutCubic(phaseT(p, PH.rotateToProfile)));
+      else if (p < PH.rotateBack[0]) opacity = 0.5;
+      else if (p < PH.rotateBack[1]) opacity = lerp(0.5, 1, easeInOutCubic(phaseT(p, PH.rotateBack)));
       else opacity = 1;
 
       return { riseAmount: riseAmount, opacity: opacity };
     }
 
     function render(p) {
-      var cam = computeCamera(p);
-      // cameraTiltX is the inner (rightmost) transform -- applied first,
-      // and never itself touched by cameraYawY -- which is what keeps
-      // "the same side tilt" genuinely constant while the yaw sweeps.
-      // rotateZ never appears anywhere in this expression.
-      scene.style.transform = 'rotateY(' + cam.yawY.toFixed(3) + 'deg) rotateX(' + cam.tiltX.toFixed(3) + 'deg)';
-
-      var fade = computeFadeMultipliers(cam.yawY);
-      fabric.face.style.opacity = fade.fabricFade.toFixed(3);
+      var cameraAngle = computeCamera(p);
+      scene.style.transform = 'rotateX(' + cameraAngle.toFixed(3) + 'deg)';
 
       renderSlit(leftSlitEl, X_leftSlit, computeSlitOpen(p, 'left'));
       renderSlit(rightSlitEl, X_rightSlit, computeSlitOpen(p, 'right'));
 
       var tunnelState = computeTunnelState(p);
-      renderTunnel(tunnelState.riseAmount, tunnelState.opacity, fade.fabricFade);
-      var wireProgress = computeWireProgress(p);
-      renderCrossSection(tunnelState.opacity, fade.archFade, fade.fabricFade);
-
-      renderWire(wireProgress, fade.fabricFade);
+      renderTunnel(tunnelState.riseAmount, tunnelState.opacity);
+      renderWire(computeWireProgress(p));
     }
 
     function computeSlitOpen(p, which) {
@@ -1966,24 +1760,21 @@
       return easeInOutCubic(phaseT(p, range));
     }
 
-    // Reduced motion: no rotation, ever (cameraTiltX/cameraYawY both
-    // stay 0) -- instead the tunnel is held at a permanent 50% "cutaway"
-    // opacity from the start, so the wire threading through it stays
-    // visible from directly overhead without needing the orbit. Slits,
-    // tunnel rise, and wire travel still play out for real, just faster
-    // and with the camera never leaving top-down.
+    // Reduced motion: camera pinned at rotateX(0) throughout -- instead
+    // the tunnel is held at a permanent 50% "cutaway" opacity from the
+    // start, so the wire threading through it stays visible from
+    // directly overhead without needing the rotation. Slits, tunnel
+    // rise, and wire travel still play out for real, just faster.
     var REDUCED_DURATION = 3200;
     function renderReduced(rp) {
-      scene.style.transform = 'rotateY(0deg) rotateX(0deg)';
-      fabric.face.style.opacity = '1';
+      scene.style.transform = 'rotateX(0deg)';
       var slitsT = easeInOutCubic(clamp01(rp / 0.22));
       renderSlit(leftSlitEl, X_leftSlit, slitsT);
       renderSlit(rightSlitEl, X_rightSlit, slitsT);
       var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
-      renderTunnel(clamp01(riseT), 0.5, 1);
+      renderTunnel(clamp01(riseT), 0.5);
       var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
-      renderCrossSection(0.5, 0, 1);
-      renderWire(wireT, 1);
+      renderWire(wireT);
     }
 
     var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
