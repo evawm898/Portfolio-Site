@@ -359,19 +359,26 @@ robust answer.
 
 **Stage 1 — automatic proposal + human review** (`propose_measurement_
 rois` in `analysis/gauge_analysis.py`, `POST /propose-rois`). Candidate
-square windows (sized from the calibrated scale, targeting ~0.75–1.0in
-per side) slide across the image and are scored by a **generic**
-image-quality heuristic — sharpness (Laplacian variance), local contrast
-(std-dev), texture consistency (contrast uniformity across a coarse
-grid), periodicity strength (the same 1D-autocorrelation primitive the
-real detector uses), and a brightness-extremity penalty. Deliberately
+square windows are scored by a **generic** image-quality heuristic —
+sharpness (Laplacian variance), local contrast (std-dev), texture
+consistency (contrast uniformity across a coarse grid), periodicity
+strength (the same 1D-autocorrelation primitive the real detector uses),
+periodicity *consistency* (does the measured period agree across the
+window's four quadrants, or does it drift the way a curl/wrinkle/stretch
+would drift it?), and a brightness-extremity penalty. Deliberately
 generic: nothing in the scorer knows what a ruler or a label looks like.
 Those regions score low on their own merits — usually low periodicity,
 often low texture-consistency or blown-out brightness — so a ruler gets
-avoided without ever being named. A greedy selection then picks 2–6
-high-scoring, spatially-diverse candidates (bounded overlap + a minimum
-center-to-center spacing) so the proposal spreads across the fabric
-instead of clustering neighboring boxes together.
+avoided without ever being named. Candidates are also hard-gated by a
+local-variance-based fabric mask before they're even scored — a window
+that dips into flat background, even briefly at one edge, is rejected
+outright regardless of how good its aggregate stats look. A greedy
+selection then picks well-separated, high-scoring candidates (bounded
+overlap + a minimum center-to-center spacing) so the proposal spreads
+across the fabric instead of clustering neighboring boxes together. **See
+the "Stage 4" section below** for how the window sizing itself (originally
+a single fixed ~0.75–1.0in target) and the region count (originally up to
+6) both changed, and why.
 
 Critically, the system **stops here** and does not analyze anything yet.
 The frontend's step 3, "Review Measurement Areas," shows every proposed
@@ -534,6 +541,91 @@ signal of real closeness to the threshold, not a glitch). Course is
 unaffected by this change and remains ~7.28 CPI, same as before. Reported
 as-is: an honest, verified improvement on the specific failure this
 project already knew about, not a claim that wale detection is solved.
+
+### Stage 4: a few large regular regions, not many small ones
+
+The original proposal design (Stage 1 above, before this section) picked
+up to 6 small windows (~0.75–1.0in per side) purely by image-quality
+score. Real photos exposed two problems with that, both found by testing
+against actual photos rather than assumed:
+
+**Small windows can land on distortion that a generic quality score
+doesn't catch.** A user-submitted photo of a pinned swatch with curled,
+rolled edges got an auto-proposed box sitting directly on the curl — the
+existing scorer (sharpness/contrast/texture-consistency/periodicity) rated
+it highly because the curled fabric is still sharp, high-contrast, and
+periodic; it just isn't *flat*. The direct fix was a new scoring
+component, `_periodicity_consistency_score`: split the candidate crop into
+four quadrants, measure each quadrant's own dominant period independently,
+and score how well they agree in log-space. A curl, wrinkle, or stretch
+compresses or expands the period locally, so the quadrants disagree even
+though each one individually still looks sharp and periodic.
+
+The first version of this idea used gradient-orientation statistics
+(circular/doubled-angle averaging of edge directions) instead of measured
+period, on the theory that distortion should show up as inconsistent edge
+orientation. Tested directly against the real jersey fixture — known
+flat, known clean — it scored 0.28 (should be near 1.0). The cause: knit
+fabric's edge structure is naturally bimodal even when perfectly flat (the
+V-shape loop legs run diagonally, the stitch grid runs vertically/
+horizontally), so there's no single dominant orientation to be consistent
+about in the first place — the metric wasn't measuring what it was meant
+to. It was replaced outright with the period-agreement version above
+before ever being shown as a result; caught by testing against the known-
+clean fixture before trusting it, not by inspection.
+
+**Given that better single-region vetting exists, is one big, well-vetted
+region actually reliable enough on its own?** The user's next request was
+direct: auto-select the single largest regular area, drop multi-region
+cross-checking entirely, and derive confidence from that one region's own
+internal agreement (measured period vs. counted loop columns) instead of
+cross-region agreement. That version was built in full — largest-first
+multi-scale window search, the fabric-mask gate, periodicity-consistency
+scoring, single-region confidence from internal agreement — and then
+tested rigorously *before* being shown to the user: a sweep of window size
+(0.75in–2.5in) at a fixed position on the real jersey photo. The result
+had no monotonic size-to-accuracy trend, and included at least one
+confidently-wrong case (a 0.75in window reporting 11.08 WPI, more than 2x
+the true ~5, at 77% self-reported confidence). This wasn't a coding bug —
+the code did exactly what it was designed to do — it was evidence that the
+underlying premise ("a single large, well-vetted region is reliable
+because it's large and well-vetted") doesn't hold for this detector
+architecture. Reported as a negative finding, not shipped quietly.
+
+The resolution — and the current design — keeps everything from both
+attempts above (the largest-first search, the fabric-mask gate, periodicity
+consistency scoring) but restores multi-region cross-checking as the
+safety net: `propose_measurement_rois` now tries candidate window sizes
+largest-first (from `CANDIDATE_SIZE_INCHES`, 3.0in down to 0.75in), and at
+each size greedily selects up to `ROI_PROPOSAL_MAX_REGIONS` (4) spatially-
+separated, high-scoring candidates. It stops at the **largest** size that
+can still support at least `ROI_PROPOSAL_MIN_REGIONS` (2) such candidates,
+so the proposal is a few large regions rather than either one region or a
+swarm of small ones. If no size can support even 2, it falls back to
+whatever the largest size actually produced (down to a single region on a
+small or difficult image) rather than failing outright — Stage 2/3's
+existing consensus machinery already handles anywhere from 1 region up.
+
+**Result on the real jersey photo**: 2 regions at ~1.5in² each (the
+largest size the photo's usable fabric area could support 2 of).
+Consensus wale came out to 4.49 WPI at Low confidence (correctly flagged
+as uncertain — the two regions' own counted-column values didn't tightly
+agree), course came out to 7.04 CPI at higher confidence — both consistent
+with the known ~5 WPI / ~7.2 CPI ground truth for this photo, verified via
+a full Playwright run through calibration → review → approve → analyze →
+results, not just the backend in isolation.
+
+One thing this stage does **not** claim to have fixed: a separate photo
+(a teal/blue swatch, examined via Developer Diagnostics screenshots rather
+than the raw file, which this environment can't access from a pasted
+image) showed both the periodicity detector and the loop-lattice counter
+independently landing on the same wrong ~2x harmonic for the same region —
+a case where Stage 3's core assumption (that the two methods are
+sufficiently independent to cross-validate each other) didn't hold. Fewer,
+larger, better-vetted regions may help this incidentally, since a larger
+window gives both detectors more of the true repeat to lock onto, but it
+hasn't been verified against that specific photo and isn't claimed as
+fixed here — an open, disclosed limitation, not a solved one.
 
 ### Image viewer pan/zoom
 

@@ -450,7 +450,7 @@ async def propose_rois(
                 x=r.x, y=r.y, width=r.width, height=r.height, label=r.label,
                 quality_score=r.quality_score, sharpness=r.sharpness, contrast=r.contrast,
                 periodicity=r.periodicity, texture_consistency=r.texture_consistency,
-                brightness_score=r.brightness_score,
+                brightness_score=r.brightness_score, periodicity_consistency=r.periodicity_consistency,
             )
             for r in proposal.rois
         ],
@@ -607,6 +607,7 @@ async def analyze_multi(
             periodicity=m.quality_parts.get("periodicity"),
             texture_consistency=m.quality_parts.get("texture_consistency"),
             brightness_score=m.quality_parts.get("brightness_score"),
+            periodicity_consistency=m.quality_parts.get("periodicity_consistency"),
             rotation_deg=m.rotation_deg,
             loop_lattice_debug=_loop_lattice_to_out(m.loop_lattice, pixels_per_mm) if m.loop_lattice else None,
             wale_source=m.wale_source,

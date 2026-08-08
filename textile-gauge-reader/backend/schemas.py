@@ -46,6 +46,7 @@ class ProposedRoiOut(BaseModel):
     periodicity: float
     texture_consistency: float
     brightness_score: float
+    periodicity_consistency: float = 0.5
 
 
 class ProposeRoisResponse(BaseModel):
@@ -196,6 +197,7 @@ class RoiMeasurementOut(BaseModel):
     periodicity: Optional[float] = None
     texture_consistency: Optional[float] = None
     brightness_score: Optional[float] = None
+    periodicity_consistency: Optional[float] = None
     rotation_deg: float = 0.0
     loop_lattice_debug: Optional[LoopLatticeDebugOut] = None
     # Which evidence this region's WALE consensus candidate actually came

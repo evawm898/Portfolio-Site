@@ -2437,38 +2437,53 @@ def analyze_loop_lattice_experiment(
 # --- Automatic measurement-area (ROI) proposal --------------------------
 #
 # Stage 1 of the multi-region workflow: BEFORE any gauge analysis runs,
-# propose several candidate square regions for the user to review/edit/
-# approve (see backend main.py's /propose-rois and the frontend's
-# "Review Measurement Areas" step). This function only scores and selects
-# candidate regions -- it never runs wale/course detection itself, and it
-# has no knowledge of ground-truth values (those stay evaluation-only,
-# per the project's established separation).
+# propose ONE candidate region -- the largest one that still looks
+# regular -- for the user to review/edit/approve (see backend main.py's
+# /propose-rois and the frontend's "Review Measurement Areas" step). This
+# function only scores and selects a candidate region -- it never runs
+# wale/course detection itself, and it has no knowledge of ground-truth
+# values (those stay evaluation-only, per the project's established
+# separation). A user can still manually add MORE regions afterward for
+# cross-region checking (analyze_multi_roi handles any count identically);
+# this function only decides the automatic starting point.
 #
-# Deliberately generic: the quality score below has no notion of "ruler"
-# or "label" at all. A ruler/label/background region scores low on its
-# own merits (usually low periodicity, and often low texture-consistency
+# Deliberately generic: the quality score below has no notion of "ruler,"
+# "label," "edge," "wrinkle," or "curl" at all. A ruler/label/background
+# region scores low on its own merits (usually low periodicity, and often low texture-consistency
 # or extreme brightness), not because anything here was told to avoid it.
 
-TARGET_ROI_INCHES = (0.75, 1.0)          # target candidate square side, min/max, in inches
-ROI_PROPOSAL_MIN_REGIONS = 2             # below this, prefer relaxing the quality floor over proposing nothing
-ROI_PROPOSAL_MAX_REGIONS = 6
-ROI_PROPOSAL_STRIDE_FRACTION = 0.5       # candidate grid step, as a fraction of the window size
-ROI_PROPOSAL_MAX_OVERLAP_IOU = 0.02      # two accepted candidates may not overlap more than this
-ROI_PROPOSAL_MIN_CENTER_SPACING = 1.15   # ...nor have centers closer than this fraction of the window size
-ROI_PROPOSAL_MIN_QUALITY = 0.30          # candidates below this are skipped once ROI_PROPOSAL_MIN_REGIONS is met
+# Candidate sizes to try, LARGEST first, in inches -- the proposal picks
+# the largest one whose best positions can fill ROI_PROPOSAL_MIN_REGIONS
+# well-separated, regular slots, so the result is "as many large regular
+# areas as the fabric supports," not a fixed size or a fixed count. Sizes
+# that don't fit the image at all (window_px too big) are skipped
+# automatically; the smallest entries match the original per-region
+# target from the first version of this function (a single fixed
+# ~0.75-1in window).
+CANDIDATE_SIZE_INCHES = [3.0, 2.5, 2.0, 1.5, 1.25, 1.0, 0.875, 0.75]
+ROI_PROPOSAL_STRIDE_FRACTION = 0.35      # candidate grid step, as a fraction of the window size
+ROI_PROPOSAL_MIN_QUALITY = 0.45          # a large region is stricter-vetted than the old small-window floor -- fewer, larger regions means each one matters more
 ROI_PROPOSAL_EDGE_MARGIN_FRACTION = 0.02 # keep candidate windows off the outer image border
 ROI_PROPOSAL_LABELS = "ABCDEF"
+ROI_PROPOSAL_MIN_REGIONS = 2             # below this, single-region measurement has no cross-check at all -- prefer a smaller size that supports 2+ over a bigger size that only supports 1
+ROI_PROPOSAL_MAX_REGIONS = 4             # large regions are individually more expensive to review than the old small ones -- fewer of them is the point
+ROI_PROPOSAL_MAX_OVERLAP_IOU = 0.02      # two selected regions may not overlap more than this
+ROI_PROPOSAL_MIN_CENTER_SPACING = 1.15   # ...nor have centers closer than this fraction of the window size
 
-# Quality-score component weights (sum to 1.0). Periodicity gets the
-# largest weight -- "does this patch actually repeat" is the single
-# strongest signal that it's genuine knit texture and not background,
-# a ruler, or a label.
+# Quality-score component weights (sum to 1.0). Periodicity and
+# periodicity-consistency get the largest weights: periodicity is "does
+# this patch actually repeat" (the strongest signal against background/
+# ruler/label), and periodicity-consistency is "does it repeat the SAME
+# way everywhere in the patch" (the strongest signal against a curled,
+# stretched, or wrinkled area -- which can still be locally periodic and
+# high-contrast, just geometrically distorted).
 ROI_QUALITY_WEIGHTS = {
-    "sharpness": 0.20,
-    "contrast": 0.15,
-    "periodicity": 0.30,
+    "sharpness": 0.15,
+    "contrast": 0.10,
+    "periodicity": 0.25,
     "texture_consistency": 0.20,
-    "brightness_score": 0.15,
+    "brightness_score": 0.10,
+    "periodicity_consistency": 0.20,
 }
 
 
@@ -2487,6 +2502,7 @@ class ProposedRoi:
     periodicity: float
     texture_consistency: float
     brightness_score: float
+    periodicity_consistency: float = 0.5
 
 
 @dataclass
@@ -2497,35 +2513,70 @@ class RoiProposalResult:
     window_size_px: Optional[int] = None
 
 
-def _roi_iou(a: dict, b: dict) -> float:
-    ax1, ay1, ax2, ay2 = a["x"], a["y"], a["x"] + a["w"], a["y"] + a["h"]
-    bx1, by1, bx2, by2 = b["x"], b["y"], b["x"] + b["w"], b["y"] + b["h"]
-    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
-    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
-    iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
-    inter = iw * ih
-    if inter <= 0:
-        return 0.0
-    area_a = (ax2 - ax1) * (ay2 - ay1)
-    area_b = (bx2 - bx1) * (by2 - by1)
-    union = area_a + area_b - inter
-    return inter / union if union > 0 else 0.0
+def _periodicity_consistency_score(crop_gray: np.ndarray) -> float:
+    """
+    Whether the dominant repeat period stays roughly the SAME across
+    different parts of this candidate window -- a flat, undistorted knit
+    patch repeats at close to the same spacing everywhere in it; a
+    curled, stretched, or wrinkled area compresses/expands the apparent
+    stitch spacing differently in different parts of the same window,
+    even though periodicity/texture-consistency scored on the window AS
+    A WHOLE can still look fine (each part still "has a repeat," just
+    not the SAME repeat as the part next to it).
 
+    (An earlier version of this signal measured local gradient
+    ORIENTATION consistency instead. That penalized genuinely flat knit
+    fabric too: a stitch's V-shape has diagonal legs in two directions
+    plus strong vertical/horizontal edges, so even undistorted fabric has
+    no single dominant gradient direction -- confirmed on the real jersey
+    fixture, which scored ~0.28 despite being flat and clean. Comparing
+    the actual measured PERIOD across quadrants, reusing the same 1D-
+    autocorrelation primitive the real detector and the rest of this
+    quality score already use, measures the thing that actually matters
+    for a gauge reading and doesn't carry that false-positive.)
 
-def _roi_center_distance(a: dict, b: dict) -> float:
-    return math.hypot(
-        (a["x"] + a["w"] / 2) - (b["x"] + b["w"] / 2),
-        (a["y"] + a["h"] / 2) - (b["y"] + b["h"] / 2),
-    )
+    Splits the crop into four quadrants, measures each quadrant's own
+    dominant period along both projections, and scores how tightly the
+    four quadrant estimates agree with each other in LOG-space (so a
+    given relative disagreement, e.g. "20% different," is judged the
+    same way regardless of the fabric's own gauge) -- separately for the
+    x- and y-projection periods, then averages the two.
+    """
+    h, w = crop_gray.shape[:2]
+    half_h, half_w = h // 2, w // 2
+    if half_h < 20 or half_w < 20:
+        return 0.5  # too small to subdivide meaningfully -- neutral, not penalized
 
+    quadrants = [
+        crop_gray[:half_h, :half_w], crop_gray[:half_h, half_w:],
+        crop_gray[half_h:, :half_w], crop_gray[half_h:, half_w:],
+    ]
 
-def _too_close_to_selected(cand: dict, selected: List[dict], window_px: float) -> bool:
-    for s in selected:
-        if _roi_iou(cand, s) > ROI_PROPOSAL_MAX_OVERLAP_IOU:
-            return True
-        if _roi_center_distance(cand, s) < window_px * ROI_PROPOSAL_MIN_CENTER_SPACING:
-            return True
-    return False
+    x_periods: List[float] = []
+    y_periods: List[float] = []
+    for q in quadrants:
+        _, gx, gy = _enhance_texture(q)
+        px, _ = _autocorrelation_spacing(_project(gx, axis=0))
+        py, _ = _autocorrelation_spacing(_project(gy, axis=1))
+        if px is not None:
+            x_periods.append(px)
+        if py is not None:
+            y_periods.append(py)
+
+    def _agreement(periods: List[float]) -> Optional[float]:
+        if len(periods) < 2:
+            return None  # not enough signal on this projection to judge either way
+        log_vals = np.log(np.array(periods))
+        spread = float(log_vals.max() - log_vals.min())
+        # 0 log-spread (identical period everywhere) -> 1.0; ~0.7 log-
+        # spread (about a 2x difference between the most/least extreme
+        # quadrant) or more -> essentially no agreement -> 0.0.
+        return float(np.clip(1.0 - spread / 0.7, 0.0, 1.0))
+
+    scores = [s for s in (_agreement(x_periods), _agreement(y_periods)) if s is not None]
+    if not scores:
+        return 0.5  # neither projection had enough signal to judge -- neutral
+    return float(np.clip(sum(scores) / len(scores), 0.0, 1.0))
 
 
 def _texture_consistency_score(crop_f: np.ndarray, grid: int = 4) -> float:
@@ -2572,7 +2623,10 @@ def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
     rank and select candidate regions before the user ever sees them.
     """
     if crop_gray.size == 0:
-        parts = dict(sharpness=0.0, contrast=0.0, periodicity=0.0, texture_consistency=0.0, brightness_score=0.0)
+        parts = dict(
+            sharpness=0.0, contrast=0.0, periodicity=0.0, texture_consistency=0.0,
+            brightness_score=0.0, periodicity_consistency=0.0,
+        )
         return 0.0, parts
 
     crop_f = crop_gray.astype(np.float32)
@@ -2602,41 +2656,116 @@ def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
 
     brightness_score = _brightness_score(float(crop_f.mean()))
 
+    periodicity_consistency = _periodicity_consistency_score(crop_gray)
+
     parts = dict(
         sharpness=sharpness,
         contrast=contrast,
         periodicity=periodicity,
         texture_consistency=texture_consistency,
         brightness_score=brightness_score,
+        periodicity_consistency=periodicity_consistency,
     )
     score = sum(parts[k] * ROI_QUALITY_WEIGHTS[k] for k in ROI_QUALITY_WEIGHTS)
     return float(np.clip(score, 0.0, 1.0)), parts
 
 
-def propose_measurement_rois(
-    image_bgr: np.ndarray,
-    pixels_per_mm: float,
-    min_regions: int = ROI_PROPOSAL_MIN_REGIONS,
-    max_regions: int = ROI_PROPOSAL_MAX_REGIONS,
-) -> RoiProposalResult:
+ROI_PROPOSAL_BACKGROUND_BLOCK_PX = 16       # block size for the coarse fabric-vs-background variance map
+ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD = 10.0  # blocks with local std-dev below this count as "background"
+ROI_PROPOSAL_MIN_FABRIC_FRACTION = 0.97       # a candidate window must be at least this "fabric" to be considered at all
+
+
+def _roi_iou(a: dict, b: dict) -> float:
+    ax1, ay1, ax2, ay2 = a["x"], a["y"], a["x"] + a["w"], a["y"] + a["h"]
+    bx1, by1, bx2, by2 = b["x"], b["y"], b["x"] + b["w"], b["y"] + b["h"]
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    area_a = (ax2 - ax1) * (ay2 - ay1)
+    area_b = (bx2 - bx1) * (by2 - by1)
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _roi_center_distance(a: dict, b: dict) -> float:
+    return math.hypot(
+        (a["x"] + a["w"] / 2) - (b["x"] + b["w"] / 2),
+        (a["y"] + a["h"] / 2) - (b["y"] + b["h"] / 2),
+    )
+
+
+def _too_close_to_selected(cand: dict, selected: List[dict], window_px: float) -> bool:
+    for s in selected:
+        if _roi_iou(cand, s) > ROI_PROPOSAL_MAX_OVERLAP_IOU:
+            return True
+        if _roi_center_distance(cand, s) < window_px * ROI_PROPOSAL_MIN_CENTER_SPACING:
+            return True
+    return False
+
+
+def _fabric_mask(gray_full: np.ndarray) -> np.ndarray:
     """
-    Propose several candidate square measurement areas, sized from the
-    calibrated physical scale (~0.75-1.0in per side) and spread across
-    the image, for the user to review/edit/approve BEFORE any gauge
-    analysis runs.
+    Coarse per-pixel map of "has real local texture" vs "flat/uniform" --
+    local std-dev, via a box-filtered mean and mean-of-squares (fast,
+    same cost regardless of block size). Used only to keep proposed
+    windows away from non-fabric regions (a plain background behind a
+    small swatch, an empty margin, a stretch of unmarked ruler) -- NOT to
+    segment the fabric's exact silhouette, and not color- or brightness-
+    specific, so it generalizes across yarn colors and lighting the same
+    way the rest of this quality score does.
+    """
+    gray_f = gray_full.astype(np.float32)
+    block = ROI_PROPOSAL_BACKGROUND_BLOCK_PX
+    mean = cv2.boxFilter(gray_f, ddepth=-1, ksize=(block, block), normalize=True)
+    mean_sq = cv2.boxFilter(gray_f * gray_f, ddepth=-1, ksize=(block, block), normalize=True)
+    variance = np.clip(mean_sq - mean * mean, 0.0, None)
+    local_std = np.sqrt(variance)
+    return local_std >= ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD
 
-    Slides a grid of candidate square windows across the image, scores
-    each with a generic image-quality heuristic (see _roi_quality_score),
-    then greedily selects the highest-scoring candidates subject to a
-    spatial-diversity constraint (no two selections may overlap much or
-    sit too close together) -- so the result naturally spreads across
-    different parts of the fabric rather than clustering.
 
-    Adapts the count to what the image actually supports: aims for
-    `max_regions`, never proposes anything scoring below
-    ROI_PROPOSAL_MIN_QUALITY once `min_regions` is already met, but will
-    relax that floor (rather than propose nothing) if the image can't
-    otherwise reach `min_regions` at all.
+def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:
+    """
+    Propose a FEW (ROI_PROPOSAL_MIN_REGIONS..ROI_PROPOSAL_MAX_REGIONS)
+    candidate measurement areas for the user to review/edit/approve
+    BEFORE any gauge analysis runs -- as LARGE as the fabric supports
+    while still looking regular (see _roi_quality_score, especially
+    _periodicity_consistency_score, which catches curled/stretched/
+    wrinkled areas that plain periodicity/texture-consistency alone can
+    miss), and well-separated from each other.
+
+    Single-region measurement, however large or well-vetted the one
+    region is, turned out NOT to be reliable enough on its own: a sweep
+    across window sizes on a real photo showed no monotonic size-to-
+    accuracy relationship, including at least one confidently-wrong
+    case (this is a direct, evidence-driven finding from testing, not a
+    hypothetical). Cross-region consensus (analyze_multi_roi) is what
+    actually catches a single region landing on a bad harmonic --
+    dropping to one region drops that safety net. So this still proposes
+    MULTIPLE regions, just fewer and larger ones than the original
+    small-window (~0.75-1in) design: bigger gives the detector more
+    repeat cycles per region, more regions gives cross-checking, and the
+    two together are the point.
+
+    Tries CANDIDATE_SIZE_INCHES largest-first: at each size, grid-scans
+    the whole image (skipping any window that dips into background/
+    non-fabric pixels -- see _fabric_mask) and greedily selects up to
+    ROI_PROPOSAL_MAX_REGIONS non-overlapping, well-separated candidates
+    that clear ROI_PROPOSAL_MIN_QUALITY. Takes the first (largest) size
+    that can fill at least ROI_PROPOSAL_MIN_REGIONS such slots -- a
+    smaller size that supports 2+ well-separated good regions is
+    preferred over a bigger size that can only fit 1, since a single
+    region has no cross-check at all.
+
+    If NO size can fill even the minimum, falls back to whatever it DID
+    find (as few as one region, or the best-scoring candidate seen at
+    all if nothing cleared the quality bar) rather than proposing
+    nothing -- the frontend's review step and "Add Measurement Area"
+    manual option are exactly the safety net for that case; this
+    function's job is to always offer its best guess and let a human
+    confirm or correct it, never to silently give up.
     """
     if image_bgr is None or image_bgr.size == 0:
         return RoiProposalResult(success=False, message="No image data to propose areas from.")
@@ -2644,77 +2773,103 @@ def propose_measurement_rois(
         return RoiProposalResult(success=False, message="Invalid calibration scale.")
 
     img_h, img_w = image_bgr.shape[:2]
-
     mm_per_inch = 25.4
-    target_in = sum(TARGET_ROI_INCHES) / 2.0  # ~0.875in midpoint
-    window_px = int(round(pixels_per_mm * mm_per_inch * target_in))
+    margin = int(round(min(img_w, img_h) * ROI_PROPOSAL_EDGE_MARGIN_FRACTION))
+    max_window = min(img_w, img_h) - 2 * margin
 
-    # Never bigger than ~45% of the shorter image dimension (so several
-    # non-identical windows can actually fit), never smaller than the
-    # real detector's own minimum usable ROI size.
-    max_window = int(min(img_w, img_h) * 0.45)
-    window_px = max(MIN_ROI_DIM_PX * 2, min(window_px, max_window)) if max_window > 0 else 0
-
-    if window_px < MIN_ROI_DIM_PX or window_px > min(img_w, img_h):
+    if max_window < MIN_ROI_DIM_PX * 2:
         return RoiProposalResult(
             success=False,
             message="Image is too small relative to the calibrated scale to propose measurement areas.",
         )
 
-    margin = int(round(min(img_w, img_h) * ROI_PROPOSAL_EDGE_MARGIN_FRACTION))
-    stride = max(1, int(round(window_px * ROI_PROPOSAL_STRIDE_FRACTION)))
-
-    xs = list(range(margin, max(margin + 1, img_w - window_px - margin + 1), stride))
-    ys = list(range(margin, max(margin + 1, img_h - window_px - margin + 1), stride))
-    if not xs:
-        xs = [max(0, (img_w - window_px) // 2)]
-    if not ys:
-        ys = [max(0, (img_h - window_px) // 2)]
-
     gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    fabric_mask = _fabric_mask(gray_full)
 
-    candidates: List[dict] = []
-    for cy in ys:
-        for cx in xs:
-            crop_gray = gray_full[cy:cy + window_px, cx:cx + window_px]
-            score, parts = _roi_quality_score(crop_gray)
-            candidates.append({"x": cx, "y": cy, "w": window_px, "h": window_px, "score": score, **parts})
+    best_size_selection: Optional[List[dict]] = None  # best candidate SET seen at any size, as a last-resort fallback
+    best_size_window_px: Optional[int] = None
+    chosen_selection: Optional[List[dict]] = None      # the largest size that filled >= ROI_PROPOSAL_MIN_REGIONS slots
+    chosen_window_px: Optional[int] = None
 
-    if not candidates:
-        return RoiProposalResult(success=False, message="Could not evaluate any candidate measurement areas.")
+    for size_in in CANDIDATE_SIZE_INCHES:
+        window_px = int(round(pixels_per_mm * mm_per_inch * size_in))
+        if window_px < MIN_ROI_DIM_PX * 2 or window_px > max_window:
+            continue  # doesn't fit this image at this size -- try the next one
 
-    candidates.sort(key=lambda c: c["score"], reverse=True)
+        stride = max(1, int(round(window_px * ROI_PROPOSAL_STRIDE_FRACTION)))
+        xs = list(range(margin, max(margin + 1, img_w - window_px - margin + 1), stride))
+        ys = list(range(margin, max(margin + 1, img_h - window_px - margin + 1), stride))
+        if not xs:
+            xs = [max(0, (img_w - window_px) // 2)]
+        if not ys:
+            ys = [max(0, (img_h - window_px) // 2)]
 
-    selected: List[dict] = []
-    for cand in candidates:
-        if len(selected) >= max_regions:
-            break
-        if cand["score"] < ROI_PROPOSAL_MIN_QUALITY and len(selected) >= min_regions:
-            break
-        if _too_close_to_selected(cand, selected, window_px):
-            continue
-        selected.append(cand)
+        candidates: List[dict] = []
+        for cy in ys:
+            for cx in xs:
+                # Hard gate, checked BEFORE scoring: a window that dips
+                # meaningfully into flat/background pixels is rejected
+                # outright at this size, regardless of how good its
+                # aggregate statistics might otherwise look (a window
+                # mostly-fabric-plus-a-little-background can still score
+                # deceptively well on sharpness/periodicity/contrast,
+                # since those are dominated by the fabric majority -- this
+                # catches exactly that case, which the quality-score
+                # components alone did not).
+                fabric_fraction = float(fabric_mask[cy:cy + window_px, cx:cx + window_px].mean())
+                if fabric_fraction < ROI_PROPOSAL_MIN_FABRIC_FRACTION:
+                    continue
+                crop_gray = gray_full[cy:cy + window_px, cx:cx + window_px]
+                score, parts = _roi_quality_score(crop_gray)
+                candidates.append({"x": cx, "y": cy, "w": window_px, "h": window_px, "score": score, **parts})
 
-    # Didn't reach min_regions honoring the quality floor -- relax it and
-    # backfill with the next-best, still-spread-out candidates rather
-    # than proposing fewer than min_regions usable areas outright. Spatial
-    # diversity is still enforced; only the quality floor is relaxed.
-    if len(selected) < min_regions:
-        already = {id(c) for c in selected}
+        if not candidates:
+            continue  # every position at this size dipped into background -- try a smaller size
+        candidates.sort(key=lambda c: c["score"], reverse=True)
+
+        selected: List[dict] = []
         for cand in candidates:
-            if len(selected) >= min_regions:
+            if len(selected) >= ROI_PROPOSAL_MAX_REGIONS:
                 break
-            if id(cand) in already:
-                continue
+            if cand["score"] < ROI_PROPOSAL_MIN_QUALITY:
+                break  # sorted descending -- nothing after this clears the bar either
             if _too_close_to_selected(cand, selected, window_px):
                 continue
             selected.append(cand)
 
-    if not selected:
-        return RoiProposalResult(
-            success=False,
-            message="No suitable measurement areas were found in this image.",
-            window_size_px=window_px,
+        if best_size_selection is None or len(selected) > len(best_size_selection) or (
+            len(selected) == len(best_size_selection) and window_px > (best_size_window_px or 0)
+        ):
+            best_size_selection = selected or [candidates[0]]  # keep at least the single best candidate as a fallback
+            best_size_window_px = window_px
+
+        if len(selected) >= ROI_PROPOSAL_MIN_REGIONS:
+            chosen_selection = selected
+            chosen_window_px = window_px
+            break  # sizes are tried largest-first -- the first size that fills enough slots wins
+
+    used_fallback = chosen_selection is None
+    if used_fallback:
+        chosen_selection = best_size_selection
+        chosen_window_px = best_size_window_px
+
+    if not chosen_selection:
+        return RoiProposalResult(success=False, message="Could not evaluate any candidate measurement areas.")
+
+    side_in = chosen_window_px / (pixels_per_mm * mm_per_inch)
+    region_word = "region" if len(chosen_selection) == 1 else "regions"
+    if not used_fallback:
+        message = f"Proposed {len(chosen_selection)} large regular {region_word} (~{side_in:.2f}in square each)."
+    elif len(chosen_selection) >= ROI_PROPOSAL_MIN_REGIONS:
+        message = (
+            f"Proposed {len(chosen_selection)} regular {region_word} (~{side_in:.2f}in square each) -- "
+            f"the largest size that supported {ROI_PROPOSAL_MIN_REGIONS}+ well-separated areas wasn't reachable, "
+            "so this is the best available spread."
+        )
+    else:
+        message = (
+            f"Only {len(chosen_selection)} usable {region_word} found (~{side_in:.2f}in square) -- cross-region "
+            "checking works best with 2 or more; consider adding another area manually if you can find one."
         )
 
     rois = [
@@ -2727,15 +2882,11 @@ def propose_measurement_rois(
             periodicity=round(c["periodicity"], 4),
             texture_consistency=round(c["texture_consistency"], 4),
             brightness_score=round(c["brightness_score"], 4),
+            periodicity_consistency=round(c["periodicity_consistency"], 4),
         )
-        for i, c in enumerate(selected)
+        for i, c in enumerate(chosen_selection)
     ]
-    return RoiProposalResult(
-        success=True,
-        message=f"Proposed {len(rois)} measurement area(s).",
-        rois=rois,
-        window_size_px=window_px,
-    )
+    return RoiProposalResult(success=True, message=message, rois=rois, window_size_px=chosen_window_px)
 
 
 # --- Multi-ROI independent analysis + cross-region consensus ------------
@@ -2806,6 +2957,43 @@ def _wale_count_confidence(lattice: "LoopLatticeResult") -> float:
     else:
         support_ratio = 0.0
     return float(np.clip(0.5 * lattice.lattice_consistency + 0.5 * support_ratio, 0.0, 1.0))
+
+
+SINGLE_REGION_AGREEMENT_CLOSE_LOG = 0.22      # periodicity & counted within this log-ratio -- same tolerance _consensus_for_axis uses for "agrees"
+SINGLE_REGION_AGREEMENT_LOOSE_LOG = 0.45      # ...within this -- still the same ballpark, not tight
+SINGLE_REGION_AGREEMENT_CLOSE_FACTOR = 0.95   # agree closely -- almost as trustworthy as real cross-region corroboration
+SINGLE_REGION_AGREEMENT_LOOSE_FACTOR = 0.6    # same ballpark but not tight
+SINGLE_REGION_AGREEMENT_POOR_FACTOR = 0.3     # substantially disagree -- little reason to trust either alone
+
+
+def _single_region_agreement_confidence(
+    periodicity_px: Optional[float], counted_px: Optional[float], base_confidence: float
+) -> float:
+    """
+    Confidence for wale on a SINGLE approved region (no cross-region
+    consensus possible), informed by how well its two INDEPENDENT
+    methods -- the periodicity estimate and the loop-lattice's counted
+    column spacing -- agree with each other. This is the within-region
+    analogue of cross-region agreement: close agreement between two
+    genuinely different measurement approaches on the same pixels is
+    real corroborating evidence, not proof, so it still only scales
+    `base_confidence` (whatever the preferred method already claims for
+    itself, per _wale_count_candidate) rather than manufacturing
+    confidence neither method earned on its own. Falls back to the flat
+    single-region factor when only one of the two values is available.
+    """
+    if periodicity_px is None or counted_px is None or periodicity_px <= 0 or counted_px <= 0:
+        return base_confidence * CONSENSUS_SINGLE_REGION_FACTOR
+
+    ratio = counted_px / periodicity_px
+    log_ratio = abs(math.log(ratio))
+    if log_ratio <= SINGLE_REGION_AGREEMENT_CLOSE_LOG:
+        agreement_factor = SINGLE_REGION_AGREEMENT_CLOSE_FACTOR
+    elif log_ratio <= SINGLE_REGION_AGREEMENT_LOOSE_LOG:
+        agreement_factor = SINGLE_REGION_AGREEMENT_LOOSE_FACTOR
+    else:
+        agreement_factor = SINGLE_REGION_AGREEMENT_POOR_FACTOR
+    return base_confidence * agreement_factor
 
 
 def _wale_count_candidate(lattice: Optional["LoopLatticeResult"]) -> Tuple[Optional[float], float]:
@@ -3165,16 +3353,27 @@ def analyze_multi_roi(
         # didn't produce a trustworthy result for that region, so a
         # region is never dropped just because the experimental detector
         # came up empty on it.
+        #
+        # With exactly ONE approved region, cross-region consensus isn't
+        # possible at all -- confidence instead comes from whether this
+        # region's own two independent methods (periodicity vs. counted)
+        # agree with each other, per _single_region_agreement_confidence.
+        single_region = len(per_roi) == 1
         out = []
         for m in per_roi:
             if m.wale_source == "loop_count":
                 spacing_px = m.loop_lattice.wale_spacing_px
-                confidence = m.wale_count_confidence
+                base_confidence = m.wale_count_confidence
             else:
                 spacing_px = m.wale.spacing_px
-                confidence = m.wale.confidence
+                base_confidence = m.wale.confidence
             if spacing_px is None:
                 continue
+            if single_region:
+                counted_px = m.loop_lattice.wale_spacing_px if m.loop_lattice else None
+                confidence = _single_region_agreement_confidence(m.wale.spacing_px, counted_px, base_confidence)
+            else:
+                confidence = base_confidence
             out.append({
                 "label": m.label, "spacing_px": spacing_px,
                 "confidence": confidence, "quality_score": max(m.quality_score, 0.05),
