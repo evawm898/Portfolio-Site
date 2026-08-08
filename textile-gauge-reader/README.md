@@ -254,6 +254,69 @@ absolute margin modest — the UI surfaces that honestly (see the LOW
 CONFIDENCE treatment below) rather than presenting a resolved-looking
 number.
 
+### Simplified Results UI + a hidden Developer diagnostics mode
+
+The Results panel accumulated a lot of algorithm-internal detail across
+the rounds above (candidate periods, evidence/phase scores,
+autocorrelation values, uncertain-reason text) — useful while developing
+the detector, not for reading a gauge measurement. The normal-user-facing
+Results panel now shows only: **Wales/inch**, **Courses/inch**, one
+**Confidence** word (High/Medium/Low — the weaker of the two axes, forced
+to Low whenever either is flagged `uncertain`), optional secondary wale/
+course spacing in mm, the visual overlay, and — when confidence is Low —
+a single short message ("Low confidence — verify the detected loops.").
+No harmonic/scoring terminology in that view.
+
+Everything that used to live there (per-axis confidence percentages,
+detected-position counts, uncertain reasons, Detection Details' full
+candidate breakdown, "Show loop centers") moved into a collapsed
+**Developer diagnostics** section, off by default — same information as
+before, just not front-and-center.
+
+### Experimental: an explicit V-shape loop-center detector
+
+Real-photo diagnostics (previous section) established that the
+periodicity-based detector's remaining wale ambiguity is fundamentally a
+*geometry* problem: nothing in autocorrelation, 2D support, patch
+consensus, or even phase consistency looks at SHAPE — they measure
+repetition and texture consistency, not "does this look like a complete
+knit loop." `analyze_loop_lattice_experiment` (in `analysis/gauge_
+analysis.py`'s "Experimental" section) takes a different, explicit
+approach instead: look for the geometric signature of a face-knit V-shape
+loop directly — two diagonal yarn legs of opposite orientation converging
+toward a shared point (`_v_shape_response_map`, via signed diagonal
+gradient channels and a `min()` of both sides' evidence, so a single
+strong edge on only one side — the "just one yarn leg" false positive —
+doesn't register as a complete loop). Candidate loop centers are the
+response map's local maxima; a 2D lattice is then fit to them (rows =
+courses, columns = wales, via nearest-neighbor clustering with outlier
+rejection), giving an independent, geometry-based wale/course spacing
+estimate. The existing periodicity detector's own candidates seed the
+scale search (a PRIOR — evaluated at each of them, the most internally
+consistent lattice wins), rather than assuming one fixed loop size.
+
+This is deliberately a **parallel, comparison-only path**: it does not
+replace, feed into, or influence `analyze_gauge`'s own prediction in any
+way (see `test_experiment_does_not_affect_analyze_gauge_result`). It
+computes on every `/analyze` request and is exposed as `loop_lattice_debug`
+in the response, but the frontend only shows it (a "Show detected loops"
+overlay toggle, plus a comparison table against the current detector's
+numbers) inside Developer diagnostics.
+
+**Honest first-pass result on the real jersey photo**: visually inspecting
+the detected points (the actual point-by-request from this work: "do the
+dots land on complete loops?") shows real over-detection — more points
+than there are visible loops in the ROI, and the resulting lattice-derived
+wale spacing (~18px) lands close to the *wrong* half-period interpretation
+(~9 WPI), not the correct ~35px/~4.75 WPI one the periodicity detector
+(with phase consistency) already finds. This is presented as-is rather
+than tuned to look better: the detector as currently implemented likely
+still responds partly to individual yarn legs, not exclusively complete
+loop centers — evaluating and improving that (tighter response-map
+peaks, better NMS, possibly requiring stronger bilateral symmetry) is the
+clear next step before this could ever be considered as evidence for,
+let alone a replacement of, the current wale/course prediction.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/

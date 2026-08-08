@@ -75,6 +75,28 @@ class AxisOut(BaseModel):
     uncertain_reason: Optional[str] = None
 
 
+class LoopLatticeDebugOut(BaseModel):
+    """
+    Output of the EXPERIMENTAL, parallel V-shape loop-center lattice
+    detector (see analysis.gauge_analysis.analyze_loop_lattice_experiment).
+    Development/comparison information only -- never influences `wale`/
+    `course` above, and is not something a normal user needs to see; the
+    frontend only renders this in its developer-diagnostics mode.
+    """
+
+    centers_px: List[Tuple[float, float]] = Field(default_factory=list)
+    center_count: int = 0
+    row_count: int = 0
+    column_count: int = 0
+    lattice_consistency: float = 0.0
+    wale_spacing_px: Optional[float] = None
+    course_spacing_px: Optional[float] = None
+    wale_per_inch: Optional[float] = None
+    course_per_inch: Optional[float] = None
+    scale_used_px: Optional[float] = None
+    message: str = ""
+
+
 class AnalyzeResponse(BaseModel):
     success: bool
     message: str
@@ -97,6 +119,11 @@ class AnalyzeResponse(BaseModel):
     # applied/needed. Purely diagnostic -- overlays are always in
     # original-image coordinates regardless of this value.
     rotation_deg: float = 0.0
+    # Experimental parallel loop-lattice detector's output, for
+    # development comparison only -- see LoopLatticeDebugOut. None if it
+    # couldn't run (e.g. no periodicity to seed a scale search) or the
+    # request failed before reaching it.
+    loop_lattice_debug: Optional[LoopLatticeDebugOut] = None
 
 
 class ErrorResponse(BaseModel):

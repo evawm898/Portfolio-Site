@@ -2031,3 +2031,277 @@ def _analyze_axis_v3(
         uncertain,
         uncertain_reason,
     )
+
+
+# --- Experimental: V-shape loop-center lattice detector --------------------
+#
+# A parallel, INDEPENDENT path -- not called by analyze_gauge /
+# _analyze_axis_v3, and does not influence the main prediction in any
+# way (see analyze_loop_lattice_experiment, the only public entry point
+# here). Real-photo diagnostics established that the periodicity-based
+# detector already generates a candidate close to the true wale repeat,
+# but nothing in autocorrelation/2D-support/patch-consensus/phase-
+# consistency evidence can distinguish a complete knit-loop column from
+# a single yarn leg by GEOMETRY -- they measure repetition and texture
+# consistency, not shape. This detector instead looks explicitly for the
+# geometric signature of a complete face-knit loop: two diagonal yarn
+# legs of opposite orientation converging toward a shared point,
+# evaluated at scales seeded by the existing periodicity candidates
+# (used as a PRIOR to know what scale to search at, never as the
+# answer). Kept deliberately experimental/comparison-only: surfaced in
+# the UI's debug mode next to the current prediction, not wired into it,
+# so it can be evaluated on its own merits (does it actually land on
+# complete loops?) before any decision about replacing anything.
+
+LOOP_SCALE_HALF_WIDTH_FRACTION = 0.5   # candidate loop "radius" as a fraction of the periodicity candidate period
+MIN_LOOP_LATTICE_SEPARATION_FRACTION = 0.6  # min fraction of scale between two accepted loop-center local maxima
+LOOP_RESPONSE_PERCENTILE = 70          # keep only local maxima above this percentile of the response map's own values
+MIN_LATTICE_POINTS = 4                 # fewer detected centers than this and a spacing estimate isn't trustworthy
+
+
+@dataclass
+class LoopLatticeResult:
+    """
+    Output of the experimental V-shape loop-center lattice detector (see
+    analyze_loop_lattice_experiment). Positions are in FULL-IMAGE pixel
+    coordinates (offset by the ROI origin), matching
+    GaugeAnalysisResult.loop_centers_px's convention.
+    """
+
+    centers_px: List[Tuple[float, float]] = field(default_factory=list)
+    center_count: int = 0
+    row_count: int = 0        # distinct course rows the lattice found
+    column_count: int = 0     # distinct wale columns the lattice found
+    lattice_consistency: float = 0.0   # 0..1, spacing-regularity of the accepted lattice
+    wale_spacing_px: Optional[float] = None
+    course_spacing_px: Optional[float] = None
+    scale_used_px: Optional[float] = None   # which periodicity-candidate scale won
+    message: str = ""
+
+
+def _diagonal_gradient_channels(gx: np.ndarray, gy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Project the signed Sobel gradient onto the two diagonal axes (+45
+    degrees and -45 degrees), giving two channels that respond
+    preferentially to "/"- and "\\"-oriented local edges respectively --
+    exactly the two leg orientations of a face-knit V-shaped loop. Kept
+    signed (not squared/magnitude) so a later min() of complementary
+    channels can require the pair to actually be evaluated as two
+    genuinely different local orientations, not just "any two strong
+    edges nearby."
+    """
+    inv_sqrt2 = 0.7071067811865476
+    diag_a = (gx + gy) * inv_sqrt2
+    diag_b = (gx - gy) * inv_sqrt2
+    return diag_a, diag_b
+
+
+def _box_mean(channel: np.ndarray, width: int, height: int, side: str) -> np.ndarray:
+    """
+    Mean of `channel` over a `width` x `height` box positioned to one
+    side of each output pixel (not centered on it): side="left" gives,
+    at each (x, y), the mean over the box immediately to the LEFT of x;
+    side="right" gives the box immediately to the RIGHT. Used to score a
+    candidate loop center's two leg regions independently and
+    efficiently (one box-filter call per side, rather than a
+    per-candidate nested loop over every pixel).
+    """
+    width = max(1, int(width))
+    height = max(1, int(height))
+    anchor_x = width - 1 if side == "left" else 0
+    anchor_y = height // 2
+    return cv2.boxFilter(
+        channel, ddepth=-1, ksize=(width, height), anchor=(anchor_x, anchor_y),
+        normalize=True, borderType=cv2.BORDER_REPLICATE,
+    )
+
+
+def _v_shape_response_map(gx: np.ndarray, gy: np.ndarray, scale_px: float) -> np.ndarray:
+    """
+    For every pixel, how strongly does it look like the CENTER of a
+    complete V-shaped knit loop at this scale: a leg of one diagonal
+    orientation immediately to its left, and a leg of the OPPOSITE
+    diagonal orientation immediately to its right (or vice versa -- both
+    pairings are tried, since which physical diagonal appears on which
+    side isn't assumed/hard-coded).
+
+    `min()` of the two sides' evidence is deliberate (see module
+    docstring): a single strong edge on only one side is exactly the
+    "one yarn leg, not a complete loop" false positive this is trying to
+    avoid -- BOTH sides must show real evidence. Tolerant scoring (no
+    exact angle/shape match required) that still requires bilateral
+    support, per the "real yarn is fuzzy, twisted, irregular" guidance.
+    """
+    half = max(2.0, scale_px * LOOP_SCALE_HALF_WIDTH_FRACTION)
+    width = max(2, int(round(half)))
+    height = max(4, int(round(half * 3)))  # taller than wide: legs span a vertical range, not one row
+
+    diag_a, diag_b = _diagonal_gradient_channels(gx, gy)
+    abs_a, abs_b = np.abs(diag_a), np.abs(diag_b)
+
+    left_a = _box_mean(abs_a, width, height, "left")
+    left_b = _box_mean(abs_b, width, height, "left")
+    right_a = _box_mean(abs_a, width, height, "right")
+    right_b = _box_mean(abs_b, width, height, "right")
+
+    pairing_1 = np.minimum(left_a, right_b)  # left leg ~ diag_a, right leg ~ diag_b
+    pairing_2 = np.minimum(left_b, right_a)  # left leg ~ diag_b, right leg ~ diag_a
+    return np.maximum(pairing_1, pairing_2)
+
+
+def _local_maxima(response: np.ndarray, min_separation_px: float, percentile: float) -> List[Tuple[float, float]]:
+    """
+    Non-maximum suppression: keep only pixels that are the strict max
+    within a min_separation_px neighborhood AND above the given
+    percentile of the response map's own (positive) values -- so a flat
+    or uniformly weak map (no real loop evidence anywhere) doesn't
+    return an arbitrary grid of "maxima" that aren't actually strong
+    evidence of anything.
+    """
+    positive = response[response > 0]
+    if positive.size == 0:
+        return []
+    threshold = float(np.percentile(positive, percentile))
+    if threshold <= 0:
+        return []
+    size = max(3, int(round(min_separation_px)))
+    local_max = maximum_filter(response, size=size, mode="nearest")
+    mask = (response == local_max) & (response >= threshold)
+    ys, xs = np.nonzero(mask)
+    return [(float(px), float(py)) for px, py in zip(xs, ys)]
+
+
+def _fit_loop_lattice(points: List[Tuple[float, float]], expected_scale_px: float) -> LoopLatticeResult:
+    """
+    Organize detected loop-center points into rows (courses) and columns
+    (wales) via nearest-neighbor clustering, and derive robust spacing +
+    a consistency score. Tolerant of missing points and mild distortion
+    (real textile photography: shadow, fuzz, slight curvature) --
+    outlier nearest-neighbor distances (more than 2x or less than 0.4x
+    the median) are dropped before the final median/consistency
+    calculation, rather than requiring a perfect grid.
+    """
+    if len(points) < MIN_LATTICE_POINTS:
+        return LoopLatticeResult(
+            centers_px=points, center_count=len(points),
+            message="Too few loop-center candidates for a lattice estimate.",
+        )
+
+    arr = np.array(points)  # columns: x, y
+
+    def _cluster_1d(order_axis: int, group_axis: int, tolerance: float) -> List[List[np.ndarray]]:
+        order = np.argsort(arr[:, order_axis])
+        groups: List[List[np.ndarray]] = []
+        for idx in order:
+            p = arr[idx]
+            if groups and abs(p[order_axis] - np.mean([q[order_axis] for q in groups[-1]])) <= tolerance:
+                groups[-1].append(p)
+            else:
+                groups.append([p])
+        return groups
+
+    def _robust_spacing(groups: List[List[np.ndarray]], spacing_axis: int) -> Tuple[Optional[float], float, int]:
+        diffs: List[float] = []
+        for group in groups:
+            if len(group) < 2:
+                continue
+            vals = sorted(q[spacing_axis] for q in group)
+            diffs.extend(float(b - a) for a, b in zip(vals, vals[1:]))
+        if not diffs:
+            return None, 0.0, len(groups)
+        diffs_arr = np.array(diffs)
+        med = float(np.median(diffs_arr))
+        if med <= 0:
+            return None, 0.0, len(groups)
+        kept = diffs_arr[(diffs_arr >= med * 0.4) & (diffs_arr <= med * 2.0)]
+        if kept.size == 0:
+            return round(med, 2), 0.0, len(groups)
+        final_med = float(np.median(kept))
+        mad = float(np.median(np.abs(kept - final_med)))
+        consistency = float(np.clip(1.0 - (mad / final_med), 0.0, 1.0)) if final_med > 0 else 0.0
+        return round(final_med, 2), consistency, len(groups)
+
+    tolerance = max(3.0, expected_scale_px * 0.6)
+    rows = _cluster_1d(order_axis=1, group_axis=1, tolerance=tolerance)   # cluster by y -> rows
+    cols = _cluster_1d(order_axis=0, group_axis=0, tolerance=tolerance)   # cluster by x -> columns
+
+    wale_spacing, wale_consistency, row_count = _robust_spacing(rows, spacing_axis=0)
+    course_spacing, course_consistency, column_count = _robust_spacing(cols, spacing_axis=1)
+
+    consistencies = [c for c in (wale_consistency, course_consistency) if c > 0]
+    lattice_consistency = float(np.mean(consistencies)) if consistencies else 0.0
+
+    return LoopLatticeResult(
+        centers_px=points,
+        center_count=len(points),
+        row_count=row_count,
+        column_count=column_count,
+        lattice_consistency=round(lattice_consistency, 3),
+        wale_spacing_px=wale_spacing,
+        course_spacing_px=course_spacing,
+    )
+
+
+def analyze_loop_lattice_experiment(
+    image_bgr: np.ndarray, roi: Tuple[int, int, int, int], orientation: Orientation
+) -> LoopLatticeResult:
+    """
+    Experimental, parallel loop-identification path (see module-level
+    comment above): explicit V-shape detection + 2D lattice fitting,
+    evaluated at multiple scales seeded by the existing periodicity
+    detector (used as a scale PRIOR, not the answer -- the scale whose
+    resulting lattice is most internally consistent wins). Completely
+    independent of analyze_gauge's own prediction; callers should treat
+    this as diagnostic/comparison information only, never as a
+    replacement for it without deliberately deciding to do so.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return LoopLatticeResult(message="No image data to analyze.")
+
+    img_h, img_w = image_bgr.shape[:2]
+    x, y, w, h = roi
+    x = max(0, min(int(round(x)), img_w - 1))
+    y = max(0, min(int(round(y)), img_h - 1))
+    w = max(0, min(int(round(w)), img_w - x))
+    h = max(0, min(int(round(h)), img_h - y))
+    if w < MIN_ROI_DIM_PX or h < MIN_ROI_DIM_PX:
+        return LoopLatticeResult(message="Selected area is too small to analyze.")
+
+    crop = image_bgr[y : y + h, x : x + w]
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    # Reuse the SAME restrained preprocessing as the main detector (mild
+    # CLAHE + light Gaussian smoothing + signed Sobel) -- no additional
+    # or more-aggressive preprocessing that could distort the apparent
+    # loop geometry.
+    _, gx, gy = _enhance_texture(gray)
+
+    wale_direction, _ = _direction_for(orientation)
+    wale_source = gx if wale_direction == "horizontal" else gy
+    wale_signal = _project(wale_source, axis=_COLLAPSE_AXIS[wale_direction])
+    p0_wale, _ = _autocorrelation_spacing(wale_signal)
+
+    if p0_wale is None:
+        return LoopLatticeResult(message="No reliable periodicity to seed a loop-scale search.")
+
+    candidate_scales = [c for c, _ in _labeled_candidates(p0_wale, MIN_PLAUSIBLE_SPACING_PX)]
+    if not candidate_scales:
+        candidate_scales = [p0_wale]
+
+    best: Optional[LoopLatticeResult] = None
+    for scale in candidate_scales:
+        response = _v_shape_response_map(gx, gy, scale)
+        min_sep = max(3.0, scale * MIN_LOOP_LATTICE_SEPARATION_FRACTION)
+        points = _local_maxima(response, min_sep, LOOP_RESPONSE_PERCENTILE)
+        lattice = _fit_loop_lattice(points, scale)
+        lattice.scale_used_px = round(scale, 2)
+        if best is None or lattice.lattice_consistency > best.lattice_consistency:
+            best = lattice
+
+    if best is None:
+        return LoopLatticeResult(message="No loop-center candidates found at any evaluated scale.")
+
+    # Translate to full-image coordinates, matching loop_centers_px's convention.
+    best.centers_px = [(cx + x, cy + y) for cx, cy in best.centers_px]
+    if not best.centers_px and not best.message:
+        best.message = "No loop-center candidates found at any evaluated scale."
+    return best

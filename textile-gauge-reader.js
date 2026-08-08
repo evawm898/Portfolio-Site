@@ -107,6 +107,8 @@
   const resultsWarning = document.getElementById("resultsWarning");
   const resetBtn = document.getElementById("resetBtn");
   const showLoopCentersCheck = document.getElementById("showLoopCentersCheck");
+  const showVShapeLoopsCheck = document.getElementById("showVShapeLoopsCheck");
+  const loopLatticeComparison = document.getElementById("loopLatticeComparison");
   const detectionDetailsContent = document.getElementById("detectionDetailsContent");
 
   const serviceStatusEl = document.getElementById("serviceStatus");
@@ -603,12 +605,20 @@
     drawAxisLines(result.course.positions_px, !waleIsVertical, COURSE_COLOR, roiTop, roiBottom);
 
     if (showLoopCentersCheck.checked && result.loop_centers_px && result.loop_centers_px.length) {
-      drawLoopCenters(result.loop_centers_px);
+      drawLoopCenters(result.loop_centers_px, "#e9ecec");
+    }
+    if (
+      showVShapeLoopsCheck.checked &&
+      result.loop_lattice_debug &&
+      result.loop_lattice_debug.centers_px &&
+      result.loop_lattice_debug.centers_px.length
+    ) {
+      drawLoopCenters(result.loop_lattice_debug.centers_px, "#4fd67a");
     }
   }
 
-  function drawLoopCenters(centers) {
-    ctx.fillStyle = "#e9ecec";
+  function drawLoopCenters(centers, color) {
+    ctx.fillStyle = color || "#e9ecec";
     ctx.globalAlpha = 0.85;
     for (const [cx, cy] of centers) {
       const p = naturalToDisplay({ x: cx, y: cy });
@@ -1097,7 +1107,64 @@
     return "";
   }
 
-  function axisCard(label, axis, color) {
+  // Single overall confidence word for the simplified results view --
+  // the weaker of the two axes decides it, and an axis explicitly
+  // flagged "uncertain" (see the backend's harmonic-ambiguity / low-
+  // confidence-floor logic) always forces "Low", even if the raw
+  // percentage alone would round up to "Medium". Detailed per-axis
+  // confidence/percentages/reasons remain available in Developer
+  // diagnostics -- this is deliberately the ONE number/word a normal
+  // user needs.
+  function overallConfidence(r) {
+    if (r.wale.spacing_px == null || r.course.spacing_px == null) {
+      return { level: "Low", value: 0 };
+    }
+    const value = Math.min(r.wale.confidence ?? 0, r.course.confidence ?? 0);
+    const forcedLow = r.wale.status === "uncertain" || r.course.status === "uncertain";
+    let level;
+    if (forcedLow || value < 0.4) level = "Low";
+    else if (value < 0.7) level = "Medium";
+    else level = "High";
+    return { level, value };
+  }
+
+  // Simplified primary number -- just the label and value. No per-axis
+  // "uncertain" styling here anymore; the single Confidence card below
+  // (plus the one-line message when it's Low) is the only confidence
+  // signal a normal user sees. Detailed per-axis confidence, spacing in
+  // px, detected-position counts, and uncertain reasons move to
+  // Developer diagnostics (see axisDiagnosticsCard).
+  function primaryBlock(label, value, color) {
+    return `
+      <div class="tgr-result-card__block">
+        <div class="tgr-result-card__label">${label}</div>
+        <div class="tgr-result-card__value" style="color:${color}">${value}</div>
+      </div>`;
+  }
+
+  function confidenceCard(level) {
+    return `
+      <div class="tgr-result-card tgr-confidence-card">
+        <div class="tgr-result-card__label">Confidence</div>
+        <div class="tgr-confidence-word tgr-confidence-word--${level.toLowerCase()}">${escapeHtml(level)}</div>
+      </div>`;
+  }
+
+  function secondaryMeasurementsCard(r) {
+    const waleMm = r.wale.spacing_mm != null ? `${r.wale.spacing_mm.toFixed(2)} mm` : "—";
+    const courseMm = r.course.spacing_mm != null ? `${r.course.spacing_mm.toFixed(2)} mm` : "—";
+    return `
+      <div class="tgr-result-card tgr-secondary-card">
+        <div class="tgr-secondary-row"><span>Wale spacing</span><span>${waleMm}</span></div>
+        <div class="tgr-secondary-row"><span>Course spacing</span><span>${courseMm}</span></div>
+      </div>`;
+  }
+
+  // Full per-axis technical detail (confidence %, spacing in px,
+  // detected-position count, uncertain reason) -- moved out of the
+  // normal Results view into Developer diagnostics. Same information
+  // as before, just no longer front-and-center for a normal user.
+  function axisDiagnosticsCard(label, axis, color) {
     if (axis.spacing_px == null) {
       return `
         <div class="tgr-result-card">
@@ -1118,58 +1185,52 @@
       </div>`;
   }
 
-  // A primary-card number's own axis is uncertain (or was never
-  // reliably detected) -- render it visually distinct from a trustworthy
-  // measurement (muted color, a LOW CONFIDENCE tag, no false authority)
-  // rather than as a normal-looking result. The number itself stays
-  // visible (still useful for debugging), it just shouldn't *read* as
-  // dependable at a glance. See the "uncertain" per-axis status.
-  function primaryBlock(label, value, axis, color) {
-    const uncertain = axis.status === "uncertain";
-    const undetected = axis.spacing_px == null;
-    const flagged = uncertain || undetected;
-    return `
-      <div class="tgr-result-card__block${flagged ? " tgr-result-card__block--low-confidence" : ""}">
-        <div class="tgr-result-card__label">${label}</div>
-        <div class="tgr-result-card__value" style="color:${flagged ? "var(--ink-faint)" : color}">${value}</div>
-        ${flagged ? `<div class="tgr-low-confidence-tag">⚠ LOW CONFIDENCE<span class="tgr-low-confidence-tag__sub">Manual verification recommended</span></div>` : ""}
-      </div>`;
-  }
-
   function renderResults() {
     const r = state.result;
     const wpi = r.wale.per_inch != null ? r.wale.per_inch.toFixed(2) : "—";
     const cpi = r.course.per_inch != null ? r.course.per_inch.toFixed(2) : "—";
+    const { level } = overallConfidence(r);
 
+    // Normal-user-facing Results: WALES/IN, COURSES/IN, one Confidence
+    // word, and optional secondary spacing-in-mm -- no harmonic/scoring
+    // terminology. See Developer diagnostics for everything else.
     let html = `
       <div class="tgr-result-card tgr-result-card--primary">
-        ${primaryBlock("Wales / inch", wpi, r.wale, WALE_COLOR)}
-        ${primaryBlock("Courses / inch", cpi, r.course, COURSE_COLOR)}
+        ${primaryBlock("Wales / inch", wpi, WALE_COLOR)}
+        ${primaryBlock("Courses / inch", cpi, COURSE_COLOR)}
       </div>`;
-    html += axisCard("Wale", r.wale, WALE_COLOR);
-    html += axisCard("Course", r.course, COURSE_COLOR);
-    html += `
-      <div class="tgr-result-card">
-        <div class="tgr-result-card__label">Scale</div>
-        <div class="tgr-result-card__value" style="font-size:1.05rem">${r.pixels_per_mm.toFixed(3)} px/mm</div>
-      </div>
-      <div class="tgr-result-card">
-        <div class="tgr-result-card__label">Analyzed area</div>
-        <div class="tgr-result-card__value" style="font-size:1.05rem">${r.analyzed_area_mm.width_mm.toFixed(1)} × ${r.analyzed_area_mm.height_mm.toFixed(1)} mm</div>
-        <div class="tgr-result-card__sub">${r.analyzed_area_px.width} × ${r.analyzed_area_px.height} px</div>
-      </div>`;
+    html += confidenceCard(level);
+    html += secondaryMeasurementsCard(r);
 
     resultsGrid.innerHTML = html;
 
-    if (r.wale.spacing_px == null || r.course.spacing_px == null) {
-      resultsWarning.textContent =
-        "One or more axes could not be reliably measured. Try a larger, flatter, more evenly lit area of fabric, or re-check your ROI selection.";
+    if (level === "Low") {
+      resultsWarning.textContent = "Low confidence — verify the detected loops.";
       resultsWarning.hidden = false;
     } else {
       resultsWarning.hidden = true;
     }
 
+    const axisDiagnosticsContent = document.getElementById("axisDiagnosticsContent");
+    if (axisDiagnosticsContent) {
+      axisDiagnosticsContent.innerHTML =
+        `<div class="tgr-results-grid">` +
+        axisDiagnosticsCard("Wale", r.wale, WALE_COLOR) +
+        axisDiagnosticsCard("Course", r.course, COURSE_COLOR) +
+        `<div class="tgr-result-card">
+          <div class="tgr-result-card__label">Scale</div>
+          <div class="tgr-result-card__value" style="font-size:1.05rem">${r.pixels_per_mm.toFixed(3)} px/mm</div>
+        </div>
+        <div class="tgr-result-card">
+          <div class="tgr-result-card__label">Analyzed area</div>
+          <div class="tgr-result-card__value" style="font-size:1.05rem">${r.analyzed_area_mm.width_mm.toFixed(1)} × ${r.analyzed_area_mm.height_mm.toFixed(1)} mm</div>
+          <div class="tgr-result-card__sub">${r.analyzed_area_px.width} × ${r.analyzed_area_px.height} px</div>
+        </div>` +
+        `</div>`;
+    }
+
     renderDetectionDetails(r);
+    renderLoopLatticeComparison(r);
     initVerifySection(r);
     render();
   }
@@ -1268,7 +1329,46 @@
     detectionDetailsContent.innerHTML = html;
   }
 
+  // Experimental V-shape loop-center lattice, run alongside (never
+  // instead of) the current gauge detector -- see loop_lattice_debug in
+  // the /analyze response. Development-only comparison: does an
+  // independent, explicit "find complete loops" detector agree with the
+  // periodicity-based prediction above? Not used to decide anything --
+  // just shown side by side.
+  function renderLoopLatticeComparison(result) {
+    const d = result.loop_lattice_debug;
+    if (!d) {
+      loopLatticeComparison.innerHTML = "";
+      return;
+    }
+    const row = (label, value) => `<div class="tgr-verify__predicted-row"><span>${escapeHtml(label)}</span><span>${value}</span></div>`;
+    const fmt = (v, digits, suffix) => (v == null ? "—" : `${v.toFixed(digits)}${suffix || ""}`);
+    loopLatticeComparison.innerHTML = `
+      <div class="tgr-debug-axis">
+        <div class="tgr-debug-axis__title">Loop-center lattice experiment</div>
+        <p class="tgr-hint">
+          An explicit V-shape loop detector (paired diagonal gradients converging
+          at a point), run independently of the periodicity-based detector above.
+          Compares a 2D lattice of detected complete-loop centers against the
+          current prediction -- shown for development comparison only, it does
+          not influence the results above. Enable "Show detected loops" to see
+          where its points actually land.
+        </p>
+        ${row("Loop centers detected", d.center_count)}
+        ${row("Estimated wale columns", d.column_count)}
+        ${row("Estimated course rows", d.row_count)}
+        ${row("Lattice consistency", fmt(d.lattice_consistency, 2))}
+        ${row("Loop-lattice wale spacing", fmt(d.wale_spacing_px, 1, " px"))}
+        ${row("Loop-lattice course spacing", fmt(d.course_spacing_px, 1, " px"))}
+        ${row("Loop-lattice wales/in", fmt(d.wale_per_inch, 2))}
+        ${row("Loop-lattice courses/in", fmt(d.course_per_inch, 2))}
+        ${row("Current-detector wales/in", fmt(result.wale.per_inch, 2))}
+        ${row("Current-detector courses/in", fmt(result.course.per_inch, 2))}
+      </div>`;
+  }
+
   showLoopCentersCheck.addEventListener("change", () => render());
+  showVShapeLoopsCheck.addEventListener("change", () => render());
 
   // --- Verify Measurement (ground-truth correction) ---------------------
 
@@ -1539,6 +1639,8 @@
     correctionStatus.hidden = true;
     detectionDetailsContent.innerHTML = "";
     showLoopCentersCheck.checked = false;
+    showVShapeLoopsCheck.checked = false;
+    loopLatticeComparison.innerHTML = "";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     goToStep("upload");
   });

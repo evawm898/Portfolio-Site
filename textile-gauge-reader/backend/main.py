@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 
 from analysis import ALGORITHM_VERSION, analyze_gauge
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
+from analysis.gauge_analysis import analyze_loop_lattice_experiment
 from storage import corrections_store
 
 from .corrections_api import router as corrections_router
@@ -39,6 +40,7 @@ from .schemas import (
     AreaMm,
     AxisOut,
     CandidateOut,
+    LoopLatticeDebugOut,
     Orientation,
     RoiOut,
     Structure,
@@ -275,6 +277,37 @@ async def analyze(
             content=AnalyzeResponse(success=False, message=result.message).model_dump(),
         )
 
+    # Experimental, parallel loop-lattice detector (see analysis.gauge_
+    # analysis.analyze_loop_lattice_experiment) -- development/comparison
+    # diagnostic only, never allowed to affect the real `wale`/`course`
+    # response above. Wrapped defensively: a failure here must never
+    # break the actual analysis result.
+    loop_lattice_out: Optional[LoopLatticeDebugOut] = None
+    try:
+        lattice = analyze_loop_lattice_experiment(image, roi=roi, orientation=orientation)  # type: ignore[arg-type]
+        loop_lattice_out = LoopLatticeDebugOut(
+            centers_px=lattice.centers_px,
+            center_count=lattice.center_count,
+            row_count=lattice.row_count,
+            column_count=lattice.column_count,
+            lattice_consistency=lattice.lattice_consistency,
+            wale_spacing_px=lattice.wale_spacing_px,
+            course_spacing_px=lattice.course_spacing_px,
+            wale_per_inch=(
+                _period_px_to_per_inch(lattice.wale_spacing_px, pixels_per_mm)
+                if lattice.wale_spacing_px else None
+            ),
+            course_per_inch=(
+                _period_px_to_per_inch(lattice.course_spacing_px, pixels_per_mm)
+                if lattice.course_spacing_px else None
+            ),
+            scale_used_px=lattice.scale_used_px,
+            message=lattice.message,
+        )
+    except Exception:  # pragma: no cover - defensive: experimental path, never fatal
+        logger.exception("Loop-lattice experiment raised an unexpected exception")
+        loop_lattice_out = None
+
     response = AnalyzeResponse(
         success=True,
         message=result.message,
@@ -294,6 +327,7 @@ async def analyze(
         algorithm_version=ALGORITHM_VERSION,
         loop_centers_px=result.loop_centers_px,
         rotation_deg=result.rotation_deg,
+        loop_lattice_debug=loop_lattice_out,
     )
     return JSONResponse(status_code=200, content=response.model_dump())
 
