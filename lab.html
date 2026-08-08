@@ -1386,8 +1386,8 @@
   /* ============================================================
      EDIT EMBEDDED WIRE / TUNNEL CONFIGURATION HERE
      ------------------------------------------------------------
-     The tunnel's shape, the two slit openings, the wire's diameter,
-     and the camera's profile angle all derive from this one object --
+     The tunnel's shape, the two slit openings, the wire's own width and
+     height, and the camera's profile angle all derive from this one object --
      change a value here rather than hunting for coordinates elsewhere.
      Changing SLIT_SPACING moves both slits, the tunnel's span, and
      the wire's tunnel-crossing path together automatically.
@@ -1398,7 +1398,8 @@
     SLIT_WIDTH: 3,                // visual gap width of each cut, fully open
     TUNNEL_HEIGHT: 34,            // peak dome height above the fabric plane
     TUNNEL_WIDTH: 62,             // arch cross-section span, edge to edge
-    WIRE_DIAMETER: 4,
+    WIRE_WIDTH: 9,                // extruded conductor: across the cavity (Y)
+    WIRE_HEIGHT: 7,                // extruded conductor: thickness (Z)
     // The tunnel and wire both run along world X (see the module header
     // comment). The arch's own curvature is encoded across world Y (the
     // rib fan) and Z (height) -- so exposing that curvature as an
@@ -1531,6 +1532,18 @@
       return { phiDeg: phiRad * 180 / Math.PI, peakLen: peakLen };
     }
 
+    // Same fold-solving math as solveRibFold above, exposed directly
+    // against a (targetY, targetZ) pair rather than an ellipse's own
+    // eccentric-angle parametrization -- the wire's own cross-section
+    // (see where it's built) is a rectangle, not an ellipse: every
+    // slice across its width targets the *same* height, not a height
+    // that varies by position the way the tunnel's arch curve does.
+    function solveSliceFold(targetY, targetZ) {
+      var phiRad = Math.atan2(-targetZ, targetY);
+      var peakLen = Math.sqrt(targetY * targetY + targetZ * targetZ);
+      return { phiDeg: phiRad * 180 / Math.PI, peakLen: peakLen };
+    }
+
     // High enough that the ribs' individual facets fuse into what reads
     // as one continuous curved surface rather than a faceted fan, at
     // every camera state this module ever uses -- top-down, and the
@@ -1544,10 +1557,12 @@
     }
 
     // ---- DOM: one stage > one rotating scene > fabric face, N rib
-    // faces, and one wire face. No face ever carries the scene's own
-    // rotation -- every face's transform is either absent (fabric, at
-    // the base plane) or a fixed, one-time value (each rib's fold, the
-    // wire's small constant lift). ----
+    // faces, and WIRE_SLICE_COUNT wire-slice faces. No face ever carries
+    // the scene's own rotation -- every face's transform is either
+    // absent (fabric, at the base plane) or its own combined fold +
+    // lift (each rib, each wire slice), recomputed per frame only where
+    // that lift itself changes (the wire's, for legibility -- see where
+    // it's built). ----
     var stageEl = document.createElement('div');
     stageEl.className = 'embeddedWire-stage';
     var scene = document.createElement('div');
@@ -1555,12 +1570,12 @@
     stageEl.appendChild(scene);
     stage.appendChild(stageEl);
 
-    function makeFace(extraClass) {
+    function makeFace(extraClass, parent) {
       var face = document.createElement('div');
       face.className = 'embeddedWire-face' + (extraClass ? ' ' + extraClass : '');
       var svg = el('svg', { viewBox: '0 0 240 140', class: 'circuit-panel__svg' });
       face.appendChild(svg);
-      scene.appendChild(face);
+      (parent || scene).appendChild(face);
       return { face: face, svg: svg };
     }
 
@@ -1688,54 +1703,86 @@
       });
     }
 
-    // ---- 3. wire -- one continuous path, one measurement path driving
-    // both its own reveal and (were it curved) its own tangent. It never
-    // changes shape, and there is only ever this one wire -- but its
-    // lift off the fabric plane and its own stroke width (see render())
-    // both vary, tied to the same camera-approach progress as the
-    // tunnel's cutaway opacity: small/realistic at top-down, easing to
-    // taller/thicker at the profile hold. That's for legibility only,
-    // per spec ("educational readability... more important than an
-    // almost invisible end-on pixel") -- same wire, same path data, same
-    // progress-driven reveal throughout, just more headroom and heft in
-    // the one view where the real dimensions would put it almost flush
-    // with the baseline and foreshortened to a sliver.
-    var wire = makeFace();
-    var WIRE_LIFT_BASE = CFG.WIRE_DIAMETER;
-    var WIRE_LIFT_PROFILE = 15;
-    // Same reasoning as the lift above -- a stroke this thin, foreshortened
-    // by the near-edge-on profile camera, reads as barely more than a
-    // pixel. Thickened at the profile hold purely for legibility (same
-    // wire, same path, same reveal), landing on roughly the reference's
-    // own "short bar" scale.
-    var WIRE_STROKE_BASE = CFG.WIRE_DIAMETER;
-    var WIRE_STROKE_PROFILE = 11;
-    var WIRE_D = 'M' + X_wireStart.toFixed(2) + ',' + midY.toFixed(2) + ' L' + X_wireEnd.toFixed(2) + ',' + midY.toFixed(2);
-    var wireOuter = el('path', { d: WIRE_D, fill: 'none', stroke: 'var(--ink-dim)', 'stroke-linecap': 'round', class: 'embeddedWire-wire' });
-    var wireInner = el('path', { d: WIRE_D, fill: 'none', stroke: 'var(--petrol-bright)', 'stroke-linecap': 'round', class: 'embeddedWire-wire' });
-    wire.svg.appendChild(wireOuter);
-    wire.svg.appendChild(wireInner);
-    var wireLen = wireOuter.getTotalLength();
-    function primeDash(p) {
-      p.style.strokeDasharray = wireLen + ' ' + wireLen;
-      p.style.strokeDashoffset = String(wireLen);
+    // ---- 3. wire -- an extruded rectangular conductor occupying the
+    // open cavity INSIDE the raised tunnel, not a flat stroke sitting on
+    // the fabric plane and not a shape underneath the tunnel. Built the
+    // same way the tunnel's own arch is: WIRE_SLICE_COUNT cross-section
+    // slices fanned across the wire's own WIDTH (Y), each folded once
+    // via solveSliceFold. The one difference from the tunnel's ribs:
+    // every slice here targets the *same* height (WIRE_HEIGHT is
+    // constant across the width -- a rectangle, not an ellipse), so the
+    // slices' tips trace a flat top edge rather than a curve. Extruded
+    // along X the same way, and revealed the same way a flat stroke's
+    // dashoffset would have been -- a filled quad that simply stops
+    // short of its full length -- so the length reveal is still exactly
+    // wireProgress, just expressed as geometry instead of a dash.
+    //
+    // It never changes shape or position, and there is only ever this
+    // one wire -- but its lift off the fabric plane (see render()) does
+    // vary, tied to the same camera-approach progress as the tunnel's
+    // cutaway opacity: small/realistic at top-down, easing to taller at
+    // the profile hold, so there's unmistakable separation between the
+    // fabric plane, the wire, and the tunnel roof once the camera tips
+    // toward edge-on. That's for legibility only, per spec
+    // ("educational readability... more important than an almost
+    // invisible end-on pixel") -- same wire, same slice geometry, same
+    // progress-driven length reveal throughout, just more headroom in
+    // the one view where the real lift would put it almost flush with
+    // the baseline.
+    var WIRE_SLICE_COUNT = 9;
+    var WIRE_LIFT_BASE = 4;
+    var WIRE_LIFT_PROFILE = 16;
+
+    // Each slice is a direct sibling of the tunnel's own ribs -- not
+    // wrapped in an intermediate group -- structurally identical to
+    // them (a lone rotateX fold, nothing nested). That match matters:
+    // an earlier version wrapped the slices in their own preserve-3d
+    // group with the lift applied at the group level, and the browser's
+    // depth sort for that nested group vs. the ribs (direct `scene`
+    // children) put the wire behind an opaque top-down tunnel even
+    // though its true height was well inside the cavity -- confirmed
+    // directly (hiding the ribs alone made the wire reappear). Giving
+    // each slice its own combined 'translateZ(lift) rotateX(fold)',
+    // exactly mirroring how every rib is just its own lone rotateX, is
+    // what makes the depth sort treat them consistently.
+    var wireSlices = [];
+    for (var wsi = 0; wsi < WIRE_SLICE_COUNT; wsi++) {
+      var wSlice = makeFace('embeddedWire-wireSlice');
+      var wPath = el('path', { d: '', fill: 'var(--petrol-bright)', stroke: 'none' });
+      var wTip = el('line', { x1: 0, y1: 0, x2: 0, y2: 0, stroke: 'var(--ink-dim)', 'stroke-width': 1, 'stroke-linecap': 'round' });
+      wSlice.svg.appendChild(wPath);
+      wSlice.svg.appendChild(wTip);
+      wireSlices.push({ face: wSlice.face, path: wPath, tip: wTip, y0Frac: lerp(-0.5, 0.5, (wsi + 0.5) / WIRE_SLICE_COUNT) });
     }
-    primeDash(wireOuter);
-    primeDash(wireInner);
-    // Always fully opaque -- one persistent element, rotating rigidly
-    // with the rest of `scene`, visible throughout every phase (top-down,
-    // rotating, profile hold, and back). No marker, no second wire, no
-    // fade tied to camera state. `strokeW` is the inner (petrol) stroke's
-    // own width; the outer (insulation) stroke is always 2 units wider,
-    // same convention as its own base width used everywhere else.
-    function renderWire(t, strokeW) {
-      var offset = wireLen * (1 - clamp01(t));
-      wireOuter.style.strokeDashoffset = String(offset);
-      wireInner.style.strokeDashoffset = String(offset);
-      if (strokeW !== undefined) {
-        wireOuter.setAttribute('stroke-width', strokeW + 2);
-        wireInner.setAttribute('stroke-width', strokeW);
-      }
+
+    function wireSliceD(x2, y) {
+      return 'M' + X_wireStart.toFixed(2) + ',' + midY.toFixed(2) +
+        ' L' + X_wireStart.toFixed(2) + ',' + y.toFixed(2) +
+        ' L' + x2.toFixed(2) + ',' + y.toFixed(2) +
+        ' L' + x2.toFixed(2) + ',' + midY.toFixed(2) +
+        ' Z';
+    }
+
+    // Always fully opaque -- one persistent set of slices, rotating
+    // rigidly with the rest of `scene`, visible throughout every phase
+    // (top-down, rotating, profile hold, and back). No marker, no
+    // second wire, no fade tied to tunnel/fabric opacity -- opacity is
+    // never set here at all, so it stays at the CSS default (1).
+    // `lift` is the same camera-approach-driven value the tunnel's
+    // cutaway opacity uses, applied here as a real Z offset rather than
+    // a visual-only stroke trick.
+    function renderWire(t, lift) {
+      var revealedX = lerp(X_wireStart, X_wireEnd, clamp01(t));
+      wireSlices.forEach(function (slice) {
+        var def = solveSliceFold(slice.y0Frac * CFG.WIRE_WIDTH, CFG.WIRE_HEIGHT);
+        slice.face.style.transform = 'translateZ(' + lift.toFixed(2) + 'px) rotateX(' + def.phiDeg.toFixed(3) + 'deg)';
+        var y = midY - def.peakLen;
+        slice.path.setAttribute('d', wireSliceD(revealedX, y));
+        slice.tip.setAttribute('x1', X_wireStart.toFixed(2));
+        slice.tip.setAttribute('y1', y.toFixed(2));
+        slice.tip.setAttribute('x2', revealedX.toFixed(2));
+        slice.tip.setAttribute('y2', y.toFixed(2));
+      });
     }
 
     // ---- timeline: one simple camera path, top-down -> profile ->
@@ -1800,13 +1847,19 @@
       return { yaw: lerp(0, CFG.PROFILE_YAW, t), tilt: lerp(0, CFG.PROFILE_TILT, t) };
     }
 
-    // Top-down values match how this module has always looked (fill
-    // effectively solid, tip strokes strong); the profile-hold targets
-    // are tuned against the actual accumulated render, not against what
-    // a single rib's own opacity "should" look like -- see renderTunnel.
-    var TUNNEL_FILL_TOP = 1;
+    // Both tuned low throughout, not just at the profile hold: an
+    // opaque top-down fill physically occludes the wire wherever the
+    // tunnel's real height exceeds the wire's own (which is most of the
+    // footprint, since the wire sits inside the cavity, below the
+    // roof) -- confirmed directly, hiding the ribs alone made an
+    // otherwise-invisible top-down wire reappear. The tunnel's own
+    // *shape* still reads clearly at these values (see renderTunnel):
+    // the tip strokes, not the fill, carry the silhouette. Values are
+    // tuned against the actual accumulated render, not against what a
+    // single rib's own opacity "should" look like.
+    var TUNNEL_FILL_TOP = 0.15;
     var TUNNEL_FILL_PROFILE = 0.10;
-    var TUNNEL_TIP_TOP = 0.9;
+    var TUNNEL_TIP_TOP = 0.55;
     var TUNNEL_TIP_PROFILE = 0.35;
 
     function computeTunnelState(p) {
@@ -1851,7 +1904,6 @@
 
       var approachT = computeApproachT(p);
       var wireLift = lerp(WIRE_LIFT_BASE, WIRE_LIFT_PROFILE, approachT);
-      wire.face.style.transform = 'translateZ(' + wireLift.toFixed(2) + 'px)';
 
       renderSlit(leftSlitEl, X_leftSlit, computeSlitOpen(p, 'left'));
       renderSlit(rightSlitEl, X_rightSlit, computeSlitOpen(p, 'right'));
@@ -1862,9 +1914,9 @@
       renderTunnel(tunnelState.riseAmount, tunnelState.fillOpacity, tunnelState.tipOpacity);
       // Wire opacity is never multiplied by tunnel/fabric opacity -- it
       // stays a fixed, fully-opaque element throughout every phase; only
-      // its lift/stroke width (legibility, see above) and its own
-      // dash-reveal progress ever change.
-      renderWire(computeWireProgress(p), lerp(WIRE_STROKE_BASE, WIRE_STROKE_PROFILE, approachT));
+      // its lift (legibility, see above) and its own length reveal ever
+      // change.
+      renderWire(computeWireProgress(p), wireLift);
     }
 
     function computeSlitOpen(p, which) {
@@ -1883,14 +1935,13 @@
     var REDUCED_DURATION = 3200;
     function renderReduced(rp) {
       scene.style.transform = 'rotateY(0deg) rotateX(0deg)';
-      wire.face.style.transform = 'translateZ(' + WIRE_LIFT_BASE.toFixed(2) + 'px)';
       var slitsT = easeInOutCubic(clamp01(rp / 0.22));
       renderSlit(leftSlitEl, X_leftSlit, slitsT);
       renderSlit(rightSlitEl, X_rightSlit, slitsT);
       var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
-      renderTunnel(clamp01(riseT), 0.5, 0.85);
+      renderTunnel(clamp01(riseT), TUNNEL_FILL_TOP, TUNNEL_TIP_TOP);
       var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
-      renderWire(wireT, WIRE_STROKE_BASE);
+      renderWire(wireT, WIRE_LIFT_BASE);
     }
 
     var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
