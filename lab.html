@@ -1588,7 +1588,13 @@
     // full SLIT_LENGTH, reading as a cut opening rather than a printed
     // line. Left cuts slightly ahead of right, with some overlap.
     function makeSlit(extraClass) {
-      var r = el('rect', { rx: 1.5, fill: 'var(--black)', stroke: 'var(--line-strong)', 'stroke-width': 1, class: 'embeddedWire-slit ' + extraClass });
+      // --ink-dim, not --line-strong: at the profile hold this needs to
+      // read clearly as an opening against a much more translucent
+      // tunnel interior (see renderSlitEmphasis) -- the same brighter
+      // neutral already used for the wire's own outer/insulation stroke,
+      // kept restrained rather than competing with the wire's petrol
+      // color for attention.
+      var r = el('rect', { rx: 1.5, fill: 'var(--black)', stroke: 'var(--ink-dim)', 'stroke-width': 1, class: 'embeddedWire-slit ' + extraClass });
       fabricG.appendChild(r);
       return r;
     }
@@ -1660,7 +1666,16 @@
         ' L' + X_rightSlit.toFixed(2) + ',' + midY.toFixed(2) +
         ' Z';
     }
-    function renderTunnel(riseAmount, cutawayOpacity) {
+    // fillOpacity and tipOpacity are independent, not one value shared
+    // between them (see computeTunnelState for why): with TUNNEL_RIB_COUNT
+    // this high, 60 overlapping fills or 60 densely-packed tip strokes
+    // each accumulate visually into something far darker than their own
+    // individual opacity value, *even at the same opacity a single shape
+    // would read as* -- confirmed directly (60 tip strokes at 0.85 alone,
+    // zero fill, still rendered as a solid-looking mass). So both are
+    // tuned low enough, independently, to keep the accumulated result --
+    // not the per-element value -- inside the intended range.
+    function renderTunnel(riseAmount, fillOpacity, tipOpacity) {
       ribs.forEach(function (rib) {
         var y = midY - rib.peakLen * riseAmount;
         rib.path.setAttribute('d', ribBandD(rib.peakLen, riseAmount));
@@ -1668,11 +1683,8 @@
         rib.tip.setAttribute('y1', y.toFixed(2));
         rib.tip.setAttribute('x2', X_rightSlit.toFixed(2));
         rib.tip.setAttribute('y2', y.toFixed(2));
-        // Fill dims to the 50% cutaway at the profile hold so the wire
-        // stays visible through it; the tip stroke stays strong so the
-        // arch is still clearly readable as a shape, not just a haze.
-        rib.path.style.fillOpacity = cutawayOpacity.toFixed(3);
-        rib.tip.style.opacity = Math.max(cutawayOpacity, 0.85).toFixed(3);
+        rib.path.style.fillOpacity = fillOpacity.toFixed(3);
+        rib.tip.style.opacity = tipOpacity.toFixed(3);
       });
     }
 
@@ -1788,18 +1800,49 @@
       return { yaw: lerp(0, CFG.PROFILE_YAW, t), tilt: lerp(0, CFG.PROFILE_TILT, t) };
     }
 
+    // Top-down values match how this module has always looked (fill
+    // effectively solid, tip strokes strong); the profile-hold targets
+    // are tuned against the actual accumulated render, not against what
+    // a single rib's own opacity "should" look like -- see renderTunnel.
+    var TUNNEL_FILL_TOP = 1;
+    var TUNNEL_FILL_PROFILE = 0.10;
+    var TUNNEL_TIP_TOP = 0.9;
+    var TUNNEL_TIP_PROFILE = 0.35;
+
     function computeTunnelState(p) {
       var riseAmount;
       if (p < PH.tunnelRise[0]) riseAmount = 0;
       else if (p < PH.tunnelRise[1]) riseAmount = easeInOutCubic(phaseT(p, PH.tunnelRise));
       else riseAmount = 1;
 
-      // Cutaway opacity: normal (1) at top-down, dims to 0.5 at the
-      // profile hold so the wire stays visible through the raised
-      // tunnel, restores to 1 on the way back.
-      var opacity = lerp(1, 0.5, computeApproachT(p));
+      var t = computeApproachT(p);
+      return {
+        riseAmount: riseAmount,
+        fillOpacity: lerp(TUNNEL_FILL_TOP, TUNNEL_FILL_PROFILE, t),
+        tipOpacity: lerp(TUNNEL_TIP_TOP, TUNNEL_TIP_PROFILE, t)
+      };
+    }
 
-      return { riseAmount: riseAmount, opacity: opacity };
+    // Near/far slit emphasis at the profile hold -- both boosted for
+    // legibility (a flat cut's own stroke, this thin, is otherwise as
+    // hard to read as the wire was), but asymmetrically: PROFILE_YAW is
+    // a fixed, positive constant, so which slit ends up nearer the
+    // camera at the profile hold is a fixed fact of this geometry, not
+    // something that needs recomputing per frame -- verified directly
+    // (projecting both slits' centers through the profile camera): the
+    // left slit -- the one the wire has already entered by the profile
+    // hold -- lands nearer, the right one farther. So the left gets the
+    // stronger emphasis, the right stays subtler, per spec ("slightly
+    // thinner or lower-opacity outline" for the far opening).
+    var SLIT_STROKE_BASE = 1;
+    var SLIT_STROKE_NEAR_PROFILE = 3;
+    var SLIT_STROKE_FAR_PROFILE = 2.2;
+    var SLIT_OPACITY_BASE = 1;
+    var SLIT_OPACITY_NEAR_PROFILE = 0.9;
+    var SLIT_OPACITY_FAR_PROFILE = 0.55;
+    function renderSlitEmphasis(rectEl, t, strokeProfile, opacityProfile) {
+      rectEl.setAttribute('stroke-width', lerp(SLIT_STROKE_BASE, strokeProfile, t).toFixed(2));
+      rectEl.style.opacity = lerp(SLIT_OPACITY_BASE, opacityProfile, t).toFixed(3);
     }
 
     function render(p) {
@@ -1812,9 +1855,15 @@
 
       renderSlit(leftSlitEl, X_leftSlit, computeSlitOpen(p, 'left'));
       renderSlit(rightSlitEl, X_rightSlit, computeSlitOpen(p, 'right'));
+      renderSlitEmphasis(leftSlitEl, approachT, SLIT_STROKE_NEAR_PROFILE, SLIT_OPACITY_NEAR_PROFILE);
+      renderSlitEmphasis(rightSlitEl, approachT, SLIT_STROKE_FAR_PROFILE, SLIT_OPACITY_FAR_PROFILE);
 
       var tunnelState = computeTunnelState(p);
-      renderTunnel(tunnelState.riseAmount, tunnelState.opacity);
+      renderTunnel(tunnelState.riseAmount, tunnelState.fillOpacity, tunnelState.tipOpacity);
+      // Wire opacity is never multiplied by tunnel/fabric opacity -- it
+      // stays a fixed, fully-opaque element throughout every phase; only
+      // its lift/stroke width (legibility, see above) and its own
+      // dash-reveal progress ever change.
       renderWire(computeWireProgress(p), lerp(WIRE_STROKE_BASE, WIRE_STROKE_PROFILE, approachT));
     }
 
@@ -1839,7 +1888,7 @@
       renderSlit(leftSlitEl, X_leftSlit, slitsT);
       renderSlit(rightSlitEl, X_rightSlit, slitsT);
       var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
-      renderTunnel(clamp01(riseT), 0.5);
+      renderTunnel(clamp01(riseT), 0.5, 0.85);
       var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
       renderWire(wireT, WIRE_STROKE_BASE);
     }
