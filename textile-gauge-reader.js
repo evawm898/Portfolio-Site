@@ -1778,11 +1778,19 @@
     const waleWpi = m.wale.per_inch != null ? m.wale.per_inch.toFixed(2) : "—";
     const courseCpi = m.course.per_inch != null ? m.course.per_inch.toFixed(2) : "—";
     const d = m.loop_lattice_debug;
+    const isCounted = m.wale_source === "loop_count";
+    // What actually fed the wale consensus for this region: its counted
+    // spacing (from the loop-lattice detector's own accepted columns)
+    // when trustworthy, its periodicity estimate otherwise -- see the
+    // module comment above _wale_count_candidate in gauge_analysis.py.
+    const waleUsedWpi = isCounted && d && d.wale_per_inch != null ? d.wale_per_inch.toFixed(2) : waleWpi;
 
     roiDiagContent.innerHTML = `
       <div class="tgr-roi-diag-card">
         <div class="tgr-roi-diag-card__row"><span>Source</span><span>${m.source === "manual" ? "Manual" : "Auto-proposed"}</span></div>
-        <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleUsedWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Wale evidence used</span><span>${isCounted ? `counted (${d ? d.column_count : "?"} columns)` : "periodicity"}</span></div>
+        ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
         <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}%</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
         ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} columns</span></div>` : ""}

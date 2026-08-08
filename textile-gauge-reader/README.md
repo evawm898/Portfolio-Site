@@ -319,6 +319,14 @@ only shows it (a "Show detected loops" overlay — green solid = direct
 detection, hollow orange = inferred, gold line = accepted column — plus
 a comparison table) inside Developer diagnostics.
 
+*(This "comparison-only, never touches the real result" description is
+still exactly true for `analyze_gauge` and the single-ROI `/analyze`
+endpoint. It stopped being the whole story once the multi-region
+consensus arrived — see [Wale gauge from counted loop columns](
+#wale-gauge-from-counted-loop-columns-not-a-raw-period) below for the
+one place this detector's output now DOES feed into a real,
+reported measurement.)*
+
 **Honest result on the real jersey photo, tested across 5 nearby ~1in²
 ROIs**: direct detections dropped from over-detecting everywhere to
 being confined to course-row bands, and columns now require multi-row
@@ -429,31 +437,103 @@ centers, inferred wale columns/course rows from its own loop-lattice
 experiment, WPI/CPI, confidence, and included/excluded status — lives in
 Developer diagnostics' region selector, never the normal view.
 
-**Honest result on the real jersey photo** (6 auto-proposed regions,
-0.87in² each): course consensus landed close to the known ~7.2 CPI
-(7.28/in, from 4 of 6 regions; A and E were correctly excluded, one as a
-~2x harmonic, one as a ~0.5x harmonic). Wale consensus did **not** land
-close to the known ~5 WPI — it converged on ~9.5 WPI instead, because 4
-of the 6 regions' own independent `analyze_gauge()` calls happened to
-lock onto the same half-loop harmonic (only regions A and B were close
-to the true value, and got outvoted). This is a real, unflattering
-result, reported as-is rather than tuned away: **robust cross-region
-statistics cannot distinguish "the true value" from "a majority of
-independent detectors sharing the same systematic error"** — no purely
-statistical consensus method can, without an additional prior. What the
-system got right is that it never claimed false certainty about it: wale
-confidence came out at 23% (Low), correctly flagging the number as
-unreliable and worth manual verification, rather than reporting ~9.5 WPI
-with unearned confidence. This is the intended failure mode — cross-
-region agreement (or the lack of it) driving confidence is "much more
-useful than confidence based on one crop" specifically because it can
-catch this even when the point estimate itself is fooled.
+**Original honest result on the real jersey photo** (6 auto-proposed
+regions, 0.87in² each), from the first version of this consensus —
+period-estimate-per-region, statistically combined, no counting yet:
+course consensus landed close to the known ~7.2 CPI (7.28/in, from 4 of
+6 regions; A and E were correctly excluded, one as a ~2x harmonic, one
+as a ~0.5x harmonic). Wale consensus did **not** land close to the known
+~5 WPI — it converged on ~9.5 WPI instead, because 4 of the 6 regions'
+own independent `analyze_gauge()` calls happened to lock onto the same
+half-loop harmonic (only regions A and B were close to the true value,
+and got outvoted). This is a real, unflattering result, reported as-is
+rather than tuned away: **robust cross-region statistics cannot
+distinguish "the true value" from "a majority of independent detectors
+sharing the same systematic error"** — no purely statistical consensus
+method can, without an additional prior. What the system got right is
+that it never claimed false certainty about it: wale confidence came out
+at 23% (Low), correctly flagging the number as unreliable and worth
+manual verification, rather than reporting ~9.5 WPI with unearned
+confidence. This is the intended failure mode — cross-region agreement
+(or the lack of it) driving confidence is "much more useful than
+confidence based on one crop" specifically because it can catch this
+even when the point estimate itself is fooled. **This specific failure
+is exactly what the next section fixes** — not by tuning the statistics,
+but by changing what each region votes WITH.
 
 Ground truth (the "Verify Measurement" correction system) is never used
 anywhere in this pipeline — not for proposing regions, not for scoring
 their quality, not for selecting inliers, not for consensus. It remains
 strictly an evaluation-only comparison, entered by the user after the
 fact.
+
+### Wale gauge from counted loop columns, not a raw period
+
+The failure above has a specific shape: autocorrelation on a short
+(~0.87in) window has no notion of "loop," just "some periodic edge
+pattern" — so a region can find a very clean, very confident repeat and
+still have that repeat be the wrong one (the leg-to-leg half-repeat,
+not the loop-to-loop full repeat). Feeding that period straight into
+cross-region consensus means a majority of regions can confidently agree
+with each other while being wrong TOGETHER, and no amount of robust
+statistics on the *periods themselves* can catch that.
+
+The fix (`analyze_multi_roi` + `_wale_count_candidate` in `analysis/
+gauge_analysis.py`) doesn't touch the statistics at all — it changes
+what each region contributes to them. For the WALE axis specifically,
+every region's consensus candidate now prefers its **counted** spacing —
+the median interval between the experimental loop-lattice detector's own
+ACCEPTED columns (real, individually-verified V-shape detections,
+requiring support from multiple course rows before a column counts at
+all — see [the loop-lattice section above](#experimental-an-explicit-v-
+shape-loop-center-detector)) — over its raw autocorrelation period,
+whenever that count is trustworthy enough
+(`_wale_count_confidence` ≥ `WALE_COUNT_MIN_CONFIDENCE`, from ≥2
+accepted columns, weighted half by spacing regularity and half by how
+many course rows actually confirmed each column). A region whose
+loop-lattice result isn't trustworthy for this — too few accepted
+columns, weak support, irregular spacing — still falls back to its own
+periodicity estimate, exactly as before; no region is ever dropped just
+because the experimental detector came up empty on it. Course is
+deliberately left alone: it hasn't shown this project's history of
+harmonic-doubling, and the loop-lattice detector treats course rows as a
+given prior rather than something it independently counts (see
+`LoopLatticeResult`'s docstring), so there's no analogous "count" to
+prefer there.
+
+Counting sidesteps the specific failure mode above almost by
+construction: an accepted column is a claim about a SPECIFIC, located
+stitch, verified against multiple course rows before it counts at all —
+there's no "is this the fundamental repeat or its harmonic" question to
+get wrong the way a period estimate has. This is also the ONE place in
+the whole codebase the loop-lattice detector is allowed to influence a
+real, reported measurement (see the module comment above
+`_wale_count_candidate`); every other use of it — the single-ROI
+`/analyze` endpoint's `loop_lattice_debug`, Developer diagnostics —
+remains exactly what it always was: comparison-only, never touching the
+actual result.
+
+Each region's own `wale_source` ("loop_count" or "periodicity") and
+`wale_count_confidence` are exposed per-region in `/analyze-multi`'s
+`multi_roi.per_roi`, and surfaced in Developer diagnostics' per-region
+inspector, so it's always visible which kind of evidence actually fed
+the consensus for any given region.
+
+**Result on the same real jersey photo, same 6 regions**: wale moved
+from ~9.5 WPI (wrong, a clean 2x of the true value) to **~5.9 WPI**
+(much closer to the known ~5) — a real, substantial improvement, not a
+marginal one. It's not a perfect result: only 2 of the 6 regions (A and
+B) ended up in wale's accepted cluster, so confidence lands around
+70-75% and the axis can still report `status: "uncertain"` depending on
+exactly how tight those two regions' counted values agree (this
+particular photo sits close enough to the classification boundary that
+it was observed to flip between "confident" and "uncertain" across
+otherwise-identical runs, purely from sub-pixel JPEG re-encoding noise
+in one test harness — a reminder that "uncertain" here is an honest
+signal of real closeness to the threshold, not a glitch). Course is
+unaffected by this change and remains ~7.28 CPI, same as before. Reported
+as-is: an honest, verified improvement on the specific failure this
+project already knew about, not a claim that wale detection is solved.
 
 ### Image viewer pan/zoom
 
@@ -637,10 +717,12 @@ of `{label, x, y, width, height, source}`, in place of `/analyze`'s single
 `orientation`/`structure` fields as `/analyze`. Returns the **same shape**
 as `/analyze` (`wale`/`course` are the cross-region consensus, `roi` is
 the primary/overlay region) plus `multi_roi`: every region's own
-independent measurement (`per_roi`) and each axis's consensus detail
-(`wale_consensus`/`course_consensus`: `included_labels`,
-`excluded_labels`, `outliers`, `regional_median_px`/`_per_inch`,
-`regional_spread_px`).
+independent measurement (`per_roi`, including `wale_source` — `"loop_
+count"` or `"periodicity"`, see [Wale gauge from counted loop columns](
+#wale-gauge-from-counted-loop-columns-not-a-raw-period) — and `wale_
+count_confidence`) and each axis's consensus detail (`wale_consensus`/
+`course_consensus`: `included_labels`, `excluded_labels`, `outliers`,
+`regional_median_px`/`_per_inch`, `regional_spread_px`).
 
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.

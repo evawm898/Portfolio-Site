@@ -220,7 +220,16 @@ def test_regions_are_analyzed_independently_of_each_other():
     assert by_label["B"].course.spacing_px == standalone_b.course.spacing_px
 
 
-def test_agreeing_regions_produce_a_confident_consensus_close_to_ground_truth():
+def test_agreeing_regions_produce_a_confident_consensus_close_to_ground_truth(monkeypatch):
+    # This test is about the CONSENSUS wiring/correctness, not about
+    # which per-region evidence wale prefers -- pin wale to its
+    # periodicity estimate (see test_wale_consensus_prefers_counted_
+    # spacing_when_trustworthy below for that behavior specifically) so
+    # this stays a stable check of general multi-region correctness
+    # regardless of how the experimental loop-lattice detector happens to
+    # score on this particular synthetic texture.
+    monkeypatch.setattr(gauge_analysis, "_wale_count_candidate", lambda lattice: (None, 0.0))
+
     image = make_synthetic_knit(width=500, height=500, wale_period=12, course_period=16)
     rois = [
         {"label": "A", "x": 20, "y": 20, "width": 180, "height": 180, "source": "auto"},
@@ -239,7 +248,12 @@ def test_agreeing_regions_produce_a_confident_consensus_close_to_ground_truth():
     assert result.primary_roi_px is not None
 
 
-def test_single_roi_degenerates_to_that_regions_own_result():
+def test_single_roi_degenerates_to_that_regions_own_result(monkeypatch):
+    # Pinned to periodicity for the same reason as the test above -- this
+    # test is about the n=1 degenerate-case wiring, not the count-vs-
+    # periodicity choice.
+    monkeypatch.setattr(gauge_analysis, "_wale_count_candidate", lambda lattice: (None, 0.0))
+
     image = make_synthetic_knit(width=300, height=300, wale_period=12, course_period=16)
     rois = [{"label": "A", "x": 20, "y": 20, "width": 200, "height": 200, "source": "auto"}]
     standalone = analyze_gauge(image, roi=(20, 20, 200, 200), orientation="vertical")
@@ -251,6 +265,63 @@ def test_single_roi_degenerates_to_that_regions_own_result():
     # Cross-region validation isn't possible with one region -- confidence
     # must be reduced relative to that region's own standalone confidence.
     assert result.wale.confidence < standalone.wale.confidence
+
+
+def test_wale_consensus_prefers_counted_spacing_when_trustworthy(monkeypatch):
+    # The actual behavior this phase adds: when a region's loop-lattice
+    # result is trustworthy (enough accepted, well-supported columns),
+    # its COUNTED spacing is used for the wale consensus instead of its
+    # raw periodicity estimate -- and RoiMeasurement.wale_source records
+    # which one was actually used, per region.
+    class FakeLattice:
+        def __init__(self, wale_spacing_px, column_count, column_support_counts, row_count, lattice_consistency):
+            self.wale_spacing_px = wale_spacing_px
+            self.column_count = column_count
+            self.column_support_counts = column_support_counts
+            self.row_count = row_count
+            self.lattice_consistency = lattice_consistency
+
+    trustworthy = FakeLattice(
+        wale_spacing_px=11.0, column_count=6,
+        column_support_counts=[6, 6, 5, 6, 6, 5], row_count=6, lattice_consistency=0.9,
+    )
+    untrustworthy = FakeLattice(
+        wale_spacing_px=999.0, column_count=1,  # below WALE_COUNT_MIN_COLUMNS
+        column_support_counts=[1], row_count=6, lattice_consistency=0.2,
+    )
+
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+        axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.6)
+        return GaugeAnalysisResult(
+            success=True, message="", wale=axis(12.0), course=axis(16.0),
+            roi_width_px=roi[2], roi_height_px=roi[3],
+        )
+
+    fake_lattices = {0: trustworthy, 100: untrustworthy}
+
+    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None):
+        return fake_lattices[roi[0]]
+
+    monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)
+    monkeypatch.setattr(gauge_analysis, "analyze_loop_lattice_experiment", fake_loop_lattice)
+
+    image = make_synthetic_knit(width=300, height=100)
+    rois = [
+        {"label": "A", "x": 0, "y": 0, "width": 90, "height": 90, "source": "auto"},
+        {"label": "B", "x": 100, "y": 0, "width": 90, "height": 90, "source": "auto"},
+    ]
+    result = analyze_multi_roi(image, rois, orientation="vertical")
+
+    by_label = {m.label: m for m in result.per_roi}
+    assert by_label["A"].wale_source == "loop_count"
+    assert by_label["A"].wale_count_confidence > 0
+    assert by_label["B"].wale_source == "periodicity"
+    assert by_label["B"].wale_count_confidence == 0.0
+    # Each region's own wale.spacing_px (the periodicity/raw AxisResult)
+    # is untouched either way -- only which value FEEDS the consensus
+    # candidate changes, not the per-region diagnostic itself.
+    assert by_label["A"].wale.spacing_px == 12.0
+    assert by_label["B"].wale.spacing_px == 12.0
 
 
 def test_primary_region_is_never_an_outlier_on_every_axis_it_has(monkeypatch):
@@ -280,6 +351,11 @@ def test_primary_region_is_never_an_outlier_on_every_axis_it_has(monkeypatch):
         )
 
     monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)
+    # Keep wale on the hand-crafted periodicity values above -- this test
+    # is about primary-region selection, not the count-vs-periodicity
+    # choice (see test_wale_consensus_prefers_counted_spacing_when_
+    # trustworthy for that).
+    monkeypatch.setattr(gauge_analysis, "_wale_count_candidate", lambda lattice: (None, 0.0))
 
     image = make_synthetic_knit(width=500, height=100)
     rois = [

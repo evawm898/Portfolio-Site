@@ -2036,9 +2036,10 @@ def _analyze_axis_v3(
 # --- Experimental: V-shape loop-center lattice detector --------------------
 #
 # A parallel, INDEPENDENT path -- not called by analyze_gauge /
-# _analyze_axis_v3, and does not influence the main prediction in any
-# way (see analyze_loop_lattice_experiment, the only public entry point
-# here). Real-photo diagnostics established that the periodicity-based
+# _analyze_axis_v3, and does not influence the SINGLE-ROI prediction (the
+# /analyze endpoint, analyze_gauge itself) in any way. See
+# analyze_loop_lattice_experiment, the only public entry point here.
+# Real-photo diagnostics established that the periodicity-based
 # detector already generates a candidate close to the true wale repeat,
 # but nothing in autocorrelation/2D-support/patch-consensus/phase-
 # consistency evidence can distinguish a complete knit-loop column from
@@ -2048,10 +2049,14 @@ def _analyze_axis_v3(
 # legs of opposite orientation converging toward a shared point,
 # evaluated at scales seeded by the existing periodicity candidates
 # (used as a PRIOR to know what scale to search at, never as the
-# answer). Kept deliberately experimental/comparison-only: surfaced in
-# the UI's debug mode next to the current prediction, not wired into it,
-# so it can be evaluated on its own merits (does it actually land on
-# complete loops?) before any decision about replacing anything.
+# answer). Kept experimental/comparison-only everywhere EXCEPT one place:
+# the multi-region consensus (analyze_multi_roi, below) DOES let a
+# region's counted column spacing from here outrank its own periodicity
+# estimate for the WALE axis specifically, once this detector's evidence
+# clears a trust threshold -- see the module comment above
+# _wale_count_candidate for why, and why wale only. Every other caller
+# (the /analyze endpoint's loop_lattice_debug, Developer diagnostics)
+# still only ever shows this alongside the real prediction, never inside it.
 
 LOOP_SCALE_HALF_WIDTH_FRACTION = 0.5   # candidate loop "radius" as a fraction of the periodicity candidate period
 MIN_LOOP_LATTICE_SEPARATION_FRACTION = 0.6  # min fraction of scale between two accepted loop-center local maxima
@@ -2757,6 +2762,66 @@ CONSENSUS_TIGHT_SPREAD_LOG = 0.06        # relative (log) inlier spread below wh
 CONSENSUS_LOOSE_SPREAD_LOG = 0.16        # ...below which agreement still counts for something
 
 
+# --- Wale measurement: prefer counted loop columns over a raw period ----
+#
+# Per real-photo evidence (see the README's "Multi-region measurement"
+# section): wale is the axis that keeps getting fooled by harmonic
+# ambiguity in a short autocorrelation window, while the experimental
+# loop-lattice detector's ACCEPTED columns -- built from real, individually
+# -verified V-shape detections requiring multi-row support, not a period
+# guess -- don't share that specific failure mode, because counting
+# discrete, located stitches has no "is it the fundamental repeat or its
+# harmonic" question to get wrong in the first place. Course keeps using
+# the periodicity detector's own row positions unchanged (it hasn't shown
+# this project's history of harmonic-doubling, and the loop-lattice
+# detector treats course rows as a given prior, not something it
+# independently counts -- see LoopLatticeResult's docstring).
+#
+# This is the ONE place in the whole codebase where the loop-lattice
+# detector is allowed to influence a real, reported measurement -- and
+# only here, only for wale, only inside the multi-region consensus. Every
+# other use of analyze_loop_lattice_experiment (the single-ROI /analyze
+# endpoint's loop_lattice_debug, Developer diagnostics) remains exactly
+# what it always was: a parallel, comparison-only diagnostic that never
+# touches analyze_gauge's own result.
+WALE_COUNT_MIN_COLUMNS = 2         # need >=2 accepted columns for even one real interval
+WALE_COUNT_MIN_CONFIDENCE = 0.30   # below this, the count isn't trustworthy enough to prefer over periodicity
+
+
+def _wale_count_confidence(lattice: "LoopLatticeResult") -> float:
+    """
+    How much to trust a region's COUNTED wale spacing (median interval
+    between accepted, position-verified columns) -- half from how regular
+    those intervals are (lattice_consistency), half from how well-
+    supported the columns themselves are (average fraction of course rows
+    that directly confirmed each accepted column, out of every row
+    searched). Both matter: consistent-but-thin evidence and well-
+    supported-but-irregular spacing are each less trustworthy than both
+    together.
+    """
+    if lattice.column_count < WALE_COUNT_MIN_COLUMNS or not lattice.wale_spacing_px:
+        return 0.0
+    if lattice.row_count > 0 and lattice.column_support_counts:
+        support_ratio = (sum(lattice.column_support_counts) / len(lattice.column_support_counts)) / lattice.row_count
+    else:
+        support_ratio = 0.0
+    return float(np.clip(0.5 * lattice.lattice_consistency + 0.5 * support_ratio, 0.0, 1.0))
+
+
+def _wale_count_candidate(lattice: Optional["LoopLatticeResult"]) -> Tuple[Optional[float], float]:
+    """
+    Returns (spacing_px, count_confidence) from counted loop columns, or
+    (None, 0.0) if this region's loop-lattice result isn't trustworthy
+    enough to prefer over its own periodicity-based estimate.
+    """
+    if lattice is None:
+        return None, 0.0
+    confidence = _wale_count_confidence(lattice)
+    if confidence < WALE_COUNT_MIN_CONFIDENCE:
+        return None, 0.0
+    return lattice.wale_spacing_px, confidence
+
+
 @dataclass
 class OutlierInfo:
     """
@@ -2811,6 +2876,16 @@ class RoiMeasurement:
     loop_centers_px: List[Tuple[float, float]] = field(default_factory=list)
     rotation_deg: float = 0.0
     loop_lattice: Optional["LoopLatticeResult"] = None
+    # Which evidence the WALE consensus candidate below actually came
+    # from: "loop_count" when this region's own loop-lattice detector
+    # found enough well-supported columns to COUNT a spacing directly
+    # (median interval between real, position-verified stitch columns);
+    # "periodicity" when it fell back to the autocorrelation-based
+    # estimate (analyze_gauge's own wale.spacing_px) because loop-lattice
+    # didn't produce a trustworthy result for this region. See
+    # _wale_count_candidate.
+    wale_source: str = "periodicity"
+    wale_count_confidence: float = 0.0
 
 
 @dataclass
@@ -3052,9 +3127,12 @@ def analyze_multi_roi(
         if w > 0 and h > 0:
             quality_score, quality_parts = _roi_quality_score(gray_full[y:y + h, x:x + w])
 
-        # Development/comparison diagnostic only (see analyze_loop_lattice_
-        # experiment's own docstring) -- never allowed to affect wale/course,
-        # and a failure here must never break this region's real result.
+        # A parallel, independent detector -- see analyze_loop_lattice_
+        # experiment's own docstring for the search architecture. A
+        # failure here must never break this region's real result; see
+        # the module comment above _wale_count_candidate for the ONE
+        # place this is now allowed to feed into a real measurement
+        # (wale, only inside this multi-region consensus).
         loop_lattice = None
         try:
             loop_lattice = analyze_loop_lattice_experiment(
@@ -3064,6 +3142,9 @@ def analyze_multi_roi(
         except Exception:
             loop_lattice = None
 
+        count_spacing, count_confidence = _wale_count_candidate(loop_lattice)
+        wale_source = "loop_count" if count_spacing is not None else "periodicity"
+
         per_roi.append(RoiMeasurement(
             label=spec["label"], x=x, y=y, width=w, height=h,
             source=spec.get("source", "auto"),
@@ -3072,13 +3153,38 @@ def analyze_multi_roi(
             quality_score=quality_score, quality_parts=quality_parts,
             loop_centers_px=result.loop_centers_px,
             rotation_deg=result.rotation_deg, loop_lattice=loop_lattice,
+            wale_source=wale_source, wale_count_confidence=count_confidence,
         ))
 
-    def axis_candidates(attr: str) -> List[dict]:
+    def wale_candidates() -> List[dict]:
+        # Prefer each region's COUNTED spacing (median interval between
+        # real, position-verified loop columns) over its periodicity
+        # estimate whenever the count is trustworthy enough -- see the
+        # module comment above _wale_count_candidate for why wale
+        # specifically. Falls back to periodicity when loop-lattice
+        # didn't produce a trustworthy result for that region, so a
+        # region is never dropped just because the experimental detector
+        # came up empty on it.
         out = []
         for m in per_roi:
-            axis: AxisResult = getattr(m, attr)
-            if axis.spacing_px is None:
+            if m.wale_source == "loop_count":
+                spacing_px = m.loop_lattice.wale_spacing_px
+                confidence = m.wale_count_confidence
+            else:
+                spacing_px = m.wale.spacing_px
+                confidence = m.wale.confidence
+            if spacing_px is None:
+                continue
+            out.append({
+                "label": m.label, "spacing_px": spacing_px,
+                "confidence": confidence, "quality_score": max(m.quality_score, 0.05),
+            })
+        return out
+
+    def course_candidates() -> List[dict]:
+        out = []
+        for m in per_roi:
+            if m.course.spacing_px is None:
                 continue
             # A floor on quality weight so a region with a near-zero
             # quality score can't be given literally zero say -- it was
@@ -3086,13 +3192,13 @@ def analyze_multi_roi(
             # generic quality heuristic doesn't (see PART 20: a
             # knowledgeable user can always add/keep an area they trust).
             out.append({
-                "label": m.label, "spacing_px": axis.spacing_px,
-                "confidence": axis.confidence, "quality_score": max(m.quality_score, 0.05),
+                "label": m.label, "spacing_px": m.course.spacing_px,
+                "confidence": m.course.confidence, "quality_score": max(m.quality_score, 0.05),
             })
         return out
 
-    wale_consensus = _consensus_for_axis(axis_candidates("wale"), "wale")
-    course_consensus = _consensus_for_axis(axis_candidates("course"), "course")
+    wale_consensus = _consensus_for_axis(wale_candidates(), "wale")
+    course_consensus = _consensus_for_axis(course_candidates(), "course")
 
     # Primary region for the overlay/analyzed-area: prefer whichever
     # (in approval order) region is accepted into the MOST axes' consensus

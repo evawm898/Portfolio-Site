@@ -110,9 +110,14 @@ class LoopLatticeDebugOut(BaseModel):
     """
     Output of the EXPERIMENTAL, parallel V-shape loop-center lattice
     detector (see analysis.gauge_analysis.analyze_loop_lattice_experiment).
-    Development/comparison information only -- never influences `wale`/
-    `course` above, and is not something a normal user needs to see; the
-    frontend only renders this in its developer-diagnostics mode.
+    Development/comparison information, not something a normal user needs
+    to see -- the frontend only renders this in its developer-diagnostics
+    mode. Never influences `wale`/`course` on the single-ROI /analyze
+    response above; on /analyze-multi, this SAME per-region detection may
+    also be what wale's cross-region consensus candidate came from for
+    that region (see RoiMeasurementOut.wale_source) -- the field here is
+    still just an echo of the detector's own output either way, not the
+    thing doing the influencing.
     """
 
     # Direct V-shape detections vs. the lattice's own inferred/missing
@@ -193,6 +198,14 @@ class RoiMeasurementOut(BaseModel):
     brightness_score: Optional[float] = None
     rotation_deg: float = 0.0
     loop_lattice_debug: Optional[LoopLatticeDebugOut] = None
+    # Which evidence this region's WALE consensus candidate actually came
+    # from -- "loop_count" when the loop-lattice detector found enough
+    # well-supported columns to COUNT a spacing directly (median interval
+    # between real, position-verified stitch columns), "periodicity" when
+    # it fell back to wale.spacing_px above. See analysis.gauge_analysis's
+    # module comment above _wale_count_candidate for why wale specifically.
+    wale_source: str = "periodicity"
+    wale_count_confidence: float = 0.0
 
 
 class MultiRoiDebugOut(BaseModel):

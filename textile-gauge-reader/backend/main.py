@@ -609,6 +609,8 @@ async def analyze_multi(
             brightness_score=m.quality_parts.get("brightness_score"),
             rotation_deg=m.rotation_deg,
             loop_lattice_debug=_loop_lattice_to_out(m.loop_lattice, pixels_per_mm) if m.loop_lattice else None,
+            wale_source=m.wale_source,
+            wale_count_confidence=m.wale_count_confidence,
         )
         for m in result.per_roi
     ]
