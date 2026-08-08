@@ -3094,16 +3094,27 @@ def analyze_multi_roi(
     wale_consensus = _consensus_for_axis(axis_candidates("wale"), "wale")
     course_consensus = _consensus_for_axis(axis_candidates("course"), "course")
 
-    # Primary region for the overlay/analyzed-area: the first (in approval
-    # order) region accepted into BOTH axes' consensus -- deterministic,
-    # and never the region either axis flagged as an outlier. Falls back
-    # to the first region with any successful axis, then simply the first
-    # approved region, so there's always a primary even when consensus
-    # couldn't be computed for either axis.
+    # Primary region for the overlay/analyzed-area: prefer whichever
+    # (in approval order) region is accepted into the MOST axes' consensus
+    # -- both, if any region qualifies for both; otherwise just one axis
+    # rather than falling all the way back to an unconditional "first
+    # region" that could easily BE an outlier on every axis (e.g. when
+    # wale's and course's inlier sets don't overlap at all, which is a
+    # real, observed case -- a region excluded from both axes must never
+    # become the primary/overlay region while any better-agreeing region
+    # exists). Only when literally no region has a successful measurement
+    # on ANY axis does this fall back to the first approved region, since
+    # there's no better alternative left.
+    def _included_axis_count(m: RoiMeasurement) -> int:
+        return (m.label in wale_consensus.included_labels) + (m.label in course_consensus.included_labels)
+
     primary: Optional[RoiMeasurement] = None
-    for m in per_roi:
-        if m.label in wale_consensus.included_labels and m.label in course_consensus.included_labels:
-            primary = m
+    for target_count in (2, 1):
+        for m in per_roi:
+            if _included_axis_count(m) == target_count:
+                primary = m
+                break
+        if primary is not None:
             break
     if primary is None:
         for m in per_roi:

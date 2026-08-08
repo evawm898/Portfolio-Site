@@ -24,8 +24,11 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+import analysis.gauge_analysis as gauge_analysis
 from analysis.gauge_analysis import (
     CONSENSUS_SINGLE_REGION_FACTOR,
+    AxisResult,
+    GaugeAnalysisResult,
     _consensus_for_axis,
     _weighted_median,
     analyze_gauge,
@@ -248,6 +251,49 @@ def test_single_roi_degenerates_to_that_regions_own_result():
     # Cross-region validation isn't possible with one region -- confidence
     # must be reduced relative to that region's own standalone confidence.
     assert result.wale.confidence < standalone.wale.confidence
+
+
+def test_primary_region_is_never_an_outlier_on_every_axis_it_has(monkeypatch):
+    # Regression test for a real bug: when wale's and course's inlier sets
+    # don't overlap at all (a real, observed case -- e.g. the regions that
+    # agree on wale aren't the same regions that agree on course), the
+    # primary/overlay region must still be chosen from whichever region
+    # agrees on AT LEAST ONE axis, never unconditionally "the first
+    # approved region" regardless of whether THAT region was excluded on
+    # every axis it has.
+    #
+    # Fake analyze_gauge for an exact, deterministic scenario: A is an
+    # extreme outlier on BOTH axes (approved first, so it's what the old
+    # unconditional "first region" fallback would have picked). B/C/D
+    # cluster together on wale only; E/F/G cluster together on course
+    # only -- the two inlier sets share no region at all.
+    fake_wale = {"A": 1.0, "B": 10.0, "C": 10.1, "D": 10.2, "E": 2.0, "F": 500.0, "G": 999.0}
+    fake_course = {"A": 1.0, "B": 2.0, "C": 500.0, "D": 999.0, "E": 50.0, "F": 50.1, "G": 50.2}
+    labels_by_x = {i * 60: label for i, label in enumerate("ABCDEFG")}
+
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+        label = labels_by_x[roi[0]]
+        axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.6)
+        return GaugeAnalysisResult(
+            success=True, message="", wale=axis(fake_wale[label]), course=axis(fake_course[label]),
+            roi_width_px=roi[2], roi_height_px=roi[3],
+        )
+
+    monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)
+
+    image = make_synthetic_knit(width=500, height=100)
+    rois = [
+        {"label": label, "x": i * 60, "y": 0, "width": 50, "height": 50, "source": "auto"}
+        for i, label in enumerate("ABCDEFG")
+    ]
+    result = analyze_multi_roi(image, rois, orientation="vertical")
+
+    assert result.wale_consensus.included_labels == ["B", "C", "D"]
+    assert result.course_consensus.included_labels == ["E", "F", "G"]
+    # A is excluded from BOTH axes -- it must never be picked as primary
+    # even though it's first in approval order (the old bug's fallback).
+    assert result.primary_label != "A"
+    assert result.primary_label in {"B", "C", "D", "E", "F", "G"}
 
 
 def test_no_rois_fails_cleanly():
