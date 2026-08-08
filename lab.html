@@ -1419,8 +1419,13 @@
     // top/bottom edges land exactly on each slit's own endpoints.
     // SLIT_LENGTH is the source of truth; change it there, not here.
     TUNNEL_WIDTH: EMBEDDED_WIRE_SLIT_LENGTH, // arch cross-section span, edge to edge -- == SLIT_LENGTH
-    WIRE_WIDTH: 9,                // extruded conductor: across the cavity (Y)
-    WIRE_HEIGHT: 7,                // extruded conductor: thickness (Z)
+    // The bundle is WIRE_STRAND_COUNT round conductors, all sharing this
+    // one diameter -- centralized here rather than each strand picking
+    // its own size, per spec ("all four conductors should derive from
+    // the same value"). See where the bundle is built for how this
+    // becomes an actual round cross-section, not just a circle drawn on
+    // a flat panel.
+    WIRE_DIAMETER: 2.5,
     // The tunnel and wire both run along world X (see the module header
     // comment). The arch's own curvature is encoded across world Y (the
     // rib fan) and Z (height) -- so exposing that curvature as an
@@ -1571,13 +1576,13 @@
     }
 
     // ---- DOM: one stage > one rotating scene > fabric face, N rib
-    // faces, and WIRE_STRAND_COUNT*2 wire faces (a flat top + a folded
-    // wall per strand). No face ever carries the scene's own rotation --
-    // every face's transform is either absent (fabric, at the base
-    // plane), its own fixed fold (each rib), or its own fold + lift
-    // (each wire face), recomputed per frame only where that lift
-    // itself changes (the wire's, for legibility -- see where it's
-    // built). ----
+    // faces, and WIRE_STRAND_COUNT*WIRE_PETAL_COUNT wire-petal faces (a
+    // fanned-circle conductor per strand). No face ever carries the
+    // scene's own rotation -- every face's transform is either absent
+    // (fabric, at the base plane), its own fixed fold (each rib), or
+    // its own fold + lift (each wire petal), recomputed per frame only
+    // where that lift itself changes (the wire's, for legibility -- see
+    // where it's built). ----
     var stageEl = document.createElement('div');
     stageEl.className = 'embeddedWire-stage';
     var scene = document.createElement('div');
@@ -1718,86 +1723,134 @@
       });
     }
 
-    // ---- 3. wire -- a small BUNDLE of WIRE_STRAND_COUNT parallel
-    // rectangular conductors occupying the open cavity INSIDE the raised
-    // tunnel, not a flat stroke sitting on the fabric plane and not a
-    // shape underneath the tunnel.
+    // ---- 3. wire -- a small BUNDLE of WIRE_STRAND_COUNT round
+    // conductors occupying the open cavity INSIDE the raised tunnel, not
+    // a flat stroke sitting on the fabric plane and not a shape
+    // underneath the tunnel.
     //
-    // Earlier version: WIRE_SLICE_COUNT slices fanned across the wire's
-    // width, each folded via the same eccentric-angle math the tunnel's
-    // ribs use (solveSliceFold). That's the right technique for a
-    // *curved* cross-section, but a rectangle isn't curved -- fanning
-    // slices from one shared hinge at the centerline made the fill
-    // narrow toward that hinge, reading as a wedge/triangle rather than
-    // a parallel-sided bundle (confirmed directly, screenshotted).
+    // Earlier version: each strand was two *flat* faces (a top panel + a
+    // wall folded at a fixed -90deg), which fixed an even earlier
+    // wedge/taper bug but only ever reads as a rectangular prism -- flat
+    // walls can't present a round silhouette from the profile camera.
     //
-    // Fixed here with plain flat-panel geometry instead of a fan: each
-    // strand is exactly two faces --
-    //   - a TOP face: flat in the local XY plane (no fold at all, just
-    //     translateZ to its height), the strand's own constant-width Y
-    //     band. This is what reads as "one of several parallel strands"
-    //     from directly above.
-    //   - a WALL face: one flat panel folded by a FIXED -90deg (never a
-    //     variable angle, never fanned) standing straight up from the
-    //     fabric plane to the strand's own height, at that strand's own
-    //     centerline. This is what reads as a small filled rectangle --
-    //     the strand's own cross-section -- once the camera tips toward
-    //     profile.
-    // Every strand's two faces span exactly [X_wireStart, revealedX] in
-    // local X and never change shape, so growing the reveal only ever
-    // extends a flat-ended rectangle -- it cannot taper, because there
-    // is no per-position angle left anywhere in the geometry to taper.
+    // Fixed here by building each conductor as WIRE_PETAL_COUNT thin
+    // bands fanned around a circle -- in spirit the same fold technique
+    // the tunnel's own arch uses (many bands, each folded once, tracing
+    // a curved cross-section), but NOT via solveRibFold's eccentric-
+    // angle math: that atan2-based correction exists specifically to
+    // handle an ellipse's peakLen *varying* with position, and while it
+    // behaves correctly across the tunnel's own 0-180deg sweep, it does
+    // not stay single-valued/monotonic across a full 360deg sweep --
+    // confirmed directly, an isolated conductor built that way rendered
+    // as a spiky, self-crossing star, not a circle. A circle doesn't
+    // have that varying-radius problem in the first place: peakLen is
+    // simply WIRE_RADIUS at every position, so the fold angle can be
+    // swept directly and linearly (phiDeg = i * 360/WIRE_PETAL_COUNT,
+    // see wirePetalDefs) with no solving needed at all -- confirmed
+    // directly to trace a clean, closed radial fan. One shared petal
+    // definition set is reused across all WIRE_STRAND_COUNT conductors,
+    // since every conductor has the same radius -- only each
+    // conductor's own centerY (see wireConductorCenters) differs.
+    //
+    // This is what gives the two approved reads for free, as the
+    // natural consequence of one persistent round shape viewed from two
+    // angles, rather than two special-cased looks: from directly above,
+    // a fan of thin bands spanning [centerY-radius, centerY+radius]
+    // tiles into one solid flat-topped rectangle per conductor (reads
+    // as a parallel strand); from the profile camera looking nearly
+    // end-on down the tunnel, those same bands' outer tips trace a true
+    // circle (reads as a round cross-section).
     var WIRE_STRAND_COUNT = 4;
-    var WIRE_STRAND_GAP = 1.2;
-    // Both tuned as fractions of the *original* TUNNEL_HEIGHT (34), then
-    // scaled down by the same ratio TUNNEL_HEIGHT itself just was --
-    // otherwise, now that the tunnel is a low ~14-unit arch instead of a
-    // 34-unit peak, the old fixed lift of 16 would put the bundle's
-    // base above the new roof entirely. This keeps the bundle inside
-    // the cavity (base above the fabric plane, top below the roof) at
-    // both the top-down and profile lift amounts, same as before the
-    // tunnel was resized.
-    var WIRE_LIFT_BASE = 4 * (CFG.TUNNEL_HEIGHT / EMBEDDED_WIRE_ORIGINAL_TUNNEL_HEIGHT);
-    var WIRE_LIFT_PROFILE = 16 * (CFG.TUNNEL_HEIGHT / EMBEDDED_WIRE_ORIGINAL_TUNNEL_HEIGHT);
+    // Tuned empirically against the actual rendered profile view, not
+    // derived from a flat sum of diameters -- the profile camera's own
+    // foreshortening (PROFILE_YAW/TILT are deliberately short of a true
+    // 90deg, see their own comment) elongates a true circle into an
+    // ellipse on screen, so a gap that looks right has to be checked
+    // against that rendered ellipse, not against the round conductor's
+    // nominal diameter alone. This value is what kept all four
+    // conductors visibly separate at the profile hold without their
+    // fills merging into one solid band.
+    var WIRE_STRAND_GAP = 3.5; // gap between adjacent conductors' edges
+    var WIRE_RADIUS = CFG.WIRE_DIAMETER / 2;
+    var WIRE_PETAL_COUNT = 16; // full 360deg sweep, smooth enough at this small a radius
 
-    var WIRE_STRAND_WIDTH = (CFG.WIRE_WIDTH - (WIRE_STRAND_COUNT - 1) * WIRE_STRAND_GAP) / WIRE_STRAND_COUNT;
+    // WIRE_LIFT_BASE keeps the bundle low and near-flush at top-down,
+    // as a fraction of TUNNEL_HEIGHT so it stays proportionate to
+    // however tall the tunnel itself is configured. WIRE_LIFT_PROFILE
+    // (also tuned empirically against the rendered result, for the same
+    // foreshortening reason as WIRE_STRAND_GAP above) lifts the bundle
+    // well toward the roof at the profile hold -- confirmed directly
+    // that this keeps clear, visible empty space on BOTH sides: below
+    // the bundle down to the fabric plane, and above it up to the
+    // tunnel roof.
+    var WIRE_LIFT_BASE = CFG.TUNNEL_HEIGHT * 0.12;
+    var WIRE_LIFT_PROFILE = CFG.TUNNEL_HEIGHT * 0.95;
 
-    // Each strand's two faces are direct siblings of the tunnel's own
-    // ribs -- not wrapped in an intermediate group -- for the same
-    // depth-sort reason the old slices were: a nested preserve-3d group
-    // sorted behind an opaque top-down tunnel even when the wire's true
-    // height was well inside the cavity (confirmed directly).
-    var wireStrands = [];
-    for (var wsi = 0; wsi < WIRE_STRAND_COUNT; wsi++) {
-      var strandY0 = (midY - CFG.WIRE_WIDTH / 2) + wsi * (WIRE_STRAND_WIDTH + WIRE_STRAND_GAP);
-      var strandYMid = strandY0 + WIRE_STRAND_WIDTH / 2;
-
-      var top = makeFace('embeddedWire-wireSlice');
-      var topRect = el('rect', { x: 0, y: strandY0.toFixed(2), width: 0, height: WIRE_STRAND_WIDTH.toFixed(2), fill: 'var(--petrol-bright)' });
-      top.svg.appendChild(topRect);
-
-      var wall = makeFace('embeddedWire-wireSlice');
-      var wallPath = el('path', { d: '', fill: 'var(--petrol-bright)', stroke: 'none' });
-      var wallTip = el('line', { x1: 0, y1: 0, x2: 0, y2: 0, stroke: 'var(--ink-dim)', 'stroke-width': 0.75, 'stroke-linecap': 'round' });
-      wall.svg.appendChild(wallPath);
-      wall.svg.appendChild(wallTip);
-
-      wireStrands.push({ topFace: top.face, topRect: topRect, wallFace: wall.face, wallPath: wallPath, wallTip: wallTip, yMid: strandYMid });
+    // Every conductor shares this one set of fold angles (built once,
+    // never recomputed) -- they only differ in which Y they're centered
+    // on. peakLen is the same WIRE_RADIUS at every step (a circle, not
+    // an ellipse), so a direct linear sweep of the fold angle itself
+    // traces the full circle -- see the header comment above for why
+    // this is deliberately NOT solveRibFold.
+    var wirePetalDefs = [];
+    for (var wpi = 0; wpi < WIRE_PETAL_COUNT; wpi++) {
+      wirePetalDefs.push({ phiDeg: wpi * (360 / WIRE_PETAL_COUNT), peakLen: WIRE_RADIUS });
     }
 
-    // Local pre-fold quad for a strand's WALL: hinges at local Y=hingeY
-    // (the strand's own centerline, at the fabric-plane baseline before
-    // `lift`), rising WIRE_HEIGHT to hingeY-WIRE_HEIGHT ("up" in local
-    // SVG space) -- the same negate-to-fold-toward-viewer convention
-    // solveRibFold uses, but at the fixed -90deg this rectangle always
-    // needs (a wall standing perfectly upright), so no eccentric-angle
-    // solving is needed here at all.
-    function wallD(hingeY, x2) {
-      var yTop = hingeY - CFG.WIRE_HEIGHT;
-      return 'M' + X_wireStart.toFixed(2) + ',' + hingeY.toFixed(2) +
-        ' L' + X_wireStart.toFixed(2) + ',' + yTop.toFixed(2) +
-        ' L' + x2.toFixed(2) + ',' + yTop.toFixed(2) +
-        ' L' + x2.toFixed(2) + ',' + hingeY.toFixed(2) +
+    // WIRE_STRAND_COUNT conductors laid out side by side across Y, all
+    // sharing the same lift (Z) -- never stacked -- so the bundle is
+    // wider than it is tall by construction, per spec.
+    var wireConductorSpacing = CFG.WIRE_DIAMETER + WIRE_STRAND_GAP;
+    var wireConductorCenters = [];
+    for (var wcc = 0; wcc < WIRE_STRAND_COUNT; wcc++) {
+      wireConductorCenters.push(midY + (wcc - (WIRE_STRAND_COUNT - 1) / 2) * wireConductorSpacing);
+    }
+
+    // Each petal face is a direct sibling of the tunnel's own ribs --
+    // not wrapped in an intermediate group -- for the same depth-sort
+    // reason established earlier: a nested preserve-3d group sorted
+    // behind an opaque top-down tunnel even when the wire's true height
+    // was well inside the cavity (confirmed directly).
+    // CSS rotateX pivots each face around its own transform-origin,
+    // which defaults to the face's exact center -- 50% 50%, i.e. SVG
+    // Y=70 in this 240x140 viewBox. The tunnel's ribs all hinge exactly
+    // there (midY==70) so that default is already correct for them and
+    // never needs overriding. Every conductor here, though, is centered
+    // somewhere else (spread across the bundle's own width around
+    // midY), so leaving transform-origin at the default pivots each
+    // petal around the WRONG point -- fine for a single fixed small
+    // fold (the previous rectangular wall design got away with it), but
+    // across a full 360deg sweep of fold angles the mismatch drifts
+    // each petal by a different amount, breaking the circle (confirmed
+    // directly -- a single isolated conductor rendered as a flattened,
+    // split blob straddling the fabric baseline instead of a circle).
+    // Setting transform-origin explicitly to each conductor's own
+    // centerY makes the actual CSS pivot match the geometric hinge used
+    // in petalD below, exactly the way midY already matches it for the
+    // ribs.
+    var wireStrands = wireConductorCenters.map(function (centerY) {
+      var originPct = (centerY / 140 * 100).toFixed(3) + '%';
+      var petals = wirePetalDefs.map(function (def) {
+        var petal = makeFace('embeddedWire-wireSlice');
+        petal.face.style.transformOrigin = '50% ' + originPct;
+        var path = el('path', { d: '', fill: 'var(--petrol-bright)', stroke: 'var(--ink-dim)', 'stroke-width': 0.3 });
+        petal.svg.appendChild(path);
+        return { face: petal.face, path: path, peakLen: def.peakLen, phiDeg: def.phiDeg };
+      });
+      return { centerY: centerY, petals: petals };
+    });
+
+    // Local pre-fold quad for one petal: hinges at local Y=centerY (the
+    // conductor's own centerline, at the fabric-plane baseline before
+    // `lift`), rising peakLen (== WIRE_RADIUS, constant for a true
+    // circle) toward centerY-peakLen ("up" in local SVG space, the same
+    // negate-to-fold-toward-viewer convention solveRibFold uses).
+    function petalD(centerY, peakLen, x2) {
+      var y = centerY - peakLen;
+      return 'M' + X_wireStart.toFixed(2) + ',' + centerY.toFixed(2) +
+        ' L' + X_wireStart.toFixed(2) + ',' + y.toFixed(2) +
+        ' L' + x2.toFixed(2) + ',' + y.toFixed(2) +
+        ' L' + x2.toFixed(2) + ',' + centerY.toFixed(2) +
         ' Z';
     }
 
@@ -1809,25 +1862,18 @@
     // the same camera-approach-driven value the tunnel's cutaway
     // opacity uses, applied here as a real Z offset rather than a
     // visual-only stroke trick. `t` is a single leading-edge position --
-    // one advancing front, not two independently-revealed ends: every
-    // strand's fixed start (X_wireStart) never moves, only revealedX
-    // does, so everything already behind the leading edge stays exactly
-    // as it was.
+    // one advancing front, not four independently-timed conductors:
+    // every petal's fixed start (X_wireStart) never moves and every
+    // conductor shares the same revealedX, so all four leading ends
+    // stay aligned and everything already behind them stays exactly as
+    // it was.
     function renderWire(t, lift) {
       var revealedX = lerp(X_wireStart, X_wireEnd, clamp01(t));
-      var topZ = lift + CFG.WIRE_HEIGHT;
       wireStrands.forEach(function (strand) {
-        strand.topFace.style.transform = 'translateZ(' + topZ.toFixed(2) + 'px)';
-        strand.topRect.setAttribute('x', X_wireStart.toFixed(2));
-        strand.topRect.setAttribute('width', (revealedX - X_wireStart).toFixed(2));
-
-        strand.wallFace.style.transform = 'translateZ(' + lift.toFixed(2) + 'px) rotateX(-90deg)';
-        strand.wallPath.setAttribute('d', wallD(strand.yMid, revealedX));
-        var tipY = strand.yMid - CFG.WIRE_HEIGHT;
-        strand.wallTip.setAttribute('x1', X_wireStart.toFixed(2));
-        strand.wallTip.setAttribute('y1', tipY.toFixed(2));
-        strand.wallTip.setAttribute('x2', revealedX.toFixed(2));
-        strand.wallTip.setAttribute('y2', tipY.toFixed(2));
+        strand.petals.forEach(function (petal) {
+          petal.face.style.transform = 'translateZ(' + lift.toFixed(2) + 'px) rotateX(' + petal.phiDeg.toFixed(3) + 'deg)';
+          petal.path.setAttribute('d', petalD(strand.centerY, petal.peakLen, revealedX));
+        });
       });
     }
 
