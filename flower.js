@@ -34,7 +34,8 @@ const BASE_RADIUS    = 0;      // spiral petals: spine starts on the axis; the
                                // base is then placed at its own spiral radius
 const CUP_AMOUNT     = 0.22;   // transverse cupping (edges curl inward)
 const SPINE_CURL     = 0.30;   // progressive outward bend toward the tip (rad)
-const RADIAL_SEGMENTS = 6;     // tube cross-section resolution
+const RADIAL_SEGMENTS = 8;     // tube cross-section resolution (round enough
+                               // that a thickened tube doesn't read as faceted)
 const SEED_BASE      = 20250808;
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
@@ -150,7 +151,7 @@ class MeshAccumulator {
 
   /* A small welded bead (low-res UV sphere) that caps tube ends and reads
      as a lattice node. */
-  addBead(center, radius, rings = 4, sectors = 6) {
+  addBead(center, radius, rings = 5, sectors = 8) {
     const start = this.vcount;
     for (let ri = 0; ri <= rings; ri++) {
       const phi = (Math.PI * ri) / rings;
@@ -240,18 +241,33 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
   const outline = buildSilhouette(P);
   const lattice = buildLattice(outline, P.targetSeeds, rng);
 
-  // struts
+  // Rim: the petal outline is one smooth curve, so extrude it as a single
+  // continuous closed tube instead of the ~100 tiny per-edge stubs the Voronoi
+  // boundary would otherwise produce. When the tube is thick, that's the
+  // difference between a lumpy caterpillar rope and a clean, smooth edge.
+  const rim = outline.map((pt) => {
+    const local = mapPointToSurface(pt, P, spine);
+    return placePoint(local, az, baseHeight, radialOffset, tilt);
+  });
+  rim.push(rim[0]);                       // close the loop at the petal base
+  acc.addTube(rim, P.tubeRadius);
+
+  // Interior struts only — the boundary walls are now covered by the rim tube.
   for (const edge of lattice.edges) {
+    if (edge.boundary) continue;
     const local = mapEdgeToSurface(edge, P, spine);
     const world = local.map((p) => placePoint(p, az, baseHeight, radialOffset, tilt));
     acc.addTube(world, P.tubeRadius);
   }
-  // welded beads at every node (cover tube ends, read as lattice nodules)
+  // Welded beads only where an interior strut meets the web: those open tube
+  // ends need sealing. Pure rim vertices are covered by the continuous rim
+  // tube, so beading them just added the overlapping nodules that read as bumps.
   for (const node of lattice.nodes) {
+    if (node.interiorDegree < 1) continue;
     const local = mapPointToSurface(node, P, spine);
     const world = placePoint(local, az, baseHeight, radialOffset, tilt);
     const r = P.tubeRadius * (node.degree >= 3 ? 1.4 : 1.15);
-    acc.addBead(world, r);
+    acc.addBead(world, r, 6, 10);
   }
 }
 

@@ -389,9 +389,9 @@ function keyOf(p) { return Math.round(p.x * Q) + ',' + Math.round(p.y * Q); }
 
 export function buildLattice(outline, targetSeeds, rng) {
   const seeds = generateSeeds(outline, targetSeeds, rng);
-  const edgeMap = new Map();   // canonicalKey -> {a, b}
+  const edgeMap = new Map();   // canonicalKey -> {a, b, seen}
   const nodePos = new Map();   // key -> {x, y}
-  const degree  = new Map();   // key -> count
+  const degree  = new Map();   // key -> total incident edges
 
   for (const seed of seeds) {
     const cell = clipCellPolygon(seed, seeds, outline);
@@ -403,24 +403,37 @@ export function buildLattice(outline, targetSeeds, rng) {
       const kA = keyOf(A), kB = keyOf(B);
       if (kA === kB) continue;
       const ek = kA < kB ? kA + '|' + kB : kB + '|' + kA;
-      if (!edgeMap.has(ek)) {
-        edgeMap.set(ek, { a: A, b: B });
+      const existing = edgeMap.get(ek);
+      if (existing) {
+        existing.seen++;                 // shared wall -> interior
+      } else {
+        edgeMap.set(ek, { a: A, b: B, seen: 1 });
         nodePos.set(kA, A);
         nodePos.set(kB, B);
       }
     }
   }
 
+  // An interior wall is shared by two cells (seen twice); a wall seen once
+  // lies on the petal outline. The Three.js layer renders the outline as one
+  // continuous smooth tube, so interior struts skip the boundary edges and
+  // beads are placed only where an interior strut actually meets the web.
+  const interiorDeg = new Map();   // key -> incident interior edges
   for (const e of edgeMap.values()) {
+    e.boundary = e.seen < 2;
     const kA = keyOf(e.a), kB = keyOf(e.b);
     degree.set(kA, (degree.get(kA) || 0) + 1);
     degree.set(kB, (degree.get(kB) || 0) + 1);
+    if (!e.boundary) {
+      interiorDeg.set(kA, (interiorDeg.get(kA) || 0) + 1);
+      interiorDeg.set(kB, (interiorDeg.get(kB) || 0) + 1);
+    }
   }
 
   const nodes = [];
   for (const [k, d] of degree.entries()) {
     const p = nodePos.get(k);
-    nodes.push({ x: p.x, y: p.y, degree: d });
+    nodes.push({ x: p.x, y: p.y, degree: d, interiorDegree: interiorDeg.get(k) || 0 });
   }
 
   return { edges: Array.from(edgeMap.values()), nodes, seedCount: seeds.length };
