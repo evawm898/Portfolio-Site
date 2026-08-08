@@ -1425,7 +1425,12 @@
     // the same value"). See where the bundle is built for how this
     // becomes an actual round cross-section, not just a circle drawn on
     // a flat panel.
-    WIRE_DIAMETER: 2.5,
+    // Sized (together with WIRE_STRAND_GAP, see where the bundle is
+    // built) so the overall bundle -- 4 conductors plus the 3 gaps
+    // between them -- comes out to exactly 12 units wide, while keeping
+    // the same diameter:gap ratio (5:7) that was tuned empirically for
+    // visual separation at the profile hold.
+    WIRE_DIAMETER: 1.4634,
     // The tunnel and wire both run along world X (see the module header
     // comment). The arch's own curvature is encoded across world Y (the
     // rib fan) and Z (height) -- so exposing that curvature as an
@@ -1761,16 +1766,18 @@
     // end-on down the tunnel, those same bands' outer tips trace a true
     // circle (reads as a round cross-section).
     var WIRE_STRAND_COUNT = 4;
-    // Tuned empirically against the actual rendered profile view, not
-    // derived from a flat sum of diameters -- the profile camera's own
-    // foreshortening (PROFILE_YAW/TILT are deliberately short of a true
-    // 90deg, see their own comment) elongates a true circle into an
-    // ellipse on screen, so a gap that looks right has to be checked
-    // against that rendered ellipse, not against the round conductor's
-    // nominal diameter alone. This value is what kept all four
-    // conductors visibly separate at the profile hold without their
-    // fills merging into one solid band.
-    var WIRE_STRAND_GAP = 3.5; // gap between adjacent conductors' edges
+    // Overall bundle width = WIRE_STRAND_COUNT*WIRE_DIAMETER +
+    // (WIRE_STRAND_COUNT-1)*WIRE_STRAND_GAP -- with WIRE_DIAMETER fixed
+    // at 1.4634 (see CFG.WIRE_DIAMETER's own comment for why), this gap
+    // is exactly what makes that total come out to 12: 4*1.4634 +
+    // 3*2.0488 = 12.0. The 5:7 diameter:gap ratio itself is preserved
+    // from the value originally tuned empirically against the rendered
+    // profile view (where the profile camera's own foreshortening --
+    // PROFILE_YAW/TILT are deliberately short of a true 90deg --
+    // elongates a true circle into an ellipse on screen, so the gap
+    // that reads as separated has to be checked against that rendered
+    // ellipse, not the conductor's nominal diameter alone).
+    var WIRE_STRAND_GAP = 2.0488; // gap between adjacent conductors' edges
     var WIRE_RADIUS = CFG.WIRE_DIAMETER / 2;
     var WIRE_PETAL_COUNT = 16; // full 360deg sweep, smooth enough at this small a radius
 
