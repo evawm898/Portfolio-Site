@@ -63,8 +63,29 @@ def test_corrects_wale_halved_when_course_already_correct():
     assert new_course.selected_reason == "test fixture"
 
 
-def test_corrects_course_halved_when_wale_already_correct():
-    # Mirror case: course is the one locked onto a sub-loop harmonic.
+def test_never_corrects_course_even_when_wale_already_correct():
+    # Regression test: density cross-check used to be able to "fix"
+    # COURSE too (mirror of the wale case above). That let a genuinely
+    # correct course pick get overwritten to compensate for an unrelated
+    # wale-axis error whenever wale's own candidate family didn't happen
+    # to contain a value that fully closed the density gap -- confirmed
+    # as the cause of a real regression on a real jersey photo (course
+    # flipped from a correct ~6.87 c/in to a doubled ~3.47 c/in). Density
+    # cross-check is now wale-only: `course` itself must never be
+    # substituted, even when it's the axis actually causing the mismatch.
+    #
+    # KNOWN TRADEOFF, accepted deliberately for this fix: with only wale
+    # eligible, a mismatch actually caused by a wrong COURSE value can
+    # still get "resolved" by nudging wale's own candidates until the
+    # product matches -- wale.spacing_px is NOT asserted unchanged here.
+    # This mirrors the exact ambiguity the density check always had (it
+    # cannot tell which axis is *actually* wrong from area alone); wale
+    # is the axis with the known, still-unresolved harmonic-lock-on
+    # problem (see the module docstring in gauge_analysis.py), so
+    # accepting this direction of ambiguity is the intentional choice
+    # while course detection is deliberately frozen. A more principled
+    # fix (e.g. only trusting a wale substitution when wale's own
+    # confidence was already suspect) is future work, not this pass.
     wale = _axis(34.8, [17.4, 34.8, 69.6], confidence=0.85)
     course = _axis(12.1, [6.05, 12.1, 24.2], confidence=0.55)
     roi_area = 163.0 * 163.0
@@ -80,22 +101,21 @@ def test_corrects_course_halved_when_wale_already_correct():
         roi_area=roi_area,
     )
 
-    assert new_course.spacing_px == pytest.approx(24.2, abs=0.1)
-    assert new_wale.spacing_px == pytest.approx(34.8)
+    # The one guarantee this test actually exists to enforce: course
+    # itself is NEVER substituted, no matter what.
+    assert new_course.spacing_px == pytest.approx(12.1)
+    assert new_course.selected_reason == "test fixture"
 
 
-def test_ambiguous_tie_prefers_correcting_the_less_confident_axis():
-    # Only wale is actually wrong here (half its true spacing; course is
-    # already correct) -- but because the mismatch is a clean 2x, EITHER
-    # axis's own candidate set contains a swap that reproduces the exact
-    # same corrected product (doubling wale, or doubling the already-right
-    # course), so which one "resolves" the density check is genuinely
-    # ambiguous from density alone. The less-trusted (lower confidence)
-    # axis should be the one adjusted, not whichever is checked first.
-    wale = _axis(17.4, [8.7, 17.4, 34.8], confidence=0.9)     # trusted
-    course = _axis(24.2, [12.1, 24.2, 48.4], confidence=0.3)  # not trusted
+def test_only_wale_is_ever_adjusted_even_when_course_is_less_confident():
+    # Same deliberately-ambiguous-by-density-alone setup as the old
+    # tie-break test, but the tie-break no longer applies: course is
+    # never eligible for substitution at all, regardless of its
+    # (lower) confidence relative to wale.
+    wale = _axis(17.4, [8.7, 17.4, 34.8], confidence=0.9)     # trusted, actually wrong (half true spacing)
+    course = _axis(24.2, [12.1, 24.2, 48.4], confidence=0.3)  # not trusted, but already correct
     roi_area = 163.0 * 163.0
-    n_centers = round(roi_area / (34.8 * 24.2))
+    n_centers = round(roi_area / (34.8 * 24.2))  # true density (matches corrected wale, unchanged course)
     loop_centers = np.zeros((n_centers, 2))
 
     new_wale, new_course = _cross_check_density(
@@ -107,12 +127,11 @@ def test_ambiguous_tie_prefers_correcting_the_less_confident_axis():
         roi_area=roi_area,
     )
 
-    # The low-confidence course axis gets adjusted (to whatever candidate
-    # ties the density check), not the trusted wale one -- confirming the
-    # tie-break rule itself, independent of which outcome is "correct"
-    # in this particular (deliberately ambiguous) case.
-    assert new_wale.spacing_px == pytest.approx(17.4)
-    assert new_course.spacing_px == pytest.approx(48.4, abs=0.1)
+    # Wale is corrected (its own 2x candidate closes the gap); course,
+    # despite being the less-confident axis, is never touched.
+    assert new_wale.spacing_px == pytest.approx(34.8, abs=0.1)
+    assert new_course.spacing_px == pytest.approx(24.2)
+    assert new_course.selected_reason == "test fixture"
 
 
 def test_no_change_when_density_already_plausible():
@@ -238,15 +257,12 @@ def test_does_not_revert_a_fold_consistency_validated_wale_pick():
     assert new_wale.spacing_px == pytest.approx(14.0)
 
 
-def test_course_still_adjustable_when_wale_fold_consistency_blocks_it():
-    # If wale's own leg-scale candidate is excluded by fold-consistency,
-    # density can still fix a genuinely wrong COURSE value via course's
-    # own candidates -- fold-consistency data (wale-only) never blocks
-    # course from being corrected. Note: wale's un-excluded 28px candidate
-    # *also* mathematically resolves the same density mismatch (doubling
-    # either axis gives the same product) -- same inherent ambiguity as
-    # the plain density cross-check tie-break, resolved the same way here
-    # (favor adjusting the less-trusted axis: course).
+def test_course_never_adjusted_even_when_wale_fold_consistency_blocks_wale_fix():
+    # If wale's own leg-scale candidate is excluded by fold-consistency
+    # and its remaining candidates don't close the density gap, nothing
+    # is corrected on EITHER axis -- course is still never eligible for
+    # substitution, even though (mathematically) its own 20.0px candidate
+    # would have resolved the same mismatch.
     wale = _axis(
         14.0,
         [7.0, 14.0, 28.0],
@@ -271,5 +287,9 @@ def test_course_still_adjustable_when_wale_fold_consistency_blocks_it():
         roi_area=roi_area,
     )
 
-    assert new_wale.spacing_px == pytest.approx(14.0)
-    assert new_course.spacing_px == pytest.approx(20.0, abs=0.1)
+    # Wale's un-excluded 28px candidate *does* mathematically close this
+    # particular gap too (14 * 20 == 28 * 10), so wale still gets
+    # corrected here -- but course is left untouched either way.
+    assert new_wale.spacing_px == pytest.approx(28.0)
+    assert new_course.spacing_px == pytest.approx(10.0)
+    assert new_course.selected_reason == "test fixture"

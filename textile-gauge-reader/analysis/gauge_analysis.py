@@ -185,6 +185,7 @@ CLOSENESS_LOG_SCALE = 0.25
 MIN_REPEATS_FOR_FULL_SCORE = 8.0     # visible repeats in the ROI at which repeat_count score saturates at 1.0
 MIN_REPEATS_FOR_ANY_SCORE = 2.0      # fewer than this and repeat_count score is 0
 UNCERTAIN_SCORE_MARGIN = 0.08        # top-2 final candidate scores within this margin -> "uncertain"
+UNCERTAIN_CONFIDENCE_THRESHOLD = 0.35  # confidence below this -> "uncertain" regardless of margin (any axis/pipeline)
 N_CONSENSUS_PATCHES = 4              # overlapping sub-region bands analyzed per axis
 PATCH_OVERLAP_FRACTION = 0.5
 MIN_PATCH_DIM_PX = 24                # a band thinner than this along its collapsed dimension isn't trustworthy
@@ -433,6 +434,8 @@ def analyze_gauge(
     )
 
     weights = WEIGHTS_JERSEY if structure == "jersey" else WEIGHTS_UNKNOWN
+    wale_p_centers = _trusted_center_pitch(loop_centers, wale_center_axis, wale_band_px)
+    course_p_centers = _trusted_center_pitch(loop_centers, course_center_axis, course_band_px)
 
     # Fold-consistency (V-leg-pairing structural check) is scoped to the
     # wale axis only: it targets the specific failure mode of a face-knit
@@ -444,14 +447,39 @@ def analyze_gauge(
         ac2d, wale_direction == "horizontal", wale_patch_periods, float(w if wale_direction == "horizontal" else h),
         use_fold_consistency=True, weights=weights,
     )
-    course = _analyze_axis_v3(
+
+    # COURSE: selection deliberately uses the older, previously-proven
+    # per-axis reconciliation (_analyze_direction: autocorrelation +
+    # loop-center pitch, the same pipeline that reported ~6.87 c/in on a
+    # real jersey photo where ground truth was 7.2), NOT the new v0.3
+    # evidence-based scorer -- a real regression was found where the v0.3
+    # scorer selected a doubled (2x) course period on real fabric texture
+    # even though the coarse autocorrelation/loop-center evidence already
+    # pointed at the correct one. The v0.3 scorer is still run alongside
+    # it purely for its richer per-candidate diagnostics (autocorrelation,
+    # 2D support, structural, patch consensus, evidence/final score),
+    # merged onto the older pipeline's answer with `selected` corrected to
+    # match -- "improved diagnostic candidate evaluation" without
+    # replacing a detector that was already working. Wale keeps using the
+    # v0.3 scorer (it doesn't have a working baseline to fall back to --
+    # it was ~9.55 c/in before v0.3 and ~9.64 after, i.e. still wrong
+    # either way -- and is the subject of ongoing, separate work).
+    course_v3_diagnostics = _analyze_axis_v3(
         course_signal, p0_course, loop_centers, course_center_axis, course_band_px,
         ac2d, course_direction == "horizontal", course_patch_periods, float(w if course_direction == "horizontal" else h),
         use_fold_consistency=False, weights=weights,
     )
+    course = _analyze_direction(
+        course_signal, p0_course, course_p_centers, loop_centers, course_center_axis,
+        use_fold_consistency=False,
+    )
+    old_selected = next((d.period_px for d in course.candidate_details if d.selected), None)
+    if old_selected is not None and course_v3_diagnostics.candidate_details:
+        course = replace(
+            course,
+            candidate_details=_reselect_candidate(course_v3_diagnostics.candidate_details, old_selected),
+        )
 
-    wale_p_centers = _trusted_center_pitch(loop_centers, wale_center_axis, wale_band_px)
-    course_p_centers = _trusted_center_pitch(loop_centers, course_center_axis, course_band_px)
     wale, course = _cross_check_density(
         wale,
         course,
@@ -464,6 +492,13 @@ def analyze_gauge(
         course_signal=course_signal,
         roi_area=float(w * h),
     )
+
+    # Generic confidence-floor uncertainty: independent of which pipeline
+    # produced the result (v0.3 scorer or the restored course pipeline
+    # above), a genuinely low-confidence number shouldn't present as a
+    # normal, trustworthy measurement -- see UNCERTAIN_CONFIDENCE_THRESHOLD.
+    wale = _apply_confidence_floor_uncertainty(wale)
+    course = _apply_confidence_floor_uncertainty(course)
 
     # Translate positions from ROI-local coordinates to full-image coordinates.
     if wale_center_axis == 0:
@@ -1137,10 +1172,13 @@ def _cross_check_density(
     dependency, so it can catch cases the per-axis check alone missed.
 
     If the reconciled cell area is a clear mismatch against density, look
-    at whether either axis's OWN already-computed 0.5x/1x/2x candidates
-    contains a value that resolves it — never an invented multiplier, and
-    never a value that axis's own harmonic analysis hadn't already
-    flagged as plausible.
+    at whether WALE's own already-computed 0.5x/1x/2x candidates contains
+    a value that resolves it — never an invented multiplier, and never a
+    value wale's own harmonic analysis hadn't already flagged as
+    plausible. Deliberately WALE-ONLY (course is never substituted here):
+    see the note above the per-axis search loop below for why trying
+    course too let a correct course pick get overwritten to compensate
+    for an unrelated wale-axis error.
     """
     n = loop_centers.shape[0]
     if n < MIN_LOOP_CENTERS_FOR_EVIDENCE or wale.spacing_px is None or course.spacing_px is None or roi_area <= 0:
@@ -1159,10 +1197,22 @@ def _cross_check_density(
     # arbitrary value) as a replacement for that axis's current pick,
     # holding the other axis fixed, and find the best fix *within each
     # axis independently* first.
+    #
+    # WALE ONLY: this used to also try substituting a course candidate,
+    # but that let a genuinely correct course pick get "corrected" into a
+    # wrong one purely to compensate for an unrelated wale-axis error --
+    # since the density equation (candidate * other_spacing) is symmetric,
+    # if wale's own candidate family didn't happen to contain a value
+    # close enough to fully close the gap, the search would find a
+    # doubled/halved COURSE candidate that closed it instead, on a real
+    # photo where course was already right. Confirmed as the cause of a
+    # real regression (course flipped from ~6.87 to ~3.47 c/in on a real
+    # jersey photo) -- see the module docstring. Wale is the axis still
+    # known to have a harmonic-lock-on problem; course is not, so only
+    # wale's own candidates are ever tried as a substitute.
     per_axis_best: dict = {}  # which -> (abs_log_ratio, candidate)
     for which, axis_result, other_spacing in (
         ("wale", wale, course.spacing_px),
-        ("course", course, wale.spacing_px),
     ):
         # Where fold-consistency data exists (wale axis), a candidate it
         # already flagged as structurally inconsistent with itself (i.e.
@@ -1189,18 +1239,9 @@ def _cross_check_density(
         which: (ratio, cand) for which, (ratio, cand) in per_axis_best.items() if ratio < DENSITY_MISMATCH_LOG_THRESHOLD
     }
     if not candidates_by_axis:
-        return wale, course  # nothing among the axes' own candidates actually helps
+        return wale, course  # nothing among wale's own candidates actually helps
 
-    # Both axes independently resolving the mismatch about equally well is
-    # inherently ambiguous from density alone (the product is symmetric in
-    # wale/course) — break the tie by adjusting whichever axis was already
-    # less trusted going in, rather than an arbitrary axis-checked-first bias.
-    if len(candidates_by_axis) == 2 and abs(candidates_by_axis["wale"][0] - candidates_by_axis["course"][0]) < 0.02:
-        which = "wale" if wale.confidence <= course.confidence else "course"
-    else:
-        which = min(candidates_by_axis, key=lambda w: candidates_by_axis[w][0])
-
-    _, candidate = candidates_by_axis[which]
+    _, candidate = candidates_by_axis["wale"]
     note = (
         f"Density cross-check corrected this to {candidate:.1f}px: the previously reconciled "
         f"wale x course cell area didn't match how many loop centers were actually detected "
@@ -1208,20 +1249,12 @@ def _cross_check_density(
         f"autocorrelation already considered."
     )
 
-    if which == "wale":
-        updated = _finalize_axis(
-            candidate, wale_signal, loop_centers, wale_center_axis, wale_p_centers,
-            wale.candidates_px, note, structural_score=0.75,
-            candidate_details=_reselect_candidate(wale.candidate_details, candidate),
-        )
-        return updated, course
-    else:
-        updated = _finalize_axis(
-            candidate, course_signal, loop_centers, course_center_axis, course_p_centers,
-            course.candidates_px, note, structural_score=0.75,
-            candidate_details=_reselect_candidate(course.candidate_details, candidate),
-        )
-        return wale, updated
+    updated = _finalize_axis(
+        candidate, wale_signal, loop_centers, wale_center_axis, wale_p_centers,
+        wale.candidates_px, note, structural_score=0.75,
+        candidate_details=_reselect_candidate(wale.candidate_details, candidate),
+    )
+    return updated, course
 
 
 def _reselect_candidate(details: List[CandidateInfo], new_period: float) -> List[CandidateInfo]:
@@ -1697,6 +1730,33 @@ def _finalize_axis_v3(
         candidate_details=candidate_details,
         status="uncertain" if uncertain else "confident",
         uncertain_reason=uncertain_reason,
+    )
+
+
+def _apply_confidence_floor_uncertainty(axis: AxisResult) -> AxisResult:
+    """
+    Flag "uncertain" purely from low absolute confidence, independent of
+    whichever pipeline produced the result (the v0.3 candidate scorer's
+    own top-two-candidates-too-close margin, or the older per-axis
+    reconciliation, which has no such margin concept at all). A 9%- or
+    18%-confidence number is not a trustworthy measurement regardless of
+    *why* confidence came out low, and the UI should never present it as
+    if it were -- see UNCERTAIN_CONFIDENCE_THRESHOLD.
+
+    Never downgrades an already-"uncertain" result, and never invents a
+    reason where one already exists.
+    """
+    if axis.status == "uncertain" or axis.spacing_px is None:
+        return axis
+    if axis.confidence >= UNCERTAIN_CONFIDENCE_THRESHOLD:
+        return axis
+    return replace(
+        axis,
+        status="uncertain",
+        uncertain_reason=(
+            axis.uncertain_reason
+            or f"Confidence is low ({axis.confidence * 100:.0f}%) — manual verification recommended."
+        ),
     )
 
 

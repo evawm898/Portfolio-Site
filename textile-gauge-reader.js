@@ -1118,6 +1118,24 @@
       </div>`;
   }
 
+  // A primary-card number's own axis is uncertain (or was never
+  // reliably detected) -- render it visually distinct from a trustworthy
+  // measurement (muted color, a LOW CONFIDENCE tag, no false authority)
+  // rather than as a normal-looking result. The number itself stays
+  // visible (still useful for debugging), it just shouldn't *read* as
+  // dependable at a glance. See the "uncertain" per-axis status.
+  function primaryBlock(label, value, axis, color) {
+    const uncertain = axis.status === "uncertain";
+    const undetected = axis.spacing_px == null;
+    const flagged = uncertain || undetected;
+    return `
+      <div class="tgr-result-card__block${flagged ? " tgr-result-card__block--low-confidence" : ""}">
+        <div class="tgr-result-card__label">${label}</div>
+        <div class="tgr-result-card__value" style="color:${flagged ? "var(--ink-faint)" : color}">${value}</div>
+        ${flagged ? `<div class="tgr-low-confidence-tag">⚠ LOW CONFIDENCE<span class="tgr-low-confidence-tag__sub">Manual verification recommended</span></div>` : ""}
+      </div>`;
+  }
+
   function renderResults() {
     const r = state.result;
     const wpi = r.wale.per_inch != null ? r.wale.per_inch.toFixed(2) : "—";
@@ -1125,14 +1143,8 @@
 
     let html = `
       <div class="tgr-result-card tgr-result-card--primary">
-        <div class="tgr-result-card__block">
-          <div class="tgr-result-card__label">Wales / inch</div>
-          <div class="tgr-result-card__value" style="color:${WALE_COLOR}">${wpi}</div>
-        </div>
-        <div class="tgr-result-card__block">
-          <div class="tgr-result-card__label">Courses / inch</div>
-          <div class="tgr-result-card__value" style="color:${COURSE_COLOR}">${cpi}</div>
-        </div>
+        ${primaryBlock("Wales / inch", wpi, r.wale, WALE_COLOR)}
+        ${primaryBlock("Courses / inch", cpi, r.course, COURSE_COLOR)}
       </div>`;
     html += axisCard("Wale", r.wale, WALE_COLOR);
     html += axisCard("Course", r.course, COURSE_COLOR);
@@ -1226,11 +1238,21 @@
         .join("");
     }
     const corrected = (axis.selected_reason || "").includes("corrected") || (axis.selected_reason || "").includes("Selected");
-    const statusTag = axis.status === "uncertain" ? '<span class="tgr-debug-axis__status is-uncertain">UNCERTAIN</span>' : "";
+    const uncertain = axis.status === "uncertain";
+    const statusTag = uncertain ? '<span class="tgr-debug-axis__status is-uncertain">UNCERTAIN</span>' : "";
+    // Surfaced here too (not just the results card above) per the request
+    // that Detection Details never let an ambiguous call read as settled
+    // -- "Harmonic ambiguity detected" plus whichever periods are
+    // actually competing, not a claim that the system resolved something
+    // it didn't.
+    const ambiguityHtml = uncertain
+      ? `<div class="tgr-debug-axis__ambiguity">⚠ Harmonic ambiguity detected — ${escapeHtml(axis.uncertain_reason || "top candidates scored nearly as well as each other; manual verification recommended.")}</div>`
+      : "";
     return `
       <div class="tgr-debug-axis">
         <div class="tgr-debug-axis__title">${escapeHtml(label)} period candidates ${statusTag}</div>
         <div class="tgr-debug-axis__candidates">${candidatesHtml || "<span class=\"tgr-debug-candidate\">none</span>"}</div>
+        ${ambiguityHtml}
         <div class="tgr-debug-axis__reason${corrected ? " is-corrected" : ""}">${escapeHtml(axis.selected_reason || "—")}</div>
       </div>`;
   }
