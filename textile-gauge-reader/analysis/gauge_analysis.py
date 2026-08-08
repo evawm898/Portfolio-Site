@@ -2057,24 +2057,48 @@ LOOP_SCALE_HALF_WIDTH_FRACTION = 0.5   # candidate loop "radius" as a fraction o
 MIN_LOOP_LATTICE_SEPARATION_FRACTION = 0.6  # min fraction of scale between two accepted loop-center local maxima
 LOOP_RESPONSE_PERCENTILE = 70          # keep only local maxima above this percentile of the response map's own values
 MIN_LATTICE_POINTS = 4                 # fewer detected centers than this and a spacing estimate isn't trustworthy
+MIN_ROW_SUPPORT_FOR_COLUMN = 2         # a candidate wale column needs V-shape evidence from at least this many course rows
+COLUMN_CLUSTER_FRACTION = 0.5          # x-position tolerance for "same column", as a fraction of the trial scale
+ROW_BAND_HALF_FRACTION = 0.4           # half-height of each course-row search band, as a fraction of course-row spacing
 
 
 @dataclass
 class LoopLatticeResult:
     """
     Output of the experimental V-shape loop-center lattice detector (see
-    analyze_loop_lattice_experiment). Positions are in FULL-IMAGE pixel
-    coordinates (offset by the ROI origin), matching
+    analyze_loop_lattice_experiment). All positions are in FULL-IMAGE
+    pixel coordinates (offset by the ROI origin), matching
     GaugeAnalysisResult.loop_centers_px's convention.
+
+    Course rows are taken as a given structural PRIOR (the existing,
+    unmodified course detector's own row positions -- see
+    analyze_loop_lattice_experiment) and used to constrain the search:
+    V-shape evidence is only looked for in a narrow band around each
+    known course row, not the whole ROI indiscriminately. Wale columns
+    are then built from X-position consensus ACROSS those rows, not
+    from any single row's detections -- a column needs support from at
+    least MIN_ROW_SUPPORT_FOR_COLUMN distinct rows to be accepted, so an
+    isolated one-off detection can't create a spurious wale.
     """
 
-    centers_px: List[Tuple[float, float]] = field(default_factory=list)
-    center_count: int = 0
-    row_count: int = 0        # distinct course rows the lattice found
-    column_count: int = 0     # distinct wale columns the lattice found
-    lattice_consistency: float = 0.0   # 0..1, spacing-regularity of the accepted lattice
+    # Direct detections: real, individually-measured V-shape evidence.
+    direct_centers_px: List[Tuple[float, float]] = field(default_factory=list)
+    # Positions where an ACCEPTED column crosses a course row that had no
+    # direct detection near it -- the lattice's inference, not raw
+    # evidence. Shown as hollow markers so the two are never confused.
+    inferred_centers_px: List[Tuple[float, float]] = field(default_factory=list)
+    # Full-image X positions (or Y, if wales run horizontally) of every
+    # ACCEPTED wale column -- i.e. the teal "column" lines.
+    wale_columns_px: List[float] = field(default_factory=list)
+    # How many distinct course rows support each entry in wale_columns_px
+    # (same order/length) -- a rough per-column confidence signal.
+    column_support_counts: List[int] = field(default_factory=list)
+    direct_center_count: int = 0
+    row_count: int = 0        # course rows used as the structural prior
+    column_count: int = 0     # accepted (multi-row-supported) wale columns
+    lattice_consistency: float = 0.0   # 0..1, spacing-regularity of the accepted columns
     wale_spacing_px: Optional[float] = None
-    course_spacing_px: Optional[float] = None
+    course_spacing_px: Optional[float] = None   # echoed from the given course rows, not re-measured here
     scale_used_px: Optional[float] = None   # which periodicity-candidate scale won
     message: str = ""
 
@@ -2171,89 +2195,141 @@ def _local_maxima(response: np.ndarray, min_separation_px: float, percentile: fl
     return [(float(px), float(py)) for px, py in zip(xs, ys)]
 
 
-def _fit_loop_lattice(points: List[Tuple[float, float]], expected_scale_px: float) -> LoopLatticeResult:
+def _build_row_banded_lattice(
+    gx: np.ndarray, gy: np.ndarray, rows_local: List[float], scale_px: float, image_shape: Tuple[int, int]
+) -> LoopLatticeResult:
     """
-    Organize detected loop-center points into rows (courses) and columns
-    (wales) via nearest-neighbor clustering, and derive robust spacing +
-    a consistency score. Tolerant of missing points and mild distortion
-    (real textile photography: shadow, fuzz, slight curvature) --
-    outlier nearest-neighbor distances (more than 2x or less than 0.4x
-    the median) are dropped before the final median/consistency
-    calculation, rather than requiring a perfect grid.
+    The core of the row-banded approach: search for V-shape evidence
+    only in narrow bands around each given course row (never the whole
+    ROI indiscriminately), then build wale columns from X-position
+    CONSENSUS across those rows -- a column needs direct support from at
+    least MIN_ROW_SUPPORT_FOR_COLUMN distinct rows to be accepted, so
+    real but sparse/partial detections (missing loops from shadow, fuzz,
+    a weak row) can still support a column without a single stray
+    detection anywhere being able to invent one. All positions here are
+    in the CALLER's working coordinate frame (not yet offset to the
+    full image) -- see analyze_loop_lattice_experiment.
     """
-    if len(points) < MIN_LATTICE_POINTS:
+    rows_sorted = sorted(rows_local)
+    if len(rows_sorted) >= 2:
+        row_pitch = float(np.median(np.diff(rows_sorted)))
+    else:
+        row_pitch = scale_px * 1.5  # rough fallback: courses are usually a bit finer than wales
+    band_half = max(3.0, row_pitch * ROW_BAND_HALF_FRACTION)
+    min_sep = max(3.0, scale_px * MIN_LOOP_LATTICE_SEPARATION_FRACTION)
+
+    response = _v_shape_response_map(gx, gy, scale_px)
+    h = image_shape[0]
+
+    # (row_index, x, y) for every direct V-shape detection, confined to
+    # its own row's band.
+    row_points: List[Tuple[int, float, float]] = []
+    for ridx, ry in enumerate(rows_sorted):
+        lo = max(0, int(round(ry - band_half)))
+        hi = min(h, int(round(ry + band_half)))
+        if hi <= lo:
+            continue
+        masked = np.zeros_like(response)
+        masked[lo:hi, :] = response[lo:hi, :]
+        for px, py in _local_maxima(masked, min_sep, LOOP_RESPONSE_PERCENTILE):
+            row_points.append((ridx, px, py))
+
+    direct_centers = [(px, py) for _, px, py in row_points]
+    if not row_points:
         return LoopLatticeResult(
-            centers_px=points, center_count=len(points),
-            message="Too few loop-center candidates for a lattice estimate.",
+            row_count=len(rows_sorted), scale_used_px=round(scale_px, 2),
+            message="No V-shape evidence found in any course-row band at this scale.",
         )
 
-    arr = np.array(points)  # columns: x, y
+    # Cluster x-positions across ALL rows into candidate wale columns.
+    col_tolerance = max(3.0, scale_px * COLUMN_CLUSTER_FRACTION)
+    by_x = sorted(row_points, key=lambda t: t[1])
+    groups: List[List[Tuple[int, float, float]]] = []
+    for item in by_x:
+        if groups and abs(item[1] - np.mean([g[1] for g in groups[-1]])) <= col_tolerance:
+            groups[-1].append(item)
+        else:
+            groups.append([item])
 
-    def _cluster_1d(order_axis: int, group_axis: int, tolerance: float) -> List[List[np.ndarray]]:
-        order = np.argsort(arr[:, order_axis])
-        groups: List[List[np.ndarray]] = []
-        for idx in order:
-            p = arr[idx]
-            if groups and abs(p[order_axis] - np.mean([q[order_axis] for q in groups[-1]])) <= tolerance:
-                groups[-1].append(p)
-            else:
-                groups.append([p])
-        return groups
+    wale_columns: List[float] = []
+    support_counts: List[int] = []
+    accepted_groups: List[List[Tuple[int, float, float]]] = []
+    for group in groups:
+        distinct_rows = sorted(set(r for r, _, _ in group))
+        if len(distinct_rows) >= MIN_ROW_SUPPORT_FOR_COLUMN:
+            wale_columns.append(float(np.median([px for _, px, _ in group])))
+            support_counts.append(len(distinct_rows))
+            accepted_groups.append(group)
 
-    def _robust_spacing(groups: List[List[np.ndarray]], spacing_axis: int) -> Tuple[Optional[float], float, int]:
-        diffs: List[float] = []
-        for group in groups:
-            if len(group) < 2:
-                continue
-            vals = sorted(q[spacing_axis] for q in group)
-            diffs.extend(float(b - a) for a, b in zip(vals, vals[1:]))
-        if not diffs:
-            return None, 0.0, len(groups)
-        diffs_arr = np.array(diffs)
-        med = float(np.median(diffs_arr))
-        if med <= 0:
-            return None, 0.0, len(groups)
-        kept = diffs_arr[(diffs_arr >= med * 0.4) & (diffs_arr <= med * 2.0)]
-        if kept.size == 0:
-            return round(med, 2), 0.0, len(groups)
-        final_med = float(np.median(kept))
-        mad = float(np.median(np.abs(kept - final_med)))
-        consistency = float(np.clip(1.0 - (mad / final_med), 0.0, 1.0)) if final_med > 0 else 0.0
-        return round(final_med, 2), consistency, len(groups)
+    # Inferred markers: an accepted column crossing a row that had no
+    # direct detection near it -- the lattice's inference, kept visually
+    # distinct (see LoopLatticeResult docstring).
+    inferred_centers: List[Tuple[float, float]] = []
+    for col_x, group in zip(wale_columns, accepted_groups):
+        rows_with_support = set(r for r, _, _ in group)
+        for ridx, ry in enumerate(rows_sorted):
+            if ridx not in rows_with_support:
+                inferred_centers.append((col_x, ry))
 
-    tolerance = max(3.0, expected_scale_px * 0.6)
-    rows = _cluster_1d(order_axis=1, group_axis=1, tolerance=tolerance)   # cluster by y -> rows
-    cols = _cluster_1d(order_axis=0, group_axis=0, tolerance=tolerance)   # cluster by x -> columns
+    wale_spacing = None
+    lattice_consistency = 0.0
+    if len(wale_columns) >= 2:
+        sorted_cols = sorted(wale_columns)
+        # N columns -> N-1 center-to-center intervals, not N -- np.diff
+        # already gives exactly that, not "span / N".
+        diffs = np.diff(sorted_cols)
+        med = float(np.median(diffs)) if diffs.size else 0.0
+        if med > 0:
+            kept = diffs[(diffs >= med * 0.4) & (diffs <= med * 2.0)]
+            if kept.size:
+                wale_spacing = round(float(np.median(kept)), 2)
+                mad = float(np.median(np.abs(kept - wale_spacing)))
+                lattice_consistency = float(np.clip(1.0 - (mad / wale_spacing), 0.0, 1.0)) if wale_spacing > 0 else 0.0
 
-    wale_spacing, wale_consistency, row_count = _robust_spacing(rows, spacing_axis=0)
-    course_spacing, course_consistency, column_count = _robust_spacing(cols, spacing_axis=1)
-
-    consistencies = [c for c in (wale_consistency, course_consistency) if c > 0]
-    lattice_consistency = float(np.mean(consistencies)) if consistencies else 0.0
+    course_spacing = round(row_pitch, 2) if len(rows_sorted) >= 2 else None
 
     return LoopLatticeResult(
-        centers_px=points,
-        center_count=len(points),
-        row_count=row_count,
-        column_count=column_count,
+        direct_centers_px=direct_centers,
+        inferred_centers_px=inferred_centers,
+        wale_columns_px=wale_columns,
+        column_support_counts=support_counts,
+        direct_center_count=len(direct_centers),
+        row_count=len(rows_sorted),
+        column_count=len(wale_columns),
         lattice_consistency=round(lattice_consistency, 3),
         wale_spacing_px=wale_spacing,
         course_spacing_px=course_spacing,
+        scale_used_px=round(scale_px, 2),
     )
 
 
 def analyze_loop_lattice_experiment(
-    image_bgr: np.ndarray, roi: Tuple[int, int, int, int], orientation: Orientation
+    image_bgr: np.ndarray,
+    roi: Tuple[int, int, int, int],
+    orientation: Orientation,
+    course_rows_px: Optional[List[float]] = None,
 ) -> LoopLatticeResult:
     """
     Experimental, parallel loop-identification path (see module-level
-    comment above): explicit V-shape detection + 2D lattice fitting,
+    comment above): explicit V-shape detection constrained to bands
+    around known course rows, then wale columns built from X-position
+    consensus ACROSS those rows (see _build_row_banded_lattice) --
     evaluated at multiple scales seeded by the existing periodicity
-    detector (used as a scale PRIOR, not the answer -- the scale whose
+    detector (used as a scale PRIOR, not the answer; the scale whose
     resulting lattice is most internally consistent wins). Completely
     independent of analyze_gauge's own prediction; callers should treat
     this as diagnostic/comparison information only, never as a
     replacement for it without deliberately deciding to do so.
+
+    `course_rows_px` (FULL-IMAGE pixel coordinates, e.g.
+    GaugeAnalysisResult.course.positions_px from a normal analyze_gauge
+    call) is the "use the reliable course rows as a structural prior"
+    input -- pass the EXISTING, unmodified course detector's own row
+    positions here; this function only ever READS them, never adjusts
+    or feeds anything back into course detection. If omitted, a coarse
+    fallback estimate is computed locally (autocorrelation + peak
+    detection on the course signal, the same primitives the main
+    detector itself is built from) so this remains callable standalone.
     """
     if image_bgr is None or image_bgr.size == 0:
         return LoopLatticeResult(message="No image data to analyze.")
@@ -2269,19 +2345,46 @@ def analyze_loop_lattice_experiment(
 
     crop = image_bgr[y : y + h, x : x + w]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+
+    # Work in a canonical frame where wale spacing always varies along
+    # the WORKING image's x-axis (columns) and course rows are always
+    # stacked along its y-axis (rows) -- transpose once up front when
+    # the fabric is rotated 90 degrees, instead of duplicating every
+    # piece of row/column logic below for both axis orderings. Every
+    # working-frame coordinate gets transposed back at the very end.
+    wale_direction, _ = _direction_for(orientation)
+    wale_along_x = wale_direction == "horizontal"
+    work_gray = gray if wale_along_x else gray.T
+    band_offset = y if wale_along_x else x   # ROI offset along the working frame's row (course) axis
+    pos_offset = x if wale_along_x else y    # ROI offset along the working frame's column (wale) axis
+
     # Reuse the SAME restrained preprocessing as the main detector (mild
     # CLAHE + light Gaussian smoothing + signed Sobel) -- no additional
     # or more-aggressive preprocessing that could distort the apparent
     # loop geometry.
-    _, gx, gy = _enhance_texture(gray)
+    _, gx, gy = _enhance_texture(work_gray)
 
-    wale_direction, _ = _direction_for(orientation)
-    wale_source = gx if wale_direction == "horizontal" else gy
-    wale_signal = _project(wale_source, axis=_COLLAPSE_AXIS[wale_direction])
+    # Wale periodicity, computed the same way analyze_gauge computes it
+    # for the "horizontal" (standard) case -- used only as a scale
+    # PRIOR (see docstring), never as the answer.
+    wale_signal = _project(gx, axis=0)
     p0_wale, _ = _autocorrelation_spacing(wale_signal)
-
     if p0_wale is None:
         return LoopLatticeResult(message="No reliable periodicity to seed a loop-scale search.")
+
+    if course_rows_px:
+        rows_local = sorted(v - band_offset for v in course_rows_px)
+        rows_local = [r for r in rows_local if 0 <= r < work_gray.shape[0]]
+    else:
+        # Standalone fallback: the same coarse autocorrelation + peak-
+        # detection primitives the main course detector itself starts
+        # from (read-only reuse, not a second course "decision").
+        course_signal = _project(gy, axis=1)
+        p0_course, _ = _autocorrelation_spacing(course_signal)
+        rows_local = _detect_peaks(course_signal, p0_course) if p0_course else []
+
+    if len(rows_local) < 2:
+        return LoopLatticeResult(message="Not enough course rows available to use as a structural search prior.")
 
     candidate_scales = [c for c, _ in _labeled_candidates(p0_wale, MIN_PLAUSIBLE_SPACING_PX)]
     if not candidate_scales:
@@ -2289,19 +2392,38 @@ def analyze_loop_lattice_experiment(
 
     best: Optional[LoopLatticeResult] = None
     for scale in candidate_scales:
-        response = _v_shape_response_map(gx, gy, scale)
-        min_sep = max(3.0, scale * MIN_LOOP_LATTICE_SEPARATION_FRACTION)
-        points = _local_maxima(response, min_sep, LOOP_RESPONSE_PERCENTILE)
-        lattice = _fit_loop_lattice(points, scale)
-        lattice.scale_used_px = round(scale, 2)
-        if best is None or lattice.lattice_consistency > best.lattice_consistency:
+        lattice = _build_row_banded_lattice(gx, gy, rows_local, scale, work_gray.shape)
+        if best is None:
+            best = lattice
+            continue
+        # Prefer a lattice with enough accepted columns to trust a
+        # spacing estimate from; among those, the more internally
+        # consistent one wins. Never picked by closeness to any
+        # expected/ground-truth number -- see PART 16 in the request
+        # this implements.
+        best_qualifies = best.column_count >= MIN_ROW_SUPPORT_FOR_COLUMN
+        candidate_qualifies = lattice.column_count >= MIN_ROW_SUPPORT_FOR_COLUMN
+        if candidate_qualifies and not best_qualifies:
+            best = lattice
+        elif candidate_qualifies == best_qualifies and lattice.lattice_consistency > best.lattice_consistency:
             best = lattice
 
     if best is None:
         return LoopLatticeResult(message="No loop-center candidates found at any evaluated scale.")
 
-    # Translate to full-image coordinates, matching loop_centers_px's convention.
-    best.centers_px = [(cx + x, cy + y) for cx, cy in best.centers_px]
-    if not best.centers_px and not best.message:
-        best.message = "No loop-center candidates found at any evaluated scale."
+    def _to_full_image(px: float, py: float) -> Tuple[float, float]:
+        # (px, py) are working-frame (x, y); transpose back if we
+        # transposed on the way in, then add the ROI origin.
+        if wale_along_x:
+            return px + x, py + y
+        return py + x, px + y
+
+    best.direct_centers_px = [_to_full_image(px, py) for px, py in best.direct_centers_px]
+    best.inferred_centers_px = [_to_full_image(px, py) for px, py in best.inferred_centers_px]
+    # wale_columns_px are single-axis (working-frame x) values -- the
+    # corresponding full-image axis is x when wale_along_x, else y.
+    best.wale_columns_px = [c + pos_offset for c in best.wale_columns_px]
+
+    if not best.wale_columns_px and not best.message:
+        best.message = "No wale columns had support from enough course rows at any evaluated scale."
     return best

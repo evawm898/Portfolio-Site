@@ -284,10 +284,20 @@ async def analyze(
     # break the actual analysis result.
     loop_lattice_out: Optional[LoopLatticeDebugOut] = None
     try:
-        lattice = analyze_loop_lattice_experiment(image, roi=roi, orientation=orientation)  # type: ignore[arg-type]
+        # "Use the reliable course rows as a structural prior": pass the
+        # EXISTING, frozen course detector's own row positions straight
+        # through -- this experiment only ever reads them, never adjusts
+        # course detection itself.
+        lattice = analyze_loop_lattice_experiment(
+            image, roi=roi, orientation=orientation,  # type: ignore[arg-type]
+            course_rows_px=result.course.positions_px or None,
+        )
         loop_lattice_out = LoopLatticeDebugOut(
-            centers_px=lattice.centers_px,
-            center_count=lattice.center_count,
+            direct_centers_px=lattice.direct_centers_px,
+            inferred_centers_px=lattice.inferred_centers_px,
+            wale_columns_px=lattice.wale_columns_px,
+            column_support_counts=lattice.column_support_counts,
+            direct_center_count=lattice.direct_center_count,
             row_count=lattice.row_count,
             column_count=lattice.column_count,
             lattice_consistency=lattice.lattice_consistency,

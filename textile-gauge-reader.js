@@ -607,13 +607,18 @@
     if (showLoopCentersCheck.checked && result.loop_centers_px && result.loop_centers_px.length) {
       drawLoopCenters(result.loop_centers_px, "#e9ecec");
     }
-    if (
-      showVShapeLoopsCheck.checked &&
-      result.loop_lattice_debug &&
-      result.loop_lattice_debug.centers_px &&
-      result.loop_lattice_debug.centers_px.length
-    ) {
-      drawLoopCenters(result.loop_lattice_debug.centers_px, "#4fd67a");
+    if (showVShapeLoopsCheck.checked && result.loop_lattice_debug) {
+      const d = result.loop_lattice_debug;
+      // Inferred wale columns first (so points draw on top of the lines).
+      if (d.wale_columns_px && d.wale_columns_px.length) {
+        drawAxisLines(d.wale_columns_px, waleIsVertical, "#e0b830", roiTop, roiBottom);
+      }
+      if (d.direct_centers_px && d.direct_centers_px.length) {
+        drawLoopCenters(d.direct_centers_px, "#4fd67a");
+      }
+      if (d.inferred_centers_px && d.inferred_centers_px.length) {
+        drawHollowCenters(d.inferred_centers_px, "#ff9f43");
+      }
     }
   }
 
@@ -625,6 +630,25 @@
       ctx.beginPath();
       ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
       ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Hollow markers -- the lattice's INFERRED/missing loop positions (a
+  // column crossing a course row with no direct V-shape detection near
+  // it), kept visually distinct from real, individually-measured
+  // detections (drawLoopCenters' solid dots) so the two are never
+  // confused: "the CV actually saw a loop here" vs. "the lattice
+  // predicts a loop should exist here."
+  function drawHollowCenters(centers, color) {
+    ctx.strokeStyle = color || "#ff9f43";
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.85;
+    for (const [cx, cy] of centers) {
+      const p = naturalToDisplay({ x: cx, y: cy });
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.globalAlpha = 1;
   }
@@ -1348,20 +1372,21 @@
         <div class="tgr-debug-axis__title">Loop-center lattice experiment</div>
         <p class="tgr-hint">
           An explicit V-shape loop detector (paired diagonal gradients converging
-          at a point), run independently of the periodicity-based detector above.
-          Compares a 2D lattice of detected complete-loop centers against the
-          current prediction -- shown for development comparison only, it does
-          not influence the results above. Enable "Show detected loops" to see
-          where its points actually land.
+          at a point), searched only in bands around the EXISTING course rows
+          (used as a structural prior, never modified) -- wale columns need
+          direct evidence from multiple rows to be accepted, not just one.
+          Shown for development comparison only, it does not influence the
+          results above. Enable "Show detected loops" for green = directly
+          detected loop, hollow orange = a column's inferred/missing position,
+          gold vertical line = an accepted wale column.
         </p>
-        ${row("Loop centers detected", d.center_count)}
-        ${row("Estimated wale columns", d.column_count)}
-        ${row("Estimated course rows", d.row_count)}
+        ${row("Direct loop detections", d.direct_center_count)}
+        ${row("Course rows used as prior", d.row_count)}
+        ${row("Accepted wale columns", d.column_count)}
+        ${row("Column row-support (min..max)", d.column_support_counts && d.column_support_counts.length ? `${Math.min(...d.column_support_counts)}..${Math.max(...d.column_support_counts)} of ${d.row_count}` : "—")}
         ${row("Lattice consistency", fmt(d.lattice_consistency, 2))}
         ${row("Loop-lattice wale spacing", fmt(d.wale_spacing_px, 1, " px"))}
-        ${row("Loop-lattice course spacing", fmt(d.course_spacing_px, 1, " px"))}
         ${row("Loop-lattice wales/in", fmt(d.wale_per_inch, 2))}
-        ${row("Loop-lattice courses/in", fmt(d.course_per_inch, 2))}
         ${row("Current-detector wales/in", fmt(result.wale.per_inch, 2))}
         ${row("Current-detector courses/in", fmt(result.course.per_inch, 2))}
       </div>`;

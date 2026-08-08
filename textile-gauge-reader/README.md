@@ -275,47 +275,67 @@ before, just not front-and-center.
 
 ### Experimental: an explicit V-shape loop-center detector
 
-Real-photo diagnostics (previous section) established that the
-periodicity-based detector's remaining wale ambiguity is fundamentally a
-*geometry* problem: nothing in autocorrelation, 2D support, patch
-consensus, or even phase consistency looks at SHAPE — they measure
-repetition and texture consistency, not "does this look like a complete
-knit loop." `analyze_loop_lattice_experiment` (in `analysis/gauge_
-analysis.py`'s "Experimental" section) takes a different, explicit
-approach instead: look for the geometric signature of a face-knit V-shape
-loop directly — two diagonal yarn legs of opposite orientation converging
-toward a shared point (`_v_shape_response_map`, via signed diagonal
-gradient channels and a `min()` of both sides' evidence, so a single
-strong edge on only one side — the "just one yarn leg" false positive —
-doesn't register as a complete loop). Candidate loop centers are the
-response map's local maxima; a 2D lattice is then fit to them (rows =
-courses, columns = wales, via nearest-neighbor clustering with outlier
-rejection), giving an independent, geometry-based wale/course spacing
-estimate. The existing periodicity detector's own candidates seed the
-scale search (a PRIOR — evaluated at each of them, the most internally
-consistent lattice wins), rather than assuming one fixed loop size.
+Real-photo diagnostics established that the periodicity-based detector's
+remaining wale ambiguity is fundamentally a *geometry* problem: nothing
+in autocorrelation, 2D support, patch consensus, or even phase
+consistency looks at SHAPE — they measure repetition and texture
+consistency, not "does this look like a complete knit loop."
+`analyze_loop_lattice_experiment` (in `analysis/gauge_analysis.py`'s
+"Experimental" section) takes a different, explicit approach: look for
+the geometric signature of a face-knit V-shape directly — two diagonal
+yarn legs of opposite orientation converging toward a shared point
+(`_v_shape_response_map`, signed diagonal gradient channels + a `min()`
+of both sides' evidence, so a single strong edge on only one side — the
+"just one yarn leg" false positive — doesn't register as a complete
+loop).
+
+**Second pass: row-banded search + column consensus.** A first version
+searched the whole ROI indiscriminately and visibly over-detected (more
+points than visible loops). It's now constrained by the EXISTING,
+unmodified course detector's own row positions, passed in as
+`course_rows_px` and used purely as a structural prior — V-shape search
+only happens in a narrow band around each known course row, never the
+whole ROI. Wale columns are then built from X-position CONSENSUS across
+those rows (`_build_row_banded_lattice`): candidate x-positions across
+all rows are clustered, and a column is only ACCEPTED if it has direct
+evidence from at least `MIN_ROW_SUPPORT_FOR_COLUMN` (2) distinct rows —
+a single stray detection anywhere can never invent a wale. Missing
+detections are fine (a column can still be accepted from partial
+row coverage); the lattice fills in "inferred" markers at the rows
+where an accepted column had no direct hit, kept visually distinct
+(hollow) from real detections (solid). Wale spacing comes from the
+median center-to-center interval between accepted columns (N columns →
+N−1 intervals, not N — worth stating explicitly since it's an easy
+off-by-one to get wrong).
 
 This is deliberately a **parallel, comparison-only path**: it does not
-replace, feed into, or influence `analyze_gauge`'s own prediction in any
-way (see `test_experiment_does_not_affect_analyze_gauge_result`). It
-computes on every `/analyze` request and is exposed as `loop_lattice_debug`
-in the response, but the frontend only shows it (a "Show detected loops"
-overlay toggle, plus a comparison table against the current detector's
-numbers) inside Developer diagnostics.
+replace, feed into, or influence `analyze_gauge`'s own prediction, nor
+does it modify course detection in any way — it only ever *reads* the
+course detector's already-computed row positions (see
+`test_experiment_does_not_affect_analyze_gauge_result` and
+`test_analyze_loop_lattice_experiment_uses_real_course_detector_as_prior`).
+Exposed as `loop_lattice_debug` in the `/analyze` response; the frontend
+only shows it (a "Show detected loops" overlay — green solid = direct
+detection, hollow orange = inferred, gold line = accepted column — plus
+a comparison table) inside Developer diagnostics.
 
-**Honest first-pass result on the real jersey photo**: visually inspecting
-the detected points (the actual point-by-request from this work: "do the
-dots land on complete loops?") shows real over-detection — more points
-than there are visible loops in the ROI, and the resulting lattice-derived
-wale spacing (~18px) lands close to the *wrong* half-period interpretation
-(~9 WPI), not the correct ~35px/~4.75 WPI one the periodicity detector
-(with phase consistency) already finds. This is presented as-is rather
-than tuned to look better: the detector as currently implemented likely
-still responds partly to individual yarn legs, not exclusively complete
-loop centers — evaluating and improving that (tighter response-map
-peaks, better NMS, possibly requiring stronger bilateral symmetry) is the
-clear next step before this could ever be considered as evidence for,
-let alone a replacement of, the current wale/course prediction.
+**Honest result on the real jersey photo, tested across 5 nearby ~1in²
+ROIs**: direct detections dropped from over-detecting everywhere to
+being confined to course-row bands, and columns now require multi-row
+support (typically 4–7 of 7 rows) rather than one-off detections. The
+derived wale spacing is mixed, not yet reliable: loop-derived WPI came
+out as 6.21, 4.68, 19.56 (a clear failure — one ROI produced far too
+many spurious columns), 5.54, and 5.28 across the five ROIs — some
+notably close to the true ~5 WPI (occasionally closer than the
+periodicity detector's own ~4.6–4.9), one badly wrong. This is reported
+as-is, not tuned to look better. Remaining known issues: (1) at least
+one ROI over-detects severely, suggesting the response-map threshold or
+NMS still isn't robust to some lighting/contrast regions; (2) the
+"centered" ROI's column gaps are visibly uneven (one gap roughly double
+the others), consistent with a real, plausible wale column being missed
+between two accepted ones rather than a scale/harmonic error. Neither
+has been patched by adjusting parameters against the known answer —
+both are left as open, visible findings for the next pass.
 
 ### Image viewer pan/zoom
 

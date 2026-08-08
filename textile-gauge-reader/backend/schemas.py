@@ -84,8 +84,15 @@ class LoopLatticeDebugOut(BaseModel):
     frontend only renders this in its developer-diagnostics mode.
     """
 
-    centers_px: List[Tuple[float, float]] = Field(default_factory=list)
-    center_count: int = 0
+    # Direct V-shape detections vs. the lattice's own inferred/missing
+    # positions -- kept as two separate lists (rather than one flagged
+    # list) so the frontend can render them with genuinely different
+    # markers (solid vs. hollow) without any per-point lookup.
+    direct_centers_px: List[Tuple[float, float]] = Field(default_factory=list)
+    inferred_centers_px: List[Tuple[float, float]] = Field(default_factory=list)
+    wale_columns_px: List[float] = Field(default_factory=list)
+    column_support_counts: List[int] = Field(default_factory=list)
+    direct_center_count: int = 0
     row_count: int = 0
     column_count: int = 0
     lattice_consistency: float = 0.0

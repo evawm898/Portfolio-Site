@@ -2,18 +2,24 @@
 Tests for the EXPERIMENTAL, parallel V-shape loop-center lattice
 detector (analyze_loop_lattice_experiment) -- an explicit-geometry
 alternative to the periodicity-based gauge detector, evaluated
-independently and not yet wired into the main prediction (see the
-module docstring in gauge_analysis.py's "Experimental" section).
+independently and not wired into the main prediction (see the module
+docstring in gauge_analysis.py's "Experimental" section).
 
-These tests deliberately do NOT assert that the detector currently
-finds the "correct" wale/course spacing on the real photo -- honest
-first-pass diagnostics (see the accompanying report) showed it still
-over-detects, likely responding partly to individual yarn legs rather
-than exclusively complete loop centers. The user explicitly asked to
-evaluate this visually before optimizing any number, so these tests
-check the ARCHITECTURE (runs without crashing, returns a well-formed
-result, never touches ground truth, doesn't affect analyze_gauge) --
-not a numeric accuracy bar this first version hasn't earned yet.
+Second-pass architecture: V-shape search is now constrained to narrow
+bands around EXISTING course rows (a structural prior, never modified --
+see PART 1/14 of the request this implements), and wale columns are
+built from X-position CONSENSUS across those rows, requiring support
+from multiple rows before a column is accepted (PART 6). This is a
+different, more structured approach than the first pass's whole-ROI
+search, and these tests check that specific architecture: the row-band
+constraint, multi-row-support requirement, N-columns-vs-N-1-intervals
+spacing math, and non-interference with analyze_gauge/ground truth.
+
+These tests do NOT assert a specific WPI accuracy bar on the real photo
+-- see the accompanying report for honest, as-is real-photo diagnostics
+(including a still-open "possibly skipping a column" finding). The
+point of these tests is the architecture, not a numeric target this
+still-experimental detector hasn't earned.
 """
 import os
 
@@ -24,8 +30,9 @@ from fastapi.testclient import TestClient
 
 from analysis.gauge_analysis import (
     LoopLatticeResult,
+    MIN_ROW_SUPPORT_FOR_COLUMN,
+    _build_row_banded_lattice,
     _diagonal_gradient_channels,
-    _fit_loop_lattice,
     _local_maxima,
     _v_shape_response_map,
     analyze_gauge,
@@ -37,13 +44,16 @@ FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 REAL_JERSEY_PATH = os.path.join(FIXTURES_DIR, "real_jersey_sample.jpg")
 
 
-def _v_grid_image(width=300, height=300, period=30, seed=1):
+def _v_grid_image(width=300, height=300, period=30, seed=1, rows=None):
     """A grid of actual drawn V-shapes (not a blob/sine proxy), standing
-    in for a repeating face-knit jersey structure, to exercise the
-    diagonal-gradient response end to end."""
+    in for a repeating face-knit jersey structure, with known row Y
+    positions returned alongside so tests can pass them as the
+    structural prior (mirroring how main.py passes the real course
+    detector's own positions)."""
     rng = np.random.default_rng(seed)
     img = np.full((height, width), 180, dtype=np.uint8)
-    for row_y in range(period, height - period, period):
+    row_ys = rows if rows is not None else list(range(period, height - period, period))
+    for row_y in row_ys:
         for col_x in range(period, width - period, period):
             half = period // 2
             pts = np.array(
@@ -53,18 +63,16 @@ def _v_grid_image(width=300, height=300, period=30, seed=1):
             cv2.polylines(img, [pts], isClosed=False, color=60, thickness=2, lineType=cv2.LINE_AA)
     noise = rng.normal(0, 4, size=img.shape)
     img = np.clip(img.astype(np.float64) + noise, 0, 255).astype(np.uint8)
-    return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR), [float(v) for v in row_ys]
 
 
-# --- Building blocks ---------------------------------------------------
+# --- Building blocks (unchanged mechanics) ----------------------------------
 
 
 def test_diagonal_gradient_channels_orthogonal_on_pure_diagonal_edge():
-    # A pure "\" (falling left-to-right) ramp should show up almost
-    # entirely in one diagonal channel and near-zero in the other.
     size = 40
     yy, xx = np.mgrid[0:size, 0:size]
-    ramp = (xx + yy).astype(np.float64)  # "\" oriented gradient
+    ramp = (xx + yy).astype(np.float64)
     gx = np.gradient(ramp, axis=1)
     gy = np.gradient(ramp, axis=0)
     diag_a, diag_b = _diagonal_gradient_channels(gx, gy)
@@ -72,13 +80,13 @@ def test_diagonal_gradient_channels_orthogonal_on_pure_diagonal_edge():
 
 
 def test_v_shape_response_map_matches_input_shape():
-    img = _v_grid_image()
+    img, _ = _v_grid_image()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.float64)
     gx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
     gy = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
     response = _v_shape_response_map(gx, gy, scale_px=30.0)
     assert response.shape == gray.shape
-    assert np.all(response >= 0)  # min() of two absolute-value channels
+    assert np.all(response >= 0)
 
 
 def test_local_maxima_empty_on_flat_response():
@@ -96,48 +104,100 @@ def test_local_maxima_finds_isolated_peaks():
     assert (40, 45) in coords
 
 
-# --- Lattice fitting -----------------------------------------------------
+# --- Row-banded lattice building --------------------------------------------
 
 
-def test_fit_loop_lattice_too_few_points_reports_message_not_a_fabricated_spacing():
-    result = _fit_loop_lattice([(10.0, 10.0), (20.0, 10.0)], expected_scale_px=20.0)
-    assert result.wale_spacing_px is None
-    assert result.course_spacing_px is None
-    assert "few" in result.message.lower()
+def test_row_banded_lattice_requires_multi_row_support_for_a_column():
+    """A column with evidence from only 1 row must be rejected (PART 6);
+    one with evidence from every row must be accepted. Built directly
+    from a synthetic response map so the assertion is about the
+    clustering/support logic itself, not detector sensitivity."""
+    h, w = 120, 120
+    response = np.zeros((h, w))
+    rows_local = [20.0, 50.0, 80.0, 110.0]
+    # A "real" column with a peak near x=60 in every row.
+    for ry in rows_local:
+        response[int(ry), 60] = 5.0
+    # An isolated, single-row-only peak near x=100 -- should NOT become a column.
+    response[int(rows_local[0]), 100] = 5.0
 
+    gx = np.zeros((h, w))  # unused by _build_row_banded_lattice directly here;
+    gy = np.zeros((h, w))  # response is injected via monkeypatching below instead.
 
-def test_fit_loop_lattice_recovers_clean_grid_spacing():
-    # A perfectly regular 4x4 grid at 20px spacing -- the lattice fit
-    # should recover that spacing with high consistency and correct
-    # row/column counts, independent of any detector noise.
-    points = [(float(c * 20 + 5), float(r * 20 + 5)) for r in range(4) for c in range(4)]
-    result = _fit_loop_lattice(points, expected_scale_px=20.0)
-    assert result.wale_spacing_px == pytest.approx(20.0, abs=0.5)
-    assert result.course_spacing_px == pytest.approx(20.0, abs=0.5)
+    import analysis.gauge_analysis as ga
+
+    original = ga._v_shape_response_map
+    ga._v_shape_response_map = lambda gx_, gy_, scale: response
+    try:
+        result = _build_row_banded_lattice(gx, gy, rows_local, scale_px=20.0, image_shape=(h, w))
+    finally:
+        ga._v_shape_response_map = original
+
+    assert 60.0 in [round(c) for c in result.wale_columns_px]
+    assert 100.0 not in [round(c) for c in result.wale_columns_px]
     assert result.row_count == 4
-    assert result.column_count == 4
-    assert result.lattice_consistency > 0.9
 
 
-def test_fit_loop_lattice_rejects_gross_outliers():
-    # A clean grid plus one wildly-out-of-place point shouldn't drag the
-    # median spacing off -- robust stats, not a raw mean.
-    points = [(float(c * 20 + 5), float(r * 20 + 5)) for r in range(4) for c in range(4)]
-    points.append((5.0, 5.0 + 1))  # near-duplicate of an existing point, creates a tiny outlier diff
-    result = _fit_loop_lattice(points, expected_scale_px=20.0)
-    assert result.wale_spacing_px == pytest.approx(20.0, abs=1.0)
+def test_row_banded_lattice_column_count_vs_interval_math():
+    """5 accepted columns -> exactly 4 center-to-center intervals feed
+    the median spacing, never span/5 or span/count (PART 13)."""
+    h, w = 60, 260
+    response = np.zeros((h, w))
+    rows_local = [10.0, 30.0, 50.0]
+    xs = [20.0, 60.0, 100.0, 140.0, 180.0]  # 5 columns, spacing exactly 40px
+    for ry in rows_local:
+        for x in xs:
+            response[int(ry), int(x)] = 5.0
+
+    import analysis.gauge_analysis as ga
+
+    original = ga._v_shape_response_map
+    ga._v_shape_response_map = lambda gx_, gy_, scale: response
+    try:
+        result = _build_row_banded_lattice(np.zeros((h, w)), np.zeros((h, w)), rows_local, scale_px=40.0, image_shape=(h, w))
+    finally:
+        ga._v_shape_response_map = original
+
+    assert result.column_count == 5
+    assert result.wale_spacing_px == pytest.approx(40.0, abs=2.0)
+
+
+def test_row_banded_lattice_marks_inferred_positions_for_missing_rows():
+    h, w = 100, 100
+    response = np.zeros((h, w))
+    rows_local = [10.0, 40.0, 70.0]
+    # Column at x=50 present in rows 0 and 2, missing from row 1.
+    response[10, 50] = 5.0
+    response[70, 50] = 5.0
+    response[10, 20] = 5.0
+    response[40, 20] = 5.0
+    response[70, 20] = 5.0
+
+    import analysis.gauge_analysis as ga
+
+    original = ga._v_shape_response_map
+    ga._v_shape_response_map = lambda gx_, gy_, scale: response
+    try:
+        result = _build_row_banded_lattice(np.zeros((h, w)), np.zeros((h, w)), rows_local, scale_px=20.0, image_shape=(h, w))
+    finally:
+        ga._v_shape_response_map = original
+
+    inferred_at_50 = [p for p in result.inferred_centers_px if round(p[0]) == 50]
+    assert len(inferred_at_50) == 1
+    assert inferred_at_50[0][1] == pytest.approx(40.0)
 
 
 # --- Top-level entry point -------------------------------------------------
 
 
-def test_analyze_loop_lattice_experiment_runs_on_synthetic_v_grid():
-    img = _v_grid_image()
-    result = analyze_loop_lattice_experiment(img, roi=(20, 20, 260, 260), orientation="vertical")
+def test_analyze_loop_lattice_experiment_runs_on_synthetic_v_grid_with_row_prior():
+    rows = [30, 60, 90, 120, 150]
+    img, row_ys = _v_grid_image(rows=rows)
+    result = analyze_loop_lattice_experiment(
+        img, roi=(20, 20, 260, 180), orientation="vertical", course_rows_px=row_ys
+    )
     assert isinstance(result, LoopLatticeResult)
-    # Not asserting a specific accuracy bar (see module docstring) --
-    # just that it produces a well-formed, non-fabricated result.
-    assert result.center_count >= 0
+    assert result.direct_center_count >= 0
     if result.wale_spacing_px is not None:
         assert result.wale_spacing_px > 0
 
@@ -149,43 +209,66 @@ def test_analyze_loop_lattice_experiment_no_crash_on_flat_image():
     assert result.wale_spacing_px is None
 
 
+def test_analyze_loop_lattice_experiment_falls_back_without_course_rows():
+    """Standalone callers that don't pass course_rows_px still get a
+    (possibly less reliable) result via the coarse fallback, not a crash."""
+    img, _ = _v_grid_image()
+    result = analyze_loop_lattice_experiment(img, roi=(20, 20, 260, 260), orientation="vertical")
+    assert isinstance(result, LoopLatticeResult)
+
+
 def test_analyze_loop_lattice_experiment_signature_has_no_ground_truth_param():
     import inspect
 
     params = set(inspect.signature(analyze_loop_lattice_experiment).parameters)
-    assert params == {"image_bgr", "roi", "orientation"}
+    assert params == {"image_bgr", "roi", "orientation", "course_rows_px"}
     assert not any("actual" in p or "ground" in p or "truth" in p for p in params)
 
 
 @pytest.mark.skipif(not os.path.exists(REAL_JERSEY_PATH), reason="real photo fixture not present")
-def test_analyze_loop_lattice_experiment_runs_on_real_photo_without_crashing():
+def test_analyze_loop_lattice_experiment_uses_real_course_detector_as_prior():
+    """The realistic usage pattern: pass the EXISTING, unmodified course
+    detector's own positions in (as main.py does), and confirm the
+    experiment runs against real fabric texture without crashing and
+    without altering analyze_gauge's own course result."""
     img = cv2.imread(REAL_JERSEY_PATH)
     assert img is not None
-    result = analyze_loop_lattice_experiment(img, roi=(280, 120, 166, 166), orientation="vertical")
+    roi = (280, 120, 166, 166)
+    gauge = analyze_gauge(img, roi=roi, orientation="vertical", structure="jersey")
+    course_positions_before = list(gauge.course.positions_px)
+
+    result = analyze_loop_lattice_experiment(
+        img, roi=roi, orientation="vertical", course_rows_px=gauge.course.positions_px
+    )
     assert isinstance(result, LoopLatticeResult)
-    # Development-stage assertion only: it should at least find SOME
-    # candidates on real fabric texture, not silently do nothing.
-    assert result.center_count > 0
+    assert result.row_count == len(course_positions_before)
+
+    gauge_after = analyze_gauge(img, roi=roi, orientation="vertical", structure="jersey")
+    assert gauge_after.course.positions_px == course_positions_before
+    assert gauge_after.wale.spacing_px == gauge.wale.spacing_px
 
 
 def test_experiment_does_not_affect_analyze_gauge_result():
-    """The parallel path must never change what analyze_gauge itself
-    returns -- calling the experiment before/after/never must not alter
-    the main prediction."""
-    img = _v_grid_image()
+    img, row_ys = _v_grid_image()
     roi = (20, 20, 260, 260)
     before = analyze_gauge(img, roi=roi, orientation="vertical")
-    analyze_loop_lattice_experiment(img, roi=roi, orientation="vertical")
+    analyze_loop_lattice_experiment(img, roi=roi, orientation="vertical", course_rows_px=row_ys)
     after = analyze_gauge(img, roi=roi, orientation="vertical")
     assert before.wale.spacing_px == after.wale.spacing_px
     assert before.course.spacing_px == after.course.spacing_px
 
 
-# --- API wiring ------------------------------------------------------------
+def test_min_row_support_constant_is_at_least_two():
+    # Sanity-check the constant itself matches the "no isolated single
+    # detection creates a wale" requirement (PART 6).
+    assert MIN_ROW_SUPPORT_FOR_COLUMN >= 2
+
+
+# --- API wiring --------------------------------------------------------------
 
 
 def test_analyze_endpoint_includes_loop_lattice_debug_field():
-    img = _v_grid_image()
+    img, _ = _v_grid_image()
     ok, buf = cv2.imencode(".jpg", img)
     assert ok
     client = TestClient(app)
@@ -203,7 +286,5 @@ def test_analyze_endpoint_includes_loop_lattice_debug_field():
     body = resp.json()
     assert body["success"] is True
     assert "loop_lattice_debug" in body
-    # Present (even if some sub-fields are null on this input) -- proves
-    # the experimental path is actually wired into the response, not
-    # silently dropped.
     assert body["loop_lattice_debug"] is not None
+    assert "wale_columns_px" in body["loop_lattice_debug"]
