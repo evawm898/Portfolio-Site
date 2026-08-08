@@ -123,6 +123,16 @@ ALGORITHM_VERSION = "cv-v0.3"
 MIN_ROI_DIM_PX = 40          # smallest ROI edge we'll attempt to analyze
 MIN_PEAKS_FOR_GOOD_CONFIDENCE = 3
 MIN_PLAUSIBLE_SPACING_PX = 3.0   # ignore periodicities finer than this (likely noise)
+# How far the mean of actually-detected peak gaps is allowed to drift from
+# the already-evidence-selected candidate period before we stop trusting
+# it as a sub-pixel refinement (see _refine_spacing_from_positions). Real
+# (non-synthetic) photos can have `_detect_peaks` miss or double a peak
+# here and there -- each miss silently inflates the gap on either side of
+# it toward a harmonic of the true period. On a clean signal the detected
+# gaps naturally cluster tightly around the candidate period already, so
+# this tolerance only ever discards refinements that look like exactly
+# that failure, never ordinary sub-pixel jitter. log(1.20) =~ 0.18.
+SPACING_REFINEMENT_MAX_LOG_DEVIATION = 0.18
 SMOOTHING_WINDOW_PX = 3          # 1D smoothing window applied to projection signals
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_TILE_GRID = (8, 8)
@@ -1065,6 +1075,46 @@ def _cluster_positions(coords: np.ndarray, period: float) -> List[float]:
     return [float(np.mean(g)) for g in groups]
 
 
+def _refine_spacing_from_positions(positions: List[float], period: float) -> Tuple[float, float]:
+    """
+    Try to refine a candidate period into a sub-pixel-accurate spacing
+    using the actually-detected peak positions, without letting noisy
+    peak detection silently overrule an already-evidence-selected period.
+
+    `_detect_peaks` is tuned for overlay drawing, not measurement -- on a
+    clean synthetic signal its gaps cluster tightly around `period` and
+    refining toward their mean is a strict improvement. On a real photo it
+    can occasionally miss a peak (inflating the gaps on both sides toward
+    ~2x period) or insert a spurious one (deflating a gap toward ~0.5x),
+    and those bad gaps get averaged in right alongside the good ones --
+    silently smuggling a harmonic-sized error into a period that evidence
+    scoring already got right. (Found via real-photo diagnostics: a large,
+    clean crop of a real swatch correctly selected 35px as the winning
+    candidate, but this refinement then overwrote it with 43px -- a ~23%
+    inflation -- from a handful of noisy gaps mixed in with mostly-good
+    ones.)
+
+    Only accept the refinement if its result is still close to the
+    period it was meant to refine (see SPACING_REFINEMENT_MAX_LOG_
+    DEVIATION); otherwise the noisy positions aren't trustworthy for this
+    and the caller should keep the original candidate period as-is.
+    Returns (spacing_px, spacing_consistency) -- consistency is 0.0
+    whenever no refinement was attempted or accepted.
+    """
+    if len(positions) < MIN_PEAKS_FOR_GOOD_CONFIDENCE or period <= 0:
+        return period, 0.0
+    diffs = np.diff(sorted(positions))
+    diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
+    if len(diffs) == 0:
+        return period, 0.0
+    refined = float(np.mean(diffs))
+    if refined <= 0 or abs(math.log(refined / period)) > SPACING_REFINEMENT_MAX_LOG_DEVIATION:
+        return period, 0.0
+    cv = float(np.std(diffs) / np.mean(diffs)) if np.mean(diffs) > 0 else 1.0
+    spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
+    return refined, spacing_consistency
+
+
 def _trusted_center_pitch(
     loop_centers: np.ndarray, center_axis_index: int, band_tolerance_px: float
 ) -> Optional[float]:
@@ -1113,15 +1163,7 @@ def _finalize_axis(
         positions = _detect_peaks(signal, period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
-    spacing_px = period
-    spacing_consistency = 0.0
-    if len(positions) >= MIN_PEAKS_FOR_GOOD_CONFIDENCE:
-        diffs = np.diff(sorted(positions))
-        diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
-        if len(diffs) > 0:
-            spacing_px = float(np.mean(diffs))
-            cv = float(np.std(diffs) / np.mean(diffs)) if np.mean(diffs) > 0 else 1.0
-            spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
+    spacing_px, spacing_consistency = _refine_spacing_from_positions(positions, period)
 
     peak_count_score = float(np.clip(len(positions) / (MIN_PEAKS_FOR_GOOD_CONFIDENCE * 2), 0.0, 1.0))
 
@@ -1872,12 +1914,7 @@ def _finalize_axis_v3(
         positions = _detect_peaks(signal, period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
-    spacing_px = period
-    if len(positions) >= MIN_PEAKS_FOR_GOOD_CONFIDENCE:
-        diffs = np.diff(sorted(positions))
-        diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
-        if len(diffs) > 0:
-            spacing_px = float(np.mean(diffs))
+    spacing_px, _ = _refine_spacing_from_positions(positions, period)
 
     # Confidence directly reflects the v0.3 combined evidence score for
     # the winning candidate (already blends periodicity, 2D support,

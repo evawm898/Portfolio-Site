@@ -627,6 +627,78 @@ window gives both detectors more of the true repeat to lock onto, but it
 hasn't been verified against that specific photo and isn't claimed as
 fixed here — an open, disclosed limitation, not a solved one.
 
+### A real second photo, a real bug found and fixed, and a narrower open problem
+
+The teal photo above eventually became available as an actual file
+(`tests/fixtures/sarahmaker-knitting-gauge.jpg`, added directly to the
+repo — chat-pasted images aren't reachable from this environment's
+filesystem, only a real committed file or fetchable URL is), which made
+it possible to reproduce and test against real pixels instead of
+reasoning from screenshots. Two independent things came out of that:
+
+**A real, fixed bug, unrelated to harmonic selection.** `_finalize_axis`/
+`_finalize_axis_v3` take the period that evidence-scoring already chose
+and try to sub-pixel-refine it using the actual detected peak positions —
+reasonable when peak detection is clean, but on a real (non-synthetic)
+photo `_detect_peaks` (tuned for overlay drawing, not measurement) can
+miss a peak here and there, and each miss inflates the gaps on either
+side of it toward a harmonic of the true period. The old code
+unconditionally overwrote the spacing with the mean of ALL detected
+gaps, good and bad alike. Caught directly: a large, clean crop of the
+real jersey photo had evidence-scoring correctly select 35px as the
+winning wale candidate, and this refinement step then silently
+overwrote it with 43px — a ~23% inflation — from a handful of bad gaps
+mixed in with mostly-good ones. Fixed (`_refine_spacing_from_positions`)
+by only accepting the refinement when it's still close to the period it
+was meant to refine (within `SPACING_REFINEMENT_MAX_LOG_DEVIATION`,
+~1.20x); a bigger drift means the detected positions aren't trustworthy
+and the original, evidence-selected period is kept as-is. Covered by
+`tests/test_spacing_refinement.py` (unit tests against synthetic
+position lists, plus a real-photo regression test against this exact
+jersey crop) — 148/148 tests passing after the fix, no regressions.
+
+**The teal photo's own doubling, more precisely diagnosed, still open.**
+Direct measurement against the real file (ruler-calibrated at 272.8px/
+inch from the numeral labels, cross-checked with a clean autocorrelation
++ peak count across the full accessible fabric area: 26 peaks, only
+1.86px standard deviation on a 38.76px mean spacing) puts this fabric's
+true wale spacing at **~7.04 wales/inch**. Two distinct, narrower
+findings against that ground truth, from the exact same real file:
+
+1. On a large, single-region crop, raw evidence-scoring for the 1x
+   (38px, correct) vs. 2x (76px, wrong) candidates came out to 0.499 vs.
+   0.543 — a 0.044 margin, under the system's own `UNCERTAIN_SCORE_
+   MARGIN` (0.08), so the pipeline DOES correctly self-flag this as
+   uncertain ("Competing 1x candidate scored nearly as well"). The
+   candidate that wins the tie is real: `phase_consistency`, deliberately
+   the highest-weighted evidence term (0.35, "gets to matter the most"),
+   scores the WRONG 2x candidate higher than the correct 1x candidate on
+   this fabric (0.59 vs. 0.32) — backwards from its intent. Meanwhile
+   `patch_consensus` (deliberately down-weighted to 0.10 after an
+   *earlier* real photo showed it wasn't independent enough to trust)
+   correctly favors the true 1x candidate here (0.941 vs. 0.442). Two
+   real photos now each have a different one of these two signals
+   pointing the wrong way — evidence a single fixed weighting can't
+   simultaneously satisfy both, not a bug in either signal alone.
+2. Through the live multi-region flow, wale for this photo actually
+   comes from Stage 3's loop-lattice counted-column path (both proposed
+   regions had a confident enough count), not the raw-periodicity path
+   above at all — so finding 1 doesn't even directly explain what a user
+   sees. The two regions' *counted* values agreed closely enough to pass
+   cross-region consensus ("2 of 2 agreed"), landing on 8.27 WPI —
+   moderately (not 2x) high against the ~7.04 true value. That the
+   counting path can independently converge two regions on the same
+   moderately-wrong number, past a consensus check specifically meant to
+   catch disagreement, is a real, different failure shape from the
+   already-documented "both detectors double together" case above, and
+   is not yet root-caused.
+
+Both of these remain open. Fixing them safely needs the same discipline
+already applied throughout this project — testing candidate weight/logic
+changes against every real photo fixture that exists before trusting a
+result, not just the one photo that motivated the change — which is real
+work still ahead, not a quick tuning pass.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/
