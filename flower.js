@@ -36,6 +36,10 @@ const CUP_AMOUNT     = 0.22;   // transverse cupping (edges curl inward)
 const SPINE_CURL     = 0.30;   // progressive outward bend toward the tip (rad)
 const RADIAL_SEGMENTS = 8;     // tube cross-section resolution (round enough
                                // that a thickened tube doesn't read as faceted)
+const JOIN_FLARE      = 0.35;  // struts swell this much toward each end so they
+const JOIN_FLARE_DIST = 0.10;  // blend into the node bead (a soft fillet) rather
+                               // than butting it with a hard cylinder-into-sphere
+                               // crease; ramped in over this world distance
 const SEED_BASE      = 20250808;
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
@@ -79,9 +83,23 @@ class MeshAccumulator {
   /* Extrude a round tube of the given radius along a 3D polyline, using a
      rotation-minimizing frame so the cross-section doesn't twist between
      segments. Points are plain {x,y,z}. */
-  addTube(points, radius, radialSegments = RADIAL_SEGMENTS) {
+  addTube(points, radius, flare = 0, radialSegments = RADIAL_SEGMENTS) {
     const n = points.length;
     if (n < 2) return;
+
+    // ---- cumulative arc length (used to flare the radius toward the ends) ----
+    const arc = new Array(n);
+    arc[0] = 0;
+    for (let i = 1; i < n; i++) {
+      arc[i] = arc[i - 1] + Math.hypot(
+        points[i].x - points[i - 1].x,
+        points[i].y - points[i - 1].y,
+        points[i].z - points[i - 1].z);
+    }
+    const total = arc[n - 1];
+    // keep at least a ~10% waist in the middle so short struts don't turn into
+    // solid blobs when both end-flares would otherwise overlap
+    const flareDist = flare > 0 ? Math.min(JOIN_FLARE_DIST, 0.45 * total) : 0;
 
     // ---- per-point tangents ----
     const T = new Array(n);
@@ -128,13 +146,21 @@ class MeshAccumulator {
       const bz = t[0] * nrm[1] - t[1] * nrm[0];
       const P = points[i];
       ringStart[i] = this.vcount;
+      // flare: grow the radius near each end (smoothstep) so the strut meets
+      // the node bead in a soft swell instead of a hard butt joint
+      let rr = radius;
+      if (flareDist > 0) {
+        const dEnd = Math.min(arc[i], total - arc[i]);
+        const w = Math.max(0, 1 - dEnd / flareDist);   // 0 mid-strut -> 1 at end
+        rr = radius * (1 + flare * w * w * (3 - 2 * w));
+      }
       for (let j = 0; j < radialSegments; j++) {
         const th = (j / radialSegments) * Math.PI * 2;
         const c = Math.cos(th), sn = Math.sin(th);
         const ox = nrm[0] * c + bx * sn;
         const oy = nrm[1] * c + by * sn;
         const oz = nrm[2] * c + bz * sn;
-        this._vertex(P.x + ox * radius, P.y + oy * radius, P.z + oz * radius, ox, oy, oz);
+        this._vertex(P.x + ox * rr, P.y + oy * rr, P.z + oz * rr, ox, oy, oz);
       }
     }
 
@@ -250,23 +276,26 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
     return placePoint(local, az, baseHeight, radialOffset, tilt);
   });
   rim.push(rim[0]);                       // close the loop at the petal base
-  acc.addTube(rim, P.tubeRadius);
+  acc.addTube(rim, P.tubeRadius, 0);      // rim is continuous — no join to flare
 
   // Interior struts only — the boundary walls are now covered by the rim tube.
+  // Each strut flares toward its ends so it blends into the node bead.
   for (const edge of lattice.edges) {
     if (edge.boundary) continue;
     const local = mapEdgeToSurface(edge, P, spine);
     const world = local.map((p) => placePoint(p, az, baseHeight, radialOffset, tilt));
-    acc.addTube(world, P.tubeRadius);
+    acc.addTube(world, P.tubeRadius, JOIN_FLARE);
   }
   // Welded beads only where an interior strut meets the web: those open tube
   // ends need sealing. Pure rim vertices are covered by the continuous rim
   // tube, so beading them just added the overlapping nodules that read as bumps.
+  // Bead radius tracks the flared strut end (1 + JOIN_FLARE) so the strut flows
+  // into the node without a step; higher-degree junctions read a touch fuller.
   for (const node of lattice.nodes) {
     if (node.interiorDegree < 1) continue;
     const local = mapPointToSurface(node, P, spine);
     const world = placePoint(local, az, baseHeight, radialOffset, tilt);
-    const r = P.tubeRadius * (node.degree >= 3 ? 1.4 : 1.15);
+    const r = P.tubeRadius * (node.degree >= 3 ? 1.5 : 1.35);
     acc.addBead(world, r, 6, 10);
   }
 }
