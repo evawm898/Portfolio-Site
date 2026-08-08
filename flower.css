@@ -1,0 +1,311 @@
+/* ---------------------------------------------------
+   Flower Bloom Generator — tool-specific styles
+   Palette tokens (--black, --petrol, --ink, fonts…) come from styles.css.
+   Deep Winter: black base, petrol accent, sharp edges.
+--------------------------------------------------- */
+
+html, body {
+  height: 100%;
+  overflow: hidden;                 /* full-bleed 3D tool, no page scroll */
+}
+
+/* The WebGL canvas fills the viewport and sits behind the overlay UI. */
+#flower-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  touch-action: none;               /* let OrbitControls own touch gestures */
+}
+
+/* ---------------------------------------------------
+   Top bar — minimal, matches the site's project-header
+--------------------------------------------------- */
+
+.fl-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 6vw;
+  pointer-events: none;             /* only the links inside are clickable */
+}
+
+.fl-header > * { pointer-events: auto; }
+
+.fl-back {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid transparent;
+}
+.fl-back:hover {
+  color: var(--petrol-bright);
+  border-bottom-color: var(--petrol-bright);
+}
+
+.fl-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+}
+
+/* ---------------------------------------------------
+   Control panel
+--------------------------------------------------- */
+
+.fl-panel {
+  position: fixed;
+  top: 4.75rem;
+  right: 1.5rem;
+  z-index: 10;
+  width: 300px;
+  max-width: calc(100vw - 3rem);
+  max-height: calc(100vh - 6.5rem);
+  overflow-y: auto;
+  background: rgba(12, 14, 14, 0.86);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  border: 1px solid var(--line-strong);
+  padding: 1.4rem 1.4rem 1.2rem;
+}
+
+.fl-panel__head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1.1rem;
+  margin-bottom: 1.2rem;
+}
+
+.fl-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  margin-bottom: 0.7rem;
+}
+
+.fl-title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.fl-sub {
+  margin-top: 0.6rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+.fl-sub #readout { color: var(--ink-dim); }
+
+/* one control block: label row + slider */
+.fl-ctrl { margin-bottom: 1.1rem; }
+
+.fl-ctrl__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.fl-ctrl label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.fl-ctrl__val {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--petrol-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-ctrl__hint {
+  display: block;
+  margin-top: 0.4rem;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+/* ---------------------------------------------------
+   Range sliders — petrol thumb on a hairline track
+--------------------------------------------------- */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--line-strong);
+}
+input[type="range"]::-moz-range-track {
+  height: 2px;
+  background: var(--line-strong);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5.5px;               /* centre the thumb on the 2px track */
+  border-radius: 50%;
+  background: var(--petrol-bright);
+  border: 1px solid #071615;
+  transition: background-color 0.12s ease, transform 0.12s ease;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--petrol-bright);
+  border: 1px solid #071615;
+}
+input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.15); }
+input[type="range"]:focus { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(47, 163, 163, 0.35);
+}
+
+/* ---------------------------------------------------
+   Toggles (checkboxes)
+--------------------------------------------------- */
+
+.fl-ctrl--toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  background: var(--black);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 12px; height: 12px;
+  background: var(--ink-faint);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+input[type="checkbox"]:checked {
+  border-color: var(--petrol);
+  background: rgba(28, 107, 107, 0.25);
+}
+input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+  background: var(--petrol-bright);
+}
+
+/* ---------------------------------------------------
+   Panel footer
+--------------------------------------------------- */
+
+.fl-panel__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+  margin-top: 0.3rem;
+}
+
+.fl-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.fl-btn:hover {
+  color: var(--petrol-bright);
+  border-color: var(--petrol-bright);
+}
+
+.fl-building {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.fl-building.is-on { opacity: 1; }
+
+/* ---------------------------------------------------
+   Orbit hint
+--------------------------------------------------- */
+
+.fl-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 1.4rem;
+  transform: translateX(-50%);
+  z-index: 10;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.fl-hint .dot { color: var(--petrol); margin: 0 0.5rem; }
+
+/* ---------------------------------------------------
+   Responsive — panel becomes a bottom sheet on small screens
+--------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .fl-panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 52vh;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+  .fl-hint { display: none; }
+  .fl-header { padding: 1rem 6vw; }
+}

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flower Bloom Generator — Eva Maskalenko</title>
+<meta name="description" content="Parametric 3D flower-bloom generator — radially repeated petals with a Voronoi tube-lattice, rendered live in the browser.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="flower.css">
+
+<!-- Three.js is loaded client-side via an ES-module import map. This is the
+     first Three.js page on the site; the map keeps the version in one place. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body id="top">
+
+<canvas id="flower-canvas"></canvas>
+
+<header class="fl-header">
+  <a href="index.html" class="fl-back">&larr; Index</a>
+  <span class="fl-tag">Flower &mdash; unlisted</span>
+</header>
+
+<aside class="fl-panel" aria-label="Bloom controls">
+  <div class="fl-panel__head">
+    <div class="fl-eyebrow">Generative &middot; v1</div>
+    <h1 class="fl-title">Flower Bloom</h1>
+    <p class="fl-sub">Radial petal lattice &mdash; <span id="readout">&nbsp;</span></p>
+  </div>
+
+  <div class="fl-controls">
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="petalCount">Petal count</label>
+        <span class="fl-ctrl__val" data-value="petalCount"></span>
+      </div>
+      <input type="range" id="petalCount" min="1" max="16" step="1" value="6">
+    </div>
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="width">Petal width</label>
+        <span class="fl-ctrl__val" data-value="width"></span>
+      </div>
+      <input type="range" id="width" min="0.45" max="1.5" step="0.01" value="0.9">
+    </div>
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="taper">Taper</label>
+        <span class="fl-ctrl__val" data-value="taper"></span>
+      </div>
+      <input type="range" id="taper" min="0" max="1" step="0.01" value="0.35">
+      <span class="fl-ctrl__hint">broad &rarr; slender</span>
+    </div>
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="tip">Tip shape</label>
+        <span class="fl-ctrl__val" data-value="tip"></span>
+      </div>
+      <input type="range" id="tip" min="0" max="1" step="0.01" value="0.5">
+      <span class="fl-ctrl__hint">round &rarr; pointed</span>
+    </div>
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="bloom">Bloom angle</label>
+        <span class="fl-ctrl__val" data-value="bloom"></span>
+      </div>
+      <input type="range" id="bloom" min="0" max="90" step="1" value="55">
+      <span class="fl-ctrl__hint">closed bud &rarr; fully open</span>
+    </div>
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="tube">Tube thickness</label>
+        <span class="fl-ctrl__val" data-value="tube"></span>
+      </div>
+      <input type="range" id="tube" min="0" max="1" step="0.01" value="0.4">
+    </div>
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="density">Cell density</label>
+        <span class="fl-ctrl__val" data-value="density"></span>
+      </div>
+      <input type="range" id="density" min="3" max="12" step="1" value="7">
+      <span class="fl-ctrl__hint">open lattice &rarr; tight lattice</span>
+    </div>
+
+    <div class="fl-ctrl fl-ctrl--toggle">
+      <label for="innerWhorl">Inner whorl</label>
+      <input type="checkbox" id="innerWhorl" checked>
+    </div>
+
+    <div class="fl-ctrl fl-ctrl--toggle">
+      <label for="autoRotate">Auto-rotate</label>
+      <input type="checkbox" id="autoRotate" checked>
+    </div>
+
+  </div>
+
+  <div class="fl-panel__foot">
+    <button id="reset" class="fl-btn" type="button">Reset</button>
+    <span id="building" class="fl-building">building&hellip;</span>
+  </div>
+</aside>
+
+<div class="fl-hint">Drag to orbit <span class="dot">&middot;</span> Scroll to zoom <span class="dot">&middot;</span> Right-drag to pan</div>
+
+<script type="module" src="flower.js"></script>
+</body>
+</html>
