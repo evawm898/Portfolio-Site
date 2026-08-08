@@ -131,7 +131,7 @@ class MeshAccumulator {
       for (let j = 0; j < radialSegments; j++) {
         const jn = (j + 1) % radialSegments;
         const a = a0 + j, b = a0 + jn, c = b0 + j, d = b0 + jn;
-        this.idx.push(a, c, b, b, c, d);
+        this.idx.push(a, b, c, b, d, c);
       }
     }
   }
@@ -154,7 +154,7 @@ class MeshAccumulator {
       for (let si = 0; si < sectors; si++) {
         const a = start + ri * stride + si;
         const b = a + 1, c = a + stride, d = c + 1;
-        this.idx.push(a, c, b, b, c, d);
+        this.idx.push(a, b, c, b, d, c);
       }
     }
   }
@@ -355,9 +355,9 @@ function generate() {
     buildPetalInto(outerAcc, P, az, 0, mulberry32(SEED_BASE + i * 131));
   }
 
-  if (ui.innerWhorl && count >= 2) {
+  if (ui.innerWhorl) {
     const innerP = deriveInnerParams(P);
-    const off = Math.PI / count;                 // half-step offset
+    const off = Math.PI / count;                 // half-step offset (= π for a single petal)
     const lift = 0.10 * P.L;
     for (let i = 0; i < count; i++) {
       const az = (i / count) * Math.PI * 2 + off;
@@ -403,7 +403,11 @@ function frameCameraOnce(...accs) {
 
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (canvas.width !== w || canvas.height !== h) {
+  // Compare against the actual drawing-buffer size (CSS px x pixelRatio).
+  // Comparing canvas.width (buffer px) to clientWidth (CSS px) would be true
+  // every frame on HiDPI displays and re-run setSize needlessly each frame.
+  const pr = renderer.getPixelRatio();
+  if (canvas.width !== Math.floor(w * pr) || canvas.height !== Math.floor(h * pr)) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -469,7 +473,7 @@ function updateReadout(outerAcc, innerAcc, ui) {
   const tris = Math.round((outerAcc.idx.length + innerAcc.idx.length + coreIdx) / 3);
   const el = document.getElementById('readout');
   if (!el) return;
-  const hasWhorl = ui.innerWhorl && ui.petalCount >= 2;   // whorl is skipped for a single petal
+  const hasWhorl = ui.innerWhorl;
   const petals = `${ui.petalCount} petal${ui.petalCount === 1 ? '' : 's'}`;
   el.textContent = `${petals}${hasWhorl ? ' + inner whorl' : ''} · ~${tris.toLocaleString()} tris`;
 }
@@ -480,10 +484,14 @@ function scheduleRegen() {
   if (pending) return;
   pending = true;
   setBuilding(true);
+  // Double rAF: let the "building…" state paint for one frame before the
+  // synchronous rebuild blocks the main thread and then clears it.
   requestAnimationFrame(() => {
-    pending = false;
-    generate();
-    setBuilding(false);
+    requestAnimationFrame(() => {
+      pending = false;
+      generate();
+      setBuilding(false);
+    });
   });
 }
 function setBuilding(on) {

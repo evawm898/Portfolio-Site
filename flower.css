@@ -140,9 +140,9 @@ html, body {
   display: block;
   margin-top: 0.4rem;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 10.5px;                /* readable size; --ink-dim clears WCAG AA */
   letter-spacing: 0.06em;
-  color: var(--ink-faint);
+  color: var(--ink-dim);
 }
 
 /* ---------------------------------------------------
@@ -184,9 +184,12 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid #071615;
 }
 input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.15); }
+/* Suppress the outline only for pointer focus; show a clear, cross-browser
+   petrol focus ring for keyboard users (Firefox has no ::-moz-thumb :focus). */
 input[type="range"]:focus { outline: none; }
-input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgba(47, 163, 163, 0.35);
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--petrol-bright);
+  outline-offset: 4px;
 }
 
 /* ---------------------------------------------------
