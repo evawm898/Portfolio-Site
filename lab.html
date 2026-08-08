@@ -1393,11 +1393,25 @@
      the wire's tunnel-crossing path together automatically.
   ============================================================= */
   var EMBEDDED_WIRE_SLIT_LENGTH = 26; // vertical extent of each slit opening
+  // The originally-approved tunnel was width=62, height=34 -- a low,
+  // smooth arch. Once TUNNEL_WIDTH is locked to SLIT_LENGTH (below), the
+  // height has to scale down with it or the same absolute height turns
+  // that low arch into a tall, narrow peak. Deriving it from the
+  // original ratio, not picking a new number visually, keeps the same
+  // proportions: 26 * (34/62) ~= 14.26.
+  var EMBEDDED_WIRE_ORIGINAL_TUNNEL_WIDTH = 62;
+  var EMBEDDED_WIRE_ORIGINAL_TUNNEL_HEIGHT = 34;
+  var EMBEDDED_WIRE_TUNNEL_RATIO = EMBEDDED_WIRE_ORIGINAL_TUNNEL_HEIGHT / EMBEDDED_WIRE_ORIGINAL_TUNNEL_WIDTH;
   var EMBEDDED_WIRE_CONFIG = {
     SLIT_LENGTH: EMBEDDED_WIRE_SLIT_LENGTH,
     SLIT_SPACING: 92,             // distance between the two slit centers
     SLIT_WIDTH: 3,                // visual gap width of each cut, fully open
-    TUNNEL_HEIGHT: 34,            // peak dome height above the fabric plane
+    // Derived from the locked TUNNEL_WIDTH below via the original
+    // width:height ratio -- not an arbitrary number of its own. Change
+    // EMBEDDED_WIRE_ORIGINAL_TUNNEL_WIDTH/HEIGHT above if the *shape* of
+    // the arch itself ever needs to change; this just keeps that shape
+    // as TUNNEL_WIDTH is resized.
+    TUNNEL_HEIGHT: EMBEDDED_WIRE_SLIT_LENGTH * EMBEDDED_WIRE_TUNNEL_RATIO,
     // The tunnel's cross-section span (world Y, across the slit
     // direction) is derived directly from SLIT_LENGTH, not kept as a
     // separate value -- the raised tunnel must span exactly the same Y
@@ -1507,13 +1521,17 @@
 
     var X_leftSlit = midX - CFG.SLIT_SPACING / 2;
     var X_rightSlit = midX + CFG.SLIT_SPACING / 2;
-    // The wire's own path extends WIRE_LEAD past BOTH slits -- the same
-    // distance on each side, so there's a real external segment visible
-    // outside the fabric on the left before the wire ever enters, and a
-    // matching one on the right after it exits. Same wire, same slice
-    // geometry, the whole way: LEFT OUTSIDE -> left slit -> tunnel
-    // interior -> right slit -> RIGHT OUTSIDE (see WIRE_T_LEAD below for
-    // how the reveal timeline accounts for this longer span).
+    // The wire's full path runs WIRE_LEAD past BOTH slits -- a fixed
+    // starting anchor to the left, out past the fabric, and a matching
+    // margin past the right slit on exit. X_wireStart is *not* where
+    // the wire is already visible from frame one -- it's the fixed
+    // point the single leading edge starts advancing from (see
+    // WIRE_CHECKPOINTS below): nothing is revealed at all until that
+    // edge starts moving, so the wire is watched arriving from the
+    // left, not present from the start. One continuous wire the whole
+    // way: LEFT OUTSIDE -> left slit -> tunnel interior -> right slit
+    // -> RIGHT OUTSIDE, all the same geometry, only its revealed length
+    // ever changes.
     var WIRE_LEAD = 20;
     var X_wireStart = X_leftSlit - WIRE_LEAD;
     var X_wireEnd = X_rightSlit + WIRE_LEAD;
@@ -1540,18 +1558,6 @@
       return { phiDeg: phiRad * 180 / Math.PI, peakLen: peakLen };
     }
 
-    // Same fold-solving math as solveRibFold above, exposed directly
-    // against a (targetY, targetZ) pair rather than an ellipse's own
-    // eccentric-angle parametrization -- the wire's own cross-section
-    // (see where it's built) is a rectangle, not an ellipse: every
-    // slice across its width targets the *same* height, not a height
-    // that varies by position the way the tunnel's arch curve does.
-    function solveSliceFold(targetY, targetZ) {
-      var phiRad = Math.atan2(-targetZ, targetY);
-      var peakLen = Math.sqrt(targetY * targetY + targetZ * targetZ);
-      return { phiDeg: phiRad * 180 / Math.PI, peakLen: peakLen };
-    }
-
     // High enough that the ribs' individual facets fuse into what reads
     // as one continuous curved surface rather than a faceted fan, at
     // every camera state this module ever uses -- top-down, and the
@@ -1565,12 +1571,13 @@
     }
 
     // ---- DOM: one stage > one rotating scene > fabric face, N rib
-    // faces, and WIRE_SLICE_COUNT wire-slice faces. No face ever carries
-    // the scene's own rotation -- every face's transform is either
-    // absent (fabric, at the base plane) or its own combined fold +
-    // lift (each rib, each wire slice), recomputed per frame only where
-    // that lift itself changes (the wire's, for legibility -- see where
-    // it's built). ----
+    // faces, and WIRE_STRAND_COUNT*2 wire faces (a flat top + a folded
+    // wall per strand). No face ever carries the scene's own rotation --
+    // every face's transform is either absent (fabric, at the base
+    // plane), its own fixed fold (each rib), or its own fold + lift
+    // (each wire face), recomputed per frame only where that lift
+    // itself changes (the wire's, for legibility -- see where it's
+    // built). ----
     var stageEl = document.createElement('div');
     stageEl.className = 'embeddedWire-stage';
     var scene = document.createElement('div');
@@ -1711,85 +1718,116 @@
       });
     }
 
-    // ---- 3. wire -- an extruded rectangular conductor occupying the
-    // open cavity INSIDE the raised tunnel, not a flat stroke sitting on
-    // the fabric plane and not a shape underneath the tunnel. Built the
-    // same way the tunnel's own arch is: WIRE_SLICE_COUNT cross-section
-    // slices fanned across the wire's own WIDTH (Y), each folded once
-    // via solveSliceFold. The one difference from the tunnel's ribs:
-    // every slice here targets the *same* height (WIRE_HEIGHT is
-    // constant across the width -- a rectangle, not an ellipse), so the
-    // slices' tips trace a flat top edge rather than a curve. Extruded
-    // along X the same way, and revealed the same way a flat stroke's
-    // dashoffset would have been -- a filled quad that simply stops
-    // short of its full length -- so the length reveal is still exactly
-    // wireProgress, just expressed as geometry instead of a dash.
+    // ---- 3. wire -- a small BUNDLE of WIRE_STRAND_COUNT parallel
+    // rectangular conductors occupying the open cavity INSIDE the raised
+    // tunnel, not a flat stroke sitting on the fabric plane and not a
+    // shape underneath the tunnel.
     //
-    // It never changes shape or position, and there is only ever this
-    // one wire -- but its lift off the fabric plane (see render()) does
-    // vary, tied to the same camera-approach progress as the tunnel's
-    // cutaway opacity: small/realistic at top-down, easing to taller at
-    // the profile hold, so there's unmistakable separation between the
-    // fabric plane, the wire, and the tunnel roof once the camera tips
-    // toward edge-on. That's for legibility only, per spec
-    // ("educational readability... more important than an almost
-    // invisible end-on pixel") -- same wire, same slice geometry, same
-    // progress-driven length reveal throughout, just more headroom in
-    // the one view where the real lift would put it almost flush with
-    // the baseline.
-    var WIRE_SLICE_COUNT = 9;
-    var WIRE_LIFT_BASE = 4;
-    var WIRE_LIFT_PROFILE = 16;
+    // Earlier version: WIRE_SLICE_COUNT slices fanned across the wire's
+    // width, each folded via the same eccentric-angle math the tunnel's
+    // ribs use (solveSliceFold). That's the right technique for a
+    // *curved* cross-section, but a rectangle isn't curved -- fanning
+    // slices from one shared hinge at the centerline made the fill
+    // narrow toward that hinge, reading as a wedge/triangle rather than
+    // a parallel-sided bundle (confirmed directly, screenshotted).
+    //
+    // Fixed here with plain flat-panel geometry instead of a fan: each
+    // strand is exactly two faces --
+    //   - a TOP face: flat in the local XY plane (no fold at all, just
+    //     translateZ to its height), the strand's own constant-width Y
+    //     band. This is what reads as "one of several parallel strands"
+    //     from directly above.
+    //   - a WALL face: one flat panel folded by a FIXED -90deg (never a
+    //     variable angle, never fanned) standing straight up from the
+    //     fabric plane to the strand's own height, at that strand's own
+    //     centerline. This is what reads as a small filled rectangle --
+    //     the strand's own cross-section -- once the camera tips toward
+    //     profile.
+    // Every strand's two faces span exactly [X_wireStart, revealedX] in
+    // local X and never change shape, so growing the reveal only ever
+    // extends a flat-ended rectangle -- it cannot taper, because there
+    // is no per-position angle left anywhere in the geometry to taper.
+    var WIRE_STRAND_COUNT = 4;
+    var WIRE_STRAND_GAP = 1.2;
+    // Both tuned as fractions of the *original* TUNNEL_HEIGHT (34), then
+    // scaled down by the same ratio TUNNEL_HEIGHT itself just was --
+    // otherwise, now that the tunnel is a low ~14-unit arch instead of a
+    // 34-unit peak, the old fixed lift of 16 would put the bundle's
+    // base above the new roof entirely. This keeps the bundle inside
+    // the cavity (base above the fabric plane, top below the roof) at
+    // both the top-down and profile lift amounts, same as before the
+    // tunnel was resized.
+    var WIRE_LIFT_BASE = 4 * (CFG.TUNNEL_HEIGHT / EMBEDDED_WIRE_ORIGINAL_TUNNEL_HEIGHT);
+    var WIRE_LIFT_PROFILE = 16 * (CFG.TUNNEL_HEIGHT / EMBEDDED_WIRE_ORIGINAL_TUNNEL_HEIGHT);
 
-    // Each slice is a direct sibling of the tunnel's own ribs -- not
-    // wrapped in an intermediate group -- structurally identical to
-    // them (a lone rotateX fold, nothing nested). That match matters:
-    // an earlier version wrapped the slices in their own preserve-3d
-    // group with the lift applied at the group level, and the browser's
-    // depth sort for that nested group vs. the ribs (direct `scene`
-    // children) put the wire behind an opaque top-down tunnel even
-    // though its true height was well inside the cavity -- confirmed
-    // directly (hiding the ribs alone made the wire reappear). Giving
-    // each slice its own combined 'translateZ(lift) rotateX(fold)',
-    // exactly mirroring how every rib is just its own lone rotateX, is
-    // what makes the depth sort treat them consistently.
-    var wireSlices = [];
-    for (var wsi = 0; wsi < WIRE_SLICE_COUNT; wsi++) {
-      var wSlice = makeFace('embeddedWire-wireSlice');
-      var wPath = el('path', { d: '', fill: 'var(--petrol-bright)', stroke: 'none' });
-      var wTip = el('line', { x1: 0, y1: 0, x2: 0, y2: 0, stroke: 'var(--ink-dim)', 'stroke-width': 1, 'stroke-linecap': 'round' });
-      wSlice.svg.appendChild(wPath);
-      wSlice.svg.appendChild(wTip);
-      wireSlices.push({ face: wSlice.face, path: wPath, tip: wTip, y0Frac: lerp(-0.5, 0.5, (wsi + 0.5) / WIRE_SLICE_COUNT) });
+    var WIRE_STRAND_WIDTH = (CFG.WIRE_WIDTH - (WIRE_STRAND_COUNT - 1) * WIRE_STRAND_GAP) / WIRE_STRAND_COUNT;
+
+    // Each strand's two faces are direct siblings of the tunnel's own
+    // ribs -- not wrapped in an intermediate group -- for the same
+    // depth-sort reason the old slices were: a nested preserve-3d group
+    // sorted behind an opaque top-down tunnel even when the wire's true
+    // height was well inside the cavity (confirmed directly).
+    var wireStrands = [];
+    for (var wsi = 0; wsi < WIRE_STRAND_COUNT; wsi++) {
+      var strandY0 = (midY - CFG.WIRE_WIDTH / 2) + wsi * (WIRE_STRAND_WIDTH + WIRE_STRAND_GAP);
+      var strandYMid = strandY0 + WIRE_STRAND_WIDTH / 2;
+
+      var top = makeFace('embeddedWire-wireSlice');
+      var topRect = el('rect', { x: 0, y: strandY0.toFixed(2), width: 0, height: WIRE_STRAND_WIDTH.toFixed(2), fill: 'var(--petrol-bright)' });
+      top.svg.appendChild(topRect);
+
+      var wall = makeFace('embeddedWire-wireSlice');
+      var wallPath = el('path', { d: '', fill: 'var(--petrol-bright)', stroke: 'none' });
+      var wallTip = el('line', { x1: 0, y1: 0, x2: 0, y2: 0, stroke: 'var(--ink-dim)', 'stroke-width': 0.75, 'stroke-linecap': 'round' });
+      wall.svg.appendChild(wallPath);
+      wall.svg.appendChild(wallTip);
+
+      wireStrands.push({ topFace: top.face, topRect: topRect, wallFace: wall.face, wallPath: wallPath, wallTip: wallTip, yMid: strandYMid });
     }
 
-    function wireSliceD(x2, y) {
-      return 'M' + X_wireStart.toFixed(2) + ',' + midY.toFixed(2) +
-        ' L' + X_wireStart.toFixed(2) + ',' + y.toFixed(2) +
-        ' L' + x2.toFixed(2) + ',' + y.toFixed(2) +
-        ' L' + x2.toFixed(2) + ',' + midY.toFixed(2) +
+    // Local pre-fold quad for a strand's WALL: hinges at local Y=hingeY
+    // (the strand's own centerline, at the fabric-plane baseline before
+    // `lift`), rising WIRE_HEIGHT to hingeY-WIRE_HEIGHT ("up" in local
+    // SVG space) -- the same negate-to-fold-toward-viewer convention
+    // solveRibFold uses, but at the fixed -90deg this rectangle always
+    // needs (a wall standing perfectly upright), so no eccentric-angle
+    // solving is needed here at all.
+    function wallD(hingeY, x2) {
+      var yTop = hingeY - CFG.WIRE_HEIGHT;
+      return 'M' + X_wireStart.toFixed(2) + ',' + hingeY.toFixed(2) +
+        ' L' + X_wireStart.toFixed(2) + ',' + yTop.toFixed(2) +
+        ' L' + x2.toFixed(2) + ',' + yTop.toFixed(2) +
+        ' L' + x2.toFixed(2) + ',' + hingeY.toFixed(2) +
         ' Z';
     }
 
-    // Always fully opaque -- one persistent set of slices, rotating
-    // rigidly with the rest of `scene`, visible throughout every phase
-    // (top-down, rotating, profile hold, and back). No marker, no
-    // second wire, no fade tied to tunnel/fabric opacity -- opacity is
-    // never set here at all, so it stays at the CSS default (1).
-    // `lift` is the same camera-approach-driven value the tunnel's
-    // cutaway opacity uses, applied here as a real Z offset rather than
-    // a visual-only stroke trick.
+    // Always fully opaque -- one persistent bundle, rotating rigidly
+    // with the rest of `scene`, visible throughout every phase (top-
+    // down, rotating, profile hold, and back). No marker, no second
+    // wire, no fade tied to tunnel/fabric opacity -- opacity is never
+    // set here at all, so it stays at the CSS default (1). `lift` is
+    // the same camera-approach-driven value the tunnel's cutaway
+    // opacity uses, applied here as a real Z offset rather than a
+    // visual-only stroke trick. `t` is a single leading-edge position --
+    // one advancing front, not two independently-revealed ends: every
+    // strand's fixed start (X_wireStart) never moves, only revealedX
+    // does, so everything already behind the leading edge stays exactly
+    // as it was.
     function renderWire(t, lift) {
       var revealedX = lerp(X_wireStart, X_wireEnd, clamp01(t));
-      wireSlices.forEach(function (slice) {
-        var def = solveSliceFold(slice.y0Frac * CFG.WIRE_WIDTH, CFG.WIRE_HEIGHT);
-        slice.face.style.transform = 'translateZ(' + lift.toFixed(2) + 'px) rotateX(' + def.phiDeg.toFixed(3) + 'deg)';
-        var y = midY - def.peakLen;
-        slice.path.setAttribute('d', wireSliceD(revealedX, y));
-        slice.tip.setAttribute('x1', X_wireStart.toFixed(2));
-        slice.tip.setAttribute('y1', y.toFixed(2));
-        slice.tip.setAttribute('x2', revealedX.toFixed(2));
-        slice.tip.setAttribute('y2', y.toFixed(2));
+      var topZ = lift + CFG.WIRE_HEIGHT;
+      wireStrands.forEach(function (strand) {
+        strand.topFace.style.transform = 'translateZ(' + topZ.toFixed(2) + 'px)';
+        strand.topRect.setAttribute('x', X_wireStart.toFixed(2));
+        strand.topRect.setAttribute('width', (revealedX - X_wireStart).toFixed(2));
+
+        strand.wallFace.style.transform = 'translateZ(' + lift.toFixed(2) + 'px) rotateX(-90deg)';
+        strand.wallPath.setAttribute('d', wallD(strand.yMid, revealedX));
+        var tipY = strand.yMid - CFG.WIRE_HEIGHT;
+        strand.wallTip.setAttribute('x1', X_wireStart.toFixed(2));
+        strand.wallTip.setAttribute('y1', tipY.toFixed(2));
+        strand.wallTip.setAttribute('x2', revealedX.toFixed(2));
+        strand.wallTip.setAttribute('y2', tipY.toFixed(2));
       });
     }
 
@@ -1807,34 +1845,34 @@
       finish:          [0.87, 1.00]
     };
 
-    // Fraction of the wire's total reveal span (X_wireStart..X_wireEnd)
-    // occupied by the external left-side lead-in alone. The wire's
-    // reveal is held at this fraction, at rest, for the whole flat
-    // portion of the timeline below (p < wireApproach start) -- so the
-    // very first frame already shows a real external segment left of
-    // the left slit, not a wire starting flush with the opening. Every
-    // checkpoint past that point is linearly remapped onto the
-    // [WIRE_T_LEAD, 1] range via remapWireT, so the wire's own pacing
-    // through the tunnel itself (slit to slit) is unchanged from before
-    // this lead-in segment existed -- only where the reveal *starts*
-    // moved, not how fast it travels once inside.
-    var WIRE_T_LEAD = WIRE_LEAD / (X_wireEnd - X_wireStart);
-    function remapWireT(t) { return WIRE_T_LEAD + t * (1 - WIRE_T_LEAD); }
+    // Converts an absolute world-X position into the [0,1] wireProgress
+    // fraction that reveals the bundle exactly up to that point (see
+    // renderWire: revealedX = lerp(X_wireStart, X_wireEnd, t)). Used
+    // below to define WIRE_CHECKPOINTS by *where the leading edge is*
+    // at each phase boundary, rather than by opaque fraction numbers --
+    // xToT(X_wireStart) is 0 (nothing revealed yet), xToT(X_wireEnd) is
+    // 1 (fully revealed).
+    function xToT(x) { return (x - X_wireStart) / (X_wireEnd - X_wireStart); }
 
-    // wireProgress checkpoints: continuous, always-forward mapping from
-    // the master timeline to wire travel -- flat only before the wire
-    // begins (p < wireApproach start, held at WIRE_T_LEAD), never flat
-    // again after that, so it keeps moving through every camera phase
-    // that follows: rotating into profile, the profile hold, and
-    // rotating back.
+    // wireProgress checkpoints: one continuous, always-forward mapping
+    // from the master timeline to where the wire's single leading edge
+    // currently is. Flat at 0 (nothing visible at all) until
+    // wireApproach begins -- the bundle is watched arriving from the
+    // left, not already present -- then the leading edge advances
+    // LEFT OUTSIDE -> left slit -> tunnel interior -> right slit ->
+    // RIGHT OUTSIDE, never flat again, so it keeps moving through every
+    // camera phase that follows: rotating into profile, the profile
+    // hold, and rotating back. Everything already behind the leading
+    // edge stays revealed (see renderWire) -- this is one advancing
+    // front, not two independently-timed ends.
     var WIRE_CHECKPOINTS = [
-      [0.00, WIRE_T_LEAD],
-      [PH.wireApproach[0], WIRE_T_LEAD],
-      [PH.wireApproach[1], remapWireT(0.20)],
-      [PH.rotateToProfile[1], remapWireT(0.42)],
-      [PH.profileHold[1], remapWireT(0.65)],
-      [PH.rotateBack[1], remapWireT(0.85)],
-      [1.00, remapWireT(1.00)]
+      [0.00, 0],
+      [PH.wireApproach[0], 0],
+      [PH.wireApproach[1], xToT(X_leftSlit)],       // arrives at the left slit as the approach ends
+      [PH.rotateToProfile[1], xToT(midX)],          // halfway through the tunnel by the time profile is reached
+      [PH.profileHold[1], xToT(X_rightSlit)],       // reaches the right slit as the hold ends
+      [PH.rotateBack[1], xToT(X_rightSlit + WIRE_LEAD * 0.7)],
+      [1.00, xToT(X_wireEnd)]                       // fully clear of the tunnel, external on both ends
     ];
     function computeWireProgress(p) {
       for (var i = 0; i < WIRE_CHECKPOINTS.length - 1; i++) {
@@ -1963,11 +2001,10 @@
       renderSlit(rightSlitEl, X_rightSlit, slitsT);
       var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
       renderTunnel(clamp01(riseT), TUNNEL_FILL_TOP, TUNNEL_TIP_TOP);
-      // Held at WIRE_T_LEAD (not 0) below the same threshold, for the
-      // same reason as the main timeline's WIRE_CHECKPOINTS: rp=0 should
-      // already show the external left lead-in, not a wire starting
-      // flush with the left slit.
-      var wireT = remapWireT(easeInOutCubic(clamp01((rp - 0.30) / 0.68)));
+      // Same as the main timeline: held at 0 (nothing visible) below
+      // this threshold, so reduced motion also shows the bundle arrive
+      // from the left rather than starting already present.
+      var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
       renderWire(wireT, WIRE_LIFT_BASE);
     }
 
