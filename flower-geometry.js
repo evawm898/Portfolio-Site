@@ -79,12 +79,19 @@ export function mulberry32(seed) {
 const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
 
 export function petalHalfWidth(u, P) {
+  u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
+                        // marginally-negative cos() (u just past 1) into NaN
   const T = clamp(P.taper, 0, 1);
   const tip = clamp(P.tip, 0, 1);
 
   const peak    = lerp(0.48, 0.34, T);   // where the petal is widest
   const riseExp = lerp(1.0, 1.7, T);     // base sharpness
-  const tipExp  = lerp(3.0, 1.0, tip);   // round (blunt, high exp) -> point (linear)
+  // Fall-off exponent for the tip segment (cos^tipExp). Below 1 the outline
+  // meets the apex with a vertical tangent -> a genuinely rounded/domed tip;
+  // at 1 it meets linearly -> a sharp leaf point. (Exponents above 1 draw the
+  // tip out into a thin needle, which reads as sharper, not rounder — the old
+  // 3.0->1.0 mapping had this backwards and never produced a round tip.)
+  const tipExp  = lerp(0.5, 1.0, tip);   // 0 = round dome -> 1 = sharp point
 
   let shape;
   if (u <= peak) {
