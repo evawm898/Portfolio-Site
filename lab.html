@@ -1392,12 +1392,19 @@
      Changing SLIT_SPACING moves both slits, the tunnel's span, and
      the wire's tunnel-crossing path together automatically.
   ============================================================= */
+  var EMBEDDED_WIRE_SLIT_LENGTH = 26; // vertical extent of each slit opening
   var EMBEDDED_WIRE_CONFIG = {
-    SLIT_LENGTH: 26,              // vertical extent of each slit opening
+    SLIT_LENGTH: EMBEDDED_WIRE_SLIT_LENGTH,
     SLIT_SPACING: 92,             // distance between the two slit centers
     SLIT_WIDTH: 3,                // visual gap width of each cut, fully open
     TUNNEL_HEIGHT: 34,            // peak dome height above the fabric plane
-    TUNNEL_WIDTH: 62,             // arch cross-section span, edge to edge
+    // The tunnel's cross-section span (world Y, across the slit
+    // direction) is derived directly from SLIT_LENGTH, not kept as a
+    // separate value -- the raised tunnel must span exactly the same Y
+    // extent as the slit openings it grows out of, no wider, so its
+    // top/bottom edges land exactly on each slit's own endpoints.
+    // SLIT_LENGTH is the source of truth; change it there, not here.
+    TUNNEL_WIDTH: EMBEDDED_WIRE_SLIT_LENGTH, // arch cross-section span, edge to edge -- == SLIT_LENGTH
     WIRE_WIDTH: 9,                // extruded conductor: across the cavity (Y)
     WIRE_HEIGHT: 7,                // extruded conductor: thickness (Z)
     // The tunnel and wire both run along world X (see the module header
@@ -1500,14 +1507,15 @@
 
     var X_leftSlit = midX - CFG.SLIT_SPACING / 2;
     var X_rightSlit = midX + CFG.SLIT_SPACING / 2;
-    // The wire's own path starts exactly at the left slit -- not before
-    // it -- so nothing is ever revealed outside the tunnel structure.
-    // It still extends WIRE_LEAD past the right slit on exit, per spec
-    // ("wire completes travel through right slit, extends slightly
-    // beyond"), which is a one-sided choice and deliberately so: this
-    // is where the wire's own reveal starts, not a symmetric margin.
+    // The wire's own path extends WIRE_LEAD past BOTH slits -- the same
+    // distance on each side, so there's a real external segment visible
+    // outside the fabric on the left before the wire ever enters, and a
+    // matching one on the right after it exits. Same wire, same slice
+    // geometry, the whole way: LEFT OUTSIDE -> left slit -> tunnel
+    // interior -> right slit -> RIGHT OUTSIDE (see WIRE_T_LEAD below for
+    // how the reveal timeline accounts for this longer span).
     var WIRE_LEAD = 20;
-    var X_wireStart = X_leftSlit;
+    var X_wireStart = X_leftSlit - WIRE_LEAD;
     var X_wireEnd = X_rightSlit + WIRE_LEAD;
 
     // Solves for the CSS rotateX fold angle (phiDeg) and the rib's own
@@ -1799,19 +1807,34 @@
       finish:          [0.87, 1.00]
     };
 
+    // Fraction of the wire's total reveal span (X_wireStart..X_wireEnd)
+    // occupied by the external left-side lead-in alone. The wire's
+    // reveal is held at this fraction, at rest, for the whole flat
+    // portion of the timeline below (p < wireApproach start) -- so the
+    // very first frame already shows a real external segment left of
+    // the left slit, not a wire starting flush with the opening. Every
+    // checkpoint past that point is linearly remapped onto the
+    // [WIRE_T_LEAD, 1] range via remapWireT, so the wire's own pacing
+    // through the tunnel itself (slit to slit) is unchanged from before
+    // this lead-in segment existed -- only where the reveal *starts*
+    // moved, not how fast it travels once inside.
+    var WIRE_T_LEAD = WIRE_LEAD / (X_wireEnd - X_wireStart);
+    function remapWireT(t) { return WIRE_T_LEAD + t * (1 - WIRE_T_LEAD); }
+
     // wireProgress checkpoints: continuous, always-forward mapping from
     // the master timeline to wire travel -- flat only before the wire
-    // begins (p < wireApproach start), never flat again after that, so
-    // it keeps moving through every camera phase that follows: rotating
-    // into profile, the profile hold, and rotating back.
+    // begins (p < wireApproach start, held at WIRE_T_LEAD), never flat
+    // again after that, so it keeps moving through every camera phase
+    // that follows: rotating into profile, the profile hold, and
+    // rotating back.
     var WIRE_CHECKPOINTS = [
-      [0.00, 0],
-      [PH.wireApproach[0], 0],
-      [PH.wireApproach[1], 0.20],
-      [PH.rotateToProfile[1], 0.42],
-      [PH.profileHold[1], 0.65],
-      [PH.rotateBack[1], 0.85],
-      [1.00, 1.00]
+      [0.00, WIRE_T_LEAD],
+      [PH.wireApproach[0], WIRE_T_LEAD],
+      [PH.wireApproach[1], remapWireT(0.20)],
+      [PH.rotateToProfile[1], remapWireT(0.42)],
+      [PH.profileHold[1], remapWireT(0.65)],
+      [PH.rotateBack[1], remapWireT(0.85)],
+      [1.00, remapWireT(1.00)]
     ];
     function computeWireProgress(p) {
       for (var i = 0; i < WIRE_CHECKPOINTS.length - 1; i++) {
@@ -1940,7 +1963,11 @@
       renderSlit(rightSlitEl, X_rightSlit, slitsT);
       var riseT = easeInOutCubic(clamp01((rp - 0.18) / 0.18));
       renderTunnel(clamp01(riseT), TUNNEL_FILL_TOP, TUNNEL_TIP_TOP);
-      var wireT = easeInOutCubic(clamp01((rp - 0.30) / 0.68));
+      // Held at WIRE_T_LEAD (not 0) below the same threshold, for the
+      // same reason as the main timeline's WIRE_CHECKPOINTS: rp=0 should
+      // already show the external left lead-in, not a wire starting
+      // flush with the left slit.
+      var wireT = remapWireT(easeInOutCubic(clamp01((rp - 0.30) / 0.68)));
       renderWire(wireT, WIRE_LIFT_BASE);
     }
 
