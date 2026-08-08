@@ -184,14 +184,28 @@ export function surfacePoint(u, v, P, spine) {
   };
 }
 
-/* Rotate a local point about the vertical (y) axis by `az` and lift it by
-   `baseHeight`, placing the petal into its slot around the bloom. */
-export function placePoint(p, az, baseHeight) {
+/* Place a local petal point into the bloom.
+     tilt         : lean the petal within its own radial/vertical plane (about
+                    the local z / width axis) — used so petals follow the
+                    slope of an elevated (cone) or depressed (bowl) centre.
+     az           : rotation about the vertical (y) axis — the petal's angular
+                    position on the phyllotactic spiral.
+     radialOffset : shift the base outward along its radial direction, so the
+                    petal attaches at its spiral radius rather than the axis.
+     baseHeight   : vertical lift (the receptacle height at this petal). */
+export function placePoint(p, az, baseHeight, radialOffset = 0, tilt = 0) {
+  let x = p.x, y = p.y;
+  if (tilt !== 0) {
+    const ct = Math.cos(tilt), st = Math.sin(tilt);
+    const nx = x * ct - y * st;
+    y = x * st + y * ct;
+    x = nx;
+  }
   const c = Math.cos(az), s = Math.sin(az);
   return {
-    x: p.x * c + p.z * s,
-    y: p.y + baseHeight,
-    z: -p.x * s + p.z * c,
+    x: x * c + p.z * s + radialOffset * c,
+    y: y + baseHeight,
+    z: -x * s + p.z * c - radialOffset * s,
   };
 }
 

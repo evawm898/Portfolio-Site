@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flower Bloom Generator — Eva Maskalenko</title>
-<meta name="description" content="Parametric 3D flower-bloom generator — radially repeated petals with a Voronoi tube-lattice, rendered live in the browser.">
+<meta name="description" content="Parametric 3D flower-bloom generator — petals on a phyllotactic spiral with a Voronoi tube-lattice, rendered live in the browser.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -39,7 +39,7 @@
   <div class="fl-panel__head">
     <div class="fl-eyebrow">Generative &middot; v1</div>
     <h1 class="fl-title">Flower Bloom</h1>
-    <p class="fl-sub">Radial petal lattice &mdash; <span id="readout">&nbsp;</span></p>
+    <p class="fl-sub">Phyllotactic spiral lattice &mdash; <span id="readout">&nbsp;</span></p>
   </div>
 
   <div class="fl-controls">
@@ -49,7 +49,8 @@
         <label for="petalCount">Petal count</label>
         <span class="fl-ctrl__val" data-value="petalCount"></span>
       </div>
-      <input type="range" id="petalCount" min="1" max="16" step="1" value="6">
+      <input type="range" id="petalCount" min="1" max="40" step="1" value="21">
+      <span class="fl-ctrl__hint">total petals along the spiral</span>
     </div>
 
     <div class="fl-ctrl">
@@ -104,9 +105,22 @@
       <span class="fl-ctrl__hint">open lattice &rarr; tight lattice</span>
     </div>
 
-    <div class="fl-ctrl fl-ctrl--toggle">
-      <label for="innerWhorl">Inner whorl</label>
-      <input type="checkbox" id="innerWhorl" checked>
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="tightness">Coil tightness</label>
+        <span class="fl-ctrl__val" data-value="tightness"></span>
+      </div>
+      <input type="range" id="tightness" min="0" max="1" step="0.01" value="0.5">
+      <span class="fl-ctrl__hint">loose, open spiral &rarr; tight, packed</span>
+    </div>
+
+    <div class="fl-ctrl">
+      <div class="fl-ctrl__row">
+        <label for="elevation">Center elevation</label>
+        <span class="fl-ctrl__val" data-value="elevation"></span>
+      </div>
+      <input type="range" id="elevation" min="-1" max="1" step="0.01" value="0">
+      <span class="fl-ctrl__hint">sunken bowl &rarr; flat &rarr; raised cone</span>
     </div>
 
     <div class="fl-ctrl fl-ctrl--toggle">

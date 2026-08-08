@@ -4,7 +4,7 @@
 
    Responsibilities (the abstract geometry lives in flower-geometry.js):
      - turn lattice struts + nodes into real tube / bead mesh geometry
-     - assemble petals radially into a bloom (+ optional inner whorl + core)
+     - arrange petals on a phyllotactic (golden-angle) spiral + central core
      - set up the scene, lighting, orbit controls, and render loop
      - wire the parametric sliders so any change regenerates live
 
@@ -12,7 +12,7 @@
      spine + silhouette  ->  clipped-Voronoi lattice (flattened space)
        ->  map each strut onto the cupped 3D petal surface
        ->  extrude a tube along it, drop a bead at every node
-       ->  rotate/lift the petal into its slot around the axis
+       ->  place it on the spiral (angle, radius, receptacle height + lean)
 
    v1 scope: bloom only. No stem, no leaves, no export.
    =================================================================== */
@@ -30,11 +30,23 @@ const DEG = Math.PI / 180;
 /* Fixed bloom constants (not exposed as sliders in v1, but grouped here so
    they are trivial to promote to controls in a later pass). */
 const PETAL_LENGTH   = 2.2;    // world units, base -> tip along the spine
-const BASE_RADIUS    = 0.16;   // how far petals attach from the central axis
+const BASE_RADIUS    = 0;      // spiral petals: spine starts on the axis; the
+                               // base is then placed at its own spiral radius
 const CUP_AMOUNT     = 0.22;   // transverse cupping (edges curl inward)
 const SPINE_CURL     = 0.30;   // progressive outward bend toward the tip (rad)
 const RADIAL_SEGMENTS = 6;     // tube cross-section resolution
 const SEED_BASE      = 20250808;
+
+/* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
+   layout). Petal i sits at angle i*GOLDEN_ANGLE and radius spread*sqrt(i)
+   (Vogel's model — the sunflower packing). */
+const GOLDEN_ANGLE   = Math.PI * (3 - Math.sqrt(5));  // ~137.5°, the divergence angle
+const SPREAD_LOOSE   = 0.52;   // radial spacing at min coil tightness (open, gappy spiral)
+const SPREAD_TIGHT   = 0.13;   // radial spacing at max coil tightness (dense, packed spiral)
+const ELEV_FACTOR    = 0.85;   // centre rise/sink at full elevation, as a fraction of the
+                               // bloom radius — keeps the cone/bowl aspect natural at any tightness
+const RECEPTACLE_TILT = 0.55;  // how strongly petals lean along the cone/bowl slope (0..1)
+const CORE_SPREAD    = 0.14;   // stamen-cluster radius at the bloom's heart
 
 
 /* ===================================================================
@@ -216,26 +228,14 @@ function resolveParams(ui) {
   };
 }
 
-// Inner whorl: smaller, more upright (less open), slightly raised & rotated.
-function deriveInnerParams(P) {
-  return Object.assign({}, P, {
-    W: P.W * 0.66,
-    L: P.L * 0.72,
-    r0: P.r0 * 0.7,
-    bloom: Math.max(0, P.bloom - 30 * DEG),
-    tubeRadius: P.tubeRadius * 0.92,
-    targetSeeds: Math.max(4, Math.round(P.targetSeeds * 0.7)),
-  });
-}
-
-
 /* ===================================================================
    3. PETAL + BLOOM ASSEMBLY
    =================================================================== */
 
-/* Build one petal's lattice directly into an accumulator, rotated to `az`
-   around the axis and lifted by `baseHeight`. */
-function buildPetalInto(acc, P, az, baseHeight, rng) {
+/* Build one petal's lattice directly into an accumulator, placed on the
+   phyllotactic spiral: rotated to `az`, leaned by `tilt`, based at
+   `radialOffset` out from the axis, and lifted by `baseHeight`. */
+function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
   const spine = buildSpine(P);
   const outline = buildSilhouette(P);
   const lattice = buildLattice(outline, P.targetSeeds, rng);
@@ -243,27 +243,27 @@ function buildPetalInto(acc, P, az, baseHeight, rng) {
   // struts
   for (const edge of lattice.edges) {
     const local = mapEdgeToSurface(edge, P, spine);
-    const world = local.map((p) => placePoint(p, az, baseHeight));
+    const world = local.map((p) => placePoint(p, az, baseHeight, radialOffset, tilt));
     acc.addTube(world, P.tubeRadius);
   }
   // welded beads at every node (cover tube ends, read as lattice nodules)
   for (const node of lattice.nodes) {
     const local = mapPointToSurface(node, P, spine);
-    const world = placePoint(local, az, baseHeight);
+    const world = placePoint(local, az, baseHeight, radialOffset, tilt);
     const r = P.tubeRadius * (node.degree >= 3 ? 1.4 : 1.15);
     acc.addBead(world, r);
   }
 }
 
-/* A small central stamen cluster so the point where petals converge reads as
-   an organic flower heart rather than a bare seam. */
-function buildCoreInto(acc, P, count, rng) {
-  const N = 14 + Math.round(count * 1.5);
+/* A small central stamen cluster so the spiral's heart reads as an organic
+   flower centre. `centerHeight` follows the receptacle so it stays seated in
+   an elevated (cone) or depressed (bowl) middle. */
+function buildCoreInto(acc, P, count, centerHeight, rng) {
+  const N = Math.min(36, 12 + Math.round(count * 0.6));
   const H = 0.34;
-  const spread = P.r0 * 0.95;
   for (let i = 0; i < N; i++) {
     const a = rng() * Math.PI * 2;
-    const rr = spread * Math.sqrt(rng());
+    const rr = CORE_SPREAD * Math.sqrt(rng());
     const h = H * (0.6 + 0.4 * rng());
     const lean = 0.14 * (0.5 + rng());
     const steps = 5;
@@ -272,7 +272,7 @@ function buildCoreInto(acc, P, count, rng) {
       const t = k / steps;
       const rad = rr + lean * t;
       const yy = h * Math.sin((t * Math.PI) / 2);
-      pts.push({ x: rad * Math.cos(a), y: yy, z: rad * Math.sin(a) });
+      pts.push({ x: rad * Math.cos(a), y: centerHeight + yy, z: rad * Math.sin(a) });
     }
     acc.addTube(pts, P.tubeRadius * 1.05);
     acc.addBead(pts[pts.length - 1], P.tubeRadius * 2.1);  // anther
@@ -317,17 +317,15 @@ const coreGlow = new THREE.PointLight(0x2fa3a3, 0.6, 50);
 coreGlow.position.set(0, 0.6, 0);
 scene.add(coreGlow);
 
-// materials
-const matOuter = new THREE.MeshStandardMaterial({ color: 0x4fb0ab, roughness: 0.5, metalness: 0.15, emissive: 0x08211f, emissiveIntensity: 0.35 });
-const matInner = new THREE.MeshStandardMaterial({ color: 0x8fd3cc, roughness: 0.5, metalness: 0.15, emissive: 0x0a2422, emissiveIntensity: 0.35 });
-const matCore  = new THREE.MeshStandardMaterial({ color: 0x2fa3a3, roughness: 0.45, metalness: 0.2, emissive: 0x0c3a38, emissiveIntensity: 0.55 });
+// materials — all spiral petals share one material; the core glows brighter
+const matPetals = new THREE.MeshStandardMaterial({ color: 0x4fb0ab, roughness: 0.5, metalness: 0.15, emissive: 0x08211f, emissiveIntensity: 0.35 });
+const matCore   = new THREE.MeshStandardMaterial({ color: 0x2fa3a3, roughness: 0.45, metalness: 0.2, emissive: 0x0c3a38, emissiveIntensity: 0.55 });
 
 const bloomGroup = new THREE.Group();
 scene.add(bloomGroup);
-const meshOuter = new THREE.Mesh(new THREE.BufferGeometry(), matOuter);
-const meshInner = new THREE.Mesh(new THREE.BufferGeometry(), matInner);
-const meshCore  = new THREE.Mesh(new THREE.BufferGeometry(), matCore);
-bloomGroup.add(meshOuter, meshInner, meshCore);
+const meshPetals = new THREE.Mesh(new THREE.BufferGeometry(), matPetals);
+const meshCore   = new THREE.Mesh(new THREE.BufferGeometry(), matCore);
+bloomGroup.add(meshPetals, meshCore);
 
 function swapGeometry(mesh, acc) {
   mesh.geometry.dispose();
@@ -345,34 +343,39 @@ function generate() {
   const ui = readUI();
   const P = resolveParams(ui);
 
-  const outerAcc = new MeshAccumulator();
-  const innerAcc = new MeshAccumulator();
+  const petalAcc = new MeshAccumulator();
   const coreAcc  = new MeshAccumulator();
 
   const count = ui.petalCount;
+  const spread = lerp(SPREAD_LOOSE, SPREAD_TIGHT, ui.tightness);  // tighter coil -> smaller spacing
+  const rMax = spread * Math.sqrt(Math.max(1, count - 1));
+  const elev = ui.elevation;                                     // -1 (bowl) .. +1 (cone)
+  const elevAmp = ELEV_FACTOR * rMax;                            // scale elevation with bloom size
+
   for (let i = 0; i < count; i++) {
-    const az = (i / count) * Math.PI * 2;
-    buildPetalInto(outerAcc, P, az, 0, mulberry32(SEED_BASE + i * 131));
+    const az = i * GOLDEN_ANGLE;
+    const r = spread * Math.sqrt(i);
+    const rho = rMax > 1e-6 ? clamp(r / rMax, 0, 1) : 0;
+    // raised-cosine receptacle profile: 1 at the centre, 0 at the rim
+    const profile = 0.5 * (1 + Math.cos(Math.PI * rho));
+    const height = elev * elevAmp * profile;
+    // lean each petal along the receptacle slope (dy/dr of the height field) so
+    // a raised centre reads as a cone and a sunken centre as a bowl. The bloom
+    // radius cancels here, so the lean stays bounded at any coil tightness.
+    const slope = -elev * ELEV_FACTOR * (Math.PI / 2) * Math.sin(Math.PI * rho);
+    const tilt = RECEPTACLE_TILT * Math.atan(slope);
+    buildPetalInto(petalAcc, P, az, height, r - P.r0, tilt, mulberry32(SEED_BASE + i * 131));
   }
 
-  if (ui.innerWhorl) {
-    const innerP = deriveInnerParams(P);
-    const off = Math.PI / count;                 // half-step offset (= π for a single petal)
-    const lift = 0.10 * P.L;
-    for (let i = 0; i < count; i++) {
-      const az = (i / count) * Math.PI * 2 + off;
-      buildPetalInto(innerAcc, innerP, az, lift, mulberry32(SEED_BASE + 900 + i * 131));
-    }
-  }
+  const centerHeight = elev * elevAmp;                           // core sits at the receptacle centre
+  coreGlow.position.y = centerHeight + 0.2;
+  buildCoreInto(coreAcc, P, count, centerHeight, mulberry32(SEED_BASE + 7));
 
-  buildCoreInto(coreAcc, P, count, mulberry32(SEED_BASE + 7));
-
-  swapGeometry(meshOuter, outerAcc);
-  swapGeometry(meshInner, innerAcc);
+  swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
 
-  frameCameraOnce(outerAcc, innerAcc);
-  updateReadout(outerAcc, innerAcc, ui);
+  frameCameraOnce(petalAcc, coreAcc);
+  updateReadout(petalAcc, ui);
 }
 
 function frameCameraOnce(...accs) {
@@ -435,7 +438,8 @@ const inputs = {
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   density: document.getElementById('density'),
-  innerWhorl: document.getElementById('innerWhorl'),
+  tightness: document.getElementById('tightness'),
+  elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
 };
 
@@ -448,7 +452,8 @@ function readUI() {
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     density: parseInt(inputs.density.value, 10),
-    innerWhorl: inputs.innerWhorl.checked,
+    tightness: parseFloat(inputs.tightness.value),
+    elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
   };
 }
@@ -462,20 +467,22 @@ function refreshLabels() {
   setLabel('bloom', inputs.bloom.value + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
+  setLabel('tightness', (+inputs.tightness.value).toFixed(2));
+  const e = +inputs.elevation.value;
+  setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
 }
 function setLabel(id, text) {
   const el = document.querySelector(`[data-value="${id}"]`);
   if (el) el.textContent = text;
 }
 
-function updateReadout(outerAcc, innerAcc, ui) {
+function updateReadout(petalAcc, ui) {
   const coreIdx = meshCore.geometry.index ? meshCore.geometry.index.count : 0;
-  const tris = Math.round((outerAcc.idx.length + innerAcc.idx.length + coreIdx) / 3);
+  const tris = Math.round((petalAcc.idx.length + coreIdx) / 3);
   const el = document.getElementById('readout');
   if (!el) return;
-  const hasWhorl = ui.innerWhorl;
   const petals = `${ui.petalCount} petal${ui.petalCount === 1 ? '' : 's'}`;
-  el.textContent = `${petals}${hasWhorl ? ' + inner whorl' : ''} · ~${tris.toLocaleString()} tris`;
+  el.textContent = `${petals} · spiral · ~${tris.toLocaleString()} tris`;
 }
 
 // coalesce rapid slider input into one rebuild per frame
@@ -500,10 +507,9 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'width', 'taper', 'tip', 'bloom', 'tube', 'density'].forEach((k) => {
+['petalCount', 'width', 'taper', 'tip', 'bloom', 'tube', 'density', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
-inputs.innerWhorl.addEventListener('change', scheduleRegen);
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 
 const resetBtn = document.getElementById('reset');
@@ -517,7 +523,8 @@ if (resetBtn) {
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
     inputs.density.value = d.density;
-    inputs.innerWhorl.checked = d.innerWhorl;
+    inputs.tightness.value = d.tightness;
+    inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
     controls.autoRotate = d.autoRotate;
     refreshLabels();
@@ -526,8 +533,8 @@ if (resetBtn) {
 }
 
 const DEFAULTS = {
-  petalCount: 6, width: 0.9, taper: 0.35, tip: 0.5,
-  bloom: 55, tube: 0.4, density: 7, innerWhorl: true, autoRotate: true,
+  petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5,
+  bloom: 55, tube: 0.4, density: 7, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
 
