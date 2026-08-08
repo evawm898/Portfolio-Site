@@ -574,6 +574,19 @@ comment. Until that's set, the page still loads and works through ROI/
 orientation selection; only "Analyze" shows a clear "service not
 configured" message instead of crashing or silently failing.
 
+**Keeping the two copies in sync is a manual step, not automatic** — a
+real gap that caused real confusion once already: `frontend/` sat
+unsynced from the very first version of the app until this sentence was
+written, so the backend's own root URL (which `StaticFiles` mounts as a
+catch-all) served a stale, pre-multi-region UI indefinitely while
+looking enough like the real thing that a live test against it produced
+a plausible-looking but meaningless number to compare against the
+current app. There's no build step tying these together, so after any
+change to the root-level `textile-gauge-reader.{html,js,css}`, copy the
+same files into `frontend/` (only `frontend/textile-gauge-reader.js`'s
+`CONFIG.API_BASE_URL` should differ — empty string there, since it's
+served same-origin) rather than hand-editing `frontend/` independently.
+
 ## Workflow
 
 1. **Upload** a JPG/PNG/WEBP photo of a knit textile.
