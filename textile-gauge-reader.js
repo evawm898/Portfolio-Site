@@ -1204,6 +1204,8 @@
               ${scoreRow("2D support", d.support_2d)}
               ${scoreRow("Structural score", d.structural_score)}
               ${scoreRow("Regional consensus", d.patch_consensus)}
+              ${scoreRow("Phase consistency", d.phase_consistency)}
+              ${scoreRow("Alternating phase", d.alternating_phase_score != null ? -d.alternating_phase_score : null)}
               <div class="tgr-debug-score-row tgr-debug-score-row--final"><span>Evidence score (decides winner)</span><span>${d.evidence_score != null ? d.evidence_score.toFixed(2) : "—"}</span></div>
               ${scoreRow("Harmonic penalty", d.harmonic_penalty != null ? -d.harmonic_penalty : null)}
               <div class="tgr-debug-score-row"><span>Final score (confidence-adjusted)</span><span>${d.final_score.toFixed(2)}</span></div>

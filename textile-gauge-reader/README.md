@@ -186,6 +186,74 @@ feed into the unified score (as `structural_score`) — it replaces the
 "chain of independent patches" architecture around them with one scoring
 system that's easier to reason about and extend.
 
+### A real-photo regression, and phase consistency as its fix
+
+The first real photo run through `cv-v0.3` (a hand-knit jersey swatch,
+ruler-calibrated, ~5 true wales/in and ~7.2 true courses/in — kept as
+`tests/fixtures/real_jersey_sample.jpg`) surfaced two more problems:
+
+1. **Course regressed.** The pre-`cv-v0.3` pipeline got course right on
+   this photo (~6.87 c/in); the new evidence scorer picked a doubled
+   period (~3.5 c/in) instead, and `_cross_check_density` (which could
+   substitute *either* axis's own candidate to resolve a whole-ROI
+   density mismatch) made it worse by "fixing" the correct course value
+   to compensate for wale's separate, still-unresolved error. Fixed by
+   restoring the older, proven per-axis pipeline
+   (`_analyze_direction`) as course's actual SELECTION mechanism — the
+   v0.3 scorer still runs alongside it purely to supply the rich
+   per-candidate diagnostics shown in Detection Details — and by making
+   `_cross_check_density` wale-only, so it can never again overwrite a
+   correct course pick.
+2. **Wale's half-period ambiguity was a scoring problem, not a
+   candidate-generation problem.** Diagnostics confirmed the correct
+   ~4.75–5 WPI candidate was already being generated every time — it
+   just didn't reliably *win* against the ~9.5 WPI half-period harmonic,
+   and which one won flipped depending on exact ROI placement/size.
+   Every periodicity-strength evidence term (autocorrelation, 2D
+   support, patch consensus) is mathematically incapable of telling them
+   apart: a periodic half-feature (e.g. one leg of a V-shaped loop) is
+   *just as periodic* as the true full-loop repeat.
+
+**Phase consistency** (`_phase_consistency_evidence`) closes that gap:
+for a candidate's own generated marker positions, it extracts a narrow
+local image patch at each one, standardizes it (so overall
+brightness/contrast differences between markers don't matter — only the
+texture PATTERN does), and compares them pairwise. A genuine full
+repeat's markers should look like each other every time
+(`phase_consistency`, the mean adjacent-marker similarity); a
+half-period harmonic instead alternates between two visually distinct
+phases (e.g. a V's left leg vs. right leg) — caught by comparing
+same-parity markers (1↔3, 2↔4, …) against adjacent ones (1↔2, 2↔3, …):
+if same-parity markers agree much more than adjacent ones do, that's the
+"A B A B" signature of a half-period harmonic
+(`alternating_phase_score`).
+
+Unlike the harmonic-ambiguity penalty (which is deliberately excluded
+from deciding a winner — see `_harmonic_penalty`'s docstring for why a
+symmetric pairwise comparison can't be trusted to), phase consistency
+and its alternating-phase penalty ARE part of `evidence_score` and do
+get to decide which candidate is selected: each is a genuine,
+self-contained, per-candidate structural measurement, not a comparison
+between two candidates that's mathematically a wash. `ScoringWeights`
+gives phase consistency the largest single weight of any positive
+evidence term for this reason (and correspondingly reduced
+`patch_consensus`'s weight — real-photo diagnostics showed sub-region
+patch agreement isn't as independent as it looks, since each patch runs
+its own autocorrelation on the same texture and can inherit the same
+half-period bias in every patch at once).
+
+Result on the real photo, tested across 6 differently-placed/sized ~1in²
+ROIs: the correct wale candidate now wins in all 6 (up from 3/6 before
+phase consistency), and course remains correct in 5/6 (the one failure
+is an excessively large whole-fabric-strip ROI — a known, deliberately
+out-of-scope-for-now limitation; see Known V0 limitations). Confidence
+is not artificially inflated: these results are still often reported as
+`uncertain` when the harmonic-ambiguity penalty (a genuine, expected
+mathematical property of periodic signals, not a bug) keeps the
+absolute margin modest — the UI surfaces that honestly (see the LOW
+CONFIDENCE treatment below) rather than presenting a resolved-looking
+number.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/
@@ -527,6 +595,20 @@ sqlite3 textile-gauge-reader/data/corrections.db "select * from corrections;"
   lowers confidence accordingly, but it does not attempt to actually
   correct for perspective/lens distortion — a future version could warp
   the ROI to a fronto-parallel view before periodicity analysis.
+- Course selection (restored to the pre-`cv-v0.3` per-axis pipeline —
+  see "A real-photo regression, and phase consistency as its fix" above)
+  is tuned for reasonably-sized measurement ROIs, not arbitrarily large
+  ones: on the real jersey photo used for regression testing, an
+  excessively large whole-fabric-strip ROI still picked a doubled course
+  period. Prefer a smaller, representative crop (roughly what the
+  ~1in²-ish examples throughout this doc use) over analyzing the entire
+  visible fabric at once.
+- Wale detection remains genuinely uncertain on some ROI placements even
+  with phase-consistency evidence (see above): it's expected, and by
+  design, for a result to come back flagged `uncertain`/LOW CONFIDENCE
+  rather than a falsely-confident number when the true full repeat and
+  its half-period harmonic are still close to a coin flip on a
+  particular crop.
 - Ground-truth corrections are collected but never applied automatically
   — tuning the algorithm from that data is a deliberate, separate step.
 - Correction storage is a single SQLite file with no auth in front of

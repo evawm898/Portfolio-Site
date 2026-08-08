@@ -144,33 +144,64 @@ FOLD_CONSISTENCY_MARGIN = 0.15       # ...and beat the raw estimate's own score 
 # by hunting for magic numbers.
 #
 # The positive terms (autocorr, support_2d, structural, patch_consensus,
-# regularity, repeat_count) are deliberately close to summing to 1.0, so a
-# candidate with strong, fully-agreeing evidence scores close to 1.0
-# before any penalty; harmonic_penalty_weight and instability_penalty_weight
-# are subtracted, not part of that budget.
+# regularity, repeat_count, phase_consistency) are deliberately close to
+# summing to 1.0, so a candidate with strong, fully-agreeing evidence
+# scores close to 1.0 before any penalty; harmonic_penalty_weight,
+# alternating_phase_penalty_weight, and instability_penalty_weight are
+# subtracted, not part of that budget.
 
 
 @dataclass(frozen=True)
 class ScoringWeights:
-    autocorr: float = 0.20              # 1D autocorrelation strength at this exact lag
-    support_2d: float = 0.20            # 2D autocorrelation support at this lag (see _sample_2d_support)
-    structural: float = 0.25            # fold-consistency (wale) + loop-center pitch agreement
-    patch_consensus: float = 0.20       # agreement with independent overlapping sub-region estimates
-    regularity: float = 0.10            # spacing consistency of the positions this candidate implies
-    repeat_count: float = 0.05          # reward seeing enough repeats in the ROI to trust a periodicity claim
+    autocorr: float = 0.12              # 1D autocorrelation strength at this exact lag
+    support_2d: float = 0.12            # 2D autocorrelation support at this lag (see _sample_2d_support)
+    structural: float = 0.20            # fold-consistency (wale) + loop-center pitch agreement
+    # Deliberately reduced from earlier v0.3 tuning: real-photo diagnostics
+    # (see gauge_analysis module docstring / phase-consistency work) showed
+    # patch consensus is NOT as independent as it looks -- each sub-region
+    # band runs its own 1D autocorrelation, seeded from the same texture,
+    # and can inherit the identical half-period lock-on in every patch at
+    # once (the same "independent evidence that isn't fully independent"
+    # failure mode already documented for loop-center-detection scale).
+    # Sub-regions agreeing with each other is corroborating evidence, not
+    # proof of structural correctness.
+    patch_consensus: float = 0.10       # agreement with independent overlapping sub-region estimates
+    regularity: float = 0.08            # spacing consistency of the positions this candidate implies
+    repeat_count: float = 0.03          # reward seeing enough repeats in the ROI to trust a periodicity claim
+    # Does every repeat land on the SAME kind of textile feature (a true
+    # full repeat), or does it alternate between two visually different
+    # ones every other marker (a half-period harmonic, e.g. one leg of a
+    # V each time)? See _phase_consistency_evidence. The LARGEST single
+    # weight here, deliberately: every other positive term above is a
+    # periodicity-STRENGTH proxy, and a periodic half-feature is
+    # mathematically just as periodic as the true full feature -- none of
+    # them can structurally tell a full loop from its own leg. Phase
+    # consistency is grounded in the actual local image content at each
+    # candidate's own marker positions and directly tests the thing a
+    # wale/course repeat is actually DEFINED as (see the module
+    # docstring), so it gets to matter the most.
+    phase_consistency: float = 0.35
     harmonic_penalty_weight: float = 0.30    # subtracted: how ambiguous this candidate is vs. a 0.5x/2x relative
+    # subtracted: how much repeat markers alternate between two distinct
+    # visual phases (A B A B ...) instead of repeating the same one --
+    # see _phase_consistency_evidence. A genuine per-candidate structural
+    # red flag (not a symmetric pairwise comparison like the harmonic
+    # penalty above), so -- unlike that one -- this DOES factor into
+    # which candidate wins, not just confidence.
+    alternating_phase_penalty_weight: float = 0.30
     instability_penalty_weight: float = 0.35  # subtracted from CONFIDENCE (not ranking) when patches disagree
 
 
-# Structure="jersey" leans harder on structural (V-shape/loop-center)
-# evidence, since that's specifically what a face-knit loop's geometry
-# gives us; "unknown" (default) relies relatively more on periodicity and
-# cross-region consensus, which don't assume any particular loop shape.
+# Structure="jersey" leans harder on structural (V-shape/loop-center) and
+# phase-consistency evidence, since both are specifically grounded in a
+# face-knit loop's actual geometry; "unknown" (default) relies relatively
+# more on periodicity and cross-region consensus, which don't assume any
+# particular loop shape.
 WEIGHTS_UNKNOWN = ScoringWeights()
 WEIGHTS_JERSEY = ScoringWeights(
-    autocorr=0.15, support_2d=0.15, structural=0.35, patch_consensus=0.20,
-    regularity=0.10, repeat_count=0.05,
-    harmonic_penalty_weight=0.30, instability_penalty_weight=0.35,
+    autocorr=0.08, support_2d=0.08, structural=0.25, patch_consensus=0.08,
+    regularity=0.08, repeat_count=0.03, phase_consistency=0.40,
+    harmonic_penalty_weight=0.30, alternating_phase_penalty_weight=0.30, instability_penalty_weight=0.35,
 )
 
 # Harmonic-relative log-tolerance: how close c2/c1 must be to exactly 2.0
@@ -188,6 +219,15 @@ UNCERTAIN_SCORE_MARGIN = 0.08        # top-2 final candidate scores within this 
 UNCERTAIN_CONFIDENCE_THRESHOLD = 0.35  # confidence below this -> "uncertain" regardless of margin (any axis/pipeline)
 N_CONSENSUS_PATCHES = 4              # overlapping sub-region bands analyzed per axis
 PATCH_OVERLAP_FRACTION = 0.5
+
+# --- Phase consistency (_phase_consistency_evidence) ----------------------
+# For a candidate period, does every repeat marker land on the SAME kind
+# of local visual feature, or does it alternate between two distinct ones
+# (e.g. a V-shaped loop's left leg vs. right leg)? See the function's
+# docstring for the full explanation.
+PHASE_PATCH_WIDTH_FRACTION = 0.5     # patch width/height around each marker, as a fraction of the candidate period
+MIN_PHASE_PATCH_PX = 3               # never extract a narrower patch than this, however small the period
+MIN_MARKERS_FOR_PHASE_EVIDENCE = 3   # need >=3 markers for 1 same-parity pair; fewer -> neutral evidence
 MIN_PATCH_DIM_PX = 24                # a band thinner than this along its collapsed dimension isn't trustworthy
 ROTATION_SEARCH_DEG = 6.0            # search +/- this many degrees for small tilt correction
 ROTATION_STEP_DEG = 1.5
@@ -218,9 +258,18 @@ class CandidateInfo:
     final_score: Optional[float] = None
     # Weighted evidence composite BEFORE the harmonic penalty is subtracted
     # (autocorr + 2D support + structural + patch consensus + regularity +
-    # repeat count). This -- not final_score -- is what decides `selected`;
-    # see the note above _score_candidates for why.
+    # repeat count + phase consistency - alternating-phase penalty). This
+    # -- not final_score -- is what decides `selected`; see the note above
+    # _score_candidates for why.
     evidence_score: Optional[float] = None
+    # Do this candidate's own repeat markers land on the same local visual
+    # feature every time (high) or alternate between two distinct ones
+    # (low)? And the companion alternating_phase_score: how much MORE
+    # similar same-parity markers (1<->3, 2<->4, ...) are than adjacent
+    # ones (1<->2, 2<->3, ...) -- the specific "A B A B" signature of a
+    # half-period harmonic. See _phase_consistency_evidence.
+    phase_consistency: Optional[float] = None
+    alternating_phase_score: Optional[float] = None
 
 
 @dataclass
@@ -445,7 +494,7 @@ def analyze_gauge(
     wale = _analyze_axis_v3(
         wale_signal, p0_wale, loop_centers, wale_center_axis, wale_band_px,
         ac2d, wale_direction == "horizontal", wale_patch_periods, float(w if wale_direction == "horizontal" else h),
-        use_fold_consistency=True, weights=weights,
+        use_fold_consistency=True, weights=weights, normalized_2d=normalized,
     )
 
     # COURSE: selection deliberately uses the older, previously-proven
@@ -467,7 +516,7 @@ def analyze_gauge(
     course_v3_diagnostics = _analyze_axis_v3(
         course_signal, p0_course, loop_centers, course_center_axis, course_band_px,
         ac2d, course_direction == "horizontal", course_patch_periods, float(w if course_direction == "horizontal" else h),
-        use_fold_consistency=False, weights=weights,
+        use_fold_consistency=False, weights=weights, normalized_2d=normalized,
     )
     course = _analyze_direction(
         course_signal, p0_course, course_p_centers, loop_centers, course_center_axis,
@@ -1526,6 +1575,113 @@ def _autocorr_strength_at_lag(signal: np.ndarray, lag: float) -> float:
     return float(np.clip(value, 0.0, 1.0))
 
 
+def _extract_phase_patch(
+    normalized_2d: np.ndarray, position: float, half_width: float, lag_dx: bool
+) -> Optional[np.ndarray]:
+    """
+    A narrow strip of the ROI's normalized image centered on one repeat
+    marker: the full ROI extent along the "collapsed" direction (so the
+    strip captures the whole visual character of that column/row, not
+    just one point), and a narrow window of `2*half_width` around
+    `position` along the axis that varies with this candidate's period.
+    Returns None if the strip would run off the edge of the ROI --
+    positions right at the edge don't have a full, comparable patch.
+    """
+    h, w = normalized_2d.shape[:2]
+    lo = int(round(position - half_width))
+    hi = int(round(position + half_width))
+    if lag_dx:
+        if lo < 0 or hi > w or hi <= lo:
+            return None
+        return normalized_2d[:, lo:hi]
+    else:
+        if lo < 0 or hi > h or hi <= lo:
+            return None
+        return normalized_2d[lo:hi, :]
+
+
+def _patch_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """
+    Normalized cross-correlation between two equal-shaped image patches,
+    each standardized (zero mean, unit std) first so overall brightness
+    differences between markers don't matter -- only the TEXTURE PATTERN
+    does. Mapped from [-1, 1] to [0, 1] to match the other evidence
+    terms' scale.
+    """
+    if a.shape != b.shape or a.size == 0:
+        return 0.0
+    af = a.astype(np.float64)
+    bf = b.astype(np.float64)
+    a_std = af.std()
+    b_std = bf.std()
+    if a_std < 1e-6 or b_std < 1e-6:
+        return 0.5  # both (near-)flat patches -- not evidence of anything either way
+    a_norm = (af - af.mean()) / a_std
+    b_norm = (bf - bf.mean()) / b_std
+    corr = float(np.clip(np.mean(a_norm * b_norm), -1.0, 1.0))
+    return float(np.clip((corr + 1.0) / 2.0, 0.0, 1.0))
+
+
+def _phase_consistency_evidence(
+    normalized_2d: Optional[np.ndarray],
+    positions: List[float],
+    period: float,
+    lag_dx: bool,
+) -> Tuple[float, float]:
+    """
+    Does this candidate's own repeat markers land on the SAME local
+    visual feature every time, or does the pattern alternate between two
+    distinct ones? This is the piece of evidence pure periodicity
+    strength structurally cannot provide: a loop's two legs each produce
+    their own regular edge, so the half-period candidate that isolates
+    one leg can autocorrelate just as strongly as the true full-loop
+    period -- but the legs don't look like each other, while genuine
+    repeats of the same complete structure do.
+
+    For each marker, extract a narrow local patch (see
+    _extract_phase_patch) and standardize it. Then compare:
+      - ADJACENT markers (1<->2, 2<->3, ...) -- high similarity is what a
+        genuine full repeat looks like (every step returns to the same
+        phase of the structure).
+      - SAME-PARITY markers two steps apart (1<->3, 2<->4, ...) -- for a
+        half-period harmonic, two steps of the wrong (too-short) period
+        equals one true full period, so these come back into phase even
+        when adjacent ones don't.
+
+    Returns (phase_consistency, alternating_phase_score):
+      - phase_consistency = mean adjacent-marker similarity. High for a
+        genuine full repeat; low when consecutive markers look
+        different from each other.
+      - alternating_phase_score = how much MORE similar same-parity
+        markers are than adjacent ones (clipped at 0) -- the specific
+        "A B A B" signature of a half-period harmonic. Near zero for a
+        genuine full repeat (adjacent markers are already just as
+        similar as same-parity ones).
+
+    Returns (0.5, 0.0) -- neutral, no signal either way -- when there
+    isn't enough image data or enough markers to measure this (fewer
+    than MIN_MARKERS_FOR_PHASE_EVIDENCE positions, or no 2D image
+    supplied at all).
+    """
+    if normalized_2d is None or period <= 0 or len(positions) < MIN_MARKERS_FOR_PHASE_EVIDENCE:
+        return 0.5, 0.0
+
+    half_width = max(MIN_PHASE_PATCH_PX, period * PHASE_PATCH_WIDTH_FRACTION / 2.0)
+    ordered = sorted(positions)
+    patches = [_extract_phase_patch(normalized_2d, p, half_width, lag_dx) for p in ordered]
+    patches = [p for p in patches if p is not None]
+    if len(patches) < MIN_MARKERS_FOR_PHASE_EVIDENCE:
+        return 0.5, 0.0
+
+    adjacent_sims = [_patch_similarity(patches[i], patches[i + 1]) for i in range(len(patches) - 1)]
+    same_parity_sims = [_patch_similarity(patches[i], patches[i + 2]) for i in range(len(patches) - 2)]
+
+    phase_consistency = float(np.mean(adjacent_sims)) if adjacent_sims else 0.5
+    same_parity_mean = float(np.mean(same_parity_sims)) if same_parity_sims else phase_consistency
+    alternating_phase_score = float(np.clip(same_parity_mean - phase_consistency, 0.0, 1.0))
+    return phase_consistency, alternating_phase_score
+
+
 def _harmonic_penalty(candidate: float, candidates: List[float], autocorr_scores: dict) -> float:
     """
     How much harmonic ambiguity exists between `candidate` and any OTHER
@@ -1583,16 +1739,18 @@ def _score_candidates(
     use_fold_consistency: bool,
     min_plausible: float,
     weights: ScoringWeights,
+    normalized_2d: Optional[np.ndarray] = None,
 ) -> Tuple[List[CandidateInfo], float]:
     """
     Score every 0.5x/1x/2x candidate for one axis, combining periodicity
     (1D + 2D), structural (fold-consistency + loop-center) evidence,
     regional (patch) consensus, spacing regularity, visible-repeat count,
-    and a harmonic-ambiguity penalty into one `final_score` per
-    candidate (see ScoringWeights -- the one place all these weights are
-    defined). Returns (candidate_infos, instability_penalty) --
-    instability_penalty is axis-level (not per-candidate), used for
-    CONFIDENCE, not for deciding which candidate wins.
+    phase consistency, and a harmonic-ambiguity penalty into one
+    `final_score` per candidate (see ScoringWeights -- the one place all
+    these weights are defined). Returns (candidate_infos,
+    instability_penalty) -- instability_penalty is axis-level (not
+    per-candidate), used for CONFIDENCE, not for deciding which
+    candidate wins.
 
     `center_median`/`center_consistency` are the axis's loop-center
     nearest-neighbor pitch evidence, computed ONCE by the caller (see
@@ -1600,6 +1758,11 @@ def _score_candidates(
     centers` is O(N^2) in the number of detected loop centers, by far
     the most expensive step in analysis, and was previously being
     redundantly recomputed up to 3x per axis.
+
+    `normalized_2d` (the CLAHE-enhanced ROI grayscale) enables phase-
+    consistency evidence (see _phase_consistency_evidence) -- optional
+    so existing callers/tests that only have the 1D signal still work;
+    phase evidence is simply neutral (no signal either way) without it.
     """
     labeled = _labeled_candidates(p0, min_plausible)
     if not labeled:
@@ -1616,6 +1779,9 @@ def _score_candidates(
         center_agree = _center_pitch_agreement(c, center_median, center_consistency)
         structural = _combine_structural(fold, center_agree)
         positions_c = _detect_peaks(signal, c)
+        phase_consistency, alternating_phase = _phase_consistency_evidence(
+            normalized_2d, positions_c, c, lag_dx
+        )
         per_candidate[c] = dict(
             autocorr=autocorr_scores[c],
             support_2d=support_2d,
@@ -1624,6 +1790,8 @@ def _score_candidates(
             regularity=_positions_regularity(positions_c),
             repeat=_repeat_count_score(roi_extent_px, c),
             patch=_patch_consensus_score(patch_periods, c),
+            phase_consistency=phase_consistency,
+            alternating_phase=alternating_phase,
         )
 
     for c in candidates:
@@ -1636,17 +1804,24 @@ def _score_candidates(
             + weights.patch_consensus * e["patch"]
             + weights.regularity * e["regularity"]
             + weights.repeat_count * e["repeat"]
+            + weights.phase_consistency * e["phase_consistency"]
+            - weights.alternating_phase_penalty_weight * e["alternating_phase"]
         )
         e["evidence"] = float(np.clip(evidence, 0.0, 1.0))
         e["final"] = float(np.clip(evidence - weights.harmonic_penalty_weight * e["harmonic_penalty"], -1.0, 1.0))
 
     # The WINNER is decided by evidence_score (periodicity + structural +
-    # regional consensus, before the harmonic penalty). The penalty is
-    # provably a wash between two candidates that are actually ambiguous
-    # with each other (see _harmonic_penalty docstring) -- ranking by the
-    # post-penalty `final` score instead would let it leak across pairs
-    # and hand the win to an unrelated, evidence-weak third candidate
-    # just because it happened not to be part of any ambiguous pair.
+    # regional consensus + phase consistency, before the harmonic
+    # penalty). The harmonic penalty is provably a wash between two
+    # candidates that are actually ambiguous with each other (see
+    # _harmonic_penalty docstring) -- ranking by the post-penalty `final`
+    # score instead would let it leak across pairs and hand the win to
+    # an unrelated, evidence-weak third candidate just because it
+    # happened not to be part of any ambiguous pair. Phase consistency
+    # and its alternating-phase penalty are NOT like the harmonic
+    # penalty in this respect -- each is a genuine, self-contained,
+    # per-candidate measurement (not a symmetric pairwise comparison),
+    # so both belong in `evidence` and DO get to decide the winner.
     winner = max(candidates, key=lambda c: per_candidate[c]["evidence"])
     infos = [
         CandidateInfo(
@@ -1661,6 +1836,8 @@ def _score_candidates(
             evidence_score=round(per_candidate[c]["evidence"], 3),
             harmonic_penalty=round(per_candidate[c]["harmonic_penalty"], 3),
             final_score=round(per_candidate[c]["final"], 3),
+            phase_consistency=round(per_candidate[c]["phase_consistency"], 3),
+            alternating_phase_score=round(per_candidate[c]["alternating_phase"], 3),
         )
         for c in candidates
     ]
@@ -1772,6 +1949,7 @@ def _analyze_axis_v3(
     roi_extent_px: float,
     use_fold_consistency: bool,
     weights: ScoringWeights,
+    normalized_2d: Optional[np.ndarray] = None,
 ) -> AxisResult:
     """
     v0.3 entry point for analyzing one axis (wale or course): generate
@@ -1802,6 +1980,7 @@ def _analyze_axis_v3(
     candidate_details, instability = _score_candidates(
         p0, signal, center_median, center_consistency, ac2d, lag_dx,
         patch_periods, roi_extent_px, use_fold_consistency, MIN_PLAUSIBLE_SPACING_PX, weights,
+        normalized_2d=normalized_2d,
     )
     # Ranked (and the winner picked) by evidence_score, not final_score --
     # see _score_candidates for why the harmonic penalty must not decide

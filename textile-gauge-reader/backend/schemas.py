@@ -43,6 +43,8 @@ class CandidateOut(BaseModel):
     structural_score: Optional[float] = None  # combined fold-consistency + loop-center pitch agreement
     patch_consensus: Optional[float] = None  # agreement with independent overlapping sub-region estimates
     harmonic_penalty: Optional[float] = None  # ambiguity vs. a 0.5x/2x relative that scored similarly
+    phase_consistency: Optional[float] = None  # do repeat markers land on the same local visual feature each time?
+    alternating_phase_score: Optional[float] = None  # "A B A B" signature of a half-period harmonic; penalizes evidence_score
     evidence_score: Optional[float] = None  # weighted evidence composite BEFORE the harmonic penalty -- decides `selected`
     final_score: Optional[float] = None  # evidence_score minus the harmonic penalty (confidence-facing, not selection)
     selected: bool = False
