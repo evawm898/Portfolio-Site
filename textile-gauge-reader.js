@@ -92,7 +92,11 @@
   const calError = document.getElementById("calError");
 
   const roiStatus = document.getElementById("roiStatus");
-  const roiClearBtn = document.getElementById("roiClear");
+  const roiError = document.getElementById("roiError");
+  const roiList = document.getElementById("roiList");
+  const roiAddModeBtn = document.getElementById("roiAddMode");
+  const roiDeleteSelectedBtn = document.getElementById("roiDeleteSelected");
+  const roiResetBtn = document.getElementById("roiReset");
   const roiConfirmBtn = document.getElementById("roiConfirm");
 
   const orientationConfirmBtn = document.getElementById("orientationConfirm");
@@ -149,8 +153,16 @@
       unit: "cm",
       pixelsPerMm: null,
     },
-    roi: null, // {x, y, width, height} in natural coords
-    roiDrag: null, // active drag interaction descriptor
+    roi: null, // {x, y, width, height} in natural coords -- the PRIMARY approved measurement
+               // area, derived from rois[0] on approval. Multi-region independent analysis is
+               // a later stage, not yet built; the existing single-ROI /analyze call downstream
+               // (orientation/analyze/results steps) still reads this exactly as before.
+    rois: [], // [{id, label, x, y, width, height, source: "auto"|"manual"}] in natural coords --
+              // all measurement areas shown/edited on the "Review Measurement Areas" step.
+    proposedRois: [], // snapshot of the last auto-proposal, so "Reset to Proposed" doesn't need a re-fetch
+    selectedRoiId: null,
+    roiAddMode: false, // true while "Add Measurement Area" is armed -- next drag draws a new box
+    roiDrag: null, // active drag interaction descriptor: {mode: "create"|"move"|"resize", roiId, ...}
     view: { zoom: 1, panX: 0, panY: 0 }, // image viewer pan/zoom, in display (unscaled) px
     panDrag: null, // active viewer-pan drag descriptor
     orientation: "vertical",
@@ -254,6 +266,7 @@
       chip.classList.toggle("is-done", STEPS.indexOf(s) < STEPS.indexOf(step));
     }
     updateZoomUI(); // pan-cursor affordance depends on the step (roi/calibrate reserve plain drag)
+    updateRoiAddModeUI(); // add-mode crosshair cursor only applies while actually on the roi step
     render();
   }
 
@@ -555,6 +568,10 @@
     ctx.fillText(text, x, y - 4);
   }
 
+  function roiSwatchColor(roi) {
+    return roi.source === "manual" ? COURSE_COLOR : WALE_COLOR;
+  }
+
   function roiHandles(rect) {
     const tl = naturalToDisplay({ x: rect.x, y: rect.y });
     const br = naturalToDisplay({ x: rect.x + rect.width, y: rect.y + rect.height });
@@ -567,6 +584,15 @@
   }
 
   function drawRoi(editable) {
+    // On the "Review Measurement Areas" step itself, draw every candidate
+    // box (labeled, selected one editable) -- see drawAllRois. Every
+    // other step that still shows a rectangle (orientation/analyze/
+    // results) shows only the single approved PRIMARY area (state.roi),
+    // read-only, exactly as before multi-ROI review existed.
+    if (state.currentStep === "roi") {
+      drawAllRois();
+      return;
+    }
     if (!state.roi) return;
     const tl = naturalToDisplay({ x: state.roi.x, y: state.roi.y });
     const w = state.roi.width * getScale();
@@ -586,6 +612,49 @@
       for (const key of ["tl", "tr", "bl", "br"]) {
         const p = handles[key];
         ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
+      }
+    }
+  }
+
+  // Draws every candidate measurement area on the review step: a subtle
+  // dashed outline + label chip for each, a solid outline + resize
+  // handles for whichever one is currently selected. Manually-added areas
+  // get the course color instead of the wale color so they're visually
+  // distinguishable from auto-proposed ones at a glance (also reflected
+  // in the list below the image).
+  function drawAllRois() {
+    for (const r of state.rois) {
+      const isSelected = r.id === state.selectedRoiId;
+      const color = roiSwatchColor(r);
+      const tl = naturalToDisplay({ x: r.x, y: r.y });
+      const w = r.width * getScale();
+      const h = r.height * getScale();
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = isSelected ? 2.5 : 1.5;
+      ctx.setLineDash(isSelected ? [] : [5, 4]);
+      ctx.strokeRect(tl.x, tl.y, w, h);
+      ctx.setLineDash([]);
+      ctx.fillStyle = isSelected ? "rgba(15,125,125,0.16)" : "rgba(15,125,125,0.06)";
+      ctx.fillRect(tl.x, tl.y, w, h);
+
+      ctx.font = "bold 12px monospace";
+      const padding = 4;
+      const metrics = ctx.measureText(r.label);
+      ctx.fillStyle = color;
+      ctx.fillRect(tl.x, tl.y, metrics.width + padding * 2, 16);
+      ctx.fillStyle = "#060707";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(r.label, tl.x + padding, tl.y + 8);
+
+      if (isSelected) {
+        const handles = roiHandles(r);
+        ctx.fillStyle = color;
+        for (const key of ["tl", "tr", "bl", "br"]) {
+          const p = handles[key];
+          ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
+        }
       }
     }
   }
@@ -795,7 +864,7 @@
     render();
   });
 
-  calConfirmBtn.addEventListener("click", () => {
+  calConfirmBtn.addEventListener("click", async () => {
     const known = parseFloat(knownDistanceInput.value);
     if (state.cal.points.length !== 2 || !(known > 0)) {
       calError.textContent = "Please click two points and enter a positive known distance.";
@@ -806,35 +875,262 @@
     state.cal.knownDistance = known;
     state.cal.unit = unitSelect.value;
     goToStep("roi");
+    await proposeMeasurementAreas();
   });
 
-  // --- Step 3: ROI --------------------------------------------------
+  // --- Step 3: Review Measurement Areas -----------------------------
+  //
+  // After calibration, the system proposes several candidate square
+  // measurement areas (see backend /propose-rois, which wraps analysis.
+  // gauge_analysis.propose_measurement_rois) and STOPS here so the user
+  // can review, edit, add, or remove areas before anything is analyzed.
+  // Approving carries the areas forward as state.rois; state.roi (the
+  // single legacy field the rest of the app still reads) is set to the
+  // first approved area on approval -- multi-region independent analysis
+  // is a later stage, not yet built.
+
+  let roiIdCounter = 0;
+  function nextRoiId() {
+    roiIdCounter += 1;
+    return `roi-${roiIdCounter}`;
+  }
+
+  const ROI_LABELS = "ABCDEFGHIJ";
+  function nextRoiLabel() {
+    const used = new Set(state.rois.map((r) => r.label));
+    for (const ch of ROI_LABELS) {
+      if (!used.has(ch)) return ch;
+    }
+    return String(state.rois.length + 1);
+  }
 
   function resetRoiUI() {
+    state.rois = [];
+    state.proposedRois = [];
+    state.selectedRoiId = null;
+    state.roiAddMode = false;
     roiStatus.textContent = "Draw a rectangle on the image.";
+    roiError.hidden = true;
     roiConfirmBtn.disabled = true;
+    roiDeleteSelectedBtn.disabled = true;
+    updateRoiAddModeUI();
+    renderRoiList();
   }
 
-  function updateRoiUI() {
-    if (!state.roi) {
-      roiStatus.textContent = "Draw a rectangle on the image.";
-      roiConfirmBtn.disabled = true;
+  function updateRoiAddModeUI() {
+    roiAddModeBtn.classList.toggle("is-active", state.roiAddMode);
+    roiAddModeBtn.textContent = state.roiAddMode ? "Cancel Add" : "Add Measurement Area";
+    canvas.classList.toggle("is-roi-add-mode", state.roiAddMode && state.currentStep === "roi");
+  }
+
+  function currentPixelsPerMm() {
+    if (state.cal.points.length !== 2 || !(state.cal.knownDistance > 0)) return null;
+    const unitToMm = { mm: 1, cm: 10, in: 25.4 };
+    const pxDist = Math.hypot(
+      state.cal.points[1].x - state.cal.points[0].x,
+      state.cal.points[1].y - state.cal.points[0].y
+    );
+    const mm = state.cal.knownDistance * unitToMm[state.cal.unit];
+    return mm > 0 ? pxDist / mm : null;
+  }
+
+  function renderRoiList() {
+    if (!state.rois.length) {
+      roiList.innerHTML =
+        '<li class="tgr-roi-list__empty">No measurement areas yet — proposals will appear here, or use "Add Measurement Area".</li>';
       return;
     }
-    const big = state.roi.width >= MIN_ROI_NATURAL_PX && state.roi.height >= MIN_ROI_NATURAL_PX;
-    roiStatus.textContent = big
-      ? `Area: ${Math.round(state.roi.width)} × ${Math.round(state.roi.height)} px. Drag handles to adjust, or confirm.`
-      : `Area too small — minimum ${MIN_ROI_NATURAL_PX}×${MIN_ROI_NATURAL_PX}px.`;
-    roiConfirmBtn.disabled = !big;
+    const ppm = currentPixelsPerMm();
+    roiList.innerHTML = state.rois
+      .map((r) => {
+        const tooSmall = r.width < MIN_ROI_NATURAL_PX || r.height < MIN_ROI_NATURAL_PX;
+        const sizeText = ppm
+          ? `${(r.width / ppm / 25.4).toFixed(2)} × ${(r.height / ppm / 25.4).toFixed(2)} in`
+          : `${Math.round(r.width)} × ${Math.round(r.height)} px`;
+        const kindText = r.source === "manual" ? "Manual area" : "Proposed area";
+        return `
+          <li class="tgr-roi-list__item${r.id === state.selectedRoiId ? " is-selected" : ""}${r.source === "manual" ? " is-manual" : ""}" data-roi-id="${r.id}">
+            <span class="tgr-roi-list__swatch">${escapeHtml(r.label)}</span>
+            <span class="tgr-roi-list__meta">
+              <span>${kindText}${tooSmall ? " — too small" : ""}</span>
+              <span>${sizeText}</span>
+            </span>
+            <button type="button" class="tgr-roi-list__remove" data-remove-roi-id="${r.id}" aria-label="Remove area ${escapeHtml(r.label)}">&times;</button>
+          </li>`;
+      })
+      .join("");
   }
 
-  roiClearBtn.addEventListener("click", () => {
-    state.roi = null;
-    resetRoiUI();
+  function selectRoi(id) {
+    state.selectedRoiId = id;
+    updateRoiUI();
+    render();
+  }
+
+  function removeRoi(id) {
+    state.rois = state.rois.filter((r) => r.id !== id);
+    if (state.selectedRoiId === id) {
+      state.selectedRoiId = state.rois.length ? state.rois[state.rois.length - 1].id : null;
+    }
+    updateRoiUI();
+    render();
+  }
+
+  roiList.addEventListener("click", (e) => {
+    const removeBtn = e.target.closest("[data-remove-roi-id]");
+    if (removeBtn) {
+      removeRoi(removeBtn.dataset.removeRoiId);
+      return;
+    }
+    const item = e.target.closest("[data-roi-id]");
+    if (item) selectRoi(item.dataset.roiId);
+  });
+
+  function updateRoiUI() {
+    const count = state.rois.length;
+    const tooSmall = state.rois.filter((r) => r.width < MIN_ROI_NATURAL_PX || r.height < MIN_ROI_NATURAL_PX);
+    if (count === 0) {
+      roiStatus.textContent = state.roiAddMode
+        ? "Draw a rectangle on the image to add a measurement area."
+        : "No measurement areas yet.";
+    } else if (tooSmall.length) {
+      roiStatus.textContent = `${tooSmall.map((r) => r.label).join(", ")} too small — minimum ${MIN_ROI_NATURAL_PX}×${MIN_ROI_NATURAL_PX}px.`;
+    } else {
+      roiStatus.textContent = `${count} measurement area${count === 1 ? "" : "s"} — review, then approve.`;
+    }
+    roiConfirmBtn.disabled = count === 0 || tooSmall.length > 0;
+    roiDeleteSelectedBtn.disabled = !state.selectedRoiId;
+    renderRoiList();
+  }
+
+  // Calls the backend to propose candidate measurement areas from the
+  // calibrated scale. On any failure (service not configured/unreachable,
+  // or the image genuinely has no suitable areas), falls back to leaving
+  // area selection entirely manual -- "computer proposes, human reviews,
+  // computer measures," never "computer removes human control," so a
+  // failed proposal is a degraded starting point, not a dead end.
+  async function proposeMeasurementAreas() {
+    state.rois = [];
+    state.proposedRois = [];
+    state.selectedRoiId = null;
+    roiError.hidden = true;
+    updateRoiUI();
+    render();
+
+    if (!CONFIG.API_BASE_URL) {
+      roiStatus.textContent = "Analysis service not configured — add a measurement area manually below.";
+      state.roiAddMode = true;
+      updateRoiAddModeUI();
+      return;
+    }
+
+    roiStatus.textContent = "Proposing measurement areas…";
+
+    try {
+      const fd = new FormData();
+      fd.append("file", state.file);
+      fd.append("cal_x1", state.cal.points[0].x);
+      fd.append("cal_y1", state.cal.points[0].y);
+      fd.append("cal_x2", state.cal.points[1].x);
+      fd.append("cal_y2", state.cal.points[1].y);
+      fd.append("known_distance", state.cal.knownDistance);
+      fd.append("unit", state.cal.unit);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+      let res;
+      try {
+        res = await fetch(`${CONFIG.API_BASE_URL}/propose-rois`, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+      }
+      if (!res.ok) {
+        throw new Error(data.message || `Proposing measurement areas failed (HTTP ${res.status}).`);
+      }
+
+      const proposed = (data.rois || []).map((r) => ({
+        id: nextRoiId(),
+        label: r.label,
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+        source: "auto",
+        qualityScore: r.quality_score,
+      }));
+
+      if (!proposed.length) {
+        roiStatus.textContent = data.message || "No suitable measurement areas were found automatically.";
+        roiError.textContent = "Add a measurement area manually below.";
+        roiError.hidden = false;
+        state.roiAddMode = true;
+        updateRoiAddModeUI();
+        return;
+      }
+
+      state.proposedRois = proposed.map((r) => ({ ...r }));
+      state.rois = proposed;
+      state.selectedRoiId = proposed[0].id;
+      updateRoiUI();
+      render();
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        roiStatus.textContent = "Proposing measurement areas timed out.";
+      } else if (err instanceof TypeError) {
+        roiStatus.textContent = "Could not reach the analysis service to propose measurement areas.";
+      } else {
+        roiStatus.textContent = (err && err.message) || "Could not propose measurement areas.";
+      }
+      roiError.textContent = "You can still add a measurement area manually below.";
+      roiError.hidden = false;
+      state.roiAddMode = true;
+      updateRoiAddModeUI();
+      updateRoiUI();
+      render();
+    }
+  }
+
+  roiAddModeBtn.addEventListener("click", () => {
+    state.roiAddMode = !state.roiAddMode;
+    updateRoiAddModeUI();
+  });
+
+  roiDeleteSelectedBtn.addEventListener("click", () => {
+    if (state.selectedRoiId) removeRoi(state.selectedRoiId);
+  });
+
+  roiResetBtn.addEventListener("click", () => {
+    state.rois = state.proposedRois.map((r) => ({ ...r }));
+    state.selectedRoiId = state.rois.length ? state.rois[0].id : null;
+    state.roiAddMode = false;
+    roiError.hidden = true;
+    updateRoiAddModeUI();
+    updateRoiUI();
     render();
   });
 
-  roiConfirmBtn.addEventListener("click", () => goToStep("orientation"));
+  roiConfirmBtn.addEventListener("click", () => {
+    if (!state.rois.length) return;
+    // Stage 1: the multi-region independent-analysis/consensus pipeline
+    // is a later stage, not yet built. The existing single-ROI /analyze
+    // call downstream still needs exactly one ROI -- use the first
+    // approved area as that primary region, preserving the entire
+    // orientation/analyze/results flow unchanged.
+    const primary = state.rois[0];
+    state.roi = { x: primary.x, y: primary.y, width: primary.width, height: primary.height };
+    goToStep("orientation");
+  });
 
   function normalizeRect(a, b) {
     return {
@@ -880,25 +1176,58 @@
       const dispPt = eventToDisplayPoint(evt);
       canvas.setPointerCapture(evt.pointerId);
 
-      if (state.roi) {
-        const handle = hitTestHandle(dispPt, state.roi);
-        if (handle) {
-          state.roiDrag = { mode: "resize", handle, startRoi: { ...state.roi } };
-          return;
+      if (!state.roiAddMode) {
+        // Only the currently-selected box exposes resize handles (drawAllRois
+        // only draws them for it), so only it needs to be handle-tested.
+        const selected = state.rois.find((r) => r.id === state.selectedRoiId);
+        if (selected) {
+          const handle = hitTestHandle(dispPt, selected);
+          if (handle) {
+            state.roiDrag = { mode: "resize", roiId: selected.id, handle, startRoi: { ...selected } };
+            return;
+          }
         }
-        if (pointInRoiDisplay(dispPt, state.roi)) {
-          state.roiDrag = {
-            mode: "move",
-            startNatural: displayToNatural(dispPt),
-            startRoi: { ...state.roi },
-          };
-          return;
+        // Hit-test bodies topmost-first (later in the array = drawn last =
+        // visually on top) so overlapping boxes pick the one the user
+        // actually clicked on.
+        for (let i = state.rois.length - 1; i >= 0; i--) {
+          const r = state.rois[i];
+          if (pointInRoiDisplay(dispPt, r)) {
+            state.selectedRoiId = r.id;
+            state.roiDrag = {
+              mode: "move",
+              roiId: r.id,
+              startNatural: displayToNatural(dispPt),
+              startRoi: { ...r },
+            };
+            updateRoiUI();
+            render();
+            return;
+          }
         }
+        // Clicked empty space -- just deselect, don't start drawing (that
+        // requires "Add Measurement Area" to be armed, so an accidental
+        // click on the image can't silently create a stray box).
+        state.selectedRoiId = null;
+        updateRoiUI();
+        render();
+        return;
       }
-      // Start a brand-new rectangle.
+
+      // Add mode: start drawing a brand-new labeled rectangle.
       const startNatural = displayToNatural(dispPt);
-      state.roiDrag = { mode: "create", anchor: startNatural };
-      state.roi = { x: startNatural.x, y: startNatural.y, width: 0, height: 0 };
+      const newRoi = {
+        id: nextRoiId(),
+        label: nextRoiLabel(),
+        x: startNatural.x,
+        y: startNatural.y,
+        width: 0,
+        height: 0,
+        source: "manual",
+      };
+      state.rois.push(newRoi);
+      state.selectedRoiId = newRoi.id;
+      state.roiDrag = { mode: "create", roiId: newRoi.id, anchor: startNatural };
     }
   });
 
@@ -907,24 +1236,27 @@
     const dispPt = eventToDisplayPoint(evt);
     const natPt = displayToNatural(dispPt);
     const drag = state.roiDrag;
+    const roi = state.rois.find((r) => r.id === drag.roiId);
+    if (!roi) {
+      state.roiDrag = null;
+      return;
+    }
 
     if (drag.mode === "create") {
       let target = natPt;
       if (evt.shiftKey) {
         target = squareSnappedPoint(drag.anchor, natPt);
       }
-      state.roi = normalizeRect(drag.anchor, target);
+      Object.assign(roi, normalizeRect(drag.anchor, target));
     } else if (drag.mode === "move") {
       const dx = natPt.x - drag.startNatural.x;
       const dy = natPt.y - drag.startNatural.y;
       const w = drag.startRoi.width;
       const h = drag.startRoi.height;
-      state.roi = {
-        x: clamp(drag.startRoi.x + dx, 0, state.naturalWidth - w),
-        y: clamp(drag.startRoi.y + dy, 0, state.naturalHeight - h),
-        width: w,
-        height: h,
-      };
+      roi.x = clamp(drag.startRoi.x + dx, 0, state.naturalWidth - w);
+      roi.y = clamp(drag.startRoi.y + dy, 0, state.naturalHeight - h);
+      roi.width = w;
+      roi.height = h;
     } else if (drag.mode === "resize") {
       const r = drag.startRoi;
       let x1 = r.x,
@@ -952,7 +1284,7 @@
         else y2 = snapped.y;
       }
 
-      state.roi = normalizeRect({ x: x1, y: y1 }, { x: x2, y: y2 });
+      Object.assign(roi, normalizeRect({ x: x1, y: y1 }, { x: x2, y: y2 }));
     }
     updateRoiUI();
     render();
@@ -980,8 +1312,22 @@
     if (state.roiDrag && canvas.hasPointerCapture(evt.pointerId)) {
       canvas.releasePointerCapture(evt.pointerId);
     }
+    if (state.roiDrag && state.roiDrag.mode === "create") {
+      // Drop a stray/near-zero-size box (e.g. a single click with no
+      // drag), and exit add-mode automatically after drawing one box --
+      // matches the single-ROI step's old behavior of ending the
+      // gesture on pointerup, extended to "one box per Add click."
+      const roi = state.rois.find((r) => r.id === state.roiDrag.roiId);
+      if (roi && (roi.width < 4 || roi.height < 4)) {
+        state.rois = state.rois.filter((r) => r.id !== roi.id);
+        state.selectedRoiId = state.rois.length ? state.rois[state.rois.length - 1].id : null;
+      }
+      state.roiAddMode = false;
+      updateRoiAddModeUI();
+    }
     state.roiDrag = null;
     updateRoiUI();
+    render();
   }
   canvas.addEventListener("pointerup", endRoiDrag);
   canvas.addEventListener("pointercancel", endRoiDrag);

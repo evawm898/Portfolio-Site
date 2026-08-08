@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from analysis import ALGORITHM_VERSION, analyze_gauge
+from analysis import ALGORITHM_VERSION, analyze_gauge, propose_measurement_rois
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
 from analysis.gauge_analysis import analyze_loop_lattice_experiment
 from storage import corrections_store
@@ -42,6 +42,8 @@ from .schemas import (
     CandidateOut,
     LoopLatticeDebugOut,
     Orientation,
+    ProposedRoiOut,
+    ProposeRoisResponse,
     RoiOut,
     Structure,
     Unit,
@@ -339,6 +341,94 @@ async def analyze(
         rotation_deg=result.rotation_deg,
         loop_lattice_debug=loop_lattice_out,
     )
+    return JSONResponse(status_code=200, content=response.model_dump())
+
+
+@app.post("/propose-rois", response_model=ProposeRoisResponse)
+async def propose_rois(
+    file: UploadFile = File(...),
+    cal_x1: float = Form(...),
+    cal_y1: float = Form(...),
+    cal_x2: float = Form(...),
+    cal_y2: float = Form(...),
+    known_distance: float = Form(...),
+    unit: Unit = Form(...),
+) -> JSONResponse:
+    """
+    Stage 1 of the multi-region workflow: given an uploaded image and its
+    calibration, propose several candidate square measurement areas for
+    the user to review/edit/approve in the "Review Measurement Areas"
+    step -- BEFORE any gauge analysis runs. See analysis.gauge_analysis.
+    propose_measurement_rois for the selection/scoring logic.
+    """
+    try:
+        data = await file.read()
+        validate_upload(file.content_type, len(data))
+        image = decode_image(data)
+    except ImageValidationError as exc:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(success=False, message=str(exc)).model_dump(),
+        )
+
+    if known_distance <= 0:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(
+                success=False, message="Known calibration distance must be greater than zero."
+            ).model_dump(),
+        )
+
+    cal_pixel_dist = ((cal_x2 - cal_x1) ** 2 + (cal_y2 - cal_y1) ** 2) ** 0.5
+    if cal_pixel_dist < 2:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(
+                success=False,
+                message="Calibration points are too close together. Please pick two distinct points.",
+            ).model_dump(),
+        )
+
+    known_distance_mm = known_distance * UNIT_TO_MM[unit]
+    pixels_per_mm = cal_pixel_dist / known_distance_mm
+    if pixels_per_mm <= 0:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(
+                success=False, message="Could not compute a valid scale from calibration."
+            ).model_dump(),
+        )
+
+    try:
+        proposal = propose_measurement_rois(image_bgr=image, pixels_per_mm=pixels_per_mm)
+    except Exception:  # pragma: no cover - defensive: never fabricate a result
+        logger.exception("ROI proposal raised an unexpected exception")
+        return JSONResponse(
+            status_code=500,
+            content=ProposeRoisResponse(
+                success=False, message="Proposing measurement areas failed unexpectedly. Please try again."
+            ).model_dump(),
+        )
+
+    response = ProposeRoisResponse(
+        success=proposal.success,
+        message=proposal.message,
+        rois=[
+            ProposedRoiOut(
+                x=r.x, y=r.y, width=r.width, height=r.height, label=r.label,
+                quality_score=r.quality_score, sharpness=r.sharpness, contrast=r.contrast,
+                periodicity=r.periodicity, texture_consistency=r.texture_consistency,
+                brightness_score=r.brightness_score,
+            )
+            for r in proposal.rois
+        ],
+        window_size_px=proposal.window_size_px,
+        pixels_per_mm=round(pixels_per_mm, 6),
+    )
+    # success=False here means "valid request, but no suitable areas found"
+    # (e.g. a tiny or extremely uniform image) -- not a request error, so
+    # this is still a 200; the frontend shows proposal.message and offers
+    # the manual "Add Measurement Area" fallback.
     return JSONResponse(status_code=200, content=response.model_dump())
 
 

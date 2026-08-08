@@ -49,7 +49,7 @@
     <ol class="tgr-steps" id="steps">
       <li class="tgr-step" data-step="upload">1. Upload Image</li>
       <li class="tgr-step" data-step="calibrate">2. Calibrate Scale</li>
-      <li class="tgr-step" data-step="roi">3. Select Measurement Area</li>
+      <li class="tgr-step" data-step="roi">3. Review Measurement Areas</li>
       <li class="tgr-step" data-step="orientation">4. Select Orientation</li>
       <li class="tgr-step" data-step="analyze">5. Analyze</li>
       <li class="tgr-step" data-step="results">6. Results</li>
@@ -88,14 +88,31 @@
       <p class="tgr-error" id="calError" hidden></p>
     </section>
 
-    <!-- Step 3: ROI -->
+    <!-- Step 3: Review Measurement Areas -->
     <section class="tgr-step-panel" data-panel="roi" hidden>
-      <h2>Select measurement area</h2>
-      <p class="tgr-hint">Click and drag a rectangle over a clean, flat, representative part of the textile. Drag the handles to adjust it. Hold <strong>Shift</strong> while dragging to snap to a square.</p>
-      <p class="tgr-status" id="roiStatus">Draw a rectangle on the image.</p>
+      <h2>Review measurement areas</h2>
+      <p class="tgr-hint">
+        The system proposes several candidate measurement areas, sized from
+        the calibrated scale (roughly <strong>0.75&ndash;1&nbsp;in</strong>
+        square) and spread across different parts of the fabric, so the
+        gauge can later be cross-checked across independent regions rather
+        than trusting a single crop. Click a labeled box (on the image or in
+        the list below) to select it, drag its handles to resize, drag its
+        body to move it &mdash; hold <strong>Shift</strong> while dragging
+        to keep it square. Review the boxes, adjust or remove any that land
+        on a bad spot, add your own if you'd rather choose one yourself,
+        then approve.
+      </p>
+      <p class="tgr-status" id="roiStatus">Proposing measurement areas&hellip;</p>
+      <p class="tgr-error" id="roiError" hidden></p>
+      <ul class="tgr-roi-list" id="roiList"></ul>
       <div class="tgr-button-row">
-        <button id="roiClear" class="tgr-btn tgr-btn--secondary" type="button">Clear</button>
-        <button id="roiConfirm" class="tgr-btn" type="button" disabled>Confirm Area</button>
+        <button id="roiAddMode" class="tgr-btn tgr-btn--secondary" type="button">Add Measurement Area</button>
+        <button id="roiDeleteSelected" class="tgr-btn tgr-btn--secondary" type="button" disabled>Delete Selected</button>
+        <button id="roiReset" class="tgr-btn tgr-btn--secondary" type="button">Reset to Proposed</button>
+      </div>
+      <div class="tgr-button-row">
+        <button id="roiConfirm" class="tgr-btn" type="button" disabled>Approve Measurement Areas</button>
       </div>
     </section>
 

@@ -25,6 +25,37 @@ class AreaMm(BaseModel):
     height_mm: float
 
 
+class ProposedRoiOut(BaseModel):
+    """
+    One automatically-proposed candidate measurement area (Stage 1 of the
+    multi-region workflow — see analysis.gauge_analysis.propose_measurement_
+    rois). Full-image pixel coordinates. quality_score and its components
+    are a generic image-quality heuristic used only to select/rank
+    candidates — NOT the final gauge-detection confidence, which is
+    computed per-approved-ROI later.
+    """
+
+    x: float
+    y: float
+    width: float
+    height: float
+    label: str
+    quality_score: float
+    sharpness: float
+    contrast: float
+    periodicity: float
+    texture_consistency: float
+    brightness_score: float
+
+
+class ProposeRoisResponse(BaseModel):
+    success: bool
+    message: str = ""
+    rois: List[ProposedRoiOut] = Field(default_factory=list)
+    window_size_px: Optional[int] = None
+    pixels_per_mm: Optional[float] = None
+
+
 class CandidateOut(BaseModel):
     """
     One harmonic period candidate considered for an axis, with the

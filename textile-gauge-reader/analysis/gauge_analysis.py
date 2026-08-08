@@ -2427,3 +2427,307 @@ def analyze_loop_lattice_experiment(
     if not best.wale_columns_px and not best.message:
         best.message = "No wale columns had support from enough course rows at any evaluated scale."
     return best
+
+
+# --- Automatic measurement-area (ROI) proposal --------------------------
+#
+# Stage 1 of the multi-region workflow: BEFORE any gauge analysis runs,
+# propose several candidate square regions for the user to review/edit/
+# approve (see backend main.py's /propose-rois and the frontend's
+# "Review Measurement Areas" step). This function only scores and selects
+# candidate regions -- it never runs wale/course detection itself, and it
+# has no knowledge of ground-truth values (those stay evaluation-only,
+# per the project's established separation).
+#
+# Deliberately generic: the quality score below has no notion of "ruler"
+# or "label" at all. A ruler/label/background region scores low on its
+# own merits (usually low periodicity, and often low texture-consistency
+# or extreme brightness), not because anything here was told to avoid it.
+
+TARGET_ROI_INCHES = (0.75, 1.0)          # target candidate square side, min/max, in inches
+ROI_PROPOSAL_MIN_REGIONS = 2             # below this, prefer relaxing the quality floor over proposing nothing
+ROI_PROPOSAL_MAX_REGIONS = 6
+ROI_PROPOSAL_STRIDE_FRACTION = 0.5       # candidate grid step, as a fraction of the window size
+ROI_PROPOSAL_MAX_OVERLAP_IOU = 0.02      # two accepted candidates may not overlap more than this
+ROI_PROPOSAL_MIN_CENTER_SPACING = 1.15   # ...nor have centers closer than this fraction of the window size
+ROI_PROPOSAL_MIN_QUALITY = 0.30          # candidates below this are skipped once ROI_PROPOSAL_MIN_REGIONS is met
+ROI_PROPOSAL_EDGE_MARGIN_FRACTION = 0.02 # keep candidate windows off the outer image border
+ROI_PROPOSAL_LABELS = "ABCDEF"
+
+# Quality-score component weights (sum to 1.0). Periodicity gets the
+# largest weight -- "does this patch actually repeat" is the single
+# strongest signal that it's genuine knit texture and not background,
+# a ruler, or a label.
+ROI_QUALITY_WEIGHTS = {
+    "sharpness": 0.20,
+    "contrast": 0.15,
+    "periodicity": 0.30,
+    "texture_consistency": 0.20,
+    "brightness_score": 0.15,
+}
+
+
+@dataclass(frozen=True)
+class ProposedRoi:
+    """One automatically-proposed candidate measurement area, in full-image pixel coordinates."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+    label: str
+    quality_score: float
+    sharpness: float
+    contrast: float
+    periodicity: float
+    texture_consistency: float
+    brightness_score: float
+
+
+@dataclass
+class RoiProposalResult:
+    success: bool
+    message: str = ""
+    rois: List[ProposedRoi] = field(default_factory=list)
+    window_size_px: Optional[int] = None
+
+
+def _roi_iou(a: dict, b: dict) -> float:
+    ax1, ay1, ax2, ay2 = a["x"], a["y"], a["x"] + a["w"], a["y"] + a["h"]
+    bx1, by1, bx2, by2 = b["x"], b["y"], b["x"] + b["w"], b["y"] + b["h"]
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    area_a = (ax2 - ax1) * (ay2 - ay1)
+    area_b = (bx2 - bx1) * (by2 - by1)
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _roi_center_distance(a: dict, b: dict) -> float:
+    return math.hypot(
+        (a["x"] + a["w"] / 2) - (b["x"] + b["w"] / 2),
+        (a["y"] + a["h"] / 2) - (b["y"] + b["h"] / 2),
+    )
+
+
+def _too_close_to_selected(cand: dict, selected: List[dict], window_px: float) -> bool:
+    for s in selected:
+        if _roi_iou(cand, s) > ROI_PROPOSAL_MAX_OVERLAP_IOU:
+            return True
+        if _roi_center_distance(cand, s) < window_px * ROI_PROPOSAL_MIN_CENTER_SPACING:
+            return True
+    return False
+
+
+def _texture_consistency_score(crop_f: np.ndarray, grid: int = 4) -> float:
+    """
+    How uniform the local contrast is across a coarse grid of sub-blocks.
+    Real knit fabric has fairly even texture energy everywhere in a
+    representative crop; a region straddling a fold/seam/shadow boundary,
+    or a mix of fabric and background, has sub-blocks with wildly
+    different local contrast.
+    """
+    h, w = crop_f.shape[:2]
+    if h < grid * 4 or w < grid * 4:
+        return 0.5  # too small to subdivide meaningfully -- neutral, not penalized
+    block_h = h // grid
+    block_w = w // grid
+    local_stds = [
+        float(crop_f[gy * block_h:(gy + 1) * block_h, gx * block_w:(gx + 1) * block_w].std())
+        for gy in range(grid)
+        for gx in range(grid)
+    ]
+    local_stds = np.array(local_stds)
+    mean_std = float(local_stds.mean())
+    if mean_std < 1e-6:
+        return 0.0  # perfectly flat everywhere -- no texture at all, not "consistent" texture
+    coefficient_of_variation = float(local_stds.std() / mean_std)
+    return float(np.clip(1.0 - coefficient_of_variation, 0.0, 1.0))
+
+
+def _brightness_score(mean_brightness: float) -> float:
+    """1.0 within a comfortable mid-range, falling off toward 0 at black/blown-out."""
+    lo, hi = 60.0, 200.0
+    if lo <= mean_brightness <= hi:
+        return 1.0
+    if mean_brightness < lo:
+        return float(np.clip(mean_brightness / lo, 0.0, 1.0))
+    return float(np.clip((255.0 - mean_brightness) / (255.0 - hi), 0.0, 1.0))
+
+
+def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
+    """
+    Generic image-quality score for an automatically-proposed measurement
+    area candidate -- NOT the final gauge-detection confidence (that's
+    computed per-approved-ROI, later, by analyze_gauge). Used only to
+    rank and select candidate regions before the user ever sees them.
+    """
+    if crop_gray.size == 0:
+        parts = dict(sharpness=0.0, contrast=0.0, periodicity=0.0, texture_consistency=0.0, brightness_score=0.0)
+        return 0.0, parts
+
+    crop_f = crop_gray.astype(np.float32)
+
+    # Sharpness: variance of the Laplacian -- low for blur, high for
+    # crisp edges. Normalized against a generous ceiling (empirically,
+    # very sharp textile close-ups rarely exceed this) so no single
+    # outlier crop dominates relative ranking.
+    sharpness_raw = float(cv2.Laplacian(crop_gray, cv2.CV_32F).var())
+    sharpness = float(np.clip(sharpness_raw / 500.0, 0.0, 1.0))
+
+    # Local contrast: plain std-dev of intensity. Flat background or a
+    # blown-out region both score low here.
+    contrast = float(np.clip(float(crop_f.std()) / 50.0, 0.0, 1.0))
+
+    texture_consistency = _texture_consistency_score(crop_f)
+
+    # Periodicity strength: reuse the same 1D-autocorrelation primitive
+    # the real wale/course detector uses, on both projections of this
+    # crop. Genuine knit texture autocorrelates strongly at some lag; a
+    # ruler, label, or empty background does not -- this is what lets the
+    # scorer avoid those regions without ever being told what they are.
+    _, gx, gy = _enhance_texture(crop_gray)
+    _, strength_x = _autocorrelation_spacing(_project(gx, axis=0))
+    _, strength_y = _autocorrelation_spacing(_project(gy, axis=1))
+    periodicity = float(max(strength_x, strength_y))
+
+    brightness_score = _brightness_score(float(crop_f.mean()))
+
+    parts = dict(
+        sharpness=sharpness,
+        contrast=contrast,
+        periodicity=periodicity,
+        texture_consistency=texture_consistency,
+        brightness_score=brightness_score,
+    )
+    score = sum(parts[k] * ROI_QUALITY_WEIGHTS[k] for k in ROI_QUALITY_WEIGHTS)
+    return float(np.clip(score, 0.0, 1.0)), parts
+
+
+def propose_measurement_rois(
+    image_bgr: np.ndarray,
+    pixels_per_mm: float,
+    min_regions: int = ROI_PROPOSAL_MIN_REGIONS,
+    max_regions: int = ROI_PROPOSAL_MAX_REGIONS,
+) -> RoiProposalResult:
+    """
+    Propose several candidate square measurement areas, sized from the
+    calibrated physical scale (~0.75-1.0in per side) and spread across
+    the image, for the user to review/edit/approve BEFORE any gauge
+    analysis runs.
+
+    Slides a grid of candidate square windows across the image, scores
+    each with a generic image-quality heuristic (see _roi_quality_score),
+    then greedily selects the highest-scoring candidates subject to a
+    spatial-diversity constraint (no two selections may overlap much or
+    sit too close together) -- so the result naturally spreads across
+    different parts of the fabric rather than clustering.
+
+    Adapts the count to what the image actually supports: aims for
+    `max_regions`, never proposes anything scoring below
+    ROI_PROPOSAL_MIN_QUALITY once `min_regions` is already met, but will
+    relax that floor (rather than propose nothing) if the image can't
+    otherwise reach `min_regions` at all.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return RoiProposalResult(success=False, message="No image data to propose areas from.")
+    if pixels_per_mm is None or pixels_per_mm <= 0:
+        return RoiProposalResult(success=False, message="Invalid calibration scale.")
+
+    img_h, img_w = image_bgr.shape[:2]
+
+    mm_per_inch = 25.4
+    target_in = sum(TARGET_ROI_INCHES) / 2.0  # ~0.875in midpoint
+    window_px = int(round(pixels_per_mm * mm_per_inch * target_in))
+
+    # Never bigger than ~45% of the shorter image dimension (so several
+    # non-identical windows can actually fit), never smaller than the
+    # real detector's own minimum usable ROI size.
+    max_window = int(min(img_w, img_h) * 0.45)
+    window_px = max(MIN_ROI_DIM_PX * 2, min(window_px, max_window)) if max_window > 0 else 0
+
+    if window_px < MIN_ROI_DIM_PX or window_px > min(img_w, img_h):
+        return RoiProposalResult(
+            success=False,
+            message="Image is too small relative to the calibrated scale to propose measurement areas.",
+        )
+
+    margin = int(round(min(img_w, img_h) * ROI_PROPOSAL_EDGE_MARGIN_FRACTION))
+    stride = max(1, int(round(window_px * ROI_PROPOSAL_STRIDE_FRACTION)))
+
+    xs = list(range(margin, max(margin + 1, img_w - window_px - margin + 1), stride))
+    ys = list(range(margin, max(margin + 1, img_h - window_px - margin + 1), stride))
+    if not xs:
+        xs = [max(0, (img_w - window_px) // 2)]
+    if not ys:
+        ys = [max(0, (img_h - window_px) // 2)]
+
+    gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+
+    candidates: List[dict] = []
+    for cy in ys:
+        for cx in xs:
+            crop_gray = gray_full[cy:cy + window_px, cx:cx + window_px]
+            score, parts = _roi_quality_score(crop_gray)
+            candidates.append({"x": cx, "y": cy, "w": window_px, "h": window_px, "score": score, **parts})
+
+    if not candidates:
+        return RoiProposalResult(success=False, message="Could not evaluate any candidate measurement areas.")
+
+    candidates.sort(key=lambda c: c["score"], reverse=True)
+
+    selected: List[dict] = []
+    for cand in candidates:
+        if len(selected) >= max_regions:
+            break
+        if cand["score"] < ROI_PROPOSAL_MIN_QUALITY and len(selected) >= min_regions:
+            break
+        if _too_close_to_selected(cand, selected, window_px):
+            continue
+        selected.append(cand)
+
+    # Didn't reach min_regions honoring the quality floor -- relax it and
+    # backfill with the next-best, still-spread-out candidates rather
+    # than proposing fewer than min_regions usable areas outright. Spatial
+    # diversity is still enforced; only the quality floor is relaxed.
+    if len(selected) < min_regions:
+        already = {id(c) for c in selected}
+        for cand in candidates:
+            if len(selected) >= min_regions:
+                break
+            if id(cand) in already:
+                continue
+            if _too_close_to_selected(cand, selected, window_px):
+                continue
+            selected.append(cand)
+
+    if not selected:
+        return RoiProposalResult(
+            success=False,
+            message="No suitable measurement areas were found in this image.",
+            window_size_px=window_px,
+        )
+
+    rois = [
+        ProposedRoi(
+            x=c["x"], y=c["y"], width=c["w"], height=c["h"],
+            label=ROI_PROPOSAL_LABELS[i] if i < len(ROI_PROPOSAL_LABELS) else str(i + 1),
+            quality_score=round(c["score"], 4),
+            sharpness=round(c["sharpness"], 4),
+            contrast=round(c["contrast"], 4),
+            periodicity=round(c["periodicity"], 4),
+            texture_consistency=round(c["texture_consistency"], 4),
+            brightness_score=round(c["brightness_score"], 4),
+        )
+        for i, c in enumerate(selected)
+    ]
+    return RoiProposalResult(
+        success=True,
+        message=f"Proposed {len(rois)} measurement area(s).",
+        rois=rois,
+        window_size_px=window_px,
+    )

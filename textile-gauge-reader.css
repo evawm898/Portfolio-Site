@@ -429,6 +429,82 @@
 }
 .tgr-btn--secondary:hover { border-color: var(--ink-dim); }
 
+/* ---------------------------------------------------
+   Review Measurement Areas (multi-ROI proposal/review)
+--------------------------------------------------- */
+
+.tgr-roi-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.tgr-roi-list__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--black-raised);
+}
+.tgr-roi-list__item:hover { border-color: var(--ink-dim); }
+.tgr-roi-list__item.is-selected {
+  border-color: var(--petrol-bright);
+  background: rgba(15, 125, 125, 0.08);
+}
+.tgr-roi-list__swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--black);
+  background: var(--petrol-bright);
+}
+.tgr-roi-list__item.is-manual .tgr-roi-list__swatch { background: var(--tgr-course); }
+.tgr-roi-list__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  color: var(--ink-dim);
+}
+.tgr-roi-list__meta span:first-child { color: var(--ink); }
+.tgr-roi-list__meta span:last-child { font-size: 10.5px; color: var(--ink-faint); }
+.tgr-roi-list__remove {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-faint);
+  border-radius: 3px;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 13px;
+}
+.tgr-roi-list__remove:hover { border-color: var(--tgr-error); color: var(--tgr-error); }
+.tgr-roi-list__empty {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 0.5rem 0;
+}
+
+.tgr-viewer__stage canvas.is-roi-add-mode { cursor: crosshair; }
+
 .tgr-summary {
   list-style: none;
   padding: 0;
