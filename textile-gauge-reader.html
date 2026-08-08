@@ -167,6 +167,23 @@
       <div class="tgr-results-grid" id="resultsGrid"></div>
       <div id="resultsWarning" class="tgr-warning" hidden></div>
 
+      <details class="tgr-debug-panel tgr-consistency-panel" id="measurementConsistencyPanel" hidden>
+        <summary>Measurement consistency</summary>
+        <p class="tgr-hint">
+          The final gauge above is a cross-region consensus, not a single
+          crop's guess: each approved area was measured independently, and
+          regions that didn't agree with the majority are excluded rather
+          than averaged in. This is that comparison, in brief -- see
+          Developer diagnostics below for each region's own numbers.
+        </p>
+        <div id="measurementConsistencyContent"></div>
+      </details>
+
+      <label class="tgr-checkbox-option tgr-show-centers-toggle" id="showMeasurementAreasRow" hidden>
+        <input type="checkbox" id="showMeasurementAreasCheck">
+        <span>Show measurement areas</span>
+      </label>
+
       <details class="tgr-debug-panel" id="devDiagnosticsPanel">
         <summary>Developer diagnostics</summary>
         <p class="tgr-hint">
@@ -184,6 +201,12 @@
           <input type="checkbox" id="showVShapeLoopsCheck">
           <span>Show detected loops (V-shape experiment)</span>
         </label>
+
+        <div class="tgr-field-row" id="roiDiagSelectRow" hidden>
+          <label for="roiDiagSelect">Inspect region</label>
+          <select id="roiDiagSelect"></select>
+        </div>
+        <div id="roiDiagContent"></div>
 
         <div id="axisDiagnosticsContent"></div>
         <div id="loopLatticeComparison"></div>

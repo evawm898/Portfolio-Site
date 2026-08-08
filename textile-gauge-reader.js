@@ -115,6 +115,15 @@
   const loopLatticeComparison = document.getElementById("loopLatticeComparison");
   const detectionDetailsContent = document.getElementById("detectionDetailsContent");
 
+  // Multi-region diagnostics (Stage 2)
+  const measurementConsistencyPanel = document.getElementById("measurementConsistencyPanel");
+  const measurementConsistencyContent = document.getElementById("measurementConsistencyContent");
+  const showMeasurementAreasRow = document.getElementById("showMeasurementAreasRow");
+  const showMeasurementAreasCheck = document.getElementById("showMeasurementAreasCheck");
+  const roiDiagSelectRow = document.getElementById("roiDiagSelectRow");
+  const roiDiagSelect = document.getElementById("roiDiagSelect");
+  const roiDiagContent = document.getElementById("roiDiagContent");
+
   const serviceStatusEl = document.getElementById("serviceStatus");
   const serviceStatusDot = document.getElementById("serviceStatusDot");
   const serviceStatusText = document.getElementById("serviceStatusText");
@@ -168,6 +177,8 @@
     orientation: "vertical",
     structure: "unknown",
     result: null,
+    showMeasurementAreas: false, // "Show measurement areas" toggle -- all approved ROI outlines, results step
+    selectedDiagnosticRoiLabel: null, // which region's own detail is shown in Developer diagnostics' per-region panel
     serviceOnline: null, // null = unknown/not configured, true/false once checked
   };
 
@@ -676,18 +687,68 @@
     if (showLoopCentersCheck.checked && result.loop_centers_px && result.loop_centers_px.length) {
       drawLoopCenters(result.loop_centers_px, "#e9ecec");
     }
-    if (showVShapeLoopsCheck.checked && result.loop_lattice_debug) {
-      const d = result.loop_lattice_debug;
-      // Inferred wale columns first (so points draw on top of the lines).
-      if (d.wale_columns_px && d.wale_columns_px.length) {
-        drawAxisLines(d.wale_columns_px, waleIsVertical, "#e0b830", roiTop, roiBottom);
+
+    // "Show detected loops": the currently SELECTED region's own
+    // loop-lattice experiment result (see Developer diagnostics' per-
+    // region selector), drawn within THAT region's own bounds -- not
+    // necessarily the primary/overlay region above. Falls back to the
+    // top-level (primary) loop_lattice_debug when there's no multi-region
+    // diagnostics at all (a legacy single-region result).
+    if (showVShapeLoopsCheck.checked) {
+      const mr = result.multi_roi;
+      let d = result.loop_lattice_debug;
+      let dRoiTop = roiTop;
+      let dRoiBottom = roiBottom;
+      if (mr && mr.per_roi && mr.per_roi.length) {
+        const m = mr.per_roi.find((x) => x.label === state.selectedDiagnosticRoiLabel) || mr.per_roi[0];
+        d = m.loop_lattice_debug;
+        dRoiTop = naturalToDisplay({ x: m.x, y: m.y });
+        dRoiBottom = naturalToDisplay({ x: m.x + m.width, y: m.y + m.height });
       }
-      if (d.direct_centers_px && d.direct_centers_px.length) {
-        drawLoopCenters(d.direct_centers_px, "#4fd67a");
+      if (d) {
+        // Inferred wale columns first (so points draw on top of the lines).
+        if (d.wale_columns_px && d.wale_columns_px.length) {
+          drawAxisLines(d.wale_columns_px, waleIsVertical, "#e0b830", dRoiTop, dRoiBottom);
+        }
+        if (d.direct_centers_px && d.direct_centers_px.length) {
+          drawLoopCenters(d.direct_centers_px, "#4fd67a");
+        }
+        if (d.inferred_centers_px && d.inferred_centers_px.length) {
+          drawHollowCenters(d.inferred_centers_px, "#ff9f43");
+        }
       }
-      if (d.inferred_centers_px && d.inferred_centers_px.length) {
-        drawHollowCenters(d.inferred_centers_px, "#ff9f43");
-      }
+    }
+
+    if (state.showMeasurementAreas) {
+      drawApprovedAreaOutlines();
+    }
+  }
+
+  // "Show measurement areas" toggle: every approved area's outline, drawn
+  // subtly (dashed, low alpha, no fill/handles) so the user can see which
+  // parts of the fabric contributed to the result without the display
+  // becoming as busy as the review step's fully-editable view.
+  function drawApprovedAreaOutlines() {
+    for (const roi of state.rois) {
+      const tl = naturalToDisplay({ x: roi.x, y: roi.y });
+      const w = roi.width * getScale();
+      const h = roi.height * getScale();
+      const isPrimary =
+        state.roi &&
+        roi.x === state.roi.x && roi.y === state.roi.y &&
+        roi.width === state.roi.width && roi.height === state.roi.height;
+      ctx.save();
+      ctx.strokeStyle = roiSwatchColor(roi);
+      ctx.lineWidth = isPrimary ? 1.5 : 1;
+      ctx.globalAlpha = 0.55;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(tl.x, tl.y, w, h);
+      ctx.restore();
+      ctx.font = "10px monospace";
+      ctx.fillStyle = roiSwatchColor(roi);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(roi.label, tl.x + 3, tl.y + 2);
     }
   }
 
@@ -782,6 +843,8 @@
       state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null };
       state.roi = null;
       state.result = null;
+      state.showMeasurementAreas = false;
+      state.selectedDiagnosticRoiLabel = null;
       resetCalibrationUI();
       resetRoiUI();
       resetView();
@@ -1361,8 +1424,8 @@
     );
     const mm = state.cal.knownDistance * unitToMm[state.cal.unit];
     const ppm = pxDist / mm;
-    const roiMmW = (state.roi.width / ppm).toFixed(1);
-    const roiMmH = (state.roi.height / ppm).toFixed(1);
+    const regionCount = state.rois.length;
+    const areaLabels = state.rois.map((r) => r.label).join(", ");
 
     const rows = [
       ["File", state.file.name],
@@ -1370,8 +1433,8 @@
       ["Calibration", `${state.cal.knownDistance} ${state.cal.unit} (${pxDist.toFixed(1)} px)`],
       ["Scale", `${ppm.toFixed(3)} px/mm`],
       [
-        "Measurement area",
-        `${Math.round(state.roi.width)}×${Math.round(state.roi.height)} px (${roiMmW}×${roiMmH} mm)`,
+        "Measurement areas",
+        `${regionCount} region${regionCount === 1 ? "" : "s"} (${areaLabels})`,
       ],
       ["Wale orientation", state.orientation === "vertical" ? "Vertical ↕" : "Horizontal ↔"],
       ["Structure", state.structure === "jersey" ? "Jersey / Single Knit" : "Unknown"],
@@ -1407,10 +1470,24 @@
     try {
       const fd = new FormData();
       fd.append("file", state.file);
-      fd.append("roi_x", state.roi.x);
-      fd.append("roi_y", state.roi.y);
-      fd.append("roi_width", state.roi.width);
-      fd.append("roi_height", state.roi.height);
+      // Every approved measurement area, in full-image pixel coordinates
+      // -- the backend analyzes each one COMPLETELY INDEPENDENTLY (see
+      // analyze_multi_roi) and returns a robust cross-region consensus
+      // as wale/course below; state.roi is updated afterward to whichever
+      // approved area the backend used as the primary/overlay region.
+      fd.append(
+        "rois_json",
+        JSON.stringify(
+          state.rois.map((r) => ({
+            label: r.label,
+            x: r.x,
+            y: r.y,
+            width: r.width,
+            height: r.height,
+            source: r.source,
+          }))
+        )
+      );
       fd.append("cal_x1", state.cal.points[0].x);
       fd.append("cal_y1", state.cal.points[0].y);
       fd.append("cal_x2", state.cal.points[1].x);
@@ -1424,7 +1501,7 @@
       const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
       let res;
       try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/analyze`, {
+        res = await fetch(`${CONFIG.API_BASE_URL}/analyze-multi`, {
           method: "POST",
           body: fd,
           signal: controller.signal,
@@ -1445,6 +1522,16 @@
       }
 
       state.result = data;
+      // The backend picks one approved area as the "primary" region (the
+      // first one accepted into both axes' consensus) and echoes its
+      // bounds back as `roi` -- align state.roi to it so every existing
+      // overlay/verify-measurement calculation (built around a single
+      // ROI) keeps working unchanged, now pointed at a real, specifically
+      // measured region rather than an arbitrary placeholder.
+      if (data.roi) {
+        state.roi = { x: data.roi.x, y: data.roi.y, width: data.roi.width, height: data.roi.height };
+      }
+      state.selectedDiagnosticRoiLabel = data.multi_roi && data.multi_roi.primary_label;
       analyzeStatus.hidden = true;
       renderResults();
       goToStep("results");
@@ -1601,9 +1688,112 @@
 
     renderDetectionDetails(r);
     renderLoopLatticeComparison(r);
+    renderMeasurementConsistency(r);
+    renderRoiDiagSelector(r);
     initVerifySection(r);
     render();
   }
+
+  // --- Multi-region diagnostics (Stage 2) ---------------------------------
+
+  // Small, normal-results-visible summary of the cross-region consensus --
+  // deliberately NOT the full per-region breakdown (that's Developer
+  // diagnostics' per-region selector below). Hidden entirely for a legacy/
+  // single-region result (r.multi_roi is only present from /analyze-multi).
+  function renderMeasurementConsistency(r) {
+    const mr = r.multi_roi;
+    if (!mr || !mr.per_roi || mr.per_roi.length < 2) {
+      measurementConsistencyPanel.hidden = true;
+      showMeasurementAreasRow.hidden = !mr; // still offer the outline toggle for a single region
+      return;
+    }
+    measurementConsistencyPanel.hidden = false;
+    showMeasurementAreasRow.hidden = false;
+
+    const regionCount = mr.per_roi.length;
+    const row = (label, value) => `<div class="tgr-consistency-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(value))}</span></div>`;
+    const agreedText = (consensus) =>
+      `${consensus.included_labels.length} of ${regionCount} agreed` +
+      (consensus.excluded_labels.length ? ` — ${consensus.excluded_labels.length} excluded as outlier${consensus.excluded_labels.length === 1 ? "" : "s"}` : "");
+
+    let html = "";
+    html += row("Regions analyzed", regionCount);
+    html += row("Wale agreement", agreedText(mr.wale_consensus));
+    html += row("Course agreement", agreedText(mr.course_consensus));
+
+    const outlierLines = [];
+    for (const o of mr.wale_consensus.outliers) {
+      outlierLines.push(`Wale ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
+    }
+    for (const o of mr.course_consensus.outliers) {
+      outlierLines.push(`Course ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
+    }
+    const outlierHtml = outlierLines.map((line) => `<div class="tgr-consistency-outlier">⚠ ${escapeHtml(line)}</div>`).join("");
+
+    measurementConsistencyContent.innerHTML = html + outlierHtml;
+  }
+
+  showMeasurementAreasCheck.addEventListener("change", () => {
+    state.showMeasurementAreas = showMeasurementAreasCheck.checked;
+    render();
+  });
+
+  // Developer diagnostics: let a region be inspected individually --
+  // its own detected loop centers, inferred wale columns/course rows
+  // (from that region's own loop-lattice experiment), WPI/CPI,
+  // confidence, and whether it was included/excluded from consensus.
+  function renderRoiDiagSelector(r) {
+    const mr = r.multi_roi;
+    if (!mr || !mr.per_roi || !mr.per_roi.length) {
+      roiDiagSelectRow.hidden = true;
+      roiDiagContent.innerHTML = "";
+      return;
+    }
+    roiDiagSelectRow.hidden = false;
+    const current = state.selectedDiagnosticRoiLabel;
+    const hasCurrent = mr.per_roi.some((m) => m.label === current);
+    if (!hasCurrent) state.selectedDiagnosticRoiLabel = mr.per_roi[0].label;
+
+    roiDiagSelect.innerHTML = mr.per_roi
+      .map((m) => `<option value="${escapeHtml(m.label)}"${m.label === state.selectedDiagnosticRoiLabel ? " selected" : ""}>Region ${escapeHtml(m.label)}${m.source === "manual" ? " (manual)" : ""}</option>`)
+      .join("");
+
+    renderRoiDiagContent(r);
+  }
+
+  function roiDiagTag(label, included) {
+    return `<span class="tgr-roi-diag-card__tag ${included ? "is-included" : "is-excluded"}">${included ? "included" : "excluded"}</span>`;
+  }
+
+  function renderRoiDiagContent(r) {
+    const mr = r.multi_roi;
+    if (!mr) return;
+    const m = mr.per_roi.find((x) => x.label === state.selectedDiagnosticRoiLabel);
+    if (!m) {
+      roiDiagContent.innerHTML = "";
+      return;
+    }
+    const waleIncluded = mr.wale_consensus.included_labels.includes(m.label);
+    const courseIncluded = mr.course_consensus.included_labels.includes(m.label);
+    const waleWpi = m.wale.per_inch != null ? m.wale.per_inch.toFixed(2) : "—";
+    const courseCpi = m.course.per_inch != null ? m.course.per_inch.toFixed(2) : "—";
+    const d = m.loop_lattice_debug;
+
+    roiDiagContent.innerHTML = `
+      <div class="tgr-roi-diag-card">
+        <div class="tgr-roi-diag-card__row"><span>Source</span><span>${m.source === "manual" ? "Manual" : "Auto-proposed"}</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
+        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} columns</span></div>` : ""}
+      </div>`;
+    render(); // re-draw the results overlay so it reflects the newly selected region
+  }
+
+  roiDiagSelect.addEventListener("change", () => {
+    state.selectedDiagnosticRoiLabel = roiDiagSelect.value;
+    renderRoiDiagContent(state.result);
+  });
 
   // --- Detection Details (harmonic-candidate diagnostics) ----------------
 
@@ -1992,6 +2182,8 @@
     state.roiDrag = null;
     state.orientation = "vertical";
     state.result = null;
+    state.showMeasurementAreas = false;
+    state.selectedDiagnosticRoiLabel = null;
 
     fileInput.value = "";
     img.src = "";
@@ -2012,6 +2204,13 @@
     showLoopCentersCheck.checked = false;
     showVShapeLoopsCheck.checked = false;
     loopLatticeComparison.innerHTML = "";
+    measurementConsistencyPanel.hidden = true;
+    measurementConsistencyContent.innerHTML = "";
+    showMeasurementAreasRow.hidden = true;
+    showMeasurementAreasCheck.checked = false;
+    roiDiagSelectRow.hidden = true;
+    roiDiagSelect.innerHTML = "";
+    roiDiagContent.innerHTML = "";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     goToStep("upload");
   });

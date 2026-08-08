@@ -337,6 +337,124 @@ between two accepted ones rather than a scale/harmonic error. Neither
 has been patched by adjusting parameters against the known answer —
 both are left as open, visible findings for the next pass.
 
+### Multi-region measurement: propose, review, measure independently, cross-check
+
+The single-crop workflow above has an inherent blind spot: one ROI can
+fail for reasons that have nothing to do with the detector's logic —
+uneven lighting, a fold, a stray shadow, an unlucky patch of fuzz — and
+there was no way to tell "the detector is wrong" apart from "this one
+crop happened to be bad." The multi-region workflow addresses that by
+never trusting a single crop at all: propose several candidate areas,
+let the user review and approve them, measure each one **completely
+independently**, and only then combine the independent results into one
+robust answer.
+
+**Stage 1 — automatic proposal + human review** (`propose_measurement_
+rois` in `analysis/gauge_analysis.py`, `POST /propose-rois`). Candidate
+square windows (sized from the calibrated scale, targeting ~0.75–1.0in
+per side) slide across the image and are scored by a **generic**
+image-quality heuristic — sharpness (Laplacian variance), local contrast
+(std-dev), texture consistency (contrast uniformity across a coarse
+grid), periodicity strength (the same 1D-autocorrelation primitive the
+real detector uses), and a brightness-extremity penalty. Deliberately
+generic: nothing in the scorer knows what a ruler or a label looks like.
+Those regions score low on their own merits — usually low periodicity,
+often low texture-consistency or blown-out brightness — so a ruler gets
+avoided without ever being named. A greedy selection then picks 2–6
+high-scoring, spatially-diverse candidates (bounded overlap + a minimum
+center-to-center spacing) so the proposal spreads across the fabric
+instead of clustering neighboring boxes together.
+
+Critically, the system **stops here** and does not analyze anything yet.
+The frontend's step 3, "Review Measurement Areas," shows every proposed
+box labeled (A/B/C…) over the photo and requires an explicit "Approve
+Measurement Areas" click before analysis runs. Every box can be moved,
+resized (Shift to keep it square, the same interaction as the original
+single-ROI step), deleted, or reset to the original proposal; an "Add
+Measurement Area" control lets a user draw their own region entirely
+manually if they'd rather choose one themselves — manually-added areas
+(course-colored, vs. teal for auto-proposed) are treated identically to
+proposed ones from Stage 2 onward. The point, explicitly: *the computer
+proposes, the human reviews, the computer measures* — never the computer
+silently removing the human from the loop.
+
+**Stage 2 — independent analysis + robust consensus** (`analyze_multi_
+roi` + `_consensus_for_axis` in `analysis/gauge_analysis.py`, `POST
+/analyze-multi`). Once approved, every region is analyzed by calling the
+existing, unmodified `analyze_gauge()` **once per region, on that
+region's own pixels only** — no region's pixels are combined with
+another's, and no region's result is allowed to influence another
+region's own detection. Only after every region already has its own
+independent measurement does the consensus step run, separately for the
+wale axis and the course axis (a region can be an inlier for one axis
+and an outlier for the other):
+
+1. A coarse **median** (never a mean) of all regions' values for that
+   axis separates likely inliers (within ~1.25x of the median, in
+   log-space) from outliers.
+2. An excluded region's raw measurement is **never rewritten** to match
+   the consensus — `per_roi` in the API response always carries that
+   region's own untouched `analyze_gauge()` result, and the region is
+   simply flagged `excluded` for that axis.
+3. If an outlier's value is close to 2x or 0.5x the accepted median, its
+   diagnostic `reason` says so ("consistent with a half-loop/sub-feature
+   harmonic") — this is corroborating evidence shown to a human, **not**
+   the rule that excluded it (the log-ratio tolerance check already did
+   that); a non-harmonic deviation gets a plain "deviates from the
+   regional consensus" reason instead.
+4. The **final** value is a confidence- and quality-weighted median of
+   the inliers only (`_weighted_median`) — still never an average, so a
+   strong, confident region can't be outvoted by sheer count, but also
+   never gets its exact value blended with anyone else's.
+5. Confidence starts from the inliers' own weighted-average confidence
+   and is scaled by how well they agree (tight agreement across 3+
+   regions can pull it up toward what they already claim for themselves
+   — never above it; loose agreement, or only one usable region, pulls
+   it down). This makes confidence a genuine signal of *regional
+   agreement*, not just one crop's self-reported certainty.
+
+The final `wale`/`course` fields in the API response are ordinary
+`AxisResult`s — same shape as the original single-ROI `/analyze` — so
+the normal Results view (WALES/IN, COURSES/IN, one Confidence word,
+spacing) needed no changes at all. A `multi_roi` field carries the full
+diagnostics: every region's own independent measurement, and each axis's
+consensus (which regions agreed, which were excluded and why, the
+regional median and spread). The frontend surfaces a **small, collapsed-
+by-default** "Measurement consistency" panel in normal Results (e.g. "6
+regions analyzed — Wale: 4 of 6 agreed, 2 excluded as outliers") without
+cluttering the primary numbers, plus a "Show measurement areas" toggle
+that draws every approved box subtly over the final image. The full
+per-region breakdown — including that region's own detected loop
+centers, inferred wale columns/course rows from its own loop-lattice
+experiment, WPI/CPI, confidence, and included/excluded status — lives in
+Developer diagnostics' region selector, never the normal view.
+
+**Honest result on the real jersey photo** (6 auto-proposed regions,
+0.87in² each): course consensus landed close to the known ~7.2 CPI
+(7.28/in, from 4 of 6 regions; A and E were correctly excluded, one as a
+~2x harmonic, one as a ~0.5x harmonic). Wale consensus did **not** land
+close to the known ~5 WPI — it converged on ~9.5 WPI instead, because 4
+of the 6 regions' own independent `analyze_gauge()` calls happened to
+lock onto the same half-loop harmonic (only regions A and B were close
+to the true value, and got outvoted). This is a real, unflattering
+result, reported as-is rather than tuned away: **robust cross-region
+statistics cannot distinguish "the true value" from "a majority of
+independent detectors sharing the same systematic error"** — no purely
+statistical consensus method can, without an additional prior. What the
+system got right is that it never claimed false certainty about it: wale
+confidence came out at 23% (Low), correctly flagging the number as
+unreliable and worth manual verification, rather than reporting ~9.5 WPI
+with unearned confidence. This is the intended failure mode — cross-
+region agreement (or the lack of it) driving confidence is "much more
+useful than confidence based on one crop" specifically because it can
+catch this even when the point estimate itself is fooled.
+
+Ground truth (the "Verify Measurement" correction system) is never used
+anywhere in this pipeline — not for proposing regions, not for scoring
+their quality, not for selecting inliers, not for consensus. It remains
+strictly an evaluation-only comparison, entered by the user after the
+fact.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/
@@ -381,20 +499,26 @@ configured" message instead of crashing or silently failing.
 1. **Upload** a JPG/PNG/WEBP photo of a knit textile.
 2. **Calibrate scale** — click two points a known distance apart (e.g. a
    ruler in the shot), enter that distance and its unit.
-3. **Select measurement area** — drag a rectangle over a clean, flat,
-   representative patch of fabric. Handles let you resize it afterward.
+3. **Review measurement areas** — the backend proposes several candidate
+   square areas from the calibrated scale, spread across the fabric (see
+   [Multi-region measurement](#multi-region-measurement-propose-review-measure-independently-cross-check)
+   below); move, resize, delete, or add your own before approving. Nothing
+   is analyzed until you click "Approve Measurement Areas."
 4. **Select orientation** — tell it whether wales run vertically or
    horizontally in the photo (V0 does not auto-detect this).
-5. **Analyze** — the image, ROI, calibration, and orientation are sent to
-   the backend, which runs the CV pipeline and returns spacing/gauge
-   estimates with confidence scores.
+5. **Analyze** — the image, every approved area, calibration, and
+   orientation are sent to the backend, which analyzes each area
+   independently and returns a cross-region-consensus gauge estimate
+   with confidence scores.
 6. **Results** — wales/inch and courses/inch are shown prominently, along
    with spacing in mm, analyzed area size, and detected wale/course
-   positions drawn back over the image. A collapsible **Detection
-   Details** panel shows every harmonic period candidate considered per
-   axis and why the final one was picked; a **Show loop centers**
-   checkbox overlays the detector's approximate 2D loop-center points so
-   you can visually check them against the real knit structure.
+   positions drawn back over the image. A collapsible **Measurement
+   consistency** panel summarizes regional agreement (e.g. "4 of 6
+   agreed, 2 excluded as outliers"); a **Detection Details** panel shows
+   every harmonic period candidate considered per axis and why the final
+   one was picked; **Show loop centers** and **Show measurement areas**
+   checkboxes overlay the detector's approximate 2D loop-center points and
+   every approved area's outline, respectively.
 7. **Verify Measurement** (optional) — enter the true gauge for this
    sample (directly, or via a stitch count over the ROI) to save a
    labeled ground-truth record for later evaluation. See
@@ -499,6 +623,24 @@ points for the debug overlay). Validation failures (bad file type,
 oversized upload, degenerate calibration, out-of-bounds ROI) come back
 as `success: false` with a clear `message` and an appropriate 4xx
 status — never a fabricated result.
+
+`POST /propose-rois` — multipart form: `file` + the same calibration
+fields as `/analyze` (no ROI/orientation yet — this runs before either is
+known). Returns `rois` (list of `{x, y, width, height, label,
+quality_score, sharpness, contrast, periodicity, texture_consistency,
+brightness_score}`) and `window_size_px`. See [Multi-region measurement](
+#multi-region-measurement-propose-review-measure-independently-cross-check).
+
+`POST /analyze-multi` — multipart form: `file`, `rois_json` (a JSON array
+of `{label, x, y, width, height, source}`, in place of `/analyze`'s single
+`roi_x`/`roi_y`/`roi_width`/`roi_height`), plus the same calibration/
+`orientation`/`structure` fields as `/analyze`. Returns the **same shape**
+as `/analyze` (`wale`/`course` are the cross-region consensus, `roi` is
+the primary/overlay region) plus `multi_roi`: every region's own
+independent measurement (`per_roi`) and each axis's consensus detail
+(`wale_consensus`/`course_consensus`: `included_labels`,
+`excluded_labels`, `outliers`, `regional_median_px`/`_per_inch`,
+`regional_spread_px`).
 
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.

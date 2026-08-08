@@ -2731,3 +2731,428 @@ def propose_measurement_rois(
         rois=rois,
         window_size_px=window_px,
     )
+
+
+# --- Multi-ROI independent analysis + cross-region consensus ------------
+#
+# Stage 2 of the multi-region workflow (see propose_measurement_rois above
+# for Stage 1). Every APPROVED region is analyzed completely independently
+# -- analyze_gauge() is called once per region, on that region's own
+# pixels only, exactly as it always has been for a single ROI. Nothing
+# here combines ROI pixels or lets one region's result influence another
+# region's own detection; the only place results interact is the
+# consensus step below, which runs strictly AFTER every region already
+# has its own independent measurement.
+#
+# The final wale/course numbers are a robust, confidence-weighted median
+# of the regions that agree with each other -- never a plain mean, and an
+# excluded outlier's own raw measurement is never overwritten to match
+# the consensus (see RoiMeasurement.wale/course, which always carries
+# that region's own untouched analyze_gauge() result).
+
+CONSENSUS_INLIER_LOG_TOLERANCE = 0.22    # ~1.25x: candidates within this log-ratio of the median agree with it
+CONSENSUS_HARMONIC_LOG_TOLERANCE = 0.25  # log-ratio tolerance for recognizing a candidate as ~2x/0.5x of the median
+CONSENSUS_SINGLE_REGION_FACTOR = 0.85    # confidence multiplier when only one region has a usable measurement
+CONSENSUS_TIGHT_SPREAD_LOG = 0.06        # relative (log) inlier spread below which agreement counts as "tight"
+CONSENSUS_LOOSE_SPREAD_LOG = 0.16        # ...below which agreement still counts for something
+
+
+@dataclass
+class OutlierInfo:
+    """
+    One region's measurement that was excluded from an axis's consensus.
+    Its own raw spacing_px is preserved here exactly as analyze_gauge()
+    measured it -- outlier classification never rewrites a region's own
+    result, only whether that result counts toward the combined value.
+    """
+
+    label: str
+    spacing_px: float
+    ratio_to_consensus: float
+    reason: str
+
+
+@dataclass
+class AxisConsensusResult:
+    """
+    Cross-region consensus for one axis (wale or course), built from every
+    approved region's own independent AxisResult for that axis. See
+    _consensus_for_axis for the algorithm.
+    """
+
+    spacing_px: Optional[float]
+    confidence: float
+    status: str = "confident"  # "confident" | "uncertain"
+    uncertain_reason: Optional[str] = None
+    message: str = ""
+    included_labels: List[str] = field(default_factory=list)
+    excluded_labels: List[str] = field(default_factory=list)
+    outliers: List[OutlierInfo] = field(default_factory=list)
+    regional_median_px: Optional[float] = None
+    regional_spread_px: Optional[float] = None
+
+
+@dataclass
+class RoiMeasurement:
+    """One approved region's own, fully independent analysis result."""
+
+    label: str
+    x: int
+    y: int
+    width: int
+    height: int
+    source: str  # "auto" | "manual"
+    success: bool
+    message: str
+    wale: AxisResult
+    course: AxisResult
+    quality_score: float
+    quality_parts: dict
+    loop_centers_px: List[Tuple[float, float]] = field(default_factory=list)
+    rotation_deg: float = 0.0
+    loop_lattice: Optional["LoopLatticeResult"] = None
+
+
+@dataclass
+class MultiRoiAnalysisResult:
+    success: bool
+    message: str
+    per_roi: List[RoiMeasurement] = field(default_factory=list)
+    wale: AxisResult = field(default_factory=lambda: AxisResult(spacing_px=None, positions_px=[], confidence=0.0))
+    course: AxisResult = field(default_factory=lambda: AxisResult(spacing_px=None, positions_px=[], confidence=0.0))
+    wale_consensus: Optional[AxisConsensusResult] = None
+    course_consensus: Optional[AxisConsensusResult] = None
+    primary_label: Optional[str] = None
+    primary_roi_px: Optional[Tuple[int, int, int, int]] = None
+
+
+def _weighted_median(values: List[float], weights: List[float]) -> float:
+    """
+    The value at which cumulative weight first reaches half the total --
+    a robust central tendency that lets a region's own confidence and ROI
+    quality matter WITHOUT ever averaging measurements together the way a
+    plain mean would (a strong, confident region among weak/noisy ones
+    still can't be outvoted by sheer count, but also doesn't get its exact
+    value silently blended with anyone else's).
+    """
+    pairs = sorted(zip(values, weights), key=lambda p: p[0])
+    total = sum(w for _, w in pairs)
+    if total <= 0:
+        vals = sorted(values)
+        n = len(vals)
+        mid = n // 2
+        return vals[mid] if n % 2 else (vals[mid - 1] + vals[mid]) / 2.0
+    cum = 0.0
+    for v, w in pairs:
+        cum += w
+        if cum >= total / 2.0:
+            return v
+    return pairs[-1][0]
+
+
+def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensusResult:
+    """
+    Robust cross-region consensus for one axis, from independently
+    measured per-region candidates: [{"label","spacing_px","confidence",
+    "quality_score"}, ...] (regions with no usable measurement for this
+    axis are simply not included in `candidates`).
+
+    Never a plain mean, per PART 9 of the request this implements: a
+    coarse median first separates likely inliers from outliers (values
+    more than CONSENSUS_INLIER_LOG_TOLERANCE off in log-space), then the
+    FINAL value is a confidence/quality-weighted median of the inliers
+    only. An outlier close to 2x or 0.5x the median is annotated as
+    "consistent with a harmonic" in its reason -- corroborating evidence
+    for a human reading the diagnostics, never the reason it was excluded
+    in the first place (the tolerance check already excluded it).
+    """
+    if not candidates:
+        return AxisConsensusResult(
+            spacing_px=None, confidence=0.0,
+            message=f"No region produced a usable {axis_label} measurement.",
+        )
+
+    values = [c["spacing_px"] for c in candidates]
+    labels = [c["label"] for c in candidates]
+
+    if len(candidates) == 1:
+        c = candidates[0]
+        return AxisConsensusResult(
+            spacing_px=c["spacing_px"],
+            confidence=round(c["confidence"] * CONSENSUS_SINGLE_REGION_FACTOR, 4),
+            message=(
+                f"Only region {c['label']} produced a usable {axis_label} measurement -- "
+                "cross-region validation unavailable."
+            ),
+            included_labels=[c["label"]],
+            regional_median_px=c["spacing_px"],
+            regional_spread_px=0.0,
+        )
+
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    mid = n // 2
+    initial_median = sorted_vals[mid] if n % 2 else (sorted_vals[mid - 1] + sorted_vals[mid]) / 2.0
+
+    inliers: List[dict] = []
+    outliers: List[OutlierInfo] = []
+    for c in candidates:
+        ratio = c["spacing_px"] / initial_median if initial_median > 0 else 1.0
+        log_ratio = abs(math.log(ratio)) if ratio > 0 else float("inf")
+        if log_ratio <= CONSENSUS_INLIER_LOG_TOLERANCE:
+            inliers.append(c)
+            continue
+        if abs(math.log(ratio / 2.0)) <= CONSENSUS_HARMONIC_LOG_TOLERANCE:
+            reason = (
+                f"~2x the regional consensus ({initial_median:.1f}px) -- "
+                "consistent with a half-loop/sub-feature harmonic, not forced to match it."
+            )
+        elif abs(math.log(ratio * 2.0)) <= CONSENSUS_HARMONIC_LOG_TOLERANCE:
+            reason = (
+                f"~0.5x the regional consensus ({initial_median:.1f}px) -- "
+                "consistent with a doubled-repeat harmonic, not forced to match it."
+            )
+        else:
+            reason = f"deviates from the regional consensus ({initial_median:.1f}px) with no clean harmonic relationship."
+        outliers.append(OutlierInfo(
+            label=c["label"], spacing_px=c["spacing_px"],
+            ratio_to_consensus=round(ratio, 3), reason=reason,
+        ))
+
+    if not inliers:
+        # Every region disagreed with every other -- no dominant cluster
+        # at all. Rather than silently pick one, use the confidence-
+        # weighted median of everything (still never a plain mean) and
+        # mark the axis uncertain so the UI never claims a settled
+        # agreement that doesn't exist.
+        weights = [max(c["confidence"] * c["quality_score"], 1e-6) for c in candidates]
+        return AxisConsensusResult(
+            spacing_px=_weighted_median(values, weights),
+            confidence=round(min(c["confidence"] for c in candidates) * 0.5, 4),
+            status="uncertain",
+            uncertain_reason=(
+                f"No dominant cluster among {len(candidates)} regions for {axis_label} -- "
+                "values disagreed too much to call."
+            ),
+            message=(
+                f"No dominant regional consensus for {axis_label}; used the confidence-weighted "
+                f"median of all {len(candidates)} regions."
+            ),
+            included_labels=labels,
+            regional_median_px=initial_median,
+            regional_spread_px=(sorted_vals[-1] - sorted_vals[0]) / 2.0,
+        )
+
+    inlier_values = [c["spacing_px"] for c in inliers]
+    inlier_weights = [max(c["confidence"] * c["quality_score"], 1e-6) for c in inliers]
+    final_value = _weighted_median(inlier_values, inlier_weights)
+
+    inlier_sorted = sorted(inlier_values)
+    spread = (inlier_sorted[-1] - inlier_sorted[0]) / 2.0
+    relative_spread_log = abs(math.log(inlier_sorted[-1] / inlier_sorted[0])) if inlier_sorted[0] > 0 else 0.0
+
+    base_confidence = sum(c["confidence"] * w for c, w in zip(inliers, inlier_weights)) / sum(inlier_weights)
+
+    # Regional-agreement adjustment: tight, multi-region agreement can
+    # only pull confidence UP TOWARD what the inliers already claim for
+    # themselves (agreement_factor never exceeds 1.0) -- corroborating an
+    # axis's own confidence, never manufacturing confidence no individual
+    # region actually earned. Looser agreement, or too few inliers, pulls
+    # it down instead.
+    if len(inliers) >= 3 and relative_spread_log <= CONSENSUS_TIGHT_SPREAD_LOG:
+        agreement_factor = 1.0
+    elif len(inliers) >= 2 and relative_spread_log <= CONSENSUS_LOOSE_SPREAD_LOG:
+        agreement_factor = 0.9
+    elif len(inliers) >= 2:
+        agreement_factor = 0.75
+    else:
+        agreement_factor = CONSENSUS_SINGLE_REGION_FACTOR
+
+    confidence = round(base_confidence * agreement_factor, 4)
+
+    status = "confident"
+    uncertain_reason = None
+    if outliers and len(inliers) < 2:
+        status = "uncertain"
+        uncertain_reason = f"Only {len(inliers)} region(s) agreed for {axis_label}; {len(outliers)} excluded as outlier(s)."
+    elif relative_spread_log > CONSENSUS_LOOSE_SPREAD_LOG:
+        status = "uncertain"
+        uncertain_reason = f"Regions that agreed for {axis_label} still spread more than expected."
+
+    included_labels = [c["label"] for c in inliers]
+    excluded_labels = [o.label for o in outliers]
+    message = (
+        f"{axis_label.capitalize()} consensus from {len(inliers)} of {len(candidates)} region(s)"
+        + (f"; excluded {', '.join(excluded_labels)} as outlier(s)." if excluded_labels else ".")
+    )
+
+    return AxisConsensusResult(
+        spacing_px=final_value,
+        confidence=confidence,
+        status=status,
+        uncertain_reason=uncertain_reason,
+        message=message,
+        included_labels=included_labels,
+        excluded_labels=excluded_labels,
+        outliers=outliers,
+        regional_median_px=initial_median,
+        regional_spread_px=spread,
+    )
+
+
+def analyze_multi_roi(
+    image_bgr: np.ndarray,
+    rois: List[dict],
+    orientation: Orientation,
+    structure: Structure = "unknown",
+) -> MultiRoiAnalysisResult:
+    """
+    Analyze every approved measurement area COMPLETELY INDEPENDENTLY (each
+    is just a separate analyze_gauge() call on that region's own pixels --
+    no ROI's result can influence another's own detection), then combine
+    the independent results into one robust, confidence-weighted-median
+    consensus per axis (see _consensus_for_axis). Mirrors PARTS 8/9/10/17
+    of the request this implements: independent-first, consensus-second,
+    never circular.
+
+    `rois`: [{"label","x","y","width","height","source"}, ...], in
+    full-image pixel coordinates, exactly as approved on the "Review
+    Measurement Areas" step (both auto-proposed and manually-added areas
+    are treated identically here -- this function doesn't know or care
+    which is which beyond echoing `source` back in diagnostics).
+
+    Adapts to whatever the input supports: with a single region, this
+    degenerates to that region's own result with a reduced confidence
+    (cross-region validation isn't possible); with 2+, outliers are
+    identified but their own raw measurement is preserved unchanged in
+    per_roi, never rewritten to match the consensus.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return MultiRoiAnalysisResult(success=False, message="No image data to analyze.")
+    if not rois:
+        return MultiRoiAnalysisResult(success=False, message="No measurement areas were approved.")
+
+    img_h, img_w = image_bgr.shape[:2]
+    gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+
+    per_roi: List[RoiMeasurement] = []
+    for spec in rois:
+        x = max(0, min(int(round(spec["x"])), max(img_w - 1, 0)))
+        y = max(0, min(int(round(spec["y"])), max(img_h - 1, 0)))
+        w = max(0, min(int(round(spec["width"])), img_w - x))
+        h = max(0, min(int(round(spec["height"])), img_h - y))
+        roi_tuple = (x, y, w, h)
+
+        # Independent analysis: the SAME single-ROI detector used before
+        # multi-region review existed, called once per region, never
+        # given any other region's pixels or results.
+        result = analyze_gauge(image_bgr=image_bgr, roi=roi_tuple, orientation=orientation, structure=structure)
+
+        quality_score, quality_parts = 0.0, {}
+        if w > 0 and h > 0:
+            quality_score, quality_parts = _roi_quality_score(gray_full[y:y + h, x:x + w])
+
+        # Development/comparison diagnostic only (see analyze_loop_lattice_
+        # experiment's own docstring) -- never allowed to affect wale/course,
+        # and a failure here must never break this region's real result.
+        loop_lattice = None
+        try:
+            loop_lattice = analyze_loop_lattice_experiment(
+                image_bgr, roi=roi_tuple, orientation=orientation,
+                course_rows_px=result.course.positions_px or None,
+            )
+        except Exception:
+            loop_lattice = None
+
+        per_roi.append(RoiMeasurement(
+            label=spec["label"], x=x, y=y, width=w, height=h,
+            source=spec.get("source", "auto"),
+            success=result.success, message=result.message,
+            wale=result.wale, course=result.course,
+            quality_score=quality_score, quality_parts=quality_parts,
+            loop_centers_px=result.loop_centers_px,
+            rotation_deg=result.rotation_deg, loop_lattice=loop_lattice,
+        ))
+
+    def axis_candidates(attr: str) -> List[dict]:
+        out = []
+        for m in per_roi:
+            axis: AxisResult = getattr(m, attr)
+            if axis.spacing_px is None:
+                continue
+            # A floor on quality weight so a region with a near-zero
+            # quality score can't be given literally zero say -- it was
+            # still approved by the user, who may know something the
+            # generic quality heuristic doesn't (see PART 20: a
+            # knowledgeable user can always add/keep an area they trust).
+            out.append({
+                "label": m.label, "spacing_px": axis.spacing_px,
+                "confidence": axis.confidence, "quality_score": max(m.quality_score, 0.05),
+            })
+        return out
+
+    wale_consensus = _consensus_for_axis(axis_candidates("wale"), "wale")
+    course_consensus = _consensus_for_axis(axis_candidates("course"), "course")
+
+    # Primary region for the overlay/analyzed-area: the first (in approval
+    # order) region accepted into BOTH axes' consensus -- deterministic,
+    # and never the region either axis flagged as an outlier. Falls back
+    # to the first region with any successful axis, then simply the first
+    # approved region, so there's always a primary even when consensus
+    # couldn't be computed for either axis.
+    primary: Optional[RoiMeasurement] = None
+    for m in per_roi:
+        if m.label in wale_consensus.included_labels and m.label in course_consensus.included_labels:
+            primary = m
+            break
+    if primary is None:
+        for m in per_roi:
+            if m.wale.spacing_px is not None or m.course.spacing_px is not None:
+                primary = m
+                break
+    if primary is None:
+        primary = per_roi[0]
+
+    # The final wale/course AxisResult keeps the PRIMARY region's own
+    # positions_px (so the results overlay draws real, specific detected
+    # positions rather than nothing) but its spacing/confidence/status
+    # come from the cross-region CONSENSUS, not that one region's own
+    # number -- exactly PART 12's "final gauge from consensus."
+    final_wale = replace(
+        primary.wale,
+        spacing_px=wale_consensus.spacing_px,
+        confidence=wale_consensus.confidence,
+        message=wale_consensus.message,
+        selected_reason=wale_consensus.message,
+        status=wale_consensus.status,
+        uncertain_reason=wale_consensus.uncertain_reason,
+    )
+    final_course = replace(
+        primary.course,
+        spacing_px=course_consensus.spacing_px,
+        confidence=course_consensus.confidence,
+        message=course_consensus.message,
+        selected_reason=course_consensus.message,
+        status=course_consensus.status,
+        uncertain_reason=course_consensus.uncertain_reason,
+    )
+
+    any_axis_ok = wale_consensus.spacing_px is not None or course_consensus.spacing_px is not None
+    message = (
+        f"Analyzed {len(per_roi)} measurement area(s): "
+        f"wale consensus from {len(wale_consensus.included_labels)}, "
+        f"course consensus from {len(course_consensus.included_labels)}."
+        if any_axis_ok else "No region produced a usable measurement."
+    )
+
+    return MultiRoiAnalysisResult(
+        success=any_axis_ok,
+        message=message,
+        per_roi=per_roi,
+        wale=final_wale,
+        course=final_course,
+        wale_consensus=wale_consensus,
+        course_consensus=course_consensus,
+        primary_label=primary.label,
+        primary_roi_px=(primary.x, primary.y, primary.width, primary.height),
+    )

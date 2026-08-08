@@ -624,6 +624,61 @@
 }
 
 /* ---------------------------------------------------
+   Measurement consistency (normal-results-visible summary
+   of the cross-region consensus -- NOT developer diagnostics)
+--------------------------------------------------- */
+
+.tgr-consistency-panel {
+  border-color: rgba(15, 125, 125, 0.35);
+}
+.tgr-consistency-panel summary { color: var(--petrol-bright); font-weight: 600; }
+.tgr-consistency-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 12px;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--line);
+}
+.tgr-consistency-row:last-child { border-bottom: none; }
+.tgr-consistency-row span:first-child { color: var(--ink-dim); }
+.tgr-consistency-row span:last-child { color: var(--ink); font-family: var(--mono); text-align: right; }
+.tgr-consistency-outlier {
+  font-size: 11px;
+  color: var(--tgr-course);
+  line-height: 1.5;
+  padding: 0.25rem 0;
+}
+
+/* Per-region inspector inside Developer diagnostics */
+.tgr-roi-diag-card {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.6rem 0.7rem;
+  margin: 0.5rem 0;
+  font-size: 12px;
+}
+.tgr-roi-diag-card__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.15rem 0;
+  color: var(--ink-dim);
+}
+.tgr-roi-diag-card__row span:last-child { color: var(--ink); font-family: var(--mono); }
+.tgr-roi-diag-card__tag {
+  display: inline-block;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  margin-left: 0.4rem;
+}
+.tgr-roi-diag-card__tag.is-included { color: var(--tgr-ok-dot); border: 1px solid var(--tgr-ok-dot); }
+.tgr-roi-diag-card__tag.is-excluded { color: var(--tgr-error); border: 1px solid var(--tgr-error-border); }
+
+/* ---------------------------------------------------
    Debug / diagnostics (loop centers, detection details)
 --------------------------------------------------- */
 

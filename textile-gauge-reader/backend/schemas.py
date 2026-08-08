@@ -135,6 +135,81 @@ class LoopLatticeDebugOut(BaseModel):
     message: str = ""
 
 
+class OutlierOut(BaseModel):
+    """
+    One region's measurement excluded from an axis's cross-region
+    consensus. spacing_px/per_inch is that region's own RAW result,
+    unchanged -- it is never rewritten to match the consensus value.
+    """
+
+    label: str
+    spacing_px: float
+    per_inch: Optional[float] = None
+    ratio_to_consensus: float
+    reason: str
+
+
+class AxisConsensusOut(BaseModel):
+    """
+    Cross-region consensus diagnostics for one axis (wale or course) --
+    which regions agreed, which were excluded and why, and how spread out
+    the agreeing regions were. See analysis.gauge_analysis._consensus_for_
+    axis. Development/"Measurement consistency" information only; the
+    authoritative wale/course numbers are still AnalyzeResponse.wale/course.
+    """
+
+    included_labels: List[str] = Field(default_factory=list)
+    excluded_labels: List[str] = Field(default_factory=list)
+    outliers: List[OutlierOut] = Field(default_factory=list)
+    regional_median_px: Optional[float] = None
+    regional_median_per_inch: Optional[float] = None
+    regional_spread_px: Optional[float] = None
+    message: str = ""
+
+
+class RoiMeasurementOut(BaseModel):
+    """One approved measurement area's own, fully independent analysis."""
+
+    label: str
+    x: float
+    y: float
+    width: float
+    height: float
+    source: str  # "auto" | "manual"
+    success: bool
+    message: str
+    wale: AxisOut = Field(default_factory=AxisOut)
+    course: AxisOut = Field(default_factory=AxisOut)
+    # Generic image-quality score (sharpness/contrast/texture-consistency/
+    # periodicity/brightness) -- the SAME heuristic used to propose
+    # candidates in Stage 1, reused here on the region's final approved
+    # bounds. Distinct from wale.confidence/course.confidence, which are
+    # this detector's confidence in its own measurement.
+    quality_score: float = 0.0
+    sharpness: Optional[float] = None
+    contrast: Optional[float] = None
+    periodicity: Optional[float] = None
+    texture_consistency: Optional[float] = None
+    brightness_score: Optional[float] = None
+    rotation_deg: float = 0.0
+    loop_lattice_debug: Optional[LoopLatticeDebugOut] = None
+
+
+class MultiRoiDebugOut(BaseModel):
+    """
+    Full multi-region diagnostics: every approved area's own independent
+    result, plus the cross-region consensus that produced the top-level
+    wale/course. Kept out of the normal Results view (see the frontend's
+    small "Measurement consistency" summary and Developer diagnostics'
+    per-region selector) -- this is the complete picture behind them.
+    """
+
+    per_roi: List[RoiMeasurementOut] = Field(default_factory=list)
+    wale_consensus: AxisConsensusOut = Field(default_factory=AxisConsensusOut)
+    course_consensus: AxisConsensusOut = Field(default_factory=AxisConsensusOut)
+    primary_label: Optional[str] = None
+
+
 class AnalyzeResponse(BaseModel):
     success: bool
     message: str
@@ -162,6 +237,10 @@ class AnalyzeResponse(BaseModel):
     # couldn't run (e.g. no periodicity to seed a scale search) or the
     # request failed before reaching it.
     loop_lattice_debug: Optional[LoopLatticeDebugOut] = None
+    # Multi-region diagnostics -- present only when this response came
+    # from /analyze-multi (the "Review Measurement Areas" flow). None for
+    # the legacy single-ROI /analyze path.
+    multi_roi: Optional[MultiRoiDebugOut] = None
 
 
 class ErrorResponse(BaseModel):
