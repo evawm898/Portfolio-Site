@@ -28,8 +28,11 @@ a multiplier doesn't fix this — it's a difference in what the algorithm
 is actually locking onto, and would produce a different, uncorrectable
 error on a different photo.
 
-The pipeline (`ALGORITHM_VERSION` `cv-clahe-sobel-autocorr-loopcenter-density-foldpair-v0.4`)
-addresses this with a second, independent signal: an approximate 2D
+The pipeline (originally shipped as `ALGORITHM_VERSION`
+`cv-clahe-sobel-autocorr-loopcenter-density-foldpair-v0.4`; see
+[cv-v0.3](#cv-v0.3-a-structural-redesign-of-the-scoring-not-another-bolt-on-check)
+below for the current version string and the redesign that replaced this
+naming scheme) addresses this with a second, independent signal: an approximate 2D
 loop-center detector (a Difference-of-Gaussians blob response tuned to
 loop scale, since a genuine loop center is a compact, roughly isotropic
 highlight, unlike a loop's more elongated, edge-like legs). For each
@@ -99,6 +102,89 @@ it isn't assumed to be "solved" — see
 [Ground Truth / Correction System](#ground-truth--correction-system)
 for how to build an evaluation set against real photos and decide
 whether/how to tune it further.
+
+## cv-v0.3: a structural redesign of the scoring, not another bolt-on check
+
+The v0.2–v0.4 checks above (density cross-check, fold-consistency) were
+each a targeted patch for one specific way the *previous* version got
+fooled — and on the next real photo, the wale count was still roughly
+double the true value (~9.55 vs. ~5 wales/in), because the underlying
+architecture was still fundamentally "trust one autocorrelation estimate
+per axis, then try to catch it after the fact." `cv-v0.3` (the algorithm
+version string resets to `cv-v0.3` here — it's a new architecture, not a
+"v0.5") rebuilds candidate selection around one unified, weighted scoring
+system instead of a chain of independent patches:
+
+- **2D periodicity as additional evidence.** Alongside the existing 1D
+  autocorrelation (per axis), a single whole-ROI 2D autocorrelation
+  (FFT-based Wiener–Khinchin) is computed once and sampled per candidate
+  by bilinear interpolation — a genuine full-loop repeat should show up
+  as periodicity in *both* the 1D projection and the full 2D structure;
+  a sub-loop feature (a yarn leg/edge) is far more likely to show up
+  strongly in one but not the other.
+- **Multi-patch regional consensus.** Each axis's signal is sliced into
+  several overlapping bands, each independently autocorrelated, and the
+  per-candidate score rewards agreement with the robust (median-based)
+  consensus across those bands — a real repeat should hold up across
+  sub-regions of the same fabric; a fluke shouldn't. Wide disagreement
+  between bands also feeds an axis-level *instability* penalty (distinct
+  from any single candidate's score) that lowers confidence, since it's
+  the same signature as spacing drifting across the ROI (mild perspective
+  distortion, an uneven surface).
+- **Rotation normalization.** Before periodicity analysis, the ROI is
+  internally rotated (small bounded-angle search, maximizing combined
+  periodicity strength) so wales/courses are closer to vertical/
+  horizontal — a few degrees of photo tilt no longer measurably degrades
+  the period estimate. This is deliberately used *only* to seed a
+  cleaner scalar period — all position/coordinate data (peaks, loop
+  centers, the 2D autocorrelation itself) stays in the original,
+  unrotated image coordinates, so the overlay never needs (and doesn't
+  get) any inverse-rotation mapping.
+- **One centralized, weighted scoring config** (`ScoringWeights` in
+  `analysis/gauge_analysis.py`) combines all of the above — 1D
+  autocorrelation, 2D support, structural (fold-consistency + loop-center
+  pitch agreement) evidence, patch consensus, spacing regularity, and
+  visible-repeat count — into one `evidence_score` per 0.5x/1x/2x
+  candidate, weighted differently depending on the optional **Structure**
+  selector (Jersey gives structural/V-shape evidence more weight; the
+  default Unknown leans more on periodicity/consensus). No magic numbers
+  scattered through the code — every weight and threshold lives in that
+  one block.
+- **Harmonic-ambiguity penalty, and why it must not decide the winner.**
+  A separate penalty term flags when a candidate's raw autocorrelation is
+  suspiciously close to a 0.5x/2x relative's — exactly the "P and 2P look
+  alike" signature of a half-repeat lock-on — and is subtracted to
+  produce a `final_score` used for **confidence**, not for picking the
+  winner. This distinction matters: the penalty is symmetric (it reduces
+  *both* members of a genuinely ambiguous pair by the same amount, so it
+  can never change their relative order), but for a genuinely periodic
+  signal, a true period P and its trivial double 2P are *always* going to
+  autocorrelate similarly — that's guaranteed by periodicity, not
+  ambiguity — so a candidate can rack up a large penalty purely from its
+  double, while a completely unrelated, evidence-weak third candidate
+  (not part of any ambiguous pair) pays no penalty at all. Selecting by
+  post-penalty score let that unrelated weak candidate win by default;
+  `cv-v0.3` selects by pre-penalty `evidence_score` instead (the penalty
+  still lowers the winner's absolute, confidence-facing `final_score`).
+  Both scores are exposed per candidate in **Detection Details**.
+- **Explicit "uncertain" results.** When the top two scored candidates
+  are within a small margin of each other, the result is flagged
+  `status: "uncertain"` with a human-readable reason (e.g. "Competing 0.5x
+  harmonic candidate scored nearly as well") — the UI still shows the
+  best estimate (visually distinguished, not hidden), rather than always
+  presenting a single confident number regardless of how close the call
+  actually was.
+- **Optional Structure control** (Jersey / Single Knit vs. Unknown,
+  default Unknown) reweights structural (loop-center/V-shape) evidence
+  higher for Jersey without building a full automatic knit-structure
+  classifier — Rib/Interlock/Mesh are deliberately left for a future
+  version.
+
+None of this removes the v0.2–v0.4 checks described above — fold-
+consistency and the density cross-check are still computed and still
+feed into the unified score (as `structural_score`) — it replaces the
+"chain of independent patches" architecture around them with one scoring
+system that's easier to reason about and extend.
 
 ### Image viewer pan/zoom
 
@@ -436,6 +522,11 @@ sqlite3 textile-gauge-reader/data/corrections.db "select * from corrections;"
   Detection Details and Show Loop Centers on any result you're not sure
   about, rather than assuming a number without a "corrected" reason is
   automatically right.
+- No automatic perspective correction: `cv-v0.3` detects spacing that
+  varies significantly across the ROI (via multi-patch consensus) and
+  lowers confidence accordingly, but it does not attempt to actually
+  correct for perspective/lens distortion — a future version could warp
+  the ROI to a fronto-parallel view before periodicity analysis.
 - Ground-truth corrections are collected but never applied automatically
   — tuning the algorithm from that data is a deliberate, separate step.
 - Correction storage is a single SQLite file with no auth in front of

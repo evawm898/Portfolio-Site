@@ -96,14 +96,16 @@ tuned further from there, not treated as definitively solved.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import List, Literal, Optional, Tuple
 
 import cv2
 import numpy as np
-from scipy.ndimage import center_of_mass, label, maximum_filter, uniform_filter1d
+from scipy.ndimage import center_of_mass, label, map_coordinates, maximum_filter, uniform_filter1d
 from scipy.ndimage import sum as ndimage_sum
 from scipy.signal import correlate, detrend, find_peaks
+
+Structure = Literal["jersey", "unknown"]
 
 Orientation = Literal["vertical", "horizontal"]
 Direction = Literal["horizontal", "vertical"]  # which image axis a quantity is measured along
@@ -114,7 +116,7 @@ Direction = Literal["horizontal", "vertical"]  # which image axis a quantity is 
 # saved ground-truth correction record so later analysis can tell which
 # algorithm version a given prediction came from — e.g. to check whether a
 # tuning change actually reduced systematic error, not just re-labeled it.
-ALGORITHM_VERSION = "cv-clahe-sobel-autocorr-loopcenter-density-foldpair-v0.4"
+ALGORITHM_VERSION = "cv-v0.3"
 
 # --- Tunable constants -------------------------------------------------
 
@@ -132,6 +134,64 @@ DENSITY_MISMATCH_LOG_THRESHOLD = 0.35  # ~1.4x wiggle room before wale*course ce
 FOLD_CONSISTENCY_MIN_TRUST = 0.55    # a candidate must reach at least this to count as "a genuine repeat"
 FOLD_CONSISTENCY_MARGIN = 0.15       # ...and beat the raw estimate's own score by at least this to override it
 
+# --- v0.3 candidate-scoring configuration ---------------------------------
+#
+# Every wale/course period candidate is scored by combining several
+# independent pieces of evidence into one number (see _score_candidates).
+# All the weights and thresholds that decide how much each piece of
+# evidence matters live HERE, in one place, rather than as scattered
+# coefficients through the analysis functions — change tuning here, not
+# by hunting for magic numbers.
+#
+# The positive terms (autocorr, support_2d, structural, patch_consensus,
+# regularity, repeat_count) are deliberately close to summing to 1.0, so a
+# candidate with strong, fully-agreeing evidence scores close to 1.0
+# before any penalty; harmonic_penalty_weight and instability_penalty_weight
+# are subtracted, not part of that budget.
+
+
+@dataclass(frozen=True)
+class ScoringWeights:
+    autocorr: float = 0.20              # 1D autocorrelation strength at this exact lag
+    support_2d: float = 0.20            # 2D autocorrelation support at this lag (see _sample_2d_support)
+    structural: float = 0.25            # fold-consistency (wale) + loop-center pitch agreement
+    patch_consensus: float = 0.20       # agreement with independent overlapping sub-region estimates
+    regularity: float = 0.10            # spacing consistency of the positions this candidate implies
+    repeat_count: float = 0.05          # reward seeing enough repeats in the ROI to trust a periodicity claim
+    harmonic_penalty_weight: float = 0.30    # subtracted: how ambiguous this candidate is vs. a 0.5x/2x relative
+    instability_penalty_weight: float = 0.35  # subtracted from CONFIDENCE (not ranking) when patches disagree
+
+
+# Structure="jersey" leans harder on structural (V-shape/loop-center)
+# evidence, since that's specifically what a face-knit loop's geometry
+# gives us; "unknown" (default) relies relatively more on periodicity and
+# cross-region consensus, which don't assume any particular loop shape.
+WEIGHTS_UNKNOWN = ScoringWeights()
+WEIGHTS_JERSEY = ScoringWeights(
+    autocorr=0.15, support_2d=0.15, structural=0.35, patch_consensus=0.20,
+    regularity=0.10, repeat_count=0.05,
+    harmonic_penalty_weight=0.30, instability_penalty_weight=0.35,
+)
+
+# Harmonic-relative log-tolerance: how close c2/c1 must be to exactly 2.0
+# (or 0.5) to count as "the same harmonic relationship" when computing the
+# ambiguity penalty (accounts for c being derived from a slightly-off p0).
+HARMONIC_RELATIVE_LOG_TOLERANCE = 0.12
+# Falloff scale for "closeness on a log scale" style evidence terms
+# (candidate-vs-loop-center-pitch, candidate-vs-patch-median): a factor of
+# ~1.28x off (log ratio 0.25) still counts as reasonably close, further
+# than that falls off quickly.
+CLOSENESS_LOG_SCALE = 0.25
+MIN_REPEATS_FOR_FULL_SCORE = 8.0     # visible repeats in the ROI at which repeat_count score saturates at 1.0
+MIN_REPEATS_FOR_ANY_SCORE = 2.0      # fewer than this and repeat_count score is 0
+UNCERTAIN_SCORE_MARGIN = 0.08        # top-2 final candidate scores within this margin -> "uncertain"
+N_CONSENSUS_PATCHES = 4              # overlapping sub-region bands analyzed per axis
+PATCH_OVERLAP_FRACTION = 0.5
+MIN_PATCH_DIM_PX = 24                # a band thinner than this along its collapsed dimension isn't trustworthy
+ROTATION_SEARCH_DEG = 6.0            # search +/- this many degrees for small tilt correction
+ROTATION_STEP_DEG = 1.5
+MIN_ROI_DIM_FOR_ROTATION_PX = 80     # skip rotation search on ROIs too small to safely rotate/crop
+
 
 @dataclass
 class CandidateInfo:
@@ -146,6 +206,20 @@ class CandidateInfo:
     harmonic: str  # "0.5x" / "1x" / "2x" relative to the raw autocorrelation estimate
     fold_consistency: Optional[float]  # None when not computed for this axis (course, currently)
     selected: bool
+    # v0.3 scoring breakdown (None for candidates produced by the older,
+    # still-present _reconcile_period path — e.g. when a caller opts out
+    # of the v0.3 scorer). See ScoringWeights / _score_candidates.
+    autocorr_score: Optional[float] = None
+    support_2d: Optional[float] = None
+    structural_score: Optional[float] = None
+    patch_consensus: Optional[float] = None
+    harmonic_penalty: Optional[float] = None
+    final_score: Optional[float] = None
+    # Weighted evidence composite BEFORE the harmonic penalty is subtracted
+    # (autocorr + 2D support + structural + patch consensus + regularity +
+    # repeat count). This -- not final_score -- is what decides `selected`;
+    # see the note above _score_candidates for why.
+    evidence_score: Optional[float] = None
 
 
 @dataclass
@@ -163,6 +237,12 @@ class AxisResult:
     # Richer per-candidate diagnostics (harmonic relationship, structural
     # score, which one was selected) — see CandidateInfo.
     candidate_details: List[CandidateInfo] = field(default_factory=list)
+    # "confident" (default) or "uncertain" -- set when the top two scored
+    # candidates were too close to call (see UNCERTAIN_SCORE_MARGIN). The
+    # numeric spacing_px/positions_px are still the best estimate even
+    # when uncertain; the UI is expected to visually flag it, not hide it.
+    status: str = "confident"
+    uncertain_reason: Optional[str] = None
 
 
 @dataclass
@@ -180,6 +260,11 @@ class GaugeAnalysisResult:
     # Empty if there wasn't enough periodicity to seed a scale hint, or no
     # confident local maxima were found.
     loop_centers_px: List[Tuple[float, float]] = field(default_factory=list)
+    # Small-angle tilt correction applied before analysis (see
+    # _normalize_rotation), in degrees; 0.0 if none was applied/needed.
+    # Purely diagnostic -- overlays are always translated back to the
+    # original (unrotated) image coordinates.
+    rotation_deg: float = 0.0
 
 
 def _direction_for(orientation: Orientation) -> Tuple[Direction, Direction]:
@@ -201,6 +286,7 @@ def analyze_gauge(
     image_bgr: np.ndarray,
     roi: Tuple[int, int, int, int],
     orientation: Orientation,
+    structure: Structure = "unknown",
 ) -> GaugeAnalysisResult:
     """
     Analyze a rectangular region of a textile photograph and estimate
@@ -212,7 +298,15 @@ def analyze_gauge(
              pixel coordinates of ``image_bgr``.
         orientation: "vertical" if wales run vertically (columns run up/down,
              the common case), "horizontal" if the fabric is rotated so
-             wales run left-to-right.
+             wales run left-to-right. Authoritative -- this function only
+             compensates for a few degrees of tilt *around* whichever way
+             the user says the fabric runs (see _normalize_rotation); it
+             never guesses orientation itself.
+        structure: "jersey" leans the candidate scoring harder on
+             structural (V-shape/loop-center) evidence, appropriate for a
+             face-knit single-jersey fabric; "unknown" (default) relies
+             relatively more on periodicity and cross-region consensus,
+             which don't assume any particular loop geometry.
 
     Returns:
         GaugeAnalysisResult. If the ROI is invalid or the image cannot be
@@ -256,20 +350,44 @@ def analyze_gauge(
 
     crop = image_bgr[y : y + h, x : x + w]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    normalized, gx, gy = _enhance_texture(gray)
 
     wale_direction, course_direction = _direction_for(orientation)
+
+    # All SPATIAL evidence (loop centers, detected positions, the 2D
+    # autocorrelation, overlay coordinates) is derived from this
+    # ORIGINAL, unrotated crop -- never from the rotated one below -- so
+    # every reported pixel coordinate stays exactly registered to the
+    # original image with no inverse-rotation bookkeeping required.
+    normalized, gx, gy = _enhance_texture(gray)
     wale_source = gx if wale_direction == "horizontal" else gy
     course_source = gx if course_direction == "horizontal" else gy
-
     wale_signal = _project(wale_source, axis=_COLLAPSE_AXIS[wale_direction])
     course_signal = _project(course_source, axis=_COLLAPSE_AXIS[course_direction])
 
-    # Coarse autocorrelation-based period per direction — this is the
-    # "might be a harmonic" estimate that loop-center evidence will
-    # cross-check below.
-    p0_wale, _ = _autocorrelation_spacing(wale_signal)
-    p0_course, _ = _autocorrelation_spacing(course_signal)
+    # Small-angle tilt correction (see _normalize_rotation): only the
+    # SCALAR period estimate benefits from the cleaner, de-tilted signal
+    # -- positions/overlays stay in the original crop's coordinate space
+    # (see above), which is the deliberate simplification documented on
+    # GaugeAnalysisResult.rotation_deg. Full perspective correction is
+    # out of scope for v0.3 (see module docstring / README).
+    rotation_deg, rotated_gray = _normalize_rotation(gray, wale_direction, course_direction)
+    if rotation_deg != 0.0:
+        _, rot_gx, rot_gy = _enhance_texture(rotated_gray)
+        rot_wale_source = rot_gx if wale_direction == "horizontal" else rot_gy
+        rot_course_source = rot_gx if course_direction == "horizontal" else rot_gy
+        wale_signal_for_period = _project(rot_wale_source, axis=_COLLAPSE_AXIS[wale_direction])
+        course_signal_for_period = _project(rot_course_source, axis=_COLLAPSE_AXIS[course_direction])
+    else:
+        wale_signal_for_period = wale_signal
+        course_signal_for_period = course_signal
+
+    # Coarse autocorrelation-based period per direction — this seeds the
+    # 0.5x/1x/2x candidate family that _analyze_axis_v3 scores below. It
+    # is exactly the kind of measurement that can lock onto a loop's
+    # leg-to-leg spacing (a harmonic) instead of the true loop-to-loop
+    # repeat — see the module docstring.
+    p0_wale, _ = _autocorrelation_spacing(wale_signal_for_period)
+    p0_course, _ = _autocorrelation_spacing(course_signal_for_period)
 
     # Detect approximate loop-center points once for the whole ROI (not
     # per-direction — a loop center is a single 2D feature). Use the
@@ -295,19 +413,45 @@ def analyze_gauge(
     wale_band_px = max(3.0, 0.4 * (p0_course or p0_wale or 10.0))
     course_band_px = max(3.0, 0.4 * (p0_wale or p0_course or 10.0))
 
-    wale_p_centers = _trusted_center_pitch(loop_centers, wale_center_axis, wale_band_px)
-    course_p_centers = _trusted_center_pitch(loop_centers, course_center_axis, course_band_px)
+    # 2D periodicity: one FFT-based autocorrelation of the whole ROI,
+    # sampled per-candidate below (see _sample_2d_support) rather than
+    # trusting two independent 1D projections alone.
+    ac2d = _two_d_autocorrelation(normalized)
+
+    # Multi-patch regional consensus: independent period estimates from
+    # several overlapping sub-region bands per axis (see
+    # _patch_period_estimates), used both as scoring evidence and (via
+    # _patch_instability) to catch spacing that varies noticeably across
+    # the ROI -- e.g. from mild perspective distortion (see module
+    # docstring; full perspective correction is deliberately out of
+    # scope for v0.3).
+    wale_patch_periods = _patch_period_estimates(
+        wale_source, _COLLAPSE_AXIS[wale_direction], N_CONSENSUS_PATCHES, PATCH_OVERLAP_FRACTION
+    )
+    course_patch_periods = _patch_period_estimates(
+        course_source, _COLLAPSE_AXIS[course_direction], N_CONSENSUS_PATCHES, PATCH_OVERLAP_FRACTION
+    )
+
+    weights = WEIGHTS_JERSEY if structure == "jersey" else WEIGHTS_UNKNOWN
 
     # Fold-consistency (V-leg-pairing structural check) is scoped to the
     # wale axis only: it targets the specific failure mode of a face-knit
     # V-shape's bilateral leg symmetry fooling plain autocorrelation.
     # Course-row periodicity doesn't have that failure mode, and this
-    # keeps course detection completely unchanged.
-    wale = _analyze_direction(
-        wale_signal, p0_wale, wale_p_centers, loop_centers, wale_center_axis, use_fold_consistency=True
+    # keeps course detection unaffected by it.
+    wale = _analyze_axis_v3(
+        wale_signal, p0_wale, loop_centers, wale_center_axis, wale_band_px,
+        ac2d, wale_direction == "horizontal", wale_patch_periods, float(w if wale_direction == "horizontal" else h),
+        use_fold_consistency=True, weights=weights,
     )
-    course = _analyze_direction(course_signal, p0_course, course_p_centers, loop_centers, course_center_axis)
+    course = _analyze_axis_v3(
+        course_signal, p0_course, loop_centers, course_center_axis, course_band_px,
+        ac2d, course_direction == "horizontal", course_patch_periods, float(w if course_direction == "horizontal" else h),
+        use_fold_consistency=False, weights=weights,
+    )
 
+    wale_p_centers = _trusted_center_pitch(loop_centers, wale_center_axis, wale_band_px)
+    course_p_centers = _trusted_center_pitch(loop_centers, course_center_axis, course_band_px)
     wale, course = _cross_check_density(
         wale,
         course,
@@ -350,6 +494,7 @@ def analyze_gauge(
         roi_width_px=w,
         roi_height_px=h,
         loop_centers_px=loop_centers_full,
+        rotation_deg=rotation_deg,
     )
 
 
@@ -1084,8 +1229,566 @@ def _reselect_candidate(details: List[CandidateInfo], new_period: float) -> List
     entry matches `new_period` — used when a later stage (density
     cross-check) picks a different candidate than the per-axis
     reconciliation did, so the diagnostics stay consistent with the
-    actual final answer."""
-    return [
-        CandidateInfo(d.period_px, d.harmonic, d.fold_consistency, abs(d.period_px - new_period) < 1e-6)
-        for d in details
+    actual final answer. Preserves every field (including the v0.3
+    scoring breakdown, when present) via dataclasses.replace -- only
+    `selected` changes."""
+    return [replace(d, selected=abs(d.period_px - new_period) < 1e-6) for d in details]
+
+
+# --- v0.3: rotation normalization, 2D periodicity, multi-patch consensus,
+#     and the unified candidate-scoring system -----------------------------
+
+
+def _normalize_rotation(
+    gray: np.ndarray, wale_direction: Direction, course_direction: Direction
+) -> Tuple[float, np.ndarray]:
+    """
+    Search a small range of rotation angles and return whichever one
+    produces the strongest COMBINED 1D periodicity signal along both the
+    wale and course directions -- i.e. de-tilt the crop just enough that
+    "wale direction" and "course direction" line up cleanly with the
+    image's x/y axes before periodicity analysis runs.
+
+    This does NOT replace the user's manual orientation control (that
+    still decides which axis is which, authoritatively -- see
+    analyze_gauge); it only compensates for a few degrees of camera/
+    fabric tilt around that. It does not attempt full perspective
+    correction (a tilted-but-planar fabric is a very different problem
+    from a genuinely perspective-distorted photo) -- see the module
+    docstring and README for that as documented future work.
+
+    Returns (angle_deg, rotated_gray). angle_deg is 0.0 (and rotated_gray
+    is just `gray`) when the crop is too small to safely rotate/crop, or
+    when no tested angle beat the unrotated baseline.
+    """
+    h, w = gray.shape[:2]
+    if h < MIN_ROI_DIM_FOR_ROTATION_PX or w < MIN_ROI_DIM_FOR_ROTATION_PX:
+        return 0.0, gray
+
+    def _combined_strength(g: np.ndarray) -> float:
+        _, gx, gy = _enhance_texture(g)
+        wale_source = gx if wale_direction == "horizontal" else gy
+        course_source = gx if course_direction == "horizontal" else gy
+        wale_sig = _project(wale_source, axis=_COLLAPSE_AXIS[wale_direction])
+        course_sig = _project(course_source, axis=_COLLAPSE_AXIS[course_direction])
+        _, s1 = _autocorrelation_spacing(wale_sig)
+        _, s2 = _autocorrelation_spacing(course_sig)
+        return s1 + s2
+
+    center = (w / 2.0, h / 2.0)
+    best_angle = 0.0
+    best_strength = _combined_strength(gray)
+
+    angle = -ROTATION_SEARCH_DEG
+    while angle <= ROTATION_SEARCH_DEG + 1e-6:
+        if abs(angle) > 1e-6:
+            rot_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+            rotated = cv2.warpAffine(
+                gray, rot_matrix, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT101
+            )
+            strength = _combined_strength(rotated)
+            if strength > best_strength:
+                best_strength = strength
+                best_angle = angle
+        angle += ROTATION_STEP_DEG
+
+    if abs(best_angle) < 1e-6:
+        return 0.0, gray
+
+    rot_matrix = cv2.getRotationMatrix2D(center, best_angle, 1.0)
+    rotated_gray = cv2.warpAffine(
+        gray, rot_matrix, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT101
+    )
+    return float(best_angle), rotated_gray
+
+
+def _two_d_autocorrelation(img: np.ndarray) -> np.ndarray:
+    """
+    Full 2D autocorrelation of `img` via FFT (Wiener-Khinchin theorem),
+    centered (fftshift) so the zero-lag peak sits at the array's own
+    center. This is "does the whole 2D texture repeat here" evidence --
+    richer than two independent 1D projections, since it can confirm (or
+    fail to confirm) a candidate (dx, dy) repeat directly against the
+    real 2D image rather than a collapsed, direction-blind average.
+    """
+    arr = img.astype(np.float64)
+    arr = arr - arr.mean()
+    spectrum = np.fft.fft2(arr)
+    power = spectrum * np.conj(spectrum)
+    ac = np.fft.ifft2(power).real
+    return np.fft.fftshift(ac)
+
+
+def _sample_2d_support(ac2d: np.ndarray, dx: float, dy: float) -> float:
+    """
+    Normalized 2D autocorrelation value at lag (dx, dy) from the zero-lag
+    center, in [0, 1] (bilinear-interpolated; clipped since noise can
+    push interpolated values slightly outside that range).
+    """
+    if ac2d.size == 0:
+        return 0.0
+    h, w = ac2d.shape[:2]
+    cy, cx = h / 2.0, w / 2.0
+    zero_lag = ac2d[int(round(cy)), int(round(cx))]
+    if zero_lag <= 0:
+        return 0.0
+    y, x = cy + dy, cx + dx
+    if y < 0 or y > h - 1 or x < 0 or x > w - 1:
+        return 0.0
+    value = map_coordinates(ac2d, [[y], [x]], order=1, mode="nearest")[0]
+    return float(np.clip(value / zero_lag, 0.0, 1.0))
+
+
+def _patch_period_estimates(
+    source: np.ndarray, collapse_axis: int, n_patches: int, overlap: float
+) -> List[float]:
+    """
+    Split `source` (a 2D signed-gradient array) into `n_patches`
+    overlapping bands along the SAME dimension being averaged away by
+    the projection (i.e. each band is a different subset of the rows/
+    columns that get collapsed into the 1D signal), run the same 1D
+    autocorrelation-based period estimate independently in each band,
+    and return whichever estimates were plausible.
+
+    This is the "several overlapping sub-regions" cross-check: a genuine
+    textile repeat should show up consistently across different parts of
+    the ROI; a spurious one -- or one only true in part of the ROI, e.g.
+    from mild perspective distortion -- won't.
+    """
+    band_dim = collapse_axis
+    total = source.shape[band_dim]
+    if n_patches < 2 or total < MIN_PATCH_DIM_PX * 2:
+        return []
+    band_len = max(MIN_PATCH_DIM_PX, int(total / (1 + (n_patches - 1) * (1 - overlap))))
+    step = max(1, int(band_len * (1 - overlap)))
+    periods: List[float] = []
+    start = 0
+    seen = 0
+    while start < total and seen < n_patches:
+        end = min(start + band_len, total)
+        if end - start >= MIN_PATCH_DIM_PX:
+            patch = source[start:end, :] if band_dim == 0 else source[:, start:end]
+            sig = _project(patch, axis=collapse_axis)
+            p, strength = _autocorrelation_spacing(sig)
+            if p is not None and strength > 0.05:
+                periods.append(p)
+        start += step
+        seen += 1
+    return periods
+
+
+def _closeness_log(a: float, b: float, scale: float = CLOSENESS_LOG_SCALE) -> float:
+    """1.0 when a==b, smoothly falling off as their ratio moves away from
+    1 on a log scale (harmonics/scale mismatches are multiplicative, not
+    additive, so a log-scale falloff treats "2x off" consistently
+    regardless of the absolute pixel scale)."""
+    if a <= 0 or b <= 0:
+        return 0.0
+    return float(math.exp(-abs(math.log(a / b)) / scale))
+
+
+def _patch_consensus_score(patch_periods: List[float], candidate: float) -> float:
+    """How well `candidate` agrees with the robust median of independent
+    per-patch period estimates, weighted by how tightly those patches
+    agree with each other in the first place (a "consensus" built from
+    wildly disagreeing patches isn't worth much)."""
+    if len(patch_periods) < 2:
+        return 0.0
+    median = float(np.median(patch_periods))
+    if median <= 0:
+        return 0.0
+    closeness = _closeness_log(candidate, median)
+    mad = float(np.median(np.abs(np.array(patch_periods) - median)))
+    internal_agreement = float(np.clip(1.0 - (mad / median), 0.0, 1.0))
+    return float(np.clip(0.6 * closeness + 0.4 * internal_agreement, 0.0, 1.0))
+
+
+def _patch_instability(patch_periods: List[float]) -> float:
+    """
+    Axis-level (not per-candidate) instability signal used for
+    CONFIDENCE, not candidate ranking: how much the independent per-patch
+    period estimates disagree with each other. High instability is
+    exactly what "spacing changes noticeably across the ROI" (e.g. mild
+    perspective distortion, or a crumpled/uneven fabric surface) looks
+    like -- see analyze_gauge and the module docstring.
+    """
+    if len(patch_periods) < 2:
+        return 0.3  # couldn't cross-check regionally at all -- a little uncertainty, not none
+    median = float(np.median(patch_periods))
+    if median <= 0:
+        return 0.3
+    mad = float(np.median(np.abs(np.array(patch_periods) - median)))
+    return float(np.clip(mad / median, 0.0, 1.0))
+
+
+def _center_pitch_agreement(candidate: float, center_median: Optional[float], center_consistency: float) -> float:
+    """How well `candidate` agrees with loop-center nearest-neighbor
+    pitch, weighted by how internally consistent that loop-center
+    evidence itself was (see _estimate_pitch_from_centers) -- noisy
+    loop-center evidence shouldn't get to vote as strongly as clean
+    evidence."""
+    if center_median is None or center_median <= 0:
+        return 0.0
+    return _closeness_log(candidate, center_median) * float(np.clip(center_consistency, 0.0, 1.0))
+
+
+def _combine_structural(fold_consistency: Optional[float], center_agreement: float) -> float:
+    """Blend the two structural (loop-anatomy-grounded) evidence sources
+    available for a candidate: fold-consistency (wale axis only -- see
+    _fold_consistency) and loop-center pitch agreement (both axes)."""
+    if fold_consistency is None:
+        return center_agreement
+    return 0.5 * fold_consistency + 0.5 * center_agreement
+
+
+def _repeat_count_score(roi_extent_px: float, period_px: float) -> float:
+    """Reward a candidate that implies enough visible repeats in the ROI
+    to actually trust a periodicity claim; a "period" comparable to (or
+    bigger than) the ROI itself isn't a trustworthy repeat estimate no
+    matter how well it scores on every other axis."""
+    if period_px <= 0:
+        return 0.0
+    count = roi_extent_px / period_px
+    span = MIN_REPEATS_FOR_FULL_SCORE - MIN_REPEATS_FOR_ANY_SCORE
+    return float(np.clip((count - MIN_REPEATS_FOR_ANY_SCORE) / span, 0.0, 1.0))
+
+
+def _positions_regularity(positions: List[float]) -> float:
+    """Spacing consistency (1 - coefficient of variation) of consecutive
+    detected positions at a candidate period -- a genuine repeat should
+    imply evenly-spaced positions; a spurious one (from noise, or a
+    partial/uneven match) typically doesn't."""
+    if len(positions) < MIN_PEAKS_FOR_GOOD_CONFIDENCE:
+        return 0.0
+    diffs = np.diff(sorted(positions))
+    diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
+    if len(diffs) == 0 or np.mean(diffs) <= 0:
+        return 0.0
+    cv = float(np.std(diffs) / np.mean(diffs))
+    return float(np.clip(1.0 - cv, 0.0, 1.0))
+
+
+def _autocorr_strength_at_lag(signal: np.ndarray, lag: float) -> float:
+    """
+    Normalized 1D autocorrelation value at an arbitrary (possibly
+    non-integer) lag, interpolated. Unlike `_autocorrelation_spacing`
+    (which reports only the single strongest peak found), this samples
+    the curve at a SPECIFIC candidate period, whether or not it happens
+    to be that peak -- so every 0.5x/1x/2x candidate gets a genuinely
+    measured periodicity score, not just whichever one autocorrelation
+    would have picked on its own.
+    """
+    n = len(signal)
+    if n < 2 * MIN_PLAUSIBLE_SPACING_PX or np.std(signal) < 1e-6 or lag <= 0:
+        return 0.0
+    full_corr = correlate(signal, signal, mode="full")
+    zero_lag_idx = n - 1
+    autocorr = full_corr[zero_lag_idx:]
+    if autocorr[0] <= 0:
+        return 0.0
+    autocorr_norm = autocorr / autocorr[0]
+    if lag >= len(autocorr_norm) - 1:
+        return 0.0
+    value = float(np.interp(lag, np.arange(len(autocorr_norm)), autocorr_norm))
+    return float(np.clip(value, 0.0, 1.0))
+
+
+def _harmonic_penalty(candidate: float, candidates: List[float], autocorr_scores: dict) -> float:
+    """
+    How much harmonic ambiguity exists between `candidate` and any OTHER
+    candidate in the same family that's ~2x or ~0.5x of it: if a harmonic
+    relative scores nearly as strongly on raw periodicity alone, that's
+    exactly the "P and 2P look similar" ambiguity that causes half-repeat
+    lock-on (see the module docstring), and every other piece of
+    evidence needs to work harder to resolve it.
+
+    Symmetric by construction -- it penalizes BOTH members of an
+    ambiguous pair equally; which one actually wins is decided by the
+    other (structural / 2D / regional-consensus) terms, never by this
+    penalty alone. Returns 0 when no harmonic relative is in the
+    candidate set at all.
+
+    IMPORTANT: because it's identical for both members of a pair, it is
+    mathematically a no-op for deciding a head-to-head between exactly
+    those two (subtracting the same amount from both leaves their order
+    unchanged) -- its only real effect is lowering the absolute score of
+    an ambiguous pair, which is exactly what CONFIDENCE should reflect,
+    but MUST NOT be used to rank a pair member against a *third*,
+    unrelated candidate: a candidate strongly ambiguous with its 2x/0.5x
+    neighbor (both scoring high) would otherwise lose to a completely
+    different, evidence-weak candidate that simply wasn't part of any
+    ambiguous pair. See `evidence_score` in _score_candidates, which is
+    what actually decides the winner.
+    """
+    if candidate <= 0:
+        return 0.0
+    own_score = autocorr_scores.get(candidate, 0.0)
+    worst = 0.0
+    for other in candidates:
+        if other == candidate or other <= 0:
+            continue
+        ratio = other / candidate
+        is_double = abs(math.log(ratio / 2.0)) < HARMONIC_RELATIVE_LOG_TOLERANCE
+        is_half = abs(math.log(ratio * 2.0)) < HARMONIC_RELATIVE_LOG_TOLERANCE
+        if not (is_double or is_half):
+            continue
+        other_score = autocorr_scores.get(other, 0.0)
+        similarity = 1.0 - abs(own_score - other_score)
+        worst = max(worst, float(np.clip(similarity, 0.0, 1.0)))
+    return worst
+
+
+def _score_candidates(
+    p0: float,
+    signal: np.ndarray,
+    center_median: Optional[float],
+    center_consistency: float,
+    ac2d: np.ndarray,
+    lag_dx: bool,
+    patch_periods: List[float],
+    roi_extent_px: float,
+    use_fold_consistency: bool,
+    min_plausible: float,
+    weights: ScoringWeights,
+) -> Tuple[List[CandidateInfo], float]:
+    """
+    Score every 0.5x/1x/2x candidate for one axis, combining periodicity
+    (1D + 2D), structural (fold-consistency + loop-center) evidence,
+    regional (patch) consensus, spacing regularity, visible-repeat count,
+    and a harmonic-ambiguity penalty into one `final_score` per
+    candidate (see ScoringWeights -- the one place all these weights are
+    defined). Returns (candidate_infos, instability_penalty) --
+    instability_penalty is axis-level (not per-candidate), used for
+    CONFIDENCE, not for deciding which candidate wins.
+
+    `center_median`/`center_consistency` are the axis's loop-center
+    nearest-neighbor pitch evidence, computed ONCE by the caller (see
+    analyze_gauge) rather than recomputed here -- `_estimate_pitch_from_
+    centers` is O(N^2) in the number of detected loop centers, by far
+    the most expensive step in analysis, and was previously being
+    redundantly recomputed up to 3x per axis.
+    """
+    labeled = _labeled_candidates(p0, min_plausible)
+    if not labeled:
+        labeled = [(round(p0, 3), "1x")]
+    candidates = [c for c, _ in labeled]
+    harmonic_of = dict(labeled)
+
+    autocorr_scores: dict = {c: _autocorr_strength_at_lag(signal, c) for c in candidates}
+
+    per_candidate: dict = {}
+    for c in candidates:
+        support_2d = _sample_2d_support(ac2d, c if lag_dx else 0.0, 0.0 if lag_dx else c)
+        fold = _fold_consistency(signal, c, min_plausible) if use_fold_consistency else None
+        center_agree = _center_pitch_agreement(c, center_median, center_consistency)
+        structural = _combine_structural(fold, center_agree)
+        positions_c = _detect_peaks(signal, c)
+        per_candidate[c] = dict(
+            autocorr=autocorr_scores[c],
+            support_2d=support_2d,
+            structural=structural,
+            fold=fold,
+            regularity=_positions_regularity(positions_c),
+            repeat=_repeat_count_score(roi_extent_px, c),
+            patch=_patch_consensus_score(patch_periods, c),
+        )
+
+    for c in candidates:
+        e = per_candidate[c]
+        e["harmonic_penalty"] = _harmonic_penalty(c, candidates, autocorr_scores)
+        evidence = (
+            weights.autocorr * e["autocorr"]
+            + weights.support_2d * e["support_2d"]
+            + weights.structural * e["structural"]
+            + weights.patch_consensus * e["patch"]
+            + weights.regularity * e["regularity"]
+            + weights.repeat_count * e["repeat"]
+        )
+        e["evidence"] = float(np.clip(evidence, 0.0, 1.0))
+        e["final"] = float(np.clip(evidence - weights.harmonic_penalty_weight * e["harmonic_penalty"], -1.0, 1.0))
+
+    # The WINNER is decided by evidence_score (periodicity + structural +
+    # regional consensus, before the harmonic penalty). The penalty is
+    # provably a wash between two candidates that are actually ambiguous
+    # with each other (see _harmonic_penalty docstring) -- ranking by the
+    # post-penalty `final` score instead would let it leak across pairs
+    # and hand the win to an unrelated, evidence-weak third candidate
+    # just because it happened not to be part of any ambiguous pair.
+    winner = max(candidates, key=lambda c: per_candidate[c]["evidence"])
+    infos = [
+        CandidateInfo(
+            period_px=c,
+            harmonic=harmonic_of[c],
+            fold_consistency=per_candidate[c]["fold"],
+            selected=(c == winner),
+            autocorr_score=round(per_candidate[c]["autocorr"], 3),
+            support_2d=round(per_candidate[c]["support_2d"], 3),
+            structural_score=round(per_candidate[c]["structural"], 3),
+            patch_consensus=round(per_candidate[c]["patch"], 3),
+            evidence_score=round(per_candidate[c]["evidence"], 3),
+            harmonic_penalty=round(per_candidate[c]["harmonic_penalty"], 3),
+            final_score=round(per_candidate[c]["final"], 3),
+        )
+        for c in candidates
     ]
+
+    instability = _patch_instability(patch_periods)
+    return infos, instability
+
+
+def _finalize_axis_v3(
+    period: float,
+    signal: np.ndarray,
+    loop_centers: np.ndarray,
+    center_axis_index: int,
+    p_centers: Optional[float],
+    candidates_px: List[float],
+    selected_reason: str,
+    candidate_details: List[CandidateInfo],
+    final_score: float,
+    instability_penalty: float,
+    uncertain: bool,
+    uncertain_reason: Optional[str],
+) -> AxisResult:
+    """v0.3 counterpart to `_finalize_axis`: same position/spacing
+    derivation, but confidence comes directly from the winning
+    candidate's combined evidence score (see ScoringWeights) rather than
+    the older ad hoc blend, and the result can be explicitly flagged
+    "uncertain" instead of always returning a single confident number."""
+    if p_centers is not None:
+        positions = _cluster_positions(loop_centers[:, center_axis_index], period)
+        position_source = "loop-center clustering"
+    else:
+        positions = _detect_peaks(signal, period)
+        position_source = "1D edge-signal peak detection (no loop-center evidence available)"
+
+    spacing_px = period
+    if len(positions) >= MIN_PEAKS_FOR_GOOD_CONFIDENCE:
+        diffs = np.diff(sorted(positions))
+        diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
+        if len(diffs) > 0:
+            spacing_px = float(np.mean(diffs))
+
+    # Confidence directly reflects the v0.3 combined evidence score for
+    # the winning candidate (already blends periodicity, 2D support,
+    # structural evidence, regional consensus, and the harmonic penalty
+    # -- see ScoringWeights), further reduced when independent
+    # sub-region patches disagreed with each other.
+    confidence = float(np.clip(final_score * (1.0 - 0.5 * instability_penalty), 0.0, 1.0))
+
+    message = ""
+    if len(positions) < MIN_PEAKS_FOR_GOOD_CONFIDENCE:
+        message = "Few repeating loops detected; spacing estimate is low-confidence."
+    elif uncertain:
+        message = uncertain_reason or "Low confidence — competing candidate scored nearly as well; manual verification recommended."
+    elif instability_penalty > 0.4:
+        message = (
+            "Spacing varies noticeably across the selected area (possible perspective "
+            "distortion or an uneven surface) — treat with caution."
+        )
+
+    return AxisResult(
+        spacing_px=round(spacing_px, 3),
+        positions_px=positions,
+        confidence=round(confidence, 3),
+        message=message,
+        candidates_px=candidates_px,
+        selected_reason=f"{selected_reason} (positions from {position_source})",
+        candidate_details=candidate_details,
+        status="uncertain" if uncertain else "confident",
+        uncertain_reason=uncertain_reason,
+    )
+
+
+def _analyze_axis_v3(
+    signal: np.ndarray,
+    p0: Optional[float],
+    loop_centers: np.ndarray,
+    center_axis_index: int,
+    band_tolerance_px: float,
+    ac2d: np.ndarray,
+    lag_dx: bool,
+    patch_periods: List[float],
+    roi_extent_px: float,
+    use_fold_consistency: bool,
+    weights: ScoringWeights,
+) -> AxisResult:
+    """
+    v0.3 entry point for analyzing one axis (wale or course): generate
+    the 0.5x/1x/2x candidate family from the coarse autocorrelation
+    estimate, score every candidate against periodicity (1D + 2D),
+    structural, and regional-consensus evidence (see _score_candidates),
+    and report the winner -- explicitly flagged uncertain when the top
+    two candidates scored too close to call (see UNCERTAIN_SCORE_MARGIN).
+    """
+    if p0 is None:
+        return AxisResult(
+            spacing_px=None,
+            positions_px=[],
+            confidence=0.0,
+            message="No reliable periodicity detected along this axis.",
+        )
+
+    # Computed ONCE here (the expensive, O(N^2)-in-loop-center-count
+    # step) and reused for both candidate scoring and position selection
+    # below -- see the docstring on _score_candidates.
+    center_median: Optional[float] = None
+    center_consistency = 0.0
+    if loop_centers.shape[0] >= MIN_LOOP_CENTERS_FOR_EVIDENCE:
+        center_median, center_consistency = _estimate_pitch_from_centers(
+            loop_centers, center_axis_index, band_tolerance_px
+        )
+
+    candidate_details, instability = _score_candidates(
+        p0, signal, center_median, center_consistency, ac2d, lag_dx,
+        patch_periods, roi_extent_px, use_fold_consistency, MIN_PLAUSIBLE_SPACING_PX, weights,
+    )
+    # Ranked (and the winner picked) by evidence_score, not final_score --
+    # see _score_candidates for why the harmonic penalty must not decide
+    # the winner across unrelated candidates. A fallback to final_score
+    # keeps this safe for any hand-built CandidateInfo (older tests) that
+    # predates the evidence_score field.
+    def _rank_key(d: CandidateInfo) -> float:
+        if d.evidence_score is not None:
+            return d.evidence_score
+        return d.final_score if d.final_score is not None else 0.0
+
+    ranked = sorted(candidate_details, key=_rank_key, reverse=True)
+    best = ranked[0]
+    runner_up = ranked[1] if len(ranked) > 1 else None
+
+    uncertain = runner_up is not None and (_rank_key(best) - _rank_key(runner_up)) < UNCERTAIN_SCORE_MARGIN
+    uncertain_reason = None
+    if uncertain:
+        uncertain_reason = (
+            f"Competing {runner_up.harmonic} candidate at {runner_up.period_px:.1f}px scored nearly "
+            f"as well ({_rank_key(runner_up):.2f} vs {_rank_key(best):.2f} evidence) as the selected "
+            f"{best.period_px:.1f}px ({best.harmonic}) — manual verification recommended."
+        )
+
+    p_centers_for_positions = None
+    if center_median is not None and center_consistency >= MIN_CENTER_CONSISTENCY:
+        p_centers_for_positions = center_median
+
+    reason = (
+        f"Selected {best.period_px:.1f}px ({best.harmonic} of raw autocorrelation estimate "
+        f"{p0:.1f}px). Evidence score {_rank_key(best):.2f} = autocorrelation {best.autocorr_score:.2f} "
+        f"+ 2D support {best.support_2d:.2f} + structural {best.structural_score:.2f} + regional "
+        f"consensus {best.patch_consensus:.2f} (weighted); final score after harmonic-ambiguity "
+        f"penalty: {best.final_score:.2f}."
+    )
+
+    return _finalize_axis_v3(
+        best.period_px,
+        signal,
+        loop_centers,
+        center_axis_index,
+        p_centers_for_positions,
+        [d.period_px for d in candidate_details],
+        reason,
+        candidate_details,
+        best.final_score,
+        instability,
+        uncertain,
+        uncertain_reason,
+    )

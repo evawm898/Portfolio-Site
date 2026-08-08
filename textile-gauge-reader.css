@@ -283,6 +283,18 @@
   letter-spacing: 0.01em;
 }
 
+.tgr-substep-heading {
+  margin: 1.25rem 0 0.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
 .tgr-hint {
   color: var(--ink-dim);
   font-size: 12.5px;
@@ -487,6 +499,17 @@
 .tgr-confidence-bar__fill.is-low { background: var(--tgr-error); }
 .tgr-confidence-bar__fill.is-mid { background: var(--tgr-course); }
 
+.tgr-result-card--uncertain {
+  border-color: var(--tgr-warn-border);
+  background: var(--tgr-warn-bg);
+}
+.tgr-uncertain-badge {
+  margin-top: 0.5rem;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--tgr-course);
+}
+
 /* ---------------------------------------------------
    Debug / diagnostics (loop centers, detection details)
 --------------------------------------------------- */
@@ -561,6 +584,90 @@
   line-height: 1.5;
 }
 .tgr-debug-axis__reason.is-corrected { color: var(--tgr-course); }
+
+.tgr-debug-axis__status {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+.tgr-debug-axis__status.is-uncertain {
+  color: var(--tgr-course);
+  border: 1px solid var(--tgr-warn-border);
+  background: var(--tgr-warn-bg);
+}
+
+.tgr-debug-rotation {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--line);
+}
+
+/* v0.3 full per-candidate scoring breakdown card (used whenever a
+   candidate carries a final_score; older/partial candidates fall back
+   to the compact .tgr-debug-candidate chip above). */
+.tgr-debug-axis__candidates:has(.tgr-debug-candidate-card) {
+  flex-direction: column;
+  align-items: stretch;
+}
+.tgr-debug-candidate-card {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 0.5rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  position: relative;
+}
+.tgr-debug-candidate-card.is-selected {
+  border-color: var(--petrol-bright);
+  background: rgba(15, 125, 125, 0.06);
+}
+.tgr-debug-candidate-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tgr-debug-candidate-card.is-selected .tgr-debug-candidate-card__head { color: var(--petrol-bright); }
+.tgr-debug-candidate-card__perinch { color: var(--ink-faint); font-weight: 400; }
+.tgr-debug-candidate-card__harmonic {
+  margin-left: auto;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+.tgr-debug-score-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  padding: 0.05rem 0;
+}
+.tgr-debug-score-row--final {
+  margin-top: 0.2rem;
+  padding-top: 0.3rem;
+  border-top: 1px dashed var(--line);
+  font-weight: 600;
+  color: var(--ink);
+}
+.tgr-debug-candidate-card__selected-tag {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.6rem;
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: var(--petrol-bright);
+  font-weight: 700;
+}
 
 /* ---------------------------------------------------
    Verify Measurement (ground-truth correction)

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 Unit = Literal["mm", "cm", "in"]
 Orientation = Literal["vertical", "horizontal"]
+Structure = Literal["jersey", "unknown"]
 
 UNIT_TO_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4}
 MM_PER_INCH = 25.4
@@ -27,14 +28,23 @@ class AreaMm(BaseModel):
 class CandidateOut(BaseModel):
     """
     One harmonic period candidate considered for an axis, with the
-    evidence used to judge it -- lets a human (or a future tuning pass)
-    see *why* a period was picked, not just what was picked.
+    v0.3 scoring breakdown used to judge it -- lets a human (or a future
+    tuning pass) see *why* a period was picked, not just what was
+    picked. See ScoringWeights in analysis/gauge_analysis.py for how
+    these combine into final_score.
     """
 
     period_px: float
     per_inch: Optional[float] = None  # same period, converted with this request's calibration
     harmonic: str  # "0.5x" / "1x" / "2x" relative to the raw autocorrelation estimate
-    fold_consistency: Optional[float] = None  # structural score; None where not computed (course axis)
+    fold_consistency: Optional[float] = None  # V-leg structural score; None where not computed (course axis)
+    autocorr_score: Optional[float] = None  # 1D autocorrelation strength at this exact lag
+    support_2d: Optional[float] = None  # 2D autocorrelation support at this lag
+    structural_score: Optional[float] = None  # combined fold-consistency + loop-center pitch agreement
+    patch_consensus: Optional[float] = None  # agreement with independent overlapping sub-region estimates
+    harmonic_penalty: Optional[float] = None  # ambiguity vs. a 0.5x/2x relative that scored similarly
+    evidence_score: Optional[float] = None  # weighted evidence composite BEFORE the harmonic penalty -- decides `selected`
+    final_score: Optional[float] = None  # evidence_score minus the harmonic penalty (confidence-facing, not selection)
     selected: bool = False
 
 
@@ -55,6 +65,12 @@ class AxisOut(BaseModel):
     candidates_px: List[float] = Field(default_factory=list)
     selected_reason: str = ""
     candidate_details: List[CandidateOut] = Field(default_factory=list)
+    # "confident" or "uncertain" -- set when the top two scored
+    # candidates were too close to call. spacing_px is still the best
+    # estimate even when uncertain; the UI visually flags it rather than
+    # hiding it (see uncertain_reason).
+    status: str = "confident"
+    uncertain_reason: Optional[str] = None
 
 
 class AnalyzeResponse(BaseModel):
@@ -65,6 +81,7 @@ class AnalyzeResponse(BaseModel):
     analyzed_area_px: Optional[RoiOut] = None
     analyzed_area_mm: Optional[AreaMm] = None
     orientation: Optional[Orientation] = None
+    structure: Optional[str] = None
     wale: AxisOut = Field(default_factory=AxisOut)
     course: AxisOut = Field(default_factory=AxisOut)
     algorithm_version: Optional[str] = None
@@ -73,6 +90,11 @@ class AnalyzeResponse(BaseModel):
     # overlay — lets a human visually confirm what the detector is
     # treating as one complete loop, not just trust the final numbers.
     loop_centers_px: List[Tuple[float, float]] = Field(default_factory=list)
+    # Small-angle tilt correction applied before analysis, in degrees
+    # (see analysis.gauge_analysis._normalize_rotation). 0.0 if none was
+    # applied/needed. Purely diagnostic -- overlays are always in
+    # original-image coordinates regardless of this value.
+    rotation_deg: float = 0.0
 
 
 class ErrorResponse(BaseModel):
@@ -95,6 +117,8 @@ class CorrectionOut(BaseModel):
     predicted_courses_per_inch: Optional[float] = None
     actual_wales_per_inch: Optional[float] = None
     actual_courses_per_inch: Optional[float] = None
+    wale_absolute_error: Optional[float] = None  # predicted - actual, in wales/inch
+    course_absolute_error: Optional[float] = None  # predicted - actual, in courses/inch
     wale_percent_error: Optional[float] = None
     course_percent_error: Optional[float] = None
     algorithm_version: str

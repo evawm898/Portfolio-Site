@@ -41,6 +41,7 @@ from .schemas import (
     CandidateOut,
     Orientation,
     RoiOut,
+    Structure,
     Unit,
 )
 
@@ -157,10 +158,19 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
                 per_inch=_period_px_to_per_inch(d.period_px, pixels_per_mm),
                 harmonic=d.harmonic,
                 fold_consistency=d.fold_consistency,
+                autocorr_score=getattr(d, "autocorr_score", None),
+                support_2d=getattr(d, "support_2d", None),
+                structural_score=getattr(d, "structural_score", None),
+                patch_consensus=getattr(d, "patch_consensus", None),
+                harmonic_penalty=getattr(d, "harmonic_penalty", None),
+                evidence_score=getattr(d, "evidence_score", None),
+                final_score=getattr(d, "final_score", None),
                 selected=d.selected,
             )
             for d in getattr(axis, "candidate_details", [])
         ],
+        status=getattr(axis, "status", "confident"),
+        uncertain_reason=getattr(axis, "uncertain_reason", None),
     )
 
 
@@ -178,6 +188,7 @@ async def analyze(
     known_distance: float = Form(...),
     unit: Unit = Form(...),
     orientation: Orientation = Form(...),
+    structure: Structure = Form("unknown"),
 ) -> JSONResponse:
     # --- Validate + decode upload (in memory only, never persisted) -----
     try:
@@ -245,6 +256,7 @@ async def analyze(
             image_bgr=image,
             roi=roi,
             orientation=orientation,  # type: ignore[arg-type]  # Literal-compatible str
+            structure=structure,  # type: ignore[arg-type]  # Literal-compatible str
         )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Analysis raised an unexpected exception")
@@ -274,10 +286,12 @@ async def analyze(
             height_mm=round(result.roi_height_px / pixels_per_mm, 3),
         ),
         orientation=orientation,
+        structure=structure,
         wale=_axis_to_out(result.wale, pixels_per_mm),
         course=_axis_to_out(result.course, pixels_per_mm),
         algorithm_version=ALGORITHM_VERSION,
         loop_centers_px=result.loop_centers_px,
+        rotation_deg=result.rotation_deg,
     )
     return JSONResponse(status_code=200, content=response.model_dump())
 

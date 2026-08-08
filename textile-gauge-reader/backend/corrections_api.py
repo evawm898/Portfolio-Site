@@ -52,6 +52,16 @@ def _percent_error(predicted: Optional[float], actual: Optional[float]) -> Optio
     return round((predicted - actual) / actual * 100, 2)
 
 
+def _absolute_error(predicted: Optional[float], actual: Optional[float]) -> Optional[float]:
+    """Signed absolute error (predicted - actual), in the same units as
+    both inputs (wales/inch or courses/inch) -- kept alongside percent
+    error since a percentage alone can obscure how far off a very low-
+    gauge fabric's prediction actually was in absolute terms."""
+    if predicted is None or actual is None:
+        return None
+    return round(predicted - actual, 3)
+
+
 def _safe_positions_json(raw: str) -> str:
     """Validate the positions payload is JSON; fall back to an empty list rather than 500ing."""
     try:
@@ -108,8 +118,10 @@ async def save_correction(
     resolved_actual_wpi = _derive_actual_per_inch(actual_wales_per_inch, actual_wale_count, wale_extent_mm)
     resolved_actual_cpi = _derive_actual_per_inch(actual_courses_per_inch, actual_course_count, course_extent_mm)
 
-    wale_err = _percent_error(predicted_wales_per_inch, resolved_actual_wpi)
-    course_err = _percent_error(predicted_courses_per_inch, resolved_actual_cpi)
+    wale_pct_err = _percent_error(predicted_wales_per_inch, resolved_actual_wpi)
+    course_pct_err = _percent_error(predicted_courses_per_inch, resolved_actual_cpi)
+    wale_abs_err = _absolute_error(predicted_wales_per_inch, resolved_actual_wpi)
+    course_abs_err = _absolute_error(predicted_courses_per_inch, resolved_actual_cpi)
 
     sample_id = store.CorrectionRecord.new_id()
 
@@ -155,8 +167,10 @@ async def save_correction(
         actual_course_count=actual_course_count,
         actual_wales_per_inch=resolved_actual_wpi,
         actual_courses_per_inch=resolved_actual_cpi,
-        wale_percent_error=wale_err,
-        course_percent_error=course_err,
+        wale_absolute_error=wale_abs_err,
+        course_absolute_error=course_abs_err,
+        wale_percent_error=wale_pct_err,
+        course_percent_error=course_pct_err,
         calibration_correct=calibration_correct,
         orientation_correct=orientation_correct,
         algorithm_version=algorithm_version,
@@ -174,8 +188,10 @@ async def save_correction(
             predicted_courses_per_inch=predicted_courses_per_inch,
             actual_wales_per_inch=resolved_actual_wpi,
             actual_courses_per_inch=resolved_actual_cpi,
-            wale_percent_error=wale_err,
-            course_percent_error=course_err,
+            wale_absolute_error=wale_abs_err,
+            course_absolute_error=course_abs_err,
+            wale_percent_error=wale_pct_err,
+            course_percent_error=course_pct_err,
             algorithm_version=algorithm_version,
             image_saved=image_saved,
         ).model_dump(),

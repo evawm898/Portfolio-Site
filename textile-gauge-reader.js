@@ -152,6 +152,7 @@
     view: { zoom: 1, panX: 0, panY: 0 }, // image viewer pan/zoom, in display (unscaled) px
     panDrag: null, // active viewer-pan drag descriptor
     orientation: "vertical",
+    structure: "unknown",
     result: null,
     serviceOnline: null, // null = unknown/not configured, true/false once checked
   };
@@ -959,6 +960,12 @@
     });
   });
 
+  document.querySelectorAll('input[name="structure"]').forEach((radio) => {
+    radio.addEventListener("change", (e) => {
+      if (e.target.checked) state.structure = e.target.value;
+    });
+  });
+
   orientationConfirmBtn.addEventListener("click", () => {
     buildAnalyzeSummary();
     goToStep("analyze");
@@ -987,6 +994,7 @@
         `${Math.round(state.roi.width)}×${Math.round(state.roi.height)} px (${roiMmW}×${roiMmH} mm)`,
       ],
       ["Wale orientation", state.orientation === "vertical" ? "Vertical ↕" : "Horizontal ↔"],
+      ["Structure", state.structure === "jersey" ? "Jersey / Single Knit" : "Unknown"],
     ];
     analyzeSummary.innerHTML = rows
       .map(([k, v]) => `<li><span>${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></li>`)
@@ -1030,6 +1038,7 @@
       fd.append("known_distance", state.cal.knownDistance);
       fd.append("unit", state.cal.unit);
       fd.append("orientation", state.orientation);
+      fd.append("structure", state.structure);
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
@@ -1097,13 +1106,15 @@
           <div class="tgr-result-card__sub">Not reliably detected${axis.message ? ": " + escapeHtml(axis.message) : ""}</div>
         </div>`;
     }
+    const uncertain = axis.status === "uncertain";
     return `
-      <div class="tgr-result-card">
+      <div class="tgr-result-card${uncertain ? " tgr-result-card--uncertain" : ""}">
         <div class="tgr-result-card__label">${label} spacing</div>
         <div class="tgr-result-card__value" style="color:${color}">${axis.spacing_mm.toFixed(2)} mm</div>
         <div class="tgr-result-card__sub">${axis.spacing_px.toFixed(1)} px &middot; ${axis.positions_px.length} detected</div>
         <div class="tgr-confidence-bar"><div class="tgr-confidence-bar__fill ${confidenceClass(axis.confidence)}" style="width:${Math.round(axis.confidence * 100)}%"></div></div>
-        <div class="tgr-result-card__sub">Confidence: ${Math.round(axis.confidence * 100)}%</div>
+        <div class="tgr-result-card__sub">Confidence: ${uncertain ? "Low — Uncertain" : `${Math.round(axis.confidence * 100)}%`}</div>
+        ${uncertain ? `<div class="tgr-uncertain-badge">⚠ ${escapeHtml(axis.uncertain_reason || "Manual verification recommended.")}</div>` : ""}
       </div>`;
   }
 
@@ -1153,16 +1164,44 @@
 
   // --- Detection Details (harmonic-candidate diagnostics) ----------------
 
+  function scoreRow(labelText, value) {
+    if (value == null) return "";
+    return `<div class="tgr-debug-score-row"><span>${escapeHtml(labelText)}</span><span>${value.toFixed(2)}</span></div>`;
+  }
+
   function detectionAxisBlock(label, axis) {
     const details = axis.candidate_details || [];
     let candidatesHtml;
-    if (details.length) {
-      // Rich per-candidate diagnostics: period, harmonic relationship to
-      // the raw autocorrelation estimate, normalized wales(or courses)/in
-      // at this request's calibration, and (wale axis only, currently)
-      // the fold-consistency structural score that distinguishes a
-      // complete-loop repeat from a leg/sub-feature. `selected` comes
-      // straight from the backend's own decision, not a fuzzy re-match.
+    if (details.length && details[0].final_score != null) {
+      // v0.3: full per-candidate scoring breakdown -- period, normalized
+      // per-inch value, every evidence component that fed the combined
+      // score, and the harmonic relationship to the raw autocorrelation
+      // estimate. `selected` comes straight from the backend's own
+      // decision, not a fuzzy re-match.
+      candidatesHtml = details
+        .map((d) => {
+          const perInch = d.per_inch != null ? `${d.per_inch.toFixed(2)}/in` : "—";
+          return `
+            <div class="tgr-debug-candidate-card${d.selected ? " is-selected" : ""}">
+              <div class="tgr-debug-candidate-card__head">
+                <span class="tgr-debug-candidate-card__px">${d.period_px.toFixed(1)}px</span>
+                <span class="tgr-debug-candidate-card__perinch">${escapeHtml(perInch)}</span>
+                <span class="tgr-debug-candidate-card__harmonic">${escapeHtml(d.harmonic)}</span>
+              </div>
+              ${scoreRow("Autocorrelation", d.autocorr_score)}
+              ${scoreRow("2D support", d.support_2d)}
+              ${scoreRow("Structural score", d.structural_score)}
+              ${scoreRow("Regional consensus", d.patch_consensus)}
+              <div class="tgr-debug-score-row tgr-debug-score-row--final"><span>Evidence score (decides winner)</span><span>${d.evidence_score != null ? d.evidence_score.toFixed(2) : "—"}</span></div>
+              ${scoreRow("Harmonic penalty", d.harmonic_penalty != null ? -d.harmonic_penalty : null)}
+              <div class="tgr-debug-score-row"><span>Final score (confidence-adjusted)</span><span>${d.final_score.toFixed(2)}</span></div>
+              ${d.selected ? '<div class="tgr-debug-candidate-card__selected-tag">SELECTED</div>' : ""}
+            </div>`;
+        })
+        .join("");
+    } else if (details.length) {
+      // Older-style candidate (e.g. fold-consistency-only path with no
+      // v0.3 breakdown) -- compact single-line rendering.
       candidatesHtml = details
         .map((d) => {
           const perInch = d.per_inch != null ? `${d.per_inch.toFixed(2)}/in` : "";
@@ -1186,18 +1225,23 @@
         })
         .join("");
     }
-    const corrected = (axis.selected_reason || "").includes("corrected");
+    const corrected = (axis.selected_reason || "").includes("corrected") || (axis.selected_reason || "").includes("Selected");
+    const statusTag = axis.status === "uncertain" ? '<span class="tgr-debug-axis__status is-uncertain">UNCERTAIN</span>' : "";
     return `
       <div class="tgr-debug-axis">
-        <div class="tgr-debug-axis__title">${escapeHtml(label)} period candidates</div>
+        <div class="tgr-debug-axis__title">${escapeHtml(label)} period candidates ${statusTag}</div>
         <div class="tgr-debug-axis__candidates">${candidatesHtml || "<span class=\"tgr-debug-candidate\">none</span>"}</div>
         <div class="tgr-debug-axis__reason${corrected ? " is-corrected" : ""}">${escapeHtml(axis.selected_reason || "—")}</div>
       </div>`;
   }
 
   function renderDetectionDetails(result) {
-    detectionDetailsContent.innerHTML =
-      detectionAxisBlock("Wale", result.wale) + detectionAxisBlock("Course", result.course);
+    let html = "";
+    if (result.rotation_deg && Math.abs(result.rotation_deg) > 0.01) {
+      html += `<div class="tgr-debug-rotation">Tilt correction applied before period estimation: ${result.rotation_deg > 0 ? "+" : ""}${result.rotation_deg.toFixed(1)}&deg; (overlay positions stay in the original, unrotated image).</div>`;
+    }
+    html += detectionAxisBlock("Wale", result.wale) + detectionAxisBlock("Course", result.course);
+    detectionDetailsContent.innerHTML = html;
   }
 
   showLoopCentersCheck.addEventListener("change", () => render());
