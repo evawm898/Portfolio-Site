@@ -521,6 +521,19 @@
   -webkit-backface-visibility: hidden;
 }
 
+/* The tunnel ribs and wire slices fold past 90° (their crest ribs / far
+   wire faces) as part of a single continuous curved surface, not a
+   flat panel that could ever show a mirrored duplicate of itself — so
+   the backface-hiding above (meant for flat faces near edge-on) would
+   instead silently cull half of this curved surface's own fill. Keep
+   both faces of these two element types visible so the dome and wire
+   render as complete, continuous geometry from every camera angle. */
+.embeddedWire-tunnelRib,
+.embeddedWire-wireSlice {
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+}
+
 .circuit-panel__label {
   margin-top: 1.5rem;
   font-family: var(--serif);
