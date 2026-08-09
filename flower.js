@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation, buildJaggedEdge,
+  buildSpine, buildSilhouette, buildVenation, buildJaggedEdge, buildRuffledEdge,
   mapPointToSurface, placePoint,
 } from './flower-geometry.js';
 
@@ -310,11 +310,12 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
   const toWorld = (pt) => place(mapPointToSurface(pt, P, spine));
 
-  // PETAL EDGE: when TIP STYLE = jagged, the outline itself becomes a row of
-  // teeth around the tip end (buildJaggedEdge returns a rim that weaves through
-  // them, plus a mid-vein per tooth). Otherwise the rim is the smooth outline.
+  // PETAL EDGE: the tip style can reshape the outline. JAGGED turns the tip end
+  // into a row of teeth (a rim weaving through them + a mid-vein per tooth);
+  // RUFFLED rolls the tip end into a smooth continuous wave (no extra veins).
+  // Either returns { rim, teethVeins }; otherwise the rim is the smooth outline.
   const tipRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
-  const jag = buildJaggedEdge(P, spine, tipRng);
+  const jag = buildJaggedEdge(P, spine, tipRng) || buildRuffledEdge(P, spine, tipRng);
 
   // Rim: one continuous closed tube along the (possibly jagged) petal margin.
   const rim = jag ? jag.rim.map(place) : outline.map(toWorld);
@@ -711,7 +712,6 @@ accSections.forEach((section) => {
 // Placeholder controls — no rendering logic yet. `fmt` formats the read-out for
 // slider controls; selects (fmt: null) show their value in the control itself.
 const placeholderControls = [
-  { id: 'undulation',      fmt: (v) => (+v).toFixed(2) },
   { id: 'fractalGrowth',   fmt: (v) => (+v).toFixed(2) },
   { id: 'infillType',      fmt: null },
 ];

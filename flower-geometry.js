@@ -733,3 +733,79 @@ export function buildJaggedEdge(P, spine, rng) {
 
   return { rim, teethVeins };
 }
+
+const RUFFLE_AMP_MAX = 0.40;   // world amplitude of the ruffle at TIP LENGTH = 1
+
+/* -------------------------------------------------------------------
+   RUFFLED tip: a smooth sinusoidal wave running along the tip end of the
+   margin. Unlike JAGGED it makes no points — the outline rolls in and out in
+   one continuous curve. Same shared controls, remapped:
+     TIP SHAPE     -> wave profile: soft sine (0) -> tight gathered crest (1)
+     TIP FREQUENCY -> full oscillations along each side of the ruffled span
+     TIP REGION    -> how far the ruffle reaches from the apex down the edge
+     TIP LENGTH    -> amplitude (how far the edge departs in/out from the base)
+   The displacement rides the CUP-FREE outward normal (as the teeth do), so a
+   ruffle on a tilted / cupped petal reads as surface detail, not a flat outline.
+   Veins are untouched, so they stay inside the core (un-ruffled) boundary.
+   Returns { rim, teethVeins: [] } or null when the style/amplitude is off.
+   ------------------------------------------------------------------- */
+export function buildRuffledEdge(P, spine /* , rng */) {
+  if (P.tipStyle !== 'ruffled') return null;
+  const amp = (P.tipLength || 0) * RUFFLE_AMP_MAX;
+  if (amp <= 1e-4) return null;
+  const TWO_PI = Math.PI * 2;
+  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);   // oscillations per side
+  const crest = clamp(P.tip != null ? P.tip : 0.5, 0, 1);       // TIP SHAPE
+  const { uStart } = tipRegionRange(P);
+  const Pflat = { ...P, cup: 0 };
+
+  // Along-edge profile. p in [0,1] runs the region start -> tip; the SAME p(u)
+  // drives both sides, so the ruffle mirrors across the midline. sign(sin)|sin|^k
+  // keeps smooth zero-crossings (no corners) while raising k pinches the crests
+  // into tight, gathered folds with flatter spans between — "gathered fabric".
+  const k = lerp(1, 3, crest);
+  const wave = (p) => {
+    const s = Math.sin(TWO_PI * freq * p);
+    return Math.sign(s) * Math.pow(Math.abs(s), k);
+  };
+  // Amplitude window: eases in from the smooth edge at the region start and back
+  // to zero at the tip, so the ruffle blends at both ends and the apex stays a
+  // single clean point (two sides can't pull one point in two directions).
+  const RAMP = 0.16;
+  const env = (p) => smootherstep(p / RAMP) * smootherstep((1 - p) / RAMP);
+
+  const uTip = 0.992;                 // ruffle fades out here; smooth cap crosses the tip
+  const span = Math.max(1e-4, uTip - uStart);
+
+  const rufflePoint = (u, s) => {
+    const base = surfacePoint(clamp(u, 0, 0.9995), s, P, spine);
+    const p = (u - uStart) / span;
+    const e = env(p);
+    if (e <= 1e-5) return base;
+    const { out } = edgeOutward(u, s, Pflat, spine);   // cup-free: rides the broad plane
+    const d = amp * e * wave(p);
+    return { x: base.x + out.x * d, y: base.y + out.y * d, z: base.z + out.z * d };
+  };
+
+  const rim = [];
+  const uBase = 0.004;
+  const nSmooth = 64;
+  const nRuffle = clamp(Math.round(freq * 16) + 72, 150, 400);   // dense enough for smooth waves
+  const smoothTo = (from, to, s) => {
+    const steps = Math.max(1, Math.round(Math.abs(to - from) * nSmooth));
+    for (let i = 1; i <= steps; i++) rim.push(surfacePoint(clamp(lerp(from, to, i / steps), 0, 0.9995), s, P, spine));
+  };
+  const ruffleTo = (from, to, s) => {
+    for (let i = 1; i <= nRuffle; i++) rim.push(rufflePoint(lerp(from, to, i / nRuffle), s));
+  };
+
+  rim.push(surfacePoint(uBase, 1, P, spine));
+  smoothTo(uBase, uStart, 1);         // smooth base -> region start (+Y)
+  ruffleTo(uStart, uTip, 1);          // ruffled +Y edge up toward the tip
+  smoothTo(uTip, 0.9995, 1);          // smooth cap: +Y edge converging on the apex
+  smoothTo(0.9995, uTip, -1);         // ...and back down onto the -Y side
+  ruffleTo(uTip, uStart, -1);         // ruffled -Y edge back down to the region start
+  smoothTo(uStart, uBase, -1);        // smooth region start -> base (-Y)
+
+  return { rim, teethVeins: [] };     // veins stay inside the core boundary
+}

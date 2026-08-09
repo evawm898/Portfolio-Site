@@ -291,7 +291,7 @@ input[type="checkbox"]:checked::after {
 .fl-acc__body .fl-ctrl:last-child { margin-bottom: 0; }
 
 /* per-style option controls are shown/hidden by JS via the hidden attribute */
-.fl-ctrl[hidden], .fl-tip-note[hidden] { display: none; }
+.fl-ctrl[hidden], .fl-tip-note[hidden], .fl-ctrl__hint[hidden] { display: none; }
 
 /* small standalone note under a Tip style (e.g. "not built yet") */
 .fl-tip-note {
