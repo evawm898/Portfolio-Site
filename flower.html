@@ -159,13 +159,15 @@
       </div>
     </section>
 
-    <!-- ========================== PETAL EDGE ========================= -->
+    <!-- ============================= TIP ============================= -->
+    <!-- The tip is a feature with a STYLE (clean / jagged / ruffled / fractal),
+         mirroring INFILL: pick a style, then only that style's options show. -->
     <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-edge">
-        <span class="fl-acc__label">Petal edge</span>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-tip">
+        <span class="fl-acc__label">Tip</span>
         <span class="fl-acc__chev" aria-hidden="true"></span>
       </button>
-      <div class="fl-acc__body" id="acc-edge">
+      <div class="fl-acc__body" id="acc-tip">
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
@@ -175,10 +177,11 @@
             <option value="clean">CLEAN</option>
             <option value="jagged">JAGGED</option>
             <option value="ruffled">RUFFLED</option>
+            <option value="fractal">FRACTAL</option>
           </select>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
           <div class="fl-ctrl__row">
             <label for="tipRegion">Tip region</label>
             <span class="fl-ctrl__val" data-value="tipRegion"></span>
@@ -187,7 +190,7 @@
           <span class="fl-ctrl__hint">how much of the petal end is the tip</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled">
           <div class="fl-ctrl__row">
             <label for="tipLength">Tip length</label>
             <span class="fl-ctrl__val" data-value="tipLength"></span>
@@ -196,7 +199,7 @@
           <span class="fl-ctrl__hint">how far tips extend from the edge</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
           <div class="fl-ctrl__row">
             <label for="tipFrequency">Tip frequency</label>
             <span class="fl-ctrl__val" data-value="tipFrequency"></span>
@@ -205,7 +208,7 @@
           <span class="fl-ctrl__hint">points / oscillations around the edge</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
           <div class="fl-ctrl__row">
             <label for="tipIrregularity">Tip irregularity</label>
             <span class="fl-ctrl__val" data-value="tipIrregularity"></span>
@@ -214,7 +217,7 @@
           <span class="fl-ctrl__hint">regular &rarr; organic, varied</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-tip-styles="ruffled">
           <div class="fl-ctrl__row">
             <label for="undulation">Organic undulation</label>
             <span class="fl-ctrl__val" data-value="undulation"></span>
@@ -223,7 +226,7 @@
           <span class="fl-ctrl__hint">slow, large-amplitude edge wave</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-tip-styles="fractal">
           <div class="fl-ctrl__row">
             <label for="fractalGrowth">Fractal growth</label>
             <span class="fl-ctrl__val" data-value="fractalGrowth"></span>
@@ -231,6 +234,9 @@
           <input type="range" id="fractalGrowth" min="0" max="1" step="0.01" value="0">
           <span class="fl-ctrl__hint">edge dissolves into branching filaments</span>
         </div>
+
+        <p class="fl-tip-note" data-tip-styles="clean">Smooth petal edge.</p>
+        <p class="fl-tip-note" data-tip-styles="ruffled fractal">This style isn&rsquo;t built yet &mdash; controls are placeholders.</p>
 
       </div>
     </section>

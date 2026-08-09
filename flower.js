@@ -631,8 +631,16 @@ function setBuilding(on) {
  'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
-// tip style is a <select>; regenerate on change (clean/jagged/ruffled)
-inputs.tipStyle.addEventListener('change', () => { scheduleRegen(); });
+// Tip: like Infill, only the selected style's options are shown. Each option's
+// data-tip-styles lists the styles it belongs to; hide the rest.
+function updateTipOptions() {
+  const style = inputs.tipStyle.value;
+  document.querySelectorAll('[data-tip-styles]').forEach((el) => {
+    el.hidden = !el.getAttribute('data-tip-styles').split(/\s+/).includes(style);
+  });
+}
+// tip style is a <select>; swap the visible options and regenerate on change
+inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 
 const resetBtn = document.getElementById('reset');
@@ -659,6 +667,7 @@ if (resetBtn) {
     inputs.autoRotate.checked = d.autoRotate;
     controls.autoRotate = d.autoRotate;
     resetPlaceholders();
+    updateTipOptions();
     refreshLabels();
     scheduleRegen();
   });
@@ -747,6 +756,7 @@ placeholderControls.forEach(({ id, fmt }) => {
    =================================================================== */
 
 controls.autoRotate = inputs.autoRotate.checked;
+updateTipOptions();
 refreshLabels();
 generate();
 animate();
