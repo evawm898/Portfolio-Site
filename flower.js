@@ -679,7 +679,7 @@ if (resetBtn) {
 }
 
 const DEFAULTS = {
-  petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
+  petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, toothShape: 1, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };

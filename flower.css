@@ -203,6 +203,12 @@ input[type="range"]:focus-visible {
   margin-bottom: 0.85rem;
 }
 
+/* Auto-rotate lives in the header, always visible under the description. */
+.fl-ctrl--head {
+  margin-top: 1rem;
+  margin-bottom: 0;
+}
+
 input[type="checkbox"] {
   -webkit-appearance: none;
   appearance: none;
