@@ -569,8 +569,8 @@ export function mapPointToSurface(pt, P, spine) {
    ------------------------------------------------------------------- */
 
 const TIP_LENGTH_MAX = 0.5;    // world reach of a tooth at TIP LENGTH = 1
-const TIP_U_APEX     = 0.94;   // the tip region ends here (short of the degenerate
-                               // apex, where half-width -> 0)
+const TIP_U_APEX     = 0.985;  // the tip region reaches almost to the apex; a
+                               // dedicated apex tooth then wraps the very tip
 const TIP_REGION_MIN = 0.10;   // shortest "tip" — the last tenth of the petal
 const TIP_REGION_MAX = 0.85;   // longest — nearly the whole edge
 
@@ -611,25 +611,34 @@ export function buildJaggedEdge(P, spine, rng) {
   if (len0 <= 1e-4) return null;
   const freq = clamp(Math.round(P.tipFrequency || 0), 2, 80);
   const irr = clamp(P.tipIrregularity || 0, 0, 1);
+  const shape = clamp(P.toothShape != null ? P.toothShape : 1, 0, 1);  // round..pointed
   const { uStart, uEnd } = tipRegionRange(P);    // the petal end that is "the tip"
   const perSide = Math.max(1, Math.round(freq / 2));
   const du = (uEnd - uStart) / perSide;
   const hb = du * 0.48;                          // tooth base half-width, in u
+  const nEdge = 64;
 
-  // One tooth on side s at station uc: its edge foot E, its apex, and the side.
+  // Tooth crown profile across the base (t in [0,1]): a sine hump for ROUND
+  // teeth vs a tent (sharp peak) for POINTED, blended by TOOTH SHAPE. Sampled
+  // at t = 0.25 / 0.5 / 0.75 — pointed stays collinear with the straight sides
+  // (a crisp triangle), round bulges past them (a scalloped bump).
+  const tent = (t) => 1 - 2 * Math.abs(t - 0.5);
+  const profile = (t) => (1 - shape) * Math.sin(Math.PI * t) + shape * tent(t);
+
+  // A tooth centred at uc on side s: three crown points + its peak (vein target).
   const makeTooth = (uc, s) => {
-    const { p: E, out, tan } = edgeOutward(uc, s, P, spine);
+    const { out, tan } = edgeOutward(uc, s, P, spine);
     let len = len0, skew = 0;
     if (irr > 0) {
       len *= 1 + irr * (rng() * 2 - 1) * 0.55;   // varied length
       skew = irr * (rng() * 2 - 1) * 0.5;        // varied angle: skew along the edge
     }
-    const apex = {
-      x: E.x + out.x * len + tan.x * skew * len,
-      y: E.y + out.y * len + tan.y * skew * len,
-      z: E.z + out.z * len + tan.z * skew * len,
-    };
-    return { uc, s, E, apex };
+    const crown = [0.25, 0.5, 0.75].map((t) => {
+      const base = surfacePoint(clamp(uc + (t - 0.5) * 2 * hb, 0, 0.9995), s, P, spine);
+      const off = profile(t) * len, sk = skew * off;
+      return { x: base.x + out.x * off + tan.x * sk, y: base.y + out.y * off + tan.y * sk, z: base.z + out.z * off + tan.z * sk };
+    });
+    return { uc, s, footInner: surfacePoint(clamp(uc, 0, 0.9995), s * 0.45, P, spine), crown, peak: crown[1] };
   };
   const teethOf = (s) => {
     const arr = [];
@@ -639,10 +648,19 @@ export function buildJaggedEdge(P, spine, rng) {
   const plus = teethOf(1);
   const minus = teethOf(-1);
 
-  // ---- rim: smooth edge, detouring out to each tooth apex and back ----
+  // A single apex tooth wraps the very tip (pointing tip-ward) so the jagged
+  // treatment is continuous around the apex rather than leaving a smooth gap.
+  const uApex = 0.995;
+  const tipC = surfacePoint(uApex, 0, P, spine);
+  const tAhead = surfacePoint(0.999, 0, P, spine), tBack = surfacePoint(uEnd, 0, P, spine);
+  let ax = tAhead.x - tBack.x, ay = tAhead.y - tBack.y, az = tAhead.z - tBack.z;
+  const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
+  let aLen = len0; if (irr > 0) aLen *= 1 + irr * (rng() * 2 - 1) * 0.55;
+  const apexPeak = { x: tipC.x + ax * aLen, y: tipC.y + ay * aLen, z: tipC.z + az * aLen };
+
+  // ---- rim: smooth edge, detouring out to each tooth crown and back ----
   const rim = [];
-  const nEdge = 64;
-  const uBase = 0.004, uApex = 0.995;
+  const uBase = 0.004;
   const edgeTo = (from, to, s) => {              // append edge samples for u in (from, to]
     const steps = Math.max(1, Math.round(Math.abs(to - from) * nEdge));
     for (let i = 1; i <= steps; i++) rim.push(surfacePoint(clamp(lerp(from, to, i / steps), 0, 0.9995), s, P, spine));
@@ -651,17 +669,19 @@ export function buildJaggedEdge(P, spine, rng) {
   rim.push(surfacePoint(uBase, 1, P, spine));    // +Y base, then base -> tip
   let cur = uBase;
   for (const t of plus) {
-    edgeTo(cur, t.uc - hb, 1);                    // smooth edge up to the tooth foot A
-    rim.push(t.apex);                             // out to the tooth apex...
-    rim.push(surfacePoint(t.uc + hb, 1, P, spine)); // ...and back to foot B
+    edgeTo(cur, t.uc - hb, 1);                    // smooth edge up to the tooth foot
+    for (const c of t.crown) rim.push(c);         // out over the crown...
+    rim.push(surfacePoint(t.uc + hb, 1, P, spine)); // ...and back to the far foot
     cur = t.uc + hb;
   }
-  edgeTo(cur, uApex, 1);                          // smooth edge to the apex point
-  cur = uApex;
+  edgeTo(cur, uEnd, 1);                           // +Y edge up to the apex-tooth foot
+  rim.push(apexPeak);                             // wrap the very tip
+  rim.push(surfacePoint(uEnd, -1, P, spine));     // down onto the -Y side
+  cur = uEnd;
   for (let i = minus.length - 1; i >= 0; i--) {   // -Y side, tip -> base (descending)
     const t = minus[i];
     edgeTo(cur, t.uc + hb, -1);
-    rim.push(t.apex);
+    for (let j = t.crown.length - 1; j >= 0; j--) rim.push(t.crown[j]);  // crown, reversed
     rim.push(surfacePoint(t.uc - hb, -1, P, spine));
     cur = t.uc - hb;
   }
@@ -669,10 +689,8 @@ export function buildJaggedEdge(P, spine, rng) {
 
   // ---- a fine mid-vein running from inside the petal into each tooth ----
   const teethVeins = [];
-  for (const t of [...plus, ...minus]) {
-    const inner = surfacePoint(clamp(t.uc, 0, 0.9995), t.s * 0.45, P, spine);
-    teethVeins.push([inner, t.E, t.apex]);
-  }
+  for (const t of [...plus, ...minus]) teethVeins.push([t.footInner, t.peak]);
+  teethVeins.push([surfacePoint(0.9, 0, P, spine), apexPeak]);  // into the apex tooth
 
   return { rim, teethVeins };
 }

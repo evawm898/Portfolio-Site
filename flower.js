@@ -270,6 +270,7 @@ function resolveParams(ui) {
     tipStyle: ui.tipStyle,                       // petal-edge tip style (clean/jagged/…)
     tipRegion: ui.tipRegion,                     // how much of the petal end is the tip
     tipLength: ui.tipLength,                     // how far tips extend past the edge
+    toothShape: ui.toothShape,                   // jagged teeth: round (0) -> pointed (1)
     tipFrequency: ui.tipFrequency,               // number of tips around the outer edge
     tipIrregularity: ui.tipIrregularity,         // 0 uniform -> 1 varied length & angle
     L: PETAL_LENGTH,
@@ -534,6 +535,7 @@ const inputs = {
   tipStyle: document.getElementById('tipStyle'),
   tipRegion: document.getElementById('tipRegion'),
   tipLength: document.getElementById('tipLength'),
+  toothShape: document.getElementById('toothShape'),
   tipFrequency: document.getElementById('tipFrequency'),
   tipIrregularity: document.getElementById('tipIrregularity'),
   bloom: document.getElementById('bloom'),
@@ -556,6 +558,7 @@ function readUI() {
     tipStyle: inputs.tipStyle.value,
     tipRegion: parseFloat(inputs.tipRegion.value),
     tipLength: parseFloat(inputs.tipLength.value),
+    toothShape: parseFloat(inputs.toothShape.value),
     tipFrequency: parseInt(inputs.tipFrequency.value, 10),
     tipIrregularity: parseFloat(inputs.tipIrregularity.value),
     bloom: parseFloat(inputs.bloom.value),
@@ -580,6 +583,7 @@ function refreshLabels() {
   setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
   setLabel('tipRegion', (+inputs.tipRegion.value).toFixed(2));
   setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
+  setLabel('toothShape', (+inputs.toothShape.value).toFixed(2));
   setLabel('tipFrequency', inputs.tipFrequency.value);
   setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
   setLabel('bloom', inputs.bloom.value + '°');
@@ -627,7 +631,7 @@ function setBuilding(on) {
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
 ['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
- 'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
+ 'tipRegion', 'tipLength', 'toothShape', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
@@ -656,6 +660,7 @@ if (resetBtn) {
     inputs.tipStyle.value = d.tipStyle;
     inputs.tipRegion.value = d.tipRegion;
     inputs.tipLength.value = d.tipLength;
+    inputs.toothShape.value = d.toothShape;
     inputs.tipFrequency.value = d.tipFrequency;
     inputs.tipIrregularity.value = d.tipIrregularity;
     inputs.bloom.value = d.bloom;
@@ -675,7 +680,7 @@ if (resetBtn) {
 
 const DEFAULTS = {
   petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
-  tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
+  tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, toothShape: 1, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
