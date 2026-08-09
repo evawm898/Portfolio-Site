@@ -44,7 +44,9 @@ const SEED_BASE      = 20250808;
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
    layout). Petal i sits at angle i*GOLDEN_ANGLE and radius spread*sqrt(i)
-   (Vogel's model — the sunflower packing). */
+   (Vogel's model — the sunflower packing). Below EVEN_MAX petals the spiral has
+   too few points to read as a spiral and collapses into a lopsided clump, so we
+   switch to an evenly-spaced rosette there (see generate()). */
 const GOLDEN_ANGLE   = Math.PI * (3 - Math.sqrt(5));  // ~137.5°, the divergence angle
 const SPREAD_LOOSE   = 0.52;   // radial spacing at min coil tightness (open, gappy spiral)
 const SPREAD_TIGHT   = 0.13;   // radial spacing at max coil tightness (dense, packed spiral)
@@ -52,6 +54,10 @@ const ELEV_FACTOR    = 0.85;   // centre rise/sink at full elevation, as a fract
                                // bloom radius — keeps the cone/bowl aspect natural at any tightness
 const RECEPTACLE_TILT = 0.55;  // how strongly petals lean along the cone/bowl slope (0..1)
 const CORE_SPREAD    = 0.14;   // stamen-cluster radius at the bloom's heart
+const EVEN_MAX       = 4;      // at/below this petal count, arrange petals as an even rosette
+                               // (equal angle + equal radius) instead of the phyllotactic
+                               // spiral, so 3 or 4 petals sit evenly spaced from each other
+const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom radius
 
 
 /* ===================================================================
@@ -397,9 +403,14 @@ function generate() {
   const elev = ui.elevation;                                     // -1 (bowl) .. +1 (cone)
   const elevAmp = ELEV_FACTOR * rMax;                            // scale elevation with bloom size
 
+  // Few-petal blooms (3, 4, …) look clumped on the golden-angle spiral, so place
+  // them on a symmetric rosette: equal angular spacing and one shared ring radius.
+  // A single petal stays on the axis; the spiral takes over once past EVEN_MAX.
+  const evenSpaced = count <= EVEN_MAX;
+
   for (let i = 0; i < count; i++) {
-    const az = i * GOLDEN_ANGLE;
-    const r = spread * Math.sqrt(i);
+    const az = evenSpaced ? (i * 2 * Math.PI / count) : (i * GOLDEN_ANGLE);
+    const r = evenSpaced ? (count === 1 ? 0 : EVEN_RING * rMax) : (spread * Math.sqrt(i));
     const rho = rMax > 1e-6 ? clamp(r / rMax, 0, 1) : 0;
     // raised-cosine receptacle profile: 1 at the centre, 0 at the rim
     const profile = 0.5 * (1 + Math.cos(Math.PI * rho));
