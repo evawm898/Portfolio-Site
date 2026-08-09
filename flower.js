@@ -267,10 +267,13 @@ function resolveParams(ui) {
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
-    // Density now drives the leaf-venation network: how many secondary veins
-    // branch off the midrib, and how many tertiary rungs ladder each strip.
-    secondaries: clamp(Math.round(ui.density * 0.7) + 1, 3, 10),
-    crossPerStrip: clamp(Math.round(ui.density * 0.6), 2, 8),
+    // Density drives the fractal leaf venation: how many secondaries branch
+    // off the midrib, how deep the branching recurses (the "fractaling"), and
+    // how many tertiary rungs ladder each strip.
+    secondaries: clamp(Math.round(ui.density * 0.5) + 2, 4, 8),
+    maxDepth: clamp(Math.round((ui.density - 3) / 3) + 2, 2, 4),
+    crossPerStrip: clamp(Math.round(ui.density * 0.4), 2, 5),
+    softness: ui.softness,   // 0 = crisp branch angles, 1 = rounded, organic
     tubeRadius: lerp(0.008, 0.030, ui.tube),
   };
 }
@@ -288,7 +291,10 @@ function resolveParams(ui) {
 function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
   const spine = buildSpine(P);
   const outline = buildSilhouette(P);
-  const ven = buildVenation(P, rng, { secondaries: P.secondaries, crossPerStrip: P.crossPerStrip });
+  const ven = buildVenation(P, rng, {
+    secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
+    maxDepth: P.maxDepth, softness: P.softness,
+  });
 
   const toWorld = (pt) => placePoint(mapPointToSurface(pt, P, spine), az, baseHeight, radialOffset, tilt);
 
@@ -303,7 +309,9 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
   // line weight thins from the midrib through secondary, tertiary and veinlet.
   for (const vein of ven.veins) {
     const world = vein.points.map(toWorld);
-    acc.addTube(world, [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1], 0);
+    // veins are thin — 6 radial sides read as round and roughly halve the
+    // triangle count versus the default, which matters on deep fractals
+    acc.addTube(world, [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1], 0, 6);
   }
   // Welded caps seal the open tube ends (free vein tips, and the T-junctions
   // where a secondary meets the midrib) so nothing reads as a hollow ring.
@@ -500,6 +508,7 @@ const inputs = {
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   density: document.getElementById('density'),
+  softness: document.getElementById('softness'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -514,6 +523,7 @@ function readUI() {
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     density: parseInt(inputs.density.value, 10),
+    softness: parseFloat(inputs.softness.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -529,6 +539,7 @@ function refreshLabels() {
   setLabel('bloom', inputs.bloom.value + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
+  setLabel('softness', (+inputs.softness.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -569,7 +580,7 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'width', 'taper', 'tip', 'bloom', 'tube', 'density', 'tightness', 'elevation'].forEach((k) => {
+['petalCount', 'width', 'taper', 'tip', 'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
@@ -585,6 +596,7 @@ if (resetBtn) {
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
     inputs.density.value = d.density;
+    inputs.softness.value = d.softness;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -596,7 +608,7 @@ if (resetBtn) {
 
 const DEFAULTS = {
   petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5,
-  bloom: 55, tube: 0.4, density: 7, tightness: 0.5, elevation: 0, autoRotate: true,
+  bloom: 55, tube: 0.4, density: 7, softness: 0.6, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
 

@@ -264,29 +264,36 @@ function dedupePolygon(poly) {
 
 
 /* -------------------------------------------------------------------
-   5. Leaf venation — a hierarchical, bilaterally-symmetric vein network
-      (this is the petal infill).
+   5. Leaf venation — a hierarchical, bilaterally-symmetric, FRACTAL
+      vein network (this is the petal infill).
 
-   Built strictly by hierarchy (never by random point scatter):
-     1. a single central MIDRIB along the axis of symmetry (Y = 0), from
-        base to tip, thickest at the base and tapering toward the tip;
-     2. SECONDARY veins branching off the midrib at ~45-60 deg, curving
-        forward toward the tip, and shorter the nearer the tip they start;
-     3. TERTIARY cross-veins laddering between adjacent secondaries, plus
-        marginal loops that join secondary tips — together these enclose
-        the polygonal cells. Rungs are spaced tighter toward the margin,
-        so cells shrink toward the edge and stay large near the midrib;
-     4. fine free-ending VEINLETS poking into the big inner cells so they
-        read as irregular polygons rather than a tidy ladder.
+   Built strictly by recursive hierarchy (never by random point scatter):
+     1. a single central MIDRIB along the axis of symmetry (Y = 0), base
+        to tip, thickest at the base and tapering toward the tip;
+     2. SECONDARY veins branch off the midrib at ~45-60 deg and then
+        RECURSE: every vein spawns finer child veins at softened angles,
+        each a shorter, thinner, curvier copy of its parent, down to a
+        depth set by `maxDepth`. That self-similar bifurcation is what
+        gives the network its organic, fractal, skeleton-leaf character;
+     3. TERTIARY cross-veins ladder between adjacent secondaries and
+        marginal loops join their tips, closing the polygonal cells that
+        the fractal branches fill (rungs pack tighter toward the margin,
+        so cells shrink outward and stay large near the midrib).
 
-   Only the right half (Y >= 0) is generated, then mirrored across the axis
-   to build the left half EXACTLY — so every petal is perfectly symmetric.
-   ("Alternating left/right" is realised as opposite pairs; strict mirror
-   symmetry, which the brief requires explicitly, rules out true alternation
-   since that would not be mirror-symmetric.) All jitter is drawn from the
-   supplied seeded PRNG, so a given petal is stable across live rebuilds.
+   Angle softening: every finished polyline is run through `softenVein`, a
+   corner-rounding (Chaikin) pass whose strength follows the `softness`
+   knob — 0 leaves crisp branch angles, 1 rounds them into smooth arcs.
 
-   Line-weights are RELATIVE multipliers (midrib thickest -> veinlet
+   Fractal density: `maxDepth` (how many times the branching recurses) is
+   driven by the density slider, so a "denser" bloom is literally a more
+   deeply fractal one, not just more struts.
+
+   Only the right half (Y >= 0) is generated, then mirrored across the
+   axis to build the left half EXACTLY — so every petal is perfectly
+   symmetric. All jitter is drawn from the supplied seeded PRNG, so a
+   given petal is stable across live rebuilds.
+
+   Line-weights are RELATIVE multipliers (midrib thickest -> finest twig
    thinnest); the render layer scales them by the tube-thickness slider so
    the taper keeps its proportions at any thickness.
 
@@ -297,10 +304,15 @@ function dedupePolygon(poly) {
 
 const VEIN_MIDRIB_BASE = 1.00;
 const VEIN_MIDRIB_TIP  = 0.42;
-const VEIN_SEC_BASE    = 0.56;
-const VEIN_SEC_TIP     = 0.32;
-const VEIN_TERTIARY    = 0.30;
-const VEIN_VEINLET     = 0.20;
+const VEIN_TERTIARY    = 0.28;
+// relative line-weight by branch order (0 = midrib). Deeper orders are finer;
+// the last entry is the floor so very deep fractal twigs stay visible.
+const VEIN_WIDTH_BY_ORDER = [1.00, 0.56, 0.38, 0.28, 0.22, 0.18];
+const D2R = Math.PI / 180;
+
+function widthOfOrder(o) {
+  return VEIN_WIDTH_BY_ORDER[Math.min(o, VEIN_WIDTH_BY_ORDER.length - 1)];
+}
 
 // Sample a polyline at fraction t in [0,1] by cumulative arc length.
 function veinSample(pts, t) {
@@ -320,33 +332,91 @@ function veinSample(pts, t) {
   return { x: lerp(pts[i - 1].x, pts[i].x, f), y: lerp(pts[i - 1].y, pts[i].y, f) };
 }
 
-// Grow one secondary vein on the RIGHT half (Y >= 0). It launches from the
-// midrib at station u0, at ~45-60 deg from the axis, then curves progressively
-// forward (toward the tip) and stops just shy of the margin. Returns a polyline
-// of >= 2 flattened points, or a single point if there was no room to grow.
-function growSecondary(u0, P, rng) {
-  const L = P.L;
-  const D = Math.PI / 180;
-  const start = { x: L * u0, y: 0 };
-  const pts = [start];
-  // launch steeper near the base, shallower near the tip; small seeded wobble
-  let ang    = (lerp(58, 47, u0) + (rng() - 0.5) * 5) * D;   // from the +X (tip) axis
-  const angTip = (24 + (rng() - 0.5) * 8) * D;               // forward-sweep target
-  const reachFrac = clamp(0.86 + (rng() - 0.5) * 0.06, 0.7, 0.94);
-  const maxLen = L * (0.95 - 0.6 * u0);                      // shorter toward the tip
-  const ds = 0.055;
-  let x = start.x, y = start.y, len = 0, guard = 0;
-  while (len < maxLen && guard++ < 400) {
-    x += ds * Math.cos(ang);
-    y += ds * Math.sin(ang);
-    len += ds;
-    if (x >= L * 0.98) { x = L * 0.98; }
+// Point + local heading (radians) at fraction t along a polyline.
+function veinPointHeading(pts, t) {
+  const p  = veinSample(pts, t);
+  const pA = veinSample(pts, Math.max(0, t - 0.03));
+  const pB = veinSample(pts, Math.min(1, t + 0.03));
+  return { p, theta: Math.atan2(pB.y - pA.y, pB.x - pA.x) };
+}
+
+// --- angle softening (Chaikin corner-cutting, endpoint-preserving) -----
+function chaikinOnce(pts) {
+  if (pts.length < 3) return pts.slice();
+  const out = [pts[0]];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+    out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+function resamplePolyline(pts, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(veinSample(pts, n <= 1 ? 0 : i / (n - 1)));
+  return out;
+}
+function polyLen(pts) {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return L;
+}
+// Round the corners of a vein by `softness` in [0,1]: 0 -> crisp branch angles,
+// 1 -> fully Chaikin-smoothed arcs, in between a continuous blend of the two.
+// Every vein is resampled to an arc-length-proportional, capped point count, so
+// point density (and therefore triangle count) stays bounded on deep fractals.
+function softenVein(pts, softness) {
+  if (pts.length < 2) return pts;
+  const n = Math.max(2, Math.min(22, Math.round(polyLen(pts) / 0.16) + 1));
+  const sharp = resamplePolyline(pts, n);
+  if (softness <= 0.001 || pts.length < 3) return sharp;
+  const sm = resamplePolyline(chaikinOnce(chaikinOnce(pts)), n);
+  if (softness >= 0.999) return sm;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ x: lerp(sharp[i].x, sm[i].x, softness), y: lerp(sharp[i].y, sm[i].y, softness) });
+  }
+  return out;
+}
+
+// Grow one vein on the RIGHT half (Y >= 0) and RECURSE into finer children.
+// Returns the vein's own polyline so a caller can hang cross-veins off a
+// top-level secondary. Children branch off at softened angles, each shorter,
+// thinner and a touch curvier than the parent — the self-similar fractal step.
+function growBranch(start, theta0, length, order, env, rng, ctx) {
+  if (ctx.count >= ctx.maxCount) return null;
+  ctx.count++;
+  const { P, L, maxDepth } = env;
+  const ds = 0.07;
+  const n = Math.max(2, Math.round(length / ds));
+  const tipTarget = theta0 * 0.5;              // curl gently forward toward the tip
+  const wanderAmp = 0.022 + 0.016 * order;     // deeper veins wander a little more
+  const pts = [{ x: start.x, y: start.y }];
+  let x = start.x, y = start.y, theta = theta0;
+  for (let i = 1; i <= n; i++) {
+    theta = lerp(theta, tipTarget, 0.05) + (rng() - 0.5) * wanderAmp;
+    x += ds * Math.cos(theta);
+    y += ds * Math.sin(theta);
     const marg = petalHalfWidth(clamp(x / L, 0, 1), P);
-    if (marg <= 1e-3) break;
-    if (y >= reachFrac * marg) { pts.push({ x, y: reachFrac * marg }); break; }
+    if (marg <= 1e-3 || x >= L * 0.985) break;
+    if (y > 0.9 * marg) { pts.push({ x, y: 0.9 * marg }); break; }
+    if (y < 0.02) y = 0.02;                    // keep this half on its own side
     pts.push({ x, y });
-    if (x >= L * 0.98) break;
-    ang = lerp(ang, angTip, 0.10);   // curve forward toward the tip
+  }
+  if (pts.length < 2) return null;
+
+  ctx.rightVeins.push({ points: pts, w0: widthOfOrder(order), w1: widthOfOrder(order + 1) });
+
+  if (order < maxDepth && length > 0.14) {
+    const kids = 2;
+    for (let c = 0; c < kids; c++) {
+      const f = kids === 1 ? 0.7 : 0.5 + 0.32 * c;        // spawn mid- and near-tip
+      const { p, theta: h } = veinPointHeading(pts, f);
+      const side = (c % 2 === 0) ? 1 : -1;                // alternate sides
+      const branchAngle = (46 - 5 * order + (rng() - 0.5) * 10) * D2R;
+      growBranch(p, h + side * branchAngle, length * (0.52 + rng() * 0.16), order + 1, env, rng, ctx);
+    }
   }
   return pts;
 }
@@ -354,96 +424,65 @@ function growSecondary(u0, P, rng) {
 export function buildVenation(P, rng, opts = {}) {
   const L = P.L;
   const secCount  = clamp(Math.round(opts.secondaries || 6), 3, 11);
-  const crossBase = clamp(Math.round(opts.crossPerStrip || 4), 2, 9);
+  const crossBase = clamp(Math.round(opts.crossPerStrip || 3), 1, 8);
+  const maxDepth  = clamp(Math.round(opts.maxDepth || 3), 1, 5);
+  const softness  = clamp(opts.softness != null ? opts.softness : 0.5, 0, 1);
   const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+  const env = { P, L, maxDepth };
 
-  const veins = [];        // on-axis + final (mirrored) output
+  const veins = [];
   const nodes = [];
-  const rightVeins = [];   // right-half veins, mirrored to the left below
-  const rightNodes = [];   // right-half nodes (off-axis), mirrored below
+  const ctx = { rightVeins: [], count: 0, maxCount: 1200 };
 
   // --- 1. midrib (on the axis; added once, never mirrored) ----------
   const uBase = 0.02, uApex = 0.985, nMid = 30;
   const midrib = [];
   for (let i = 0; i <= nMid; i++) midrib.push({ x: L * lerp(uBase, uApex, i / nMid), y: 0 });
   veins.push({ points: midrib, w0: VEIN_MIDRIB_BASE, w1: VEIN_MIDRIB_TIP });
-  nodes.push({ x: midrib[0].x, y: 0, width: VEIN_MIDRIB_BASE });     // base cap
-  nodes.push({ x: midrib[nMid].x, y: 0, width: VEIN_MIDRIB_TIP });   // apex cap
+  nodes.push({ x: midrib[0].x, y: 0, width: VEIN_MIDRIB_BASE });
+  nodes.push({ x: midrib[nMid].x, y: 0, width: VEIN_MIDRIB_TIP });
 
-  // --- 2. secondary veins (right half), evenly stationed base -> tip -
-  const secondaries = [];
+  // --- 2. secondary veins off the midrib, each a recursive fractal ---
+  const secMain = [];
   for (let i = 0; i < secCount; i++) {
     const frac = (i + 0.5) / secCount;
-    const u0 = clamp(lerp(0.13, 0.9, frac) + (rng() - 0.5) * 0.02, 0.1, 0.92);
-    const pts = growSecondary(u0, P, rng);
-    if (pts.length < 2) continue;
-    secondaries.push({ u0, pts });
-    const wBase = lerp(VEIN_SEC_BASE, VEIN_SEC_BASE * 0.7, u0);
-    const wTip  = lerp(VEIN_SEC_TIP,  VEIN_SEC_TIP  * 0.7, u0);
-    rightVeins.push({ points: pts, w0: wBase, w1: wTip });
-    nodes.push({ x: pts[0].x, y: 0, width: wBase });   // base sits on the axis
-    rightNodes.push({ x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, width: wTip });
+    const u0 = clamp(lerp(0.12, 0.9, frac) + (rng() - 0.5) * 0.02, 0.1, 0.92);
+    const theta0 = (lerp(58, 46, u0) + (rng() - 0.5) * 6) * D2R;
+    const len = L * (0.95 - 0.55 * u0);
+    const main = growBranch({ x: L * u0, y: 0 }, theta0, len, 1, env, rng, ctx);
+    if (!main) continue;
+    secMain.push(main);
+    nodes.push({ x: L * u0, y: 0, width: widthOfOrder(1) });   // T-join on the axis
   }
 
   // --- 3. tertiary cross-veins + marginal loops between neighbours ---
-  for (let i = 0; i < secondaries.length - 1; i++) {
-    const A = secondaries[i].pts;       // inner (nearer the base)
-    const B = secondaries[i + 1].pts;   // outer (nearer the tip)
-    const rungs = clamp(crossBase - i, 2, crossBase);
+  //         (these close the polygonal cells; the fractal branches fill them)
+  for (let i = 0; i < secMain.length - 1; i++) {
+    const A = secMain[i], B = secMain[i + 1];
+    const rungs = clamp(crossBase - Math.floor(i / 2), 1, crossBase);
     for (let k = 1; k <= rungs; k++) {
-      // bias rungs toward t = 1 (the margin) so outer cells come out smaller
-      const t = Math.pow(k / (rungs + 1), 0.7);
-      const a = veinSample(A, t);
-      const b = veinSample(B, t);
+      const t = Math.pow(k / (rungs + 1), 0.7);          // tighter toward the margin
+      const a = veinSample(A, t), b = veinSample(B, t);
       const mid = {
         x: (a.x + b.x) / 2 + (rng() - 0.5) * 0.05,
         y: (a.y + b.y) / 2 + (rng() - 0.5) * 0.05,
       };
-      rightVeins.push({ points: [a, mid, b], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
-
-      // free-ending veinlet dropped into the larger inner cells (small t)
-      if (t < 0.5) {
-        const vlen = 0.10 + rng() * 0.06;
-        const tip = { x: mid.x + (rng() - 0.35) * 0.06, y: Math.max(0.03, mid.y - vlen) };
-        rightVeins.push({ points: [mid, tip], w0: VEIN_VEINLET, w1: VEIN_VEINLET * 0.6 });
-        rightNodes.push({ x: tip.x, y: tip.y, width: VEIN_VEINLET * 0.6 });
-      }
+      ctx.rightVeins.push({ points: [a, mid, b], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
     }
-
-    // marginal loop: arch joining A's tip to a near-tip point of B, bowed out
-    const tip = A[A.length - 1];
-    const anchor = veinSample(B, 0.8);
-    const um = clamp(((tip.x + anchor.x) / 2) / L, 0, 1);
-    const crest = {
-      x: (tip.x + anchor.x) / 2,
-      y: Math.min(margin(um) * 0.95, (tip.y + anchor.y) / 2 + 0.3 * (margin(um) - (tip.y + anchor.y) / 2)),
-    };
-    rightVeins.push({ points: [tip, crest, anchor], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
-    // marginal veinlet from the loop crest out to the edge (free tip)
-    const edge = { x: crest.x, y: Math.min(margin(um) * 0.99, crest.y + 0.5 * (margin(um) - crest.y)) };
-    rightVeins.push({ points: [crest, edge], w0: VEIN_VEINLET, w1: VEIN_VEINLET });
-    rightNodes.push({ x: edge.x, y: edge.y, width: VEIN_VEINLET });
+    // marginal loop joining the two tips, bowed toward the margin
+    const tipA = A[A.length - 1];
+    const anchor = veinSample(B, 0.82);
+    const um = clamp(((tipA.x + anchor.x) / 2) / L, 0, 1);
+    const midY = (tipA.y + anchor.y) / 2;
+    const crest = { x: (tipA.x + anchor.x) / 2, y: Math.min(margin(um) * 0.96, midY + 0.3 * (margin(um) - midY)) };
+    ctx.rightVeins.push({ points: [tipA, crest, anchor], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
   }
 
-  // --- 4. apical fan filling the tip above the last secondary --------
-  const lastU = secondaries.length ? secondaries[secondaries.length - 1].u0 : 0.6;
-  for (let i = 1; i <= 2; i++) {
-    const u0 = clamp(lerp(lastU + 0.02, 0.955, i / 3), 0.1, 0.965);
-    const pts = growSecondary(u0, P, rng);
-    if (pts.length < 2) continue;
-    rightVeins.push({ points: pts, w0: VEIN_SEC_TIP, w1: VEIN_SEC_TIP * 0.7 });
-    nodes.push({ x: pts[0].x, y: 0, width: VEIN_SEC_TIP });
-    rightNodes.push({ x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, width: VEIN_SEC_TIP * 0.7 });
-  }
-
-  // --- 5. mirror the right half across the axis to build the left ----
-  for (const v of rightVeins) {
-    veins.push(v);
-    veins.push({ points: v.points.map((p) => ({ x: p.x, y: -p.y })), w0: v.w0, w1: v.w1 });
-  }
-  for (const nd of rightNodes) {
-    nodes.push(nd);
-    nodes.push({ x: nd.x, y: -nd.y, width: nd.width });
+  // --- 4. soften every right-half vein, then MIRROR it to the left ---
+  for (const v of ctx.rightVeins) {
+    const soft = softenVein(v.points, softness);
+    veins.push({ points: soft, w0: v.w0, w1: v.w1 });
+    veins.push({ points: soft.map((p) => ({ x: p.x, y: -p.y })), w0: v.w0, w1: v.w1 });
   }
 
   return { veins, nodes };
