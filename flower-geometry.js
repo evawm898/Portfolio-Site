@@ -618,6 +618,15 @@ export function buildJaggedEdge(P, spine, rng) {
   const hb = du * 0.48;                          // tooth base half-width, in u
   const nEdge = 64;
 
+  // Teeth extend along the CUP-FREE outward normal so they stay in the petal's
+  // broad plane — the same plane the apex tooth lives in (its peak runs up the
+  // midrib, where there is no cup). Taking the direction from a flat clone of
+  // the surface strips the transverse cupping that would otherwise splay each
+  // tooth out of plane by a different amount, which is what made the side teeth
+  // read as ragged, inconsistent spikes next to the clean apex. Feet still sit
+  // on the real (cupped) edge, so every tooth attaches seamlessly to the rim.
+  const Pflat = { ...P, cup: 0 };
+
   // ONE shape rule for every tooth — the side teeth and the apex tooth alike.
   // A tooth is two feet on the edge (F0, F1) rising to a single peak K. The rim
   // sweeps the straight chord F0->F1 while lifting toward K by a height profile
@@ -640,9 +649,9 @@ export function buildJaggedEdge(P, spine, rng) {
   };
 
   // A side tooth centred at uc on side s: its two feet on the edge, its peak
-  // (pushed out along the in-surface outward normal), and an inner vein root.
+  // (pushed out along the cup-free outward normal), and an inner vein root.
   const makeTooth = (uc, s) => {
-    const { out, tan } = edgeOutward(uc, s, P, spine);
+    const { out, tan } = edgeOutward(uc, s, Pflat, spine);
     let len = len0, skew = 0;
     if (irr > 0) {
       len *= 1 + irr * (rng() * 2 - 1) * 0.55;   // varied length
