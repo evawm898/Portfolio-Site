@@ -382,20 +382,31 @@ function softenVein(pts, softness) {
 
 // Grow one vein on the RIGHT half (Y >= 0) and RECURSE into finer children.
 // Returns the vein's own polyline so a caller can hang cross-veins off a
-// top-level secondary. Children branch off at softened angles, each shorter,
-// thinner and a touch curvier than the parent — the self-similar fractal step.
-function growBranch(start, theta0, length, order, env, rng, ctx) {
+// top-level secondary. Children branch off, each shorter, thinner and curvier
+// than the parent — the self-similar fractal step.
+//
+// A vein LAUNCHES from `launchHeading` (near its parent's own heading) and only
+// eases out to its full `branchHeading` over the first `easeFrac` of its length,
+// then curls forward toward the tip. That easing is what turns every junction
+// from a hard V into a smooth fork; the softer the `softness`, the longer and
+// gentler the peel-off (and children are launched nearer to tangent as well).
+function growBranch(start, launchHeading, branchHeading, length, order, env, rng, ctx) {
   if (ctx.count >= ctx.maxCount) return null;
   ctx.count++;
-  const { P, L, maxDepth } = env;
+  const { P, L, maxDepth, softness } = env;
   const ds = 0.07;
   const n = Math.max(2, Math.round(length / ds));
-  const tipTarget = theta0 * 0.5;              // curl gently forward toward the tip
-  const wanderAmp = 0.022 + 0.016 * order;     // deeper veins wander a little more
+  const easeFrac = 0.22 + 0.4 * softness;      // longer, gentler peel-off when softer
+  const tipTarget = branchHeading * 0.5;       // curl gently forward toward the tip
+  const wanderAmp = 0.02 + 0.014 * order;      // deeper veins wander a little more
   const pts = [{ x: start.x, y: start.y }];
-  let x = start.x, y = start.y, theta = theta0;
+  let x = start.x, y = start.y, theta = launchHeading;
   for (let i = 1; i <= n; i++) {
-    theta = lerp(theta, tipTarget, 0.05) + (rng() - 0.5) * wanderAmp;
+    const s = i / n;
+    const target = s < easeFrac
+      ? lerp(launchHeading, branchHeading, s / easeFrac)                       // peel off the parent
+      : lerp(branchHeading, tipTarget, (s - easeFrac) / (1 - easeFrac));       // then sweep to the tip
+    theta = lerp(theta, target, 0.3) + (rng() - 0.5) * wanderAmp;
     x += ds * Math.cos(theta);
     y += ds * Math.sin(theta);
     const marg = petalHalfWidth(clamp(x / L, 0, 1), P);
@@ -415,7 +426,9 @@ function growBranch(start, theta0, length, order, env, rng, ctx) {
       const { p, theta: h } = veinPointHeading(pts, f);
       const side = (c % 2 === 0) ? 1 : -1;                // alternate sides
       const branchAngle = (46 - 5 * order + (rng() - 0.5) * 10) * D2R;
-      growBranch(p, h + side * branchAngle, length * (0.52 + rng() * 0.16), order + 1, env, rng, ctx);
+      const full = h + side * branchAngle;
+      const launch = h + side * branchAngle * (1 - 0.7 * softness);   // soft -> leave near-tangent
+      growBranch(p, launch, full, length * (0.52 + rng() * 0.16), order + 1, env, rng, ctx);
     }
   }
   return pts;
@@ -428,7 +441,7 @@ export function buildVenation(P, rng, opts = {}) {
   const maxDepth  = clamp(Math.round(opts.maxDepth || 3), 1, 5);
   const softness  = clamp(opts.softness != null ? opts.softness : 0.5, 0, 1);
   const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
-  const env = { P, L, maxDepth };
+  const env = { P, L, maxDepth, softness };
 
   const veins = [];
   const nodes = [];
@@ -443,17 +456,29 @@ export function buildVenation(P, rng, opts = {}) {
   nodes.push({ x: midrib[nMid].x, y: 0, width: VEIN_MIDRIB_TIP });
 
   // --- 2. secondary veins off the midrib, each a recursive fractal ---
-  const secMain = [];
+  //         Launch each one near-tangent to the midrib (soft T-join) and let it
+  //         ease out to its branch angle. A couple of extra basal veins plus a
+  //         base-biased station spread keep the narrow petal base from reading
+  //         empty (leaves are densest where the veins fan off the petiole).
+  const secList = [];   // { u0, pts }
+  const addSecondary = (u0, branchDeg) => {
+    const branchHeading = branchDeg * D2R;
+    const launchHeading = branchHeading * (1 - 0.7 * softness);   // soft junction on the axis
+    const len = L * (0.96 - 0.5 * u0);
+    const main = growBranch({ x: L * u0, y: 0 }, launchHeading, branchHeading, len, 1, env, rng, ctx);
+    if (main) { secList.push({ u0, pts: main }); nodes.push({ x: L * u0, y: 0, width: widthOfOrder(1) }); }
+  };
+  // basal fan — short, wider-angle veins that populate the claw / base region
+  addSecondary(0.05, 70 + (rng() - 0.5) * 8);
+  addSecondary(0.09, 64 + (rng() - 0.5) * 8);
+  // main pinnate secondaries, biased toward the base so the lower petal fills in
   for (let i = 0; i < secCount; i++) {
-    const frac = (i + 0.5) / secCount;
+    const frac = Math.pow((i + 0.5) / secCount, 1.25);
     const u0 = clamp(lerp(0.12, 0.9, frac) + (rng() - 0.5) * 0.02, 0.1, 0.92);
-    const theta0 = (lerp(58, 46, u0) + (rng() - 0.5) * 6) * D2R;
-    const len = L * (0.95 - 0.55 * u0);
-    const main = growBranch({ x: L * u0, y: 0 }, theta0, len, 1, env, rng, ctx);
-    if (!main) continue;
-    secMain.push(main);
-    nodes.push({ x: L * u0, y: 0, width: widthOfOrder(1) });   // T-join on the axis
+    addSecondary(u0, lerp(58, 46, u0) + (rng() - 0.5) * 6);
   }
+  secList.sort((a, b) => a.u0 - b.u0);
+  const secMain = secList.map((s) => s.pts);
 
   // --- 3. tertiary cross-veins + marginal loops between neighbours ---
   //         (these close the polygonal cells; the fractal branches fill them)

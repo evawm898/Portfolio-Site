@@ -608,7 +608,7 @@ if (resetBtn) {
 
 const DEFAULTS = {
   petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5,
-  bloom: 55, tube: 0.4, density: 7, softness: 0.6, tightness: 0.5, elevation: 0, autoRotate: true,
+  bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
 
