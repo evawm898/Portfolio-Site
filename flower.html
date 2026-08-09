@@ -178,7 +178,16 @@
             <span class="fl-ctrl__val" data-value="tip"></span>
           </div>
           <input type="range" id="tip" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">round &rarr; pointed</span>
+          <span class="fl-ctrl__hint">round &rarr; pointed &mdash; apex &amp; teeth</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
+          <div class="fl-ctrl__row">
+            <label for="tipFrequency">Tip frequency</label>
+            <span class="fl-ctrl__val" data-value="tipFrequency"></span>
+          </div>
+          <input type="range" id="tipFrequency" min="1" max="40" step="1" value="14">
+          <span class="fl-ctrl__hint">total tips &mdash; 1 = apex only</span>
         </div>
 
         <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
@@ -187,7 +196,7 @@
             <span class="fl-ctrl__val" data-value="tipRegion"></span>
           </div>
           <input type="range" id="tipRegion" min="0" max="1" step="0.01" value="0.25">
-          <span class="fl-ctrl__hint">how much of the petal end is the tip</span>
+          <span class="fl-ctrl__hint">how far teeth reach from the apex down</span>
         </div>
 
         <div class="fl-ctrl" data-tip-styles="jagged ruffled">
@@ -196,25 +205,7 @@
             <span class="fl-ctrl__val" data-value="tipLength"></span>
           </div>
           <input type="range" id="tipLength" min="0" max="1" step="0.01" value="0.3">
-          <span class="fl-ctrl__hint">how far tips extend from the edge</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="jagged">
-          <div class="fl-ctrl__row">
-            <label for="toothShape">Tooth shape</label>
-            <span class="fl-ctrl__val" data-value="toothShape"></span>
-          </div>
-          <input type="range" id="toothShape" min="0" max="1" step="0.01" value="1">
-          <span class="fl-ctrl__hint">round &rarr; pointed teeth</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
-          <div class="fl-ctrl__row">
-            <label for="tipFrequency">Tip frequency</label>
-            <span class="fl-ctrl__val" data-value="tipFrequency"></span>
-          </div>
-          <input type="range" id="tipFrequency" min="3" max="48" step="1" value="14">
-          <span class="fl-ctrl__hint">points / oscillations around the edge</span>
+          <span class="fl-ctrl__hint">how far all tips extend outward</span>
         </div>
 
         <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">

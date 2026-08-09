@@ -572,7 +572,7 @@ const TIP_LENGTH_MAX = 0.5;    // world reach of a tooth at TIP LENGTH = 1
 const TIP_U_APEX     = 0.985;  // the tip region reaches almost to the apex; a
                                // dedicated apex tooth then wraps the very tip
 const TIP_REGION_MIN = 0.10;   // shortest "tip" — the last tenth of the petal
-const TIP_REGION_MAX = 0.85;   // longest — nearly the whole edge
+const TIP_REGION_MAX = 0.95;   // longest — teeth run all the way to the base
 
 // How much of the petal END counts as "the tip", driven by the TIP REGION
 // slider (P.tipRegion, 0..1). Shared by every PETAL EDGE style (jagged now;
@@ -607,16 +607,25 @@ function edgeOutward(u, s, P, spine) {
 
 export function buildJaggedEdge(P, spine, rng) {
   if (P.tipStyle !== 'jagged') return null;
-  const len0 = (P.tipLength || 0) * TIP_LENGTH_MAX;
-  if (len0 <= 1e-4) return null;
-  const freq = clamp(Math.round(P.tipFrequency || 0), 2, 80);
+  // There is ONE feature — a pointed tip — that appears as the big apex tip and
+  // as smaller repeated teeth along the edge. TIP LENGTH sets the apex reach;
+  // teeth are the same tip scaled down by a fixed sub-apex ratio, so the apex
+  // is always the largest and lengthening never flattens the hierarchy.
+  const apexLen = (P.tipLength || 0) * TIP_LENGTH_MAX;
+  if (apexLen <= 1e-4) return null;
+  // TIP FREQUENCY = TOTAL number of tips including the apex. 1 -> apex only;
+  // each extra pair flanks the apex symmetrically with more, smaller teeth.
+  const freqTotal = clamp(Math.round(P.tipFrequency || 1), 1, 41);
+  const perSide = Math.max(0, Math.round((freqTotal - 1) / 2));
   const irr = clamp(P.tipIrregularity || 0, 0, 1);
-  const shape = clamp(P.toothShape != null ? P.toothShape : 1, 0, 1);  // round..pointed
-  const { uStart, uEnd } = tipRegionRange(P);    // the petal end that is "the tip"
-  const perSide = Math.max(1, Math.round(freq / 2));
-  const du = (uEnd - uStart) / perSide;
+  const shape = clamp(P.tip != null ? P.tip : 0.5, 0, 1);  // TIP SHAPE: sharpness of EVERY tip
+  const { uStart, uEnd } = tipRegionRange(P);    // the petal edge that carries teeth
+  const du = perSide > 0 ? (uEnd - uStart) / perSide : 0;
   const hb = du * 0.48;                          // tooth base half-width, in u
   const nEdge = 64;
+  // Teeth shrink as more of them pack in (more teeth -> smaller teeth), but
+  // always stay a sub-apex fraction so the apex reads as the largest tip.
+  const toothLen = apexLen * clamp(0.62 * Math.pow(Math.max(perSide, 1), -0.4), 0.18, 0.72);
 
   // Teeth extend along the CUP-FREE outward normal so they stay in the petal's
   // broad plane — the same plane the apex tooth lives in (its peak runs up the
@@ -627,14 +636,14 @@ export function buildJaggedEdge(P, spine, rng) {
   // on the real (cupped) edge, so every tooth attaches seamlessly to the rim.
   const Pflat = { ...P, cup: 0 };
 
-  // ONE shape rule for every tooth — the side teeth and the apex tooth alike.
-  // A tooth is two feet on the edge (F0, F1) rising to a single peak K. The rim
+  // ONE shape rule for every tip — the side teeth and the apex tip alike.
+  // A tip is two feet on the edge (F0, F1) rising to a single peak K. The rim
   // sweeps the straight chord F0->F1 while lifting toward K by a height profile
-  // that morphs from a smooth hump (ROUND) to a sharp tent (POINTED) via TOOTH
+  // that morphs from a smooth hump (ROUND) to a sharp tent (POINTED) via TIP
   // SHAPE. The feet themselves are supplied by the edge trace, so the samples
-  // here are the interior of the tooth. At POINTED every sample lands on the two
-  // straight sides F0->K and K->F1, giving a crisp triangle — exactly the clean
-  // shape the apex tooth has always had; ROUND bulges past those sides.
+  // here are the interior of the tip. At POINTED every sample lands on the two
+  // straight sides F0->K and K->F1, giving a crisp triangle; ROUND bulges past
+  // those sides. The apex tip runs through the very same profile.
   const tent = (t) => 1 - 2 * Math.abs(t - 0.5);
   const profile = (t) => (1 - shape) * Math.sin(Math.PI * t) + shape * tent(t);
   const T_SAMPLES = [0.15, 0.35, 0.5, 0.65, 0.85];
@@ -652,7 +661,7 @@ export function buildJaggedEdge(P, spine, rng) {
   // (pushed out along the cup-free outward normal), and an inner vein root.
   const makeTooth = (uc, s) => {
     const { out, tan } = edgeOutward(uc, s, Pflat, spine);
-    let len = len0, skew = 0;
+    let len = toothLen, skew = 0;
     if (irr > 0) {
       len *= 1 + irr * (rng() * 2 - 1) * 0.55;   // varied length
       skew = irr * (rng() * 2 - 1) * 0.5;        // varied angle: skew along the edge
@@ -675,16 +684,16 @@ export function buildJaggedEdge(P, spine, rng) {
   const plus = teethOf(1);
   const minus = teethOf(-1);
 
-  // The apex tooth wraps the very tip so the jagged edge is continuous around
-  // the apex. It is just another tooth: its feet sit at the tip on each side and
-  // its peak points tip-ward — then it runs through the SAME toothRim profile.
+  // The apex tip caps the very end of the petal. It is just the largest tip:
+  // feet at the tip on each side, peak pointing tip-ward, run through the SAME
+  // profile — only longer (apexLen) than the flanking teeth.
   const apF0 = surfacePoint(uEnd, 1, P, spine);
   const apF1 = surfacePoint(uEnd, -1, P, spine);
   const tipC = surfacePoint(0.99, 0, P, spine);
   const tAhead = surfacePoint(0.999, 0, P, spine), tBack = surfacePoint(uEnd, 0, P, spine);
   let ax = tAhead.x - tBack.x, ay = tAhead.y - tBack.y, az = tAhead.z - tBack.z;
   const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
-  let aLen = len0; if (irr > 0) aLen *= 1 + irr * (rng() * 2 - 1) * 0.55;
+  let aLen = apexLen; if (irr > 0) aLen *= 1 + irr * (rng() * 2 - 1) * 0.55;
   const apexPeak = { x: tipC.x + ax * aLen, y: tipC.y + ay * aLen, z: tipC.z + az * aLen };
 
   // ---- rim: smooth edge, detouring through each tooth (foot -> profile -> foot)
