@@ -601,6 +601,7 @@ if (resetBtn) {
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
     controls.autoRotate = d.autoRotate;
+    resetPlaceholders();
     refreshLabels();
     scheduleRegen();
   });
@@ -610,6 +611,83 @@ const DEFAULTS = {
   petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5,
   bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };
+
+
+/* ===================================================================
+   7b. COLLAPSIBLE SECTIONS + PLACEHOLDER CONTROLS
+   The panel groups its controls into accordion sections (only one open at a
+   time, all collapsed on load). A handful of newly-added controls don't drive
+   the geometry yet — they're wired to a state object, keep their on-screen
+   read-out in sync, and log to the console so the render work can pick them up
+   later. Existing controls and rendering are untouched.
+   =================================================================== */
+
+// Accordion: click a header to open its section; opening one closes the rest.
+const accSections = Array.from(document.querySelectorAll('[data-acc]'));
+accSections.forEach((section) => {
+  const head = section.querySelector('.fl-acc__head');
+  if (!head) return;
+  head.addEventListener('click', () => {
+    const willOpen = !section.classList.contains('is-open');
+    for (const s of accSections) {
+      s.classList.remove('is-open');
+      const h = s.querySelector('.fl-acc__head');
+      if (h) h.setAttribute('aria-expanded', 'false');
+    }
+    if (willOpen) {
+      section.classList.add('is-open');
+      head.setAttribute('aria-expanded', 'true');
+    }
+  });
+});
+
+// Placeholder controls — no rendering logic yet. `fmt` formats the read-out for
+// slider controls; selects (fmt: null) show their value in the control itself.
+const placeholderControls = [
+  { id: 'centerCurve',     fmt: (v) => (+v).toFixed(2) },
+  { id: 'edgeCurve',       fmt: (v) => (+v).toFixed(2) },
+  { id: 'tipStyle',        fmt: null },
+  { id: 'tipLength',       fmt: (v) => (+v).toFixed(2) },
+  { id: 'tipFrequency',    fmt: (v) => String(v) },
+  { id: 'tipIrregularity', fmt: (v) => (+v).toFixed(2) },
+  { id: 'undulation',      fmt: (v) => (+v).toFixed(2) },
+  { id: 'fractalGrowth',   fmt: (v) => (+v).toFixed(2) },
+  { id: 'infillType',      fmt: null },
+];
+
+// current values, exposed for the future render layer / quick debugging
+const edgeParams = {};
+window.flowerEdgeParams = edgeParams;
+const placeholderDefaults = {};
+
+function syncPlaceholder(id, fmt, log) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  edgeParams[id] = el.type === 'range' ? parseFloat(el.value) : el.value;
+  if (fmt) {
+    const label = document.querySelector(`[data-value="${id}"]`);
+    if (label) label.textContent = fmt(el.value);
+  }
+  if (log) console.log(`[flower] ${id} = ${JSON.stringify(edgeParams[id])} (placeholder — no rendering yet)`);
+}
+
+function resetPlaceholders() {
+  for (const { id, fmt } of placeholderControls) {
+    const el = document.getElementById(id);
+    if (!el || !(id in placeholderDefaults)) continue;
+    el.value = placeholderDefaults[id];
+    syncPlaceholder(id, fmt, false);
+  }
+}
+
+placeholderControls.forEach(({ id, fmt }) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  placeholderDefaults[id] = el.value;
+  syncPlaceholder(id, fmt, false);                       // seed state + read-out
+  el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input',
+    () => syncPlaceholder(id, fmt, true));
+});
 
 
 /* ===================================================================
