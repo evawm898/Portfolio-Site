@@ -78,6 +78,7 @@ export function mulberry32(seed) {
    ------------------------------------------------------------------- */
 
 const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
+const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the edge-curve slider
 
 export function petalHalfWidth(u, P) {
   u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
@@ -102,7 +103,12 @@ export function petalHalfWidth(u, P) {
     const t = (u - peak) / (1 - peak);
     shape = Math.pow(Math.cos(t * Math.PI / 2), tipExp);
   }
-  return Math.max(0, P.W * shape);
+  // Edge curve: billow (+) the sides outward or pinch (-) them inward,
+  // independently of the taper. The bulge peaks mid-petal and vanishes at the
+  // base and tip, so the claw and apex stay anchored while the sides bow.
+  const edge = clamp(P.edgeCurve || 0, -1, 1);
+  const bulge = 1 + EDGE_CURVE_AMP * edge * Math.sin(Math.PI * u);
+  return Math.max(0, P.W * shape * bulge);
 }
 
 

@@ -33,7 +33,9 @@ const PETAL_LENGTH   = 2.2;    // world units, base -> tip along the spine
 const BASE_RADIUS    = 0;      // spiral petals: spine starts on the axis; the
                                // base is then placed at its own spiral radius
 const CUP_AMOUNT     = 0.22;   // transverse cupping (edges curl inward)
-const SPINE_CURL     = 0.30;   // progressive outward bend toward the tip (rad)
+const CENTER_CURVE_SCALE = 0.75;  // centre-curve slider (-1..1) -> spine curl (rad);
+                                  // +convex arches away, -concave bends toward centre.
+                                  // default slider 0.4 -> 0.30 rad = the original curl
 const RADIAL_SEGMENTS = 8;     // tube cross-section resolution (round enough
                                // that a thickened tube doesn't read as faceted)
 const JOIN_FLARE_DIST = 0.10;  // a flared tube blends into its end bead (a soft
@@ -263,7 +265,8 @@ function resolveParams(ui) {
     taper: ui.taper,
     tip: ui.tip,
     bloom: ui.bloom * DEG,
-    curl: SPINE_CURL,
+    curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
+    edgeCurve: ui.edgeCurve,                     // side billow (+) / pinch (-)
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -505,6 +508,8 @@ const inputs = {
   width: document.getElementById('width'),
   taper: document.getElementById('taper'),
   tip: document.getElementById('tip'),
+  centerCurve: document.getElementById('centerCurve'),
+  edgeCurve: document.getElementById('edgeCurve'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   density: document.getElementById('density'),
@@ -520,6 +525,8 @@ function readUI() {
     width: parseFloat(inputs.width.value),
     taper: parseFloat(inputs.taper.value),
     tip: parseFloat(inputs.tip.value),
+    centerCurve: parseFloat(inputs.centerCurve.value),
+    edgeCurve: parseFloat(inputs.edgeCurve.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     density: parseInt(inputs.density.value, 10),
@@ -536,6 +543,10 @@ function refreshLabels() {
   setLabel('width', (+inputs.width.value).toFixed(2));
   setLabel('taper', (+inputs.taper.value).toFixed(2));
   setLabel('tip', (+inputs.tip.value).toFixed(2));
+  const cc = +inputs.centerCurve.value;
+  setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
+  const ec = +inputs.edgeCurve.value;
+  setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
   setLabel('bloom', inputs.bloom.value + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
@@ -580,7 +591,7 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'width', 'taper', 'tip', 'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
+['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
@@ -593,6 +604,8 @@ if (resetBtn) {
     inputs.width.value = d.width;
     inputs.taper.value = d.taper;
     inputs.tip.value = d.tip;
+    inputs.centerCurve.value = d.centerCurve;
+    inputs.edgeCurve.value = d.edgeCurve;
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
     inputs.density.value = d.density;
@@ -608,7 +621,7 @@ if (resetBtn) {
 }
 
 const DEFAULTS = {
-  petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5,
+  petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
@@ -644,8 +657,6 @@ accSections.forEach((section) => {
 // Placeholder controls — no rendering logic yet. `fmt` formats the read-out for
 // slider controls; selects (fmt: null) show their value in the control itself.
 const placeholderControls = [
-  { id: 'centerCurve',     fmt: (v) => (+v).toFixed(2) },
-  { id: 'edgeCurve',       fmt: (v) => (+v).toFixed(2) },
   { id: 'tipStyle',        fmt: null },
   { id: 'tipLength',       fmt: (v) => (+v).toFixed(2) },
   { id: 'tipFrequency',    fmt: (v) => String(v) },
