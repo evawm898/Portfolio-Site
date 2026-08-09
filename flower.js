@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation, buildJaggedTips,
+  buildSpine, buildSilhouette, buildVenation, buildJaggedEdge,
   mapPointToSurface, placePoint,
 } from './flower-geometry.js';
 
@@ -309,9 +309,14 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
   const toWorld = (pt) => place(mapPointToSurface(pt, P, spine));
 
-  // Rim: the petal margin is one smooth curve, extruded as a single continuous
-  // closed tube. It's a fine vein (the leaf edge), so it rides thin.
-  const rim = outline.map(toWorld);
+  // PETAL EDGE: when TIP STYLE = jagged, the outline itself becomes a row of
+  // teeth around the tip end (buildJaggedEdge returns a rim that weaves through
+  // them, plus a mid-vein per tooth). Otherwise the rim is the smooth outline.
+  const tipRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  const jag = buildJaggedEdge(P, spine, tipRng);
+
+  // Rim: one continuous closed tube along the (possibly jagged) petal margin.
+  const rim = jag ? jag.rim.map(place) : outline.map(toWorld);
   rim.push(rim[0]);                              // close the loop at the petal base
   acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0); // continuous — no join to flare
 
@@ -324,21 +329,17 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     // triangle count versus the default, which matters on deep fractals
     acc.addTube(world, [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1], 0, 6);
   }
+  // A fine mid-vein reaching from inside the petal into each jagged tooth, so
+  // the veins extend into the jagged edge along with the outline.
+  if (jag) {
+    for (const v of jag.teethVeins) {
+      acc.addTube(v.map(place), [P.tubeRadius * 0.30, P.tubeRadius * 0.10], 0, 6);
+    }
+  }
   // Welded caps seal the open tube ends (free vein tips, and the T-junctions
   // where a secondary meets the midrib) so nothing reads as a hollow ring.
   for (const node of ven.nodes) {
     acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15, 4, 7);
-  }
-
-  // Jagged edge tips (PETAL EDGE > TIP STYLE = jagged): sharp triangles that
-  // stick out past the rim, tapering to a point. They're extra geometry beyond
-  // the boundary — the rim and veins above are unchanged. buildJaggedTips
-  // returns local-frame points, so we place them exactly like every other point.
-  const tipRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
-  for (const t of buildJaggedTips(P, spine, tipRng)) {
-    const A = place(t.A), apex = place(t.apex), B = place(t.B);
-    acc.addTube([A, apex], [P.tubeRadius * RIM_WIDTH, P.tubeRadius * 0.10], 0, 6);
-    acc.addTube([apex, B], [P.tubeRadius * 0.10, P.tubeRadius * RIM_WIDTH], 0, 6);
   }
 }
 

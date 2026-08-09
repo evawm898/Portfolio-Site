@@ -551,23 +551,26 @@ export function mapPointToSurface(pt, P, spine) {
 
 
 /* -------------------------------------------------------------------
-   7. Jagged edge tips — sharp triangular points that emanate OUTWARD from
-   the outer petal edge. Each tip is a triangle: a base flush with the edge
-   (two nearby edge points A, B) and an apex offset beyond the boundary. The
-   apex is pushed along the in-surface OUTWARD NORMAL — the surface tangent
-   perpendicular to the edge — computed from the real 3D surface, so tips
-   follow the petal's curvature and tilt rather than a fixed world axis.
+   7. Jagged edge — the petal's own OUTLINE becomes a row of sharp teeth
+   around the TIP END (the outer third of the margin); the sides stay smooth.
 
-   Tips only ADD geometry past the boundary: the core outline (the rim) and
-   the veins are left untouched, and no tips are placed along the base where
-   petals meet the centre. Everything is returned in the LOCAL petal frame as
-   [{A, apex, B}] (plain {x,y,z}); the render layer maps them into the bloom
-   exactly like every other petal point, so they inherit the petal's placement.
+   This is not an add-on: the rim tube traces the teeth (so the outline itself
+   is jagged) and a fine vein runs up the middle of each tooth (so the veins
+   extend into the jagged edge too). Each tooth apex is pushed out along the
+   in-surface OUTWARD NORMAL — the surface tangent perpendicular to the edge,
+   from the real 3D surface — so teeth follow the petal's curvature and tilt,
+   not a fixed world axis. The whole edge is one modifiable outline, ready for
+   the other PETAL EDGE options (ruffle, undulation, fractal) to perturb next.
+
+   buildJaggedEdge returns LOCAL-frame geometry (or null when not jagged):
+     rim        : ordered [{x,y,z}] closed outline, weaving through the teeth
+     teethVeins : [ [{x,y,z}...] ]  one small mid-vein polyline per tooth
+   The render layer places these into the bloom exactly like every other point.
    ------------------------------------------------------------------- */
 
-const TIP_LENGTH_MAX = 0.5;   // world reach of a tip at TIP LENGTH = 1
-const TIP_U_START    = 0.30;  // skip the inner (base) portion of the edge
-const TIP_U_END      = 0.90;  // and the degenerate apex, where half-width -> 0
+const TIP_LENGTH_MAX = 0.5;   // world reach of a tooth at TIP LENGTH = 1
+const TIP_U_START    = 0.66;  // teeth live on the outer third of the edge only
+const TIP_U_END      = 0.94;  // (short of the degenerate apex, where hw -> 0)
 
 // Edge point at station u on side s (+1 / -1), plus the unit outward direction:
 // tangent to the surface and perpendicular to the edge, so it tracks curvature.
@@ -589,35 +592,73 @@ function edgeOutward(u, s, P, spine) {
   return { p, out: { x: lx / ll, y: ly / ll, z: lz / ll }, tan: { x: tx, y: ty, z: tz } };
 }
 
-export function buildJaggedTips(P, spine, rng) {
-  const tips = [];
-  if (P.tipStyle !== 'jagged') return tips;
+export function buildJaggedEdge(P, spine, rng) {
+  if (P.tipStyle !== 'jagged') return null;
   const len0 = (P.tipLength || 0) * TIP_LENGTH_MAX;
-  if (len0 <= 1e-4) return tips;
-  const freq = clamp(Math.round(P.tipFrequency || 0), 1, 60);
+  if (len0 <= 1e-4) return null;
+  const freq = clamp(Math.round(P.tipFrequency || 0), 2, 80);
   const irr = clamp(P.tipIrregularity || 0, 0, 1);
   const perSide = Math.max(1, Math.round(freq / 2));
   const du = (TIP_U_END - TIP_U_START) / perSide;
-  const halfBase = du * 0.35;                 // triangle base half-width, in u
+  const hb = du * 0.48;                          // tooth base half-width, in u
 
-  for (const s of [1, -1]) {
-    for (let k = 0; k < perSide; k++) {
-      const uc = TIP_U_START + du * (k + 0.5);
-      const A = surfacePoint(clamp(uc - halfBase, 0, 0.9995), s, P, spine);
-      const B = surfacePoint(clamp(uc + halfBase, 0, 0.9995), s, P, spine);
-      const { p: E, out, tan } = edgeOutward(uc, s, P, spine);
-      let len = len0, skew = 0;
-      if (irr > 0) {
-        len *= 1 + irr * (rng() * 2 - 1) * 0.55;   // varied length
-        skew = irr * (rng() * 2 - 1) * 0.5;        // varied angle: skew along the edge
-      }
-      const apex = {
-        x: E.x + out.x * len + tan.x * skew * len,
-        y: E.y + out.y * len + tan.y * skew * len,
-        z: E.z + out.z * len + tan.z * skew * len,
-      };
-      tips.push({ A, apex, B });
+  // One tooth on side s at station uc: its edge foot E, its apex, and the side.
+  const makeTooth = (uc, s) => {
+    const { p: E, out, tan } = edgeOutward(uc, s, P, spine);
+    let len = len0, skew = 0;
+    if (irr > 0) {
+      len *= 1 + irr * (rng() * 2 - 1) * 0.55;   // varied length
+      skew = irr * (rng() * 2 - 1) * 0.5;        // varied angle: skew along the edge
     }
+    const apex = {
+      x: E.x + out.x * len + tan.x * skew * len,
+      y: E.y + out.y * len + tan.y * skew * len,
+      z: E.z + out.z * len + tan.z * skew * len,
+    };
+    return { uc, s, E, apex };
+  };
+  const teethOf = (s) => {
+    const arr = [];
+    for (let k = 0; k < perSide; k++) arr.push(makeTooth(TIP_U_START + du * (k + 0.5), s));
+    return arr;
+  };
+  const plus = teethOf(1);
+  const minus = teethOf(-1);
+
+  // ---- rim: smooth edge, detouring out to each tooth apex and back ----
+  const rim = [];
+  const nEdge = 64;
+  const uBase = 0.004, uApex = 0.995;
+  const edgeTo = (from, to, s) => {              // append edge samples for u in (from, to]
+    const steps = Math.max(1, Math.round(Math.abs(to - from) * nEdge));
+    for (let i = 1; i <= steps; i++) rim.push(surfacePoint(clamp(lerp(from, to, i / steps), 0, 0.9995), s, P, spine));
+  };
+
+  rim.push(surfacePoint(uBase, 1, P, spine));    // +Y base, then base -> tip
+  let cur = uBase;
+  for (const t of plus) {
+    edgeTo(cur, t.uc - hb, 1);                    // smooth edge up to the tooth foot A
+    rim.push(t.apex);                             // out to the tooth apex...
+    rim.push(surfacePoint(t.uc + hb, 1, P, spine)); // ...and back to foot B
+    cur = t.uc + hb;
   }
-  return tips;
+  edgeTo(cur, uApex, 1);                          // smooth edge to the apex point
+  cur = uApex;
+  for (let i = minus.length - 1; i >= 0; i--) {   // -Y side, tip -> base (descending)
+    const t = minus[i];
+    edgeTo(cur, t.uc + hb, -1);
+    rim.push(t.apex);
+    rim.push(surfacePoint(t.uc - hb, -1, P, spine));
+    cur = t.uc - hb;
+  }
+  edgeTo(cur, uBase, -1);                         // smooth edge back to the base
+
+  // ---- a fine mid-vein running from inside the petal into each tooth ----
+  const teethVeins = [];
+  for (const t of [...plus, ...minus]) {
+    const inner = surfacePoint(clamp(t.uc, 0, 0.9995), t.s * 0.45, P, spine);
+    teethVeins.push([inner, t.E, t.apex]);
+  }
+
+  return { rim, teethVeins };
 }
