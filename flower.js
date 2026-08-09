@@ -268,6 +268,7 @@ function resolveParams(ui) {
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
     edgeCurve: ui.edgeCurve,                     // side billow (+) / pinch (-)
     tipStyle: ui.tipStyle,                       // petal-edge tip style (clean/jagged/…)
+    tipRegion: ui.tipRegion,                     // how much of the petal end is the tip
     tipLength: ui.tipLength,                     // how far tips extend past the edge
     tipFrequency: ui.tipFrequency,               // number of tips around the outer edge
     tipIrregularity: ui.tipIrregularity,         // 0 uniform -> 1 varied length & angle
@@ -531,6 +532,7 @@ const inputs = {
   centerCurve: document.getElementById('centerCurve'),
   edgeCurve: document.getElementById('edgeCurve'),
   tipStyle: document.getElementById('tipStyle'),
+  tipRegion: document.getElementById('tipRegion'),
   tipLength: document.getElementById('tipLength'),
   tipFrequency: document.getElementById('tipFrequency'),
   tipIrregularity: document.getElementById('tipIrregularity'),
@@ -552,6 +554,7 @@ function readUI() {
     centerCurve: parseFloat(inputs.centerCurve.value),
     edgeCurve: parseFloat(inputs.edgeCurve.value),
     tipStyle: inputs.tipStyle.value,
+    tipRegion: parseFloat(inputs.tipRegion.value),
     tipLength: parseFloat(inputs.tipLength.value),
     tipFrequency: parseInt(inputs.tipFrequency.value, 10),
     tipIrregularity: parseFloat(inputs.tipIrregularity.value),
@@ -575,6 +578,7 @@ function refreshLabels() {
   setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
   const ec = +inputs.edgeCurve.value;
   setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
+  setLabel('tipRegion', (+inputs.tipRegion.value).toFixed(2));
   setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
   setLabel('tipFrequency', inputs.tipFrequency.value);
   setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
@@ -623,7 +627,7 @@ function setBuilding(on) {
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
 ['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
- 'tipLength', 'tipFrequency', 'tipIrregularity',
+ 'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
@@ -642,6 +646,7 @@ if (resetBtn) {
     inputs.centerCurve.value = d.centerCurve;
     inputs.edgeCurve.value = d.edgeCurve;
     inputs.tipStyle.value = d.tipStyle;
+    inputs.tipRegion.value = d.tipRegion;
     inputs.tipLength.value = d.tipLength;
     inputs.tipFrequency.value = d.tipFrequency;
     inputs.tipIrregularity.value = d.tipIrregularity;
@@ -661,7 +666,7 @@ if (resetBtn) {
 
 const DEFAULTS = {
   petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
-  tipStyle: 'clean', tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
+  tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 

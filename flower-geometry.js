@@ -568,9 +568,22 @@ export function mapPointToSurface(pt, P, spine) {
    The render layer places these into the bloom exactly like every other point.
    ------------------------------------------------------------------- */
 
-const TIP_LENGTH_MAX = 0.5;   // world reach of a tooth at TIP LENGTH = 1
-const TIP_U_START    = 0.66;  // teeth live on the outer third of the edge only
-const TIP_U_END      = 0.94;  // (short of the degenerate apex, where hw -> 0)
+const TIP_LENGTH_MAX = 0.5;    // world reach of a tooth at TIP LENGTH = 1
+const TIP_U_APEX     = 0.94;   // the tip region ends here (short of the degenerate
+                               // apex, where half-width -> 0)
+const TIP_REGION_MIN = 0.10;   // shortest "tip" — the last tenth of the petal
+const TIP_REGION_MAX = 0.85;   // longest — nearly the whole edge
+
+// How much of the petal END counts as "the tip", driven by the TIP REGION
+// slider (P.tipRegion, 0..1). Shared by every PETAL EDGE style (jagged now;
+// ruffle / fractal later) so they all shape the same stretch of the outline.
+// Returns { uStart, uEnd } stations bounding the tip region on the edge.
+export function tipRegionRange(P) {
+  const region = clamp(P.tipRegion != null ? P.tipRegion : 0.3, 0, 1);
+  const uEnd = TIP_U_APEX;
+  const uStart = clamp(uEnd - lerp(TIP_REGION_MIN, TIP_REGION_MAX, region), 0.05, uEnd - 0.04);
+  return { uStart, uEnd };
+}
 
 // Edge point at station u on side s (+1 / -1), plus the unit outward direction:
 // tangent to the surface and perpendicular to the edge, so it tracks curvature.
@@ -598,8 +611,9 @@ export function buildJaggedEdge(P, spine, rng) {
   if (len0 <= 1e-4) return null;
   const freq = clamp(Math.round(P.tipFrequency || 0), 2, 80);
   const irr = clamp(P.tipIrregularity || 0, 0, 1);
+  const { uStart, uEnd } = tipRegionRange(P);    // the petal end that is "the tip"
   const perSide = Math.max(1, Math.round(freq / 2));
-  const du = (TIP_U_END - TIP_U_START) / perSide;
+  const du = (uEnd - uStart) / perSide;
   const hb = du * 0.48;                          // tooth base half-width, in u
 
   // One tooth on side s at station uc: its edge foot E, its apex, and the side.
@@ -619,7 +633,7 @@ export function buildJaggedEdge(P, spine, rng) {
   };
   const teethOf = (s) => {
     const arr = [];
-    for (let k = 0; k < perSide; k++) arr.push(makeTooth(TIP_U_START + du * (k + 0.5), s));
+    for (let k = 0; k < perSide; k++) arr.push(makeTooth(uStart + du * (k + 0.5), s));
     return arr;
   };
   const plus = teethOf(1);
