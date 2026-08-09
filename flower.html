@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flower Bloom Generator — Eva Maskalenko</title>
-<meta name="description" content="Parametric 3D flower-bloom generator — petals on a phyllotactic spiral with a Voronoi tube-lattice, rendered live in the browser.">
+<meta name="description" content="Parametric 3D flower-bloom generator — petals on a phyllotactic spiral, each veined like a skeletonized leaf, rendered live in the browser.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -39,7 +39,7 @@
   <div class="fl-panel__head">
     <div class="fl-eyebrow">Generative &middot; v1</div>
     <h1 class="fl-title">Flower Bloom</h1>
-    <p class="fl-sub">Phyllotactic spiral lattice &mdash; <span id="readout">&nbsp;</span></p>
+    <p class="fl-sub">Phyllotactic spiral &middot; leaf venation &mdash; <span id="readout">&nbsp;</span></p>
   </div>
 
   <div class="fl-controls">
@@ -98,11 +98,11 @@
 
     <div class="fl-ctrl">
       <div class="fl-ctrl__row">
-        <label for="density">Cell density</label>
+        <label for="density">Vein density</label>
         <span class="fl-ctrl__val" data-value="density"></span>
       </div>
       <input type="range" id="density" min="3" max="12" step="1" value="7">
-      <span class="fl-ctrl__hint">open lattice &rarr; tight lattice</span>
+      <span class="fl-ctrl__hint">few veins &rarr; dense veins</span>
     </div>
 
     <div class="fl-ctrl">

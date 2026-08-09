@@ -16,10 +16,11 @@
      y  = up      (the bloom's central axis is +y)
      z  = tangential / lateral (petal width fans out along ±z)
 
-   "Flattened" petal space (used only to lay out the Voronoi lattice so the
-   cells come out evenly sized in real-world scale):
+   "Flattened" petal space (used to lay out the leaf-venation network so the
+   veins and cells come out evenly sized in real-world scale):
      X = arc length along the petal spine from base -> tip   (== L * u)
      Y = lateral position across the petal, in [-halfWidth, +halfWidth]
+   The axis of symmetry is the line Y = 0 (the midrib).
 
    The parameter `u` runs 0 (base, attached to the receptacle) -> 1 (tip).
    The parameter `v` runs -1 (one edge) -> 0 (mid-rib) -> +1 (other edge).
@@ -263,219 +264,200 @@ function dedupePolygon(poly) {
 
 
 /* -------------------------------------------------------------------
-   5. Polygon utilities: area, point-in-polygon, half-plane clip
-   ------------------------------------------------------------------- */
+   5. Leaf venation — a hierarchical, bilaterally-symmetric vein network
+      (this is the petal infill).
 
-export function polygonArea(poly) {
-  let a = 0;
-  for (let i = 0; i < poly.length; i++) {
-    const p = poly[i], q = poly[(i + 1) % poly.length];
-    a += p.x * q.y - q.x * p.y;
-  }
-  return Math.abs(a) / 2;
-}
+   Built strictly by hierarchy (never by random point scatter):
+     1. a single central MIDRIB along the axis of symmetry (Y = 0), from
+        base to tip, thickest at the base and tapering toward the tip;
+     2. SECONDARY veins branching off the midrib at ~45-60 deg, curving
+        forward toward the tip, and shorter the nearer the tip they start;
+     3. TERTIARY cross-veins laddering between adjacent secondaries, plus
+        marginal loops that join secondary tips — together these enclose
+        the polygonal cells. Rungs are spaced tighter toward the margin,
+        so cells shrink toward the edge and stay large near the midrib;
+     4. fine free-ending VEINLETS poking into the big inner cells so they
+        read as irregular polygons rather than a tidy ladder.
 
-export function pointInPolygon(poly, pt) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const pi = poly[i], pj = poly[j];
-    const intersect = ((pi.y > pt.y) !== (pj.y > pt.y)) &&
-      (pt.x < (pj.x - pi.x) * (pt.y - pi.y) / ((pj.y - pi.y) || 1e-12) + pi.x);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
+   Only the right half (Y >= 0) is generated, then mirrored across the axis
+   to build the left half EXACTLY — so every petal is perfectly symmetric.
+   ("Alternating left/right" is realised as opposite pairs; strict mirror
+   symmetry, which the brief requires explicitly, rules out true alternation
+   since that would not be mirror-symmetric.) All jitter is drawn from the
+   supplied seeded PRNG, so a given petal is stable across live rebuilds.
 
-/* Sutherland–Hodgman clip of `poly` (any polygon) against one half-plane.
-   Keeps the region where dot(point - mid, normal) <= 0. */
-function clipHalfPlane(poly, midx, midy, nx, ny) {
-  const out = [];
-  const L = poly.length;
-  for (let i = 0; i < L; i++) {
-    const A = poly[i];
-    const B = poly[(i + 1) % L];
-    const dA = (A.x - midx) * nx + (A.y - midy) * ny;
-    const dB = (B.x - midx) * nx + (B.y - midy) * ny;
-    const inA = dA <= 0;
-    const inB = dB <= 0;
-    if (inA) out.push(A);
-    if (inA !== inB) {
-      const t = dA / (dA - dB);
-      out.push({ x: A.x + t * (B.x - A.x), y: A.y + t * (B.y - A.y) });
-    }
-  }
-  return out;
-}
-
-/* One Voronoi cell = the silhouette clipped by the perpendicular bisector
-   between `seed` and every other seed, keeping the seed's side. */
-export function clipCellPolygon(seed, seeds, boundary) {
-  let poly = boundary.slice();
-  for (let k = 0; k < seeds.length; k++) {
-    const q = seeds[k];
-    if (q === seed) continue;
-    const nx = q.x - seed.x;
-    const ny = q.y - seed.y;
-    if (nx * nx + ny * ny < 1e-12) continue;   // coincident seeds
-    const midx = (seed.x + q.x) * 0.5;
-    const midy = (seed.y + q.y) * 0.5;
-    poly = clipHalfPlane(poly, midx, midy, nx, ny);
-    if (poly.length < 3) return poly;           // clipped away
-  }
-  return poly;
-}
-
-
-/* -------------------------------------------------------------------
-   6. Seed generation — jittered grid, rejection-tested inside the petal
-
-   A jittered grid gives an even, organic-but-non-slivery seed distribution
-   (far better than pure random for a lace lattice). `targetSeeds` sets the
-   approximate count; cell density derives directly from it. All jitter uses
-   the supplied seeded PRNG so the pattern is stable across regenerations.
-   ------------------------------------------------------------------- */
-
-export function generateSeeds(outline, targetSeeds, rng) {
-  const area = polygonArea(outline);
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const p of outline) {
-    if (p.x < minX) minX = p.x;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.y > maxY) maxY = p.y;
-  }
-  const seeds = [];
-  let cell = Math.sqrt(area / Math.max(1, targetSeeds));
-  if (!isFinite(cell) || cell <= 1e-4) cell = (maxX - minX) / 4 || 0.25;
-
-  for (let x = minX + cell * 0.5; x < maxX; x += cell) {
-    for (let y = minY + cell * 0.5; y < maxY; y += cell) {
-      const jx = (rng() - 0.5) * cell * 0.7;
-      const jy = (rng() - 0.5) * cell * 0.7;
-      const p = { x: x + jx, y: y + jy };
-      if (pointInPolygon(outline, p)) seeds.push(p);
-    }
-  }
-
-  // Guarantee a workable minimum so tiny petals / low density still lattice.
-  if (seeds.length < 2) {
-    for (const u of [0.35, 0.6, 0.8]) {
-      const p = { x: (minX + (maxX - minX) * u), y: 0 };
-      if (pointInPolygon(outline, p)) seeds.push(p);
-    }
-  }
-  return seeds;
-}
-
-
-/* -------------------------------------------------------------------
-   7. Voronoi lattice — cell walls as a deduplicated edge graph
-
-   For each seed we compute its clipped Voronoi cell, then collect the cell
-   walls. Interior walls are shared by two cells and appear twice (reversed);
-   we dedupe them by rounding endpoints to a grid and keying canonically.
-   We also record node degree. The Three.js layer places a small welded bead
-   at every node: this covers the open ends of the tubes (so no hollow rings
-   show) and makes the network read as a connected, print-friendly web of
-   struts-and-nodules. Higher-degree junctions get a slightly larger bead.
+   Line-weights are RELATIVE multipliers (midrib thickest -> veinlet
+   thinnest); the render layer scales them by the tube-thickness slider so
+   the taper keeps its proportions at any thickness.
 
    Returns:
-     edges : [{ a:{x,y}, b:{x,y} }, ...]        unique struts (flattened space)
-     nodes : [{ x, y, degree }, ...]            unique welded nodes
+     veins : [{ points:[{x,y}...], w0, w1 }]   polylines, end line-weights
+     nodes : [{ x, y, width }]                 welded caps at ends/junctions
    ------------------------------------------------------------------- */
 
-const Q = 1e4;   // rounding grid for endpoint welding
-function keyOf(p) { return Math.round(p.x * Q) + ',' + Math.round(p.y * Q); }
+const VEIN_MIDRIB_BASE = 1.00;
+const VEIN_MIDRIB_TIP  = 0.42;
+const VEIN_SEC_BASE    = 0.56;
+const VEIN_SEC_TIP     = 0.32;
+const VEIN_TERTIARY    = 0.30;
+const VEIN_VEINLET     = 0.20;
 
-export function buildLattice(outline, targetSeeds, rng) {
-  const seeds = generateSeeds(outline, targetSeeds, rng);
-  const edgeMap = new Map();   // canonicalKey -> {a, b, seen}
-  const nodePos = new Map();   // key -> {x, y}
-  const degree  = new Map();   // key -> total incident edges
-
-  for (const seed of seeds) {
-    const cell = clipCellPolygon(seed, seeds, outline);
-    if (cell.length < 3) continue;
-    for (let i = 0; i < cell.length; i++) {
-      const A = cell[i];
-      const B = cell[(i + 1) % cell.length];
-      if (Math.hypot(A.x - B.x, A.y - B.y) < 1e-4) continue;
-      const kA = keyOf(A), kB = keyOf(B);
-      if (kA === kB) continue;
-      const ek = kA < kB ? kA + '|' + kB : kB + '|' + kA;
-      const existing = edgeMap.get(ek);
-      if (existing) {
-        existing.seen++;                 // shared wall -> interior
-      } else {
-        edgeMap.set(ek, { a: A, b: B, seen: 1 });
-        nodePos.set(kA, A);
-        nodePos.set(kB, B);
-      }
-    }
+// Sample a polyline at fraction t in [0,1] by cumulative arc length.
+function veinSample(pts, t) {
+  const n = pts.length;
+  if (n === 1) return { x: pts[0].x, y: pts[0].y };
+  const cum = [0];
+  let total = 0;
+  for (let i = 1; i < n; i++) {
+    total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    cum.push(total);
   }
-
-  // An interior wall is shared by two cells (seen twice); a wall seen once
-  // lies on the petal outline. The Three.js layer renders the outline as one
-  // continuous smooth tube, so interior struts skip the boundary edges and
-  // beads are placed only where an interior strut actually meets the web.
-  const interiorDeg = new Map();   // key -> incident interior edges
-  for (const e of edgeMap.values()) {
-    e.boundary = e.seen < 2;
-    const kA = keyOf(e.a), kB = keyOf(e.b);
-    degree.set(kA, (degree.get(kA) || 0) + 1);
-    degree.set(kB, (degree.get(kB) || 0) + 1);
-    if (!e.boundary) {
-      interiorDeg.set(kA, (interiorDeg.get(kA) || 0) + 1);
-      interiorDeg.set(kB, (interiorDeg.get(kB) || 0) + 1);
-    }
-  }
-
-  const nodes = [];
-  for (const [k, d] of degree.entries()) {
-    const p = nodePos.get(k);
-    nodes.push({ x: p.x, y: p.y, degree: d, interiorDegree: interiorDeg.get(k) || 0 });
-  }
-
-  return { edges: Array.from(edgeMap.values()), nodes, seedCount: seeds.length };
+  if (total < 1e-9) return { x: pts[0].x, y: pts[0].y };
+  const target = clamp(t, 0, 1) * total;
+  let i = 1;
+  while (i < n && cum[i] < target) i++;
+  const f = (target - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+  return { x: lerp(pts[i - 1].x, pts[i].x, f), y: lerp(pts[i - 1].y, pts[i].y, f) };
 }
 
-
-/* -------------------------------------------------------------------
-   8. Map a flattened-space edge onto the 3D petal surface
-
-   A strut is a straight segment in flattened (X, Y) space, but on the cupped,
-   arced petal surface it should follow the surface rather than cut through
-   it as a chord. So we subdivide long struts and lift every sample onto the
-   surface via surfacePoint. Returns a polyline of LOCAL 3D points; the
-   caller rotates/lifts them into place and builds a tube along the polyline.
-
-   The (X, Y) -> (u, v) conversion uses the arc-length identity X = L*u and
-   v = Y / halfWidth(u). Near the tip halfWidth -> 0; seeds can't exist there
-   (they're inside the outline where |Y| <= halfWidth), and v is clamped to
-   guard the degenerate 0/0 exactly at the apex.
-   ------------------------------------------------------------------- */
-
-export function mapEdgeToSurface(edge, P, spine, opts = {}) {
-  const maxSeg = opts.maxSeg || 6;
-  const segLen = opts.segLen || 0.14;
-  const len = Math.hypot(edge.b.x - edge.a.x, edge.b.y - edge.a.y);
-  const nseg = clamp(Math.round(len / segLen), 1, maxSeg);
-
-  const pts = [];
-  for (let k = 0; k <= nseg; k++) {
-    const t = k / nseg;
-    const X = lerp(edge.a.x, edge.b.x, t);
-    const Y = lerp(edge.a.y, edge.b.y, t);
-    const u = clamp(X / P.L, 0, 0.9995);
-    const hw = petalHalfWidth(u, P);
-    const v = hw > 1e-4 ? clamp(Y / hw, -1, 1) : 0;
-    pts.push(surfacePoint(u, v, P, spine));
+// Grow one secondary vein on the RIGHT half (Y >= 0). It launches from the
+// midrib at station u0, at ~45-60 deg from the axis, then curves progressively
+// forward (toward the tip) and stops just shy of the margin. Returns a polyline
+// of >= 2 flattened points, or a single point if there was no room to grow.
+function growSecondary(u0, P, rng) {
+  const L = P.L;
+  const D = Math.PI / 180;
+  const start = { x: L * u0, y: 0 };
+  const pts = [start];
+  // launch steeper near the base, shallower near the tip; small seeded wobble
+  let ang    = (lerp(58, 47, u0) + (rng() - 0.5) * 5) * D;   // from the +X (tip) axis
+  const angTip = (24 + (rng() - 0.5) * 8) * D;               // forward-sweep target
+  const reachFrac = clamp(0.86 + (rng() - 0.5) * 0.06, 0.7, 0.94);
+  const maxLen = L * (0.95 - 0.6 * u0);                      // shorter toward the tip
+  const ds = 0.055;
+  let x = start.x, y = start.y, len = 0, guard = 0;
+  while (len < maxLen && guard++ < 400) {
+    x += ds * Math.cos(ang);
+    y += ds * Math.sin(ang);
+    len += ds;
+    if (x >= L * 0.98) { x = L * 0.98; }
+    const marg = petalHalfWidth(clamp(x / L, 0, 1), P);
+    if (marg <= 1e-3) break;
+    if (y >= reachFrac * marg) { pts.push({ x, y: reachFrac * marg }); break; }
+    pts.push({ x, y });
+    if (x >= L * 0.98) break;
+    ang = lerp(ang, angTip, 0.10);   // curve forward toward the tip
   }
   return pts;
 }
 
-/* Convenience: map a single flattened point (e.g. a junction) to a local
-   3D surface point. */
+export function buildVenation(P, rng, opts = {}) {
+  const L = P.L;
+  const secCount  = clamp(Math.round(opts.secondaries || 6), 3, 11);
+  const crossBase = clamp(Math.round(opts.crossPerStrip || 4), 2, 9);
+  const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+
+  const veins = [];        // on-axis + final (mirrored) output
+  const nodes = [];
+  const rightVeins = [];   // right-half veins, mirrored to the left below
+  const rightNodes = [];   // right-half nodes (off-axis), mirrored below
+
+  // --- 1. midrib (on the axis; added once, never mirrored) ----------
+  const uBase = 0.02, uApex = 0.985, nMid = 30;
+  const midrib = [];
+  for (let i = 0; i <= nMid; i++) midrib.push({ x: L * lerp(uBase, uApex, i / nMid), y: 0 });
+  veins.push({ points: midrib, w0: VEIN_MIDRIB_BASE, w1: VEIN_MIDRIB_TIP });
+  nodes.push({ x: midrib[0].x, y: 0, width: VEIN_MIDRIB_BASE });     // base cap
+  nodes.push({ x: midrib[nMid].x, y: 0, width: VEIN_MIDRIB_TIP });   // apex cap
+
+  // --- 2. secondary veins (right half), evenly stationed base -> tip -
+  const secondaries = [];
+  for (let i = 0; i < secCount; i++) {
+    const frac = (i + 0.5) / secCount;
+    const u0 = clamp(lerp(0.13, 0.9, frac) + (rng() - 0.5) * 0.02, 0.1, 0.92);
+    const pts = growSecondary(u0, P, rng);
+    if (pts.length < 2) continue;
+    secondaries.push({ u0, pts });
+    const wBase = lerp(VEIN_SEC_BASE, VEIN_SEC_BASE * 0.7, u0);
+    const wTip  = lerp(VEIN_SEC_TIP,  VEIN_SEC_TIP  * 0.7, u0);
+    rightVeins.push({ points: pts, w0: wBase, w1: wTip });
+    nodes.push({ x: pts[0].x, y: 0, width: wBase });   // base sits on the axis
+    rightNodes.push({ x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, width: wTip });
+  }
+
+  // --- 3. tertiary cross-veins + marginal loops between neighbours ---
+  for (let i = 0; i < secondaries.length - 1; i++) {
+    const A = secondaries[i].pts;       // inner (nearer the base)
+    const B = secondaries[i + 1].pts;   // outer (nearer the tip)
+    const rungs = clamp(crossBase - i, 2, crossBase);
+    for (let k = 1; k <= rungs; k++) {
+      // bias rungs toward t = 1 (the margin) so outer cells come out smaller
+      const t = Math.pow(k / (rungs + 1), 0.7);
+      const a = veinSample(A, t);
+      const b = veinSample(B, t);
+      const mid = {
+        x: (a.x + b.x) / 2 + (rng() - 0.5) * 0.05,
+        y: (a.y + b.y) / 2 + (rng() - 0.5) * 0.05,
+      };
+      rightVeins.push({ points: [a, mid, b], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
+
+      // free-ending veinlet dropped into the larger inner cells (small t)
+      if (t < 0.5) {
+        const vlen = 0.10 + rng() * 0.06;
+        const tip = { x: mid.x + (rng() - 0.35) * 0.06, y: Math.max(0.03, mid.y - vlen) };
+        rightVeins.push({ points: [mid, tip], w0: VEIN_VEINLET, w1: VEIN_VEINLET * 0.6 });
+        rightNodes.push({ x: tip.x, y: tip.y, width: VEIN_VEINLET * 0.6 });
+      }
+    }
+
+    // marginal loop: arch joining A's tip to a near-tip point of B, bowed out
+    const tip = A[A.length - 1];
+    const anchor = veinSample(B, 0.8);
+    const um = clamp(((tip.x + anchor.x) / 2) / L, 0, 1);
+    const crest = {
+      x: (tip.x + anchor.x) / 2,
+      y: Math.min(margin(um) * 0.95, (tip.y + anchor.y) / 2 + 0.3 * (margin(um) - (tip.y + anchor.y) / 2)),
+    };
+    rightVeins.push({ points: [tip, crest, anchor], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
+    // marginal veinlet from the loop crest out to the edge (free tip)
+    const edge = { x: crest.x, y: Math.min(margin(um) * 0.99, crest.y + 0.5 * (margin(um) - crest.y)) };
+    rightVeins.push({ points: [crest, edge], w0: VEIN_VEINLET, w1: VEIN_VEINLET });
+    rightNodes.push({ x: edge.x, y: edge.y, width: VEIN_VEINLET });
+  }
+
+  // --- 4. apical fan filling the tip above the last secondary --------
+  const lastU = secondaries.length ? secondaries[secondaries.length - 1].u0 : 0.6;
+  for (let i = 1; i <= 2; i++) {
+    const u0 = clamp(lerp(lastU + 0.02, 0.955, i / 3), 0.1, 0.965);
+    const pts = growSecondary(u0, P, rng);
+    if (pts.length < 2) continue;
+    rightVeins.push({ points: pts, w0: VEIN_SEC_TIP, w1: VEIN_SEC_TIP * 0.7 });
+    nodes.push({ x: pts[0].x, y: 0, width: VEIN_SEC_TIP });
+    rightNodes.push({ x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, width: VEIN_SEC_TIP * 0.7 });
+  }
+
+  // --- 5. mirror the right half across the axis to build the left ----
+  for (const v of rightVeins) {
+    veins.push(v);
+    veins.push({ points: v.points.map((p) => ({ x: p.x, y: -p.y })), w0: v.w0, w1: v.w1 });
+  }
+  for (const nd of rightNodes) {
+    nodes.push(nd);
+    nodes.push({ x: nd.x, y: -nd.y, width: nd.width });
+  }
+
+  return { veins, nodes };
+}
+
+
+/* -------------------------------------------------------------------
+   6. Map a flattened petal point onto the cupped 3D petal surface
+
+   The (X, Y) -> (u, v) conversion uses the arc-length identity X = L*u and
+   v = Y / halfWidth(u). Near the tip halfWidth -> 0, so v is clamped to guard
+   the degenerate 0/0 exactly at the apex.
+   ------------------------------------------------------------------- */
+
 export function mapPointToSurface(pt, P, spine) {
   const u = clamp(pt.x / P.L, 0, 0.9995);
   const hw = petalHalfWidth(u, P);

@@ -3,15 +3,15 @@
    Parametric 3D flower-bloom — THREE.JS RENDER LAYER
 
    Responsibilities (the abstract geometry lives in flower-geometry.js):
-     - turn lattice struts + nodes into real tube / bead mesh geometry
+     - turn the leaf-venation vein graph into real tube / bead mesh geometry
      - arrange petals on a phyllotactic (golden-angle) spiral + central core
      - set up the scene, lighting, orbit controls, and render loop
      - wire the parametric sliders so any change regenerates live
 
    The build pipeline for one petal:
-     spine + silhouette  ->  clipped-Voronoi lattice (flattened space)
-       ->  map each strut onto the cupped 3D petal surface
-       ->  extrude a tube along it, drop a bead at every node
+     spine + silhouette  ->  hierarchical leaf venation (flattened space)
+       ->  map each vein onto the cupped 3D petal surface
+       ->  extrude a tapering tube along it, cap the open ends with beads
        ->  place it on the spiral (angle, radius, receptacle height + lean)
 
    v1 scope: bloom only. No stem, no leaves, no export.
@@ -21,8 +21,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildLattice,
-  mapEdgeToSurface, mapPointToSurface, placePoint,
+  buildSpine, buildSilhouette, buildVenation,
+  mapPointToSurface, placePoint,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -36,10 +36,11 @@ const CUP_AMOUNT     = 0.22;   // transverse cupping (edges curl inward)
 const SPINE_CURL     = 0.30;   // progressive outward bend toward the tip (rad)
 const RADIAL_SEGMENTS = 8;     // tube cross-section resolution (round enough
                                // that a thickened tube doesn't read as faceted)
-const JOIN_FLARE      = 0.35;  // struts swell this much toward each end so they
-const JOIN_FLARE_DIST = 0.10;  // blend into the node bead (a soft fillet) rather
-                               // than butting it with a hard cylinder-into-sphere
-                               // crease; ramped in over this world distance
+const JOIN_FLARE_DIST = 0.10;  // a flared tube blends into its end bead (a soft
+                               // fillet) over this world distance rather than
+                               // butting it with a hard cylinder-into-sphere crease
+const RIM_WIDTH       = 0.34;  // petal-margin line weight, relative to the midrib
+                               // (the leaf edge is a fine vein, not a fat rope)
 const SEED_BASE      = 20250808;
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
@@ -86,9 +87,12 @@ class MeshAccumulator {
     return this.vcount++;
   }
 
-  /* Extrude a round tube of the given radius along a 3D polyline, using a
-     rotation-minimizing frame so the cross-section doesn't twist between
-     segments. Points are plain {x,y,z}. */
+  /* Extrude a round tube along a 3D polyline, using a rotation-minimizing
+     frame so the cross-section doesn't twist between segments. Points are
+     plain {x,y,z}. `radius` may be a constant, a [startRadius, endRadius]
+     pair (linear taper along the tube), or a function t->radius with t the
+     normalized arc position in [0,1] — so a single tube can taper smoothly,
+     which is how veins thin from midrib toward the finer orders. */
   addTube(points, radius, flare = 0, radialSegments = RADIAL_SEGMENTS) {
     const n = points.length;
     if (n < 2) return;
@@ -152,13 +156,20 @@ class MeshAccumulator {
       const bz = t[0] * nrm[1] - t[1] * nrm[0];
       const P = points[i];
       ringStart[i] = this.vcount;
+      // resolve the base radius at this ring: constant, [start,end] taper, or
+      // a t->radius function (t = normalized arc position along the tube)
+      const tArc = total > 1e-9 ? arc[i] / total : 0;
+      let base;
+      if (typeof radius === 'function')   base = radius(tArc);
+      else if (Array.isArray(radius))     base = lerp(radius[0], radius[1], tArc);
+      else                                base = radius;
       // flare: grow the radius near each end (smoothstep) so the strut meets
       // the node bead in a soft swell instead of a hard butt joint
-      let rr = radius;
+      let rr = base;
       if (flareDist > 0) {
         const dEnd = Math.min(arc[i], total - arc[i]);
         const w = Math.max(0, 1 - dEnd / flareDist);   // 0 mid-strut -> 1 at end
-        rr = radius * (1 + flare * w * w * (3 - 2 * w));
+        rr = base * (1 + flare * w * w * (3 - 2 * w));
       }
       for (let j = 0; j < radialSegments; j++) {
         const th = (j / radialSegments) * Math.PI * 2;
@@ -256,7 +267,10 @@ function resolveParams(ui) {
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
-    targetSeeds: clamp(Math.round(ui.density * ui.density * 0.8), 4, 150),
+    // Density now drives the leaf-venation network: how many secondary veins
+    // branch off the midrib, and how many tertiary rungs ladder each strip.
+    secondaries: clamp(Math.round(ui.density * 0.7) + 1, 3, 10),
+    crossPerStrip: clamp(Math.round(ui.density * 0.6), 2, 8),
     tubeRadius: lerp(0.008, 0.030, ui.tube),
   };
 }
@@ -265,44 +279,36 @@ function resolveParams(ui) {
    3. PETAL + BLOOM ASSEMBLY
    =================================================================== */
 
-/* Build one petal's lattice directly into an accumulator, placed on the
+/* Build one petal's leaf-venation network into an accumulator, placed on the
    phyllotactic spiral: rotated to `az`, leaned by `tilt`, based at
-   `radialOffset` out from the axis, and lifted by `baseHeight`. */
+   `radialOffset` out from the axis, and lifted by `baseHeight`. The abstract,
+   symmetric vein graph comes from buildVenation (flattened space); here we map
+   each vein onto the cupped 3D petal surface and extrude it as a tapering
+   tube — thick midrib down to hair-fine veinlets. */
 function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
   const spine = buildSpine(P);
   const outline = buildSilhouette(P);
-  const lattice = buildLattice(outline, P.targetSeeds, rng);
+  const ven = buildVenation(P, rng, { secondaries: P.secondaries, crossPerStrip: P.crossPerStrip });
 
-  // Rim: the petal outline is one smooth curve, so extrude it as a single
-  // continuous closed tube instead of the ~100 tiny per-edge stubs the Voronoi
-  // boundary would otherwise produce. When the tube is thick, that's the
-  // difference between a lumpy caterpillar rope and a clean, smooth edge.
-  const rim = outline.map((pt) => {
-    const local = mapPointToSurface(pt, P, spine);
-    return placePoint(local, az, baseHeight, radialOffset, tilt);
-  });
-  rim.push(rim[0]);                       // close the loop at the petal base
-  acc.addTube(rim, P.tubeRadius, 0);      // rim is continuous — no join to flare
+  const toWorld = (pt) => placePoint(mapPointToSurface(pt, P, spine), az, baseHeight, radialOffset, tilt);
 
-  // Interior struts only — the boundary walls are now covered by the rim tube.
-  // Each strut flares toward its ends so it blends into the node bead.
-  for (const edge of lattice.edges) {
-    if (edge.boundary) continue;
-    const local = mapEdgeToSurface(edge, P, spine);
-    const world = local.map((p) => placePoint(p, az, baseHeight, radialOffset, tilt));
-    acc.addTube(world, P.tubeRadius, JOIN_FLARE);
+  // Rim: the petal margin is one smooth curve, extruded as a single continuous
+  // closed tube. It's a fine vein (the leaf edge), so it rides thin.
+  const rim = outline.map(toWorld);
+  rim.push(rim[0]);                              // close the loop at the petal base
+  acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0); // continuous — no join to flare
+
+  // Veins: each is a flattened-space polyline with relative end line-weights.
+  // Map its points onto the surface and extrude one smoothly-tapering tube, so
+  // line weight thins from the midrib through secondary, tertiary and veinlet.
+  for (const vein of ven.veins) {
+    const world = vein.points.map(toWorld);
+    acc.addTube(world, [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1], 0);
   }
-  // Welded beads only where an interior strut meets the web: those open tube
-  // ends need sealing. Pure rim vertices are covered by the continuous rim
-  // tube, so beading them just added the overlapping nodules that read as bumps.
-  // Bead radius tracks the flared strut end (1 + JOIN_FLARE) so the strut flows
-  // into the node without a step; higher-degree junctions read a touch fuller.
-  for (const node of lattice.nodes) {
-    if (node.interiorDegree < 1) continue;
-    const local = mapPointToSurface(node, P, spine);
-    const world = placePoint(local, az, baseHeight, radialOffset, tilt);
-    const r = P.tubeRadius * (node.degree >= 3 ? 1.5 : 1.35);
-    acc.addBead(world, r, 6, 10);
+  // Welded caps seal the open tube ends (free vein tips, and the T-junctions
+  // where a secondary meets the midrib) so nothing reads as a hollow ring.
+  for (const node of ven.nodes) {
+    acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15, 4, 7);
   }
 }
 
@@ -369,7 +375,7 @@ coreGlow.position.set(0, 0.6, 0);
 scene.add(coreGlow);
 
 // materials — all spiral petals share one material; the core glows brighter
-const matPetals = new THREE.MeshStandardMaterial({ color: 0x4fb0ab, roughness: 0.5, metalness: 0.15, emissive: 0x08211f, emissiveIntensity: 0.35 });
+const matPetals = new THREE.MeshStandardMaterial({ color: 0xe6f3f0, roughness: 0.5, metalness: 0.12, emissive: 0x0f2e2b, emissiveIntensity: 0.3 });
 const matCore   = new THREE.MeshStandardMaterial({ color: 0x2fa3a3, roughness: 0.45, metalness: 0.2, emissive: 0x0c3a38, emissiveIntensity: 0.55 });
 
 const bloomGroup = new THREE.Group();
@@ -538,7 +544,7 @@ function updateReadout(petalAcc, ui) {
   const el = document.getElementById('readout');
   if (!el) return;
   const petals = `${ui.petalCount} petal${ui.petalCount === 1 ? '' : 's'}`;
-  el.textContent = `${petals} · spiral · ~${tris.toLocaleString()} tris`;
+  el.textContent = `${petals} · leaf venation · ~${tris.toLocaleString()} tris`;
 }
 
 // coalesce rapid slider input into one rebuild per frame
