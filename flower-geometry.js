@@ -410,8 +410,9 @@ function growBranch(start, launchHeading, branchHeading, length, order, env, rng
     x += ds * Math.cos(theta);
     y += ds * Math.sin(theta);
     const marg = petalHalfWidth(clamp(x / L, 0, 1), P);
-    if (marg <= 1e-3 || x >= L * 0.985) break;
-    if (y > 0.9 * marg) { pts.push({ x, y: 0.9 * marg }); break; }
+    if (marg <= 1e-3 || x >= L * 0.99) break;
+    // run right out to the margin (a hair inside it) so veins reach the edge
+    if (y > 0.985 * marg) { pts.push({ x, y: 0.985 * marg }); break; }
     if (y < 0.02) y = 0.02;                    // keep this half on its own side
     pts.push({ x, y });
   }
@@ -494,13 +495,26 @@ export function buildVenation(P, rng, opts = {}) {
       };
       ctx.rightVeins.push({ points: [a, mid, b], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
     }
-    // marginal loop joining the two tips, bowed toward the margin
+    // marginal loop joining the two tips, riding right up against the margin
     const tipA = A[A.length - 1];
     const anchor = veinSample(B, 0.82);
-    const um = clamp(((tipA.x + anchor.x) / 2) / L, 0, 1);
+    const cx = (tipA.x + anchor.x) / 2;
+    const um = clamp(cx / L, 0, 1);
     const midY = (tipA.y + anchor.y) / 2;
-    const crest = { x: (tipA.x + anchor.x) / 2, y: Math.min(margin(um) * 0.96, midY + 0.3 * (margin(um) - midY)) };
+    const crest = { x: cx, y: Math.min(margin(um) * 0.99, midY + 0.55 * (margin(um) - midY)) };
     ctx.rightVeins.push({ points: [tipA, crest, anchor], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
+    // a fine veinlet from the loop crest out to touch the petal edge
+    ctx.rightVeins.push({ points: [crest, { x: cx, y: margin(um) * 0.997 }], w0: VEIN_TERTIARY, w1: 0.16 });
+  }
+
+  // fine marginal spurs so any secondary tip still shy of the rim reaches it
+  for (const s of secMain) {
+    const tip = s[s.length - 1];
+    const um = clamp(tip.x / L, 0, 1);
+    const edgeY = margin(um) * 0.997;
+    if (tip.y < edgeY - 0.03) {
+      ctx.rightVeins.push({ points: [tip, { x: tip.x, y: edgeY }], w0: widthOfOrder(2), w1: 0.16 });
+    }
   }
 
   // --- 4. soften every right-half vein, then MIRROR it to the left ---
