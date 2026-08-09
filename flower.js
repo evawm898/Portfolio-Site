@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation,
+  buildSpine, buildSilhouette, buildVenation, buildJaggedTips,
   mapPointToSurface, placePoint,
 } from './flower-geometry.js';
 
@@ -267,6 +267,10 @@ function resolveParams(ui) {
     bloom: ui.bloom * DEG,
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
     edgeCurve: ui.edgeCurve,                     // side billow (+) / pinch (-)
+    tipStyle: ui.tipStyle,                       // petal-edge tip style (clean/jagged/…)
+    tipLength: ui.tipLength,                     // how far tips extend past the edge
+    tipFrequency: ui.tipFrequency,               // number of tips around the outer edge
+    tipIrregularity: ui.tipIrregularity,         // 0 uniform -> 1 varied length & angle
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -290,8 +294,11 @@ function resolveParams(ui) {
    `radialOffset` out from the axis, and lifted by `baseHeight`. The abstract,
    symmetric vein graph comes from buildVenation (flattened space); here we map
    each vein onto the cupped 3D petal surface and extrude it as a tapering
-   tube — thick midrib down to hair-fine veinlets. */
-function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
+   tube — thick midrib down to hair-fine veinlets. `seed` seeds this petal's
+   PRNG (the venation gets one stream, the edge tips an independent one so
+   changing density doesn't reshuffle the tips). */
+function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
+  const rng = mulberry32(seed);
   const spine = buildSpine(P);
   const outline = buildSilhouette(P);
   const ven = buildVenation(P, rng, {
@@ -299,7 +306,8 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
     maxDepth: P.maxDepth, softness: P.softness,
   });
 
-  const toWorld = (pt) => placePoint(mapPointToSurface(pt, P, spine), az, baseHeight, radialOffset, tilt);
+  const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
+  const toWorld = (pt) => place(mapPointToSurface(pt, P, spine));
 
   // Rim: the petal margin is one smooth curve, extruded as a single continuous
   // closed tube. It's a fine vein (the leaf edge), so it rides thin.
@@ -320,6 +328,17 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, rng) {
   // where a secondary meets the midrib) so nothing reads as a hollow ring.
   for (const node of ven.nodes) {
     acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15, 4, 7);
+  }
+
+  // Jagged edge tips (PETAL EDGE > TIP STYLE = jagged): sharp triangles that
+  // stick out past the rim, tapering to a point. They're extra geometry beyond
+  // the boundary — the rim and veins above are unchanged. buildJaggedTips
+  // returns local-frame points, so we place them exactly like every other point.
+  const tipRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  for (const t of buildJaggedTips(P, spine, tipRng)) {
+    const A = place(t.A), apex = place(t.apex), B = place(t.B);
+    acc.addTube([A, apex], [P.tubeRadius * RIM_WIDTH, P.tubeRadius * 0.10], 0, 6);
+    acc.addTube([apex, B], [P.tubeRadius * 0.10, P.tubeRadius * RIM_WIDTH], 0, 6);
   }
 }
 
@@ -437,7 +456,7 @@ function generate() {
     // radius cancels here, so the lean stays bounded at any coil tightness.
     const slope = -elev * ELEV_FACTOR * (Math.PI / 2) * Math.sin(Math.PI * rho);
     const tilt = RECEPTACLE_TILT * Math.atan(slope);
-    buildPetalInto(petalAcc, P, az, height, r - P.r0, tilt, mulberry32(SEED_BASE + i * 131));
+    buildPetalInto(petalAcc, P, az, height, r - P.r0, tilt, SEED_BASE + i * 131);
   }
 
   const centerHeight = elev * elevAmp;                           // core sits at the receptacle centre
@@ -510,6 +529,10 @@ const inputs = {
   tip: document.getElementById('tip'),
   centerCurve: document.getElementById('centerCurve'),
   edgeCurve: document.getElementById('edgeCurve'),
+  tipStyle: document.getElementById('tipStyle'),
+  tipLength: document.getElementById('tipLength'),
+  tipFrequency: document.getElementById('tipFrequency'),
+  tipIrregularity: document.getElementById('tipIrregularity'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   density: document.getElementById('density'),
@@ -527,6 +550,10 @@ function readUI() {
     tip: parseFloat(inputs.tip.value),
     centerCurve: parseFloat(inputs.centerCurve.value),
     edgeCurve: parseFloat(inputs.edgeCurve.value),
+    tipStyle: inputs.tipStyle.value,
+    tipLength: parseFloat(inputs.tipLength.value),
+    tipFrequency: parseInt(inputs.tipFrequency.value, 10),
+    tipIrregularity: parseFloat(inputs.tipIrregularity.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     density: parseInt(inputs.density.value, 10),
@@ -547,6 +574,9 @@ function refreshLabels() {
   setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
   const ec = +inputs.edgeCurve.value;
   setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
+  setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
+  setLabel('tipFrequency', inputs.tipFrequency.value);
+  setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
   setLabel('bloom', inputs.bloom.value + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
@@ -591,9 +621,13 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
+['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
+ 'tipLength', 'tipFrequency', 'tipIrregularity',
+ 'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
+// tip style is a <select>; regenerate on change (clean/jagged/ruffled)
+inputs.tipStyle.addEventListener('change', () => { scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 
 const resetBtn = document.getElementById('reset');
@@ -606,6 +640,10 @@ if (resetBtn) {
     inputs.tip.value = d.tip;
     inputs.centerCurve.value = d.centerCurve;
     inputs.edgeCurve.value = d.edgeCurve;
+    inputs.tipStyle.value = d.tipStyle;
+    inputs.tipLength.value = d.tipLength;
+    inputs.tipFrequency.value = d.tipFrequency;
+    inputs.tipIrregularity.value = d.tipIrregularity;
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
     inputs.density.value = d.density;
@@ -622,6 +660,7 @@ if (resetBtn) {
 
 const DEFAULTS = {
   petalCount: 21, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
+  tipStyle: 'clean', tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
@@ -657,10 +696,6 @@ accSections.forEach((section) => {
 // Placeholder controls — no rendering logic yet. `fmt` formats the read-out for
 // slider controls; selects (fmt: null) show their value in the control itself.
 const placeholderControls = [
-  { id: 'tipStyle',        fmt: null },
-  { id: 'tipLength',       fmt: (v) => (+v).toFixed(2) },
-  { id: 'tipFrequency',    fmt: (v) => String(v) },
-  { id: 'tipIrregularity', fmt: (v) => (+v).toFixed(2) },
   { id: 'undulation',      fmt: (v) => (+v).toFixed(2) },
   { id: 'fractalGrowth',   fmt: (v) => (+v).toFixed(2) },
   { id: 'infillType',      fmt: null },

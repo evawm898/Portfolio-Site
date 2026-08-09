@@ -548,3 +548,76 @@ export function mapPointToSurface(pt, P, spine) {
   const v = hw > 1e-4 ? clamp(pt.y / hw, -1, 1) : 0;
   return surfacePoint(u, v, P, spine);
 }
+
+
+/* -------------------------------------------------------------------
+   7. Jagged edge tips — sharp triangular points that emanate OUTWARD from
+   the outer petal edge. Each tip is a triangle: a base flush with the edge
+   (two nearby edge points A, B) and an apex offset beyond the boundary. The
+   apex is pushed along the in-surface OUTWARD NORMAL — the surface tangent
+   perpendicular to the edge — computed from the real 3D surface, so tips
+   follow the petal's curvature and tilt rather than a fixed world axis.
+
+   Tips only ADD geometry past the boundary: the core outline (the rim) and
+   the veins are left untouched, and no tips are placed along the base where
+   petals meet the centre. Everything is returned in the LOCAL petal frame as
+   [{A, apex, B}] (plain {x,y,z}); the render layer maps them into the bloom
+   exactly like every other petal point, so they inherit the petal's placement.
+   ------------------------------------------------------------------- */
+
+const TIP_LENGTH_MAX = 0.5;   // world reach of a tip at TIP LENGTH = 1
+const TIP_U_START    = 0.30;  // skip the inner (base) portion of the edge
+const TIP_U_END      = 0.90;  // and the degenerate apex, where half-width -> 0
+
+// Edge point at station u on side s (+1 / -1), plus the unit outward direction:
+// tangent to the surface and perpendicular to the edge, so it tracks curvature.
+function edgeOutward(u, s, P, spine) {
+  const eps = 0.004;
+  const p = surfacePoint(u, s, P, spine);
+  // along-edge tangent (central difference in u)
+  const a = surfacePoint(clamp(u + eps, 0, 0.9995), s, P, spine);
+  const b = surfacePoint(clamp(u - eps, 0, 0.9995), s, P, spine);
+  let tx = a.x - b.x, ty = a.y - b.y, tz = a.z - b.z;
+  const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+  // lateral direction (inner -> edge across the width) points generally outward
+  const pin = surfacePoint(u, s * (1 - eps), P, spine);
+  let lx = p.x - pin.x, ly = p.y - pin.y, lz = p.z - pin.z;
+  // remove the along-edge component so the result is perpendicular to the edge
+  const d = lx * tx + ly * ty + lz * tz;
+  lx -= d * tx; ly -= d * ty; lz -= d * tz;
+  const ll = Math.hypot(lx, ly, lz) || 1;
+  return { p, out: { x: lx / ll, y: ly / ll, z: lz / ll }, tan: { x: tx, y: ty, z: tz } };
+}
+
+export function buildJaggedTips(P, spine, rng) {
+  const tips = [];
+  if (P.tipStyle !== 'jagged') return tips;
+  const len0 = (P.tipLength || 0) * TIP_LENGTH_MAX;
+  if (len0 <= 1e-4) return tips;
+  const freq = clamp(Math.round(P.tipFrequency || 0), 1, 60);
+  const irr = clamp(P.tipIrregularity || 0, 0, 1);
+  const perSide = Math.max(1, Math.round(freq / 2));
+  const du = (TIP_U_END - TIP_U_START) / perSide;
+  const halfBase = du * 0.35;                 // triangle base half-width, in u
+
+  for (const s of [1, -1]) {
+    for (let k = 0; k < perSide; k++) {
+      const uc = TIP_U_START + du * (k + 0.5);
+      const A = surfacePoint(clamp(uc - halfBase, 0, 0.9995), s, P, spine);
+      const B = surfacePoint(clamp(uc + halfBase, 0, 0.9995), s, P, spine);
+      const { p: E, out, tan } = edgeOutward(uc, s, P, spine);
+      let len = len0, skew = 0;
+      if (irr > 0) {
+        len *= 1 + irr * (rng() * 2 - 1) * 0.55;   // varied length
+        skew = irr * (rng() * 2 - 1) * 0.5;        // varied angle: skew along the edge
+      }
+      const apex = {
+        x: E.x + out.x * len + tan.x * skew * len,
+        y: E.y + out.y * len + tan.y * skew * len,
+        z: E.z + out.z * len + tan.z * skew * len,
+      };
+      tips.push({ A, apex, B });
+    }
+  }
+  return tips;
+}
