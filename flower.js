@@ -386,6 +386,7 @@ function resolveParams(ui) {
     strandWidth: ui.strandWidth,                 // STRANDS: tube thickness as a fraction of the gap
     strandTaper: ui.strandTaper,                 // STRANDS: 0 uniform -> 1 fine point at the tip
     strandCurvature: ui.strandCurvature,         // STRANDS: 0 straight radial -> 1 organic bow
+    strandIrregularity: ui.strandIrregularity,   // STRANDS: 0 uniform width -> 1 varied strand widths
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -424,6 +425,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     ? buildStrands(P, {
         count: P.strandCount, width: P.strandWidth,
         taper: P.strandTaper, curvature: P.strandCurvature,
+        irregularity: P.strandIrregularity, seed,
       })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
@@ -698,6 +700,7 @@ const inputs = {
   strandWidth: document.getElementById('strandWidth'),
   strandTaper: document.getElementById('strandTaper'),
   strandCurvature: document.getElementById('strandCurvature'),
+  strandIrregularity: document.getElementById('strandIrregularity'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -725,6 +728,7 @@ function readUI() {
     strandWidth: parseFloat(inputs.strandWidth.value),
     strandTaper: parseFloat(inputs.strandTaper.value),
     strandCurvature: parseFloat(inputs.strandCurvature.value),
+    strandIrregularity: parseFloat(inputs.strandIrregularity.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -753,6 +757,7 @@ function refreshLabels() {
   setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
   setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
   setLabel('strandCurvature', (+inputs.strandCurvature.value).toFixed(2));
+  setLabel('strandIrregularity', (+inputs.strandIrregularity.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -799,7 +804,7 @@ function setBuilding(on) {
 ['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
- 'tightness', 'elevation'].forEach((k) => {
+ 'strandIrregularity', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -852,6 +857,7 @@ if (resetBtn) {
     inputs.strandWidth.value = d.strandWidth;
     inputs.strandTaper.value = d.strandTaper;
     inputs.strandCurvature.value = d.strandCurvature;
+    inputs.strandIrregularity.value = d.strandIrregularity;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -868,7 +874,7 @@ const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
-  strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4,
+  strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 

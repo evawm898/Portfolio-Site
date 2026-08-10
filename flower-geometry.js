@@ -617,6 +617,8 @@ export function buildStrands(P, opts = {}) {
   const width     = clamp(opts.width     != null ? opts.width     : 0.5, 0, 1);
   const taper     = clamp(opts.taper     != null ? opts.taper     : 0.5, 0, 1);
   const curvature = clamp(opts.curvature != null ? opts.curvature : 0.4, 0, 1);
+  const irregular = clamp(opts.irregularity != null ? opts.irregularity : 0, 0, 1);
+  const seed = (opts.seed | 0);                             // per-petal variety for the irregularity
   const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
   const tubeR = P.tubeRadius > 1e-6 ? P.tubeRadius : 0.02;   // render multiplies this back in
 
@@ -673,6 +675,16 @@ export function buildStrands(P, opts = {}) {
     // leaving a bald wedge; the mid-fan strands carry the organic bow.
     const bowMag = curvature * 0.24 * len * Math.sign(q) * Math.sin(Math.PI * aq);
 
+    // IRREGULARITY: vary each strand's thickness for a natural, hand-made look —
+    // some strands run thicker, some thinner, with a gentle wobble along their
+    // length. Keyed off the mirror-pair index (min(j, count-1-j)) so a strand and
+    // its reflection get the SAME variation and the petal stays symmetric; the
+    // per-petal seed keeps different petals from sharing one pattern.
+    const pair = Math.min(j, count - 1 - j);
+    const widthMul = 1 + irregular * (hash01(pair * 2654435761 + seed * 40503) * 2 - 1) * 0.8;
+    const wobPhase = hash01(pair * 668265263 + seed * 374761393 + 17) * Math.PI * 2;
+    const wobFreq = 2 + Math.floor(hash01(pair * 1103515245 + seed * 12345 + 3) * 3);   // 2..4 humps
+
     const pts = new Array(nS + 1);
     const rads = new Array(nS + 1);
     for (let i = 0; i <= nS; i++) {
@@ -686,7 +698,8 @@ export function buildStrands(P, opts = {}) {
       pts[i] = { x, y };
       // thin, ~uniform line with extra taper, tapering to a point where it meets
       // the rim (edgeRoom -> 0), so nothing crosses the outline.
-      let r = rBase * (1 - 0.8 * taper * s);
+      const wob = 1 + irregular * 0.35 * Math.sin(wobFreq * Math.PI * s + wobPhase);
+      let r = rBase * Math.max(0.05, widthMul * wob) * (1 - 0.8 * taper * s);
       const edgeRoom = (room - Math.abs(y)) * 0.8;
       rads[i] = Math.max(0, Math.min(r, edgeRoom));
     }
@@ -695,6 +708,16 @@ export function buildStrands(P, opts = {}) {
   // one welded bead at the shared hub caps the converged strand starts
   nodes.push({ x: O.x, y: 0, width: (rBase / tubeR) * 1.7 });
   return { veins, nodes };
+}
+
+// Stable, well-mixed pseudo-random in [0,1) from an integer key (integer hash).
+// Deterministic — used to give each strand a repeatable thickness variation.
+function hash01(n) {
+  let h = n >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 2246822507);
+  h = Math.imul(h ^ (h >>> 13), 3266489909);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
 }
 
 // Turn a per-sample radius array (sampled uniformly along the strand) into a
