@@ -468,7 +468,9 @@ coreGlow.position.set(0, 0.6, 0);
 scene.add(coreGlow);
 
 // materials — all spiral petals share one material; the core glows brighter
-const matPetals = new THREE.MeshStandardMaterial({ color: 0xe6f3f0, roughness: 0.5, metalness: 0.12, emissive: 0x0f2e2b, emissiveIntensity: 0.3 });
+// double-sided: the Voronoi sheet is a thin perforated membrane seen from both
+// faces (through its holes and where petals cup), so back faces must render too.
+const matPetals = new THREE.MeshStandardMaterial({ color: 0xe6f3f0, roughness: 0.5, metalness: 0.12, emissive: 0x0f2e2b, emissiveIntensity: 0.3, side: THREE.DoubleSide });
 const matCore   = new THREE.MeshStandardMaterial({ color: 0x2fa3a3, roughness: 0.45, metalness: 0.2, emissive: 0x0c3a38, emissiveIntensity: 0.55 });
 
 const bloomGroup = new THREE.Group();

@@ -661,7 +661,10 @@ export function buildVoronoi(P, rng, opts = {}) {
     const ann = cellAnnulus(cell, round, holeScale);
     if (!ann) continue;
     slabs.push(ann);                                                                   // +Y
-    slabs.push({ outer: ann.outer.map(mirrorY), inner: ann.inner.map(mirrorY) });      // -Y mirror
+    // -Y mirror: reflecting Y reverses the ring order (winding), so reverse the
+    // loops back — otherwise the mirrored slab renders inside-out (its faces cull
+    // and shade backwards, which is why half of every petal looked wrong).
+    slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse() });
   }
   return { veins: [], nodes: [], slabs };
 }
