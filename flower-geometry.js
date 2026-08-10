@@ -345,7 +345,7 @@ function dedupePolygon(poly) {
 const VEIN_MIDRIB_BASE = 1.00;
 const VEIN_MIDRIB_TIP  = 0.42;
 const VEIN_TERTIARY    = 0.28;
-const VORONOI_GROW     = 0.5;   // even strut thickening per unit softness
+const VORONOI_GROW     = 0.9;   // even strut thickening per unit softness
 // relative line-weight by branch order (0 = midrib). Deeper orders are finer;
 // the last entry is the floor so very deep fractal twigs stay visible.
 const VEIN_WIDTH_BY_ORDER = [1.00, 0.56, 0.38, 0.28, 0.22, 0.18];
@@ -656,7 +656,7 @@ export function buildVoronoi(P, rng, opts = {}) {
   // Voronoi); at 5 they are ovals separated by an even web.
   const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
   const round = clamp(softness / 5, 0, 1);                 // polygon -> ellipse
-  const inset = 1 - lerp(0, 0.14, clamp(softness, 0, 5) / 5); // shrink to open the web
+  const inset = 1 - lerp(0, 0.04, clamp(softness, 0, 5) / 5); // slight shrink to define holes
   const smooth = Math.min(2, Math.round(softness));        // 0 = sharp cells, up to 2 corner-cuts
   const m = 1 + softness * VORONOI_GROW;                   // even strut thickening
   const weight = VEIN_TERTIARY * m;
@@ -688,7 +688,7 @@ function roundedCell(poly, round, inset, smooth) {
   for (const p of poly) { const dx = p.x - cx, dy = p.y - cy; Cxx += dx * dx; Cyy += dy * dy; Cxy += dx * dy; }
   Cxx /= n; Cyy /= n; Cxy /= n;
   const tr = Cxx + Cyy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (Cxx * Cyy - Cxy * Cxy)));
-  const ELL = 1.45;                           // std-dev -> semi-axis (ellipse ~ the cell size)
+  const ELL = 1.22;                           // std-dev -> semi-axis (ellipse inscribed in the cell)
   const a = Math.sqrt(Math.max(tr / 2 + disc, 1e-9)) * ELL;
   const b = Math.sqrt(Math.max(tr / 2 - disc, 1e-9)) * ELL;
   const ang = 0.5 * Math.atan2(2 * Cxy, Cxx - Cyy);
