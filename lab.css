@@ -484,26 +484,19 @@
 /* Embedded wire's own 3D stage — a fabric face, a wire face, and
    TUNNEL_RIB_COUNT tunnel "rib" faces (fanned out at their own fixed
    fold angles, solved in the JS) under one rotating
-   .embeddedWire-scene. Unlike the printedInk and laminatedTrace rigs
-   above, this scene combines rotateX (side-view tilt) and rotateY
-   (the 90deg through-tunnel yaw) together — still never rotateZ. A
-   wider perspective than the other two rigs: the yaw spreads the
-   fabric's own width across a much deeper range than either of those
-   rigs ever needs. */
+   .embeddedWire-scene. The scene's rotation is a single coupled
+   rotateY(yaw) + rotateX(tilt) orbit, both driven off one shared
+   progress value (never rotateZ, never independently re-eased) —
+   top-down to a near-edge-on cross-section profile and back. See the
+   JS module header comment for why both axes are needed: the tunnel
+   runs along X, and only a yaw component reorients the viewing
+   direction to run parallel to that axis, which is what exposes the
+   arch's own Y/Z cross-section as an on-screen shape. */
 .embeddedWire-stage {
   width: 100%;
   height: 100%;
   perspective: 1800px;
   position: relative;
-}
-
-/* The through-tunnel arch caps are drawn here, as flat, JS-projected
-   2D paths — a sibling of .embeddedWire-scene, not a child, so they
-   never enter its 3D transform hierarchy at all. See the JS comment
-   where they're built for why. Sits on top in normal DOM paint order;
-   never intercepts hover/click, same as every other face here. */
-.embeddedWire-overlay {
-  pointer-events: none;
 }
 
 .embeddedWire-scene {
@@ -523,9 +516,22 @@
   /* Every face's only rotation is its own fixed, one-time fold (or no
      rotation at all, for the fabric/wire faces) — hiding the true
      backface stops any face from rendering as a mirrored ghost of
-     itself once the through-tunnel yaw brings it close to edge-on. */
+     itself once the profile rotation brings it close to edge-on. */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* The tunnel ribs and wire slices fold past 90° (their crest ribs / far
+   wire faces) as part of a single continuous curved surface, not a
+   flat panel that could ever show a mirrored duplicate of itself — so
+   the backface-hiding above (meant for flat faces near edge-on) would
+   instead silently cull half of this curved surface's own fill. Keep
+   both faces of these two element types visible so the dome and wire
+   render as complete, continuous geometry from every camera angle. */
+.embeddedWire-tunnelRib,
+.embeddedWire-wireSlice {
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
 }
 
 .circuit-panel__label {
