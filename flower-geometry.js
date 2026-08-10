@@ -345,6 +345,7 @@ function dedupePolygon(poly) {
 const VEIN_MIDRIB_BASE = 1.00;
 const VEIN_MIDRIB_TIP  = 0.42;
 const VEIN_TERTIARY    = 0.28;
+const VORONOI_BULGE    = 2.6;   // extra wall-end/junction material per unit softness
 // relative line-weight by branch order (0 = midrib). Deeper orders are finer;
 // the last entry is the floor so very deep fractal twigs stay visible.
 const VEIN_WIDTH_BY_ORDER = [1.00, 0.56, 0.38, 0.28, 0.22, 0.18];
@@ -666,13 +667,25 @@ export function buildVoronoi(P, rng, opts = {}) {
     ? roundGraph(walls, sil, softness)
     : walls.map((w) => [{ x: w.a.x, y: w.a.y }, { x: w.b.x, y: w.b.y }]);
 
-  const veins = polylines.map((pl) => ({ points: pl, w0: VEIN_TERTIARY, w1: VEIN_TERTIARY }));
+  // SOFTNESS also adds fillet MATERIAL at the junctions (independent of the tube
+  // slider): each wall keeps its mid thickness but swells toward its endpoints,
+  // and the junction beads grow to match — so the cells read as solid rounded
+  // webbing that thickens where walls meet, not uniform wire. `rad` is a
+  // t -> weight function (multiplied by the tube radius in the render layer);
+  // it dips to VEIN_TERTIARY mid-wall and rises at both ends.
+  const bulge = softness * VORONOI_BULGE;
+  const endMul = 1 + bulge;
+  const rad = bulge > 1e-3
+    ? (t) => VEIN_TERTIARY * (1 + bulge * (1 - Math.sin(Math.PI * t)))
+    : null;
+
+  const veins = polylines.map((pl) => ({ points: pl, w0: VEIN_TERTIARY, w1: VEIN_TERTIARY, rad }));
   const nodes = [];                          // bead the (smoothed) junctions to seal joins
   const seen = new Set();
   for (const pl of polylines) {
     for (const p of [pl[0], pl[pl.length - 1]]) {
       const vk = rk(p.x) + ',' + rk(p.y);
-      if (!seen.has(vk)) { seen.add(vk); nodes.push({ x: p.x, y: p.y, width: VEIN_TERTIARY }); }
+      if (!seen.has(vk)) { seen.add(vk); nodes.push({ x: p.x, y: p.y, width: VEIN_TERTIARY * endMul }); }
     }
   }
   return { veins, nodes };

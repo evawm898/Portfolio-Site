@@ -340,8 +340,13 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     const pts = ruffled ? densifyByStep(vein.points, veinStep) : vein.points;
     const world = pts.map(toWorld);
     // veins are thin — 6 radial sides read as round and roughly halve the
-    // triangle count versus the default, which matters on deep fractals
-    acc.addTube(world, [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1], 0, 6);
+    // triangle count versus the default, which matters on deep fractals.
+    // vein.rad (Voronoi junction bulge) is a t->weight profile; otherwise the
+    // weight tapers linearly from w0 to w1.
+    const radius = vein.rad
+      ? (t) => P.tubeRadius * vein.rad(t)
+      : [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1];
+    acc.addTube(world, radius, 0, 6);
   }
   // A fine mid-vein reaching from inside the petal into each jagged tooth, so
   // the veins extend into the jagged edge along with the outline.
