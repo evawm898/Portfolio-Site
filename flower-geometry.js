@@ -658,25 +658,31 @@ export function buildVoronoi(P, rng, opts = {}) {
   const walls = [];
   for (const { a, b, n } of edges.values()) if (n >= 2) walls.push({ a, b });
 
-  // SOFTNESS rounds the angular cells into smooth organic ones. It works on the
-  // shared wall graph (not per cell), so junctions stay connected and mirror
-  // symmetry is preserved: subdivide every wall, then Laplacian-smooth with the
-  // petal-boundary vertices pinned and each step re-symmetrised across the axis.
-  const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 1);
-  const polylines = softness > 0.02
-    ? roundGraph(walls, sil, softness)
+  // SOFTNESS (0..5) rounds the angular cells into smooth organic ones. Path
+  // rounding works on the shared wall graph (not per cell), so junctions stay
+  // connected and mirror symmetry is preserved: subdivide every wall, then
+  // Laplacian-smooth with the petal-boundary vertices pinned and each step
+  // re-symmetrised across the axis. Path rounding saturates at 1 (cells are
+  // already fully rounded there; more would just collapse them) — above 1 the
+  // extra softness keeps adding material instead.
+  const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
+  const roundSoft = Math.min(softness, 1);
+  const polylines = roundSoft > 0.02
+    ? roundGraph(walls, sil, roundSoft)
     : walls.map((w) => [{ x: w.a.x, y: w.a.y }, { x: w.b.x, y: w.b.y }]);
 
   // SOFTNESS also adds fillet MATERIAL at the junctions (independent of the tube
-  // slider): each wall keeps its mid thickness but swells toward its endpoints,
-  // and the junction beads grow to match — so the cells read as solid rounded
-  // webbing that thickens where walls meet, not uniform wire. `rad` is a
-  // t -> weight function (multiplied by the tube radius in the render layer);
-  // it dips to VEIN_TERTIARY mid-wall and rises at both ends.
+  // slider): each wall swells toward its endpoints and the junction beads grow
+  // to match, so the cells read as solid rounded webbing that thickens where
+  // walls meet. The bulge scales linearly with softness (5 -> 5x the amount at
+  // 1); past 1 a rising floor also thickens the mid-wall so the whole web fills
+  // out rather than turning into bead-on-string. `rad` is a t -> weight function
+  // (multiplied by the tube radius in the render layer).
   const bulge = softness * VORONOI_BULGE;
   const endMul = 1 + bulge;
+  const floor = 0.4 * clamp((softness - 1) / 4, 0, 1);
   const rad = bulge > 1e-3
-    ? (t) => VEIN_TERTIARY * (1 + bulge * (1 - Math.sin(Math.PI * t)))
+    ? (t) => VEIN_TERTIARY * (1 + bulge * (floor + (1 - floor) * (1 - Math.sin(Math.PI * t))))
     : null;
 
   const veins = polylines.map((pl) => ({ points: pl, w0: VEIN_TERTIARY, w1: VEIN_TERTIARY, rad }));

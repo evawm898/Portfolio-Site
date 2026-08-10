@@ -662,14 +662,20 @@ function updateTipOptions() {
 }
 // tip style is a <select>; swap the visible options and regenerate on change
 inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
-// Infill: only the selected type's options are shown (like Tip). Regenerate on change.
+// Infill: only the selected type's options are shown (like Tip). The Softness
+// slider is shared, but Voronoi accepts a wider range (up to 5x) than the
+// venation (0..1), so its max is retuned per type to keep the useful range
+// spread across the whole track.
 function updateInfillOptions() {
   const type = inputs.infillType.value;
   document.querySelectorAll('[data-infill-styles]').forEach((el) => {
     el.hidden = !el.getAttribute('data-infill-styles').split(/\s+/).includes(type);
   });
+  inputs.softness.max = type === 'voronoi' ? '5' : '1';
+  inputs.softness.step = type === 'voronoi' ? '0.05' : '0.01';
+  if (+inputs.softness.value > +inputs.softness.max) inputs.softness.value = inputs.softness.max;
 }
-inputs.infillType.addEventListener('change', () => { updateInfillOptions(); scheduleRegen(); });
+inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 
 const resetBtn = document.getElementById('reset');
