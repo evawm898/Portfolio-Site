@@ -624,7 +624,9 @@ export function buildStrands(P, opts = {}) {
 
   const uOrigin = 0.035;               // fan hub, near the base claw
   const uStartEdge = 0.12;             // nearest-base endpoint on the margin
-  const uTipEdge = 0.982;              // tip endpoint
+  const uTipEdge = 0.985;              // tip endpoint
+  const uApex = 0.982;                 // apex-zone strands gather to this clean point (near the tip)
+  const apexZone = 0.72;               // fan fraction above this is pulled toward the apex
   const nS = 32;                       // samples per strand
   const O = { x: L * uOrigin, y: 0 };
   const rBase = lerp(0.006, 0.05, width) * P.W;   // strand thickness scale (thin lines by default)
@@ -666,7 +668,14 @@ export function buildStrands(P, opts = {}) {
     const side = Math.sign(q);                             // +1 / -1 margin; 0 = straight up the axis
     const frac = clamp(1 - (aq - aqMin) / (1 - aqMin), 0, 1);  // innermost -> tip(1), outer -> base(0)
     const uE = edgeUAt(frac);
-    const E = { x: L * uE, y: side * hw(uE) };             // axis strand (side 0) ends on the axis
+    // Gather the apex-zone strands to one clean convergence point just inside the
+    // tip, so their tapered tips meet neatly there instead of crossing and
+    // overlapping into a tangle where the rim (and any ruffle crest) also gather.
+    const cz = smootherstep(clamp((frac - apexZone) / (1 - apexZone), 0, 1));
+    const E = {
+      x: lerp(L * uE, L * uApex, cz),
+      y: lerp(side * hw(uE), 0, cz),                       // pulled onto the axis at the apex
+    };
     const dx = E.x - O.x, dy = E.y - O.y;
     const len = Math.hypot(dx, dy) || 1;
     const px = -dy / len, py = dx / len;                    // unit perpendicular
@@ -705,8 +714,11 @@ export function buildStrands(P, opts = {}) {
     }
     veins.push({ points: pts, rad: strandRadProfile(rads, tubeR) });
   }
-  // one welded bead at the shared hub caps the converged strand starts
+  // welded beads cap the two convergences: the base hub and the apex gather,
+  // so both ends read as clean nodes rather than a bundle of overlapping tips.
+  const apexR = Math.min(rBase, hw(uApex) * 0.7);
   nodes.push({ x: O.x, y: 0, width: (rBase / tubeR) * 1.7 });
+  nodes.push({ x: L * uApex, y: 0, width: (apexR / tubeR) * 1.5 });
   return { veins, nodes };
 }
 
