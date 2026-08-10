@@ -307,7 +307,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // INFILL: leaf venation (default) or a bilaterally-symmetric Voronoi mesh.
   // Both return { veins, nodes } in flattened space, rendered identically below.
   const ven = P.infillType === 'voronoi'
-    ? buildVoronoi(P, rng, { density: P.density })
+    ? buildVoronoi(P, rng, { density: P.density, softness: P.softness })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
         maxDepth: P.maxDepth, softness: P.softness,

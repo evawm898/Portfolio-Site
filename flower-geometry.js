@@ -652,20 +652,113 @@ export function buildVoronoi(P, rng, opts = {}) {
     }
   }
 
-  // interior walls border TWO cells -> draw once; silhouette walls border one
-  // -> skip (the rim already traces them). Bead every wall vertex to seal joins.
-  const veins = [];
-  const nodes = [];
+  // interior walls border TWO cells -> keep once; silhouette walls border one
+  // -> drop (the rim already traces them).
+  const walls = [];
+  for (const { a, b, n } of edges.values()) if (n >= 2) walls.push({ a, b });
+
+  // SOFTNESS rounds the angular cells into smooth organic ones. It works on the
+  // shared wall graph (not per cell), so junctions stay connected and mirror
+  // symmetry is preserved: subdivide every wall, then Laplacian-smooth with the
+  // petal-boundary vertices pinned and each step re-symmetrised across the axis.
+  const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 1);
+  const polylines = softness > 0.02
+    ? roundGraph(walls, sil, softness)
+    : walls.map((w) => [{ x: w.a.x, y: w.a.y }, { x: w.b.x, y: w.b.y }]);
+
+  const veins = polylines.map((pl) => ({ points: pl, w0: VEIN_TERTIARY, w1: VEIN_TERTIARY }));
+  const nodes = [];                          // bead the (smoothed) junctions to seal joins
   const seen = new Set();
-  for (const { a, b, n } of edges.values()) {
-    if (n < 2) continue;
-    veins.push({ points: [{ x: a.x, y: a.y }, { x: b.x, y: b.y }], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
-    for (const p of [a, b]) {
+  for (const pl of polylines) {
+    for (const p of [pl[0], pl[pl.length - 1]]) {
       const vk = rk(p.x) + ',' + rk(p.y);
       if (!seen.has(vk)) { seen.add(vk); nodes.push({ x: p.x, y: p.y, width: VEIN_TERTIARY }); }
     }
   }
   return { veins, nodes };
+}
+
+// Round a shared wall graph into smooth cells. Walls are subdivided and the
+// whole network is Laplacian-smoothed; vertices on the petal boundary are
+// pinned (cells stay inside the rim) and every pass is mirrored across the axis
+// so bilateral symmetry is exact. Returns one smoothed polyline per wall, all
+// sharing their junction endpoints so the mesh stays connected.
+function roundGraph(walls, sil, softness) {
+  const rk = (v) => Math.round(v * 8000) / 8000;
+  const key = (p) => rk(p.x) + ',' + rk(p.y);
+  const verts = [];
+  const idx = new Map();
+  const getV = (p) => {
+    const k = key(p); let i = idx.get(k);
+    if (i === undefined) { i = verts.length; verts.push({ x: p.x, y: p.y }); idx.set(k, i); }
+    return i;
+  };
+  const segs = walls.map((w) => [getV(w.a), getV(w.b)]);
+  const nV = verts.length;
+
+  const S = 4;                               // subdivisions per wall
+  const pts = verts.map((v) => ({ x: v.x, y: v.y }));
+  const pinned = new Array(nV).fill(false);
+  for (let i = 0; i < nV; i++) if (distToPolyBoundary(verts[i].x, verts[i].y, sil) < 0.03) pinned[i] = true;
+
+  const chains = [];
+  for (const [a, b] of segs) {
+    const chain = [a];
+    for (let s = 1; s < S; s++) {
+      const t = s / S, i = pts.length;
+      pts.push({ x: lerp(verts[a].x, verts[b].x, t), y: lerp(verts[a].y, verts[b].y, t) });
+      chain.push(i);
+    }
+    chain.push(b);
+    chains.push(chain);
+  }
+  const nP = pts.length;
+  const isPinned = (i) => i < nV && pinned[i];
+
+  const nbr = Array.from({ length: nP }, () => []);
+  for (const chain of chains) for (let i = 0; i < chain.length - 1; i++) { nbr[chain[i]].push(chain[i + 1]); nbr[chain[i + 1]].push(chain[i]); }
+
+  // fixed mirror pairing from the (exactly symmetric) starting positions
+  const pos = new Map();
+  for (let i = 0; i < nP; i++) pos.set(key(pts[i]), i);
+  const mate = new Array(nP).fill(-1);
+  for (let i = 0; i < nP; i++) { const j = pos.get(rk(pts[i].x) + ',' + rk(-pts[i].y)); if (j !== undefined) mate[i] = j; }
+
+  const iters = Math.max(1, Math.round(lerp(1, 7, softness)));
+  const wgt = 0.5;
+  for (let it = 0; it < iters; it++) {
+    const nx = new Array(nP), ny = new Array(nP);
+    for (let i = 0; i < nP; i++) {
+      if (isPinned(i) || nbr[i].length === 0) { nx[i] = pts[i].x; ny[i] = pts[i].y; continue; }
+      let sx = 0, sy = 0;
+      for (const j of nbr[i]) { sx += pts[j].x; sy += pts[j].y; }
+      sx /= nbr[i].length; sy /= nbr[i].length;
+      nx[i] = lerp(pts[i].x, sx, wgt); ny[i] = lerp(pts[i].y, sy, wgt);
+    }
+    for (let i = 0; i < nP; i++) { pts[i].x = nx[i]; pts[i].y = ny[i]; }
+    for (let i = 0; i < nP; i++) {                 // re-symmetrise across the axis
+      const j = mate[i];
+      if (j >= i) {
+        const ax = (pts[i].x + pts[j].x) / 2, ay = (pts[i].y - pts[j].y) / 2;
+        pts[i].x = ax; pts[i].y = ay; pts[j].x = ax; pts[j].y = -ay;
+      }
+    }
+  }
+  return chains.map((chain) => chain.map((i) => ({ x: pts[i].x, y: pts[i].y })));
+}
+
+// Distance from a point to the boundary of a polygon (min over its edges).
+function distToPolyBoundary(x, y, poly) {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const ax = poly[j].x, ay = poly[j].y, bx = poly[i].x, by = poly[i].y;
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let t = l2 > 0 ? ((x - ax) * dx + (y - ay) * dy) / l2 : 0;
+    t = clamp(t, 0, 1);
+    const cx = ax + dx * t, cy = ay + dy * t;
+    best = Math.min(best, Math.hypot(x - cx, y - cy));
+  }
+  return best;
 }
 
 // Keep the part of a polygon on the inner side of a*x + b*y + c <= 0
