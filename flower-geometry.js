@@ -345,7 +345,8 @@ function dedupePolygon(poly) {
 const VEIN_MIDRIB_BASE = 1.00;
 const VEIN_MIDRIB_TIP  = 0.42;
 const VEIN_TERTIARY    = 0.28;
-const VORONOI_BULGE    = 2.6;   // extra wall-end/junction material per unit softness
+const VORONOI_GROW     = 0.5;   // uniform wall thickening per unit softness (even struts)
+const VORONOI_FILLET   = 0.12;  // small extra at the junctions per unit softness (smooth joins)
 // relative line-weight by branch order (0 = midrib). Deeper orders are finer;
 // the last entry is the floor so very deep fractal twigs stay visible.
 const VEIN_WIDTH_BY_ORDER = [1.00, 0.56, 0.38, 0.28, 0.22, 0.18];
@@ -671,18 +672,19 @@ export function buildVoronoi(P, rng, opts = {}) {
     ? roundGraph(walls, sil, roundSoft)
     : walls.map((w) => [{ x: w.a.x, y: w.a.y }, { x: w.b.x, y: w.b.y }]);
 
-  // SOFTNESS also adds fillet MATERIAL at the junctions (independent of the tube
-  // slider): each wall swells toward its endpoints and the junction beads grow
-  // to match, so the cells read as solid rounded webbing that thickens where
-  // walls meet. The bulge scales linearly with softness (5 -> 5x the amount at
-  // 1); past 1 a rising floor also thickens the mid-wall so the whole web fills
-  // out rather than turning into bead-on-string. `rad` is a t -> weight function
-  // (multiplied by the tube radius in the render layer).
-  const bulge = softness * VORONOI_BULGE;
-  const endMul = 1 + bulge;
-  const floor = 0.4 * clamp((softness - 1) / 4, 0, 1);
-  const rad = bulge > 1e-3
-    ? (t) => VEIN_TERTIARY * (1 + bulge * (floor + (1 - floor) * (1 - Math.sin(Math.PI * t))))
+  // SOFTNESS also adds MATERIAL, thickening the web (independent of the tube
+  // slider). To keep it EVEN across the surface rather than bulbous, almost all
+  // of that material is a UNIFORM thickening of every wall; only a small fillet
+  // is concentrated at the junctions, just enough to round the joins. The
+  // junction beads track the uniform thickness (not the fillet), so nodes stay
+  // flush with the struts instead of ballooning. The uniform growth scales
+  // linearly with softness (5 -> 5x the added material of 1). `rad` is a
+  // t -> weight function (multiplied by the tube radius in the render layer).
+  const grow = softness * VORONOI_GROW;      // even, all-along thickening
+  const fillet = softness * VORONOI_FILLET;  // small junction-only fillet
+  const m = 1 + grow;
+  const rad = softness > 1e-3
+    ? (t) => VEIN_TERTIARY * (m + fillet * (1 - Math.sin(Math.PI * t)))
     : null;
 
   const veins = polylines.map((pl) => ({ points: pl, w0: VEIN_TERTIARY, w1: VEIN_TERTIARY, rad }));
@@ -691,7 +693,7 @@ export function buildVoronoi(P, rng, opts = {}) {
   for (const pl of polylines) {
     for (const p of [pl[0], pl[pl.length - 1]]) {
       const vk = rk(p.x) + ',' + rk(p.y);
-      if (!seen.has(vk)) { seen.add(vk); nodes.push({ x: p.x, y: p.y, width: VEIN_TERTIARY * endMul }); }
+      if (!seen.has(vk)) { seen.add(vk); nodes.push({ x: p.x, y: p.y, width: VEIN_TERTIARY * m }); }
     }
   }
   return { veins, nodes };
