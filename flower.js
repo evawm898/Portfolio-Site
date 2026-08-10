@@ -22,7 +22,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
   buildSpine, buildSilhouette, buildVenation, buildJaggedEdge, buildRuffledEdge,
-  mapPointToSurface, placePoint,
+  mapPointToSurface, placePoint, densifyByStep,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -325,8 +325,14 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // Veins: each is a flattened-space polyline with relative end line-weights.
   // Map its points onto the surface and extrude one smoothly-tapering tube, so
   // line weight thins from the midrib through secondary, tertiary and veinlet.
+  // When the petal is RUFFLED the whole surface buckles, so veins are first
+  // densified (in flattened space) to a spacing fine enough to ride the flutes
+  // without faceting — step scales with the flute frequency.
+  const ruffled = P.tipStyle === 'ruffled';
+  const veinStep = ruffled ? clamp(PETAL_LENGTH * 0.9 / (Math.max(1, P.tipFrequency) * 5), 0.05, 0.18) : 0;
   for (const vein of ven.veins) {
-    const world = vein.points.map(toWorld);
+    const pts = ruffled ? densifyByStep(vein.points, veinStep) : vein.points;
+    const world = pts.map(toWorld);
     // veins are thin — 6 radial sides read as round and roughly halve the
     // triangle count versus the default, which matters on deep fractals
     acc.addTube(world, [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1], 0, 6);

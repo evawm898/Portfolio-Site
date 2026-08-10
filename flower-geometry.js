@@ -187,10 +187,44 @@ export function sampleSpine(spine, u) {
    rides on this surface.
    ------------------------------------------------------------------- */
 
+// Amplitude of the RUFFLED buckle at TIP LENGTH = 1, in world units along the
+// surface normal (which is the spine normal — the same axis the cup lifts along).
+const RUFFLE_AMP_MAX = 0.55;
+
+// RUFFLED is a full-surface treatment, not an outline trick: the margin carries
+// excess length and buckles OUT of the petal plane, and that deflection reaches
+// inward across the whole lamina, fading to nothing at the stiff mid-rib. This
+// returns that out-of-plane deflection at (u, v): a wave running ALONG the
+// margin (phase from u), deepening from mid-rib to edge (radial from v), eased
+// in at the region start and out at the tip so it blends with the smooth
+// surface and never tears the apex. Because the mid-rib stays put and the edges
+// swing, the lamina flutes — exactly the differential-growth ruffle.
+function ruffleLift(u, v, P) {
+  if ((P.tipLength || 0) <= 1e-4) return 0;
+  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
+  // Finer ruffles ride shallower: amplitude eases down with frequency so many
+  // flutes read as fine fabric texture, not a row of tall spikes (broad ruffles
+  // still stand proud). TIP LENGTH remains the dominant amplitude control.
+  const amp = (P.tipLength || 0) * RUFFLE_AMP_MAX * clamp(Math.pow(5 / freq, 0.4), 0.42, 1.3);
+  const { uStart } = tipRegionRange(P);
+  const uTip = 0.985;
+  if (u <= uStart || u >= uTip) return 0;
+  const p = (u - uStart) / (uTip - uStart);          // 0 at region start -> 1 near the tip
+  const RAMP = 0.14;
+  const envU = smootherstep(p / RAMP) * smootherstep((1 - p) / RAMP);
+  if (envU <= 1e-6) return 0;
+  const radial = smootherstep(Math.abs(v));           // mid-rib still -> edge swings full (eased both ends)
+  const k = lerp(1, 3, clamp(P.tip != null ? P.tip : 0.5, 0, 1));  // TIP SHAPE: sine -> gathered crest
+  const s = Math.sin(Math.PI * 2 * freq * p);
+  const wave = Math.sign(s) * Math.pow(Math.abs(s), k);
+  return amp * envU * radial * wave;
+}
+
 export function surfacePoint(u, v, P, spine) {
   const sp = sampleSpine(spine, u);
   const hw = petalHalfWidth(u, P);
-  const lift = P.cup * hw * v * v;   // 0 at mid-rib, max at edges
+  let lift = P.cup * hw * v * v;   // parabolic cup: 0 at mid-rib, max at edges
+  if (P.tipStyle === 'ruffled') lift += ruffleLift(u, v, P);   // + full-surface ruffle buckle
   return {
     x: sp.s + sp.nx * lift,
     y: sp.y + sp.ny * lift,
@@ -368,6 +402,20 @@ function polyLen(pts) {
   for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   return L;
 }
+// Insert evenly-spaced points along a flattened polyline (endpoints preserved)
+// so it can ride a high-frequency surface — the ruffle buckle — without
+// faceting. `step` is the target spacing in flattened (X, Y) units.
+export function densifyByStep(pts, step) {
+  if (pts.length < 2 || step <= 0) return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const segs = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
+    for (let k = 1; k <= segs; k++) out.push({ x: lerp(a.x, b.x, k / segs), y: lerp(a.y, b.y, k / segs) });
+  }
+  return out;
+}
+
 // Round the corners of a vein by `softness` in [0,1]: 0 -> crisp branch angles,
 // 1 -> fully Chaikin-smoothed arcs, in between a continuous blend of the two.
 // Every vein is resampled to an arc-length-proportional, capped point count, so
@@ -734,78 +782,41 @@ export function buildJaggedEdge(P, spine, rng) {
   return { rim, teethVeins };
 }
 
-const RUFFLE_AMP_MAX = 0.40;   // world amplitude of the ruffle at TIP LENGTH = 1
-
 /* -------------------------------------------------------------------
-   RUFFLED tip: a smooth sinusoidal wave running along the tip end of the
-   margin. Unlike JAGGED it makes no points — the outline rolls in and out in
-   one continuous curve. Same shared controls, remapped:
-     TIP SHAPE     -> wave profile: soft sine (0) -> tight gathered crest (1)
-     TIP FREQUENCY -> full oscillations along each side of the ruffled span
+   RUFFLED tip: a FULL-surface edge treatment, not an outline trick. The
+   buckle itself lives in surfacePoint (ruffleLift), so the whole lamina —
+   every vein and the margin alike — waves out of plane, strongest at the
+   edge and fading to the mid-rib, exactly like differential growth on a thin
+   sheet. This function only supplies the RIM: a densely-sampled smooth
+   outline which, mapped through the now-buckling surfacePoint, traces the
+   fluted margin. Shared controls, remapped:
+     TIP SHAPE     -> buckle profile: soft sine (0) -> tight gathered crest (1)
+     TIP FREQUENCY -> flutes along the margin
      TIP REGION    -> how far the ruffle reaches from the apex down the edge
-     TIP LENGTH    -> amplitude (how far the edge departs in/out from the base)
-   The displacement rides the CUP-FREE outward normal (as the teeth do), so a
-   ruffle on a tilted / cupped petal reads as surface detail, not a flat outline.
-   Veins are untouched, so they stay inside the core (un-ruffled) boundary.
+     TIP LENGTH    -> amplitude of the out-of-plane buckle
    Returns { rim, teethVeins: [] } or null when the style/amplitude is off.
    ------------------------------------------------------------------- */
 export function buildRuffledEdge(P, spine /* , rng */) {
   if (P.tipStyle !== 'ruffled') return null;
-  const amp = (P.tipLength || 0) * RUFFLE_AMP_MAX;
-  if (amp <= 1e-4) return null;
-  const TWO_PI = Math.PI * 2;
-  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);   // oscillations per side
-  const crest = clamp(P.tip != null ? P.tip : 0.5, 0, 1);       // TIP SHAPE
+  if ((P.tipLength || 0) * RUFFLE_AMP_MAX <= 1e-4) return null;
+  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
   const { uStart } = tipRegionRange(P);
-  const Pflat = { ...P, cup: 0 };
-
-  // Along-edge profile. p in [0,1] runs the region start -> tip; the SAME p(u)
-  // drives both sides, so the ruffle mirrors across the midline. sign(sin)|sin|^k
-  // keeps smooth zero-crossings (no corners) while raising k pinches the crests
-  // into tight, gathered folds with flatter spans between — "gathered fabric".
-  const k = lerp(1, 3, crest);
-  const wave = (p) => {
-    const s = Math.sin(TWO_PI * freq * p);
-    return Math.sign(s) * Math.pow(Math.abs(s), k);
-  };
-  // Amplitude window: eases in from the smooth edge at the region start and back
-  // to zero at the tip, so the ruffle blends at both ends and the apex stays a
-  // single clean point (two sides can't pull one point in two directions).
-  const RAMP = 0.16;
-  const env = (p) => smootherstep(p / RAMP) * smootherstep((1 - p) / RAMP);
-
-  const uTip = 0.992;                 // ruffle fades out here; smooth cap crosses the tip
-  const span = Math.max(1e-4, uTip - uStart);
-
-  const rufflePoint = (u, s) => {
-    const base = surfacePoint(clamp(u, 0, 0.9995), s, P, spine);
-    const p = (u - uStart) / span;
-    const e = env(p);
-    if (e <= 1e-5) return base;
-    const { out } = edgeOutward(u, s, Pflat, spine);   // cup-free: rides the broad plane
-    const d = amp * e * wave(p);
-    return { x: base.x + out.x * d, y: base.y + out.y * d, z: base.z + out.z * d };
-  };
+  const uBase = 0.004, uApex = 0.9995;
+  const nRuffle = clamp(Math.round(freq * 16) + 96, 180, 460);   // dense enough to trace the buckled margin
+  const nSmooth = 48;
 
   const rim = [];
-  const uBase = 0.004;
-  const nSmooth = 64;
-  const nRuffle = clamp(Math.round(freq * 16) + 72, 150, 400);   // dense enough for smooth waves
-  const smoothTo = (from, to, s) => {
-    const steps = Math.max(1, Math.round(Math.abs(to - from) * nSmooth));
-    for (let i = 1; i <= steps; i++) rim.push(surfacePoint(clamp(lerp(from, to, i / steps), 0, 0.9995), s, P, spine));
+  const sampleTo = (from, to, s, n) => {
+    for (let i = 1; i <= n; i++) rim.push(surfacePoint(clamp(lerp(from, to, i / n), 0, uApex), s, P, spine));
   };
-  const ruffleTo = (from, to, s) => {
-    for (let i = 1; i <= nRuffle; i++) rim.push(rufflePoint(lerp(from, to, i / nRuffle), s));
-  };
+  const belowSteps = Math.max(2, Math.round((uStart - uBase) * nSmooth));
 
   rim.push(surfacePoint(uBase, 1, P, spine));
-  smoothTo(uBase, uStart, 1);         // smooth base -> region start (+Y)
-  ruffleTo(uStart, uTip, 1);          // ruffled +Y edge up toward the tip
-  smoothTo(uTip, 0.9995, 1);          // smooth cap: +Y edge converging on the apex
-  smoothTo(0.9995, uTip, -1);         // ...and back down onto the -Y side
-  ruffleTo(uTip, uStart, -1);         // ruffled -Y edge back down to the region start
-  smoothTo(uStart, uBase, -1);        // smooth region start -> base (-Y)
+  sampleTo(uBase, uStart, 1, belowSteps);   // smooth margin below the region (+Y)
+  sampleTo(uStart, uApex, 1, nRuffle);       // ruffled +Y margin up to the apex
+  rim.push(surfacePoint(uApex, 0, P, spine)); // the apex point itself
+  sampleTo(uApex, uStart, -1, nRuffle);      // ruffled -Y margin back down
+  sampleTo(uStart, uBase, -1, belowSteps);   // smooth margin below the region (-Y)
 
-  return { rim, teethVeins: [] };     // veins stay inside the core boundary
+  return { rim, teethVeins: [] };            // no extra veins; the real veins ride the buckle
 }
