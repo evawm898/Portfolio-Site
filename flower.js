@@ -221,37 +221,45 @@ class MeshAccumulator {
 
   /* A sealed slab lofted between two matched rings (a cell's outer boundary and
      its inner round hole). Each ring point carries a world position `p` and the
-     surface normal `n`. Instead of squaring the sheet off with vertical walls, the
-     edge is FILLETED: every rim point expands into a small cross-section profile
-     that curves from the flat top face, around a rounded bullnose, down to the
-     bottom face. Those rim vertices get blended normals (surface-normal -> outward
-     -> -surface-normal), so light rolls smoothly across the edge with no hard
-     crease — the struts read like the rounded vein tubes rather than flat chips.
-     The result is still a solid, watertight perforated tile: top face, bottom
-     face, and the two rounded rims fully enclose it. */
+     surface normal `n`.
+
+     Only the HOLE edge is a true free edge, so only it is FILLETED: every hole-rim
+     point expands into a small cross-section that curves from the flat top face,
+     around a rounded bullnose, down to the bottom face, with blended normals
+     (surface-normal -> inward -> -surface-normal) so light rolls smoothly across it
+     — the soft, tube-like roll the vein cylinders have.
+
+     The CELL edge is left square (top/bottom at full ±half-thickness). Adjacent
+     cells subdivide their shared edge identically, so their square top faces meet
+     flush at full height and read as one continuous surface. Rounding it too (a
+     bulge per cell) made each cell's surface dip to mid-height at the shared edge,
+     leaving a groove down the middle of every strut — the "line between the bulges".
+     Keeping it square removes that line. The tile stays solid and watertight: top
+     face, bottom face, the rounded hole rim and the flush cell wall enclose it. */
   addSlab(outer, inner, thick) {
     const N = outer.length;
     if (N < 3 || inner.length !== N) return;
     const H = thick * 0.5;
 
-    // Cross-section samples, from the top face (+90°) round the outward bulge
-    // (0°) to the bottom face (-90°). The 0° pair repeats so that, when the
-    // fillet is smaller than the half-thickness, the straight wall between the
-    // two fillets is preserved (the "wall" the loft meets).
+    // Hole-rim cross-section samples, from the top face (+90°) round the inward
+    // bulge (0°) to the bottom face (-90°). The 0° pair repeats so that, when the
+    // fillet is smaller than the half-thickness, the straight wall between the two
+    // fillets is preserved (the wall the loft meets).
     const PHI = [Math.PI / 2, Math.PI / 4, 0, 0, -Math.PI / 4, -Math.PI / 2];
-    const M = PHI.length, TOP = 0, BOT = M - 1;
+    const MH = PHI.length, TOP = 0, BOT = MH - 1;
+    // Cell-wall samples (fewer — this wall stays flat, only its shading rounds).
+    const PHO = [Math.PI / 2, Math.PI / 6, -Math.PI / 6, -Math.PI / 2];
+    const MO = PHO.length;
 
-    // Build one rim point's rounded profile column and return its M vertex indices.
-    // (p) mid-surface point, (n) surface normal, (e*) unit in-plane direction that
-    // points away from the tile body (outward for the cell edge, into the hole for
-    // the hole edge), (r) fillet radius.
-    const column = (p, n, ex, ey, ez, r) => {
-      const col = new Array(M), Hr = H - r;
-      for (let m = 0; m < M; m++) {
+    // Rounded profile column for the free hole edge: (p) rim point, (n) surface
+    // normal, (e*) unit in-plane direction pointing into the hole, (r) fillet radius.
+    const holeColumn = (p, n, ex, ey, ez, r) => {
+      const col = new Array(MH), Hr = H - r;
+      for (let m = 0; m < MH; m++) {
         const s = Math.sin(PHI[m]), c = Math.cos(PHI[m]);
         const cn = PHI[m] >= 0 ? Hr : -Hr;     // arc centre offset along the normal
         const ne = cn + r * s;                 // offset along surface normal
-        const ee = -r + r * c;                 // offset along e (<=0: inset from the edge)
+        const ee = -r + r * c;                 // offset along e (<=0: inset from the hole)
         const nx = n.x * s + ex * c, ny = n.y * s + ey * c, nz = n.z * s + ez * c;
         col[m] = this._vertex(
           p.x + n.x * ne + ex * ee, p.y + n.y * ne + ey * ee, p.z + n.z * ne + ez * ee,
@@ -260,31 +268,49 @@ class MeshAccumulator {
       return col;
     };
 
+    // Cell-edge wall column. Geometrically it is a straight drop at the boundary
+    // (no outward inset), so two neighbouring tiles that share an edge meet flush
+    // and read as one surface — no groove down the strut. But the normals sweep
+    // surface-normal -> outward -> -surface-normal, so where the wall IS exposed
+    // (only the petal's outer rim, which has no neighbour to hide it) it shades
+    // like a soft rounded bead instead of a hard, comb-like edge.
+    const wallColumn = (p, n, ex, ey, ez) => {
+      const col = new Array(MO);
+      for (let m = 0; m < MO; m++) {
+        const s = Math.sin(PHO[m]), c = Math.cos(PHO[m]);
+        const ne = H * s;                      // full ±half-thickness, no outward offset
+        col[m] = this._vertex(
+          p.x + n.x * ne, p.y + n.y * ne, p.z + n.z * ne,
+          n.x * s + ex * c, n.y * s + ey * c, n.z * s + ez * c);
+      }
+      return col;
+    };
+
     const colO = new Array(N), colI = new Array(N);
     for (let k = 0; k < N; k++) {
       const o = outer[k], i = inner[k];
       // Radial (outward) direction from the matched inner/outer pair — they sit on
-      // the same ray from the cell centre — projected into each rim's tangent plane.
+      // the same ray from the cell centre.
       const rx = o.p.x - i.p.x, ry = o.p.y - i.p.y, rz = o.p.z - i.p.z;
       const W = Math.hypot(rx, ry, rz) || 1e-3;
-      const r = Math.min(H, 0.45 * W) * SLAB_FILLET;      // fillet radius (kept < half the strut)
-      const eo = projPerpUnit(rx, ry, rz, o.n);           // cell edge: bulge outward
-      const ei = projPerpUnit(-rx, -ry, -rz, i.n);        // hole edge: bulge into the hole
-      colO[k] = column(o.p, o.n,  eo[0], eo[1], eo[2], r);
-      colI[k] = column(i.p, i.n,  ei[0], ei[1], ei[2], r);
+      const r = Math.min(H, 0.45 * W) * SLAB_FILLET;      // hole fillet (kept < the strut width)
+      const eo = projPerpUnit(rx, ry, rz, o.n);           // outward (petal rim shades round)
+      const ei = projPerpUnit(-rx, -ry, -rz, i.n);        // into the hole
+      colO[k] = wallColumn(o.p, o.n, eo[0], eo[1], eo[2]);
+      colI[k] = holeColumn(i.p, i.n, ei[0], ei[1], ei[2], r);
     }
 
     for (let k = 0; k < N; k++) {
       const k1 = (k + 1) % N;
       const O = colO[k], O1 = colO[k1], I = colI[k], I1 = colI[k1];
-      for (let m = 0; m < M - 1; m++) {
-        // outer rim (faces outward)
-        this.idx.push(O[m], O1[m + 1], O1[m],   O[m], O[m + 1], O1[m + 1]);
-        // inner rim (faces into the hole)
-        this.idx.push(I[m], I1[m], I1[m + 1],   I[m], I1[m + 1], I[m + 1]);
+      for (let m = 0; m < MO - 1; m++) {
+        this.idx.push(O[m], O1[m + 1], O1[m],   O[m], O[m + 1], O1[m + 1]);   // cell wall (faces outward)
       }
-      this.idx.push(O[TOP], O1[TOP], I1[TOP],  O[TOP], I1[TOP], I[TOP]);   // top face (outer -> hole)
-      this.idx.push(O[BOT], I1[BOT], O1[BOT],  O[BOT], I[BOT], I1[BOT]);   // bottom face (reversed)
+      for (let m = 0; m < MH - 1; m++) {
+        this.idx.push(I[m], I1[m], I1[m + 1],   I[m], I1[m + 1], I[m + 1]);   // rounded hole rim
+      }
+      this.idx.push(O[0], O1[0], I1[TOP],   O[0], I1[TOP], I[TOP]);              // top face (cell edge -> hole)
+      this.idx.push(O[MO - 1], I1[BOT], O1[MO - 1],   O[MO - 1], I[BOT], I1[BOT]); // bottom face (reversed)
     }
   }
 
