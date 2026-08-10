@@ -653,16 +653,25 @@ export function buildStrands(P, opts = {}) {
   const veins = [];
   const nodes = [];
 
+  // The smallest |q| in the set: 0 when the count is odd (a strand up the axis),
+  // else the innermost off-axis position. Endpoints are mapped so this innermost
+  // strand lands on the tip, so the apex is always reached at any count.
+  const aqMin = (count % 2 === 1) ? 0 : 1 / (count - 1);
+
   for (let j = 0; j < count; j++) {
-    const q = count > 1 ? -1 + (2 * j) / (count - 1) : 0;   // signed fan position [-1,1], 0 = tip
+    const q = count > 1 ? -1 + (2 * j) / (count - 1) : 0;   // signed fan position [-1,1], 0 = apex
     const aq = Math.abs(q);
     const side = Math.sign(q);                             // +1 / -1 margin; 0 = straight up the axis
-    const uE = edgeUAt(1 - aq);                             // aq=0 -> tip, aq=1 -> near base
+    const frac = clamp(1 - (aq - aqMin) / (1 - aqMin), 0, 1);  // innermost -> tip(1), outer -> base(0)
+    const uE = edgeUAt(frac);
     const E = { x: L * uE, y: side * hw(uE) };             // axis strand (side 0) ends on the axis
     const dx = E.x - O.x, dy = E.y - O.y;
     const len = Math.hypot(dx, dy) || 1;
     const px = -dy / len, py = dx / len;                    // unit perpendicular
-    const bowMag = curvature * 0.20 * len * Math.sign(q);   // outward bow (0 on the axis strand)
+    // Outward bow, but faded to nothing for the near-axis strands (sin(pi*aq) is
+    // 0 at aq=0) so they run straight to the apex instead of curving away and
+    // leaving a bald wedge; the mid-fan strands carry the organic bow.
+    const bowMag = curvature * 0.24 * len * Math.sign(q) * Math.sin(Math.PI * aq);
 
     const pts = new Array(nS + 1);
     const rads = new Array(nS + 1);
