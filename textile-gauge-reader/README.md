@@ -657,47 +657,82 @@ and the original, evidence-selected period is kept as-is. Covered by
 position lists, plus a real-photo regression test against this exact
 jersey crop) — 148/148 tests passing after the fix, no regressions.
 
-**The teal photo's own doubling, more precisely diagnosed, still open.**
-Direct measurement against the real file (ruler-calibrated at 272.8px/
-inch from the numeral labels, cross-checked with a clean autocorrelation
-+ peak count across the full accessible fabric area: 26 peaks, only
-1.86px standard deviation on a 38.76px mean spacing) puts this fabric's
-true wale spacing at **~7.04 wales/inch**. Two distinct, narrower
-findings against that ground truth, from the exact same real file:
+**The teal photo's own doubling — first mis-measured, then actually
+fixed for one of its two causes.** An initial direct measurement against
+the real file (ruler-calibrated at 272.8px/inch from the numeral labels)
+used a clean autocorrelation + peak count across the full accessible
+fabric area — 26 peaks, only 1.86px standard deviation on a 38.76px mean
+spacing — and concluded the true wale spacing was ~7.04 wales/inch.
+**That number was itself wrong**, in exactly the way this whole section
+is about: this specific yarn has a real, genuinely periodic sub-column
+texture (most likely ply twist) at close to double the true stitch
+frequency, clean and low-noise enough to fool a careful direct pixel
+measurement, not just the detector. The person who took the photo
+hand-counted it directly: **4 wales/inch, 5 courses/inch** — the actual
+ground truth used below, not the earlier self-measured one.
 
-1. On a large, single-region crop, raw evidence-scoring for the 1x
-   (38px, correct) vs. 2x (76px, wrong) candidates came out to 0.499 vs.
-   0.543 — a 0.044 margin, under the system's own `UNCERTAIN_SCORE_
-   MARGIN` (0.08), so the pipeline DOES correctly self-flag this as
-   uncertain ("Competing 1x candidate scored nearly as well"). The
-   candidate that wins the tie is real: `phase_consistency`, deliberately
-   the highest-weighted evidence term (0.35, "gets to matter the most"),
-   scores the WRONG 2x candidate higher than the correct 1x candidate on
-   this fabric (0.59 vs. 0.32) — backwards from its intent. Meanwhile
-   `patch_consensus` (deliberately down-weighted to 0.10 after an
-   *earlier* real photo showed it wasn't independent enough to trust)
-   correctly favors the true 1x candidate here (0.941 vs. 0.442). Two
-   real photos now each have a different one of these two signals
-   pointing the wrong way — evidence a single fixed weighting can't
-   simultaneously satisfy both, not a bug in either signal alone.
-2. Through the live multi-region flow, wale for this photo actually
-   comes from Stage 3's loop-lattice counted-column path (both proposed
-   regions had a confident enough count), not the raw-periodicity path
-   above at all — so finding 1 doesn't even directly explain what a user
-   sees. The two regions' *counted* values agreed closely enough to pass
-   cross-region consensus ("2 of 2 agreed"), landing on 8.27 WPI —
-   moderately (not 2x) high against the ~7.04 true value. That the
-   counting path can independently converge two regions on the same
-   moderately-wrong number, past a consensus check specifically meant to
-   catch disagreement, is a real, different failure shape from the
-   already-documented "both detectors double together" case above, and
-   is not yet root-caused.
+Checked against that real number, two distinct, separately-diagnosed
+bugs were driving the doubling, not one:
 
-Both of these remain open. Fixing them safely needs the same discipline
-already applied throughout this project — testing candidate weight/logic
-changes against every real photo fixture that exists before trusting a
-result, not just the one photo that motivated the change — which is real
-work still ahead, not a quick tuning pass.
+1. **Fixed and verified.** Raw periodicity candidate scoring for wale
+   was a genuine, position-dependent coin-flip at the ~1.25in window
+   size this photo's usable fabric area forces the multi-region proposal
+   down to: four independent windows across the same clean fabric gave
+   WPI ratios-to-truth of 0.59, 1.11, 0.56, 1.17 — alternating between
+   the true period and its half-period harmonic purely by where the
+   window landed. The mechanism, found directly in the real candidate
+   scoring breakdown: `patch_consensus` favored the WRONG (half-period)
+   candidate in every case checked, often by a wide margin (e.g.
+   0.94–0.96 vs. 0.43–0.44) — the exact "sub-region patches aren't
+   independent, they can all inherit the same wrong lock-on together"
+   failure its weight was already reduced once before to guard against
+   (see the multi-region section above), just not far enough.
+   `phase_consistency` favored the CORRECT candidate in every case
+   checked, including on the jersey photo it already worked for. Fixed
+   by reducing `patch_consensus` again (0.10 → 0.03) and moving the
+   freed weight into `phase_consistency` (0.35 → 0.42, keeping the
+   positive terms summing to 1.0) — verified this fixes all 4 small-
+   window positions plus the full large-crop case on the teal photo,
+   *without* changing the already-correct jersey result. Covered by
+   `tests/test_wale_scoring_weights.py`, including a test that pins down
+   the exact mechanism (`patch_consensus` favoring the wrong candidate,
+   `phase_consistency` favoring the right one), not just the end-to-end
+   number.
+2. **Found, attempted, and honestly still open.** Through the live
+   multi-region flow, wale for this photo doesn't actually use the path
+   above at all — it comes from Stage 3's loop-lattice counted-column
+   path, which both proposed regions were confident enough to trigger.
+   That path picks its own wale scale independently (direct V-shape
+   detection at each of the same 0.5x/1x/2x candidate scales, chosen by
+   `lattice_consistency` — spacing regularity between accepted columns),
+   and has the *same* underlying vulnerability as finding 1, just via a
+   different mechanism: on this yarn, `lattice_consistency` can be
+   genuinely higher at the wrong scale (0.909 at the wrong 37px vs. 0.898
+   at the correct 74px, on the exact region the live proposal picked) for
+   the identical reason — the wrong-frequency texture really is that
+   regular, `lattice_consistency` has no way to know it isn't the stitch
+   structure. Blending `phase_consistency` into this selection too (the
+   obvious next move, given finding 1) was implemented and DID improve
+   the teal photo — 2 of 6 tested positions correct beforehand, 4 of 6
+   after — but verified directly against the real jersey fixture, it
+   regressed two previously-correct positions to a badly wrong
+   quarter-period lock-on (ratio ~0.26 instead of ~1.0): `phase_
+   consistency` isn't reliable at the very fine scales jersey's own
+   candidate search can explore (tiny ~9px patches, too small for
+   `_phase_consistency_evidence`'s extracted patches to carry real
+   signal) the way it is in the range periodicity scoring works with.
+   **Reverted rather than shipped with a known regression** — the module
+   comment above the scale-selection loop in
+   `analyze_loop_lattice_experiment` documents this attempt and why it
+   was undone, so it isn't silently retried later without the same
+   real-jersey check catching it again. The live teal-photo wale result
+   is consequently still wrong today (8.27 WPI vs. the true 4) — this
+   is a real, disclosed, unsolved limitation, not something this section
+   is claiming to have fixed.
+
+Fixing the loop-lattice path safely needs its own targeted evidence — not
+a copy of finding 1's fix, which was checked here and shown not to
+generalize — and is real work still ahead.
 
 ### Image viewer pan/zoom
 

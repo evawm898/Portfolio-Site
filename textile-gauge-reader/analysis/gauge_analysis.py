@@ -166,16 +166,30 @@ class ScoringWeights:
     autocorr: float = 0.12              # 1D autocorrelation strength at this exact lag
     support_2d: float = 0.12            # 2D autocorrelation support at this lag (see _sample_2d_support)
     structural: float = 0.20            # fold-consistency (wale) + loop-center pitch agreement
-    # Deliberately reduced from earlier v0.3 tuning: real-photo diagnostics
-    # (see gauge_analysis module docstring / phase-consistency work) showed
-    # patch consensus is NOT as independent as it looks -- each sub-region
-    # band runs its own 1D autocorrelation, seeded from the same texture,
-    # and can inherit the identical half-period lock-on in every patch at
-    # once (the same "independent evidence that isn't fully independent"
+    # Reduced twice now, both times from real-photo diagnostics, both
+    # times for the same underlying reason: each sub-region band runs its
+    # own 1D autocorrelation, seeded from the same texture, and can
+    # inherit the identical half-period lock-on in every patch at once
+    # (the same "independent evidence that isn't fully independent"
     # failure mode already documented for loop-center-detection scale).
     # Sub-regions agreeing with each other is corroborating evidence, not
-    # proof of structural correctness.
-    patch_consensus: float = 0.10       # agreement with independent overlapping sub-region estimates
+    # proof of structural correctness. The second reduction has direct
+    # ground-truth confirmation, not just a plausibility argument: on a
+    # real hand-counted swatch (tests/fixtures/sarahmaker-knitting-gauge.
+    # jpg, 4 true wales/in), patch_consensus favored the wrong (half-
+    # period) wale candidate over the correct one in every single window
+    # position tested -- large crop and four small ones alike -- typically
+    # by a wide margin (e.g. 0.94-0.96 for the wrong candidate vs.
+    # 0.43-0.44 for the right one). At its old weight (0.10) that was
+    # sometimes enough to flip an otherwise-correct pick into a coin-flip
+    # against phase_consistency, since real evidence-score margins
+    # between the true period and its half-period harmonic are often only
+    # a few hundredths. Left small rather than zeroed: it still helps
+    # correctly on the jersey fixture (favors the true period there,
+    # 0.469 vs. 0.284, just never needed to be decisive), and one more
+    # real photo isn't a large enough sample to conclude it's *never*
+    # useful, only that it can't be trusted to swing a close call.
+    patch_consensus: float = 0.03       # agreement with independent overlapping sub-region estimates
     regularity: float = 0.08            # spacing consistency of the positions this candidate implies
     repeat_count: float = 0.03          # reward seeing enough repeats in the ROI to trust a periodicity claim
     # Does every repeat land on the SAME kind of textile feature (a true
@@ -189,8 +203,14 @@ class ScoringWeights:
     # consistency is grounded in the actual local image content at each
     # candidate's own marker positions and directly tests the thing a
     # wale/course repeat is actually DEFINED as (see the module
-    # docstring), so it gets to matter the most.
-    phase_consistency: float = 0.35
+    # docstring), so it gets to matter the most. Raised again (0.35 ->
+    # 0.42, absorbing patch_consensus's second reduction so the weights
+    # still sum to 1.0) after it turned out to be the one signal that
+    # discriminated correctly in EVERY real-photo case checked above --
+    # large crop and small, jersey and teal alike -- including several
+    # where every other positive term either disagreed or was too weak to
+    # matter.
+    phase_consistency: float = 0.42
     harmonic_penalty_weight: float = 0.30    # subtracted: how ambiguous this candidate is vs. a 0.5x/2x relative
     # subtracted: how much repeat markers alternate between two distinct
     # visual phases (A B A B ...) instead of repeating the same one --
@@ -2432,6 +2452,23 @@ def analyze_loop_lattice_experiment(
     if not candidate_scales:
         candidate_scales = [p0_wale]
 
+    # An earlier version of this loop tried blending in phase_consistency
+    # here too (the same signal that fixed this exact wale/half-wale
+    # ambiguity for periodicity-based candidate scoring -- see
+    # ScoringWeights.phase_consistency), on the strength of it correctly
+    # picking the true scale on a real ground-truth-verified photo
+    # (tests/fixtures/sarahmaker-knitting-gauge.jpg) where lattice_
+    # consistency alone picked the wrong one. Reverted: verified directly
+    # against the real jersey fixture, it regressed two previously-
+    # correct positions to a badly wrong quarter-period lock-on (ratio
+    # ~0.26 instead of ~1.0) -- phase_consistency isn't reliable at the
+    # very fine scales this search can explore (tiny ~9px patches, well
+    # under a size where _phase_consistency_evidence's extracted patches
+    # carry real signal) the way it is in the 0.5x/1x/2x range periodicity
+    # scoring works with. Fixing that safely needs its own targeted,
+    # verified work, not a copy-paste of a fix that only checked one
+    # fixture -- left as a documented, real, NOT-yet-fixed limitation
+    # (see README) rather than shipped with a known regression.
     best: Optional[LoopLatticeResult] = None
     for scale in candidate_scales:
         lattice = _build_row_banded_lattice(gx, gy, rows_local, scale, work_gray.shape)
