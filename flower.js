@@ -62,6 +62,7 @@ const EVEN_MAX       = 4;      // at/below this petal count, arrange petals as a
                                // spiral, so 3 or 4 petals sit evenly spaced from each other
 const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom radius
 const SLAB_THICK     = 3.2;    // Voronoi sheet thickness, as a multiple of the tube radius
+const SLAB_FILLET    = 1.0;    // rounded-edge radius as a fraction of half-thickness (1 = full bullnose)
 
 
 /* ===================================================================
@@ -220,27 +221,70 @@ class MeshAccumulator {
 
   /* A sealed slab lofted between two matched rings (a cell's outer boundary and
      its inner round hole). Each ring point carries a world position `p` and the
-     surface normal `n`; the slab is offset ±half the thickness along the normal
-     for a top and a bottom face, and the hole rim and outer rim close the sides
-     — so each cell is a solid, watertight perforated tile. */
+     surface normal `n`. Instead of squaring the sheet off with vertical walls, the
+     edge is FILLETED: every rim point expands into a small cross-section profile
+     that curves from the flat top face, around a rounded bullnose, down to the
+     bottom face. Those rim vertices get blended normals (surface-normal -> outward
+     -> -surface-normal), so light rolls smoothly across the edge with no hard
+     crease — the struts read like the rounded vein tubes rather than flat chips.
+     The result is still a solid, watertight perforated tile: top face, bottom
+     face, and the two rounded rims fully enclose it. */
   addSlab(outer, inner, thick) {
     const N = outer.length;
     if (N < 3 || inner.length !== N) return;
-    const half = thick * 0.5;
-    const tO = new Array(N), bO = new Array(N), tI = new Array(N), bI = new Array(N);
+    const H = thick * 0.5;
+
+    // Cross-section samples, from the top face (+90°) round the outward bulge
+    // (0°) to the bottom face (-90°). The 0° pair repeats so that, when the
+    // fillet is smaller than the half-thickness, the straight wall between the
+    // two fillets is preserved (the "wall" the loft meets).
+    const PHI = [Math.PI / 2, Math.PI / 4, 0, 0, -Math.PI / 4, -Math.PI / 2];
+    const M = PHI.length, TOP = 0, BOT = M - 1;
+
+    // Build one rim point's rounded profile column and return its M vertex indices.
+    // (p) mid-surface point, (n) surface normal, (e*) unit in-plane direction that
+    // points away from the tile body (outward for the cell edge, into the hole for
+    // the hole edge), (r) fillet radius.
+    const column = (p, n, ex, ey, ez, r) => {
+      const col = new Array(M), Hr = H - r;
+      for (let m = 0; m < M; m++) {
+        const s = Math.sin(PHI[m]), c = Math.cos(PHI[m]);
+        const cn = PHI[m] >= 0 ? Hr : -Hr;     // arc centre offset along the normal
+        const ne = cn + r * s;                 // offset along surface normal
+        const ee = -r + r * c;                 // offset along e (<=0: inset from the edge)
+        const nx = n.x * s + ex * c, ny = n.y * s + ey * c, nz = n.z * s + ez * c;
+        col[m] = this._vertex(
+          p.x + n.x * ne + ex * ee, p.y + n.y * ne + ey * ee, p.z + n.z * ne + ez * ee,
+          nx, ny, nz);
+      }
+      return col;
+    };
+
+    const colO = new Array(N), colI = new Array(N);
     for (let k = 0; k < N; k++) {
       const o = outer[k], i = inner[k];
-      tO[k] = this._vertex(o.p.x + o.n.x * half, o.p.y + o.n.y * half, o.p.z + o.n.z * half,  o.n.x,  o.n.y,  o.n.z);
-      bO[k] = this._vertex(o.p.x - o.n.x * half, o.p.y - o.n.y * half, o.p.z - o.n.z * half, -o.n.x, -o.n.y, -o.n.z);
-      tI[k] = this._vertex(i.p.x + i.n.x * half, i.p.y + i.n.y * half, i.p.z + i.n.z * half,  i.n.x,  i.n.y,  i.n.z);
-      bI[k] = this._vertex(i.p.x - i.n.x * half, i.p.y - i.n.y * half, i.p.z - i.n.z * half, -i.n.x, -i.n.y, -i.n.z);
+      // Radial (outward) direction from the matched inner/outer pair — they sit on
+      // the same ray from the cell centre — projected into each rim's tangent plane.
+      const rx = o.p.x - i.p.x, ry = o.p.y - i.p.y, rz = o.p.z - i.p.z;
+      const W = Math.hypot(rx, ry, rz) || 1e-3;
+      const r = Math.min(H, 0.45 * W) * SLAB_FILLET;      // fillet radius (kept < half the strut)
+      const eo = projPerpUnit(rx, ry, rz, o.n);           // cell edge: bulge outward
+      const ei = projPerpUnit(-rx, -ry, -rz, i.n);        // hole edge: bulge into the hole
+      colO[k] = column(o.p, o.n,  eo[0], eo[1], eo[2], r);
+      colI[k] = column(i.p, i.n,  ei[0], ei[1], ei[2], r);
     }
+
     for (let k = 0; k < N; k++) {
       const k1 = (k + 1) % N;
-      this.idx.push(tO[k], tO[k1], tI[k1],  tO[k], tI[k1], tI[k]);   // top face (outer -> hole)
-      this.idx.push(bO[k], bI[k1], bO[k1],  bO[k], bI[k], bI[k1]);   // bottom face (reversed)
-      this.idx.push(tI[k], tI[k1], bI[k1],  tI[k], bI[k1], bI[k]);   // inner rim (hole wall)
-      this.idx.push(tO[k], bO[k1], tO[k1],  tO[k], bO[k], bO[k1]);   // outer rim (cell edge)
+      const O = colO[k], O1 = colO[k1], I = colI[k], I1 = colI[k1];
+      for (let m = 0; m < M - 1; m++) {
+        // outer rim (faces outward)
+        this.idx.push(O[m], O1[m + 1], O1[m],   O[m], O[m + 1], O1[m + 1]);
+        // inner rim (faces into the hole)
+        this.idx.push(I[m], I1[m], I1[m + 1],   I[m], I1[m + 1], I[m + 1]);
+      }
+      this.idx.push(O[TOP], O1[TOP], I1[TOP],  O[TOP], I1[TOP], I[TOP]);   // top face (outer -> hole)
+      this.idx.push(O[BOT], I1[BOT], O1[BOT],  O[BOT], I[BOT], I1[BOT]);   // bottom face (reversed)
     }
   }
 
@@ -253,6 +297,17 @@ class MeshAccumulator {
     g.computeBoundingSphere();
     return g;
   }
+}
+
+// Component of (vx,vy,vz) perpendicular to unit normal n, returned as a unit
+// vector — the in-plane direction used to sweep a filleted rim. Falls back to any
+// perpendicular of n if the input is (near-)parallel to n.
+function projPerpUnit(vx, vy, vz, n) {
+  const d = vx * n.x + vy * n.y + vz * n.z;
+  let px = vx - d * n.x, py = vy - d * n.y, pz = vz - d * n.z;
+  let l = Math.hypot(px, py, pz);
+  if (l < 1e-6) { const p = perpendicular([n.x, n.y, n.z]); return p; }
+  return [px / l, py / l, pz / l];
 }
 
 // smallest-component axis gives a stable perpendicular to t
