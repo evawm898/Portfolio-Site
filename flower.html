@@ -252,10 +252,11 @@
           <select class="fl-select" id="infillType">
             <option value="veins">VEINS</option>
             <option value="voronoi">VORONOI</option>
+            <option value="strands">STRANDS</option>
           </select>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-infill-styles="veins voronoi">
           <div class="fl-ctrl__row">
             <label for="density">Density</label>
             <span class="fl-ctrl__val" data-value="density"></span>
@@ -265,7 +266,7 @@
           <span class="fl-ctrl__hint" data-infill-styles="voronoi">few, large cells &rarr; many, small</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-infill-styles="veins voronoi">
           <div class="fl-ctrl__row">
             <label for="softness">Softness</label>
             <span class="fl-ctrl__val" data-value="softness"></span>
@@ -275,7 +276,44 @@
           <span class="fl-ctrl__hint" data-infill-styles="voronoi">angular cells &rarr; rounded, organic &mdash; up to 5&times;</span>
         </div>
 
+        <div class="fl-ctrl" data-infill-styles="strands">
+          <div class="fl-ctrl__row">
+            <label for="strandCount">Strand count</label>
+            <span class="fl-ctrl__val" data-value="strandCount"></span>
+          </div>
+          <input type="range" id="strandCount" min="3" max="16" step="1" value="8">
+          <span class="fl-ctrl__hint">wide gaps &rarr; densely packed</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="strands">
+          <div class="fl-ctrl__row">
+            <label for="strandWidth">Strand width</label>
+            <span class="fl-ctrl__val" data-value="strandWidth"></span>
+          </div>
+          <input type="range" id="strandWidth" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">thin strands, open voids &rarr; thick strands, narrow slits</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="strands">
+          <div class="fl-ctrl__row">
+            <label for="strandTaper">Strand taper</label>
+            <span class="fl-ctrl__val" data-value="strandTaper"></span>
+          </div>
+          <input type="range" id="strandTaper" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">uniform width &rarr; fine point at the tip</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="strands">
+          <div class="fl-ctrl__row">
+            <label for="strandCurvature">Strand curvature</label>
+            <span class="fl-ctrl__val" data-value="strandCurvature"></span>
+          </div>
+          <input type="range" id="strandCurvature" min="0" max="1" step="0.01" value="0.4">
+          <span class="fl-ctrl__hint">straight radial &rarr; organic bow</span>
+        </div>
+
         <p class="fl-tip-note" data-infill-styles="voronoi">Cells are mirrored across the petal centre.</p>
+        <p class="fl-tip-note" data-infill-styles="strands">Strands are mirrored across the petal centre.</p>
 
       </div>
     </section>

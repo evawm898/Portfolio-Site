@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildJaggedEdge, buildRuffledEdge,
+  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildStrands, buildJaggedEdge, buildRuffledEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
 } from './flower-geometry.js';
 
@@ -380,8 +380,12 @@ function resolveParams(ui) {
     tipLength: ui.tipLength,                     // how far all tips extend outward
     tipFrequency: ui.tipFrequency,               // total number of tips, including the apex
     tipIrregularity: ui.tipIrregularity,         // 0 uniform -> 1 varied length & angle
-    infillType: ui.infillType,                   // 'veins' (leaf venation) or 'voronoi'
+    infillType: ui.infillType,                   // 'veins' (leaf venation), 'voronoi', or 'strands'
     density: ui.density,                          // raw density: vein depth OR voronoi cell count
+    strandCount: ui.strandCount,                 // STRANDS: number of radial strands across the width
+    strandWidth: ui.strandWidth,                 // STRANDS: tube thickness as a fraction of the gap
+    strandTaper: ui.strandTaper,                 // STRANDS: 0 uniform -> 1 fine point at the tip
+    strandCurvature: ui.strandCurvature,         // STRANDS: 0 straight radial -> 1 organic bow
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -416,6 +420,11 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // Both return { veins, nodes } in flattened space, rendered identically below.
   const ven = P.infillType === 'voronoi'
     ? buildVoronoi(P, rng, { density: P.density, softness: P.softness })
+    : P.infillType === 'strands'
+    ? buildStrands(P, {
+        count: P.strandCount, width: P.strandWidth,
+        taper: P.strandTaper, curvature: P.strandCurvature,
+      })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
         maxDepth: P.maxDepth, softness: P.softness,
@@ -685,6 +694,10 @@ const inputs = {
   infillType: document.getElementById('infillType'),
   density: document.getElementById('density'),
   softness: document.getElementById('softness'),
+  strandCount: document.getElementById('strandCount'),
+  strandWidth: document.getElementById('strandWidth'),
+  strandTaper: document.getElementById('strandTaper'),
+  strandCurvature: document.getElementById('strandCurvature'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -708,6 +721,10 @@ function readUI() {
     infillType: inputs.infillType.value,
     density: parseInt(inputs.density.value, 10),
     softness: parseFloat(inputs.softness.value),
+    strandCount: parseInt(inputs.strandCount.value, 10),
+    strandWidth: parseFloat(inputs.strandWidth.value),
+    strandTaper: parseFloat(inputs.strandTaper.value),
+    strandCurvature: parseFloat(inputs.strandCurvature.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -732,6 +749,10 @@ function refreshLabels() {
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
   setLabel('softness', (+inputs.softness.value).toFixed(2));
+  setLabel('strandCount', inputs.strandCount.value);
+  setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
+  setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
+  setLabel('strandCurvature', (+inputs.strandCurvature.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -747,7 +768,9 @@ function updateReadout(petalAcc, ui) {
   const el = document.getElementById('readout');
   if (!el) return;
   const petals = `${ui.petalCount} petal${ui.petalCount === 1 ? '' : 's'}`;
-  const infill = ui.infillType === 'voronoi' ? 'voronoi cells' : 'leaf venation';
+  const infill = ui.infillType === 'voronoi' ? 'voronoi cells'
+    : ui.infillType === 'strands' ? 'radial strands'
+    : 'leaf venation';
   el.textContent = `${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
 }
 
@@ -775,7 +798,8 @@ function setBuilding(on) {
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
 ['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
- 'bloom', 'tube', 'density', 'softness', 'tightness', 'elevation'].forEach((k) => {
+ 'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
+ 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -824,6 +848,10 @@ if (resetBtn) {
     inputs.infillType.value = d.infillType;
     inputs.density.value = d.density;
     inputs.softness.value = d.softness;
+    inputs.strandCount.value = d.strandCount;
+    inputs.strandWidth.value = d.strandWidth;
+    inputs.strandTaper.value = d.strandTaper;
+    inputs.strandCurvature.value = d.strandCurvature;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -839,7 +867,9 @@ if (resetBtn) {
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
-  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
+  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
+  strandCount: 8, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4,
+  tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
 

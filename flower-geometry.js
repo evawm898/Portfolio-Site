@@ -583,7 +583,114 @@ export function buildVenation(P, rng, opts = {}) {
 
 
 /* -------------------------------------------------------------------
-   5b. Voronoi infill — an alternative petal fill to the leaf venation.
+   5b. Strand infill — thick radial strands fanning base -> tip.
+
+   A set of strands runs lengthwise down the petal, spread across its width.
+   Each strand sits at a fixed fraction of the local half-width, so it follows
+   the petal outline: the petal narrows at the base and closes at the tip, which
+   draws neighbouring strands together at both ends and leaves an elongated,
+   oval / teardrop void between them in the middle — exactly the negative space
+   the reference shows. The strands are the solid material (extruded as thick
+   tapering tubes by the render layer); the gaps between them are left open.
+
+   Controls (opts):
+     count      : STRAND COUNT — strands across the width (low = wide gaps).
+     width      : STRAND WIDTH — 0..1, tube thickness as a fraction of the gap
+                  between strands (low = thin strands / big voids, high = thick
+                  strands / narrow slits).
+     taper      : STRAND TAPER — 0 = ~uniform, 1 = narrow to a fine point at tip.
+     curvature  : STRAND CURVATURE — 0 = straight radial, 1 = organic outward bow.
+
+   Strands are generated symmetric about the mid-rib (matched +f / -f pairs, and
+   a lone mid-rib strand when the count is odd), so every petal is bilaterally
+   symmetric. Each strand's tube radius is hard-clamped to keep the whole tube
+   inside the petal outline. Returns the same { veins, nodes } shape as the other
+   infills — each strand is a polyline carrying a t -> radius profile (`rad`),
+   already divided by the tube-radius the render layer multiplies back in, so a
+   strand's thickness follows STRAND WIDTH and the local gap rather than the
+   global tube slider.
+   ------------------------------------------------------------------- */
+export function buildStrands(P, opts = {}) {
+  const L = P.L;
+  const count     = clamp(Math.round(opts.count != null ? opts.count : 8), 2, 16);
+  const width     = clamp(opts.width     != null ? opts.width     : 0.5, 0, 1);
+  const taper     = clamp(opts.taper     != null ? opts.taper     : 0.5, 0, 1);
+  const curvature = clamp(opts.curvature != null ? opts.curvature : 0.4, 0, 1);
+  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+  const tubeR = P.tubeRadius > 1e-6 ? P.tubeRadius : 0.02;   // render multiplies this back in
+
+  const uBase = 0.03, uTip = 0.985, nU = 48;
+  const widthProp = lerp(0.16, 0.9, width);                 // tube fills this much of the half-gap
+
+  // Outermost strand fraction, sized so that strand + its tube stays inside the
+  // outline without the safety clamp biting: fMax*(1 + widthProp/(count-1)) < 1.
+  const spanDen = 1 + widthProp / Math.max(1, count - 1);
+  const fMax = Math.min(0.86, 0.96 / spanDen);
+  const df = count > 1 ? (2 * fMax) / (count - 1) : 0;       // lateral spacing (fraction units)
+  const bowAmp = 0.30 * curvature;                          // organic mid-petal bow
+
+  // End convergence: pull every strand toward the mid-rib at BOTH ends so they
+  // radiate from a single point at the base and gather again at the tip. That
+  // pinches the negative space between neighbours into a closed, elongated oval,
+  // and keeps the base ends from fanning out of the cup plane into a messy
+  // scatter — they all meet on the axis (where the cup lift is zero).
+  const spread = (u) =>
+    smootherstep(clamp((u - uBase) / 0.22, 0, 1)) *
+    smootherstep(clamp((uTip - u) / 0.16, 0, 1));
+
+  const veins = [];
+  const nodes = [];
+  let baseR = 0, tipR = 0;
+
+  for (let j = 0; j < count; j++) {
+    const f = count > 1 ? -fMax + df * j : 0;               // symmetric lateral position
+    // Bow: mid-ranked strands sweep outward the most; the centre and edge
+    // strands stay put, so nothing is pushed past fMax (or out of the petal).
+    const bowShape = fMax > 1e-6 ? (Math.abs(f) * (fMax - Math.abs(f))) / (fMax * fMax * 0.25) : 0;
+    const bow = bowAmp * Math.sign(f) * bowShape;
+
+    const pts = new Array(nU + 1);
+    const rads = new Array(nU + 1);
+    for (let i = 0; i <= nU; i++) {
+      const u = lerp(uBase, uTip, i / nU);
+      const sp = spread(u);
+      const vf = clamp((f + bow * Math.sin(Math.PI * u)) * sp, -0.995, 0.995);
+      const halfw = hw(u);
+      pts[i] = { x: L * u, y: vf * halfw };
+      // radius: a share of the local half-spacing, then extra tip taper, then
+      // hard-clamped so the tube never crosses the petal edge.
+      const uNorm = (u - uBase) / (uTip - uBase);
+      const r = widthProp * 0.5 * df * halfw * (1 - taper * uNorm);
+      const room = Math.max(0, (1 - Math.abs(vf)) * halfw - 0.012);
+      rads[i] = Math.max(0, Math.min(r, room));
+    }
+    veins.push({ points: pts, rad: strandRadProfile(rads, tubeR) });
+    baseR = Math.max(baseR, rads[0]);
+    tipR = Math.max(tipR, rads[nU]);
+  }
+  // All strands share the base point and the tip point (spread -> 0 at both), so
+  // one welded bead at each end caps the whole converged cluster cleanly.
+  nodes.push({ x: L * uBase, y: 0, width: (baseR / tubeR) * 1.5 });
+  nodes.push({ x: L * uTip,  y: 0, width: (tipR  / tubeR) * 1.5 });
+  return { veins, nodes };
+}
+
+// Turn a per-sample radius array (sampled uniformly along the strand) into a
+// t -> radius function for addTube, divided by `denom` so the render layer's
+// `tubeRadius * rad(t)` recovers the intended world radius.
+function strandRadProfile(rads, denom) {
+  const n = rads.length;
+  return (t) => {
+    const f = clamp(t, 0, 1) * (n - 1);
+    const i0 = Math.floor(f);
+    if (i0 >= n - 1) return rads[n - 1] / denom;
+    return lerp(rads[i0], rads[i0 + 1], f - i0) / denom;
+  };
+}
+
+
+/* -------------------------------------------------------------------
+   5c. Voronoi infill — an alternative petal fill to the leaf venation.
 
    Seeds are scattered only in the +Y half of the petal and MIRRORED to the
    -Y half, so the whole diagram — and therefore every cell — is symmetric
