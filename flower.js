@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation, buildJaggedEdge, buildRuffledEdge,
+  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildJaggedEdge, buildRuffledEdge,
   mapPointToSurface, placePoint, densifyByStep,
 } from './flower-geometry.js';
 
@@ -272,6 +272,8 @@ function resolveParams(ui) {
     tipLength: ui.tipLength,                     // how far all tips extend outward
     tipFrequency: ui.tipFrequency,               // total number of tips, including the apex
     tipIrregularity: ui.tipIrregularity,         // 0 uniform -> 1 varied length & angle
+    infillType: ui.infillType,                   // 'veins' (leaf venation) or 'voronoi'
+    density: ui.density,                          // raw density: vein depth OR voronoi cell count
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -302,10 +304,14 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const rng = mulberry32(seed);
   const spine = buildSpine(P);
   const outline = buildSilhouette(P);
-  const ven = buildVenation(P, rng, {
-    secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
-    maxDepth: P.maxDepth, softness: P.softness,
-  });
+  // INFILL: leaf venation (default) or a bilaterally-symmetric Voronoi mesh.
+  // Both return { veins, nodes } in flattened space, rendered identically below.
+  const ven = P.infillType === 'voronoi'
+    ? buildVoronoi(P, rng, { density: P.density })
+    : buildVenation(P, rng, {
+        secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
+        maxDepth: P.maxDepth, softness: P.softness,
+      });
 
   const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
   const toWorld = (pt) => place(mapPointToSurface(pt, P, spine));
@@ -545,6 +551,7 @@ const inputs = {
   tipIrregularity: document.getElementById('tipIrregularity'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
+  infillType: document.getElementById('infillType'),
   density: document.getElementById('density'),
   softness: document.getElementById('softness'),
   tightness: document.getElementById('tightness'),
@@ -567,6 +574,7 @@ function readUI() {
     tipIrregularity: parseFloat(inputs.tipIrregularity.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
+    infillType: inputs.infillType.value,
     density: parseInt(inputs.density.value, 10),
     softness: parseFloat(inputs.softness.value),
     tightness: parseFloat(inputs.tightness.value),
@@ -608,7 +616,8 @@ function updateReadout(petalAcc, ui) {
   const el = document.getElementById('readout');
   if (!el) return;
   const petals = `${ui.petalCount} petal${ui.petalCount === 1 ? '' : 's'}`;
-  el.textContent = `${petals} · leaf venation · ~${tris.toLocaleString()} tris`;
+  const infill = ui.infillType === 'voronoi' ? 'voronoi cells' : 'leaf venation';
+  el.textContent = `${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
 }
 
 // coalesce rapid slider input into one rebuild per frame
@@ -648,6 +657,14 @@ function updateTipOptions() {
 }
 // tip style is a <select>; swap the visible options and regenerate on change
 inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
+// Infill: only the selected type's options are shown (like Tip). Regenerate on change.
+function updateInfillOptions() {
+  const type = inputs.infillType.value;
+  document.querySelectorAll('[data-infill-styles]').forEach((el) => {
+    el.hidden = !el.getAttribute('data-infill-styles').split(/\s+/).includes(type);
+  });
+}
+inputs.infillType.addEventListener('change', () => { updateInfillOptions(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 
 const resetBtn = document.getElementById('reset');
@@ -667,6 +684,7 @@ if (resetBtn) {
     inputs.tipIrregularity.value = d.tipIrregularity;
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
+    inputs.infillType.value = d.infillType;
     inputs.density.value = d.density;
     inputs.softness.value = d.softness;
     inputs.tightness.value = d.tightness;
@@ -675,6 +693,7 @@ if (resetBtn) {
     controls.autoRotate = d.autoRotate;
     resetPlaceholders();
     updateTipOptions();
+    updateInfillOptions();
     refreshLabels();
     scheduleRegen();
   });
@@ -683,7 +702,7 @@ if (resetBtn) {
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
-  bloom: 55, tube: 0.4, density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
+  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
 
@@ -719,7 +738,6 @@ accSections.forEach((section) => {
 // slider controls; selects (fmt: null) show their value in the control itself.
 const placeholderControls = [
   { id: 'fractalGrowth',   fmt: (v) => (+v).toFixed(2) },
-  { id: 'infillType',      fmt: null },
 ];
 
 // current values, exposed for the future render layer / quick debugging
@@ -763,6 +781,7 @@ placeholderControls.forEach(({ id, fmt }) => {
 
 controls.autoRotate = inputs.autoRotate.checked;
 updateTipOptions();
+updateInfillOptions();
 refreshLabels();
 generate();
 animate();

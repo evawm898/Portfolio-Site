@@ -583,6 +583,120 @@ export function buildVenation(P, rng, opts = {}) {
 
 
 /* -------------------------------------------------------------------
+   5b. Voronoi infill — an alternative petal fill to the leaf venation.
+
+   Seeds are scattered only in the +Y half of the petal and MIRRORED to the
+   -Y half, so the whole diagram — and therefore every cell — is symmetric
+   across the centre axis. With no seed sitting on the axis, the midline turns
+   into a continuous run of cell walls (a clean central seam) and each +Y cell
+   has an exact mirror twin below it. Each cell is the petal silhouette clipped
+   by that seed's perpendicular-bisector half-planes against every other seed;
+   interior walls (shared by two cells) are drawn once, and walls that fall on
+   the silhouette are left to the rim. Returns the same { veins, nodes } shape
+   as buildVenation, so the render layer treats it identically.
+   ------------------------------------------------------------------- */
+export function buildVoronoi(P, rng, opts = {}) {
+  const density = clamp(Math.round(opts.density || 7), 3, 12);
+  const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // seeds in the +Y half
+  const sil = buildSilhouette(P, 72);
+  const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+
+  // blue-noise-ish seeds in the +Y half (best-candidate sampling for even cells)
+  const half = [];
+  const xLo = P.L * 0.05, xHi = P.L * 0.96;
+  let guard = 0;
+  while (half.length < perHalf && guard < perHalf * 600) {
+    let best = null, bestD = -1;
+    for (let c = 0; c < 10; c++) {
+      guard++;
+      const x = lerp(xLo, xHi, rng());
+      const hw = margin(x / P.L);
+      if (hw < 0.06) continue;
+      const y = lerp(0.02 * hw + 0.015, hw * 0.95, rng());     // strictly +Y, inside the edge
+      if (!pointInPoly(x, y, sil)) continue;
+      let d = 1e9;
+      for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
+      if (d > bestD) { bestD = d; best = { x, y }; }
+    }
+    if (best) half.push(best);
+  }
+
+  // mirror to a fully symmetric seed set (no seed on the axis)
+  const seeds = [];
+  for (const s of half) { seeds.push({ x: s.x, y: s.y }); seeds.push({ x: s.x, y: -s.y }); }
+
+  // each cell = silhouette clipped by every perpendicular-bisector half-plane
+  const edges = new Map();                    // dedup key -> { a, b, n }
+  const rk = (v) => Math.round(v * 2000) / 2000;
+  const edgeKey = (a, b) => {
+    const ka = rk(a.x) + ',' + rk(a.y), kb = rk(b.x) + ',' + rk(b.y);
+    return ka < kb ? ka + '|' + kb : kb + '|' + ka;
+  };
+  for (let i = 0; i < seeds.length; i++) {
+    const s = seeds[i];
+    let cell = sil;
+    for (let j = 0; j < seeds.length && cell.length >= 3; j++) {
+      if (j === i) continue;
+      const t = seeds[j];
+      // keep the side closer to s:  2(t-s)·p + (|s|^2 - |t|^2) <= 0
+      cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * (t.y - s.y),
+        (s.x * s.x + s.y * s.y) - (t.x * t.x + t.y * t.y));
+    }
+    if (cell.length < 3) continue;
+    for (let k = 0; k < cell.length; k++) {
+      const a = cell[k], b = cell[(k + 1) % cell.length];
+      if (Math.hypot(a.x - b.x, a.y - b.y) < 1e-4) continue;
+      const key = edgeKey(a, b);
+      const e = edges.get(key);
+      if (e) e.n++; else edges.set(key, { a, b, n: 1 });
+    }
+  }
+
+  // interior walls border TWO cells -> draw once; silhouette walls border one
+  // -> skip (the rim already traces them). Bead every wall vertex to seal joins.
+  const veins = [];
+  const nodes = [];
+  const seen = new Set();
+  for (const { a, b, n } of edges.values()) {
+    if (n < 2) continue;
+    veins.push({ points: [{ x: a.x, y: a.y }, { x: b.x, y: b.y }], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
+    for (const p of [a, b]) {
+      const vk = rk(p.x) + ',' + rk(p.y);
+      if (!seen.has(vk)) { seen.add(vk); nodes.push({ x: p.x, y: p.y, width: VEIN_TERTIARY }); }
+    }
+  }
+  return { veins, nodes };
+}
+
+// Keep the part of a polygon on the inner side of a*x + b*y + c <= 0
+// (Sutherland-Hodgman against one half-plane; robust for any simple polygon).
+function clipHalfPlane(poly, a, b, c) {
+  const out = [];
+  const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    const p = poly[i], q = poly[(i + 1) % n];
+    const dp = a * p.x + b * p.y + c, dq = a * q.x + b * q.y + c;
+    if (dp <= 0) out.push(p);
+    if ((dp < 0) !== (dq < 0)) {
+      const t = dp / (dp - dq);
+      out.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+    }
+  }
+  return out;
+}
+
+// Even-odd point-in-polygon test for seed rejection.
+function pointInPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+
+/* -------------------------------------------------------------------
    6. Map a flattened petal point onto the cupped 3D petal surface
 
    The (X, Y) -> (u, v) conversion uses the arc-length identity X = L*u and
