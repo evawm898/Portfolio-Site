@@ -345,7 +345,6 @@ function dedupePolygon(poly) {
 const VEIN_MIDRIB_BASE = 1.00;
 const VEIN_MIDRIB_TIP  = 0.42;
 const VEIN_TERTIARY    = 0.28;
-const VORONOI_GROW     = 0.9;   // even strut thickening per unit softness
 // relative line-weight by branch order (0 = midrib). Deeper orders are finer;
 // the last entry is the floor so very deep fractal twigs stay visible.
 const VEIN_WIDTH_BY_ORDER = [1.00, 0.56, 0.38, 0.28, 0.22, 0.18];
@@ -644,83 +643,69 @@ export function buildVoronoi(P, rng, opts = {}) {
     if (cell.length >= 3) cells.push(cell);
   }
 
-  // SOFTNESS reshapes each cell toward a smooth OVAL hole. Voronoi walls are
-  // shared between two cells, so no shared-wall smoothing can round both of the
-  // holes a wall borders at once — instead each cell is drawn as its OWN closed
-  // loop, blended from its straight polygon toward its fitted ellipse as softness
-  // rises, and inset a little so neighbouring holes separate into a lattice. The
-  // strut material thickens evenly with softness (uniform ring weight — no
-  // bulbous junctions). Because the seed set is mirror-symmetric, so is every
-  // cell and its ellipse, so the whole field stays symmetric across the axis. At
-  // softness 0 the loops are the bare polygons (touching — the plain angular
-  // Voronoi); at 5 they are ovals separated by an even web.
+  // SOFTNESS turns each cell into a solid ANNULUS: the full cell polygon on the
+  // outside (adjacent cells share edges, so the annuli tile into one continuous
+  // sheet) around a ROUND hole on the inside. The render layer lofts a sealed
+  // slab between the two rings — top face, bottom face and both rims — so the web
+  // is a real perforated sheet, not tube outlines. `round` blends the hole from
+  // the cell's own shape toward its fitted ellipse; `holeScale` sets the hole
+  // size (a smaller hole = a thicker strut) and shrinks as softness rises. Only
+  // the +Y cells are solved; each annulus is mirrored to the -Y half, so the
+  // whole sheet stays exactly symmetric across the axis.
   const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
-  const round = clamp(softness / 5, 0, 1);                 // polygon -> ellipse
-  const inset = 1 - lerp(0, 0.04, clamp(softness, 0, 5) / 5); // slight shrink to define holes
-  const smooth = Math.min(2, Math.round(softness));        // 0 = sharp cells, up to 2 corner-cuts
-  const m = 1 + softness * VORONOI_GROW;                   // even strut thickening
-  const weight = VEIN_TERTIARY * m;
+  const round = clamp(softness / 5, 0, 1);                       // hole: cell shape -> ellipse
+  const holeScale = lerp(0.9, 0.58, clamp(softness, 0, 5) / 5);  // hole size (strut thickness)
 
-  const veins = [];
+  const slabs = [];
   for (const cell of cells) {
-    const loop = roundedCell(cell, round, inset, smooth);
-    if (loop.length < 3) continue;
-    const ring = [...loop, { x: loop[0].x, y: loop[0].y }];        // close the ring
-    veins.push({ points: ring, w0: weight, w1: weight });          // +Y cell
-    const mir = ring.map((p) => ({ x: p.x, y: -p.y }));            // exact -Y mirror
-    veins.push({ points: mir, w0: weight, w1: weight });
+    const ann = cellAnnulus(cell, round, holeScale);
+    if (!ann) continue;
+    slabs.push(ann);                                                                   // +Y
+    slabs.push({ outer: ann.outer.map(mirrorY), inner: ann.inner.map(mirrorY) });      // -Y mirror
   }
-  return { veins, nodes: [] };
+  return { veins: [], nodes: [], slabs };
 }
 
-// Reshape one Voronoi cell polygon into a smooth closed loop. Each vertex is
-// blended from the polygon toward the cell's fitted ellipse (round 0..1: 0 keeps
-// the polygon, 1 lands it on the ellipse in its own radial direction), then
-// pulled toward the centroid (inset) to open gaps between neighbours, then
-// corner-cut for a smooth oval. Deterministic, so a mirrored cell yields the
-// mirrored loop and bilateral symmetry is preserved.
-function roundedCell(poly, round, inset, smooth) {
+const mirrorY = (p) => ({ x: p.x, y: -p.y });
+
+// Build one cell's ANNULUS for the perforated sheet. The outer loop walks the
+// cell polygon's EXACT edges (subdivided) — so corners are kept and, since two
+// neighbours subdivide their shared edge identically, their outer boundaries
+// coincide and the tiles stay watertight (no gaps at the junctions). The inner
+// loop is the round hole: for each outer point, the cell shape blended toward
+// the fitted ellipse in that radial direction, scaled in by holeScale.
+function cellAnnulus(poly, round, holeScale) {
   const n = poly.length;
   let cx = 0, cy = 0;
   for (const p of poly) { cx += p.x; cy += p.y; }
   cx /= n; cy /= n;
-  let Cxx = 0, Cyy = 0, Cxy = 0;              // vertex covariance -> equivalent ellipse
+  let Cxx = 0, Cyy = 0, Cxy = 0;                    // vertex covariance -> fitted ellipse
   for (const p of poly) { const dx = p.x - cx, dy = p.y - cy; Cxx += dx * dx; Cyy += dy * dy; Cxy += dx * dy; }
   Cxx /= n; Cyy /= n; Cxy /= n;
   const tr = Cxx + Cyy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (Cxx * Cyy - Cxy * Cxy)));
-  const ELL = 1.22;                           // std-dev -> semi-axis (ellipse inscribed in the cell)
+  const ELL = 1.32;
   const a = Math.sqrt(Math.max(tr / 2 + disc, 1e-9)) * ELL;
   const b = Math.sqrt(Math.max(tr / 2 - disc, 1e-9)) * ELL;
   const ang = 0.5 * Math.atan2(2 * Cxy, Cxx - Cyy);
   const ca = Math.cos(ang), sa = Math.sin(ang);
-  const pts = poly.map((p) => {
-    const dx = p.x - cx, dy = p.y - cy;
-    const u = dx * ca + dy * sa, v = -dx * sa + dy * ca;   // into ellipse axes
-    const len = Math.hypot(u, v) || 1;
-    const du = u / len, dv = v / len;
-    const t = 1 / Math.hypot(du / a, dv / b);              // ray from centre hits ellipse
-    const ex = cx + (du * t) * ca - (dv * t) * sa;
-    const ey = cy + (du * t) * sa + (dv * t) * ca;
-    let bx = lerp(p.x, ex, round), by = lerp(p.y, ey, round);
-    bx = cx + (bx - cx) * inset; by = cy + (by - cy) * inset;
-    return { x: bx, y: by };
-  });
-  return chaikinClosed(pts, smooth);
-}
-
-// Corner-cutting (Chaikin) on a CLOSED polyline -> a smooth loop.
-function chaikinClosed(pts, iters) {
-  let p = pts;
-  for (let it = 0; it < iters; it++) {
-    const q = [], n = p.length;
-    for (let i = 0; i < n; i++) {
-      const a = p[i], b = p[(i + 1) % n];
-      q.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
-      q.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+  const SUB = 5;                                    // samples per cell edge (holes read round)
+  const outer = [], inner = [];
+  for (let i = 0; i < n; i++) {
+    const A = poly[i], B = poly[(i + 1) % n];
+    for (let s = 0; s < SUB; s++) {
+      const t = s / SUB;
+      const ox = lerp(A.x, B.x, t), oy = lerp(A.y, B.y, t);     // on the exact cell edge
+      const dx = ox - cx, dy = oy - cy;
+      const rOut = Math.hypot(dx, dy) || 1;
+      const ux = dx / rOut, uy = dy / rOut;                     // radial direction
+      const eu = ux * ca + uy * sa, ev = -ux * sa + uy * ca;    // ellipse hit distance, same ray
+      const tEll = 1 / Math.hypot(eu / a, ev / b);
+      const tHole = Math.min(lerp(rOut, tEll, round) * holeScale, rOut * 0.95);
+      outer.push({ x: ox, y: oy });
+      inner.push({ x: cx + ux * tHole, y: cy + uy * tHole });
     }
-    p = q;
   }
-  return p;
+  return { outer, inner };
 }
 
 
@@ -765,6 +750,35 @@ export function mapPointToSurface(pt, P, spine) {
   const hw = petalHalfWidth(u, P);
   const v = hw > 1e-4 ? clamp(pt.y / hw, -1, 1) : 0;
   return surfacePoint(u, v, P, spine);
+}
+
+// Unit surface normal at a flattened point — used to give the Voronoi sheet its
+// slab thickness (top/bottom offset along the normal). Cross product of the two
+// surface tangents (∂/∂u × ∂/∂v), by finite difference.
+export function surfaceNormalAt(pt, P, spine) {
+  const u = clamp(pt.x / P.L, 0, 0.9995);
+  const hw = petalHalfWidth(u, P);
+  const v = hw > 1e-4 ? clamp(pt.y / hw, -1, 1) : 0;
+  const p = surfacePoint(u, v, P, spine);
+  const pu = surfacePoint(clamp(u + 0.004, 0, 0.9995), v, P, spine);
+  const pv = surfacePoint(u, clamp(v + 0.02, -1, 1), P, spine);
+  const ax = pu.x - p.x, ay = pu.y - p.y, az = pu.z - p.z;
+  const bx = pv.x - p.x, by = pv.y - p.y, bz = pv.z - p.z;
+  let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+  const l = Math.hypot(nx, ny, nz) || 1;
+  return { x: nx / l, y: ny / l, z: nz / l };
+}
+
+// Rotate a DIRECTION into the bloom the same way placePoint rotates a position
+// (tilt about the width axis, then azimuth about the vertical) — no translation.
+export function placeDir(d, az, tilt = 0) {
+  let x = d.x, y = d.y;
+  if (tilt !== 0) {
+    const ct = Math.cos(tilt), st = Math.sin(tilt);
+    const nx = x * ct - y * st; y = x * st + y * ct; x = nx;
+  }
+  const c = Math.cos(az), s = Math.sin(az);
+  return { x: x * c + d.z * s, y, z: -x * s + d.z * c };
 }
 
 

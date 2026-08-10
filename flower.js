@@ -22,7 +22,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
   buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildJaggedEdge, buildRuffledEdge,
-  mapPointToSurface, placePoint, densifyByStep,
+  mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -61,6 +61,7 @@ const EVEN_MAX       = 4;      // at/below this petal count, arrange petals as a
                                // (equal angle + equal radius) instead of the phyllotactic
                                // spiral, so 3 or 4 petals sit evenly spaced from each other
 const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom radius
+const SLAB_THICK     = 3.2;    // Voronoi sheet thickness, as a multiple of the tube radius
 
 
 /* ===================================================================
@@ -217,6 +218,32 @@ class MeshAccumulator {
     }
   }
 
+  /* A sealed slab lofted between two matched rings (a cell's outer boundary and
+     its inner round hole). Each ring point carries a world position `p` and the
+     surface normal `n`; the slab is offset ±half the thickness along the normal
+     for a top and a bottom face, and the hole rim and outer rim close the sides
+     — so each cell is a solid, watertight perforated tile. */
+  addSlab(outer, inner, thick) {
+    const N = outer.length;
+    if (N < 3 || inner.length !== N) return;
+    const half = thick * 0.5;
+    const tO = new Array(N), bO = new Array(N), tI = new Array(N), bI = new Array(N);
+    for (let k = 0; k < N; k++) {
+      const o = outer[k], i = inner[k];
+      tO[k] = this._vertex(o.p.x + o.n.x * half, o.p.y + o.n.y * half, o.p.z + o.n.z * half,  o.n.x,  o.n.y,  o.n.z);
+      bO[k] = this._vertex(o.p.x - o.n.x * half, o.p.y - o.n.y * half, o.p.z - o.n.z * half, -o.n.x, -o.n.y, -o.n.z);
+      tI[k] = this._vertex(i.p.x + i.n.x * half, i.p.y + i.n.y * half, i.p.z + i.n.z * half,  i.n.x,  i.n.y,  i.n.z);
+      bI[k] = this._vertex(i.p.x - i.n.x * half, i.p.y - i.n.y * half, i.p.z - i.n.z * half, -i.n.x, -i.n.y, -i.n.z);
+    }
+    for (let k = 0; k < N; k++) {
+      const k1 = (k + 1) % N;
+      this.idx.push(tO[k], tO[k1], tI[k1],  tO[k], tI[k1], tI[k]);   // top face (outer -> hole)
+      this.idx.push(bO[k], bI[k1], bO[k1],  bO[k], bI[k], bI[k1]);   // bottom face (reversed)
+      this.idx.push(tI[k], tI[k1], bI[k1],  tI[k], bI[k1], bI[k]);   // inner rim (hole wall)
+      this.idx.push(tO[k], bO[k1], tO[k1],  tO[k], bO[k], bO[k1]);   // outer rim (cell edge)
+    }
+  }
+
   toGeometry() {
     if (this.vcount === 0) return null;
     const g = new THREE.BufferGeometry();
@@ -359,6 +386,22 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // where a secondary meets the midrib) so nothing reads as a hollow ring.
   for (const node of ven.nodes) {
     acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15, 4, 7);
+  }
+
+  // VORONOI infill is a solid perforated SHEET, not tubes: each cell is a sealed
+  // slab lofted between its outer boundary and its round inner hole. Map both
+  // rings onto the surface (with normals) and let the accumulator build the
+  // top/bottom faces and rims. Adjacent cells share outer edges, so the slabs
+  // tile into one continuous membrane with round holes.
+  if (ven.slabs) {
+    const withNormal = (pt) => ({
+      p: place(mapPointToSurface(pt, P, spine)),
+      n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
+    });
+    const thick = P.tubeRadius * SLAB_THICK;
+    for (const slab of ven.slabs) {
+      acc.addSlab(slab.outer.map(withNormal), slab.inner.map(withNormal), thick);
+    }
   }
 }
 
