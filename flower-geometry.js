@@ -583,95 +583,108 @@ export function buildVenation(P, rng, opts = {}) {
 
 
 /* -------------------------------------------------------------------
-   5b. Strand infill — thick radial strands fanning base -> tip.
+   5b. Strand infill — a radial fan of strands from the petal base to the edge.
 
-   A set of strands runs lengthwise down the petal, spread across its width.
-   Each strand sits at a fixed fraction of the local half-width, so it follows
-   the petal outline: the petal narrows at the base and closes at the tip, which
-   draws neighbouring strands together at both ends and leaves an elongated,
-   oval / teardrop void between them in the middle — exactly the negative space
-   the reference shows. The strands are the solid material (extruded as thick
-   tapering tubes by the render layer); the gaps between them are left open.
+   Like the reference lily-pad / ginkgo leaves: every strand RADIATES from a
+   single hub at the petal base and runs out to a point on the OUTER MARGIN —
+   not just the apex, but the whole edge, from one side, around the tip, to the
+   other side. The strand endpoints are spread by even arc-length along the
+   margin, so the fan covers the rim uniformly. Between neighbouring strands the
+   open negative space forms the elongated wedge / teardrop voids the reference
+   shows, pinched to a point at the shared hub and widening toward the rim. The
+   strands are the solid material (thick tapering tubes on the cupped surface);
+   the gaps are left open.
 
    Controls (opts):
-     count      : STRAND COUNT — strands across the width (low = wide gaps).
-     width      : STRAND WIDTH — 0..1, tube thickness as a fraction of the gap
-                  between strands (low = thin strands / big voids, high = thick
-                  strands / narrow slits).
-     taper      : STRAND TAPER — 0 = ~uniform, 1 = narrow to a fine point at tip.
-     curvature  : STRAND CURVATURE — 0 = straight radial, 1 = organic outward bow.
+     count      : STRAND COUNT — number of strands fanned across the margin.
+     width      : STRAND WIDTH — 0..1, strand thickness (low = thin lines / big
+                  voids, high = thick strands / narrow slits).
+     taper      : STRAND TAPER — extra narrowing from the hub out to the rim.
+     curvature  : STRAND CURVATURE — 0 straight radial, 1 organic outward bow.
 
-   Strands are generated symmetric about the mid-rib (matched +f / -f pairs, and
-   a lone mid-rib strand when the count is odd), so every petal is bilaterally
-   symmetric. Each strand's tube radius is hard-clamped to keep the whole tube
-   inside the petal outline. Returns the same { veins, nodes } shape as the other
-   infills — each strand is a polyline carrying a t -> radius profile (`rad`),
-   already divided by the tube-radius the render layer multiplies back in, so a
-   strand's thickness follows STRAND WIDTH and the local gap rather than the
-   global tube slider.
+   Strands are placed symmetrically about the mid-rib (a strand at signed fan
+   position q and its mirror at -q are exact reflections; an odd count puts one
+   strand straight up the axis to the tip), so every petal stays bilaterally
+   symmetric. Each strand ends ON the margin with its radius clamped to zero
+   there, and is clamped inside the outline all along its length. Returns the
+   same { veins, nodes } shape as the other infills — a polyline per strand with
+   a t -> radius profile (`rad`) pre-divided by the tube radius so a strand's
+   thickness follows STRAND WIDTH, not the global tube slider.
    ------------------------------------------------------------------- */
 export function buildStrands(P, opts = {}) {
   const L = P.L;
-  const count     = clamp(Math.round(opts.count != null ? opts.count : 8), 2, 16);
+  const count     = clamp(Math.round(opts.count != null ? opts.count : 20), 4, 44);
   const width     = clamp(opts.width     != null ? opts.width     : 0.5, 0, 1);
   const taper     = clamp(opts.taper     != null ? opts.taper     : 0.5, 0, 1);
   const curvature = clamp(opts.curvature != null ? opts.curvature : 0.4, 0, 1);
   const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
   const tubeR = P.tubeRadius > 1e-6 ? P.tubeRadius : 0.02;   // render multiplies this back in
 
-  const uBase = 0.03, uTip = 0.985, nU = 48;
-  const widthProp = lerp(0.16, 0.9, width);                 // tube fills this much of the half-gap
+  const uOrigin = 0.035;               // fan hub, near the base claw
+  const uStartEdge = 0.12;             // nearest-base endpoint on the margin
+  const uTipEdge = 0.982;              // tip endpoint
+  const nS = 32;                       // samples per strand
+  const O = { x: L * uOrigin, y: 0 };
+  const rBase = lerp(0.006, 0.05, width) * P.W;   // strand thickness scale (thin lines by default)
 
-  // Outermost strand fraction, sized so that strand + its tube stays inside the
-  // outline without the safety clamp biting: fMax*(1 + widthProp/(count-1)) < 1.
-  const spanDen = 1 + widthProp / Math.max(1, count - 1);
-  const fMax = Math.min(0.86, 0.96 / spanDen);
-  const df = count > 1 ? (2 * fMax) / (count - 1) : 0;       // lateral spacing (fraction units)
-  const bowAmp = 0.30 * curvature;                          // organic mid-petal bow
-
-  // End convergence: pull every strand toward the mid-rib at BOTH ends so they
-  // radiate from a single point at the base and gather again at the tip. That
-  // pinches the negative space between neighbours into a closed, elongated oval,
-  // and keeps the base ends from fanning out of the cup plane into a messy
-  // scatter — they all meet on the axis (where the cup lift is zero).
-  const spread = (u) =>
-    smootherstep(clamp((u - uBase) / 0.22, 0, 1)) *
-    smootherstep(clamp((uTip - u) / 0.16, 0, 1));
+  // Even arc-length along the +Y margin (base -> tip) so endpoints spread evenly
+  // around the rim instead of bunching where the outline is steep.
+  const EM = 128;
+  const edgeU = new Array(EM + 1), edgeCum = new Array(EM + 1);
+  edgeCum[0] = 0;
+  edgeU[0] = uStartEdge;
+  let prevx = L * uStartEdge, prevy = hw(uStartEdge);
+  for (let i = 1; i <= EM; i++) {
+    const u = lerp(uStartEdge, uTipEdge, i / EM);
+    const x = L * u, y = hw(u);
+    edgeU[i] = u;
+    edgeCum[i] = edgeCum[i - 1] + Math.hypot(x - prevx, y - prevy);
+    prevx = x; prevy = y;
+  }
+  const edgeTotal = edgeCum[EM] || 1;
+  const edgeUAt = (frac) => {           // arc fraction (0 = near base, 1 = tip) -> u_e
+    const target = clamp(frac, 0, 1) * edgeTotal;
+    let i = 1;
+    while (i < EM && edgeCum[i] < target) i++;
+    const f = (target - edgeCum[i - 1]) / ((edgeCum[i] - edgeCum[i - 1]) || 1);
+    return lerp(edgeU[i - 1], edgeU[i], f);
+  };
 
   const veins = [];
   const nodes = [];
-  let baseR = 0, tipR = 0;
 
   for (let j = 0; j < count; j++) {
-    const f = count > 1 ? -fMax + df * j : 0;               // symmetric lateral position
-    // Bow: mid-ranked strands sweep outward the most; the centre and edge
-    // strands stay put, so nothing is pushed past fMax (or out of the petal).
-    const bowShape = fMax > 1e-6 ? (Math.abs(f) * (fMax - Math.abs(f))) / (fMax * fMax * 0.25) : 0;
-    const bow = bowAmp * Math.sign(f) * bowShape;
+    const q = count > 1 ? -1 + (2 * j) / (count - 1) : 0;   // signed fan position [-1,1], 0 = tip
+    const aq = Math.abs(q);
+    const side = Math.sign(q);                             // +1 / -1 margin; 0 = straight up the axis
+    const uE = edgeUAt(1 - aq);                             // aq=0 -> tip, aq=1 -> near base
+    const E = { x: L * uE, y: side * hw(uE) };             // axis strand (side 0) ends on the axis
+    const dx = E.x - O.x, dy = E.y - O.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const px = -dy / len, py = dx / len;                    // unit perpendicular
+    const bowMag = curvature * 0.20 * len * Math.sign(q);   // outward bow (0 on the axis strand)
 
-    const pts = new Array(nU + 1);
-    const rads = new Array(nU + 1);
-    for (let i = 0; i <= nU; i++) {
-      const u = lerp(uBase, uTip, i / nU);
-      const sp = spread(u);
-      const vf = clamp((f + bow * Math.sin(Math.PI * u)) * sp, -0.995, 0.995);
-      const halfw = hw(u);
-      pts[i] = { x: L * u, y: vf * halfw };
-      // radius: a share of the local half-spacing, then extra tip taper, then
-      // hard-clamped so the tube never crosses the petal edge.
-      const uNorm = (u - uBase) / (uTip - uBase);
-      const r = widthProp * 0.5 * df * halfw * (1 - taper * uNorm);
-      const room = Math.max(0, (1 - Math.abs(vf)) * halfw - 0.012);
-      rads[i] = Math.max(0, Math.min(r, room));
+    const pts = new Array(nS + 1);
+    const rads = new Array(nS + 1);
+    for (let i = 0; i <= nS; i++) {
+      const s = i / nS;
+      const b = bowMag * Math.sin(Math.PI * s);
+      let x = O.x + dx * s + px * b;
+      let y = O.y + dy * s + py * b;
+      const u = clamp(x / L, 0, 1);
+      const room = hw(u);
+      if (Math.abs(y) > room * 0.999) y = Math.sign(y) * room * 0.999;   // keep inside the outline
+      pts[i] = { x, y };
+      // thin, ~uniform line with extra taper, tapering to a point where it meets
+      // the rim (edgeRoom -> 0), so nothing crosses the outline.
+      let r = rBase * (1 - 0.8 * taper * s);
+      const edgeRoom = (room - Math.abs(y)) * 0.8;
+      rads[i] = Math.max(0, Math.min(r, edgeRoom));
     }
     veins.push({ points: pts, rad: strandRadProfile(rads, tubeR) });
-    baseR = Math.max(baseR, rads[0]);
-    tipR = Math.max(tipR, rads[nU]);
   }
-  // All strands share the base point and the tip point (spread -> 0 at both), so
-  // one welded bead at each end caps the whole converged cluster cleanly.
-  nodes.push({ x: L * uBase, y: 0, width: (baseR / tubeR) * 1.5 });
-  nodes.push({ x: L * uTip,  y: 0, width: (tipR  / tubeR) * 1.5 });
+  // one welded bead at the shared hub caps the converged strand starts
+  nodes.push({ x: O.x, y: 0, width: (rBase / tubeR) * 1.7 });
   return { veins, nodes };
 }
 

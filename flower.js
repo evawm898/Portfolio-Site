@@ -868,7 +868,7 @@ const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
-  strandCount: 8, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4,
+  strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
