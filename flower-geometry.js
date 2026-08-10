@@ -662,14 +662,12 @@ export function buildVoronoi(P, rng, opts = {}) {
   // SOFTNESS (0..5) rounds the angular cells into smooth organic ones. Path
   // rounding works on the shared wall graph (not per cell), so junctions stay
   // connected and mirror symmetry is preserved: subdivide every wall, then
-  // Laplacian-smooth with the petal-boundary vertices pinned and each step
-  // re-symmetrised across the axis. Path rounding saturates at 1 (cells are
-  // already fully rounded there; more would just collapse them) — above 1 the
-  // extra softness keeps adding material instead.
+  // Taubin-smooth with the petal-boundary vertices pinned and each step
+  // re-symmetrised across the axis. Higher softness keeps rounding the holes
+  // further toward circles (Taubin doesn't collapse them) and also adds material.
   const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
-  const roundSoft = Math.min(softness, 1);
-  const polylines = roundSoft > 0.02
-    ? roundGraph(walls, sil, roundSoft)
+  const polylines = softness > 0.02
+    ? roundGraph(walls, sil, softness)
     : walls.map((w) => [{ x: w.a.x, y: w.a.y }, { x: w.b.x, y: w.b.y }]);
 
   // SOFTNESS also adds MATERIAL, thickening the web (independent of the tube
@@ -700,9 +698,11 @@ export function buildVoronoi(P, rng, opts = {}) {
 }
 
 // Round a shared wall graph into smooth cells. Walls are subdivided and the
-// whole network is Laplacian-smoothed; vertices on the petal boundary are
-// pinned (cells stay inside the rim) and every pass is mirrored across the axis
-// so bilateral symmetry is exact. Returns one smoothed polyline per wall, all
+// whole network is Taubin-smoothed (an alternating shrink/inflate low-pass that
+// rounds toward circles WITHOUT collapsing the cells, so higher softness can
+// keep making the holes rounder). Vertices on the petal boundary are pinned
+// (cells stay inside the rim) and every pass is mirrored across the axis so
+// bilateral symmetry is exact. Returns one smoothed polyline per wall, all
 // sharing their junction endpoints so the mesh stays connected.
 function roundGraph(walls, sil, softness) {
   const rk = (v) => Math.round(v * 8000) / 8000;
@@ -717,7 +717,7 @@ function roundGraph(walls, sil, softness) {
   const segs = walls.map((w) => [getV(w.a), getV(w.b)]);
   const nV = verts.length;
 
-  const S = 4;                               // subdivisions per wall
+  const S = 6;                               // subdivisions per wall (smoother rounded curves)
   const pts = verts.map((v) => ({ x: v.x, y: v.y }));
   const pinned = new Array(nV).fill(false);
   for (let i = 0; i < nV; i++) if (distToPolyBoundary(verts[i].x, verts[i].y, sil) < 0.03) pinned[i] = true;
@@ -745,16 +745,20 @@ function roundGraph(walls, sil, softness) {
   const mate = new Array(nP).fill(-1);
   for (let i = 0; i < nP; i++) { const j = pos.get(rk(pts[i].x) + ',' + rk(-pts[i].y)); if (j !== undefined) mate[i] = j; }
 
-  const iters = Math.max(1, Math.round(lerp(1, 7, softness)));
-  const wgt = 0.5;
-  for (let it = 0; it < iters; it++) {
+  // More softness -> more Taubin passes -> rounder holes (2..~22 passes over
+  // softness 0..5). Taubin alternates a smoothing step (LAMBDA) with a slightly
+  // larger inflate step (MU), which low-pass-filters the outline toward circles
+  // while keeping the cells their size — plain Laplacian would just shrink them.
+  const passes = Math.max(1, Math.round(2 + 4 * clamp(softness, 0, 5)));
+  const LAMBDA = 0.5, MU = -0.52;
+  const smoothStep = (w) => {
     const nx = new Array(nP), ny = new Array(nP);
     for (let i = 0; i < nP; i++) {
       if (isPinned(i) || nbr[i].length === 0) { nx[i] = pts[i].x; ny[i] = pts[i].y; continue; }
       let sx = 0, sy = 0;
       for (const j of nbr[i]) { sx += pts[j].x; sy += pts[j].y; }
       sx /= nbr[i].length; sy /= nbr[i].length;
-      nx[i] = lerp(pts[i].x, sx, wgt); ny[i] = lerp(pts[i].y, sy, wgt);
+      nx[i] = pts[i].x + w * (sx - pts[i].x); ny[i] = pts[i].y + w * (sy - pts[i].y);
     }
     for (let i = 0; i < nP; i++) { pts[i].x = nx[i]; pts[i].y = ny[i]; }
     for (let i = 0; i < nP; i++) {                 // re-symmetrise across the axis
@@ -764,7 +768,8 @@ function roundGraph(walls, sil, softness) {
         pts[i].x = ax; pts[i].y = ay; pts[j].x = ax; pts[j].y = -ay;
       }
     }
-  }
+  };
+  for (let it = 0; it < passes; it++) { smoothStep(LAMBDA); smoothStep(MU); }
   return chains.map((chain) => chain.map((i) => ({ x: pts[i].x, y: pts[i].y })));
 }
 
