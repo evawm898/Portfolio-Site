@@ -76,6 +76,35 @@ def test_save_correction_with_direct_actual_values(client):
     assert body["created_at"]
 
 
+def test_absolute_error_reported_alongside_percent_error(client):
+    res = client.post(
+        "/corrections",
+        data=_base_correction_fields(
+            actual_wales_per_inch=10.0, actual_courses_per_inch=7.0, algorithm_version="cv-v0.3"
+        ),
+    )
+    assert res.status_code == 201
+    body = res.json()
+    # predicted (8.0, 6.0) - actual (10.0, 7.0)
+    assert body["wale_absolute_error"] == pytest.approx(8.0 - 10.0, abs=0.001)
+    assert body["course_absolute_error"] == pytest.approx(6.0 - 7.0, abs=0.001)
+    assert body["algorithm_version"] == "cv-v0.3"
+
+    # Persisted, not just echoed in the immediate response.
+    records = client.get("/corrections").json()
+    saved = [r for r in records if r["id"] == body["id"]][0]
+    assert saved["wale_absolute_error"] == pytest.approx(-2.0, abs=0.001)
+    assert saved["course_absolute_error"] == pytest.approx(-1.0, abs=0.001)
+    assert saved["algorithm_version"] == "cv-v0.3"
+
+
+def test_absolute_error_null_when_no_ground_truth(client):
+    res = client.post("/corrections", data=_base_correction_fields())
+    body = res.json()
+    assert body["wale_absolute_error"] is None
+    assert body["course_absolute_error"] is None
+
+
 def test_actual_per_inch_derived_from_roi_stitch_count(client):
     # orientation=vertical -> wale extent is ROI width (60mm), course extent is ROI height (40mm)
     res = client.post(

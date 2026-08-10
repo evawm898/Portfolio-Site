@@ -43,11 +43,13 @@
 
   <!-- Left: step panel -->
   <aside class="tgr-panel" id="panel">
+    <button type="button" id="panelToggle" class="tgr-panel-toggle" aria-label="Collapse panel" aria-expanded="true">&lsaquo;</button>
 
+    <div class="tgr-panel__scroll" id="panelScroll">
     <ol class="tgr-steps" id="steps">
       <li class="tgr-step" data-step="upload">1. Upload Image</li>
       <li class="tgr-step" data-step="calibrate">2. Calibrate Scale</li>
-      <li class="tgr-step" data-step="roi">3. Select Measurement Area</li>
+      <li class="tgr-step" data-step="roi">3. Review Measurement Areas</li>
       <li class="tgr-step" data-step="orientation">4. Select Orientation</li>
       <li class="tgr-step" data-step="analyze">5. Analyze</li>
       <li class="tgr-step" data-step="results">6. Results</li>
@@ -86,14 +88,31 @@
       <p class="tgr-error" id="calError" hidden></p>
     </section>
 
-    <!-- Step 3: ROI -->
+    <!-- Step 3: Review Measurement Areas -->
     <section class="tgr-step-panel" data-panel="roi" hidden>
-      <h2>Select measurement area</h2>
-      <p class="tgr-hint">Click and drag a rectangle over a clean, flat, representative part of the textile. Drag the handles to adjust it.</p>
-      <p class="tgr-status" id="roiStatus">Draw a rectangle on the image.</p>
+      <h2>Review measurement areas</h2>
+      <p class="tgr-hint">
+        The system proposes several candidate measurement areas, sized from
+        the calibrated scale (roughly <strong>0.75&ndash;1&nbsp;in</strong>
+        square) and spread across different parts of the fabric, so the
+        gauge can later be cross-checked across independent regions rather
+        than trusting a single crop. Click a labeled box (on the image or in
+        the list below) to select it, drag its handles to resize, drag its
+        body to move it &mdash; hold <strong>Shift</strong> while dragging
+        to keep it square. Review the boxes, adjust or remove any that land
+        on a bad spot, add your own if you'd rather choose one yourself,
+        then approve.
+      </p>
+      <p class="tgr-status" id="roiStatus">Proposing measurement areas&hellip;</p>
+      <p class="tgr-error" id="roiError" hidden></p>
+      <ul class="tgr-roi-list" id="roiList"></ul>
       <div class="tgr-button-row">
-        <button id="roiClear" class="tgr-btn tgr-btn--secondary" type="button">Clear</button>
-        <button id="roiConfirm" class="tgr-btn" type="button" disabled>Confirm Area</button>
+        <button id="roiAddMode" class="tgr-btn tgr-btn--secondary" type="button">Add Measurement Area</button>
+        <button id="roiDeleteSelected" class="tgr-btn tgr-btn--secondary" type="button" disabled>Delete Selected</button>
+        <button id="roiReset" class="tgr-btn tgr-btn--secondary" type="button">Reset to Proposed</button>
+      </div>
+      <div class="tgr-button-row">
+        <button id="roiConfirm" class="tgr-btn" type="button" disabled>Approve Measurement Areas</button>
       </div>
     </section>
 
@@ -111,6 +130,20 @@
           <span>Wales run <strong>horizontally</strong> ↔ (courses run vertically)</span>
         </label>
       </div>
+
+      <h2 class="tgr-substep-heading">Structure (optional)</h2>
+      <p class="tgr-hint">If this is a plain face-knit jersey / single-knit, selecting it lets the detector lean more on loop-shape evidence. Leave as Unknown otherwise.</p>
+      <div class="tgr-radio-row">
+        <label class="tgr-radio-option">
+          <input type="radio" name="structure" value="unknown" checked>
+          <span>Unknown</span>
+        </label>
+        <label class="tgr-radio-option">
+          <input type="radio" name="structure" value="jersey">
+          <span>Jersey / Single Knit</span>
+        </label>
+      </div>
+
       <div class="tgr-button-row">
         <button id="orientationConfirm" class="tgr-btn" type="button">Continue</button>
       </div>
@@ -134,23 +167,63 @@
       <div class="tgr-results-grid" id="resultsGrid"></div>
       <div id="resultsWarning" class="tgr-warning" hidden></div>
 
-      <label class="tgr-checkbox-option tgr-show-centers-toggle">
-        <input type="checkbox" id="showLoopCentersCheck">
-        <span>Show loop centers (debug)</span>
+      <details class="tgr-debug-panel tgr-consistency-panel" id="measurementConsistencyPanel" hidden>
+        <summary>Measurement consistency</summary>
+        <p class="tgr-hint">
+          The final gauge above is a cross-region consensus, not a single
+          crop's guess: each approved area was measured independently, and
+          regions that didn't agree with the majority are excluded rather
+          than averaged in. This is that comparison, in brief -- see
+          Developer diagnostics below for each region's own numbers.
+        </p>
+        <div id="measurementConsistencyContent"></div>
+      </details>
+
+      <label class="tgr-checkbox-option tgr-show-centers-toggle" id="showMeasurementAreasRow" hidden>
+        <input type="checkbox" id="showMeasurementAreasCheck">
+        <span>Show measurement areas</span>
       </label>
 
-      <details class="tgr-debug-panel" id="detectionDetailsPanel">
-        <summary>Detection Details</summary>
+      <details class="tgr-debug-panel" id="devDiagnosticsPanel">
+        <summary>Developer diagnostics</summary>
         <p class="tgr-hint">
-          What the detector actually locked onto for each axis: every harmonic
-          period candidate it considered (typically half / full / double the raw
-          edge-signal estimate) and why the final one was picked. A "corrected"
-          reason means the raw estimate looked like it was following a sub-loop
-          feature (e.g. one leg of a V) or a doubled repeat, and loop-center
-          evidence was used to fix it — use "Show loop centers" above to check
-          that visually against the actual knit structure.
+          Internal algorithm detail, kept out of the normal results view on
+          purpose — candidate periods, evidence scores, and loop-center
+          detections are useful while developing the detector, not for
+          reading a gauge measurement.
         </p>
-        <div id="detectionDetailsContent"></div>
+
+        <label class="tgr-checkbox-option tgr-show-centers-toggle">
+          <input type="checkbox" id="showLoopCentersCheck">
+          <span>Show loop centers (periodicity detector)</span>
+        </label>
+        <label class="tgr-checkbox-option tgr-show-centers-toggle">
+          <input type="checkbox" id="showVShapeLoopsCheck">
+          <span>Show detected loops (V-shape experiment)</span>
+        </label>
+
+        <div class="tgr-field-row" id="roiDiagSelectRow" hidden>
+          <label for="roiDiagSelect">Inspect region</label>
+          <select id="roiDiagSelect"></select>
+        </div>
+        <div id="roiDiagContent"></div>
+
+        <div id="axisDiagnosticsContent"></div>
+        <div id="loopLatticeComparison"></div>
+
+        <details class="tgr-debug-panel" id="detectionDetailsPanel">
+          <summary>Detection Details</summary>
+          <p class="tgr-hint">
+            What the detector actually locked onto for each axis: every harmonic
+            period candidate it considered (typically half / full / double the raw
+            edge-signal estimate) and why the final one was picked. A "corrected"
+            reason means the raw estimate looked like it was following a sub-loop
+            feature (e.g. one leg of a V) or a doubled repeat, and loop-center
+            evidence was used to fix it — use "Show loop centers" above to check
+            that visually against the actual knit structure.
+          </p>
+          <div id="detectionDetailsContent"></div>
+        </details>
       </details>
 
       <div class="tgr-verify" id="verifySection">
@@ -213,6 +286,7 @@
         <button id="resetBtn" class="tgr-btn" type="button">Reset / Analyze Another Image</button>
       </div>
     </section>
+    </div>
 
   </aside>
 
@@ -222,6 +296,12 @@
     <div class="tgr-viewer__stage" id="stage" hidden>
       <img id="sourceImage" alt="Uploaded textile" draggable="false">
       <canvas id="overlay"></canvas>
+    </div>
+    <div class="tgr-zoom-controls" id="zoomControls" hidden title="Drag to reposition &middot; scroll to pan &middot; Ctrl/pinch-scroll or +/&minus; to zoom">
+      <button type="button" id="zoomOutBtn" class="tgr-zoom-controls__btn" aria-label="Zoom out">&minus;</button>
+      <span class="tgr-zoom-controls__level" id="zoomLevel">100%</span>
+      <button type="button" id="zoomInBtn" class="tgr-zoom-controls__btn" aria-label="Zoom in">+</button>
+      <button type="button" id="zoomResetBtn" class="tgr-zoom-controls__reset" aria-label="Reset zoom and position">Reset</button>
     </div>
   </section>
 

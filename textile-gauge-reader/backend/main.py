@@ -15,18 +15,21 @@ to disk.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from analysis import ALGORITHM_VERSION, analyze_gauge
+from analysis import ALGORITHM_VERSION, analyze_gauge, analyze_multi_roi, propose_measurement_rois
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
+from analysis.gauge_analysis import analyze_loop_lattice_experiment
 from storage import corrections_store
 
 from .corrections_api import router as corrections_router
@@ -36,9 +39,18 @@ from .schemas import (
     UNIT_TO_MM,
     AnalyzeResponse,
     AreaMm,
+    AxisConsensusOut,
     AxisOut,
+    CandidateOut,
+    LoopLatticeDebugOut,
+    MultiRoiDebugOut,
     Orientation,
+    OutlierOut,
+    ProposedRoiOut,
+    ProposeRoisResponse,
+    RoiMeasurementOut,
     RoiOut,
+    Structure,
     Unit,
 )
 
@@ -124,6 +136,15 @@ def health_legacy() -> dict:
     return {"status": "ok"}
 
 
+def _period_px_to_per_inch(period_px: float, pixels_per_mm: float) -> Optional[float]:
+    if pixels_per_mm <= 0:
+        return None
+    spacing_mm = period_px / pixels_per_mm
+    if spacing_mm <= 0:
+        return None
+    return round(MM_PER_INCH / spacing_mm, 3)
+
+
 def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
     spacing_mm = None
     per_inch = None
@@ -140,6 +161,75 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
         message=axis.message,
         candidates_px=axis.candidates_px,
         selected_reason=axis.selected_reason,
+        candidate_details=[
+            CandidateOut(
+                period_px=d.period_px,
+                per_inch=_period_px_to_per_inch(d.period_px, pixels_per_mm),
+                harmonic=d.harmonic,
+                fold_consistency=d.fold_consistency,
+                autocorr_score=getattr(d, "autocorr_score", None),
+                support_2d=getattr(d, "support_2d", None),
+                structural_score=getattr(d, "structural_score", None),
+                patch_consensus=getattr(d, "patch_consensus", None),
+                harmonic_penalty=getattr(d, "harmonic_penalty", None),
+                phase_consistency=getattr(d, "phase_consistency", None),
+                alternating_phase_score=getattr(d, "alternating_phase_score", None),
+                evidence_score=getattr(d, "evidence_score", None),
+                final_score=getattr(d, "final_score", None),
+                selected=d.selected,
+            )
+            for d in getattr(axis, "candidate_details", [])
+        ],
+        status=getattr(axis, "status", "confident"),
+        uncertain_reason=getattr(axis, "uncertain_reason", None),
+    )
+
+
+def _loop_lattice_to_out(lattice, pixels_per_mm: float) -> LoopLatticeDebugOut:
+    """Shared by /analyze and /analyze-multi (once per region, in the latter)."""
+    return LoopLatticeDebugOut(
+        direct_centers_px=lattice.direct_centers_px,
+        inferred_centers_px=lattice.inferred_centers_px,
+        wale_columns_px=lattice.wale_columns_px,
+        column_support_counts=lattice.column_support_counts,
+        direct_center_count=lattice.direct_center_count,
+        row_count=lattice.row_count,
+        column_count=lattice.column_count,
+        lattice_consistency=lattice.lattice_consistency,
+        wale_spacing_px=lattice.wale_spacing_px,
+        course_spacing_px=lattice.course_spacing_px,
+        wale_per_inch=(
+            _period_px_to_per_inch(lattice.wale_spacing_px, pixels_per_mm) if lattice.wale_spacing_px else None
+        ),
+        course_per_inch=(
+            _period_px_to_per_inch(lattice.course_spacing_px, pixels_per_mm) if lattice.course_spacing_px else None
+        ),
+        scale_used_px=lattice.scale_used_px,
+        message=lattice.message,
+    )
+
+
+def _axis_consensus_to_out(consensus, pixels_per_mm: float) -> AxisConsensusOut:
+    return AxisConsensusOut(
+        included_labels=consensus.included_labels,
+        excluded_labels=consensus.excluded_labels,
+        outliers=[
+            OutlierOut(
+                label=o.label,
+                spacing_px=o.spacing_px,
+                per_inch=_period_px_to_per_inch(o.spacing_px, pixels_per_mm),
+                ratio_to_consensus=o.ratio_to_consensus,
+                reason=o.reason,
+            )
+            for o in consensus.outliers
+        ],
+        regional_median_px=consensus.regional_median_px,
+        regional_median_per_inch=(
+            _period_px_to_per_inch(consensus.regional_median_px, pixels_per_mm)
+            if consensus.regional_median_px else None
+        ),
+        regional_spread_px=consensus.regional_spread_px,
+        message=consensus.message,
     )
 
 
@@ -157,6 +247,7 @@ async def analyze(
     known_distance: float = Form(...),
     unit: Unit = Form(...),
     orientation: Orientation = Form(...),
+    structure: Structure = Form("unknown"),
 ) -> JSONResponse:
     # --- Validate + decode upload (in memory only, never persisted) -----
     try:
@@ -224,6 +315,7 @@ async def analyze(
             image_bgr=image,
             roi=roi,
             orientation=orientation,  # type: ignore[arg-type]  # Literal-compatible str
+            structure=structure,  # type: ignore[arg-type]  # Literal-compatible str
         )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Analysis raised an unexpected exception")
@@ -240,6 +332,26 @@ async def analyze(
             content=AnalyzeResponse(success=False, message=result.message).model_dump(),
         )
 
+    # Experimental, parallel loop-lattice detector (see analysis.gauge_
+    # analysis.analyze_loop_lattice_experiment) -- development/comparison
+    # diagnostic only, never allowed to affect the real `wale`/`course`
+    # response above. Wrapped defensively: a failure here must never
+    # break the actual analysis result.
+    loop_lattice_out: Optional[LoopLatticeDebugOut] = None
+    try:
+        # "Use the reliable course rows as a structural prior": pass the
+        # EXISTING, frozen course detector's own row positions straight
+        # through -- this experiment only ever reads them, never adjusts
+        # course detection itself.
+        lattice = analyze_loop_lattice_experiment(
+            image, roi=roi, orientation=orientation,  # type: ignore[arg-type]
+            course_rows_px=result.course.positions_px or None,
+        )
+        loop_lattice_out = _loop_lattice_to_out(lattice, pixels_per_mm)
+    except Exception:  # pragma: no cover - defensive: experimental path, never fatal
+        logger.exception("Loop-lattice experiment raised an unexpected exception")
+        loop_lattice_out = None
+
     response = AnalyzeResponse(
         success=True,
         message=result.message,
@@ -253,10 +365,284 @@ async def analyze(
             height_mm=round(result.roi_height_px / pixels_per_mm, 3),
         ),
         orientation=orientation,
+        structure=structure,
         wale=_axis_to_out(result.wale, pixels_per_mm),
         course=_axis_to_out(result.course, pixels_per_mm),
         algorithm_version=ALGORITHM_VERSION,
         loop_centers_px=result.loop_centers_px,
+        rotation_deg=result.rotation_deg,
+        loop_lattice_debug=loop_lattice_out,
+    )
+    return JSONResponse(status_code=200, content=response.model_dump())
+
+
+@app.post("/propose-rois", response_model=ProposeRoisResponse)
+async def propose_rois(
+    file: UploadFile = File(...),
+    cal_x1: float = Form(...),
+    cal_y1: float = Form(...),
+    cal_x2: float = Form(...),
+    cal_y2: float = Form(...),
+    known_distance: float = Form(...),
+    unit: Unit = Form(...),
+) -> JSONResponse:
+    """
+    Stage 1 of the multi-region workflow: given an uploaded image and its
+    calibration, propose several candidate square measurement areas for
+    the user to review/edit/approve in the "Review Measurement Areas"
+    step -- BEFORE any gauge analysis runs. See analysis.gauge_analysis.
+    propose_measurement_rois for the selection/scoring logic.
+    """
+    try:
+        data = await file.read()
+        validate_upload(file.content_type, len(data))
+        image = decode_image(data)
+    except ImageValidationError as exc:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(success=False, message=str(exc)).model_dump(),
+        )
+
+    if known_distance <= 0:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(
+                success=False, message="Known calibration distance must be greater than zero."
+            ).model_dump(),
+        )
+
+    cal_pixel_dist = ((cal_x2 - cal_x1) ** 2 + (cal_y2 - cal_y1) ** 2) ** 0.5
+    if cal_pixel_dist < 2:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(
+                success=False,
+                message="Calibration points are too close together. Please pick two distinct points.",
+            ).model_dump(),
+        )
+
+    known_distance_mm = known_distance * UNIT_TO_MM[unit]
+    pixels_per_mm = cal_pixel_dist / known_distance_mm
+    if pixels_per_mm <= 0:
+        return JSONResponse(
+            status_code=400,
+            content=ProposeRoisResponse(
+                success=False, message="Could not compute a valid scale from calibration."
+            ).model_dump(),
+        )
+
+    try:
+        proposal = propose_measurement_rois(image_bgr=image, pixels_per_mm=pixels_per_mm)
+    except Exception:  # pragma: no cover - defensive: never fabricate a result
+        logger.exception("ROI proposal raised an unexpected exception")
+        return JSONResponse(
+            status_code=500,
+            content=ProposeRoisResponse(
+                success=False, message="Proposing measurement areas failed unexpectedly. Please try again."
+            ).model_dump(),
+        )
+
+    response = ProposeRoisResponse(
+        success=proposal.success,
+        message=proposal.message,
+        rois=[
+            ProposedRoiOut(
+                x=r.x, y=r.y, width=r.width, height=r.height, label=r.label,
+                quality_score=r.quality_score, sharpness=r.sharpness, contrast=r.contrast,
+                periodicity=r.periodicity, texture_consistency=r.texture_consistency,
+                brightness_score=r.brightness_score, periodicity_consistency=r.periodicity_consistency,
+            )
+            for r in proposal.rois
+        ],
+        window_size_px=proposal.window_size_px,
+        pixels_per_mm=round(pixels_per_mm, 6),
+    )
+    # success=False here means "valid request, but no suitable areas found"
+    # (e.g. a tiny or extremely uniform image) -- not a request error, so
+    # this is still a 200; the frontend shows proposal.message and offers
+    # the manual "Add Measurement Area" fallback.
+    return JSONResponse(status_code=200, content=response.model_dump())
+
+
+@app.post("/analyze-multi", response_model=AnalyzeResponse)
+async def analyze_multi(
+    file: UploadFile = File(...),
+    rois_json: str = Form(...),
+    cal_x1: float = Form(...),
+    cal_y1: float = Form(...),
+    cal_x2: float = Form(...),
+    cal_y2: float = Form(...),
+    known_distance: float = Form(...),
+    unit: Unit = Form(...),
+    orientation: Orientation = Form(...),
+    structure: Structure = Form("unknown"),
+) -> JSONResponse:
+    """
+    Stage 2 of the multi-region workflow: analyze every approved
+    measurement area completely independently, then combine them into a
+    robust cross-region consensus -- see analysis.gauge_analysis.
+    analyze_multi_roi. Returns the SAME response shape as /analyze
+    (wale/course/roi/analyzed_area_*), so the normal Results view needs
+    no changes; `multi_roi` carries the additional per-region + consensus
+    diagnostics for the "Measurement consistency" summary and Developer
+    diagnostics' per-region selector.
+
+    `rois_json`: a JSON array of {label, x, y, width, height, source},
+    in full-image pixel coordinates, exactly as approved on the "Review
+    Measurement Areas" step.
+    """
+    # --- Validate + decode upload (in memory only, never persisted) -----
+    try:
+        data = await file.read()
+        validate_upload(file.content_type, len(data))
+        image = decode_image(data)
+    except ImageValidationError as exc:
+        return JSONResponse(
+            status_code=400,
+            content=AnalyzeResponse(success=False, message=str(exc)).model_dump(),
+        )
+
+    img_h, img_w = image.shape[:2]
+
+    # --- Parse + validate measurement areas ------------------------------
+    try:
+        rois_raw = json.loads(rois_json)
+    except (TypeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content=AnalyzeResponse(success=False, message="Could not parse measurement areas.").model_dump(),
+        )
+    if not isinstance(rois_raw, list) or not rois_raw:
+        return JSONResponse(
+            status_code=400,
+            content=AnalyzeResponse(success=False, message="At least one measurement area is required.").model_dump(),
+        )
+
+    rois: list[dict] = []
+    for i, item in enumerate(rois_raw):
+        try:
+            label = str(item.get("label") or chr(ord("A") + i))
+            x = float(item["x"])
+            y = float(item["y"])
+            width = float(item["width"])
+            height = float(item["height"])
+            source = str(item.get("source", "auto"))
+        except (AttributeError, KeyError, TypeError, ValueError):
+            return JSONResponse(
+                status_code=400,
+                content=AnalyzeResponse(success=False, message="One or more measurement areas were malformed.").model_dump(),
+            )
+        if width <= 0 or height <= 0 or x < 0 or y < 0 or x + width > img_w or y + height > img_h:
+            return JSONResponse(
+                status_code=400,
+                content=AnalyzeResponse(
+                    success=False, message=f"Measurement area {label} falls outside the image bounds."
+                ).model_dump(),
+            )
+        rois.append({"label": label, "x": x, "y": y, "width": width, "height": height, "source": source})
+
+    # --- Validate calibration (identical to /analyze) --------------------
+    if known_distance <= 0:
+        return JSONResponse(
+            status_code=400,
+            content=AnalyzeResponse(
+                success=False, message="Known calibration distance must be greater than zero."
+            ).model_dump(),
+        )
+    cal_pixel_dist = ((cal_x2 - cal_x1) ** 2 + (cal_y2 - cal_y1) ** 2) ** 0.5
+    if cal_pixel_dist < 2:
+        return JSONResponse(
+            status_code=400,
+            content=AnalyzeResponse(
+                success=False,
+                message="Calibration points are too close together. Please pick two distinct points.",
+            ).model_dump(),
+        )
+    known_distance_mm = known_distance * UNIT_TO_MM[unit]
+    pixels_per_mm = cal_pixel_dist / known_distance_mm
+    if pixels_per_mm <= 0:
+        return JSONResponse(
+            status_code=400,
+            content=AnalyzeResponse(
+                success=False, message="Could not compute a valid scale from calibration."
+            ).model_dump(),
+        )
+
+    # --- Run independent-per-region analysis + consensus -----------------
+    try:
+        result = analyze_multi_roi(
+            image_bgr=image, rois=rois,
+            orientation=orientation,  # type: ignore[arg-type]
+            structure=structure,  # type: ignore[arg-type]
+        )
+    except Exception:  # pragma: no cover - defensive: never fabricate a result
+        logger.exception("Multi-ROI analysis raised an unexpected exception")
+        return JSONResponse(
+            status_code=500,
+            content=AnalyzeResponse(
+                success=False, message="Analysis failed unexpectedly. Please try again."
+            ).model_dump(),
+        )
+
+    if not result.success:
+        return JSONResponse(
+            status_code=200,
+            content=AnalyzeResponse(success=False, message=result.message).model_dump(),
+        )
+
+    primary_x, primary_y, primary_w, primary_h = result.primary_roi_px
+    primary_measurement = next(
+        (m for m in result.per_roi if m.label == result.primary_label), result.per_roi[0]
+    )
+
+    per_roi_out = [
+        RoiMeasurementOut(
+            label=m.label, x=m.x, y=m.y, width=m.width, height=m.height, source=m.source,
+            success=m.success, message=m.message,
+            wale=_axis_to_out(m.wale, pixels_per_mm),
+            course=_axis_to_out(m.course, pixels_per_mm),
+            quality_score=m.quality_score,
+            sharpness=m.quality_parts.get("sharpness"),
+            contrast=m.quality_parts.get("contrast"),
+            periodicity=m.quality_parts.get("periodicity"),
+            texture_consistency=m.quality_parts.get("texture_consistency"),
+            brightness_score=m.quality_parts.get("brightness_score"),
+            periodicity_consistency=m.quality_parts.get("periodicity_consistency"),
+            rotation_deg=m.rotation_deg,
+            loop_lattice_debug=_loop_lattice_to_out(m.loop_lattice, pixels_per_mm) if m.loop_lattice else None,
+            wale_source=m.wale_source,
+            wale_count_confidence=m.wale_count_confidence,
+        )
+        for m in result.per_roi
+    ]
+    primary_loop_lattice_out = next(
+        (r.loop_lattice_debug for r in per_roi_out if r.label == result.primary_label), None
+    )
+
+    response = AnalyzeResponse(
+        success=True,
+        message=result.message,
+        pixels_per_mm=round(pixels_per_mm, 6),
+        roi=RoiOut(x=primary_x, y=primary_y, width=primary_w, height=primary_h),
+        analyzed_area_px=RoiOut(x=primary_x, y=primary_y, width=primary_w, height=primary_h),
+        analyzed_area_mm=AreaMm(
+            width_mm=round(primary_w / pixels_per_mm, 3),
+            height_mm=round(primary_h / pixels_per_mm, 3),
+        ),
+        orientation=orientation,
+        structure=structure,
+        wale=_axis_to_out(result.wale, pixels_per_mm),
+        course=_axis_to_out(result.course, pixels_per_mm),
+        algorithm_version=ALGORITHM_VERSION,
+        loop_centers_px=primary_measurement.loop_centers_px,
+        rotation_deg=primary_measurement.rotation_deg,
+        loop_lattice_debug=primary_loop_lattice_out,
+        multi_roi=MultiRoiDebugOut(
+            per_roi=per_roi_out,
+            wale_consensus=_axis_consensus_to_out(result.wale_consensus, pixels_per_mm),
+            course_consensus=_axis_consensus_to_out(result.course_consensus, pixels_per_mm),
+            primary_label=result.primary_label,
+        ),
     )
     return JSONResponse(status_code=200, content=response.model_dump())
 
