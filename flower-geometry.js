@@ -345,8 +345,7 @@ function dedupePolygon(poly) {
 const VEIN_MIDRIB_BASE = 1.00;
 const VEIN_MIDRIB_TIP  = 0.42;
 const VEIN_TERTIARY    = 0.28;
-const VORONOI_GROW     = 0.5;   // uniform wall thickening per unit softness (even struts)
-const VORONOI_FILLET   = 0.12;  // small extra at the junctions per unit softness (smooth joins)
+const VORONOI_GROW     = 0.5;   // even strut thickening per unit softness
 // relative line-weight by branch order (0 = midrib). Deeper orders are finer;
 // the last entry is the floor so very deep fractal twigs stay visible.
 const VEIN_WIDTH_BY_ORDER = [1.00, 0.56, 0.38, 0.28, 0.22, 0.18];
@@ -627,14 +626,12 @@ export function buildVoronoi(P, rng, opts = {}) {
   const seeds = [];
   for (const s of half) { seeds.push({ x: s.x, y: s.y }); seeds.push({ x: s.x, y: -s.y }); }
 
-  // each cell = silhouette clipped by every perpendicular-bisector half-plane
-  const edges = new Map();                    // dedup key -> { a, b, n }
-  const rk = (v) => Math.round(v * 2000) / 2000;
-  const edgeKey = (a, b) => {
-    const ka = rk(a.x) + ',' + rk(a.y), kb = rk(b.x) + ',' + rk(b.y);
-    return ka < kb ? ka + '|' + kb : kb + '|' + ka;
-  };
-  for (let i = 0; i < seeds.length; i++) {
+  // Each cell = silhouette clipped by every perpendicular-bisector half-plane.
+  // Only the +Y seed of each mirror pair (even indices) is solved; its -Y twin's
+  // cell is the exact mirror, added later — this guarantees bilateral symmetry
+  // instead of leaving it to float-identical clipping of mirrored inputs.
+  const cells = [];
+  for (let i = 0; i < seeds.length; i += 2) {
     const s = seeds[i];
     let cell = sil;
     for (let j = 0; j < seeds.length && cell.length >= 3; j++) {
@@ -644,148 +641,88 @@ export function buildVoronoi(P, rng, opts = {}) {
       cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * (t.y - s.y),
         (s.x * s.x + s.y * s.y) - (t.x * t.x + t.y * t.y));
     }
-    if (cell.length < 3) continue;
-    for (let k = 0; k < cell.length; k++) {
-      const a = cell[k], b = cell[(k + 1) % cell.length];
-      if (Math.hypot(a.x - b.x, a.y - b.y) < 1e-4) continue;
-      const key = edgeKey(a, b);
-      const e = edges.get(key);
-      if (e) e.n++; else edges.set(key, { a, b, n: 1 });
-    }
+    if (cell.length >= 3) cells.push(cell);
   }
 
-  // interior walls border TWO cells -> keep once; silhouette walls border one
-  // -> drop (the rim already traces them).
-  const walls = [];
-  for (const { a, b, n } of edges.values()) if (n >= 2) walls.push({ a, b });
-
-  // SOFTNESS (0..5) rounds the angular cells into smooth organic ones. Path
-  // rounding works on the shared wall graph (not per cell), so junctions stay
-  // connected and mirror symmetry is preserved: subdivide every wall, then
-  // Taubin-smooth with the petal-boundary vertices pinned and each step
-  // re-symmetrised across the axis. Higher softness keeps rounding the holes
-  // further toward circles (Taubin doesn't collapse them) and also adds material.
+  // SOFTNESS reshapes each cell toward a smooth OVAL hole. Voronoi walls are
+  // shared between two cells, so no shared-wall smoothing can round both of the
+  // holes a wall borders at once — instead each cell is drawn as its OWN closed
+  // loop, blended from its straight polygon toward its fitted ellipse as softness
+  // rises, and inset a little so neighbouring holes separate into a lattice. The
+  // strut material thickens evenly with softness (uniform ring weight — no
+  // bulbous junctions). Because the seed set is mirror-symmetric, so is every
+  // cell and its ellipse, so the whole field stays symmetric across the axis. At
+  // softness 0 the loops are the bare polygons (touching — the plain angular
+  // Voronoi); at 5 they are ovals separated by an even web.
   const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
-  const polylines = softness > 0.02
-    ? roundGraph(walls, sil, softness)
-    : walls.map((w) => [{ x: w.a.x, y: w.a.y }, { x: w.b.x, y: w.b.y }]);
+  const round = clamp(softness / 5, 0, 1);                 // polygon -> ellipse
+  const inset = 1 - lerp(0, 0.14, clamp(softness, 0, 5) / 5); // shrink to open the web
+  const smooth = Math.min(2, Math.round(softness));        // 0 = sharp cells, up to 2 corner-cuts
+  const m = 1 + softness * VORONOI_GROW;                   // even strut thickening
+  const weight = VEIN_TERTIARY * m;
 
-  // SOFTNESS also adds MATERIAL, thickening the web (independent of the tube
-  // slider). To keep it EVEN across the surface rather than bulbous, almost all
-  // of that material is a UNIFORM thickening of every wall; only a small fillet
-  // is concentrated at the junctions, just enough to round the joins. The
-  // junction beads track the uniform thickness (not the fillet), so nodes stay
-  // flush with the struts instead of ballooning. The uniform growth scales
-  // linearly with softness (5 -> 5x the added material of 1). `rad` is a
-  // t -> weight function (multiplied by the tube radius in the render layer).
-  const grow = softness * VORONOI_GROW;      // even, all-along thickening
-  const fillet = softness * VORONOI_FILLET;  // small junction-only fillet
-  const m = 1 + grow;
-  const rad = softness > 1e-3
-    ? (t) => VEIN_TERTIARY * (m + fillet * (1 - Math.sin(Math.PI * t)))
-    : null;
-
-  const veins = polylines.map((pl) => ({ points: pl, w0: VEIN_TERTIARY, w1: VEIN_TERTIARY, rad }));
-  const nodes = [];                          // bead the (smoothed) junctions to seal joins
-  const seen = new Set();
-  for (const pl of polylines) {
-    for (const p of [pl[0], pl[pl.length - 1]]) {
-      const vk = rk(p.x) + ',' + rk(p.y);
-      if (!seen.has(vk)) { seen.add(vk); nodes.push({ x: p.x, y: p.y, width: VEIN_TERTIARY * m }); }
-    }
+  const veins = [];
+  for (const cell of cells) {
+    const loop = roundedCell(cell, round, inset, smooth);
+    if (loop.length < 3) continue;
+    const ring = [...loop, { x: loop[0].x, y: loop[0].y }];        // close the ring
+    veins.push({ points: ring, w0: weight, w1: weight });          // +Y cell
+    const mir = ring.map((p) => ({ x: p.x, y: -p.y }));            // exact -Y mirror
+    veins.push({ points: mir, w0: weight, w1: weight });
   }
-  return { veins, nodes };
+  return { veins, nodes: [] };
 }
 
-// Round a shared wall graph into smooth cells. Walls are subdivided and the
-// whole network is Taubin-smoothed (an alternating shrink/inflate low-pass that
-// rounds toward circles WITHOUT collapsing the cells, so higher softness can
-// keep making the holes rounder). Vertices on the petal boundary are pinned
-// (cells stay inside the rim) and every pass is mirrored across the axis so
-// bilateral symmetry is exact. Returns one smoothed polyline per wall, all
-// sharing their junction endpoints so the mesh stays connected.
-function roundGraph(walls, sil, softness) {
-  const rk = (v) => Math.round(v * 8000) / 8000;
-  const key = (p) => rk(p.x) + ',' + rk(p.y);
-  const verts = [];
-  const idx = new Map();
-  const getV = (p) => {
-    const k = key(p); let i = idx.get(k);
-    if (i === undefined) { i = verts.length; verts.push({ x: p.x, y: p.y }); idx.set(k, i); }
-    return i;
-  };
-  const segs = walls.map((w) => [getV(w.a), getV(w.b)]);
-  const nV = verts.length;
-
-  const S = 6;                               // subdivisions per wall (smoother rounded curves)
-  const pts = verts.map((v) => ({ x: v.x, y: v.y }));
-  const pinned = new Array(nV).fill(false);
-  for (let i = 0; i < nV; i++) if (distToPolyBoundary(verts[i].x, verts[i].y, sil) < 0.03) pinned[i] = true;
-
-  const chains = [];
-  for (const [a, b] of segs) {
-    const chain = [a];
-    for (let s = 1; s < S; s++) {
-      const t = s / S, i = pts.length;
-      pts.push({ x: lerp(verts[a].x, verts[b].x, t), y: lerp(verts[a].y, verts[b].y, t) });
-      chain.push(i);
-    }
-    chain.push(b);
-    chains.push(chain);
-  }
-  const nP = pts.length;
-  const isPinned = (i) => i < nV && pinned[i];
-
-  const nbr = Array.from({ length: nP }, () => []);
-  for (const chain of chains) for (let i = 0; i < chain.length - 1; i++) { nbr[chain[i]].push(chain[i + 1]); nbr[chain[i + 1]].push(chain[i]); }
-
-  // fixed mirror pairing from the (exactly symmetric) starting positions
-  const pos = new Map();
-  for (let i = 0; i < nP; i++) pos.set(key(pts[i]), i);
-  const mate = new Array(nP).fill(-1);
-  for (let i = 0; i < nP; i++) { const j = pos.get(rk(pts[i].x) + ',' + rk(-pts[i].y)); if (j !== undefined) mate[i] = j; }
-
-  // More softness -> more Taubin passes -> rounder holes (2..~22 passes over
-  // softness 0..5). Taubin alternates a smoothing step (LAMBDA) with a slightly
-  // larger inflate step (MU), which low-pass-filters the outline toward circles
-  // while keeping the cells their size — plain Laplacian would just shrink them.
-  const passes = Math.max(1, Math.round(2 + 4 * clamp(softness, 0, 5)));
-  const LAMBDA = 0.5, MU = -0.52;
-  const smoothStep = (w) => {
-    const nx = new Array(nP), ny = new Array(nP);
-    for (let i = 0; i < nP; i++) {
-      if (isPinned(i) || nbr[i].length === 0) { nx[i] = pts[i].x; ny[i] = pts[i].y; continue; }
-      let sx = 0, sy = 0;
-      for (const j of nbr[i]) { sx += pts[j].x; sy += pts[j].y; }
-      sx /= nbr[i].length; sy /= nbr[i].length;
-      nx[i] = pts[i].x + w * (sx - pts[i].x); ny[i] = pts[i].y + w * (sy - pts[i].y);
-    }
-    for (let i = 0; i < nP; i++) { pts[i].x = nx[i]; pts[i].y = ny[i]; }
-    for (let i = 0; i < nP; i++) {                 // re-symmetrise across the axis
-      const j = mate[i];
-      if (j >= i) {
-        const ax = (pts[i].x + pts[j].x) / 2, ay = (pts[i].y - pts[j].y) / 2;
-        pts[i].x = ax; pts[i].y = ay; pts[j].x = ax; pts[j].y = -ay;
-      }
-    }
-  };
-  for (let it = 0; it < passes; it++) { smoothStep(LAMBDA); smoothStep(MU); }
-  return chains.map((chain) => chain.map((i) => ({ x: pts[i].x, y: pts[i].y })));
+// Reshape one Voronoi cell polygon into a smooth closed loop. Each vertex is
+// blended from the polygon toward the cell's fitted ellipse (round 0..1: 0 keeps
+// the polygon, 1 lands it on the ellipse in its own radial direction), then
+// pulled toward the centroid (inset) to open gaps between neighbours, then
+// corner-cut for a smooth oval. Deterministic, so a mirrored cell yields the
+// mirrored loop and bilateral symmetry is preserved.
+function roundedCell(poly, round, inset, smooth) {
+  const n = poly.length;
+  let cx = 0, cy = 0;
+  for (const p of poly) { cx += p.x; cy += p.y; }
+  cx /= n; cy /= n;
+  let Cxx = 0, Cyy = 0, Cxy = 0;              // vertex covariance -> equivalent ellipse
+  for (const p of poly) { const dx = p.x - cx, dy = p.y - cy; Cxx += dx * dx; Cyy += dy * dy; Cxy += dx * dy; }
+  Cxx /= n; Cyy /= n; Cxy /= n;
+  const tr = Cxx + Cyy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (Cxx * Cyy - Cxy * Cxy)));
+  const ELL = 1.45;                           // std-dev -> semi-axis (ellipse ~ the cell size)
+  const a = Math.sqrt(Math.max(tr / 2 + disc, 1e-9)) * ELL;
+  const b = Math.sqrt(Math.max(tr / 2 - disc, 1e-9)) * ELL;
+  const ang = 0.5 * Math.atan2(2 * Cxy, Cxx - Cyy);
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const pts = poly.map((p) => {
+    const dx = p.x - cx, dy = p.y - cy;
+    const u = dx * ca + dy * sa, v = -dx * sa + dy * ca;   // into ellipse axes
+    const len = Math.hypot(u, v) || 1;
+    const du = u / len, dv = v / len;
+    const t = 1 / Math.hypot(du / a, dv / b);              // ray from centre hits ellipse
+    const ex = cx + (du * t) * ca - (dv * t) * sa;
+    const ey = cy + (du * t) * sa + (dv * t) * ca;
+    let bx = lerp(p.x, ex, round), by = lerp(p.y, ey, round);
+    bx = cx + (bx - cx) * inset; by = cy + (by - cy) * inset;
+    return { x: bx, y: by };
+  });
+  return chaikinClosed(pts, smooth);
 }
 
-// Distance from a point to the boundary of a polygon (min over its edges).
-function distToPolyBoundary(x, y, poly) {
-  let best = Infinity;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const ax = poly[j].x, ay = poly[j].y, bx = poly[i].x, by = poly[i].y;
-    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
-    let t = l2 > 0 ? ((x - ax) * dx + (y - ay) * dy) / l2 : 0;
-    t = clamp(t, 0, 1);
-    const cx = ax + dx * t, cy = ay + dy * t;
-    best = Math.min(best, Math.hypot(x - cx, y - cy));
+// Corner-cutting (Chaikin) on a CLOSED polyline -> a smooth loop.
+function chaikinClosed(pts, iters) {
+  let p = pts;
+  for (let it = 0; it < iters; it++) {
+    const q = [], n = p.length;
+    for (let i = 0; i < n; i++) {
+      const a = p[i], b = p[(i + 1) % n];
+      q.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      q.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    p = q;
   }
-  return best;
+  return p;
 }
+
 
 // Keep the part of a polygon on the inner side of a*x + b*y + c <= 0
 // (Sutherland-Hodgman against one half-plane; robust for any simple polygon).
