@@ -64,6 +64,8 @@ _COLUMNS: List[str] = [
     "actual_course_count",
     "actual_wales_per_inch",
     "actual_courses_per_inch",
+    "wale_absolute_error",
+    "course_absolute_error",
     "wale_percent_error",
     "course_percent_error",
     "calibration_correct",
@@ -105,6 +107,8 @@ class CorrectionRecord:
     actual_course_count: Optional[int]
     actual_wales_per_inch: Optional[float]
     actual_courses_per_inch: Optional[float]
+    wale_absolute_error: Optional[float]
+    course_absolute_error: Optional[float]
     wale_percent_error: Optional[float]
     course_percent_error: Optional[float]
     calibration_correct: bool
@@ -185,6 +189,7 @@ def _row_to_record(row: sqlite3.Row) -> CorrectionRecord:
         "predicted_wales_per_inch", "predicted_courses_per_inch",
         "predicted_wale_confidence", "predicted_course_confidence",
         "actual_wales_per_inch", "actual_courses_per_inch",
+        "wale_absolute_error", "course_absolute_error",
         "wale_percent_error", "course_percent_error",
     ):
         if kwargs[key] is not None and kwargs[key] != "":

@@ -4,14 +4,22 @@
  * Pure UI/interaction code: image upload, two-point calibration, ROI
  * selection, orientation choice, calling the analysis API, and drawing
  * results. No image analysis happens here — everything is delegated to
- * the FastAPI backend (deployed separately, e.g. on Render), which
- * delegates the actual computer vision to its `analysis` package.
+ * the FastAPI backend, which delegates the actual computer vision to its
+ * `analysis` package.
  *
- * This page is served as static files from the portfolio site (e.g.
- * GitHub Pages / Netlify), which cannot run the Python backend itself.
- * The backend lives at a different origin, configured below. Upload,
- * calibration, ROI selection, and overlay drawing all work with zero
- * backend involvement — only the "Analyze" step needs the API.
+ * THIS COPY (backend/frontend/) is served BY the backend itself --
+ * `uvicorn backend.main:app` mounts this directory at "/" for local
+ * full-stack development, same-origin, no CORS needed. It must stay a
+ * byte-for-byte mirror of the root-level production copy (`../../
+ * textile-gauge-reader.{html,js,css}`, served separately from the
+ * portfolio site) except for API_BASE_URL below -- copy the other files
+ * over wholesale on every change rather than hand-editing this one, or
+ * the two silently drift apart (this file only exists because they once
+ * already had: this whole copy sat unsynced since the very first version
+ * of the app, so visiting the backend's own root URL served a stale,
+ * pre-multi-region UI with none of the later fixes, while looking enough
+ * like the real thing to cause real confusion about which result to
+ * trust).
  *
  * All interaction state (calibration points, ROI, detected positions)
  * is stored in ORIGINAL IMAGE PIXEL coordinates ("natural" coordinates).
@@ -25,17 +33,13 @@
   // -------------------------------------------------------------------
   // CONFIGURATION — the one place the backend API URL is defined.
   //
-  // Set this to your deployed FastAPI backend's base URL, with no
-  // trailing slash, e.g.:
-  //   API_BASE_URL: "https://textile-gauge-reader-api.onrender.com"
-  //
-  // Leave it as an empty string until the backend is deployed. The page
-  // still loads and every step up through ROI/orientation selection
-  // still works — only "Analyze" will show a clear "service not
-  // configured" message instead of trying (and failing) to call it.
+  // Empty string: this copy is served BY the backend (same origin), so
+  // API calls need no base URL at all. The production copy at the repo
+  // root sets this to the deployed backend's full URL instead, since it
+  // runs on a different origin (the portfolio site).
   // -------------------------------------------------------------------
   const CONFIG = {
-    API_BASE_URL: "https://textile-gauge-reader-api.onrender.com",
+    API_BASE_URL: "",
   };
 
   const STEPS = ["upload", "calibrate", "roi", "orientation", "analyze", "results"];
