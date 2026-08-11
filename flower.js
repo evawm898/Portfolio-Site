@@ -22,7 +22,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
+  buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
 } from './flower-geometry.js';
@@ -327,6 +327,34 @@ class MeshAccumulator {
     const rl = ringStart[rings - 1];
     for (let si = 0; si < sectors; si++) {                              // south cap fan
       this.idx.push(south, rl + (si + 1) % sectors, rl + si);
+    }
+  }
+
+  /* A filled double-sided membrane stitched from a grid of surface points. The
+     grid is rows x cols of {p, n} — a world position and its surface normal.
+     Consecutive rows/columns are joined into quads; the petal material is
+     DoubleSide, so this single sheet reads as a thin solid leaf. Used for the
+     SOLID sepal blade (no thickness needed for the live view). */
+  addMembrane(grid) {
+    const rows = grid.length;
+    if (rows < 2) return;
+    const cols = grid[0].length;
+    if (cols < 2) return;
+    const rowStart = new Array(rows);
+    for (let i = 0; i < rows; i++) {
+      rowStart[i] = this.vcount;
+      const row = grid[i];
+      for (let j = 0; j < cols; j++) {
+        const { p, n } = row[j];
+        this._vertex(p.x, p.y, p.z, n.x, n.y, n.z);
+      }
+    }
+    for (let i = 0; i < rows - 1; i++) {
+      for (let j = 0; j < cols - 1; j++) {
+        const a = rowStart[i] + j, b = a + 1;
+        const c = rowStart[i + 1] + j, d = c + 1;
+        this.idx.push(a, b, c, b, d, c);
+      }
     }
   }
 
@@ -677,6 +705,23 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
   });
 
+  // SOLID BLADE: render the petal as one filled, soft-edged membrane instead of
+  // a vein/infill skeleton (used by solid sepals). A rim tube still traces the
+  // margin so the leaf edge reads as a clean rounded lip, then we're done — the
+  // skeleton infill below is skipped entirely.
+  if (P.solidBlade) {
+    const { rows } = buildBlade(P, { uSteps: 26, vSteps: 12 });
+    const grid = rows.map((row) => row.map((pt) => ({
+      p: place(mapPointToSurface(pt, P, spine)),
+      n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
+    })));
+    acc.addMembrane(grid);
+    const rim = outline.map(toWorld);
+    rim.push(rim[0]);                              // close the loop at the base
+    acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0);
+    return;
+  }
+
   // PETAL EDGE: the tip style can reshape the outline. JAGGED turns the tip end
   // into a row of teeth (a rim weaving through them + a mid-vein per tooth);
   // RUFFLED rolls the tip end into a smooth continuous wave (no extra veins).
@@ -834,20 +879,25 @@ function buildReceptacleInto(acc, P, cx, cy, cz, size) {
    step between the petals. Real sepals are thin straps, not leaf-shaped petals,
    so these are much narrower and more tapered than a petal, with a light midrib
    and a strong recurve. Reuses the petal builder (same tube line weight & teal). */
-function buildSepalsInto(acc, P, cx, cy, cz, count, size, ringR) {
-  const N = clamp(Math.round(count), 3, 24);
+function buildSepalsInto(acc, P, cx, cy, cz, opts, ringR) {
+  const N = clamp(Math.round(opts.count), 3, 24);       // COUNT: sepals in the whorl
+  const size = clamp(opts.size, 0.1, 1.5);
+  const solid = opts.style === 'solid';                 // STYLE: solid leaf vs strap
   const sepR = Math.max(ringR * 0.85, 0.16);
+  // SOLID sepals are broader, soft-tipped leaf blades; STRAP sepals stay narrow,
+  // sharply tapered spikes. Curve is user-driven for both (centre + two edges).
   const Ps = {
     ...P,
     L: P.L * size,
-    W: P.W * size * 0.3,        // narrow, strap-like — a thin sepal, not a petal
-    taper: 0.78,                // slender: taper to a fine point
-    tip: 0.97,                  // sharp spike tip
-    edgeCurve: -0.25,           // pinch the sides in -> spiky
-    edgeProfile: 0,
+    W: P.W * size * (solid ? 0.55 : 0.3),
+    taper: solid ? 0.5 : 0.78,       // solid: fuller blade; strap: taper to a point
+    tip: solid ? 0.45 : 0.97,        // solid: rounded soft tip; strap: sharp spike
+    edgeCurve: opts.edgeCurve,       // top-down side billow (+) / pinch (-)
+    edgeProfile: opts.edgeProfile,   // out-of-plane profile lift of the margins
     tipStyle: 'clean',
     infillType: 'veins',
-    curl: 0.85,                 // reflex: the down-tilted sepal arcs its tip back up
+    curl: opts.centerCurve,          // centre curve -> reflex of the down-tilted sepal
+    solidBlade: solid,
     secondaries: 3, maxDepth: 2, crossPerStrip: 2,   // light midrib, not full venation
   };
   const off = Math.PI / N;                              // tuck between the petals
@@ -1046,7 +1096,14 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     stemTop = centerHeight - hh;
   }
   if (ui.sepalsType !== 'none') {
-    buildSepalsInto(petalAcc, P, 0, centerHeight, 0, count, clamp(ui.sepalSize, 0.1, 1.5), ringR);
+    buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
+      count: ui.sepalCount,
+      size: ui.sepalSize,
+      style: ui.sepalStyle,
+      centerCurve: ui.sepalCenterCurve,
+      edgeCurve: ui.sepalEdgeCurve,
+      edgeProfile: ui.sepalEdgeProfile,
+    }, ringR);
   }
   if (ui.stemType !== 'none') {
     buildStemInto(petalAcc, P, 0, stemTop, 0, clamp(ui.stemLength, 0.2, 6), clamp(ui.stemCurve, -1, 1));
@@ -1287,6 +1344,11 @@ const inputs = {
   receptacleSize: document.getElementById('receptacleSize'),
   sepalsType: document.getElementById('sepalsType'),
   sepalSize: document.getElementById('sepalSize'),
+  sepalCount: document.getElementById('sepalCount'),
+  sepalStyle: document.getElementById('sepalStyle'),
+  sepalCenterCurve: document.getElementById('sepalCenterCurve'),
+  sepalEdgeCurve: document.getElementById('sepalEdgeCurve'),
+  sepalEdgeProfile: document.getElementById('sepalEdgeProfile'),
   stemType: document.getElementById('stemType'),
   stemLength: document.getElementById('stemLength'),
   stemCurve: document.getElementById('stemCurve'),
@@ -1360,6 +1422,11 @@ function readUI() {
     receptacleSize: parseFloat(inputs.receptacleSize.value),
     sepalsType: inputs.sepalsType.value,
     sepalSize: parseFloat(inputs.sepalSize.value),
+    sepalCount: parseInt(inputs.sepalCount.value, 10),
+    sepalStyle: inputs.sepalStyle.value,
+    sepalCenterCurve: parseFloat(inputs.sepalCenterCurve.value),
+    sepalEdgeCurve: parseFloat(inputs.sepalEdgeCurve.value),
+    sepalEdgeProfile: parseFloat(inputs.sepalEdgeProfile.value),
     stemType: inputs.stemType.value,
     stemLength: parseFloat(inputs.stemLength.value),
     stemCurve: parseFloat(inputs.stemCurve.value),
@@ -1422,6 +1489,13 @@ function refreshLabels() {
   setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
   setLabel('receptacleSize', (+inputs.receptacleSize.value).toFixed(2));
   setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
+  setLabel('sepalCount', inputs.sepalCount.value);
+  const scc = +inputs.sepalCenterCurve.value;
+  setLabel('sepalCenterCurve', (scc > 0 ? '+' : '') + scc.toFixed(2));
+  const sec = +inputs.sepalEdgeCurve.value;
+  setLabel('sepalEdgeCurve', (sec > 0 ? '+' : '') + sec.toFixed(2));
+  const sep = +inputs.sepalEdgeProfile.value;
+  setLabel('sepalEdgeProfile', (sep > 0 ? '+' : '') + sep.toFixed(2));
   setLabel('stemLength', (+inputs.stemLength.value).toFixed(2));
   const scv = +inputs.stemCurve.value;
   setLabel('stemCurve', (scv > 0 ? '+' : '') + scv.toFixed(2));
@@ -1484,7 +1558,8 @@ function setBuilding(on) {
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize',
- 'receptacleSize', 'sepalSize', 'stemLength', 'stemCurve', 'tightness', 'elevation'].forEach((k) => {
+ 'receptacleSize', 'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
+ 'stemLength', 'stemCurve', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -1566,6 +1641,7 @@ function updateBaseOptions() {
 }
 inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.sepalsType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+inputs.sepalStyle.addEventListener('change', () => { scheduleRegen(); });
 // Adding / lengthening the stem grows the plant past the current framing, so
 // request a camera refit on the next rebuild to bring the whole flower into view.
 inputs.stemType.addEventListener('change', () => {
@@ -1660,6 +1736,11 @@ if (resetBtn) {
     inputs.receptacleSize.value = d.receptacleSize;
     inputs.sepalsType.value = d.sepalsType;
     inputs.sepalSize.value = d.sepalSize;
+    inputs.sepalCount.value = d.sepalCount;
+    inputs.sepalStyle.value = d.sepalStyle;
+    inputs.sepalCenterCurve.value = d.sepalCenterCurve;
+    inputs.sepalEdgeCurve.value = d.sepalEdgeCurve;
+    inputs.sepalEdgeProfile.value = d.sepalEdgeProfile;
     inputs.stemType.value = d.stemType;
     inputs.stemLength.value = d.stemLength;
     inputs.stemCurve.value = d.stemCurve;
@@ -1713,6 +1794,7 @@ const DEFAULTS = {
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
   centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
   receptacleType: 'none', receptacleSize: 0.6, sepalsType: 'none', sepalSize: 0.6,
+  sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
   stemType: 'none', stemLength: 1.8, stemCurve: 0.2,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };

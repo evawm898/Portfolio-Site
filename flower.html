@@ -680,6 +680,53 @@
           <span class="fl-ctrl__hint">small &rarr; large</span>
         </div>
 
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalCount">Sepal count</label>
+            <span class="fl-ctrl__val" data-value="sepalCount"></span>
+          </div>
+          <input type="range" id="sepalCount" min="3" max="24" step="1" value="5">
+          <span class="fl-ctrl__hint">number of sepals in the whorl</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalStyle">Sepal style</label>
+          </div>
+          <select class="fl-select" id="sepalStyle">
+            <option value="strap">STRAP</option>
+            <option value="solid">SOLID</option>
+          </select>
+          <span class="fl-ctrl__hint">spiky straps &rarr; solid soft-edged leaves</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalCenterCurve">Sepal center curve</label>
+            <span class="fl-ctrl__val" data-value="sepalCenterCurve"></span>
+          </div>
+          <input type="range" id="sepalCenterCurve" min="-1" max="1" step="0.01" value="0.85">
+          <span class="fl-ctrl__hint">reflex down &rarr; arc up (spine)</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalEdgeCurve">Sepal edge curve &mdash; top-down</label>
+            <span class="fl-ctrl__val" data-value="sepalEdgeCurve"></span>
+          </div>
+          <input type="range" id="sepalEdgeCurve" min="-1" max="1" step="0.01" value="-0.25">
+          <span class="fl-ctrl__hint">pinched &rarr; billowed (plan view)</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalEdgeProfile">Sepal edge curve &mdash; profile</label>
+            <span class="fl-ctrl__val" data-value="sepalEdgeProfile"></span>
+          </div>
+          <input type="range" id="sepalEdgeProfile" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">edges dip &rarr; lift (parallel to centre curve)</span>
+        </div>
+
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="stemType">Stem</label>
