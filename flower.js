@@ -62,6 +62,9 @@ const EVEN_MAX       = 4;      // at/below this petal count, arrange petals as a
                                // (equal angle + equal radius) instead of the phyllotactic
                                // spiral, so 3 or 4 petals sit evenly spaced from each other
 const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom radius
+const BIL_STEP_MAX   = Math.PI / 4;   // bilateral fan: widest comfortable gap between neighbours
+const BIL_SPAN_MAX   = Math.PI * 1.5; // bilateral fan: total spread caps here, always leaving a
+                                      // >=90 deg opening so the single mirror axis stays obvious
 const SLAB_THICK     = 3.2;    // Voronoi sheet thickness, as a multiple of the tube radius
 const SLAB_FILLET    = 1.0;    // rounded-edge radius as a fraction of half-thickness (1 = full bullnose)
 
@@ -619,14 +622,38 @@ function generate() {
   const elev = ui.elevation;                                     // -1 (bowl) .. +1 (cone)
   const elevAmp = ELEV_FACTOR * rMax;                            // scale elevation with bloom size
 
-  // Few-petal blooms (3, 4, …) look clumped on the golden-angle spiral, so place
-  // them on a symmetric rosette: equal angular spacing and one shared ring radius.
-  // A single petal stays on the axis; the spiral takes over once past EVEN_MAX.
-  const evenSpaced = count <= EVEN_MAX;
+  // Bloom arrangement:
+  //  · COILED   — the phyllotactic golden-angle spiral (Vogel packing). Few petals
+  //               read as a clump there, so 3–4 fall back to an even rosette.
+  //  · RADIAL   — all petals evenly spread around one ring (actinomorphic daisy).
+  //  · BILATERAL— a symmetric fan across a single axis: azimuths spread as a
+  //               mirror-symmetric set about the front, leaving an open wedge at the
+  //               back, so the bloom has exactly one vertical plane of symmetry.
+  const bloomType = ui.bloomType;
+  const coiledEven = count <= EVEN_MAX;       // coiled-only rosette fallback
+  const ringR = EVEN_RING * rMax;             // shared single-ring radius
+  // Bilateral fan: comfortable neighbour gap for few petals, packed toward the max
+  // total spread as the count grows (never wrapping into a closed ring).
+  const bilStep = count > 1 ? Math.min(BIL_STEP_MAX, BIL_SPAN_MAX / (count - 1)) : 0;
 
   for (let i = 0; i < count; i++) {
-    const az = evenSpaced ? (i * 2 * Math.PI / count) : (i * GOLDEN_ANGLE);
-    const r = evenSpaced ? (count === 1 ? 0 : EVEN_RING * rMax) : (spread * Math.sqrt(i));
+    let az, r, seedIdx = i;
+    if (count === 1) {
+      az = 0; r = 0;
+    } else if (bloomType === 'radial') {
+      az = i * 2 * Math.PI / count;                       // evenly around one ring
+      r = ringR;
+    } else if (bloomType === 'bilateral') {
+      az = (i - (count - 1) / 2) * bilStep;               // symmetric fan about az=0
+      r = ringR;
+      seedIdx = Math.min(i, count - 1 - i);               // mirror pairs share venation
+    } else if (coiledEven) {                              // coiled, few petals -> rosette
+      az = i * 2 * Math.PI / count;
+      r = ringR;
+    } else {                                              // coiled spiral
+      az = i * GOLDEN_ANGLE;
+      r = spread * Math.sqrt(i);
+    }
     const rho = rMax > 1e-6 ? clamp(r / rMax, 0, 1) : 0;
     // raised-cosine receptacle profile: 1 at the centre, 0 at the rim
     const profile = 0.5 * (1 + Math.cos(Math.PI * rho));
@@ -636,7 +663,7 @@ function generate() {
     // radius cancels here, so the lean stays bounded at any coil tightness.
     const slope = -elev * ELEV_FACTOR * (Math.PI / 2) * Math.sin(Math.PI * rho);
     const tilt = RECEPTACLE_TILT * Math.atan(slope);
-    buildPetalInto(petalAcc, P, az, height, r - P.r0, tilt, SEED_BASE + i * 131);
+    buildPetalInto(petalAcc, P, az, height, r - P.r0, tilt, SEED_BASE + seedIdx * 131);
   }
 
   const centerHeight = elev * elevAmp;                           // core sits at the receptacle centre
@@ -714,6 +741,7 @@ const inputs = {
   tipLength: document.getElementById('tipLength'),
   tipFrequency: document.getElementById('tipFrequency'),
   tipIrregularity: document.getElementById('tipIrregularity'),
+  bloomType: document.getElementById('bloomType'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   infillType: document.getElementById('infillType'),
@@ -750,6 +778,7 @@ function readUI() {
     tipLength: parseFloat(inputs.tipLength.value),
     tipFrequency: parseInt(inputs.tipFrequency.value, 10),
     tipIrregularity: parseFloat(inputs.tipIrregularity.value),
+    bloomType: inputs.bloomType.value,
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     infillType: inputs.infillType.value,
@@ -820,12 +849,15 @@ function updateReadout(petalAcc, ui) {
   const el = document.getElementById('readout');
   if (!el) return;
   const petals = `${ui.petalCount} petal${ui.petalCount === 1 ? '' : 's'}`;
+  const arrange = ui.bloomType === 'radial' ? 'radial rosette'
+    : ui.bloomType === 'bilateral' ? 'bilateral fan'
+    : 'phyllotactic spiral';
   const infill = ui.infillType === 'voronoi' ? 'voronoi cells'
     : ui.infillType === 'strands' ? 'radial strands'
     : ui.infillType === 'bone' ? 'bone lattice'
     : ui.infillType === 'lace' ? 'lace filigree'
     : 'leaf venation';
-  el.textContent = `${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
+  el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
 }
 
 // coalesce rapid slider input into one rebuild per frame
@@ -891,6 +923,15 @@ function updateInfillOptions() {
   }
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
+// Bloom type is a <select>; like Tip/Infill, only the chosen arrangement's hints
+// are shown (data-bloom-styles), and changing it re-lays out the whole bloom.
+function updateBloomOptions() {
+  const type = inputs.bloomType.value;
+  document.querySelectorAll('[data-bloom-styles]').forEach((el) => {
+    el.hidden = !el.getAttribute('data-bloom-styles').split(/\s+/).includes(type);
+  });
+}
+inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 // the outline toggle changes geometry, so it regenerates
 inputs.boneOutline.addEventListener('change', () => { scheduleRegen(); });
@@ -910,6 +951,7 @@ if (resetBtn) {
     inputs.tipLength.value = d.tipLength;
     inputs.tipFrequency.value = d.tipFrequency;
     inputs.tipIrregularity.value = d.tipIrregularity;
+    inputs.bloomType.value = d.bloomType;
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
     inputs.infillType.value = d.infillType;
@@ -935,6 +977,7 @@ if (resetBtn) {
     resetPlaceholders();
     updateTipOptions();
     updateInfillOptions();
+    updateBloomOptions();
     refreshLabels();
     scheduleRegen();
   });
@@ -943,7 +986,7 @@ if (resetBtn) {
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
-  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
+  bloomType: 'coiled', bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
@@ -1027,6 +1070,7 @@ placeholderControls.forEach(({ id, fmt }) => {
 controls.autoRotate = inputs.autoRotate.checked;
 updateTipOptions();
 updateInfillOptions();
+updateBloomOptions();
 refreshLabels();
 generate();
 animate();
