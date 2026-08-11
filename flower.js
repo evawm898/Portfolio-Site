@@ -19,6 +19,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import {
   lerp, clamp, mulberry32,
   buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
@@ -267,32 +268,65 @@ class MeshAccumulator {
         this.idx.push(a, b, c, b, d, c);
       }
     }
+
+    // EXPORT: seal the two open cylinder ends with a triangle fan to a centre
+    // vertex, so every tube (incl. the core filaments, receptacle ribs and stem,
+    // and the closed-loop rim seam) becomes a watertight solid with no boundary
+    // edges. The fan reuses the existing ring vertices, so ring-perimeter edges
+    // are shared with the wall quads (no new boundary). Live builds skip this.
+    if (this.exportMode) {
+      const rs = radialSegments;
+      const t0 = T[0], p0 = points[0];
+      const c0 = this._vertex(p0.x, p0.y, p0.z, -t0[0], -t0[1], -t0[2]);   // start cap, faces -tangent
+      const s0 = ringStart[0];
+      for (let j = 0; j < rs; j++) this.idx.push(c0, s0 + (j + 1) % rs, s0 + j);
+      const tl = T[n - 1], pl = points[n - 1];
+      const cl = this._vertex(pl.x, pl.y, pl.z, tl[0], tl[1], tl[2]);       // end cap, faces +tangent
+      const sl = ringStart[n - 1];
+      for (let j = 0; j < rs; j++) this.idx.push(cl, sl + j, sl + (j + 1) % rs);
+    }
   }
 
-  /* A small welded bead (low-res UV sphere) that caps tube ends and reads
-     as a lattice node. */
+  /* A small WATERTIGHT bead (low-res UV sphere) that caps tube ends and reads as
+     a lattice node. Single pole vertices and a wrapped longitude (no duplicated
+     seam column) so it is a closed manifold with no boundary edges — earlier it
+     had an open seam + degenerate poles, which showed up as boundary edges in the
+     STL export. Outward normals. */
   addBead(center, radius, rings = 5, sectors = 8) {
     if (this.exportMode) {
       radius = Math.max(MIN_RADIUS_UNITS, radius);                      // export floor
       if (radius < this.minRadius) this.minRadius = radius;             // telemetry
     }
-    const start = this.vcount;
-    for (let ri = 0; ri <= rings; ri++) {
+    rings = Math.max(2, rings); sectors = Math.max(3, sectors);
+    const cx = center.x, cy = center.y, cz = center.z;
+    const north = this._vertex(cx, cy + radius, cz, 0, 1, 0);
+    // Interior latitude rings ri = 1..rings-1 (poles handled separately).
+    const ringStart = new Array(rings);
+    for (let ri = 1; ri <= rings - 1; ri++) {
       const phi = (Math.PI * ri) / rings;
-      const cy = Math.cos(phi), sr = Math.sin(phi);
-      for (let si = 0; si <= sectors; si++) {
+      const cyy = Math.cos(phi), sr = Math.sin(phi);
+      ringStart[ri] = this.vcount;
+      for (let si = 0; si < sectors; si++) {
         const th = (2 * Math.PI * si) / sectors;
-        const nx = sr * Math.cos(th), ny = cy, nz = sr * Math.sin(th);
-        this._vertex(center.x + nx * radius, center.y + ny * radius, center.z + nz * radius, nx, ny, nz);
+        const nx = sr * Math.cos(th), ny = cyy, nz = sr * Math.sin(th);
+        this._vertex(cx + nx * radius, cy + ny * radius, cz + nz * radius, nx, ny, nz);
       }
     }
-    const stride = sectors + 1;
-    for (let ri = 0; ri < rings; ri++) {
+    const south = this._vertex(cx, cy - radius, cz, 0, -1, 0);
+    const r1 = ringStart[1];
+    for (let si = 0; si < sectors; si++) {                              // north cap fan
+      this.idx.push(north, r1 + si, r1 + (si + 1) % sectors);
+    }
+    for (let ri = 1; ri <= rings - 2; ri++) {                          // body quads
+      const a = ringStart[ri], b = ringStart[ri + 1];
       for (let si = 0; si < sectors; si++) {
-        const a = start + ri * stride + si;
-        const b = a + 1, c = a + stride, d = c + 1;
-        this.idx.push(a, b, c, b, d, c);
+        const sn = (si + 1) % sectors;
+        this.idx.push(a + si, a + sn, b + si, a + sn, b + sn, b + si);
       }
+    }
+    const rl = ringStart[rings - 1];
+    for (let si = 0; si < sectors; si++) {                              // south cap fan
+      this.idx.push(south, rl + (si + 1) % sectors, rl + si);
     }
   }
 
@@ -384,14 +418,18 @@ class MeshAccumulator {
     for (let k = 0; k < N; k++) {
       const k1 = (k + 1) % N;
       const O = colO[k], O1 = colO[k1], I = colI[k], I1 = colI[k1];
+      // Winding is reversed vs. the obvious loft so the outward face normal (used
+      // as the STL facet normal) points OUT of the solid — the signed volume of a
+      // voronoi petal comes out positive, matching the tube/ribbon parts. The live
+      // view is unaffected (it shades from the per-vertex normals, DoubleSide).
       for (let m = 0; m < MO - 1; m++) {
-        this.idx.push(O[m], O1[m + 1], O1[m],   O[m], O[m + 1], O1[m + 1]);   // cell wall (faces outward)
+        this.idx.push(O[m], O1[m], O1[m + 1],   O[m], O1[m + 1], O[m + 1]);   // cell wall
       }
       for (let m = 0; m < MH - 1; m++) {
-        this.idx.push(I[m], I1[m], I1[m + 1],   I[m], I1[m + 1], I[m + 1]);   // rounded hole rim
+        this.idx.push(I[m], I1[m + 1], I1[m],   I[m], I[m + 1], I1[m + 1]);   // rounded hole rim
       }
-      this.idx.push(O[0], O1[0], I1[TOP],   O[0], I1[TOP], I[TOP]);              // top face (cell edge -> hole)
-      this.idx.push(O[MO - 1], I1[BOT], O1[MO - 1],   O[MO - 1], I[BOT], I1[BOT]); // bottom face (reversed)
+      this.idx.push(O[0], I1[TOP], O1[0],   O[0], I[TOP], I1[TOP]);              // top face (cell edge -> hole)
+      this.idx.push(O[MO - 1], O1[MO - 1], I1[BOT],   O[MO - 1], I1[BOT], I[BOT]); // bottom face
     }
   }
 
@@ -423,7 +461,7 @@ class MeshAccumulator {
 
     // Per-station orthonormal frame (tangent t along the vein, surface normal n,
     // in-surface side u = t x n) and the four cross-section corners.
-    const Tt = [], Nn = [], Uu = [], TL = [], TR = [], BR = [], BL = [];
+    const Nn = [], Uu = [], TL = [], TR = [], BR = [], BL = [];
     for (let i = 0; i < n; i++) {
       const p = stations[i].p;
       let tx, ty, tz;
@@ -447,50 +485,49 @@ class MeshAccumulator {
         const f = Math.min(2 * hw, 2 * ht);
         if (f < this.minThick) this.minThick = f;
       }
-      Tt[i] = [tx, ty, tz]; Nn[i] = [nx, ny, nz]; Uu[i] = [ux, uy, uz];
+      Nn[i] = [nx, ny, nz]; Uu[i] = [ux, uy, uz];
       TL[i] = [p.x + ux * hw + nx * ht, p.y + uy * hw + ny * ht, p.z + uz * hw + nz * ht];
       TR[i] = [p.x - ux * hw + nx * ht, p.y - uy * hw + ny * ht, p.z - uz * hw + nz * ht];
       BR[i] = [p.x - ux * hw - nx * ht, p.y - uy * hw - ny * ht, p.z - uz * hw - nz * ht];
       BL[i] = [p.x + ux * hw - nx * ht, p.y + uy * hw - ny * ht, p.z + uz * hw - nz * ht];
     }
 
-    // Loft one face as a quad strip between two corner-arrays, with a per-station
-    // outward normal. `sign` sets the winding so the face faces `normArr` outward.
-    const face = (A, B, normArr, sign) => {
-      const col = new Array(n);
-      for (let i = 0; i < n; i++) {
-        const nm = normArr[i];
-        col[i] = [
-          this._vertex(A[i][0], A[i][1], A[i][2], nm[0], nm[1], nm[2]),
-          this._vertex(B[i][0], B[i][1], B[i][2], nm[0], nm[1], nm[2]),
-        ];
-      }
-      for (let i = 0; i < n - 1; i++) {
-        const a0 = col[i][0], b0 = col[i][1], a1 = col[i + 1][0], b1 = col[i + 1][1];
-        if (sign > 0) this.idx.push(a0, b0, b1, a0, b1, a1);
-        else          this.idx.push(a0, b1, b0, a0, a1, b1);
-      }
-    };
-    const neg = (v) => [-v[0], -v[1], -v[2]];
-    face(TL, TR, Nn, +1);                    // top  (+normal)
-    face(BL, BR, Nn.map(neg), -1);           // bottom (-normal)
-    face(TR, BR, Uu.map(neg), +1);           // right (-u)
-    face(BL, TL, Uu, -1);                    // left  (+u)
+    // Emit the four corner vertex-lines ONCE per station (shared by the faces
+    // that meet there) so every edge is shared by exactly two triangles — the
+    // ribbon is a watertight box beam with no boundary edges. Corner normals are
+    // the average of the two faces meeting at that corner (a soft bevel; the STL
+    // uses per-facet normals regardless). Corner order around the section is
+    // TL -> TR -> BR -> BL (clockwise seen from +tangent).
+    const unit = (x, y, z) => { const l = Math.hypot(x, y, z) || 1; return [x / l, y / l, z / l]; };
+    const ring = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const u = Uu[i], nn = Nn[i];
+      const nTL = unit(u[0] + nn[0], u[1] + nn[1], u[2] + nn[2]);
+      const nTR = unit(-u[0] + nn[0], -u[1] + nn[1], -u[2] + nn[2]);
+      const nBR = unit(-u[0] - nn[0], -u[1] - nn[1], -u[2] - nn[2]);
+      const nBL = unit(u[0] - nn[0], u[1] - nn[1], u[2] - nn[2]);
+      const base = this.vcount;
+      this._vertex(TL[i][0], TL[i][1], TL[i][2], nTL[0], nTL[1], nTL[2]);
+      this._vertex(TR[i][0], TR[i][1], TR[i][2], nTR[0], nTR[1], nTR[2]);
+      this._vertex(BR[i][0], BR[i][1], BR[i][2], nBR[0], nBR[1], nBR[2]);
+      this._vertex(BL[i][0], BL[i][1], BL[i][2], nBL[0], nBL[1], nBL[2]);
+      ring[i] = base;   // corners at base+0(TL) +1(TR) +2(BR) +3(BL)
+    }
 
-    // End caps seal the strip into a closed solid.
-    const cap = (i, nrm, order) => {
-      const nx = nrm[0], ny = nrm[1], nz = nrm[2];
-      const v = [
-        this._vertex(TL[i][0], TL[i][1], TL[i][2], nx, ny, nz),
-        this._vertex(TR[i][0], TR[i][1], TR[i][2], nx, ny, nz),
-        this._vertex(BR[i][0], BR[i][1], BR[i][2], nx, ny, nz),
-        this._vertex(BL[i][0], BL[i][1], BL[i][2], nx, ny, nz),
-      ];
-      if (order > 0) { this.idx.push(v[0], v[1], v[2], v[0], v[2], v[3]); }
-      else           { this.idx.push(v[0], v[2], v[1], v[0], v[3], v[2]); }
-    };
-    cap(0, neg(Tt[0]), -1);                  // front cap faces -tangent
-    cap(n - 1, Tt[n - 1], +1);               // back cap faces +tangent
+    // Four side faces, each wrapping corner c -> c+1 around the loop, wound so
+    // the outward normal points away from the beam axis.
+    for (let c = 0; c < 4; c++) {
+      const cn = (c + 1) % 4;
+      for (let i = 0; i < n - 1; i++) {
+        const A = ring[i] + c, B = ring[i] + cn, A1 = ring[i + 1] + c, B1 = ring[i + 1] + cn;
+        this.idx.push(A, B1, B, A, A1, B1);
+      }
+    }
+
+    // End caps (front faces -tangent, back faces +tangent) seal the beam.
+    const f = ring[0], b = ring[n - 1];
+    this.idx.push(f + 0, f + 2, f + 1, f + 0, f + 3, f + 2);   // front cap (-t)
+    this.idx.push(b + 0, b + 1, b + 2, b + 0, b + 2, b + 3);   // back cap (+t)
   }
 
   toGeometry() {
@@ -1084,6 +1121,79 @@ function refitCamera(...accs) {
 
 
 /* ===================================================================
+   5b. STL EXPORT (Phase 4)
+   Rebuild the current flower into a throwaway EXPORT-mode accumulator — every
+   feature floored to the min printable thickness (Phase 2) and every tube end
+   sealed, so the result is a set of closed solids with no boundary edges — then
+   merge petals + core, scale world units to millimetres, and write a binary STL.
+   The live scene and its meshes are never touched.
+
+   This is a "union-ready" export: the petal is thousands of individually-closed
+   solids that overlap where veins cross. A true boolean union / voxel remesh of
+   that many thin primitives is not feasible in-browser without losing the fine
+   detail, and the CSG libraries considered choke on self-union at this scale — so
+   we instead guarantee the property that matters for printing (zero boundary
+   edges: every triangle edge shared, nothing open) and let the slicer union the
+   overlapping closed shells, which every slicer does. See PROGRESS.md.
+   =================================================================== */
+
+const MAX_EXPORT_TRIS = 1500000;   // binary STL ~50 B/tri; ~75 MB here — confirm past this
+
+// Build the current UI/params into one merged, export-mode geometry.
+function buildExportGeometry() {
+  const ui = readUI();
+  const P = resolveParams(ui);
+  const acc = new MeshAccumulator({ exportMode: true });
+  buildInto(acc, acc, ui, P);   // petals AND core into a single accumulator
+  const geo = acc.toGeometry() || new THREE.BufferGeometry();
+  const tris = acc.idx.length / 3;
+  // Thinnest real-world feature: round Ø = 2·minRadius; ribbon/slab = minThick.
+  const minDia = isFinite(acc.minRadius) ? 2 * acc.minRadius : Infinity;
+  const minFeatureMM = MM_PER_UNIT * Math.min(minDia, isFinite(acc.minThick) ? acc.minThick : Infinity);
+  return { geo, tris, minFeatureMM };
+}
+
+function exportSTL() {
+  let built;
+  try {
+    built = buildExportGeometry();
+  } catch (e) {
+    console.error('[STL] build failed:', e);
+    window.alert('STL export failed while building the model — see the console.');
+    return false;
+  }
+  const { geo, tris, minFeatureMM } = built;
+  if (tris === 0) { window.alert('Nothing to export yet.'); return false; }
+  if (tris > MAX_EXPORT_TRIS) {
+    const mb = Math.round(tris * 50 / 1e6);
+    if (!window.confirm(`This model is ${tris.toLocaleString()} triangles ` +
+        `(~${mb} MB STL) and may be slow to save and slice. Export anyway?`)) {
+      geo.dispose();
+      return false;
+    }
+  }
+  // Bake world-unit -> millimetre scale into a temp mesh's matrix; STLExporter
+  // applies it and writes per-facet normals from the scaled positions.
+  const mesh = new THREE.Mesh(geo, matPetals);
+  mesh.scale.setScalar(MM_PER_UNIT);
+  mesh.updateMatrixWorld(true);
+  const stl = new STLExporter().parse(mesh, { binary: true });
+  geo.dispose();
+
+  const blob = new Blob([stl], { type: 'model/stl' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'flower-bloom.stl';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  console.log(`[STL] exported ${tris.toLocaleString()} tris, ` +
+    `${(blob.size / 1e6).toFixed(1)} MB, thinnest feature ${minFeatureMM.toFixed(2)} mm ` +
+    `at ${MM_PER_UNIT} mm/unit`);
+  return true;
+}
+
+
+/* ===================================================================
    6. RENDER LOOP + RESIZE
    =================================================================== */
 
@@ -1565,6 +1675,24 @@ if (resetBtn) {
     updateBaseOptions();
     refreshLabels();
     scheduleRegen();
+  });
+}
+
+// EXPORT STL — build the print-ready mesh and download it, with brief button
+// feedback. Guarded so a large model asks before saving (see exportSTL).
+const exportBtn = document.getElementById('exportStl');
+if (exportBtn) {
+  exportBtn.addEventListener('click', () => {
+    const label = exportBtn.textContent;
+    exportBtn.disabled = true;
+    exportBtn.textContent = 'Exporting…';
+    // let the label paint before the synchronous build blocks the main thread
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const ok = exportSTL();
+      exportBtn.textContent = ok ? 'Exported ✓' : label;
+      exportBtn.disabled = false;
+      if (ok) setTimeout(() => { exportBtn.textContent = label; }, 1600);
+    }));
   });
 }
 
