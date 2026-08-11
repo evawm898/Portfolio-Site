@@ -77,6 +77,7 @@ class CandidateOut(BaseModel):
     harmonic_penalty: Optional[float] = None  # ambiguity vs. a 0.5x/2x relative that scored similarly
     phase_consistency: Optional[float] = None  # do repeat markers land on the same local visual feature each time?
     alternating_phase_score: Optional[float] = None  # "A B A B" signature of a half-period harmonic; penalizes evidence_score
+    template_match_score: Optional[float] = None  # auto-anchored template-match confirmation; see _template_match_consistency_score
     evidence_score: Optional[float] = None  # weighted evidence composite BEFORE the harmonic penalty -- decides `selected`
     final_score: Optional[float] = None  # evidence_score minus the harmonic penalty (confidence-facing, not selection)
     selected: bool = False
@@ -256,6 +257,35 @@ class AnalyzeResponse(BaseModel):
     # from /analyze-multi (the "Review Measurement Areas" flow). None for
     # the legacy single-ROI /analyze path.
     multi_roi: Optional[MultiRoiDebugOut] = None
+
+
+class RepeatMatchOut(BaseModel):
+    """
+    Result of a user-anchored repeat count (see analysis.gauge_analysis.
+    count_repeats_by_template_match / POST /count-repeats) -- the user
+    marks two points spanning ONE confirmed wale or course repeat, and
+    this reports how many real occurrences of that exact patch were
+    found across the measurement area via normalized cross-correlation,
+    and the resulting spacing. An optional, independent evidence source
+    alongside automatic detection, not a replacement for it -- see the
+    module comment above count_repeats_by_template_match for why this
+    sidesteps the harmonic-ambiguity failure mode (a texture periodic at
+    the wrong frequency, e.g. yarn ply twist) that every purely
+    automatic detection path in this app has hit on some real photo.
+    """
+
+    success: bool
+    message: str = ""
+    spacing_px: Optional[float] = None
+    spacing_mm: Optional[float] = None
+    per_inch: Optional[float] = None
+    match_count: int = 0
+    match_positions_px: List[float] = Field(default_factory=list)
+    match_scores: List[float] = Field(default_factory=list)
+    confidence: float = 0.0
+    template_width_px: float = 0.0
+    template_height_px: float = 0.0
+    seed_period_px: float = 0.0
 
 
 class ErrorResponse(BaseModel):

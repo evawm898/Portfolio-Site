@@ -1,6 +1,7 @@
 """
-Tests for Stage 1/4 of the multi-region workflow: automatic measurement-
-area proposal (analysis.gauge_analysis.propose_measurement_rois).
+Tests for Stage 1/4/5 of the multi-region workflow: automatic
+measurement-area proposal (analysis.gauge_analysis.propose_measurement_
+rois).
 
 No committed tests existed for this function before Stage 4 -- earlier
 verification was manual/inline against the real jersey photo fixture.
@@ -14,14 +15,36 @@ photo showed no monotonic size-to-accuracy trend, including a
 confidently-wrong case -- so multi-region cross-checking (analyze_multi_
 roi's consensus) is kept as a safety net; see README.md's "Stage 4"
 section for the full story.
+
+Stage 5 (real user report on a pinned swatch photo: a proposed region had
+a metal T-pin running straight through it, and a second region was pushed
+out toward the tape measure at the edge just to satisfy a "well-separated
+from the first" spacing rule) changed two things, both covered below:
+regions are now explicitly allowed to OVERLAP each other (only a near-
+exact duplicate is rejected -- see _too_close_to_selected), and a new
+hard gate, _local_anomaly_fraction, rejects any candidate window
+containing a LARGE, obvious non-fabric intrusion (a ruler/tape measure,
+a label) that the existing weighted quality score alone didn't drop
+enough to catch on its own, since it only covers a fraction of a large
+window and gets diluted by everything else in the average. The thin-pin
+half of that report turned out NOT to be reliably solvable this way --
+every classical-CV formulation tried false-positived on real fabric's
+own natural local-contrast variation or missed the pin entirely (see
+_local_anomaly_fraction's docstring for specifics) -- so it's disclosed
+as open work, not tested here as if it were fixed.
 """
 import numpy as np
 import pytest
 
 from analysis.gauge_analysis import (
     MIN_ROI_DIM_PX,
+    ROI_PROPOSAL_MAX_ANOMALY_FRACTION,
+    ROI_PROPOSAL_MAX_OVERLAP_IOU,
     ROI_PROPOSAL_MIN_QUALITY,
+    _global_local_std_baseline,
+    _local_anomaly_fraction,
     _periodicity_consistency_score,
+    _roi_iou,
     _roi_quality_score,
     propose_measurement_rois,
 )
@@ -72,6 +95,29 @@ def make_knit_with_distorted_edge(height=600, width=600, distort_height=100, **k
     distorted_band = 190 + 45 * np.sin(2 * np.pi * xx / compressed_period) + 45 * np.sin(2 * np.pi * yy / 18)
     gray[:distort_height, :] = np.clip(distorted_band, 0, 255)
     out = np.repeat(gray.astype(np.uint8)[:, :, None], 3, axis=2)
+    return out
+
+
+def make_knit_with_ruler_block(height=900, width=900, ruler_y0=700, ruler_height=180, **knit_kwargs):
+    """
+    A knit texture with a ruler/tape-measure-like band along the bottom
+    -- dense alternating light/dark hash marks covering the WHOLE band
+    (a real close-up tape measure photo is fine, dense print throughout,
+    not a mostly-blank surface with a thin tick strip), the same real
+    signature (see _local_anomaly_fraction's docstring) that measured
+    0.84-0.98 on the real teal fixture's actual ruler strip during
+    development, comfortably above real clean fabric's worst-case
+    natural reading (~0.29) anywhere in either real fixture. This is
+    what _local_anomaly_fraction is validated to reliably catch -- a
+    LARGE, obvious non-fabric surface, not a thin pin/stitch-marker (see
+    that docstring for the honest limitation).
+    """
+    img = make_knit_image(height=height, width=width, **knit_kwargs)
+    gray = img[:, :, 0].astype(np.float32)
+    gray[ruler_y0:, :] = 235
+    for x in range(0, width, 6):
+        gray[ruler_y0:, x : x + 3] = 20
+    out = np.repeat(np.clip(gray, 0, 255).astype(np.uint8)[:, :, None], 3, axis=2)
     return out
 
 
@@ -197,25 +243,39 @@ def test_prefers_uniform_region_over_locally_distorted_one():
         assert overlap_with_distorted_band < r.height * 0.25
 
 
-def test_proposed_regions_are_spatially_separated():
-    # Multiple proposed regions shouldn't cluster on top of each other --
-    # each pair must be far enough apart (or non-overlapping) that they're
-    # genuinely independent samples of the fabric.
+def test_proposed_regions_may_now_overlap_on_a_uniform_image():
+    # Stage 5 change: regions are explicitly ALLOWED to overlap now (see
+    # this file's module docstring) -- on a single uniform texture with
+    # nothing to avoid, the grid scan's own stride (35% of window size)
+    # naturally produces adjacent candidates that overlap ~65%, and all
+    # of them should now be eligible rather than force-rejected for being
+    # "too close." This is the direct opposite of the old assertion this
+    # test replaces.
     img = make_knit_image(height=900, width=900)
     ppm = 8.0
     result = propose_measurement_rois(img, pixels_per_mm=ppm)
     assert result.success
     if len(result.rois) < 2:
         pytest.skip("only one region was proposed on this synthetic image")
+    overlaps = []
     for i, a in enumerate(result.rois):
-        for b in result.rois[i + 1:]:
-            ax1, ay1, ax2, ay2 = a.x, a.y, a.x + a.width, a.y + a.height
-            bx1, by1, bx2, by2 = b.x, b.y, b.x + b.width, b.y + b.height
-            ix = max(0, min(ax2, bx2) - max(ax1, bx1))
-            iy = max(0, min(ay2, by2) - max(ay1, by1))
-            overlap_area = ix * iy
-            min_area = min(a.width * a.height, b.width * b.height)
-            assert overlap_area / min_area < 0.1
+        for b in result.rois[i + 1 :]:
+            overlaps.append(_roi_iou({"x": a.x, "y": a.y, "w": a.width, "h": a.height}, {"x": b.x, "y": b.y, "w": b.width, "h": b.height}))
+    assert max(overlaps) > 0.1, "expected at least one meaningfully-overlapping pair on a uniform image"
+
+
+def test_selected_regions_are_never_near_duplicates():
+    # Overlap is allowed, but a near-EXACT duplicate of an already-
+    # selected region adds no real coverage -- _too_close_to_selected
+    # should still reject those.
+    img = make_knit_image(height=900, width=900)
+    ppm = 8.0
+    result = propose_measurement_rois(img, pixels_per_mm=ppm)
+    assert result.success
+    for i, a in enumerate(result.rois):
+        for b in result.rois[i + 1 :]:
+            iou = _roi_iou({"x": a.x, "y": a.y, "w": a.width, "h": a.height}, {"x": b.x, "y": b.y, "w": b.width, "h": b.height})
+            assert iou <= ROI_PROPOSAL_MAX_OVERLAP_IOU
 
 
 def test_quality_score_of_distorted_band_is_lower_than_clean_interior():
@@ -226,3 +286,89 @@ def test_quality_score_of_distorted_band_is_lower_than_clean_interior():
     distorted_score, _ = _roi_quality_score(distorted_crop)
     clean_score, _ = _roi_quality_score(clean_crop)
     assert clean_score > distorted_score
+
+
+# --- _local_anomaly_fraction / avoiding large non-fabric intrusions --------
+#
+# _local_anomaly_fraction is validated (against real photos, see its own
+# docstring) to reliably catch a LARGE, obvious non-fabric surface --
+# these tests use a ruler-like block, not a thin pin: a thin linear
+# intrusion turned out NOT to be reliably separable from real fabric's
+# own natural local-contrast variation with any classical-CV formulation
+# tried during development (also documented in that docstring), so it's
+# deliberately not what's tested or claimed here.
+
+
+def test_local_anomaly_fraction_is_zero_on_clean_texture():
+    img = make_knit_image(height=406, width=406)
+    gray = img[:, :, 0]
+    median, mad = _global_local_std_baseline(gray)
+    assert _local_anomaly_fraction(gray, median, mad) == 0.0
+
+
+def test_local_anomaly_fraction_flags_a_ruler_like_block():
+    # Baseline is computed from the WHOLE photo (mixed fabric + ruler),
+    # exactly as propose_measurement_rois does -- a per-window self-
+    # relative baseline was tried first and structurally can't flag a
+    # window that's uniformly anomalous throughout (see _global_local_
+    # std_baseline's docstring for the real, direct finding that led to
+    # this design).
+    img = make_knit_with_ruler_block(height=900, width=900, ruler_y0=700, ruler_height=180)
+    gray = img[:, :, 0]
+    median, mad = _global_local_std_baseline(gray)
+    ruler_crop = gray[700:900, 0:406]
+    assert _local_anomaly_fraction(ruler_crop, median, mad) > ROI_PROPOSAL_MAX_ANOMALY_FRACTION
+    clean_crop = gray[0:406, 0:406]
+    assert _local_anomaly_fraction(clean_crop, median, mad) <= ROI_PROPOSAL_MAX_ANOMALY_FRACTION
+
+
+def test_local_anomaly_fraction_too_small_crop_is_not_penalized():
+    img = make_knit_image(height=406, width=406)
+    median, mad = _global_local_std_baseline(img[:, :, 0])
+    tiny = np.full((10, 10), 128, dtype=np.uint8)
+    assert _local_anomaly_fraction(tiny, median, mad) == 0.0
+
+
+def test_local_anomaly_fraction_no_baseline_is_not_penalized():
+    # A fully flat "photo" has no textured blocks to build a baseline
+    # from at all -- _global_local_std_baseline returns (None, None),
+    # and _local_anomaly_fraction must treat that as "couldn't measure,"
+    # not "found an anomaly."
+    flat = np.full((406, 406), 128, dtype=np.uint8)
+    median, mad = _global_local_std_baseline(flat)
+    assert median is None and mad is None
+    assert _local_anomaly_fraction(flat, median, mad) == 0.0
+
+
+def test_proposed_regions_avoid_a_ruler_like_block():
+    # Real-photo motivation (see this file's module docstring): a real
+    # user photo had a tape measure along one edge. Uses a tall image
+    # with plenty of clean fabric ABOVE the ruler band -- realistically
+    # proportioned (the ruler is ~17% of the photo's height here, close
+    # to the real teal fixture's own ~17%), not an unrealistically huge
+    # anomaly -- so there are enough genuinely clean candidate positions
+    # that the greedy highest-quality-first selection never needs to
+    # reach for one that dips into the ruler at all.
+    ruler_y0 = 1250
+    img = make_knit_with_ruler_block(height=1500, width=900, ruler_y0=ruler_y0, ruler_height=250)
+    ppm = 8.0
+    result = propose_measurement_rois(img, pixels_per_mm=ppm)
+    assert result.success
+    for r in result.rois:
+        assert r.y + r.height <= ruler_y0, f"region {r.label} at y={r.y}..{r.y + r.height} dips into the ruler band starting at {ruler_y0}"
+
+
+def test_a_window_mostly_inside_the_ruler_is_gated_out():
+    # Direct regression test for the hard gate itself (not just the
+    # ranking preference above): a large, realistically-proportioned
+    # photo (ruler ~17% of total height, matching the real teal fixture)
+    # so the whole-photo baseline stays fabric-dominated and valid, but
+    # a window taken from well inside the ruler band -- regardless of
+    # what clean alternatives exist elsewhere in the photo -- must still
+    # be individually rejected by the gate itself.
+    img = make_knit_with_ruler_block(height=1500, width=900, ruler_y0=1250, ruler_height=250)
+    gray = img[:, :, 0]
+    median, mad = _global_local_std_baseline(gray)
+    assert median is not None and median < 60.0  # sanity: baseline reflects fabric (~43), not the ruler (~107)
+    ruler_crop = gray[1280:1280 + 200, 0:400]
+    assert _local_anomaly_fraction(ruler_crop, median, mad) > ROI_PROPOSAL_MAX_ANOMALY_FRACTION

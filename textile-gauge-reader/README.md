@@ -734,6 +734,256 @@ Fixing the loop-lattice path safely needs its own targeted evidence — not
 a copy of finding 1's fix, which was checked here and shown not to
 generalize — and is real work still ahead.
 
+### Verify by counting a repeat: user-anchored template matching
+
+Every detection path above — raw autocorrelation, the v0.3 candidate
+scorer, the loop-lattice V-shape counter — works by discovering
+periodicity purely from the image's own frequency content, with no
+ground truth for what one real repeat looks like. That's the root cause
+behind every failure mode documented in this file so far: a texture
+that's genuinely periodic at the *wrong* frequency (most often yarn ply
+twist) is mathematically indistinguishable from the true repeat to a
+method that only asks "how periodic is this."
+
+The idea this section implements: if the user marks two points spanning
+ONE confirmed repeat — the same visual feature on two adjacent wale
+columns, or two adjacent course rows — there's no more ambiguity to be
+fooled by. That patch becomes a template, and `count_repeats_by_
+template_match` (classical CV, `cv2.matchTemplate` — no ML) counts real
+occurrences of it across the photo directly, the way a person would:
+find the next one, then the next, then the next.
+
+**Why it walks outward instead of matching the whole region against one
+fixed template.** The first version did exactly that — one template,
+searched everywhere at once — and it failed hard on the real jersey
+photo: only 4 of the region's ~14 true repeats matched above a
+reasonable correlation threshold, because real (non-synthetic) fabric's
+natural stitch-to-stitch variation — lighting, fiber irregularity, slight
+curvature — makes a patch drift in appearance faster than distance alone
+would suggest. The fix walks outward from the anchor one step at a time,
+in both directions, refreshing the reference template to the newest
+match after every step, so no single comparison ever has to span more
+than one repeat's worth of real-world drift.
+
+**Two real bugs found and fixed while getting this to work, both caught
+by testing against the real jersey fixture before trusting the result:**
+
+1. A window-bound arithmetic error let the *backward* half of the walk's
+   search window overshoot past the anchor position itself, corrupting
+   which physical location each candidate match index actually
+   corresponded to. Manifested as the walk taking confident, consistent
+   ~2px "steps" in the wrong direction instead of ~35px ones toward the
+   next real repeat — a completely different bug from harmonic ambiguity,
+   caught by tracing the actual index-to-position math against real
+   image content rather than trusting the first plausible-looking result.
+2. The initial correlation threshold (0.45) was calibrated on intuition,
+   not evidence, and turned out to be too strict for real fabric: it cut
+   the walk off after 2 steps in each direction, with scores hovering
+   right at the cutoff. Lowered to 0.35 after directly verifying this is
+   safe — the geometric search window (a narrow band around the expected
+   next-repeat position) is what actually guards against matching the
+   wrong harmonic, not the correlation threshold, so a lower floor mainly
+   costs a few genuinely-empty steps rather than harmonic confusion. This
+   raised the same jersey walk from 2 real matches to 9, spanning the
+   whole region.
+
+**Real-photo results, reported honestly rather than only showing the
+good one:**
+
+- **Jersey wale: 5.04 predicted vs. ~5.0 true** — 9 real, consistently-
+  spaced matches across the region, the closest any single automatic-or-
+  assisted wale measurement has come to ground truth in this entire
+  investigation.
+- **Teal wale: consistently ~14% too coarse** across four independent
+  anchor placements on the real photo — a real, modest, *non-harmonic*
+  overcount, not the ~2x doubling every other method has shown on this
+  same photo. This yarn's fuzzier, more heavily-plied texture correlates
+  less cleanly even between genuinely adjacent repeats than jersey's
+  smooth cotton does — an honest limitation, not tuned away by loosening
+  tolerances further.
+
+**Never feeds back into automatic detection.** This is a separate,
+human-in-the-loop measurement surfaced alongside the automatic wale/
+course numbers in a new "Verify by counting a repeat" panel on the
+Results step (`POST /count-repeats`) — the same spirit as the loop-
+lattice debug view being comparison-only. The user marks two points on
+the image; the panel reports the counted per-inch value, match count,
+and confidence, letting a low-confidence automatic result be checked
+against a second, independently-derived number rather than just a
+warning label.
+
+### Automatic candidate cross-checking: the same walking match, self-anchored
+
+The section above sidesteps harmonic ambiguity by construction — a
+human-confirmed patch has no periodicity-frequency ambiguity to be
+fooled by. That raises an obvious question: can the *automatic* v0.3
+candidate scorer get some of that same protection, without a human in
+the loop?
+
+`_template_match_consistency_score` (`analysis/gauge_analysis.py`) is
+that attempt. For each 0.5x/1x/2x period candidate the scorer already
+considers, it self-anchors at a real detected peak (the middle one, for
+maximum room to walk both directions), extracts a template, and reuses
+the exact walking-match core the user-anchored path above already proved
+out (`_walk_template_matches`, extracted into a shared function so both
+paths stay byte-for-byte identical rather than maintaining two copies of
+the same carefully-debugged logic). The result — how many real matches,
+how consistently spaced, how strong the correlation — becomes one more
+evidence term in `ScoringWeights`, alongside autocorrelation strength, 2D
+support, structural (fold/loop-center) evidence, regional consensus, and
+phase consistency.
+
+**Funding the new weight without repeating an old mistake.** The first
+attempt gave `template_match` a weight of 0.10, funded by cutting
+`autocorr` and `support_2d` specifically (the two "purest" periodicity-
+strength proxies it seemed to most directly supersede). That broke an
+existing regression test
+(`test_harmonic_penalty_on_the_true_period_cannot_hand_the_win_to_an_
+unrelated_weak_candidate`) — a real prior bug where a true period had to
+beat an unrelated weak candidate on autocorrelation/2D-support strength
+alone, and `template_match` is neutral (contributes nothing to the
+*difference* between candidates) whenever there's no real image data to
+test against, exactly the case in that synthetic test. Taking its
+funding from those two specifically diluted the one signal actually
+deciding that case, without adding anything back. Fixed by funding it
+instead with a **flat 10% proportional scale-down of every existing
+positive weight** — this provably cannot flip the sign of any margin
+that used to hold (it's a uniform linear scale plus a same-both-sides
+neutral addition when `template_match` has no real evidence to
+contribute), and only changes an outcome when the new term has something
+genuine to say. All 178 tests pass with this weighting.
+
+**Empirical validation against both real fixtures (jersey + all 5 teal
+ROIs from `test_wale_scoring_weights.py`), checked honestly rather than
+assumed:**
+
+- The winning wale candidate **never changed** in any of the 6 real ROIs
+  tested, vs. `template_match` disabled entirely — no regression.
+- In 4 of 6, `template_match_score` was strongly positive (~0.7) for
+  *exactly* the winning candidate and a clean 0.0 for every harmonic
+  alternative — real, correct discriminating evidence, not noise. On
+  jersey's course axis specifically, it confirmed both the true period
+  *and* its trivial double (a real period always reconfirms at 2x — see
+  `_harmonic_penalty`'s docstring, that's guaranteed, not ambiguity)
+  while flatly rejecting the dangerous half-period harmonic (0.0).
+- In the other 2 (both small, ~1in teal windows), it returned 0.0 for
+  *every* candidate — non-discriminating, not mis-discriminating: it
+  never favored a wrong candidate over the right one in any of the 6
+  cases checked, it just didn't have enough to say in these two. Teal's
+  fuzzier, more heavily-plied texture is the same honest limitation
+  already documented for the user-anchored path above.
+
+Given "never caused a wrong flip, sometimes strongly confirms the right
+answer, otherwise stays quiet" across every real case checked, the
+weight is being kept — but, consistent with the framing above, this
+should be read as "safe and genuinely useful in the cases checked so
+far," not "proven to fix the open teal wale-selection coin-flip
+documented earlier in this file." That would need more real photos than
+the two fixtures this project currently has, the same honesty standard
+already applied to every other real-photo claim in this document.
+
+### Stage 5: measurement-area proposal — overlap allowed, large intrusions gated out
+
+A real user photo of a pinned swatch (metal T-pins/stitch markers crossing
+the fabric, a tape measure along one edge) surfaced two problems with the
+automatic "Review Measurement Areas" proposal (see Stage 4 above): a
+proposed region had a pin running straight through the middle of it, and
+a second region got pushed out toward the tape measure at the edge, just
+to satisfy the old "well-separated from the first region" spacing rule.
+
+**Regions can now overlap.** The old rule (`ROI_PROPOSAL_MAX_OVERLAP_IOU
+= 0.02`, `ROI_PROPOSAL_MIN_CENTER_SPACING = 1.15`) forced proposed
+regions apart to maximize how independent they'd be for cross-region
+checking (`analyze_multi_roi`'s consensus). But a real photo often has
+only ONE genuinely clean patch of fabric — forcing regions apart was
+pushing the second and third proposals into worse areas instead of using
+more of the one good patch. `_too_close_to_selected` now only rejects a
+near-exact duplicate of an already-selected region (`ROI_PROPOSAL_MAX_
+OVERLAP_IOU = 0.9`); real overlap is fine. This trades away some
+statistical independence between regions for the sake of actually using
+good fabric — deliberately, since a region built on bad texture is worse
+for cross-checking than one that partially overlaps a good one.
+
+**A new hard gate catches large, obvious non-fabric intrusions** —
+`_local_anomaly_fraction`, alongside the existing background gate
+(`_fabric_mask`). Each candidate window's local block statistics (a
+robust median/MAD of local contrast, plus a near-blown-out brightness
+check) are compared against a baseline computed **once from the whole
+photo**, not from the window itself. That distinction turned out to
+matter a lot: a first version compared each window only against its OWN
+blocks, and a window sitting entirely inside a real ruler strip scored
+0.0 "anomaly" — 100% ruler, so nothing inside that same window looked
+different from anything else in it. A whole-photo baseline doesn't have
+that blind spot: the identical window scores 1.0 against it.
+
+**What this reliably catches, and what it honestly doesn't.** Validated
+against both real fixtures (`real_jersey_sample.jpg`, `sarahmaker-
+knitting-gauge.jpg`) at every candidate window size this function tries:
+a window that's MOSTLY OR ENTIRELY a large non-fabric surface (the real
+teal photo's actual ruler strip measured 0.60–0.74 on this metric) is
+reliably separable from genuinely clean fabric's own natural local-
+contrast variation (worst case found anywhere in either photo: ~0.38) —
+a real, if not huge, margin, which is why `ROI_PROPOSAL_MAX_ANOMALY_
+FRACTION` sits at 0.5. A window that's only a MINORITY non-fabric — a
+thin pin/needle/stitch-marker crossing the fabric, or a ruler grazing
+just one edge of an otherwise-good window — is a genuinely harder case
+that this specific signal does **not** reliably solve: a window measured
+23% ruler / 77% clean fabric during development scored only 0.24 on this
+metric, squarely inside the real clean-fabric noise range, not separable
+from it.
+
+This isn't for lack of trying. Several other classical-CV formulations
+were built and tested against the real fixtures before settling on the
+one shipped:
+- **Per-row/per-column max-anomalous-fraction** (does any single strip
+  of blocks read as almost entirely anomalous, regardless of the whole
+  window's average) reliably caught a synthetic pin at every window
+  size tried, but false-positived heavily on real fabric — a knit's own
+  wale columns are naturally correlated enough in local contrast that
+  an entire column of blocks legitimately looks unlike the window's
+  overall median sometimes, with nothing wrong with the fabric at all.
+- **Absolute anomalous area** (pixel count instead of a fraction, on
+  the theory that a fixed-size real intrusion should occupy roughly the
+  same AREA regardless of window size) went the wrong direction
+  entirely: real fuzzy/plied yarn's own natural local-contrast variation
+  produced MORE absolute anomalous area than a synthetic pin did.
+- **Brightness-only** (just look for near-white blocks, on the theory
+  that metal specifically produces specular highlights) missed a thin
+  synthetic pin altogether — box-averaging over even a modest block size
+  dilutes a narrow highlight below any reasonable threshold, while raw
+  per-pixel brightness checks picked up more scattered bright fiber
+  glints in real (especially fuzzier/plied) yarn than in the synthetic
+  pin.
+
+None of these are used. Rather than ship whichever one merely looked
+plausible, or quietly widen the threshold until the synthetic test
+passed, this is disclosed as open, unsolved work — consistent with this
+project's standing rule of reporting real, verified findings rather than
+overstating results. A window that's mostly good fabric with only a
+small intrusion is still somewhat guarded by *ranking*, not gating: it
+scores lower on the existing weighted quality score than a fully-clean
+alternative, so the greedy highest-quality-first selection still prefers
+genuinely clean fabric when enough of it is available — the hard gate
+specifically matters when a mostly-bad window would otherwise be picked
+because too few better alternatives exist.
+
+**Tests:** `tests/test_roi_proposal.py` — `_local_anomaly_fraction` and
+`_global_local_std_baseline` unit tests (clean texture, a ruler-like
+block, no-baseline-available, too-small-crop); `propose_measurement_
+rois` integration tests (regions may now overlap on a uniform image, a
+near-duplicate is still rejected, a window mostly inside a ruler-like
+block is gated out even when nothing better is available, and — given
+enough clean alternatives — the greedy selection naturally avoids a
+ruler entirely). A third pre-existing hard gate was added alongside
+these during the same investigation: `periodicity_consistency` (already
+part of `_roi_quality_score`'s weighted average) is now ALSO a hard
+floor (`ROI_PROPOSAL_MIN_PERIODICITY_CONSISTENCY = 0.6`) — a real
+regression surfaced while testing the overlap change: a window 26%
+covered by a synthetic curled/distorted band still scored 0.88 overall
+(comfortably above the quality floor) even though its own periodicity_
+consistency was only 0.50, because that term is only 20% of the weighted
+average and got diluted by everything else in the window scoring fine.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/
@@ -935,6 +1185,16 @@ count"` or `"periodicity"`, see [Wale gauge from counted loop columns](
 count_confidence`) and each axis's consensus detail (`wale_consensus`/
 `course_consensus`: `included_labels`, `excluded_labels`, `outliers`,
 `regional_median_px`/`_per_inch`, `regional_spread_px`).
+
+`POST /count-repeats` — multipart form: `file`, `roi_x`/`roi_y`/`roi_width`/
+`roi_height` (the area to search), `anchor_start_x`/`anchor_start_y`/
+`anchor_end_x`/`anchor_end_y` (two user-marked points spanning one
+confirmed repeat), `orientation`, `axis` (`wale` \| `course`), and
+`pixels_per_mm`. Returns `spacing_px`/`spacing_mm`/`per_inch`,
+`match_count`, `match_positions_px`, `match_scores`, and `confidence` — an
+independent, user-anchored evidence source that never feeds into
+automatic detection, see [Verify by counting a repeat](
+#verify-by-counting-a-repeat-user-anchored-template-matching).
 
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.

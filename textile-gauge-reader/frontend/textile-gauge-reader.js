@@ -128,6 +128,13 @@
   const roiDiagSelect = document.getElementById("roiDiagSelect");
   const roiDiagContent = document.getElementById("roiDiagContent");
 
+  // User-anchored repeat counting ("Verify by counting a repeat")
+  const markWaleRepeatBtn = document.getElementById("markWaleRepeatBtn");
+  const markCourseRepeatBtn = document.getElementById("markCourseRepeatBtn");
+  const cancelRepeatMarkBtn = document.getElementById("cancelRepeatMarkBtn");
+  const repeatMarkStatus = document.getElementById("repeatMarkStatus");
+  const repeatMatchResult = document.getElementById("repeatMatchResult");
+
   const serviceStatusEl = document.getElementById("serviceStatus");
   const serviceStatusDot = document.getElementById("serviceStatusDot");
   const serviceStatusText = document.getElementById("serviceStatusText");
@@ -183,6 +190,11 @@
     result: null,
     showMeasurementAreas: false, // "Show measurement areas" toggle -- all approved ROI outlines, results step
     selectedDiagnosticRoiLabel: null, // which region's own detail is shown in Developer diagnostics' per-region panel
+    repeatMark: {
+      active: false, // true while armed -- next two canvas clicks are collected as anchor points
+      axis: null, // "wale" | "course"
+      points: [], // [{x,y}] in natural coords, max 2, cleared once a match request fires
+    },
     serviceOnline: null, // null = unknown/not configured, true/false once checked
   };
 
@@ -439,6 +451,9 @@
     if (evt.button === 1) return true; // middle-click always pans
     if (evt.button !== 0) return false;
     if (evt.altKey) return true; // Alt+left-drag always pans
+    // Marking a repeat anchor point is a plain left-click on the results
+    // step too -- same reservation roi/calibrate already get below.
+    if (state.repeatMark.active) return false;
     return state.currentStep !== "roi" && state.currentStep !== "calibrate";
   }
 
@@ -537,7 +552,28 @@
     } else if (state.currentStep === "results") {
       drawRoi(false);
       drawResultOverlay();
+      drawRepeatMarkPoints();
     }
+  }
+
+  function drawRepeatMarkPoints() {
+    const pts = state.repeatMark.points.map(naturalToDisplay);
+    if (!pts.length) return;
+    const color = state.repeatMark.axis === "course" ? COURSE_COLOR : WALE_COLOR;
+    if (pts.length === 2) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(pts[1].x, pts[1].y);
+      ctx.stroke();
+    }
+    pts.forEach((p) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
   }
 
   function drawCalibration() {
@@ -685,8 +721,29 @@
 
     const waleIsVertical = state.orientation === "vertical";
 
-    drawAxisLines(result.wale.positions_px, waleIsVertical, WALE_COLOR, roiTop, roiBottom);
-    drawAxisLines(result.course.positions_px, !waleIsVertical, COURSE_COLOR, roiTop, roiBottom);
+    // Developer diagnostics' "Inspect region" selector picks one region
+    // to explain -- draw THAT region's own wale/course lines (not just
+    // the primary/overlay region's), so switching regions always shows
+    // how each one was actually measured, not just whichever happens to
+    // be primary. Falls back to the primary/legacy single-region result
+    // when there's no multi-region breakdown to select from.
+    const mr = result.multi_roi;
+    const selected =
+      mr && mr.per_roi && mr.per_roi.length
+        ? mr.per_roi.find((m) => m.label === state.selectedDiagnosticRoiLabel) ||
+          mr.per_roi.find((m) => m.label === mr.primary_label) ||
+          mr.per_roi[0]
+        : null;
+
+    if (selected) {
+      const selTop = naturalToDisplay({ x: selected.x, y: selected.y });
+      const selBottom = naturalToDisplay({ x: selected.x + selected.width, y: selected.y + selected.height });
+      drawAxisLines(selected.wale.positions_px, waleIsVertical, WALE_COLOR, selTop, selBottom);
+      drawAxisLines(selected.course.positions_px, !waleIsVertical, COURSE_COLOR, selTop, selBottom);
+    } else {
+      drawAxisLines(result.wale.positions_px, waleIsVertical, WALE_COLOR, roiTop, roiBottom);
+      drawAxisLines(result.course.positions_px, !waleIsVertical, COURSE_COLOR, roiTop, roiBottom);
+    }
 
     if (showLoopCentersCheck.checked && result.loop_centers_px && result.loop_centers_px.length) {
       drawLoopCenters(result.loop_centers_px, "#e9ecec");
@@ -699,16 +756,11 @@
     // top-level (primary) loop_lattice_debug when there's no multi-region
     // diagnostics at all (a legacy single-region result).
     if (showVShapeLoopsCheck.checked) {
-      const mr = result.multi_roi;
-      let d = result.loop_lattice_debug;
-      let dRoiTop = roiTop;
-      let dRoiBottom = roiBottom;
-      if (mr && mr.per_roi && mr.per_roi.length) {
-        const m = mr.per_roi.find((x) => x.label === state.selectedDiagnosticRoiLabel) || mr.per_roi[0];
-        d = m.loop_lattice_debug;
-        dRoiTop = naturalToDisplay({ x: m.x, y: m.y });
-        dRoiBottom = naturalToDisplay({ x: m.x + m.width, y: m.y + m.height });
-      }
+      const d = selected ? selected.loop_lattice_debug : result.loop_lattice_debug;
+      const dRoiTop = selected ? naturalToDisplay({ x: selected.x, y: selected.y }) : roiTop;
+      const dRoiBottom = selected
+        ? naturalToDisplay({ x: selected.x + selected.width, y: selected.y + selected.height })
+        : roiBottom;
       if (d) {
         // Inferred wale columns first (so points draw on top of the lines).
         if (d.wale_columns_px && d.wale_columns_px.length) {
@@ -1230,6 +1282,18 @@
   canvas.addEventListener("pointerdown", (evt) => {
     if (state.panDrag) return; // the viewer-pan listener above already claimed this gesture
 
+    if (state.currentStep === "results" && state.repeatMark.active) {
+      const pt = displayToNatural(eventToDisplayPoint(evt));
+      state.repeatMark.points.push(pt);
+      render();
+      if (state.repeatMark.points.length === 1) {
+        repeatMarkStatus.textContent = "Click the same point on the very next repeat over.";
+      } else if (state.repeatMark.points.length === 2) {
+        performRepeatMatch();
+      }
+      return;
+    }
+
     if (state.currentStep === "calibrate") {
       if (state.cal.points.length >= 2) return; // must Redo first
       const pt = displayToNatural(eventToDisplayPoint(evt));
@@ -1695,6 +1759,8 @@
     renderMeasurementConsistency(r);
     renderRoiDiagSelector(r);
     initVerifySection(r);
+    resetRepeatMarkUI();
+    repeatMatchResult.innerHTML = "";
     render();
   }
 
@@ -1741,6 +1807,118 @@
     state.showMeasurementAreas = showMeasurementAreasCheck.checked;
     render();
   });
+
+  // --- Verify by counting a repeat (user-anchored template match) --------
+  //
+  // Independent of automatic wale/course detection: the user marks two
+  // points on the SAME feature of two adjacent repeats, and the backend
+  // (POST /count-repeats, see analysis.gauge_analysis.count_repeats_by_
+  // template_match) counts real occurrences of that exact patch across
+  // the whole photo via normalized cross-correlation. Never fed back into
+  // the automatic result -- shown alongside it as a second opinion the
+  // user can compare against, same spirit as the loop-lattice debug view.
+
+  function resetRepeatMarkUI() {
+    state.repeatMark = { active: false, axis: null, points: [] };
+    cancelRepeatMarkBtn.hidden = true;
+    repeatMarkStatus.hidden = true;
+    markWaleRepeatBtn.disabled = false;
+    markCourseRepeatBtn.disabled = false;
+  }
+
+  function armRepeatMark(axis) {
+    state.repeatMark = { active: true, axis, points: [] };
+    cancelRepeatMarkBtn.hidden = false;
+    markWaleRepeatBtn.disabled = true;
+    markCourseRepeatBtn.disabled = true;
+    repeatMarkStatus.hidden = false;
+    repeatMarkStatus.textContent = `Click one point on a ${axis === "course" ? "course row" : "wale column"}.`;
+    render();
+  }
+
+  markWaleRepeatBtn.addEventListener("click", () => armRepeatMark("wale"));
+  markCourseRepeatBtn.addEventListener("click", () => armRepeatMark("course"));
+  cancelRepeatMarkBtn.addEventListener("click", () => {
+    resetRepeatMarkUI();
+    render();
+  });
+
+  async function performRepeatMatch() {
+    const { axis, points } = state.repeatMark;
+    const ppm = currentPixelsPerMm();
+    repeatMarkStatus.textContent = "Counting repeats…";
+
+    if (!CONFIG.API_BASE_URL || !ppm) {
+      repeatMarkStatus.textContent = "Analysis service not configured.";
+      resetRepeatMarkUI();
+      render();
+      return;
+    }
+
+    try {
+      const fd = new FormData();
+      fd.append("file", state.file);
+      fd.append("roi_x", 0);
+      fd.append("roi_y", 0);
+      fd.append("roi_width", state.naturalWidth);
+      fd.append("roi_height", state.naturalHeight);
+      fd.append("anchor_start_x", points[0].x);
+      fd.append("anchor_start_y", points[0].y);
+      fd.append("anchor_end_x", points[1].x);
+      fd.append("anchor_end_y", points[1].y);
+      fd.append("orientation", state.orientation);
+      fd.append("axis", axis);
+      fd.append("pixels_per_mm", ppm);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+      let res;
+      try {
+        res = await fetch(`${CONFIG.API_BASE_URL}/count-repeats`, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+      }
+      if (!res.ok) {
+        throw new Error(data.message || `Counting repeats failed (HTTP ${res.status}).`);
+      }
+      renderRepeatMatchResult(axis, data);
+    } catch (err) {
+      repeatMatchResult.innerHTML = `<p class="tgr-error">${escapeHtml(err.message || String(err))}</p>`;
+      repeatMatchResult.hidden = false;
+    }
+
+    resetRepeatMarkUI();
+    render();
+  }
+
+  function renderRepeatMatchResult(axis, data) {
+    const label = axis === "course" ? "Courses" : "Wales";
+    const color = axis === "course" ? COURSE_COLOR : WALE_COLOR;
+    if (!data.success) {
+      repeatMatchResult.innerHTML = `<p class="tgr-hint">${escapeHtml(data.message || "No matches found.")}</p>`;
+      return;
+    }
+    const perInch = data.per_inch != null ? data.per_inch.toFixed(2) : "—";
+    repeatMatchResult.innerHTML = `
+      <div class="tgr-result-card" style="border-color:${color}">
+        <div class="tgr-result-card__label">${label} / inch (counted)</div>
+        <div class="tgr-result-card__value" style="color:${color}">${perInch}</div>
+        <div class="tgr-result-card__sub">${data.match_count} repeats matched · ${(data.confidence * 100).toFixed(0)}% confidence</div>
+      </div>
+      <p class="tgr-hint">${escapeHtml(data.message || "")}</p>
+    `;
+  }
 
   // Developer diagnostics: let a region be inspected individually --
   // its own detected loop centers, inferred wale columns/course rows
@@ -1805,6 +1983,7 @@
   roiDiagSelect.addEventListener("change", () => {
     state.selectedDiagnosticRoiLabel = roiDiagSelect.value;
     renderRoiDiagContent(state.result);
+    render(); // the canvas overlay (wale/course lines, loop-lattice columns) is per-selected-region too
   });
 
   // --- Detection Details (harmonic-candidate diagnostics) ----------------
@@ -1839,6 +2018,7 @@
               ${scoreRow("Regional consensus", d.patch_consensus)}
               ${scoreRow("Phase consistency", d.phase_consistency)}
               ${scoreRow("Alternating phase", d.alternating_phase_score != null ? -d.alternating_phase_score : null)}
+              ${scoreRow("Template-match confirmation", d.template_match_score)}
               <div class="tgr-debug-score-row tgr-debug-score-row--final"><span>Evidence score (decides winner)</span><span>${d.evidence_score != null ? d.evidence_score.toFixed(2) : "—"}</span></div>
               ${scoreRow("Harmonic penalty", d.harmonic_penalty != null ? -d.harmonic_penalty : null)}
               <div class="tgr-debug-score-row"><span>Final score (confidence-adjusted)</span><span>${d.final_score.toFixed(2)}</span></div>
