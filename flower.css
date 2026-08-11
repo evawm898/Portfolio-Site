@@ -362,6 +362,12 @@ input[type="checkbox"]:checked::after {
   color: var(--petrol-bright);
   border-color: var(--petrol-bright);
 }
+/* full-width button inside a control row (e.g. bilateral auto-center) */
+.fl-btn--wide {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.4rem;
+}
 
 .fl-building {
   font-family: var(--mono);

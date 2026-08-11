@@ -71,13 +71,33 @@
           <span class="fl-ctrl__hint" data-bloom-styles="bilateral">symmetric fan across one axis</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-bloom-styles="coiled radial">
           <div class="fl-ctrl__row">
             <label for="petalCount">Number of petals</label>
             <span class="fl-ctrl__val" data-value="petalCount"></span>
           </div>
           <input type="range" id="petalCount" min="1" max="40" step="1" value="4">
           <span class="fl-ctrl__hint">total petals in the bloom</span>
+        </div>
+
+        <div class="fl-ctrl" data-bloom-styles="bilateral">
+          <div class="fl-ctrl__row">
+            <label for="bilPerSide">Petals per side</label>
+            <span class="fl-ctrl__val" data-value="bilPerSide"></span>
+          </div>
+          <input type="range" id="bilPerSide" min="1" max="3" step="1" value="3">
+          <span class="fl-ctrl__hint">petals on each side of the mirror line</span>
+        </div>
+
+        <div class="fl-ctrl fl-ctrl--toggle" data-bloom-styles="bilateral">
+          <label for="bilCenterPetal">Petal on mirror line</label>
+          <input type="checkbox" id="bilCenterPetal">
+        </div>
+        <p class="fl-tip-note" data-bloom-styles="bilateral">On: a centre petal is bisected by the mirror line. Off: the mirror runs through the gap between the two inner petals.</p>
+
+        <div class="fl-ctrl" data-bloom-styles="bilateral">
+          <button id="bilTopView" class="fl-btn fl-btn--wide" type="button">Auto-center (top-down)</button>
+          <span class="fl-ctrl__hint">frame the fan from straight above</span>
         </div>
 
         <div class="fl-ctrl">
