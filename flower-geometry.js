@@ -806,14 +806,17 @@ function strandRadProfile(rads, denom) {
 export function buildBone(P, opts = {}) {
   const L = P.L;
   const count  = clamp(Math.round(opts.count != null ? opts.count : 18), 4, 40);
-  const width  = clamp(opts.width  != null ? opts.width  : 0.5, 0, 1);
+  const width  = clamp(opts.width  != null ? opts.width  : 0.5, 0, 3);
   const curve  = clamp(opts.curve  != null ? opts.curve  : 0.55, -1, 1);  // +sweep to tip, -sweep to base
   const spread = clamp(opts.spread != null ? opts.spread : 0.85, 0, 1);
   const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
 
   const uBase = 0.04, uTip = 0.985;
-  const spineW = lerp(0.7, 1.7, width);          // spine relative weight
-  const ribW   = lerp(0.26, 0.72, width);        // rib relative weight (thinner than the spine)
+  // 0..1 runs fine -> heavy bones (the old range); 1..3 then scales that heaviest
+  // bone up to 3x, so the slider's max is three times the old maximum thickness.
+  const wLow = Math.min(1, width), mult = Math.max(1, width);
+  const spineW = lerp(0.7, 1.7, wLow) * mult;    // spine relative weight
+  const ribW   = lerp(0.26, 0.72, wLow) * mult;  // rib relative weight (thinner than the spine)
   const reach  = 0.62 + 0.32 * spread;           // rib reach as a fraction of the local half-width
 
   const veins = [];
