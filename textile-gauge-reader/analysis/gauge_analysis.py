@@ -2508,6 +2508,286 @@ def analyze_loop_lattice_experiment(
     return best
 
 
+# --- Repeat counting by template match (user-anchored) -------------------
+#
+# Every wale/course detection path in this file so far -- raw
+# autocorrelation, the v0.3 candidate scorer, the loop-lattice V-shape
+# counter -- works by discovering periodicity purely from the image's own
+# frequency content, with no ground truth for what one real repeat looks
+# like. Real-photo diagnostics throughout this project have repeatedly
+# found the same failure mode as a result: some yarns have a second,
+# genuinely periodic signal (most often ply twist) at close to double the
+# true stitch frequency, and nothing that only looks at "how periodic is
+# this candidate" can fully tell it apart from the real repeat, because a
+# half-repeat is mathematically just as periodic as the true one.
+#
+# This path sidesteps that ambiguity by construction instead of trying to
+# out-score it: the user marks two points spanning ONE confirmed repeat
+# (e.g. the same point on two adjacent loops, one column/row apart). That
+# patch becomes a template, searched for via normalized cross-correlation
+# (classical CV, cv2.matchTemplate -- no ML) across the rest of the
+# region. A texture that's periodic at the wrong frequency can still fool
+# a periodicity signal, but it can't produce a false match against a
+# specific, real, human-confirmed patch of pixels -- there's no harmonic
+# for a direct image match to be ambiguous about.
+
+TEMPLATE_MATCH_MIN_PERIOD_PX = 4.0        # anchor points closer than this aren't a usable template
+TEMPLATE_MATCH_HEIGHT_FRACTION = 1.6      # template extent along the orthogonal axis, as a multiple of the seed period -- wide enough to carry real 2D texture, not a one-pixel-thin sliver
+TEMPLATE_MATCH_MIN_CORRELATION = 0.35     # normalized cross-correlation floor to count a location as a real match, not a fluke -- lower than it looks like it should be, deliberately: real (non-synthetic) fabric's natural stitch-to-stitch variation genuinely doesn't reach much higher self-similarity even between correctly-adjacent repeats (verified directly against the real jersey fixture: 0.45 cut the walk off after 2 steps in each direction with scores hovering right at the cutoff, while 0.35 found 7-8 consecutive, consistently-spaced true repeats per direction). This is safe to keep low because the geometric window (TEMPLATE_MATCH_WALK_MIN_FRACTION/MAX_FRACTION) is the primary safeguard against matching the wrong harmonic, not this threshold -- it only ever gets to choose among candidates already constrained to a narrow band around the expected next position, so a lower floor mainly costs a few genuinely-empty steps, not harmonic confusion.
+TEMPLATE_MATCH_MIN_MATCHES_FOR_CONFIDENCE = 3  # fewer real matches than this and confidence is capped low regardless of correlation strength
+# How far from the current position to look for the NEXT repeat while
+# walking outward (see the module comment and count_repeats_by_template_
+# match's docstring for why this walks instead of matching the whole
+# region against one fixed template): real, non-synthetic fabric drifts
+# in appearance (lighting, fiber irregularity, slight curvature) enough
+# that correlation against a far-away reference patch degrades below any
+# reasonable fixed threshold long before real photos run out of visible
+# repeats -- verified directly against the real jersey fixture, where a
+# single whole-region match against one template found only 4 of the
+# ~14 true repeats in the region, guessing a spacing 4x too large from
+# the sparse, irregular survivors. Walking with a LOCAL search window and
+# a periodically-refreshed template (the newest match becomes the
+# reference for finding the next one) keeps every single comparison
+# short-range, where real fabric similarity actually holds up.
+TEMPLATE_MATCH_WALK_MIN_FRACTION = 0.65
+TEMPLATE_MATCH_WALK_MAX_FRACTION = 1.45
+TEMPLATE_MATCH_MAX_STEPS = 200  # hard safety cap on walk length either direction, independent of ROI size
+
+
+@dataclass
+class RepeatMatchResult:
+    """
+    Result of count_repeats_by_template_match. An independent wale/course
+    evidence source, alongside (not replacing) autocorrelation-based
+    periodicity and loop-lattice counting -- see the module comment
+    above. `match_positions_px` are repeat CENTERS, in full-image pixel
+    coordinates, ordered along the search axis.
+    """
+
+    success: bool
+    message: str = ""
+    spacing_px: Optional[float] = None
+    match_count: int = 0
+    match_positions_px: List[float] = field(default_factory=list)
+    match_scores: List[float] = field(default_factory=list)  # normalized cross-correlation at each accepted match, same order as match_positions_px
+    confidence: float = 0.0
+    template_width_px: float = 0.0
+    template_height_px: float = 0.0
+    seed_period_px: float = 0.0
+
+
+def count_repeats_by_template_match(
+    image_bgr: np.ndarray,
+    roi: Tuple[int, int, int, int],
+    anchor_start: Tuple[float, float],
+    anchor_end: Tuple[float, float],
+    orientation: Orientation,
+    axis: Literal["wale", "course"],
+) -> RepeatMatchResult:
+    """
+    Count real occurrences of a user-confirmed repeat by template-
+    matching it across `roi`.
+
+    Args:
+        image_bgr: full source image, as decoded by OpenCV.
+        roi: (x, y, width, height) to search within, full-image pixel
+             coordinates -- typically an already-approved measurement
+             area.
+        anchor_start, anchor_end: two full-image pixel points the user
+             placed on the SAME visual feature of two adjacent repeats
+             (e.g. the same leg-crossing on one loop, then the next loop
+             over) -- the distance between them along the relevant axis
+             seeds both the template size and the initial period
+             estimate. Order doesn't matter.
+        orientation: same meaning as analyze_gauge's -- which way the
+             photo is rotated relative to the fabric.
+        axis: "wale" to search along the wale (column) direction, or
+             "course" for the course (row) direction. Independent of
+             which axis the anchor points happen to differ more along --
+             the caller decides which repeat this is, the same way the
+             orientation control decides which way is which everywhere
+             else in this file.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return RepeatMatchResult(success=False, message="No image data to analyze.")
+
+    img_h, img_w = image_bgr.shape[:2]
+    x, y, w, h = roi
+    x = max(0, min(int(round(x)), img_w - 1))
+    y = max(0, min(int(round(y)), img_h - 1))
+    w = max(0, min(int(round(w)), img_w - x))
+    h = max(0, min(int(round(h)), img_h - y))
+    if w < MIN_ROI_DIM_PX or h < MIN_ROI_DIM_PX:
+        return RepeatMatchResult(success=False, message="Selected area is too small to analyze.")
+
+    crop = image_bgr[y : y + h, x : x + w]
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+
+    wale_direction, course_direction = _direction_for(orientation)
+    direction = wale_direction if axis == "wale" else course_direction
+    along_x = direction == "horizontal"
+    work_gray = gray if along_x else gray.T
+    origin_x, origin_y = (x, y) if along_x else (y, x)
+
+    def _to_working(pt: Tuple[float, float]) -> Tuple[float, float]:
+        px, py = pt
+        wx, wy = (px, py) if along_x else (py, px)
+        return wx - origin_x, wy - origin_y
+
+    sx, sy = _to_working(anchor_start)
+    ex, ey = _to_working(anchor_end)
+    seed_period = abs(ex - sx)
+    if seed_period < TEMPLATE_MATCH_MIN_PERIOD_PX:
+        return RepeatMatchResult(success=False, message="The two marked points are too close together to use as one repeat.")
+
+    anchor_wx = min(sx, ex)
+    anchor_wy = (sy + ey) / 2.0
+
+    template_w = int(round(seed_period))
+    template_h = int(round(seed_period * TEMPLATE_MATCH_HEIGHT_FRACTION))
+    template_h = max(TEMPLATE_MATCH_MIN_PERIOD_PX, min(template_h, work_gray.shape[0]))
+    template_h = int(round(template_h))
+
+    ty0 = int(round(anchor_wy - template_h / 2.0))
+    ty0 = max(0, min(ty0, work_gray.shape[0] - template_h))
+    band = work_gray[ty0 : ty0 + template_h, :]
+    if template_w <= 0 or template_h <= 0 or band.shape[1] < template_w:
+        return RepeatMatchResult(success=False, message="The marked repeat falls outside the measurement area.")
+
+    def _extract(center_x: float) -> Optional[np.ndarray]:
+        t0 = int(round(center_x - template_w / 2.0))
+        if t0 < 0 or t0 + template_w > band.shape[1]:
+            return None
+        patch = band[:, t0 : t0 + template_w]
+        if patch.shape[1] != template_w or np.std(patch) < 1e-6:
+            return None
+        return patch
+
+    anchor_center = anchor_wx + template_w / 2.0
+    first_template = _extract(anchor_center)
+    if first_template is None:
+        return RepeatMatchResult(success=False, message="The marked area doesn't have enough texture to search with.")
+
+    def _walk(start_center: float, step_sign: int) -> List[Tuple[float, float]]:
+        """
+        Starting from `start_center`, repeatedly search a LOCAL window
+        one step further in the `step_sign` direction for the best match
+        of the current reference template, refreshing that reference to
+        the newest match each time (see the module-level comment on
+        TEMPLATE_MATCH_WALK_MIN_FRACTION for why). Stops the moment a
+        step finds nothing above threshold, a window runs off the edge
+        of the region, or TEMPLATE_MATCH_MAX_STEPS is hit.
+        """
+        found: List[Tuple[float, float]] = []
+        reference = first_template
+        current = start_center
+        for _ in range(TEMPLATE_MATCH_MAX_STEPS):
+            lo = int(round(current + step_sign * seed_period * TEMPLATE_MATCH_WALK_MIN_FRACTION))
+            hi = int(round(current + step_sign * seed_period * TEMPLATE_MATCH_WALK_MAX_FRACTION))
+            lo, hi = min(lo, hi), max(lo, hi)
+            # window_lo/window_hi are chosen so that match CENTERS
+            # (window_lo + idx + template_w/2, for idx in [0, window
+            # width - template_w]) range over exactly [lo, hi] -- no
+            # extra margin. An earlier version added a stray extra
+            # `+ template_w` here, over-extending the window enough that
+            # a backward walk's "nearest" end could cross back past
+            # `current` itself, corrupting which physical position each
+            # response index actually corresponded to (verified directly
+            # against the real jersey fixture: caused runaway ~2px
+            # "steps" in the wrong direction instead of ~35px ones).
+            window_lo = max(0, lo - template_w // 2)
+            window_hi = min(band.shape[1], hi + template_w // 2)
+            if window_hi - window_lo < template_w:
+                break
+            window = band[:, window_lo:window_hi]
+            response = cv2.matchTemplate(window, reference, cv2.TM_CCOEFF_NORMED)[0]
+            if response.size == 0:
+                break
+            # The NEAREST qualifying match, not the highest-scoring one
+            # anywhere in the window -- on a very regular fabric, a
+            # position a full extra period further away can score
+            # marginally higher than the true next repeat by sheer
+            # coincidence (verified directly: a synthetic near-perfectly
+            # periodic texture made a plain argmax skip straight past the
+            # adjacent repeat to the one after it, silently halving the
+            # apparent count). response indices run left-to-right = near-
+            # to-far from `current` when walking forward, far-to-near
+            # when walking backward, since the window is built starting
+            # just past `current` in the walk direction either way.
+            order = range(len(response)) if step_sign > 0 else range(len(response) - 1, -1, -1)
+            match_idx = next((i for i in order if response[i] >= TEMPLATE_MATCH_MIN_CORRELATION), None)
+            if match_idx is None:
+                break
+            match_score = float(response[match_idx])
+            match_center = window_lo + match_idx + template_w / 2.0
+            found.append((match_center, match_score))
+            refreshed = _extract(match_center)
+            reference = refreshed if refreshed is not None else reference
+            current = match_center
+        return found
+
+    forward = _walk(anchor_center, +1)
+    backward = _walk(anchor_center, -1)
+    matches_working: List[Tuple[float, float]] = [*backward[::-1], (anchor_center, 1.0), *forward]
+
+    if len(matches_working) < 2:
+        return RepeatMatchResult(
+            success=False,
+            message="No other matches found for the marked repeat -- try a different pair of points.",
+            template_width_px=template_w, template_height_px=template_h, seed_period_px=seed_period,
+        )
+
+    # working_x is a position along the search axis, relative to the
+    # crop's own origin -- origin_x already holds the ROI's offset along
+    # THAT axis in full-image coordinates regardless of whether a
+    # transpose happened (see its assignment above), so the same
+    # addition converts back correctly either way. The result is a
+    # single scalar per match (a position along the search axis), the
+    # same convention AxisResult.positions_px already uses elsewhere in
+    # this file -- not a 2D point.
+    positions = [m[0] + origin_x for m in matches_working]
+    scores = [m[1] for m in matches_working]
+
+    spacing_px: Optional[float] = None
+    if len(positions) >= 2:
+        diffs = np.diff(sorted(positions))
+        diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
+        if diffs.size:
+            spacing_px = float(np.median(diffs))
+    if spacing_px is None:
+        spacing_px = seed_period
+
+    match_count_score = float(np.clip(len(positions) / (TEMPLATE_MATCH_MIN_MATCHES_FOR_CONFIDENCE * 2), 0.0, 1.0))
+    mean_score = float(np.mean(scores)) if scores else 0.0
+    spacing_consistency = 1.0
+    if len(positions) >= 3:
+        diffs = np.diff(sorted(positions))
+        diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
+        if diffs.size and np.mean(diffs) > 0:
+            cv = float(np.std(diffs) / np.mean(diffs))
+            spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
+    confidence = float(np.clip(0.5 * mean_score + 0.3 * spacing_consistency + 0.2 * match_count_score, 0.0, 1.0))
+    if len(positions) < TEMPLATE_MATCH_MIN_MATCHES_FOR_CONFIDENCE:
+        confidence = min(confidence, 0.4)
+
+    message = f"Matched {len(positions)} repeat(s) at {mean_score * 100:.0f}% average confidence."
+    if len(positions) < TEMPLATE_MATCH_MIN_MATCHES_FOR_CONFIDENCE:
+        message += " Few matches found; consider a larger measurement area or a different anchor."
+
+    return RepeatMatchResult(
+        success=True,
+        message=message,
+        spacing_px=round(spacing_px, 3),
+        match_count=len(positions),
+        match_positions_px=[round(p, 2) for p in positions],
+        match_scores=[round(s, 3) for s in scores],
+        confidence=round(confidence, 4),
+        template_width_px=template_w,
+        template_height_px=template_h,
+        seed_period_px=round(seed_period, 2),
+    )
+
+
 # --- Automatic measurement-area (ROI) proposal --------------------------
 #
 # Stage 1 of the multi-region workflow: BEFORE any gauge analysis runs,

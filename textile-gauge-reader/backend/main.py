@@ -29,7 +29,7 @@ from fastapi.staticfiles import StaticFiles
 
 from analysis import ALGORITHM_VERSION, analyze_gauge, analyze_multi_roi, propose_measurement_rois
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
-from analysis.gauge_analysis import analyze_loop_lattice_experiment
+from analysis.gauge_analysis import analyze_loop_lattice_experiment, count_repeats_by_template_match
 from storage import corrections_store
 
 from .corrections_api import router as corrections_router
@@ -48,6 +48,7 @@ from .schemas import (
     OutlierOut,
     ProposedRoiOut,
     ProposeRoisResponse,
+    RepeatMatchOut,
     RoiMeasurementOut,
     RoiOut,
     Structure,
@@ -644,6 +645,93 @@ async def analyze_multi(
             primary_label=result.primary_label,
         ),
     )
+    return JSONResponse(status_code=200, content=response.model_dump())
+
+
+@app.post("/count-repeats", response_model=RepeatMatchOut)
+async def count_repeats(
+    file: UploadFile = File(...),
+    roi_x: float = Form(...),
+    roi_y: float = Form(...),
+    roi_width: float = Form(...),
+    roi_height: float = Form(...),
+    anchor_start_x: float = Form(...),
+    anchor_start_y: float = Form(...),
+    anchor_end_x: float = Form(...),
+    anchor_end_y: float = Form(...),
+    orientation: Orientation = Form(...),
+    axis: str = Form(...),
+    pixels_per_mm: float = Form(...),
+) -> JSONResponse:
+    """
+    User-anchored repeat counting (see analysis.gauge_analysis.
+    count_repeats_by_template_match). Optional, independent evidence
+    source: the user marks two points spanning ONE confirmed wale or
+    course repeat, and this counts real occurrences of that exact patch
+    across the measurement area via normalized cross-correlation, rather
+    than inferring periodicity from generic frequency content the way
+    every automatic detection path in this app does. Never overwrites or
+    feeds into automatic detection -- this is a separate, human-in-the-
+    loop measurement the frontend shows alongside the automatic result,
+    same spirit as the loop-lattice debug view being comparison-only.
+    """
+    try:
+        data = await file.read()
+        validate_upload(file.content_type, len(data))
+        image = decode_image(data)
+    except ImageValidationError as exc:
+        return JSONResponse(status_code=400, content=RepeatMatchOut(success=False, message=str(exc)).model_dump())
+
+    if axis not in ("wale", "course"):
+        return JSONResponse(
+            status_code=400,
+            content=RepeatMatchOut(success=False, message="axis must be 'wale' or 'course'.").model_dump(),
+        )
+    if pixels_per_mm <= 0:
+        return JSONResponse(
+            status_code=400,
+            content=RepeatMatchOut(success=False, message="Invalid calibration scale.").model_dump(),
+        )
+
+    try:
+        result = count_repeats_by_template_match(
+            image_bgr=image,
+            roi=(roi_x, roi_y, roi_width, roi_height),
+            anchor_start=(anchor_start_x, anchor_start_y),
+            anchor_end=(anchor_end_x, anchor_end_y),
+            orientation=orientation,
+            axis=axis,  # type: ignore[arg-type]  -- validated above
+        )
+    except Exception:  # pragma: no cover - defensive: never fabricate a result
+        logger.exception("Repeat counting raised an unexpected exception")
+        return JSONResponse(
+            status_code=500,
+            content=RepeatMatchOut(
+                success=False, message="Counting repeats failed unexpectedly. Please try again."
+            ).model_dump(),
+        )
+
+    spacing_mm = result.spacing_px / pixels_per_mm if result.spacing_px else None
+    per_inch = MM_PER_INCH / spacing_mm if spacing_mm else None
+    response = RepeatMatchOut(
+        success=result.success,
+        message=result.message,
+        spacing_px=result.spacing_px,
+        spacing_mm=round(spacing_mm, 4) if spacing_mm is not None else None,
+        per_inch=round(per_inch, 3) if per_inch is not None else None,
+        match_count=result.match_count,
+        match_positions_px=result.match_positions_px,
+        match_scores=result.match_scores,
+        confidence=result.confidence,
+        template_width_px=result.template_width_px,
+        template_height_px=result.template_height_px,
+        seed_period_px=result.seed_period_px,
+    )
+    # success=False here can mean either a request-shaped-fine-but-no-
+    # matches-found result (e.g. a poorly chosen anchor) or a too-small
+    # region -- still a 200, same convention as /propose-rois: the
+    # frontend shows result.message and lets the user try different
+    # anchor points, rather than treating it as a request error.
     return JSONResponse(status_code=200, content=response.model_dump())
 
 

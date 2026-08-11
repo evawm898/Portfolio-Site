@@ -734,6 +734,84 @@ Fixing the loop-lattice path safely needs its own targeted evidence — not
 a copy of finding 1's fix, which was checked here and shown not to
 generalize — and is real work still ahead.
 
+### Verify by counting a repeat: user-anchored template matching
+
+Every detection path above — raw autocorrelation, the v0.3 candidate
+scorer, the loop-lattice V-shape counter — works by discovering
+periodicity purely from the image's own frequency content, with no
+ground truth for what one real repeat looks like. That's the root cause
+behind every failure mode documented in this file so far: a texture
+that's genuinely periodic at the *wrong* frequency (most often yarn ply
+twist) is mathematically indistinguishable from the true repeat to a
+method that only asks "how periodic is this."
+
+The idea this section implements: if the user marks two points spanning
+ONE confirmed repeat — the same visual feature on two adjacent wale
+columns, or two adjacent course rows — there's no more ambiguity to be
+fooled by. That patch becomes a template, and `count_repeats_by_
+template_match` (classical CV, `cv2.matchTemplate` — no ML) counts real
+occurrences of it across the photo directly, the way a person would:
+find the next one, then the next, then the next.
+
+**Why it walks outward instead of matching the whole region against one
+fixed template.** The first version did exactly that — one template,
+searched everywhere at once — and it failed hard on the real jersey
+photo: only 4 of the region's ~14 true repeats matched above a
+reasonable correlation threshold, because real (non-synthetic) fabric's
+natural stitch-to-stitch variation — lighting, fiber irregularity, slight
+curvature — makes a patch drift in appearance faster than distance alone
+would suggest. The fix walks outward from the anchor one step at a time,
+in both directions, refreshing the reference template to the newest
+match after every step, so no single comparison ever has to span more
+than one repeat's worth of real-world drift.
+
+**Two real bugs found and fixed while getting this to work, both caught
+by testing against the real jersey fixture before trusting the result:**
+
+1. A window-bound arithmetic error let the *backward* half of the walk's
+   search window overshoot past the anchor position itself, corrupting
+   which physical location each candidate match index actually
+   corresponded to. Manifested as the walk taking confident, consistent
+   ~2px "steps" in the wrong direction instead of ~35px ones toward the
+   next real repeat — a completely different bug from harmonic ambiguity,
+   caught by tracing the actual index-to-position math against real
+   image content rather than trusting the first plausible-looking result.
+2. The initial correlation threshold (0.45) was calibrated on intuition,
+   not evidence, and turned out to be too strict for real fabric: it cut
+   the walk off after 2 steps in each direction, with scores hovering
+   right at the cutoff. Lowered to 0.35 after directly verifying this is
+   safe — the geometric search window (a narrow band around the expected
+   next-repeat position) is what actually guards against matching the
+   wrong harmonic, not the correlation threshold, so a lower floor mainly
+   costs a few genuinely-empty steps rather than harmonic confusion. This
+   raised the same jersey walk from 2 real matches to 9, spanning the
+   whole region.
+
+**Real-photo results, reported honestly rather than only showing the
+good one:**
+
+- **Jersey wale: 5.04 predicted vs. ~5.0 true** — 9 real, consistently-
+  spaced matches across the region, the closest any single automatic-or-
+  assisted wale measurement has come to ground truth in this entire
+  investigation.
+- **Teal wale: consistently ~14% too coarse** across four independent
+  anchor placements on the real photo — a real, modest, *non-harmonic*
+  overcount, not the ~2x doubling every other method has shown on this
+  same photo. This yarn's fuzzier, more heavily-plied texture correlates
+  less cleanly even between genuinely adjacent repeats than jersey's
+  smooth cotton does — an honest limitation, not tuned away by loosening
+  tolerances further.
+
+**Never feeds back into automatic detection.** This is a separate,
+human-in-the-loop measurement surfaced alongside the automatic wale/
+course numbers in a new "Verify by counting a repeat" panel on the
+Results step (`POST /count-repeats`) — the same spirit as the loop-
+lattice debug view being comparison-only. The user marks two points on
+the image; the panel reports the counted per-inch value, match count,
+and confidence, letting a low-confidence automatic result be checked
+against a second, independently-derived number rather than just a
+warning label.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/
@@ -935,6 +1013,16 @@ count"` or `"periodicity"`, see [Wale gauge from counted loop columns](
 count_confidence`) and each axis's consensus detail (`wale_consensus`/
 `course_consensus`: `included_labels`, `excluded_labels`, `outliers`,
 `regional_median_px`/`_per_inch`, `regional_spread_px`).
+
+`POST /count-repeats` — multipart form: `file`, `roi_x`/`roi_y`/`roi_width`/
+`roi_height` (the area to search), `anchor_start_x`/`anchor_start_y`/
+`anchor_end_x`/`anchor_end_y` (two user-marked points spanning one
+confirmed repeat), `orientation`, `axis` (`wale` \| `course`), and
+`pixels_per_mm`. Returns `spacing_px`/`spacing_mm`/`per_inch`,
+`match_count`, `match_positions_px`, `match_scores`, and `confidence` — an
+independent, user-anchored evidence source that never feeds into
+automatic detection, see [Verify by counting a repeat](
+#verify-by-counting-a-repeat-user-anchored-template-matching).
 
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.
