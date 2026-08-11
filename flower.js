@@ -699,8 +699,12 @@ function generate() {
       for (let i = 0; i < T; i++) {
         const phi = T === 1 ? 0 : lerp(-phiMax, phiMax, i / (T - 1));
         const rr = R * Math.cos(phi), yy = cy + R * Math.sin(phi);
-        for (let j = 0; j < count; j++) {
-          placements.push({ az: j * 2 * Math.PI / count, r: rr, seedIdx: i * count + j, height: yy, tilt: phi });
+        // petals per ring scale with the ring radius (∝ cosφ) so the packing density
+        // is even over the sphere — `count` is the widest (equator) ring's count.
+        const nRing = Math.max(1, Math.round(count * Math.cos(phi)));
+        const azOff = (i % 2) * Math.PI / nRing;                 // brick-lay alternate tiers
+        for (let j = 0; j < nRing; j++) {
+          placements.push({ az: azOff + j * 2 * Math.PI / nRing, r: rr, seedIdx: i * count + j, height: yy, tilt: phi });
         }
       }
     }
