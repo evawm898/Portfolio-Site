@@ -2971,17 +2971,33 @@ def _template_match_consistency_score(
 #
 # Deliberately generic: the quality score below has no notion of "ruler,"
 # "label," "edge," "wrinkle," or "curl" at all. A ruler/label/background
-# region scores low on its own merits (usually low periodicity, and often low texture-consistency
-# or extreme brightness), not because anything here was told to avoid it.
+# region scores low on its own merits (usually low periodicity, and often
+# low texture-consistency or extreme brightness), not because anything
+# here was told to avoid it. The same is true of the local-anomaly gate
+# below (_local_anomaly_fraction): it flags "a block of this window looks
+# statistically unlike the REST of this same window," using the window's
+# own robust (median/MAD) block statistics as the baseline, not a lookup
+# table of what a ruler looks like.
+#
+# Real-photo motivation: a user-submitted photo of a pinned swatch (metal
+# T-pins/stitch markers crossing through the fabric, a tape measure along
+# one edge) got a proposed region with a pin running straight through the
+# middle of it. The anomaly gate below reliably catches the LARGE, obvious
+# half of that report -- a ruler/tape measure dominating a real fraction
+# of a window, validated against a real photo's actual ruler strip, see
+# _local_anomaly_fraction's docstring for the numbers -- but a THIN pin
+# specifically turned out to be a much harder case: every classical-CV
+# formulation tried (see that same docstring) either missed it or false-
+# positived on real fabric's own natural local-contrast variation.
+# Disclosed as open work rather than shipped as a false guarantee.
 
 # Candidate sizes to try, LARGEST first, in inches -- the proposal picks
 # the largest one whose best positions can fill ROI_PROPOSAL_MIN_REGIONS
-# well-separated, regular slots, so the result is "as many large regular
-# areas as the fabric supports," not a fixed size or a fixed count. Sizes
-# that don't fit the image at all (window_px too big) are skipped
-# automatically; the smallest entries match the original per-region
-# target from the first version of this function (a single fixed
-# ~0.75-1in window).
+# regular slots, so the result is "as many large regular areas as the
+# fabric supports," not a fixed size or a fixed count. Sizes that don't
+# fit the image at all (window_px too big) are skipped automatically;
+# the smallest entries match the original per-region target from the
+# first version of this function (a single fixed ~0.75-1in window).
 CANDIDATE_SIZE_INCHES = [3.0, 2.5, 2.0, 1.5, 1.25, 1.0, 0.875, 0.75]
 ROI_PROPOSAL_STRIDE_FRACTION = 0.35      # candidate grid step, as a fraction of the window size
 ROI_PROPOSAL_MIN_QUALITY = 0.45          # a large region is stricter-vetted than the old small-window floor -- fewer, larger regions means each one matters more
@@ -2989,8 +3005,10 @@ ROI_PROPOSAL_EDGE_MARGIN_FRACTION = 0.02 # keep candidate windows off the outer 
 ROI_PROPOSAL_LABELS = "ABCDEF"
 ROI_PROPOSAL_MIN_REGIONS = 2             # below this, single-region measurement has no cross-check at all -- prefer a smaller size that supports 2+ over a bigger size that only supports 1
 ROI_PROPOSAL_MAX_REGIONS = 4             # large regions are individually more expensive to review than the old small ones -- fewer of them is the point
-ROI_PROPOSAL_MAX_OVERLAP_IOU = 0.02      # two selected regions may not overlap more than this
-ROI_PROPOSAL_MIN_CENTER_SPACING = 1.15   # ...nor have centers closer than this fraction of the window size
+# Proposed regions are explicitly allowed to overlap (see
+# propose_measurement_rois's docstring for why) -- this only rejects a
+# near-EXACT duplicate of an already-selected region, not "too close."
+ROI_PROPOSAL_MAX_OVERLAP_IOU = 0.9
 
 # Quality-score component weights (sum to 1.0). Periodicity and
 # periodicity-consistency get the largest weights: periodicity is "does
@@ -3212,20 +3230,14 @@ def _roi_iou(a: dict, b: dict) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def _roi_center_distance(a: dict, b: dict) -> float:
-    return math.hypot(
-        (a["x"] + a["w"] / 2) - (b["x"] + b["w"] / 2),
-        (a["y"] + a["h"] / 2) - (b["y"] + b["h"] / 2),
-    )
-
-
-def _too_close_to_selected(cand: dict, selected: List[dict], window_px: float) -> bool:
-    for s in selected:
-        if _roi_iou(cand, s) > ROI_PROPOSAL_MAX_OVERLAP_IOU:
-            return True
-        if _roi_center_distance(cand, s) < window_px * ROI_PROPOSAL_MIN_CENTER_SPACING:
-            return True
-    return False
+def _too_close_to_selected(cand: dict, selected: List[dict]) -> bool:
+    """
+    True only for a near-EXACT duplicate of an already-selected region.
+    Overlap itself is fine now (see propose_measurement_rois's docstring)
+    -- this just stops the grid scan from offering the same position
+    twice, not from proposing genuinely overlapping regions.
+    """
+    return any(_roi_iou(cand, s) > ROI_PROPOSAL_MAX_OVERLAP_IOU for s in selected)
 
 
 def _fabric_mask(gray_full: np.ndarray) -> np.ndarray:
@@ -3248,6 +3260,152 @@ def _fabric_mask(gray_full: np.ndarray) -> np.ndarray:
     return local_std >= ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD
 
 
+ROI_PROPOSAL_ANOMALY_BLOCK_PX = 16      # fine block size for local-anomaly detection (matches _fabric_mask's block)
+# A block's local std-dev this many robust MADs from the image-wide
+# baseline (see _global_local_std_baseline) counts as an anomaly. Robust
+# (median/MAD, not mean/stdev) deliberately -- a real intrusion's own
+# blocks must not be allowed to drag the baseline they're compared
+# against.
+ROI_PROPOSAL_ANOMALY_MAD_MULTIPLIER = 4.0
+ROI_PROPOSAL_ANOMALY_BRIGHTNESS_THRESHOLD = 245.0  # near-blown-out block mean -- a generic proxy for a hard, reflective surface, not yarn-color-specific
+# Deliberately conservative, set from real-fixture evidence, not a round
+# number picked on intuition: swept both real fixtures (tests/fixtures/
+# real_jersey_sample.jpg, sarahmaker-knitting-gauge.jpg) at every
+# candidate window size this function tries. Worst-case fraction on
+# genuinely CLEAN fabric anywhere in either photo: ~0.38 (jersey) / ~0.36
+# (teal) -- real yarn has enough of its own natural local-contrast
+# variation that a tight threshold false-positives on ordinary good
+# fabric. The real teal photo's actual ruler strip, by contrast, measured
+# 0.60-0.74 in the same sweep. 0.5 sits between the two using real
+# measured evidence on both sides, not just the synthetic case -- see
+# _local_anomaly_fraction's docstring for what this gate does and
+# doesn't reliably catch as a result of that real, if not huge, margin.
+ROI_PROPOSAL_MAX_ANOMALY_FRACTION = 0.5
+# Hard floor on periodicity_consistency specifically (see its use in
+# propose_measurement_rois's grid-scan loop for why a hard gate, not
+# just its existing weighted-score contribution, is needed) -- 0.5 is
+# "the four quadrants' measured periods span about a 1.35x range,"
+# already a real, visible inconsistency; comfortably below the ~1.0 a
+# genuinely uniform patch scores, comfortably above 0.0 (~2x+ range).
+ROI_PROPOSAL_MIN_PERIODICITY_CONSISTENCY = 0.6
+
+
+def _global_local_std_baseline(gray_full: np.ndarray, block: int = ROI_PROPOSAL_ANOMALY_BLOCK_PX) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Robust (median, MAD) of per-block local std-dev across the WHOLE
+    photo, computed ONCE (see its call site in propose_measurement_rois)
+    and reused as the reference baseline every candidate window's own
+    _local_anomaly_fraction check compares against -- restricted to
+    blocks that already look like "some real texture" (reusing
+    _fabric_mask's own floor) so flat background doesn't skew the
+    baseline downward.
+
+    WHY a global reference instead of each window judging itself (an
+    earlier version of this function did exactly that): a self-relative
+    baseline structurally cannot flag a window that's uniformly
+    anomalous all the way through -- there's nothing left inside that
+    same window for an anomalous block to look different FROM. Confirmed
+    directly: a candidate window entirely inside a real ruler strip
+    scored a self-relative anomaly fraction of 0.0 (100% ruler, so every
+    block matched every OTHER block in that same window) despite being
+    0% fabric. A whole-image reference doesn't have that blind spot --
+    the same window scores 1.0 against it.
+
+    Returns (None, None) if there isn't enough textured area in the
+    photo to establish a baseline at all -- callers should treat that as
+    "couldn't measure," not "no anomaly."
+    """
+    gray_f = gray_full.astype(np.float32)
+    mean = cv2.boxFilter(gray_f, ddepth=-1, ksize=(block, block), normalize=True)
+    mean_sq = cv2.boxFilter(gray_f * gray_f, ddepth=-1, ksize=(block, block), normalize=True)
+    local_std = np.sqrt(np.clip(mean_sq - mean * mean, 0.0, None))
+    sampled = local_std[block // 2 :: block, block // 2 :: block]
+    textured = sampled[sampled >= ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD]
+    if textured.size < 5:
+        return None, None
+    median = float(np.median(textured))
+    mad = float(np.median(np.abs(textured - median)))
+    return median, mad
+
+
+def _local_anomaly_fraction(
+    crop_gray: np.ndarray,
+    global_median_std: Optional[float],
+    global_mad_std: Optional[float],
+    block: int = ROI_PROPOSAL_ANOMALY_BLOCK_PX,
+) -> float:
+    """
+    Fraction of this candidate window that looks anomalous against the
+    whole PHOTO's own block-statistics baseline (see
+    _global_local_std_baseline -- robust median/MAD local contrast, plus
+    a near-blown-out brightness check), not a fixed cross-photo
+    threshold -- the same generalizes-across-yarns-and-lighting spirit
+    as the rest of this quality score (see the module comment above
+    CANDIDATE_SIZE_INCHES). This is a HARD GATE in propose_measurement_
+    rois (like the existing fabric_fraction check), not folded into
+    _roi_quality_score's weighted average, so a small but severe
+    intrusion isn't diluted away by everything else in the window.
+
+    WHAT THIS RELIABLY CATCHES (validated against real photos, not just
+    synthetic ones): a window that's MOSTLY OR ENTIRELY a large, obvious
+    non-fabric surface -- a ruler/tape measure, a label, a sizable
+    occlusion. Swept both real fixtures (tests/fixtures/real_jersey_
+    sample.jpg, sarahmaker-knitting-gauge.jpg) at every window size this
+    function tries: the real teal photo's actual ruler strip measured
+    0.60-0.74 here, while genuinely clean fabric anywhere in either photo
+    never exceeded ~0.38 (see ROI_PROPOSAL_MAX_ANOMALY_FRACTION's own
+    comment for the exact numbers) -- a real, if not huge, margin, not a
+    hopeful guess.
+
+    WHAT THIS DOES NOT RELIABLY CATCH, disclosed honestly rather than
+    overclaimed: an intrusion that's only a MINORITY of a large window --
+    a thin pin/needle/stitch-marker crossing the fabric, or a ruler
+    grazing just one edge of an otherwise-good window. A window measured
+    23% ruler / 77% clean fabric during development scored only 0.24 on
+    this exact metric -- inside the real clean-fabric noise range, not
+    separable from it. Several other classical-CV formulations were also
+    tried against the real fixtures (a per-row/per-column max-fraction
+    variant, an absolute-anomalous-area variant, a brightness-only
+    variant, a per-window rather than per-photo self-relative baseline --
+    see this file's git history / README.md for what each one did and
+    why it didn't hold up) and none reliably separated a MINORITY real
+    intrusion from real fabric's own natural local variation without an
+    unacceptable false-positive risk on genuinely good fabric. Left as
+    open, disclosed future work rather than shipped as a false guarantee.
+    A window that's mostly good fabric with only a small intrusion is
+    still somewhat guarded by ranking, not gating: it scores lower on
+    _roi_quality_score than a fully-clean alternative, so the greedy
+    highest-quality-first selection in propose_measurement_rois still
+    prefers a genuinely clean window over it WHEN ONE IS AVAILABLE -- the
+    hard gate here specifically matters when a MOSTLY-bad window would
+    otherwise be selected because too few better alternatives exist.
+    """
+    h, w = crop_gray.shape[:2]
+    if h < block * 4 or w < block * 4 or global_median_std is None:
+        return 0.0  # too small to judge meaningfully, or no baseline available -- don't reject on this signal alone
+
+    gray_f = crop_gray.astype(np.float32)
+    mean = cv2.boxFilter(gray_f, ddepth=-1, ksize=(block, block), normalize=True)
+    mean_sq = cv2.boxFilter(gray_f * gray_f, ddepth=-1, ksize=(block, block), normalize=True)
+    local_std = np.sqrt(np.clip(mean_sq - mean * mean, 0.0, None))
+
+    # Sample on a block-spaced grid so each cell is counted once (the box
+    # filter above produces a per-pixel map; we only need one reading per
+    # block for this statistic).
+    sampled_std = local_std[block // 2 :: block, block // 2 :: block]
+    sampled_mean = mean[block // 2 :: block, block // 2 :: block]
+    if sampled_std.size == 0:
+        return 0.0
+
+    # 1.4826x converts MAD to a standard-deviation-equivalent scale for a
+    # normal distribution -- the usual robust-z-score convention.
+    robust_scale = global_mad_std * 1.4826 if (global_mad_std or 0.0) > 1e-6 else 1.0
+    contrast_outlier = np.abs(sampled_std - global_median_std) > ROI_PROPOSAL_ANOMALY_MAD_MULTIPLIER * robust_scale
+    brightness_outlier = sampled_mean > ROI_PROPOSAL_ANOMALY_BRIGHTNESS_THRESHOLD
+    anomaly = contrast_outlier | brightness_outlier
+    return float(np.mean(anomaly))
+
+
 def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:
     """
     Propose a FEW (ROI_PROPOSAL_MIN_REGIONS..ROI_PROPOSAL_MAX_REGIONS)
@@ -3256,7 +3414,11 @@ def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> Roi
     while still looking regular (see _roi_quality_score, especially
     _periodicity_consistency_score, which catches curled/stretched/
     wrinkled areas that plain periodicity/texture-consistency alone can
-    miss), and well-separated from each other.
+    miss) and free of large, obvious non-fabric intrusions (see
+    _local_anomaly_fraction -- a ruler/tape measure, a label, a sizable
+    occlusion; NOT reliably a thin pin/stitch-marker specifically, see
+    that function's docstring for what was tried and why it's disclosed
+    as open work rather than claimed solved).
 
     Single-region measurement, however large or well-vetted the one
     region is, turned out NOT to be reliable enough on its own: a sweep
@@ -3271,15 +3433,27 @@ def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> Roi
     repeat cycles per region, more regions gives cross-checking, and the
     two together are the point.
 
+    Proposed regions are explicitly allowed to OVERLAP each other (see
+    _too_close_to_selected -- it only rejects a near-exact duplicate of
+    an already-selected region, not "too close"). A real photo often has
+    only one genuinely clean, regular patch of fabric (a ruler along one
+    edge, pins/stitch-markers crossing elsewhere, a curled border) --
+    forcing regions apart to maximize spatial independence was pushing
+    proposals into those bad areas instead of using more of the one good
+    patch. This does trade away some statistical independence between
+    regions for analyze_multi_roi's cross-checking; deliberately, since a
+    region built on bad texture is worse for that cross-check than a
+    region that partially overlaps a good one.
+
     Tries CANDIDATE_SIZE_INCHES largest-first: at each size, grid-scans
-    the whole image (skipping any window that dips into background/
-    non-fabric pixels -- see _fabric_mask) and greedily selects up to
-    ROI_PROPOSAL_MAX_REGIONS non-overlapping, well-separated candidates
-    that clear ROI_PROPOSAL_MIN_QUALITY. Takes the first (largest) size
-    that can fill at least ROI_PROPOSAL_MIN_REGIONS such slots -- a
-    smaller size that supports 2+ well-separated good regions is
-    preferred over a bigger size that can only fit 1, since a single
-    region has no cross-check at all.
+    the whole image (skipping any window that dips into background/non-
+    fabric pixels, or contains a severe local intrusion -- see
+    _fabric_mask and _local_anomaly_fraction) and greedily selects up to
+    ROI_PROPOSAL_MAX_REGIONS candidates, highest-quality first, that
+    clear ROI_PROPOSAL_MIN_QUALITY. Takes the first (largest) size that
+    can fill at least ROI_PROPOSAL_MIN_REGIONS such slots -- a smaller
+    size that supports 2+ good regions is preferred over a bigger size
+    that can only fit 1, since a single region has no cross-check at all.
 
     If NO size can fill even the minimum, falls back to whatever it DID
     find (as few as one region, or the best-scoring candidate seen at
@@ -3307,6 +3481,7 @@ def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> Roi
 
     gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     fabric_mask = _fabric_mask(gray_full)
+    anomaly_baseline_median, anomaly_baseline_mad = _global_local_std_baseline(gray_full)
 
     best_size_selection: Optional[List[dict]] = None  # best candidate SET seen at any size, as a last-resort fallback
     best_size_window_px: Optional[int] = None
@@ -3342,7 +3517,33 @@ def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> Roi
                 if fabric_fraction < ROI_PROPOSAL_MIN_FABRIC_FRACTION:
                     continue
                 crop_gray = gray_full[cy:cy + window_px, cx:cx + window_px]
+                # Second hard gate: a window that's almost entirely
+                # "fabric" by the check above can still be mostly or
+                # entirely a large non-fabric surface (a ruler, a label)
+                # that a whole-window average doesn't drop enough to
+                # reject on its own -- see _local_anomaly_fraction's
+                # docstring for exactly what this does and doesn't catch.
+                anomaly_fraction = _local_anomaly_fraction(crop_gray, anomaly_baseline_median, anomaly_baseline_mad)
+                if anomaly_fraction > ROI_PROPOSAL_MAX_ANOMALY_FRACTION:
+                    continue
                 score, parts = _roi_quality_score(crop_gray)
+                # Third hard gate: periodicity_consistency is only 20% of
+                # the weighted score above, so a window that's mostly
+                # clean but grazes a curled/distorted/wrinkled band (or
+                # any other boundary where the SAME repeat stops holding
+                # partway through the window) can still clear
+                # ROI_PROPOSAL_MIN_QUALITY on the strength of its other,
+                # unaffected terms -- confirmed directly (a window 26%
+                # covered by a synthetic distorted band still scored
+                # 0.88 overall, comfortably above the 0.45 floor, even
+                # though its own periodicity_consistency was 0.50).
+                # Gating on it directly, not just weighting it, catches
+                # exactly the "mostly good, partly bad" case the whole-
+                # window average dilutes away -- the same reasoning as
+                # the fabric/anomaly gates above, applied to distortion
+                # instead of background/intrusion.
+                if parts["periodicity_consistency"] < ROI_PROPOSAL_MIN_PERIODICITY_CONSISTENCY:
+                    continue
                 candidates.append({"x": cx, "y": cy, "w": window_px, "h": window_px, "score": score, **parts})
 
         if not candidates:
@@ -3355,7 +3556,7 @@ def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> Roi
                 break
             if cand["score"] < ROI_PROPOSAL_MIN_QUALITY:
                 break  # sorted descending -- nothing after this clears the bar either
-            if _too_close_to_selected(cand, selected, window_px):
+            if _too_close_to_selected(cand, selected):
                 continue
             selected.append(cand)
 
