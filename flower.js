@@ -568,44 +568,6 @@ function buildCoreInto(acc, P, centerHeight, rng) {
   }
 }
 
-/* RADIAL only: a wireframe globe around the bloom centre — `tiers` latitude rings
-   (parallels) stacked pole to pole, plus a matching set of longitudinal meridian
-   arcs, so the flat rosette reads as sitting on/inside a sphere. `radius` sizes
-   it; meridian count scales with the tier count. Thin tubes, into the given acc. */
-function buildWireSphereInto(acc, P, cx, cy, cz, radius, tiers) {
-  tiers = clamp(Math.round(tiers), 0, 16);
-  if (tiers < 1 || radius <= 1e-4) return;
-  const meridians = clamp(2 * tiers, 12, 30);
-  const wire = P.tubeRadius * 1.05;             // line weight
-  const RING_SEG = 72, MER_SEG = 48;
-  const phiMax = 80 * DEG;                       // keep the top/bottom rings off the exact poles
-
-  // latitude tiers (parallels): horizontal rings, evenly spaced in latitude
-  for (let i = 0; i < tiers; i++) {
-    const phi = tiers === 1 ? 0 : lerp(-phiMax, phiMax, i / (tiers - 1));
-    const rr = radius * Math.cos(phi), yy = cy + radius * Math.sin(phi);
-    const pts = [];
-    for (let k = 0; k <= RING_SEG; k++) {
-      const th = (k / RING_SEG) * Math.PI * 2;
-      pts.push({ x: cx + rr * Math.cos(th), y: yy, z: cz + rr * Math.sin(th) });
-    }
-    acc.addTube(pts, wire, 0, 6);
-  }
-  // longitudinal meridians: pole-to-pole arcs at evenly spaced longitudes
-  for (let j = 0; j < meridians; j++) {
-    const th = (j / meridians) * Math.PI * 2;
-    const ct = Math.cos(th), st = Math.sin(th);
-    const pts = [];
-    for (let k = 0; k <= MER_SEG; k++) {
-      const phi = lerp(-Math.PI / 2, Math.PI / 2, k / MER_SEG);
-      const rr = radius * Math.cos(phi);
-      pts.push({ x: cx + rr * ct, y: cy + radius * Math.sin(phi), z: cz + rr * st });
-    }
-    acc.addTube(pts, wire, 0, 6);
-  }
-}
-
-
 /* ===================================================================
    4. SCENE
    =================================================================== */
@@ -723,8 +685,24 @@ function generate() {
       placements.push({ az: -a, r: ringR, seedIdx: k, over: o });   // -side (shares seed + controls -> exact mirror)
     }
   } else if (bloomType === 'radial') {
-    for (let i = 0; i < count; i++) {
-      placements.push({ az: count === 1 ? 0 : i * 2 * Math.PI / count, r: count === 1 ? 0 : ringR, seedIdx: i });
+    // Petals sit on an INVISIBLE sphere in stacked latitude rings (tiers): each ring
+    // is at its own latitude, so it has its own radius (R·cosφ) and height (R·sinφ),
+    // and its petals tilt to point radially out from the sphere centre. Rings share
+    // azimuths, so petals line up in longitudinal columns up the sphere.
+    const T = clamp(Math.round(ui.sphereTiers), 1, 12);
+    const R = ui.sphereSize * PETAL_LENGTH * 0.5 * lerp(1.25, 0.6, ui.tightness);
+    const cy = elev * elevAmp;                                 // ball centre height
+    const phiMax = 72 * DEG;
+    if (count === 1) {
+      placements.push({ az: 0, r: 0, seedIdx: 0, height: cy, tilt: 0 });
+    } else {
+      for (let i = 0; i < T; i++) {
+        const phi = T === 1 ? 0 : lerp(-phiMax, phiMax, i / (T - 1));
+        const rr = R * Math.cos(phi), yy = cy + R * Math.sin(phi);
+        for (let j = 0; j < count; j++) {
+          placements.push({ az: j * 2 * Math.PI / count, r: rr, seedIdx: i * count + j, height: yy, tilt: phi });
+        }
+      }
     }
   } else {                                                      // coiled
     const coiledEven = count <= EVEN_MAX;
@@ -739,12 +717,13 @@ function generate() {
     const rho = rMax > 1e-6 ? clamp(pl.r / rMax, 0, 1) : 0;
     // raised-cosine receptacle profile: 1 at the centre, 0 at the rim
     const profile = 0.5 * (1 + Math.cos(Math.PI * rho));
-    const height = elev * elevAmp * profile;
     // lean each petal along the receptacle slope (dy/dr of the height field) so
     // a raised centre reads as a cone and a sunken centre as a bowl. The bloom
     // radius cancels here, so the lean stays bounded at any coil tightness.
     const slope = -elev * ELEV_FACTOR * (Math.PI / 2) * Math.sin(Math.PI * rho);
-    const tilt = RECEPTACLE_TILT * Math.atan(slope);
+    // RADIAL sphere tiers supply explicit height + tilt; otherwise use the receptacle.
+    const height = pl.height != null ? pl.height : elev * elevAmp * profile;
+    const tilt = pl.tilt != null ? pl.tilt : RECEPTACLE_TILT * Math.atan(slope);
     // BILATERAL: each petal position overrides width / curves, and (unless DEFAULT)
     // its tip/edge style, on a per-petal copy of P.
     let Pp = P;
@@ -762,18 +741,11 @@ function generate() {
   coreGlow.position.y = centerHeight + 0.2;
   buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
 
-  // RADIAL only: a longitudinal wireframe sphere over the bloom. Radius scales with
-  // the bloom's petal reach so the default sizes to the rosette; the slider tunes it.
-  if (bloomType === 'radial') {
-    const sphereR = ui.sphereSize * (ringR + PETAL_LENGTH);
-    buildWireSphereInto(petalAcc, P, 0, centerHeight, 0, sphereR, ui.sphereTiers);
-  }
-
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
 
   frameCameraOnce(petalAcc, coreAcc);
-  updateReadout(petalAcc, ui, effectiveCount);
+  updateReadout(petalAcc, ui, placements.length);
 }
 
 function frameCameraOnce(...accs) {
@@ -1239,7 +1211,7 @@ const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
-  sphereTiers: 6, sphereSize: 1,
+  sphereTiers: 5, sphereSize: 1,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
   bilScale1: 1, bilScale2: 1, bilScale3: 1,
   bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
