@@ -721,8 +721,29 @@
 
     const waleIsVertical = state.orientation === "vertical";
 
-    drawAxisLines(result.wale.positions_px, waleIsVertical, WALE_COLOR, roiTop, roiBottom);
-    drawAxisLines(result.course.positions_px, !waleIsVertical, COURSE_COLOR, roiTop, roiBottom);
+    // Developer diagnostics' "Inspect region" selector picks one region
+    // to explain -- draw THAT region's own wale/course lines (not just
+    // the primary/overlay region's), so switching regions always shows
+    // how each one was actually measured, not just whichever happens to
+    // be primary. Falls back to the primary/legacy single-region result
+    // when there's no multi-region breakdown to select from.
+    const mr = result.multi_roi;
+    const selected =
+      mr && mr.per_roi && mr.per_roi.length
+        ? mr.per_roi.find((m) => m.label === state.selectedDiagnosticRoiLabel) ||
+          mr.per_roi.find((m) => m.label === mr.primary_label) ||
+          mr.per_roi[0]
+        : null;
+
+    if (selected) {
+      const selTop = naturalToDisplay({ x: selected.x, y: selected.y });
+      const selBottom = naturalToDisplay({ x: selected.x + selected.width, y: selected.y + selected.height });
+      drawAxisLines(selected.wale.positions_px, waleIsVertical, WALE_COLOR, selTop, selBottom);
+      drawAxisLines(selected.course.positions_px, !waleIsVertical, COURSE_COLOR, selTop, selBottom);
+    } else {
+      drawAxisLines(result.wale.positions_px, waleIsVertical, WALE_COLOR, roiTop, roiBottom);
+      drawAxisLines(result.course.positions_px, !waleIsVertical, COURSE_COLOR, roiTop, roiBottom);
+    }
 
     if (showLoopCentersCheck.checked && result.loop_centers_px && result.loop_centers_px.length) {
       drawLoopCenters(result.loop_centers_px, "#e9ecec");
@@ -735,16 +756,11 @@
     // top-level (primary) loop_lattice_debug when there's no multi-region
     // diagnostics at all (a legacy single-region result).
     if (showVShapeLoopsCheck.checked) {
-      const mr = result.multi_roi;
-      let d = result.loop_lattice_debug;
-      let dRoiTop = roiTop;
-      let dRoiBottom = roiBottom;
-      if (mr && mr.per_roi && mr.per_roi.length) {
-        const m = mr.per_roi.find((x) => x.label === state.selectedDiagnosticRoiLabel) || mr.per_roi[0];
-        d = m.loop_lattice_debug;
-        dRoiTop = naturalToDisplay({ x: m.x, y: m.y });
-        dRoiBottom = naturalToDisplay({ x: m.x + m.width, y: m.y + m.height });
-      }
+      const d = selected ? selected.loop_lattice_debug : result.loop_lattice_debug;
+      const dRoiTop = selected ? naturalToDisplay({ x: selected.x, y: selected.y }) : roiTop;
+      const dRoiBottom = selected
+        ? naturalToDisplay({ x: selected.x + selected.width, y: selected.y + selected.height })
+        : roiBottom;
       if (d) {
         // Inferred wale columns first (so points draw on top of the lines).
         if (d.wale_columns_px && d.wale_columns_px.length) {
@@ -1967,6 +1983,7 @@
   roiDiagSelect.addEventListener("change", () => {
     state.selectedDiagnosticRoiLabel = roiDiagSelect.value;
     renderRoiDiagContent(state.result);
+    render(); // the canvas overlay (wale/course lines, loop-lattice columns) is per-selected-region too
   });
 
   // --- Detection Details (harmonic-candidate diagnostics) ----------------
