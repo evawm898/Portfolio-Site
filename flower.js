@@ -611,19 +611,31 @@ function buildReceptacleInto(acc, P, cx, cy, cz, size) {
   return hh;
 }
 
-/* SEPALS — a ring of sepal-like leaves cupping the base from below, matching the
-   petal count and tucked half a step between/behind them, flaring down-and-out.
-   Reuses the petal builder (so same venation, line weight and teal), just smaller,
-   pointed and steeply reflexed. */
+/* SEPALS — a whorl of narrow, sharply pointed, spiky sepals radiating from the
+   base in a star and reflexing back, matching the petal count and tucked half a
+   step between the petals. Real sepals are thin straps, not leaf-shaped petals,
+   so these are much narrower and more tapered than a petal, with a light midrib
+   and a strong recurve. Reuses the petal builder (same tube line weight & teal). */
 function buildSepalsInto(acc, P, cx, cy, cz, count, size, ringR) {
   const N = clamp(Math.round(count), 3, 24);
-  const sepR = Math.max(ringR * 0.9, 0.18);
-  const Ps = { ...P, L: P.L * size, W: P.W * size * 0.75, tip: 0.9, tipStyle: 'clean',
-    infillType: 'veins', edgeCurve: 0, edgeProfile: 0, curl: Math.abs(P.curl) * 0.5 + 0.35 };
+  const sepR = Math.max(ringR * 0.85, 0.16);
+  const Ps = {
+    ...P,
+    L: P.L * size,
+    W: P.W * size * 0.3,        // narrow, strap-like — a thin sepal, not a petal
+    taper: 0.78,                // slender: taper to a fine point
+    tip: 0.97,                  // sharp spike tip
+    edgeCurve: -0.25,           // pinch the sides in -> spiky
+    edgeProfile: 0,
+    tipStyle: 'clean',
+    infillType: 'veins',
+    curl: 0.85,                 // reflex: the down-tilted sepal arcs its tip back up
+    secondaries: 3, maxDepth: 2, crossPerStrip: 2,   // light midrib, not full venation
+  };
   const off = Math.PI / N;                              // tuck between the petals
   for (let i = 0; i < N; i++) {
     const az = off + i * 2 * Math.PI / N;
-    buildPetalInto(acc, Ps, az, cy - 0.02, sepR - P.r0, -52 * DEG, SEED_BASE + 733 + i * 29);
+    buildPetalInto(acc, Ps, az, cy - 0.02, sepR - P.r0, -42 * DEG, SEED_BASE + 733 + i * 29);
   }
 }
 
