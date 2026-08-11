@@ -1082,6 +1082,33 @@
 }
 .tgr-zoom-controls__reset:hover { color: var(--petrol-bright); }
 
+.tgr-ruler-controls {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 4;
+}
+.tgr-ruler-controls__btn {
+  height: 30px;
+  padding: 0 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(20, 20, 20, 0.72);
+  color: #f2f2f0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+.tgr-ruler-controls__btn:hover { background: rgba(255, 255, 255, 0.16); }
+.tgr-ruler-controls__btn.is-active {
+  background: var(--petrol-bright);
+  border-color: var(--petrol-bright);
+  color: #060707;
+}
+
 @media (max-width: 600px) {
   .tgr-topbar,
   .tgr-intro,

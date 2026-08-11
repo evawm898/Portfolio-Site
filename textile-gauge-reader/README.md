@@ -1093,6 +1093,35 @@ on-screen size in each direction from its default centered position) —
 not just the older, much tighter "nudge the edge past the boundary by a
 fixed slack" bound.
 
+### On-image ruler overlay
+
+Once calibration is confirmed, a "Ruler" toggle appears in the viewer
+(bottom-left, next to the zoom controls). Turning it on drops a movable
+ruler graphic onto the photo, drawn at the CALIBRATED scale — 5 physical
+cm or 2 physical inches long, with major/minor ticks matching a real
+ruler's structure (10 minor ticks per cm, 8 per inch, the same split
+`detect_ruler_calibration` infers automatically on the backend) — so the
+user can drag it anywhere over the fabric to sanity-check the calibration
+against a feature they can see directly (a seam, a known-size object,
+their own tape measure still in frame), independent of trusting the
+numbers alone. Only the ruler's LENGTH is drawn to scale (in natural
+image pixels, so it stays accurate at any zoom level); its bar thickness
+and tick heights are fixed display pixels, like the calibration point
+markers and ROI resize handles already are, so ticks stay legible rather
+than shrinking away when zoomed out.
+
+Deliberately gated to appear only AFTER Confirm Calibration — before
+that there's no scale to draw it at — and stays available (and
+draggable) across every later step (Review Measurement Areas,
+Select Orientation, Analyze, Results) via `currentPixelsPerMm()`, the
+same live calibration helper `/analyze-multi` and `/count-repeats`
+already use, rather than a separately-stored value that could drift out
+of sync with it. A plain click-drag already pans the image on some of
+those steps (see above); `isPanTrigger` reserves the gesture for the
+ruler the same way it already reserves it for ROI/calibration
+interactions, but only when the drag actually starts on the ruler
+itself, so panning elsewhere on those steps is unaffected.
+
 ## Two deployments of the same idea
 
 This directory (`textile-gauge-reader/`) contains the **backend only**:

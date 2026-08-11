@@ -75,6 +75,9 @@
   const zoomResetBtn = document.getElementById("zoomResetBtn");
   const zoomLevelEl = document.getElementById("zoomLevel");
 
+  const rulerControls = document.getElementById("rulerControls");
+  const rulerToggleBtn = document.getElementById("rulerToggleBtn");
+
   const panelEl = document.getElementById("panel");
   const panelToggle = document.getElementById("panelToggle");
   const appEl = document.querySelector(".tgr-app");
@@ -173,6 +176,17 @@
                                   // guards against a late response overwriting points the user has since
                                   // started marking manually, or landing on a since-replaced image
     calAutoDetected: false, // true once auto-detected points are showing, still awaiting the user's own confirm
+    ruler: {
+      visible: false, // the on-image ruler overlay -- a movable, to-scale physical ruler drawn over
+                       // the photo so the user can sanity-check the calibration against real fabric
+                       // features, distinct from the (also draggable) calibration POINTS themselves.
+                       // Only ever available once currentPixelsPerMm() is non-null, i.e. AFTER
+                       // Confirm Calibration -- see updateRulerUI.
+      x: null, // natural coords, left end of the ruler bar; null until first shown (see ensureRulerPosition)
+      y: null,
+      dragging: false,
+      dragOffset: null, // {dx, dy} from the pointer to state.ruler.{x,y} at drag start, in natural px
+    },
     roi: null, // {x, y, width, height} in natural coords -- the PRIMARY approved measurement
                // area, derived from rois[0] on approval. Multi-region independent analysis is
                // a later stage, not yet built; the existing single-ROI /analyze call downstream
@@ -295,6 +309,7 @@
     }
     updateZoomUI(); // pan-cursor affordance depends on the step (roi/calibrate reserve plain drag)
     updateRoiAddModeUI(); // add-mode crosshair cursor only applies while actually on the roi step
+    updateRulerUI(); // ruler overlay only becomes available once calibration is confirmed
     render();
   }
 
@@ -455,7 +470,20 @@
     // Marking a repeat anchor point is a plain left-click on the results
     // step too -- same reservation roi/calibrate already get below.
     if (state.repeatMark.active) return false;
-    return state.currentStep !== "roi" && state.currentStep !== "calibrate";
+    if (state.currentStep === "roi" || state.currentStep === "calibrate") return false;
+    // The ruler overlay is draggable on every step it's available in,
+    // which includes the steps (orientation/analyze/results) where a
+    // plain drag otherwise pans -- reserve the gesture the same way
+    // roi/calibrate already do, but only when the click actually starts
+    // on the ruler itself, so panning elsewhere on those steps is unaffected.
+    if (state.ruler.visible) {
+      const spec = rulerSpec();
+      if (spec) {
+        ensureRulerPosition(spec);
+        if (pointInRulerDisplay(eventToDisplayPoint(evt), spec)) return false;
+      }
+    }
+    return true;
   }
 
   canvas.addEventListener("pointerdown", (evt) => {
@@ -555,6 +583,9 @@
       drawResultOverlay();
       drawRepeatMarkBox();
     }
+    // Drawn last (on top of everything else) on whichever step it's
+    // available in -- see updateRulerUI / rulerControls.
+    drawRuler();
   }
 
   function drawRepeatMarkBox() {
@@ -907,6 +938,7 @@
       state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null };
       state.calAutoDetectPending = false;
       state.calAutoDetected = false;
+      state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
       state.roi = null;
       state.result = null;
       state.showMeasurementAreas = false;
@@ -1137,6 +1169,120 @@
     return mm > 0 ? pxDist / mm : null;
   }
 
+  // --- On-image ruler overlay ---------------------------------------------
+  //
+  // A movable, physically-proportioned ruler drawn over the photo once
+  // calibration is confirmed (currentPixelsPerMm() is only non-null AFTER
+  // that click -- see calConfirmBtn's handler -- which is what "available
+  // only after calibration" means here). Its LENGTH is exact: computed
+  // from currentPixelsPerMm() so the tick spacing really does match the
+  // calibrated scale, same as every other overlay measurement in this
+  // file. Its bar thickness/tick heights are fixed DISPLAY pixels instead
+  // (like the calibration point markers and ROI resize handles already
+  // are) so ticks stay legible at any zoom level rather than shrinking to
+  // nothing when zoomed out -- only the measurement axis needs to be "to
+  // scale," not the graphic's incidental thickness.
+  const RULER_BAR_HEIGHT = 22; // display px
+  const RULER_MAJOR_TICK_H = 14; // display px, from the bar's top edge
+  const RULER_MINOR_TICK_H = 7;
+
+  function rulerSpec() {
+    const ppm = currentPixelsPerMm();
+    if (!ppm) return null;
+    // Metric rulers: 5cm shown, major tick per cm, minor per mm (10/major).
+    // Imperial: 2in shown, major tick per inch, minor per eighth-inch (8/major)
+    // -- the same major/minor structure real rulers use, and the same
+    // metric-vs-imperial split analysis.gauge_analysis.detect_ruler_
+    // calibration infers automatically on the backend.
+    const imperial = state.cal.unit === "in";
+    const majorUnitMm = imperial ? 25.4 : 10;
+    const minorPerMajor = imperial ? 8 : 10;
+    const totalMajors = imperial ? 2 : 5;
+    const lengthPx = majorUnitMm * totalMajors * ppm;
+    return {
+      imperial,
+      minorPerMajor,
+      totalMinors: totalMajors * minorPerMajor,
+      lengthPx,
+      minorSpacingPx: (majorUnitMm / minorPerMajor) * ppm,
+      unitLabel: imperial ? "in" : "cm",
+    };
+  }
+
+  function ensureRulerPosition(spec) {
+    if (state.ruler.x !== null && state.ruler.y !== null) return;
+    state.ruler.x = clamp(state.naturalWidth / 2 - spec.lengthPx / 2, 0, Math.max(0, state.naturalWidth - spec.lengthPx));
+    state.ruler.y = state.naturalHeight / 2;
+  }
+
+  function rulerBoundsDisplay(spec) {
+    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
+    return {
+      x: origin.x,
+      y: origin.y,
+      width: spec.lengthPx * getScale(),
+      height: RULER_BAR_HEIGHT + RULER_MAJOR_TICK_H,
+    };
+  }
+
+  function pointInRulerDisplay(displayPt, spec) {
+    const b = rulerBoundsDisplay(spec);
+    return displayPt.x >= b.x && displayPt.x <= b.x + b.width && displayPt.y >= b.y && displayPt.y <= b.y + b.height;
+  }
+
+  function drawRuler() {
+    if (!state.ruler.visible) return;
+    const spec = rulerSpec();
+    if (!spec) return;
+    ensureRulerPosition(spec);
+
+    const s = getScale();
+    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
+    const lengthDisplay = spec.lengthPx * s;
+    const minorSpacingDisplay = spec.minorSpacingPx * s;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(233, 236, 236, 0.92)";
+    ctx.strokeStyle = "rgba(6, 7, 7, 0.7)";
+    ctx.lineWidth = 1;
+    ctx.fillRect(origin.x, origin.y, lengthDisplay, RULER_BAR_HEIGHT);
+    ctx.strokeRect(origin.x, origin.y, lengthDisplay, RULER_BAR_HEIGHT);
+
+    ctx.fillStyle = "#060707";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    for (let i = 0; i <= spec.totalMinors; i++) {
+      const x = origin.x + i * minorSpacingDisplay;
+      const isMajor = i % spec.minorPerMajor === 0;
+      ctx.lineWidth = isMajor ? 1.6 : 1;
+      ctx.beginPath();
+      ctx.moveTo(x, origin.y);
+      ctx.lineTo(x, origin.y + (isMajor ? RULER_MAJOR_TICK_H : RULER_MINOR_TICK_H));
+      ctx.stroke();
+      if (isMajor && i > 0) {
+        ctx.fillText(String(i / spec.minorPerMajor), x, origin.y + RULER_MAJOR_TICK_H + 2);
+      }
+    }
+    ctx.textAlign = "left";
+    ctx.fillText(spec.unitLabel, origin.x + 3, origin.y + RULER_BAR_HEIGHT - 11);
+    ctx.restore();
+  }
+
+  function updateRulerUI() {
+    const available = currentPixelsPerMm() !== null;
+    rulerControls.hidden = !available;
+    if (!available) state.ruler.visible = false;
+    rulerToggleBtn.classList.toggle("is-active", state.ruler.visible);
+    rulerToggleBtn.setAttribute("aria-pressed", String(state.ruler.visible));
+  }
+
+  rulerToggleBtn.addEventListener("click", () => {
+    state.ruler.visible = !state.ruler.visible;
+    updateRulerUI();
+    render();
+  });
+
   function renderRoiList() {
     if (!state.rois.length) {
       roiList.innerHTML =
@@ -1366,6 +1512,26 @@
   canvas.addEventListener("pointerdown", (evt) => {
     if (state.panDrag) return; // the viewer-pan listener above already claimed this gesture
 
+    // The ruler overlay (if visible) sits on top of every other
+    // interaction on every step it's available in -- hit-test it first
+    // so dragging it never gets shadowed by whatever the current step
+    // would otherwise do with this same click.
+    if (state.ruler.visible) {
+      const spec = rulerSpec();
+      if (spec) {
+        ensureRulerPosition(spec);
+        const dispPt = eventToDisplayPoint(evt);
+        if (pointInRulerDisplay(dispPt, spec)) {
+          const natPt = displayToNatural(dispPt);
+          state.ruler.dragging = true;
+          state.ruler.dragOffset = { dx: natPt.x - state.ruler.x, dy: natPt.y - state.ruler.y };
+          canvas.setPointerCapture(evt.pointerId);
+          render();
+          return;
+        }
+      }
+    }
+
     if (state.currentStep === "results" && state.repeatMark.active) {
       const pt = displayToNatural(eventToDisplayPoint(evt));
       state.repeatMark.dragging = true;
@@ -1569,6 +1735,30 @@
   }
   canvas.addEventListener("pointerup", endRoiDrag);
   canvas.addEventListener("pointercancel", endRoiDrag);
+
+  // Ruler overlay drag -- unlike the roi/repeat-mark drags above, this
+  // isn't gated to one currentStep, since the ruler stays available (and
+  // draggable) across roi/orientation/analyze/results once calibration
+  // is confirmed.
+  canvas.addEventListener("pointermove", (evt) => {
+    if (!state.ruler.dragging) return;
+    const spec = rulerSpec();
+    if (!spec) {
+      state.ruler.dragging = false;
+      return;
+    }
+    const natPt = displayToNatural(eventToDisplayPoint(evt));
+    state.ruler.x = clamp(natPt.x - state.ruler.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.lengthPx));
+    state.ruler.y = clamp(natPt.y - state.ruler.dragOffset.dy, 0, state.naturalHeight);
+    render();
+  });
+  function endRulerDrag(evt) {
+    if (!state.ruler.dragging) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.ruler.dragging = false;
+  }
+  canvas.addEventListener("pointerup", endRulerDrag);
+  canvas.addEventListener("pointercancel", endRulerDrag);
 
   // --- Step 4: Orientation -----------------------------------------------
 
@@ -2512,6 +2702,9 @@
     state.naturalWidth = 0;
     state.naturalHeight = 0;
     state.cal = { points: [], knownDistance: null, unit: "cm", pixelsPerMm: null };
+    state.calAutoDetectPending = false;
+    state.calAutoDetected = false;
+    state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
     state.roi = null;
     state.roiDrag = null;
     state.orientation = "vertical";
