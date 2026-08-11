@@ -587,9 +587,10 @@ function buildStemInto(acc, P, cx, cy, cz, length, curve) {
 
 /* RECEPTACLE — a small rounded swelling where the petals converge (a rose hip /
    tulip base), drawn minimally as a few wireframe latitude rings + vertical ribs
-   of a small ellipsoid hanging just under the convergence point, with a short
-   stem. Just enough to explain where the petals attach. */
-function buildReceptacleInto(acc, P, cx, cy, cz, size, stemLen, curve) {
+   of a small ellipsoid hanging just under the convergence point. Just enough to
+   explain where the petals attach. Returns the depth it hangs below cy, so a stem
+   can start from its underside. */
+function buildReceptacleInto(acc, P, cx, cy, cz, size) {
   const rad = size * 0.42, hh = size * 0.9, wire = P.tubeRadius * 1.5;
   const RIBS = 7, RINGS = 3, MS = 18, RS = 40;
   // ellipsoid hanging below cy: top point at cy, widest mid, bottom point at cy-hh
@@ -607,14 +608,14 @@ function buildReceptacleInto(acc, P, cx, cy, cz, size, stemLen, curve) {
     for (let s = 0; s <= RS; s++) pts.push(pt(phi, (s / RS) * Math.PI * 2));
     acc.addTube(pts, wire, 0, 6);
   }
-  buildStemInto(acc, P, cx, cy - hh, cz, stemLen, curve);
+  return hh;
 }
 
-/* CALYX — a ring of sepal-like leaves cupping the base from below, matching the
-   petal count and tucked half a step between/behind them, flaring down-and-out
-   and tapering to a short stem. Reuses the petal builder (so same venation, line
-   weight and teal), just smaller, pointed and steeply reflexed. */
-function buildCalyxInto(acc, P, cx, cy, cz, count, size, ringR, stemLen, curve) {
+/* SEPALS — a ring of sepal-like leaves cupping the base from below, matching the
+   petal count and tucked half a step between/behind them, flaring down-and-out.
+   Reuses the petal builder (so same venation, line weight and teal), just smaller,
+   pointed and steeply reflexed. */
+function buildSepalsInto(acc, P, cx, cy, cz, count, size, ringR) {
   const N = clamp(Math.round(count), 3, 24);
   const sepR = Math.max(ringR * 0.9, 0.18);
   const Ps = { ...P, L: P.L * size, W: P.W * size * 0.75, tip: 0.9, tipStyle: 'clean',
@@ -624,7 +625,6 @@ function buildCalyxInto(acc, P, cx, cy, cz, count, size, ringR, stemLen, curve) 
     const az = off + i * 2 * Math.PI / N;
     buildPetalInto(acc, Ps, az, cy - 0.02, sepR - P.r0, -52 * DEG, SEED_BASE + 733 + i * 29);
   }
-  buildStemInto(acc, P, cx, cy - size * 0.25, cz, stemLen, curve);
 }
 
 /* ===================================================================
@@ -808,23 +808,29 @@ function generate() {
   coreGlow.position.y = centerHeight + 0.2;
   buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
 
-  // BASE — an organic wireframe structure the petals grow from, in the same teal
-  // tubes as the petals (into the petal mesh). CALYX / STEM / RECEPTACLE / NONE.
-  const baseSize = clamp(ui.baseSize, 0.1, 1.5);
-  const stemLen = clamp(ui.baseStemLen, 0, 4);
-  const stemCurve = clamp(ui.baseCurve, -1, 1);
-  if (ui.baseType === 'calyx') {
-    buildCalyxInto(petalAcc, P, 0, centerHeight, 0, count, baseSize, ringR, stemLen, stemCurve);
-  } else if (ui.baseType === 'stem') {
-    buildStemInto(petalAcc, P, 0, centerHeight, 0, stemLen, stemCurve);
-  } else if (ui.baseType === 'receptacle') {
-    buildReceptacleInto(petalAcc, P, 0, centerHeight, 0, baseSize, stemLen, stemCurve);
+  // BASE — independent organic parts, all in the same teal tubes as the petals
+  // (into the petal mesh): a RECEPTACLE swelling, a ring of SEPALS, and a STEM.
+  // They compose freely; the stem descends from the receptacle underside if there
+  // is one, otherwise straight from the convergence point.
+  let stemTop = centerHeight;
+  if (ui.receptacleType !== 'none') {
+    const hh = buildReceptacleInto(petalAcc, P, 0, centerHeight, 0, clamp(ui.receptacleSize, 0.1, 1.5));
+    stemTop = centerHeight - hh;
+  }
+  if (ui.sepalsType !== 'none') {
+    buildSepalsInto(petalAcc, P, 0, centerHeight, 0, count, clamp(ui.sepalSize, 0.1, 1.5), ringR);
+  }
+  if (ui.stemType !== 'none') {
+    buildStemInto(petalAcc, P, 0, stemTop, 0, clamp(ui.stemLength, 0.2, 6), clamp(ui.stemCurve, -1, 1));
   }
 
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
 
   frameCameraOnce(petalAcc, coreAcc);
+  // Adding a stem grows the flower well past the initial framing — refit the
+  // camera (keeping the current view direction) so the whole plant is in view.
+  if (pendingRefit) { pendingRefit = false; refitCamera(petalAcc, coreAcc); }
   updateReadout(petalAcc, ui, placements.length);
 }
 
@@ -843,6 +849,31 @@ function frameCameraOnce(...accs) {
   const dist = (radius / Math.tan((camera.fov * DEG) / 2)) * 1.6;
   controls.target.set(cx, cy, cz);
   camera.position.set(cx + dist * 0.45, cy + dist * 0.3, cz + dist * 0.85);
+  camera.near = Math.max(0.05, dist * 0.02);
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+// Refit the camera to the current geometry bounds WITHOUT changing the view
+// direction: recentre the target and pull back just far enough to fit everything
+// (used when a stem is added and the plant no longer fits the initial framing).
+let pendingRefit = false;
+function refitCamera(...accs) {
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (const a of accs) {
+    if (a.vcount === 0) continue;
+    for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], a.min[k]); max[k] = Math.max(max[k], a.max[k]); }
+  }
+  if (!isFinite(min[0])) return;
+  const cx = (min[0] + max[0]) / 2, cy = (min[1] + max[1]) / 2, cz = (min[2] + max[2]) / 2;
+  const radius = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]) * 0.5 || 2;
+  const dist = (radius / Math.tan((camera.fov * DEG) / 2)) * 1.5;
+  // keep the current view direction; just recentre + set distance
+  let dx = camera.position.x - controls.target.x, dy = camera.position.y - controls.target.y, dz = camera.position.z - controls.target.z;
+  const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
+  controls.target.set(cx, cy, cz);
+  camera.position.set(cx + dx * dist, cy + dy * dist, cz + dz * dist);
   camera.near = Math.max(0.05, dist * 0.02);
   camera.far = dist * 20;
   camera.updateProjectionMatrix();
@@ -940,10 +971,13 @@ const inputs = {
   centerCount: document.getElementById('centerCount'),
   centerLength: document.getElementById('centerLength'),
   centerTipSize: document.getElementById('centerTipSize'),
-  baseType: document.getElementById('baseType'),
-  baseSize: document.getElementById('baseSize'),
-  baseStemLen: document.getElementById('baseStemLen'),
-  baseCurve: document.getElementById('baseCurve'),
+  receptacleType: document.getElementById('receptacleType'),
+  receptacleSize: document.getElementById('receptacleSize'),
+  sepalsType: document.getElementById('sepalsType'),
+  sepalSize: document.getElementById('sepalSize'),
+  stemType: document.getElementById('stemType'),
+  stemLength: document.getElementById('stemLength'),
+  stemCurve: document.getElementById('stemCurve'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -1010,10 +1044,13 @@ function readUI() {
     centerCount: parseInt(inputs.centerCount.value, 10),
     centerLength: parseFloat(inputs.centerLength.value),
     centerTipSize: parseFloat(inputs.centerTipSize.value),
-    baseType: inputs.baseType.value,
-    baseSize: parseFloat(inputs.baseSize.value),
-    baseStemLen: parseFloat(inputs.baseStemLen.value),
-    baseCurve: parseFloat(inputs.baseCurve.value),
+    receptacleType: inputs.receptacleType.value,
+    receptacleSize: parseFloat(inputs.receptacleSize.value),
+    sepalsType: inputs.sepalsType.value,
+    sepalSize: parseFloat(inputs.sepalSize.value),
+    stemType: inputs.stemType.value,
+    stemLength: parseFloat(inputs.stemLength.value),
+    stemCurve: parseFloat(inputs.stemCurve.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -1071,10 +1108,11 @@ function refreshLabels() {
   setLabel('centerCount', inputs.centerCount.value);
   setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
   setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
-  setLabel('baseSize', (+inputs.baseSize.value).toFixed(2));
-  setLabel('baseStemLen', (+inputs.baseStemLen.value).toFixed(2));
-  const bcv = +inputs.baseCurve.value;
-  setLabel('baseCurve', (bcv > 0 ? '+' : '') + bcv.toFixed(2));
+  setLabel('receptacleSize', (+inputs.receptacleSize.value).toFixed(2));
+  setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
+  setLabel('stemLength', (+inputs.stemLength.value).toFixed(2));
+  const scv = +inputs.stemCurve.value;
+  setLabel('stemCurve', (scv > 0 ? '+' : '') + scv.toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -1134,7 +1172,7 @@ function setBuilding(on) {
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize',
- 'baseSize', 'baseStemLen', 'baseCurve', 'tightness', 'elevation'].forEach((k) => {
+ 'receptacleSize', 'sepalSize', 'stemLength', 'stemCurve', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -1208,14 +1246,22 @@ function updateCenterOptions() {
   });
 }
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
-// Base type is a <select>; like Tip/Infill, only the chosen part's controls show.
+// Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
-  const type = inputs.baseType.value;
-  document.querySelectorAll('[data-base-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-base-styles').split(/\s+/).includes(type);
-  });
+  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = inputs.receptacleType.value === 'none'; });
+  document.querySelectorAll('[data-sepal]').forEach((el) => { el.hidden = inputs.sepalsType.value === 'none'; });
+  document.querySelectorAll('[data-stem]').forEach((el) => { el.hidden = inputs.stemType.value === 'none'; });
 }
-inputs.baseType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+inputs.sepalsType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+// Adding / lengthening the stem grows the plant past the current framing, so
+// request a camera refit on the next rebuild to bring the whole flower into view.
+inputs.stemType.addEventListener('change', () => {
+  updateBaseOptions();
+  if (inputs.stemType.value !== 'none') pendingRefit = true;
+  scheduleRegen();
+});
+inputs.stemLength.addEventListener('input', () => { if (inputs.stemType.value !== 'none') pendingRefit = true; });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 // Auto-center (top-down): frame the bloom from straight above with the mirror
 // axis (+X) pointing up on screen, so a bilateral fan reads centred and
@@ -1298,10 +1344,13 @@ if (resetBtn) {
     inputs.centerCount.value = d.centerCount;
     inputs.centerLength.value = d.centerLength;
     inputs.centerTipSize.value = d.centerTipSize;
-    inputs.baseType.value = d.baseType;
-    inputs.baseSize.value = d.baseSize;
-    inputs.baseStemLen.value = d.baseStemLen;
-    inputs.baseCurve.value = d.baseCurve;
+    inputs.receptacleType.value = d.receptacleType;
+    inputs.receptacleSize.value = d.receptacleSize;
+    inputs.sepalsType.value = d.sepalsType;
+    inputs.sepalSize.value = d.sepalSize;
+    inputs.stemType.value = d.stemType;
+    inputs.stemLength.value = d.stemLength;
+    inputs.stemCurve.value = d.stemCurve;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -1333,7 +1382,8 @@ const DEFAULTS = {
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
   centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
-  baseType: 'none', baseSize: 0.6, baseStemLen: 1.2, baseCurve: 0.2,
+  receptacleType: 'none', receptacleSize: 0.6, sepalsType: 'none', sepalSize: 0.6,
+  stemType: 'none', stemLength: 1.8, stemCurve: 0.2,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
