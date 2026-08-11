@@ -568,6 +568,43 @@ function buildCoreInto(acc, P, centerHeight, rng) {
   }
 }
 
+/* RADIAL only: a wireframe globe around the bloom centre — `tiers` latitude rings
+   (parallels) stacked pole to pole, plus a matching set of longitudinal meridian
+   arcs, so the flat rosette reads as sitting on/inside a sphere. `radius` sizes
+   it; meridian count scales with the tier count. Thin tubes, into the given acc. */
+function buildWireSphereInto(acc, P, cx, cy, cz, radius, tiers) {
+  tiers = clamp(Math.round(tiers), 0, 16);
+  if (tiers < 1 || radius <= 1e-4) return;
+  const meridians = clamp(2 * tiers, 12, 30);
+  const wire = P.tubeRadius * 1.05;             // line weight
+  const RING_SEG = 72, MER_SEG = 48;
+  const phiMax = 80 * DEG;                       // keep the top/bottom rings off the exact poles
+
+  // latitude tiers (parallels): horizontal rings, evenly spaced in latitude
+  for (let i = 0; i < tiers; i++) {
+    const phi = tiers === 1 ? 0 : lerp(-phiMax, phiMax, i / (tiers - 1));
+    const rr = radius * Math.cos(phi), yy = cy + radius * Math.sin(phi);
+    const pts = [];
+    for (let k = 0; k <= RING_SEG; k++) {
+      const th = (k / RING_SEG) * Math.PI * 2;
+      pts.push({ x: cx + rr * Math.cos(th), y: yy, z: cz + rr * Math.sin(th) });
+    }
+    acc.addTube(pts, wire, 0, 6);
+  }
+  // longitudinal meridians: pole-to-pole arcs at evenly spaced longitudes
+  for (let j = 0; j < meridians; j++) {
+    const th = (j / meridians) * Math.PI * 2;
+    const ct = Math.cos(th), st = Math.sin(th);
+    const pts = [];
+    for (let k = 0; k <= MER_SEG; k++) {
+      const phi = lerp(-Math.PI / 2, Math.PI / 2, k / MER_SEG);
+      const rr = radius * Math.cos(phi);
+      pts.push({ x: cx + rr * ct, y: cy + radius * Math.sin(phi), z: cz + rr * st });
+    }
+    acc.addTube(pts, wire, 0, 6);
+  }
+}
+
 
 /* ===================================================================
    4. SCENE
@@ -725,6 +762,13 @@ function generate() {
   coreGlow.position.y = centerHeight + 0.2;
   buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
 
+  // RADIAL only: a longitudinal wireframe sphere over the bloom. Radius scales with
+  // the bloom's petal reach so the default sizes to the rosette; the slider tunes it.
+  if (bloomType === 'radial') {
+    const sphereR = ui.sphereSize * (ringR + PETAL_LENGTH);
+    buildWireSphereInto(petalAcc, P, 0, centerHeight, 0, sphereR, ui.sphereTiers);
+  }
+
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
 
@@ -819,6 +863,8 @@ const inputs = {
   bilEdgeProfile1: document.getElementById('bilEdgeProfile1'),
   bilEdgeProfile2: document.getElementById('bilEdgeProfile2'),
   bilEdgeProfile3: document.getElementById('bilEdgeProfile3'),
+  sphereTiers: document.getElementById('sphereTiers'),
+  sphereSize: document.getElementById('sphereSize'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   infillType: document.getElementById('infillType'),
@@ -882,6 +928,8 @@ function readUI() {
     bilEdgeProfile1: parseFloat(inputs.bilEdgeProfile1.value),
     bilEdgeProfile2: parseFloat(inputs.bilEdgeProfile2.value),
     bilEdgeProfile3: parseFloat(inputs.bilEdgeProfile3.value),
+    sphereTiers: parseInt(inputs.sphereTiers.value, 10),
+    sphereSize: parseFloat(inputs.sphereSize.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     infillType: inputs.infillType.value,
@@ -928,6 +976,8 @@ function refreshLabels() {
   setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
   setLabel('bilPerSide', inputs.bilPerSide.value);
   setLabel('bilSpacing', inputs.bilSpacing.value + '°');
+  setLabel('sphereTiers', inputs.sphereTiers.value);
+  setLabel('sphereSize', (+inputs.sphereSize.value).toFixed(2) + '×');
   for (let k = 1; k <= 3; k++) {
     setLabel('bilScale' + k, (+inputs['bilScale' + k].value).toFixed(2) + '×');
     setLabel('bilWidth' + k, (+inputs['bilWidth' + k].value).toFixed(2));
@@ -1006,7 +1056,7 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'bilPerSide', 'bilSpacing',
+['petalCount', 'bilPerSide', 'bilSpacing', 'sphereTiers', 'sphereSize',
  'bilScale1', 'bilScale2', 'bilScale3',
  'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
@@ -1136,6 +1186,8 @@ if (resetBtn) {
     inputs.bloomType.value = d.bloomType;
     inputs.bilPerSide.value = d.bilPerSide;
     inputs.bilSpacing.value = d.bilSpacing;
+    inputs.sphereTiers.value = d.sphereTiers;
+    inputs.sphereSize.value = d.sphereSize;
     inputs.bilCenterPetal.checked = d.bilCenterPetal;
     inputs.bilEdge1.value = d.bilEdge1;
     inputs.bilEdge2.value = d.bilEdge2;
@@ -1187,6 +1239,7 @@ const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
+  sphereTiers: 6, sphereSize: 1,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
   bilScale1: 1, bilScale2: 1, bilScale3: 1,
   bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
