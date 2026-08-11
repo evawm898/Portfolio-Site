@@ -884,7 +884,11 @@ export function buildLace(P, rng, opts = {}) {
   const nodes = [];
   const W = 0.34;                       // fine lace-wire relative weight
   const uBase = 0.05, uTip = 0.965;
-  const inset = 0.9;                    // border frame / curl field, as a fraction of half-width
+  const curlInset = 0.88;               // curl field, as a fraction of half-width
+  // The border frame is the petal's edge line. With a SCALLOP edge it sits right
+  // on the outline so the scallops spring straight off it (attached); otherwise
+  // it is drawn a touch inside as a decorative inner frame.
+  const frameInset = P.tipStyle === 'scallop' ? 0.995 : 0.9;
   const mirror = (pts) => pts.map((p) => ({ x: p.x, y: -p.y }));
 
   // 1. central midrib (on the axis, never mirrored)
@@ -894,9 +898,11 @@ export function buildLace(P, rng, opts = {}) {
   nodes.push({ x: mid[0].x, y: 0, width: W * 1.5 });
   nodes.push({ x: mid[nMid].x, y: 0, width: W * 0.7 });
 
-  // 2. inner border frame — a smooth loop just inside the +Y margin (mirrored below)
-  const nF = 64, frame = new Array(nF + 1);
-  for (let i = 0; i <= nF; i++) { const u = lerp(uBase, uTip, i / nF); frame[i] = { x: L * u, y: inset * hw(u) }; }
+  // 2. border frame — the edge line (mirrored below); runs almost to the tip so it
+  //    meets the scalloped margin all the way round.
+  const uFrameTip = P.tipStyle === 'scallop' ? 0.99 : 0.965;
+  const nF = 72, frame = new Array(nF + 1);
+  for (let i = 0; i <= nF; i++) { const u = lerp(uBase, uFrameTip, i / nF); frame[i] = { x: L * u, y: frameInset * hw(u) }; }
   veins.push({ points: frame, w0: W, w1: W });
   veins.push({ points: mirror(frame), w0: W, w1: W });
 
@@ -910,10 +916,10 @@ export function buildLace(P, rng, opts = {}) {
     const u = lerp(uBase + 0.02, uTip - 0.02, (cx + 0.5) / cols);
     const hwu = hw(u);
     if (hwu < 0.06) continue;
-    const cellY = inset * hwu / rows;
+    const cellY = curlInset * hwu / rows;
     for (let ry = 0; ry < rows; ry++) {
       const centerU = clamp(u + (rng() - 0.5) * 0.5 * cellU / L, 0.02, 0.98);
-      const centerY = clamp((ry + 0.5) * cellY + (rng() - 0.5) * 0.4 * cellY, 0.02, inset * hw(centerU));
+      const centerY = clamp((ry + 0.5) * cellY + (rng() - 0.5) * 0.4 * cellY, 0.02, curlInset * hw(centerU));
       const size = Math.min(0.52 * cellU, 0.52 * cellY) * lerp(1.7, 1.05, swirl);
       const dir = ((cx + ry) % 2 === 0) ? 1 : -1;   // alternate handedness
       const th0 = rng() * Math.PI * 2;
