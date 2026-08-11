@@ -191,6 +191,16 @@ export function sampleSpine(spine, u) {
 // surface normal (which is the spine normal — the same axis the cup lifts along).
 const RUFFLE_AMP_MAX = 0.55;
 
+// The TIP FREQUENCY slider (1..40) is shared with JAGGED, where it is a literal
+// tooth count. For the RUFFLE it is remapped through a power curve so the LOW end
+// is finely resolved — about the first quarter of the slider covers 1..3 waves,
+// where the subtle ruffles live — while the slider top caps at ~16 waves, the
+// densest useful ruffle. Fractional (not rounded) so every slider step reads.
+function ruffleWaveCount(P) {
+  const s = clamp(P.tipFrequency || 1, 1, 40);
+  return 1 + 15 * Math.pow((s - 1) / 39, 1.4);   // slider ~10 -> 3 waves, 40 -> 16 waves
+}
+
 // RUFFLED is a full-surface, differential-growth FLOUNCE, not a one-axis wave.
 // A real ruffle's margin carries EXCESS length, so it cannot lie flat: it buckles
 // out of the plane AND spreads sideways, the edge tracing a coil along the margin
@@ -205,7 +215,7 @@ const RUFFLE_AMP_MAX = 0.55;
 function ruffleDisplace(u, v, P) {
   const out = { dn: 0, dz: 0 };
   if ((P.tipLength || 0) <= 1e-4) return out;
-  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
+  const freq = ruffleWaveCount(P);                   // remapped: fine at the low end, caps ~16
   // Finer ruffles ride shallower: amplitude eases down with frequency so many
   // flutes read as fine fabric texture, not a row of tall spikes. TIP LENGTH is
   // the dominant amplitude control.
@@ -1251,7 +1261,7 @@ export function buildJaggedEdge(P, spine, rng) {
 export function buildRuffledEdge(P, spine /* , rng */) {
   if (P.tipStyle !== 'ruffled') return null;
   if ((P.tipLength || 0) * RUFFLE_AMP_MAX <= 1e-4) return null;
-  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
+  const freq = ruffleWaveCount(P);                   // remapped: fine at the low end, caps ~16
   const { uStart } = tipRegionRange(P);
   const uBase = 0.004, uApex = 0.9995;
   const nRuffle = clamp(Math.round(freq * 24) + 130, 240, 620);  // dense enough to trace the coiling margin + fine frills
