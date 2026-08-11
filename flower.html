@@ -642,64 +642,46 @@
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
-            <label for="receptacleType">Receptacle</label>
+            <label for="baseType">Base type</label>
           </div>
-          <select class="fl-select" id="receptacleType">
+          <select class="fl-select" id="baseType">
             <option value="none">NONE</option>
-            <option value="dome">DOME</option>
-            <option value="cone">CONE</option>
-            <option value="knob">KNOB</option>
-            <option value="pedestal">PEDESTAL</option>
+            <option value="calyx">CALYX</option>
+            <option value="stem">STEM</option>
+            <option value="receptacle">RECEPTACLE</option>
           </select>
-          <span class="fl-ctrl__hint">solid base that ties the petals together (for 3D printing)</span>
+          <span class="fl-ctrl__hint" data-base-styles="none">petals meet at the centre &mdash; no base geometry</span>
+          <span class="fl-ctrl__hint" data-base-styles="calyx">sepals cupping the base, tapering to a stem</span>
+          <span class="fl-ctrl__hint" data-base-styles="stem">a single slender stem descending from the base</span>
+          <span class="fl-ctrl__hint" data-base-styles="receptacle">a small swelling where the petals converge</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl" data-base-styles="calyx receptacle">
           <div class="fl-ctrl__row">
-            <label for="receptacleSize">Receptacle size</label>
-            <span class="fl-ctrl__val" data-value="receptacleSize"></span>
+            <label for="baseSize">Base size</label>
+            <span class="fl-ctrl__val" data-value="baseSize"></span>
           </div>
-          <input type="range" id="receptacleSize" min="0.05" max="2.5" step="0.05" value="0.6">
-          <span class="fl-ctrl__hint">radius &mdash; grow it to reach the petal bases</span>
+          <input type="range" id="baseSize" min="0.1" max="1.5" step="0.05" value="0.6">
+          <span class="fl-ctrl__hint" data-base-styles="calyx">size of the sepals</span>
+          <span class="fl-ctrl__hint" data-base-styles="receptacle">size of the swelling</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl" data-base-styles="calyx stem receptacle">
           <div class="fl-ctrl__row">
-            <label for="receptacleHeight">Receptacle height</label>
-            <span class="fl-ctrl__val" data-value="receptacleHeight"></span>
+            <label for="baseStemLen">Stem length</label>
+            <span class="fl-ctrl__val" data-value="baseStemLen"></span>
           </div>
-          <input type="range" id="receptacleHeight" min="0.02" max="2.5" step="0.05" value="0.5">
-          <span class="fl-ctrl__hint">flat &rarr; tall</span>
+          <input type="range" id="baseStemLen" min="0" max="4" step="0.05" value="1.2">
+          <span class="fl-ctrl__hint">length of the stem below</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-base-styles="calyx stem receptacle">
           <div class="fl-ctrl__row">
-            <label for="sepalsType">Sepals</label>
+            <label for="baseCurve">Stem curve</label>
+            <span class="fl-ctrl__val" data-value="baseCurve"></span>
           </div>
-          <select class="fl-select" id="sepalsType">
-            <option value="none">NONE</option>
-            <option value="pointed">POINTED</option>
-            <option value="rounded">ROUNDED</option>
-          </select>
-          <span class="fl-ctrl__hint">small leaves flaring below the petals</span>
-        </div>
-
-        <div class="fl-ctrl" data-sepal>
-          <div class="fl-ctrl__row">
-            <label for="sepalCount">Sepal count</label>
-            <span class="fl-ctrl__val" data-value="sepalCount"></span>
-          </div>
-          <input type="range" id="sepalCount" min="1" max="20" step="1" value="5">
-          <span class="fl-ctrl__hint">number of sepals around the base</span>
-        </div>
-
-        <div class="fl-ctrl" data-sepal>
-          <div class="fl-ctrl__row">
-            <label for="sepalSize">Sepal size</label>
-            <span class="fl-ctrl__val" data-value="sepalSize"></span>
-          </div>
-          <input type="range" id="sepalSize" min="0.1" max="1.5" step="0.05" value="0.5">
-          <span class="fl-ctrl__hint">small &rarr; large</span>
+          <input type="range" id="baseCurve" min="-1" max="1" step="0.01" value="0.2">
+          <span class="fl-ctrl__hint">straight &rarr; gently bent</span>
         </div>
 
       </div>
