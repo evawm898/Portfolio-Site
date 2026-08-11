@@ -632,6 +632,79 @@
       </div>
     </section>
 
+    <!-- ============================ BASE ============================= -->
+    <section class="fl-acc" data-acc>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-base">
+        <span class="fl-acc__label">Base</span>
+        <span class="fl-acc__chev" aria-hidden="true"></span>
+      </button>
+      <div class="fl-acc__body" id="acc-base">
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="receptacleType">Receptacle</label>
+          </div>
+          <select class="fl-select" id="receptacleType">
+            <option value="none">NONE</option>
+            <option value="dome">DOME</option>
+            <option value="cone">CONE</option>
+            <option value="knob">KNOB</option>
+            <option value="pedestal">PEDESTAL</option>
+          </select>
+          <span class="fl-ctrl__hint">solid base that ties the petals together (for 3D printing)</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept>
+          <div class="fl-ctrl__row">
+            <label for="receptacleSize">Receptacle size</label>
+            <span class="fl-ctrl__val" data-value="receptacleSize"></span>
+          </div>
+          <input type="range" id="receptacleSize" min="0.05" max="2.5" step="0.05" value="0.6">
+          <span class="fl-ctrl__hint">radius &mdash; grow it to reach the petal bases</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept>
+          <div class="fl-ctrl__row">
+            <label for="receptacleHeight">Receptacle height</label>
+            <span class="fl-ctrl__val" data-value="receptacleHeight"></span>
+          </div>
+          <input type="range" id="receptacleHeight" min="0.02" max="2.5" step="0.05" value="0.5">
+          <span class="fl-ctrl__hint">flat &rarr; tall</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="sepalsType">Sepals</label>
+          </div>
+          <select class="fl-select" id="sepalsType">
+            <option value="none">NONE</option>
+            <option value="pointed">POINTED</option>
+            <option value="rounded">ROUNDED</option>
+          </select>
+          <span class="fl-ctrl__hint">small leaves flaring below the petals</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalCount">Sepal count</label>
+            <span class="fl-ctrl__val" data-value="sepalCount"></span>
+          </div>
+          <input type="range" id="sepalCount" min="1" max="20" step="1" value="5">
+          <span class="fl-ctrl__hint">number of sepals around the base</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalSize">Sepal size</label>
+            <span class="fl-ctrl__val" data-value="sepalSize"></span>
+          </div>
+          <input type="range" id="sepalSize" min="0.1" max="1.5" step="0.05" value="0.5">
+          <span class="fl-ctrl__hint">small &rarr; large</span>
+        </div>
+
+      </div>
+    </section>
+
   </div>
 
   <div class="fl-panel__foot">

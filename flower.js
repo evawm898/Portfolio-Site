@@ -568,6 +568,54 @@ function buildCoreInto(acc, P, centerHeight, rng) {
   }
 }
 
+/* The RECEPTACLE — a solid body of revolution at the bloom's base that the petals
+   spring from and, for 3D printing, physically ties them together. Built from a
+   per-type profile (radius vs height, bottom -> top) revolved around the axis and
+   capped at both ends, so it is a closed, watertight solid. `radius`/`height` size
+   it; the material is double-sided, so winding doesn't matter. */
+function buildReceptacleInto(acc, type, cx, cy, cz, radius, height) {
+  if (type === 'none' || radius <= 1e-4) return;
+  const SECT = 44, ROWS = 20;
+  // profile(t), t: 0 (bottom) -> 1 (top); {r: ring radius, y: height above cy}
+  const profile = (t) => {
+    switch (type) {
+      case 'cone':     return { r: radius * (1 - t),               y: height * t };
+      case 'knob':     return { r: radius * Math.sin(t * Math.PI), y: height * 0.5 * (1 - Math.cos(t * Math.PI)) };
+      case 'pedestal': return { r: radius * (0.5 + 0.5 * t),       y: height * t };
+      default:         return { r: radius * Math.cos(t * Math.PI / 2), y: height * Math.sin(t * Math.PI / 2) }; // dome
+    }
+  };
+  const rows = [];
+  for (let i = 0; i <= ROWS; i++) {
+    const t = i / ROWS;
+    const p = profile(t);
+    const p0 = profile(Math.max(0, t - 1e-3)), p1 = profile(Math.min(1, t + 1e-3));
+    // outward surface normal in the (r, y) plane, perpendicular to the profile tangent
+    let nr = p1.y - p0.y, ny = -(p1.r - p0.r);
+    const nl = Math.hypot(nr, ny) || 1; nr /= nl; ny /= nl;
+    const ring = [];
+    for (let s = 0; s <= SECT; s++) {
+      const th = (s / SECT) * Math.PI * 2, ct = Math.cos(th), st = Math.sin(th);
+      ring.push(acc._vertex(cx + p.r * ct, cy + p.y, cz + p.r * st, nr * ct, ny, nr * st));
+    }
+    rows.push({ ring, r: p.r, y: p.y });
+  }
+  for (let i = 0; i < ROWS; i++) {
+    for (let s = 0; s < SECT; s++) {
+      const a = rows[i].ring[s], b = rows[i].ring[s + 1], c = rows[i + 1].ring[s], d = rows[i + 1].ring[s + 1];
+      acc.idx.push(a, c, b, b, c, d);
+    }
+  }
+  // cap any open end (a ring with a non-zero radius) with a triangle fan
+  const cap = (row, ny) => {
+    if (row.r < 1e-3) return;
+    const ctr = acc._vertex(cx, cy + row.y, cz, 0, ny, 0);
+    for (let s = 0; s < SECT; s++) acc.idx.push(ctr, row.ring[s], row.ring[s + 1]);
+  };
+  cap(rows[0], -1);            // bottom
+  cap(rows[ROWS], 1);          // top
+}
+
 /* ===================================================================
    4. SCENE
    =================================================================== */
@@ -749,6 +797,27 @@ function generate() {
   coreGlow.position.y = centerHeight + 0.2;
   buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
 
+  // BASE parts — SEPALS: a ring of small leaf-like sepals sitting just below the
+  // petals and flaring down-and-out (like the green cup under a real bloom).
+  if (ui.sepalsType !== 'none') {
+    const nSep = clamp(Math.round(ui.sepalCount), 1, 20);
+    const sSize = clamp(ui.sepalSize, 0.1, 1.5);
+    const sepR = Math.max(ringR, 0.28);
+    const Ps = { ...P, L: P.L * sSize, W: P.W * sSize,
+      tip: ui.sepalsType === 'pointed' ? 0.92 : 0.2, tipStyle: 'clean',
+      infillType: 'veins', edgeCurve: 0, edgeProfile: 0, curl: P.curl * 0.4 };
+    for (let i = 0; i < nSep; i++) {
+      const az = i * 2 * Math.PI / nSep;
+      buildPetalInto(petalAcc, Ps, az, centerHeight - 0.05, sepR - P.r0, -32 * DEG, SEED_BASE + 911 + i * 17);
+    }
+  }
+  // BASE parts — RECEPTACLE: a solid base body at the centre. It's the part that
+  // holds every petal together for 3D printing, so it's a closed solid.
+  if (ui.receptacleType !== 'none') {
+    buildReceptacleInto(petalAcc, ui.receptacleType, 0, centerHeight, 0,
+      clamp(ui.receptacleSize, 0.05, 2.5), clamp(ui.receptacleHeight, 0.02, 2.5));
+  }
+
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
 
@@ -868,6 +937,12 @@ const inputs = {
   centerCount: document.getElementById('centerCount'),
   centerLength: document.getElementById('centerLength'),
   centerTipSize: document.getElementById('centerTipSize'),
+  receptacleType: document.getElementById('receptacleType'),
+  receptacleSize: document.getElementById('receptacleSize'),
+  receptacleHeight: document.getElementById('receptacleHeight'),
+  sepalsType: document.getElementById('sepalsType'),
+  sepalCount: document.getElementById('sepalCount'),
+  sepalSize: document.getElementById('sepalSize'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -934,6 +1009,12 @@ function readUI() {
     centerCount: parseInt(inputs.centerCount.value, 10),
     centerLength: parseFloat(inputs.centerLength.value),
     centerTipSize: parseFloat(inputs.centerTipSize.value),
+    receptacleType: inputs.receptacleType.value,
+    receptacleSize: parseFloat(inputs.receptacleSize.value),
+    receptacleHeight: parseFloat(inputs.receptacleHeight.value),
+    sepalsType: inputs.sepalsType.value,
+    sepalCount: parseInt(inputs.sepalCount.value, 10),
+    sepalSize: parseFloat(inputs.sepalSize.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -991,6 +1072,10 @@ function refreshLabels() {
   setLabel('centerCount', inputs.centerCount.value);
   setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
   setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
+  setLabel('receptacleSize', (+inputs.receptacleSize.value).toFixed(2));
+  setLabel('receptacleHeight', (+inputs.receptacleHeight.value).toFixed(2));
+  setLabel('sepalCount', inputs.sepalCount.value);
+  setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -1049,7 +1134,8 @@ function setBuilding(on) {
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
- 'centerCount', 'centerLength', 'centerTipSize', 'tightness', 'elevation'].forEach((k) => {
+ 'centerCount', 'centerLength', 'centerTipSize',
+ 'receptacleSize', 'receptacleHeight', 'sepalCount', 'sepalSize', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -1123,6 +1209,13 @@ function updateCenterOptions() {
   });
 }
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
+// Base parts: hide each part's sliders when it's set to NONE.
+function updateBaseOptions() {
+  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = inputs.receptacleType.value === 'none'; });
+  document.querySelectorAll('[data-sepal]').forEach((el) => { el.hidden = inputs.sepalsType.value === 'none'; });
+}
+inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+inputs.sepalsType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 // Auto-center (top-down): frame the bloom from straight above with the mirror
 // axis (+X) pointing up on screen, so a bilateral fan reads centred and
@@ -1205,6 +1298,12 @@ if (resetBtn) {
     inputs.centerCount.value = d.centerCount;
     inputs.centerLength.value = d.centerLength;
     inputs.centerTipSize.value = d.centerTipSize;
+    inputs.receptacleType.value = d.receptacleType;
+    inputs.receptacleSize.value = d.receptacleSize;
+    inputs.receptacleHeight.value = d.receptacleHeight;
+    inputs.sepalsType.value = d.sepalsType;
+    inputs.sepalCount.value = d.sepalCount;
+    inputs.sepalSize.value = d.sepalSize;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -1214,6 +1313,7 @@ if (resetBtn) {
     updateInfillOptions();
     updateBloomOptions();
     updateCenterOptions();
+    updateBaseOptions();
     refreshLabels();
     scheduleRegen();
   });
@@ -1235,6 +1335,8 @@ const DEFAULTS = {
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
   centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
+  receptacleType: 'none', receptacleSize: 0.6, receptacleHeight: 0.5,
+  sepalsType: 'none', sepalCount: 5, sepalSize: 0.5,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
@@ -1317,6 +1419,7 @@ updateTipOptions();
 updateInfillOptions();
 updateBloomOptions();
 updateCenterOptions();
+updateBaseOptions();
 refreshLabels();
 generate();
 animate();
