@@ -330,31 +330,63 @@ class MeshAccumulator {
     }
   }
 
-  /* A filled double-sided membrane stitched from a grid of surface points. The
-     grid is rows x cols of {p, n} — a world position and its surface normal.
-     Consecutive rows/columns are joined into quads; the petal material is
-     DoubleSide, so this single sheet reads as a thin solid leaf. Used for the
-     SOLID sepal blade (no thickness needed for the live view). */
-  addMembrane(grid) {
+  /* A watertight SOLID blade from a grid of surface points {p, n}. Each point is
+     offset ±half-thickness along its normal into a top face (+n) and a bottom
+     face (-n); the whole grid perimeter is then sealed with a wall, so the blade
+     encloses a volume instead of being a zero-thickness membrane. Used for SOLID
+     sepals so they export watertight, the same way the Voronoi slab and solid
+     petals gain thickness. Thickness is floored to the printable minimum in
+     export mode (matches addSlab). The rim tube drawn over the margin hides the
+     thin wall in the live view. */
+  addBladeSolid(grid, thick) {
     const rows = grid.length;
     if (rows < 2) return;
     const cols = grid[0].length;
     if (cols < 2) return;
-    const rowStart = new Array(rows);
-    for (let i = 0; i < rows; i++) {
-      rowStart[i] = this.vcount;
-      const row = grid[i];
-      for (let j = 0; j < cols; j++) {
-        const { p, n } = row[j];
-        this._vertex(p.x, p.y, p.z, n.x, n.y, n.z);
-      }
+    if (this.exportMode) {
+      thick = Math.max(MIN_FEATURE_UNITS, thick);                       // export: floor blade thickness
+      if (thick < this.minThick) this.minThick = thick;                 // telemetry
     }
-    for (let i = 0; i < rows - 1; i++) {
-      for (let j = 0; j < cols - 1; j++) {
-        const a = rowStart[i] + j, b = a + 1;
-        const c = rowStart[i + 1] + j, d = c + 1;
-        this.idx.push(a, b, c, b, d, c);
+    const H = thick * 0.5;
+
+    // Two vertex layers: top (offset +n) then bottom (offset -n).
+    const tBase = this.vcount;
+    for (let i = 0; i < rows; i++)
+      for (let j = 0; j < cols; j++) {
+        const { p, n } = grid[i][j];
+        this._vertex(p.x + n.x * H, p.y + n.y * H, p.z + n.z * H, n.x, n.y, n.z);
       }
+    const bBase = this.vcount;
+    for (let i = 0; i < rows; i++)
+      for (let j = 0; j < cols; j++) {
+        const { p, n } = grid[i][j];
+        this._vertex(p.x - n.x * H, p.y - n.y * H, p.z - n.z * H, -n.x, -n.y, -n.z);
+      }
+    const T = (i, j) => tBase + i * cols + j;
+    const B = (i, j) => bBase + i * cols + j;
+
+    // Top face (+n) and bottom face (reversed winding -> -n).
+    for (let i = 0; i < rows - 1; i++)
+      for (let j = 0; j < cols - 1; j++) {
+        const a = T(i, j), b = T(i, j + 1), c = T(i + 1, j), d = T(i + 1, j + 1);
+        this.idx.push(a, b, c, b, d, c);
+        const e = B(i, j), f = B(i, j + 1), g = B(i + 1, j), h = B(i + 1, j + 1);
+        this.idx.push(e, g, f, f, g, h);
+      }
+
+    // Seal the perimeter: walk the grid boundary as one closed loop and bridge
+    // the top layer to the bottom layer, so every rim edge is shared by exactly
+    // two triangles (watertight).
+    const loop = [];
+    for (let j = 0; j < cols; j++) loop.push([0, j]);
+    for (let i = 1; i < rows; i++) loop.push([i, cols - 1]);
+    for (let j = cols - 2; j >= 0; j--) loop.push([rows - 1, j]);
+    for (let i = rows - 2; i >= 1; i--) loop.push([i, 0]);
+    for (let k = 0; k < loop.length; k++) {
+      const [i0, j0] = loop[k];
+      const [i1, j1] = loop[(k + 1) % loop.length];
+      const t0 = T(i0, j0), t1 = T(i1, j1), b0 = B(i0, j0), b1 = B(i1, j1);
+      this.idx.push(t0, b0, t1, t1, b0, b1);                            // wall quad
     }
   }
 
@@ -705,9 +737,10 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
   });
 
-  // SOLID BLADE: render the petal as one filled, soft-edged membrane instead of
-  // a vein/infill skeleton (used by solid sepals). A rim tube still traces the
-  // margin so the leaf edge reads as a clean rounded lip, then we're done — the
+  // SOLID BLADE: render the petal as one filled, soft-edged solid instead of a
+  // vein/infill skeleton (used by solid sepals). The blade is a watertight slab
+  // (top + bottom + sealed rim), so it exports as a printable solid; a rim tube
+  // still traces the margin for a clean rounded lip. Then we're done — the
   // skeleton infill below is skipped entirely.
   if (P.solidBlade) {
     const { rows } = buildBlade(P, { uSteps: 26, vSteps: 12 });
@@ -715,7 +748,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       p: place(mapPointToSurface(pt, P, spine)),
       n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
     })));
-    acc.addMembrane(grid);
+    acc.addBladeSolid(grid, P.tubeRadius * SLAB_THICK);   // same thickness rule as the Voronoi sheet
     const rim = outline.map(toWorld);
     rim.push(rim[0]);                              // close the loop at the base
     acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0);
