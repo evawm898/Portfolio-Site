@@ -78,7 +78,8 @@ export function mulberry32(seed) {
    ------------------------------------------------------------------- */
 
 const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
-const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the edge-curve slider
+const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the (top-down) edge-curve slider
+const EDGE_PROFILE_AMP = 0.85;  // max out-of-plane edge lift from the profile edge-curve slider
 
 export function petalHalfWidth(u, P) {
   u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
@@ -254,6 +255,11 @@ export function surfacePoint(u, v, P, spine) {
   const sp = sampleSpine(spine, u);
   const hw = petalHalfWidth(u, P);
   let normalLift = P.cup * hw * v * v;   // parabolic cup: 0 at mid-rib, max at edges
+  // Profile edge curve: an out-of-plane lift of the margins in the SAME plane the
+  // centre curve bends (along the spine normal), growing from base toward the tip,
+  // so the edges curl up (+) or down (-) along the length, independent of the
+  // fixed cup and of the top-down width billow.
+  if (P.edgeProfile) normalLift += P.edgeProfile * EDGE_PROFILE_AMP * hw * v * v * u;
   let dz = 0;
   if (P.tipStyle === 'ruffled') {
     const r = ruffleDisplace(u, v, P);   // full-surface flounce: out-of-plane + lateral spread
@@ -1234,7 +1240,7 @@ export function buildJaggedEdge(P, spine, rng) {
   // tooth out of plane by a different amount, which is what made the side teeth
   // read as ragged, inconsistent spikes next to the clean apex. Feet still sit
   // on the real (cupped) edge, so every tooth attaches seamlessly to the rim.
-  const Pflat = { ...P, cup: 0 };
+  const Pflat = { ...P, cup: 0, edgeProfile: 0 };
 
   // ONE shape rule for every tip — the side teeth and the apex tip alike.
   // A tip is two feet on the edge (F0, F1) rising to a single peak K. The rim
@@ -1390,7 +1396,7 @@ export function buildScallopEdge(P, spine) {
   const count = clamp(Math.round(P.scallopCount || 8), 2, 30);
   const height = clamp(P.scallopHeight != null ? P.scallopHeight : 0.4, 0, 1) * SCALLOP_MAX;
   const uBase = 0.02, uApex = 0.9995;
-  const Pflat = { ...P, cup: 0 };            // outward direction free of cup splay
+  const Pflat = { ...P, cup: 0, edgeProfile: 0 };  // outward direction free of cup / profile splay
   const nPer = Math.max(6, Math.round(120 / count));  // samples per scallop
 
   // One side, base -> tip: `count` convex bumps meeting at cusps on the outline.

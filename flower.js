@@ -377,7 +377,8 @@ function resolveParams(ui) {
     tip: ui.tip,                                 // TIP SHAPE: sharpness of every tip (apex + teeth)
     bloom: ui.bloom * DEG,
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
-    edgeCurve: ui.edgeCurve,                     // side billow (+) / pinch (-)
+    edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
+    edgeProfile: ui.edgeProfile,                 // out-of-plane edge lift, parallel to the centre curve
     tipStyle: ui.tipStyle,                       // petal-edge tip style (clean/jagged/…)
     tipRegion: ui.tipRegion,                     // how far teeth reach from the apex down
     tipLength: ui.tipLength,                     // how far all tips extend outward
@@ -672,6 +673,7 @@ function generate() {
       W: [ui.bilWidth1, ui.bilWidth2, ui.bilWidth3][k - 1],
       curl: [ui.bilCenterCurve1, ui.bilCenterCurve2, ui.bilCenterCurve3][k - 1] * CENTER_CURVE_SCALE,
       edgeCurve: [ui.bilEdgeCurve1, ui.bilEdgeCurve2, ui.bilEdgeCurve3][k - 1],
+      edgeProfile: [ui.bilEdgeProfile1, ui.bilEdgeProfile2, ui.bilEdgeProfile3][k - 1],
       scale: [ui.bilScale1, ui.bilScale2, ui.bilScale3][k - 1],
     });
     const maxK = bilCenter ? bilPerSide : (bilPerSide - 0.5);
@@ -713,7 +715,7 @@ function generate() {
       // Scale grows the whole petal (length + width proportionally) from its base;
       // curl / edgeCurve are shape ratios, so they stay put under scale.
       const s = pl.over.scale;
-      Pp = { ...P, L: P.L * s, W: pl.over.W * s, curl: pl.over.curl, edgeCurve: pl.over.edgeCurve };
+      Pp = { ...P, L: P.L * s, W: pl.over.W * s, curl: pl.over.curl, edgeCurve: pl.over.edgeCurve, edgeProfile: pl.over.edgeProfile };
       if (pl.over.edge && pl.over.edge !== 'default') Pp.tipStyle = pl.over.edge;
     }
     buildPetalInto(petalAcc, Pp, pl.az, height, pl.r - P.r0, tilt, SEED_BASE + pl.seedIdx * 131);
@@ -789,6 +791,7 @@ const inputs = {
   tip: document.getElementById('tip'),
   centerCurve: document.getElementById('centerCurve'),
   edgeCurve: document.getElementById('edgeCurve'),
+  edgeProfile: document.getElementById('edgeProfile'),
   tipStyle: document.getElementById('tipStyle'),
   tipRegion: document.getElementById('tipRegion'),
   tipLength: document.getElementById('tipLength'),
@@ -813,6 +816,9 @@ const inputs = {
   bilScale1: document.getElementById('bilScale1'),
   bilScale2: document.getElementById('bilScale2'),
   bilScale3: document.getElementById('bilScale3'),
+  bilEdgeProfile1: document.getElementById('bilEdgeProfile1'),
+  bilEdgeProfile2: document.getElementById('bilEdgeProfile2'),
+  bilEdgeProfile3: document.getElementById('bilEdgeProfile3'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   infillType: document.getElementById('infillType'),
@@ -848,6 +854,7 @@ function readUI() {
     tip: parseFloat(inputs.tip.value),
     centerCurve: parseFloat(inputs.centerCurve.value),
     edgeCurve: parseFloat(inputs.edgeCurve.value),
+    edgeProfile: parseFloat(inputs.edgeProfile.value),
     tipStyle: inputs.tipStyle.value,
     tipRegion: parseFloat(inputs.tipRegion.value),
     tipLength: parseFloat(inputs.tipLength.value),
@@ -872,6 +879,9 @@ function readUI() {
     bilScale1: parseFloat(inputs.bilScale1.value),
     bilScale2: parseFloat(inputs.bilScale2.value),
     bilScale3: parseFloat(inputs.bilScale3.value),
+    bilEdgeProfile1: parseFloat(inputs.bilEdgeProfile1.value),
+    bilEdgeProfile2: parseFloat(inputs.bilEdgeProfile2.value),
+    bilEdgeProfile3: parseFloat(inputs.bilEdgeProfile3.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     infillType: inputs.infillType.value,
@@ -910,6 +920,8 @@ function refreshLabels() {
   setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
   const ec = +inputs.edgeCurve.value;
   setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
+  const ep = +inputs.edgeProfile.value;
+  setLabel('edgeProfile', (ep > 0 ? '+' : '') + ep.toFixed(2));
   setLabel('tipRegion', (+inputs.tipRegion.value).toFixed(2));
   setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
   setLabel('tipFrequency', inputs.tipFrequency.value);
@@ -923,6 +935,8 @@ function refreshLabels() {
     setLabel('bilCenterCurve' + k, (cc > 0 ? '+' : '') + cc.toFixed(2));
     const ec = +inputs['bilEdgeCurve' + k].value;
     setLabel('bilEdgeCurve' + k, (ec > 0 ? '+' : '') + ec.toFixed(2));
+    const ep = +inputs['bilEdgeProfile' + k].value;
+    setLabel('bilEdgeProfile' + k, (ep > 0 ? '+' : '') + ep.toFixed(2));
   }
   setLabel('bloom', inputs.bloom.value + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
@@ -996,7 +1010,8 @@ function setBuilding(on) {
  'bilScale1', 'bilScale2', 'bilScale3',
  'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
- 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
+ 'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
+ 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
@@ -1112,6 +1127,7 @@ if (resetBtn) {
     inputs.tip.value = d.tip;
     inputs.centerCurve.value = d.centerCurve;
     inputs.edgeCurve.value = d.edgeCurve;
+    inputs.edgeProfile.value = d.edgeProfile;
     inputs.tipStyle.value = d.tipStyle;
     inputs.tipRegion.value = d.tipRegion;
     inputs.tipLength.value = d.tipLength;
@@ -1129,6 +1145,7 @@ if (resetBtn) {
       inputs['bilWidth' + k].value = d['bilWidth' + k];
       inputs['bilCenterCurve' + k].value = d['bilCenterCurve' + k];
       inputs['bilEdgeCurve' + k].value = d['bilEdgeCurve' + k];
+      inputs['bilEdgeProfile' + k].value = d['bilEdgeProfile' + k];
     }
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
@@ -1168,13 +1185,14 @@ if (resetBtn) {
 
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
-  tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
+  tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
   bilScale1: 1, bilScale2: 1, bilScale3: 1,
   bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
   bilCenterCurve1: 0.4, bilCenterCurve2: 0.4, bilCenterCurve3: 0.4,
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
+  bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,

@@ -134,8 +134,12 @@
           <input type="range" id="bilCenterCurve1" min="-1" max="1" step="0.01" value="0.4">
         </div>
         <div class="fl-ctrl" data-bil-petal="1">
-          <div class="fl-ctrl__row"><label for="bilEdgeCurve1">Edge curve</label><span class="fl-ctrl__val" data-value="bilEdgeCurve1"></span></div>
+          <div class="fl-ctrl__row"><label for="bilEdgeCurve1">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve1"></span></div>
           <input type="range" id="bilEdgeCurve1" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="fl-ctrl" data-bil-petal="1">
+          <div class="fl-ctrl__row"><label for="bilEdgeProfile1">Edge curve &mdash; profile</label><span class="fl-ctrl__val" data-value="bilEdgeProfile1"></span></div>
+          <input type="range" id="bilEdgeProfile1" min="-1" max="1" step="0.01" value="0">
         </div>
 
         <p class="fl-bil-head" data-bil-petal="2">Petal 2</p>
@@ -162,8 +166,12 @@
           <input type="range" id="bilCenterCurve2" min="-1" max="1" step="0.01" value="0.4">
         </div>
         <div class="fl-ctrl" data-bil-petal="2">
-          <div class="fl-ctrl__row"><label for="bilEdgeCurve2">Edge curve</label><span class="fl-ctrl__val" data-value="bilEdgeCurve2"></span></div>
+          <div class="fl-ctrl__row"><label for="bilEdgeCurve2">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve2"></span></div>
           <input type="range" id="bilEdgeCurve2" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="fl-ctrl" data-bil-petal="2">
+          <div class="fl-ctrl__row"><label for="bilEdgeProfile2">Edge curve &mdash; profile</label><span class="fl-ctrl__val" data-value="bilEdgeProfile2"></span></div>
+          <input type="range" id="bilEdgeProfile2" min="-1" max="1" step="0.01" value="0">
         </div>
 
         <p class="fl-bil-head" data-bil-petal="3">Petal 3 &mdash; outer</p>
@@ -190,8 +198,12 @@
           <input type="range" id="bilCenterCurve3" min="-1" max="1" step="0.01" value="0.4">
         </div>
         <div class="fl-ctrl" data-bil-petal="3">
-          <div class="fl-ctrl__row"><label for="bilEdgeCurve3">Edge curve</label><span class="fl-ctrl__val" data-value="bilEdgeCurve3"></span></div>
+          <div class="fl-ctrl__row"><label for="bilEdgeCurve3">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve3"></span></div>
           <input type="range" id="bilEdgeCurve3" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="fl-ctrl" data-bil-petal="3">
+          <div class="fl-ctrl__row"><label for="bilEdgeProfile3">Edge curve &mdash; profile</label><span class="fl-ctrl__val" data-value="bilEdgeProfile3"></span></div>
+          <input type="range" id="bilEdgeProfile3" min="-1" max="1" step="0.01" value="0">
         </div>
 
         <div class="fl-ctrl">
@@ -262,11 +274,20 @@
 
         <div class="fl-ctrl" data-hide-bilateral>
           <div class="fl-ctrl__row">
-            <label for="edgeCurve">Edge curve</label>
+            <label for="edgeCurve">Edge curve &mdash; top-down</label>
             <span class="fl-ctrl__val" data-value="edgeCurve"></span>
           </div>
           <input type="range" id="edgeCurve" min="-1" max="1" step="0.01" value="0">
-          <span class="fl-ctrl__hint">pinched &rarr; billowed</span>
+          <span class="fl-ctrl__hint">pinched &rarr; billowed (plan view)</span>
+        </div>
+
+        <div class="fl-ctrl" data-hide-bilateral>
+          <div class="fl-ctrl__row">
+            <label for="edgeProfile">Edge curve &mdash; profile</label>
+            <span class="fl-ctrl__val" data-value="edgeProfile"></span>
+          </div>
+          <input type="range" id="edgeProfile" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">edges dip &rarr; lift (parallel to centre curve)</span>
         </div>
 
         <div class="fl-ctrl">
