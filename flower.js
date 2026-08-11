@@ -389,8 +389,9 @@ function resolveParams(ui) {
     strandIrregularity: ui.strandIrregularity,   // STRANDS: 0 uniform width -> 1 varied strand widths
     boneCount: ui.boneCount,                     // BONE: number of rib pairs along the spine
     boneWidth: ui.boneWidth,                     // BONE: thickness of the spine and ribs
-    boneCurve: ui.boneCurve,                     // BONE: 0 ribs straight out -> 1 swept to the tip
+    boneCurve: ui.boneCurve,                     // BONE: -1 swept to base <- 0 straight out -> 1 swept to tip
     boneSpread: ui.boneSpread,                   // BONE: how far the ribs reach toward the margin
+    boneOutline: ui.boneOutline,                 // BONE: draw the petal outline (rim) or not
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -452,9 +453,13 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const jag = buildJaggedEdge(P, spine, tipRng) || buildRuffledEdge(P, spine, tipRng);
 
   // Rim: one continuous closed tube along the (possibly jagged) petal margin.
-  const rim = jag ? jag.rim.map(place) : outline.map(toWorld);
-  rim.push(rim[0]);                              // close the loop at the petal base
-  acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0); // continuous — no join to flare
+  // BONE can opt out of the outline entirely, leaving just the bare rib skeleton.
+  const drawRim = !(P.infillType === 'bone' && P.boneOutline === false);
+  if (drawRim) {
+    const rim = jag ? jag.rim.map(place) : outline.map(toWorld);
+    rim.push(rim[0]);                            // close the loop at the petal base
+    acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0); // continuous — no join to flare
+  }
 
   // Veins: each is a flattened-space polyline with relative end line-weights.
   // Map its points onto the surface and extrude one smoothly-tapering tube, so
@@ -477,8 +482,9 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     acc.addTube(world, radius, 0, 6);
   }
   // A fine mid-vein reaching from inside the petal into each jagged tooth, so
-  // the veins extend into the jagged edge along with the outline.
-  if (jag) {
+  // the veins extend into the jagged edge along with the outline (skipped when
+  // the outline is turned off).
+  if (jag && drawRim) {
     for (const v of jag.teethVeins) {
       acc.addTube(v.map(place), [P.tubeRadius * 0.30, P.tubeRadius * 0.10], 0, 6);
     }
@@ -714,6 +720,7 @@ const inputs = {
   boneWidth: document.getElementById('boneWidth'),
   boneCurve: document.getElementById('boneCurve'),
   boneSpread: document.getElementById('boneSpread'),
+  boneOutline: document.getElementById('boneOutline'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -746,6 +753,7 @@ function readUI() {
     boneWidth: parseFloat(inputs.boneWidth.value),
     boneCurve: parseFloat(inputs.boneCurve.value),
     boneSpread: parseFloat(inputs.boneSpread.value),
+    boneOutline: inputs.boneOutline.checked,
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -777,7 +785,8 @@ function refreshLabels() {
   setLabel('strandIrregularity', (+inputs.strandIrregularity.value).toFixed(2));
   setLabel('boneCount', inputs.boneCount.value);
   setLabel('boneWidth', (+inputs.boneWidth.value).toFixed(2));
-  setLabel('boneCurve', (+inputs.boneCurve.value).toFixed(2));
+  const bc = +inputs.boneCurve.value;
+  setLabel('boneCurve', (bc > 0 ? '+' : '') + bc.toFixed(2));
   setLabel('boneSpread', (+inputs.boneSpread.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
@@ -855,6 +864,8 @@ function updateInfillOptions() {
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
+// the outline toggle changes geometry, so it regenerates
+inputs.boneOutline.addEventListener('change', () => { scheduleRegen(); });
 
 const resetBtn = document.getElementById('reset');
 if (resetBtn) {
@@ -885,6 +896,7 @@ if (resetBtn) {
     inputs.boneWidth.value = d.boneWidth;
     inputs.boneCurve.value = d.boneCurve;
     inputs.boneSpread.value = d.boneSpread;
+    inputs.boneOutline.checked = d.boneOutline;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -902,7 +914,7 @@ const DEFAULTS = {
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
-  boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85,
+  boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 

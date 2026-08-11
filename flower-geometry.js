@@ -772,7 +772,7 @@ export function buildBone(P, opts = {}) {
   const L = P.L;
   const count  = clamp(Math.round(opts.count != null ? opts.count : 18), 4, 40);
   const width  = clamp(opts.width  != null ? opts.width  : 0.5, 0, 1);
-  const curve  = clamp(opts.curve  != null ? opts.curve  : 0.55, 0, 1);
+  const curve  = clamp(opts.curve  != null ? opts.curve  : 0.55, -1, 1);  // +sweep to tip, -sweep to base
   const spread = clamp(opts.spread != null ? opts.spread : 0.85, 0, 1);
   const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
 
@@ -797,14 +797,17 @@ export function buildBone(P, opts = {}) {
   for (let k = 0; k < count; k++) {
     const tk = (k + 0.5) / count;
     const uk = lerp(uBase + 0.015, uTip - 0.02, tk);
-    const room = uTip - uk;
-    const sweepU = curve * room * 0.8;           // forward sweep (more room near the base)
+    // Sweep the ribs along the spine: forward toward the tip (curve > 0) or back
+    // toward the base (curve < 0). The available room is measured in whichever
+    // direction the sweep goes, so a rib never runs off the end of the spine.
+    const room = curve >= 0 ? (uTip - uk) : (uk - uBase);
+    const sweepU = curve * room * 0.8;
     const wTip = ribW * 0.22;
     for (let s = -1; s <= 1; s += 2) {
       const pts = new Array(nRib + 1);
       for (let i = 0; i <= nRib; i++) {
         const t = i / nRib;
-        const uu = clamp(uk + sweepU * Math.pow(t, 1.3), 0, uTip);
+        const uu = clamp(uk + sweepU * Math.pow(t, 1.3), uBase, uTip);
         const f = Math.sin(t * Math.PI / 2);      // lateral eases out to `reach`
         const y = s * reach * f * hw(uu);
         const cap = 0.97 * hw(uu);
