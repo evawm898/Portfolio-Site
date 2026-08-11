@@ -653,6 +653,7 @@ function resolveParams(ui) {
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
     edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
     edgeProfile: ui.edgeProfile,                 // out-of-plane edge lift, parallel to the centre curve
+    petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
     tipStyle: ui.tipStyle,                       // petal-edge tip style (clean/jagged/…)
     tipRegion: ui.tipRegion,                     // how far teeth reach from the apex down
     tipLength: ui.tipLength,                     // how far all tips extend outward
@@ -1387,6 +1388,7 @@ const inputs = {
   centerCurve: document.getElementById('centerCurve'),
   edgeCurve: document.getElementById('edgeCurve'),
   edgeProfile: document.getElementById('edgeProfile'),
+  petalCup: document.getElementById('petalCup'),
   tipStyle: document.getElementById('tipStyle'),
   tipRegion: document.getElementById('tipRegion'),
   tipLength: document.getElementById('tipLength'),
@@ -1471,6 +1473,7 @@ function readUI() {
     centerCurve: parseFloat(inputs.centerCurve.value),
     edgeCurve: parseFloat(inputs.edgeCurve.value),
     edgeProfile: parseFloat(inputs.edgeProfile.value),
+    petalCup: parseFloat(inputs.petalCup.value),
     tipStyle: inputs.tipStyle.value,
     tipRegion: parseFloat(inputs.tipRegion.value),
     tipLength: parseFloat(inputs.tipLength.value),
@@ -1559,6 +1562,8 @@ function refreshLabels() {
   setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
   const ep = +inputs.edgeProfile.value;
   setLabel('edgeProfile', (ep > 0 ? '+' : '') + ep.toFixed(2));
+  const pc = +inputs.petalCup.value;
+  setLabel('petalCup', (pc > 0 ? '+' : '') + pc.toFixed(2));
   setLabel('tipRegion', (+inputs.tipRegion.value).toFixed(2));
   setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
   setLabel('tipFrequency', inputs.tipFrequency.value);
@@ -1671,7 +1676,7 @@ function setBuilding(on) {
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
  'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
- 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile',
+ 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
@@ -1816,6 +1821,7 @@ if (resetBtn) {
     inputs.centerCurve.value = d.centerCurve;
     inputs.edgeCurve.value = d.edgeCurve;
     inputs.edgeProfile.value = d.edgeProfile;
+    inputs.petalCup.value = d.petalCup;
     inputs.tipStyle.value = d.tipStyle;
     inputs.tipRegion.value = d.tipRegion;
     inputs.tipLength.value = d.tipLength;
@@ -1913,7 +1919,7 @@ if (exportBtn) {
 }
 
 const DEFAULTS = {
-  petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
+  petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
   layerCount: 1, petalsPerLayer: '', layerSizeFalloff: 0.75, layerHeightOffset: 0.05,

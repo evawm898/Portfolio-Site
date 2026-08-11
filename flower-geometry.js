@@ -80,6 +80,7 @@ export function mulberry32(seed) {
 const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
 const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the (top-down) edge-curve slider
 const EDGE_PROFILE_AMP = 0.85;  // max out-of-plane edge lift from the profile edge-curve slider
+const PETAL_CUP_AMP = 0.5;   // max extra across-width cup/reflex from the Petal cup slider
 
 export function petalHalfWidth(u, P) {
   u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
@@ -255,6 +256,12 @@ export function surfacePoint(u, v, P, spine) {
   const sp = sampleSpine(spine, u);
   const hw = petalHalfWidth(u, P);
   let normalLift = P.cup * hw * v * v;   // parabolic cup: 0 at mid-rib, max at edges
+  // PETAL CUP: user-controlled across-width concavity, on the same axis as the
+  // fixed cup and uniform along the length. +ve deepens the bowl (sides lift toward
+  // the flower centre, like a rose/tulip); -ve reverses it convex (sides curl
+  // down/out, like a reflexed lily). 0 leaves the surface exactly as before. Because
+  // every vein / infill point is mapped through surfacePoint, they cup with it.
+  if (P.petalCup) normalLift += P.petalCup * PETAL_CUP_AMP * hw * v * v;
   // Profile edge curve: an out-of-plane lift of the margins in the SAME plane the
   // centre curve bends (along the spine normal), growing from base toward the tip,
   // so the edges curl up (+) or down (-) along the length, independent of the

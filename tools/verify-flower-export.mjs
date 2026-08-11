@@ -82,6 +82,8 @@ const CONFIGS = [
   { label: 'full plant (receptacle + stem + solid sepals)', set: [{ id: 'receptacleType', value: 'rounded', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
   { label: '+ 3 layers (uniform count)', set: [{ id: 'layerCount', value: '3' }] },
   { label: '+ 4 layers, per-layer counts (rose/peony)', set: [{ id: 'layerCount', value: '4' }, { id: 'petalsPerLayer', value: '6,10,14,18' }] },
+  { label: 'petal cup +1 (cupped, single layer)', set: [{ id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'petalCup', value: '1' }] },
+  { label: 'petal cup -1 (reflexed) + solid sepals', set: [{ id: 'petalCup', value: '-1' }] },
 ];
 
 const server = http.createServer((req, res) => {
