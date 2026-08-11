@@ -253,6 +253,7 @@
             <option value="veins">VEINS</option>
             <option value="voronoi">VORONOI</option>
             <option value="strands">STRANDS</option>
+            <option value="bone">BONE</option>
           </select>
         </div>
 
@@ -321,8 +322,45 @@
           <span class="fl-ctrl__hint">uniform widths &rarr; naturally varied</span>
         </div>
 
+        <div class="fl-ctrl" data-infill-styles="bone">
+          <div class="fl-ctrl__row">
+            <label for="boneCount">Bone count</label>
+            <span class="fl-ctrl__val" data-value="boneCount"></span>
+          </div>
+          <input type="range" id="boneCount" min="4" max="40" step="1" value="18">
+          <span class="fl-ctrl__hint">few ribs &rarr; dense rib cage</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="bone">
+          <div class="fl-ctrl__row">
+            <label for="boneWidth">Bone width</label>
+            <span class="fl-ctrl__val" data-value="boneWidth"></span>
+          </div>
+          <input type="range" id="boneWidth" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">fine bones &rarr; heavy bones</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="bone">
+          <div class="fl-ctrl__row">
+            <label for="boneCurve">Bone curve</label>
+            <span class="fl-ctrl__val" data-value="boneCurve"></span>
+          </div>
+          <input type="range" id="boneCurve" min="0" max="1" step="0.01" value="0.55">
+          <span class="fl-ctrl__hint">ribs straight out &rarr; swept to the tip</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="bone">
+          <div class="fl-ctrl__row">
+            <label for="boneSpread">Bone spread</label>
+            <span class="fl-ctrl__val" data-value="boneSpread"></span>
+          </div>
+          <input type="range" id="boneSpread" min="0" max="1" step="0.01" value="0.85">
+          <span class="fl-ctrl__hint">short ribs &rarr; reach the margin</span>
+        </div>
+
         <p class="fl-tip-note" data-infill-styles="voronoi">Cells are mirrored across the petal centre.</p>
         <p class="fl-tip-note" data-infill-styles="strands">Strands are mirrored across the petal centre.</p>
+        <p class="fl-tip-note" data-infill-styles="bone">A central spine with ribbed bones, mirrored across the petal centre.</p>
 
       </div>
     </section>

@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildStrands, buildJaggedEdge, buildRuffledEdge,
+  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildStrands, buildBone, buildJaggedEdge, buildRuffledEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
 } from './flower-geometry.js';
 
@@ -387,6 +387,10 @@ function resolveParams(ui) {
     strandTaper: ui.strandTaper,                 // STRANDS: 0 uniform -> 1 fine point at the tip
     strandCurvature: ui.strandCurvature,         // STRANDS: 0 straight radial -> 1 organic bow
     strandIrregularity: ui.strandIrregularity,   // STRANDS: 0 uniform width -> 1 varied strand widths
+    boneCount: ui.boneCount,                     // BONE: number of rib pairs along the spine
+    boneWidth: ui.boneWidth,                     // BONE: thickness of the spine and ribs
+    boneCurve: ui.boneCurve,                     // BONE: 0 ribs straight out -> 1 swept to the tip
+    boneSpread: ui.boneSpread,                   // BONE: how far the ribs reach toward the margin
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -426,6 +430,11 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         count: P.strandCount, width: P.strandWidth,
         taper: P.strandTaper, curvature: P.strandCurvature,
         irregularity: P.strandIrregularity, seed,
+      })
+    : P.infillType === 'bone'
+    ? buildBone(P, {
+        count: P.boneCount, width: P.boneWidth,
+        curve: P.boneCurve, spread: P.boneSpread,
       })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
@@ -701,6 +710,10 @@ const inputs = {
   strandTaper: document.getElementById('strandTaper'),
   strandCurvature: document.getElementById('strandCurvature'),
   strandIrregularity: document.getElementById('strandIrregularity'),
+  boneCount: document.getElementById('boneCount'),
+  boneWidth: document.getElementById('boneWidth'),
+  boneCurve: document.getElementById('boneCurve'),
+  boneSpread: document.getElementById('boneSpread'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -729,6 +742,10 @@ function readUI() {
     strandTaper: parseFloat(inputs.strandTaper.value),
     strandCurvature: parseFloat(inputs.strandCurvature.value),
     strandIrregularity: parseFloat(inputs.strandIrregularity.value),
+    boneCount: parseInt(inputs.boneCount.value, 10),
+    boneWidth: parseFloat(inputs.boneWidth.value),
+    boneCurve: parseFloat(inputs.boneCurve.value),
+    boneSpread: parseFloat(inputs.boneSpread.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -758,6 +775,10 @@ function refreshLabels() {
   setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
   setLabel('strandCurvature', (+inputs.strandCurvature.value).toFixed(2));
   setLabel('strandIrregularity', (+inputs.strandIrregularity.value).toFixed(2));
+  setLabel('boneCount', inputs.boneCount.value);
+  setLabel('boneWidth', (+inputs.boneWidth.value).toFixed(2));
+  setLabel('boneCurve', (+inputs.boneCurve.value).toFixed(2));
+  setLabel('boneSpread', (+inputs.boneSpread.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -775,6 +796,7 @@ function updateReadout(petalAcc, ui) {
   const petals = `${ui.petalCount} petal${ui.petalCount === 1 ? '' : 's'}`;
   const infill = ui.infillType === 'voronoi' ? 'voronoi cells'
     : ui.infillType === 'strands' ? 'radial strands'
+    : ui.infillType === 'bone' ? 'bone lattice'
     : 'leaf venation';
   el.textContent = `${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
 }
@@ -804,7 +826,8 @@ function setBuilding(on) {
 ['petalCount', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
- 'strandIrregularity', 'tightness', 'elevation'].forEach((k) => {
+ 'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
+ 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -858,6 +881,10 @@ if (resetBtn) {
     inputs.strandTaper.value = d.strandTaper;
     inputs.strandCurvature.value = d.strandCurvature;
     inputs.strandIrregularity.value = d.strandIrregularity;
+    inputs.boneCount.value = d.boneCount;
+    inputs.boneWidth.value = d.boneWidth;
+    inputs.boneCurve.value = d.boneCurve;
+    inputs.boneSpread.value = d.boneSpread;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -875,6 +902,7 @@ const DEFAULTS = {
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
+  boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 

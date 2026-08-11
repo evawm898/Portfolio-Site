@@ -747,6 +747,78 @@ function strandRadProfile(rads, denom) {
 
 
 /* -------------------------------------------------------------------
+   5bb. Bone infill — a skeletal rib cage (Josh-Harker-style lace).
+
+   Modelled on the reference: a central SPINE runs the length of the petal, and
+   evenly-spaced RIBS branch off it in mirror-symmetric pairs, each rib sweeping
+   forward (toward the tip) and curving out toward the margin — like a fish
+   skeleton or a rib cage. Ribs from neighbouring stations interleave into the
+   nested-arc, woven look; on the cupped surface they read as a curved basket.
+   When several petals meet at the centre, their spines radiate out and the ribs
+   weave together into the reference's radial lace.
+
+   Controls (opts):
+     count  : BONE COUNT  — number of rib pairs along the spine.
+     width  : BONE WIDTH  — thickness of the spine and ribs.
+     curve  : BONE CURVE  — 0 ribs branch straight out, 1 swept/curved to the tip.
+     spread : BONE SPREAD — how far the ribs reach toward the margin.
+
+   Ribs are mirror-symmetric (+side / -side share a station) so the petal stays
+   bilaterally symmetric, and every rib is clamped inside the outline. Returns
+   the same { veins, nodes } shape as the other tube infills (relative weights
+   w0 -> w1, scaled by the tube slider in the render layer).
+   ------------------------------------------------------------------- */
+export function buildBone(P, opts = {}) {
+  const L = P.L;
+  const count  = clamp(Math.round(opts.count != null ? opts.count : 18), 4, 40);
+  const width  = clamp(opts.width  != null ? opts.width  : 0.5, 0, 1);
+  const curve  = clamp(opts.curve  != null ? opts.curve  : 0.55, 0, 1);
+  const spread = clamp(opts.spread != null ? opts.spread : 0.85, 0, 1);
+  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+
+  const uBase = 0.04, uTip = 0.985;
+  const spineW = lerp(0.7, 1.7, width);          // spine relative weight
+  const ribW   = lerp(0.26, 0.72, width);        // rib relative weight (thinner than the spine)
+  const reach  = 0.62 + 0.32 * spread;           // rib reach as a fraction of the local half-width
+
+  const veins = [];
+  const nodes = [];
+
+  // central spine, base -> tip, tapering
+  const nSpine = 44;
+  const spine = new Array(nSpine + 1);
+  for (let i = 0; i <= nSpine; i++) spine[i] = { x: L * lerp(uBase, uTip, i / nSpine), y: 0 };
+  veins.push({ points: spine, w0: spineW, w1: spineW * 0.34 });
+  nodes.push({ x: spine[0].x, y: 0, width: spineW });
+  nodes.push({ x: spine[nSpine].x, y: 0, width: spineW * 0.34 });
+
+  // rib pairs along the spine
+  const nRib = 16;
+  for (let k = 0; k < count; k++) {
+    const tk = (k + 0.5) / count;
+    const uk = lerp(uBase + 0.015, uTip - 0.02, tk);
+    const room = uTip - uk;
+    const sweepU = curve * room * 0.8;           // forward sweep (more room near the base)
+    const wTip = ribW * 0.22;
+    for (let s = -1; s <= 1; s += 2) {
+      const pts = new Array(nRib + 1);
+      for (let i = 0; i <= nRib; i++) {
+        const t = i / nRib;
+        const uu = clamp(uk + sweepU * Math.pow(t, 1.3), 0, uTip);
+        const f = Math.sin(t * Math.PI / 2);      // lateral eases out to `reach`
+        const y = s * reach * f * hw(uu);
+        const cap = 0.97 * hw(uu);
+        pts[i] = { x: L * uu, y: Math.abs(y) > cap ? s * cap : y };
+      }
+      veins.push({ points: pts, w0: ribW, w1: wTip });
+    }
+    nodes.push({ x: L * uk, y: 0, width: ribW * 1.05 });   // welded joint where the ribs meet the spine
+  }
+  return { veins, nodes };
+}
+
+
+/* -------------------------------------------------------------------
    5c. Voronoi infill — an alternative petal fill to the leaf venation.
 
    Seeds are scattered only in the +Y half of the petal and MIRRORED to the
