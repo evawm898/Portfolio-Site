@@ -88,6 +88,7 @@
   const uploadError = document.getElementById("uploadError");
 
   const calStatus = document.getElementById("calStatus");
+  const calAutoHint = document.getElementById("calAutoHint");
   const knownDistanceInput = document.getElementById("knownDistance");
   const unitSelect = document.getElementById("unitSelect");
   const ppmPreview = document.getElementById("ppmPreview");
@@ -172,6 +173,10 @@
       unit: "cm",
       pixelsPerMm: null,
     },
+    calAutoDetectPending: false, // true while a /detect-ruler request for the CURRENT image is in flight --
+                                  // guards against a late response overwriting points the user has since
+                                  // started marking manually, or landing on a since-replaced image
+    calAutoDetected: false, // true once auto-detected points are showing, still awaiting the user's own confirm
     roi: null, // {x, y, width, height} in natural coords -- the PRIMARY approved measurement
                // area, derived from rois[0] on approval. Multi-region independent analysis is
                // a later stage, not yet built; the existing single-ROI /analyze call downstream
@@ -904,6 +909,8 @@
       zoomControls.hidden = false;
       // Reset any prior interaction state for a fresh image.
       state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null };
+      state.calAutoDetectPending = false;
+      state.calAutoDetected = false;
       state.roi = null;
       state.result = null;
       state.showMeasurementAreas = false;
@@ -913,6 +920,7 @@
       resetView();
       syncCanvasSize();
       goToStep("calibrate");
+      detectRulerCalibration();
     };
     img.src = state.objectUrl;
   }
@@ -949,6 +957,8 @@
     ppmPreview.textContent = "";
     calError.hidden = true;
     knownDistanceInput.value = "";
+    calAutoHint.hidden = true;
+    calAutoHint.textContent = "";
   }
 
   function updateCalibrationUI() {
@@ -984,8 +994,79 @@
   knownDistanceInput.addEventListener("input", updatePpmPreview);
   unitSelect.addEventListener("change", updatePpmPreview);
 
+  // Automatic ruler calibration detection (see backend /detect-ruler,
+  // which wraps analysis.gauge_analysis.detect_ruler_calibration). Runs
+  // as soon as an image is uploaded, BEFORE the user clicks anything, and
+  // -- if it finds a plausible ruler -- pre-fills the two calibration
+  // points, known distance, and unit as a SUGGESTION only: the Confirm
+  // Calibration button still requires the user's own click (same as
+  // every other value on this step, auto-filled or not), and clicking
+  // "Redo Points" or marking a point manually always wins over a
+  // still-in-flight or already-applied auto-detection. Best-effort only
+  // -- any failure here just leaves manual calibration exactly as it
+  // already was, with no error shown (this is a convenience, not a
+  // required step).
+  async function detectRulerCalibration() {
+    if (!CONFIG.API_BASE_URL) return;
+    const forFile = state.file;
+    state.calAutoDetectPending = true;
+
+    let data;
+    try {
+      const fd = new FormData();
+      fd.append("file", forFile);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+      let res;
+      try {
+        res = await fetch(`${CONFIG.API_BASE_URL}/detect-ruler`, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      data = await res.json();
+      if (!res.ok || !data.success) return;
+    } catch {
+      return;
+    } finally {
+      // Only this request's own "in flight" claim is cleared here -- if
+      // the user already took over manually, they've already flipped
+      // this back to false themselves, and the check below still catches it.
+      if (state.file === forFile) state.calAutoDetectPending = false;
+    }
+
+    // The image may have changed, or the user may already be calibrating
+    // manually, since this request went out -- never overwrite either.
+    if (state.file !== forFile || state.cal.points.length > 0) return;
+
+    state.cal.points = [
+      { x: data.point1_px[0], y: data.point1_px[1] },
+      { x: data.point2_px[0], y: data.point2_px[1] },
+    ];
+    knownDistanceInput.value = data.suggested_distance;
+    unitSelect.value = data.suggested_unit;
+    state.calAutoDetected = true;
+
+    const confidencePct = Math.round((data.confidence || 0) * 100);
+    const spanDesc =
+      data.major_tick_count >= 2
+        ? `${data.suggested_distance} ${data.suggested_unit} between two numbered tick marks`
+        : "a short span of ruler tick marks";
+    calAutoHint.textContent =
+      `Auto-detected from a ruler in your photo (${spanDesc}, ~${confidencePct}% confidence). ` +
+      `Review the two points and known distance below, then confirm — or click "Redo Points" to mark manually.`;
+    calAutoHint.hidden = false;
+
+    updateCalibrationUI();
+    render();
+  }
+
   calRedoBtn.addEventListener("click", () => {
     state.cal.points = [];
+    state.calAutoDetectPending = false; // user is taking over manually -- don't let a late auto-detect response overwrite this
     resetCalibrationUI();
     render();
   });
@@ -1302,6 +1383,7 @@
 
     if (state.currentStep === "calibrate") {
       if (state.cal.points.length >= 2) return; // must Redo first
+      state.calAutoDetectPending = false; // user is marking manually -- don't let a late auto-detect response overwrite this
       const pt = displayToNatural(eventToDisplayPoint(evt));
       state.cal.points.push(pt);
       updateCalibrationUI();
