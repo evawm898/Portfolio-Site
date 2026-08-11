@@ -46,6 +46,28 @@ const RIM_WIDTH       = 0.34;  // petal-margin line weight, relative to the midr
                                // (the leaf edge is a fine vein, not a fat rope)
 const SEED_BASE      = 20250808;
 
+/* ===================================================================
+   REAL-WORLD SCALE  (STL export — Phase 1)
+   -------------------------------------------------------------------
+   A single source-of-truth constant maps Three.js world units to
+   millimetres. It is applied ONLY when exporting an STL (a scale factor
+   baked into the exported geometry), never to the live scene — so the
+   interactive view keeps rendering in the same unitless world it always
+   has, and changing this number rescales the physical print without
+   touching any of the shape constants above.
+
+   Calibration: the default bloom as the page first loads (4 petals,
+   bloom 55°, tightness 0.5, elevation 0) measures ~4.62 world units
+   across its widest span (headless bounding-box, X/Z). Targeting a
+   ~120 mm fully-open flower gives 120 / 4.62 ≈ 26 mm per unit. Fuller
+   blooms (more petals / looser coil) are larger in world units and so
+   print proportionally larger — e.g. a 24-petal bloom (~6.8 units) lands
+   near ~177 mm. This constant fixes the units→mm ratio; the physical
+   size of any given bloom then follows from its own extent.
+
+   To rescale every future export, change ONLY this number. */
+const MM_PER_UNIT = 26;   // millimetres per Three.js world unit (single scale knob)
+
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
    layout). Petal i sits at angle i*GOLDEN_ANGLE and radius spread*sqrt(i)
    (Vogel's model — the sunflower packing). Below EVEN_MAX petals the spiral has
