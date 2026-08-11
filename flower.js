@@ -1014,6 +1014,10 @@ function resolveLayerCounts(ui, layerCount) {
   // layers past the end of the list, fall back to the Bloom petal count — so an
   // empty list makes every layer match the single-ring flower.
   const base = clamp(Math.round(ui.petalCount), 1, 40);
+  // A single whorl ALWAYS uses NUMBER OF PETALS. The per-layer list only applies
+  // with 2+ layers — its control is hidden at 1 layer, so a leftover value must
+  // never silently override the visible petal-count slider.
+  if (layerCount <= 1) return [base];
   const raw = String(ui.petalsPerLayer || '').split(',').map((s) => parseInt(s.trim(), 10));
   const counts = [];
   for (let i = 0; i < layerCount; i++) {
