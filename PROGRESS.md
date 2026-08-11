@@ -121,3 +121,64 @@ count unchanged; 24-petal voronoi still 954,432 tris). `node --check` passes.
 - The floor thickens thin lines on export (e.g. the 0.30 mm default rim → 0.8 mm).
   That is the intended printability trade-off and only affects the STL, never the
   screen.
+
+---
+
+## Phase 3 — Solid petal lamina (DONE)
+
+**Goal:** petals should be real, printable material — a solid leaf-skeleton
+lamina — not a bundle of open-ended round tubes floating in space. Extend the
+`addSlab` solid approach to the tube-based infills; verify veins + strands render
+solid; sepals a stretch goal.
+
+**What changed** (`flower.js`)
+- New primitive `MeshAccumulator.addRibbon(stations, halfWidth, halfThick)` — the
+  open-polyline analogue of `addSlab`. It lofts a **closed, solid flat RIBBON**
+  along a vein: a thin lamina lying *in* the petal surface (thickness along the
+  surface normal, width across the vein in the surface plane), with four side
+  faces and two end caps so each vein is a watertight solid. `halfWidth` accepts
+  the same constant / `[start,end]` / `t→w` forms as the old tube radius, so every
+  vein keeps its exact midrib→veinlet taper. Thickness is capped to the width
+  (a tapering tip stays a flat pad, never a tall fin) and, in export mode, both
+  width and thickness are floored to the min printable feature (with `minThick`
+  telemetry).
+- `buildPetalInto`: the per-vein `addTube(...)` became `addRibbon(...)`. A hoisted
+  `station(pt)` helper maps each flattened vein point to `{ p: surface point,
+  n: surface normal }` (also de-duplicates the Voronoi block's old local
+  `withNormal`). Half-width = the old tube radius (`P.tubeRadius * weight`);
+  half-thickness = `P.tubeRadius * LAMINA_HALF` (new constant, 0.5 → a flat sheet).
+- Result per infill type:
+  - **veins / strands / bone / lace** → solid flat ribbons ("pattern as solid
+    material" — a leaf-skeleton). Where ribbons branch/cross they interpenetrate
+    into one connected solid.
+  - **voronoi** → unchanged (already a solid perforated sheet — "lamina with
+    voids").
+  Both models the brief allowed are now present.
+- Kept as-is (deliberately): the **rim** is a closed-loop `addTube` (a loop has no
+  open ends — already watertight, and a rolled round margin reads well); **node
+  beads** at junctions/tips (closed solids that reinforce connectivity for the
+  Phase-4 union); **jagged-tooth mid-veins** as small tubes.
+- **Sepals (stretch goal): done for free.** `buildSepalsInto` routes through
+  `buildPetalInto`, so sepals became solid ribbon skeletons automatically.
+
+**Verification** (headless renders + probes)
+- Single-petal renders confirm each infill is solid: veins/bone/lace/strands are
+  flat ribbon skeletons; voronoi is the unchanged perforated sheet. A full flower
+  (petals + reflexed sepals + receptacle basket + stamens) composes coherently.
+- Export-mode floor probe (thinnest `tube = 0`): every feature — round (rim/beads),
+  ribbon (veins/strands/bone/lace) and slab (voronoi) — floors to exactly 0.800 mm
+  across all infills; nothing thinner.
+- Live view: petal *solidity* changed (allowed); the *silhouette* is preserved —
+  default bounds still `x,z ∈ ±2.3089`, `y_max` 0.9925 (was 0.9916), tri count
+  27,840 → 25,096 (ribbons are slightly cheaper than 6-sided tubes). `node --check`
+  passes.
+
+**Open issues / notes for Phase 4**
+- Not every primitive is closed yet: the **core filaments, receptacle ribs, and
+  stem tubes** are open-ended `addTube` cylinders (no end caps). Phase 4 must
+  close them (an export-time cap option on `addTube`) or rely on a voxel remesh.
+- Ribbon winding is best-effort (faces carry correct outward normals; the live
+  material is `DoubleSide`, so shading is fine). The petal is a set of
+  *overlapping closed solids*, not yet a single manifold — Phase 4's union / voxel
+  remesh is what fuses them and regularizes winding.
+- Voronoi in-plane wall width still not floored (carried over from Phase 2).

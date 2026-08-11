@@ -109,6 +109,12 @@ const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom
 // so the fan never wraps past the back; max 3 petals per side.
 const SLAB_THICK     = 3.2;    // Voronoi sheet thickness, as a multiple of the tube radius
 const SLAB_FILLET    = 1.0;    // rounded-edge radius as a fraction of half-thickness (1 = full bullnose)
+// Veins / strands / bone / lace render as solid FLAT RIBBONS (a leaf-skeleton
+// lamina) instead of round tubes: each vein keeps its width taper (half-width =
+// the old tube radius) but is given a flat thickness along the petal surface
+// normal. This ratio sets the lamina half-thickness as a fraction of the tube
+// radius — < 1 so the ribbon reads as a thin flat leaf vein, not a round rope.
+const LAMINA_HALF    = 0.5;
 
 
 /* ===================================================================
@@ -389,6 +395,104 @@ class MeshAccumulator {
     }
   }
 
+  /* A closed, solid FLAT RIBBON lofted along a surface polyline — the leaf-vein
+     analogue of addSlab (a solid strip instead of a perforated sheet). It turns
+     a vein / strand / bone / lace line into real printable material: a thin flat
+     lamina that lies IN the petal surface, so where veins cross and branch the
+     ribbons interpenetrate into one connected solid (a leaf-skeleton), instead
+     of the earlier bundle of open-ended round tubes.
+
+     `stations` are { p:{x,y,z}, n:{x,y,z} } — the centre point on the petal
+     surface and that surface's unit normal. `halfWidth` is the half-extent
+     ACROSS the vein, in the surface plane (constant, [start,end], or t->w — so
+     the vein still tapers midrib->veinlet). `halfThick` is the half-extent along
+     the surface normal (the lamina's half-thickness). Thickness is capped to the
+     width so a tapering tip stays a flat pad, never a tall fin, and in export
+     mode both are floored to the minimum printable feature. */
+  addRibbon(stations, halfWidth, halfThick) {
+    const n = stations.length;
+    if (n < 2) return;
+    const resolve = (r, t) => typeof r === 'function' ? r(t) : Array.isArray(r) ? lerp(r[0], r[1], t) : r;
+
+    const arc = new Array(n); arc[0] = 0;
+    for (let i = 1; i < n; i++) {
+      const a = stations[i].p, b = stations[i - 1].p;
+      arc[i] = arc[i - 1] + Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+    }
+    const total = arc[n - 1] || 1;
+
+    // Per-station orthonormal frame (tangent t along the vein, surface normal n,
+    // in-surface side u = t x n) and the four cross-section corners.
+    const Tt = [], Nn = [], Uu = [], TL = [], TR = [], BR = [], BL = [];
+    for (let i = 0; i < n; i++) {
+      const p = stations[i].p;
+      let tx, ty, tz;
+      if (i === 0)          { const q = stations[1].p;     tx = q.x - p.x; ty = q.y - p.y; tz = q.z - p.z; }
+      else if (i === n - 1) { const q = stations[i - 1].p; tx = p.x - q.x; ty = p.y - q.y; tz = p.z - q.z; }
+      else                  { const a = stations[i + 1].p, b = stations[i - 1].p; tx = a.x - b.x; ty = a.y - b.y; tz = a.z - b.z; }
+      let tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+      let nx = stations[i].n.x, ny = stations[i].n.y, nz = stations[i].n.z;
+      let nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      const d = nx * tx + ny * ty + nz * tz;         // re-orthogonalize n against t
+      nx -= tx * d; ny -= ty * d; nz -= tz * d;
+      nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      let ux = ty * nz - tz * ny, uy = tz * nx - tx * nz, uz = tx * ny - ty * nx;   // u = t x n
+      let ul = Math.hypot(ux, uy, uz) || 1; ux /= ul; uy /= ul; uz /= ul;
+      const t = arc[i] / total;
+      let hw = Math.max(0, resolve(halfWidth, t));
+      let ht = Math.min(Math.max(0, resolve(halfThick, t)), hw);   // never a fin
+      if (this.exportMode) {
+        hw = Math.max(MIN_RADIUS_UNITS, hw);
+        ht = Math.max(MIN_RADIUS_UNITS, ht);
+        const f = Math.min(2 * hw, 2 * ht);
+        if (f < this.minThick) this.minThick = f;
+      }
+      Tt[i] = [tx, ty, tz]; Nn[i] = [nx, ny, nz]; Uu[i] = [ux, uy, uz];
+      TL[i] = [p.x + ux * hw + nx * ht, p.y + uy * hw + ny * ht, p.z + uz * hw + nz * ht];
+      TR[i] = [p.x - ux * hw + nx * ht, p.y - uy * hw + ny * ht, p.z - uz * hw + nz * ht];
+      BR[i] = [p.x - ux * hw - nx * ht, p.y - uy * hw - ny * ht, p.z - uz * hw - nz * ht];
+      BL[i] = [p.x + ux * hw - nx * ht, p.y + uy * hw - ny * ht, p.z + uz * hw - nz * ht];
+    }
+
+    // Loft one face as a quad strip between two corner-arrays, with a per-station
+    // outward normal. `sign` sets the winding so the face faces `normArr` outward.
+    const face = (A, B, normArr, sign) => {
+      const col = new Array(n);
+      for (let i = 0; i < n; i++) {
+        const nm = normArr[i];
+        col[i] = [
+          this._vertex(A[i][0], A[i][1], A[i][2], nm[0], nm[1], nm[2]),
+          this._vertex(B[i][0], B[i][1], B[i][2], nm[0], nm[1], nm[2]),
+        ];
+      }
+      for (let i = 0; i < n - 1; i++) {
+        const a0 = col[i][0], b0 = col[i][1], a1 = col[i + 1][0], b1 = col[i + 1][1];
+        if (sign > 0) this.idx.push(a0, b0, b1, a0, b1, a1);
+        else          this.idx.push(a0, b1, b0, a0, a1, b1);
+      }
+    };
+    const neg = (v) => [-v[0], -v[1], -v[2]];
+    face(TL, TR, Nn, +1);                    // top  (+normal)
+    face(BL, BR, Nn.map(neg), -1);           // bottom (-normal)
+    face(TR, BR, Uu.map(neg), +1);           // right (-u)
+    face(BL, TL, Uu, -1);                    // left  (+u)
+
+    // End caps seal the strip into a closed solid.
+    const cap = (i, nrm, order) => {
+      const nx = nrm[0], ny = nrm[1], nz = nrm[2];
+      const v = [
+        this._vertex(TL[i][0], TL[i][1], TL[i][2], nx, ny, nz),
+        this._vertex(TR[i][0], TR[i][1], TR[i][2], nx, ny, nz),
+        this._vertex(BR[i][0], BR[i][1], BR[i][2], nx, ny, nz),
+        this._vertex(BL[i][0], BL[i][1], BL[i][2], nx, ny, nz),
+      ];
+      if (order > 0) { this.idx.push(v[0], v[1], v[2], v[0], v[2], v[3]); }
+      else           { this.idx.push(v[0], v[2], v[1], v[0], v[3], v[2]); }
+    };
+    cap(0, neg(Tt[0]), -1);                  // front cap faces -tangent
+    cap(n - 1, Tt[n - 1], +1);               // back cap faces +tangent
+  }
+
   toGeometry() {
     if (this.vcount === 0) return null;
     const g = new THREE.BufferGeometry();
@@ -529,6 +633,12 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
 
   const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
   const toWorld = (pt) => place(mapPointToSurface(pt, P, spine));
+  // A vein point promoted to a ribbon station: its world position on the cupped
+  // petal surface plus that surface's world normal (the lamina's thickness axis).
+  const station = (pt) => ({
+    p: place(mapPointToSurface(pt, P, spine)),
+    n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
+  });
 
   // PETAL EDGE: the tip style can reshape the outline. JAGGED turns the tip end
   // into a row of teeth (a rim weaving through them + a mid-vein per tooth);
@@ -547,8 +657,11 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   }
 
   // Veins: each is a flattened-space polyline with relative end line-weights.
-  // Map its points onto the surface and extrude one smoothly-tapering tube, so
-  // line weight thins from the midrib through secondary, tertiary and veinlet.
+  // Map its points onto the cupped surface and loft one smoothly-tapering SOLID
+  // FLAT RIBBON along it (a leaf-vein lamina), so line weight thins from the
+  // midrib through secondary, tertiary and veinlet while every vein is real,
+  // printable material lying in the petal surface. Where veins branch and cross
+  // the ribbons interpenetrate into one connected solid — a leaf-skeleton.
   // When the petal is RUFFLED the whole surface buckles, so veins are first
   // densified (in flattened space) to a spacing fine enough to ride the flutes
   // without faceting — step scales with the flute frequency.
@@ -556,17 +669,17 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // finer than the flute spacing so infill rides the coil + its second-scale
   // frills (~2.7x the base frequency) without faceting.
   const veinStep = ruffled ? clamp(PETAL_LENGTH * 0.8 / (Math.max(1, P.tipFrequency) * 9), 0.03, 0.14) : 0;
+  const lamHalf = P.tubeRadius * LAMINA_HALF;    // lamina half-thickness (flat sheet)
   for (const vein of ven.veins) {
     const pts = ruffled ? densifyByStep(vein.points, veinStep) : vein.points;
-    const world = pts.map(toWorld);
-    // veins are thin — 6 radial sides read as round and roughly halve the
-    // triangle count versus the default, which matters on deep fractals.
-    // vein.rad (Voronoi junction bulge) is a t->weight profile; otherwise the
-    // weight tapers linearly from w0 to w1.
-    const radius = vein.rad
+    const stations = pts.map(station);
+    // Ribbon half-WIDTH (across the vein, in the surface) = the old tube radius,
+    // so the vein keeps its exact width taper. vein.rad (Voronoi junction bulge)
+    // is a t->weight profile; otherwise the weight tapers linearly w0 -> w1.
+    const halfWidth = vein.rad
       ? (t) => P.tubeRadius * vein.rad(t)
       : [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1];
-    acc.addTube(world, radius, 0, 6);
+    acc.addRibbon(stations, halfWidth, lamHalf);
   }
   // A fine mid-vein reaching from inside the petal into each jagged tooth, so
   // the veins extend into the jagged edge along with the outline (skipped when
@@ -588,13 +701,9 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // top/bottom faces and rims. Adjacent cells share outer edges, so the slabs
   // tile into one continuous membrane with round holes.
   if (ven.slabs) {
-    const withNormal = (pt) => ({
-      p: place(mapPointToSurface(pt, P, spine)),
-      n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
-    });
     const thick = P.tubeRadius * SLAB_THICK;
     for (const slab of ven.slabs) {
-      acc.addSlab(slab.outer.map(withNormal), slab.inner.map(withNormal), thick);
+      acc.addSlab(slab.outer.map(station), slab.inner.map(station), thick);
     }
   }
 }
