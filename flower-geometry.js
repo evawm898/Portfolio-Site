@@ -252,6 +252,52 @@ function ruffleDisplace(u, v, P) {
   return out;
 }
 
+
+/* -------------------------------------------------------------------
+   EDGE NOISE — organic, non-periodic crinkle layered on the petal margin, on top
+   of whatever tip style is active (clean, jagged, ruffled, scallop). It is a
+   surface displacement, so — like the ruffle and the cup — every rim / vein /
+   infill point conforms to it automatically.
+   ------------------------------------------------------------------- */
+
+// Out-of-plane crinkle amplitude at EDGE NOISE = 1, in world units along the
+// spine normal (the same axis the cup and ruffle lift along).
+const EDGE_NOISE_AMP = 0.34;
+
+// Value noise: an integer hash on a 1-D lattice, smootherstep-interpolated, then
+// summed over a few octaves (fBm). This is real non-periodic noise — NOT a sine
+// wave — so the crinkle never reads as a mechanical ripple.
+function hashNoise(i) {
+  let h = (Math.floor(i) | 0) * 374761393 + 668265263;
+  h = ((h ^ (h >>> 13)) * 1274126177) | 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;          // [0, 1)
+}
+function valueNoise1D(x) {
+  const i = Math.floor(x);
+  return lerp(hashNoise(i), hashNoise(i + 1), smootherstep(x - i)) * 2 - 1;  // [-1, 1]
+}
+function fbm1D(x) {
+  let sum = 0, amp = 0.5, freq = 1;
+  for (let o = 0; o < 3; o++) { sum += amp * valueNoise1D(x * freq + o * 17.3); freq *= 2.03; amp *= 0.5; }
+  return sum;                                              // ~[-0.9, 0.9]
+}
+
+// Crinkle lift at (u, v): concentrated at the margin (|v| -> 1), fading to the
+// calm mid-rib so the infill stays legible; irregular along the edge length (u)
+// with a finer cross-margin ripple so it reads as crumpled tissue rather than
+// parallel corrugations. Uses |v|, so the two margins mirror (bilateral symmetry
+// is preserved). EDGE NOISE SCALE sets the crinkle frequency.
+function edgeNoiseDisplace(u, v, P) {
+  const amt = P.edgeNoise || 0;
+  if (amt <= 1e-4) return 0;
+  const av = Math.abs(v);
+  const band = smootherstep(clamp((av - 0.30) / 0.70, 0, 1));   // 0 at mid-rib, 1 at the edge
+  if (band <= 1e-6) return 0;
+  const freq = lerp(3, 40, clamp(P.edgeNoiseScale || 0, 0, 1)); // broad crinkles -> dense fine ones
+  const n = fbm1D(u * freq) * 0.8 + fbm1D(av * freq * 1.7 + 5) * 0.4;
+  return amt * EDGE_NOISE_AMP * band * n;
+}
+
 export function surfacePoint(u, v, P, spine) {
   const sp = sampleSpine(spine, u);
   const hw = petalHalfWidth(u, P);
@@ -273,6 +319,9 @@ export function surfacePoint(u, v, P, spine) {
     normalLift += r.dn;
     dz = r.dz;
   }
+  // EDGE NOISE: organic crinkle on top of ANY tip style (adds to the ruffle when
+  // both are on). 0 leaves the surface untouched.
+  if (P.edgeNoise) normalLift += edgeNoiseDisplace(u, v, P);
   return {
     x: sp.s + sp.nx * normalLift,
     y: sp.y + sp.ny * normalLift,

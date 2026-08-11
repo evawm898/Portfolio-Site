@@ -474,6 +474,25 @@
           <span class="fl-ctrl__hint">shallow &rarr; deep bulge</span>
         </div>
 
+        <!-- EDGE NOISE applies to every tip style (no data-tip-styles) -->
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="edgeNoise">Edge noise</label>
+            <span class="fl-ctrl__val" data-value="edgeNoise"></span>
+          </div>
+          <input type="range" id="edgeNoise" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">organic micro-crinkle (crepe paper), layered on top of any tip style</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="edgeNoiseScale">Edge noise scale</label>
+            <span class="fl-ctrl__val" data-value="edgeNoiseScale"></span>
+          </div>
+          <input type="range" id="edgeNoiseScale" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">a few broad crinkles &rarr; dense fine crinkling</span>
+        </div>
+
         <p class="fl-tip-note" data-tip-styles="clean">Smooth petal edge.</p>
         <p class="fl-tip-note" data-tip-styles="scallop">Scalloped doily edge &mdash; pairs with the LACE infill.</p>
         <p class="fl-tip-note" data-tip-styles="fractal">This style isn&rsquo;t built yet &mdash; controls are placeholders.</p>

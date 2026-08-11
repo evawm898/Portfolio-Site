@@ -659,6 +659,8 @@ function resolveParams(ui) {
     tipLength: ui.tipLength,                     // how far all tips extend outward
     tipFrequency: ui.tipFrequency,               // total number of tips, including the apex
     tipIrregularity: ui.tipIrregularity,         // 0 uniform -> 1 varied length & angle
+    edgeNoise: ui.edgeNoise,                      // organic non-periodic edge crinkle (any tip style)
+    edgeNoiseScale: ui.edgeNoiseScale,           // crinkle frequency: broad -> dense
     infillType: ui.infillType,                   // 'veins' (leaf venation), 'voronoi', or 'strands'
     density: ui.density,                          // raw density: vein depth OR voronoi cell count
     strandCount: ui.strandCount,                 // STRANDS: number of radial strands across the width
@@ -1383,6 +1385,8 @@ const inputs = {
   tipLength: document.getElementById('tipLength'),
   tipFrequency: document.getElementById('tipFrequency'),
   tipIrregularity: document.getElementById('tipIrregularity'),
+  edgeNoise: document.getElementById('edgeNoise'),
+  edgeNoiseScale: document.getElementById('edgeNoiseScale'),
   bloomType: document.getElementById('bloomType'),
   layerCount: document.getElementById('layerCount'),
   petalsPerLayer: document.getElementById('petalsPerLayer'),
@@ -1465,6 +1469,8 @@ function readUI() {
     tipLength: parseFloat(inputs.tipLength.value),
     tipFrequency: parseInt(inputs.tipFrequency.value, 10),
     tipIrregularity: parseFloat(inputs.tipIrregularity.value),
+    edgeNoise: parseFloat(inputs.edgeNoise.value),
+    edgeNoiseScale: parseFloat(inputs.edgeNoiseScale.value),
     bloomType: inputs.bloomType.value,
     layerCount: parseInt(inputs.layerCount.value, 10),
     petalsPerLayer: inputs.petalsPerLayer.value,
@@ -1551,6 +1557,8 @@ function refreshLabels() {
   setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
   setLabel('tipFrequency', inputs.tipFrequency.value);
   setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
+  setLabel('edgeNoise', (+inputs.edgeNoise.value).toFixed(2));
+  setLabel('edgeNoiseScale', (+inputs.edgeNoiseScale.value).toFixed(2));
   setLabel('bilPerSide', inputs.bilPerSide.value);
   setLabel('bilSpacing', inputs.bilSpacing.value + '°');
   setLabel('layerCount', inputs.layerCount.value);
@@ -1657,7 +1665,7 @@ function setBuilding(on) {
  'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
  'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
- 'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
+ 'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
@@ -1807,6 +1815,8 @@ if (resetBtn) {
     inputs.tipLength.value = d.tipLength;
     inputs.tipFrequency.value = d.tipFrequency;
     inputs.tipIrregularity.value = d.tipIrregularity;
+    inputs.edgeNoise.value = d.edgeNoise;
+    inputs.edgeNoiseScale.value = d.edgeNoiseScale;
     inputs.bloomType.value = d.bloomType;
     inputs.layerCount.value = d.layerCount;
     inputs.petalsPerLayer.value = d.petalsPerLayer;
@@ -1898,6 +1908,7 @@ if (exportBtn) {
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
+  edgeNoise: 0, edgeNoiseScale: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
   layerCount: 1, petalsPerLayer: '', layerSizeFalloff: 0.75, layerHeightOffset: 0.05,
   layerRotationOffset: 24, layerBloomAngleDelta: 12,
