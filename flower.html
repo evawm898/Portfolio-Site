@@ -89,11 +89,60 @@
           <span class="fl-ctrl__hint">petals on each side of the mirror line</span>
         </div>
 
+        <div class="fl-ctrl" data-bloom-styles="bilateral">
+          <div class="fl-ctrl__row">
+            <label for="bilSpacing">Petal spacing</label>
+            <span class="fl-ctrl__val" data-value="bilSpacing"></span>
+          </div>
+          <input type="range" id="bilSpacing" min="15" max="60" step="1" value="45">
+          <span class="fl-ctrl__hint">angle between neighbouring petals</span>
+        </div>
+
         <div class="fl-ctrl fl-ctrl--toggle" data-bloom-styles="bilateral">
           <label for="bilCenterPetal">Petal on mirror line</label>
           <input type="checkbox" id="bilCenterPetal">
         </div>
         <p class="fl-tip-note" data-bloom-styles="bilateral">On: a centre petal is bisected by the mirror line. Off: the mirror runs through the gap between the two inner petals.</p>
+
+        <div class="fl-ctrl" data-bil-petal="1">
+          <div class="fl-ctrl__row">
+            <label for="bilEdge1">Petal 1 edge &mdash; inner</label>
+          </div>
+          <select class="fl-select" id="bilEdge1">
+            <option value="default">DEFAULT (GLOBAL TIP)</option>
+            <option value="clean">CLEAN</option>
+            <option value="jagged">JAGGED</option>
+            <option value="ruffled">RUFFLED</option>
+            <option value="fractal">FRACTAL</option>
+          </select>
+          <span class="fl-ctrl__hint">innermost pair &mdash; and the centre petal, if on</span>
+        </div>
+
+        <div class="fl-ctrl" data-bil-petal="2">
+          <div class="fl-ctrl__row">
+            <label for="bilEdge2">Petal 2 edge</label>
+          </div>
+          <select class="fl-select" id="bilEdge2">
+            <option value="default">DEFAULT (GLOBAL TIP)</option>
+            <option value="clean">CLEAN</option>
+            <option value="jagged">JAGGED</option>
+            <option value="ruffled">RUFFLED</option>
+            <option value="fractal">FRACTAL</option>
+          </select>
+        </div>
+
+        <div class="fl-ctrl" data-bil-petal="3">
+          <div class="fl-ctrl__row">
+            <label for="bilEdge3">Petal 3 edge &mdash; outer</label>
+          </div>
+          <select class="fl-select" id="bilEdge3">
+            <option value="default">DEFAULT (GLOBAL TIP)</option>
+            <option value="clean">CLEAN</option>
+            <option value="jagged">JAGGED</option>
+            <option value="ruffled">RUFFLED</option>
+            <option value="fractal">FRACTAL</option>
+          </select>
+        </div>
 
         <div class="fl-ctrl" data-bloom-styles="bilateral">
           <button id="bilTopView" class="fl-btn fl-btn--wide" type="button">Auto-center (top-down)</button>

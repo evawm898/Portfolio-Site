@@ -62,9 +62,8 @@ const EVEN_MAX       = 4;      // at/below this petal count, arrange petals as a
                                // (equal angle + equal radius) instead of the phyllotactic
                                // spiral, so 3 or 4 petals sit evenly spaced from each other
 const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom radius
-const BIL_STEP       = Math.PI / 4;   // bilateral fan: fixed 45 deg spacing between neighbours.
-                                      // Capped at 3 petals per side, so the fan spans at most
-                                      // 270 deg and always leaves a >=90 deg wedge at the back.
+// bilateral fan spacing is user-set (Petal spacing slider) and capped in generate()
+// so the fan never wraps past the back; max 3 petals per side.
 const SLAB_THICK     = 3.2;    // Voronoi sheet thickness, as a multiple of the tube radius
 const SLAB_FILLET    = 1.0;    // rounded-edge radius as a fraction of half-thickness (1 = full bullnose)
 
@@ -665,11 +664,17 @@ function generate() {
   //               leaving an open wedge at the back (exactly one plane of symmetry).
   const placements = [];
   if (bloomType === 'bilateral') {
-    if (bilCenter) placements.push({ az: 0, r: ringR, seedIdx: 0 });
+    // Petal spacing is user-set, then capped so the outermost petal never swings
+    // past ~170° (no wrap into the back / overlap), keeping the mirror wedge.
+    const edges = [ui.bilEdge1, ui.bilEdge2, ui.bilEdge3];
+    const maxK = bilCenter ? bilPerSide : (bilPerSide - 0.5);
+    const step = Math.min(clamp(ui.bilSpacing, 5, 90) * DEG, (170 * DEG) / Math.max(1e-6, maxK));
+    if (bilCenter) placements.push({ az: 0, r: ringR, seedIdx: 0, edge: edges[0] });   // centre petal takes petal-1's edge
     for (let k = 1; k <= bilPerSide; k++) {
-      const a = (bilCenter ? k : k - 0.5) * BIL_STEP;           // 45° spacing about the axis
-      placements.push({ az:  a, r: ringR, seedIdx: k });        // +side
-      placements.push({ az: -a, r: ringR, seedIdx: k });        // -side (shares seed -> exact mirror)
+      const a = (bilCenter ? k : k - 0.5) * step;
+      const edge = edges[k - 1];
+      placements.push({ az:  a, r: ringR, seedIdx: k, edge });   // +side
+      placements.push({ az: -a, r: ringR, seedIdx: k, edge });   // -side (shares seed + edge -> exact mirror)
     }
   } else if (bloomType === 'radial') {
     for (let i = 0; i < count; i++) {
@@ -694,7 +699,10 @@ function generate() {
     // radius cancels here, so the lean stays bounded at any coil tightness.
     const slope = -elev * ELEV_FACTOR * (Math.PI / 2) * Math.sin(Math.PI * rho);
     const tilt = RECEPTACLE_TILT * Math.atan(slope);
-    buildPetalInto(petalAcc, P, pl.az, height, pl.r - P.r0, tilt, SEED_BASE + pl.seedIdx * 131);
+    // BILATERAL: each petal position can override the global tip/edge style.
+    const Pp = (pl.edge && pl.edge !== 'default' && pl.edge !== P.tipStyle)
+      ? { ...P, tipStyle: pl.edge } : P;
+    buildPetalInto(petalAcc, Pp, pl.az, height, pl.r - P.r0, tilt, SEED_BASE + pl.seedIdx * 131);
   }
 
   const centerHeight = elev * elevAmp;                           // core sits at the receptacle centre
@@ -774,7 +782,11 @@ const inputs = {
   tipIrregularity: document.getElementById('tipIrregularity'),
   bloomType: document.getElementById('bloomType'),
   bilPerSide: document.getElementById('bilPerSide'),
+  bilSpacing: document.getElementById('bilSpacing'),
   bilCenterPetal: document.getElementById('bilCenterPetal'),
+  bilEdge1: document.getElementById('bilEdge1'),
+  bilEdge2: document.getElementById('bilEdge2'),
+  bilEdge3: document.getElementById('bilEdge3'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   infillType: document.getElementById('infillType'),
@@ -817,7 +829,11 @@ function readUI() {
     tipIrregularity: parseFloat(inputs.tipIrregularity.value),
     bloomType: inputs.bloomType.value,
     bilPerSide: parseInt(inputs.bilPerSide.value, 10),
+    bilSpacing: parseFloat(inputs.bilSpacing.value),
     bilCenterPetal: inputs.bilCenterPetal.checked,
+    bilEdge1: inputs.bilEdge1.value,
+    bilEdge2: inputs.bilEdge2.value,
+    bilEdge3: inputs.bilEdge3.value,
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     infillType: inputs.infillType.value,
@@ -861,6 +877,7 @@ function refreshLabels() {
   setLabel('tipFrequency', inputs.tipFrequency.value);
   setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
   setLabel('bilPerSide', inputs.bilPerSide.value);
+  setLabel('bilSpacing', inputs.bilSpacing.value + '°');
   setLabel('bloom', inputs.bloom.value + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
@@ -929,7 +946,7 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'bilPerSide', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
+['petalCount', 'bilPerSide', 'bilSpacing', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
@@ -978,10 +995,25 @@ function updateBloomOptions() {
   document.querySelectorAll('[data-bloom-styles]').forEach((el) => {
     el.hidden = !el.getAttribute('data-bloom-styles').split(/\s+/).includes(type);
   });
+  updateBilateralPetals();
+}
+// The per-petal edge dropdowns (bilateral only) show one per petal position, up to
+// the current PETALS PER SIDE — so they appear/disappear as that slider moves.
+function updateBilateralPetals() {
+  const on = inputs.bloomType.value === 'bilateral';
+  const perSide = clamp(parseInt(inputs.bilPerSide.value, 10) || 1, 1, 3);
+  document.querySelectorAll('[data-bil-petal]').forEach((el) => {
+    const k = parseInt(el.getAttribute('data-bil-petal'), 10);
+    el.hidden = !(on && k <= perSide);
+  });
 }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
+// per-side count also drives which per-petal dropdowns are shown
+inputs.bilPerSide.addEventListener('input', updateBilateralPetals);
 // the bilateral "petal on mirror line" toggle changes the layout, so it regenerates
 inputs.bilCenterPetal.addEventListener('change', () => { scheduleRegen(); });
+// per-petal edge dropdowns (selects) regenerate on change
+[inputs.bilEdge1, inputs.bilEdge2, inputs.bilEdge3].forEach((s) => s.addEventListener('change', () => { scheduleRegen(); }));
 // Center type is a <select>; NONE hides the length/amount/tip sliders (data-center-styles).
 function updateCenterOptions() {
   const type = inputs.centerType.value;
@@ -1034,7 +1066,11 @@ if (resetBtn) {
     inputs.tipIrregularity.value = d.tipIrregularity;
     inputs.bloomType.value = d.bloomType;
     inputs.bilPerSide.value = d.bilPerSide;
+    inputs.bilSpacing.value = d.bilSpacing;
     inputs.bilCenterPetal.checked = d.bilCenterPetal;
+    inputs.bilEdge1.value = d.bilEdge1;
+    inputs.bilEdge2.value = d.bilEdge2;
+    inputs.bilEdge3.value = d.bilEdge3;
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
     inputs.infillType.value = d.infillType;
@@ -1074,7 +1110,8 @@ if (resetBtn) {
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
-  bloomType: 'coiled', bilPerSide: 3, bilCenterPetal: false,
+  bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
+  bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
