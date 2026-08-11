@@ -10,6 +10,13 @@ phases land.
 > solidity (Phase 3); everything about real-world scale, minimum thickness, and
 > manifold-ness applies at **export time only**.
 
+> **Standing invariant (non-negotiable):** watertight, printable STL export is a
+> permanent requirement of the flower generator, not a one-off deliverable. Every
+> future geometry change must keep the export at **zero boundary edges**. Gate:
+> `node tools/verify-flower-export.mjs`. If a feature can't be built print-safe,
+> flag it before implementing. Full rule in `CLAUDE.md` → "Flower generator —
+> print-safety is a hard invariant".
+
 ---
 
 ## Summary — all four phases complete ✅
