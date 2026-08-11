@@ -78,7 +78,9 @@ export function mulberry32(seed) {
    ------------------------------------------------------------------- */
 
 const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
-const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the edge-curve slider
+const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the (top-down) edge-curve slider
+const EDGE_PROFILE_AMP = 0.85;  // max out-of-plane edge lift from the profile edge-curve slider
+const PETAL_CUP_AMP = 0.5;   // max extra across-width cup/reflex from the Petal cup slider
 
 export function petalHalfWidth(u, P) {
   u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
@@ -191,44 +193,90 @@ export function sampleSpine(spine, u) {
 // surface normal (which is the spine normal — the same axis the cup lifts along).
 const RUFFLE_AMP_MAX = 0.55;
 
-// RUFFLED is a full-surface treatment, not an outline trick: the margin carries
-// excess length and buckles OUT of the petal plane, and that deflection reaches
-// inward across the whole lamina, fading to nothing at the stiff mid-rib. This
-// returns that out-of-plane deflection at (u, v): a wave running ALONG the
-// margin (phase from u), deepening from mid-rib to edge (radial from v), eased
-// in at the region start and out at the tip so it blends with the smooth
-// surface and never tears the apex. Because the mid-rib stays put and the edges
-// swing, the lamina flutes — exactly the differential-growth ruffle.
-function ruffleLift(u, v, P) {
-  if ((P.tipLength || 0) <= 1e-4) return 0;
-  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
+// The TIP FREQUENCY slider (1..40) is shared with JAGGED, where it is a literal
+// tooth count. For the RUFFLE it is remapped through a power curve so the LOW end
+// is finely resolved — about the first quarter of the slider covers 1..3 waves,
+// where the subtle ruffles live — while the slider top caps at ~16 waves, the
+// densest useful ruffle. Fractional (not rounded) so every slider step reads.
+function ruffleWaveCount(P) {
+  const s = clamp(P.tipFrequency || 1, 1, 40);
+  return 1 + 15 * Math.pow((s - 1) / 39, 1.4);   // slider ~10 -> 3 waves, 40 -> 16 waves
+}
+
+// RUFFLED is a full-surface, differential-growth FLOUNCE, not a one-axis wave.
+// A real ruffle's margin carries EXCESS length, so it cannot lie flat: it buckles
+// out of the plane AND spreads sideways, the edge tracing a coil along the margin
+// so it undulates in two axes at once (the fabric-ruffle spread). A second, finer
+// scale frills the edge again. The whole deflection is strongest at the very edge
+// and fades to nothing at the stiff mid-rib, eased in and out along the region so
+// the apex never tears.
+//
+// Returns { dn, dz }: dn is the deflection along the spine normal (out of the
+// plane), shared by both sides; dz is along the width axis (lateral spread),
+// carrying sign(v) so the +Y and -Y halves stay exact mirrors.
+function ruffleDisplace(u, v, P) {
+  const out = { dn: 0, dz: 0 };
+  if ((P.tipLength || 0) <= 1e-4) return out;
+  const freq = ruffleWaveCount(P);                   // remapped: fine at the low end, caps ~16
   // Finer ruffles ride shallower: amplitude eases down with frequency so many
-  // flutes read as fine fabric texture, not a row of tall spikes (broad ruffles
-  // still stand proud). TIP LENGTH remains the dominant amplitude control.
+  // flutes read as fine fabric texture, not a row of tall spikes. TIP LENGTH is
+  // the dominant amplitude control.
   const amp = (P.tipLength || 0) * RUFFLE_AMP_MAX * clamp(Math.pow(5 / freq, 0.4), 0.42, 1.3);
   const { uStart } = tipRegionRange(P);
   const uTip = 0.985;
-  if (u <= uStart || u >= uTip) return 0;
+  if (u <= uStart || u >= uTip) return out;
   const p = (u - uStart) / (uTip - uStart);          // 0 at region start -> 1 near the tip
   const RAMP = 0.14;
   const envU = smootherstep(p / RAMP) * smootherstep((1 - p) / RAMP);
-  if (envU <= 1e-6) return 0;
-  const radial = smootherstep(Math.abs(v));           // mid-rib still -> edge swings full (eased both ends)
+  if (envU <= 1e-6) return out;
+  const av = Math.abs(v);
+  // Confine the flounce to the outer margin: the inner lamina stays calm (so the
+  // infill doesn't spaghetti) and only the edge band gathers, waves and spreads —
+  // as in a real ruffle, where the excess length lives at the hem.
+  const radial = smootherstep(clamp((av - 0.42) / 0.58, 0, 1));
+  const edge = radial * av;                           // extra growth concentrated at the very edge
   const k = lerp(1, 3, clamp(P.tip != null ? P.tip : 0.5, 0, 1));  // TIP SHAPE: sine -> gathered crest
-  const s = Math.sin(Math.PI * 2 * freq * p);
-  const wave = Math.sign(s) * Math.pow(Math.abs(s), k);
-  return amp * envU * radial * wave;
+  const phi = Math.PI * 2 * freq * p;
+  const sgn = Math.sign(v) || 1;
+
+  // Out-of-plane flute is the dominant, clean motion.
+  const sN = Math.sin(phi);
+  const waveN = Math.sign(sN) * Math.pow(Math.abs(sN), k);
+  out.dn = amp * envU * radial * waveN;
+  // Lateral: a steady outward GROWTH (the edge fans wider) plus a SLOW scallop at
+  // half the flute frequency, so the outline undulates and spreads without the
+  // lateral and out-of-plane swings tight-coiling into loops.
+  out.dz = amp * envU * edge * sgn * (0.45 + 0.40 * Math.sin(phi * 0.5 + 0.6));
+  // A subtle finer frill on the flute, near the very edge only.
+  out.dn += amp * 0.22 * envU * edge * Math.sin(phi * 2.3 + 1.1);
+  return out;
 }
 
 export function surfacePoint(u, v, P, spine) {
   const sp = sampleSpine(spine, u);
   const hw = petalHalfWidth(u, P);
-  let lift = P.cup * hw * v * v;   // parabolic cup: 0 at mid-rib, max at edges
-  if (P.tipStyle === 'ruffled') lift += ruffleLift(u, v, P);   // + full-surface ruffle buckle
+  let normalLift = P.cup * hw * v * v;   // parabolic cup: 0 at mid-rib, max at edges
+  // PETAL CUP: user-controlled across-width concavity, on the same axis as the
+  // fixed cup and uniform along the length. +ve deepens the bowl (sides lift toward
+  // the flower centre, like a rose/tulip); -ve reverses it convex (sides curl
+  // down/out, like a reflexed lily). 0 leaves the surface exactly as before. Because
+  // every vein / infill point is mapped through surfacePoint, they cup with it.
+  if (P.petalCup) normalLift += P.petalCup * PETAL_CUP_AMP * hw * v * v;
+  // Profile edge curve: an out-of-plane lift of the margins in the SAME plane the
+  // centre curve bends (along the spine normal), growing from base toward the tip,
+  // so the edges curl up (+) or down (-) along the length, independent of the
+  // fixed cup and of the top-down width billow.
+  if (P.edgeProfile) normalLift += P.edgeProfile * EDGE_PROFILE_AMP * hw * v * v * u;
+  let dz = 0;
+  if (P.tipStyle === 'ruffled') {
+    const r = ruffleDisplace(u, v, P);   // full-surface flounce: out-of-plane + lateral spread
+    normalLift += r.dn;
+    dz = r.dz;
+  }
   return {
-    x: sp.s + sp.nx * lift,
-    y: sp.y + sp.ny * lift,
-    z: v * hw,
+    x: sp.s + sp.nx * normalLift,
+    y: sp.y + sp.ny * normalLift,
+    z: v * hw + dz,
   };
 }
 
@@ -285,6 +333,31 @@ export function buildSilhouette(P, n = 56) {
   for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
   // drop duplicate/degenerate points at the tip (hw -> 0) and base
   return dedupePolygon(outline);
+}
+
+/* Solid blade — a filled lamina spanning the whole silhouette, sampled as a
+   (uSteps+1) x (vSteps+1) grid of flattened points from base (u=0) to tip
+   (u=1) and margin (v=-1) to margin (v=+1). The render layer maps each point
+   onto the petal surface with its normal and stitches the quads into one
+   double-sided membrane — used for SOLID sepals (a soft leaf blade instead of
+   the wireframe skeleton). Reuses the same u/v flattened space as the
+   silhouette and the Voronoi sheet, so it rides the identical cupped surface. */
+export function buildBlade(P, opts = {}) {
+  const uSteps = Math.max(2, opts.uSteps || 26);
+  const vSteps = Math.max(2, opts.vSteps || 12);
+  const rows = [];
+  for (let i = 0; i <= uSteps; i++) {
+    const u = i / uSteps;
+    const X = P.L * clamp(u, 0, 0.9995);
+    const hw = petalHalfWidth(u, P);
+    const row = [];
+    for (let j = 0; j <= vSteps; j++) {
+      const v = -1 + (2 * j) / vSteps;
+      row.push({ x: X, y: v * hw });
+    }
+    rows.push(row);
+  }
+  return { rows };
 }
 
 function dedupePolygon(poly) {
@@ -583,7 +656,333 @@ export function buildVenation(P, rng, opts = {}) {
 
 
 /* -------------------------------------------------------------------
-   5b. Voronoi infill — an alternative petal fill to the leaf venation.
+   5b. Strand infill — a radial fan of strands from the petal base to the edge.
+
+   Like the reference lily-pad / ginkgo leaves: every strand RADIATES from a
+   single hub at the petal base and runs out to a point on the OUTER MARGIN —
+   not just the apex, but the whole edge, from one side, around the tip, to the
+   other side. The strand endpoints are spread by even arc-length along the
+   margin, so the fan covers the rim uniformly. Between neighbouring strands the
+   open negative space forms the elongated wedge / teardrop voids the reference
+   shows, pinched to a point at the shared hub and widening toward the rim. The
+   strands are the solid material (thick tapering tubes on the cupped surface);
+   the gaps are left open.
+
+   Controls (opts):
+     count      : STRAND COUNT — number of strands fanned across the margin.
+     width      : STRAND WIDTH — 0..1, strand thickness (low = thin lines / big
+                  voids, high = thick strands / narrow slits).
+     taper      : STRAND TAPER — extra narrowing from the hub out to the rim.
+     curvature  : STRAND CURVATURE — 0 straight radial, 1 organic outward bow.
+
+   Strands are placed symmetrically about the mid-rib (a strand at signed fan
+   position q and its mirror at -q are exact reflections; an odd count puts one
+   strand straight up the axis to the tip), so every petal stays bilaterally
+   symmetric. Each strand ends ON the margin with its radius clamped to zero
+   there, and is clamped inside the outline all along its length. Returns the
+   same { veins, nodes } shape as the other infills — a polyline per strand with
+   a t -> radius profile (`rad`) pre-divided by the tube radius so a strand's
+   thickness follows STRAND WIDTH, not the global tube slider.
+   ------------------------------------------------------------------- */
+export function buildStrands(P, opts = {}) {
+  const L = P.L;
+  const count     = clamp(Math.round(opts.count != null ? opts.count : 20), 4, 44);
+  const width     = clamp(opts.width     != null ? opts.width     : 0.5, 0, 1);
+  const taper     = clamp(opts.taper     != null ? opts.taper     : 0.5, 0, 1);
+  const curvature = clamp(opts.curvature != null ? opts.curvature : 0.4, 0, 1);
+  const irregular = clamp(opts.irregularity != null ? opts.irregularity : 0, 0, 1);
+  const seed = (opts.seed | 0);                             // per-petal variety for the irregularity
+  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+  const tubeR = P.tubeRadius > 1e-6 ? P.tubeRadius : 0.02;   // render multiplies this back in
+
+  const uOrigin = 0.035;               // fan hub, near the base claw
+  const uStartEdge = 0.12;             // nearest-base endpoint on the margin
+  const uTipEdge = 0.985;              // tip endpoint
+  const uApex = 0.982;                 // apex-zone strands gather to this clean point (near the tip)
+  const apexZone = 0.72;               // fan fraction above this is pulled toward the apex
+  const nS = 32;                       // samples per strand
+  const O = { x: L * uOrigin, y: 0 };
+  const rBase = lerp(0.006, 0.05, width) * P.W;   // strand thickness scale (thin lines by default)
+
+  // Even arc-length along the +Y margin (base -> tip) so endpoints spread evenly
+  // around the rim instead of bunching where the outline is steep.
+  const EM = 128;
+  const edgeU = new Array(EM + 1), edgeCum = new Array(EM + 1);
+  edgeCum[0] = 0;
+  edgeU[0] = uStartEdge;
+  let prevx = L * uStartEdge, prevy = hw(uStartEdge);
+  for (let i = 1; i <= EM; i++) {
+    const u = lerp(uStartEdge, uTipEdge, i / EM);
+    const x = L * u, y = hw(u);
+    edgeU[i] = u;
+    edgeCum[i] = edgeCum[i - 1] + Math.hypot(x - prevx, y - prevy);
+    prevx = x; prevy = y;
+  }
+  const edgeTotal = edgeCum[EM] || 1;
+  const edgeUAt = (frac) => {           // arc fraction (0 = near base, 1 = tip) -> u_e
+    const target = clamp(frac, 0, 1) * edgeTotal;
+    let i = 1;
+    while (i < EM && edgeCum[i] < target) i++;
+    const f = (target - edgeCum[i - 1]) / ((edgeCum[i] - edgeCum[i - 1]) || 1);
+    return lerp(edgeU[i - 1], edgeU[i], f);
+  };
+
+  const veins = [];
+  const nodes = [];
+
+  // The smallest |q| in the set: 0 when the count is odd (a strand up the axis),
+  // else the innermost off-axis position. Endpoints are mapped so this innermost
+  // strand lands on the tip, so the apex is always reached at any count.
+  const aqMin = (count % 2 === 1) ? 0 : 1 / (count - 1);
+
+  for (let j = 0; j < count; j++) {
+    const q = count > 1 ? -1 + (2 * j) / (count - 1) : 0;   // signed fan position [-1,1], 0 = apex
+    const aq = Math.abs(q);
+    const side = Math.sign(q);                             // +1 / -1 margin; 0 = straight up the axis
+    const frac = clamp(1 - (aq - aqMin) / (1 - aqMin), 0, 1);  // innermost -> tip(1), outer -> base(0)
+    const uE = edgeUAt(frac);
+    // Gather the apex-zone strands to one clean convergence point just inside the
+    // tip, so their tapered tips meet neatly there instead of crossing and
+    // overlapping into a tangle where the rim (and any ruffle crest) also gather.
+    const cz = smootherstep(clamp((frac - apexZone) / (1 - apexZone), 0, 1));
+    const E = {
+      x: lerp(L * uE, L * uApex, cz),
+      y: lerp(side * hw(uE), 0, cz),                       // pulled onto the axis at the apex
+    };
+    const dx = E.x - O.x, dy = E.y - O.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const px = -dy / len, py = dx / len;                    // unit perpendicular
+    // Outward bow, but faded to nothing for the near-axis strands (sin(pi*aq) is
+    // 0 at aq=0) so they run straight to the apex instead of curving away and
+    // leaving a bald wedge; the mid-fan strands carry the organic bow.
+    const bowMag = curvature * 0.24 * len * Math.sign(q) * Math.sin(Math.PI * aq);
+
+    // IRREGULARITY: vary each strand's thickness for a natural, hand-made look —
+    // some strands run thicker, some thinner, with a gentle wobble along their
+    // length. Keyed off the mirror-pair index (min(j, count-1-j)) so a strand and
+    // its reflection get the SAME variation and the petal stays symmetric; the
+    // per-petal seed keeps different petals from sharing one pattern.
+    const pair = Math.min(j, count - 1 - j);
+    const widthMul = 1 + irregular * (hash01(pair * 2654435761 + seed * 40503) * 2 - 1) * 0.8;
+    const wobPhase = hash01(pair * 668265263 + seed * 374761393 + 17) * Math.PI * 2;
+    const wobFreq = 2 + Math.floor(hash01(pair * 1103515245 + seed * 12345 + 3) * 3);   // 2..4 humps
+
+    const pts = new Array(nS + 1);
+    const rads = new Array(nS + 1);
+    for (let i = 0; i <= nS; i++) {
+      const s = i / nS;
+      const b = bowMag * Math.sin(Math.PI * s);
+      let x = O.x + dx * s + px * b;
+      let y = O.y + dy * s + py * b;
+      const u = clamp(x / L, 0, 1);
+      const room = hw(u);
+      if (Math.abs(y) > room * 0.999) y = Math.sign(y) * room * 0.999;   // keep inside the outline
+      pts[i] = { x, y };
+      // thin, ~uniform line with extra taper, tapering to a point where it meets
+      // the rim (edgeRoom -> 0), so nothing crosses the outline.
+      const wob = 1 + irregular * 0.35 * Math.sin(wobFreq * Math.PI * s + wobPhase);
+      let r = rBase * Math.max(0.05, widthMul * wob) * (1 - 0.8 * taper * s);
+      const edgeRoom = (room - Math.abs(y)) * 0.8;
+      rads[i] = Math.max(0, Math.min(r, edgeRoom));
+    }
+    veins.push({ points: pts, rad: strandRadProfile(rads, tubeR) });
+  }
+  // welded beads cap the two convergences: the base hub and the apex gather,
+  // so both ends read as clean nodes rather than a bundle of overlapping tips.
+  const apexR = Math.min(rBase, hw(uApex) * 0.7);
+  nodes.push({ x: O.x, y: 0, width: (rBase / tubeR) * 1.7 });
+  nodes.push({ x: L * uApex, y: 0, width: (apexR / tubeR) * 1.5 });
+  return { veins, nodes };
+}
+
+// Stable, well-mixed pseudo-random in [0,1) from an integer key (integer hash).
+// Deterministic — used to give each strand a repeatable thickness variation.
+function hash01(n) {
+  let h = n >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 2246822507);
+  h = Math.imul(h ^ (h >>> 13), 3266489909);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+// Turn a per-sample radius array (sampled uniformly along the strand) into a
+// t -> radius function for addTube, divided by `denom` so the render layer's
+// `tubeRadius * rad(t)` recovers the intended world radius.
+function strandRadProfile(rads, denom) {
+  const n = rads.length;
+  return (t) => {
+    const f = clamp(t, 0, 1) * (n - 1);
+    const i0 = Math.floor(f);
+    if (i0 >= n - 1) return rads[n - 1] / denom;
+    return lerp(rads[i0], rads[i0 + 1], f - i0) / denom;
+  };
+}
+
+
+/* -------------------------------------------------------------------
+   5bb. Bone infill — a skeletal rib cage (Josh-Harker-style lace).
+
+   Modelled on the reference: a central SPINE runs the length of the petal, and
+   evenly-spaced RIBS branch off it in mirror-symmetric pairs, each rib sweeping
+   forward (toward the tip) and curving out toward the margin — like a fish
+   skeleton or a rib cage. Ribs from neighbouring stations interleave into the
+   nested-arc, woven look; on the cupped surface they read as a curved basket.
+   When several petals meet at the centre, their spines radiate out and the ribs
+   weave together into the reference's radial lace.
+
+   Controls (opts):
+     count  : BONE COUNT  — number of rib pairs along the spine.
+     width  : BONE WIDTH  — thickness of the spine and ribs.
+     curve  : BONE CURVE  — 0 ribs branch straight out, 1 swept/curved to the tip.
+     spread : BONE SPREAD — how far the ribs reach toward the margin.
+
+   Ribs are mirror-symmetric (+side / -side share a station) so the petal stays
+   bilaterally symmetric, and every rib is clamped inside the outline. Returns
+   the same { veins, nodes } shape as the other tube infills (relative weights
+   w0 -> w1, scaled by the tube slider in the render layer).
+   ------------------------------------------------------------------- */
+export function buildBone(P, opts = {}) {
+  const L = P.L;
+  const count  = clamp(Math.round(opts.count != null ? opts.count : 18), 4, 40);
+  const width  = clamp(opts.width  != null ? opts.width  : 0.5, 0, 3);
+  const curve  = clamp(opts.curve  != null ? opts.curve  : 0.55, -1, 1);  // +sweep to tip, -sweep to base
+  const spread = clamp(opts.spread != null ? opts.spread : 0.85, 0, 1);
+  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+
+  const uBase = 0.04, uTip = 0.985;
+  // 0..1 runs fine -> heavy bones (the old range); 1..3 then scales that heaviest
+  // bone up to 3x, so the slider's max is three times the old maximum thickness.
+  const wLow = Math.min(1, width), mult = Math.max(1, width);
+  const spineW = lerp(0.7, 1.7, wLow) * mult;    // spine relative weight
+  const ribW   = lerp(0.26, 0.72, wLow) * mult;  // rib relative weight (thinner than the spine)
+  const reach  = 0.62 + 0.32 * spread;           // rib reach as a fraction of the local half-width
+
+  const veins = [];
+  const nodes = [];
+
+  // central spine, base -> tip, tapering
+  const nSpine = 44;
+  const spine = new Array(nSpine + 1);
+  for (let i = 0; i <= nSpine; i++) spine[i] = { x: L * lerp(uBase, uTip, i / nSpine), y: 0 };
+  veins.push({ points: spine, w0: spineW, w1: spineW * 0.34 });
+  nodes.push({ x: spine[0].x, y: 0, width: spineW });
+  nodes.push({ x: spine[nSpine].x, y: 0, width: spineW * 0.34 });
+
+  // rib pairs along the spine
+  const nRib = 16;
+  for (let k = 0; k < count; k++) {
+    const tk = (k + 0.5) / count;
+    const uk = lerp(uBase + 0.015, uTip - 0.02, tk);
+    // Sweep the ribs along the spine: forward toward the tip (curve > 0) or back
+    // toward the base (curve < 0). The available room is measured in whichever
+    // direction the sweep goes, so a rib never runs off the end of the spine.
+    const room = curve >= 0 ? (uTip - uk) : (uk - uBase);
+    const sweepU = curve * room * 0.8;
+    const wTip = ribW * 0.22;
+    for (let s = -1; s <= 1; s += 2) {
+      const pts = new Array(nRib + 1);
+      for (let i = 0; i <= nRib; i++) {
+        const t = i / nRib;
+        const uu = clamp(uk + sweepU * Math.pow(t, 1.3), uBase, uTip);
+        const f = Math.sin(t * Math.PI / 2);      // lateral eases out to `reach`
+        const y = s * reach * f * hw(uu);
+        const cap = 0.97 * hw(uu);
+        pts[i] = { x: L * uu, y: Math.abs(y) > cap ? s * cap : y };
+      }
+      veins.push({ points: pts, w0: ribW, w1: wTip });
+    }
+    nodes.push({ x: L * uk, y: 0, width: ribW * 1.05 });   // welded joint where the ribs meet the spine
+  }
+  return { veins, nodes };
+}
+
+
+/* -------------------------------------------------------------------
+   5bc. Lace infill — a filigree field of scroll/swirl curls.
+
+   Modelled on the bobbin-/needle-lace reference: a fine wire midrib and an inner
+   border frame, with the two halves of the petal packed with little SPIRAL CURLS
+   (scrolls) on a jittered grid, handedness alternating cell to cell so they read
+   as dense, organic scrollwork. Everything is generated in the +Y half and
+   MIRRORED to -Y, so each petal is bilaterally symmetric. Curls are clipped to
+   sit inside the outline. Extruded as thin tubes (fine lace wire) by the render
+   layer — returns the same { veins, nodes } shape as the other tube infills.
+
+   Controls (opts):
+     density : reuses the shared DENSITY slider — grid fineness (more, smaller curls).
+     swirl   : LACE SWIRL — 0 loose open scrolls -> 1 tight coils.
+   ------------------------------------------------------------------- */
+export function buildLace(P, rng, opts = {}) {
+  const L = P.L;
+  const density = clamp(Math.round(opts.density || 7), 3, 12);
+  const swirl = clamp(opts.swirl != null ? opts.swirl : 0.5, 0, 1);
+  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+
+  const veins = [];
+  const nodes = [];
+  const W = 0.34;                       // fine lace-wire relative weight
+  const uBase = 0.05, uTip = 0.965;
+  const curlInset = 0.88;               // curl field, as a fraction of half-width
+  // The border frame is the petal's edge line. With a SCALLOP edge it sits right
+  // on the outline so the scallops spring straight off it (attached); otherwise
+  // it is drawn a touch inside as a decorative inner frame.
+  const frameInset = P.tipStyle === 'scallop' ? 0.995 : 0.9;
+  const mirror = (pts) => pts.map((p) => ({ x: p.x, y: -p.y }));
+
+  // 1. central midrib (on the axis, never mirrored)
+  const nMid = 30, mid = new Array(nMid + 1);
+  for (let i = 0; i <= nMid; i++) mid[i] = { x: L * lerp(uBase, uTip, i / nMid), y: 0 };
+  veins.push({ points: mid, w0: W * 1.5, w1: W * 0.7 });
+  nodes.push({ x: mid[0].x, y: 0, width: W * 1.5 });
+  nodes.push({ x: mid[nMid].x, y: 0, width: W * 0.7 });
+
+  // 2. border frame — the edge line (mirrored below); runs almost to the tip so it
+  //    meets the scalloped margin all the way round.
+  const uFrameTip = P.tipStyle === 'scallop' ? 0.99 : 0.965;
+  const nF = 72, frame = new Array(nF + 1);
+  for (let i = 0; i <= nF; i++) { const u = lerp(uBase, uFrameTip, i / nF); frame[i] = { x: L * u, y: frameInset * hw(u) }; }
+  veins.push({ points: frame, w0: W, w1: W });
+  veins.push({ points: mirror(frame), w0: W, w1: W });
+
+  // 3. swirl field — spiral curls on a jittered grid in the +Y half, mirrored.
+  const cols = density + 3;
+  const rows = clamp(Math.round(density * 0.55), 2, 7);
+  const turns = lerp(0.9, 2.0, swirl);
+  const cellU = L * (uTip - uBase) / cols;
+  const N = 16;
+  for (let cx = 0; cx < cols; cx++) {
+    const u = lerp(uBase + 0.02, uTip - 0.02, (cx + 0.5) / cols);
+    const hwu = hw(u);
+    if (hwu < 0.06) continue;
+    const cellY = curlInset * hwu / rows;
+    for (let ry = 0; ry < rows; ry++) {
+      const centerU = clamp(u + (rng() - 0.5) * 0.5 * cellU / L, 0.02, 0.98);
+      const centerY = clamp((ry + 0.5) * cellY + (rng() - 0.5) * 0.4 * cellY, 0.02, curlInset * hw(centerU));
+      const size = Math.min(0.52 * cellU, 0.52 * cellY) * lerp(1.7, 1.05, swirl);
+      const dir = ((cx + ry) % 2 === 0) ? 1 : -1;   // alternate handedness
+      const th0 = rng() * Math.PI * 2;
+      const curl = new Array(N + 1);
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const th = th0 + dir * turns * 2 * Math.PI * t;
+        const r = size * (1 - 0.82 * t);            // spiral inward to a tight centre
+        const x = L * centerU + r * Math.cos(th);
+        const uu = clamp(x / L, 0, 1), m = 0.965 * hw(uu);
+        let y = centerY + r * Math.sin(th);
+        if (Math.abs(y) > m) y = Math.sign(y) * m;  // clip inside the outline
+        curl[i] = { x, y };
+      }
+      veins.push({ points: curl, w0: W * 0.8, w1: W * 0.8 });
+      veins.push({ points: mirror(curl), w0: W * 0.8, w1: W * 0.8 });
+    }
+  }
+
+  return { veins, nodes };
+}
+
+
+/* -------------------------------------------------------------------
+   5c. Voronoi infill — an alternative petal fill to the leaf venation.
 
    Seeds are scattered only in the +Y half of the petal and MIRRORED to the
    -Y half, so the whole diagram — and therefore every cell — is symmetric
@@ -814,7 +1213,11 @@ const TIP_REGION_MAX = 0.95;   // longest — teeth run all the way to the base
 // ruffle / fractal later) so they all shape the same stretch of the outline.
 // Returns { uStart, uEnd } stations bounding the tip region on the edge.
 export function tipRegionRange(P) {
-  const region = clamp(P.tipRegion != null ? P.tipRegion : 0.3, 0, 1);
+  // RUFFLED has no TIP REGION control — it always covers the whole tip region, so
+  // the flounce reaches from the apex all the way down every time.
+  const region = P.tipStyle === 'ruffled'
+    ? 1
+    : clamp(P.tipRegion != null ? P.tipRegion : 0.3, 0, 1);
   const uEnd = TIP_U_APEX;
   const uStart = clamp(uEnd - lerp(TIP_REGION_MIN, TIP_REGION_MAX, region), 0.05, uEnd - 0.04);
   return { uStart, uEnd };
@@ -869,7 +1272,7 @@ export function buildJaggedEdge(P, spine, rng) {
   // tooth out of plane by a different amount, which is what made the side teeth
   // read as ragged, inconsistent spikes next to the clean apex. Feet still sit
   // on the real (cupped) edge, so every tooth attaches seamlessly to the rim.
-  const Pflat = { ...P, cup: 0 };
+  const Pflat = { ...P, cup: 0, edgeProfile: 0 };
 
   // ONE shape rule for every tip — the side teeth and the apex tip alike.
   // A tip is two feet on the edge (F0, F1) rising to a single peak K. The rim
@@ -971,8 +1374,9 @@ export function buildJaggedEdge(P, spine, rng) {
 
 /* -------------------------------------------------------------------
    RUFFLED tip: a FULL-surface edge treatment, not an outline trick. The
-   buckle itself lives in surfacePoint (ruffleLift), so the whole lamina —
-   every vein and the margin alike — waves out of plane, strongest at the
+   buckle itself lives in surfacePoint (ruffleDisplace), so the whole lamina —
+   every vein and the margin alike — flounces (out of plane + lateral spread),
+   strongest at the
    edge and fading to the mid-rib, exactly like differential growth on a thin
    sheet. This function only supplies the RIM: a densely-sampled smooth
    outline which, mapped through the now-buckling surfacePoint, traces the
@@ -986,10 +1390,10 @@ export function buildJaggedEdge(P, spine, rng) {
 export function buildRuffledEdge(P, spine /* , rng */) {
   if (P.tipStyle !== 'ruffled') return null;
   if ((P.tipLength || 0) * RUFFLE_AMP_MAX <= 1e-4) return null;
-  const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
+  const freq = ruffleWaveCount(P);                   // remapped: fine at the low end, caps ~16
   const { uStart } = tipRegionRange(P);
   const uBase = 0.004, uApex = 0.9995;
-  const nRuffle = clamp(Math.round(freq * 16) + 96, 180, 460);   // dense enough to trace the buckled margin
+  const nRuffle = clamp(Math.round(freq * 24) + 130, 240, 620);  // dense enough to trace the coiling margin + fine frills
   const nSmooth = 48;
 
   const rim = [];
@@ -1006,4 +1410,48 @@ export function buildRuffledEdge(P, spine /* , rng */) {
   sampleTo(uStart, uBase, -1, belowSteps);   // smooth margin below the region (-Y)
 
   return { rim, teethVeins: [] };            // no extra veins; the real veins ride the buckle
+}
+
+
+/* -------------------------------------------------------------------
+   Scallop edge — the petal OUTLINE becomes a row of convex arcs (scallops), the
+   doily/picot border of the reference lace. It pairs only with the LACE infill.
+   Each scallop bulges outward along the in-surface normal by SCALLOP HEIGHT and
+   drops back to a cusp between neighbours; SCALLOP COUNT sets how many run along
+   each side (and therefore how wide each one is). Generated per side and made
+   exactly mirror-symmetric across the mid-rib. Returns { rim, teethVeins }.
+   ------------------------------------------------------------------- */
+const SCALLOP_MAX = 0.34;   // world reach of a scallop at SCALLOP HEIGHT = 1
+
+export function buildScallopEdge(P, spine) {
+  if (P.tipStyle !== 'scallop') return null;
+  const count = clamp(Math.round(P.scallopCount || 8), 2, 30);
+  const height = clamp(P.scallopHeight != null ? P.scallopHeight : 0.4, 0, 1) * SCALLOP_MAX;
+  const uBase = 0.02, uApex = 0.9995;
+  const Pflat = { ...P, cup: 0, edgeProfile: 0 };  // outward direction free of cup / profile splay
+  const nPer = Math.max(6, Math.round(120 / count));  // samples per scallop
+
+  // One side, base -> tip: `count` convex bumps meeting at cusps on the outline.
+  const sideRim = (s) => {
+    const pts = [];
+    for (let k = 0; k < count; k++) {
+      const uA = lerp(uBase, uApex, k / count), uB = lerp(uBase, uApex, (k + 1) / count);
+      for (let i = (k === 0 ? 0 : 1); i <= nPer; i++) {
+        const t = i / nPer;
+        const u = clamp(lerp(uA, uB, t), 0, 0.9995);
+        const { p, out } = edgeOutward(u, s, Pflat, spine);
+        const bump = height * Math.sin(Math.PI * t);     // 0 at the cusps, max mid-scallop
+        pts.push({ x: p.x + out.x * bump, y: p.y + out.y * bump, z: p.z + out.z * bump });
+      }
+    }
+    return pts;
+  };
+
+  const plusRim = sideRim(1);                // +Y base -> tip
+  const minusRim = sideRim(-1);              // -Y base -> tip (mirror of +Y by construction)
+  const rim = [];
+  for (const q of plusRim) rim.push(q);
+  rim.push(surfacePoint(uApex, 0, P, spine));// the apex point
+  for (let i = minusRim.length - 1; i >= 0; i--) rim.push(minusRim[i]);   // -Y tip -> base
+  return { rim, teethVeins: [] };
 }
