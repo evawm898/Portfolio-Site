@@ -21,7 +21,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   lerp, clamp, mulberry32,
-  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildStrands, buildBone, buildJaggedEdge, buildRuffledEdge,
+  buildSpine, buildSilhouette, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
+  buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
 } from './flower-geometry.js';
 
@@ -392,6 +393,9 @@ function resolveParams(ui) {
     boneCurve: ui.boneCurve,                     // BONE: -1 swept to base <- 0 straight out -> 1 swept to tip
     boneSpread: ui.boneSpread,                   // BONE: how far the ribs reach toward the margin
     boneOutline: ui.boneOutline,                 // BONE: draw the petal outline (rim) or not
+    laceSwirl: ui.laceSwirl,                     // LACE: 0 loose scrolls -> 1 tight coils
+    scallopCount: ui.scallopCount,               // SCALLOP edge: scallops per side (width)
+    scallopHeight: ui.scallopHeight,             // SCALLOP edge: how far each scallop bulges out
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -437,6 +441,8 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         count: P.boneCount, width: P.boneWidth,
         curve: P.boneCurve, spread: P.boneSpread,
       })
+    : P.infillType === 'lace'
+    ? buildLace(P, rng, { density: P.density, swirl: P.laceSwirl })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
         maxDepth: P.maxDepth, softness: P.softness,
@@ -450,7 +456,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // RUFFLED rolls the tip end into a smooth continuous wave (no extra veins).
   // Either returns { rim, teethVeins }; otherwise the rim is the smooth outline.
   const tipRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
-  const jag = buildJaggedEdge(P, spine, tipRng) || buildRuffledEdge(P, spine, tipRng);
+  const jag = buildJaggedEdge(P, spine, tipRng) || buildRuffledEdge(P, spine, tipRng) || buildScallopEdge(P, spine);
 
   // Rim: one continuous closed tube along the (possibly jagged) petal margin.
   // BONE can opt out of the outline entirely, leaving just the bare rib skeleton.
@@ -723,6 +729,9 @@ const inputs = {
   boneCurve: document.getElementById('boneCurve'),
   boneSpread: document.getElementById('boneSpread'),
   boneOutline: document.getElementById('boneOutline'),
+  laceSwirl: document.getElementById('laceSwirl'),
+  scallopCount: document.getElementById('scallopCount'),
+  scallopHeight: document.getElementById('scallopHeight'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -756,6 +765,9 @@ function readUI() {
     boneCurve: parseFloat(inputs.boneCurve.value),
     boneSpread: parseFloat(inputs.boneSpread.value),
     boneOutline: inputs.boneOutline.checked,
+    laceSwirl: parseFloat(inputs.laceSwirl.value),
+    scallopCount: parseInt(inputs.scallopCount.value, 10),
+    scallopHeight: parseFloat(inputs.scallopHeight.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -790,6 +802,9 @@ function refreshLabels() {
   const bc = +inputs.boneCurve.value;
   setLabel('boneCurve', (bc > 0 ? '+' : '') + bc.toFixed(2));
   setLabel('boneSpread', (+inputs.boneSpread.value).toFixed(2));
+  setLabel('laceSwirl', (+inputs.laceSwirl.value).toFixed(2));
+  setLabel('scallopCount', inputs.scallopCount.value);
+  setLabel('scallopHeight', (+inputs.scallopHeight.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -808,6 +823,7 @@ function updateReadout(petalAcc, ui) {
   const infill = ui.infillType === 'voronoi' ? 'voronoi cells'
     : ui.infillType === 'strands' ? 'radial strands'
     : ui.infillType === 'bone' ? 'bone lattice'
+    : ui.infillType === 'lace' ? 'lace filigree'
     : 'leaf venation';
   el.textContent = `${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
 }
@@ -838,7 +854,7 @@ function setBuilding(on) {
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
- 'tightness', 'elevation'].forEach((k) => {
+ 'laceSwirl', 'scallopCount', 'scallopHeight', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -863,6 +879,16 @@ function updateInfillOptions() {
   inputs.softness.max = type === 'voronoi' ? '5' : '1';
   inputs.softness.step = type === 'voronoi' ? '0.05' : '0.01';
   if (+inputs.softness.value > +inputs.softness.max) inputs.softness.value = inputs.softness.max;
+  // The SCALLOP edge pairs only with LACE: offer its tip-style option only then,
+  // and fall back to CLEAN if scallop was selected under a different infill.
+  const scOpt = inputs.tipStyle.querySelector('option[value="scallop"]');
+  if (scOpt) {
+    scOpt.hidden = scOpt.disabled = type !== 'lace';
+    if (type !== 'lace' && inputs.tipStyle.value === 'scallop') {
+      inputs.tipStyle.value = 'clean';
+      updateTipOptions();
+    }
+  }
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
@@ -899,6 +925,9 @@ if (resetBtn) {
     inputs.boneCurve.value = d.boneCurve;
     inputs.boneSpread.value = d.boneSpread;
     inputs.boneOutline.checked = d.boneOutline;
+    inputs.laceSwirl.value = d.laceSwirl;
+    inputs.scallopCount.value = d.scallopCount;
+    inputs.scallopHeight.value = d.scallopHeight;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -917,6 +946,7 @@ const DEFAULTS = {
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
+  laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 

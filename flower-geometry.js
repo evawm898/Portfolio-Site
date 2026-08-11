@@ -860,6 +860,84 @@ export function buildBone(P, opts = {}) {
 
 
 /* -------------------------------------------------------------------
+   5bc. Lace infill — a filigree field of scroll/swirl curls.
+
+   Modelled on the bobbin-/needle-lace reference: a fine wire midrib and an inner
+   border frame, with the two halves of the petal packed with little SPIRAL CURLS
+   (scrolls) on a jittered grid, handedness alternating cell to cell so they read
+   as dense, organic scrollwork. Everything is generated in the +Y half and
+   MIRRORED to -Y, so each petal is bilaterally symmetric. Curls are clipped to
+   sit inside the outline. Extruded as thin tubes (fine lace wire) by the render
+   layer — returns the same { veins, nodes } shape as the other tube infills.
+
+   Controls (opts):
+     density : reuses the shared DENSITY slider — grid fineness (more, smaller curls).
+     swirl   : LACE SWIRL — 0 loose open scrolls -> 1 tight coils.
+   ------------------------------------------------------------------- */
+export function buildLace(P, rng, opts = {}) {
+  const L = P.L;
+  const density = clamp(Math.round(opts.density || 7), 3, 12);
+  const swirl = clamp(opts.swirl != null ? opts.swirl : 0.5, 0, 1);
+  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+
+  const veins = [];
+  const nodes = [];
+  const W = 0.34;                       // fine lace-wire relative weight
+  const uBase = 0.05, uTip = 0.965;
+  const inset = 0.9;                    // border frame / curl field, as a fraction of half-width
+  const mirror = (pts) => pts.map((p) => ({ x: p.x, y: -p.y }));
+
+  // 1. central midrib (on the axis, never mirrored)
+  const nMid = 30, mid = new Array(nMid + 1);
+  for (let i = 0; i <= nMid; i++) mid[i] = { x: L * lerp(uBase, uTip, i / nMid), y: 0 };
+  veins.push({ points: mid, w0: W * 1.5, w1: W * 0.7 });
+  nodes.push({ x: mid[0].x, y: 0, width: W * 1.5 });
+  nodes.push({ x: mid[nMid].x, y: 0, width: W * 0.7 });
+
+  // 2. inner border frame — a smooth loop just inside the +Y margin (mirrored below)
+  const nF = 64, frame = new Array(nF + 1);
+  for (let i = 0; i <= nF; i++) { const u = lerp(uBase, uTip, i / nF); frame[i] = { x: L * u, y: inset * hw(u) }; }
+  veins.push({ points: frame, w0: W, w1: W });
+  veins.push({ points: mirror(frame), w0: W, w1: W });
+
+  // 3. swirl field — spiral curls on a jittered grid in the +Y half, mirrored.
+  const cols = density + 3;
+  const rows = clamp(Math.round(density * 0.55), 2, 7);
+  const turns = lerp(0.9, 2.0, swirl);
+  const cellU = L * (uTip - uBase) / cols;
+  const N = 16;
+  for (let cx = 0; cx < cols; cx++) {
+    const u = lerp(uBase + 0.02, uTip - 0.02, (cx + 0.5) / cols);
+    const hwu = hw(u);
+    if (hwu < 0.06) continue;
+    const cellY = inset * hwu / rows;
+    for (let ry = 0; ry < rows; ry++) {
+      const centerU = clamp(u + (rng() - 0.5) * 0.5 * cellU / L, 0.02, 0.98);
+      const centerY = clamp((ry + 0.5) * cellY + (rng() - 0.5) * 0.4 * cellY, 0.02, inset * hw(centerU));
+      const size = Math.min(0.52 * cellU, 0.52 * cellY) * lerp(1.7, 1.05, swirl);
+      const dir = ((cx + ry) % 2 === 0) ? 1 : -1;   // alternate handedness
+      const th0 = rng() * Math.PI * 2;
+      const curl = new Array(N + 1);
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const th = th0 + dir * turns * 2 * Math.PI * t;
+        const r = size * (1 - 0.82 * t);            // spiral inward to a tight centre
+        const x = L * centerU + r * Math.cos(th);
+        const uu = clamp(x / L, 0, 1), m = 0.965 * hw(uu);
+        let y = centerY + r * Math.sin(th);
+        if (Math.abs(y) > m) y = Math.sign(y) * m;  // clip inside the outline
+        curl[i] = { x, y };
+      }
+      veins.push({ points: curl, w0: W * 0.8, w1: W * 0.8 });
+      veins.push({ points: mirror(curl), w0: W * 0.8, w1: W * 0.8 });
+    }
+  }
+
+  return { veins, nodes };
+}
+
+
+/* -------------------------------------------------------------------
    5c. Voronoi infill — an alternative petal fill to the leaf venation.
 
    Seeds are scattered only in the +Y half of the petal and MIRRORED to the
@@ -1288,4 +1366,48 @@ export function buildRuffledEdge(P, spine /* , rng */) {
   sampleTo(uStart, uBase, -1, belowSteps);   // smooth margin below the region (-Y)
 
   return { rim, teethVeins: [] };            // no extra veins; the real veins ride the buckle
+}
+
+
+/* -------------------------------------------------------------------
+   Scallop edge — the petal OUTLINE becomes a row of convex arcs (scallops), the
+   doily/picot border of the reference lace. It pairs only with the LACE infill.
+   Each scallop bulges outward along the in-surface normal by SCALLOP HEIGHT and
+   drops back to a cusp between neighbours; SCALLOP COUNT sets how many run along
+   each side (and therefore how wide each one is). Generated per side and made
+   exactly mirror-symmetric across the mid-rib. Returns { rim, teethVeins }.
+   ------------------------------------------------------------------- */
+const SCALLOP_MAX = 0.34;   // world reach of a scallop at SCALLOP HEIGHT = 1
+
+export function buildScallopEdge(P, spine) {
+  if (P.tipStyle !== 'scallop') return null;
+  const count = clamp(Math.round(P.scallopCount || 8), 2, 30);
+  const height = clamp(P.scallopHeight != null ? P.scallopHeight : 0.4, 0, 1) * SCALLOP_MAX;
+  const uBase = 0.02, uApex = 0.9995;
+  const Pflat = { ...P, cup: 0 };            // outward direction free of cup splay
+  const nPer = Math.max(6, Math.round(120 / count));  // samples per scallop
+
+  // One side, base -> tip: `count` convex bumps meeting at cusps on the outline.
+  const sideRim = (s) => {
+    const pts = [];
+    for (let k = 0; k < count; k++) {
+      const uA = lerp(uBase, uApex, k / count), uB = lerp(uBase, uApex, (k + 1) / count);
+      for (let i = (k === 0 ? 0 : 1); i <= nPer; i++) {
+        const t = i / nPer;
+        const u = clamp(lerp(uA, uB, t), 0, 0.9995);
+        const { p, out } = edgeOutward(u, s, Pflat, spine);
+        const bump = height * Math.sin(Math.PI * t);     // 0 at the cusps, max mid-scallop
+        pts.push({ x: p.x + out.x * bump, y: p.y + out.y * bump, z: p.z + out.z * bump });
+      }
+    }
+    return pts;
+  };
+
+  const plusRim = sideRim(1);                // +Y base -> tip
+  const minusRim = sideRim(-1);              // -Y base -> tip (mirror of +Y by construction)
+  const rim = [];
+  for (const q of plusRim) rim.push(q);
+  rim.push(surfacePoint(uApex, 0, P, spine));// the apex point
+  for (let i = minusRim.length - 1; i >= 0; i--) rim.push(minusRim[i]);   // -Y tip -> base
+  return { rim, teethVeins: [] };
 }

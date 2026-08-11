@@ -169,6 +169,7 @@
             <option value="jagged">JAGGED</option>
             <option value="ruffled">RUFFLED</option>
             <option value="fractal">FRACTAL</option>
+            <option value="scallop" hidden disabled>SCALLOP</option>
           </select>
         </div>
 
@@ -230,7 +231,26 @@
           <span class="fl-ctrl__hint">edge dissolves into branching filaments</span>
         </div>
 
+        <div class="fl-ctrl" data-tip-styles="scallop">
+          <div class="fl-ctrl__row">
+            <label for="scallopCount">Scallop count</label>
+            <span class="fl-ctrl__val" data-value="scallopCount"></span>
+          </div>
+          <input type="range" id="scallopCount" min="2" max="30" step="1" value="9">
+          <span class="fl-ctrl__hint">few, wide scallops &rarr; many, narrow</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="scallop">
+          <div class="fl-ctrl__row">
+            <label for="scallopHeight">Scallop height</label>
+            <span class="fl-ctrl__val" data-value="scallopHeight"></span>
+          </div>
+          <input type="range" id="scallopHeight" min="0" max="1" step="0.01" value="0.4">
+          <span class="fl-ctrl__hint">shallow &rarr; deep bulge</span>
+        </div>
+
         <p class="fl-tip-note" data-tip-styles="clean">Smooth petal edge.</p>
+        <p class="fl-tip-note" data-tip-styles="scallop">Scalloped doily edge &mdash; pairs with the LACE infill.</p>
         <p class="fl-tip-note" data-tip-styles="fractal">This style isn&rsquo;t built yet &mdash; controls are placeholders.</p>
 
       </div>
@@ -253,10 +273,11 @@
             <option value="voronoi">VORONOI</option>
             <option value="strands">STRANDS</option>
             <option value="bone">BONE</option>
+            <option value="lace">LACE</option>
           </select>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins voronoi">
+        <div class="fl-ctrl" data-infill-styles="veins voronoi lace">
           <div class="fl-ctrl__row">
             <label for="density">Density</label>
             <span class="fl-ctrl__val" data-value="density"></span>
@@ -264,6 +285,7 @@
           <input type="range" id="density" min="3" max="12" step="1" value="7">
           <span class="fl-ctrl__hint" data-infill-styles="veins">sparse &rarr; deeply fractal</span>
           <span class="fl-ctrl__hint" data-infill-styles="voronoi">few, large cells &rarr; many, small</span>
+          <span class="fl-ctrl__hint" data-infill-styles="lace">sparse &rarr; densely packed scrolls</span>
         </div>
 
         <div class="fl-ctrl" data-infill-styles="veins voronoi">
@@ -362,9 +384,19 @@
           <input type="checkbox" id="boneOutline" checked>
         </div>
 
+        <div class="fl-ctrl" data-infill-styles="lace">
+          <div class="fl-ctrl__row">
+            <label for="laceSwirl">Lace swirl</label>
+            <span class="fl-ctrl__val" data-value="laceSwirl"></span>
+          </div>
+          <input type="range" id="laceSwirl" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">loose open scrolls &rarr; tight coils</span>
+        </div>
+
         <p class="fl-tip-note" data-infill-styles="voronoi">Cells are mirrored across the petal centre.</p>
         <p class="fl-tip-note" data-infill-styles="strands">Strands are mirrored across the petal centre.</p>
         <p class="fl-tip-note" data-infill-styles="bone">A central spine with ribbed bones, mirrored across the petal centre.</p>
+        <p class="fl-tip-note" data-infill-styles="lace">Filigree scrolls, mirrored across the petal centre. Pairs with the SCALLOP tip edge.</p>
 
       </div>
     </section>
