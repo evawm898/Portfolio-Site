@@ -672,6 +672,7 @@ function generate() {
       W: [ui.bilWidth1, ui.bilWidth2, ui.bilWidth3][k - 1],
       curl: [ui.bilCenterCurve1, ui.bilCenterCurve2, ui.bilCenterCurve3][k - 1] * CENTER_CURVE_SCALE,
       edgeCurve: [ui.bilEdgeCurve1, ui.bilEdgeCurve2, ui.bilEdgeCurve3][k - 1],
+      scale: [ui.bilScale1, ui.bilScale2, ui.bilScale3][k - 1],
     });
     const maxK = bilCenter ? bilPerSide : (bilPerSide - 0.5);
     const step = Math.min(clamp(ui.bilSpacing, 5, 90) * DEG, (170 * DEG) / Math.max(1e-6, maxK));
@@ -709,7 +710,10 @@ function generate() {
     // its tip/edge style, on a per-petal copy of P.
     let Pp = P;
     if (pl.over) {
-      Pp = { ...P, W: pl.over.W, curl: pl.over.curl, edgeCurve: pl.over.edgeCurve };
+      // Scale grows the whole petal (length + width proportionally) from its base;
+      // curl / edgeCurve are shape ratios, so they stay put under scale.
+      const s = pl.over.scale;
+      Pp = { ...P, L: P.L * s, W: pl.over.W * s, curl: pl.over.curl, edgeCurve: pl.over.edgeCurve };
       if (pl.over.edge && pl.over.edge !== 'default') Pp.tipStyle = pl.over.edge;
     }
     buildPetalInto(petalAcc, Pp, pl.az, height, pl.r - P.r0, tilt, SEED_BASE + pl.seedIdx * 131);
@@ -806,6 +810,9 @@ const inputs = {
   bilEdgeCurve1: document.getElementById('bilEdgeCurve1'),
   bilEdgeCurve2: document.getElementById('bilEdgeCurve2'),
   bilEdgeCurve3: document.getElementById('bilEdgeCurve3'),
+  bilScale1: document.getElementById('bilScale1'),
+  bilScale2: document.getElementById('bilScale2'),
+  bilScale3: document.getElementById('bilScale3'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   infillType: document.getElementById('infillType'),
@@ -862,6 +869,9 @@ function readUI() {
     bilEdgeCurve1: parseFloat(inputs.bilEdgeCurve1.value),
     bilEdgeCurve2: parseFloat(inputs.bilEdgeCurve2.value),
     bilEdgeCurve3: parseFloat(inputs.bilEdgeCurve3.value),
+    bilScale1: parseFloat(inputs.bilScale1.value),
+    bilScale2: parseFloat(inputs.bilScale2.value),
+    bilScale3: parseFloat(inputs.bilScale3.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     infillType: inputs.infillType.value,
@@ -907,6 +917,7 @@ function refreshLabels() {
   setLabel('bilPerSide', inputs.bilPerSide.value);
   setLabel('bilSpacing', inputs.bilSpacing.value + '°');
   for (let k = 1; k <= 3; k++) {
+    setLabel('bilScale' + k, (+inputs['bilScale' + k].value).toFixed(2) + '×');
     setLabel('bilWidth' + k, (+inputs['bilWidth' + k].value).toFixed(2));
     const cc = +inputs['bilCenterCurve' + k].value;
     setLabel('bilCenterCurve' + k, (cc > 0 ? '+' : '') + cc.toFixed(2));
@@ -982,6 +993,7 @@ function setBuilding(on) {
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
 ['petalCount', 'bilPerSide', 'bilSpacing',
+ 'bilScale1', 'bilScale2', 'bilScale3',
  'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
  'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
@@ -1113,6 +1125,7 @@ if (resetBtn) {
     inputs.bilEdge2.value = d.bilEdge2;
     inputs.bilEdge3.value = d.bilEdge3;
     for (let k = 1; k <= 3; k++) {
+      inputs['bilScale' + k].value = d['bilScale' + k];
       inputs['bilWidth' + k].value = d['bilWidth' + k];
       inputs['bilCenterCurve' + k].value = d['bilCenterCurve' + k];
       inputs['bilEdgeCurve' + k].value = d['bilEdgeCurve' + k];
@@ -1158,6 +1171,7 @@ const DEFAULTS = {
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
+  bilScale1: 1, bilScale2: 1, bilScale3: 1,
   bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
   bilCenterCurve1: 0.4, bilCenterCurve2: 0.4, bilCenterCurve3: 0.4,
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
