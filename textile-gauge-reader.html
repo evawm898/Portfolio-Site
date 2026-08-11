@@ -170,17 +170,18 @@
       <details class="tgr-debug-panel tgr-repeat-count-panel" id="repeatCountPanel">
         <summary>Verify by counting a repeat</summary>
         <p class="tgr-hint">
-          Not sure the number above is right? Click the same point on two
-          adjacent wale columns (or course rows) in the image, and this
-          counts how many times that exact patch actually repeats across
-          the photo -- directly, by matching real pixels, not inferred
-          from periodicity the way the automatic result above is. An
-          independent second opinion, not a replacement for the number
-          above.
+          Not sure the numbers above are right? Drag a box around ONE full
+          repeat cell -- corner to the same corner on the diagonally
+          adjacent stitch, so the box's width spans one wale-to-wale
+          repeat and its height spans one course-to-course repeat -- and
+          this counts how many times that exact patch actually repeats
+          across the photo in both directions, directly, by matching real
+          pixels, not inferred from periodicity the way the automatic
+          result above is. An independent second opinion, not a
+          replacement for the numbers above.
         </p>
         <div class="tgr-field-row">
-          <button type="button" class="tgr-btn tgr-btn--secondary" id="markWaleRepeatBtn">Mark one wale repeat</button>
-          <button type="button" class="tgr-btn tgr-btn--secondary" id="markCourseRepeatBtn">Mark one course repeat</button>
+          <button type="button" class="tgr-btn tgr-btn--secondary" id="markRepeatBtn">Mark one repeat</button>
           <button type="button" class="tgr-btn tgr-btn--secondary" id="cancelRepeatMarkBtn" hidden>Cancel</button>
         </div>
         <p class="tgr-status" id="repeatMarkStatus" hidden></p>

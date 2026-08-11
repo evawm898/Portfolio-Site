@@ -612,6 +612,15 @@
 .tgr-confidence-bar__fill.is-low { background: var(--tgr-error); }
 .tgr-confidence-bar__fill.is-mid { background: var(--tgr-course); }
 
+.tgr-repeat-result-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+@media (max-width: 480px) {
+  .tgr-repeat-result-row { grid-template-columns: 1fr; }
+}
+
 .tgr-result-card--uncertain {
   border-color: var(--tgr-warn-border);
   background: var(--tgr-warn-bg);

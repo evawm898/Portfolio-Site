@@ -129,8 +129,7 @@
   const roiDiagContent = document.getElementById("roiDiagContent");
 
   // User-anchored repeat counting ("Verify by counting a repeat")
-  const markWaleRepeatBtn = document.getElementById("markWaleRepeatBtn");
-  const markCourseRepeatBtn = document.getElementById("markCourseRepeatBtn");
+  const markRepeatBtn = document.getElementById("markRepeatBtn");
   const cancelRepeatMarkBtn = document.getElementById("cancelRepeatMarkBtn");
   const repeatMarkStatus = document.getElementById("repeatMarkStatus");
   const repeatMatchResult = document.getElementById("repeatMatchResult");
@@ -191,9 +190,10 @@
     showMeasurementAreas: false, // "Show measurement areas" toggle -- all approved ROI outlines, results step
     selectedDiagnosticRoiLabel: null, // which region's own detail is shown in Developer diagnostics' per-region panel
     repeatMark: {
-      active: false, // true while armed -- next two canvas clicks are collected as anchor points
-      axis: null, // "wale" | "course"
-      points: [], // [{x,y}] in natural coords, max 2, cleared once a match request fires
+      active: false, // true while armed -- next canvas drag draws the repeat-cell box
+      dragging: false, // true mid-drag, between pointerdown and pointerup
+      anchor: null, // {x,y} natural coords, drag start corner
+      box: null, // {x,y,width,height} natural coords -- one full repeat cell (one wale-to-wale span, one course-to-course span), cleared once a match request fires
     },
     serviceOnline: null, // null = unknown/not configured, true/false once checked
   };
@@ -552,27 +552,34 @@
     } else if (state.currentStep === "results") {
       drawRoi(false);
       drawResultOverlay();
-      drawRepeatMarkPoints();
+      drawRepeatMarkBox();
     }
   }
 
-  function drawRepeatMarkPoints() {
-    const pts = state.repeatMark.points.map(naturalToDisplay);
-    if (!pts.length) return;
-    const color = state.repeatMark.axis === "course" ? COURSE_COLOR : WALE_COLOR;
-    if (pts.length === 2) {
+  function drawRepeatMarkBox() {
+    const box = state.repeatMark.box;
+    if (!box || box.width <= 0 || box.height <= 0) return;
+    const tl = naturalToDisplay({ x: box.x, y: box.y });
+    const br = naturalToDisplay({ x: box.x + box.width, y: box.y + box.height });
+    ctx.save();
+    ctx.strokeStyle = "#565e60";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    ctx.restore();
+    // Small ticks on the midpoints of each edge, colored by which axis
+    // that edge's span maps to (see repeatBoxAnchorPoints) -- a quick
+    // visual hint that the box's WIDTH becomes one repeat measurement
+    // and its HEIGHT becomes the other, not just a generic selection.
+    const anchors = repeatBoxAnchorPoints(box);
+    ctx.lineWidth = 3;
+    [["wale", WALE_COLOR], ["course", COURSE_COLOR]].forEach(([axis, color]) => {
+      const [a, b] = anchors[axis].map(naturalToDisplay);
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      ctx.lineTo(pts[1].x, pts[1].y);
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
       ctx.stroke();
-    }
-    pts.forEach((p) => {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-      ctx.fill();
     });
   }
 
@@ -1284,13 +1291,12 @@
 
     if (state.currentStep === "results" && state.repeatMark.active) {
       const pt = displayToNatural(eventToDisplayPoint(evt));
-      state.repeatMark.points.push(pt);
+      state.repeatMark.dragging = true;
+      state.repeatMark.anchor = pt;
+      state.repeatMark.box = { x: pt.x, y: pt.y, width: 0, height: 0 };
+      canvas.setPointerCapture(evt.pointerId);
+      repeatMarkStatus.textContent = "Drag to the diagonally opposite corner of the same repeat cell, then release.";
       render();
-      if (state.repeatMark.points.length === 1) {
-        repeatMarkStatus.textContent = "Click the same point on the very next repeat over.";
-      } else if (state.repeatMark.points.length === 2) {
-        performRepeatMatch();
-      }
       return;
     }
 
@@ -1360,6 +1366,29 @@
       state.selectedRoiId = newRoi.id;
       state.roiDrag = { mode: "create", roiId: newRoi.id, anchor: startNatural };
     }
+  });
+
+  const MIN_REPEAT_BOX_PX = 8; // a drag smaller than this in either dimension is treated as an accidental click, not a real box
+
+  canvas.addEventListener("pointermove", (evt) => {
+    if (state.currentStep !== "results" || !state.repeatMark.dragging) return;
+    const pt = displayToNatural(eventToDisplayPoint(evt));
+    state.repeatMark.box = normalizeRect(state.repeatMark.anchor, pt);
+    render();
+  });
+
+  canvas.addEventListener("pointerup", (evt) => {
+    if (state.currentStep !== "results" || !state.repeatMark.dragging) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.repeatMark.dragging = false;
+    const box = state.repeatMark.box;
+    if (!box || box.width < MIN_REPEAT_BOX_PX || box.height < MIN_REPEAT_BOX_PX) {
+      repeatMarkStatus.textContent = "That box was too small -- drag a larger one spanning one full repeat cell.";
+      state.repeatMark.box = null;
+      render();
+      return;
+    }
+    performRepeatMatch();
   });
 
   canvas.addEventListener("pointermove", (evt) => {
@@ -1818,33 +1847,92 @@
   // the automatic result -- shown alongside it as a second opinion the
   // user can compare against, same spirit as the loop-lattice debug view.
 
-  function resetRepeatMarkUI() {
-    state.repeatMark = { active: false, axis: null, points: [] };
-    cancelRepeatMarkBtn.hidden = true;
-    repeatMarkStatus.hidden = true;
-    markWaleRepeatBtn.disabled = false;
-    markCourseRepeatBtn.disabled = false;
+  // A repeat-cell box's width spans one wale-to-wale repeat and its
+  // height spans one course-to-course repeat, but WHICH image axis (x or
+  // y) that corresponds to depends on orientation -- wales are vertical
+  // columns whose SPACING is measured horizontally, courses are
+  // horizontal rows whose spacing is measured vertically (see the
+  // backend's _direction_for docstring; this mirrors it exactly so the
+  // two count-repeats calls below measure the same thing the backend
+  // itself would call "wale" and "course"). Returns anchor point PAIRS
+  // (not periods) since /count-repeats takes two points spanning one
+  // repeat, same contract count_repeats_by_template_match always has.
+  function repeatBoxAnchorPoints(box) {
+    const midX = box.x + box.width / 2;
+    const midY = box.y + box.height / 2;
+    const horizontalPair = [{ x: box.x, y: midY }, { x: box.x + box.width, y: midY }];
+    const verticalPair = [{ x: midX, y: box.y }, { x: midX, y: box.y + box.height }];
+    const waleDir = state.orientation === "vertical" ? "horizontal" : "vertical";
+    return {
+      wale: waleDir === "horizontal" ? horizontalPair : verticalPair,
+      course: waleDir === "horizontal" ? verticalPair : horizontalPair,
+    };
   }
 
-  function armRepeatMark(axis) {
-    state.repeatMark = { active: true, axis, points: [] };
+  function resetRepeatMarkUI() {
+    state.repeatMark = { active: false, dragging: false, anchor: null, box: null };
+    cancelRepeatMarkBtn.hidden = true;
+    repeatMarkStatus.hidden = true;
+    markRepeatBtn.disabled = false;
+  }
+
+  function armRepeatMark() {
+    state.repeatMark = { active: true, dragging: false, anchor: null, box: null };
     cancelRepeatMarkBtn.hidden = false;
-    markWaleRepeatBtn.disabled = true;
-    markCourseRepeatBtn.disabled = true;
+    markRepeatBtn.disabled = true;
     repeatMarkStatus.hidden = false;
-    repeatMarkStatus.textContent = `Click one point on a ${axis === "course" ? "course row" : "wale column"}.`;
+    repeatMarkStatus.textContent = "Drag a box around one full repeat cell -- corner to the same corner on the diagonally adjacent stitch.";
     render();
   }
 
-  markWaleRepeatBtn.addEventListener("click", () => armRepeatMark("wale"));
-  markCourseRepeatBtn.addEventListener("click", () => armRepeatMark("course"));
+  markRepeatBtn.addEventListener("click", armRepeatMark);
   cancelRepeatMarkBtn.addEventListener("click", () => {
     resetRepeatMarkUI();
     render();
   });
 
+  async function fetchRepeatCount(axis, anchorStart, anchorEnd, ppm) {
+    const fd = new FormData();
+    fd.append("file", state.file);
+    fd.append("roi_x", 0);
+    fd.append("roi_y", 0);
+    fd.append("roi_width", state.naturalWidth);
+    fd.append("roi_height", state.naturalHeight);
+    fd.append("anchor_start_x", anchorStart.x);
+    fd.append("anchor_start_y", anchorStart.y);
+    fd.append("anchor_end_x", anchorEnd.x);
+    fd.append("anchor_end_y", anchorEnd.y);
+    fd.append("orientation", state.orientation);
+    fd.append("axis", axis);
+    fd.append("pixels_per_mm", ppm);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/count-repeats`, {
+        method: "POST",
+        body: fd,
+        signal: controller.signal,
+      });
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+      }
+      if (!res.ok) {
+        throw new Error(data.message || `Counting repeats failed (HTTP ${res.status}).`);
+      }
+      return { axis, data };
+    } catch (err) {
+      return { axis, error: err.message || String(err) };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function performRepeatMatch() {
-    const { axis, points } = state.repeatMark;
+    const box = state.repeatMark.box;
     const ppm = currentPixelsPerMm();
     repeatMarkStatus.textContent = "Counting repeats…";
 
@@ -1855,68 +1943,44 @@
       return;
     }
 
-    try {
-      const fd = new FormData();
-      fd.append("file", state.file);
-      fd.append("roi_x", 0);
-      fd.append("roi_y", 0);
-      fd.append("roi_width", state.naturalWidth);
-      fd.append("roi_height", state.naturalHeight);
-      fd.append("anchor_start_x", points[0].x);
-      fd.append("anchor_start_y", points[0].y);
-      fd.append("anchor_end_x", points[1].x);
-      fd.append("anchor_end_y", points[1].y);
-      fd.append("orientation", state.orientation);
-      fd.append("axis", axis);
-      fd.append("pixels_per_mm", ppm);
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/count-repeats`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok) {
-        throw new Error(data.message || `Counting repeats failed (HTTP ${res.status}).`);
-      }
-      renderRepeatMatchResult(axis, data);
-    } catch (err) {
-      repeatMatchResult.innerHTML = `<p class="tgr-error">${escapeHtml(err.message || String(err))}</p>`;
-      repeatMatchResult.hidden = false;
-    }
+    const anchors = repeatBoxAnchorPoints(box);
+    const [waleResult, courseResult] = await Promise.all([
+      fetchRepeatCount("wale", anchors.wale[0], anchors.wale[1], ppm),
+      fetchRepeatCount("course", anchors.course[0], anchors.course[1], ppm),
+    ]);
+    renderRepeatMatchResults(waleResult, courseResult);
 
     resetRepeatMarkUI();
     render();
   }
 
-  function renderRepeatMatchResult(axis, data) {
-    const label = axis === "course" ? "Courses" : "Wales";
-    const color = axis === "course" ? COURSE_COLOR : WALE_COLOR;
+  function repeatMatchResultCard(result) {
+    const label = result.axis === "course" ? "Courses" : "Wales";
+    const color = result.axis === "course" ? COURSE_COLOR : WALE_COLOR;
+    if (result.error) {
+      return `<p class="tgr-error">${escapeHtml(label)}: ${escapeHtml(result.error)}</p>`;
+    }
+    const { data } = result;
     if (!data.success) {
-      repeatMatchResult.innerHTML = `<p class="tgr-hint">${escapeHtml(data.message || "No matches found.")}</p>`;
-      return;
+      return `<p class="tgr-hint">${escapeHtml(label)}: ${escapeHtml(data.message || "No matches found.")}</p>`;
     }
     const perInch = data.per_inch != null ? data.per_inch.toFixed(2) : "—";
-    repeatMatchResult.innerHTML = `
+    return `
       <div class="tgr-result-card" style="border-color:${color}">
-        <div class="tgr-result-card__label">${label} / inch (counted)</div>
+        <div class="tgr-result-card__label">${escapeHtml(label)} / inch (counted)</div>
         <div class="tgr-result-card__value" style="color:${color}">${perInch}</div>
         <div class="tgr-result-card__sub">${data.match_count} repeats matched · ${(data.confidence * 100).toFixed(0)}% confidence</div>
       </div>
       <p class="tgr-hint">${escapeHtml(data.message || "")}</p>
+    `;
+  }
+
+  function renderRepeatMatchResults(waleResult, courseResult) {
+    repeatMatchResult.innerHTML = `
+      <div class="tgr-repeat-result-row">
+        <div>${repeatMatchResultCard(waleResult)}</div>
+        <div>${repeatMatchResultCard(courseResult)}</div>
+      </div>
     `;
   }
 
