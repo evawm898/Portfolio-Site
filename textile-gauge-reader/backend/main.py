@@ -175,6 +175,7 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
                 harmonic_penalty=getattr(d, "harmonic_penalty", None),
                 phase_consistency=getattr(d, "phase_consistency", None),
                 alternating_phase_score=getattr(d, "alternating_phase_score", None),
+                template_match_score=getattr(d, "template_match_score", None),
                 evidence_score=getattr(d, "evidence_score", None),
                 final_score=getattr(d, "final_score", None),
                 selected=d.selected,

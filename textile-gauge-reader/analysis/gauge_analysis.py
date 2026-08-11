@@ -97,7 +97,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, replace
-from typing import List, Literal, Optional, Tuple
+from typing import Callable, List, Literal, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -163,9 +163,9 @@ FOLD_CONSISTENCY_MARGIN = 0.15       # ...and beat the raw estimate's own score 
 
 @dataclass(frozen=True)
 class ScoringWeights:
-    autocorr: float = 0.12              # 1D autocorrelation strength at this exact lag
-    support_2d: float = 0.12            # 2D autocorrelation support at this lag (see _sample_2d_support)
-    structural: float = 0.20            # fold-consistency (wale) + loop-center pitch agreement
+    autocorr: float = 0.108             # 1D autocorrelation strength at this exact lag
+    support_2d: float = 0.108           # 2D autocorrelation support at this lag (see _sample_2d_support)
+    structural: float = 0.18            # fold-consistency (wale) + loop-center pitch agreement
     # Reduced twice now, both times from real-photo diagnostics, both
     # times for the same underlying reason: each sub-region band runs its
     # own 1D autocorrelation, seeded from the same texture, and can
@@ -189,9 +189,9 @@ class ScoringWeights:
     # 0.469 vs. 0.284, just never needed to be decisive), and one more
     # real photo isn't a large enough sample to conclude it's *never*
     # useful, only that it can't be trusted to swing a close call.
-    patch_consensus: float = 0.03       # agreement with independent overlapping sub-region estimates
-    regularity: float = 0.08            # spacing consistency of the positions this candidate implies
-    repeat_count: float = 0.03          # reward seeing enough repeats in the ROI to trust a periodicity claim
+    patch_consensus: float = 0.027      # agreement with independent overlapping sub-region estimates
+    regularity: float = 0.072           # spacing consistency of the positions this candidate implies
+    repeat_count: float = 0.027         # reward seeing enough repeats in the ROI to trust a periodicity claim
     # Does every repeat land on the SAME kind of textile feature (a true
     # full repeat), or does it alternate between two visually different
     # ones every other marker (a half-period harmonic, e.g. one leg of a
@@ -210,7 +210,39 @@ class ScoringWeights:
     # large crop and small, jersey and teal alike -- including several
     # where every other positive term either disagreed or was too weak to
     # matter.
-    phase_consistency: float = 0.42
+    phase_consistency: float = 0.378
+    # Automatic, self-anchored sibling of count_repeats_by_template_match
+    # (see _template_match_consistency_score / the module comment above
+    # it): does a real patch of texture, template-matched with a
+    # periodically-refreshed reference, actually keep recurring at this
+    # candidate's spacing? Unlike every term above, this doesn't just
+    # measure periodicity strength (autocorr, support_2d) or structural
+    # plausibility (structural, patch_consensus) -- it directly confirms
+    # (or fails to confirm) the same real repeat by direct image
+    # matching, the same technique the user-anchored path already proved
+    # out on real photos this session.
+    #
+    # Funded by scaling every OTHER positive weight above down by a flat
+    # 10% (0.108/0.108/0.18/0.027/0.072/0.027/0.378 = the old 0.12/0.12/
+    # 0.20/0.03/0.08/0.03/0.42 each x0.9) rather than cutting any one term
+    # -- deliberately NOT autocorr/support_2d alone, which was tried
+    # first and broke test_v03_candidate_scoring.py's harmonic-penalty
+    # regression test: that test's whole point is a real period beating
+    # an unrelated weak candidate purely on autocorr/2D-support strength
+    # (autocorr 0.92 vs 0.0), and template_match is neutral (0.5/0.5,
+    # see below) whenever normalized_2d isn't supplied -- exactly the
+    # case in that synthetic test -- so taking its funding from those two
+    # specifically diluted the one signal actually deciding that case
+    # without adding anything back. A uniform proportional scale-down
+    # instead preserves every existing term's RELATIVE weight exactly
+    # (so it can't flip any sign that used to hold), and only changes an
+    # outcome when template_match itself has real, non-neutral evidence
+    # to contribute -- which is the only time it should matter. Like
+    # every other weight in this file, not yet swept against real
+    # fixtures the way patch_consensus/phase_consistency were; see the
+    # empirical tuning note in README.md before trusting this value as
+    # final.
+    template_match: float = 0.10
     harmonic_penalty_weight: float = 0.30    # subtracted: how ambiguous this candidate is vs. a 0.5x/2x relative
     # subtracted: how much repeat markers alternate between two distinct
     # visual phases (A B A B ...) instead of repeating the same one --
@@ -228,9 +260,14 @@ class ScoringWeights:
 # more on periodicity and cross-region consensus, which don't assume any
 # particular loop shape.
 WEIGHTS_UNKNOWN = ScoringWeights()
+# Same proportional-scaling approach as WEIGHTS_UNKNOWN above: every
+# original positive weight (autocorr=0.08, support_2d=0.08,
+# structural=0.25, patch_consensus=0.08, regularity=0.08,
+# repeat_count=0.03, phase_consistency=0.40 -- summed to 1.0) x0.9, plus
+# template_match=0.10.
 WEIGHTS_JERSEY = ScoringWeights(
-    autocorr=0.08, support_2d=0.08, structural=0.25, patch_consensus=0.08,
-    regularity=0.08, repeat_count=0.03, phase_consistency=0.40,
+    autocorr=0.072, support_2d=0.072, structural=0.225, patch_consensus=0.072,
+    regularity=0.072, repeat_count=0.027, phase_consistency=0.36, template_match=0.10,
     harmonic_penalty_weight=0.30, alternating_phase_penalty_weight=0.30, instability_penalty_weight=0.35,
 )
 
@@ -300,6 +337,11 @@ class CandidateInfo:
     # half-period harmonic. See _phase_consistency_evidence.
     phase_consistency: Optional[float] = None
     alternating_phase_score: Optional[float] = None
+    # Automatic, self-anchored template-match confirmation (see
+    # _template_match_consistency_score) -- 0.5 means "couldn't measure"
+    # (no 2D image, no detected peaks to anchor from), not "neutral
+    # evidence of periodicity" like it does for phase_consistency.
+    template_match_score: Optional[float] = None
 
 
 @dataclass
@@ -1807,9 +1849,10 @@ def _score_candidates(
     Score every 0.5x/1x/2x candidate for one axis, combining periodicity
     (1D + 2D), structural (fold-consistency + loop-center) evidence,
     regional (patch) consensus, spacing regularity, visible-repeat count,
-    phase consistency, and a harmonic-ambiguity penalty into one
-    `final_score` per candidate (see ScoringWeights -- the one place all
-    these weights are defined). Returns (candidate_infos,
+    phase consistency, automatic template-match confirmation (see
+    _template_match_consistency_score), and a harmonic-ambiguity penalty
+    into one `final_score` per candidate (see ScoringWeights -- the one
+    place all these weights are defined). Returns (candidate_infos,
     instability_penalty) -- instability_penalty is axis-level (not
     per-candidate), used for CONFIDENCE, not for deciding which
     candidate wins.
@@ -1854,6 +1897,7 @@ def _score_candidates(
             patch=_patch_consensus_score(patch_periods, c),
             phase_consistency=phase_consistency,
             alternating_phase=alternating_phase,
+            template_match=_template_match_consistency_score(normalized_2d, signal, c, lag_dx),
         )
 
     for c in candidates:
@@ -1867,6 +1911,7 @@ def _score_candidates(
             + weights.regularity * e["regularity"]
             + weights.repeat_count * e["repeat"]
             + weights.phase_consistency * e["phase_consistency"]
+            + weights.template_match * e["template_match"]
             - weights.alternating_phase_penalty_weight * e["alternating_phase"]
         )
         e["evidence"] = float(np.clip(evidence, 0.0, 1.0))
@@ -1900,6 +1945,7 @@ def _score_candidates(
             final_score=round(per_candidate[c]["final"], 3),
             phase_consistency=round(per_candidate[c]["phase_consistency"], 3),
             alternating_phase_score=round(per_candidate[c]["alternating_phase"], 3),
+            template_match_score=round(per_candidate[c]["template_match"], 3),
         )
         for c in candidates
     ]
@@ -2530,6 +2576,13 @@ def analyze_loop_lattice_experiment(
 # a periodicity signal, but it can't produce a false match against a
 # specific, real, human-confirmed patch of pixels -- there's no harmonic
 # for a direct image match to be ambiguous about.
+#
+# _template_match_consistency_score (below, after count_repeats_by_
+# template_match) is the automatic sibling: the same walking-match
+# technique, but self-anchored from a real detected peak per candidate
+# instead of a human click, feeding "does a real patch of texture keep
+# recurring at this spacing" into _score_candidates as one more evidence
+# term alongside periodicity/structural/phase-consistency.
 
 TEMPLATE_MATCH_MIN_PERIOD_PX = 4.0        # anchor points closer than this aren't a usable template
 TEMPLATE_MATCH_HEIGHT_FRACTION = 1.6      # template extent along the orthogonal axis, as a multiple of the seed period -- wide enough to carry real 2D texture, not a one-pixel-thin sliver
@@ -2574,6 +2627,96 @@ class RepeatMatchResult:
     template_width_px: float = 0.0
     template_height_px: float = 0.0
     seed_period_px: float = 0.0
+
+
+def _walk_template_matches(
+    band: np.ndarray,
+    template_w: int,
+    seed_period: float,
+    anchor_center: float,
+    initial_template: np.ndarray,
+    extract_fn: Callable[[float], Optional[np.ndarray]],
+) -> List[Tuple[float, float]]:
+    """
+    Shared walking-match core for both the user-anchored repeat counter
+    (count_repeats_by_template_match) and automatic candidate-period
+    validation (_template_match_consistency_score) -- see the module
+    comment above count_repeats_by_template_match for the full rationale
+    (why walking outward with a periodically-refreshed reference, rather
+    than matching the whole region against one fixed template).
+
+    Starting from `anchor_center`, walks outward in both directions,
+    repeatedly searching a LOCAL window one step further out for the
+    NEAREST match (not the highest-scoring one anywhere in the window --
+    see the inline comment below for why that distinction matters) of
+    the current reference template, refreshing that reference to the
+    newest match after every step. Each direction stops the moment a
+    step finds nothing above threshold, a window runs off the edge of
+    the region, or TEMPLATE_MATCH_MAX_STEPS is hit.
+
+    `extract_fn(center_x)` must return the template_w-wide patch of
+    `band` centered at `center_x`, or None if that position is out of
+    bounds / has no usable texture -- same contract callers already use
+    to build `initial_template`.
+
+    Returns [(position, score), ...] sorted by position (ascending),
+    including the anchor itself (score 1.0, since it trivially matches
+    itself) -- positions are in `band`'s own column-index space, same
+    space `anchor_center` and `extract_fn` already work in; converting
+    to any other coordinate frame is the caller's job.
+    """
+    def _walk(step_sign: int) -> List[Tuple[float, float]]:
+        found: List[Tuple[float, float]] = []
+        reference = initial_template
+        current = anchor_center
+        for _ in range(TEMPLATE_MATCH_MAX_STEPS):
+            lo = int(round(current + step_sign * seed_period * TEMPLATE_MATCH_WALK_MIN_FRACTION))
+            hi = int(round(current + step_sign * seed_period * TEMPLATE_MATCH_WALK_MAX_FRACTION))
+            lo, hi = min(lo, hi), max(lo, hi)
+            # window_lo/window_hi are chosen so that match CENTERS
+            # (window_lo + idx + template_w/2, for idx in [0, window
+            # width - template_w]) range over exactly [lo, hi] -- no
+            # extra margin. An earlier version added a stray extra
+            # `+ template_w` here, over-extending the window enough that
+            # a backward walk's "nearest" end could cross back past
+            # `current` itself, corrupting which physical position each
+            # response index actually corresponded to (verified directly
+            # against the real jersey fixture: caused runaway ~2px
+            # "steps" in the wrong direction instead of ~35px ones).
+            window_lo = max(0, lo - template_w // 2)
+            window_hi = min(band.shape[1], hi + template_w // 2)
+            if window_hi - window_lo < template_w:
+                break
+            window = band[:, window_lo:window_hi]
+            response = cv2.matchTemplate(window, reference, cv2.TM_CCOEFF_NORMED)[0]
+            if response.size == 0:
+                break
+            # The NEAREST qualifying match, not the highest-scoring one
+            # anywhere in the window -- on a very regular fabric, a
+            # position a full extra period further away can score
+            # marginally higher than the true next repeat by sheer
+            # coincidence (verified directly: a synthetic near-perfectly
+            # periodic texture made a plain argmax skip straight past the
+            # adjacent repeat to the one after it, silently halving the
+            # apparent count). response indices run left-to-right = near-
+            # to-far from `current` when walking forward, far-to-near
+            # when walking backward, since the window is built starting
+            # just past `current` in the walk direction either way.
+            order = range(len(response)) if step_sign > 0 else range(len(response) - 1, -1, -1)
+            match_idx = next((i for i in order if response[i] >= TEMPLATE_MATCH_MIN_CORRELATION), None)
+            if match_idx is None:
+                break
+            match_score = float(response[match_idx])
+            match_center = window_lo + match_idx + template_w / 2.0
+            found.append((match_center, match_score))
+            refreshed = extract_fn(match_center)
+            reference = refreshed if refreshed is not None else reference
+            current = match_center
+        return found
+
+    forward = _walk(+1)
+    backward = _walk(-1)
+    return [*backward[::-1], (anchor_center, 1.0), *forward]
 
 
 def count_repeats_by_template_match(
@@ -2668,67 +2811,7 @@ def count_repeats_by_template_match(
     if first_template is None:
         return RepeatMatchResult(success=False, message="The marked area doesn't have enough texture to search with.")
 
-    def _walk(start_center: float, step_sign: int) -> List[Tuple[float, float]]:
-        """
-        Starting from `start_center`, repeatedly search a LOCAL window
-        one step further in the `step_sign` direction for the best match
-        of the current reference template, refreshing that reference to
-        the newest match each time (see the module-level comment on
-        TEMPLATE_MATCH_WALK_MIN_FRACTION for why). Stops the moment a
-        step finds nothing above threshold, a window runs off the edge
-        of the region, or TEMPLATE_MATCH_MAX_STEPS is hit.
-        """
-        found: List[Tuple[float, float]] = []
-        reference = first_template
-        current = start_center
-        for _ in range(TEMPLATE_MATCH_MAX_STEPS):
-            lo = int(round(current + step_sign * seed_period * TEMPLATE_MATCH_WALK_MIN_FRACTION))
-            hi = int(round(current + step_sign * seed_period * TEMPLATE_MATCH_WALK_MAX_FRACTION))
-            lo, hi = min(lo, hi), max(lo, hi)
-            # window_lo/window_hi are chosen so that match CENTERS
-            # (window_lo + idx + template_w/2, for idx in [0, window
-            # width - template_w]) range over exactly [lo, hi] -- no
-            # extra margin. An earlier version added a stray extra
-            # `+ template_w` here, over-extending the window enough that
-            # a backward walk's "nearest" end could cross back past
-            # `current` itself, corrupting which physical position each
-            # response index actually corresponded to (verified directly
-            # against the real jersey fixture: caused runaway ~2px
-            # "steps" in the wrong direction instead of ~35px ones).
-            window_lo = max(0, lo - template_w // 2)
-            window_hi = min(band.shape[1], hi + template_w // 2)
-            if window_hi - window_lo < template_w:
-                break
-            window = band[:, window_lo:window_hi]
-            response = cv2.matchTemplate(window, reference, cv2.TM_CCOEFF_NORMED)[0]
-            if response.size == 0:
-                break
-            # The NEAREST qualifying match, not the highest-scoring one
-            # anywhere in the window -- on a very regular fabric, a
-            # position a full extra period further away can score
-            # marginally higher than the true next repeat by sheer
-            # coincidence (verified directly: a synthetic near-perfectly
-            # periodic texture made a plain argmax skip straight past the
-            # adjacent repeat to the one after it, silently halving the
-            # apparent count). response indices run left-to-right = near-
-            # to-far from `current` when walking forward, far-to-near
-            # when walking backward, since the window is built starting
-            # just past `current` in the walk direction either way.
-            order = range(len(response)) if step_sign > 0 else range(len(response) - 1, -1, -1)
-            match_idx = next((i for i in order if response[i] >= TEMPLATE_MATCH_MIN_CORRELATION), None)
-            if match_idx is None:
-                break
-            match_score = float(response[match_idx])
-            match_center = window_lo + match_idx + template_w / 2.0
-            found.append((match_center, match_score))
-            refreshed = _extract(match_center)
-            reference = refreshed if refreshed is not None else reference
-            current = match_center
-        return found
-
-    forward = _walk(anchor_center, +1)
-    backward = _walk(anchor_center, -1)
-    matches_working: List[Tuple[float, float]] = [*backward[::-1], (anchor_center, 1.0), *forward]
+    matches_working = _walk_template_matches(band, template_w, seed_period, anchor_center, first_template, _extract)
 
     if len(matches_working) < 2:
         return RepeatMatchResult(
@@ -2786,6 +2869,91 @@ def count_repeats_by_template_match(
         template_height_px=template_h,
         seed_period_px=round(seed_period, 2),
     )
+
+
+def _template_match_consistency_score(
+    normalized_2d: Optional[np.ndarray],
+    signal: np.ndarray,
+    candidate_period: float,
+    lag_dx: bool,
+) -> float:
+    """
+    Automatic, self-anchored sibling of count_repeats_by_template_match:
+    a NEW evidence signal for _score_candidates, independent of every
+    other term there. None of autocorrelation strength, 2D support,
+    structural (fold/center-pitch), patch consensus, or phase consistency
+    directly confirm "does this SAME real patch of texture, template-
+    matched with a periodically-refreshed reference, actually keep
+    recurring at this candidate's spacing" -- this does, using the exact
+    walking-match technique the user-anchored path already proved out
+    against real photos this session (see the module comment above
+    count_repeats_by_template_match), just anchored from a real detected
+    peak instead of a human click.
+
+    Anchors at the MIDDLE detected peak for `candidate_period` (not an
+    edge one -- more room to walk both directions before running off the
+    ROI), extracts a template spanning a band around that peak (same
+    TEMPLATE_MATCH_HEIGHT_FRACTION tuned for the user-anchored path, not
+    the full ROI extent -- reusing an already-validated parameter rather
+    than inventing an untested convention), and walks outward with
+    _walk_template_matches exactly like the user-anchored path does.
+    Scores from match count + spacing consistency + mean correlation, the
+    same blend count_repeats_by_template_match's own confidence uses.
+
+    Returns 0.5 -- "couldn't measure," not "neutral evidence of
+    periodicity" -- when there's no 2D image, the period is too small to
+    template with, or no peak could be detected to anchor from at all.
+    Returns 0.0 when a real anchor was found and walked from, but nothing
+    else matched anywhere nearby: genuine negative evidence that this
+    candidate's spacing doesn't correspond to a real recurring patch of
+    texture, not a "couldn't measure" case.
+    """
+    if normalized_2d is None or candidate_period < TEMPLATE_MATCH_MIN_PERIOD_PX:
+        return 0.5
+    peaks = _detect_peaks(signal, candidate_period)
+    if not peaks:
+        return 0.5
+
+    work = normalized_2d if lag_dx else normalized_2d.T
+    template_w = int(round(candidate_period))
+    template_h = int(round(candidate_period * TEMPLATE_MATCH_HEIGHT_FRACTION))
+    template_h = max(int(TEMPLATE_MATCH_MIN_PERIOD_PX), min(template_h, work.shape[0]))
+    if template_w <= 0 or template_h <= 0 or work.shape[1] < template_w:
+        return 0.5
+
+    ty0 = max(0, min((work.shape[0] - template_h) // 2, work.shape[0] - template_h))
+    band = work[ty0 : ty0 + template_h, :]
+
+    def _extract(center_x: float) -> Optional[np.ndarray]:
+        t0 = int(round(center_x - template_w / 2.0))
+        if t0 < 0 or t0 + template_w > band.shape[1]:
+            return None
+        patch = band[:, t0 : t0 + template_w]
+        if patch.shape[1] != template_w or np.std(patch) < 1e-6:
+            return None
+        return patch
+
+    anchor_center = float(sorted(peaks)[len(peaks) // 2])
+    first_template = _extract(anchor_center)
+    if first_template is None:
+        return 0.5
+
+    matches = _walk_template_matches(band, template_w, candidate_period, anchor_center, first_template, _extract)
+    positions = [m[0] for m in matches]
+    scores = [m[1] for m in matches]
+    if len(positions) < 2:
+        return 0.0
+
+    match_count_score = float(np.clip(len(positions) / (TEMPLATE_MATCH_MIN_MATCHES_FOR_CONFIDENCE * 2), 0.0, 1.0))
+    mean_score = float(np.mean(scores)) if scores else 0.0
+    spacing_consistency = 1.0
+    if len(positions) >= 3:
+        diffs = np.diff(sorted(positions))
+        diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
+        if diffs.size and np.mean(diffs) > 0:
+            cv = float(np.std(diffs) / np.mean(diffs))
+            spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
+    return float(np.clip(0.5 * mean_score + 0.3 * spacing_consistency + 0.2 * match_count_score, 0.0, 1.0))
 
 
 # --- Automatic measurement-area (ROI) proposal --------------------------

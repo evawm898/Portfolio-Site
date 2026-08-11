@@ -76,7 +76,10 @@ def test_current_weights_still_sum_to_one_for_the_positive_terms():
     # weights) are designed to blend into one bounded [0, 1] evidence
     # score.
     w = WEIGHTS_UNKNOWN
-    total = w.autocorr + w.support_2d + w.structural + w.patch_consensus + w.regularity + w.repeat_count + w.phase_consistency
+    total = (
+        w.autocorr + w.support_2d + w.structural + w.patch_consensus + w.regularity
+        + w.repeat_count + w.phase_consistency + w.template_match
+    )
     assert total == pytest.approx(1.0, abs=1e-9)
 
 

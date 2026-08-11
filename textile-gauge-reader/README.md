@@ -812,6 +812,76 @@ and confidence, letting a low-confidence automatic result be checked
 against a second, independently-derived number rather than just a
 warning label.
 
+### Automatic candidate cross-checking: the same walking match, self-anchored
+
+The section above sidesteps harmonic ambiguity by construction — a
+human-confirmed patch has no periodicity-frequency ambiguity to be
+fooled by. That raises an obvious question: can the *automatic* v0.3
+candidate scorer get some of that same protection, without a human in
+the loop?
+
+`_template_match_consistency_score` (`analysis/gauge_analysis.py`) is
+that attempt. For each 0.5x/1x/2x period candidate the scorer already
+considers, it self-anchors at a real detected peak (the middle one, for
+maximum room to walk both directions), extracts a template, and reuses
+the exact walking-match core the user-anchored path above already proved
+out (`_walk_template_matches`, extracted into a shared function so both
+paths stay byte-for-byte identical rather than maintaining two copies of
+the same carefully-debugged logic). The result — how many real matches,
+how consistently spaced, how strong the correlation — becomes one more
+evidence term in `ScoringWeights`, alongside autocorrelation strength, 2D
+support, structural (fold/loop-center) evidence, regional consensus, and
+phase consistency.
+
+**Funding the new weight without repeating an old mistake.** The first
+attempt gave `template_match` a weight of 0.10, funded by cutting
+`autocorr` and `support_2d` specifically (the two "purest" periodicity-
+strength proxies it seemed to most directly supersede). That broke an
+existing regression test
+(`test_harmonic_penalty_on_the_true_period_cannot_hand_the_win_to_an_
+unrelated_weak_candidate`) — a real prior bug where a true period had to
+beat an unrelated weak candidate on autocorrelation/2D-support strength
+alone, and `template_match` is neutral (contributes nothing to the
+*difference* between candidates) whenever there's no real image data to
+test against, exactly the case in that synthetic test. Taking its
+funding from those two specifically diluted the one signal actually
+deciding that case, without adding anything back. Fixed by funding it
+instead with a **flat 10% proportional scale-down of every existing
+positive weight** — this provably cannot flip the sign of any margin
+that used to hold (it's a uniform linear scale plus a same-both-sides
+neutral addition when `template_match` has no real evidence to
+contribute), and only changes an outcome when the new term has something
+genuine to say. All 178 tests pass with this weighting.
+
+**Empirical validation against both real fixtures (jersey + all 5 teal
+ROIs from `test_wale_scoring_weights.py`), checked honestly rather than
+assumed:**
+
+- The winning wale candidate **never changed** in any of the 6 real ROIs
+  tested, vs. `template_match` disabled entirely — no regression.
+- In 4 of 6, `template_match_score` was strongly positive (~0.7) for
+  *exactly* the winning candidate and a clean 0.0 for every harmonic
+  alternative — real, correct discriminating evidence, not noise. On
+  jersey's course axis specifically, it confirmed both the true period
+  *and* its trivial double (a real period always reconfirms at 2x — see
+  `_harmonic_penalty`'s docstring, that's guaranteed, not ambiguity)
+  while flatly rejecting the dangerous half-period harmonic (0.0).
+- In the other 2 (both small, ~1in teal windows), it returned 0.0 for
+  *every* candidate — non-discriminating, not mis-discriminating: it
+  never favored a wrong candidate over the right one in any of the 6
+  cases checked, it just didn't have enough to say in these two. Teal's
+  fuzzier, more heavily-plied texture is the same honest limitation
+  already documented for the user-anchored path above.
+
+Given "never caused a wrong flip, sometimes strongly confirms the right
+answer, otherwise stays quiet" across every real case checked, the
+weight is being kept — but, consistent with the framing above, this
+should be read as "safe and genuinely useful in the cases checked so
+far," not "proven to fix the open teal wale-selection coin-flip
+documented earlier in this file." That would need more real photos than
+the two fixtures this project currently has, the same honesty standard
+already applied to every other real-photo claim in this document.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/

@@ -77,6 +77,7 @@ class CandidateOut(BaseModel):
     harmonic_penalty: Optional[float] = None  # ambiguity vs. a 0.5x/2x relative that scored similarly
     phase_consistency: Optional[float] = None  # do repeat markers land on the same local visual feature each time?
     alternating_phase_score: Optional[float] = None  # "A B A B" signature of a half-period harmonic; penalizes evidence_score
+    template_match_score: Optional[float] = None  # auto-anchored template-match confirmation; see _template_match_consistency_score
     evidence_score: Optional[float] = None  # weighted evidence composite BEFORE the harmonic penalty -- decides `selected`
     final_score: Optional[float] = None  # evidence_score minus the harmonic penalty (confidence-facing, not selection)
     selected: bool = False
