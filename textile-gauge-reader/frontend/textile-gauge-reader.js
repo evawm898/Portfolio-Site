@@ -1178,60 +1178,152 @@
   // A movable, physically-proportioned ruler drawn over the photo once
   // calibration is confirmed (currentPixelsPerMm() is only non-null AFTER
   // that click -- see calConfirmBtn's handler -- which is what "available
-  // only after calibration" means here). Its LENGTH is exact: computed
-  // from currentPixelsPerMm() so the tick spacing really does match the
-  // calibrated scale, same as every other overlay measurement in this
-  // file. Its bar thickness/tick heights are fixed DISPLAY pixels instead
-  // (like the calibration point markers and ROI resize handles already
-  // are) so ticks stay legible at any zoom level rather than shrinking to
-  // nothing when zoomed out -- only the measurement axis needs to be "to
-  // scale," not the graphic's incidental thickness.
-  const RULER_BAR_HEIGHT = 22; // display px
-  const RULER_MAJOR_TICK_H = 14; // display px, from the bar's top edge
-  const RULER_MINOR_TICK_H = 7;
+  // only after calibration" means here). It's drawn as a single rigid
+  // corner bracket -- one arm running along image x, one along image y,
+  // sharing a draggable origin corner -- so both the wale (x) and course
+  // (y) directions can be checked against the same reference point at
+  // once, rather than needing two separately-positioned rulers. Each arm
+  // shows BOTH a cm scale and an in scale simultaneously (like a real
+  // dual-marked ruler prints both scales on opposite edges), computed
+  // straight from currentPixelsPerMm() -- no dependence on state.cal.unit,
+  // since the calibration is exact in either system regardless of which
+  // unit the user happened to enter it in.
+  //
+  // Every length here is exact: computed from currentPixelsPerMm() so
+  // the tick spacing really does match the calibrated scale, same as
+  // every other overlay measurement in this file. Bar thickness/tick
+  // lengths are fixed DISPLAY pixels instead (like the calibration point
+  // markers and ROI resize handles already are) so ticks stay legible at
+  // any zoom level rather than shrinking to nothing when zoomed out --
+  // only the measurement axis itself needs to be "to scale."
+  const RULER_ARM_LENGTH_MM = 60; // per arm -- fits a full 5cm scale AND a full 2in scale (50.8mm) with a little headroom
+  const RULER_BAR_THICKNESS = 26; // display px, shared by both arms; each arm's thickness is split between its two unit scales
+  const RULER_TICK_MINOR = 5; // display px, tick length measured in from each edge toward the shared centerline
+  const RULER_TICK_MAJOR = 10;
+  const RULER_SCALES = [
+    { label: "cm", minorMm: 1, minorPerMajor: 10 }, // metric: major per cm, minor per mm
+    { label: "in", minorMm: 25.4 / 8, minorPerMajor: 8 }, // imperial: major per inch, minor per eighth-inch
+  ];
 
   function rulerSpec() {
     const ppm = currentPixelsPerMm();
     if (!ppm) return null;
-    // Metric rulers: 5cm shown, major tick per cm, minor per mm (10/major).
-    // Imperial: 2in shown, major tick per inch, minor per eighth-inch (8/major)
-    // -- the same major/minor structure real rulers use, and the same
-    // metric-vs-imperial split analysis.gauge_analysis.detect_ruler_
-    // calibration infers automatically on the backend.
-    const imperial = state.cal.unit === "in";
-    const majorUnitMm = imperial ? 25.4 : 10;
-    const minorPerMajor = imperial ? 8 : 10;
-    const totalMajors = imperial ? 2 : 5;
-    const lengthPx = majorUnitMm * totalMajors * ppm;
-    return {
-      imperial,
-      minorPerMajor,
-      totalMinors: totalMajors * minorPerMajor,
-      lengthPx,
-      minorSpacingPx: (majorUnitMm / minorPerMajor) * ppm,
-      unitLabel: imperial ? "in" : "cm",
-    };
+    return { ppm, armLengthPx: RULER_ARM_LENGTH_MM * ppm };
+  }
+
+  function rulerTicksForScale(scale) {
+    const n = Math.floor(RULER_ARM_LENGTH_MM / scale.minorMm + 1e-6);
+    const ticks = [];
+    for (let i = 0; i <= n; i++) {
+      ticks.push({ mm: i * scale.minorMm, isMajor: i % scale.minorPerMajor === 0, majorNum: i / scale.minorPerMajor });
+    }
+    return ticks;
   }
 
   function ensureRulerPosition(spec) {
     if (state.ruler.x !== null && state.ruler.y !== null) return;
-    state.ruler.x = clamp(state.naturalWidth / 2 - spec.lengthPx / 2, 0, Math.max(0, state.naturalWidth - spec.lengthPx));
-    state.ruler.y = state.naturalHeight / 2;
-  }
-
-  function rulerBoundsDisplay(spec) {
-    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
-    return {
-      x: origin.x,
-      y: origin.y,
-      width: spec.lengthPx * getScale(),
-      height: RULER_BAR_HEIGHT + RULER_MAJOR_TICK_H,
-    };
+    state.ruler.x = clamp(state.naturalWidth / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
+    state.ruler.y = clamp(state.naturalHeight / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
   }
 
   function pointInRulerDisplay(displayPt, spec) {
-    const b = rulerBoundsDisplay(spec);
-    return displayPt.x >= b.x && displayPt.x <= b.x + b.width && displayPt.y >= b.y && displayPt.y <= b.y + b.height;
+    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
+    const armLenDisplay = spec.armLengthPx * getScale();
+    const inRect = (x, y, w, h) => displayPt.x >= x && displayPt.x <= x + w && displayPt.y >= y && displayPt.y <= y + h;
+    return (
+      inRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS) || // horizontal (x) arm
+      inRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay) // vertical (y) arm
+    );
+  }
+
+  function drawRulerArm(origin, armLenDisplay, mmToDisplayPx, axis) {
+    const half = RULER_BAR_THICKNESS / 2;
+    const horizontal = axis === "x";
+
+    ctx.fillStyle = "rgba(233, 236, 236, 0.92)";
+    ctx.strokeStyle = "rgba(6, 7, 7, 0.7)";
+    ctx.lineWidth = 1;
+    if (horizontal) {
+      ctx.fillRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
+      ctx.strokeRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y + half);
+      ctx.lineTo(origin.x + armLenDisplay, origin.y + half);
+      ctx.stroke();
+    } else {
+      ctx.fillRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
+      ctx.strokeRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
+      ctx.beginPath();
+      ctx.moveTo(origin.x + half, origin.y);
+      ctx.lineTo(origin.x + half, origin.y + armLenDisplay);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "#060707";
+    ctx.font = "9px monospace";
+    RULER_SCALES.forEach((scale, idx) => {
+      // idx 0 (cm) draws in the "outer" half -- above the bar for the x
+      // arm, left of the bar for the y arm; idx 1 (in) draws in the
+      // "inner" half -- below/right -- mirroring how real dual-marked
+      // rulers print one scale per edge.
+      rulerTicksForScale(scale).forEach((t) => {
+        const pos = t.mm * mmToDisplayPx;
+        const tickLen = t.isMajor ? RULER_TICK_MAJOR : RULER_TICK_MINOR;
+        ctx.lineWidth = t.isMajor ? 1.6 : 1;
+        ctx.beginPath();
+        if (horizontal) {
+          const x = origin.x + pos;
+          if (idx === 0) {
+            ctx.moveTo(x, origin.y);
+            ctx.lineTo(x, origin.y + tickLen);
+          } else {
+            ctx.moveTo(x, origin.y + RULER_BAR_THICKNESS);
+            ctx.lineTo(x, origin.y + RULER_BAR_THICKNESS - tickLen);
+          }
+        } else {
+          const y = origin.y + pos;
+          if (idx === 0) {
+            ctx.moveTo(origin.x, y);
+            ctx.lineTo(origin.x + tickLen, y);
+          } else {
+            ctx.moveTo(origin.x + RULER_BAR_THICKNESS, y);
+            ctx.lineTo(origin.x + RULER_BAR_THICKNESS - tickLen, y);
+          }
+        }
+        ctx.stroke();
+
+        if (!t.isMajor || t.majorNum === 0) return;
+        const label = String(t.majorNum);
+        if (horizontal) {
+          const x = origin.x + pos;
+          ctx.textAlign = "center";
+          ctx.textBaseline = idx === 0 ? "bottom" : "top";
+          ctx.fillText(label, x, idx === 0 ? origin.y - 2 : origin.y + RULER_BAR_THICKNESS + 2);
+        } else {
+          const y = origin.y + pos;
+          ctx.textAlign = idx === 0 ? "right" : "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, idx === 0 ? origin.x - 3 : origin.x + RULER_BAR_THICKNESS + 3, y);
+        }
+      });
+    });
+
+    // Unit tag at the far end of each scale row -- past the last tick,
+    // so it never collides with a numbered label near the origin.
+    ctx.font = "8px monospace";
+    ctx.fillStyle = "#565e60";
+    if (horizontal) {
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("cm", origin.x + armLenDisplay + 3, origin.y + half);
+      ctx.textBaseline = "top";
+      ctx.fillText("in", origin.x + armLenDisplay + 3, origin.y + half);
+    } else {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("cm", origin.x + half, origin.y + armLenDisplay + 3);
+      ctx.fillText("in", origin.x + half, origin.y + armLenDisplay + 12);
+    }
   }
 
   function drawRuler() {
@@ -1242,34 +1334,17 @@
 
     const s = getScale();
     const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
-    const lengthDisplay = spec.lengthPx * s;
-    const minorSpacingDisplay = spec.minorSpacingPx * s;
+    const armLenDisplay = spec.armLengthPx * s;
+    const mmToDisplayPx = spec.ppm * s;
 
     ctx.save();
-    ctx.fillStyle = "rgba(233, 236, 236, 0.92)";
-    ctx.strokeStyle = "rgba(6, 7, 7, 0.7)";
-    ctx.lineWidth = 1;
-    ctx.fillRect(origin.x, origin.y, lengthDisplay, RULER_BAR_HEIGHT);
-    ctx.strokeRect(origin.x, origin.y, lengthDisplay, RULER_BAR_HEIGHT);
-
-    ctx.fillStyle = "#060707";
-    ctx.font = "9px monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    for (let i = 0; i <= spec.totalMinors; i++) {
-      const x = origin.x + i * minorSpacingDisplay;
-      const isMajor = i % spec.minorPerMajor === 0;
-      ctx.lineWidth = isMajor ? 1.6 : 1;
-      ctx.beginPath();
-      ctx.moveTo(x, origin.y);
-      ctx.lineTo(x, origin.y + (isMajor ? RULER_MAJOR_TICK_H : RULER_MINOR_TICK_H));
-      ctx.stroke();
-      if (isMajor && i > 0) {
-        ctx.fillText(String(i / spec.minorPerMajor), x, origin.y + RULER_MAJOR_TICK_H + 2);
-      }
-    }
-    ctx.textAlign = "left";
-    ctx.fillText(spec.unitLabel, origin.x + 3, origin.y + RULER_BAR_HEIGHT - 11);
+    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "x");
+    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "y");
+    // Corner drag handle, drawn last so it sits on top of both arms.
+    ctx.fillStyle = "rgba(6, 7, 7, 0.85)";
+    ctx.beginPath();
+    ctx.arc(origin.x, origin.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
@@ -1752,8 +1827,8 @@
       return;
     }
     const natPt = displayToNatural(eventToDisplayPoint(evt));
-    state.ruler.x = clamp(natPt.x - state.ruler.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.lengthPx));
-    state.ruler.y = clamp(natPt.y - state.ruler.dragOffset.dy, 0, state.naturalHeight);
+    state.ruler.x = clamp(natPt.x - state.ruler.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
+    state.ruler.y = clamp(natPt.y - state.ruler.dragOffset.dy, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
     render();
   });
   function endRulerDrag(evt) {

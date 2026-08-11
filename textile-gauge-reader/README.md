@@ -1097,18 +1097,32 @@ fixed slack" bound.
 
 Once calibration is confirmed, a "Ruler" toggle appears in the viewer
 (bottom-left, next to the zoom controls). Turning it on drops a movable
-ruler graphic onto the photo, drawn at the CALIBRATED scale — 5 physical
-cm or 2 physical inches long, with major/minor ticks matching a real
-ruler's structure (10 minor ticks per cm, 8 per inch, the same split
-`detect_ruler_calibration` infers automatically on the backend) — so the
-user can drag it anywhere over the fabric to sanity-check the calibration
+ruler graphic onto the photo, drawn at the CALIBRATED scale, so the user
+can drag it anywhere over the fabric to sanity-check the calibration
 against a feature they can see directly (a seam, a known-size object,
 their own tape measure still in frame), independent of trusting the
-numbers alone. Only the ruler's LENGTH is drawn to scale (in natural
-image pixels, so it stays accurate at any zoom level); its bar thickness
-and tick heights are fixed display pixels, like the calibration point
-markers and ROI resize handles already are, so ticks stay legible rather
-than shrinking away when zoomed out.
+numbers alone.
+
+It's drawn as a single rigid corner bracket — one arm running along
+image x, one along image y, sharing a draggable origin corner — rather
+than a lone horizontal bar, so both the wale (x) and course (y)
+directions can be checked against the same reference point at once. Each
+arm is 60mm long (enough room for a full 5cm scale AND a full 2in scale
+with some headroom) and shows BOTH a cm row and an in row simultaneously
+— like a real dual-marked ruler prints both scales on opposite edges —
+with major/minor ticks matching each system's real structure (10 minor
+per cm, 8 per inch, the same split `detect_ruler_calibration` infers
+automatically on the backend). Both scales come straight from
+`currentPixelsPerMm()`, with no dependence on which unit the user
+happened to calibrate in — the calibration is exact in either system
+regardless.
+
+Only each arm's LENGTH is drawn to scale (in natural image pixels, so it
+stays accurate at any zoom level); bar thickness and tick lengths are
+fixed display pixels, like the calibration point markers and ROI resize
+handles already are, so ticks stay legible rather than shrinking away
+when zoomed out. Dragging anywhere on either arm (or the corner handle)
+moves the whole bracket as one unit.
 
 Deliberately gated to appear only AFTER Confirm Calibration — before
 that there's no scale to draw it at — and stays available (and
