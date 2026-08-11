@@ -337,6 +337,21 @@ input[type="checkbox"]:checked::after {
   background-position: right 0.6rem center;
 }
 .fl-select:hover { border-color: var(--petrol); }
+
+/* Free-text control (e.g. per-layer petal counts) — matches .fl-select, no chevron. */
+.fl-text {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--petrol-bright);
+  background-color: var(--black);
+  border: 1px solid var(--line-strong);
+  padding: 0.5rem 0.6rem;
+}
+.fl-text::placeholder { color: var(--petrol); opacity: 0.6; text-transform: none; letter-spacing: 0.04em; }
+.fl-text:hover { border-color: var(--petrol); }
+.fl-text:focus { outline: none; border-color: var(--petrol-bright); }
 .fl-select:focus-visible {
   outline: 2px solid var(--petrol-bright);
   outline-offset: 2px;

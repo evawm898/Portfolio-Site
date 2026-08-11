@@ -46,6 +46,7 @@ const JOIN_FLARE_DIST = 0.10;  // a flared tube blends into its end bead (a soft
 const RIM_WIDTH       = 0.34;  // petal-margin line weight, relative to the midrib
                                // (the leaf edge is a fine vein, not a fat rope)
 const SEED_BASE      = 20250808;
+const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
 
 /* ===================================================================
    REAL-WORLD SCALE  (STL export — Phase 1)
@@ -1006,8 +1007,87 @@ let hasFramed = false;
 // accumulators built with { exportMode: true }, so every radius and slab
 // thickness is floored to the minimum printable feature. Pure w.r.t. the scene
 // (no camera / glow side effects); returns what the caller needs for framing.
+function resolveLayerCounts(ui, layerCount) {
+  // Petal count for each whorl, outer -> inner. The optional "petals per layer"
+  // list (comma-separated) overrides per layer; blank / invalid slots, and any
+  // layers past the end of the list, fall back to the Bloom petal count — so an
+  // empty list makes every layer match the single-ring flower.
+  const base = clamp(Math.round(ui.petalCount), 1, 40);
+  const raw = String(ui.petalsPerLayer || '').split(',').map((s) => parseInt(s.trim(), 10));
+  const counts = [];
+  for (let i = 0; i < layerCount; i++) {
+    let v = i < raw.length ? raw[i] : raw[raw.length - 1];
+    if (!Number.isFinite(v) || v < 1) v = base;
+    counts.push(clamp(Math.round(v), 1, 40));
+  }
+  return counts;
+}
+
 function buildInto(petalAcc, coreAcc, ui, P) {
-  const count = ui.petalCount;
+  // LAYERS — concentric petal whorls. Layer 0 is the original single-ring flower;
+  // each further whorl reuses the SAME petal recipe (shape / tip / infill), just
+  // smaller, higher, rotated into the outer gaps, and more closed. With
+  // layerCount = 1 only layer 0 builds, so the output is identical to the
+  // pre-layers flower.
+  const layerCount = clamp(Math.round(ui.layerCount), 1, 6);
+  const falloff = clamp(ui.layerSizeFalloff, 0.3, 1);       // inner size as a fraction of the layer outside it
+  const heightStep = ui.layerHeightOffset;                  // vertical stack distance per layer (world units)
+  const rotStep = ui.layerRotationOffset * DEG;             // angular stagger per layer
+  const bloomStep = ui.layerBloomAngleDelta * DEG;          // extra closure (lower opening angle) per layer
+  const layerPetals = resolveLayerCounts(ui, layerCount);
+
+  const placements = [];
+  let outer = null;                                          // layer 0's sizing drives the core / base
+  for (let li = 0; li < layerCount; li++) {
+    const layer = {
+      index: li,
+      scale: Math.pow(falloff, li),
+      dHeight: heightStep * li,
+      dRot: rotStep * li,
+      dBloom: bloomStep * li,
+    };
+    const res = buildLayerInto(petalAcc, ui, P, layerPetals[li], layer);
+    if (li === 0) outer = res;
+    for (const pl of res.placements) placements.push(pl);
+  }
+
+  const elev = ui.elevation;
+  const centerHeight = elev * outer.elevAmp;                 // core sits at the outer receptacle centre
+  const ringR = outer.ringR;
+  buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
+
+  // BASE — independent organic parts, all in the same teal tubes as the petals
+  // (into the petal mesh): a RECEPTACLE swelling, a ring of SEPALS, and a STEM.
+  // They compose freely around the OUTER whorl; the stem descends from the
+  // receptacle underside if there is one, otherwise straight from the
+  // convergence point.
+  let stemTop = centerHeight;
+  if (ui.receptacleType !== 'none') {
+    const hh = buildReceptacleInto(petalAcc, P, 0, centerHeight, 0, clamp(ui.receptacleSize, 0.1, 1.5));
+    stemTop = centerHeight - hh;
+  }
+  if (ui.sepalsType !== 'none') {
+    buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
+      count: ui.sepalCount,
+      size: ui.sepalSize,
+      style: ui.sepalStyle,
+      centerCurve: ui.sepalCenterCurve,
+      edgeCurve: ui.sepalEdgeCurve,
+      edgeProfile: ui.sepalEdgeProfile,
+    }, ringR);
+  }
+  if (ui.stemType !== 'none') {
+    buildStemInto(petalAcc, P, 0, stemTop, 0, clamp(ui.stemLength, 0.2, 6), clamp(ui.stemCurve, -1, 1));
+  }
+
+  return { placements, centerHeight };
+}
+
+// Build ONE whorl's petals into the accumulator. `count` is this whorl's petal
+// count; `layer` carries its transforms (scale / dHeight / dRot / dBloom — all
+// zero-effect for layer 0). Returns the placements plus the derived sizing the
+// caller needs for the core / base. Reuses buildPetalInto — no petal logic here.
+function buildLayerInto(petalAcc, ui, P, count, layer) {
   const bloomType = ui.bloomType;
 
   // BILATERAL is organised per side (max 3 petals each side of the mirror line),
@@ -1101,7 +1181,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     // radius cancels here, so the lean stays bounded at any coil tightness.
     const slope = -elev * ELEV_FACTOR * (Math.PI / 2) * Math.sin(Math.PI * rho);
     // RADIAL sphere tiers supply explicit height + tilt; otherwise use the receptacle.
-    const height = pl.height != null ? pl.height : elev * elevAmp * profile;
+    const baseHeight = pl.height != null ? pl.height : elev * elevAmp * profile;
     const tilt = pl.tilt != null ? pl.tilt : RECEPTACLE_TILT * Math.atan(slope);
     // BILATERAL: each petal position overrides width / curves, and (unless DEFAULT)
     // its tip/edge style, on a per-petal copy of P.
@@ -1113,36 +1193,22 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       Pp = { ...P, L: P.L * s, W: pl.over.W * s, curl: pl.over.curl, edgeCurve: pl.over.edgeCurve, edgeProfile: pl.over.edgeProfile };
       if (pl.over.edge && pl.over.edge !== 'default') Pp.tipStyle = pl.over.edge;
     }
-    buildPetalInto(petalAcc, Pp, pl.az, height, pl.r - P.r0, tilt, SEED_BASE + pl.seedIdx * 131);
+    // LAYER transforms — identity for layer 0 (scale 1, all deltas 0), so the outer
+    // whorl is byte-identical to the single-ring flower. Inner whorls shrink the
+    // petal + its ring radius, lower the petal's own opening angle (dBloom) so it
+    // closes up, stack vertically, and rotate into the outer gaps. A per-layer seed
+    // offset varies the venation between whorls.
+    if (layer.scale !== 1 || layer.dBloom !== 0) {
+      Pp = { ...Pp, L: Pp.L * layer.scale, W: Pp.W * layer.scale, bloom: Math.max(0, Pp.bloom - layer.dBloom) };
+    }
+    const az = pl.az + layer.dRot;
+    const height = baseHeight * layer.scale + layer.dHeight;
+    const radialOffset = (pl.r - P.r0) * layer.scale;
+    buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt,
+                   SEED_BASE + pl.seedIdx * 131 + layer.index * LAYER_SEED_STRIDE);
   }
 
-  const centerHeight = elev * elevAmp;                           // core sits at the receptacle centre
-  buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
-
-  // BASE — independent organic parts, all in the same teal tubes as the petals
-  // (into the petal mesh): a RECEPTACLE swelling, a ring of SEPALS, and a STEM.
-  // They compose freely; the stem descends from the receptacle underside if there
-  // is one, otherwise straight from the convergence point.
-  let stemTop = centerHeight;
-  if (ui.receptacleType !== 'none') {
-    const hh = buildReceptacleInto(petalAcc, P, 0, centerHeight, 0, clamp(ui.receptacleSize, 0.1, 1.5));
-    stemTop = centerHeight - hh;
-  }
-  if (ui.sepalsType !== 'none') {
-    buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
-      count: ui.sepalCount,
-      size: ui.sepalSize,
-      style: ui.sepalStyle,
-      centerCurve: ui.sepalCenterCurve,
-      edgeCurve: ui.sepalEdgeCurve,
-      edgeProfile: ui.sepalEdgeProfile,
-    }, ringR);
-  }
-  if (ui.stemType !== 'none') {
-    buildStemInto(petalAcc, P, 0, stemTop, 0, clamp(ui.stemLength, 0.2, 6), clamp(ui.stemCurve, -1, 1));
-  }
-
-  return { placements, centerHeight };
+  return { placements, elevAmp, ringR };
 }
 
 function generate() {
@@ -1327,6 +1393,12 @@ const inputs = {
   tipFrequency: document.getElementById('tipFrequency'),
   tipIrregularity: document.getElementById('tipIrregularity'),
   bloomType: document.getElementById('bloomType'),
+  layerCount: document.getElementById('layerCount'),
+  petalsPerLayer: document.getElementById('petalsPerLayer'),
+  layerSizeFalloff: document.getElementById('layerSizeFalloff'),
+  layerHeightOffset: document.getElementById('layerHeightOffset'),
+  layerRotationOffset: document.getElementById('layerRotationOffset'),
+  layerBloomAngleDelta: document.getElementById('layerBloomAngleDelta'),
   bilPerSide: document.getElementById('bilPerSide'),
   bilSpacing: document.getElementById('bilSpacing'),
   bilCenterPetal: document.getElementById('bilCenterPetal'),
@@ -1405,6 +1477,12 @@ function readUI() {
     tipFrequency: parseInt(inputs.tipFrequency.value, 10),
     tipIrregularity: parseFloat(inputs.tipIrregularity.value),
     bloomType: inputs.bloomType.value,
+    layerCount: parseInt(inputs.layerCount.value, 10),
+    petalsPerLayer: inputs.petalsPerLayer.value,
+    layerSizeFalloff: parseFloat(inputs.layerSizeFalloff.value),
+    layerHeightOffset: parseFloat(inputs.layerHeightOffset.value),
+    layerRotationOffset: parseFloat(inputs.layerRotationOffset.value),
+    layerBloomAngleDelta: parseFloat(inputs.layerBloomAngleDelta.value),
     bilPerSide: parseInt(inputs.bilPerSide.value, 10),
     bilSpacing: parseFloat(inputs.bilSpacing.value),
     bilCenterPetal: inputs.bilCenterPetal.checked,
@@ -1490,6 +1568,12 @@ function refreshLabels() {
   setLabel('sphereTiers', inputs.sphereTiers.value);
   setLabel('sphereStart', inputs.sphereStart.value);
   setLabel('sphereSize', (+inputs.sphereSize.value).toFixed(2) + '×');
+  setLabel('layerCount', inputs.layerCount.value);
+  setLabel('layerSizeFalloff', (+inputs.layerSizeFalloff.value).toFixed(2) + '×');
+  const lho = +inputs.layerHeightOffset.value;
+  setLabel('layerHeightOffset', (lho > 0 ? '+' : '') + lho.toFixed(2));
+  setLabel('layerRotationOffset', inputs.layerRotationOffset.value + '°');
+  setLabel('layerBloomAngleDelta', inputs.layerBloomAngleDelta.value + '°');
   for (let k = 1; k <= 3; k++) {
     setLabel('bilScale' + k, (+inputs['bilScale' + k].value).toFixed(2) + '×');
     setLabel('bilWidth' + k, (+inputs['bilWidth' + k].value).toFixed(2));
@@ -1546,7 +1630,8 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
   const tris = Math.round((petalAcc.idx.length + coreIdx) / 3);
   const el = document.getElementById('readout');
   if (!el) return;
-  const petals = `${petalCount} petal${petalCount === 1 ? '' : 's'}`;
+  const layers = clamp(Math.round(ui.layerCount || 1), 1, 6);
+  const petals = `${petalCount} petal${petalCount === 1 ? '' : 's'}${layers > 1 ? ` · ${layers} layers` : ''}`;
   const arrange = ui.bloomType === 'radial' ? 'radial rosette'
     : ui.bloomType === 'bilateral' ? 'bilateral fan'
     : 'phyllotactic spiral';
@@ -1585,6 +1670,7 @@ function setBuilding(on) {
  'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
  'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
+ 'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
  'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
@@ -1652,6 +1738,15 @@ function updateBilateralPetals() {
   document.querySelectorAll('[data-hide-bilateral]').forEach((el) => { el.hidden = on; });
 }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
+// LAYERS: the per-layer controls only matter with more than one whorl, so hide
+// them (data-layers-multi) when Layer count is 1.
+function updateLayerOptions() {
+  const multi = (parseInt(inputs.layerCount.value, 10) || 1) > 1;
+  document.querySelectorAll('[data-layers-multi]').forEach((el) => { el.hidden = !multi; });
+}
+inputs.layerCount.addEventListener('input', () => { refreshLabels(); updateLayerOptions(); scheduleRegen(); });
+// per-layer petal count is a free-text list; rebuild on edit (parsing is tolerant)
+inputs.petalsPerLayer.addEventListener('input', () => { scheduleRegen(); });
 // per-side count also drives which per-petal dropdowns are shown
 inputs.bilPerSide.addEventListener('input', updateBilateralPetals);
 // the bilateral "petal on mirror line" toggle changes the layout, so it regenerates
@@ -1727,6 +1822,12 @@ if (resetBtn) {
     inputs.tipFrequency.value = d.tipFrequency;
     inputs.tipIrregularity.value = d.tipIrregularity;
     inputs.bloomType.value = d.bloomType;
+    inputs.layerCount.value = d.layerCount;
+    inputs.petalsPerLayer.value = d.petalsPerLayer;
+    inputs.layerSizeFalloff.value = d.layerSizeFalloff;
+    inputs.layerHeightOffset.value = d.layerHeightOffset;
+    inputs.layerRotationOffset.value = d.layerRotationOffset;
+    inputs.layerBloomAngleDelta.value = d.layerBloomAngleDelta;
     inputs.bilPerSide.value = d.bilPerSide;
     inputs.bilSpacing.value = d.bilSpacing;
     inputs.sphereTiers.value = d.sphereTiers;
@@ -1785,6 +1886,7 @@ if (resetBtn) {
     updateTipOptions();
     updateInfillOptions();
     updateBloomOptions();
+    updateLayerOptions();
     updateCenterOptions();
     updateBaseOptions();
     refreshLabels();
@@ -1814,6 +1916,8 @@ const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
+  layerCount: 1, petalsPerLayer: '', layerSizeFalloff: 0.75, layerHeightOffset: 0.05,
+  layerRotationOffset: 24, layerBloomAngleDelta: 12,
   sphereTiers: 5, sphereStart: 1, sphereSize: 1,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
   bilScale1: 1, bilScale2: 1, bilScale3: 1,
@@ -1910,6 +2014,7 @@ controls.autoRotate = inputs.autoRotate.checked;
 updateTipOptions();
 updateInfillOptions();
 updateBloomOptions();
+updateLayerOptions();
 updateCenterOptions();
 updateBaseOptions();
 refreshLabels();

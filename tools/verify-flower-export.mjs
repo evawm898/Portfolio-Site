@@ -80,6 +80,8 @@ const CONFIGS = [
   { label: '+ strap sepals', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }] },
   { label: '+ solid sepals', set: [{ id: 'sepalStyle', value: 'solid', evt: 'change' }] },
   { label: 'full plant (receptacle + stem + solid sepals)', set: [{ id: 'receptacleType', value: 'rounded', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
+  { label: '+ 3 layers (uniform count)', set: [{ id: 'layerCount', value: '3' }] },
+  { label: '+ 4 layers, per-layer counts (rose/peony)', set: [{ id: 'layerCount', value: '4' }, { id: 'petalsPerLayer', value: '6,10,14,18' }] },
 ];
 
 const server = http.createServer((req, res) => {

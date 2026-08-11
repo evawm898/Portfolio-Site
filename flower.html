@@ -265,6 +265,70 @@
       </div>
     </section>
 
+    <!-- ============================ LAYERS =========================== -->
+    <section class="fl-acc" data-acc>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-layers">
+        <span class="fl-acc__label">Layers</span>
+        <span class="fl-acc__chev" aria-hidden="true"></span>
+      </button>
+      <div class="fl-acc__body" id="acc-layers">
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="layerCount">Layer count</label>
+            <span class="fl-ctrl__val" data-value="layerCount"></span>
+          </div>
+          <input type="range" id="layerCount" min="1" max="6" step="1" value="1">
+          <span class="fl-ctrl__hint">concentric petal whorls (1 = single ring, unchanged)</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="petalsPerLayer">Petals per layer</label>
+          </div>
+          <input type="text" id="petalsPerLayer" class="fl-text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="blank = Bloom petal count" value="">
+          <span class="fl-ctrl__hint">comma list, outer&rarr;inner (e.g. 8,12,16); blank slots use the Bloom petal count</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerSizeFalloff">Layer size falloff</label>
+            <span class="fl-ctrl__val" data-value="layerSizeFalloff"></span>
+          </div>
+          <input type="range" id="layerSizeFalloff" min="0.3" max="1" step="0.01" value="0.75">
+          <span class="fl-ctrl__hint">each inner layer's size, as a fraction of the one outside it (1 = uniform)</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerHeightOffset">Layer height offset</label>
+            <span class="fl-ctrl__val" data-value="layerHeightOffset"></span>
+          </div>
+          <input type="range" id="layerHeightOffset" min="-0.3" max="0.3" step="0.01" value="0.05">
+          <span class="fl-ctrl__hint">vertical stacking distance between layers (+ raises the inner layers)</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerRotationOffset">Layer rotation offset</label>
+            <span class="fl-ctrl__val" data-value="layerRotationOffset"></span>
+          </div>
+          <input type="range" id="layerRotationOffset" min="0" max="90" step="1" value="24">
+          <span class="fl-ctrl__hint">angular stagger per layer, so inner petals fall in the outer gaps</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerBloomAngleDelta">Layer bloom angle delta</label>
+            <span class="fl-ctrl__val" data-value="layerBloomAngleDelta"></span>
+          </div>
+          <input type="range" id="layerBloomAngleDelta" min="0" max="40" step="1" value="12">
+          <span class="fl-ctrl__hint">how much more closed/cupped each inner layer is (rose/peony centre)</span>
+        </div>
+
+      </div>
+    </section>
+
     <!-- ============================ PETAL ============================ -->
     <section class="fl-acc" data-acc>
       <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-petal">
