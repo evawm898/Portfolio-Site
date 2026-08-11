@@ -687,17 +687,21 @@ function generate() {
   } else if (bloomType === 'radial') {
     // Petals sit on an INVISIBLE sphere in stacked latitude rings (tiers): each ring
     // is at its own latitude, so it has its own radius (R·cosφ) and height (R·sinφ),
-    // and its petals tilt to point radially out from the sphere centre. Rings share
-    // azimuths, so petals line up in longitudinal columns up the sphere.
+    // and its petals tilt to point radially out from the sphere centre.
     const T = clamp(Math.round(ui.sphereTiers), 1, 12);
+    const startTier = clamp(Math.round(ui.sphereStart), 1, T);  // first tier (from the bottom) with petals
     const R = ui.sphereSize * PETAL_LENGTH * 0.5 * lerp(1.25, 0.6, ui.tightness);
     const cy = elev * elevAmp;                                 // ball centre height
-    const phiMax = 72 * DEG;
+    // The bottom reaches deeper than the top and a >1 bias clusters the tiers toward
+    // the lower half of the sphere (fuller skirt below the equator). i = 0 is the
+    // bottom tier, i = T-1 the top.
+    const phiTop = 72 * DEG, phiBottom = -84 * DEG, biasLow = 1.4;
     if (count === 1) {
       placements.push({ az: 0, r: 0, seedIdx: 0, height: cy, tilt: 0 });
     } else {
-      for (let i = 0; i < T; i++) {
-        const phi = T === 1 ? 0 : lerp(-phiMax, phiMax, i / (T - 1));
+      for (let i = startTier - 1; i < T; i++) {
+        const t = T === 1 ? 0 : Math.pow(i / (T - 1), biasLow);
+        const phi = T === 1 ? 0 : lerp(phiBottom, phiTop, t);
         const rr = R * Math.cos(phi), yy = cy + R * Math.sin(phi);
         // petals per ring scale with the ring radius (∝ cosφ) so the packing density
         // is even over the sphere — `count` is the widest (equator) ring's count.
@@ -840,6 +844,7 @@ const inputs = {
   bilEdgeProfile2: document.getElementById('bilEdgeProfile2'),
   bilEdgeProfile3: document.getElementById('bilEdgeProfile3'),
   sphereTiers: document.getElementById('sphereTiers'),
+  sphereStart: document.getElementById('sphereStart'),
   sphereSize: document.getElementById('sphereSize'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
@@ -905,6 +910,7 @@ function readUI() {
     bilEdgeProfile2: parseFloat(inputs.bilEdgeProfile2.value),
     bilEdgeProfile3: parseFloat(inputs.bilEdgeProfile3.value),
     sphereTiers: parseInt(inputs.sphereTiers.value, 10),
+    sphereStart: parseInt(inputs.sphereStart.value, 10),
     sphereSize: parseFloat(inputs.sphereSize.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
@@ -953,6 +959,7 @@ function refreshLabels() {
   setLabel('bilPerSide', inputs.bilPerSide.value);
   setLabel('bilSpacing', inputs.bilSpacing.value + '°');
   setLabel('sphereTiers', inputs.sphereTiers.value);
+  setLabel('sphereStart', inputs.sphereStart.value);
   setLabel('sphereSize', (+inputs.sphereSize.value).toFixed(2) + '×');
   for (let k = 1; k <= 3; k++) {
     setLabel('bilScale' + k, (+inputs['bilScale' + k].value).toFixed(2) + '×');
@@ -1032,7 +1039,7 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'bilPerSide', 'bilSpacing', 'sphereTiers', 'sphereSize',
+['petalCount', 'bilPerSide', 'bilSpacing', 'sphereTiers', 'sphereStart', 'sphereSize',
  'bilScale1', 'bilScale2', 'bilScale3',
  'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
@@ -1163,6 +1170,7 @@ if (resetBtn) {
     inputs.bilPerSide.value = d.bilPerSide;
     inputs.bilSpacing.value = d.bilSpacing;
     inputs.sphereTiers.value = d.sphereTiers;
+    inputs.sphereStart.value = d.sphereStart;
     inputs.sphereSize.value = d.sphereSize;
     inputs.bilCenterPetal.checked = d.bilCenterPetal;
     inputs.bilEdge1.value = d.bilEdge1;
@@ -1215,7 +1223,7 @@ const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
-  sphereTiers: 5, sphereSize: 1,
+  sphereTiers: 5, sphereStart: 1, sphereSize: 1,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
   bilScale1: 1, bilScale2: 1, bilScale3: 1,
   bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
