@@ -62,3 +62,62 @@ constant fixes the ratio, not any one flower's size.
   specific print by adjusting it (or by scaling in the slicer).
 - Phase 4 must apply `MM_PER_UNIT` to a **copy** of the geometry at export, not
   to the live meshes.
+
+---
+
+## Phase 2 — Minimum feature thickness (DONE)
+
+**Goal:** guarantee every printed strut/wall is ≥ 0.8 mm (SLS/MJF floor), applied
+at export only, without changing the live view.
+
+**What changed** (`flower.js`)
+- Constants: `MIN_FEATURE_MM = 0.8`, `MIN_FEATURE_UNITS = 0.8/26 ≈ 0.0308 u`,
+  `MIN_RADIUS_UNITS = MIN_FEATURE_UNITS/2 ≈ 0.0154 u` (a round tube's printed
+  thickness is its diameter, so the radius floor is half the feature size).
+- `MeshAccumulator` gained an `exportMode` flag (constructor opt). When set:
+  - `addTube` runs its radius through `_floorRadius()`, which lifts the floor
+    while preserving the radius's form — constant, `[start,end]` taper pair, or
+    `t→radius` function (the veins' smooth taper);
+  - `addBead` floors its radius; `addSlab` floors its `thick` to the full
+    feature size (a sheet's thickness is the whole feature, not half).
+  - The live scene builds accumulators **without** the flag, so its hair-fine
+    veins/rims are untouched — the floor is export-only.
+- Added `minRadius` / `minThick` telemetry (tracked only in export mode) so the
+  export UI can report the real-world thinnest feature of a print (Phase 4).
+- **Refactor:** the geometry-population body of `generate()` moved into a shared
+  `buildInto(petalAcc, coreAcc, ui, P)`. The live path calls it with normal
+  accumulators; the export path (Phase 4) will call it with
+  `new MeshAccumulator({ exportMode: true })`. This is why the floor reaches
+  *every* part uniformly — all radii already flow through
+  `addTube`/`addBead`/`addSlab`, so flooring there covers rims, veins, teeth
+  veins, node beads, voronoi slabs, strands, bone, lace, the core stamens/pistil,
+  and the receptacle/sepals/stem.
+
+**Verification** (headless, export-mode build of each config — thinnest tube
+slider `tube = 0`, floor = 0.8 mm):
+
+| Config | tube/bead Ø (mm) | voronoi slab (mm) | core Ø (mm) |
+| --- | --- | --- | --- |
+| default (tube 0.4, veins) | 0.800 | — | 0.917 |
+| thin-tube veins | 0.800 | — | 0.800 |
+| voronoi thin | 0.800 | 0.800 | 0.800 |
+| strands thin | 0.800 | — | 0.800 |
+| bone thin | 0.800 | — | 0.800 |
+| lace thin | 0.800 | — | 0.800 |
+| base + core (receptacle+sepals+stem) thin | 0.800 | — | 0.800 |
+
+Every thinnest feature lands exactly at the 0.8 mm floor; nothing prints thinner.
+Where a feature is already thicker than 0.8 mm (e.g. default core at 0.917 mm) it
+passes through unclamped. Live view remains byte-identical (default bounds + tri
+count unchanged; 24-petal voronoi still 954,432 tris). `node --check` passes.
+
+**Open issues / notes for later phases**
+- The Voronoi slab's **in-plane wall width** (the material between a cell's hole
+  and its neighbour) is set by the cell packing, not by a radius argument, so it
+  is not directly floored here. At the default density the walls are comfortably
+  thick, but very high Voronoi density at a tiny `MM_PER_UNIT` could thin them.
+  Phase 3 reworks the petal lamina and is the right place to guarantee a minimum
+  wall; noted so it isn't lost.
+- The floor thickens thin lines on export (e.g. the 0.30 mm default rim → 0.8 mm).
+  That is the intended printability trade-off and only affects the STL, never the
+  screen.

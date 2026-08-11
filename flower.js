@@ -68,6 +68,27 @@ const SEED_BASE      = 20250808;
    To rescale every future export, change ONLY this number. */
 const MM_PER_UNIT = 26;   // millimetres per Three.js world unit (single scale knob)
 
+/* ===================================================================
+   MINIMUM FEATURE THICKNESS  (STL export — Phase 2)
+   -------------------------------------------------------------------
+   Powder-bed processes (SLS / MJF) can only reliably resolve struts and
+   walls down to ~0.8 mm; anything thinner either fails to fuse or snaps
+   off. So at export time every radius/thickness is floored to guarantee
+   the printed feature is at least this thick. Like MM_PER_UNIT this only
+   affects exported geometry — the live view keeps its hair-fine veins.
+
+   A round tube's printed thickness is its DIAMETER (2·radius), so the
+   radius floor is half the feature size. A Voronoi slab's thickness is
+   its full `thick`, so that floors to the whole feature size.
+
+   At MM_PER_UNIT = 26: MIN_FEATURE_UNITS = 0.8/26 ≈ 0.0308 u, radius
+   floor ≈ 0.0154 u. For reference the thinnest tube slider gives radius
+   0.008 u (0.42 mm dia) and the default rim 0.0057 u (0.30 mm dia) —
+   both below the floor, so both are lifted to 0.8 mm on export. */
+const MIN_FEATURE_MM    = 0.8;                          // smallest reliable SLS/MJF feature
+const MIN_FEATURE_UNITS = MIN_FEATURE_MM / MM_PER_UNIT; // slab-thickness / wall floor, in world units
+const MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;        // tube/bead radius floor (diameter = feature)
+
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
    layout). Petal i sits at angle i*GOLDEN_ANGLE and radius spread*sqrt(i)
    (Vogel's model — the sunflower packing). Below EVEN_MAX petals the spiral has
@@ -98,13 +119,32 @@ const SLAB_FILLET    = 1.0;    // rounded-edge radius as a fraction of half-thic
    =================================================================== */
 
 class MeshAccumulator {
-  constructor() {
+  constructor(opts = {}) {
     this.pos = [];
     this.nor = [];
     this.idx = [];
     this.vcount = 0;
     this.min = [Infinity, Infinity, Infinity];
     this.max = [-Infinity, -Infinity, -Infinity];
+    // EXPORT ONLY: when true, every tube/bead radius and slab thickness is
+    // floored to the minimum printable feature (Phase 2). The live scene
+    // builds accumulators without this flag, so its thin veins are untouched.
+    this.exportMode = !!opts.exportMode;
+    // Export telemetry: thinnest round radius and slab thickness actually
+    // emitted (world units). Only tracked in export mode; used to report the
+    // real-world minimum feature size of a print.
+    this.minRadius = Infinity;
+    this.minThick = Infinity;
+  }
+
+  // Lift a radius to the export floor, preserving its form (constant number,
+  // [start,end] taper pair, or a t->radius function). A no-op when not exporting.
+  _floorRadius(radius) {
+    if (!this.exportMode) return radius;
+    const f = MIN_RADIUS_UNITS;
+    if (typeof radius === 'function') return (t) => Math.max(f, radius(t));
+    if (Array.isArray(radius)) return [Math.max(f, radius[0]), Math.max(f, radius[1])];
+    return Math.max(f, radius);
   }
 
   _vertex(x, y, z, nx, ny, nz) {
@@ -125,6 +165,7 @@ class MeshAccumulator {
   addTube(points, radius, flare = 0, radialSegments = RADIAL_SEGMENTS) {
     const n = points.length;
     if (n < 2) return;
+    radius = this._floorRadius(radius);   // export: floor to min printable feature (no-op live)
 
     // ---- cumulative arc length (used to flare the radius toward the ends) ----
     const arc = new Array(n);
@@ -208,6 +249,7 @@ class MeshAccumulator {
         const oz = nrm[2] * c + bz * sn;
         this._vertex(P.x + ox * rr, P.y + oy * rr, P.z + oz * rr, ox, oy, oz);
       }
+      if (this.exportMode && rr < this.minRadius) this.minRadius = rr;   // telemetry
     }
 
     // ---- stitch quads between consecutive rings ----
@@ -224,6 +266,10 @@ class MeshAccumulator {
   /* A small welded bead (low-res UV sphere) that caps tube ends and reads
      as a lattice node. */
   addBead(center, radius, rings = 5, sectors = 8) {
+    if (this.exportMode) {
+      radius = Math.max(MIN_RADIUS_UNITS, radius);                      // export floor
+      if (radius < this.minRadius) this.minRadius = radius;             // telemetry
+    }
     const start = this.vcount;
     for (let ri = 0; ri <= rings; ri++) {
       const phi = (Math.PI * ri) / rings;
@@ -264,6 +310,10 @@ class MeshAccumulator {
   addSlab(outer, inner, thick) {
     const N = outer.length;
     if (N < 3 || inner.length !== N) return;
+    if (this.exportMode) {
+      thick = Math.max(MIN_FEATURE_UNITS, thick);                      // export: floor sheet thickness
+      if (thick < this.minThick) this.minThick = thick;                // telemetry
+    }
     const H = thick * 0.5;
 
     // Hole-rim cross-section samples, from the top face (+90°) round the inward
@@ -722,13 +772,12 @@ function swapGeometry(mesh, acc) {
 
 let hasFramed = false;
 
-function generate() {
-  const ui = readUI();
-  const P = resolveParams(ui);
-
-  const petalAcc = new MeshAccumulator();
-  const coreAcc  = new MeshAccumulator();
-
+// Populate the petal + core accumulators for the current UI/params. Shared by
+// the live path (generate) and the STL export path — the latter passes
+// accumulators built with { exportMode: true }, so every radius and slab
+// thickness is floored to the minimum printable feature. Pure w.r.t. the scene
+// (no camera / glow side effects); returns what the caller needs for framing.
+function buildInto(petalAcc, coreAcc, ui, P) {
   const count = ui.petalCount;
   const bloomType = ui.bloomType;
 
@@ -839,7 +888,6 @@ function generate() {
   }
 
   const centerHeight = elev * elevAmp;                           // core sits at the receptacle centre
-  coreGlow.position.y = centerHeight + 0.2;
   buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
 
   // BASE — independent organic parts, all in the same teal tubes as the petals
@@ -857,6 +905,17 @@ function generate() {
   if (ui.stemType !== 'none') {
     buildStemInto(petalAcc, P, 0, stemTop, 0, clamp(ui.stemLength, 0.2, 6), clamp(ui.stemCurve, -1, 1));
   }
+
+  return { placements, centerHeight };
+}
+
+function generate() {
+  const ui = readUI();
+  const P = resolveParams(ui);
+  const petalAcc = new MeshAccumulator();
+  const coreAcc  = new MeshAccumulator();
+  const { placements, centerHeight } = buildInto(petalAcc, coreAcc, ui, P);
+  coreGlow.position.y = centerHeight + 0.2;   // scene-only glow follows the core height
 
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
