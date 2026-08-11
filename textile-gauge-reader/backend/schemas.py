@@ -288,6 +288,29 @@ class RepeatMatchOut(BaseModel):
     seed_period_px: float = 0.0
 
 
+class RulerCalibrationOut(BaseModel):
+    """
+    Result of automatic ruler/scale-bar calibration detection (see
+    analysis.gauge_analysis.detect_ruler_calibration / POST /detect-ruler).
+    A SUGGESTED two-point calibration the frontend pre-fills into the
+    Calibrate Scale step for the user to review, confirm, or override --
+    never applied silently. suggested_unit is a structural HINT (inferred
+    from minor-tick-per-major-tick counts, not read from any printed
+    numeral) so it needs the same confirm-or-override treatment as the
+    points themselves.
+    """
+
+    success: bool
+    message: str = ""
+    point1_px: Optional[Tuple[float, float]] = None
+    point2_px: Optional[Tuple[float, float]] = None
+    suggested_distance: float = 1.0
+    suggested_unit: Unit = "cm"
+    minor_tick_spacing_px: Optional[float] = None
+    major_tick_count: int = 0
+    confidence: float = 0.0
+
+
 class ErrorResponse(BaseModel):
     success: bool = False
     message: str

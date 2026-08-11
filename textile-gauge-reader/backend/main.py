@@ -29,7 +29,11 @@ from fastapi.staticfiles import StaticFiles
 
 from analysis import ALGORITHM_VERSION, analyze_gauge, analyze_multi_roi, propose_measurement_rois
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
-from analysis.gauge_analysis import analyze_loop_lattice_experiment, count_repeats_by_template_match
+from analysis.gauge_analysis import (
+    analyze_loop_lattice_experiment,
+    count_repeats_by_template_match,
+    detect_ruler_calibration,
+)
 from storage import corrections_store
 
 from .corrections_api import router as corrections_router
@@ -51,6 +55,7 @@ from .schemas import (
     RepeatMatchOut,
     RoiMeasurementOut,
     RoiOut,
+    RulerCalibrationOut,
     Structure,
     Unit,
 )
@@ -463,6 +468,53 @@ async def propose_rois(
     # (e.g. a tiny or extremely uniform image) -- not a request error, so
     # this is still a 200; the frontend shows proposal.message and offers
     # the manual "Add Measurement Area" fallback.
+    return JSONResponse(status_code=200, content=response.model_dump())
+
+
+@app.post("/detect-ruler", response_model=RulerCalibrationOut)
+async def detect_ruler(file: UploadFile = File(...)) -> JSONResponse:
+    """
+    Runs BEFORE any calibration exists -- unlike every other endpoint in
+    this file, this one needs nothing but the raw uploaded image. See
+    analysis.gauge_analysis.detect_ruler_calibration for the detection
+    logic and its module-level design rationale. The frontend uses a
+    success result to PRE-FILL the Calibrate Scale step's two points,
+    known-distance, and unit -- never to skip the user's own confirm/
+    override step, same as /propose-rois pre-fills but never auto-
+    approves measurement areas.
+    """
+    try:
+        data = await file.read()
+        validate_upload(file.content_type, len(data))
+        image = decode_image(data)
+    except ImageValidationError as exc:
+        return JSONResponse(status_code=400, content=RulerCalibrationOut(success=False, message=str(exc)).model_dump())
+
+    try:
+        result = detect_ruler_calibration(image)
+    except Exception:  # pragma: no cover - defensive: never fabricate a result
+        logger.exception("Ruler calibration detection raised an unexpected exception")
+        return JSONResponse(
+            status_code=500,
+            content=RulerCalibrationOut(
+                success=False, message="Ruler detection failed unexpectedly. Please calibrate manually."
+            ).model_dump(),
+        )
+
+    response = RulerCalibrationOut(
+        success=result.success,
+        message=result.message,
+        point1_px=result.point1_px,
+        point2_px=result.point2_px,
+        suggested_distance=result.suggested_distance,
+        suggested_unit=result.suggested_unit,
+        minor_tick_spacing_px=result.minor_tick_spacing_px,
+        major_tick_count=result.major_tick_count,
+        confidence=result.confidence,
+    )
+    # success=False here means "no plausible ruler found" -- not a
+    # request error, same convention as /propose-rois and /count-repeats:
+    # still a 200, and the frontend just leaves manual calibration as-is.
     return JSONResponse(status_code=200, content=response.model_dump())
 
 
