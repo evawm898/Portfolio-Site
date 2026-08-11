@@ -399,6 +399,10 @@ function resolveParams(ui) {
     laceSwirl: ui.laceSwirl,                     // LACE: 0 loose scrolls -> 1 tight coils
     scallopCount: ui.scallopCount,               // SCALLOP edge: scallops per side (width)
     scallopHeight: ui.scallopHeight,             // SCALLOP edge: how far each scallop bulges out
+    centerType: ui.centerType,                   // CENTER part: 'stamens' | 'pistil' | 'none'
+    centerCount: ui.centerCount,                 // CENTER: number of filaments (amount)
+    centerLength: ui.centerLength,               // CENTER: filament length (0..1)
+    centerTipSize: ui.centerTipSize,             // CENTER: anther/stigma bead size (0..1)
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -523,17 +527,34 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   }
 }
 
-/* A small central stamen cluster so the spiral's heart reads as an organic
-   flower centre. `centerHeight` follows the receptacle so it stays seated in
-   an elevated (cone) or depressed (bowl) middle. */
-function buildCoreInto(acc, P, count, centerHeight, rng) {
-  const N = Math.min(36, 12 + Math.round(count * 0.6));
-  const H = 0.34;
+/* The flower's central part — a cluster of filaments, each a slender tube tipped
+   with a rounded bead. Two styles: STAMENS spread outward into a fan of thin
+   filaments with small anthers; PISTIL stands as a tighter, taller, near-upright
+   bundle of thicker styles with larger stigma knobs. Its filament count, length
+   and tip-bead size are all controllable, and NONE leaves the centre bare.
+   `centerHeight` follows the receptacle so it stays seated in an elevated (cone)
+   or depressed (bowl) middle. */
+function buildCoreInto(acc, P, centerHeight, rng) {
+  if (P.centerType === 'none') return;
+  const pistil = P.centerType === 'pistil';
+  const N   = clamp(Math.round(P.centerCount), 1, 60);
+  const len = clamp(P.centerLength, 0, 1);
+  const tip = clamp(P.centerTipSize, 0, 1);
+
+  // PISTIL: taller reach, tighter to the axis, nearly vertical, fatter style and
+  // a bigger stigma knob. STAMENS (defaults) reproduce the original cluster:
+  // H = 0.34, filament 1.05x, anther 2.1x at length 0.5 / tip 0.35.
+  const H       = pistil ? (0.16 + 0.85 * len) : (0.10 + 0.48 * len);   // max reach
+  const spreadR = CORE_SPREAD * (pistil ? 0.42 : 1.0);                  // cluster radius
+  const leanMax = pistil ? 0.05 : 0.14;                                 // outward bow
+  const filR    = P.tubeRadius * (pistil ? 1.5 : 1.05);                 // filament thickness
+  const beadR   = P.tubeRadius * lerp(pistil ? 1.4 : 0.8, pistil ? 6.0 : 4.5, tip);
+
   for (let i = 0; i < N; i++) {
     const a = rng() * Math.PI * 2;
-    const rr = CORE_SPREAD * Math.sqrt(rng());
+    const rr = spreadR * Math.sqrt(rng());
     const h = H * (0.6 + 0.4 * rng());
-    const lean = 0.14 * (0.5 + rng());
+    const lean = leanMax * (0.5 + rng());
     const steps = 5;
     const pts = [];
     for (let k = 0; k <= steps; k++) {
@@ -542,8 +563,8 @@ function buildCoreInto(acc, P, count, centerHeight, rng) {
       const yy = h * Math.sin((t * Math.PI) / 2);
       pts.push({ x: rad * Math.cos(a), y: centerHeight + yy, z: rad * Math.sin(a) });
     }
-    acc.addTube(pts, P.tubeRadius * 1.05);
-    acc.addBead(pts[pts.length - 1], P.tubeRadius * 2.1);  // anther
+    acc.addTube(pts, filR);
+    acc.addBead(pts[pts.length - 1], beadR);  // anther / stigma
   }
 }
 
@@ -668,7 +689,7 @@ function generate() {
 
   const centerHeight = elev * elevAmp;                           // core sits at the receptacle centre
   coreGlow.position.y = centerHeight + 0.2;
-  buildCoreInto(coreAcc, P, count, centerHeight, mulberry32(SEED_BASE + 7));
+  buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
 
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
@@ -760,6 +781,10 @@ const inputs = {
   laceSwirl: document.getElementById('laceSwirl'),
   scallopCount: document.getElementById('scallopCount'),
   scallopHeight: document.getElementById('scallopHeight'),
+  centerType: document.getElementById('centerType'),
+  centerCount: document.getElementById('centerCount'),
+  centerLength: document.getElementById('centerLength'),
+  centerTipSize: document.getElementById('centerTipSize'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -797,6 +822,10 @@ function readUI() {
     laceSwirl: parseFloat(inputs.laceSwirl.value),
     scallopCount: parseInt(inputs.scallopCount.value, 10),
     scallopHeight: parseFloat(inputs.scallopHeight.value),
+    centerType: inputs.centerType.value,
+    centerCount: parseInt(inputs.centerCount.value, 10),
+    centerLength: parseFloat(inputs.centerLength.value),
+    centerTipSize: parseFloat(inputs.centerTipSize.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -834,6 +863,9 @@ function refreshLabels() {
   setLabel('laceSwirl', (+inputs.laceSwirl.value).toFixed(2));
   setLabel('scallopCount', inputs.scallopCount.value);
   setLabel('scallopHeight', (+inputs.scallopHeight.value).toFixed(2));
+  setLabel('centerCount', inputs.centerCount.value);
+  setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
+  setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -886,7 +918,8 @@ function setBuilding(on) {
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
- 'laceSwirl', 'scallopCount', 'scallopHeight', 'tightness', 'elevation'].forEach((k) => {
+ 'laceSwirl', 'scallopCount', 'scallopHeight',
+ 'centerCount', 'centerLength', 'centerTipSize', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
@@ -932,6 +965,14 @@ function updateBloomOptions() {
   });
 }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
+// Center type is a <select>; NONE hides the length/amount/tip sliders (data-center-styles).
+function updateCenterOptions() {
+  const type = inputs.centerType.value;
+  document.querySelectorAll('[data-center-styles]').forEach((el) => {
+    el.hidden = !el.getAttribute('data-center-styles').split(/\s+/).includes(type);
+  });
+}
+inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 // the outline toggle changes geometry, so it regenerates
 inputs.boneOutline.addEventListener('change', () => { scheduleRegen(); });
@@ -970,6 +1011,10 @@ if (resetBtn) {
     inputs.laceSwirl.value = d.laceSwirl;
     inputs.scallopCount.value = d.scallopCount;
     inputs.scallopHeight.value = d.scallopHeight;
+    inputs.centerType.value = d.centerType;
+    inputs.centerCount.value = d.centerCount;
+    inputs.centerLength.value = d.centerLength;
+    inputs.centerTipSize.value = d.centerTipSize;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -978,6 +1023,7 @@ if (resetBtn) {
     updateTipOptions();
     updateInfillOptions();
     updateBloomOptions();
+    updateCenterOptions();
     refreshLabels();
     scheduleRegen();
   });
@@ -990,6 +1036,7 @@ const DEFAULTS = {
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
+  centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
@@ -1071,6 +1118,7 @@ controls.autoRotate = inputs.autoRotate.checked;
 updateTipOptions();
 updateInfillOptions();
 updateBloomOptions();
+updateCenterOptions();
 refreshLabels();
 generate();
 animate();

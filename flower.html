@@ -416,6 +416,58 @@
       </div>
     </section>
 
+    <!-- =========================== CENTER ============================ -->
+    <section class="fl-acc" data-acc>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-center">
+        <span class="fl-acc__label">Center</span>
+        <span class="fl-acc__chev" aria-hidden="true"></span>
+      </button>
+      <div class="fl-acc__body" id="acc-center">
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="centerType">Center type</label>
+          </div>
+          <select class="fl-select" id="centerType">
+            <option value="stamens">STAMENS</option>
+            <option value="pistil">PISTIL</option>
+            <option value="none">NONE</option>
+          </select>
+          <span class="fl-ctrl__hint" data-center-styles="stamens">spreading filaments tipped with anthers</span>
+          <span class="fl-ctrl__hint" data-center-styles="pistil">upright bundle tipped with stigmas</span>
+          <span class="fl-ctrl__hint" data-center-styles="none">bare centre &mdash; no stamens or pistil</span>
+        </div>
+
+        <div class="fl-ctrl" data-center-styles="stamens pistil">
+          <div class="fl-ctrl__row">
+            <label for="centerCount">Amount</label>
+            <span class="fl-ctrl__val" data-value="centerCount"></span>
+          </div>
+          <input type="range" id="centerCount" min="1" max="60" step="1" value="14">
+          <span class="fl-ctrl__hint">number of filaments</span>
+        </div>
+
+        <div class="fl-ctrl" data-center-styles="stamens pistil">
+          <div class="fl-ctrl__row">
+            <label for="centerLength">Length</label>
+            <span class="fl-ctrl__val" data-value="centerLength"></span>
+          </div>
+          <input type="range" id="centerLength" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">short &rarr; long</span>
+        </div>
+
+        <div class="fl-ctrl" data-center-styles="stamens pistil">
+          <div class="fl-ctrl__row">
+            <label for="centerTipSize">Tip size</label>
+            <span class="fl-ctrl__val" data-value="centerTipSize"></span>
+          </div>
+          <input type="range" id="centerTipSize" min="0" max="1" step="0.01" value="0.35">
+          <span class="fl-ctrl__hint">small &rarr; large anther / stigma</span>
+        </div>
+
+      </div>
+    </section>
+
   </div>
 
   <div class="fl-panel__foot">
