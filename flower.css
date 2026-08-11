@@ -293,6 +293,17 @@ input[type="checkbox"]:checked::after {
 /* per-style option controls are shown/hidden by JS via the hidden attribute */
 .fl-ctrl[hidden], .fl-tip-note[hidden], .fl-ctrl__hint[hidden] { display: none; }
 
+/* per-petal group header inside the bilateral controls */
+.fl-bil-head {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  margin: 1rem 0 0.5rem;
+}
+.fl-bil-head[hidden] { display: none; }
+
 /* small standalone note under a Tip style (e.g. "not built yet") */
 .fl-tip-note {
   font-family: var(--mono);

@@ -666,15 +666,21 @@ function generate() {
   if (bloomType === 'bilateral') {
     // Petal spacing is user-set, then capped so the outermost petal never swings
     // past ~170° (no wrap into the back / overlap), keeping the mirror wedge.
-    const edges = [ui.bilEdge1, ui.bilEdge2, ui.bilEdge3];
+    // Each petal position (1..3) also carries its own edge / width / curves.
+    const over = (k) => ({
+      edge: [ui.bilEdge1, ui.bilEdge2, ui.bilEdge3][k - 1],
+      W: [ui.bilWidth1, ui.bilWidth2, ui.bilWidth3][k - 1],
+      curl: [ui.bilCenterCurve1, ui.bilCenterCurve2, ui.bilCenterCurve3][k - 1] * CENTER_CURVE_SCALE,
+      edgeCurve: [ui.bilEdgeCurve1, ui.bilEdgeCurve2, ui.bilEdgeCurve3][k - 1],
+    });
     const maxK = bilCenter ? bilPerSide : (bilPerSide - 0.5);
     const step = Math.min(clamp(ui.bilSpacing, 5, 90) * DEG, (170 * DEG) / Math.max(1e-6, maxK));
-    if (bilCenter) placements.push({ az: 0, r: ringR, seedIdx: 0, edge: edges[0] });   // centre petal takes petal-1's edge
+    if (bilCenter) placements.push({ az: 0, r: ringR, seedIdx: 0, over: over(1) });   // centre petal takes petal-1's controls
     for (let k = 1; k <= bilPerSide; k++) {
       const a = (bilCenter ? k : k - 0.5) * step;
-      const edge = edges[k - 1];
-      placements.push({ az:  a, r: ringR, seedIdx: k, edge });   // +side
-      placements.push({ az: -a, r: ringR, seedIdx: k, edge });   // -side (shares seed + edge -> exact mirror)
+      const o = over(k);
+      placements.push({ az:  a, r: ringR, seedIdx: k, over: o });   // +side
+      placements.push({ az: -a, r: ringR, seedIdx: k, over: o });   // -side (shares seed + controls -> exact mirror)
     }
   } else if (bloomType === 'radial') {
     for (let i = 0; i < count; i++) {
@@ -699,9 +705,13 @@ function generate() {
     // radius cancels here, so the lean stays bounded at any coil tightness.
     const slope = -elev * ELEV_FACTOR * (Math.PI / 2) * Math.sin(Math.PI * rho);
     const tilt = RECEPTACLE_TILT * Math.atan(slope);
-    // BILATERAL: each petal position can override the global tip/edge style.
-    const Pp = (pl.edge && pl.edge !== 'default' && pl.edge !== P.tipStyle)
-      ? { ...P, tipStyle: pl.edge } : P;
+    // BILATERAL: each petal position overrides width / curves, and (unless DEFAULT)
+    // its tip/edge style, on a per-petal copy of P.
+    let Pp = P;
+    if (pl.over) {
+      Pp = { ...P, W: pl.over.W, curl: pl.over.curl, edgeCurve: pl.over.edgeCurve };
+      if (pl.over.edge && pl.over.edge !== 'default') Pp.tipStyle = pl.over.edge;
+    }
     buildPetalInto(petalAcc, Pp, pl.az, height, pl.r - P.r0, tilt, SEED_BASE + pl.seedIdx * 131);
   }
 
@@ -787,6 +797,15 @@ const inputs = {
   bilEdge1: document.getElementById('bilEdge1'),
   bilEdge2: document.getElementById('bilEdge2'),
   bilEdge3: document.getElementById('bilEdge3'),
+  bilWidth1: document.getElementById('bilWidth1'),
+  bilWidth2: document.getElementById('bilWidth2'),
+  bilWidth3: document.getElementById('bilWidth3'),
+  bilCenterCurve1: document.getElementById('bilCenterCurve1'),
+  bilCenterCurve2: document.getElementById('bilCenterCurve2'),
+  bilCenterCurve3: document.getElementById('bilCenterCurve3'),
+  bilEdgeCurve1: document.getElementById('bilEdgeCurve1'),
+  bilEdgeCurve2: document.getElementById('bilEdgeCurve2'),
+  bilEdgeCurve3: document.getElementById('bilEdgeCurve3'),
   bloom: document.getElementById('bloom'),
   tube: document.getElementById('tube'),
   infillType: document.getElementById('infillType'),
@@ -834,6 +853,15 @@ function readUI() {
     bilEdge1: inputs.bilEdge1.value,
     bilEdge2: inputs.bilEdge2.value,
     bilEdge3: inputs.bilEdge3.value,
+    bilWidth1: parseFloat(inputs.bilWidth1.value),
+    bilWidth2: parseFloat(inputs.bilWidth2.value),
+    bilWidth3: parseFloat(inputs.bilWidth3.value),
+    bilCenterCurve1: parseFloat(inputs.bilCenterCurve1.value),
+    bilCenterCurve2: parseFloat(inputs.bilCenterCurve2.value),
+    bilCenterCurve3: parseFloat(inputs.bilCenterCurve3.value),
+    bilEdgeCurve1: parseFloat(inputs.bilEdgeCurve1.value),
+    bilEdgeCurve2: parseFloat(inputs.bilEdgeCurve2.value),
+    bilEdgeCurve3: parseFloat(inputs.bilEdgeCurve3.value),
     bloom: parseFloat(inputs.bloom.value),
     tube: parseFloat(inputs.tube.value),
     infillType: inputs.infillType.value,
@@ -878,6 +906,13 @@ function refreshLabels() {
   setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
   setLabel('bilPerSide', inputs.bilPerSide.value);
   setLabel('bilSpacing', inputs.bilSpacing.value + '°');
+  for (let k = 1; k <= 3; k++) {
+    setLabel('bilWidth' + k, (+inputs['bilWidth' + k].value).toFixed(2));
+    const cc = +inputs['bilCenterCurve' + k].value;
+    setLabel('bilCenterCurve' + k, (cc > 0 ? '+' : '') + cc.toFixed(2));
+    const ec = +inputs['bilEdgeCurve' + k].value;
+    setLabel('bilEdgeCurve' + k, (ec > 0 ? '+' : '') + ec.toFixed(2));
+  }
   setLabel('bloom', inputs.bloom.value + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
@@ -946,7 +981,10 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'bilPerSide', 'bilSpacing', 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
+['petalCount', 'bilPerSide', 'bilSpacing',
+ 'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
+ 'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
+ 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity',
  'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
@@ -1006,6 +1044,9 @@ function updateBilateralPetals() {
     const k = parseInt(el.getAttribute('data-bil-petal'), 10);
     el.hidden = !(on && k <= perSide);
   });
+  // Global width / centre curve / edge curve are replaced by the per-petal
+  // versions when bilateral, so hide them there.
+  document.querySelectorAll('[data-hide-bilateral]').forEach((el) => { el.hidden = on; });
 }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
 // per-side count also drives which per-petal dropdowns are shown
@@ -1071,6 +1112,11 @@ if (resetBtn) {
     inputs.bilEdge1.value = d.bilEdge1;
     inputs.bilEdge2.value = d.bilEdge2;
     inputs.bilEdge3.value = d.bilEdge3;
+    for (let k = 1; k <= 3; k++) {
+      inputs['bilWidth' + k].value = d['bilWidth' + k];
+      inputs['bilCenterCurve' + k].value = d['bilCenterCurve' + k];
+      inputs['bilEdgeCurve' + k].value = d['bilEdgeCurve' + k];
+    }
     inputs.bloom.value = d.bloom;
     inputs.tube.value = d.tube;
     inputs.infillType.value = d.infillType;
@@ -1112,6 +1158,9 @@ const DEFAULTS = {
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0,
   bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
+  bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
+  bilCenterCurve1: 0.4, bilCenterCurve2: 0.4, bilCenterCurve3: 0.4,
+  bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
