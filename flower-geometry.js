@@ -1088,7 +1088,11 @@ const TIP_REGION_MAX = 0.95;   // longest — teeth run all the way to the base
 // ruffle / fractal later) so they all shape the same stretch of the outline.
 // Returns { uStart, uEnd } stations bounding the tip region on the edge.
 export function tipRegionRange(P) {
-  const region = clamp(P.tipRegion != null ? P.tipRegion : 0.3, 0, 1);
+  // RUFFLED has no TIP REGION control — it always covers the whole tip region, so
+  // the flounce reaches from the apex all the way down every time.
+  const region = P.tipStyle === 'ruffled'
+    ? 1
+    : clamp(P.tipRegion != null ? P.tipRegion : 0.3, 0, 1);
   const uEnd = TIP_U_APEX;
   const uStart = clamp(uEnd - lerp(TIP_REGION_MIN, TIP_REGION_MAX, region), 0.05, uEnd - 0.04);
   return { uStart, uEnd };
