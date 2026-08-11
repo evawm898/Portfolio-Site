@@ -191,44 +191,69 @@ export function sampleSpine(spine, u) {
 // surface normal (which is the spine normal — the same axis the cup lifts along).
 const RUFFLE_AMP_MAX = 0.55;
 
-// RUFFLED is a full-surface treatment, not an outline trick: the margin carries
-// excess length and buckles OUT of the petal plane, and that deflection reaches
-// inward across the whole lamina, fading to nothing at the stiff mid-rib. This
-// returns that out-of-plane deflection at (u, v): a wave running ALONG the
-// margin (phase from u), deepening from mid-rib to edge (radial from v), eased
-// in at the region start and out at the tip so it blends with the smooth
-// surface and never tears the apex. Because the mid-rib stays put and the edges
-// swing, the lamina flutes — exactly the differential-growth ruffle.
-function ruffleLift(u, v, P) {
-  if ((P.tipLength || 0) <= 1e-4) return 0;
+// RUFFLED is a full-surface, differential-growth FLOUNCE, not a one-axis wave.
+// A real ruffle's margin carries EXCESS length, so it cannot lie flat: it buckles
+// out of the plane AND spreads sideways, the edge tracing a coil along the margin
+// so it undulates in two axes at once (the fabric-ruffle spread). A second, finer
+// scale frills the edge again. The whole deflection is strongest at the very edge
+// and fades to nothing at the stiff mid-rib, eased in and out along the region so
+// the apex never tears.
+//
+// Returns { dn, dz }: dn is the deflection along the spine normal (out of the
+// plane), shared by both sides; dz is along the width axis (lateral spread),
+// carrying sign(v) so the +Y and -Y halves stay exact mirrors.
+function ruffleDisplace(u, v, P) {
+  const out = { dn: 0, dz: 0 };
+  if ((P.tipLength || 0) <= 1e-4) return out;
   const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
   // Finer ruffles ride shallower: amplitude eases down with frequency so many
-  // flutes read as fine fabric texture, not a row of tall spikes (broad ruffles
-  // still stand proud). TIP LENGTH remains the dominant amplitude control.
+  // flutes read as fine fabric texture, not a row of tall spikes. TIP LENGTH is
+  // the dominant amplitude control.
   const amp = (P.tipLength || 0) * RUFFLE_AMP_MAX * clamp(Math.pow(5 / freq, 0.4), 0.42, 1.3);
   const { uStart } = tipRegionRange(P);
   const uTip = 0.985;
-  if (u <= uStart || u >= uTip) return 0;
+  if (u <= uStart || u >= uTip) return out;
   const p = (u - uStart) / (uTip - uStart);          // 0 at region start -> 1 near the tip
   const RAMP = 0.14;
   const envU = smootherstep(p / RAMP) * smootherstep((1 - p) / RAMP);
-  if (envU <= 1e-6) return 0;
-  const radial = smootherstep(Math.abs(v));           // mid-rib still -> edge swings full (eased both ends)
+  if (envU <= 1e-6) return out;
+  const av = Math.abs(v);
+  // Confine the flounce to the outer margin: the inner lamina stays calm (so the
+  // infill doesn't spaghetti) and only the edge band gathers, waves and spreads —
+  // as in a real ruffle, where the excess length lives at the hem.
+  const radial = smootherstep(clamp((av - 0.42) / 0.58, 0, 1));
+  const edge = radial * av;                           // extra growth concentrated at the very edge
   const k = lerp(1, 3, clamp(P.tip != null ? P.tip : 0.5, 0, 1));  // TIP SHAPE: sine -> gathered crest
-  const s = Math.sin(Math.PI * 2 * freq * p);
-  const wave = Math.sign(s) * Math.pow(Math.abs(s), k);
-  return amp * envU * radial * wave;
+  const phi = Math.PI * 2 * freq * p;
+  const sgn = Math.sign(v) || 1;
+
+  // Out-of-plane flute is the dominant, clean motion.
+  const sN = Math.sin(phi);
+  const waveN = Math.sign(sN) * Math.pow(Math.abs(sN), k);
+  out.dn = amp * envU * radial * waveN;
+  // Lateral: a steady outward GROWTH (the edge fans wider) plus a SLOW scallop at
+  // half the flute frequency, so the outline undulates and spreads without the
+  // lateral and out-of-plane swings tight-coiling into loops.
+  out.dz = amp * envU * edge * sgn * (0.45 + 0.40 * Math.sin(phi * 0.5 + 0.6));
+  // A subtle finer frill on the flute, near the very edge only.
+  out.dn += amp * 0.22 * envU * edge * Math.sin(phi * 2.3 + 1.1);
+  return out;
 }
 
 export function surfacePoint(u, v, P, spine) {
   const sp = sampleSpine(spine, u);
   const hw = petalHalfWidth(u, P);
-  let lift = P.cup * hw * v * v;   // parabolic cup: 0 at mid-rib, max at edges
-  if (P.tipStyle === 'ruffled') lift += ruffleLift(u, v, P);   // + full-surface ruffle buckle
+  let normalLift = P.cup * hw * v * v;   // parabolic cup: 0 at mid-rib, max at edges
+  let dz = 0;
+  if (P.tipStyle === 'ruffled') {
+    const r = ruffleDisplace(u, v, P);   // full-surface flounce: out-of-plane + lateral spread
+    normalLift += r.dn;
+    dz = r.dz;
+  }
   return {
-    x: sp.s + sp.nx * lift,
-    y: sp.y + sp.ny * lift,
-    z: v * hw,
+    x: sp.s + sp.nx * normalLift,
+    y: sp.y + sp.ny * normalLift,
+    z: v * hw + dz,
   };
 }
 
@@ -1210,8 +1235,9 @@ export function buildJaggedEdge(P, spine, rng) {
 
 /* -------------------------------------------------------------------
    RUFFLED tip: a FULL-surface edge treatment, not an outline trick. The
-   buckle itself lives in surfacePoint (ruffleLift), so the whole lamina —
-   every vein and the margin alike — waves out of plane, strongest at the
+   buckle itself lives in surfacePoint (ruffleDisplace), so the whole lamina —
+   every vein and the margin alike — flounces (out of plane + lateral spread),
+   strongest at the
    edge and fading to the mid-rib, exactly like differential growth on a thin
    sheet. This function only supplies the RIM: a densely-sampled smooth
    outline which, mapped through the now-buckling surfacePoint, traces the
@@ -1228,7 +1254,7 @@ export function buildRuffledEdge(P, spine /* , rng */) {
   const freq = clamp(Math.round(P.tipFrequency || 1), 1, 40);
   const { uStart } = tipRegionRange(P);
   const uBase = 0.004, uApex = 0.9995;
-  const nRuffle = clamp(Math.round(freq * 16) + 96, 180, 460);   // dense enough to trace the buckled margin
+  const nRuffle = clamp(Math.round(freq * 24) + 130, 240, 620);  // dense enough to trace the coiling margin + fine frills
   const nSmooth = 48;
 
   const rim = [];

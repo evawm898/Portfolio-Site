@@ -468,7 +468,9 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // densified (in flattened space) to a spacing fine enough to ride the flutes
   // without faceting — step scales with the flute frequency.
   const ruffled = P.tipStyle === 'ruffled';
-  const veinStep = ruffled ? clamp(PETAL_LENGTH * 0.9 / (Math.max(1, P.tipFrequency) * 5), 0.05, 0.18) : 0;
+  // finer than the flute spacing so infill rides the coil + its second-scale
+  // frills (~2.7x the base frequency) without faceting.
+  const veinStep = ruffled ? clamp(PETAL_LENGTH * 0.8 / (Math.max(1, P.tipFrequency) * 9), 0.03, 0.14) : 0;
   for (const vein of ven.veins) {
     const pts = ruffled ? densifyByStep(vein.points, veinStep) : vein.points;
     const world = pts.map(toWorld);
