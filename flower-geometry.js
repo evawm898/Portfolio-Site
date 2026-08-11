@@ -328,6 +328,31 @@ export function buildSilhouette(P, n = 56) {
   return dedupePolygon(outline);
 }
 
+/* Solid blade — a filled lamina spanning the whole silhouette, sampled as a
+   (uSteps+1) x (vSteps+1) grid of flattened points from base (u=0) to tip
+   (u=1) and margin (v=-1) to margin (v=+1). The render layer maps each point
+   onto the petal surface with its normal and stitches the quads into one
+   double-sided membrane — used for SOLID sepals (a soft leaf blade instead of
+   the wireframe skeleton). Reuses the same u/v flattened space as the
+   silhouette and the Voronoi sheet, so it rides the identical cupped surface. */
+export function buildBlade(P, opts = {}) {
+  const uSteps = Math.max(2, opts.uSteps || 26);
+  const vSteps = Math.max(2, opts.vSteps || 12);
+  const rows = [];
+  for (let i = 0; i <= uSteps; i++) {
+    const u = i / uSteps;
+    const X = P.L * clamp(u, 0, 0.9995);
+    const hw = petalHalfWidth(u, P);
+    const row = [];
+    for (let j = 0; j <= vSteps; j++) {
+      const v = -1 + (2 * j) / vSteps;
+      row.push({ x: X, y: v * hw });
+    }
+    rows.push(row);
+  }
+  return { rows };
+}
+
 function dedupePolygon(poly) {
   const out = [];
   for (let i = 0; i < poly.length; i++) {
