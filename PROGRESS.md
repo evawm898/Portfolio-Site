@@ -19,6 +19,70 @@ phases land.
 
 ---
 
+## Unified trunk — receptacle + stem as one lofted body (approach D)
+
+**Problem.** The RECEPTACLE was a lattice of separate longitudinal rib-tubes that
+converged to the neck, and the STEM was a *separate* smooth tube starting at that
+neck. Where the ribbed basket met the smooth tube there was a visible **seam** —
+a change of both surface character (ribs → tube) and topology.
+
+**Change.** The receptacle now **owns a single continuous, watertight lofted trunk**
+(`buildTrunkInto`) that replaces the rib-lattice receptacle *and* — when a stem is
+present — the separate stem tube. It grows from the petal/sepal attachment ring at
+the top, necks down through the receptacle, and flows without a break into the stem
+and its tip. The old builders are gone from the render path: orchestration in
+`buildInto` no longer calls `buildReceptacleInto` (removed) and, when a receptacle
+is present, no longer calls the standalone `buildStemInto` — it grows one body.
+
+- **Ribs → fading surface relief.** The trunk is a body of revolution whose *top
+  ring* still bulges out to meet each petal/sepal base (radius sampled from the
+  attachments exactly as the old ribs were) and dips between them. That relief
+  fades to a smooth circular neck as the surface descends (`pow(1−t, curve)`
+  collapses every azimuth onto `stemR` at the neck), so there is nothing to seam.
+- **Print-safety (hard invariant — upheld).** The trunk is **one closed solid**:
+  a stack of closed rings stitched with wall quads, sealed by a top cap (buried
+  under the bloom/core) and a bottom cap (the neck, or the stem tip). Every rim
+  edge is shared, so the export has **zero boundary edges**. Every emitted radius
+  honours the `MIN_FEATURE_MM = 0.8` export floor, exactly like `addTube`. The
+  gate (`node tools/verify-flower-export.mjs`, now with two added trunk configs)
+  passes **0 boundary edges across all 27 configurations**.
+- **Leaves + side bud unchanged.** They attach on stem *nodes*. The trunk's stem
+  zone is built by the **same `stemCenterline()`** as before and `buildTrunkInto`
+  returns `cl` in the **identical shape** `buildStemInto` returned
+  (`{ pts, nodes, N, length }`), computed from the identical neck height, so
+  `buildLeafInto` / `buildBudBranchInto` consume it untouched — attachment points
+  are byte-identical to before. A stem *without* a receptacle has no junction to
+  seam, so it keeps the standalone `buildStemInto` (no change, no regression).
+- **Default output is unaffected.** The default flower is bloom-only
+  (`receptacleType: 'none'`, `stemType: 'none'`), so `buildTrunkInto` never runs
+  for it. This is **not** gated behind a new control — it changes how the
+  receptacle/stem are built **whenever the user enables them**, but every
+  bloom-only export is byte-for-byte identical (verified: `default` and every
+  infill config export the exact same triangle count before and after).
+
+**Triangle counts (this approach reduces them — confirmed).**
+- *Live* (full plant, 4 petals + receptacle + stem + oval leaves):
+  **41,948 → 36,524 tris** (−5,424, −12.9%).
+- *Export* (gate config "full plant: blended receptacle + stem + solid sepals"):
+  **52,612 → 46,030 tris** (−6,582, −12.5%) → binary STL **2.63 → 2.30 MB**
+  (`84 + 50·tris`).
+- Savings grow with the rib count the old lattice used: +3 layers
+  100,140 → 88,806 (−11,334); +4 layers 287,556 → 267,312 (−20,244);
+  receptacle-only 54,316 → 43,672 (−10,644); 20-petal + solid sepals stress
+  203,884 → 183,640 (−20,244). No trunked config increased.
+- *Unchanged* (no trunk built): default veins 26,616; voronoi 163,952; strands
+  32,688; bone 35,344; lace 59,744 — identical before/after.
+
+**Files.** `flower.js` (`buildReceptacleInto` → `buildTrunkInto`; `buildInto`
+orchestration; `buildStemInto` kept for the receptacle-less stem);
+`tools/verify-flower-export.mjs` (two trunk edge-case configs added).
+
+**Verification.** `node --check flower.js` passes; watertight gate passes (0
+boundary edges, all 27 configs); before/after full + zoomed-on-seam renders
+confirm the seam is gone and leaves/bud still seat cleanly.
+
+---
+
 ## Summary — all four phases complete ✅
 
 The flower generator now exports a 3D-printable STL. Click **Export STL** in the

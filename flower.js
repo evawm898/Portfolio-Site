@@ -1408,70 +1408,165 @@ function buildCompoundLeafInto(acc, blade, frame, node, dir, Pleaf, rLeaf) {
   }
 }
 
-/* RECEPTACLE — a blended surface GROWN FROM the petal + sepal base attachments,
-   not a separate primitive placed underneath. `attachments` is the list of base
-   points { az, r } (azimuth + radius) for every petal and sepal. A ring of
-   longitudinal ribs rises to meet each attachment and dips between them (how
-   sharply is BLEND SMOOTHNESS), then the whole surface descends by RECEPTACLE
-   DEPTH and narrows into the stem (how tightly is CONVERGENCE TIGHTNESS). It is
-   drawn in the SAME wireframe tubes as the petals (ribs + latitude rings), so the
-   petals read as emerging from one shared surface rather than sitting on a blob.
-   The bottom ring matches the stem's top radius, so the stem simply continues it.
-   Returns the depth it descends below cy (where the stem starts). */
-function buildReceptacleInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
-  const blend  = clamp(opts.blend, 0, 1);
-  const depthW = lerp(0.18, 1.15, clamp(opts.depth, 0, 1));   // descent below the attachment ring
-  const tight  = clamp(opts.tightness, 0, 1);
-  const stemR  = opts.neckR || P.tubeRadius * 4.0;           // == the stem's top radius (smooth join)
-  // Rib weight GRADES along its length: vein-fine at the ring (so the join to the
-  // petals is seamless) to stem-thick at the neck. Higher BLEND SMOOTHNESS makes
-  // the top finer AND lifts the ribs up to overlap the petal bases, so at the max
-  // you can't tell where the petal ends and the receptacle begins.
-  const topMul  = lerp(1.0, 0.40, blend);                    // top weight (× tubeRadius), finer as it smooths
-  const stemMul = 3.2;                                       // neck weight
-  const smooth  = (t) => t * t * (3 - 2 * t);
-  const ribR    = (t) => P.tubeRadius * lerp(topMul, stemMul, smooth(t));
-  const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // ribs poke up among the petals at high blend
-  const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dips fade out as it smooths
-  const sigma   = lerp(0.28, 1.7, blend);                    // tight hug -> smooth flow
-  let maxR = ringR;
-  for (const a of attachments) if (a.r > maxR) maxR = a.r;
-  // Blended attachment profile at azimuth th: radius follows the nearby bases,
-  // height rises to a base (peak ~ 1) and dips in the gaps (peak -> 0).
-  const sample = (th) => {
-    let wsum = 0, rsum = 0, peak = 0;
-    for (const a of attachments) {
-      let d = Math.abs(th - a.az) % (Math.PI * 2);
-      if (d > Math.PI) d = Math.PI * 2 - d;
-      const w = Math.exp(-(d * d) / (2 * sigma * sigma));
-      wsum += w; rsum += w * a.r; if (w > peak) peak = w;
-    }
-    const topR = wsum > 1e-6 ? rsum / wsum : ringR;
-    return { topR: clamp(topR, stemR, maxR * 1.05), topY: cy + overlap - dipMax * (1 - peak) };
+/* UNIFIED TRUNK (approach D) — ONE continuous, watertight lofted body of
+   revolution that the RECEPTACLE owns, replacing the old rib-lattice receptacle
+   AND (when a stem is present) the separate stem tube, so there is no longer a
+   seam where the two used to meet. It grows from the petal/sepal attachment ring
+   at the top, necks down through the receptacle, and — if a stem is requested —
+   continues without a break into the stem and its tip.
+
+   The fluted receptacle "ribs" are no longer separate floating tubes: they are
+   surface RELIEF on this single body. The top ring bulges out to meet each petal
+   / sepal base (its radius follows the attachments, sampled the same way the old
+   ribs were) and dips between them; that relief fades to a smooth circular neck as
+   the surface descends (pow(1-t, curve) collapses every azimuth onto stemR at the
+   neck), so the whole thing reads as one shape with nothing to seam.
+
+   PRINT-SAFETY: the trunk is a single closed solid — a stack of closed rings
+   stitched with wall quads, sealed by a top cap (buried under the bloom/core) and
+   a bottom cap (the neck, or the stem tip). Every ring shares its rim edges with
+   the caps / neighbouring rings, so there are ZERO boundary edges. Every emitted
+   radius honours the export feature-floor exactly like addTube.
+
+   LEAVES + SIDE BUD are unaffected: the stem zone's centreline is built by the
+   SAME stemCenterline() as before, and this returns `cl` in the identical shape
+   buildStemInto returned ({ pts, nodes, N, length }), so buildLeafInto /
+   buildBudBranchInto consume it unchanged. Returns { depth, cl } (cl is null when
+   no stem zone is built). */
+function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
+  const wantRecept = !!opts.receptacle;
+  const wantStem   = !!opts.stem;
+  if (!wantRecept && !wantStem) return { depth: 0, cl: null };
+  const exportMode = acc.exportMode;
+  // Floor every radius to the min printable feature in export mode, and feed the
+  // telemetry the same way addTube does (so the reported thinnest feature stays
+  // honest). A no-op live.
+  const floorRad = (r) => {
+    if (!exportMode) return r;
+    const rr = Math.max(acc.floorR, r);
+    if (rr < acc.minRadius) acc.minRadius = rr;
+    return rr;
   };
-  const M = clamp(Math.round(attachments.length * lerp(2, 4, blend)), 24, 96);   // denser ribs as it smooths
-  const STEPS = 12;                                          // rib path resolution
-  const curve = lerp(0.7, 2.4, tight);                       // >1 pinches into a tight neck
-  const grid = [];
-  for (let j = 0; j < M; j++) {
-    const th = (j / M) * Math.PI * 2;
-    const { topR, topY } = sample(th);
-    const col = [];
+
+  const stemR = opts.neckR || P.tubeRadius * 4.0;   // trunk radius at the neck
+
+  // Angular resolution. Driven by the attachment count (so the relief resolves
+  // each petal/sepal base) whenever there is a receptacle — matching the old rib
+  // count so bump fidelity is preserved; a plain round tube otherwise.
+  const blend = clamp(opts.blend, 0, 1);
+  const M = wantRecept
+    ? clamp(Math.round(attachments.length * lerp(2, 4, blend)), 24, 96)
+    : Math.max(3, RADIAL_SEGMENTS * 2);
+  const cosH = new Array(M), sinH = new Array(M);
+  for (let j = 0; j < M; j++) { const th = (j / M) * Math.PI * 2; cosH[j] = Math.cos(th); sinH[j] = Math.sin(th); }
+
+  const rings = [];                       // top -> bottom; each is an array of M {x,y,z}
+  let depth = 0, cl = null;
+  let topCap = { x: cx, y: cy, z: cz };   // apex of the sealing cap at each end
+  let botCap = { x: cx, y: cy, z: cz };
+
+  // ---------- RECEPTACLE ZONE ----------
+  if (wantRecept) {
+    const depthW = lerp(0.18, 1.15, clamp(opts.depth, 0, 1));  // descent below the ring
+    const tight  = clamp(opts.tightness, 0, 1);
+    const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // relief pokes up among the petals
+    const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dip between bases (fades as it smooths)
+    const sigma   = lerp(0.28, 1.7, blend);                    // tight hug -> smooth flow
+    const curve   = lerp(0.7, 2.4, tight);                     // >1 pinches into a tight neck
+    let maxR = ringR;
+    for (const a of attachments) if (a.r > maxR) maxR = a.r;
+    // Blended attachment profile at azimuth th (the SAME sampling the old ribs used):
+    // radius follows the nearby bases; height rises to a base (peak ~ 1) and dips in
+    // the gaps (peak -> 0).
+    const sample = (th) => {
+      let wsum = 0, rsum = 0, peak = 0;
+      for (const a of attachments) {
+        let d = Math.abs(th - a.az) % (Math.PI * 2);
+        if (d > Math.PI) d = Math.PI * 2 - d;
+        const w = Math.exp(-(d * d) / (2 * sigma * sigma));
+        wsum += w; rsum += w * a.r; if (w > peak) peak = w;
+      }
+      const topR = wsum > 1e-6 ? rsum / wsum : ringR;
+      return { topR: clamp(topR, stemR, maxR * 1.05), topY: cy + overlap - dipMax * (1 - peak) };
+    };
+    const sTopR = new Array(M), sTopY = new Array(M);
+    for (let j = 0; j < M; j++) { const s = sample((j / M) * Math.PI * 2); sTopR[j] = s.topR; sTopY[j] = s.topY; }
+    const STEPS = 12;                                          // axial resolution of the receptacle
     for (let k = 0; k <= STEPS; k++) {
       const t = k / STEPS;
-      const rad = lerp(stemR, topR, Math.pow(1 - t, curve));  // topR at the ring -> stemR at the neck
-      const y = lerp(topY, cy - depthW, t);
-      col.push({ x: cx + rad * Math.cos(th), y, z: cz + rad * Math.sin(th) });
+      const p = Math.pow(1 - t, curve);                        // 1 at the ring -> 0 at the neck
+      const ring = new Array(M);
+      for (let j = 0; j < M; j++) {
+        const rad = floorRad(lerp(stemR, sTopR[j], p));         // topR(th) at the ring -> stemR (circular) at the neck
+        const y = lerp(sTopY[j], cy - depthW, t);
+        ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
+      }
+      rings.push(ring);
     }
-    grid.push(col);
+    depth = depthW;
+    topCap = { x: cx, y: cy + overlap, z: cz };                // apex level with the relief peaks (buried under the bloom)
+    botCap = { x: cx, y: cy - depthW, z: cz };                 // neck centre (used only if no stem continues)
   }
-  for (let j = 0; j < M; j++) acc.addTube(grid[j], ribR, 0, RECEPT_TUBE_SEGS);   // tapered ribs: vein-fine top -> stem-thick neck
-  for (const k of [Math.round(STEPS * 0.3), Math.round(STEPS * 0.55), Math.round(STEPS * 0.8)]) {
-    const ring = [];
-    for (let j = 0; j <= M; j++) ring.push(grid[j % M][k]);
-    acc.addTube(ring, ribR(k / STEPS), 0, RECEPT_TUBE_SEGS);       // rings match the rib weight at their level
+
+  // ---------- STEM ZONE ----------
+  if (wantStem) {
+    const o = { ...opts.stemOpts, length: clamp(opts.stemOpts.length, 0.2, 6) };
+    const neckY = wantRecept ? cy - depth : cy;
+    cl = stemCenterline(cx, neckY, cz, o);
+    const radFn = stemRadiusFn(P, o);                          // radFn(0) == stemR, so the neck matches exactly
+    const startI = rings.length > 0 ? 1 : 0;                   // receptacle neck ring == stem ring 0; drop the dup
+    for (let i = startI; i <= cl.N; i++) {
+      const rad = floorRad(radFn(i / cl.N));                   // circular cross-section; node swells come through rad
+      const c = cl.pts[i];
+      const ring = new Array(M);
+      for (let j = 0; j < M; j++) ring[j] = { x: c.x + rad * cosH[j], y: c.y, z: c.z + rad * sinH[j] };
+      rings.push(ring);
+    }
+    if (!wantRecept) topCap = { x: cl.pts[0].x, y: cl.pts[0].y, z: cl.pts[0].z };   // stem-only: cap the top
+    botCap = { x: cl.pts[cl.N].x, y: cl.pts[cl.N].y, z: cl.pts[cl.N].z };           // stem tip centre
   }
-  return depthW;
+
+  const R = rings.length;
+  if (R < 2) return { depth, cl };
+
+  // ---------- emit: ring vertices (+ smooth normals), wall quads, two caps ----------
+  const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+  const ringStart = new Array(R);
+  for (let i = 0; i < R; i++) {
+    ringStart[i] = acc.vcount;
+    const ri = rings[i], riUp = rings[Math.max(0, i - 1)], riDn = rings[Math.min(R - 1, i + 1)];
+    for (let j = 0; j < M; j++) {
+      const jP = (j + 1) % M, jM = (j + M - 1) % M;
+      const Rv = sub(ri[jP], ri[jM]);          // along-ring tangent
+      const Av = sub(riDn[j], riUp[j]);         // along-axis tangent (top -> bottom)
+      let nx = Rv.y * Av.z - Rv.z * Av.y;       // n = Rv x Av
+      let ny = Rv.z * Av.x - Rv.x * Av.z;
+      let nz = Rv.x * Av.y - Rv.y * Av.x;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+      const radx = ri[j].x - cx, radz = ri[j].z - cz;         // force it to point outward
+      if (nx * radx + nz * radz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      acc._vertex(ri[j].x, ri[j].y, ri[j].z, nx, ny, nz);
+    }
+  }
+  // wall quads — same winding as addTube, so the faces point outward
+  for (let i = 0; i < R - 1; i++) {
+    const a0 = ringStart[i], b0 = ringStart[i + 1];
+    for (let j = 0; j < M; j++) {
+      const jn = (j + 1) % M;
+      acc.idx.push(a0 + j, a0 + jn, b0 + j, a0 + jn, b0 + jn, b0 + j);
+    }
+  }
+  // top cap: fan to an apex above ring 0 (faces up = outward); shares ring-0 rim edges
+  const s0 = ringStart[0];
+  const apexT = acc._vertex(topCap.x, topCap.y, topCap.z, 0, 1, 0);
+  for (let j = 0; j < M; j++) acc.idx.push(apexT, s0 + (j + 1) % M, s0 + j);
+  // bottom cap: fan to an apex at the last ring's centre (faces down = outward)
+  const sl = ringStart[R - 1];
+  const apexB = acc._vertex(botCap.x, botCap.y, botCap.z, 0, -1, 0);
+  for (let j = 0; j < M; j++) acc.idx.push(apexB, sl + j, sl + (j + 1) % M);
+
+  return { depth, cl };
 }
 
 /* SEPALS — a whorl of narrow, sharply pointed, spiky sepals radiating from the
@@ -1635,31 +1730,45 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // The bloom (petal whorls + central core).
   const { placements, centerHeight, ringR } = buildBloomInto(petalAcc, coreAcc, ui, P);
 
-  // BASE — independent organic parts, all in the same teal tubes as the petals
-  // (into the petal mesh): a RECEPTACLE swelling, a ring of SEPALS, and a STEM
-  // (optionally carrying a SIDE BUD on an offshoot). They compose freely around
-  // the OUTER whorl; the stem descends from the receptacle underside if there is
-  // one, otherwise straight from the convergence point.
-  let stemTop = centerHeight;
-  if (ui.receptacleType !== 'none') {
-    // Attachment points the blended surface is grown from: every petal base, plus
-    // (if present) every sepal base, tucked half a step between the petals.
+  // BASE — the RECEPTACLE and STEM grow as ONE continuous, watertight lofted TRUNK
+  // (buildTrunkInto): the receptacle owns it, and when a stem is present the body
+  // flows straight from the petal/sepal attachment ring down through the neck into
+  // the stem and its tip — no seam. SEPALS remain an independent whorl. A stem
+  // WITHOUT a receptacle has no junction to seam, so it keeps the standalone stem
+  // tube (buildStemInto). Everything builds into the petal mesh, same teal tubes.
+  const hasRecept = ui.receptacleType !== 'none';
+  const hasStem = ui.stemType !== 'none';
+  const stemOpts = hasStem ? {
+    length: clamp(ui.stemLength, 0.2, 6),
+    curve: clamp(ui.stemCurve, -1, 1),
+    thickness: clamp(ui.stemThickness, 0.3, 4),
+    nodeCount: clamp(Math.round(ui.stemNodeCount), 0, 8),
+    nodeProminence: clamp(ui.stemNodeProminence, 0, 1),
+  } : null;
+
+  let cl = null;   // stem centreline for the leaves + side bud (same shape either path)
+  if (hasRecept) {
+    // Attachment points the trunk's top is grown from: every petal base, plus (if
+    // present) every sepal base, tucked half a step between the petals.
     const attach = placements.filter((pl) => (pl.r || 0) > 1e-4).map((pl) => ({ az: pl.az, r: pl.r }));
     if (ui.sepalsType !== 'none') {
       const sc = clamp(Math.round(ui.sepalCount), 3, 24);
       const sepR = Math.max(ringR * 0.85, 0.16);
       for (let i = 0; i < sc; i++) attach.push({ az: (i + 0.5) * 2 * Math.PI / sc, r: sepR });
     }
-    // Neck the receptacle to the STEM's actual top radius (PR #24's stemRadiusFn is
-    // tubeRadius*4*thickness at t=0), so the blend flows straight into the stem at
-    // any thickness. No stem -> the default 4x neck.
-    const stemThick = ui.stemType !== 'none' ? clamp(ui.stemThickness, 0.3, 4) : 1;
-    const depth = buildReceptacleInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
+    // Neck to the STEM's actual top radius (stemRadiusFn is tubeRadius*4*thickness at
+    // t=0), so the trunk flows straight into the stem at any thickness. No stem -> 4x.
+    const stemThick = hasStem ? clamp(ui.stemThickness, 0.3, 4) : 1;
+    const trunk = buildTrunkInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
+      receptacle: true, stem: hasStem,
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
-      neckR: P.tubeRadius * 4.0 * stemThick,
+      neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
-    stemTop = centerHeight - depth;
+    cl = trunk.cl;
+  } else if (hasStem) {
+    cl = buildStemInto(petalAcc, P, 0, centerHeight, 0, stemOpts);
   }
+
   if (ui.sepalsType !== 'none') {
     buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
       count: ui.sepalCount,
@@ -1670,19 +1779,12 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       edgeProfile: ui.sepalEdgeProfile,
     }, ringR);
   }
-  if (ui.stemType !== 'none') {
-    const stemOpts = {
-      length: clamp(ui.stemLength, 0.2, 6),
-      curve: clamp(ui.stemCurve, -1, 1),
-      thickness: clamp(ui.stemThickness, 0.3, 4),
-      nodeCount: clamp(Math.round(ui.stemNodeCount), 0, 8),
-      nodeProminence: clamp(ui.stemNodeProminence, 0, 1),
-    };
-    const cl = buildStemInto(petalAcc, P, 0, stemTop, 0, stemOpts);
-    if (cl && ui.stemBudMode && ui.stemBudMode !== 'none') {
+
+  if (hasStem && cl) {
+    if (ui.stemBudMode && ui.stemBudMode !== 'none') {
       buildBudBranchInto(petalAcc, P, ui, cl, stemOpts);
     }
-    if (cl && ui.leafType && ui.leafType !== 'none') {
+    if (ui.leafType && ui.leafType !== 'none') {
       buildLeafInto(petalAcc, P, ui, cl);   // a leaf at each stem node
     }
   }
