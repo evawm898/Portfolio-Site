@@ -331,6 +331,47 @@ class MeshAccumulator {
     }
   }
 
+  /* A watertight ELLIPSOID — addBead's closed UV-sphere topology with per-axis
+     radii, so a squashed sphere reads as a disc (flat) through a dome (tall). Used
+     for the DISC centre. Normals use the normalized scaled offset (good enough for
+     shading; watertightness is unaffected). Radii are floored in export mode. */
+  addEllipsoid(center, rx, ry, rz, rings = 8, sectors = 14) {
+    if (this.exportMode) {
+      rx = Math.max(MIN_RADIUS_UNITS, rx); ry = Math.max(MIN_RADIUS_UNITS, ry); rz = Math.max(MIN_RADIUS_UNITS, rz);
+      const mn = Math.min(rx, ry, rz); if (mn < this.minRadius) this.minRadius = mn;
+    }
+    rings = Math.max(2, rings); sectors = Math.max(3, sectors);
+    const cx = center.x, cy = center.y, cz = center.z;
+    const nrm = (x, y, z) => { const l = Math.hypot(x / rx, y / ry, z / rz) || 1; return [x / rx / l, y / ry / l, z / rz / l]; };
+    let n = nrm(0, ry, 0);
+    const north = this._vertex(cx, cy + ry, cz, n[0], n[1], n[2]);
+    const ringStart = new Array(rings);
+    for (let ri = 1; ri <= rings - 1; ri++) {
+      const phi = (Math.PI * ri) / rings;
+      const cyy = Math.cos(phi), sr = Math.sin(phi);
+      ringStart[ri] = this.vcount;
+      for (let si = 0; si < sectors; si++) {
+        const th = (2 * Math.PI * si) / sectors;
+        const ux = sr * Math.cos(th), uy = cyy, uz = sr * Math.sin(th);
+        n = nrm(ux, uy, uz);
+        this._vertex(cx + ux * rx, cy + uy * ry, cz + uz * rz, n[0], n[1], n[2]);
+      }
+    }
+    n = nrm(0, -ry, 0);
+    const south = this._vertex(cx, cy - ry, cz, n[0], n[1], n[2]);
+    const r1 = ringStart[1];
+    for (let si = 0; si < sectors; si++) this.idx.push(north, r1 + si, r1 + (si + 1) % sectors);
+    for (let ri = 1; ri <= rings - 2; ri++) {
+      const a = ringStart[ri], b = ringStart[ri + 1];
+      for (let si = 0; si < sectors; si++) {
+        const sn = (si + 1) % sectors;
+        this.idx.push(a + si, a + sn, b + si, a + sn, b + sn, b + si);
+      }
+    }
+    const rl = ringStart[rings - 1];
+    for (let si = 0; si < sectors; si++) this.idx.push(south, rl + (si + 1) % sectors, rl + si);
+  }
+
   /* A watertight SOLID blade from a grid of surface points {p, n}. Each point is
      offset ±half-thickness along its normal into a top face (+n) and a bottom
      face (-n); the whole grid perimeter is then sealed with a wall, so the blade
@@ -676,10 +717,23 @@ function resolveParams(ui) {
     laceSwirl: ui.laceSwirl,                     // LACE: 0 loose scrolls -> 1 tight coils
     scallopCount: ui.scallopCount,               // SCALLOP edge: scallops per side (width)
     scallopHeight: ui.scallopHeight,             // SCALLOP edge: how far each scallop bulges out
-    centerType: ui.centerType,                   // CENTER part: 'stamens' | 'pistil' | 'none'
-    centerCount: ui.centerCount,                 // CENTER: number of filaments (amount)
-    centerLength: ui.centerLength,               // CENTER: filament length (0..1)
-    centerTipSize: ui.centerTipSize,             // CENTER: anther/stigma bead size (0..1)
+    centerArch: ui.centerArch,                   // CENTER architecture: classic | dense | disc | petaloid
+    centerType: ui.centerType,                   // CLASSIC style: 'stamens' | 'pistil' | 'none'
+    centerCount: ui.centerCount,                 // CLASSIC: number of filaments (amount)
+    centerLength: ui.centerLength,               // CLASSIC: filament length (0..1)
+    centerTipSize: ui.centerTipSize,             // CLASSIC: anther/stigma bead size (0..1)
+    denseStamenCount: ui.denseStamenCount,       // DENSE CLUSTER: fine filaments (dozens..200+)
+    denseStamenLength: ui.denseStamenLength,     // DENSE CLUSTER: filament length
+    carpelCount: ui.carpelCount,                 // DENSE CLUSTER: central rounded carpels (few)
+    carpelSize: ui.carpelSize,                   // DENSE CLUSTER: carpel size
+    discSize: ui.discSize,                       // DISC: dome radius
+    discHeight: ui.discHeight,                   // DISC: flat -> domed
+    ringStamenCount: ui.ringStamenCount,         // DISC: stamens ringing the dome edge
+    ringStamenLength: ui.ringStamenLength,       // DISC: ring stamen length
+    fillPetalCount: ui.fillPetalCount,           // PETALOID FILL: tiny centre petals (dozens..200+)
+    fillPetalSize: ui.fillPetalSize,             // PETALOID FILL: size vs the outer petal
+    fillDensity: ui.fillDensity,                 // PETALOID FILL: loose -> fully overlapping
+    fillCurl: ui.fillCurl,                       // PETALOID FILL: open (mum) -> cupped (ranunculus)
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -712,7 +766,11 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const outline = buildSilhouette(P);
   // INFILL: leaf venation (default) or a bilaterally-symmetric Voronoi mesh.
   // Both return { veins, nodes } in flattened space, rendered identically below.
-  const ven = P.infillType === 'voronoi'
+  // SOLID-BLADE petals (solid sepals, petaloid-fill centres) skip this entirely —
+  // the blade discards the infill, and computing it per petal is wasted work that
+  // matters at 100+ fill petals.
+  const ven = P.solidBlade ? null
+    : P.infillType === 'voronoi'
     ? buildVoronoi(P, rng, { density: P.density, softness: P.softness })
     : P.infillType === 'strands'
     ? buildStrands(P, {
@@ -747,15 +805,20 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // still traces the margin for a clean rounded lip. Then we're done — the
   // skeleton infill below is skipped entirely.
   if (P.solidBlade) {
-    const { rows } = buildBlade(P, { uSteps: 26, vSteps: 12 });
+    // Grid resolution defaults to the sepal blade; tiny petaloid-fill petals pass a
+    // coarser grid (bladeUSteps/bladeVSteps) and skip the rim (bladeNoRim) to stay
+    // cheap at high counts. The blade itself is watertight without the rim.
+    const { rows } = buildBlade(P, { uSteps: P.bladeUSteps || 26, vSteps: P.bladeVSteps || 12 });
     const grid = rows.map((row) => row.map((pt) => ({
       p: place(mapPointToSurface(pt, P, spine)),
       n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
     })));
     acc.addBladeSolid(grid, P.tubeRadius * SLAB_THICK);   // same thickness rule as the Voronoi sheet
-    const rim = outline.map(toWorld);
-    rim.push(rim[0]);                              // close the loop at the base
-    acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0);
+    if (!P.bladeNoRim) {
+      const rim = outline.map(toWorld);
+      rim.push(rim[0]);                            // close the loop at the base
+      acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0);
+    }
     return;
   }
 
@@ -835,6 +898,12 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
    `centerHeight` follows the receptacle so it stays seated in an elevated (cone)
    or depressed (bowl) middle. */
 function buildCoreInto(acc, P, centerHeight, rng) {
+  // CENTER TYPE dispatch. CLASSIC (default) falls through to the original
+  // stamens / pistil / none cluster below — unchanged. The others are separate
+  // builders, all writing into the same core accumulator (core material / glow).
+  if (P.centerArch === 'dense') return buildDenseClusterInto(acc, P, centerHeight, rng);
+  if (P.centerArch === 'disc') return buildDiscInto(acc, P, centerHeight, rng);
+  if (P.centerArch === 'petaloid') return buildPetaloidFillInto(acc, P, centerHeight, rng);
   if (P.centerType === 'none') return;
   const pistil = P.centerType === 'pistil';
   const N   = clamp(Math.round(P.centerCount), 1, 60);
@@ -865,6 +934,98 @@ function buildCoreInto(acc, P, centerHeight, rng) {
     }
     acc.addTube(pts, filR);
     acc.addBead(pts[pts.length - 1], beadR);  // anther / stigma
+  }
+}
+
+/* DENSE CLUSTER — peony centre: many very fine, short filaments packed densely
+   around a smaller, separate cluster of thicker rounded carpels that sit slightly
+   lower (recessed) at the very centre. */
+function buildDenseClusterInto(acc, P, centerHeight, rng) {
+  const N   = clamp(Math.round(P.denseStamenCount), 1, 240);
+  const len = clamp(P.denseStamenLength, 0, 1);
+  const H   = 0.05 + 0.30 * len;
+  const filR  = P.tubeRadius * 0.5;                     // finer than the classic 1.05x filament
+  const beadR = P.tubeRadius * 0.9;                     // tiny anther
+  const innerR = CORE_SPREAD * 0.55;                    // ring starts just outside the carpels
+  const outerR = CORE_SPREAD * 1.7;
+  for (let i = 0; i < N; i++) {
+    const a = rng() * Math.PI * 2;
+    const rr = lerp(innerR, outerR, Math.sqrt(rng()));
+    const h = H * (0.7 + 0.4 * rng());
+    const lean = 0.10 * (0.5 + rng());
+    const pts = [];
+    for (let k = 0; k <= 4; k++) {
+      const t = k / 4, rad = rr + lean * t;
+      pts.push({ x: rad * Math.cos(a), y: centerHeight + h * Math.sin((t * Math.PI) / 2), z: rad * Math.sin(a) });
+    }
+    acc.addTube(pts, filR);
+    acc.addBead(pts[pts.length - 1], beadR, 3, 5);
+  }
+  const M  = clamp(Math.round(P.carpelCount), 1, 12);
+  const cR = P.tubeRadius * lerp(2.4, 6.0, clamp(P.carpelSize, 0, 1));
+  const clusterR = CORE_SPREAD * 0.34;
+  for (let j = 0; j < M; j++) {
+    const a = (j / M) * Math.PI * 2 + 0.4;
+    const rr = M === 1 ? 0 : clusterR * (0.35 + 0.65 * rng());
+    acc.addBead({ x: rr * Math.cos(a), y: centerHeight - cR * 0.35, z: rr * Math.sin(a) }, cR, 6, 9);
+  }
+}
+
+/* DISC — anemone centre: a solid rounded dome/disc (a closed ellipsoid) with a
+   ring of short, fine stamens emerging from just around its outer edge, splaying
+   outward — not covering the dome's surface. */
+function buildDiscInto(acc, P, centerHeight, rng) {
+  const R  = CORE_SPREAD * lerp(1.3, 3.4, clamp(P.discSize, 0, 1));     // disc radius
+  const Hy = R * lerp(0.14, 0.95, clamp(P.discHeight, 0, 1));           // flat disc -> tall dome
+  acc.addEllipsoid({ x: 0, y: centerHeight + Hy * 0.5, z: 0 }, R, Hy, R, 9, 16);
+  const N   = clamp(Math.round(P.ringStamenCount), 0, 200);
+  const len = clamp(P.ringStamenLength, 0, 1);
+  const h   = 0.03 + 0.20 * len;
+  const filR  = P.tubeRadius * 0.5;
+  const beadR = P.tubeRadius * 0.9;
+  for (let i = 0; i < N; i++) {
+    const a = (i / Math.max(1, N)) * Math.PI * 2 + rng() * 0.12;
+    const baseR = R * 0.97, splay = R * 0.55;
+    const pts = [];
+    for (let k = 0; k <= 4; k++) {
+      const t = k / 4, rad = baseR + splay * t;
+      pts.push({ x: rad * Math.cos(a), y: centerHeight + Hy * 0.16 + h * Math.sin((t * Math.PI) / 2) * 0.7, z: rad * Math.sin(a) });
+    }
+    acc.addTube(pts, filR);
+    acc.addBead(pts[pts.length - 1], beadR, 3, 5);
+  }
+}
+
+/* PETALOID FILL — ranunculus / mum centre: many tiny petals packed into the
+   centre on a phyllotactic (golden-angle) spiral, REPLACING the stamen/pistil
+   systems. Each is the SAME petal builder (buildPetalInto) in solid-blade mode —
+   coarse grid, no rim — inheriting the current petal shape (silhouette, cup, edge
+   curves, ruffle, edge noise). The full venation/infill is intentionally skipped:
+   reusing it for 100+ petals would be catastrophic (a Voronoi petal alone is
+   ~160k tris). FILL CURL closes each tiny petal (open mum -> cupped ranunculus). */
+function buildPetaloidFillInto(acc, P, centerHeight, rng) {
+  const N    = clamp(Math.round(P.fillPetalCount), 1, 240);
+  const size = clamp(P.fillPetalSize, 0.03, 0.6);
+  const dens = clamp(P.fillDensity, 0, 1);
+  const curl = clamp(P.fillCurl, 0, 1);
+  const petalL = P.L * size;
+  const Pfill = {
+    ...P,
+    L: petalL,
+    bloom: lerp(0.95, 0.12, curl),                      // open (mum) -> tightly closed (ranunculus)
+    curl: lerp(0.25, 1.15, curl) * CENTER_CURVE_SCALE,  // inward spine curve
+    edgeProfile: 0,                                      // keep the tiny blades tidy
+    solidBlade: true, bladeNoRim: true, bladeUSteps: 10, bladeVSteps: 5,
+  };
+  const spiralK = lerp(0.16, 0.05, dens);               // spacing constant (smaller = tighter overlap)
+  const maxR    = CORE_SPREAD * lerp(2.7, 1.0, dens);
+  for (let i = 0; i < N; i++) {
+    const az = i * GOLDEN_ANGLE;
+    const rr = Math.min(maxR, spiralK * Math.sqrt(i));
+    const tRatio = N > 1 ? i / (N - 1) : 0;             // 0 = inner, 1 = outer
+    const tilt = lerp(1.0, 0.3, tRatio);               // inner upright, outer opening
+    const height = centerHeight + lerp(0.12, 0.0, tRatio) * petalL;
+    buildPetalInto(acc, Pfill, az, height, rr, tilt, SEED_BASE + 4200 + i * 53);
   }
 }
 
@@ -1433,10 +1594,23 @@ const inputs = {
   laceSwirl: document.getElementById('laceSwirl'),
   scallopCount: document.getElementById('scallopCount'),
   scallopHeight: document.getElementById('scallopHeight'),
+  centerArch: document.getElementById('centerArch'),
   centerType: document.getElementById('centerType'),
   centerCount: document.getElementById('centerCount'),
   centerLength: document.getElementById('centerLength'),
   centerTipSize: document.getElementById('centerTipSize'),
+  denseStamenCount: document.getElementById('denseStamenCount'),
+  denseStamenLength: document.getElementById('denseStamenLength'),
+  carpelCount: document.getElementById('carpelCount'),
+  carpelSize: document.getElementById('carpelSize'),
+  discSize: document.getElementById('discSize'),
+  discHeight: document.getElementById('discHeight'),
+  ringStamenCount: document.getElementById('ringStamenCount'),
+  ringStamenLength: document.getElementById('ringStamenLength'),
+  fillPetalCount: document.getElementById('fillPetalCount'),
+  fillPetalSize: document.getElementById('fillPetalSize'),
+  fillDensity: document.getElementById('fillDensity'),
+  fillCurl: document.getElementById('fillCurl'),
   receptacleType: document.getElementById('receptacleType'),
   receptacleSize: document.getElementById('receptacleSize'),
   sepalsType: document.getElementById('sepalsType'),
@@ -1517,10 +1691,23 @@ function readUI() {
     laceSwirl: parseFloat(inputs.laceSwirl.value),
     scallopCount: parseInt(inputs.scallopCount.value, 10),
     scallopHeight: parseFloat(inputs.scallopHeight.value),
+    centerArch: inputs.centerArch.value,
     centerType: inputs.centerType.value,
     centerCount: parseInt(inputs.centerCount.value, 10),
     centerLength: parseFloat(inputs.centerLength.value),
     centerTipSize: parseFloat(inputs.centerTipSize.value),
+    denseStamenCount: parseInt(inputs.denseStamenCount.value, 10),
+    denseStamenLength: parseFloat(inputs.denseStamenLength.value),
+    carpelCount: parseInt(inputs.carpelCount.value, 10),
+    carpelSize: parseFloat(inputs.carpelSize.value),
+    discSize: parseFloat(inputs.discSize.value),
+    discHeight: parseFloat(inputs.discHeight.value),
+    ringStamenCount: parseInt(inputs.ringStamenCount.value, 10),
+    ringStamenLength: parseFloat(inputs.ringStamenLength.value),
+    fillPetalCount: parseInt(inputs.fillPetalCount.value, 10),
+    fillPetalSize: parseFloat(inputs.fillPetalSize.value),
+    fillDensity: parseFloat(inputs.fillDensity.value),
+    fillCurl: parseFloat(inputs.fillCurl.value),
     receptacleType: inputs.receptacleType.value,
     receptacleSize: parseFloat(inputs.receptacleSize.value),
     sepalsType: inputs.sepalsType.value,
@@ -1597,6 +1784,18 @@ function refreshLabels() {
   setLabel('centerCount', inputs.centerCount.value);
   setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
   setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
+  setLabel('denseStamenCount', inputs.denseStamenCount.value);
+  setLabel('denseStamenLength', (+inputs.denseStamenLength.value).toFixed(2));
+  setLabel('carpelCount', inputs.carpelCount.value);
+  setLabel('carpelSize', (+inputs.carpelSize.value).toFixed(2));
+  setLabel('discSize', (+inputs.discSize.value).toFixed(2));
+  setLabel('discHeight', (+inputs.discHeight.value).toFixed(2));
+  setLabel('ringStamenCount', inputs.ringStamenCount.value);
+  setLabel('ringStamenLength', (+inputs.ringStamenLength.value).toFixed(2));
+  setLabel('fillPetalCount', inputs.fillPetalCount.value);
+  setLabel('fillPetalSize', (+inputs.fillPetalSize.value).toFixed(2));
+  setLabel('fillDensity', (+inputs.fillDensity.value).toFixed(2));
+  setLabel('fillCurl', (+inputs.fillCurl.value).toFixed(2));
   setLabel('receptacleSize', (+inputs.receptacleSize.value).toFixed(2));
   setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
   setLabel('sepalCount', inputs.sepalCount.value);
@@ -1670,6 +1869,9 @@ function setBuilding(on) {
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize',
+ 'denseStamenCount', 'denseStamenLength', 'carpelCount', 'carpelSize',
+ 'discSize', 'discHeight', 'ringStamenCount', 'ringStamenLength',
+ 'fillPetalCount', 'fillPetalSize', 'fillDensity', 'fillCurl',
  'receptacleSize', 'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
  'stemLength', 'stemCurve', 'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
@@ -1746,13 +1948,21 @@ inputs.bilPerSide.addEventListener('input', updateBilateralPetals);
 inputs.bilCenterPetal.addEventListener('change', () => { scheduleRegen(); });
 // per-petal edge dropdowns (selects) regenerate on change
 [inputs.bilEdge1, inputs.bilEdge2, inputs.bilEdge3].forEach((s) => s.addEventListener('change', () => { scheduleRegen(); }));
-// Center type is a <select>; NONE hides the length/amount/tip sliders (data-center-styles).
+// CENTER visibility: the architecture selector (data-center-arch) shows one type's
+// controls; within CLASSIC, the stamens/pistil/none sub-select (data-center-styles)
+// further hides the amount/length/tip sliders when NONE is chosen.
 function updateCenterOptions() {
-  const type = inputs.centerType.value;
-  document.querySelectorAll('[data-center-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-center-styles').split(/\s+/).includes(type);
+  const arch = inputs.centerArch.value;
+  const style = inputs.centerType.value;
+  document.querySelectorAll('#acc-center [data-center-arch]').forEach((el) => {
+    let show = el.getAttribute('data-center-arch').split(/\s+/).includes(arch);
+    if (show && arch === 'classic' && el.hasAttribute('data-center-styles')) {
+      show = el.getAttribute('data-center-styles').split(/\s+/).includes(style);
+    }
+    el.hidden = !show;
   });
 }
+inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 // Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
@@ -1855,10 +2065,23 @@ if (resetBtn) {
     inputs.laceSwirl.value = d.laceSwirl;
     inputs.scallopCount.value = d.scallopCount;
     inputs.scallopHeight.value = d.scallopHeight;
+    inputs.centerArch.value = d.centerArch;
     inputs.centerType.value = d.centerType;
     inputs.centerCount.value = d.centerCount;
     inputs.centerLength.value = d.centerLength;
     inputs.centerTipSize.value = d.centerTipSize;
+    inputs.denseStamenCount.value = d.denseStamenCount;
+    inputs.denseStamenLength.value = d.denseStamenLength;
+    inputs.carpelCount.value = d.carpelCount;
+    inputs.carpelSize.value = d.carpelSize;
+    inputs.discSize.value = d.discSize;
+    inputs.discHeight.value = d.discHeight;
+    inputs.ringStamenCount.value = d.ringStamenCount;
+    inputs.ringStamenLength.value = d.ringStamenLength;
+    inputs.fillPetalCount.value = d.fillPetalCount;
+    inputs.fillPetalSize.value = d.fillPetalSize;
+    inputs.fillDensity.value = d.fillDensity;
+    inputs.fillCurl.value = d.fillCurl;
     inputs.receptacleType.value = d.receptacleType;
     inputs.receptacleSize.value = d.receptacleSize;
     inputs.sepalsType.value = d.sepalsType;
@@ -1922,7 +2145,11 @@ const DEFAULTS = {
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
+  centerArch: 'classic',
   centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
+  denseStamenCount: 80, denseStamenLength: 0.4, carpelCount: 5, carpelSize: 0.5,
+  discSize: 0.5, discHeight: 0.5, ringStamenCount: 40, ringStamenLength: 0.35,
+  fillPetalCount: 60, fillPetalSize: 0.18, fillDensity: 0.6, fillCurl: 0.6,
   receptacleType: 'none', receptacleSize: 0.6, sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
   stemType: 'none', stemLength: 1.8, stemCurve: 0.2,
