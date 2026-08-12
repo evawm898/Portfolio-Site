@@ -751,7 +751,7 @@ function resolveParams(ui) {
 function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const rng = mulberry32(seed);
   const spine = buildSpine(P);
-  const outline = buildSilhouette(P);
+  const outline = buildSilhouette(P, P.outlineSteps || 56);   // leaves use a lighter margin
   // INFILL: leaf venation (default) or a bilaterally-symmetric Voronoi mesh.
   // Both return { veins, nodes } in flattened space, rendered identically below.
   const ven = P.infillType === 'voronoi'
@@ -789,7 +789,9 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // still traces the margin for a clean rounded lip. Then we're done — the
   // skeleton infill below is skipped entirely.
   if (P.solidBlade) {
-    const { rows } = buildBlade(P, { uSteps: 26, vSteps: 12 });
+    // Blade resolution is overridable (P.bladeUSteps/bladeVSteps) so a leaf can use
+    // a lighter grid than a sepal; defaults reproduce the original 26x12 exactly.
+    const { rows } = buildBlade(P, { uSteps: P.bladeUSteps || 26, vSteps: P.bladeVSteps || 12 });
     const grid = rows.map((row) => row.map((pt) => ({
       p: place(mapPointToSurface(pt, P, spine)),
       n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
@@ -797,7 +799,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     acc.addBladeSolid(grid, P.tubeRadius * SLAB_THICK);   // same thickness rule as the Voronoi sheet
     const rim = outline.map(toWorld);
     rim.push(rim[0]);                              // close the loop at the base
-    acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0);
+    acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0, P.rimSegments || RADIAL_SEGMENTS);
     return;
   }
 
@@ -1086,6 +1088,155 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   acc.addBead(tipPos, (rTip || P.tubeRadius * 2) * 1.15, 5, 8);   // seat the bud on the offshoot tip
 }
 
+/* ===================================================================
+   LEAVES — a leaf at each stem node, built on buildStemInto's node structure.
+   Reuses the petal machinery wholesale: every leaf blade is a watertight SOLID
+   blade grown through buildPetalInto (the same primitive the SOLID sepals use), so
+   none of the curve / taper / jag / edge math is re-implemented here. The current
+   petal EDGE sliders (edge curve, edge profile, edge noise) shape the leaf too; the
+   selected LEAF TYPE sets the blade character (compound / lobed / oval / narrow) and
+   PHYLLOTAXY sets how many leaves sit at each node and their azimuths as the nodes
+   ascend. Each blade is built ONCE in its own accumulator and stamped onto every
+   attachment with a quaternion rotate + translate (appendTransformed) — a proper
+   rotation with NO scale, so winding + every shared edge survive (watertight in =>
+   watertight out) and the export feature-floor stays valid at true size.
+   =================================================================== */
+
+const LEAF_UP_TILT = 0.36;   // leaves angle up-and-out from the stem (radians)
+
+// Per-type blade character. lenF scales length; W/taper/tip shape the blade; cup
+// gives a slight channel; petiole is the visible stalk length (fraction of blade
+// length); lobe/lobeCount cut the margin (deep few = pinnatifid poppy, shallow many
+// = serrated rose leaflet, 0 = smooth); uSteps/vSteps keep the grid light. The
+// solid-blade path ignores tipStyle, so the "jagged/deeply-cut" look comes from the
+// watertight lobe modulation in petalHalfWidth, not the skeletal jagged-edge tool.
+const LEAF_TYPES = {
+  compound: { lenF: 0.55, W: 0.50, taper: 0.40, tip: 0.62, cup: 0.18, petiole: 0.0,  lobe: 0.18, lobeCount: 9, uSteps: 14, vSteps: 7 },
+  lobed:    { lenF: 1.05, W: 0.95, taper: 0.26, tip: 0.60, cup: 0.12, petiole: 0.06, lobe: 0.6,  lobeCount: 4, uSteps: 24, vSteps: 9 },
+  oval:     { lenF: 0.95, W: 0.72, taper: 0.16, tip: 0.32, cup: 0.14, petiole: 0.40, lobe: 0,    lobeCount: 0, uSteps: 16, vSteps: 8 },
+  narrow:   { lenF: 1.25, W: 0.34, taper: 0.60, tip: 0.72, cup: 0.10, petiole: 0.14, lobe: 0,    lobeCount: 0, uSteps: 16, vSteps: 8 },
+};
+
+// Leaf parameter set: start from the CURRENT petal params (so edgeCurve / edgeProfile
+// / edgeNoise + softness carry through — the reused "slider family"), then apply the
+// type's blade character. bloom = 90 deg makes the local spine run flat (a leaf, not
+// an upright petal); a small curl gives a gentle lengthwise droop.
+function leafParams(ui, type) {
+  const base = resolveParams(ui);
+  const t = LEAF_TYPES[type] || LEAF_TYPES.oval;
+  const size = clamp(ui.leafSize, 0.2, 3);
+  return {
+    ...base,
+    infillType: 'veins',                 // discarded for a solid blade — keep it cheap
+    solidBlade: true,
+    L: PETAL_LENGTH * 0.62 * size * t.lenF,
+    W: t.W,
+    taper: t.taper,
+    tip: t.tip,
+    tipStyle: 'clean',                   // solid blade ignores tip style; lobing is via P.lobe
+    lobe: t.lobe, lobeCount: t.lobeCount,
+    petalCup: t.cup,
+    curl: 0.16 * CENTER_CURVE_SCALE,     // gentle lengthwise droop
+    bloom: Math.PI / 2,                  // flat blade (spine runs out, not up)
+    r0: 0,
+    // keep the leaf light: coarser margin + fewer rim facets than a petal/sepal
+    bladeUSteps: t.uSteps, bladeVSteps: t.vSteps, rimSegments: 5, outlineSteps: 30,
+    _petiole: t.petiole,
+  };
+}
+
+// Azimuths of the leaves at node i for the chosen phyllotaxy (radians around the
+// stem). Alternate = 1 leaf, flipping 180 deg each node (a 2-ranked zigzag);
+// Opposite = 2 leaves across, each node turned 90 deg (decussate); Whorled = 3
+// leaves at 120 deg, the whorl rotating a little each node.
+function leafAzimuths(phyllo, i) {
+  if (phyllo === 'opposite') { const b = i * Math.PI / 2; return [b, b + Math.PI]; }
+  if (phyllo === 'whorled')  { const b = i * (Math.PI / 4); return [b, b + 2 * Math.PI / 3, b + 4 * Math.PI / 3]; }
+  return [i * Math.PI];                 // alternate
+}
+
+// World outward direction at azimuth `az`, tilted up from horizontal by `up`.
+function leafDir(az, up) {
+  const c = Math.cos(up);
+  return new THREE.Vector3(Math.cos(az) * c, Math.sin(up), Math.sin(az) * c);
+}
+
+// Matrix4 that lays the prebuilt local blade (base `B`, long axis `Lhat`, face
+// normal `Nhat`) down at world `pos`, long axis along `dir`, blade face up. Built
+// from quaternions so it is always a proper rotation (no reflection): watertight-safe.
+function leafTransform(B, Lhat, Nhat, pos, dir) {
+  const d = dir.clone().normalize();
+  const q1 = new THREE.Quaternion().setFromUnitVectors(Lhat, d);      // long axis -> dir
+  const n1 = Nhat.clone().applyQuaternion(q1);
+  let U = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(U.dot(d)) > 0.985) U.set(1, 0, 0);
+  U.addScaledVector(d, -U.dot(d)).normalize();                        // world-up made perpendicular to dir
+  n1.addScaledVector(d, -n1.dot(d)).normalize();
+  const q = new THREE.Quaternion().setFromUnitVectors(n1, U).multiply(q1);  // then face -> up, about dir
+  const R = new THREE.Matrix4().makeRotationFromQuaternion(q);
+  return new THREE.Matrix4().makeTranslation(pos.x, pos.y, pos.z)
+    .multiply(R)
+    .multiply(new THREE.Matrix4().makeTranslation(-B.x, -B.y, -B.z));  // world = pos + R*(v - B)
+}
+
+function buildLeafInto(acc, P, ui, cl) {
+  const type = ui.leafType;
+  if (!type || type === 'none' || !cl || !cl.nodes.length) return;
+  const Pleaf = leafParams(ui, type);
+  // Local frame of the blade: base, long axis (base->tip chord) and face normal.
+  const spine = buildSpine(Pleaf);
+  const Bm = mapPointToSurface({ x: 0, y: 0 }, Pleaf, spine);
+  const Tm = mapPointToSurface({ x: Pleaf.L, y: 0 }, Pleaf, spine);
+  const B = new THREE.Vector3(Bm.x, Bm.y, Bm.z);
+  const Lhat = new THREE.Vector3(Tm.x - Bm.x, Tm.y - Bm.y, Tm.z - Bm.z).normalize();
+  const What = new THREE.Vector3(0, 0, 1);                            // width axis
+  const Nhat = new THREE.Vector3().crossVectors(What, Lhat).normalize();
+  // Grow ONE blade in local space, then stamp it onto every attachment.
+  const blade = new MeshAccumulator({ exportMode: acc.exportMode });
+  buildPetalInto(blade, Pleaf, 0, 0, 0, 0, SEED_BASE + 917);
+
+  const phyllo = ui.leafPhyllotaxy;
+  const rLeaf = Pleaf.tubeRadius;
+  const petLen = Pleaf._petiole * Pleaf.L;
+  for (let i = 0; i < cl.nodes.length; i++) {
+    const node = new THREE.Vector3(cl.nodes[i].pos.x, cl.nodes[i].pos.y, cl.nodes[i].pos.z);
+    for (const az of leafAzimuths(phyllo, i)) {
+      const dir = leafDir(az, LEAF_UP_TILT);
+      if (type === 'compound') {
+        buildCompoundLeafInto(acc, blade, { B, Lhat, Nhat }, node, dir, Pleaf, rLeaf);
+      } else {
+        let baseAt = node;
+        if (petLen > 1e-4) {                                          // visible short stalk before the blade
+          const tip = node.clone().addScaledVector(dir, petLen);
+          acc.addTube([node, tip], rLeaf * 2.4, 0, 6);
+          baseAt = tip;
+        }
+        acc.appendTransformed(blade, leafTransform(B, Lhat, Nhat, baseAt, dir));
+      }
+    }
+  }
+}
+
+// A rose-style compound leaf: a short rachis (shared stalk) carrying a terminal
+// leaflet at the tip and two opposite pairs of laterals splayed in the leaf plane.
+function buildCompoundLeafInto(acc, blade, frame, node, dir, Pleaf, rLeaf) {
+  const { B, Lhat, Nhat } = frame;
+  const rachisLen = Pleaf.L * 1.55;
+  const rachisTip = node.clone().addScaledVector(dir, rachisLen);
+  acc.addTube([node, rachisTip], rLeaf * 2.2, 0, 6);                 // the rachis
+  // up axis for splaying the laterals within the leaf plane
+  let up = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(up.dot(dir)) > 0.985) up.set(1, 0, 0);
+  up.addScaledVector(dir, -up.dot(dir)).normalize();
+  const rot = (ang) => dir.clone().applyAxisAngle(up, ang).normalize();
+  acc.appendTransformed(blade, leafTransform(B, Lhat, Nhat, rachisTip, dir));   // terminal leaflet
+  for (const pr of [{ t: 0.44, splay: 0.85 }, { t: 0.72, splay: 0.72 }]) {       // two lateral pairs
+    const at = node.clone().addScaledVector(dir, rachisLen * pr.t);
+    acc.appendTransformed(blade, leafTransform(B, Lhat, Nhat, at, rot(pr.splay)));
+    acc.appendTransformed(blade, leafTransform(B, Lhat, Nhat, at, rot(-pr.splay)));
+  }
+}
+
 /* RECEPTACLE — a small rounded swelling where the petals converge (a rose hip /
    tulip base), drawn minimally as a few wireframe latitude rings + vertical ribs
    of a small ellipsoid hanging just under the convergence point. Just enough to
@@ -1304,6 +1455,9 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     const cl = buildStemInto(petalAcc, P, 0, stemTop, 0, stemOpts);
     if (cl && ui.stemBudMode && ui.stemBudMode !== 'none') {
       buildBudBranchInto(petalAcc, P, ui, cl, stemOpts);
+    }
+    if (cl && ui.leafType && ui.leafType !== 'none') {
+      buildLeafInto(petalAcc, P, ui, cl);   // a leaf at each stem node
     }
   }
 
@@ -1673,6 +1827,9 @@ const inputs = {
   stemNodeCount: document.getElementById('stemNodeCount'),
   stemNodeProminence: document.getElementById('stemNodeProminence'),
   stemBudMode: document.getElementById('stemBudMode'),
+  leafType: document.getElementById('leafType'),
+  leafPhyllotaxy: document.getElementById('leafPhyllotaxy'),
+  leafSize: document.getElementById('leafSize'),
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
@@ -1761,6 +1918,9 @@ function readUI() {
     stemNodeCount: parseInt(inputs.stemNodeCount.value, 10),
     stemNodeProminence: parseFloat(inputs.stemNodeProminence.value),
     stemBudMode: inputs.stemBudMode.value,
+    leafType: inputs.leafType.value,
+    leafPhyllotaxy: inputs.leafPhyllotaxy.value,
+    leafSize: parseFloat(inputs.leafSize.value),
     tightness: parseFloat(inputs.tightness.value),
     elevation: parseFloat(inputs.elevation.value),
     autoRotate: inputs.autoRotate.checked,
@@ -1840,6 +2000,7 @@ function refreshLabels() {
   setLabel('stemThickness', (+inputs.stemThickness.value).toFixed(2));
   setLabel('stemNodeCount', inputs.stemNodeCount.value);
   setLabel('stemNodeProminence', (+inputs.stemNodeProminence.value).toFixed(2));
+  setLabel('leafSize', (+inputs.leafSize.value).toFixed(2));
   setLabel('tightness', (+inputs.tightness.value).toFixed(2));
   const e = +inputs.elevation.value;
   setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
@@ -1902,7 +2063,7 @@ function setBuilding(on) {
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize',
  'receptacleSize', 'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
- 'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence',
+ 'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
  'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
@@ -1991,6 +2152,8 @@ function updateBaseOptions() {
   document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = inputs.receptacleType.value === 'none'; });
   document.querySelectorAll('[data-sepal]').forEach((el) => { el.hidden = inputs.sepalsType.value === 'none'; });
   document.querySelectorAll('[data-stem]').forEach((el) => { el.hidden = inputs.stemType.value === 'none'; });
+  // leaf sub-controls (arrangement / size) show only when a stem AND a leaf type are on
+  document.querySelectorAll('[data-leaf]').forEach((el) => { el.hidden = inputs.stemType.value === 'none' || inputs.leafType.value === 'none'; });
 }
 inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.sepalsType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
@@ -2009,6 +2172,13 @@ inputs.stemBudMode.addEventListener('change', () => {
   if (inputs.stemType.value !== 'none' && inputs.stemBudMode.value !== 'none') pendingRefit = true;
   scheduleRegen();
 });
+// Leaves attach to the stem nodes; adding them spreads the plant outward, so refit.
+inputs.leafType.addEventListener('change', () => {
+  updateBaseOptions();
+  if (inputs.stemType.value !== 'none' && inputs.leafType.value !== 'none') pendingRefit = true;
+  scheduleRegen();
+});
+inputs.leafPhyllotaxy.addEventListener('change', () => { scheduleRegen(); });
 inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
 // Auto-center (top-down): frame the bloom from straight above with the mirror
 // axis (+X) pointing up on screen, so a bilateral fan reads centred and
@@ -2113,6 +2283,9 @@ if (resetBtn) {
     inputs.stemNodeCount.value = d.stemNodeCount;
     inputs.stemNodeProminence.value = d.stemNodeProminence;
     inputs.stemBudMode.value = d.stemBudMode;
+    inputs.leafType.value = d.leafType;
+    inputs.leafPhyllotaxy.value = d.leafPhyllotaxy;
+    inputs.leafSize.value = d.leafSize;
     inputs.tightness.value = d.tightness;
     inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
@@ -2169,6 +2342,7 @@ const DEFAULTS = {
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
   stemType: 'none', stemLength: 1.8, stemCurve: 0.2,
   stemThickness: 1, stemNodeCount: 3, stemNodeProminence: 0.4, stemBudMode: 'none',
+  leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 

@@ -110,7 +110,20 @@ export function petalHalfWidth(u, P) {
   // base and tip, so the claw and apex stay anchored while the sides bow.
   const edge = clamp(P.edgeCurve || 0, -1, 1);
   const bulge = 1 + EDGE_CURVE_AMP * edge * Math.sin(Math.PI * u);
-  return Math.max(0, P.W * shape * bulge);
+  let w = P.W * shape * bulge;
+  // LOBES: periodic margin cuts along the length — a pinnatifid outline (poppy leaf)
+  // when deep, a serrated margin (rose leaflet) when shallow + frequent. Applied
+  // symmetrically to both sides through the SAME width profile, so the solid blade
+  // grid and its rim both follow the lobes and stay watertight. The cut envelope
+  // vanishes at the base and tip so the blade stays one connected leaf. Off
+  // (P.lobe falsy) leaves the outline exactly as before — petals/sepals unchanged.
+  if (P.lobe) {
+    const c = Math.max(1, Math.round(P.lobeCount || 5));
+    const cut = Math.abs(Math.sin(u * c * Math.PI));      // c lobes along the length
+    const env = Math.sin(Math.PI * u);                    // 0 at base & tip, 1 mid-blade
+    w *= 1 - clamp(P.lobe, 0, 1) * 0.6 * cut * env;       // 0.6 cap keeps a printable neck at each sinus
+  }
+  return Math.max(0, w);
 }
 
 
