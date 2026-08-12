@@ -25,8 +25,11 @@ forcing the mark — i.e. the documentation — to be updated):
   * rib1x1: the wale axis consistently locks onto the knit-to-knit
     VISIBLE repeat (2x the true wale pitch) — accepted as "alternate"
     per the documented labeling ambiguity, not a failure. The course
-    axis is genuinely unreliable on rib: ~18% high at the coarse gauge,
-    a half-period flip at the fine gauge (clean!).
+    axis originally read ~18% high at the coarse gauge — DIAGNOSED AND
+    FIXED by the spacing-refinement rework (the inflation was the old
+    mean-of-all-gaps estimator, not detection; see
+    _refine_spacing_from_positions); the fine-gauge half-period flip
+    (a detection-level confusion, clean image) remains open.
   * garter, 8x10: wale axis reads the 2x double-period on the bump
     lattice; course axis is fine at both gauges.
 
@@ -96,14 +99,19 @@ GRID = [
           xfail_reason="mild degradation flips the fine-gauge course axis to half period (9.0px vs 18.0 true)"),
     # --- rib1x1: wale may legitimately read the knit-to-knit repeat ----
     _case(clean, "rib1x1", 5, 7, "wale", ok=("primary", "alternate")),
-    _case(clean, "rib1x1", 5, 7, "course",
-          xfail_reason="rib course reads ~18% high (30.4px vs 25.7 true) even clean -- genuinely unreliable, cause not yet diagnosed"),
+    # The two coarse-gauge rib course cases originally xfailed as
+    # "reads high, cause not yet diagnosed" (30.4px clean / 27.9px
+    # degraded vs 25.7 true). The spacing-refinement fix (per-step-
+    # normalized gaps -- see _refine_spacing_from_positions) made both
+    # XPASS: the inflation was the old mean-of-all-gaps estimator being
+    # tilted by junk gaps, not a detection problem. Marks removed per
+    # the strict-xfail contract.
+    _case(clean, "rib1x1", 5, 7, "course"),
     _case(clean, "rib1x1", 8, 10, "wale", ok=("primary", "alternate")),
     _case(clean, "rib1x1", 8, 10, "course",
           xfail_reason="fine-gauge rib course flips to half period even clean (9.0px vs 18.0 true)"),
     _case(mildly_degraded, "rib1x1", 5, 7, "wale", ok=("primary", "alternate")),
-    _case(mildly_degraded, "rib1x1", 5, 7, "course",
-          xfail_reason="rib course reads high (27.9px vs 25.7 true, ~8.6%) under mild degradation"),
+    _case(mildly_degraded, "rib1x1", 5, 7, "course"),
     _case(mildly_degraded, "rib1x1", 8, 10, "wale", ok=("primary", "alternate")),
     _case(mildly_degraded, "rib1x1", 8, 10, "course"),
     # --- garter: course may legitimately read the ridge-pair repeat ----

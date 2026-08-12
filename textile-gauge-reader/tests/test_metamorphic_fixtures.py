@@ -8,29 +8,32 @@ diagnose every violation, THEN commit — tolerances stay commitments, and
 violations become strict xfails carrying their diagnosis, never a
 loosened tolerance):
 
-  7/10 outcomes passed outright. The three violations, each diagnosed
-  to a specific mechanism before being encoded here:
+  7/10 outcomes passed outright, with three diagnosed violations. The
+  strict-xfail mechanism then worked exactly as designed: fixing the
+  spacing refinement (see _refine_spacing_from_positions' docstring for
+  the full story) made the mirror/wale xfail XPASS, and its mark was
+  removed. Current state, 8/10 passing:
 
-  * resize/course — HARMONIC FLIP. At 1.5x upscale the coarse
-    autocorrelation seed itself lands on the DOUBLED family (candidates
-    go [12,24,48] -> [36,72,144] instead of [18,36,72]), and the course
-    axis has no independent loop-center/structural evidence to correct
-    it (the selected_reason says exactly that), so the 2x period wins.
-    A genuine scale-dependent harmonic instability, course axis only.
-  * mirror/wale — DRIFT (7.6%). Candidate selection IS mirror-symmetric
-    (both directions pick the same 35.0px candidate with near-identical
-    evidence); the divergence is entirely in post-selection spacing
-    refinement, which pulls 35.0 -> 37.2 on the original and -> 34.4 on
-    the mirror (opposite directions, ±2.3px) — a boundary-phase
-    sensitivity: mirroring changes which partial period abuts the
-    window edge. Their mean (35.8) sits on the selected candidate.
-  * rotate90/wale — DRIFT (3.5%, vs the 2% lossless-transform bound).
-    Same refinement phase-sensitivity family as the mirror case
-    (rotation also changes the boundary phase), smaller magnitude.
-
-  Fixing the refinement's phase sensitivity is a measurement-algorithm
-  change needing its own validation pass — out of scope for the harness
-  that surfaced it. The strict xfails below flag the moment it happens.
+  * mirror/wale — FIXED. Was a 7.6% drift: both directions selected the
+    same 35.0px candidate, but the old mean-of-all-gaps refinement was
+    boundary-phase sensitive (37.2 one way, 34.4 the other). The
+    per-step-normalized gap estimator brought the disagreement to 0.6%,
+    inside the 1% lossless-transform bound, and moved the baseline
+    toward the hand-counted ground truth (37.2 -> 35.3 vs ~33 true).
+  * resize/course — HARMONIC FLIP, still open. At 1.5x upscale the
+    coarse autocorrelation seed itself lands on the DOUBLED family
+    (candidates go [12,24,48] -> [36,72,144] instead of [18,36,72]),
+    and the course axis has no independent loop-center/structural
+    evidence to correct it (the selected_reason says exactly that).
+    A candidate-selection instability — refinement was never the cause.
+  * rotate90/wale — DRIFT, still open, and the refinement fix REVISED
+    its diagnosis: the residual ~4.5% disagreement is NOT boundary
+    phase. Both paths select the same 24.0px candidate, but the wale
+    pipeline refines from loop-center-CLUSTERED positions while the
+    course pipeline refines from 1D signal peaks — a position-source
+    asymmetry between the two axes' pipelines, so cross-axis agreement
+    after rotation isn't guaranteed by construction. Fixing it means
+    unifying the position sources, a separate change.
 """
 from __future__ import annotations
 
@@ -45,8 +48,7 @@ JERSEY_ROI = (30, 30, 660, 310)
 
 KNOWN_VIOLATIONS = {
     ("resize", "course"): "1.5x upscale flips the coarse autocorrelation seed to the 2x family; course has no structural evidence to correct it",
-    ("mirror", "wale"): "spacing refinement is boundary-phase sensitive: same selected candidate, refined +/-2.3px in opposite directions",
-    ("rotate90", "wale"): "same refinement phase sensitivity as mirror/wale, smaller magnitude (3.5% vs the 2% lossless bound)",
+    ("rotate90", "wale"): "wale refines from loop-center-clustered positions, course from 1D signal peaks -- cross-axis agreement after rotation isn't guaranteed by construction (~4.5%)",
 }
 
 

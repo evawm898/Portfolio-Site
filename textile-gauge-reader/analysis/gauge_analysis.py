@@ -1147,19 +1147,45 @@ def _refine_spacing_from_positions(positions: List[float], period: float) -> Tup
     clean synthetic signal its gaps cluster tightly around `period` and
     refining toward their mean is a strict improvement. On a real photo it
     can occasionally miss a peak (inflating the gaps on both sides toward
-    ~2x period) or insert a spurious one (deflating a gap toward ~0.5x),
-    and those bad gaps get averaged in right alongside the good ones --
-    silently smuggling a harmonic-sized error into a period that evidence
-    scoring already got right. (Found via real-photo diagnostics: a large,
-    clean crop of a real swatch correctly selected 35px as the winning
-    candidate, but this refinement then overwrote it with 43px -- a ~23%
-    inflation -- from a handful of noisy gaps mixed in with mostly-good
-    ones.)
+    a multiple of the period) or insert a spurious one (deflating a gap
+    toward ~0.5x). Two generations of this function have dealt with that:
 
-    Only accept the refinement if its result is still close to the
-    period it was meant to refine (see SPACING_REFINEMENT_MAX_LOG_
-    DEVIATION); otherwise the noisy positions aren't trustworthy for this
-    and the caller should keep the original candidate period as-is.
+    1. The original unconditionally averaged ALL gaps -- on a real jersey
+       crop that silently overwrote a correctly-selected 35px candidate
+       with 43px (~23% inflation) from a handful of missed-peak gaps.
+    2. The first fix gated the mean-of-all-gaps result against the
+       candidate (SPACING_REFINEMENT_MAX_LOG_DEVIATION), which stopped
+       the catastrophic overwrite but kept the fragile estimator: any
+       single missed/spurious position still tilted the mean, and WHICH
+       boundary positions get detected depends on the crop's phase. The
+       metamorphic mirror invariant caught the consequence: mirroring the
+       real jersey fixture selected the SAME 35.0px candidate yet refined
+       to 37.2 one way and 34.4 the other (+/-2.3px, opposite
+       directions), because the two runs detected slightly different
+       boundary positions and mean-of-all-gaps has no defense.
+
+    Current estimator -- per-step-normalized gaps: each consecutive gap g
+    is assigned k = round(g / period) whole periods; a gap only counts if
+    k >= 1 AND its per-step value g/k is within the SAME log tolerance of
+    the candidate that the old design applied once at the end
+    (|ln((g/k)/period)| <= SPACING_REFINEMENT_MAX_LOG_DEVIATION). The
+    refined spacing is sum(g)/sum(k) over accepted gaps. Properties, all
+    verified against the real fixture's actual detected positions before
+    this landed:
+      - a missed peak's ~2x gap now CONTRIBUTES correctly (k=2) instead
+        of poisoning the mean;
+      - a spurious insertion's two ~0.5x gaps are rejected (ln 0.5 is far
+        outside the band), as are ambiguous ~1.5x gaps under either
+        rounding (ln 0.75 and ln 1.5 both fall outside);
+      - the gap multiset is reversal-invariant, so identical detections
+        mirror to identical spacing exactly, and the one-position
+        boundary differences that remain moved the real-fixture mirror
+        disagreement from 8.2% to 0.6%;
+      - because every accepted per-step value lies within the log band
+        around the candidate, their weighted mean does too -- the
+        refinement structurally cannot wander off the evidence-selected
+        candidate (the final gate below is kept as belt-and-braces).
+
     Returns (spacing_px, spacing_consistency) -- consistency is 0.0
     whenever no refinement was attempted or accepted.
     """
@@ -1169,10 +1195,18 @@ def _refine_spacing_from_positions(positions: List[float], period: float) -> Tup
     diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
     if len(diffs) == 0:
         return period, 0.0
-    refined = float(np.mean(diffs))
+    steps = np.round(diffs / period)
+    per_step = diffs / np.maximum(steps, 1.0)
+    accepted = (steps >= 1) & (
+        np.abs(np.log(per_step / period)) <= SPACING_REFINEMENT_MAX_LOG_DEVIATION
+    )
+    if not np.any(accepted):
+        return period, 0.0
+    refined = float(np.sum(diffs[accepted]) / np.sum(steps[accepted]))
     if refined <= 0 or abs(math.log(refined / period)) > SPACING_REFINEMENT_MAX_LOG_DEVIATION:
         return period, 0.0
-    cv = float(np.std(diffs) / np.mean(diffs)) if np.mean(diffs) > 0 else 1.0
+    kept = per_step[accepted]
+    cv = float(np.std(kept) / np.mean(kept)) if np.mean(kept) > 0 else 1.0
     spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
     return refined, spacing_consistency
 

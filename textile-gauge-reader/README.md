@@ -1276,18 +1276,44 @@ python tests/metamorphic.py path/to/photo.jpg [--roi X,Y,W,H] [--orientation ver
 
 First run against the real jersey fixture: 7/10 outcomes passed; all
 three violations were diagnosed to a mechanism before being encoded as
-strict xfails. Two are the same previously-unknown root cause: **the
-post-selection spacing refinement is boundary-phase sensitive** — on
-mirror, both directions select the same 35.0px candidate with
-near-identical evidence, but refinement pulls it to 37.2 on the
-original and 34.4 on the mirror (±2.3px in opposite directions,
-straddling the candidate); rotate90 shows the same signature at 3.5%.
-The third: at 1.5× upscale the coarse autocorrelation seed itself lands
-on the doubled candidate family for the course axis, which has no
-structural evidence stream to correct it. Fixing either is a
-measurement-algorithm change needing its own validation pass — out of
-scope for the harness that surfaced them, which is working exactly as
-intended by finding them.
+strict xfails. The biggest was a previously-unknown root cause: **the
+post-selection spacing refinement was boundary-phase sensitive** — on
+mirror, both directions selected the same 35.0px candidate with
+near-identical evidence, but the old mean-of-all-gaps refinement pulled
+it to 37.2 on the original and 34.4 on the mirror (±2.3px in opposite
+directions, straddling the candidate).
+
+**That finding has since been fixed** (see `_refine_spacing_from_
+positions`' docstring for the full account): the refinement now uses
+per-step-normalized gaps — each gap counts `round(gap/period)` whole
+periods, and only contributes if its per-step value is inside the same
+log tolerance the old design applied once at the end. A missed peak's
+~2× gap now contributes correctly instead of poisoning the mean;
+spurious ~0.5× and ambiguous ~1.5× gaps are excluded under either
+rounding; and since the gap multiset is reversal-invariant, identical
+detections mirror to identical spacing exactly. Verified before/after
+on real data: the mirror disagreement fell from 7.6% to 0.6% (inside
+the 1% bound — the strict xfail XPASSed and was removed, exactly the
+designed mechanism); across five ROI phases on the real jersey photo,
+mean wale error vs the hand-counted truth HALVED (+12.4% → +6.6%) and
+course swing collapsed (8.2% → 4.7%) with mean error unchanged — no
+phase-swing was traded for a systematic offset. As a bonus the same fix
+XPASSed two synthetic rib-course xfails: their "reads ~18% high, cause
+unknown" was the old estimator's inflation all along. (The recorded-
+corrections SQLite export could not be checked directly — the local DB
+is empty and the production copy lives on Render's ephemeral disk,
+unreachable from the development sandbox — so the before/after used
+the hand-established fixture ground truths instead: jersey ~5.0 WPI /
+~7.35 CPI, teal 3.8 WPI, against which the fix moved every prediction
+closer or left it unchanged.)
+
+Still open, both with revised post-fix diagnoses: at 1.5× upscale the
+coarse autocorrelation seed itself lands on the doubled candidate
+family for the course axis (candidate selection, not refinement — the
+course axis has no structural evidence stream to correct it), and
+rotate90's residual ~4.5% wale/course disagreement comes from the two
+axes refining from different position sources (loop-center clustering
+vs 1D signal peaks) — unifying those is its own change.
 
 ## Deploying the backend to Render
 

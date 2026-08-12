@@ -58,14 +58,23 @@ def test_clean_evenly_spaced_positions_refine_toward_their_own_mean():
 
 
 def test_a_few_noisy_missed_peak_gaps_do_not_overwrite_the_period():
-    # Mostly-clean ~35px gaps, but two gaps around 51-55px (as if one real
-    # peak was missed between them) -- exactly the real-photo failure
-    # shape documented in the module docstring above.
+    # Mostly-clean ~35px gaps mixed with junk gaps (missed peaks, off-
+    # lattice detections) -- the real-photo failure shape documented in
+    # the module docstring above. The ORIGINAL fix rejected refinement
+    # outright here (returning the candidate untouched); the current
+    # per-step-gap estimator does one better: it salvages the clean gaps
+    # and rejects only the junk, so the result must stay pinned tightly
+    # to the candidate rather than drifting toward the old ~23%-inflated
+    # all-gaps mean (~43px). Either way, the regression this guards is
+    # the same: noisy gaps must never drag the result off the
+    # evidence-selected period.
     period = 35.0
     positions = [0, 55, 102, 125, 156, 196, 247, 282, 336, 390, 425, 476]
     spacing, consistency = _refine_spacing_from_positions(positions, period)
-    assert spacing == period  # refinement rejected -- too far from the candidate
-    assert consistency == 0.0
+    assert spacing == pytest.approx(period, rel=0.03)
+    # Consistency reflects only the accepted (clean) gaps now, so it is
+    # allowed to be high -- what matters is the spacing pin above.
+    assert 0.0 <= consistency <= 1.0
 
 
 def test_refinement_is_accepted_right_up_to_the_tolerance_boundary():
