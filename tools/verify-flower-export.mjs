@@ -94,6 +94,10 @@ const CONFIGS = [
   { label: 'lobed leaves (poppy), opposite', set: [{ id: 'leafType', value: 'lobed', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'opposite', evt: 'change' }] },
   { label: 'oval leaves, whorled + tight bud', set: [{ id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'whorled', evt: 'change' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   { label: 'narrow leaves, opposite (no bud)', set: [{ id: 'leafType', value: 'narrow', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'opposite', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
+  { label: 'center: DENSE CLUSTER (150 stamens) on full plant', set: [{ id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'edgeNoise', value: '0' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'centerArch', value: 'dense', evt: 'change' }, { id: 'denseStamenCount', value: '150' }] },
+  { label: 'center: DISC (domed + ring stamens)', set: [{ id: 'centerArch', value: 'disc', evt: 'change' }, { id: 'discHeight', value: '0.8' }, { id: 'ringStamenCount', value: '60' }] },
+  { label: 'center: PETALOID FILL (120 tiny petals)', set: [{ id: 'centerArch', value: 'petaloid', evt: 'change' }, { id: 'fillPetalCount', value: '120' }] },
+  { label: 'center: PETALOID FILL + lobed leaves (combined)', set: [{ id: 'centerArch', value: 'petaloid', evt: 'change' }, { id: 'fillPetalCount', value: '90' }, { id: 'leafType', value: 'lobed', evt: 'change' }, { id: 'stemNodeCount', value: '3' }] },
 ];
 
 const server = http.createServer((req, res) => {

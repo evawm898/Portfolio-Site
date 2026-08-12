@@ -655,7 +655,24 @@
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
-            <label for="centerType">Center type</label>
+            <label for="centerArch">Center type</label>
+          </div>
+          <select class="fl-select" id="centerArch">
+            <option value="classic">CLASSIC</option>
+            <option value="dense">DENSE CLUSTER</option>
+            <option value="disc">DISC</option>
+            <option value="petaloid">PETALOID FILL</option>
+          </select>
+          <span class="fl-ctrl__hint" data-center-arch="classic">stamens &amp; pistil (the original centre)</span>
+          <span class="fl-ctrl__hint" data-center-arch="dense">peony: dense fine stamens around central carpels</span>
+          <span class="fl-ctrl__hint" data-center-arch="disc">anemone: a domed disc ringed with short stamens</span>
+          <span class="fl-ctrl__hint" data-center-arch="petaloid">ranunculus / mum: centre filled with tiny petals</span>
+        </div>
+
+        <!-- CLASSIC -->
+        <div class="fl-ctrl" data-center-arch="classic">
+          <div class="fl-ctrl__row">
+            <label for="centerType">Classic style</label>
           </div>
           <select class="fl-select" id="centerType">
             <option value="stamens">STAMENS</option>
@@ -667,7 +684,7 @@
           <span class="fl-ctrl__hint" data-center-styles="none">bare centre &mdash; no stamens or pistil</span>
         </div>
 
-        <div class="fl-ctrl" data-center-styles="stamens pistil">
+        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
           <div class="fl-ctrl__row">
             <label for="centerCount">Amount</label>
             <span class="fl-ctrl__val" data-value="centerCount"></span>
@@ -676,7 +693,7 @@
           <span class="fl-ctrl__hint">number of filaments</span>
         </div>
 
-        <div class="fl-ctrl" data-center-styles="stamens pistil">
+        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
           <div class="fl-ctrl__row">
             <label for="centerLength">Length</label>
             <span class="fl-ctrl__val" data-value="centerLength"></span>
@@ -685,7 +702,7 @@
           <span class="fl-ctrl__hint">short &rarr; long</span>
         </div>
 
-        <div class="fl-ctrl" data-center-styles="stamens pistil">
+        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
           <div class="fl-ctrl__row">
             <label for="centerTipSize">Tip size</label>
             <span class="fl-ctrl__val" data-value="centerTipSize"></span>
@@ -693,6 +710,109 @@
           <input type="range" id="centerTipSize" min="0" max="1" step="0.01" value="0.35">
           <span class="fl-ctrl__hint">small &rarr; large anther / stigma</span>
         </div>
+
+        <!-- DENSE CLUSTER -->
+        <div class="fl-ctrl" data-center-arch="dense">
+          <div class="fl-ctrl__row">
+            <label for="denseStamenCount">Stamen count</label>
+            <span class="fl-ctrl__val" data-value="denseStamenCount"></span>
+          </div>
+          <input type="range" id="denseStamenCount" min="10" max="200" step="1" value="80">
+          <span class="fl-ctrl__hint">many fine filaments packed densely</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="dense">
+          <div class="fl-ctrl__row">
+            <label for="denseStamenLength">Stamen length</label>
+            <span class="fl-ctrl__val" data-value="denseStamenLength"></span>
+          </div>
+          <input type="range" id="denseStamenLength" min="0" max="1" step="0.01" value="0.4">
+          <span class="fl-ctrl__hint">short &rarr; long filaments</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="dense">
+          <div class="fl-ctrl__row">
+            <label for="carpelCount">Carpel count</label>
+            <span class="fl-ctrl__val" data-value="carpelCount"></span>
+          </div>
+          <input type="range" id="carpelCount" min="1" max="10" step="1" value="5">
+          <span class="fl-ctrl__hint">central rounded carpels (few)</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="dense">
+          <div class="fl-ctrl__row">
+            <label for="carpelSize">Carpel size</label>
+            <span class="fl-ctrl__val" data-value="carpelSize"></span>
+          </div>
+          <input type="range" id="carpelSize" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">small &rarr; large carpels</span>
+        </div>
+
+        <!-- DISC -->
+        <div class="fl-ctrl" data-center-arch="disc">
+          <div class="fl-ctrl__row">
+            <label for="discSize">Disc size</label>
+            <span class="fl-ctrl__val" data-value="discSize"></span>
+          </div>
+          <input type="range" id="discSize" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">radius of the central dome</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="disc">
+          <div class="fl-ctrl__row">
+            <label for="discHeight">Disc height</label>
+            <span class="fl-ctrl__val" data-value="discHeight"></span>
+          </div>
+          <input type="range" id="discHeight" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">flat &rarr; domed</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="disc">
+          <div class="fl-ctrl__row">
+            <label for="ringStamenCount">Ring stamen count</label>
+            <span class="fl-ctrl__val" data-value="ringStamenCount"></span>
+          </div>
+          <input type="range" id="ringStamenCount" min="0" max="150" step="1" value="40">
+          <span class="fl-ctrl__hint">short stamens ringing the dome edge</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="disc">
+          <div class="fl-ctrl__row">
+            <label for="ringStamenLength">Ring stamen length</label>
+            <span class="fl-ctrl__val" data-value="ringStamenLength"></span>
+          </div>
+          <input type="range" id="ringStamenLength" min="0" max="1" step="0.01" value="0.35">
+          <span class="fl-ctrl__hint">short &rarr; long</span>
+        </div>
+
+        <!-- PETALOID FILL -->
+        <div class="fl-ctrl" data-center-arch="petaloid">
+          <div class="fl-ctrl__row">
+            <label for="fillPetalCount">Fill petal count</label>
+            <span class="fl-ctrl__val" data-value="fillPetalCount"></span>
+          </div>
+          <input type="range" id="fillPetalCount" min="12" max="200" step="1" value="60">
+          <span class="fl-ctrl__hint">tiny petals packed into the centre</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="petaloid">
+          <div class="fl-ctrl__row">
+            <label for="fillPetalSize">Fill petal size</label>
+            <span class="fl-ctrl__val" data-value="fillPetalSize"></span>
+          </div>
+          <input type="range" id="fillPetalSize" min="0.05" max="0.5" step="0.01" value="0.18">
+          <span class="fl-ctrl__hint">size relative to the outer petal</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="petaloid">
+          <div class="fl-ctrl__row">
+            <label for="fillDensity">Fill density</label>
+            <span class="fl-ctrl__val" data-value="fillDensity"></span>
+          </div>
+          <input type="range" id="fillDensity" min="0" max="1" step="0.01" value="0.6">
+          <span class="fl-ctrl__hint">loosely spaced &rarr; fully overlapping</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="petaloid">
+          <div class="fl-ctrl__row">
+            <label for="fillCurl">Fill curl</label>
+            <span class="fl-ctrl__val" data-value="fillCurl"></span>
+          </div>
+          <input type="range" id="fillCurl" min="0" max="1" step="0.01" value="0.6">
+          <span class="fl-ctrl__hint">open (mum) &rarr; tightly cupped (ranunculus)</span>
+        </div>
+        <p class="fl-tip-note" data-center-arch="petaloid">Tiny petals inherit the PETAL shape (cup, edge, ruffle) and render as small solid blades; stamens/pistil are hidden.</p>
 
       </div>
     </section>
