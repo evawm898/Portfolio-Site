@@ -1210,6 +1210,85 @@ pip install pytest
 pytest tests/
 ```
 
+### Test harness: synthetic ground truth + metamorphic invariants
+
+Two complementary additions that test the detector in ways hand-labeled
+photos can't:
+
+**Synthetic stitch-primitive fabrics** (`tests/synthetic_fabric.py` +
+`tests/test_synthetic_fabric_gauge.py`). Renders jersey / 1×1 rib /
+garter from actual stitch primitives — a jersey stitch is a real
+two-legged V, so the leg-to-leg half-period harmonic (this project's
+single most damaging failure mode) genuinely exists in the image, unlike
+the older sinusoid fixtures which structurally cannot contain it — at
+EXACT known gauge, with composable degradations (perspective warp,
+lighting gradient, blur, JPEG round-trip, an optional yarn-ply harmonic
+trap). Ground truth lives only in `tests/`; nothing in `analysis/` can
+see it. Structures with a legitimate reading ambiguity (rib's hidden
+purl wales, garter's ridge pairs) carry BOTH truth values, and the
+scorer records which one matched rather than pretending the ambiguity
+away.
+
+Every expectation in the grid was calibrated against the real detector
+before being committed, and the calibration itself produced findings —
+encoded as **strict xfails** (they fail CI the moment a future change
+fixes them, forcing the documentation to update):
+
+- Mildly degraded jersey at 5×7 gauge flips BOTH axes to the confident
+  (~0.67) leg half-harmonic — isolated to a blur+perspective interaction
+  with one specific warp geometry (seed 7); identical degradation levels
+  at seeds 8–10 stay correct, no single degradation alone flips it, and
+  the `structure="jersey"` hint does not rescue it. The classic
+  real-photo failure, now reproducible on demand (and regression-pinned
+  from both sides: a companion test asserts seeds 8–10 stay correct).
+- Fine-gauge course axes flip to half period under mild degradation
+  (jersey) or even clean (rib); rib's course axis also reads ~18% high
+  at coarse gauge — genuinely unreliable on rib, cause not yet
+  diagnosed.
+- Fine-gauge garter wale reads the 2× bump-lattice period.
+- The ply-twist trap on clean jersey is correctly resisted (locked in
+  as a passing test — the anti-harmonic machinery earning its keep
+  against ground truth for the first time).
+
+A full degradation sweep (blur × warp × seed, diagnostic table output)
+is gated behind `TGR_FULL_SWEEP=1`.
+
+**Metamorphic invariants** (`tests/metamorphic.py` +
+`tests/test_metamorphic_fixtures.py`). For photos with NO known gauge —
+i.e. any real photo — the detector is checked against how its output
+must co-vary with known transforms: 1.5× resize scales pixel spacing by
+exactly 1.5× (tol 4%: sub-pixel refinement jitters 1–2% on these
+periods, resampling ~1%); 90° rotation with the orientation parameter
+held fixed swaps wale↔course (tol 2% — lossless, so more means
+axis-asymmetric processing); horizontal mirror is identical (tol 1%);
+halving the ROI holds density (tol 10%, and SKIPPED per axis when the
+half window would span <5 periods — below that the estimate is
+legitimately unstable, and either pass or fail would be a lie); a
+quality-60 JPEG round-trip moves the result <5%. Outcomes are
+classified, not just pass/failed: `harmonic_flip` (ratio near 0.5×/2×)
+is its own status regardless of tolerance, and `lost` another, because
+a 6% drift and a 2× flip are different bugs. Runnable on any photo
+without writing a test:
+
+```bash
+python tests/metamorphic.py path/to/photo.jpg [--roi X,Y,W,H] [--orientation vertical]
+```
+
+First run against the real jersey fixture: 7/10 outcomes passed; all
+three violations were diagnosed to a mechanism before being encoded as
+strict xfails. Two are the same previously-unknown root cause: **the
+post-selection spacing refinement is boundary-phase sensitive** — on
+mirror, both directions select the same 35.0px candidate with
+near-identical evidence, but refinement pulls it to 37.2 on the
+original and 34.4 on the mirror (±2.3px in opposite directions,
+straddling the candidate); rotate90 shows the same signature at 3.5%.
+The third: at 1.5× upscale the coarse autocorrelation seed itself lands
+on the doubled candidate family for the course axis, which has no
+structural evidence stream to correct it. Fixing either is a
+measurement-algorithm change needing its own validation pass — out of
+scope for the harness that surfaced them, which is working exactly as
+intended by finding them.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
