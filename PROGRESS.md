@@ -81,6 +81,46 @@ orchestration; `buildStemInto` kept for the receptacle-less stem);
 boundary edges, all 27 configs); before/after full + zoomed-on-seam renders
 confirm the seam is gone and leaves/bud still seat cleanly.
 
+### Flutes derived from the REAL petal outline (approach D, part 2)
+
+The trunk's receptacle flutes were an idealized gaussian-averaged ring. They now
+derive from each petal's **actual outline**: `petalBaseFootprint` samples the two
+margins of every outer-whorl petal (`u ∈ [0, 0.35]`) through the SAME
+`buildSpine` + `mapPointToSurface` + `placePoint` the petal render uses, as
+world-polar `{az, r}` points. Those samples drive the top-ring radius, so each
+flute is that petal's real edge — its width taper and edge curve included — not a
+generic bump. Because the azimuths are read from real world positions
+(`atan2(z, x)`), a flute lands under its petal for **any** arrangement (spiral /
+bilateral, not just symmetric rosettes) — a latent mirror-misalignment in the old
+point-attachment path is fixed.
+
+- **Flutes run DOWN the trunk.** The top profile is split into a circular mean +
+  an azimuthal flute deviation that fades on a **slower** curve than the radius
+  taper (`fluteCurve < curve`), so the petal-edge ridges continue a good way
+  toward the stem and gather into the round neck — the "petal material continues
+  downward into the vessel" look of the ivory reference — instead of dying at the
+  rim. Valleys between petals dip toward a floor between `stemR` and the mean.
+- **Print-safety unchanged.** Still ONE closed lofted solid (rings + wall quads +
+  caps); only the top-ring radius/azimuth profile and its downward blend changed.
+  Radii are floored to `max(stemR, …)` then the export feature-floor. Gate passes
+  **0 boundary edges across all 27 configs**.
+- **Leaves + side bud untouched.** This only changes the receptacle top profile;
+  the stem centreline/radius and `cl` are identical, so attachment is unchanged
+  (confirmed in the full-plant render).
+- **Triangles.** Sector count `M` scales with the flute (petal/sepal) count.
+  Export full plant **46,030 → 52,942 tris** (+6,912 for real flutes) — i.e.
+  **≈ the ORIGINAL rib-lattice receptacle** (52,612, +0.6%), and multi-layer /
+  stress configs land *below* their pre-approach-D originals (3 layers
+  100,140→92,790; 4 layers 287,556→266,940; 20-petal 203,884→187,048). Bloom-only
+  configs (incl. default 26,616) still identical — the trunk never builds for them.
+
+**Investigation note — leaf vs petal outline (no change made).** Both use the
+same `buildSilhouette`/`petalHalfWidth` curve (perfectly symmetric, no noise at
+defaults). The leaf margin looks coarser only because leaves deliberately sample
+it lighter — `outlineSteps: 30` (vs petals' 56) and a `rimSegments: 5` pentagonal
+rim tube (vs 8) — plus a rim-vs-blade sample-count mismatch, all visible in
+silhouette because the blade is near-flat (`bloom = 90°`). Left as-is per request.
+
 ---
 
 ## Summary — all four phases complete ✅

@@ -1408,6 +1408,30 @@ function buildCompoundLeafInto(acc, blade, frame, node, dir, Pleaf, rLeaf) {
   }
 }
 
+/* Real base-outline FOOTPRINT of one petal, as world-polar { az, r } samples
+   traced along its two margins from the base up to `uBase`. It uses the SAME
+   surface mapping the petal render uses (buildSpine + mapPointToSurface +
+   placePoint) with the petal's OWN params + placement, so the trunk's flutes are
+   the petal's actual visible edge — width taper, edge curve and all — not an
+   idealized ring. Passing y = ±BIG makes mapPointToSurface clamp v to the ±1
+   margin without needing the half-width. az is the TRUE world azimuth
+   (atan2(z, x)), so a flute lands under its petal for any arrangement (spiral /
+   bilateral included), not only symmetric rosettes. */
+const FOOT_U_MAX = 0.35;   // sample the base..shoulder of the petal (where it meets the receptacle)
+const FOOT_U_STEPS = 6;
+function petalBaseFootprint(Pp, az, baseHeight, radialOffset, tilt) {
+  const spine = buildSpine(Pp);
+  const foot = [];
+  for (let s = 0; s <= FOOT_U_STEPS; s++) {
+    const x = Pp.L * (FOOT_U_MAX * (s / FOOT_U_STEPS));
+    for (const yy of [1e6, -1e6]) {                        // +margin then -margin (v clamps to ±1)
+      const w = placePoint(mapPointToSurface({ x, y: yy }, Pp, spine), az, baseHeight, radialOffset, tilt);
+      foot.push({ az: Math.atan2(w.z, w.x), r: Math.hypot(w.x, w.z) });
+    }
+  }
+  return foot;
+}
+
 /* UNIFIED TRUNK (approach D) — ONE continuous, watertight lofted body of
    revolution that the RECEPTACLE owns, replacing the old rib-lattice receptacle
    AND (when a stem is present) the separate stem tube, so there is no longer a
@@ -1454,8 +1478,10 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
   // each petal/sepal base) whenever there is a receptacle — matching the old rib
   // count so bump fidelity is preserved; a plain round tube otherwise.
   const blend = clamp(opts.blend, 0, 1);
+  // Angular resolution: enough sectors to resolve each petal's outline as a
+  // distinct flute (more per flute at low blend, where the flutes are sharpest).
   const M = wantRecept
-    ? clamp(Math.round(attachments.length * lerp(2, 4, blend)), 24, 96)
+    ? clamp(Math.round(attachments.length * lerp(11, 7, blend)), 40, 120)
     : Math.max(3, RADIAL_SEGMENTS * 2);
   const cosH = new Array(M), sinH = new Array(M);
   for (let j = 0; j < M; j++) { const th = (j / M) * Math.PI * 2; cosH[j] = Math.cos(th); sinH[j] = Math.sin(th); }
@@ -1471,33 +1497,53 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
     const tight  = clamp(opts.tightness, 0, 1);
     const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // relief pokes up among the petals
     const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dip between bases (fades as it smooths)
-    const sigma   = lerp(0.28, 1.7, blend);                    // tight hug -> smooth flow
+    const sigma   = lerp(0.09, 0.34, blend);                   // angular kernel: sharp flutes -> smooth flow
+    const gamma   = lerp(2.2, 0.8, blend);                     // ridge->valley sharpness (peak^gamma)
     const curve   = lerp(0.7, 2.4, tight);                     // >1 pinches into a tight neck
-    let maxR = ringR;
-    for (const a of attachments) if (a.r > maxR) maxR = a.r;
-    // Blended attachment profile at azimuth th (the SAME sampling the old ribs used):
-    // radius follows the nearby bases; height rises to a base (peak ~ 1) and dips in
-    // the gaps (peak -> 0).
+    // Flatten every attachment to its outline samples: a petal contributes the
+    // world-polar { az, r } points of its REAL edge (a.foot); a sepal is one point.
+    // These drive the top-ring radius directly, so the flutes are the petal edges.
+    const samples = [];
+    for (const a of attachments) { const pts = a.foot || [a]; for (const s of pts) samples.push(s); }
+    let maxR = ringR, rSum = 0;
+    for (const s of samples) { if (s.r > maxR) maxR = s.r; rSum += s.r; }
+    const rMean = samples.length ? rSum / samples.length : ringR;
+    const valleyR = lerp(stemR, rMean, lerp(0.25, 0.8, blend));  // between-flute floor (deeper at low blend)
+    // Profile at azimuth th: radius follows the nearby real outline samples on a
+    // ridge (peak ~ 1) and retreats to the valley floor between petals (peak -> 0);
+    // height rises to meet a base and dips in the gaps, same as before.
     const sample = (th) => {
       let wsum = 0, rsum = 0, peak = 0;
-      for (const a of attachments) {
-        let d = Math.abs(th - a.az) % (Math.PI * 2);
+      for (const s of samples) {
+        let d = Math.abs(th - s.az) % (Math.PI * 2);
         if (d > Math.PI) d = Math.PI * 2 - d;
         const w = Math.exp(-(d * d) / (2 * sigma * sigma));
-        wsum += w; rsum += w * a.r; if (w > peak) peak = w;
+        wsum += w; rsum += w * s.r; if (w > peak) peak = w;
       }
-      const topR = wsum > 1e-6 ? rsum / wsum : ringR;
+      const ridgeR = wsum > 1e-6 ? rsum / wsum : ringR;         // radius tracing the real petal outline
+      const topR = lerp(valleyR, ridgeR, Math.pow(peak, gamma)); // ridge on a flute -> valley between flutes
       return { topR: clamp(topR, stemR, maxR * 1.05), topY: cy + overlap - dipMax * (1 - peak) };
     };
     const sTopR = new Array(M), sTopY = new Array(M);
-    for (let j = 0; j < M; j++) { const s = sample((j / M) * Math.PI * 2); sTopR[j] = s.topR; sTopY[j] = s.topY; }
-    const STEPS = 12;                                          // axial resolution of the receptacle
+    let meanTopR = 0;
+    for (let j = 0; j < M; j++) { const s = sample((j / M) * Math.PI * 2); sTopR[j] = s.topR; sTopY[j] = s.topY; meanTopR += s.topR; }
+    meanTopR /= M;
+    // Split the top profile into a circular MEAN + an azimuthal FLUTE deviation, so
+    // the flutes (the petal-edge ridges/valleys) fade DOWN the trunk more slowly than
+    // the radius itself collapses. The ridges then run a good way toward the stem
+    // before gathering into the round neck, instead of vanishing at the rim — the
+    // "petal material continues downward" look of the reference.
+    const fluteDev = new Array(M);
+    for (let j = 0; j < M; j++) fluteDev[j] = sTopR[j] - meanTopR;
+    const fluteCurve = lerp(0.4, 0.9, tight);                  // < curve, so the flutes persist further down
+    const STEPS = 14;                                          // axial resolution of the receptacle
     for (let k = 0; k <= STEPS; k++) {
       const t = k / STEPS;
-      const p = Math.pow(1 - t, curve);                        // 1 at the ring -> 0 at the neck
+      const circ  = lerp(stemR, meanTopR, Math.pow(1 - t, curve));  // circular taper: meanTopR -> stemR at the neck
+      const fFade = Math.pow(1 - t, fluteCurve);                    // slower azimuthal fade -> flutes run down
       const ring = new Array(M);
       for (let j = 0; j < M; j++) {
-        const rad = floorRad(lerp(stemR, sTopR[j], p));         // topR(th) at the ring -> stemR (circular) at the neck
+        const rad = floorRad(Math.max(stemR, circ + fluteDev[j] * fFade));
         const y = lerp(sTopY[j], cy - depthW, t);
         ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
       }
@@ -1748,13 +1794,19 @@ function buildInto(petalAcc, coreAcc, ui, P) {
 
   let cl = null;   // stem centreline for the leaves + side bud (same shape either path)
   if (hasRecept) {
-    // Attachment points the trunk's top is grown from: every petal base, plus (if
-    // present) every sepal base, tucked half a step between the petals.
-    const attach = placements.filter((pl) => (pl.r || 0) > 1e-4).map((pl) => ({ az: pl.az, r: pl.r }));
+    // The trunk's receptacle flutes are grown from the OUTER whorl's REAL petal
+    // outlines: each layer-0 placement carries `foot`, world-polar samples of that
+    // petal's actual visible edge (see petalBaseFootprint). Sepal bases are added
+    // as single points, tucked half a step between the petals. Everything is in the
+    // trunk's world azimuth frame (world az = -paramAz; foot samples already carry
+    // true world az via atan2), so each flute lands under its petal / sepal.
+    const attach = [];
+    for (const pl of placements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     if (ui.sepalsType !== 'none') {
       const sc = clamp(Math.round(ui.sepalCount), 3, 24);
       const sepR = Math.max(ringR * 0.85, 0.16);
-      for (let i = 0; i < sc; i++) attach.push({ az: (i + 0.5) * 2 * Math.PI / sc, r: sepR });
+      const off = Math.PI / sc;                      // buildSepalsInto tucks sepals between the petals
+      for (let i = 0; i < sc; i++) attach.push({ az: -(off + i * 2 * Math.PI / sc), r: sepR });
     }
     // Neck to the STEM's actual top radius (stemRadiusFn is tubeRadius*4*thickness at
     // t=0), so the trunk flows straight into the stem at any thickness. No stem -> 4x.
@@ -1900,6 +1952,13 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     const radialOffset = (pl.r - P.r0) * layer.scale;
     buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt,
                    SEED_BASE + pl.seedIdx * 131 + layer.index * LAYER_SEED_STRIDE);
+    // Capture the OUTER whorl's real petal outline so the trunk's receptacle
+    // flutes are grown from it (buildTrunkInto). Only layer 0 meets the receptacle
+    // rim; inner whorls sit higher and don't touch it.
+    if (layer.index === 0 && pl.r > 1e-4) {
+      pl.foot = petalBaseFootprint(Pp, az, height, radialOffset, tilt);
+      pl.footAz = -pl.az;                          // world azimuth of the petal centre
+    }
   }
 
   return { placements, elevAmp, ringR };
