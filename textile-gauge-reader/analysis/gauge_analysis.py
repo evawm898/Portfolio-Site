@@ -133,6 +133,18 @@ MIN_PLAUSIBLE_SPACING_PX = 3.0   # ignore periodicities finer than this (likely 
 # this tolerance only ever discards refinements that look like exactly
 # that failure, never ordinary sub-pixel jitter. log(1.20) =~ 0.18.
 SPACING_REFINEMENT_MAX_LOG_DEVIATION = 0.18
+# A half-lag autocorrelation peak at >= this fraction of the seed peak's
+# height counts as a T-vs-2T near-tie worth resolving with 2D template
+# evidence (see _prefer_fundamental_seed). Calibrated before commit:
+# genuine ties measured >= 0.969 (including the leg-harmonic trap, which
+# is why strength alone can NOT decide the winner), legitimate
+# non-ties <= 0.64 (garter ridge pairs) and <= 0.47 (clean sub-features).
+AUTOCORR_SUBHARMONIC_PREFERENCE = 0.95
+# Template-walk acceptance for switching the seed to its half-lag: must
+# exceed _template_match_consistency_score's 0.5 "couldn't measure"
+# neutral, so the switch only ever happens on POSITIVE 2D evidence.
+# Measured: genuine repeats 0.66-0.70, leg half-periods 0.0.
+SEED_HALF_TEMPLATE_MIN = 0.55
 SMOOTHING_WINDOW_PX = 3          # 1D smoothing window applied to projection signals
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_TILE_GRID = (8, 8)
@@ -510,6 +522,17 @@ def analyze_gauge(
     # repeat — see the module docstring.
     p0_wale, _ = _autocorrelation_spacing(wale_signal_for_period)
     p0_course, _ = _autocorrelation_spacing(course_signal_for_period)
+    # T-vs-2T near-tie resolution for the COURSE seed only (see
+    # _prefer_fundamental_seed): the course path deliberately takes its
+    # seed as-is (no v3 candidate family to rescue a doubled seed — see
+    # the course comment below), so the seed itself must land on the
+    # fundamental. The wale seed is left alone: its 0.5x/1x/2x family +
+    # evidence scoring already resolves harmonic seeds either way.
+    # Checked on the UNROTATED signal/2D pair so template-walk anchors
+    # stay coordinate-consistent with `normalized`.
+    p0_course = _prefer_fundamental_seed(
+        course_signal, normalized, p0_course, course_direction == "horizontal"
+    )
 
     # Detect approximate loop-center points once for the whole ROI (not
     # per-direction — a loop center is a single 2D feature). Use the
@@ -741,7 +764,85 @@ def _autocorrelation_spacing(signal: np.ndarray) -> Tuple[Optional[float], float
     best_local_idx = peaks[np.argmax(search_region[peaks])]
     spacing = float(best_local_idx + lo)
     strength = float(np.clip(search_region[best_local_idx], 0.0, 1.0))
+
     return spacing, strength
+
+
+def _prefer_fundamental_seed(
+    signal: np.ndarray,
+    normalized_2d: Optional[np.ndarray],
+    p0: Optional[float],
+    lag_dx: bool,
+) -> Optional[float]:
+    """
+    Resolve a T-vs-2T near-tie in the coarse autocorrelation seed using
+    2D template evidence — for the course axis, which (deliberately —
+    see analyze_gauge's course comment) takes the seed as-is instead of
+    running the v3 candidate family.
+
+    The problem, caught by the resize metamorphic invariant: a truly
+    periodic signal at period T has autocorrelation peaks at T, 2T,
+    3T... of near-equal height, so which one the argmax lands on is
+    decided by interpolation crumbs. On the real jersey fixture's
+    course signal the T-vs-2T strength ratio measured 0.977–0.996
+    across 1.25x/1.5x/2x upscales — a coin flip that fell to T at 1x
+    and to 2T at every upscale, doubling the reported course spacing.
+
+    A strength threshold ALONE cannot fix this — tried first, and the
+    rotate90 invariant immediately broke it: the wale structure's
+    leg-harmonic half-peak measures 0.969 of its fundamental, i.e.
+    INSIDE any threshold loose enough to catch the genuine ties
+    (>= 0.977). The two situations are indistinguishable in the 1D
+    autocorrelation, which is this project's oldest lesson. What DOES
+    separate them, measured on the real fixture before this landed, is
+    the template-walk score at the half-lag (_template_match_
+    consistency_score, the task-#44 machinery): a genuine repeat walks
+    consistently (0.66–0.70 measured), while leg half-periods alternate
+    between mirror-image patches and fail the walk outright (0.0
+    measured). The 0.55 acceptance sits above the function's own 0.5
+    "couldn't measure" neutral, so the seed only ever switches on
+    POSITIVE 2D evidence, never on absence of evidence.
+
+    Single step (never chains to a quarter-lag), and a no-op whenever
+    there is no half-lag peak at >= AUTOCORR_SUBHARMONIC_PREFERENCE of
+    the seed's own peak strength — garter's legitimate ridge-pair
+    double (half-peak ratios 0.52–0.64) and clean signals' minor
+    sub-features (<= 0.47) never reach the template check at all.
+    """
+    if p0 is None or p0 <= 2 * MIN_PLAUSIBLE_SPACING_PX:
+        return p0
+    n = len(signal)
+    if n < 2 * MIN_PLAUSIBLE_SPACING_PX or np.std(signal) < 1e-6:
+        return p0
+    full_corr = correlate(signal, signal, mode="full")
+    autocorr = full_corr[n - 1 :]
+    if autocorr[0] <= 0:
+        return p0
+    autocorr_norm = autocorr / autocorr[0]
+    lo = int(MIN_PLAUSIBLE_SPACING_PX)
+    hi = max(lo + 1, n // 2)
+    search_region = autocorr_norm[lo:hi]
+    if len(search_region) < 2:
+        return p0
+    peaks, _ = find_peaks(search_region, prominence=0.01)
+    if len(peaks) == 0:
+        return p0
+    lags = peaks + lo
+
+    def _strength_near(target: float, tolerance: float):
+        candidates = [(float(l), float(search_region[p])) for p, l in zip(peaks, lags) if abs(l - target) <= tolerance]
+        return max(candidates, key=lambda t: t[1]) if candidates else None
+
+    at_seed = _strength_near(p0, max(2.0, 0.12 * p0))
+    at_half = _strength_near(p0 / 2.0, max(2.0, 0.12 * (p0 / 2.0)))
+    if at_seed is None or at_half is None:
+        return p0
+    if at_half[1] < AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]:
+        return p0
+    half_lag = at_half[0]
+    if _template_match_consistency_score(normalized_2d, signal, half_lag, lag_dx) >= SEED_HALF_TEMPLATE_MIN:
+        return half_lag
+    return p0
 
 
 def _detect_peaks(signal: np.ndarray, spacing_hint: float) -> List[float]:

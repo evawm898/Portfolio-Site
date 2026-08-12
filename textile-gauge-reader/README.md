@@ -1332,10 +1332,29 @@ that luck was orientation-dependent (a mirrored upload always read
 24.9), which is exactly what the invariant forbids; on synthetics with
 exact truth, all landmark choices agree within 0.1px.
 
-Still open: at 1.5× upscale the coarse autocorrelation seed itself
-lands on the doubled candidate family for the course axis (candidate
-selection, not refinement — the course axis has no structural evidence
-stream to correct it).
+**The resize seed-doubling has since been fixed as well — and the first
+attempt was withdrawn by the harness itself.** The failure: a truly
+periodic signal's autocorrelation peaks at T and 2T are near-equal
+(measured strength ratios 0.977–0.996 across upscales — a coin flip
+decided by interpolation crumbs), and the course path deliberately
+takes its seed as-is, so at 1.5× the course reading doubled. A
+strength-threshold-only preference for the half-lag was tried first
+and immediately broken by the rotate90 invariant: the wale
+leg-harmonic's half-peak measures 0.969 of its fundamental —
+inseparable from the genuine ties in 1D autocorrelation, which is this
+project's oldest lesson re-learned at the seed level. The landed fix
+(`_prefer_fundamental_seed`, course seed only) resolves a detected
+near-tie with 2D template-walk evidence instead: a genuine repeat
+walks consistently (0.66–0.70 measured), while leg half-periods
+alternate between mirror-image patches and fail outright (0.0
+measured), and the 0.55 acceptance sits above the score's own 0.5
+"couldn't measure" neutral so the seed only ever moves on positive
+evidence. Verified a byte-identical no-op on every 1× fixture reading;
+metamorphic is now 9/10 with rotate90 fully passing. Still open (and
+strictly xfailed with its own pin against seed-flip regression): a
+residual ~5% refinement drift at 1.5×, from fixed-pixel smoothing and
+peak-prominence parameters making the upscaled gap set relatively
+noisier — a scale-parameterization question for a future pass.
 
 ## Deploying the backend to Render
 

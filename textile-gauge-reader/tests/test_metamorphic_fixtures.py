@@ -39,12 +39,23 @@ loosened tolerance):
     upload always read 24.9. Wale moved slightly TOWARD truth
     (35.27 -> 35.06). Synthetics (exact truth): all landmarks agree
     within 0.1px, so no systematic offset was introduced there.
-  * resize/course — HARMONIC FLIP, still open. At 1.5x upscale the
-    coarse autocorrelation seed itself lands on the DOUBLED family
-    (candidates go [12,24,48] -> [36,72,144] instead of [18,36,72]),
-    and the course axis has no independent loop-center/structural
-    evidence to correct it (the selected_reason says exactly that).
-    A candidate-selection instability — refinement was never the cause.
+  * resize/course — the 2x SEED FLIP is FIXED; a smaller ~5% drift
+    remains xfailed. Original failure: at 1.5x upscale the coarse
+    autocorrelation seed landed on the DOUBLED family (a T-vs-2T
+    near-tie, strength ratio 0.977-0.996, decided by interpolation
+    crumbs), and the course path takes its seed as-is. A strength-
+    threshold-only fix was tried first and immediately WITHDRAWN: the
+    rotate90 invariant showed the wale leg-harmonic's half-peak (0.969)
+    is inseparable from genuine ties (>= 0.977) in the 1D
+    autocorrelation — this project's oldest lesson, re-learned at the
+    seed level. The landed fix (_prefer_fundamental_seed) resolves the
+    tie with 2D template-walk evidence instead: genuine repeats walk at
+    0.66-0.70, leg half-periods fail outright at 0.0. Verified a no-op
+    on every 1x fixture reading. The residual drift (fixed-pixel
+    smoothing/prominence making the upscaled gap set noisier) is a
+    different, smaller mechanism — kept strictly xfailed with its own
+    reason, and the seed fix is pinned independently by
+    test_resize_course_stays_in_fundamental_family.
 """
 from __future__ import annotations
 
@@ -58,7 +69,12 @@ JERSEY = "tests/fixtures/real_jersey_sample.jpg"
 JERSEY_ROI = (30, 30, 660, 310)
 
 KNOWN_VIOLATIONS = {
-    ("resize", "course"): "1.5x upscale flips the coarse autocorrelation seed to the 2x family; course has no structural evidence to correct it",
+    ("resize", "course"): (
+        "residual ~5% refinement drift at 1.5x: SMOOTHING_WINDOW_PX and peak prominence are fixed-pixel "
+        "parameters, so the upscaled signal is relatively less smoothed and its gap set noisier. The original "
+        "2x SEED flip this slot was created for is FIXED (see _prefer_fundamental_seed) and separately pinned "
+        "by test_resize_course_stays_in_fundamental_family below"
+    ),
 }
 
 
@@ -87,6 +103,26 @@ def test_jersey_invariant(jersey_outcomes, invariant, axis):
     assert o.status in ("ok", "skipped"), (
         f"{invariant}/{axis}: {o.status} (expected {o.expected_px}, measured {o.measured_px}, "
         f"ratio {o.ratio}) {o.note}"
+    )
+
+
+def test_resize_course_stays_in_fundamental_family(jersey_outcomes):
+    """Pins the _prefer_fundamental_seed fix INDEPENDENTLY of the strict
+    xfail above, which cannot tell a 5% drift failure from a 2x flip
+    failure -- both count as 'xfailed'. The seed regression this guards:
+    at 1.5x upscale the course autocorrelation seed used to land on the
+    doubled family (T-vs-2T near-tie, ratio 0.977-0.996, falling to 2T)
+    and the course path took it as-is, reporting ~2x spacing. The fix
+    resolves the tie with the template-walk score (genuine repeats
+    measured 0.66-0.70, the leg-harmonic trap 0.0 -- which is also why a
+    strength-threshold-only version was tried and withdrawn: it broke
+    rotate90/course by halving the rotated wale structure's seed onto
+    its legs). Drift is tolerated here (tracked by the xfail); a return
+    to the 2x family or a lost detection is not."""
+    o = jersey_outcomes[("resize", "course")]
+    assert o.status not in ("harmonic_flip", "lost"), (
+        f"resize/course regressed to {o.status} (measured {o.measured_px} vs expected {o.expected_px}) -- "
+        "the seed-doubling fix has been undone"
     )
 
 
