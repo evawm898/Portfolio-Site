@@ -132,6 +132,37 @@ def test_jersey_baseline_detects_both_axes(jersey_outcomes):
     assert not any(inv == "baseline" for inv, _ in jersey_outcomes)
 
 
+def test_knit_sample_05_rotate90_course_does_not_flip_to_legs():
+    """Pins the seed-ASCENT fix (see _prefer_fundamental_seed): on
+    knit_sample_05 the wale structure's leg-lattice autocorrelation peak
+    outright BEATS the fundamental (0.755 vs 0.735 measured), so the raw
+    seed lands directly on the legs. Unrotated, the wale axis's candidate
+    family climbs back up; rotated, the same signal feeds the course path
+    (seed-as-is), which used to report the half period (ratio 0.503).
+    The ascent gate resolves it: the leg seed's own template walk fails
+    outright (0.000 measured) while the double walks at 0.704.
+
+    Deliberately NOT asserted for knit_sample_06/08: their chunky plied
+    legs correlate with their mirror twins at template scale (0.70
+    measured), so the discriminator saturates and they still flip — an
+    honest open limitation, documented in _prefer_fundamental_seed."""
+    img = cv2.imread("tests/fixtures/knit_sample_05.jpg")
+    assert img is not None, "knit_sample_05.jpg fixture missing"
+    h, w = img.shape[:2]
+    rw, rh = int(w * 0.7), int(h * 0.7)
+    x, y = (w - rw) // 2, (h - rh) // 2
+    from analysis.gauge_analysis import analyze_gauge
+
+    baseline = analyze_gauge(img, (x, y, rw, rh), "vertical")
+    rotated = analyze_gauge(cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE), (h - y - rh, x, rh, rw), "vertical")
+    assert baseline.wale.spacing_px is not None and rotated.course.spacing_px is not None
+    ratio = rotated.course.spacing_px / baseline.wale.spacing_px
+    assert 0.9 <= ratio <= 1.1, (
+        f"rotated course {rotated.course.spacing_px} vs baseline wale {baseline.wale.spacing_px} "
+        f"(ratio {ratio:.3f}) -- the leg-seed ascent fix has regressed"
+    )
+
+
 # --- classifier unit coverage (no image work) ---------------------------
 
 

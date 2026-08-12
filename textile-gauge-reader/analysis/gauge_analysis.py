@@ -145,6 +145,11 @@ AUTOCORR_SUBHARMONIC_PREFERENCE = 0.95
 # neutral, so the switch only ever happens on POSITIVE 2D evidence.
 # Measured: genuine repeats 0.66-0.70, leg half-periods 0.0.
 SEED_HALF_TEMPLATE_MIN = 0.55
+# Ascending (seed -> its double) additionally requires the seed's OWN
+# template walk to fail outright -- genuine negative evidence that the
+# seed is a false repeat (crisp leg lattices measured 0.0), far below
+# the 0.5 "couldn't measure" neutral. See _prefer_fundamental_seed.
+SEED_ASCEND_TEMPLATE_FAIL_MAX = 0.05
 SMOOTHING_WINDOW_PX = 3          # 1D smoothing window applied to projection signals
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_TILE_GRID = (8, 8)
@@ -834,14 +839,47 @@ def _prefer_fundamental_seed(
         return max(candidates, key=lambda t: t[1]) if candidates else None
 
     at_seed = _strength_near(p0, max(2.0, 0.12 * p0))
+    if at_seed is None:
+        return p0
+
+    # DESCENT: the seed may be the 2x of a near-tie fundamental below it.
     at_half = _strength_near(p0 / 2.0, max(2.0, 0.12 * (p0 / 2.0)))
-    if at_seed is None or at_half is None:
-        return p0
-    if at_half[1] < AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]:
-        return p0
-    half_lag = at_half[0]
-    if _template_match_consistency_score(normalized_2d, signal, half_lag, lag_dx) >= SEED_HALF_TEMPLATE_MIN:
-        return half_lag
+    if at_half is not None and at_half[1] >= AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]:
+        half_lag = at_half[0]
+        if _template_match_consistency_score(normalized_2d, signal, half_lag, lag_dx) >= SEED_HALF_TEMPLATE_MIN:
+            return half_lag
+
+    # ASCENT: the seed may itself BE a false half-period (a leg lattice)
+    # of a near-tie fundamental above it. Found via the rotate90
+    # metamorphic invariant on the real knit_sample photos: at coarse
+    # gauges (34-73px leg spacing) the leg lattice's autocorrelation
+    # peak outright BEATS the fundamental (e.g. 0.755 vs 0.735), so the
+    # raw seed lands directly on the legs -- the jersey fixture only
+    # escapes because its fine 17.5px legs are partially attenuated by
+    # the fixed-pixel smoothing, an accidental and unreliable
+    # suppressor. Unrotated, the wale axis's candidate family climbs
+    # back up; the course path (seed-as-is) cannot, so physical wale
+    # structure viewed through it after rotation flips to half.
+    #
+    # Gate, deliberately strict on BOTH sides: the seed's own template
+    # walk must return genuine NEGATIVE evidence (<= SEED_ASCEND_
+    # TEMPLATE_FAIL_MAX, far below the 0.5 "couldn't measure" neutral
+    # -- crisp mirror-image leg patches fail the walk outright at 0.0
+    # measured), AND the double-lag must both near-tie the seed's
+    # autocorrelation strength and walk well itself. A genuine repeat
+    # at the seed (garter ridge rows, true course pitch, chunky-yarn
+    # legs whose mirror twins correlate anyway -- 0.70 measured on two
+    # real chunky samples, an honest limitation of this discriminator)
+    # never ascends, because its own walk succeeds.
+    at_double = _strength_near(p0 * 2.0, max(2.0, 0.12 * (p0 * 2.0)))
+    if (
+        at_double is not None
+        and at_double[1] >= AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]
+        and _template_match_consistency_score(normalized_2d, signal, p0, lag_dx) <= SEED_ASCEND_TEMPLATE_FAIL_MAX
+        and _template_match_consistency_score(normalized_2d, signal, at_double[0], lag_dx) >= SEED_HALF_TEMPLATE_MIN
+    ):
+        return at_double[0]
+
     return p0
 
 

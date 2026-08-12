@@ -1356,6 +1356,46 @@ residual ~5% refinement drift at 1.5×, from fixed-pixel smoothing and
 peak-prominence parameters making the upscaled gap set relatively
 noisier — a scale-parameterization question for a future pass.
 
+**The nine real `knit_sample` fixtures then generalized the rotate90
+finding — and split it into three distinct mechanisms**, each measured
+before anything was fixed. Running the invariants over all nine photos
+showed half-period flips under rotation on five (ratios pinned at
+0.49–0.51):
+
+1. **Seed lands directly on the leg lattice** (samples 05/06/08, course
+   axis after rotation): at coarse gauges the legs' autocorrelation
+   peak outright BEATS the fundamental (0.755 vs 0.735 measured at
+   34–73px leg spacing) — the jersey fixture only escapes because its
+   fine 17.5px legs are partially attenuated by the fixed-pixel
+   smoothing, an accidental and unreliable suppressor. Unrotated, the
+   wale axis's candidate family climbs back up; the course path
+   (seed-as-is) cannot. **Fixed for crisp-leg fabrics** by extending
+   `_prefer_fundamental_seed` with a template-gated ASCENT symmetric to
+   its descent: the seed only ascends when its own template walk fails
+   outright (crisp mirror-image legs measured 0.000, far below the 0.5
+   neutral) and the double-lag near-ties its strength and walks well
+   (0.704). Sample 05's flip is gone and regression-pinned;
+   byte-identical no-op on every 1× reading of all eleven photos.
+   **Honest limitation:** samples 06/08 are chunky plied stockinette
+   whose fat legs correlate with their own mirror twins at template
+   scale (0.70 measured) — the discriminator saturates and they still
+   flip; documented open.
+2. **v3 halves rotated course structure** (samples 01/03/04, wale axis
+   after rotation): course rows genuinely carry two edge lines per
+   repeat (loop-head arc + inter-row shadow), the half-lag's
+   autocorrelation legitimately dominates (0.132 vs 0.009 measured on
+   sample 04), and the structural evidence stream (loop centers, fold
+   pairing) is all-zero for row structure, so nothing overrules it. A
+   design gap, not a scoring bug — open, needs its own pass.
+3. **knit_sample_03's baseline wale (287px) is wrong independent of any
+   transform**: clean-fabric autocorrelation shows a textbook harmonic
+   comb with the fundamental at 142px (strength 0.800) and multiples at
+   287/429/571/712, while the raw peak lattice sits at the ~67px legs;
+   by the tape measure in the photo itself (317px/cm), truth is
+   ~5.7 WPI and the 287px reading is an implausible ~2.8 WPI. The
+   selection confidently took the 2× family at this large pitch —
+   reserved for its own PR.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
