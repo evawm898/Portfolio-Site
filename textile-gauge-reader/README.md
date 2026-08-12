@@ -804,13 +804,24 @@ good one:**
 
 **Never feeds back into automatic detection.** This is a separate,
 human-in-the-loop measurement surfaced alongside the automatic wale/
-course numbers in a new "Verify by counting a repeat" panel on the
-Results step (`POST /count-repeats`) — the same spirit as the loop-
-lattice debug view being comparison-only. The user marks two points on
-the image; the panel reports the counted per-inch value, match count,
-and confidence, letting a low-confidence automatic result be checked
-against a second, independently-derived number rather than just a
-warning label.
+course numbers in a "Verify by counting a repeat" panel on the Results
+step (`POST /count-repeats`) — the same spirit as the loop-lattice debug
+view being comparison-only. The user marks two points on the image; the
+panel reports the counted per-inch value, match count, and confidence,
+letting a low-confidence automatic result be checked against a second,
+independently-derived number rather than just a warning label.
+
+**Hidden unless the automatic result is already Low confidence.** The
+panel used to be visible on every result, collapsed by default but
+always present. A real user report surfaced the problem with that: when
+this OPTIONAL secondary check itself failed (a deployment mismatch left
+`/count-repeats` unreachable on one preview), the failure read as "the
+tool doesn't work" rather than "this one extra check didn't run" — a
+confident automatic result has no need for it in the first place. The
+panel (and its own `hidden` state) is now driven by the exact same
+`overallConfidence()` threshold that already decides the "Low confidence
+— verify the detected loops" warning message, so it only appears at all
+when there's an actual reason to reach for it.
 
 ### Automatic candidate cross-checking: the same walking match, self-anchored
 

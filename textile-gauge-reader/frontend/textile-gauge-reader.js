@@ -133,6 +133,7 @@
   const roiDiagContent = document.getElementById("roiDiagContent");
 
   // User-anchored repeat counting ("Verify by counting a repeat")
+  const repeatCountPanel = document.getElementById("repeatCountPanel");
   const markRepeatBtn = document.getElementById("markRepeatBtn");
   const cancelRepeatMarkBtn = document.getElementById("cancelRepeatMarkBtn");
   const repeatMarkStatus = document.getElementById("repeatMarkStatus");
@@ -2105,11 +2106,21 @@
 
     resultsGrid.innerHTML = html;
 
+    // "Verify by counting a repeat" is an optional, secondary check --
+    // real material for a normal user only when the automatic result is
+    // already flagged uncertain. Surfacing it unconditionally on every
+    // result (even a confident one) invited exactly the wrong reading if
+    // it ever failed on its own (e.g. a transient backend issue): a
+    // failure in this OPTIONAL cross-check looked like the primary
+    // detection itself was broken. Hidden entirely otherwise; still
+    // collapsed by default even when shown, so using it is still opt-in.
     if (level === "Low") {
-      resultsWarning.textContent = "Low confidence — verify the detected loops.";
+      resultsWarning.textContent = "Low confidence — try “Verify by counting a repeat” below to double-check.";
       resultsWarning.hidden = false;
+      repeatCountPanel.hidden = false;
     } else {
       resultsWarning.hidden = true;
+      repeatCountPanel.hidden = true;
     }
 
     const axisDiagnosticsContent = document.getElementById("axisDiagnosticsContent");
