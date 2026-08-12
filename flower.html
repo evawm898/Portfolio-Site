@@ -839,6 +839,80 @@
           <span class="fl-ctrl__hint">straight &rarr; gently bent</span>
         </div>
 
+        <div class="fl-ctrl" data-stem>
+          <div class="fl-ctrl__row">
+            <label for="stemThickness">Stem thickness</label>
+            <span class="fl-ctrl__val" data-value="stemThickness"></span>
+          </div>
+          <input type="range" id="stemThickness" min="0.5" max="3" step="0.05" value="1">
+          <span class="fl-ctrl__hint">slender &rarr; thick</span>
+        </div>
+
+        <div class="fl-ctrl" data-stem>
+          <div class="fl-ctrl__row">
+            <label for="stemNodeCount">Leaf nodes</label>
+            <span class="fl-ctrl__val" data-value="stemNodeCount"></span>
+          </div>
+          <input type="range" id="stemNodeCount" min="0" max="8" step="1" value="3">
+          <span class="fl-ctrl__hint">junction points along the stem &mdash; leaves attach here in a later pass</span>
+        </div>
+
+        <div class="fl-ctrl" data-stem>
+          <div class="fl-ctrl__row">
+            <label for="stemNodeProminence">Node prominence</label>
+            <span class="fl-ctrl__val" data-value="stemNodeProminence"></span>
+          </div>
+          <input type="range" id="stemNodeProminence" min="0" max="1" step="0.01" value="0.4">
+          <span class="fl-ctrl__hint">smooth &rarr; swollen, gently kinked nodes</span>
+        </div>
+
+        <div class="fl-ctrl" data-stem>
+          <div class="fl-ctrl__row">
+            <label for="stemBudMode">Side bud</label>
+          </div>
+          <select class="fl-select" id="stemBudMode">
+            <option value="none">NONE</option>
+            <option value="tight">TIGHT BUD</option>
+            <option value="early">EARLY BLOOM</option>
+          </select>
+          <span class="fl-ctrl__hint">an offshoot stem carrying a smaller bud of the same bloom</span>
+        </div>
+
+        <div class="fl-ctrl" data-stem>
+          <div class="fl-ctrl__row">
+            <label for="leafType">Leaves</label>
+          </div>
+          <select class="fl-select" id="leafType">
+            <option value="none">NONE</option>
+            <option value="compound">COMPOUND (ROSE)</option>
+            <option value="lobed">LOBED (POPPY)</option>
+            <option value="oval">OVAL ON PETIOLE</option>
+            <option value="narrow">NARROW</option>
+          </select>
+          <span class="fl-ctrl__hint">a leaf at each stem node &mdash; solid blades reusing the petal shape</span>
+        </div>
+
+        <div class="fl-ctrl" data-stem data-leaf>
+          <div class="fl-ctrl__row">
+            <label for="leafPhyllotaxy">Leaf arrangement</label>
+          </div>
+          <select class="fl-select" id="leafPhyllotaxy">
+            <option value="alternate">ALTERNATE</option>
+            <option value="opposite">OPPOSITE</option>
+            <option value="whorled">WHORLED</option>
+          </select>
+          <span class="fl-ctrl__hint">how leaves sit around the stem: 1 zigzag &middot; 2 across &middot; 3 whorled</span>
+        </div>
+
+        <div class="fl-ctrl" data-stem data-leaf>
+          <div class="fl-ctrl__row">
+            <label for="leafSize">Leaf size</label>
+            <span class="fl-ctrl__val" data-value="leafSize"></span>
+          </div>
+          <input type="range" id="leafSize" min="0.2" max="3" step="0.05" value="1">
+          <span class="fl-ctrl__hint">small &rarr; large</span>
+        </div>
+
       </div>
     </section>
 
