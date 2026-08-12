@@ -1237,30 +1237,70 @@ function buildCompoundLeafInto(acc, blade, frame, node, dir, Pleaf, rLeaf) {
   }
 }
 
-/* RECEPTACLE — a small rounded swelling where the petals converge (a rose hip /
-   tulip base), drawn minimally as a few wireframe latitude rings + vertical ribs
-   of a small ellipsoid hanging just under the convergence point. Just enough to
-   explain where the petals attach. Returns the depth it hangs below cy, so a stem
-   can start from its underside. */
-function buildReceptacleInto(acc, P, cx, cy, cz, size) {
-  const rad = size * 0.42, hh = size * 0.9, wire = P.tubeRadius * 1.5;
-  const RIBS = 7, RINGS = 3, MS = 18, RS = 40;
-  // ellipsoid hanging below cy: top point at cy, widest mid, bottom point at cy-hh
-  const pt = (phi, th) => {
-    const r = rad * Math.sin(phi), y = cy - hh * (1 - Math.cos(phi)) / 2;
-    return { x: cx + r * Math.cos(th), y, z: cz + r * Math.sin(th) };
+/* RECEPTACLE — a blended surface GROWN FROM the petal + sepal base attachments,
+   not a separate primitive placed underneath. `attachments` is the list of base
+   points { az, r } (azimuth + radius) for every petal and sepal. A ring of
+   longitudinal ribs rises to meet each attachment and dips between them (how
+   sharply is BLEND SMOOTHNESS), then the whole surface descends by RECEPTACLE
+   DEPTH and narrows into the stem (how tightly is CONVERGENCE TIGHTNESS). It is
+   drawn in the SAME wireframe tubes as the petals (ribs + latitude rings), so the
+   petals read as emerging from one shared surface rather than sitting on a blob.
+   The bottom ring matches the stem's top radius, so the stem simply continues it.
+   Returns the depth it descends below cy (where the stem starts). */
+function buildReceptacleInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
+  const blend  = clamp(opts.blend, 0, 1);
+  const depthW = lerp(0.18, 1.15, clamp(opts.depth, 0, 1));   // descent below the attachment ring
+  const tight  = clamp(opts.tightness, 0, 1);
+  const stemR  = opts.neckR || P.tubeRadius * 4.0;           // == the stem's top radius (smooth join)
+  // Rib weight GRADES along its length: vein-fine at the ring (so the join to the
+  // petals is seamless) to stem-thick at the neck. Higher BLEND SMOOTHNESS makes
+  // the top finer AND lifts the ribs up to overlap the petal bases, so at the max
+  // you can't tell where the petal ends and the receptacle begins.
+  const topMul  = lerp(1.0, 0.40, blend);                    // top weight (× tubeRadius), finer as it smooths
+  const stemMul = 3.2;                                       // neck weight
+  const smooth  = (t) => t * t * (3 - 2 * t);
+  const ribR    = (t) => P.tubeRadius * lerp(topMul, stemMul, smooth(t));
+  const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // ribs poke up among the petals at high blend
+  const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dips fade out as it smooths
+  const sigma   = lerp(0.28, 1.7, blend);                    // tight hug -> smooth flow
+  let maxR = ringR;
+  for (const a of attachments) if (a.r > maxR) maxR = a.r;
+  // Blended attachment profile at azimuth th: radius follows the nearby bases,
+  // height rises to a base (peak ~ 1) and dips in the gaps (peak -> 0).
+  const sample = (th) => {
+    let wsum = 0, rsum = 0, peak = 0;
+    for (const a of attachments) {
+      let d = Math.abs(th - a.az) % (Math.PI * 2);
+      if (d > Math.PI) d = Math.PI * 2 - d;
+      const w = Math.exp(-(d * d) / (2 * sigma * sigma));
+      wsum += w; rsum += w * a.r; if (w > peak) peak = w;
+    }
+    const topR = wsum > 1e-6 ? rsum / wsum : ringR;
+    return { topR: clamp(topR, stemR, maxR * 1.05), topY: cy + overlap - dipMax * (1 - peak) };
   };
-  for (let j = 0; j < RIBS; j++) {
-    const th = (j / RIBS) * Math.PI * 2, pts = [];
-    for (let k = 0; k <= MS; k++) pts.push(pt((k / MS) * Math.PI, th));
-    acc.addTube(pts, wire, 0, 6);
+  const M = clamp(Math.round(attachments.length * lerp(2, 4, blend)), 24, 96);   // denser ribs as it smooths
+  const STEPS = 12;                                          // rib path resolution
+  const curve = lerp(0.7, 2.4, tight);                       // >1 pinches into a tight neck
+  const grid = [];
+  for (let j = 0; j < M; j++) {
+    const th = (j / M) * Math.PI * 2;
+    const { topR, topY } = sample(th);
+    const col = [];
+    for (let k = 0; k <= STEPS; k++) {
+      const t = k / STEPS;
+      const rad = lerp(stemR, topR, Math.pow(1 - t, curve));  // topR at the ring -> stemR at the neck
+      const y = lerp(topY, cy - depthW, t);
+      col.push({ x: cx + rad * Math.cos(th), y, z: cz + rad * Math.sin(th) });
+    }
+    grid.push(col);
   }
-  for (let r = 1; r <= RINGS; r++) {
-    const phi = (r / (RINGS + 1)) * Math.PI, pts = [];
-    for (let s = 0; s <= RS; s++) pts.push(pt(phi, (s / RS) * Math.PI * 2));
-    acc.addTube(pts, wire, 0, 6);
+  for (let j = 0; j < M; j++) acc.addTube(grid[j], ribR, 0, 5);   // tapered ribs: vein-fine top -> stem-thick neck
+  for (const k of [Math.round(STEPS * 0.3), Math.round(STEPS * 0.55), Math.round(STEPS * 0.8)]) {
+    const ring = [];
+    for (let j = 0; j <= M; j++) ring.push(grid[j % M][k]);
+    acc.addTube(ring, ribR(k / STEPS), 0, 5);                     // rings match the rib weight at their level
   }
-  return hh;
+  return depthW;
 }
 
 /* SEPALS — a whorl of narrow, sharply pointed, spiky sepals radiating from the
@@ -1431,8 +1471,23 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // one, otherwise straight from the convergence point.
   let stemTop = centerHeight;
   if (ui.receptacleType !== 'none') {
-    const hh = buildReceptacleInto(petalAcc, P, 0, centerHeight, 0, clamp(ui.receptacleSize, 0.1, 1.5));
-    stemTop = centerHeight - hh;
+    // Attachment points the blended surface is grown from: every petal base, plus
+    // (if present) every sepal base, tucked half a step between the petals.
+    const attach = placements.filter((pl) => (pl.r || 0) > 1e-4).map((pl) => ({ az: pl.az, r: pl.r }));
+    if (ui.sepalsType !== 'none') {
+      const sc = clamp(Math.round(ui.sepalCount), 3, 24);
+      const sepR = Math.max(ringR * 0.85, 0.16);
+      for (let i = 0; i < sc; i++) attach.push({ az: (i + 0.5) * 2 * Math.PI / sc, r: sepR });
+    }
+    // Neck the receptacle to the STEM's actual top radius (PR #24's stemRadiusFn is
+    // tubeRadius*4*thickness at t=0), so the blend flows straight into the stem at
+    // any thickness. No stem -> the default 4x neck.
+    const stemThick = ui.stemType !== 'none' ? clamp(ui.stemThickness, 0.3, 4) : 1;
+    const depth = buildReceptacleInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
+      blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
+      neckR: P.tubeRadius * 4.0 * stemThick,
+    });
+    stemTop = centerHeight - depth;
   }
   if (ui.sepalsType !== 'none') {
     buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
@@ -1812,7 +1867,9 @@ const inputs = {
   centerLength: document.getElementById('centerLength'),
   centerTipSize: document.getElementById('centerTipSize'),
   receptacleType: document.getElementById('receptacleType'),
-  receptacleSize: document.getElementById('receptacleSize'),
+  blendSmoothness: document.getElementById('blendSmoothness'),
+  receptacleDepth: document.getElementById('receptacleDepth'),
+  convergenceTightness: document.getElementById('convergenceTightness'),
   sepalsType: document.getElementById('sepalsType'),
   sepalSize: document.getElementById('sepalSize'),
   sepalCount: document.getElementById('sepalCount'),
@@ -1903,7 +1960,9 @@ function readUI() {
     centerLength: parseFloat(inputs.centerLength.value),
     centerTipSize: parseFloat(inputs.centerTipSize.value),
     receptacleType: inputs.receptacleType.value,
-    receptacleSize: parseFloat(inputs.receptacleSize.value),
+    blendSmoothness: parseFloat(inputs.blendSmoothness.value),
+    receptacleDepth: parseFloat(inputs.receptacleDepth.value),
+    convergenceTightness: parseFloat(inputs.convergenceTightness.value),
     sepalsType: inputs.sepalsType.value,
     sepalSize: parseFloat(inputs.sepalSize.value),
     sepalCount: parseInt(inputs.sepalCount.value, 10),
@@ -1985,7 +2044,9 @@ function refreshLabels() {
   setLabel('centerCount', inputs.centerCount.value);
   setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
   setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
-  setLabel('receptacleSize', (+inputs.receptacleSize.value).toFixed(2));
+  setLabel('blendSmoothness', (+inputs.blendSmoothness.value).toFixed(2));
+  setLabel('receptacleDepth', (+inputs.receptacleDepth.value).toFixed(2));
+  setLabel('convergenceTightness', (+inputs.convergenceTightness.value).toFixed(2));
   setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
   setLabel('sepalCount', inputs.sepalCount.value);
   const scc = +inputs.sepalCenterCurve.value;
@@ -2062,7 +2123,8 @@ function setBuilding(on) {
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize',
- 'receptacleSize', 'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
+ 'blendSmoothness', 'receptacleDepth', 'convergenceTightness',
+ 'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
  'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
  'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
@@ -2268,7 +2330,9 @@ if (resetBtn) {
     inputs.centerLength.value = d.centerLength;
     inputs.centerTipSize.value = d.centerTipSize;
     inputs.receptacleType.value = d.receptacleType;
-    inputs.receptacleSize.value = d.receptacleSize;
+    inputs.blendSmoothness.value = d.blendSmoothness;
+    inputs.receptacleDepth.value = d.receptacleDepth;
+    inputs.convergenceTightness.value = d.convergenceTightness;
     inputs.sepalsType.value = d.sepalsType;
     inputs.sepalSize.value = d.sepalSize;
     inputs.sepalCount.value = d.sepalCount;
@@ -2338,7 +2402,8 @@ const DEFAULTS = {
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
   centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
-  receptacleType: 'none', receptacleSize: 0.6, sepalsType: 'none', sepalSize: 0.6,
+  receptacleType: 'none', blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
+  sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
   stemType: 'none', stemLength: 1.8, stemCurve: 0.2,
   stemThickness: 1, stemNodeCount: 3, stemNodeProminence: 0.4, stemBudMode: 'none',
