@@ -1137,6 +1137,49 @@ def _cluster_positions(coords: np.ndarray, period: float) -> List[float]:
     return [float(np.mean(g)) for g in groups]
 
 
+def _canonical_sign_signal(signal: np.ndarray) -> np.ndarray:
+    """
+    Flip the projected 1D signal's global sign, if needed, so its
+    skewness is non-negative -- making the LANDMARK that peak detection
+    locks onto invariant under image mirroring and 90-degree rotation.
+
+    Why this exists (found by the metamorphic rotate90 invariant, and
+    initially misdiagnosed as a position-source asymmetry): the 1D
+    signals are projections of SIGNED Sobel derivatives -- deliberately
+    signed, see _enhance_texture, because rectifying with abs() would
+    frequency-double the periodicity analysis. But a horizontal mirror
+    (for the wale axis) or a 90-degree rotation (mapping one axis onto
+    the other) negates the mapped derivative, so the transformed signal
+    is the NEGATED reversal of the original (measured: correlation
+    -0.9999 on the real jersey fixture). Peak detection on a negated
+    signal locks onto the opposite edge of each ridge -- the valleys --
+    and on an asymmetric stitch profile the valley lattice refines to a
+    measurably different spacing than the peak lattice (24.0px vs
+    25.1px, 4.5%, on the real fixture's course structure).
+
+    Multiplying by the sign of the skewness picks the same physical
+    edge either way: skew(-s) = -skew(s), so original and transformed
+    signals canonicalize to exact reversals of each other, whose peak
+    lattices mirror exactly. A near-zero skew makes the choice
+    unstable, but also harmless: a sign-symmetric profile's peak and
+    valley lattices refine identically, which is precisely why the
+    wale axis passed the mirror invariant while the more asymmetric
+    course profile failed rotate90.
+
+    Global sign flip only -- never abs() -- so no frequency doubling is
+    introduced, and autocorrelation-based candidate selection (which is
+    inherently sign-invariant) is unaffected. Applied ONLY where
+    positions are extracted for refinement/overlay; the candidate-
+    scoring internals keep the raw signal, since re-anchoring their
+    evidence would shift calibrated selection scores for no invariance
+    benefit.
+    """
+    centered = signal - float(np.mean(signal))
+    if float(np.mean(centered**3)) < 0:
+        return -signal
+    return signal
+
+
 def _refine_spacing_from_positions(positions: List[float], period: float) -> Tuple[float, float]:
     """
     Try to refine a candidate period into a sub-pixel-accurate spacing
@@ -1256,7 +1299,7 @@ def _finalize_axis(
         positions = _cluster_positions(loop_centers[:, center_axis_index], period)
         position_source = "loop-center clustering"
     else:
-        positions = _detect_peaks(signal, period)
+        positions = _detect_peaks(_canonical_sign_signal(signal), period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
     spacing_px, spacing_consistency = _refine_spacing_from_positions(positions, period)
@@ -2011,7 +2054,7 @@ def _finalize_axis_v3(
         positions = _cluster_positions(loop_centers[:, center_axis_index], period)
         position_source = "loop-center clustering"
     else:
-        positions = _detect_peaks(signal, period)
+        positions = _detect_peaks(_canonical_sign_signal(signal), period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
     spacing_px, _ = _refine_spacing_from_positions(positions, period)

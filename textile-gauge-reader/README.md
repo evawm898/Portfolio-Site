@@ -1307,13 +1307,35 @@ the hand-established fixture ground truths instead: jersey ~5.0 WPI /
 ~7.35 CPI, teal 3.8 WPI, against which the fix moved every prediction
 closer or left it unchanged.)
 
-Still open, both with revised post-fix diagnoses: at 1.5× upscale the
-coarse autocorrelation seed itself lands on the doubled candidate
-family for the course axis (candidate selection, not refinement — the
-course axis has no structural evidence stream to correct it), and
-rotate90's residual ~4.5% wale/course disagreement comes from the two
-axes refining from different position sources (loop-center clustering
-vs 1D signal peaks) — unifying those is its own change.
+**The rotate90 violation has since been fixed too — after its diagnosis
+was revised twice, each time by measurement.** First guessed as
+refinement boundary phase (the estimator fix left it at 4.5%), then as
+a wale-vs-course position-source asymmetry (also wrong: both axes were
+refining from 1D peaks on this fixture, and the two sources refine
+identically). The real cause: the projected 1D signals are **signed**
+Sobel derivatives — deliberately signed, since rectifying would
+frequency-double the periodicity analysis — and a mirror or 90°
+rotation NEGATES the mapped axis's signal (measured correlation
+−0.9999 between the reversed course signal and the rotated wale
+signal). Peak detection on a negated signal locks onto the opposite
+edge of each ridge — the valley lattice — which on an asymmetric stitch
+profile refines a measurable 4.5% differently from the peak lattice.
+`_canonical_sign_signal` now flips each projected signal so its
+skewness is non-negative before positions are extracted (a global sign
+flip, never `abs()`, so no frequency doubling; autocorrelation-based
+selection is inherently sign-invariant and untouched). Rotate90 wale
+agreement went 4.5% → 0.7% and mirror became exact. The honest cost,
+measured rather than hidden: the canonical landmark on the real
+fixture's course axis is the valley lattice (24.9px, +11% vs the ~22.4
+hand count) where the lucky pre-fix sign draw read 24.0 (+7%) — but
+that luck was orientation-dependent (a mirrored upload always read
+24.9), which is exactly what the invariant forbids; on synthetics with
+exact truth, all landmark choices agree within 0.1px.
+
+Still open: at 1.5× upscale the coarse autocorrelation seed itself
+lands on the doubled candidate family for the course axis (candidate
+selection, not refinement — the course axis has no structural evidence
+stream to correct it).
 
 ## Deploying the backend to Render
 

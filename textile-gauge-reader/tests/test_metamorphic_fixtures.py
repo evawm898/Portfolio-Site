@@ -12,7 +12,7 @@ loosened tolerance):
   strict-xfail mechanism then worked exactly as designed: fixing the
   spacing refinement (see _refine_spacing_from_positions' docstring for
   the full story) made the mirror/wale xfail XPASS, and its mark was
-  removed. Current state, 8/10 passing:
+  removed. Current state, 9/10 passing:
 
   * mirror/wale — FIXED. Was a 7.6% drift: both directions selected the
     same 35.0px candidate, but the old mean-of-all-gaps refinement was
@@ -20,20 +20,31 @@ loosened tolerance):
     per-step-normalized gap estimator brought the disagreement to 0.6%,
     inside the 1% lossless-transform bound, and moved the baseline
     toward the hand-counted ground truth (37.2 -> 35.3 vs ~33 true).
+  * rotate90/wale — FIXED, after its diagnosis was revised TWICE, each
+    time by measurement: first guessed as refinement boundary phase
+    (wrong — the estimator fix left it at 4.5%), then as a
+    position-source asymmetry (also wrong — both axes were refining
+    from 1D peaks on this fixture; the sources refine identically).
+    The real cause: the projected 1D signals are SIGNED Sobel
+    derivatives, and mirror/rotation NEGATES the mapped axis's signal
+    (measured correlation -0.9999), so peak detection locked onto the
+    opposite edge of each ridge — the valley lattice — which refines
+    4.5% differently on an asymmetric stitch profile. Fixed by
+    _canonical_sign_signal (flip so skewness >= 0) at the two position-
+    extraction sites; rotate90/wale now agrees to 0.7% and mirror is
+    exact. Honest cost, measured: the canonical landmark on the real
+    fixture's course axis is the valley lattice (24.9px, +11% vs the
+    ~22.4 hand count) where the lucky pre-fix draw read 24.0 (+7%) —
+    but the old value was orientation luck, not accuracy: a mirrored
+    upload always read 24.9. Wale moved slightly TOWARD truth
+    (35.27 -> 35.06). Synthetics (exact truth): all landmarks agree
+    within 0.1px, so no systematic offset was introduced there.
   * resize/course — HARMONIC FLIP, still open. At 1.5x upscale the
     coarse autocorrelation seed itself lands on the DOUBLED family
     (candidates go [12,24,48] -> [36,72,144] instead of [18,36,72]),
     and the course axis has no independent loop-center/structural
     evidence to correct it (the selected_reason says exactly that).
     A candidate-selection instability — refinement was never the cause.
-  * rotate90/wale — DRIFT, still open, and the refinement fix REVISED
-    its diagnosis: the residual ~4.5% disagreement is NOT boundary
-    phase. Both paths select the same 24.0px candidate, but the wale
-    pipeline refines from loop-center-CLUSTERED positions while the
-    course pipeline refines from 1D signal peaks — a position-source
-    asymmetry between the two axes' pipelines, so cross-axis agreement
-    after rotation isn't guaranteed by construction. Fixing it means
-    unifying the position sources, a separate change.
 """
 from __future__ import annotations
 
@@ -48,7 +59,6 @@ JERSEY_ROI = (30, 30, 660, 310)
 
 KNOWN_VIOLATIONS = {
     ("resize", "course"): "1.5x upscale flips the coarse autocorrelation seed to the 2x family; course has no structural evidence to correct it",
-    ("rotate90", "wale"): "wale refines from loop-center-clustered positions, course from 1D signal peaks -- cross-axis agreement after rotation isn't guaranteed by construction (~4.5%)",
 }
 
 
