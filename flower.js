@@ -40,6 +40,14 @@ const CENTER_CURVE_SCALE = 0.75;  // centre-curve slider (-1..1) -> spine curl (
                                   // default slider 0.4 -> 0.30 rad = the original curl
 const RADIAL_SEGMENTS = 8;     // tube cross-section resolution (round enough
                                // that a thickened tube doesn't read as faceted)
+// Higher resolution for the CHUNKY, close-viewed base/center primitives only
+// (anther beads, stem/bud tubes, receptacle ribs) — the hair-fine venation stays
+// at RADIAL_SEGMENTS since its faceting is never visible. Bumping only these
+// smooths the close-zoom silhouette for a few thousand extra triangles.
+const NODE_BEAD_RINGS   = 6;   // was 5 — smoother anthers / bud tips / junctions
+const NODE_BEAD_SECTORS = 16;  // was 8
+const CENTER_TUBE_SEGS  = 12;  // was 8 — stamen filaments, stem, side-bud offshoot
+const RECEPT_TUBE_SEGS  = 10;  // was 5 — receptacle ribs / rings
 const JOIN_FLARE_DIST = 0.10;  // a flared tube blends into its end bead (a soft
                                // fillet) over this world distance rather than
                                // butting it with a hard cylinder-into-sphere crease
@@ -907,8 +915,8 @@ function buildCoreInto(acc, P, centerHeight, rng) {
       const yy = h * Math.sin((t * Math.PI) / 2);
       pts.push({ x: rad * Math.cos(a), y: centerHeight + yy, z: rad * Math.sin(a) });
     }
-    acc.addTube(pts, filR);
-    acc.addBead(pts[pts.length - 1], beadR);  // anther / stigma
+    acc.addTube(pts, filR, 0, CENTER_TUBE_SEGS);
+    acc.addBead(pts[pts.length - 1], beadR, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);  // anther / stigma
   }
 }
 
@@ -1005,7 +1013,7 @@ function buildStemInto(acc, P, cx, cy, cz, opts) {
   if (length <= 1e-3) return null;
   const o = { ...opts, length };
   const cl = stemCenterline(cx, cy, cz, o);
-  acc.addTube(cl.pts, stemRadiusFn(P, o), 0, 8);           // thick at the flower, slender below
+  acc.addTube(cl.pts, stemRadiusFn(P, o), 0, CENTER_TUBE_SEGS);   // thick at the flower, slender below
   return cl;
 }
 
@@ -1034,8 +1042,8 @@ function buildBudBranchInto(acc, P, ui, cl, stemOpts) {
   const M = 20, off = [];
   for (let i = 0; i <= M; i++) off.push(bezier3(p0, p1, p2, p3, i / M));
   const rBranch = P.tubeRadius * 3.0 * thickness, rTip = P.tubeRadius * 2.0 * thickness;
-  acc.addTube(off, (t) => lerp(rBranch, rTip, t), 0, 8);
-  acc.addBead(branchPos, rBranch * 1.3, 5, 8);             // weld the junction to the stem
+  acc.addTube(off, (t) => lerp(rBranch, rTip, t), 0, CENTER_TUBE_SEGS);
+  acc.addBead(branchPos, rBranch * 1.3, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);   // weld the junction to the stem
   // Bud at the tip, pointing along the offshoot's end tangent.
   const tip = off[M], prev = off[M - 1];
   let dx = tip.x - prev.x, dy = tip.y - prev.y, dz = tip.z - prev.z;
@@ -1085,7 +1093,7 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   const pos = new THREE.Vector3(tipPos.x, tipPos.y, tipPos.z).addScaledVector(dir, -seat);
   const m = new THREE.Matrix4().compose(pos, q, new THREE.Vector3(budScale, budScale, budScale));
   acc.appendTransformed(budAcc, m);
-  acc.addBead(tipPos, (rTip || P.tubeRadius * 2) * 1.15, 5, 8);   // seat the bud on the offshoot tip
+  acc.addBead(tipPos, (rTip || P.tubeRadius * 2) * 1.15, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);   // seat the bud on the offshoot tip
 }
 
 /* ===================================================================
@@ -1294,11 +1302,11 @@ function buildReceptacleInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
     }
     grid.push(col);
   }
-  for (let j = 0; j < M; j++) acc.addTube(grid[j], ribR, 0, 5);   // tapered ribs: vein-fine top -> stem-thick neck
+  for (let j = 0; j < M; j++) acc.addTube(grid[j], ribR, 0, RECEPT_TUBE_SEGS);   // tapered ribs: vein-fine top -> stem-thick neck
   for (const k of [Math.round(STEPS * 0.3), Math.round(STEPS * 0.55), Math.round(STEPS * 0.8)]) {
     const ring = [];
     for (let j = 0; j <= M; j++) ring.push(grid[j % M][k]);
-    acc.addTube(ring, ribR(k / STEPS), 0, 5);                     // rings match the rib weight at their level
+    acc.addTube(ring, ribR(k / STEPS), 0, RECEPT_TUBE_SEGS);       // rings match the rib weight at their level
   }
   return depthW;
 }
