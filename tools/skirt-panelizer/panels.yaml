@@ -1,0 +1,44 @@
+# Panel library for the skirt panelizer.
+#
+# Units: mm everywhere (the loader enforces `units: mm`).
+#
+# Panel-local coordinate frame: origin at the OUTLINE's top-left corner,
+# +x to the right (across the width), +y downward (along the height),
+# viewed face-on. When placed on the skirt, the panel's top edge (-y side)
+# faces the waist and the long axis (height) runs along the cone's ruling
+# lines.
+#
+# Fields (all required — the loader fails loudly on anything missing,
+# and on unknown keys, so typos can't pass silently):
+#   outline:      physical bounding rectangle of the module, width x height
+#   active_area:  visible display rectangle, plus `offset` = [x, y] from the
+#                 outline's top-left corner to the active area's top-left
+#   tail:
+#     origin:          [x, y] point ON the outline perimeter where the flex
+#                      cable exits
+#     exit_vector:     [x, y] direction the cable leaves the outline
+#                      (normalized on load; [0, -1] = straight out the top
+#                      edge, toward the waist when placed)
+#     min_bend_radius: tightest allowed bend of the flex cable
+#
+# Values below are placeholder dimensions for a small rigid e-ink module —
+# swap in real datasheet numbers as modules are chosen. Note the active
+# area sits slightly off-center (offset x 2.2 vs a symmetric 2.8): the
+# placement code must derive outline positions from active-area symmetry,
+# and this asymmetry exercises that path.
+
+units: mm
+
+panels:
+  eink_42x90:
+    outline:
+      width: 42.0
+      height: 90.0
+    active_area:
+      width: 36.4
+      height: 82.2
+      offset: [2.2, 3.9]
+    tail:
+      origin: [21.0, 0.0]
+      exit_vector: [0.0, -1.0]
+      min_bend_radius: 4.0

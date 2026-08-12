@@ -1,3 +1,9 @@
 node_modules/
 package.json
 package-lock.json
+
+# Skirt panelizer (Python tooling) — scratch outputs stay out of git;
+# the final SVG/report in skirt/ ARE committed (the page depends on them).
+__pycache__/
+*.pyc
+tools/skirt-panelizer/out/
