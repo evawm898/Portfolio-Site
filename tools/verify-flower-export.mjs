@@ -87,6 +87,9 @@ const CONFIGS = [
   { label: 'radial rosette (flat, no sphere)', set: [{ id: 'petalCup', value: '0' }, { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '8' }] },
   { label: 'edge noise 0.7 on CLEAN tip', set: [{ id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '4' }, { id: 'edgeNoise', value: '0.7' }, { id: 'edgeNoiseScale', value: '0.6' }] },
   { label: 'edge noise 1.0 dense + RUFFLED (peony edge)', set: [{ id: 'tipStyle', value: 'ruffled', evt: 'change' }, { id: 'edgeNoise', value: '1' }, { id: 'edgeNoiseScale', value: '1' }] },
+  { label: 'stem nodes + thickness (prominent)', set: [{ id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'edgeNoise', value: '0' }, { id: 'edgeNoiseScale', value: '0' }, { id: 'stemNodeCount', value: '5' }, { id: 'stemNodeProminence', value: '1' }, { id: 'stemThickness', value: '2.2' }] },
+  { label: 'tight side bud (veins)', set: [{ id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  { label: 'early-bloom side bud + voronoi infill', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'stemBudMode', value: 'early', evt: 'change' }] },
 ];
 
 const server = http.createServer((req, res) => {
