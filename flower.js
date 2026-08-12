@@ -899,10 +899,18 @@ function buildReceptacleInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
   const blend  = clamp(opts.blend, 0, 1);
   const depthW = lerp(0.18, 1.15, clamp(opts.depth, 0, 1));   // descent below the attachment ring
   const tight  = clamp(opts.tightness, 0, 1);
-  const wire   = P.tubeRadius * 1.35;
   const stemR  = P.tubeRadius * 4.0;                          // == the stem's top radius (smooth join)
-  const dipMax = depthW * 0.5;                               // how deep the between-attachment dips go
-  const sigma  = lerp(0.30, 1.5, blend);                     // tight hug -> smooth flow
+  // Rib weight GRADES along its length: vein-fine at the ring (so the join to the
+  // petals is seamless) to stem-thick at the neck. Higher BLEND SMOOTHNESS makes
+  // the top finer AND lifts the ribs up to overlap the petal bases, so at the max
+  // you can't tell where the petal ends and the receptacle begins.
+  const topMul  = lerp(1.0, 0.40, blend);                    // top weight (× tubeRadius), finer as it smooths
+  const stemMul = 3.2;                                       // neck weight
+  const smooth  = (t) => t * t * (3 - 2 * t);
+  const ribR    = (t) => P.tubeRadius * lerp(topMul, stemMul, smooth(t));
+  const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // ribs poke up among the petals at high blend
+  const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dips fade out as it smooths
+  const sigma   = lerp(0.28, 1.7, blend);                    // tight hug -> smooth flow
   let maxR = ringR;
   for (const a of attachments) if (a.r > maxR) maxR = a.r;
   // Blended attachment profile at azimuth th: radius follows the nearby bases,
@@ -916,10 +924,10 @@ function buildReceptacleInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       wsum += w; rsum += w * a.r; if (w > peak) peak = w;
     }
     const topR = wsum > 1e-6 ? rsum / wsum : ringR;
-    return { topR: clamp(topR, stemR, maxR * 1.05), topY: cy - dipMax * (1 - peak) };
+    return { topR: clamp(topR, stemR, maxR * 1.05), topY: cy + overlap - dipMax * (1 - peak) };
   };
-  const M = clamp(attachments.length * 2, 24, 60);            // longitudinal ribs
-  const STEPS = 10;                                           // rib path resolution
+  const M = clamp(Math.round(attachments.length * lerp(2, 4, blend)), 24, 96);   // denser ribs as it smooths
+  const STEPS = 12;                                          // rib path resolution
   const curve = lerp(0.7, 2.4, tight);                       // >1 pinches into a tight neck
   const grid = [];
   for (let j = 0; j < M; j++) {
@@ -934,11 +942,11 @@ function buildReceptacleInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
     }
     grid.push(col);
   }
-  for (let j = 0; j < M; j++) acc.addTube(grid[j], wire, 0, 5);   // ribs
-  for (const k of [Math.round(STEPS * 0.32), Math.round(STEPS * 0.62), Math.round(STEPS * 0.86)]) {
+  for (let j = 0; j < M; j++) acc.addTube(grid[j], ribR, 0, 5);   // tapered ribs: vein-fine top -> stem-thick neck
+  for (const k of [Math.round(STEPS * 0.3), Math.round(STEPS * 0.55), Math.round(STEPS * 0.8)]) {
     const ring = [];
     for (let j = 0; j <= M; j++) ring.push(grid[j % M][k]);
-    acc.addTube(ring, wire, 0, 5);                                // latitude rings follow the dips
+    acc.addTube(ring, ribR(k / STEPS), 0, 5);                     // rings match the rib weight at their level
   }
   return depthW;
 }
