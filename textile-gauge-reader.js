@@ -1,5 +1,5 @@
 /**
- * AI Textile Gauge Reader — frontend controller (experimental lab page).
+ * Automatic Textile Gauge Reader — frontend controller (experimental lab page).
  *
  * Pure UI/interaction code: image upload, two-point calibration, ROI
  * selection, orientation choice, calling the analysis API, and drawing

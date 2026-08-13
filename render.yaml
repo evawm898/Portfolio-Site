@@ -1,4 +1,4 @@
-# Render Blueprint for the AI Textile Gauge Reader backend.
+# Render Blueprint for the Automatic Textile Gauge Reader backend.
 #
 # This deploys ONLY the FastAPI/OpenCV analysis API from
 # textile-gauge-reader/ — the frontend (textile-gauge-reader.html/.css/.js

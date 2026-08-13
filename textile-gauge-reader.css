@@ -1,5 +1,5 @@
 /* ---------------------------------------------------
-   AI Textile Gauge Reader — experimental lab page
+   Automatic Textile Gauge Reader — experimental lab page
    Reuses the portfolio's token *names* (--black, --ink, --petrol,
    --mono, --serif — same variables styles.css defines) but redefines
    their values here to a light theme, specific to this page. Loading
