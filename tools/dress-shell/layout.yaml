@@ -8,46 +8,4 @@
 # AREA CENTER. rotation is 0 or 180. layer counts outward from the shell.
 
 version: 1
-panels:
-  - id: cf-facet
-    class: p750
-    theta: 0.0
-    s: 330.0
-    rotation: 0
-    layer: 0
-    mirrored: false
-  - id: cf-badge
-    class: p213
-    theta: 0.0
-    s: 300.0
-    rotation: 0
-    layer: 1
-    mirrored: false
-  - id: skirt-a
-    class: p370
-    theta: 28.0
-    s: 390.0
-    rotation: 0
-    layer: 0
-    mirrored: true
-  - id: skirt-b
-    class: p213
-    theta: 26.0
-    s: 250.0
-    rotation: 0
-    layer: 0
-    mirrored: true
-  - id: skirt-c
-    class: p213
-    theta: 45.0
-    s: 330.0
-    rotation: 0
-    layer: 0
-    mirrored: true
-  - id: bodice-a
-    class: p213
-    theta: 78.0
-    s: -65.0
-    rotation: 0
-    layer: 0
-    mirrored: true
+panels: []

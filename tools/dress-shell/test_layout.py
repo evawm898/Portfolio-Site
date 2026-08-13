@@ -14,8 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coords import ShellCoords
 from layout import (AuthoredPanel, LayoutError, SurfaceChart, assert_face_normals,
                     asymmetry_summary, connector_geometry, derive_twin,
-                    dump_layout, load_layout, resolve_layout, save_layout,
-                    wrap180)
+                    dump_layout, load_layout, outline_problems, resolve_layout,
+                    save_layout, tail_run_mm, wrap180)
 from panels import PanelClass, PanelSpecError, load_panel_classes
 from shell import ShellModel, ShellParams
 
@@ -154,20 +154,22 @@ class TestMirroring(unittest.TestCase):
         # bodice-a's twin: identity would fire the connector through the -90
         # seam, so 180 must win even though S's asymmetry is tied at 0 —
         # and, were it not, legality would still outrank it (priority 1).
-        twin = derive_twin(CHART, SYN["S"], AuthoredPanel("bo", "S", 80.0, -60.0, 0, 0, True))
+        twin = derive_twin(CHART, SYN["S"], AuthoredPanel("bo", "S", 80.0, 200.0, 0, 0, True))
         self.assertTrue(twin.valid)
         self.assertEqual(twin.rotation, 180)
 
     def test_content_rotation_tracks_physical_rotation(self):
-        authored = load_layout(HERE / "layout.yaml")
-        placed, _ = resolve_layout(CHART, CLASSES, authored)
+        placed, _ = resolve_layout(CHART, CLASSES, [
+            AuthoredPanel("a", "p213", 30.0, 200.0, 0, 0, True),
+            AuthoredPanel("b", "p213", 60.0, 300.0, 180, 0, True)])
         for p in placed:
             self.assertEqual(p.content_rotation, p.rotation, p.panel_id)
 
     def test_face_normal_assertion(self):
         # Passes for every legitimate placement (rotations are proper)...
-        authored = load_layout(HERE / "layout.yaml")
-        placed, _ = resolve_layout(CHART, CLASSES, authored)
+        placed, _ = resolve_layout(CHART, CLASSES, [
+            AuthoredPanel("a", "p213", 30.0, 200.0, 0, 0, True),
+            AuthoredPanel("b", "p370", 0.0, 250.0, 180, 0, False)])
         assert_face_normals(CHART, placed)  # must not raise
         # ...and trips if an orientation-reversing frame sneaks in.
         class ReflectedChart:
@@ -180,27 +182,27 @@ class TestMirroring(unittest.TestCase):
             assert_face_normals(ReflectedChart, placed[:1])
 
     def test_asymmetry_summary(self):
-        authored = load_layout(HERE / "layout.yaml")
-        placed, _ = resolve_layout(CHART, CLASSES, authored)
+        placed, _ = resolve_layout(CHART, CLASSES, [
+            AuthoredPanel("a", "p213", 30.0, 200.0, 0, 0, True),
+            AuthoredPanel("b", "p370", 40.0, 250.0, 0, 0, True)])
         pairs, worst, mean = asymmetry_summary(placed)
-        self.assertEqual(len(pairs), 4)
-        # real hardware is nearly symmetric: p370 exact 0, p213 pairs at
-        # 2|ex| = 2*(2.748 + 23.7046/2 - 14.6) = 0.0006 mm
+        self.assertEqual(len(pairs), 2)
+        # p213: 2|ex| = 2*(2.748 + 23.7046/2 - 14.6) = 0.0006; p370 exact 0
         self.assertAlmostEqual(worst, 0.0006, places=4)
-        self.assertAlmostEqual(mean, 3 * 0.0006 / 4.0, places=4)
+        self.assertAlmostEqual(mean, 0.0006 / 2.0, places=4)
 
     def test_side_exit_twin_flips_to_180_near_seam(self):
         # S exits sideways (-x). At theta=+80 the exit points toward center
         # front: legal. The naive twin at -80 would fire the connector into
         # the -90 seam; the derivation must flip to 180 instead.
-        src = AuthoredPanel("bo", "S", 80.0, -60.0, 0, 0, True)
-        _, (e_theta, _) = connector_geometry(CHART, SYN["S"], -80.0, -60.0, 0)
+        src = AuthoredPanel("bo", "S", 80.0, 200.0, 0, 0, True)
+        _, (e_theta, _) = connector_geometry(CHART, SYN["S"], -80.0, 200.0, 0)
         self.assertLess(e_theta, -90.0)  # the case is real, identity is illegal
         twin = derive_twin(CHART, SYN["S"], src)
         self.assertTrue(twin.valid)
         self.assertEqual(twin.rotation, 180)
         # and with 180 the connector genuinely clears the seam
-        _, (e_theta2, _) = connector_geometry(CHART, SYN["S"], -80.0, -60.0, 180)
+        _, (e_theta2, _) = connector_geometry(CHART, SYN["S"], -80.0, 200.0, 180)
         self.assertGreater(e_theta2, -90.0)
 
     def test_connector_never_mirrored(self):
@@ -225,9 +227,10 @@ class TestMirroring(unittest.TestCase):
 
     def test_invalid_twin_flagged_with_reasons(self):
         # A pathological class whose escape run is longer than the piece is
-        # wide: no rotation can keep the exit path on the piece.
+        # wide: no rotation can keep the exit path on the piece. (The run is
+        # lateral, so the waist-band clip never rescues it.)
         cls = PanelClass("HOSE", 30.0, 45.0, 1.0, 25.6, 39.0, (2.2, 3.0),
-                         (0.0, 22.5), (-1.0, 0.0), 400.0)
+                         (0.0, 22.5), (-1.0, 0.0), 600.0)
         twin = derive_twin(CHART, cls, AuthoredPanel("x", "HOSE", 40.0, 200.0, 0, 0, True))
         self.assertFalse(twin.valid)
         self.assertIn("INVALID twin: no legal transform", twin.problems[0])
@@ -252,22 +255,41 @@ class TestMirroring(unittest.TestCase):
         self.assertFalse(placed[0].is_twin)
 
     def test_starter_layout_resolves(self):
+        # layout.yaml is deliberately EMPTY pending the redesign on the
+        # confirmed skirt profile; it must load and resolve cleanly as such
         authored = load_layout(HERE / "layout.yaml")
+        self.assertEqual(authored, [])
         placed, errors = resolve_layout(CHART, CLASSES, authored)
+        self.assertEqual((placed, errors), ([], []))
+
+    def test_synthetic_pair_resolves_on_the_skirt(self):
+        placed, errors = resolve_layout(CHART, CLASSES, [
+            AuthoredPanel("sk", "p213", 30.0, 200.0, 0, 0, True)])
         self.assertEqual(errors, [])
-        # 6 authored, 4 mirrored -> 10 placed
-        self.assertEqual(len(placed), 10)
+        self.assertEqual(len(placed), 2)
         self.assertTrue(all(p.valid for p in placed),
                         [p.problems for p in placed if not p.valid])
-        twins = {p.source_id: p for p in placed if p.is_twin}
-        self.assertEqual(set(twins), {"skirt-a", "skirt-b", "skirt-c", "bodice-a"})
-        # p370's active area is exactly centered laterally (2.98 + 23.52 =
-        # 26.5 = W/2): identity is a PERFECT reflection, asymmetry 0
-        self.assertEqual(twins["skirt-a"].rotation, 0)
-        self.assertAlmostEqual(twins["skirt-a"].asymmetry_mm, 0.0, places=9)
-        # p213 twins keep rotation 0 (2|ex| ~ 0.0006 mm << 2|ey| = 5.25 mm)
-        for pid in ("skirt-b", "skirt-c", "bodice-a"):
-            self.assertEqual(twins[pid].rotation, 0)
+        twin = placed[1]
+        # p213 keeps rotation 0 (2|ex| ~ 0.0006 mm << 2|ey| = 5.25 mm)
+        self.assertEqual(twin.rotation, 0)
+        self.assertAlmostEqual(twin.asymmetry_mm, 0.0006, places=4)
+
+    def test_waist_seam_band_is_a_keepout(self):
+        # a footprint that reaches into |s| <= 8 mm is rejected...
+        probs = outline_problems(CHART, CLASSES["p213"], 20.0, 35.0, 0)
+        self.assertTrue(any("waist seam band" in p for p in probs), probs)
+        # ...and one that clears it is fine
+        self.assertEqual(outline_problems(CHART, CLASSES["p213"], 20.0, 45.0, 0), [])
+
+    def test_tail_terminates_at_the_band(self):
+        # p213 tail exits toward the waist; the escape run and the tail-run
+        # metric stop at the band edge (s = +8), not the bare waistline
+        cls = CLASSES["p213"]
+        theta, s = 20.0, 45.0
+        (ct, cs), (et, es) = connector_geometry(CHART, cls, theta, s, 0)
+        self.assertAlmostEqual(es, CHART.band_halfwidth, places=9)  # clipped
+        run = tail_run_mm(CHART, cls, theta, s, 0)
+        self.assertAlmostEqual(run, cs - CHART.band_halfwidth, places=9)
 
     def test_back_piece_mirroring(self):
         # theta 150 lives on the BACK piece; its twin at -150 does too, and

@@ -1,35 +1,44 @@
-"""Parametric rigid dress shell — MILESTONE 1.
+"""Parametric rigid shell — CONFIRMED SKIRT PROFILE (superellipse dome).
 
-The dress is a rigid 3D shell formed in 3D from the start; it is never
-flattened and there is no flat pattern anywhere in this pipeline. Two
-separate pieces, FRONT and BACK, split at the side seams (theta = +-90
-degrees), no hinge; side closure is out of scope but the pieces stay
-separable in the model.
+The garment is rigid, formed in 3D from the start, never flattened. Two
+separate pieces, FRONT and BACK, split at the side seams (theta = +-90);
+no hinge, side closure out of scope.
 
-Construction: a profile (radius as a function of height) swept with
-elliptical cross-sections whose axis ratio varies with height. Inputs
-are circumferences (bust, underbust, waist, hip, hem) with the height
-of each, plus total length. Given a circumference C and an axis ratio
-q = width/depth at a height, the ellipse semi-axes are recovered by
-inverting Ramanujan's perimeter approximation (linear in scale, so the
-solve is exact for that formula). Semi-axes a(z), b(z) and ratio are
-then interpolated with monotone cubics (PCHIP) so the sharp waist nip
-does not overshoot.
+SKIRT (confirmed): a surface of revolution. With u measured UPWARD from
+the hem (u in [0, drop]):
 
-Body frame: origin on the vertical axis at WAIST height, +z up,
-+y toward center front, +x toward the wearer's left. Units mm.
+    r(u) = a * (1 - (u/b)^n)^(1/n)
 
-`ShellModel` exposes a(z), b(z) and derivatives as the single geometry
-interface; a later variant fitted to an imported dress-form mesh can
-replace the interpolants without touching anything downstream.
-Parametric generation is the default and only path for now.
+    a = hem_circumference / 2pi          (hem radius)
+    n = dome_fullness                    (1.6 confirmed)
+    b : solved so r(drop) = waist radius; closed form
+        b = drop / (1 - (r_waist/a)^n)^(1/n)
+
+Body frame: waist plane at z = 0, +z up, +y center front, +x wearer's
+left; the skirt occupies z in [-drop, 0]. hem_circumference and
+dome_fullness are live parameters, not constants.
+
+Profile behavior worth knowing:
+  - at the hem (u = 0) the tangent is vertical and, for n < 2, the
+    meridional curvature is GENUINELY SINGULAR (r'' ~ u^(n-2)). That is a
+    property of the superellipse, not an error; curvature displays clamp
+    it and seating decisions rely on footprint sampling.
+  - at the waist the skirt arrives at dr/du != 0: the junction with the
+    bodice is a CREASE, not a smooth join. The sharp nip is the design;
+    `fillet_radius` exists for a later softened variant and must be 0 for
+    now. The waist seam band (keep-out ring, cable bus) lives in
+    `waist_band_halfwidth`.
+
+BODICE: deliberately NOT SPECIFIED. `ShellParams.bodice` is None and the
+model refuses invented measurements; the skirt is complete and correct on
+its own. Every downstream consumer treats z_top = 0 (the waist) as the
+current top edge.
 """
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
-from scipy.interpolate import PchipInterpolator
 
 
 class ShellError(ValueError):
@@ -38,158 +47,148 @@ class ShellError(ValueError):
 
 @dataclass(frozen=True)
 class Ring:
-    """One control cross-section: circumference + axis ratio at a height."""
+    """A labeled cross-section (for reports)."""
     name: str
-    z: float                # height relative to the waist, mm (+up)
-    circumference: float    # mm
-    axis_ratio: float       # width / depth (a / b)
+    z: float
+    circumference: float
 
 
 @dataclass(frozen=True)
 class ShellParams:
-    """Measurements. Heights are relative to the waist (+up), mm.
-
-    total_length is top edge to hem, measured vertically; it fixes the
-    bodice top edge at  z_top = hem_z + total_length.  The optional top
-    ring lets the corset edge taper; by default it is 98% of the bust
-    circumference at the bust's axis ratio.
-    """
-    bust: float = 900.0
-    underbust: float = 750.0
-    waist: float = 660.0
-    hip: float = 950.0
-    hem: float = 1400.0
-    bust_z: float = 170.0
-    underbust_z: float = 110.0
-    waist_z: float = 0.0
-    hip_z: float = -190.0
-    hem_z: float = -450.0
-    total_length: float = 650.0
-    bust_ratio: float = 1.35
-    underbust_ratio: float = 1.30
-    waist_ratio: float = 1.25
-    hip_ratio: float = 1.30
-    hem_ratio: float = 1.05
-    top_circumference: float = None  # default: 0.98 * bust
-    top_ratio: float = None          # default: bust_ratio
-
-
-def ellipse_perimeter(a: float, b: float) -> float:
-    """Ramanujan's second approximation (relative error < 1e-9 for the
-    axis ratios that occur on a body)."""
-    h = ((a - b) / (a + b)) ** 2
-    return math.pi * (a + b) * (1.0 + 3.0 * h / (10.0 + math.sqrt(4.0 - 3.0 * h)))
-
-
-def semi_axes_from(circumference: float, ratio: float):
-    """Invert the perimeter formula: the perimeter is linear in uniform
-    scale, so for a = ratio * b the solve is a single division."""
-    unit = ellipse_perimeter(ratio, 1.0)
-    b = circumference / unit
-    return ratio * b, b
+    """Confirmed skirt measurements (mm). Bodice intentionally absent."""
+    waist_circumference: float = 609.6   # 24 in
+    hem_circumference: float = 1549.4    # 61 in
+    drop: float = 381.0                  # waist-to-hem vertical, 15 in
+    dome_n: float = 1.6                  # dome fullness
+    fillet_radius: float = 0.0           # 0 = sharp waist crease (the design)
+    waist_band_halfwidth: float = 8.0    # seam band / cable bus, mm each side
+    bodice: object = None                # NOT SPECIFIED — supplied later
 
 
 class ShellModel:
-    """The swept shell: elliptical cross-section semi-axes as smooth
-    functions of height."""
+    """Superellipse dome skirt as a surface of revolution. Exposes the same
+    geometry interface as before (a(z), b(z), derivatives, point, meshes)
+    so coordinates, grid, curvature, layout, and the viewers are unchanged
+    consumers; sections are circular, so a(z) == b(z) == r(z)."""
 
     def __init__(self, params: ShellParams = ShellParams()):
         p = params
-        top_c = p.top_circumference if p.top_circumference is not None else 0.98 * p.bust
-        top_ratio = p.top_ratio if p.top_ratio is not None else p.bust_ratio
-        z_top = p.hem_z + p.total_length
-
-        rings = [
-            Ring("hem", p.hem_z, p.hem, p.hem_ratio),
-            Ring("hip", p.hip_z, p.hip, p.hip_ratio),
-            Ring("waist", p.waist_z, p.waist, p.waist_ratio),
-            Ring("underbust", p.underbust_z, p.underbust, p.underbust_ratio),
-            Ring("bust", p.bust_z, p.bust, p.bust_ratio),
-            Ring("top", z_top, top_c, top_ratio),
-        ]
-
-        zs = [r.z for r in rings]
-        if any(z2 - z1 < 10.0 for z1, z2 in zip(zs, zs[1:])):
+        for name, v in (("waist_circumference", p.waist_circumference),
+                        ("hem_circumference", p.hem_circumference),
+                        ("drop", p.drop), ("dome_n", p.dome_n)):
+            if not (isinstance(v, (int, float)) and math.isfinite(v) and v > 0):
+                raise ShellError(f"{name} must be a positive number, got {v!r}")
+        if p.waist_circumference >= p.hem_circumference:
             raise ShellError(
-                "ring heights must increase hem < hip < waist < underbust "
-                f"< bust < top with at least 10mm between them, got {zs}"
-            )
-        for r in rings:
-            if r.circumference <= 0:
-                raise ShellError(f"{r.name}: circumference must be > 0, got {r.circumference}")
-            if not 0.3 <= r.axis_ratio <= 3.0:
-                raise ShellError(f"{r.name}: axis ratio {r.axis_ratio} outside sane range 0.3-3")
-        if z_top <= p.bust_z:
+                f"waist circumference ({p.waist_circumference}) must be smaller "
+                f"than hem circumference ({p.hem_circumference})")
+        if not 1.0 < p.dome_n <= 8.0:
+            raise ShellError(f"dome_n must be in (1, 8], got {p.dome_n} "
+                             f"(n <= 1 gives an unusable profile)")
+        if p.fillet_radius != 0.0:
             raise ShellError(
-                f"total_length {p.total_length}mm puts the top edge at z={z_top}mm, "
-                f"at or below the bust ({p.bust_z}mm)"
-            )
+                "fillet_radius > 0 is reserved for the softened-waist variant "
+                "and is not implemented; the sharp crease is the current design")
+        if p.waist_band_halfwidth < 0:
+            raise ShellError(f"waist_band_halfwidth must be >= 0, "
+                             f"got {p.waist_band_halfwidth}")
+        if p.bodice is not None:
+            raise ShellError(
+                "bodice profile is not specified yet — refusing invented "
+                "measurements. Supply it via a future bodice segment.")
 
         self.params = p
-        self.rings = rings
-        self.z_bottom = p.hem_z
-        self.z_top = z_top
+        self.hem_radius = p.hem_circumference / math.tau        # a
+        self.waist_radius = p.waist_circumference / math.tau
+        ratio = self.waist_radius / self.hem_radius
+        # closed-form solve of r(drop) = waist radius (the superellipse b)
+        self.b_param = p.drop / (1.0 - ratio ** p.dome_n) ** (1.0 / p.dome_n)
+        self.n = p.dome_n
+        self.z_bottom = -p.drop
+        self.z_top = 0.0        # the waist IS the top edge until a bodice exists
 
-        axes = [semi_axes_from(r.circumference, r.axis_ratio) for r in rings]
-        z_arr = np.array(zs)
-        # Monotone cubic through the control semi-axes: no overshoot at the
-        # waist nip, C1 everywhere.
-        self._a = PchipInterpolator(z_arr, np.array([ax[0] for ax in axes]))
-        self._b = PchipInterpolator(z_arr, np.array([ax[1] for ax in axes]))
-        self._da = self._a.derivative()
-        self._db = self._b.derivative()
+    # -- profile -------------------------------------------------------------
 
-    # -- the geometry interface everything downstream uses ------------------
+    def _u(self, z):
+        """Height above the hem, clipped to the skirt."""
+        return np.clip(np.asarray(z, dtype=float) - self.z_bottom,
+                       0.0, self.params.drop)
 
+    def radius(self, z):
+        u = self._u(z)
+        return self.hem_radius * (1.0 - (u / self.b_param) ** self.n) ** (1.0 / self.n)
+
+    def dradius(self, z):
+        """dr/dz (= dr/du). Exactly 0 at the hem for n > 1; finite and
+        negative everywhere else, steepest at the waist."""
+        u = self._u(z)
+        t = (u / self.b_param) ** self.n
+        return (-(self.hem_radius / self.b_param) * (u / self.b_param) ** (self.n - 1.0)
+                * (1.0 - t) ** (1.0 / self.n - 1.0))
+
+    # geometry interface used by every downstream consumer
     def a(self, z):
-        """Semi-axis toward the wearer's left (half width), mm."""
-        return self._a(z)
+        return self.radius(z)
 
     def b(self, z):
-        """Semi-axis toward center front (half depth), mm."""
-        return self._b(z)
+        """Second semi-axis (sections are circular): b(z) == a(z) == r(z).
+        The solved superellipse parameter lives in `b_param`."""
+        return self.radius(z)
 
     def da(self, z):
-        return self._da(z)
+        return self.dradius(z)
 
     def db(self, z):
-        return self._db(z)
+        return self.dradius(z)
 
     def mean_radius(self, z):
-        return 0.5 * (self._a(z) + self._b(z))
+        return self.radius(z)
 
     def mean_slope(self, z):
-        return 0.5 * (self._da(z) + self._db(z))
+        return self.dradius(z)
 
     def point(self, theta_rad, z):
-        """Shell surface point(s). theta 0 = center front, + = wearer's left."""
+        r = self.radius(z)
         return np.stack([
-            self._a(z) * np.sin(theta_rad),
-            self._b(z) * np.cos(theta_rad),
+            r * np.sin(theta_rad),
+            r * np.cos(theta_rad),
             np.broadcast_to(z, np.broadcast(theta_rad, z).shape).astype(float),
         ], axis=-1)
 
-    def max_flare_z(self):
-        """Height of maximum skirt flare: steepest mean-profile slope
-        between hem and waist."""
-        zs = np.linspace(self.z_bottom, 0.0, 2001)
-        return float(zs[np.argmax(np.abs(self.mean_slope(zs)))])
+    # -- waist junction ------------------------------------------------------
+
+    def waist_tangent_deg(self):
+        """Angle of the skirt's meridian tangent at the waist, measured from
+        vertical, degrees. (dr/du = -0.88 -> ~41 deg for the confirmed
+        parameters.)"""
+        return math.degrees(math.atan(abs(float(self.dradius(0.0)))))
+
+    def crease_angle_deg(self):
+        """Angle between skirt and bodice tangents at the waist. None until
+        the bodice profile is specified — the crease exists but its angle
+        cannot be computed from one side."""
+        return None
+
+    @property
+    def rings(self):
+        return [Ring("hem", self.z_bottom, self.params.hem_circumference),
+                Ring("waist", 0.0, self.params.waist_circumference)]
+
+    def surface_area_mm2(self, n_samples=20001):
+        """Skirt area of revolution: 2pi * integral r * sqrt(1 + r'^2) du."""
+        z = np.linspace(self.z_bottom, self.z_top, n_samples)
+        integrand = self.radius(z) * np.sqrt(1.0 + self.dradius(z) ** 2)
+        return float(math.tau * np.trapezoid(integrand, z))
 
 
 def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0):
     """Triangulate the shell as two separate pieces split at the side
-    seams. Returns {"FRONT": (V, F), "BACK": (V, F)} with V (n,3) float
-    arrays (mm) and F (m,3) int arrays, faces wound outward.
-
-    Each piece has its own vertices (no sharing across the seam), so the
-    pieces are fully separable. Boundary edges (top, hem, seams) are left
-    open in milestone 1 — wall thickness / closing is a later decision.
-    """
+    seams. Returns {"FRONT": (V, F), "BACK": (V, F)}; faces wound outward.
+    Rows are spaced evenly along the meridian arc, so the near-vertical
+    hem wall and the steep waist get the same physical resolution."""
     if n_theta % 4 != 0:
         raise ShellError(f"n_theta must be a multiple of 4 (seams at +-90 deg), got {n_theta}")
 
-    # Rows spaced ~evenly along the meridian, not in z, so the flare and
-    # the nip get the same physical resolution.
     z_fine = np.linspace(model.z_bottom, model.z_top, 4001)
     g = np.sqrt(1.0 + model.mean_slope(z_fine) ** 2)
     arc = np.concatenate([[0.0], np.cumsum(0.5 * (g[1:] + g[:-1]) * np.diff(z_fine))])
@@ -206,9 +205,6 @@ def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0)
         idx = np.arange(n_rows * cols).reshape(n_rows, cols)
         q00, q01 = idx[:-1, :-1].ravel(), idx[:-1, 1:].ravel()
         q10, q11 = idx[1:, :-1].ravel(), idx[1:, 1:].ravel()
-        # Rows go bottom-to-top, theta increases along columns; outward is
-        # cross(P_z, P_theta), so wind row-first (checked against the
-        # analytic normal in tests).
         F = np.concatenate([
             np.stack([q00, q11, q01], axis=1),
             np.stack([q00, q10, q11], axis=1),

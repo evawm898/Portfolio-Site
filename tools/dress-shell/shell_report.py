@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np
 
 from coords import ShellCoords
-from shell import ShellModel, ShellParams, build_meshes, ellipse_perimeter
+from shell import ShellModel, ShellParams, build_meshes
 from test_coords import named_points
 
 
@@ -23,22 +23,22 @@ def main():
     coords = ShellCoords(model)
     p = model.params
 
-    print("DRESS SHELL — milestone 1 foundation report")
+    print("DRESS SHELL — foundation report (confirmed superellipse skirt)")
     print()
-    print("shell (mm, heights relative to waist)")
-    print(f"  {'ring':<10} {'z':>7} {'circumf':>9} {'semi-ax a':>10} {'semi-ax b':>10} {'ratio':>6}")
-    for ring in model.rings:
-        a, b = float(model.a(ring.z)), float(model.b(ring.z))
-        print(f"  {ring.name:<10} {ring.z:>7.1f} {ring.circumference:>9.1f} "
-              f"{a:>10.2f} {b:>10.2f} {a / b:>6.3f}")
-    print(f"  height span   z = {model.z_bottom:.1f} .. {model.z_top:.1f}  "
-          f"(total length {model.z_top - model.z_bottom:.1f})")
-    print(f"  meridian s    {coords.s_min:.2f} (top edge) .. {coords.s_max:.2f} (hem edge), "
-          f"0 at the waist")
-    zf = model.max_flare_z()
-    print(f"  max flare     z = {zf:.1f}  (mean profile slope "
-          f"{float(model.mean_slope(zf)):.3f}, circumference "
-          f"{ellipse_perimeter(float(model.a(zf)), float(model.b(zf))):.0f})")
+    print("skirt profile r(u) = a(1-(u/b)^n)^(1/n), u up from the hem")
+    print(f"  a (hem radius)   {model.hem_radius:.2f} mm  "
+          f"(hem circumference {p.hem_circumference:g})")
+    print(f"  waist radius     {model.waist_radius:.2f} mm  "
+          f"(waist circumference {p.waist_circumference:g})")
+    print(f"  drop             {p.drop:g} mm, n = {p.dome_n:g}")
+    print(f"  solved b         {model.b_param:.2f} mm")
+    print(f"  waist tangent    {model.waist_tangent_deg():.2f} deg from vertical "
+          f"(dr/du = {float(model.dradius(0.0)):.4f}) — CREASE at the waist; "
+          f"bodice side unspecified")
+    print(f"  seam band        +-{p.waist_band_halfwidth:g} mm about s = 0 "
+          f"(keep-out + cable bus); fillet_radius = {p.fillet_radius:g}")
+    print(f"  meridian s       0 (waist) .. {coords.s_max:.2f} (hem edge)")
+    print(f"  surface area     {model.surface_area_mm2() / 1e6:.4f} m^2")
 
     meshes = build_meshes(model)
     for name, (V, F) in meshes.items():

@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-_H = 0.5  # mm central-difference step for the profile second derivative
+_H = 0.5  # mm finite-difference step for the profile second derivative
 
 # The single named standoff tolerance. UNVALIDATED ASSUMPTION: 2 mm has not
 # been physically tested — it is surfaced in the analysis JSON and the
@@ -33,13 +33,48 @@ _H = 0.5  # mm central-difference step for the profile second derivative
 STANDOFF_TOLERANCE_MM = 2.0
 TOLERANCE_SWEEP_MM = (1.5, 2.0, 2.5, 3.0)
 
+# Display floor for the reported min curvature radius. For dome_n < 2 the
+# meridional curvature is GENUINELY SINGULAR at the hem (r'' ~ u^(n-2)) —
+# a property of the superellipse, not an error. Radii below the floor are
+# clamped for display and flagged; seating decisions never use them (they
+# come from footprint sampling).
+R_MIN_DISPLAY_FLOOR_MM = 5.0
+HEM_SINGULAR_BAND_MM = 5.0   # meridian distance from the hem treated as the singular zone
+
+
+def _second_derivative(f, z, z_lo, z_hi, h=_H):
+    """f''(z) with one-sided stencils of CORRECT spacing near the domain
+    ends — a clamped centered difference silently halves the step there and
+    reports spurious values. Interior: centered; within h of an end: the
+    second-order one-sided stencil anchored at z itself."""
+    z_in = np.asarray(z, dtype=float)
+    z = np.atleast_1d(z_in)
+    out = np.empty_like(z)
+    lo = z < z_lo + h
+    hi = z > z_hi - h
+    mid = ~(lo | hi)
+    if np.any(mid):
+        zm = z[mid]
+        out[mid] = (f(zm + h) - 2.0 * f(zm) + f(zm - h)) / h**2
+    if np.any(lo):
+        zl = z[lo]
+        out[lo] = (2.0 * f(zl) - 5.0 * f(zl + h) + 4.0 * f(zl + 2 * h)
+                   - f(zl + 3 * h)) / h**2
+    if np.any(hi):
+        zh = z[hi]
+        out[hi] = (2.0 * f(zh) - 5.0 * f(zh - h) + 4.0 * f(zh - 2 * h)
+                   - f(zh - 3 * h)) / h**2
+    return out.reshape(z_in.shape)
+
 
 def fundamental_forms(model, theta_rad, z):
-    """E, F, G, L, M, N (arrays ok) at (theta, z), outward normal."""
+    """E, F, G, L, M, N (arrays ok) at (theta, z), outward normal.
+    Second profile derivatives use end-guarded stencils (see
+    _second_derivative) — never a clamped centered difference."""
     a, b = model.a(z), model.b(z)
     da, db = model.da(z), model.db(z)
-    dda = (model.da(z + _H) - model.da(z - _H)) / (2.0 * _H)
-    ddb = (model.db(z + _H) - model.db(z - _H)) / (2.0 * _H)
+    dda = _second_derivative(model.a, z, model.z_bottom, model.z_top)
+    ddb = _second_derivative(model.b, z, model.z_bottom, model.z_top)
     sin, cos = np.sin(theta_rad), np.cos(theta_rad)
 
     p_t = np.stack(np.broadcast_arrays(a * cos, -b * sin, np.zeros_like(sin)), axis=-1)
@@ -72,9 +107,10 @@ class CellAnalysis:
     k1: float
     k2: float
     gaussian: float
-    r_min: float                 # local minimum radius of curvature, mm
+    r_min: float                 # local minimum radius of curvature, mm (display-clamped)
     standoff_by_class: dict      # class_id -> max standoff mm (inf = does not fit)
     max_class: str               # largest seatable class id, or None
+    r_min_clamped: bool = False  # True where the hem singularity hit the display floor
 
 
 def seat_standoff(coords, chart, outline_w, outline_h, theta, s, samples=9):
@@ -121,7 +157,9 @@ def analyze_cells(coords, chart, grid, classes, tolerance_mm=STANDOFF_TOLERANCE_
     z = chart.coords.z_of_s(sc)
     k1, k2, K = principal_curvatures(chart.model, np.radians(tc), z)
     kmax = np.maximum(np.abs(k1), np.abs(k2))
-    r_min = np.where(kmax > 1e-12, 1.0 / kmax, np.inf)
+    r_min_raw = np.where(kmax > 1e-12, 1.0 / kmax, np.inf)
+    clamped = r_min_raw < R_MIN_DISPLAY_FLOOR_MM
+    r_min = np.where(clamped, R_MIN_DISPLAY_FLOOR_MM, r_min_raw)
 
     by_size = sorted((c for c in classes.values() if not c.requires_facet),
                      key=lambda c: c.outline_area)
@@ -141,6 +179,7 @@ def analyze_cells(coords, chart, grid, classes, tolerance_mm=STANDOFF_TOLERANCE_
             r_min=float(r_min[i]),
             standoff_by_class=standoffs,
             max_class=best,
+            r_min_clamped=bool(clamped[i]),
         ))
     return out
 
@@ -179,3 +218,39 @@ def required_radius(cls, tolerance_mm=STANDOFF_TOLERANCE_MM):
     the more curved direction; both are reported."""
     return {"across_width": cls.outline_w**2 / (8.0 * tolerance_mm),
             "across_height": cls.outline_h**2 / (8.0 * tolerance_mm)}
+
+
+def meridional_radius_profile(model, coords, n_samples=2000,
+                              singular_band_mm=HEM_SINGULAR_BAND_MM):
+    """Min meridional curvature radius along the profile and where it
+    occurs, with the hem singularity separated from genuine problem
+    regions. Returns a dict:
+      hem_singular: True when dome_n < 2 (r'' diverges at u -> 0)
+      min_radius_mm / at_s_mm: minimum OUTSIDE the singular band
+      band_min_radius_mm: raw minimum inside the band (display only)
+    """
+    s_hi = coords.s_max
+    ss = np.linspace(0.0, s_hi, n_samples + 1)
+    z = coords.z_of_s(ss)
+    k1, k2, _ = principal_curvatures(model, 0.0, z)
+    # meridional curvature: on a surface of revolution at theta = 0 the
+    # meridian direction is the z-parameter direction; its normal curvature
+    # is the principal value whose magnitude matches r''-driven bending —
+    # take the one that is NOT the circumferential 1/r term
+    circ = -1.0 / np.maximum(model.radius(z), 1e-9)  # circumferential (convex)
+    d1 = np.abs(k1 - circ)
+    d2 = np.abs(k2 - circ)
+    k_mer = np.where(d1 >= d2, k1, k2)
+    with np.errstate(divide="ignore"):
+        r_mer = 1.0 / np.maximum(np.abs(k_mer), 1e-15)
+    dist_to_hem = s_hi - ss
+    outside = dist_to_hem > singular_band_mm
+    idx = int(np.argmin(np.where(outside, r_mer, np.inf)))
+    inside_vals = r_mer[~outside]
+    return {
+        "hem_singular": bool(model.n < 2.0),
+        "min_radius_mm": float(r_mer[idx]),
+        "at_s_mm": float(ss[idx]),
+        "band_min_radius_mm": float(inside_vals.min()) if inside_vals.size else None,
+        "singular_band_mm": singular_band_mm,
+    }

@@ -39,12 +39,19 @@ class CoordError(ValueError):
 class ShellCoords:
     def __init__(self, model: ShellModel, n_panels: int = 2000):
         self.model = model
-        # Height grid with the waist (z = 0) exactly on a node.
-        lo = np.linspace(model.z_bottom, 0.0, max(2, int(n_panels * -model.z_bottom
-                                                        / (model.z_top - model.z_bottom))) + 1)
-        hi = np.linspace(0.0, model.z_top, max(2, n_panels - len(lo) + 2) + 1)
-        self._z_grid = np.concatenate([lo, hi[1:]])
-        self._waist_idx = len(lo) - 1
+        # Height grid with the waist (z = 0) exactly on a node. With no
+        # bodice yet, the waist IS the top edge (z_top == 0) and the grid
+        # covers the skirt alone.
+        if model.z_top <= 1e-12:
+            self._z_grid = np.linspace(model.z_bottom, 0.0, n_panels + 1)
+            self._waist_idx = n_panels
+        else:
+            lo = np.linspace(model.z_bottom, 0.0,
+                             max(2, int(n_panels * -model.z_bottom
+                                        / (model.z_top - model.z_bottom))) + 1)
+            hi = np.linspace(0.0, model.z_top, max(2, n_panels - len(lo) + 2) + 1)
+            self._z_grid = np.concatenate([lo, hi[1:]])
+            self._waist_idx = len(lo) - 1
 
         # Cumulative arc length from the bottom, one Gauss panel per interval.
         z0, z1 = self._z_grid[:-1], self._z_grid[1:]

@@ -82,17 +82,38 @@ class TestGrid(unittest.TestCase):
 
 
 class TestCurvature(unittest.TestCase):
-    def test_circumferential_curvature_matches_ellipse_formula(self):
-        # at center front the ellipse x = a sin t, y = b cos t has curvature
-        # b/a^2 at t = 0; the surface's k along theta must match (convex ->
-        # negative with the outward normal)
-        k1, k2, K = principal_curvatures(MODEL, 0.0, 0.0)
-        a0, b0 = float(MODEL.a(0.0)), float(MODEL.b(0.0))
-        self.assertAlmostEqual(float(k2), -b0 / a0**2, places=6)
+    def test_circumferential_curvature_matches_meusnier(self):
+        # surface of revolution: circumferential normal curvature is
+        # -cos(phi)/r with tan(phi) = |r'| (Meusnier). At the hem r' = 0,
+        # so it is exactly -1/r_hem there; at the waist the 41 deg tilt
+        # applies.
+        import math as _m
+        for z in (0.0, float(MODEL.z_bottom)):
+            k1, k2, _ = principal_curvatures(MODEL, 0.0, z)
+            r = float(MODEL.radius(z))
+            slope = float(MODEL.dradius(z))
+            expected = -1.0 / (r * _m.sqrt(1.0 + slope**2))
+            self.assertTrue(
+                abs(float(k1) - expected) < 5e-6 or abs(float(k2) - expected) < 5e-6,
+                (z, float(k1), float(k2), expected))
 
-    def test_waist_is_a_saddle(self):
-        _, _, K = principal_curvatures(MODEL, 0.0, 0.0)
-        self.assertLess(float(K), 0.0)
+    def test_dome_is_elliptic_not_saddle(self):
+        # the superellipse dome is convex in both directions everywhere
+        # away from the hem singularity: K > 0
+        for z in (0.0, -100.0, -250.0, -370.0):
+            _, _, K = principal_curvatures(MODEL, 0.0, z)
+            self.assertGreater(float(K), 0.0, z)
+
+    def test_hem_singularity_clamped_and_flagged(self):
+        from curvature import R_MIN_DISPLAY_FLOOR_MM, meridional_radius_profile
+        analyses = analyze_cells(COORDS, CHART, GRID, CLASSES, 2.0, samples=3)
+        flagged = [a for a in analyses if a.r_min_clamped]
+        for a in analyses:
+            self.assertGreaterEqual(a.r_min, R_MIN_DISPLAY_FLOOR_MM)
+        prof = meridional_radius_profile(MODEL, COORDS)
+        self.assertTrue(prof["hem_singular"])   # n = 1.6 < 2
+        self.assertGreater(prof["min_radius_mm"], 100.0)  # genuine region is fine
+        self.assertLess(prof["band_min_radius_mm"], prof["min_radius_mm"])
 
     def test_standoff_off_edge_and_across_seam_is_inf(self):
         near_top = CHART.s_min + 5.0
@@ -244,7 +265,9 @@ class TestFacets(unittest.TestCase):
 class TestElectrical(unittest.TestCase):
     def test_rollup_on_starter_layout(self):
         from analysis_report import electrical_rollup
-        placed, errors = resolve_layout(CHART, CLASSES, load_layout(HERE / "layout.yaml"))
+        placed, errors = resolve_layout(CHART, CLASSES, [
+            AuthoredPanel("a", "p213", 30.0, 200.0, 0, 0, True),
+            AuthoredPanel("b", "p370", 0.0, 250.0, 0, 0, False)])
         self.assertEqual(errors, [])
         el = electrical_rollup(placed)
         n = el["total_panels"]
@@ -253,8 +276,7 @@ class TestElectrical(unittest.TestCase):
                           if p.valid and p.cls.price_usd is not None)
         self.assertAlmostEqual(el["cost_usd"], round(expect_cost, 2))
         # p213 refresh is unverified -> those panels excluded and listed
-        self.assertTrue(all(placed_id.startswith(("cf-badge", "skirt-b", "skirt-c", "bodice"))
-                            for placed_id in el["refresh_unknown_panels"]))
+        self.assertEqual(sorted(el["refresh_unknown_panels"]), ["a", "a~twin"])
         self.assertAlmostEqual(el["sequential_refresh_s"],
                                sum(p.cls.refresh_s for p in placed
                                    if p.valid and p.cls.refresh_s is not None), places=6)

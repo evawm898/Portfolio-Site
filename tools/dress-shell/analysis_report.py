@@ -8,6 +8,7 @@ Run:  python3 tools/dress-shell/analysis_report.py [--sweep]
 (the sweep table always prints; --sweep is accepted for compatibility)
 """
 
+import math
 import sys
 from pathlib import Path
 
@@ -17,7 +18,8 @@ import numpy as np
 
 from coords import ShellCoords
 from curvature import (STANDOFF_TOLERANCE_MM, TOLERANCE_SWEEP_MM, analyze_cells,
-                       class_distribution, required_radius, tolerance_sweep)
+                       class_distribution, meridional_radius_profile,
+                       required_radius, tolerance_sweep)
 from facets import apply_facets, facet_panels
 from grid import GridSpec, ShellGrid
 from layering import LayeringError, analyze_layering, uncovered_shell_area
@@ -29,8 +31,9 @@ from test_coords import named_points
 
 HERE = Path(__file__).resolve().parent
 
-# The placeholder-class distribution this library replaced, for comparison.
-OLD_PLACEHOLDER_DISTRIBUTION = "XS 10% | S 33% | M 35% | L 6% | none 16%"
+# Previous run (real hardware on the OLD parametric dress shell), for
+# comparison against the confirmed skirt profile.
+PREVIOUS_RUN_DISTRIBUTION = "p213 52% | p370 16% | none 33%  (old dress shell)"
 
 
 def electrical_rollup(placed):
@@ -69,10 +72,35 @@ def main():
     grid = ShellGrid(chart, GridSpec(10.0, 25.0))
     tol = STANDOFF_TOLERANCE_MM
 
-    print("DRESS SHELL — full pipeline report (real hardware library)")
+    p = model.params
+    print("DRESS SHELL — full pipeline report (confirmed skirt profile)")
     print()
-    print(f"shell         z {model.z_bottom:.0f}..{model.z_top:.0f} mm, "
-          f"s {coords.s_min:.1f}..{coords.s_max:.1f} mm (0 = waist)")
+    print(f"profile       r(u) = a(1-(u/b)^n)^(1/n): a {model.hem_radius:.2f}, "
+          f"n {p.dome_n:g}, SOLVED b = {model.b_param:.2f} mm")
+    print(f"              waist r {model.waist_radius:.2f}, drop {p.drop:g}, "
+          f"s 0..{coords.s_max:.2f} mm")
+    print(f"waist         tangent {model.waist_tangent_deg():.2f} deg from vertical "
+          f"(dr/du {float(model.dradius(0.0)):.4f}); CREASE — bodice side "
+          f"unspecified, crease angle pending; fillet_radius {p.fillet_radius:g}")
+    print(f"seam band     +-{p.waist_band_halfwidth:g} mm keep-out about s = 0; "
+          f"cable bus; tails terminate at the band edge")
+    area_m2 = model.surface_area_mm2() / 1e6
+    a213 = classes["p213"].active_area          # mm^2
+    n100 = math.ceil(area_m2 * 1e6 / a213)
+    n33 = math.ceil(0.33 * area_m2 * 1e6 / a213)
+    price = classes["p213"].price_usd or 0.0
+    print(f"surface area  {area_m2:.4f} m^2")
+    print(f"coverage cost 100% at 2.13\" active ({a213:.0f} mm^2): {n100} panels, "
+          f"${n100 * price:,.2f} list")
+    print(f"              33%: {n33} panels, ${n33 * price:,.2f} list")
+    mer = meridional_radius_profile(model, coords)
+    print(f"meridional R  min {mer['min_radius_mm']:.0f} mm at s {mer['at_s_mm']:.0f} "
+          f"(outside the {mer['singular_band_mm']:g} mm hem band)")
+    if mer["hem_singular"]:
+        print(f"              HEM SINGULARITY (n = {p.dome_n:g} < 2): r'' diverges at "
+              f"the hem — property of the superellipse, not an error; display "
+              f"clamped (band min {mer['band_min_radius_mm']:.0f} mm), seating "
+              f"decisions use footprint sampling only")
 
     worst = 0.0
     for name, (theta, s) in named_points(coords).items():
@@ -95,8 +123,8 @@ def main():
     parts = [f"{c.class_id} {pct(dist.get(c.class_id, 0))}" for c in seatable]
     parts.append(f"none {pct(dist.get(None, 0))}")
     print()
-    print(f"MAX CLASS     new: {' | '.join(parts)}   (tolerance {tol} mm)")
-    print(f"              old placeholders were: {OLD_PLACEHOLDER_DISTRIBUTION}")
+    print(f"MAX CLASS     skirt: {' | '.join(parts)}   (tolerance {tol} mm)")
+    print(f"              previous run was: {PREVIOUS_RUN_DISTRIBUTION}")
     print(f"              (p750 excluded from seating: requires_facet)")
 
     print()

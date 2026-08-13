@@ -110,6 +110,9 @@ class SurfaceChart:
         self.coords = coords
         self.s_min = coords.s_min
         self.s_max = coords.s_max
+        # waist seam band: keep-out ring around s = 0, also the cable bus
+        self.band_halfwidth = float(getattr(model.params,
+                                            "waist_band_halfwidth", 0.0))
 
     def r_theta(self, theta_deg, s):
         """Local circumferential radius |P_theta| in mm/radian."""
@@ -153,14 +156,31 @@ def _frame_offset(cls, rotation, local_xy):
 
 
 def connector_geometry(chart, cls, theta, s, rotation):
-    """Connector origin and exit-path end in (theta, s)."""
+    """Connector origin and exit-path end in (theta, s). The waist seam
+    band is the cable bus: an escape run heading into the band TERMINATES
+    at the band edge rather than running to (or past) the bare waistline."""
     dx, dy = _frame_offset(cls, rotation, cls.connector_origin)
     c_theta, c_s = chart.offset_point(theta, s, dx, dy)
     ex, ey = cls.connector_exit
     if rotation == 180:
         ex, ey = -ex, -ey
     e_theta, e_s = chart.offset_point(c_theta, c_s, ex * cls.escape_mm, ey * cls.escape_mm)
+    band = chart.band_halfwidth
+    if band > 0.0 and abs(c_s) > band and abs(e_s) < abs(c_s):
+        edge = band if c_s > 0 else -band
+        if (c_s - edge) * (e_s - edge) < 0.0:   # the run crosses the band edge
+            t = (c_s - edge) / (c_s - e_s)
+            e_theta = c_theta + t * (e_theta - c_theta)
+            e_s = edge
     return (c_theta, c_s), (e_theta, e_s)
+
+
+def tail_run_mm(chart, cls, theta, s, rotation):
+    """Meridian distance from the connector origin to the waist seam band
+    edge (the cable bus) — the tail-length metric. Terminates AT the band,
+    not the bare waistline."""
+    (c_theta, c_s), _ = connector_geometry(chart, cls, theta, s, rotation)
+    return max(0.0, abs(c_s) - chart.band_halfwidth)
 
 
 def connector_problems(chart, cls, theta, s, rotation):
@@ -183,19 +203,27 @@ def connector_problems(chart, cls, theta, s, rotation):
 
 
 def outline_problems(chart, cls, theta, s, rotation):
-    """The outline must sit inside its piece and on the shell."""
+    """The outline must sit inside its piece, on the shell, and clear of
+    the waist seam band (keep-out ring around s = 0)."""
     piece, center = piece_of(theta)
     problems = []
+    s_vals = []
     for corner in ((0.0, 0.0), (cls.outline_w, 0.0),
                    (cls.outline_w, cls.outline_h), (0.0, cls.outline_h)):
         dx, dy = _frame_offset(cls, rotation, corner)
         t, sv = chart.offset_point(theta, s, dx, dy)
+        s_vals.append(sv)
         if sv < chart.s_min - 1e-9 or sv > chart.s_max + 1e-9:
             problems.append(f"outline corner off the shell (s {sv:.1f} outside "
                             f"[{chart.s_min:.1f}, {chart.s_max:.1f}])")
         if abs(_local_angle(t, center)) >= 90.0 - 1e-9:
             problems.append(f"outline crosses the {piece} piece seam "
                             f"(corner theta {wrap180(t):.1f})")
+    band = chart.band_halfwidth
+    if band > 0.0 and min(s_vals) < band - 1e-9 and max(s_vals) > -band + 1e-9:
+        problems.append(
+            f"footprint intersects the waist seam band (keep-out +-{band:g} mm "
+            f"around s = 0; the band is the cable bus)")
     return problems
 
 

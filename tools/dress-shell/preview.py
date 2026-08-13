@@ -90,7 +90,7 @@ def main():
         v = (p[..., 0] + p[..., 1]) * 0.5 - p[..., 2]
         return u, v
     ox, oy, s2 = 1130, 720, 0.42
-    z_rings = np.arange(model.z_bottom, model.z_top + 1, 25.0)
+    z_rings = np.arange(model.z_bottom, model.z_top + 0.001, 25.0)
     th_front = np.radians(np.linspace(-90, 90, 61))
     th_back = np.radians(np.linspace(90, 270, 61))
     for zz in z_rings:
