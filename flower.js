@@ -1084,8 +1084,11 @@ function buildPetaloidFillInto(acc, P, centerHeight, rng) {
   const innerS  = clamp(P.fillInnerSize, 0.03, 0.6);
   const dens    = clamp(P.fillDensity, 0, 1);
   const bloom   = clamp(P.fillBloomAngle, 0, 90) * DEG;   // like BLOOM ANGLE: 0 closed -> 90° open
-  // Fill-disc radius: denser packs the same count into a smaller disc -> more overlap.
-  const maxR    = CORE_SPREAD * lerp(2.6, 1.1, dens);
+  // Fill-disc radius. It scales with the petals' SIZE so bigger fill petals get
+  // proportionally more room and sit side by side instead of piling up; FILL DENSITY
+  // then tightens (smaller disc = more overlap) or loosens the packing.
+  const avgSize = 0.5 * (outerS + innerS);
+  const maxR    = CORE_SPREAD * lerp(3.4, 1.6, dens) * (0.75 + 3.2 * avgSize);
   // Simplified blade: inherit ONLY outline + centre curve + cup; strip everything
   // that displaces the surface at absolute scale or adds infill.
   const shapeBase = {
