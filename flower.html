@@ -305,7 +305,7 @@
     <!-- ============================ PETAL ============================ -->
     <section class="fl-acc" data-acc>
       <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-petal">
-        <span class="fl-acc__label">Petal</span>
+        <span class="fl-acc__label">Petal shape</span>
         <span class="fl-acc__chev" aria-hidden="true"></span>
       </button>
       <div class="fl-acc__body" id="acc-petal">
@@ -364,7 +364,11 @@
           <span class="fl-ctrl__hint">across-width bowl: cupped spoon (+) &rarr; flat (0) &rarr; reflexed (&minus;)</span>
         </div>
 
-        <div class="fl-ctrl">
+        <!-- TUBE THICKNESS hidden from the PETAL panel — line weight is set per
+             component elsewhere. Kept wired (input stays, value pinned to its 0.4
+             default) so it still drives the global tube radius and readUI / reset keep
+             working. To restore: remove `hidden`. -->
+        <div class="fl-ctrl" hidden>
           <div class="fl-ctrl__row">
             <label for="tube">Tube thickness</label>
             <span class="fl-ctrl__val" data-value="tube"></span>
