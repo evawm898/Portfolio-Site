@@ -12,20 +12,37 @@ Python at request or build time.
 
 ## Status
 
-Foundation layer (awaiting review before anything is built on it):
-
 | file | concern |
 | --- | --- |
-| `shell.py` | parametric shell: profile + elliptical sections whose axis ratio varies with height; FRONT/BACK meshes |
-| `coords.py` | body-centered (theta, s) coordinates: exact forward/inverse maps, tangent frames |
+| `shell.py` | parametric shell: profile + elliptical sections whose axis ratio varies with height; FRONT/BACK meshes — **stable API** |
+| `coords.py` | body-centered (theta, s) coordinates: exact forward/inverse maps, tangent frames — **stable API** |
 | `test_coords.py` | round-trip + convention tests (waist, bust apex, hem edge, max flare, dense sweeps) |
+| `panels.py` / `panels.yaml` | panel size-class library: outline, thickness, active area, fixed connector; loud validation |
+| `layout.py` / `layout.yaml` | committed SOURCE OF TRUTH; lossless canonical IO; one-sided authoring with derived twins |
+| `test_layout.py` | lossless round-trip, loud-failure, and mirroring/connector-derivation tests |
 | `shell_report.py` | console report: dimensions + round-trip accuracy |
 | `preview.py` | scratch SVG preview of the silhouette (writes to `out/`, gitignored) |
 
-Still to come in milestone 1 (deliberately not built yet): the (theta, s)
-snap grid, per-cell curvature + max-seatable-panel-class analysis,
-`panels.yaml`, glTF export, and the local three.js dev viewer. **No placement
-editor in this milestone.**
+Awaiting review before UI: the twin-derivation semantics below. Then: grid +
+curvature/max-class analysis, glTF export, the local editor (dev-only, local
+save server), and the read-only /dress route.
+
+## Mirroring semantics (layout.py)
+
+- layout.yaml stores the authored side only (theta >= 0); `mirrored: true`
+  derives a twin at -theta on load. Twins are never stored and never
+  independently edited — re-derivation after any edit is the update path.
+- The mirror applies to the ACTIVE AREA CENTER. The twin's outline and
+  connector are derived from the class (the physical part is never
+  mirrored): the derivation tries the source's rotation first, then 180,
+  and keeps the first whose connector is LEGAL; if neither, the twin is
+  marked INVALID with reasons.
+- Geometric connector legality: the connector origin and its straight
+  escape run (`escape_mm`) must stay on the panel's own piece — not cross
+  the side seams at theta = +-90 and not run off the top or hem edge.
+  Occlusion-level escape checks are separate (layering).
+- Chart math: lateral mm convert to degrees via the local circumferential
+  radius at the point's own height.
 
 ## Run
 
