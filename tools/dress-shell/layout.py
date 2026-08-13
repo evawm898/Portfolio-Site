@@ -8,13 +8,29 @@ AUTHORING MODEL
   them by construction.
 
 MIRRORING SEMANTICS
-  The mirror applies to the ACTIVE AREA CENTER: the twin's active center
-  sits at (-theta, s) exactly. The outline and connector are then DERIVED
-  from the class definition — the physical part cannot be mirrored — by
-  choosing between the two allowed transforms, identity (the source's
-  rotation) first, then 180 degrees. A transform is chosen if it puts the
-  connector in a LEGAL position; if neither does, the twin is marked
-  INVALID and carries the reasons.
+  A twin cannot be a reflection: reflection is orientation-reversing and
+  no physical panel can undergo it. The panel decomposes into
+    - MIRRORABLE (software): rendered content. A 180-degree physical
+      rotation is compensated by rotating the framebuffer 180 degrees;
+      the per-panel `content_rotation` field tracks this and rides along
+      into the export. It equals the physical rotation by definition
+      today, but is carried explicitly because export consumers need it.
+    - NOT MIRRORABLE (physical): outline, bezel offsets, connector origin
+      and exit vector, driver footprint. Identity or 180 only. (180 =
+      reflection composed with a vertical flip: it corrects horizontal
+      bezel asymmetry but relocates the connector to the opposite edge.)
+
+  The twin's ACTIVE AREA CENTER is constrained to (-theta, s) exactly.
+  Rotation is then chosen by priority:
+    1. Connector escape legality (routing usually forces this, so it
+       wins). Geometric legality here; occlusion/burial is layering-time.
+    2. If both rotations are legal: minimize OUTLINE ASYMMETRY — the
+       distance between the twin's outline and where a true reflection
+       would put it. Same rotation as the source costs 2|ex|, the
+       opposite costs 2|ey|, where (ex, ey) is the active center's offset
+       from the outline center. Ties keep the source's rotation.
+  If neither rotation is legal the twin is marked INVALID with reasons.
+  Every twin records its outline asymmetry in mm for the summary.
 
 CONNECTOR LEGALITY (geometric, this layer)
   The connector origin and its exit path (a straight run of the class's
@@ -38,6 +54,7 @@ import math
 import re
 from dataclasses import dataclass
 
+import numpy as np
 import yaml
 
 from panels import PanelClass
@@ -68,12 +85,14 @@ class PlacedPanel:
     cls: PanelClass
     theta: float
     s: float
-    rotation: int
+    rotation: int           # physical: 0 or 180, never a reflection
+    content_rotation: int   # framebuffer counter-rotation (== rotation)
     layer: int
     is_twin: bool
     source_id: str
     valid: bool
-    problems: tuple     # human-readable strings; non-empty iff not valid
+    problems: tuple         # human-readable strings; non-empty iff not valid
+    asymmetry_mm: float = None  # twins only: outline distance from true reflection
 
 
 # ---------------------------------------------------------------------------
@@ -183,31 +202,77 @@ def outline_problems(chart, cls, theta, s, rotation):
 # ---------------------------------------------------------------------------
 # twin derivation
 
+def outline_asymmetry_mm(cls: PanelClass, source_rotation: int, twin_rotation: int):
+    """Distance between the twin's outline and where a true reflection of
+    the source would put it. With the active center pinned to the mirrored
+    position, keeping the source's rotation misses reflection by twice the
+    active center's LATERAL offset from the outline center; flipping 180
+    misses it by twice the VERTICAL offset."""
+    ex = cls.active_center[0] - cls.outline_w / 2.0
+    ey = cls.active_center[1] - cls.outline_h / 2.0
+    return 2.0 * abs(ex) if twin_rotation == source_rotation else 2.0 * abs(ey)
+
+
 def derive_twin(chart, cls, source: AuthoredPanel):
-    """Twin of a mirrored source: active center at (-theta, s); rotation is
-    whichever of [source rotation, the other] gives a legal connector and a
-    seated outline. Neither legal -> INVALID twin, reasons attached."""
+    """Twin of a mirrored source: active center at (-theta, s) exactly.
+    Rotation priority: (1) connector escape legality; (2) among legal
+    rotations, minimize outline asymmetry, ties keeping the source's
+    rotation. Neither legal -> INVALID twin, reasons attached."""
     twin_theta = -source.theta
-    tried = []
-    for rotation in (source.rotation, ROTATIONS[1] if source.rotation == ROTATIONS[0]
-                     else ROTATIONS[0]):
+    other = ROTATIONS[1] if source.rotation == ROTATIONS[0] else ROTATIONS[0]
+    candidates, tried = [], []
+    for rotation in (source.rotation, other):  # tie-break order: source first
         problems = (outline_problems(chart, cls, twin_theta, source.s, rotation)
                     + connector_problems(chart, cls, twin_theta, source.s, rotation))
-        if not problems:
-            return PlacedPanel(
-                panel_id=f"{source.panel_id}~twin", cls=cls,
-                theta=twin_theta, s=source.s, rotation=rotation,
-                layer=source.layer, is_twin=True, source_id=source.panel_id,
-                valid=True, problems=(),
-            )
-        tried.append((rotation, problems))
+        if problems:
+            tried.append((rotation, problems))
+        else:
+            candidates.append(rotation)
+
+    def _twin(rotation, valid, problems):
+        return PlacedPanel(
+            panel_id=f"{source.panel_id}~twin", cls=cls,
+            theta=twin_theta, s=source.s,
+            rotation=rotation, content_rotation=rotation,
+            layer=source.layer, is_twin=True, source_id=source.panel_id,
+            valid=valid, problems=problems,
+            asymmetry_mm=outline_asymmetry_mm(cls, source.rotation, rotation),
+        )
+
+    if candidates:
+        best = min(candidates,
+                   key=lambda r: outline_asymmetry_mm(cls, source.rotation, r))
+        return _twin(best, True, ())
     reasons = tuple(f"rotation {rot}: {p}" for rot, probs in tried for p in probs)
-    return PlacedPanel(
-        panel_id=f"{source.panel_id}~twin", cls=cls,
-        theta=twin_theta, s=source.s, rotation=source.rotation,
-        layer=source.layer, is_twin=True, source_id=source.panel_id,
-        valid=False, problems=("INVALID twin: no legal transform",) + reasons,
-    )
+    return _twin(source.rotation, False,
+                 ("INVALID twin: no legal transform",) + reasons)
+
+
+def asymmetry_summary(placed):
+    """(per-pair list, worst, mean) of twin outline asymmetry in mm —
+    how far the authored design actually is from true symmetry."""
+    pairs = [(p.source_id, p.rotation, p.asymmetry_mm)
+             for p in placed if p.is_twin and p.valid]
+    if not pairs:
+        return [], 0.0, 0.0
+    values = [a for _, _, a in pairs]
+    return pairs, max(values), sum(values) / len(values)
+
+
+def assert_face_normals(chart, placed):
+    """ASSERTION: every panel's display face normal must align with the
+    shell's outward normal, twins included. Both allowed transforms are
+    proper rotations, so this holds identically — a failure means an
+    orientation-reversing transform (a reflection) crept in somewhere."""
+    for p in placed:
+        f = chart.coords.forward(p.theta, p.s)
+        sign = -1.0 if p.rotation == 180 else 1.0
+        face_normal = np.cross(sign * f["e_theta"], sign * f["e_s"])
+        if float(face_normal @ f["normal"]) <= 0.0:
+            raise LayoutError(
+                f"{p.panel_id}: display face normal opposes the shell outward "
+                f"normal — an orientation-reversing transform crept in"
+            )
 
 
 def resolve_layout(chart, classes, authored):
@@ -225,11 +290,13 @@ def resolve_layout(chart, classes, authored):
                          + connector_problems(chart, cls, entry.theta, entry.s, entry.rotation))
         placed.append(PlacedPanel(
             panel_id=entry.panel_id, cls=cls, theta=entry.theta, s=entry.s,
-            rotation=entry.rotation, layer=entry.layer, is_twin=False,
+            rotation=entry.rotation, content_rotation=entry.rotation,
+            layer=entry.layer, is_twin=False,
             source_id=entry.panel_id, valid=not problems, problems=problems,
         ))
         if entry.mirrored:
             placed.append(derive_twin(chart, cls, entry))
+    assert_face_normals(chart, placed)
     return placed, errors
 
 

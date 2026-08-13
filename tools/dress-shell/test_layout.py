@@ -12,9 +12,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from coords import ShellCoords
-from layout import (AuthoredPanel, LayoutError, SurfaceChart, connector_geometry,
-                    derive_twin, dump_layout, load_layout, resolve_layout,
-                    save_layout, wrap180)
+from layout import (AuthoredPanel, LayoutError, SurfaceChart, assert_face_normals,
+                    asymmetry_summary, connector_geometry, derive_twin,
+                    dump_layout, load_layout, resolve_layout, save_layout,
+                    wrap180)
 from panels import PanelClass, PanelSpecError, load_panel_classes
 from shell import ShellModel, ShellParams
 
@@ -122,13 +123,60 @@ class TestMirroring(unittest.TestCase):
         self.assertEqual((twin.layer, twin.is_twin, twin.source_id), (0, True, "sk"))
         self.assertTrue(twin.valid)
 
-    def test_twin_of_top_exit_panel_keeps_identity(self):
-        # L exits out the top edge, well clear of every boundary: the
-        # source's own rotation must be chosen (identity preferred).
+    def test_both_legal_minimizes_outline_asymmetry(self):
+        # L: active center 0.2mm off laterally, 0 vertically -> keeping the
+        # source rotation costs 2|ex| = 0.4mm, flipping costs 2|ey| = 0.0mm:
+        # the twin must flip to 180 and achieve perfect reflection placement.
         twin = derive_twin(CHART, CLASSES["L"], AuthoredPanel("sk", "L", 36.0, 250.0, 0, 0, True))
-        self.assertEqual(twin.rotation, 0)
-        twin180 = derive_twin(CHART, CLASSES["L"], AuthoredPanel("sk", "L", 36.0, 250.0, 180, 0, True))
-        self.assertEqual(twin180.rotation, 180)
+        self.assertEqual(twin.rotation, 180)
+        self.assertAlmostEqual(twin.asymmetry_mm, 0.0, places=12)
+        # M: active area rides high (ey = -1.5) but nearly centered laterally
+        # (ex = -0.1): 2|ex| = 0.2 < 2|ey| = 3.0 -> keep the source rotation.
+        twin_m = derive_twin(CHART, CLASSES["M"], AuthoredPanel("mm", "M", 40.0, 300.0, 0, 0, True))
+        self.assertEqual(twin_m.rotation, 0)
+        self.assertAlmostEqual(twin_m.asymmetry_mm, 0.2, places=12)
+        # S: active center exactly on the outline center -> tie (both 0.0):
+        # keep the source's rotation.
+        twin_s = derive_twin(CHART, CLASSES["S"], AuthoredPanel("ss", "S", 40.0, 200.0, 180, 0, True))
+        self.assertEqual(twin_s.rotation, 180)
+        self.assertAlmostEqual(twin_s.asymmetry_mm, 0.0, places=12)
+
+    def test_legality_outranks_asymmetry(self):
+        # bodice-a's twin: identity would fire the connector through the -90
+        # seam, so 180 must win even though S's asymmetry is tied at 0 —
+        # and, were it not, legality would still outrank it (priority 1).
+        twin = derive_twin(CHART, CLASSES["S"], AuthoredPanel("bo", "S", 80.0, -60.0, 0, 0, True))
+        self.assertTrue(twin.valid)
+        self.assertEqual(twin.rotation, 180)
+
+    def test_content_rotation_tracks_physical_rotation(self):
+        authored = load_layout(HERE / "layout.yaml")
+        placed, _ = resolve_layout(CHART, CLASSES, authored)
+        for p in placed:
+            self.assertEqual(p.content_rotation, p.rotation, p.panel_id)
+
+    def test_face_normal_assertion(self):
+        # Passes for every legitimate placement (rotations are proper)...
+        authored = load_layout(HERE / "layout.yaml")
+        placed, _ = resolve_layout(CHART, CLASSES, authored)
+        assert_face_normals(CHART, placed)  # must not raise
+        # ...and trips if an orientation-reversing frame sneaks in.
+        class ReflectedChart:
+            class coords:
+                @staticmethod
+                def forward(theta, s):
+                    f = COORDS.forward(theta, s)
+                    return {**f, "e_theta": -f["e_theta"]}  # mirror one axis
+        with self.assertRaises(LayoutError):
+            assert_face_normals(ReflectedChart, placed[:1])
+
+    def test_asymmetry_summary(self):
+        authored = load_layout(HERE / "layout.yaml")
+        placed, _ = resolve_layout(CHART, CLASSES, authored)
+        pairs, worst, mean = asymmetry_summary(placed)
+        self.assertEqual(len(pairs), 3)
+        self.assertAlmostEqual(worst, 0.2, places=12)   # skirt-b keeps rot 0
+        self.assertAlmostEqual(mean, 0.2 / 3.0, places=12)
 
     def test_side_exit_twin_flips_to_180_near_seam(self):
         # S exits sideways (-x). At theta=+80 the exit points toward center
@@ -203,7 +251,8 @@ class TestMirroring(unittest.TestCase):
         twins = {p.source_id: p for p in placed if p.is_twin}
         self.assertEqual(set(twins), {"skirt-a", "skirt-b", "bodice-a"})
         self.assertEqual(twins["bodice-a"].rotation, 180)  # the seam case
-        self.assertEqual(twins["skirt-a"].rotation, 0)
+        self.assertEqual(twins["skirt-a"].rotation, 180)  # asymmetry rule
+        self.assertEqual(twins["skirt-b"].rotation, 0)    # asymmetry rule
 
     def test_back_piece_mirroring(self):
         # theta 150 lives on the BACK piece; its twin at -150 does too, and

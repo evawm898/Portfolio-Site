@@ -32,15 +32,27 @@ save server), and the read-only /dress route.
 - layout.yaml stores the authored side only (theta >= 0); `mirrored: true`
   derives a twin at -theta on load. Twins are never stored and never
   independently edited — re-derivation after any edit is the update path.
-- The mirror applies to the ACTIVE AREA CENTER. The twin's outline and
-  connector are derived from the class (the physical part is never
-  mirrored): the derivation tries the source's rotation first, then 180,
-  and keeps the first whose connector is LEGAL; if neither, the twin is
-  marked INVALID with reasons.
+- A twin is never a reflection (orientation-reversing; physically
+  impossible). MIRRORABLE in software: rendered content, via the per-panel
+  `content_rotation` framebuffer counter-rotation (== physical rotation,
+  tracked explicitly and included in the export). NOT mirrorable: outline,
+  bezel offsets, connector origin/exit, driver footprint — identity or
+  180 only.
+- The twin's ACTIVE AREA CENTER is pinned to (-theta, s). Rotation is then
+  chosen by priority: (1) connector escape legality; (2) if both legal,
+  minimize OUTLINE ASYMMETRY — distance from where a true reflection would
+  sit: 2|ex| keeping the source rotation, 2|ey| flipping, with (ex, ey)
+  the active center's offset from the outline center; ties keep the source
+  rotation. Neither legal -> INVALID twin with reasons. Per-twin asymmetry
+  is recorded; `asymmetry_summary` reports worst case + mean.
 - Geometric connector legality: the connector origin and its straight
   escape run (`escape_mm`) must stay on the panel's own piece — not cross
   the side seams at theta = +-90 and not run off the top or hem edge.
-  Occlusion-level escape checks are separate (layering).
+  Occlusion/burial checks are separate (layering).
+- `assert_face_normals` runs on every resolve: each panel's display face
+  normal must align with the shell's outward normal (twins included).
+  Rotations are proper transforms so this holds identically; it is an
+  assertion whose failure means a reflection crept in.
 - Chart math: lateral mm convert to degrees via the local circumferential
   radius at the point's own height.
 

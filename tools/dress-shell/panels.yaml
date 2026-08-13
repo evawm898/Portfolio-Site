@@ -42,7 +42,9 @@ classes:
   M:
     outline: {width: 45.0, height: 70.0}
     thickness: 1.4
-    active_area: {width: 40.0, height: 63.0, offset: [2.4, 3.5]}
+    # active area high in the outline (driver strip below): vertical offset
+    # dominates, so twins of M prefer keeping the source rotation
+    active_area: {width: 40.0, height: 63.0, offset: [2.4, 2.0]}
     connector: {origin: [22.5, 70.0], exit_vector: [0.0, 1.0], escape_mm: 30.0}
 
   L:
