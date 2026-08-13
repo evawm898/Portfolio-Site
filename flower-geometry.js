@@ -582,7 +582,7 @@ function softenVein(pts, softness) {
 function growBranch(start, launchHeading, branchHeading, length, order, env, rng, ctx) {
   if (ctx.count >= ctx.maxCount) return null;
   ctx.count++;
-  const { P, L, maxDepth } = env;
+  const { P, L, maxDepth, detail } = env;
   const ds = 0.07;
   const n = Math.max(2, Math.round(length / ds));
   const easeFrac = 0.28;                       // fixed gentle peel-off -> smooth forks
@@ -618,8 +618,13 @@ function growBranch(start, launchHeading, branchHeading, length, order, env, rng
   // high = down to hair-fine capillaries.
   if (order < maxDepth && length > 0.11) {
     const kids = order <= 1 ? 3 : 2;                          // primaries fan a little more
+    // Higher VEIN DETAIL pushes the FIRST child EARLIER along the parent (toward its
+    // base), so branching cascades through more of every vein's length — the network
+    // densifies overall, not just finer near the tips. Low detail keeps children out
+    // near the tip (sparse base). Applies at every generation (growBranch recurses).
+    const fStart = lerp(0.58, 0.16, detail);
     for (let c = 0; c < kids; c++) {
-      const f = kids === 1 ? 0.72 : lerp(0.5, 0.92, c / (kids - 1));   // outer half, toward the tip
+      const f = kids === 1 ? lerp(0.7, 0.32, detail) : lerp(fStart, 0.92, c / (kids - 1));
       const { p, theta: h } = veinPointHeading(pts, f);
       const side = (c % 2 === 0) ? 1 : -1;                   // alternate sides
       const branchAngle = (50 - 5 * order + (rng() - 0.5) * 12) * D2R;
@@ -635,8 +640,9 @@ export function buildVenation(P, rng, opts = {}) {
   const L = P.L;
   const primaryCount = clamp(Math.round(opts.secondaries || 6), 3, 12);  // DENSITY -> primaries off the midrib
   const maxDepth = clamp(Math.round(opts.maxDepth || 3), 1, 5);          // VEIN DETAIL -> branching generations
+  const detail = clamp(opts.softness != null ? opts.softness : 0.75, 0, 1); // raw VEIN DETAIL (0..1)
   const SMOOTH = 0.55;                     // FIXED gentle vein curvature (detail no longer controls smoothing)
-  const env = { P, L, maxDepth };
+  const env = { P, L, maxDepth, detail };
 
   const veins = [];
   const nodes = [];
@@ -665,9 +671,15 @@ export function buildVenation(P, rng, opts = {}) {
     const main = growBranch({ x: L * u0, y: 0 }, launchHeading, branchHeading, len, 1, env, rng, ctx);
     if (main) nodes.push({ x: L * u0, y: 0, width: widthOfOrder(1) });
   };
+  // The FIRST primary off the midrib also starts earlier with VEIN DETAIL: low
+  // detail keeps the lowest primary up toward the tip (sparse base); high detail
+  // drops it near the base and packs more primaries there, so the whole midrib
+  // branches.
+  const baseU = lerp(0.18, 0.05, detail);
+  const biasExp = lerp(1.1, 1.45, detail);                  // more base-packed at high detail
   for (let i = 0; i < primaryCount; i++) {
-    const frac = Math.pow((i + 0.5) / primaryCount, 1.2);   // base-biased spacing
-    const u0 = clamp(lerp(0.08, 0.9, frac) + (rng() - 0.5) * 0.02, 0.06, 0.93);
+    const frac = Math.pow((i + 0.5) / primaryCount, biasExp);
+    const u0 = clamp(lerp(baseU, 0.9, frac) + (rng() - 0.5) * 0.02, 0.04, 0.93);
     addPrimary(u0, lerp(64, 44, u0) + (rng() - 0.5) * 6);
   }
 
