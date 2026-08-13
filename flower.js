@@ -790,13 +790,14 @@ function resolveParams(ui) {
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
-    // Density drives the fractal leaf venation: how many secondaries branch
-    // off the midrib, how deep the branching recurses (the "fractaling"), and
-    // how many tertiary rungs ladder each strip.
-    secondaries: clamp(Math.round(ui.density * 0.5) + 2, 4, 8),
-    maxDepth: clamp(Math.round((ui.density - 3) / 3) + 2, 2, 4),
-    crossPerStrip: clamp(Math.round(ui.density * 0.4), 2, 5),
-    softness: ui.softness,   // 0 = crisp branch angles, 1 = rounded, organic
+    // VEINS: DENSITY sets how many PRIMARY veins branch off the midrib; VEIN DETAIL
+    // (the shared softness slider, 0..1 for veins) sets how many further branching
+    // GENERATIONS each vein grows — low = midrib + primaries only, high = down to
+    // hair-fine capillaries. (For VORONOI the same slider is cell rounding, 0..5.)
+    secondaries: clamp(Math.round(ui.density * 0.7) + 1, 3, 11),
+    maxDepth: clamp(1 + Math.round(ui.softness * 4), 1, 5),
+    crossPerStrip: 0,        // legacy (the cross-vein ladder was removed)
+    softness: ui.softness,   // VORONOI cell rounding (0..5); veins read maxDepth instead
     tubeRadius: lerp(0.008, 0.030, ui.tube),
   };
 }
@@ -2577,6 +2578,10 @@ function updateInfillOptions() {
   inputs.softness.max = type === 'voronoi' ? '5' : '1';
   inputs.softness.step = type === 'voronoi' ? '0.05' : '0.01';
   if (+inputs.softness.value > +inputs.softness.max) inputs.softness.value = inputs.softness.max;
+  // The shared slider is VEIN DETAIL for veins (branching depth) but SOFTNESS for
+  // voronoi (cell rounding); relabel it to match the active infill.
+  const softLabel = document.querySelector('label[for="softness"]');
+  if (softLabel) softLabel.textContent = type === 'veins' ? 'Vein detail' : 'Softness';
   // The SCALLOP edge pairs only with LACE: offer its tip-style option only then,
   // and fall back to CLEAN if scallop was selected under a different infill.
   const scOpt = inputs.tipStyle.querySelector('option[value="scallop"]');
