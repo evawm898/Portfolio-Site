@@ -1046,128 +1046,198 @@ export function buildLace(P, rng, opts = {}) {
 /* -------------------------------------------------------------------
    5c. Voronoi infill — an alternative petal fill to the leaf venation.
 
-   Seeds are scattered only in the +Y half of the petal and MIRRORED to the
-   -Y half, so the whole diagram — and therefore every cell — is symmetric
-   across the centre axis. With no seed sitting on the axis, the midline turns
-   into a continuous run of cell walls (a clean central seam) and each +Y cell
-   has an exact mirror twin below it. Each cell is the petal silhouette clipped
-   by that seed's perpendicular-bisector half-planes against every other seed;
-   interior walls (shared by two cells) are drawn once, and walls that fall on
-   the silhouette are left to the rim. Returns the same { veins, nodes } shape
-   as buildVenation, so the render layer treats it identically.
+   Seeds are generated ALREADY SYMMETRIC about the centre axis before the diagram
+   is built — off-axis seeds live in the +Y half and are mirrored to -Y, PLUS a
+   run of seeds sitting ON the axis (y = 0). The on-axis seeds own cells that
+   straddle the centreline, so the pattern flows continuously across it with no
+   reflect-a-finished-half seam; the mirror pairs keep the whole diagram bilaterally
+   symmetric. A couple of Lloyd relaxation passes even the cells out (organic, no
+   slivers), like the reference. Each cell is the petal silhouette clipped by its
+   perpendicular-bisector half-planes; it becomes a solid ANNULUS (cell polygon
+   outside — shared with neighbours, so the tiles fuse into one sheet — around a
+   rounded hole), lofted by addSlab. SOFTNESS rounds the hole boundary (the visible
+   wall) from the raw angular cell toward smoothly-flowing organic curves. Returns
+   the same { veins, nodes, slabs } shape as buildVenation.
    ------------------------------------------------------------------- */
+
+// One Voronoi cell: the silhouette clipped by the perpendicular bisector between
+// seed `s` and every OTHER seed. `s` must be an element of `seeds` (skipped by
+// identity). Returns the clipped polygon, or null if it collapsed.
+function voronoiCell(s, seeds, sil) {
+  let cell = sil;
+  for (const t of seeds) {
+    if (t === s) continue;
+    cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * (t.y - s.y),
+      (s.x * s.x + s.y * s.y) - (t.x * t.x + t.y * t.y));
+    if (cell.length < 3) return null;
+  }
+  return cell;
+}
+
+// Area (not vertex-average) centroid of a simple polygon; used for Lloyd
+// relaxation and as the annulus centre. Falls back to the vertex mean if the
+// polygon is degenerate (near-zero area).
+function polyCentroid(poly) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    const cr = p.x * q.y - q.x * p.y;
+    a += cr; cx += (p.x + q.x) * cr; cy += (p.y + q.y) * cr;
+  }
+  if (Math.abs(a) < 1e-9) {
+    let vx = 0, vy = 0; for (const p of poly) { vx += p.x; vy += p.y; }
+    return { x: vx / poly.length, y: vy / poly.length };
+  }
+  a *= 0.5;
+  return { x: cx / (6 * a), y: cy / (6 * a) };
+}
+
+const mirrorY = (p) => ({ x: p.x, y: -p.y });
+
 export function buildVoronoi(P, rng, opts = {}) {
   const density = clamp(Math.round(opts.density || 7), 3, 12);
-  const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // seeds in the +Y half
+  const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // off-axis seeds in the +Y half
   const sil = buildSilhouette(P, 72);
   const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
-
-  // blue-noise-ish seeds in the +Y half (best-candidate sampling for even cells)
-  const half = [];
   const xLo = P.L * 0.05, xHi = P.L * 0.96;
-  let guard = 0;
-  while (half.length < perHalf && guard < perHalf * 600) {
-    let best = null, bestD = -1;
-    for (let c = 0; c < 10; c++) {
-      guard++;
-      const x = lerp(xLo, xHi, rng());
-      const hw = margin(x / P.L);
-      if (hw < 0.06) continue;
-      const y = lerp(0.02 * hw + 0.015, hw * 0.95, rng());     // strictly +Y, inside the edge
-      if (!pointInPoly(x, y, sil)) continue;
-      let d = 1e9;
-      for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
-      if (d > bestD) { bestD = d; best = { x, y }; }
+  const minHW = 0.06;
+  const axisGap = 0.05 * P.W;                       // min |y| for an off-axis seed
+
+  // --- SEEDS ON THE AXIS: best-candidate 1-D sampling along the centreline. Their
+  //     cells straddle y = 0, so the pattern is continuous across it (no seam). ---
+  const nAxis = clamp(Math.round(perHalf * 0.4), 2, 14);
+  const axis = [];
+  { let guard = 0;
+    while (axis.length < nAxis && guard < nAxis * 400) {
+      let best = null, bestD = -1;
+      for (let c = 0; c < 12; c++) {
+        guard++;
+        const x = lerp(xLo, xHi, rng());
+        if (margin(x / P.L) < minHW) continue;
+        let d = 1e9;
+        for (const s of axis) d = Math.min(d, (s.x - x) ** 2);
+        if (d > bestD) { bestD = d; best = { x, y: 0 }; }
+      }
+      if (best) axis.push(best);
     }
-    if (best) half.push(best);
+  }
+  // --- OFF-AXIS +Y SEEDS: blue-noise, kept clear of the axis seeds (distance is
+  //     measured to axis seeds too, whose mirror is themselves). Mirrored to -Y. ---
+  const half = [];
+  { let guard = 0;
+    while (half.length < perHalf && guard < perHalf * 800) {
+      let best = null, bestD = -1;
+      for (let c = 0; c < 10; c++) {
+        guard++;
+        const x = lerp(xLo, xHi, rng());
+        const hw = margin(x / P.L);
+        if (hw < minHW) continue;
+        const y = lerp(Math.max(axisGap, 0.02 * hw + 0.015), hw * 0.95, rng());
+        if (!pointInPoly(x, y, sil)) continue;
+        let d = 1e9;
+        for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
+        for (const s of axis) d = Math.min(d, (s.x - x) ** 2 + y * y);
+        if (d > bestD) { bestD = d; best = { x, y }; }
+      }
+      if (best) half.push(best);
+    }
   }
 
-  // mirror to a fully symmetric seed set (no seed on the axis)
-  const seeds = [];
-  for (const s of half) { seeds.push({ x: s.x, y: s.y }); seeds.push({ x: s.x, y: -s.y }); }
+  // Assemble the full symmetric seed set: axis seeds once, each +Y seed with a
+  // fresh -Y twin. The +Y / axis objects are the SAME references voronoiCell skips.
+  const fullSeeds = () => {
+    const arr = [];
+    for (const s of axis) arr.push(s);
+    for (const s of half) { arr.push(s); arr.push({ x: s.x, y: -s.y }); }
+    return arr;
+  };
 
-  // Each cell = silhouette clipped by every perpendicular-bisector half-plane.
-  // Only the +Y seed of each mirror pair (even indices) is solved; its -Y twin's
-  // cell is the exact mirror, added later — this guarantees bilateral symmetry
-  // instead of leaving it to float-identical clipping of mirrored inputs.
-  const cells = [];
-  for (let i = 0; i < seeds.length; i += 2) {
-    const s = seeds[i];
-    let cell = sil;
-    for (let j = 0; j < seeds.length && cell.length >= 3; j++) {
-      if (j === i) continue;
-      const t = seeds[j];
-      // keep the side closer to s:  2(t-s)·p + (|s|^2 - |t|^2) <= 0
-      cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * (t.y - s.y),
-        (s.x * s.x + s.y * s.y) - (t.x * t.x + t.y * t.y));
+  // --- LLOYD RELAXATION: move each seed to its cell centroid; evens the cells and
+  //     kills slivers. ONE pass only — more would drive the cells isotropic (round),
+  //     but the reference wants ELONGATED cells, which the length-biased seeding gives.
+  //     Symmetry-preserving — axis seeds are pinned to y = 0, +Y seeds stay off-axis,
+  //     and the -Y twins are rebuilt from the +Y set each pass. ---
+  for (let iter = 0; iter < 1; iter++) {
+    const seeds = fullSeeds();
+    for (const s of axis) {
+      const cell = voronoiCell(s, seeds, sil);
+      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = 0; }
     }
-    if (cell.length >= 3) cells.push(cell);
+    for (const s of half) {
+      const cell = voronoiCell(s, seeds, sil);
+      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = Math.max(axisGap, c.y); }
+    }
   }
 
-  // SOFTNESS turns each cell into a solid ANNULUS: the full cell polygon on the
-  // outside (adjacent cells share edges, so the annuli tile into one continuous
-  // sheet) around a ROUND hole on the inside. The render layer lofts a sealed
-  // slab between the two rings — top face, bottom face and both rims — so the web
-  // is a real perforated sheet, not tube outlines. `round` blends the hole from
-  // the cell's own shape toward its fitted ellipse; `holeScale` sets the hole
-  // size (a smaller hole = a thicker strut) and shrinks as softness rises. Only
-  // the +Y cells are solved; each annulus is mirrored to the -Y half, so the
-  // whole sheet stays exactly symmetric across the axis.
+  // --- SOLVE + BUILD ANNULI. Axis cells are self-symmetric (built once, straddling
+  //     the axis); each +Y cell is built and its exact -Y mirror added. ---
   const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
-  const round = clamp(softness / 5, 0, 1);                       // hole: cell shape -> ellipse
-  const holeScale = lerp(0.9, 0.58, clamp(softness, 0, 5) / 5);  // hole size (strut thickness)
-
+  const seeds = fullSeeds();
   const slabs = [];
-  for (const cell of cells) {
-    const ann = cellAnnulus(cell, round, holeScale);
+  for (const s of axis) {
+    const cell = voronoiCell(s, seeds, sil);
+    const ann = cell && cellAnnulus(cell, softness);
+    if (ann) slabs.push(ann);
+  }
+  for (const s of half) {
+    const cell = voronoiCell(s, seeds, sil);
+    const ann = cell && cellAnnulus(cell, softness);
     if (!ann) continue;
     slabs.push(ann);                                                                   // +Y
-    // -Y mirror: reflecting Y reverses the ring order (winding), so reverse the
-    // loops back — otherwise the mirrored slab renders inside-out (its faces cull
-    // and shade backwards, which is why half of every petal looked wrong).
+    // -Y mirror: reflecting Y reverses the ring winding, so reverse the loops back
+    // (else the mirrored slab renders inside-out).
     slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse() });
   }
   return { veins: [], nodes: [], slabs };
 }
 
-const mirrorY = (p) => ({ x: p.x, y: -p.y });
-
-// Build one cell's ANNULUS for the perforated sheet. The outer loop walks the
-// cell polygon's EXACT edges (subdivided) — so corners are kept and, since two
-// neighbours subdivide their shared edge identically, their outer boundaries
-// coincide and the tiles stay watertight (no gaps at the junctions). The inner
-// loop is the round hole: for each outer point, the cell shape blended toward
-// the fitted ellipse in that radial direction, scaled in by holeScale.
-function cellAnnulus(poly, round, holeScale) {
-  const n = poly.length;
-  let cx = 0, cy = 0;
-  for (const p of poly) { cx += p.x; cy += p.y; }
-  cx /= n; cy /= n;
-  let Cxx = 0, Cyy = 0, Cxy = 0;                    // vertex covariance -> fitted ellipse
-  for (const p of poly) { const dx = p.x - cx, dy = p.y - cy; Cxx += dx * dx; Cyy += dy * dy; Cxy += dx * dy; }
-  Cxx /= n; Cyy /= n; Cxy /= n;
-  const tr = Cxx + Cyy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (Cxx * Cyy - Cxy * Cxy)));
-  const ELL = 1.32;
-  const a = Math.sqrt(Math.max(tr / 2 + disc, 1e-9)) * ELL;
-  const b = Math.sqrt(Math.max(tr / 2 - disc, 1e-9)) * ELL;
-  const ang = 0.5 * Math.atan2(2 * Cxy, Cxx - Cyy);
-  const ca = Math.cos(ang), sa = Math.sin(ang);
-  const SUB = 5;                                    // samples per cell edge (holes read round)
-  const outer = [], inner = [];
-  for (let i = 0; i < n; i++) {
-    const A = poly[i], B = poly[(i + 1) % n];
+// Build one cell's ANNULUS for the perforated sheet. The OUTER loop walks the cell
+// polygon's EXACT edges (subdivided) — two neighbours subdivide their shared edge
+// identically, so their outer boundaries coincide and the tiles fuse flush. That
+// wall is interior/invisible; the visible wall is the HOLE rim (+ the petal edge).
+// The INNER loop is the hole: the cell offset inward by a roughly CONSTANT margin
+// (so the strut is a uniform width, not bulging at corners / pinching at edges),
+// with its corners then rounded by SOFTNESS into smoothly-flowing curves. addSlab
+// pairs outer[k] with inner[k] on the same ray from the centroid, so both are
+// built radially from it.
+function cellAnnulus(poly, softness) {
+  const c = polyCentroid(poly);
+  const cx = c.x, cy = c.y;
+  const SUB = 5;                                    // samples per cell edge
+  const outer = [], ux = [], uy = [], rawR = [];
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i], B = poly[(i + 1) % poly.length];
     for (let s = 0; s < SUB; s++) {
       const t = s / SUB;
       const ox = lerp(A.x, B.x, t), oy = lerp(A.y, B.y, t);     // on the exact cell edge
       const dx = ox - cx, dy = oy - cy;
-      const rOut = Math.hypot(dx, dy) || 1;
-      const ux = dx / rOut, uy = dy / rOut;                     // radial direction
-      const eu = ux * ca + uy * sa, ev = -ux * sa + uy * ca;    // ellipse hit distance, same ray
-      const tEll = 1 / Math.hypot(eu / a, ev / b);
-      const tHole = Math.min(lerp(rOut, tEll, round) * holeScale, rOut * 0.95);
+      const r = Math.hypot(dx, dy) || 1e-6;
       outer.push({ x: ox, y: oy });
-      inner.push({ x: cx + ux * tHole, y: cy + uy * tHole });
+      ux.push(dx / r); uy.push(dy / r); rawR.push(r);
     }
+  }
+  const M = outer.length;
+  if (M < 3) return null;
+  // Uniform strut: offset the boundary inward by a constant margin (a fraction of
+  // the cell's mean radius). Floored so thin cells keep a hole.
+  let mean = 0; for (const r of rawR) mean += r; mean /= M;
+  const strut = mean * 0.22;                        // thinner walls -> the open, airy reference look
+  let R = new Array(M);
+  for (let k = 0; k < M; k++) R[k] = Math.max(rawR[k] - strut, 0.16 * mean);
+  // SOFTNESS rounds the hole's corners by circularly smoothing its radial profile:
+  // 0 passes = the raw (offset) angular cell; more passes = smoothly-flowing curves
+  // with no sharp vertices (the reference look). The broad cell shape / elongation
+  // survives because only the high-frequency corner spikes are averaged away.
+  const passes = Math.round(clamp(softness, 0, 5) * 1.8);       // 0 .. ~9
+  for (let p = 0; p < passes; p++) {
+    const S = new Array(M);
+    for (let k = 0; k < M; k++) S[k] = 0.25 * R[(k - 1 + M) % M] + 0.5 * R[k] + 0.25 * R[(k + 1) % M];
+    R = S;
+  }
+  const inner = new Array(M);
+  for (let k = 0; k < M; k++) {
+    const hr = Math.min(R[k], rawR[k] * 0.9);       // keep the hole strictly inside the cell
+    inner[k] = { x: cx + ux[k] * hr, y: cy + uy[k] * hr };
   }
   return { outer, inner };
 }
