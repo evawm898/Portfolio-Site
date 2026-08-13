@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np
 
 from coords import ShellCoords
-from curvature import (STANDOFF_TOLERANCE_MM, TOLERANCE_SWEEP_MM, analyze_cells,
+from curvature import (STANDOFF_TOLERANCE_MM, TOLERANCE_SWEEP_MM, analyze_cells, seat_standoff,
                        class_distribution, meridional_radius_profile,
                        required_radius, tolerance_sweep)
 from facets import apply_facets, facet_panels
@@ -31,9 +31,9 @@ from test_coords import named_points
 
 HERE = Path(__file__).resolve().parent
 
-# Previous run (real hardware on the OLD parametric dress shell), for
-# comparison against the confirmed skirt profile.
-PREVIOUS_RUN_DISTRIBUTION = "p213 52% | p370 16% | none 33%  (old dress shell)"
+# Previous run (circular sections on the confirmed profile), for
+# comparison against the elliptical-section skirt.
+PREVIOUS_RUN_DISTRIBUTION = "p213 80% | p370 0% | none 20%  (circular sections)"
 
 
 def electrical_rollup(placed):
@@ -80,10 +80,34 @@ def main():
     print(f"              waist r {model.waist_radius:.2f}, drop {p.drop:g}, "
           f"s 0..{coords.s_max:.2f} mm")
     print(f"waist         tangent {model.waist_tangent_deg():.2f} deg from vertical "
-          f"(dr/du {float(model.dradius(0.0)):.4f}); CREASE — bodice side "
+          f"(dr/du {float(model.dr_super(0.0)):.4f}); CREASE — bodice side "
           f"unspecified, crease angle pending; fillet_radius {p.fillet_radius:g}")
     print(f"seam band     +-{p.waist_band_halfwidth:g} mm keep-out about s = 0; "
           f"cable bus; tails terminate at the band edge")
+    aw, bw = (float(v) for v in model.semi_axes(0.0))
+    ah, bh = (float(v) for v in model.semi_axes(model.z_bottom))
+    print(f"sections      ELLIPTICAL, equal-arc theta: waist {aw:.2f} x {bw:.2f} "
+          f"(k {p.waist_section_ratio:g}) -> hem {ah:.2f} x {bh:.2f} "
+          f"(k {p.skirt_hem_ratio:g}, UNVERIFIED), blend '{p.ratio_blend}'")
+    try:
+        from bodice import BodiceSections
+        wrow = BodiceSections().rows[0]
+        print(f"waist match   residual vs bodice waist ellipse: "
+              f"{model.waist_match_residual_mm(wrow['a'], wrow['b']):.2e} mm "
+              f"(zero by construction)")
+    except Exception as exc:
+        print(f"waist match   NOT COMPUTED: {exc}")
+    from shell import solve_semi_axes as _ssa
+    print(f"hem widths    (for choosing skirt_hem_ratio against the photos)")
+    for k in (1.0, 1.15, 1.3):
+        ka, kb = _ssa(p.hem_circumference, k)
+        print(f"                k={k:<5g} front-view width {2*float(ka):.0f} mm, "
+              f"side-view depth {2*float(kb):.0f} mm")
+    print(f"meridians     true arc waist->hem: CF "
+          f"{model.true_meridian_arc(0.0, 0.0):.1f} mm, side "
+          f"{model.true_meridian_arc(90.0, 0.0):.1f} mm; GRID RING PARAMETER "
+          f"is the r_eq meridian arc ({coords.s_max:.1f} mm) — true s(theta,u) "
+          f"is derived/reported, never the ring parameter")
     area_m2 = model.surface_area_mm2() / 1e6
     a213 = classes["p213"].active_area          # mm^2
     n100 = math.ceil(area_m2 * 1e6 / a213)
@@ -112,7 +136,23 @@ def main():
 
     st = grid.cell_stats()
     print(f"grid          {st['count']} cells ({grid.spec.dtheta} deg x "
-          f"{grid.spec.ds} mm), width {st['width_min']:.1f}-{st['width_max']:.1f} mm")
+          f"{grid.spec.ds} mm), width {st['width_min']:.1f}-{st['width_max']:.1f} mm "
+          f"(equal-arc: uniform around each ring)")
+
+    p213 = classes["p213"]
+    print()
+    print("p213 unseatable band near the sides (footprint sampling; the piece "
+          "seam lives at +-90)")
+    for s_lvl in (45.0, 100.0, 180.0, 260.0, 340.0):
+        edge = None
+        for th in np.arange(90.0, 29.0, -2.0):
+            so = seat_standoff(coords, chart, p213.outline_w, p213.outline_h,
+                               float(th), s_lvl)
+            if so <= tol:
+                edge = th + 2.0
+                break
+        print(f"  s = {s_lvl:>5.0f}: unseatable |theta| >= "
+              f"{edge if edge is not None else '<= 30'} deg")
 
     analyses = analyze_cells(coords, chart, grid, classes, tol, samples=7)
     dist = class_distribution(analyses)

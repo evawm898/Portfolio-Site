@@ -101,27 +101,18 @@ class ShellCoords:
     def forward(self, theta_deg, s):
         """(theta, s) -> dict with position, normal, e_theta, e_s (all (..,3)).
 
-        e_theta and e_s are unit tangents along increasing theta / s; they
-        are the natural coordinate directions (not forced orthogonal — on
-        an ellipse they deviate from orthogonality only where a' != b').
-        The normal is exact and unit length, pointing outward.
+        theta is EQUAL-ARC (model convention); the ring parameter s is the
+        arc length of the perimeter-equivalent mean meridian, so
+        constant-s rings are LEVEL. The frame (with the equal-arc
+        dt/dz reparameterization term) comes from the model.
         """
         theta = np.radians(np.asarray(theta_deg, dtype=float))
         z = self.z_of_s(s)
-        m = self.model
-        a, b, da, db = m.a(z), m.b(z), m.da(z), m.db(z)
-        sin, cos = np.sin(theta), np.cos(theta)
-
-        pos = np.stack(np.broadcast_arrays(a * sin, b * cos, z), axis=-1)
-        p_theta = np.stack(np.broadcast_arrays(a * cos, -b * sin, np.zeros_like(sin)), axis=-1)
-        p_z = np.stack(np.broadcast_arrays(da * sin, db * cos, np.ones_like(sin)), axis=-1)
-
-        n = np.cross(p_z, p_theta)                      # outward
-        n /= np.linalg.norm(n, axis=-1, keepdims=True)
-        e_theta = p_theta / np.linalg.norm(p_theta, axis=-1, keepdims=True)
-        e_s = -p_z / np.linalg.norm(p_z, axis=-1, keepdims=True)  # increasing s = downward
-
-        return {"position": pos, "normal": n, "e_theta": e_theta, "e_s": e_s}
+        theta_b, z_b = np.broadcast_arrays(theta, z)
+        # astype(copy=True) preserves 0-d shapes (ascontiguousarray would
+        # silently promote scalars to shape (1,))
+        return self.model.frame(theta_b.astype(float, copy=True),
+                                z_b.astype(float, copy=True))
 
     # -- inverse map ---------------------------------------------------------
 
@@ -133,11 +124,10 @@ class ShellCoords:
         if np.any(z < self.model.z_bottom - 1e-6) or np.any(z > self.model.z_top + 1e-6):
             raise CoordError(f"height {z} outside shell [{self.model.z_bottom}, {self.model.z_top}]")
         zc = np.clip(z, self.model.z_bottom, self.model.z_top)
-        theta = np.arctan2(x / self.model.a(zc), y / self.model.b(zc))
+        theta = self.model.arc_angle_from_point(x, y, zc)   # equal-arc inverse
         s = self.s_of_z(zc)
         if check_mm is not None:
-            on_shell = np.stack(np.broadcast_arrays(
-                self.model.a(zc) * np.sin(theta), self.model.b(zc) * np.cos(theta), zc), axis=-1)
+            on_shell = self.model.point(theta, zc)
             residual = np.linalg.norm(on_shell - p, axis=-1)
             if np.any(residual > check_mm):
                 raise CoordError(

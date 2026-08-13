@@ -67,10 +67,48 @@ def _second_derivative(f, z, z_lo, z_hi, h=_H):
     return out.reshape(z_in.shape)
 
 
+def fundamental_forms_numeric(model, theta_rad, z, dt=1e-3, dz=_H):
+    """Numeric first/second fundamental forms of the GENERAL parametric
+    surface X(theta, z) — required now that the skirt sections are
+    elliptical with equal-arc theta (the surface is no longer a surface
+    of revolution and the analytic revolution formulas do not apply).
+    theta derivatives are periodic (centered); z derivatives use the same
+    end-guarded one-sided stencils as everywhere else."""
+    orig_shape = np.broadcast(np.asarray(theta_rad), np.asarray(z)).shape
+    th = np.atleast_1d(np.asarray(theta_rad, dtype=float))
+    zz = np.atleast_1d(np.asarray(z, dtype=float))
+    th, zz = np.broadcast_arrays(th, zz)
+    P = lambda t, x: model.point(t, x)
+
+    z_lo, z_hi = model.z_bottom + dz, model.z_top - dz
+    z_c = np.clip(zz, z_lo, z_hi)      # centered stencil anchor, guarded:
+    # anchoring the z-stencil at a clipped interior point keeps correct
+    # spacing; the offset from the true z is <= dz and the forms are
+    # evaluated AT z via the theta row through the true z.
+    X = P(th, zz)
+    Xt = (P(th + dt, zz) - P(th - dt, zz)) / (2 * dt)
+    Xtt = (P(th + dt, zz) - 2 * X + P(th - dt, zz)) / dt**2
+    Xzc = (P(th, z_c + dz) - P(th, z_c - dz)) / (2 * dz)
+    Xzz = (P(th, z_c + dz) - 2 * P(th, z_c) + P(th, z_c - dz)) / dz**2
+    Xtz = ((P(th + dt, z_c + dz) - P(th - dt, z_c + dz)
+            - P(th + dt, z_c - dz) + P(th - dt, z_c - dz)) / (4 * dt * dz))
+
+    n = np.cross(Xzc, Xt)
+    n = n / np.linalg.norm(n, axis=-1, keepdims=True)
+    dot = lambda u, v: np.sum(u * v, axis=-1)
+    rs = lambda arr: arr.reshape(orig_shape)   # 0-d in -> 0-d out
+    return (rs(dot(Xt, Xt)), rs(dot(Xt, Xzc)), rs(dot(Xzc, Xzc)),
+            rs(dot(Xtt, n)), rs(dot(Xtz, n)), rs(dot(Xzz, n)))
+
+
 def fundamental_forms(model, theta_rad, z):
     """E, F, G, L, M, N (arrays ok) at (theta, z), outward normal.
+    Swept-ellipse models route through the numeric general-surface path;
+    plain profile models keep the analytic revolution-style forms.
     Second profile derivatives use end-guarded stencils (see
     _second_derivative) — never a clamped centered difference."""
+    if getattr(model, "is_swept_ellipse", False):
+        return fundamental_forms_numeric(model, theta_rad, z)
     a, b = model.a(z), model.b(z)
     da, db = model.da(z), model.db(z)
     dda = _second_derivative(model.a, z, model.z_bottom, model.z_top)
@@ -232,15 +270,16 @@ def meridional_radius_profile(model, coords, n_samples=2000,
     s_hi = coords.s_max
     ss = np.linspace(0.0, s_hi, n_samples + 1)
     z = coords.z_of_s(ss)
-    k1, k2, _ = principal_curvatures(model, 0.0, z)
-    # meridional curvature: on a surface of revolution at theta = 0 the
-    # meridian direction is the z-parameter direction; its normal curvature
-    # is the principal value whose magnitude matches r''-driven bending —
-    # take the one that is NOT the circumferential 1/r term
-    circ = -1.0 / np.maximum(model.radius(z), 1e-9)  # circumferential (convex)
-    d1 = np.abs(k1 - circ)
-    d2 = np.abs(k2 - circ)
-    k_mer = np.where(d1 >= d2, k1, k2)
+    k1, k2, _ = principal_curvatures(model, np.zeros_like(z), z)
+    # meridional reference along the CF meridian: the plane curve
+    # (b(z), z), curvature b''/(1+b'^2)^1.5 with end-guarded stencils —
+    # valid for elliptical sections (at CF the meridian lies in x = 0)
+    db = model.db(z)
+    ddb = _second_derivative(model.b, z, model.z_bottom, model.z_top)
+    k_ref = ddb / (1.0 + db ** 2) ** 1.5
+    d1 = np.abs(k1 - k_ref)
+    d2 = np.abs(k2 - k_ref)
+    k_mer = np.where(d1 <= d2, k1, k2)
     with np.errstate(divide="ignore"):
         r_mer = 1.0 / np.maximum(np.abs(k_mer), 1e-15)
     dist_to_hem = s_hi - ss
@@ -248,7 +287,7 @@ def meridional_radius_profile(model, coords, n_samples=2000,
     idx = int(np.argmin(np.where(outside, r_mer, np.inf)))
     inside_vals = r_mer[~outside]
     return {
-        "hem_singular": bool(model.n < 2.0),
+        "hem_singular": bool(getattr(model, "n", 2.0) < 2.0),
         "min_radius_mm": float(r_mer[idx]),
         "at_s_mm": float(ss[idx]),
         "band_min_radius_mm": float(inside_vals.min()) if inside_vals.size else None,

@@ -33,7 +33,7 @@ def main():
     print(f"  drop             {p.drop:g} mm, n = {p.dome_n:g}")
     print(f"  solved b         {model.b_param:.2f} mm")
     print(f"  waist tangent    {model.waist_tangent_deg():.2f} deg from vertical "
-          f"(dr/du = {float(model.dradius(0.0)):.4f}) — CREASE at the waist; "
+          f"(dr/du = {float(model.dr_super(0.0)):.4f}) — CREASE at the waist; "
           f"bodice side unspecified")
     print(f"  seam band        +-{p.waist_band_halfwidth:g} mm about s = 0 "
           f"(keep-out + cable bus); fillet_radius = {p.fillet_radius:g}")

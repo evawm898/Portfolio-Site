@@ -123,9 +123,9 @@ class TestShell(unittest.TestCase):
         self.assertAlmostEqual(MODEL.b_param, 446.73, delta=0.05)
 
     def test_profile_hits_confirmed_measurements(self):
-        self.assertAlmostEqual(float(MODEL.radius(0.0)),
+        self.assertAlmostEqual(float(MODEL.mean_radius(0.0)),
                                609.6 / math.tau, places=6)     # waist 97.02
-        self.assertAlmostEqual(float(MODEL.radius(MODEL.z_bottom)),
+        self.assertAlmostEqual(float(MODEL.mean_radius(MODEL.z_bottom)),
                                1549.4 / math.tau, places=6)    # hem 246.59
 
     def test_waist_tangent_angle(self):
@@ -134,7 +134,7 @@ class TestShell(unittest.TestCase):
         self.assertIsNone(MODEL.crease_angle_deg())  # bodice unspecified
 
     def test_hem_tangent_is_vertical(self):
-        self.assertEqual(float(MODEL.dradius(MODEL.z_bottom)), 0.0)
+        self.assertEqual(float(MODEL.mean_slope(MODEL.z_bottom)), 0.0)
 
     def test_surface_area(self):
         # ~0.50 m^2 for the confirmed parameters
@@ -143,7 +143,7 @@ class TestShell(unittest.TestCase):
     def test_live_parameters_change_the_solve(self):
         m2 = ShellModel(ShellParams(hem_circumference=1400.0, dome_n=2.0))
         self.assertNotAlmostEqual(m2.b_param, MODEL.b_param, places=1)
-        self.assertAlmostEqual(float(m2.radius(0.0)), 609.6 / math.tau, places=6)
+        self.assertAlmostEqual(float(m2.mean_radius(0.0)), 609.6 / math.tau, places=6)
 
     def test_meshes_split_and_outward(self):
         meshes = build_meshes(MODEL, n_theta=96, max_row_mm=12.0)

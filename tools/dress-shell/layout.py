@@ -115,11 +115,11 @@ class SurfaceChart:
                                             "waist_band_halfwidth", 0.0))
 
     def r_theta(self, theta_deg, s):
-        """Local circumferential radius |P_theta| in mm/radian."""
+        """Chart metric: mm of section arc per radian of theta. theta is
+        EQUAL-ARC, so this is P(z)/2pi — uniform around each ring by
+        construction (trap #1 handled at the source)."""
         z = float(self.coords.z_of_s(float(np_clip(s, self.s_min, self.s_max))))
-        a, b = float(self.model.a(z)), float(self.model.b(z))
-        t = math.radians(theta_deg)
-        return math.hypot(a * math.cos(t), b * math.sin(t))
+        return float(self.model.section_perimeter(z)) / math.tau
 
     def offset_point(self, theta, s, dx_mm, dy_mm):
         """Move from (theta, s) by panel-frame offsets: dx lateral mm

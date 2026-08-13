@@ -83,19 +83,27 @@ class TestGrid(unittest.TestCase):
 
 class TestCurvature(unittest.TestCase):
     def test_circumferential_curvature_matches_meusnier(self):
-        # surface of revolution: circumferential normal curvature is
-        # -cos(phi)/r with tan(phi) = |r'| (Meusnier). At the hem r' = 0,
-        # so it is exactly -1/r_hem there; at the waist the 41 deg tilt
-        # applies.
+        # Elliptical sections: the circumferential NORMAL curvature at CF
+        # and at the side is the plan ellipse curvature scaled by the
+        # meridian tilt (Meusnier): kappa_n = -kappa_plan * cos(phi), with
+        # cos(phi) = |e_s . z_hat|. CF and the side lie on symmetry planes,
+        # so they are curvature lines and one principal value must match.
         import math as _m
-        for z in (0.0, float(MODEL.z_bottom)):
-            k1, k2, _ = principal_curvatures(MODEL, 0.0, z)
-            r = float(MODEL.radius(z))
-            slope = float(MODEL.dradius(z))
-            expected = -1.0 / (r * _m.sqrt(1.0 + slope**2))
+        for z, th_deg in [(0.0, 0.0), (0.0, 90.0),
+                          (float(MODEL.z_bottom), 0.0),
+                          (float(MODEL.z_bottom), 90.0)]:
+            a = float(MODEL.a(z)); b = float(MODEL.b(z))
+            k_plan = (b / a**2) if th_deg == 0.0 else (a / b**2)
+            s_here = float(COORDS.s_of_z(z))
+            f = COORDS.forward(th_deg, s_here)
+            cos_phi = abs(float(np.asarray(f["e_s"])[..., 2]))
+            expected = -k_plan * cos_phi
+            k1, k2, _ = principal_curvatures(MODEL, _m.radians(th_deg), z)
+            k1, k2 = float(np.asarray(k1)), float(np.asarray(k2))
+            tol = max(2e-5, 0.005 * abs(expected))   # numeric forms ~0.2%
             self.assertTrue(
-                abs(float(k1) - expected) < 5e-6 or abs(float(k2) - expected) < 5e-6,
-                (z, float(k1), float(k2), expected))
+                abs(k1 - expected) < tol or abs(k2 - expected) < tol,
+                (z, th_deg, k1, k2, expected))
 
     def test_dome_is_elliptic_not_saddle(self):
         # the superellipse dome is convex in both directions everywhere
@@ -152,6 +160,47 @@ class TestCurvature(unittest.TestCase):
         p370 = [sweep[t].get("p370", 0) for t in (1.5, 2.0, 2.5, 3.0)]
         self.assertEqual(p370, sorted(p370))                  # looser -> more p370
         self.assertEqual(sweep[2.0], class_distribution(analyses))
+
+    def test_k1_regression_reproduces_revolution(self):
+        # THE regression gate: with k held at 1.0 everywhere the numeric
+        # general-surface fundamental forms must reproduce the old
+        # surface-of-revolution values (Meusnier circumferential + FD
+        # meridional), away from the flagged hem singular band.
+        import math as _m
+        m1 = ShellModel(ShellParams(waist_section_ratio=1.0, skirt_hem_ratio=1.0))
+        for z in (-1.0, -50.0, -190.0, -330.0, -370.0):
+            for th_deg in (0.0, 37.0, 90.0, 140.0):
+                k1, k2, _ = principal_curvatures(m1, _m.radians(th_deg), z)
+                k1, k2 = float(np.asarray(k1)), float(np.asarray(k2))
+                r = float(m1.r_super(z)); rp = float(m1.dr_super(z))
+                h = 0.1
+                rpp = (float(m1.r_super(z + h)) - 2 * r + float(m1.r_super(z - h))) / h**2
+                k_circ = -1.0 / (r * _m.sqrt(1.0 + rp * rp))
+                k_mer = rpp / (1.0 + rp * rp) ** 1.5
+                ka1, ka2 = max(k_circ, k_mer), min(k_circ, k_mer)
+                for got, ref in ((k1, ka1), (k2, ka2)):
+                    self.assertLess(abs(got - ref), max(1e-6, 5e-3 * abs(ref)),
+                                    (z, th_deg, got, ref))
+                # and independence from theta: still a surface of revolution
+        k1a, _, _ = principal_curvatures(m1, 0.0, -200.0)
+        k1b, _, _ = principal_curvatures(m1, _m.radians(123.0), -200.0)
+        self.assertAlmostEqual(float(np.asarray(k1a)), float(np.asarray(k1b)), places=9)
+
+    def test_theta_is_equal_arc(self):
+        # solved ellipse parameters must place uniform theta at uniform ARC
+        import math as _m
+        z = np.full(13, -120.0)
+        th = np.radians(np.linspace(-180.0, 180.0, 13))
+        tpar = MODEL.param_from_arc_angle(th, z)
+        arc, _ = MODEL._arc_and_speed(tpar, z)
+        P = float(MODEL.section_perimeter(-120.0))
+        target = P * th / _m.tau
+        self.assertLess(float(np.max(np.abs(arc - target))), 1e-9)
+        # exact CF symmetry: mirrored theta mirrors x, keeps y
+        p_pos = MODEL.point(np.radians(np.array([35.0])), np.array([-120.0]))
+        p_neg = MODEL.point(np.radians(np.array([-35.0])), np.array([-120.0]))
+        self.assertAlmostEqual(float(p_pos[0, 0]), -float(p_neg[0, 0]), places=10)
+        self.assertAlmostEqual(float(p_pos[0, 1]), float(p_neg[0, 1]), places=10)
 
     def test_required_radius_matches_chord_model(self):
         rr = required_radius(CLASSES["p750"], 2.0)

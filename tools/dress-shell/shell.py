@@ -1,44 +1,61 @@
-"""Parametric rigid shell — CONFIRMED SKIRT PROFILE (superellipse dome).
+"""Parametric rigid shell — CONFIRMED SKIRT, ELLIPTICAL SECTIONS.
 
 The garment is rigid, formed in 3D from the start, never flattened. Two
 separate pieces, FRONT and BACK, split at the side seams (theta = +-90);
 no hinge, side closure out of scope.
 
-SKIRT (confirmed): a surface of revolution. With u measured UPWARD from
-the hem (u in [0, drop]):
+SKIRT: the superellipse profile now defines the PERIMETER schedule, not
+a radius. With u measured UPWARD from the hem (u in [0, drop]):
 
-    r(u) = a * (1 - (u/b)^n)^(1/n)
+    r_super(u) = a_hem * (1 - (u/b_solved)^n)^(1/n)
+    P(u)       = 2*pi * r_super(u)                  (section perimeter)
 
-    a = hem_circumference / 2pi          (hem radius)
-    n = dome_fullness                    (1.6 confirmed)
-    b : solved so r(drop) = waist radius; closed form
-        b = drop / (1 - (r_waist/a)^n)^(1/n)
+Each level is an ELLIPSE with semi-axes a(u) (side-to-side) x b(u)
+(front-to-back), solved from P(u) and a ratio schedule k(u) via
+Ramanujan's second approximation — the same solve the bodice uses, so
+the sections MATCH EXACTLY at the waist seam:
 
-Body frame: waist plane at z = 0, +z up, +y center front, +x wearer's
-left; the skirt occupies z in [-drop, 0]. hem_circumference and
-dome_fullness are live parameters, not constants.
+    k(drop) = waist_section_ratio   (the bodice waist ratio, est. 1.5)
+    k(0)    = skirt_hem_ratio       (NEW parameter, default 1.0 —
+                                     UNVERIFIED: reference side views may
+                                     want the bell to stay flattened)
+    k(u) blends monotonically; ratio_blend selects 'linear' or 'eased'
+    (smoothstep) so the rounding-out rate is adjustable.
 
-Profile behavior worth knowing:
-  - at the hem (u = 0) the tangent is vertical and, for n < 2, the
-    meridional curvature is GENUINELY SINGULAR (r'' ~ u^(n-2)). That is a
-    property of the superellipse, not an error; curvature displays clamp
-    it and seating decisions rely on footprint sampling.
-  - at the waist the skirt arrives at dr/du != 0: the junction with the
-    bodice is a CREASE, not a smooth join. The sharp nip is the design;
-    `fillet_radius` exists for a later softened variant and must be 0 for
-    now. The waist seam band (keep-out ring, cable bus) lives in
-    `waist_band_halfwidth`.
+THE SKIRT IS NO LONGER A SURFACE OF REVOLUTION. Downstream consequences
+handled here:
 
-BODICE: deliberately NOT SPECIFIED. `ShellParams.bodice` is None and the
-model refuses invented measurements; the skirt is complete and correct on
-its own. Every downstream consumer treats z_top = 0 (the waist) as the
-current top edge.
+  - THETA IS EQUAL-ARC around each section (not the ellipse parameter
+    angle): theta/360 deg of arc == that fraction of the section
+    perimeter, so grid columns are physically uniform around each ring.
+    theta = 0 stays center front; the mapping is odd in theta, so
+    symmetry about CF holds exactly. theta = +-90 lands exactly at the
+    ellipse major-axis ends (the true sides) by symmetry.
+  - Grid rings stay LEVEL (constant u). The ring parameter `s` is the
+    arc length of the PERIMETER-EQUIVALENT mean meridian (radius
+    r_eq(z) = P(z)/2pi — identical to the old mean profile when k = 1).
+    TRUE meridian arc length now depends on theta and is provided as the
+    derived quantity `true_meridian_arc(theta, u)` — it is reported,
+    never used as the ring parameter.
+  - Principal curvatures come from numeric first/second fundamental
+    forms of the general parametric surface (curvature.py); the old
+    revolution formulas are invalid off k = 1 and survive only inside
+    the k = 1.0 regression test.
+
+Waist junction, seam band, hem singularity, bodice status: unchanged
+from the previous revision (crease at the waist, +-8 mm band, n < 2
+meridional singularity at the hem, bodice still an unspecified segment
+with z_top = 0).
 """
 
 import math
 from dataclasses import dataclass
 
 import numpy as np
+
+# 24-point Gauss-Legendre nodes/weights on [-1, 1] for ellipse-arc
+# quadrature (smooth integrand -> ~machine precision on a quarter arc).
+_GL24 = np.polynomial.legendre.leggauss(24)
 
 
 class ShellError(ValueError):
@@ -53,6 +70,22 @@ class Ring:
     circumference: float
 
 
+def ellipse_perimeter(a, b):
+    """Ramanujan's second approximation, vectorized."""
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    h = ((a - b) / (a + b)) ** 2
+    return np.pi * (a + b) * (1.0 + 3.0 * h / (10.0 + np.sqrt(4.0 - 3.0 * h)))
+
+
+def solve_semi_axes(perimeter, ratio):
+    """Vectorized (a, b) with a/b == ratio hitting `perimeter` under
+    Ramanujan (linear in uniform scale -> exact for the formula)."""
+    unit = ellipse_perimeter(np.asarray(ratio, dtype=float), 1.0)
+    b = np.asarray(perimeter, dtype=float) / unit
+    return np.asarray(ratio, dtype=float) * b, b
+
+
 @dataclass(frozen=True)
 class ShellParams:
     """Confirmed skirt measurements (mm). Bodice intentionally absent."""
@@ -60,22 +93,29 @@ class ShellParams:
     hem_circumference: float = 1549.4    # 61 in
     drop: float = 381.0                  # waist-to-hem vertical, 15 in
     dome_n: float = 1.6                  # dome fullness
+    waist_section_ratio: float = 1.5     # = bodice waist ratio (user estimate)
+    skirt_hem_ratio: float = 1.0         # UNVERIFIED — photos may want > 1
+    ratio_blend: str = "linear"          # 'linear' | 'eased' (smoothstep)
     fillet_radius: float = 0.0           # 0 = sharp waist crease (the design)
     waist_band_halfwidth: float = 8.0    # seam band / cable bus, mm each side
     bodice: object = None                # NOT SPECIFIED — supplied later
 
 
 class ShellModel:
-    """Superellipse dome skirt as a surface of revolution. Exposes the same
-    geometry interface as before (a(z), b(z), derivatives, point, meshes)
-    so coordinates, grid, curvature, layout, and the viewers are unchanged
-    consumers; sections are circular, so a(z) == b(z) == r(z)."""
+    """Superellipse-perimeter skirt with elliptical sections and EQUAL-ARC
+    theta. Geometry interface: a(z)/b(z) semi-axes, da/db, point(theta, z)
+    with theta in equal-arc radians, section_perimeter(z), and the frame
+    helpers coords.py builds on."""
+
+    is_swept_ellipse = True   # curvature.py: use numeric fundamental forms
 
     def __init__(self, params: ShellParams = ShellParams()):
         p = params
         for name, v in (("waist_circumference", p.waist_circumference),
                         ("hem_circumference", p.hem_circumference),
-                        ("drop", p.drop), ("dome_n", p.dome_n)):
+                        ("drop", p.drop), ("dome_n", p.dome_n),
+                        ("waist_section_ratio", p.waist_section_ratio),
+                        ("skirt_hem_ratio", p.skirt_hem_ratio)):
             if not (isinstance(v, (int, float)) and math.isfinite(v) and v > 0):
                 raise ShellError(f"{name} must be a positive number, got {v!r}")
         if p.waist_circumference >= p.hem_circumference:
@@ -83,8 +123,16 @@ class ShellModel:
                 f"waist circumference ({p.waist_circumference}) must be smaller "
                 f"than hem circumference ({p.hem_circumference})")
         if not 1.0 < p.dome_n <= 8.0:
-            raise ShellError(f"dome_n must be in (1, 8], got {p.dome_n} "
-                             f"(n <= 1 gives an unusable profile)")
+            raise ShellError(f"dome_n must be in (1, 8], got {p.dome_n}")
+        if not 1.0 <= p.waist_section_ratio <= 3.0:
+            raise ShellError(f"waist_section_ratio must be in [1, 3], "
+                             f"got {p.waist_section_ratio}")
+        if not 1.0 <= p.skirt_hem_ratio <= 3.0:
+            raise ShellError(f"skirt_hem_ratio must be in [1, 3], "
+                             f"got {p.skirt_hem_ratio}")
+        if p.ratio_blend not in ("linear", "eased"):
+            raise ShellError(f"ratio_blend must be 'linear' or 'eased', "
+                             f"got {p.ratio_blend!r}")
         if p.fillet_radius != 0.0:
             raise ShellError(
                 "fillet_radius > 0 is reserved for the softened-waist variant "
@@ -98,96 +146,258 @@ class ShellModel:
                 "measurements. Supply it via a future bodice segment.")
 
         self.params = p
-        self.hem_radius = p.hem_circumference / math.tau        # a
+        self.hem_radius = p.hem_circumference / math.tau
         self.waist_radius = p.waist_circumference / math.tau
-        ratio = self.waist_radius / self.hem_radius
-        # closed-form solve of r(drop) = waist radius (the superellipse b)
-        self.b_param = p.drop / (1.0 - ratio ** p.dome_n) ** (1.0 / p.dome_n)
+        rr = self.waist_radius / self.hem_radius
+        self.b_param = p.drop / (1.0 - rr ** p.dome_n) ** (1.0 / p.dome_n)
         self.n = p.dome_n
         self.z_bottom = -p.drop
-        self.z_top = 0.0        # the waist IS the top edge until a bodice exists
+        self.z_top = 0.0
 
-    # -- profile -------------------------------------------------------------
+    # -- perimeter + ratio schedules -----------------------------------------
 
     def _u(self, z):
-        """Height above the hem, clipped to the skirt."""
         return np.clip(np.asarray(z, dtype=float) - self.z_bottom,
                        0.0, self.params.drop)
 
-    def radius(self, z):
+    def r_super(self, z):
+        """Perimeter-defining superellipse profile (mm)."""
         u = self._u(z)
         return self.hem_radius * (1.0 - (u / self.b_param) ** self.n) ** (1.0 / self.n)
 
-    def dradius(self, z):
-        """dr/dz (= dr/du). Exactly 0 at the hem for n > 1; finite and
-        negative everywhere else, steepest at the waist."""
+    def dr_super(self, z):
         u = self._u(z)
         t = (u / self.b_param) ** self.n
         return (-(self.hem_radius / self.b_param) * (u / self.b_param) ** (self.n - 1.0)
                 * (1.0 - t) ** (1.0 / self.n - 1.0))
 
-    # geometry interface used by every downstream consumer
+    def section_perimeter(self, z):
+        return math.tau * self.r_super(z)
+
+    def ratio(self, z):
+        """Section ratio schedule k(u): hem value at u = 0 blending
+        monotonically to the bodice waist ratio at u = drop."""
+        x = self._u(z) / self.params.drop
+        if self.params.ratio_blend == "eased":
+            x = x * x * (3.0 - 2.0 * x)      # smoothstep, still monotone
+        return (self.params.skirt_hem_ratio
+                + (self.params.waist_section_ratio - self.params.skirt_hem_ratio) * x)
+
+    def semi_axes(self, z):
+        """(a, b) at height z: solved from the perimeter schedule and k(z)."""
+        return solve_semi_axes(self.section_perimeter(z), self.ratio(z))
+
     def a(self, z):
-        return self.radius(z)
+        return self.semi_axes(z)[0]
 
     def b(self, z):
-        """Second semi-axis (sections are circular): b(z) == a(z) == r(z).
-        The solved superellipse parameter lives in `b_param`."""
-        return self.radius(z)
+        return self.semi_axes(z)[1]
+
+    _DZ = 0.5
+
+    def _d_guarded(self, f, z):
+        """d/dz with one-sided second-order stencils of correct spacing at
+        the profile ends (never a clamped centered difference)."""
+        z_in = np.asarray(z, dtype=float)
+        z1 = np.atleast_1d(z_in)
+        h = self._DZ
+        out = np.empty_like(z1)
+        lo = z1 < self.z_bottom + h
+        hi = z1 > self.z_top - h
+        mid = ~(lo | hi)
+        if np.any(mid):
+            zm = z1[mid]
+            out[mid] = (f(zm + h) - f(zm - h)) / (2.0 * h)
+        if np.any(lo):
+            zl = z1[lo]
+            out[lo] = (-3.0 * f(zl) + 4.0 * f(zl + h) - f(zl + 2 * h)) / (2.0 * h)
+        if np.any(hi):
+            zh = z1[hi]
+            out[hi] = (3.0 * f(zh) - 4.0 * f(zh - h) + f(zh - 2 * h)) / (2.0 * h)
+        return out.reshape(z_in.shape)
 
     def da(self, z):
-        return self.dradius(z)
+        return self._d_guarded(self.a, z)
 
     def db(self, z):
-        return self.dradius(z)
+        return self._d_guarded(self.b, z)
 
     def mean_radius(self, z):
-        return self.radius(z)
+        """Perimeter-equivalent radius r_eq = P/2pi — the ring-parameter
+        meridian (identical to the old profile when k = 1)."""
+        return self.r_super(z)
 
     def mean_slope(self, z):
-        return self.dradius(z)
+        return self.dr_super(z)
+
+    # -- equal-arc theta machinery -------------------------------------------
+
+    def _arc_and_speed(self, t, z):
+        """Arc length along the section ellipse from CF (t = 0) to
+        parameter t, plus the local speed |dX/dt| (24-pt Gauss; odd in t)."""
+        a, b = self.semi_axes(z)
+        t = np.asarray(t, dtype=float)
+        nodes, weights = _GL24
+        half = 0.5 * t
+        tau_pts = half[..., None] * (nodes + 1.0)       # [0, t]
+        sp = np.sqrt((a[..., None] * np.cos(tau_pts)) ** 2
+                     + (b[..., None] * np.sin(tau_pts)) ** 2)
+        arc = (half[..., None] * weights * sp).sum(axis=-1)
+        speed = np.sqrt((a * np.cos(t)) ** 2 + (b * np.sin(t)) ** 2)
+        return arc, speed
+
+    def param_from_arc_angle(self, theta_rad, z):
+        """Ellipse parameter t for the EQUAL-ARC angle theta (radians;
+        2pi = full perimeter). Odd in theta -> exact CF symmetry."""
+        theta = np.asarray(theta_rad, dtype=float)
+        z = np.broadcast_to(np.asarray(z, dtype=float), theta.shape).astype(float) \
+            if theta.shape else np.asarray(z, dtype=float)
+        target = self.section_perimeter(z) * theta / math.tau
+        t = np.array(theta, dtype=float, copy=True)      # good initial guess
+        for _ in range(7):
+            arc, speed = self._arc_and_speed(t, z)
+            t = t - (arc - target) / speed
+        return t
 
     def point(self, theta_rad, z):
-        r = self.radius(z)
-        return np.stack([
-            r * np.sin(theta_rad),
-            r * np.cos(theta_rad),
-            np.broadcast_to(z, np.broadcast(theta_rad, z).shape).astype(float),
-        ], axis=-1)
+        """3D point at EQUAL-ARC angle theta (radians) and height z."""
+        theta = np.asarray(theta_rad, dtype=float)
+        zb = np.broadcast_to(np.asarray(z, dtype=float),
+                             np.broadcast(theta, np.asarray(z)).shape).astype(float)
+        thb = np.broadcast_to(theta, zb.shape).astype(float)
+        t = self.param_from_arc_angle(thb, zb)
+        a, b = self.semi_axes(zb)
+        return np.stack([a * np.sin(t), b * np.cos(t), zb], axis=-1)
+
+    def _arc_z_partial(self, t, z):
+        """d(arc)/dz at FIXED ellipse parameter t (24-pt Gauss):
+        integral of (a a' cos^2 + b b' sin^2)/speed over [0, t]."""
+        a, b = self.semi_axes(z)
+        da, db = self.da(z), self.db(z)
+        t = np.asarray(t, dtype=float)
+        nodes, weights = _GL24
+        half = 0.5 * t
+        tau = half[..., None] * (nodes + 1.0)
+        c2, s2 = np.cos(tau) ** 2, np.sin(tau) ** 2
+        sp = np.sqrt((a[..., None] ** 2) * c2 + (b[..., None] ** 2) * s2)
+        integrand = ((a * da)[..., None] * c2 + (b * db)[..., None] * s2) / sp
+        return (half[..., None] * weights * integrand).sum(axis=-1)
+
+    def frame(self, theta_rad, z):
+        """Position + unit tangent frame at equal-arc (theta, z):
+        e_theta along increasing theta, e_s along increasing s (downward),
+        outward unit normal. Includes the dt/dz reparameterization term —
+        the equal-arc map shifts with height, and ignoring that would tilt
+        every meridian tangent off the true surface."""
+        theta = np.asarray(theta_rad, dtype=float)
+        zb = np.broadcast_to(np.asarray(z, dtype=float),
+                             np.broadcast(theta, np.asarray(z)).shape).astype(float)
+        thb = np.broadcast_to(theta, zb.shape).astype(float)
+        t = self.param_from_arc_angle(thb, zb)
+        a, b = self.semi_axes(zb)
+        da, db = self.da(zb), self.db(zb)
+        sin_t, cos_t = np.sin(t), np.cos(t)
+        pos = np.stack([a * sin_t, b * cos_t, zb], axis=-1)
+
+        # d(target arc)/dz at fixed theta minus d(arc)/dz at fixed t, over speed
+        speed = np.sqrt((a * cos_t) ** 2 + (b * sin_t) ** 2)
+        dP = math.tau * self.dr_super(zb)          # dP/dz
+        t_z = (thb / math.tau * dP - self._arc_z_partial(t, zb)) / speed
+
+        p_t = np.stack([a * cos_t, -b * sin_t, np.zeros_like(t)], axis=-1)
+        p_z = np.stack([da * sin_t + a * cos_t * t_z,
+                        db * cos_t - b * sin_t * t_z,
+                        np.ones_like(t)], axis=-1)
+        n = np.cross(p_z, p_t)
+        n = n / np.linalg.norm(n, axis=-1, keepdims=True)
+        e_theta = p_t / np.linalg.norm(p_t, axis=-1, keepdims=True)
+        e_s = -p_z / np.linalg.norm(p_z, axis=-1, keepdims=True)
+        return {"position": pos, "normal": n, "e_theta": e_theta, "e_s": e_s}
+
+    def arc_angle_from_point(self, x, y, z):
+        """Inverse of the equal-arc map: (x, y) on the section at height z
+        -> equal-arc angle theta (radians)."""
+        a, b = self.semi_axes(z)
+        t = np.arctan2(np.asarray(x, dtype=float) / a,
+                       np.asarray(y, dtype=float) / b)
+        arc, _ = self._arc_and_speed(t, z)
+        return math.tau * arc / self.section_perimeter(z)
+
+    def true_meridian_arc(self, theta_deg, u_hi, n_samples=801):
+        """DERIVED quantity: true arc length along the constant-theta
+        meridian from the waist (u = drop) down to height u_hi. Depends on
+        theta — the CF meridian and side meridian differ. Reported only;
+        the grid's ring parameter is the r_eq meridian arc."""
+        z_hi = self.z_bottom + u_hi
+        zs = np.linspace(self.z_top, z_hi, n_samples)
+        th = math.radians(theta_deg)
+        pts = self.point(np.full(zs.shape, th), zs)
+        return float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
 
     # -- waist junction ------------------------------------------------------
 
-    def waist_tangent_deg(self):
-        """Angle of the skirt's meridian tangent at the waist, measured from
-        vertical, degrees. (dr/du = -0.88 -> ~41 deg for the confirmed
-        parameters.)"""
-        return math.degrees(math.atan(abs(float(self.dradius(0.0)))))
+    def waist_tangent_deg(self, theta_deg=None):
+        """Meridian tangent at the waist, from vertical. With elliptical
+        sections it varies with theta; None returns the r_eq (mean) value
+        for the crease headline."""
+        if theta_deg is None:
+            return math.degrees(math.atan(abs(float(self.dr_super(0.0)))))
+        th = math.radians(float(theta_deg))
+        h = 0.5
+        p1 = self.point(np.array(th), np.array(self.z_top))
+        p0 = self.point(np.array(th), np.array(self.z_top - h))
+        d = (np.asarray(p1) - np.asarray(p0)) / h
+        horiz = math.hypot(float(d[..., 0]), float(d[..., 1]))
+        return math.degrees(math.atan2(horiz, 1.0))
+
+    def waist_match_residual_mm(self, bodice_waist_a, bodice_waist_b):
+        """Max plan-view gap between the skirt's waist section and the
+        bodice waist ellipse — zero by construction when the ratios agree;
+        reported so any drift is visible."""
+        a, b = (float(v) for v in self.semi_axes(0.0))
+        tt = np.linspace(0.0, math.tau, 1441)
+        r_skirt = np.hypot(a * np.sin(tt), b * np.cos(tt))
+        r_bod = np.hypot(bodice_waist_a * np.sin(tt), bodice_waist_b * np.cos(tt))
+        return float(np.max(np.abs(r_skirt - r_bod)))
 
     def crease_angle_deg(self):
-        """Angle between skirt and bodice tangents at the waist. None until
-        the bodice profile is specified — the crease exists but its angle
-        cannot be computed from one side."""
-        return None
+        return None   # bodice shell still unspecified
 
     @property
     def rings(self):
         return [Ring("hem", self.z_bottom, self.params.hem_circumference),
                 Ring("waist", 0.0, self.params.waist_circumference)]
 
-    def surface_area_mm2(self, n_samples=20001):
-        """Skirt area of revolution: 2pi * integral r * sqrt(1 + r'^2) du."""
-        z = np.linspace(self.z_bottom, self.z_top, n_samples)
-        integrand = self.radius(z) * np.sqrt(1.0 + self.dradius(z) ** 2)
-        return float(math.tau * np.trapezoid(integrand, z))
+    def surface_area_mm2(self, n_theta=256, n_z=400):
+        """General surface area by triangulated quadrature."""
+        V, F = _area_mesh(self, n_theta, n_z)
+        tri = V[F]
+        return float(0.5 * np.linalg.norm(
+            np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1).sum())
+
+
+def _area_mesh(model, n_theta, n_z):
+    thetas = np.linspace(-math.pi, math.pi, n_theta + 1)
+    zs = np.linspace(model.z_bottom, model.z_top, n_z + 1)
+    T, Z = np.meshgrid(thetas, zs)
+    V = model.point(T, Z).reshape(-1, 3)
+    cols = n_theta + 1
+    idx = np.arange((n_z + 1) * cols).reshape(n_z + 1, cols)
+    q00, q01 = idx[:-1, :-1].ravel(), idx[:-1, 1:].ravel()
+    q10, q11 = idx[1:, :-1].ravel(), idx[1:, 1:].ravel()
+    F = np.concatenate([np.stack([q00, q11, q01], axis=1),
+                        np.stack([q00, q10, q11], axis=1)])
+    return V, F
 
 
 def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0):
     """Triangulate the shell as two separate pieces split at the side
-    seams. Returns {"FRONT": (V, F), "BACK": (V, F)}; faces wound outward.
-    Rows are spaced evenly along the meridian arc, so the near-vertical
-    hem wall and the steep waist get the same physical resolution."""
+    seams (theta = +-90 equal-arc — exactly the ellipse major-axis ends).
+    Rows are LEVEL (constant z), spaced evenly along the r_eq meridian
+    arc; columns are equal-arc in theta, so cells are physically uniform
+    around each ring."""
     if n_theta % 4 != 0:
-        raise ShellError(f"n_theta must be a multiple of 4 (seams at +-90 deg), got {n_theta}")
+        raise ShellError(f"n_theta must be a multiple of 4, got {n_theta}")
 
     z_fine = np.linspace(model.z_bottom, model.z_top, 4001)
     g = np.sqrt(1.0 + model.mean_slope(z_fine) ** 2)
