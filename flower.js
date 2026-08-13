@@ -1172,8 +1172,8 @@ function stemRadiusFn(P, opts) {
 // string of balls. cl.nodes carries each junction's world position + direction for
 // the leaf geometry that attaches there in a later pass.
 function buildStemInto(acc, P, cx, cy, cz, opts) {
-  const length = clamp(opts.length, 0.2, 6);
-  if (length <= 1e-3) return null;
+  const length = clamp(opts.length, 0, 10);
+  if (length < 0.2) return null;                 // slider at/near its 0 minimum => no stem
   const o = { ...opts, length };
   const cl = stemCenterline(cx, cy, cz, o);
   acc.addTube(cl.pts, stemRadiusFn(P, o), 0, CENTER_TUBE_SEGS);   // thick at the flower, slender below
@@ -1573,8 +1573,12 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
   }
 
   // ---------- STEM ZONE ----------
-  if (wantStem) {
-    const o = { ...opts.stemOpts, length: clamp(opts.stemOpts.length, 0.2, 6) };
+  // A near-zero stem length (slider at/near its 0 minimum) means "no stem": skip the
+  // zone. With a receptacle its neck bottom-cap (botCap, set above) seals it — the same
+  // watertight receptacle-only path — and cl stays null so no bud / leaves attach.
+  const stemLen = wantStem ? clamp(opts.stemOpts.length, 0, 10) : 0;
+  if (wantStem && stemLen >= 0.2) {
+    const o = { ...opts.stemOpts, length: stemLen };
     const neckY = wantRecept ? cy - depth : cy;
     cl = stemCenterline(cx, neckY, cz, o);
     const radFn = stemRadiusFn(P, o);                          // radFn(0) == stemR, so the neck matches exactly
@@ -1803,7 +1807,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   const hasRecept = ui.receptacleType !== 'none';
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
-    length: clamp(ui.stemLength, 0.2, 6),
+    length: clamp(ui.stemLength, 0, 10),
     curve: clamp(ui.stemCurve, -1, 1),
     thickness: clamp(ui.stemThickness, 0.3, 4),
     nodeCount: clamp(Math.round(ui.stemNodeCount), 0, 8),
@@ -2828,7 +2832,7 @@ const DEFAULTS = {
   receptacleType: 'none', blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
   sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
-  stemType: 'none', stemLength: 1.8, stemCurve: 0,   // stemCurve control hidden for now (see flower.html); 0 = straight. Restore to 0.2 when the control returns.
+  stemType: 'none', stemLength: 4, stemCurve: 0,   // stem length range 0..10 (0 = no stem, 4 = standard); stemCurve control hidden for now (see flower.html), 0 = straight (restore to 0.2 when the control returns).
   stemThickness: 1, stemNodeCount: 3, stemNodeProminence: 0.4, stemBudMode: 'none',
   leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,
   tightness: 0.5, elevation: 0, autoRotate: true,

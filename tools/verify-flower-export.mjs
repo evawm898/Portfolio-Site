@@ -111,6 +111,11 @@ const CONFIGS = [
   { label: 'bud receptacle: early bud + blended receptacle + stem, deep neck', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '5' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemThickness', value: '1' }, { id: 'stemNodeCount', value: '0' }, { id: 'stemNodeProminence', value: '0' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'convergenceTightness', value: '0.7' }, { id: 'stemBudMode', value: 'early', evt: 'change' }] },
   // low blend => sharpest bud flutes (highest sector count), plus the pricey voronoi bud.
   { label: 'bud receptacle: tight bud + voronoi + sharp flutes (low blend)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'blendSmoothness', value: '0' }, { id: 'receptacleDepth', value: '0.6' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  // Stem length range now 0..10 (default 4). Exercise the new MAX and the 0 = no-stem edge.
+  { label: 'stem length MAX (10) + receptacle + tight bud', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '10' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  // stem length 0 with a stem + receptacle both enabled => no stem zone; the receptacle
+  // must still seal at its neck (bottom cap) and export watertight.
+  { label: 'stem length 0 (no stem) + receptacle enabled', set: [{ id: 'stemLength', value: '0' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
 ];
 
 const server = http.createServer((req, res) => {
