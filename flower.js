@@ -1963,10 +1963,12 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     // RADIAL — a flat rosette: `count` petals evenly spaced around one ring, all at
     // the same height, pointing straight out (actinomorphic daisy). A single petal
     // sits at the centre.
-    // rosette ring radius: min tightness = small ring (bases touching/overlapping) ->
-    // max = wide ring (gaps between bases). Endpoints keep the 0.5 midpoint (0.925)
-    // so the default rosette is unchanged.
-    const R = PETAL_LENGTH * 0.5 * lerp(0.35, 1.50, ui.tightness);
+    // rosette ring radius = the petal BASE attachment radius (radialOffset cancels the
+    // petal's own r0), so it is exactly what leaves — or closes — the central gap. At
+    // PETAL SPACING 0 the ring collapses to the axis (R = 0): every base sits at the
+    // centre, touching/overlapping for ANY petal count or bloom angle. It then opens to
+    // a wide ring (gaps) at max. The 0.5 midpoint stays 0.925 so the default is unchanged.
+    const R = PETAL_LENGTH * 0.5 * lerp(0, 1.85, ui.tightness);
     const cy = elev * elevAmp;                                     // ring height
     if (count === 1) {
       placements.push({ az: 0, r: 0, seedIdx: 0, height: cy, tilt: 0 });
