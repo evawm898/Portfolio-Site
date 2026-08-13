@@ -796,11 +796,19 @@
         </div>
         <div class="fl-ctrl" data-center-arch="petaloid">
           <div class="fl-ctrl__row">
-            <label for="fillPetalSize">Fill petal size</label>
-            <span class="fl-ctrl__val" data-value="fillPetalSize"></span>
+            <label for="fillOuterSize">Outer fill size</label>
+            <span class="fl-ctrl__val" data-value="fillOuterSize"></span>
           </div>
-          <input type="range" id="fillPetalSize" min="0.05" max="0.5" step="0.01" value="0.18">
-          <span class="fl-ctrl__hint">size relative to the outer petal</span>
+          <input type="range" id="fillOuterSize" min="0.05" max="0.5" step="0.01" value="0.22">
+          <span class="fl-ctrl__hint">size at the outer edge (near the real petals)</span>
+        </div>
+        <div class="fl-ctrl" data-center-arch="petaloid">
+          <div class="fl-ctrl__row">
+            <label for="fillInnerSize">Inner fill size</label>
+            <span class="fl-ctrl__val" data-value="fillInnerSize"></span>
+          </div>
+          <input type="range" id="fillInnerSize" min="0.03" max="0.5" step="0.01" value="0.10">
+          <span class="fl-ctrl__hint">size at the very centre &mdash; petals taper outer &rarr; inner</span>
         </div>
         <div class="fl-ctrl" data-center-arch="petaloid">
           <div class="fl-ctrl__row">
@@ -812,13 +820,13 @@
         </div>
         <div class="fl-ctrl" data-center-arch="petaloid">
           <div class="fl-ctrl__row">
-            <label for="fillCurl">Fill curl</label>
-            <span class="fl-ctrl__val" data-value="fillCurl"></span>
+            <label for="fillBloomAngle">Fill bloom angle</label>
+            <span class="fl-ctrl__val" data-value="fillBloomAngle"></span>
           </div>
-          <input type="range" id="fillCurl" min="0" max="1" step="0.01" value="0.6">
-          <span class="fl-ctrl__hint">open (mum) &rarr; tightly cupped (ranunculus)</span>
+          <input type="range" id="fillBloomAngle" min="0" max="90" step="1" value="30">
+          <span class="fl-ctrl__hint">closed bud (ranunculus) &rarr; fully open (mum)</span>
         </div>
-        <p class="fl-tip-note" data-center-arch="petaloid">Tiny petals inherit the PETAL shape (cup, edge, ruffle) and render as small solid blades; stamens/pistil are hidden.</p>
+        <p class="fl-tip-note" data-center-arch="petaloid">Tiny petals use a simplified PETAL shape (outline, centre curve, cup) as clean solid blades &mdash; tip style, edge noise and infill are omitted. Stamens/pistil are hidden.</p>
 
       </div>
     </section>

@@ -783,9 +783,10 @@ function resolveParams(ui) {
     ringStamenCount: ui.ringStamenCount,         // DISC: stamens ringing the dome edge
     ringStamenLength: ui.ringStamenLength,       // DISC: ring stamen length
     fillPetalCount: ui.fillPetalCount,           // PETALOID FILL: tiny centre petals (dozens..200+)
-    fillPetalSize: ui.fillPetalSize,             // PETALOID FILL: size vs the outer petal
+    fillOuterSize: ui.fillOuterSize,             // PETALOID FILL: fill-petal size at the outer edge
+    fillInnerSize: ui.fillInnerSize,             // PETALOID FILL: fill-petal size at the centre
     fillDensity: ui.fillDensity,                 // PETALOID FILL: loose -> fully overlapping
-    fillCurl: ui.fillCurl,                       // PETALOID FILL: open (mum) -> cupped (ranunculus)
+    fillBloomAngle: ui.fillBloomAngle,           // PETALOID FILL: fill-petal openness (deg), like BLOOM ANGLE
     L: PETAL_LENGTH,
     r0: BASE_RADIUS,
     cup: CUP_AMOUNT,
@@ -1057,29 +1058,56 @@ function buildDiscInto(acc, P, centerHeight, rng) {
    curves, ruffle, edge noise). The full venation/infill is intentionally skipped:
    reusing it for 100+ petals would be catastrophic (a Voronoi petal alone is
    ~160k tris). FILL CURL closes each tiny petal (open mum -> cupped ranunculus). */
+/* PETALOID FILL — a dense cluster of tiny petals packing the centre (ranunculus /
+   mum). Reworked to fix the self-intersecting "shard" geometry the first version
+   produced: it inherited the WHOLE outer-petal shape, so absolute-scale surface
+   displacements (edge noise EDGE_NOISE_AMP≈0.34, ruffle ≈0.55, lobe cuts) — which
+   are NOT scaled by petal length — dwarfed each ~0.2-long blade and folded it
+   through itself, while a very strong coupled curl (up to ~0.86 rad) coiled the
+   blades into loops.
+     Fix: each fill petal is a SIMPLIFIED clean solid blade — it keeps only the
+   outline (W/taper/tip), the centre curve (curl) and the cup, which are all
+   scale-invariant (an angle, or hw-proportional). Tip style, edge noise, edge
+   profile, lobes and the full infill are stripped. Openness is set by FILL BLOOM
+   ANGLE, working exactly like the outer BLOOM ANGLE (spine launch angle from
+   vertical: 0 = closed bud, 90° = flat/open), instead of a curl deformation.
+     Petals sit on a Vogel spiral filling the disc from the centre out to the fill
+   radius; each blade's size tapers with radius from INNER (centre) to OUTER (edge),
+   the graduated look of a real dense centre, like the LAYERS size falloff.
+   Print-safe: every blade is the same watertight solid-blade primitive as the
+   solid sepals; overlapping blades are closed shells the slicer unions. */
 function buildPetaloidFillInto(acc, P, centerHeight, rng) {
-  const N    = clamp(Math.round(P.fillPetalCount), 1, 240);
-  const size = clamp(P.fillPetalSize, 0.03, 0.6);
-  const dens = clamp(P.fillDensity, 0, 1);
-  const curl = clamp(P.fillCurl, 0, 1);
-  const petalL = P.L * size;
-  const Pfill = {
+  const N       = clamp(Math.round(P.fillPetalCount), 1, 240);
+  const outerS  = clamp(P.fillOuterSize, 0.03, 0.6);
+  const innerS  = clamp(P.fillInnerSize, 0.03, 0.6);
+  const dens    = clamp(P.fillDensity, 0, 1);
+  const bloom   = clamp(P.fillBloomAngle, 0, 90) * DEG;   // like BLOOM ANGLE: 0 closed -> 90° open
+  // Fill-disc radius: denser packs the same count into a smaller disc -> more overlap.
+  const maxR    = CORE_SPREAD * lerp(2.6, 1.1, dens);
+  // Simplified blade: inherit ONLY outline + centre curve + cup; strip everything
+  // that displaces the surface at absolute scale or adds infill.
+  const shapeBase = {
     ...P,
-    L: petalL,
-    bloom: lerp(0.95, 0.12, curl),                      // open (mum) -> tightly closed (ranunculus)
-    curl: lerp(0.25, 1.15, curl) * CENTER_CURVE_SCALE,  // inward spine curve
-    edgeProfile: 0,                                      // keep the tiny blades tidy
-    solidBlade: true, bladeNoRim: true, bladeUSteps: 10, bladeVSteps: 5,
+    bloom,
+    curl: P.curl,                                  // centre curve (scale-invariant angle)
+    petalCup: P.petalCup,                          // across-width cup (hw-proportional)
+    edgeCurve: 0, edgeProfile: 0,                  // drop billow / profile lift
+    tipStyle: 'clean', edgeNoise: 0, edgeNoiseScale: 0,
+    tipLength: 0, tipRegion: 0, tipFrequency: 1, tipIrregularity: 0,
+    lobe: 0, lobeCount: 0,
+    infillType: 'veins',                           // discarded for a solid blade
+    solidBlade: true, bladeNoRim: true, bladeUSteps: 8, bladeVSteps: 4,
   };
-  const spiralK = lerp(0.16, 0.05, dens);               // spacing constant (smaller = tighter overlap)
-  const maxR    = CORE_SPREAD * lerp(2.7, 1.0, dens);
   for (let i = 0; i < N; i++) {
-    const az = i * GOLDEN_ANGLE;
-    const rr = Math.min(maxR, spiralK * Math.sqrt(i));
-    const tRatio = N > 1 ? i / (N - 1) : 0;             // 0 = inner, 1 = outer
-    const tilt = lerp(1.0, 0.3, tRatio);               // inner upright, outer opening
-    const height = centerHeight + lerp(0.12, 0.0, tRatio) * petalL;
-    buildPetalInto(acc, Pfill, az, height, rr, tilt, SEED_BASE + 4200 + i * 53);
+    const az    = i * GOLDEN_ANGLE;
+    const rFrac = N > 1 ? Math.sqrt((i + 0.5) / N) : 0;   // 0 centre -> 1 outer edge (uniform areal fill)
+    const rr    = maxR * rFrac;
+    const size  = lerp(innerS, outerS, rFrac);           // taper: centre = INNER, edge = OUTER
+    const Pfill = { ...shapeBase, L: P.L * size };
+    // Gentle dome: inner petals sit a touch higher so the centre reads as raised,
+    // like a real packed centre. Openness comes from bloom, so no extra tilt.
+    const height = centerHeight + (1 - rFrac) * 0.07 * P.L;
+    buildPetalInto(acc, Pfill, az, height, rr, 0, SEED_BASE + 4200 + i * 53);
   }
 }
 
@@ -2230,9 +2258,10 @@ const inputs = {
   ringStamenCount: document.getElementById('ringStamenCount'),
   ringStamenLength: document.getElementById('ringStamenLength'),
   fillPetalCount: document.getElementById('fillPetalCount'),
-  fillPetalSize: document.getElementById('fillPetalSize'),
+  fillOuterSize: document.getElementById('fillOuterSize'),
+  fillInnerSize: document.getElementById('fillInnerSize'),
   fillDensity: document.getElementById('fillDensity'),
-  fillCurl: document.getElementById('fillCurl'),
+  fillBloomAngle: document.getElementById('fillBloomAngle'),
   receptacleType: document.getElementById('receptacleType'),
   blendSmoothness: document.getElementById('blendSmoothness'),
   receptacleDepth: document.getElementById('receptacleDepth'),
@@ -2336,9 +2365,10 @@ function readUI() {
     ringStamenCount: parseInt(inputs.ringStamenCount.value, 10),
     ringStamenLength: parseFloat(inputs.ringStamenLength.value),
     fillPetalCount: parseInt(inputs.fillPetalCount.value, 10),
-    fillPetalSize: parseFloat(inputs.fillPetalSize.value),
+    fillOuterSize: parseFloat(inputs.fillOuterSize.value),
+    fillInnerSize: parseFloat(inputs.fillInnerSize.value),
     fillDensity: parseFloat(inputs.fillDensity.value),
-    fillCurl: parseFloat(inputs.fillCurl.value),
+    fillBloomAngle: parseFloat(inputs.fillBloomAngle.value),
     receptacleType: inputs.receptacleType.value,
     blendSmoothness: parseFloat(inputs.blendSmoothness.value),
     receptacleDepth: parseFloat(inputs.receptacleDepth.value),
@@ -2436,9 +2466,10 @@ function refreshLabels() {
   setLabel('ringStamenCount', inputs.ringStamenCount.value);
   setLabel('ringStamenLength', (+inputs.ringStamenLength.value).toFixed(2));
   setLabel('fillPetalCount', inputs.fillPetalCount.value);
-  setLabel('fillPetalSize', (+inputs.fillPetalSize.value).toFixed(2));
+  setLabel('fillOuterSize', (+inputs.fillOuterSize.value).toFixed(2));
+  setLabel('fillInnerSize', (+inputs.fillInnerSize.value).toFixed(2));
   setLabel('fillDensity', (+inputs.fillDensity.value).toFixed(2));
-  setLabel('fillCurl', (+inputs.fillCurl.value).toFixed(2));
+  setLabel('fillBloomAngle', `${Math.round(+inputs.fillBloomAngle.value)}°`);
   setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
   setLabel('sepalCount', inputs.sepalCount.value);
   const scc = +inputs.sepalCenterCurve.value;
@@ -2517,7 +2548,7 @@ function setBuilding(on) {
  'centerCount', 'centerLength', 'centerTipSize',
  'denseStamenCount', 'denseStamenLength', 'carpelCount', 'carpelSize',
  'discSize', 'discHeight', 'ringStamenCount', 'ringStamenLength',
- 'fillPetalCount', 'fillPetalSize', 'fillDensity', 'fillCurl',
+ 'fillPetalCount', 'fillOuterSize', 'fillInnerSize', 'fillDensity', 'fillBloomAngle',
  'blendSmoothness', 'receptacleDepth', 'convergenceTightness',
  'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
  'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
@@ -2749,9 +2780,10 @@ if (resetBtn) {
     inputs.ringStamenCount.value = d.ringStamenCount;
     inputs.ringStamenLength.value = d.ringStamenLength;
     inputs.fillPetalCount.value = d.fillPetalCount;
-    inputs.fillPetalSize.value = d.fillPetalSize;
+    inputs.fillOuterSize.value = d.fillOuterSize;
+    inputs.fillInnerSize.value = d.fillInnerSize;
     inputs.fillDensity.value = d.fillDensity;
-    inputs.fillCurl.value = d.fillCurl;
+    inputs.fillBloomAngle.value = d.fillBloomAngle;
     inputs.receptacleType.value = d.receptacleType;
     inputs.blendSmoothness.value = d.blendSmoothness;
     inputs.receptacleDepth.value = d.receptacleDepth;
@@ -2828,7 +2860,7 @@ const DEFAULTS = {
   centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
   denseStamenCount: 80, denseStamenLength: 0.4, carpelCount: 5, carpelSize: 0.5,
   discSize: 0.5, discHeight: 0.5, ringStamenCount: 40, ringStamenLength: 0.35,
-  fillPetalCount: 60, fillPetalSize: 0.18, fillDensity: 0.6, fillCurl: 0.6,
+  fillPetalCount: 60, fillOuterSize: 0.22, fillInnerSize: 0.10, fillDensity: 0.6, fillBloomAngle: 30,
   receptacleType: 'none', blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
   sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
