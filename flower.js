@@ -2828,7 +2828,7 @@ const DEFAULTS = {
   receptacleType: 'none', blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
   sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
-  stemType: 'none', stemLength: 1.8, stemCurve: 0.2,
+  stemType: 'none', stemLength: 1.8, stemCurve: 0,   // stemCurve control hidden for now (see flower.html); 0 = straight. Restore to 0.2 when the control returns.
   stemThickness: 1, stemNodeCount: 3, stemNodeProminence: 0.4, stemBudMode: 'none',
   leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,
   tightness: 0.5, elevation: 0, autoRotate: true,
