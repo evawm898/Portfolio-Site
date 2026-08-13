@@ -1246,7 +1246,25 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   const budP = resolveParams(budUi);
   const exportMode = acc.exportMode;
   const budAcc = new MeshAccumulator({ exportMode, floorScale: exportMode ? budScale : 1 });
-  const { centerHeight } = buildBloomInto(budAcc, budAcc, budUi, budP);
+  const { centerHeight, placements: budPlacements, ringR: budRingR } = buildBloomInto(budAcc, budAcc, budUi, budP);
+  // MATCHING RECEPTACLE — when the main bloom carries a receptacle, give the bud its
+  // own, so the early bloom sits in the SAME vessel as the big one instead of on a bare
+  // branch. It's the exact same lofted trunk (buildTrunkInto, receptacle-only — the
+  // offshoot IS its stem), grown in the bud's OWN local frame from the bud's real petal
+  // feet and merged into budAcc; the single appendTransformed below then scales + seats
+  // it with the bloom, so it's automatically sized to the bud. It reads the MAIN ui's
+  // receptacle sliders (blend / depth / tightness) so its flutes match the big one.
+  // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
+  // gating here on the receptacle dropdown makes it appear exactly when BOTH are on.
+  if (ui.receptacleType !== 'none') {
+    const attach = [];
+    for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
+    buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
+      receptacle: true, stem: false,               // the offshoot branch is the bud's stem
+      blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
+      neckR: budP.tubeRadius * 4.0,                // no-stem neck, matching the main no-stem trunk
+    });
+  }
   // Seat the bud so its petal convergence (local y = centerHeight) lands on the
   // offshoot tip, oriented along tipDir, scaled down. Sink it a hair into the tip
   // so the shells overlap (no gap) for a clean union.
