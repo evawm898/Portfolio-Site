@@ -1092,7 +1092,6 @@ function buildPetaloidFillInto(acc, P, centerHeight, rng) {
     ...P,
     bloom,
     curl: P.curl,                                  // centre curve (scale-invariant angle)
-    petalCup: P.petalCup,                          // across-width cup (hw-proportional)
     edgeCurve: 0, edgeProfile: 0,                  // drop billow / profile lift
     tipStyle: 'clean', edgeNoise: 0, edgeNoiseScale: 0,
     tipLength: 0, tipRegion: 0, tipFrequency: 1, tipIrregularity: 0,
@@ -1100,12 +1099,21 @@ function buildPetaloidFillInto(acc, P, centerHeight, rng) {
     infillType: 'veins',                           // discarded for a solid blade
     solidBlade: true, bladeNoRim: true, bladeUSteps: 8, bladeVSteps: 4,
   };
+  // Cup grades with size: the largest (outer) fill petals are flatter/more open;
+  // the smallest (inner, at the very centre) curl in tightly, like the folded core
+  // of a ranunculus / rose.
+  const CUP_OUTER = 0.30, CUP_INNER = 1.15;
   for (let i = 0; i < N; i++) {
     const az    = i * GOLDEN_ANGLE;
     const rFrac = N > 1 ? Math.sqrt((i + 0.5) / N) : 0;   // 0 centre -> 1 outer edge (uniform areal fill)
     const rr    = maxR * rFrac;
     const size  = lerp(innerS, outerS, rFrac);           // taper: centre = INNER, edge = OUTER
-    const Pfill = { ...shapeBase, L: P.L * size };
+    const cup   = lerp(CUP_INNER, CUP_OUTER, rFrac);     // more cup toward the centre
+    // UNIFORM scale of the WHOLE petal — length, width AND base radius all scale by
+    // `size`, so a smaller fill petal is a proportionally smaller copy, not stretched
+    // or squashed. curl is an angle (scale-free) and the cup depth (∝ width) scales
+    // with it automatically; the cup AMOUNT is graded separately above.
+    const Pfill = { ...shapeBase, L: P.L * size, W: P.W * size, r0: P.r0 * size, petalCup: cup };
     // Gentle dome: inner petals sit a touch higher so the centre reads as raised,
     // like a real packed centre. Openness comes from bloom, so no extra tilt.
     const height = centerHeight + (1 - rFrac) * 0.07 * P.L;
