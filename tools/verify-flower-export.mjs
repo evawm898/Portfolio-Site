@@ -116,6 +116,14 @@ const CONFIGS = [
   // stem length 0 with a stem + receptacle both enabled => no stem zone; the receptacle
   // must still seal at its neck (bottom cap) and export watertight.
   { label: 'stem length 0 (no stem) + receptacle enabled', set: [{ id: 'stemLength', value: '0' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
+  // Classic PISTIL with the new shape controls at extremes: max LENGTH (3), thickest
+  // filament, largest + fully OBLONG stigma tip — exercises addOblongBead + the floor.
+  { label: 'center: PISTIL long + thick + oblong tip (max)', set: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'centerType', value: 'pistil', evt: 'change' }, { id: 'centerLength', value: '3' }, { id: 'centerFilThick', value: '1' }, { id: 'centerTipSize', value: '1' }, { id: 'centerTipShape', value: '1' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
+  // Classic STAMENS, THINNEST filament + oblong anthers — drives the export feature
+  // floor on both the filament radius and the oblong bead minor radius.
+  { label: 'center: STAMENS thin filament + oblong anthers', set: [{ id: 'centerType', value: 'stamens', evt: 'change' }, { id: 'centerFilThick', value: '0' }, { id: 'centerTipShape', value: '1' }, { id: 'centerTipSize', value: '0' }] },
+  // Sepals with NO receptacle: bases now anchor to the stem-top surface (strap + stem).
+  { label: 'sepals, no receptacle, stem-top attach (strap)', set: [{ id: 'centerLength', value: '0.5' }, { id: 'centerTipShape', value: '0' }, { id: 'centerFilThick', value: '0.5' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
 ];
 
 const server = http.createServer((req, res) => {

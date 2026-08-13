@@ -713,8 +713,17 @@
             <label for="centerLength">Length</label>
             <span class="fl-ctrl__val" data-value="centerLength"></span>
           </div>
-          <input type="range" id="centerLength" min="0" max="1" step="0.01" value="0.5">
+          <input type="range" id="centerLength" min="0" max="3" step="0.01" value="0.5">
           <span class="fl-ctrl__hint">short &rarr; long</span>
+        </div>
+
+        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
+          <div class="fl-ctrl__row">
+            <label for="centerFilThick">Filament thickness</label>
+            <span class="fl-ctrl__val" data-value="centerFilThick"></span>
+          </div>
+          <input type="range" id="centerFilThick" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">thin &rarr; thick filament</span>
         </div>
 
         <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
@@ -724,6 +733,15 @@
           </div>
           <input type="range" id="centerTipSize" min="0" max="1" step="0.01" value="0.35">
           <span class="fl-ctrl__hint">small &rarr; large anther / stigma</span>
+        </div>
+
+        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
+          <div class="fl-ctrl__row">
+            <label for="centerTipShape">Tip shape</label>
+            <span class="fl-ctrl__val" data-value="centerTipShape"></span>
+          </div>
+          <input type="range" id="centerTipShape" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">round bead &rarr; oblong (lily) tip</span>
         </div>
 
         <!-- DENSE CLUSTER -->
@@ -920,10 +938,10 @@
             <label for="sepalStyle">Sepal style</label>
           </div>
           <select class="fl-select" id="sepalStyle">
-            <option value="strap">STRAP</option>
+            <option value="strap">MODIFIED LEAF</option>
             <option value="solid">SOLID</option>
           </select>
-          <span class="fl-ctrl__hint">spiky straps &rarr; solid soft-edged leaves</span>
+          <span class="fl-ctrl__hint">narrow modified leaf &rarr; solid soft-edged leaves</span>
         </div>
 
         <div class="fl-ctrl" data-sepal>

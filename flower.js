@@ -334,8 +334,12 @@ class MeshAccumulator {
     }
     const south = this._vertex(cx, cy - radius, cz, 0, -1, 0);
     const r1 = ringStart[1];
+    // Cap fans must wind so their front face points OUTWARD (away from the bead
+    // centre), matching the body quads. The core material is single-sided
+    // (FrontSide), so an inward-facing pole fan is culled and reads as a hole at
+    // the bead tip — most visible on the large upward-pointing pistil stigmas.
     for (let si = 0; si < sectors; si++) {                              // north cap fan
-      this.idx.push(north, r1 + si, r1 + (si + 1) % sectors);
+      this.idx.push(north, r1 + (si + 1) % sectors, r1 + si);
     }
     for (let ri = 1; ri <= rings - 2; ri++) {                          // body quads
       const a = ringStart[ri], b = ringStart[ri + 1];
@@ -346,8 +350,67 @@ class MeshAccumulator {
     }
     const rl = ringStart[rings - 1];
     for (let si = 0; si < sectors; si++) {                              // south cap fan
-      this.idx.push(south, rl + (si + 1) % sectors, rl + si);
+      this.idx.push(south, rl + si, rl + (si + 1) % sectors);
     }
+  }
+
+  /* An ELONGATED bead — addBead's closed UV-sphere topology stretched by `elong`
+     (>= 1) along unit `axis`, so a stigma reads as an oblong / lily-like tip rather
+     than a round knob. Round when elong == 1 (delegates to addBead). Only the axis
+     direction lengthens; the minor radius stays = radius, so the export feature
+     floor still applies to the true thin dimension. Watertight (same manifold as
+     addBead); outward normals via the prolate-spheroid gradient. */
+  addOblongBead(center, radius, elong, axis, rings = 5, sectors = 8) {
+    if (!(elong > 1.0001)) return this.addBead(center, radius, rings, sectors);
+    if (this.exportMode) {
+      radius = Math.max(this.floorR, radius);
+      if (radius < this.minRadius) this.minRadius = radius;
+    }
+    rings = Math.max(2, rings); sectors = Math.max(3, sectors);
+    // orthonormal frame (e1, a, e2) matching addBead's (x, y, z): a is the long
+    // axis, and e2 = e1 x a keeps the triple right-handed so the shared winding
+    // still faces outward.
+    let al = Math.hypot(axis[0], axis[1], axis[2]) || 1;
+    const a = [axis[0] / al, axis[1] / al, axis[2] / al];
+    const t = Math.abs(a[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+    let e1 = [a[1] * t[2] - a[2] * t[1], a[2] * t[0] - a[0] * t[2], a[0] * t[1] - a[1] * t[0]];
+    const e1l = Math.hypot(e1[0], e1[1], e1[2]) || 1; e1 = [e1[0] / e1l, e1[1] / e1l, e1[2] / e1l];
+    const e2 = [e1[1] * a[2] - e1[2] * a[1], e1[2] * a[0] - e1[0] * a[2], e1[0] * a[1] - e1[1] * a[0]];
+    const cx = center.x, cy = center.y, cz = center.z, rl2 = radius * elong;
+    const put = (sx, sy, sz) => {                                        // sy = axis coord
+      const px = cx + e1[0] * sx * radius + a[0] * sy * rl2 + e2[0] * sz * radius;
+      const py = cy + e1[1] * sx * radius + a[1] * sy * rl2 + e2[1] * sz * radius;
+      const pz = cz + e1[2] * sx * radius + a[2] * sy * rl2 + e2[2] * sz * radius;
+      const gy = sy / elong;                                            // spheroid normal gradient
+      let nx = e1[0] * sx + a[0] * gy + e2[0] * sz;
+      let ny = e1[1] * sx + a[1] * gy + e2[1] * sz;
+      let nz = e1[2] * sx + a[2] * gy + e2[2] * sz;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      return this._vertex(px, py, pz, nx / nl, ny / nl, nz / nl);
+    };
+    const north = put(0, 1, 0);
+    const ringStart = new Array(rings);
+    for (let ri = 1; ri <= rings - 1; ri++) {
+      const phi = (Math.PI * ri) / rings;
+      const sy = Math.cos(phi), sr = Math.sin(phi);
+      ringStart[ri] = this.vcount;
+      for (let si = 0; si < sectors; si++) {
+        const th = (2 * Math.PI * si) / sectors;
+        put(sr * Math.cos(th), sy, sr * Math.sin(th));
+      }
+    }
+    const south = put(0, -1, 0);
+    const r1 = ringStart[1];
+    for (let si = 0; si < sectors; si++) this.idx.push(north, r1 + (si + 1) % sectors, r1 + si);
+    for (let ri = 1; ri <= rings - 2; ri++) {
+      const A = ringStart[ri], B = ringStart[ri + 1];
+      for (let si = 0; si < sectors; si++) {
+        const sn = (si + 1) % sectors;
+        this.idx.push(A + si, A + sn, B + si, A + sn, B + sn, B + si);
+      }
+    }
+    const rlr = ringStart[rings - 1];
+    for (let si = 0; si < sectors; si++) this.idx.push(south, rlr + si, rlr + (si + 1) % sectors);
   }
 
   /* A watertight ELLIPSOID — addBead's closed UV-sphere topology with per-axis
@@ -772,8 +835,10 @@ function resolveParams(ui) {
     centerArch: ui.centerArch,                   // CENTER architecture: classic | dense | disc | petaloid
     centerType: ui.centerType,                   // CLASSIC style: 'stamens' | 'pistil' | 'none'
     centerCount: ui.centerCount,                 // CLASSIC: number of filaments (amount)
-    centerLength: ui.centerLength,               // CLASSIC: filament length (0..1)
+    centerLength: ui.centerLength,               // CLASSIC: filament length (0..3)
     centerTipSize: ui.centerTipSize,             // CLASSIC: anther/stigma bead size (0..1)
+    centerTipShape: ui.centerTipShape,           // CLASSIC: tip roundness -> oblong (0..1)
+    centerFilThick: ui.centerFilThick,           // CLASSIC: filament thickness (0..1, 0.5 = default)
     denseStamenCount: ui.denseStamenCount,       // DENSE CLUSTER: fine filaments (dozens..200+)
     denseStamenLength: ui.denseStamenLength,     // DENSE CLUSTER: filament length
     carpelCount: ui.carpelCount,                 // DENSE CLUSTER: central rounded carpels (few)
@@ -963,8 +1028,16 @@ function buildCoreInto(acc, P, centerHeight, rng) {
   if (P.centerType === 'none') return;
   const pistil = P.centerType === 'pistil';
   const N   = clamp(Math.round(P.centerCount), 1, 60);
-  const len = clamp(P.centerLength, 0, 1);
+  // LENGTH slider now spans 0..3 (3x the old top end) for much taller pistils; the
+  // reach formula is unchanged, so behaviour across the old 0..1 range is identical.
+  const len = clamp(P.centerLength, 0, 3);
   const tip = clamp(P.centerTipSize, 0, 1);
+  // FILAMENT THICKNESS: multiplies the per-style base radius. 0.5 -> x1.0 (the
+  // original thickness), so the default is unchanged; 0..1 spans x0.4..x1.6.
+  const thickMul = lerp(0.4, 1.6, clamp(P.centerFilThick, 0, 1));
+  // TIP SHAPE: 0 = round bead (original), 1 = elongated oblong tip (lily-like). The
+  // bead is stretched along the filament tip tangent, so it grows longer, not wider.
+  const tipElong = 1 + 1.8 * clamp(P.centerTipShape, 0, 1);
 
   // PISTIL: taller reach, tighter to the axis, nearly vertical, fatter style and
   // a bigger stigma knob. STAMENS (defaults) reproduce the original cluster:
@@ -972,7 +1045,7 @@ function buildCoreInto(acc, P, centerHeight, rng) {
   const H       = pistil ? (0.16 + 0.85 * len) : (0.10 + 0.48 * len);   // max reach
   const spreadR = CORE_SPREAD * (pistil ? 0.42 : 1.0);                  // cluster radius
   const leanMax = pistil ? 0.05 : 0.14;                                 // outward bow
-  const filR    = P.tubeRadius * (pistil ? 1.5 : 1.05);                 // filament thickness
+  const filR    = P.tubeRadius * (pistil ? 1.5 : 1.05) * thickMul;      // filament thickness
   const beadR   = P.tubeRadius * lerp(pistil ? 1.4 : 0.8, pistil ? 6.0 : 4.5, tip);
 
   for (let i = 0; i < N; i++) {
@@ -989,7 +1062,10 @@ function buildCoreInto(acc, P, centerHeight, rng) {
       pts.push({ x: rad * Math.cos(a), y: centerHeight + yy, z: rad * Math.sin(a) });
     }
     acc.addTube(pts, filR, 0, CENTER_TUBE_SEGS);
-    acc.addBead(pts[pts.length - 1], beadR, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);  // anther / stigma
+    // anther / stigma — oblong along the filament tip direction when TIP SHAPE > 0
+    const pa = pts[pts.length - 1], pb = pts[pts.length - 2];
+    const axis = [pa.x - pb.x, pa.y - pb.y, pa.z - pb.z];
+    acc.addOblongBead(pa, beadR, tipElong, axis, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
   }
 }
 
@@ -1687,7 +1763,7 @@ function buildSepalsInto(acc, P, cx, cy, cz, opts, ringR) {
   const N = clamp(Math.round(opts.count), 3, 24);       // COUNT: sepals in the whorl
   const size = clamp(opts.size, 0.1, 1.5);
   const solid = opts.style === 'solid';                 // STYLE: solid leaf vs strap
-  const sepR = Math.max(ringR * 0.85, 0.16);
+  const sepR = opts.attachR != null ? Math.max(opts.attachR, 0.05) : Math.max(ringR * 0.85, 0.16);
   // SOLID sepals are broader, soft-tipped leaf blades; STRAP sepals stay narrow,
   // sharply tapered spikes. Curve is user-driven for both (centre + two edges).
   const Ps = {
@@ -1885,6 +1961,18 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   }
 
   if (ui.sepalsType !== 'none') {
+    // Sepal base attachment radius. WITH a receptacle, the fluted funnel fills the
+    // space between the axis and ringR, so the old ring (ringR*0.85) embeds in it —
+    // no gap. WITHOUT a receptacle the sepals otherwise float in a wide ring around
+    // the thin stem, leaving a visible gap; anchor their bases at the stem-top
+    // surface (neckR = tubeRadius*4*thickness) instead so they emerge flush from the
+    // stem, matching how petals attach to the receptacle. Slightly inset (*0.9) so
+    // the blade base overlaps the stem wall for a watertight union.
+    const stemThick = hasStem ? clamp(ui.stemThickness, 0.3, 4) : 1;
+    const stemTopR = P.tubeRadius * 4.0 * stemThick;
+    const sepalAttachR = hasRecept ? Math.max(ringR * 0.85, 0.16)
+                       : hasStem   ? stemTopR * 0.9
+                       :             Math.max(ringR * 0.85, 0.16);
     buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
       count: ui.sepalCount,
       size: ui.sepalSize,
@@ -1892,6 +1980,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       centerCurve: ui.sepalCenterCurve,
       edgeCurve: ui.sepalEdgeCurve,
       edgeProfile: ui.sepalEdgeProfile,
+      attachR: sepalAttachR,
     }, ringR);
   }
 
@@ -2268,6 +2357,8 @@ const inputs = {
   centerCount: document.getElementById('centerCount'),
   centerLength: document.getElementById('centerLength'),
   centerTipSize: document.getElementById('centerTipSize'),
+  centerTipShape: document.getElementById('centerTipShape'),
+  centerFilThick: document.getElementById('centerFilThick'),
   denseStamenCount: document.getElementById('denseStamenCount'),
   denseStamenLength: document.getElementById('denseStamenLength'),
   carpelCount: document.getElementById('carpelCount'),
@@ -2376,6 +2467,8 @@ function readUI() {
     centerCount: parseInt(inputs.centerCount.value, 10),
     centerLength: parseFloat(inputs.centerLength.value),
     centerTipSize: parseFloat(inputs.centerTipSize.value),
+    centerTipShape: parseFloat(inputs.centerTipShape.value),
+    centerFilThick: parseFloat(inputs.centerFilThick.value),
     denseStamenCount: parseInt(inputs.denseStamenCount.value, 10),
     denseStamenLength: parseFloat(inputs.denseStamenLength.value),
     carpelCount: parseInt(inputs.carpelCount.value, 10),
@@ -2475,6 +2568,8 @@ function refreshLabels() {
   setLabel('centerCount', inputs.centerCount.value);
   setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
   setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
+  setLabel('centerTipShape', (+inputs.centerTipShape.value).toFixed(2));
+  setLabel('centerFilThick', (+inputs.centerFilThick.value).toFixed(2));
   setLabel('blendSmoothness', (+inputs.blendSmoothness.value).toFixed(2));
   setLabel('receptacleDepth', (+inputs.receptacleDepth.value).toFixed(2));
   setLabel('convergenceTightness', (+inputs.convergenceTightness.value).toFixed(2));
@@ -2566,7 +2661,7 @@ function setBuilding(on) {
  'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
- 'centerCount', 'centerLength', 'centerTipSize',
+ 'centerCount', 'centerLength', 'centerTipSize', 'centerTipShape', 'centerFilThick',
  'denseStamenCount', 'denseStamenLength', 'carpelCount', 'carpelSize',
  'discSize', 'discHeight', 'ringStamenCount', 'ringStamenLength',
  'fillPetalCount', 'fillOuterSize', 'fillInnerSize', 'fillDensity', 'fillBloomAngle',
@@ -2797,6 +2892,8 @@ if (resetBtn) {
     inputs.centerCount.value = d.centerCount;
     inputs.centerLength.value = d.centerLength;
     inputs.centerTipSize.value = d.centerTipSize;
+    inputs.centerTipShape.value = d.centerTipShape;
+    inputs.centerFilThick.value = d.centerFilThick;
     inputs.denseStamenCount.value = d.denseStamenCount;
     inputs.denseStamenLength.value = d.denseStamenLength;
     inputs.carpelCount.value = d.carpelCount;
@@ -2884,6 +2981,7 @@ const DEFAULTS = {
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
   centerArch: 'classic',
   centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
+  centerTipShape: 0, centerFilThick: 0.5,
   denseStamenCount: 80, denseStamenLength: 0.4, carpelCount: 5, carpelSize: 0.5,
   discSize: 0.5, discHeight: 0.5, ringStamenCount: 40, ringStamenLength: 0.35,
   fillPetalCount: 60, fillOuterSize: 0.22, fillInnerSize: 0.10, fillDensity: 0.6, fillBloomAngle: 30,
