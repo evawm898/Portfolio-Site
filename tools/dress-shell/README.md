@@ -17,7 +17,8 @@ Python at request or build time.
 | `shell.py` | parametric shell: profile + elliptical sections whose axis ratio varies with height; FRONT/BACK meshes — **stable API** |
 | `coords.py` | body-centered (theta, s) coordinates: exact forward/inverse maps, tangent frames — **stable API** |
 | `test_coords.py` | round-trip + convention tests (waist, bust apex, hem edge, max flare, dense sweeps) |
-| `panels.py` / `panels.yaml` | panel size-class library: outline, thickness, active area, fixed connector; loud validation |
+| `panels.py` / `panels.yaml` | REAL HARDWARE library (Adafruit 6373/6394/6415 from ZJY datasheets): outline, thickness, active area, fixed connector, chipset, palette, refresh, price, per-field provenance with explicit `unverified` markers; loud validation |
+| `facets.py` | FLAT FACET mechanism: shell locally flattened to a plane for `requires_facet` classes (the 7.5"), blend band, max/RMS deviation reporting |
 | `layout.py` / `layout.yaml` | committed SOURCE OF TRUTH; lossless canonical IO; one-sided authoring with derived twins |
 | `test_layout.py` | lossless round-trip, loud-failure, and mirroring/connector-derivation tests |
 | `grid.py` | snap grid in (theta, s): rings + radials, snap targets, cell physical-size stats |
@@ -44,6 +45,20 @@ python3 export_gltf.py                                      # publish /dress ass
 so the layout can be iterated without churning the exported binary in git.
 Vendored three.js lives in `dress/vendor/` (committed; shared by the editor
 and the /dress route).
+
+## Real-hardware notes
+
+- The 7.5" (p750) is NOT a placeable panel: it needs ~773 mm local radius at
+  the 2 mm tolerance and the flattest cell offers ~258 mm. It is seated only
+  on an authored FLAT FACET (facets.py) — a deliberate design move, flagged
+  in both viewers, with the shell deviation (max/RMS mm) reported.
+- STANDOFF_TOLERANCE_MM (curvature.py) is a single named constant and an
+  UNVALIDATED assumption; the analysis JSON carries it and a 1.5/2/2.5/3 mm
+  sweep of the max-class distribution.
+- The 2.13" quad's mechanicals come from the MONO variant's datasheet
+  (same glass family, marked cross-variant/unverified); its refresh time is
+  null until a real JD79661 figure exists. All remaining gaps are listed by
+  `panels.unverified_fields` and printed by the console report.
 
 ## Mirroring semantics (layout.py)
 
