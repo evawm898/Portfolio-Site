@@ -796,6 +796,7 @@ function resolveParams(ui) {
     // hair-fine capillaries. (For VORONOI the same slider is cell rounding, 0..5.)
     secondaries: clamp(Math.round(ui.density * 0.7) + 1, 3, 11),
     maxDepth: clamp(1 + Math.round(ui.softness * 4), 1, 5),
+    branchStart: ui.veinBranchStart,   // where the first primary sits along the midrib (0=base)
     crossPerStrip: 0,        // legacy (the cross-vein ladder was removed)
     softness: ui.softness,   // VORONOI cell rounding (0..5); veins read maxDepth instead
     tubeRadius: lerp(0.008, 0.030, ui.tube),
@@ -841,7 +842,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     ? buildLace(P, rng, { density: P.density, swirl: P.laceSwirl })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
-        maxDepth: P.maxDepth, softness: P.softness,
+        maxDepth: P.maxDepth, softness: P.softness, branchStart: P.branchStart,
       });
 
   const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
@@ -2232,6 +2233,7 @@ const inputs = {
   infillType: document.getElementById('infillType'),
   density: document.getElementById('density'),
   softness: document.getElementById('softness'),
+  veinBranchStart: document.getElementById('veinBranchStart'),
   strandCount: document.getElementById('strandCount'),
   strandWidth: document.getElementById('strandWidth'),
   strandTaper: document.getElementById('strandTaper'),
@@ -2339,6 +2341,7 @@ function readUI() {
     infillType: inputs.infillType.value,
     density: parseInt(inputs.density.value, 10),
     softness: parseFloat(inputs.softness.value),
+    veinBranchStart: parseFloat(inputs.veinBranchStart.value),
     strandCount: parseInt(inputs.strandCount.value, 10),
     strandWidth: parseFloat(inputs.strandWidth.value),
     strandTaper: parseFloat(inputs.strandTaper.value),
@@ -2439,6 +2442,7 @@ function refreshLabels() {
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
   setLabel('softness', (+inputs.softness.value).toFixed(2));
+  setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
   setLabel('strandCount', inputs.strandCount.value);
   setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
   setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
@@ -2543,7 +2547,7 @@ function setBuilding(on) {
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
  'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize',
@@ -2758,6 +2762,7 @@ if (resetBtn) {
     inputs.infillType.value = d.infillType;
     inputs.density.value = d.density;
     inputs.softness.value = d.softness;
+    inputs.veinBranchStart.value = d.veinBranchStart;
     inputs.strandCount.value = d.strandCount;
     inputs.strandWidth.value = d.strandWidth;
     inputs.strandTaper.value = d.strandTaper;
@@ -2857,7 +2862,7 @@ const DEFAULTS = {
   bilCenterCurve1: 0.4, bilCenterCurve2: 0.4, bilCenterCurve3: 0.4,
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
-  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75,
+  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,

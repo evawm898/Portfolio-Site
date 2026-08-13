@@ -641,6 +641,7 @@ export function buildVenation(P, rng, opts = {}) {
   const primaryCount = clamp(Math.round(opts.secondaries || 6), 3, 12);  // DENSITY -> primaries off the midrib
   const maxDepth = clamp(Math.round(opts.maxDepth || 3), 1, 5);          // VEIN DETAIL -> branching generations
   const detail = clamp(opts.softness != null ? opts.softness : 0.75, 0, 1); // raw VEIN DETAIL (0..1)
+  const branchStart = clamp(opts.branchStart != null ? opts.branchStart : 0.05, 0, 0.85); // first primary's u along the midrib
   const SMOOTH = 0.55;                     // FIXED gentle vein curvature (detail no longer controls smoothing)
   const env = { P, L, maxDepth, detail };
 
@@ -671,15 +672,17 @@ export function buildVenation(P, rng, opts = {}) {
     const main = growBranch({ x: L * u0, y: 0 }, launchHeading, branchHeading, len, 1, env, rng, ctx);
     if (main) nodes.push({ x: L * u0, y: 0, width: widthOfOrder(1) });
   };
-  // The FIRST primary off the midrib also starts earlier with VEIN DETAIL: low
-  // detail keeps the lowest primary up toward the tip (sparse base); high detail
-  // drops it near the base and packs more primaries there, so the whole midrib
-  // branches.
-  const baseU = lerp(0.18, 0.05, detail);
-  const biasExp = lerp(1.1, 1.45, detail);                  // more base-packed at high detail
+  // The FIRST primary's position along the midrib is a dedicated control
+  // (`branchStart`, a proportion from the base), INDEPENDENT of DENSITY and VEIN
+  // DETAIL: lower drops the whole primary fan down toward the base so it covers more
+  // of the midrib's length. The fan spreads from there to the tip region; the count
+  // is DENSITY and the sub-branch starts are VEIN DETAIL (growBranch), so moving this
+  // changes neither.
+  const baseU = branchStart;
+  const biasExp = 1.2;                                       // fixed base-bias -> the control just translates the fan
   for (let i = 0; i < primaryCount; i++) {
     const frac = Math.pow((i + 0.5) / primaryCount, biasExp);
-    const u0 = clamp(lerp(baseU, 0.9, frac) + (rng() - 0.5) * 0.02, 0.04, 0.93);
+    const u0 = clamp(lerp(baseU, 0.94, frac) + (rng() - 0.5) * 0.02, 0.03, 0.95);
     addPrimary(u0, lerp(64, 44, u0) + (rng() - 0.5) * 6);
   }
 
