@@ -1,4 +1,4 @@
-# Dress Shell — Milestone 1 (in progress)
+# Dress Shell — Milestones 1 + 2
 
 Design tool for placing rigid e-ink panels on a 3D dress shell. Python for
 geometry, three.js for the viewer. The shell is rigid and formed in 3D from
@@ -20,12 +20,30 @@ Python at request or build time.
 | `panels.py` / `panels.yaml` | panel size-class library: outline, thickness, active area, fixed connector; loud validation |
 | `layout.py` / `layout.yaml` | committed SOURCE OF TRUTH; lossless canonical IO; one-sided authoring with derived twins |
 | `test_layout.py` | lossless round-trip, loud-failure, and mirroring/connector-derivation tests |
-| `shell_report.py` | console report: dimensions + round-trip accuracy |
+| `grid.py` | snap grid in (theta, s): rings + radials, snap targets, cell physical-size stats |
+| `curvature.py` | per-cell k1/k2/Gaussian/min radius + MAX SEATABLE CLASS via true standoff sampling |
+| `layering.py` | overlap DAG (same-layer overlap = hard error), mount heights, occlusion, connector burial, uncovered area |
+| `test_analysis.py` | grid / curvature / layering tests |
+| `export_gltf.py` | PUBLISH step: writes the committed `dress/dress-shell.glb` + `dress-analysis.json` the /dress route loads |
+| `editor_server.py` + `editor/` | local three.js placement editor (dev only, never deployed): orbit, heat maps, snap place/drag, rotate/layer/delete, undo/redo, save layout.yaml, publish |
+| `analysis_report.py` | full console report (shell, round-trip, grid, class distribution, layout, layering, coverage) |
+| `shell_report.py` | milestone-1 console report: dimensions + round-trip accuracy |
 | `preview.py` | scratch SVG preview of the silhouette (writes to `out/`, gitignored) |
 
-Awaiting review before UI: the twin-derivation semantics below. Then: grid +
-curvature/max-class analysis, glTF export, the local editor (dev-only, local
-save server), and the read-only /dress route.
+## Running
+
+```
+python3 -m unittest test_coords test_layout test_analysis   # all suites
+python3 analysis_report.py                                  # console report
+python3 editor_server.py --port 8765                        # placement editor
+python3 export_gltf.py                                      # publish /dress assets
+```
+
+(Editor and reports run from this directory.) The editor SAVES layout.yaml
+(lossless, canonical) and PUBLISHES the /dress glTF as two separate actions,
+so the layout can be iterated without churning the exported binary in git.
+Vendored three.js lives in `dress/vendor/` (committed; shared by the editor
+and the /dress route).
 
 ## Mirroring semantics (layout.py)
 

@@ -175,8 +175,10 @@ class TestMirroring(unittest.TestCase):
         placed, _ = resolve_layout(CHART, CLASSES, authored)
         pairs, worst, mean = asymmetry_summary(placed)
         self.assertEqual(len(pairs), 3)
-        self.assertAlmostEqual(worst, 0.2, places=12)   # skirt-b keeps rot 0
-        self.assertAlmostEqual(mean, 0.2 / 3.0, places=12)
+        # skirt-a and skirt-b are M (keep rot 0, 2|ex| = 0.2); bodice-a is S
+        # forced to 180 by legality (asym 0.0)
+        self.assertAlmostEqual(worst, 0.2, places=12)
+        self.assertAlmostEqual(mean, 0.4 / 3.0, places=12)
 
     def test_side_exit_twin_flips_to_180_near_seam(self):
         # S exits sideways (-x). At theta=+80 the exit points toward center
@@ -244,15 +246,15 @@ class TestMirroring(unittest.TestCase):
         authored = load_layout(HERE / "layout.yaml")
         placed, errors = resolve_layout(CHART, CLASSES, authored)
         self.assertEqual(errors, [])
-        # 4 authored, 3 mirrored -> 7 placed
-        self.assertEqual(len(placed), 7)
+        # 5 authored, 3 mirrored -> 8 placed
+        self.assertEqual(len(placed), 8)
         self.assertTrue(all(p.valid for p in placed),
                         [p.problems for p in placed if not p.valid])
         twins = {p.source_id: p for p in placed if p.is_twin}
         self.assertEqual(set(twins), {"skirt-a", "skirt-b", "bodice-a"})
         self.assertEqual(twins["bodice-a"].rotation, 180)  # the seam case
-        self.assertEqual(twins["skirt-a"].rotation, 180)  # asymmetry rule
-        self.assertEqual(twins["skirt-b"].rotation, 0)    # asymmetry rule
+        self.assertEqual(twins["skirt-a"].rotation, 0)    # M: 2|ex| < 2|ey|
+        self.assertEqual(twins["skirt-b"].rotation, 0)    # M: 2|ex| < 2|ey|
 
     def test_back_piece_mirroring(self):
         # theta 150 lives on the BACK piece; its twin at -150 does too, and

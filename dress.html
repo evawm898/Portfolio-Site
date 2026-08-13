@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E-Ink Dress Shell — Eva Maskalenko</title>
+<meta name="description" content="Design pipeline for placing rigid e-ink panels on a 3D dress shell: parametric corseted silhouette, body-centered coordinates, per-cell curvature analysis, and a mirrored panel layout — explored in an interactive 3D viewer.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .dress-viewer-wrap {
+    border: 1px solid var(--line-strong);
+    background: #0c0e0e;
+    margin: 0 0 0.75rem;
+  }
+  #dressViewer { width: 100%; height: min(72vh, 640px); }
+  #dressViewer canvas { display: block; }
+  .dress-controls {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+    padding: 0.6rem 0.75rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 0.7rem;
+  }
+  .dress-controls span.lbl { color: var(--ink-faint); padding: 0.25rem 0.2rem 0 0; }
+  .dress-controls button {
+    background: none; border: 1px solid var(--line); color: var(--ink-dim);
+    font: inherit; padding: 0.25rem 0.6rem; cursor: pointer; border-radius: 2px;
+  }
+  .dress-controls button:hover { border-color: var(--petrol-bright); }
+  .dress-controls button.is-on { color: var(--petrol-bright); border-color: var(--petrol); }
+  .dress-caption {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--ink-dim);
+    margin: 0 0 2rem; line-height: 1.6;
+  }
+  .dress-stats {
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.8;
+    color: var(--ink); background: var(--black-raised);
+    border: 1px solid var(--line); padding: 1.1rem 1.25rem; margin: 1rem 0;
+    overflow-x: auto; white-space: pre;
+  }
+</style>
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="index.html" class="project-header__back">&larr; Index</a>
+  <div class="project-header__index">Experimental &middot; M2</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag">
+      <span class="project__year">2026</span>
+      <span class="project__affiliation">Lab &mdash; Work in Progress</span>
+    </div>
+    <h1 class="project__title">E-Ink Dress Shell</h1>
+    <p class="project__lede">Placing rigid display panels on a rigid 3D garment &mdash; a corseted, bell-skirted shell that is formed in three dimensions from the start and never flattened. The tool answers the governing question directly: <em>what fits where?</em></p>
+  </div>
+
+  <div class="project__body">
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>01</span>Premise</h2>
+      <div class="project__section-body">
+        <p>Unlike the <a href="skirt.html" class="footer__link">earlier flat-pattern skirt study</a>, this shell is doubly curved &mdash; a fitted bodice, a sharp waist nip, a bell skirt &mdash; so it has no flat development at all. Every question has to be answered on the surface itself. The pipeline builds the shell parametrically from body measurements (five circumferences with heights, plus elliptical cross-sections whose axis ratio varies with height), lays a body-centered coordinate system over it &mdash; azimuth &theta; from center front, arc length <em>s</em> from the waist &mdash; and rules a snap grid in those coordinates so the grid stays honest on the curved surface.</p>
+        <p>For every grid cell the tool computes principal curvatures and, more usefully, the <strong>max seatable panel class</strong>: the largest rigid panel from the library that can sit tangent there without lifting more than 2&thinsp;mm off the surface. Panels are then authored on one side only; mirror twins are derived, never stored &mdash; a physical panel cannot be reflected, so each twin picks identity or 180&deg; rotation by connector legality, then by closeness to true reflection.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>02</span>The Shell, Live</h2>
+      <div class="project__section-body">
+        <p>This viewer is read-only: it loads the committed glTF export and analysis produced offline by the Python pipeline &mdash; nothing is computed at request time. Drag to orbit, scroll to zoom. The <em>max class</em> shading is the design guidance layer: each cell is tinted by the largest panel that fits it (darkest teal-blue = L, down to violet = XS only, charcoal = nothing fits within tolerance).</p>
+        <figure class="dress-viewer-wrap" style="margin:0 0 0.75rem;">
+          <div id="dressViewer"></div>
+          <div class="dress-controls">
+            <span class="lbl">shell</span>
+            <button data-shade="class" class="is-on">max class</button>
+            <button data-shade="gaussian">gaussian K</button>
+            <button data-shade="plain">plain</button>
+            <span class="lbl">panels</span>
+            <button data-ptint="class" class="is-on">class</button>
+            <button data-ptint="layer">layer</button>
+            <button data-ptint="standoff">standoff</button>
+            <span class="lbl">overlay</span>
+            <button id="gridToggle" class="is-on">grid</button>
+          </div>
+        </figure>
+        <p class="dress-caption" id="viewerStatus">loading committed glTF&hellip;</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>03</span>What the Analysis Says</h2>
+      <div class="project__section-body">
+        <p>Numbers below are read from the committed analysis file (the same data driving the shading), not recomputed by this page.</p>
+        <div class="dress-stats" id="dressStats">loading dress/dress-analysis.json &hellip;</div>
+        <p>Two findings shaped the current layout. First, the large panel class is genuinely marginal on this garment: at the hem the surface radius makes a 60&thinsp;mm-wide rigid panel lift almost exactly 2&thinsp;mm, so L seats only near center front on the lower skirt, where the elliptical cross-section is flattest. Second, the bodice&rsquo;s side-seam region forces the mirroring logic to earn its keep: the side-exit connector of the small class would fire through the seam on the mirrored side, so the derived twin flips 180&deg; &mdash; connector legality outranking symmetry, exactly as designed.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>04</span>Pipeline</h2>
+      <div class="project__section-body">
+        <p>Everything lives in the repo at <span style="font-family:var(--mono); font-size:0.85em;">tools/dress-shell/</span>, outside the site build: the parametric shell and exact coordinate maps (round-tripping at machine precision), the panel library and layout source-of-truth in YAML with lossless canonical saves, the mirroring/derivation engine, per-cell curvature and seating analysis, a layering engine (mount-height stacking, occlusion, connector-escape checks), and a local three.js placement editor with a small dev server &mdash; click to place on the snapped grid, drag to re-seat, undo/redo, save, and an explicit publish step that writes the static files this page loads. The design itself is a committed YAML file; this page only ever changes when a new layout is deliberately published.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="project__nav">
+    <a href="index.html" class="project__nav-link">&larr; Back to Index</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script type="importmap">
+{ "imports": {
+    "three": "./dress/vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./dress/vendor/controls/OrbitControls.js",
+    "three/addons/loaders/GLTFLoader.js": "./dress/vendor/loaders/GLTFLoader.js"
+} }
+</script>
+<script type="module" src="dress/viewer.js"></script>
+<script>
+  fetch('dress/dress-analysis.json').then(r => r.json()).then(a => {
+    const d = a.class_distribution, cov = a.coverage, lay = a.layering;
+    const total = Object.values(d).reduce((x, y) => x + y, 0);
+    const pct = k => (100 * (d[k] || 0) / total).toFixed(0) + '%';
+    document.getElementById('dressStats').textContent = [
+      `grid          ${a.meta.cell_count} cells (${a.meta.grid.dtheta}° × ${a.meta.grid.ds} mm), width ${a.meta.cell_width_mm[0]}–${a.meta.cell_width_mm[2]} mm`,
+      `max class     XS ${pct('XS')} · S ${pct('S')} · M ${pct('M')} · L ${pct('L')} · none ${pct('None')}   (tolerance ${a.meta.tolerance_mm} mm)`,
+      `layout        ${a.panels.filter(p => !p.is_twin).length} authored → ${a.panels.length} placed (${a.panels.filter(p => p.is_twin).length} derived twins)`,
+      `mirroring     outline asymmetry worst ${a.asymmetry.worst_mm} mm · mean ${a.asymmetry.mean_mm} mm`,
+      `layering      max stack ${lay.max_stack_mm} mm · visible active ${(lay.total_visible_mm2 / 100).toFixed(1)} / ${(lay.total_active_mm2 / 100).toFixed(1)} cm²`,
+      `coverage      shell ${(cov.shell_area_mm2 / 100).toFixed(0)} cm² · uncovered ${cov.uncovered_pct}%`,
+    ].join('\n');
+  }).catch(() => {
+    document.getElementById('dressStats').textContent = 'could not load dress/dress-analysis.json';
+  });
+</script>
+</body>
+</html>

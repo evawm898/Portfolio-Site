@@ -10,25 +10,32 @@
 version: 1
 panels:
   - id: cf-hero
-    class: M
+    class: L
     theta: 0.0
-    s: 220.0
+    s: 380.0
     rotation: 0
     layer: 0
     mirrored: false
+  - id: cf-acc
+    class: XS
+    theta: 0.0
+    s: 350.0
+    rotation: 0
+    layer: 1
+    mirrored: false
   - id: skirt-a
-    class: L
-    theta: 36.0
-    s: 250.0
+    class: M
+    theta: 40.0
+    s: 320.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: skirt-b
     class: M
     theta: 72.0
-    s: 300.0
+    s: 380.0
     rotation: 0
-    layer: 1
+    layer: 0
     mirrored: true
   - id: bodice-a
     class: S
