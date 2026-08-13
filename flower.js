@@ -107,8 +107,8 @@ const MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;        // tube/bead radius floo
    too few points to read as a spiral and collapses into a lopsided clump, so we
    switch to an evenly-spaced rosette there (see generate()). */
 const GOLDEN_ANGLE   = Math.PI * (3 - Math.sqrt(5));  // ~137.5°, the divergence angle
-const SPREAD_LOOSE   = 0.52;   // radial spacing at min coil tightness (open, gappy spiral)
-const SPREAD_TIGHT   = 0.13;   // radial spacing at max coil tightness (dense, packed spiral)
+const SPREAD_LOOSE   = 0.52;   // radial spacing at MAX slider (open, gappy spiral — petals spread)
+const SPREAD_TIGHT   = 0.13;   // radial spacing at MIN slider (dense, packed spiral — petals touching)
 const ELEV_FACTOR    = 0.85;   // centre rise/sink at full elevation, as a fraction of the
                                // bloom radius — keeps the cone/bowl aspect natural at any tightness
 const RECEPTACLE_TILT = 0.55;  // how strongly petals lean along the cone/bowl slope (0..1)
@@ -1924,7 +1924,7 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     ? (2 * bilPerSide + (bilCenter ? 1 : 0))
     : count;
 
-  const spread = lerp(SPREAD_LOOSE, SPREAD_TIGHT, ui.tightness);  // tighter coil -> smaller spacing
+  const spread = lerp(SPREAD_TIGHT, SPREAD_LOOSE, ui.tightness);  // min = tight/packed -> max = loose/spread
   const rMax = spread * Math.sqrt(Math.max(1, effectiveCount - 1));
   const elev = ui.elevation;                                     // -1 (bowl) .. +1 (cone)
   const elevAmp = ELEV_FACTOR * rMax;                            // scale elevation with bloom size
@@ -1963,7 +1963,10 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     // RADIAL — a flat rosette: `count` petals evenly spaced around one ring, all at
     // the same height, pointing straight out (actinomorphic daisy). A single petal
     // sits at the centre.
-    const R = PETAL_LENGTH * 0.5 * lerp(1.25, 0.6, ui.tightness);   // rosette ring radius
+    // rosette ring radius: min tightness = small ring (bases touching/overlapping) ->
+    // max = wide ring (gaps between bases). Endpoints keep the 0.5 midpoint (0.925)
+    // so the default rosette is unchanged.
+    const R = PETAL_LENGTH * 0.5 * lerp(0.35, 1.50, ui.tightness);
     const cy = elev * elevAmp;                                     // ring height
     if (count === 1) {
       placements.push({ az: 0, r: 0, seedIdx: 0, height: cy, tilt: 0 });
