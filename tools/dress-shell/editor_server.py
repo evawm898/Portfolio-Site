@@ -28,7 +28,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from coords import ShellCoords
-from curvature import analyze_cells, class_distribution
+from curvature import (STANDOFF_TOLERANCE_MM, analyze_cells, class_distribution)
+from facets import apply_facets
 from grid import GridSpec, ShellGrid
 from layering import LayeringError, analyze_layering, uncovered_shell_area
 from layout import (AuthoredPanel, LayoutError, SurfaceChart, asymmetry_summary,
@@ -39,7 +40,7 @@ from shell import ShellModel, ShellParams, build_meshes
 VENDOR_DIR = HERE.parents[1] / "dress" / "vendor"
 LAYOUT_PATH = HERE / "layout.yaml"
 
-TOLERANCE_MM = 2.0
+TOLERANCE_MM = STANDOFF_TOLERANCE_MM   # single named constant (curvature.py)
 GRID_SPEC = GridSpec(dtheta=10.0, ds=25.0)
 
 
@@ -55,6 +56,12 @@ class State:
         self.grid = ShellGrid(self.chart, GRID_SPEC)
         self.analyses = analyze_cells(self.coords, self.chart, self.grid,
                                       self.classes, TOLERANCE_MM, samples=7)
+        # pristine mesh cache for facet-deviation reporting
+        self._facet_mesh = []
+        for name in ("FRONT", "BACK"):
+            V, _ = build_meshes(self.model)[name]
+            th, s = self.coords.inverse(V, check_mm=None)
+            self._facet_mesh.append((V, np.stack([th, s], axis=-1)))
         self.static_payload = self._build_static()
         print(f"ready: {len(self.grid.cells)} cells analyzed")
 
@@ -98,6 +105,9 @@ class State:
                 "connector": {"origin": list(cl.connector_origin),
                               "exit": list(cl.connector_exit),
                               "escape_mm": cl.escape_mm},
+                "chipset": cl.chipset, "palette": list(cl.palette),
+                "refresh_s": cl.refresh_s, "price_usd": cl.price_usd,
+                "requires_facet": cl.requires_facet,
             } for cl in self.classes.values()},
             "cells": [{"i": a.cell_index, "k1": a.k1, "k2": a.k2, "K": a.gaussian,
                        "rmin": None if not np.isfinite(a.r_min) else round(a.r_min, 1),
@@ -135,6 +145,18 @@ class State:
         uncovered, total = uncovered_shell_area(self.chart, placed,
                                                 n_theta=360, n_s=70)
         pairs, worst, mean = asymmetry_summary(placed)
+        facet_reports = {}
+        for V, ts in self._facet_mesh:
+            _, reps = apply_facets(self.chart, self.coords, V, ts, placed)
+            for fr in reps:
+                cur = facet_reports.get(fr.panel_id)
+                if cur is None or fr.affected_vertices > cur["affected_vertices"]:
+                    facet_reports[fr.panel_id] = {
+                        "panel": fr.panel_id,
+                        "max_deviation_mm": round(fr.max_deviation_mm, 2),
+                        "rms_deviation_mm": round(fr.rms_deviation_mm, 2),
+                        "affected_vertices": fr.affected_vertices,
+                    }
         return {
             "authored": [{"id": a.panel_id, "class": a.class_id, "theta": a.theta,
                           "s": a.s, "rotation": a.rotation, "layer": a.layer,
@@ -145,6 +167,7 @@ class State:
                 "content_rotation": p.content_rotation, "layer": p.layer,
                 "is_twin": p.is_twin, "source_id": p.source_id,
                 "valid": p.valid, "problems": list(p.problems),
+                "facet": p.cls.requires_facet,
                 "mount_mm": (rep.mount_mm.get(p.panel_id, 0.0) if rep else 0.0),
                 "visible_pct": (rep.visible_pct.get(p.panel_id, 100.0) if rep else None),
             } for p in placed],
@@ -157,6 +180,7 @@ class State:
                 "overlaps": rep.overlaps,
             },
             "coverage": {"uncovered_pct": 100.0 * uncovered / total},
+            "facets": sorted(facet_reports.values(), key=lambda d: d["panel"]),
             "asymmetry": {"worst_mm": worst, "mean_mm": mean,
                           "pairs": [[a, b, c] for a, b, c in pairs]},
         }

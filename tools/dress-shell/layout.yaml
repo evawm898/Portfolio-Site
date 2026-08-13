@@ -9,38 +9,45 @@
 
 version: 1
 panels:
-  - id: cf-hero
-    class: L
+  - id: cf-facet
+    class: p750
     theta: 0.0
-    s: 380.0
+    s: 330.0
     rotation: 0
     layer: 0
     mirrored: false
-  - id: cf-acc
-    class: XS
+  - id: cf-badge
+    class: p213
     theta: 0.0
-    s: 350.0
+    s: 300.0
     rotation: 0
     layer: 1
     mirrored: false
   - id: skirt-a
-    class: M
-    theta: 40.0
-    s: 320.0
+    class: p370
+    theta: 28.0
+    s: 390.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: skirt-b
-    class: M
-    theta: 72.0
-    s: 380.0
+    class: p213
+    theta: 26.0
+    s: 250.0
+    rotation: 0
+    layer: 0
+    mirrored: true
+  - id: skirt-c
+    class: p213
+    theta: 45.0
+    s: 330.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: bodice-a
-    class: S
-    theta: 80.0
-    s: -60.0
+    class: p213
+    theta: 78.0
+    s: -65.0
     rotation: 0
     layer: 0
     mirrored: true

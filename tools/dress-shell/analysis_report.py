@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Full console report: shell, coordinates round-trip, grid, curvature /
-max-class distribution, layout, mirroring, layering, coverage.
+max-class distribution (old vs new library), tolerance sweep, facets,
+mirroring, layering, coverage, electrical rollup, and the honest list of
+still-unverified datasheet fields.
 
-Run:  python3 tools/dress-shell/analysis_report.py
+Run:  python3 tools/dress-shell/analysis_report.py [--sweep]
+(the sweep table always prints; --sweep is accepted for compatibility)
 """
 
 import sys
@@ -13,17 +16,49 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np
 
 from coords import ShellCoords
-from curvature import analyze_cells, class_distribution
+from curvature import (STANDOFF_TOLERANCE_MM, TOLERANCE_SWEEP_MM, analyze_cells,
+                       class_distribution, required_radius, tolerance_sweep)
+from facets import apply_facets, facet_panels
 from grid import GridSpec, ShellGrid
 from layering import LayeringError, analyze_layering, uncovered_shell_area
 from layout import (SurfaceChart, asymmetry_summary, load_layout,
                     resolve_layout)
-from panels import load_panel_classes
-from shell import ShellModel, ShellParams
+from panels import load_panel_classes, unverified_fields
+from shell import ShellModel, ShellParams, build_meshes
 from test_coords import named_points
 
 HERE = Path(__file__).resolve().parent
-TOLERANCE = 2.0
+
+# The placeholder-class distribution this library replaced, for comparison.
+OLD_PLACEHOLDER_DISTRIBUTION = "XS 10% | S 33% | M 35% | L 6% | none 16%"
+
+
+def electrical_rollup(placed):
+    """Informational only — no circuit design. Shared SPI bus (SCK + MOSI)
+    plus per-panel CS, DC, RST, BUSY."""
+    valid = [p for p in placed if p.valid]
+    counts, cost, unknown_cost = {}, 0.0, []
+    refresh_total, unknown_refresh = 0.0, []
+    for p in valid:
+        counts[p.cls.class_id] = counts.get(p.cls.class_id, 0) + 1
+        if p.cls.price_usd is None:
+            unknown_cost.append(p.panel_id)
+        else:
+            cost += p.cls.price_usd
+        if p.cls.refresh_s is None:
+            unknown_refresh.append(p.panel_id)
+        else:
+            refresh_total += p.cls.refresh_s
+    return {
+        "counts": counts,
+        "total_panels": len(valid),
+        "cost_usd": round(cost, 2),
+        "cost_unknown_panels": unknown_cost,
+        "control_lines": 2 + 4 * len(valid),
+        "control_lines_formula": "2 shared (SCK, MOSI) + 4 per panel (CS, DC, RST, BUSY)",
+        "sequential_refresh_s": round(refresh_total, 1),
+        "refresh_unknown_panels": unknown_refresh,
+    }
 
 
 def main():
@@ -32,8 +67,9 @@ def main():
     chart = SurfaceChart(model, coords)
     classes = load_panel_classes(HERE / "panels.yaml")
     grid = ShellGrid(chart, GridSpec(10.0, 25.0))
+    tol = STANDOFF_TOLERANCE_MM
 
-    print("DRESS SHELL — full pipeline report (milestone 2)")
+    print("DRESS SHELL — full pipeline report (real hardware library)")
     print()
     print(f"shell         z {model.z_bottom:.0f}..{model.z_top:.0f} mm, "
           f"s {coords.s_min:.1f}..{coords.s_max:.1f} mm (0 = waist)")
@@ -44,39 +80,74 @@ def main():
         t2, s2 = coords.inverse(f["position"], check_mm=0.01)
         p2 = coords.forward(float(t2), float(s2))["position"]
         worst = max(worst, float(np.linalg.norm(p2 - f["position"])))
-    print(f"round-trip    worst |d_pos| over waist/bust apex/hem edge/max flare: "
-          f"{worst:.2e} mm")
+    print(f"round-trip    worst |d_pos| over the four named sites: {worst:.2e} mm")
 
     st = grid.cell_stats()
     print(f"grid          {st['count']} cells ({grid.spec.dtheta} deg x "
-          f"{grid.spec.ds} mm), physical width {st['width_min']:.1f}-"
-          f"{st['width_max']:.1f} mm (mean {st['width_mean']:.1f}, "
-          f"spread {st['width_spread_pct']:.0f}%)")
+          f"{grid.spec.ds} mm), width {st['width_min']:.1f}-{st['width_max']:.1f} mm")
 
-    analyses = analyze_cells(coords, chart, grid, classes, TOLERANCE, samples=7)
+    analyses = analyze_cells(coords, chart, grid, classes, tol, samples=7)
     dist = class_distribution(analyses)
     total = sum(dist.values())
-    by_size = sorted(classes.values(), key=lambda c: c.outline_area)
-    parts = [f"{c.class_id} {100.0 * dist.get(c.class_id, 0) / total:.0f}%"
-             for c in by_size] + [f"none {100.0 * dist.get(None, 0) / total:.0f}%"]
-    print(f"max class     {' | '.join(parts)}  (tolerance {TOLERANCE} mm)")
+    seatable = sorted((c for c in classes.values() if not c.requires_facet),
+                      key=lambda c: c.outline_area)
+    pct = lambda n: f"{100.0 * n / total:.0f}%"
+    parts = [f"{c.class_id} {pct(dist.get(c.class_id, 0))}" for c in seatable]
+    parts.append(f"none {pct(dist.get(None, 0))}")
+    print()
+    print(f"MAX CLASS     new: {' | '.join(parts)}   (tolerance {tol} mm)")
+    print(f"              old placeholders were: {OLD_PLACEHOLDER_DISTRIBUTION}")
+    print(f"              (p750 excluded from seating: requires_facet)")
+
+    print()
+    print(f"tolerance sweep (UNVALIDATED default {tol} mm — distributions if "
+          f"the real number differs)")
+    for t, d in tolerance_sweep(analyses, classes, TOLERANCE_SWEEP_MM).items():
+        row = [f"{c.class_id} {pct(d.get(c.class_id, 0))}" for c in seatable]
+        row.append(f"none {pct(d.get(None, 0))}")
+        mark = "  <- default" if t == tol else ""
+        print(f"  {t:>4.1f} mm   {' | '.join(row)}{mark}")
+
+    print()
+    print("required local min curvature radius per class (chord model, "
+          f"{tol} mm tolerance)")
+    shell_rmin_max = max(a.r_min for a in analyses if np.isfinite(a.r_min))
+    for c in sorted(classes.values(), key=lambda c: c.outline_area):
+        rr = required_radius(c, tol)
+        can = sum(1 for a in analyses
+                  if a.standoff_by_class.get(c.class_id, float("inf")) <= tol)
+        note = (f"seats in {can}/{total} cells" if not c.requires_facet
+                else "requires_facet: never conformed, facet only")
+        print(f"  {c.class_id}: needs R >= {rr['across_width']:.0f} mm across width, "
+              f">= {rr['across_height']:.0f} mm along height — {note}")
+    print(f"  flattest cell on the shell: r_min {shell_rmin_max:.0f} mm")
 
     authored = load_layout(HERE / "layout.yaml")
     placed, errors = resolve_layout(chart, classes, authored)
     pairs, aworst, amean = asymmetry_summary(placed)
-    n_twins = sum(1 for p in placed if p.is_twin)
-    n_invalid = sum(1 for p in placed if not p.valid)
+    print()
     print(f"layout        {len(authored)} authored -> {len(placed)} placed "
-          f"({n_twins} derived twins, {n_invalid} invalid)")
-    print(f"mirroring     outline asymmetry worst {aworst:.2f} mm, "
-          f"mean {amean:.3f} mm over {len(pairs)} pairs")
+          f"({sum(1 for p in placed if p.is_twin)} twins, "
+          f"{sum(1 for p in placed if not p.valid)} invalid)")
+    print(f"mirroring     outline asymmetry worst {aworst:.4f} mm, "
+          f"mean {amean:.4f} mm over {len(pairs)} pairs")
     for e in errors:
         print(f"  ! {e}")
 
+    # facets: deform the real mesh and report silhouette cost
+    if facet_panels(placed):
+        V = np.concatenate([build_meshes(model)[n][0] for n in ("FRONT", "BACK")])
+        th, s = coords.inverse(V, check_mm=None)
+        _, reports = apply_facets(chart, coords, V, np.stack([th, s], -1), placed)
+        for r in reports:
+            print(f"facet         {r.panel_id} @ (theta {r.theta:g}, s {r.s:g}): "
+                  f"shell deviation max {r.max_deviation_mm:.2f} mm, "
+                  f"rms {r.rms_deviation_mm:.2f} mm over {r.affected_vertices} vertices")
+
     try:
         rep = analyze_layering(chart, placed)
-        print(f"layering      {len(rep.overlaps)} overlap pair(s), "
-              f"max stack {rep.max_stack_mm:.1f} mm, visible active "
+        print(f"layering      {len(rep.overlaps)} overlap pair(s), max stack "
+              f"{rep.max_stack_mm:.1f} mm, visible active "
               f"{rep.total_visible / 100:.1f} / {rep.total_active / 100:.1f} cm2")
         for pid, cover in rep.buried_connectors.items():
             print(f"  ! {pid}: connector buried under {', '.join(cover)}")
@@ -84,17 +155,26 @@ def main():
         print(f"layering      ERROR: {exc}")
 
     unc, tot = uncovered_shell_area(chart, placed)
-    print(f"coverage      shell {tot / 100:.0f} cm2, uncovered "
-          f"{100.0 * unc / tot:.1f}%")
+    print(f"coverage      shell {tot / 100:.0f} cm2, uncovered {100 * unc / tot:.1f}%")
 
+    el = electrical_rollup(placed)
     print()
-    print("panels")
-    for p in placed:
-        mark = "" if p.valid else "  INVALID: " + p.problems[0]
-        kind = "twin" if p.is_twin else "src "
-        print(f"  {p.panel_id:<16} {p.cls.class_id:<3} {kind} "
-              f"theta {p.theta:>8.2f}  s {p.s:>7.1f}  rot {p.rotation:>3}  "
-              f"layer {p.layer}{mark}")
+    print("electrical (informational)")
+    print(f"  panels        {el['total_panels']} total: "
+          + ", ".join(f"{k} x{v}" for k, v in sorted(el["counts"].items())))
+    print(f"  cost          ${el['cost_usd']:.2f} at list price"
+          + (f" (+{len(el['cost_unknown_panels'])} unknown)" if el["cost_unknown_panels"] else ""))
+    print(f"  control lines {el['control_lines']}  ({el['control_lines_formula']})")
+    print(f"  full refresh  {el['sequential_refresh_s']:.0f} s sequential"
+          + (f", EXCLUDING {len(el['refresh_unknown_panels'])} panel(s) with "
+             f"unverified refresh: {', '.join(el['refresh_unknown_panels'])}"
+             if el["refresh_unknown_panels"] else ""))
+
+    gaps = unverified_fields(classes)
+    print()
+    print(f"UNVERIFIED DATASHEET FIELDS ({len(gaps)}) — still guesses, not facts")
+    for cid, field, note in gaps:
+        print(f"  {cid}.{field}: {note[:100]}")
 
 
 if __name__ == "__main__":

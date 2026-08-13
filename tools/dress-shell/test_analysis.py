@@ -13,14 +13,16 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from coords import ShellCoords
-from curvature import (analyze_cells, class_distribution, principal_curvatures,
-                       seat_standoff)
+from curvature import (STANDOFF_TOLERANCE_MM, analyze_cells, class_distribution,
+                       principal_curvatures, required_radius, seat_standoff,
+                       tolerance_sweep)
+from facets import apply_facets
 from grid import GridError, GridSpec, ShellGrid
 from layering import (LayeringError, analyze_layering, outline_rect,
                       uncovered_shell_area)
-from layout import AuthoredPanel, SurfaceChart, resolve_layout
-from panels import load_panel_classes
-from shell import ShellModel, ShellParams
+from layout import AuthoredPanel, SurfaceChart, load_layout, resolve_layout
+from panels import PanelClass, load_panel_classes
+from shell import ShellModel, ShellParams, build_meshes
 
 HERE = Path(__file__).resolve().parent
 MODEL = ShellModel(ShellParams())
@@ -29,9 +31,13 @@ CHART = SurfaceChart(MODEL, COORDS)
 CLASSES = load_panel_classes(HERE / "panels.yaml")
 GRID = ShellGrid(CHART, GridSpec(10.0, 25.0))
 
+# synthetic class for layering geometry tests (library-independent)
+SYN = {"M": PanelClass("M", 45.0, 70.0, 1.4, 40.0, 63.0, (2.4, 2.0),
+                       (22.5, 70.0), (0.0, 1.0), 30.0)}
 
-def place(entries):
-    placed, errors = resolve_layout(CHART, CLASSES, entries)
+
+def place(entries, classes=SYN):
+    placed, errors = resolve_layout(CHART, classes, entries)
     assert not errors, errors
     return placed
 
@@ -106,16 +112,30 @@ class TestCurvature(unittest.TestCase):
         self.assertLess(so, 2.0 * est)
 
     def test_class_map_monotone_in_size(self):
-        # any cell that seats L must also seat every smaller class
+        # any cell that seats p370 must also seat p213; facet classes are
+        # excluded from seating entirely
         analyses = analyze_cells(COORDS, CHART, GRID, CLASSES, 2.0, samples=5)
-        order = [c.class_id for c in sorted(CLASSES.values(),
-                                            key=lambda c: c.outline_area)]
         for a in analyses:
-            if a.max_class == "L":
-                for smaller in order[:order.index("L")]:
-                    self.assertLessEqual(a.standoff_by_class[smaller], 2.0)
+            self.assertNotIn("p750", a.standoff_by_class)  # requires_facet
+            if a.max_class == "p370":
+                self.assertLessEqual(a.standoff_by_class["p213"], 2.0)
         dist = class_distribution(analyses)
         self.assertEqual(sum(dist.values()), len(GRID.cells))
+        self.assertNotIn("p750", dist)
+
+    def test_tolerance_sweep_monotone(self):
+        analyses = analyze_cells(COORDS, CHART, GRID, CLASSES, 2.0, samples=5)
+        sweep = tolerance_sweep(analyses, CLASSES, (1.5, 2.0, 2.5, 3.0))
+        nones = [sweep[t].get(None, 0) for t in (1.5, 2.0, 2.5, 3.0)]
+        self.assertEqual(nones, sorted(nones, reverse=True))  # looser -> fewer empty
+        p370 = [sweep[t].get("p370", 0) for t in (1.5, 2.0, 2.5, 3.0)]
+        self.assertEqual(p370, sorted(p370))                  # looser -> more p370
+        self.assertEqual(sweep[2.0], class_distribution(analyses))
+
+    def test_required_radius_matches_chord_model(self):
+        rr = required_radius(CLASSES["p750"], 2.0)
+        self.assertAlmostEqual(rr["across_width"], 111.2**2 / 16.0, places=6)
+        self.assertGreater(rr["across_width"], 770.0)  # nothing on the shell is that flat
 
 
 class TestLayering(unittest.TestCase):
@@ -135,8 +155,8 @@ class TestLayering(unittest.TestCase):
     def test_mount_heights_walk_outward(self):
         rep = analyze_layering(CHART, self.overlapping_pair())
         self.assertEqual(rep.mount_mm["under"], 0.0)
-        self.assertAlmostEqual(rep.mount_mm["over"], CLASSES["M"].thickness)
-        self.assertAlmostEqual(rep.max_stack_mm, 2.0 * CLASSES["M"].thickness)
+        self.assertAlmostEqual(rep.mount_mm["over"], SYN["M"].thickness)
+        self.assertAlmostEqual(rep.max_stack_mm, 2.0 * SYN["M"].thickness)
 
     def test_occlusion_visible_area(self):
         rep = analyze_layering(CHART, self.overlapping_pair())
@@ -171,8 +191,70 @@ class TestLayering(unittest.TestCase):
         self.assertAlmostEqual(total, total2)
         self.assertLess(unc, total)
         # covered area is at most the sum of the two outlines
-        self.assertGreater(unc, total - 2 * CLASSES["M"].outline_area * 1.2)
+        self.assertGreater(unc, total - 2 * SYN["M"].outline_area * 1.2)
 
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestFacets(unittest.TestCase):
+    def _mesh(self):
+        V, _ = build_meshes(MODEL)["FRONT"]
+        th, s = COORDS.inverse(V, check_mm=None)
+        return V, np.stack([th, s], axis=-1)
+
+    def test_facet_flattens_footprint_and_stays_local(self):
+        placed = place([AuthoredPanel("f", "p750", 0.0, 330.0, 0, 0, False)],
+                       classes=CLASSES)
+        V, ts = self._mesh()
+        V2, reports = apply_facets(CHART, COORDS, V, ts, placed, blend_mm=15.0)
+        self.assertEqual(len(reports), 1)
+        r = reports[0]
+        self.assertGreater(r.max_deviation_mm, 1.0)
+        self.assertGreater(r.max_deviation_mm, r.rms_deviation_mm)
+        # inside the footprint the shell lies in the tangent plane
+        f = COORDS.forward(0.0, 330.0)
+        n = np.asarray(f["normal"]); n = n / np.linalg.norm(n)
+        import math as _m
+        mm_per_deg = _m.pi * CHART.r_theta(0.0, 330.0) / 180.0
+        # the outline rect is shifted -3.15 mm laterally from the active
+        # center (p750's AA is off-center); keep a margin larger than that
+        inside = ((np.abs(ts[:, 0]) * mm_per_deg < 0.5 * 111.2 - 6.0)
+                  & (np.abs(ts[:, 1] - 330.0) < 0.5 * 170.2 - 6.0))
+        self.assertGreater(inside.sum(), 50)
+        d = np.abs((V2[inside] - np.asarray(f["position"])) @ n)
+        self.assertLess(float(d.max()), 1e-6)
+        # far away nothing moved
+        far = np.abs(ts[:, 1] - 330.0) > 120.0
+        self.assertAlmostEqual(float(np.abs(V2[far] - V[far]).max()), 0.0, places=12)
+
+    def test_mirrored_facet_reports_both_regions(self):
+        placed = place([AuthoredPanel("f", "p750", 40.0, 330.0, 0, 0, True)],
+                       classes=CLASSES)
+        V, ts = self._mesh()
+        _, reports = apply_facets(CHART, COORDS, V, ts, placed)
+        ids = sorted(r.panel_id for r in reports)
+        self.assertEqual(ids, ["f", "f~twin"])
+        thetas = sorted(r.theta for r in reports)
+        self.assertAlmostEqual(thetas[0], -40.0)
+        self.assertAlmostEqual(thetas[1], 40.0)
+
+
+class TestElectrical(unittest.TestCase):
+    def test_rollup_on_starter_layout(self):
+        from analysis_report import electrical_rollup
+        placed, errors = resolve_layout(CHART, CLASSES, load_layout(HERE / "layout.yaml"))
+        self.assertEqual(errors, [])
+        el = electrical_rollup(placed)
+        n = el["total_panels"]
+        self.assertEqual(el["control_lines"], 2 + 4 * n)
+        expect_cost = sum(p.cls.price_usd for p in placed
+                          if p.valid and p.cls.price_usd is not None)
+        self.assertAlmostEqual(el["cost_usd"], round(expect_cost, 2))
+        # p213 refresh is unverified -> those panels excluded and listed
+        self.assertTrue(all(placed_id.startswith(("cf-badge", "skirt-b", "skirt-c", "bodice"))
+                            for placed_id in el["refresh_unknown_panels"]))
+        self.assertAlmostEqual(el["sequential_refresh_s"],
+                               sum(p.cls.refresh_s for p in placed
+                                   if p.valid and p.cls.refresh_s is not None), places=6)

@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import * as SF from "/surface.js";
 
-const CLASS_COLORS = { XS: 0xb78ce0, S: 0x4fb8b8, M: 0x2e7a8c, L: 0x214c6b };
+const CLASS_COLORS = { p213: 0xb78ce0, p370: 0x3d9a9e, p750: 0x214c6b };
 const INVALID_COLOR = 0xcc2921, ERROR_COLOR = 0xe05545;
 
 const $ = (id) => document.getElementById(id);
@@ -116,7 +116,8 @@ function buildShell(name) {
   g.setAttribute("color", modes.class);
   const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.85, metalness: 0.0, side: THREE.DoubleSide }));
-  mesh.userData = { kind: "shell", piece: name, modes, thetaS: src.theta_s };
+  mesh.userData = { kind: "shell", piece: name, modes, thetaS: src.theta_s,
+                    basePos: Float32Array.from(src.positions) };
   scene.add(mesh);
   shellMeshes.push(mesh);
 }
@@ -169,9 +170,9 @@ function rebuildPanels() {
     const f = surf.forward(p.theta, p.s);
     const { u, v, n } = orthoFrame(f);
     const mount = rep && rep.mount[p.id] !== undefined ? rep.mount[p.id] : 0;
-    const so = SF.seatStandoff(surf, cls, p.theta, p.s);
+    const so = cls.requires_facet ? null : SF.seatStandoff(surf, cls, p.theta, p.s);
     panelStandoffs[p.id] = so;
-    const overTol = so > TOL;
+    const overTol = so !== null && so > TOL;
     const buried = rep && rep.buried[p.id];
 
     const grp = new THREE.Group();
@@ -233,9 +234,22 @@ function rebuildPanels() {
 }
 
 // ---------------------------------------------------------------- resolve
+function updateFacetShell() {
+  // re-derive shell positions from the pristine copy each resolve: facet
+  // panels flatten their footprint, removed facets restore automatically
+  for (const m of shellMeshes) {
+    const { positions } = SF.applyFacets(surf, classes, placed,
+                                         m.userData.basePos, m.userData.thetaS);
+    m.geometry.getAttribute("position").array.set(positions);
+    m.geometry.getAttribute("position").needsUpdate = true;
+    m.geometry.computeVertexNormals();
+  }
+}
+
 function resolveLocal() {
   placed = SF.resolveAll(surf, classes, authored);
   layering = SF.analyzeLayering(surf, classes, placed);
+  updateFacetShell();
   rebuildPanels();
   updateSidebar();
 }
@@ -272,14 +286,26 @@ function updateSidebar() {
   const vis = layering ? layering.totalVisible : 0;
   const act = layering ? layering.totalActive : 0;
   const sAsym = serverInfo?.asymmetry;
+  const validPanels = placed.filter(p => p.valid);
+  let cost = 0, refresh = 0, refreshUnknown = 0;
+  for (const p of validPanels) {
+    const c = classes[p.class];
+    if (c.price_usd != null) cost += c.price_usd;
+    if (c.refresh_s != null) refresh += c.refresh_s; else refreshUnknown++;
+  }
+  const facetLines = (serverInfo?.facets || []).map(f =>
+    `facet <b>${f.panel}</b>: shell dev max ${f.max_deviation_mm} / rms ${f.rms_deviation_mm} mm`);
   $("totals").innerHTML = [
-    `panels <b>${placed.filter(p => p.valid).length}</b> (${Object.entries(counts)
+    `panels <b>${validPanels.length}</b> (${Object.entries(counts)
       .map(([k, v]) => `${k}×${v}`).join(" ") || "none"})`,
     `active area visible <b>${(vis / 100).toFixed(1)}</b> / ${(act / 100).toFixed(1)} cm²`,
     `shell uncovered <b>${unc.toFixed(1)}%</b>`,
     `max stack <b>${layering ? layering.maxStack.toFixed(1) : "?"} mm</b>`,
     sAsym ? `asymmetry worst <b>${sAsym.worst_mm.toFixed(2)}</b> / mean ${sAsym.mean_mm.toFixed(3)} mm` : "",
-  ].join("<br>");
+    ...facetLines,
+    `cost <b>$${cost.toFixed(2)}</b> · lines <b>${2 + 4 * validPanels.length}</b> · ` +
+      `refresh <b>${refresh.toFixed(0)} s</b>${refreshUnknown ? ` (+${refreshUnknown} unverified)` : ""}`,
+  ].filter(Boolean).join("<br>");
 
   // errors
   const errs = [];
@@ -288,7 +314,7 @@ function updateSidebar() {
   for (const p of placed) {
     if (!p.valid) errs.push(`<span class="err">${p.id}: ${p.problems[0]}</span>`);
     const so = panelStandoffs[p.id];
-    if (so > TOL) errs.push(`<span class="err">${p.id}: standoff ${
+    if (so !== null && so > TOL) errs.push(`<span class="err">${p.id}: standoff ${
       Number.isFinite(so) ? so.toFixed(2) + " mm" : "∞"} &gt; ${TOL} mm</span>`);
   }
   for (const [pid, cover] of Object.entries(layering?.buried || {}))
@@ -309,8 +335,9 @@ function updateSidebar() {
     $("selected").innerHTML =
       `<b>${src.id}</b> · ${src.class} · θ ${src.theta.toFixed(2)}° · s ${src.s.toFixed(1)} mm<br>` +
       `rotation ${src.rotation}° · layer ${src.layer} · ${src.mirrored ? "paired" : "single"}<br>` +
-      `standoff ${Number.isFinite(so) ? so.toFixed(2) + " mm" : "∞"} · visible ${
-        layering?.visiblePct[src.id]?.toFixed(0) ?? "?"}%` +
+      (so === null ? '<span class="warn">FLAT FACET</span>'
+        : `standoff ${Number.isFinite(so) ? so.toFixed(2) + " mm" : "∞"}`) +
+      ` · visible ${layering?.visiblePct[src.id]?.toFixed(0) ?? "?"}%` +
       (twin ? `<br>twin: rot ${twin.rotation}° ${twin.valid
         ? `· asym ${twin.asymmetry_mm.toFixed(2)} mm`
         : `· <span class="err">INVALID</span>`}` : "");
@@ -419,12 +446,13 @@ renderer.domElement.addEventListener("pointermove", (ev) => {
   if (hitPanel) {
     const p = hitPanel.object.userData.placed;
     const so = panelStandoffs[p.id];
+    const soTxt = so === null ? '<span class="warn">FLAT FACET</span>'
+      : `standoff ${Number.isFinite(so) ? so.toFixed(2) : "∞"} mm`;
     $("hover").innerHTML =
       `<b>${p.id}</b> ${p.is_twin ? "(derived twin)" : ""}<br>` +
       `class ${p.class} · rot ${p.rotation}° · content rot ${p.content_rotation}°<br>` +
       `layer ${p.layer} · mount ${(layering?.mount[p.id] ?? 0).toFixed(1)} mm<br>` +
-      `standoff ${Number.isFinite(so) ? so.toFixed(2) : "∞"} mm · visible ${
-        layering?.visiblePct[p.id]?.toFixed(0) ?? "?"}%` +
+      `${soTxt} · visible ${layering?.visiblePct[p.id]?.toFixed(0) ?? "?"}%` +
       (p.valid ? "" : `<br><span class="err">${p.problems[0]}</span>`);
     return;
   }

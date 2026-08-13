@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-const CLASS_COLORS = { XS: 0xb78ce0, S: 0x4fb8b8, M: 0x2e7a8c, L: 0x214c6b };
+const CLASS_COLORS = { p213: 0xb78ce0, p370: 0x3d9a9e, p750: 0x214c6b };
 const NONE_COLOR = 0x3a4143, INVALID = 0xcc2921;
 
 const container = document.getElementById("dressViewer");
@@ -110,6 +110,9 @@ function tintPanels(mode) {
     const d = node.userData;
     let color = new THREE.Color(CLASS_COLORS[d.class] ?? 0x888888);
     if (!d.valid) color = new THREE.Color(INVALID);
+    else if (d.facet && mode === "class") {
+      color = new THREE.Color(0x8a6a2f);   // FLAT FACET — flagged distinctly
+    }
     else if (mode === "layer") {
       color = new THREE.Color().setHSL(0.52, 0.5, 0.25 + 0.5 * (d.layer / maxLayer));
     } else if (mode === "standoff") {
@@ -155,9 +158,11 @@ document.getElementById("gridToggle").addEventListener("click", (e) => {
 });
 
 tintPanels("class");
+const facetTxt = (analysis.facets || []).map(f =>
+  ` · FLAT FACET '${f.panel}': shell deviation max ${f.max_deviation_mm} mm`).join("");
 statusEl.textContent =
   `${analysis.panels.length} panels · ${analysis.meta.cell_count} cells · ` +
-  `tolerance ${TOL} mm · asymmetry worst ${analysis.asymmetry.worst_mm} mm`;
+  `tolerance ${TOL} mm · asymmetry worst ${analysis.asymmetry.worst_mm} mm` + facetTxt;
 
 (function loop() {
   requestAnimationFrame(loop);

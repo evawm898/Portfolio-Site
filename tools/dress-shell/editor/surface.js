@@ -322,3 +322,38 @@ export function uncoveredPct(surf, classes, placed, nT = 240, nS = 60) {
   }
   return 100 * unc / total;
 }
+
+
+// -- flat facets (mirrors facets.py) ----------------------------------------
+
+export function applyFacets(surf, classes, placed, basePositions, thetaS,
+                            blendMm = 15) {
+  const out = Float32Array.from(basePositions);
+  const facets = placed.filter(p => p.valid && classes[p.class].requires_facet);
+  for (const p of facets) {
+    const cls = classes[p.class];
+    const f = surf.forward(p.theta, p.s);
+    const n = f.normal;
+    const [dxo, dyo] = frameOffset(cls, p.rotation,
+                                   [cls.outline[0] / 2, cls.outline[1] / 2]);
+    const mmPerDeg = Math.PI * surf.rTheta(p.theta, p.s) / 180;
+    const tc = p.theta + dxo / mmPerDeg, sc = p.s + dyo;
+    const hw = cls.outline[0] / 2, hh = cls.outline[1] / 2;
+    const count = thetaS.length / 2;
+    for (let i = 0; i < count; i++) {
+      const dt = Math.abs(wrap180(thetaS[2 * i] - tc)) * mmPerDeg;
+      const ds = Math.abs(thetaS[2 * i + 1] - sc);
+      const outd = Math.hypot(Math.max(dt - hw, 0), Math.max(ds - hh, 0));
+      if (outd >= blendMm) continue;
+      let t = outd / blendMm;
+      t = 1 - (t * t * (3 - 2 * t));   // 1 inside, smooth to 0 at blend edge
+      const px = out[3 * i] - f.pos[0], py = out[3 * i + 1] - f.pos[1],
+            pz = out[3 * i + 2] - f.pos[2];
+      const d = t * (px * n[0] + py * n[1] + pz * n[2]);
+      out[3 * i] -= d * n[0];
+      out[3 * i + 1] -= d * n[1];
+      out[3 * i + 2] -= d * n[2];
+    }
+  }
+  return { positions: out, hasFacets: facets.length > 0 };
+}

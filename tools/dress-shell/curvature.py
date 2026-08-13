@@ -26,6 +26,13 @@ import numpy as np
 
 _H = 0.5  # mm central-difference step for the profile second derivative
 
+# The single named standoff tolerance. UNVALIDATED ASSUMPTION: 2 mm has not
+# been physically tested — it is surfaced in the analysis JSON and the
+# sweep below exists to show how the design shifts if the real number
+# differs. Do not change the default silently.
+STANDOFF_TOLERANCE_MM = 2.0
+TOLERANCE_SWEEP_MM = (1.5, 2.0, 2.5, 3.0)
+
 
 def fundamental_forms(model, theta_rad, z):
     """E, F, G, L, M, N (arrays ok) at (theta, z), outward normal."""
@@ -102,10 +109,12 @@ def seat_standoff(coords, chart, outline_w, outline_h, theta, s, samples=9):
     return float(np.max(np.abs(d)))
 
 
-def analyze_cells(coords, chart, grid, classes, tolerance_mm=2.0, samples=9):
+def analyze_cells(coords, chart, grid, classes, tolerance_mm=STANDOFF_TOLERANCE_MM,
+                  samples=9):
     """CellAnalysis for every grid cell (vectorized curvature, per-cell
     standoff sampling). `classes` is the panels.yaml dict; class order for
-    "largest" is by outline area."""
+    "largest" is by outline area. Classes marked requires_facet are
+    EXCLUDED from seating — they never conform, they get facets."""
     cells = grid.cells
     tc = np.array([c.theta_c for c in cells])
     sc = np.array([c.s_c for c in cells])
@@ -114,7 +123,8 @@ def analyze_cells(coords, chart, grid, classes, tolerance_mm=2.0, samples=9):
     kmax = np.maximum(np.abs(k1), np.abs(k2))
     r_min = np.where(kmax > 1e-12, 1.0 / kmax, np.inf)
 
-    by_size = sorted(classes.values(), key=lambda c: c.outline_area)
+    by_size = sorted((c for c in classes.values() if not c.requires_facet),
+                     key=lambda c: c.outline_area)
     out = []
     for i, cell in enumerate(cells):
         standoffs = {}
@@ -135,9 +145,37 @@ def analyze_cells(coords, chart, grid, classes, tolerance_mm=2.0, samples=9):
     return out
 
 
-def class_distribution(analyses):
-    """{class_id_or_None: cell count} across the shell."""
+def class_distribution(analyses, tolerance_mm=None, classes=None):
+    """{class_id_or_None: cell count}. With `tolerance_mm` and `classes`
+    given, re-thresholds the cached standoffs at that tolerance instead of
+    using the baked max_class — the basis of the sweep mode."""
+    if tolerance_mm is None:
+        dist = {}
+        for a in analyses:
+            dist[a.max_class] = dist.get(a.max_class, 0) + 1
+        return dist
+    order = [c.class_id for c in
+             sorted((c for c in classes.values() if not c.requires_facet),
+                    key=lambda c: c.outline_area)]
     dist = {}
     for a in analyses:
-        dist[a.max_class] = dist.get(a.max_class, 0) + 1
+        best = None
+        for cid in order:
+            if a.standoff_by_class.get(cid, float("inf")) <= tolerance_mm:
+                best = cid
+        dist[best] = dist.get(best, 0) + 1
     return dist
+
+
+def tolerance_sweep(analyses, classes, tolerances=TOLERANCE_SWEEP_MM):
+    """{tolerance: distribution} over the sweep — how the max-class map
+    shifts if the unvalidated 2 mm assumption is wrong."""
+    return {tol: class_distribution(analyses, tol, classes) for tol in tolerances}
+
+
+def required_radius(cls, tolerance_mm=STANDOFF_TOLERANCE_MM):
+    """Chord-model minimum local radius of curvature to seat this class:
+    w^2/(8*tol) per footprint axis. The binding axis is whichever crosses
+    the more curved direction; both are reported."""
+    return {"across_width": cls.outline_w**2 / (8.0 * tolerance_mm),
+            "across_height": cls.outline_h**2 / (8.0 * tolerance_mm)}

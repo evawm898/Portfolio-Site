@@ -25,6 +25,15 @@ COORDS = ShellCoords(MODEL)
 CHART = SurfaceChart(MODEL, COORDS)
 CLASSES = load_panel_classes(HERE / "panels.yaml")
 
+# Synthetic classes for the mirroring-semantics tests: geometry chosen to
+# exercise every branch (off-axis active centers, side exits), independent
+# of the real hardware library so those tests stay stable.
+SYN = {
+    "L": PanelClass("L", 60.0, 95.0, 1.8, 54.0, 87.0, (3.2, 4.0), (30.0, 0.0), (0.0, -1.0), 30.0),
+    "M": PanelClass("M", 45.0, 70.0, 1.4, 40.0, 63.0, (2.4, 2.0), (22.5, 70.0), (0.0, 1.0), 30.0),
+    "S": PanelClass("S", 30.0, 45.0, 1.0, 25.6, 39.0, (2.2, 3.0), (0.0, 22.5), (-1.0, 0.0), 25.0),
+}
+
 
 def tmpfile(text=None):
     fd = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False,
@@ -117,7 +126,7 @@ class TestLoadValidation(unittest.TestCase):
 class TestMirroring(unittest.TestCase):
     def test_twin_mirrors_active_center_exactly(self):
         src = AuthoredPanel("sk", "L", 36.0, 250.0, 0, 0, True)
-        twin = derive_twin(CHART, CLASSES["L"], src)
+        twin = derive_twin(CHART, SYN["L"], src)
         self.assertEqual(twin.theta, -36.0)
         self.assertEqual(twin.s, 250.0)
         self.assertEqual((twin.layer, twin.is_twin, twin.source_id), (0, True, "sk"))
@@ -127,17 +136,17 @@ class TestMirroring(unittest.TestCase):
         # L: active center 0.2mm off laterally, 0 vertically -> keeping the
         # source rotation costs 2|ex| = 0.4mm, flipping costs 2|ey| = 0.0mm:
         # the twin must flip to 180 and achieve perfect reflection placement.
-        twin = derive_twin(CHART, CLASSES["L"], AuthoredPanel("sk", "L", 36.0, 250.0, 0, 0, True))
+        twin = derive_twin(CHART, SYN["L"], AuthoredPanel("sk", "L", 36.0, 250.0, 0, 0, True))
         self.assertEqual(twin.rotation, 180)
         self.assertAlmostEqual(twin.asymmetry_mm, 0.0, places=12)
         # M: active area rides high (ey = -1.5) but nearly centered laterally
         # (ex = -0.1): 2|ex| = 0.2 < 2|ey| = 3.0 -> keep the source rotation.
-        twin_m = derive_twin(CHART, CLASSES["M"], AuthoredPanel("mm", "M", 40.0, 300.0, 0, 0, True))
+        twin_m = derive_twin(CHART, SYN["M"], AuthoredPanel("mm", "M", 40.0, 300.0, 0, 0, True))
         self.assertEqual(twin_m.rotation, 0)
         self.assertAlmostEqual(twin_m.asymmetry_mm, 0.2, places=12)
         # S: active center exactly on the outline center -> tie (both 0.0):
         # keep the source's rotation.
-        twin_s = derive_twin(CHART, CLASSES["S"], AuthoredPanel("ss", "S", 40.0, 200.0, 180, 0, True))
+        twin_s = derive_twin(CHART, SYN["S"], AuthoredPanel("ss", "S", 40.0, 200.0, 180, 0, True))
         self.assertEqual(twin_s.rotation, 180)
         self.assertAlmostEqual(twin_s.asymmetry_mm, 0.0, places=12)
 
@@ -145,7 +154,7 @@ class TestMirroring(unittest.TestCase):
         # bodice-a's twin: identity would fire the connector through the -90
         # seam, so 180 must win even though S's asymmetry is tied at 0 —
         # and, were it not, legality would still outrank it (priority 1).
-        twin = derive_twin(CHART, CLASSES["S"], AuthoredPanel("bo", "S", 80.0, -60.0, 0, 0, True))
+        twin = derive_twin(CHART, SYN["S"], AuthoredPanel("bo", "S", 80.0, -60.0, 0, 0, True))
         self.assertTrue(twin.valid)
         self.assertEqual(twin.rotation, 180)
 
@@ -174,24 +183,24 @@ class TestMirroring(unittest.TestCase):
         authored = load_layout(HERE / "layout.yaml")
         placed, _ = resolve_layout(CHART, CLASSES, authored)
         pairs, worst, mean = asymmetry_summary(placed)
-        self.assertEqual(len(pairs), 3)
-        # skirt-a and skirt-b are M (keep rot 0, 2|ex| = 0.2); bodice-a is S
-        # forced to 180 by legality (asym 0.0)
-        self.assertAlmostEqual(worst, 0.2, places=12)
-        self.assertAlmostEqual(mean, 0.4 / 3.0, places=12)
+        self.assertEqual(len(pairs), 4)
+        # real hardware is nearly symmetric: p370 exact 0, p213 pairs at
+        # 2|ex| = 2*(2.748 + 23.7046/2 - 14.6) = 0.0006 mm
+        self.assertAlmostEqual(worst, 0.0006, places=4)
+        self.assertAlmostEqual(mean, 3 * 0.0006 / 4.0, places=4)
 
     def test_side_exit_twin_flips_to_180_near_seam(self):
         # S exits sideways (-x). At theta=+80 the exit points toward center
         # front: legal. The naive twin at -80 would fire the connector into
         # the -90 seam; the derivation must flip to 180 instead.
         src = AuthoredPanel("bo", "S", 80.0, -60.0, 0, 0, True)
-        _, (e_theta, _) = connector_geometry(CHART, CLASSES["S"], -80.0, -60.0, 0)
+        _, (e_theta, _) = connector_geometry(CHART, SYN["S"], -80.0, -60.0, 0)
         self.assertLess(e_theta, -90.0)  # the case is real, identity is illegal
-        twin = derive_twin(CHART, CLASSES["S"], src)
+        twin = derive_twin(CHART, SYN["S"], src)
         self.assertTrue(twin.valid)
         self.assertEqual(twin.rotation, 180)
         # and with 180 the connector genuinely clears the seam
-        _, (e_theta2, _) = connector_geometry(CHART, CLASSES["S"], -80.0, -60.0, 180)
+        _, (e_theta2, _) = connector_geometry(CHART, SYN["S"], -80.0, -60.0, 180)
         self.assertGreater(e_theta2, -90.0)
 
     def test_connector_never_mirrored(self):
@@ -200,7 +209,7 @@ class TestMirroring(unittest.TestCase):
         # lateral mirror (dtheta -> -dtheta with ds fixed) that a mirrored
         # part would produce. L's connector is off-axis in both components,
         # so the three shapes are distinguishable.
-        cls = CLASSES["L"]  # connector (30, 0), active center (30.2, 47.5)
+        cls = SYN["L"]  # connector (30, 0), active center (30.2, 47.5)
         (c0t, c0s), _ = connector_geometry(CHART, cls, 40.0, 200.0, 0)
         (c1t, c1s), _ = connector_geometry(CHART, cls, 40.0, 200.0, 180)
         ds0, ds1 = c0s - 200.0, c1s - 200.0
@@ -230,14 +239,14 @@ class TestMirroring(unittest.TestCase):
         # update mechanism.
         src = AuthoredPanel("sk", "L", 36.0, 250.0, 0, 0, True)
         moved = AuthoredPanel("sk", "L", 41.0, 262.5, 0, 2, True)
-        t1 = derive_twin(CHART, CLASSES["L"], src)
-        t2 = derive_twin(CHART, CLASSES["L"], moved)
+        t1 = derive_twin(CHART, SYN["L"], src)
+        t2 = derive_twin(CHART, SYN["L"], moved)
         self.assertEqual((t2.theta, t2.s, t2.layer), (-41.0, 262.5, 2))
         self.assertNotEqual((t1.theta, t1.s), (t2.theta, t2.s))
 
     def test_center_front_panel_is_single(self):
         placed, errors = resolve_layout(
-            CHART, CLASSES, [AuthoredPanel("cf", "M", 0.0, 220.0, 0, 0, False)])
+            CHART, SYN, [AuthoredPanel("cf", "M", 0.0, 220.0, 0, 0, False)])
         self.assertEqual(errors, [])
         self.assertEqual(len(placed), 1)
         self.assertFalse(placed[0].is_twin)
@@ -246,21 +255,25 @@ class TestMirroring(unittest.TestCase):
         authored = load_layout(HERE / "layout.yaml")
         placed, errors = resolve_layout(CHART, CLASSES, authored)
         self.assertEqual(errors, [])
-        # 5 authored, 3 mirrored -> 8 placed
-        self.assertEqual(len(placed), 8)
+        # 6 authored, 4 mirrored -> 10 placed
+        self.assertEqual(len(placed), 10)
         self.assertTrue(all(p.valid for p in placed),
                         [p.problems for p in placed if not p.valid])
         twins = {p.source_id: p for p in placed if p.is_twin}
-        self.assertEqual(set(twins), {"skirt-a", "skirt-b", "bodice-a"})
-        self.assertEqual(twins["bodice-a"].rotation, 180)  # the seam case
-        self.assertEqual(twins["skirt-a"].rotation, 0)    # M: 2|ex| < 2|ey|
-        self.assertEqual(twins["skirt-b"].rotation, 0)    # M: 2|ex| < 2|ey|
+        self.assertEqual(set(twins), {"skirt-a", "skirt-b", "skirt-c", "bodice-a"})
+        # p370's active area is exactly centered laterally (2.98 + 23.52 =
+        # 26.5 = W/2): identity is a PERFECT reflection, asymmetry 0
+        self.assertEqual(twins["skirt-a"].rotation, 0)
+        self.assertAlmostEqual(twins["skirt-a"].asymmetry_mm, 0.0, places=9)
+        # p213 twins keep rotation 0 (2|ex| ~ 0.0006 mm << 2|ey| = 5.25 mm)
+        for pid in ("skirt-b", "skirt-c", "bodice-a"):
+            self.assertEqual(twins[pid].rotation, 0)
 
     def test_back_piece_mirroring(self):
         # theta 150 lives on the BACK piece; its twin at -150 does too, and
         # the seam checks must use the BACK piece's bounds (no wrap bugs).
         src = AuthoredPanel("bk", "XS", 150.0, 250.0, 0, 0, True)
-        twin = derive_twin(CHART, CLASSES["XS"], src)
+        twin = derive_twin(CHART, SYN["S"], src)
         self.assertTrue(twin.valid)
         self.assertEqual(twin.theta, -150.0)
         self.assertEqual(wrap180(twin.theta - 180.0), 30.0)
@@ -268,30 +281,72 @@ class TestMirroring(unittest.TestCase):
 
 class TestPanelLibrary(unittest.TestCase):
     def test_classes_load(self):
-        self.assertEqual(set(CLASSES), {"XS", "S", "M", "L"})
-        self.assertEqual(CLASSES["S"].connector_exit, (-1.0, 0.0))
+        self.assertEqual(set(CLASSES), {"p213", "p370", "p750"})
+        self.assertEqual(CLASSES["p750"].connector_exit, (-1.0, 0.0))
+        self.assertEqual(CLASSES["p370"].chipset, "UC8253")
+        self.assertEqual(CLASSES["p213"].palette,
+                         ("black", "white", "red", "yellow"))
+        self.assertIsNone(CLASSES["p213"].refresh_s)   # honest gap
+        self.assertEqual(CLASSES["p370"].refresh_s, 22.0)
+        self.assertTrue(CLASSES["p750"].requires_facet)
+        self.assertFalse(CLASSES["p213"].requires_facet)
+
+    def test_unverified_fields_surface_the_gaps(self):
+        from panels import unverified_fields
+        gaps = unverified_fields(CLASSES)
+        keys = {(cid, field) for cid, field, _ in gaps}
+        self.assertIn(("p213", "refresh_s"), keys)
+        self.assertIn(("p213", "mechanical"), keys)     # cross-variant glass
+        self.assertIn(("p370", "connector_chirality"), keys)
+        self.assertIn(("p750", "connector_chirality"), keys)
 
     def test_bad_library_fails_loudly(self):
+        extras = (
+            "    chipset: TEST1\n"
+            "    palette: [black]\n"
+            "    refresh_s: 10.0\n"
+            "    price_usd: 1.0\n"
+            "    requires_facet: false\n"
+            "    provenance: {all: test}\n"
+        )
         bad = (
             "units: mm\n"
             "classes:\n"
-            "  A:  # structural problems\n"
-            "    outline: {width: 30.0, height: 45.0, depth: 2}\n"
-            "    thickness: -1.0\n"
+            "  A:  # missing the new required keys entirely\n"
+            "    outline: {width: 30.0, height: 45.0}\n"
+            "    thickness: 1.0\n"
             "    active_area: {width: 25.0, height: 39.0, offset: [2.0, 3.0]}\n"
             "    connector: {origin: [15.0, 0.0], exit_vector: [0.0, -1.0], escape_mm: 10.0}\n"
-            "  B:  # cross-field problems (all fields parse)\n"
+            "  B:  # cross-field problems (all fields present)\n"
             "    outline: {width: 30.0, height: 45.0}\n"
             "    thickness: 1.0\n"
             "    active_area: {width: 40.0, height: 39.0, offset: [2.0, 3.0]}\n"
             "    connector: {origin: [15.0, 20.0], exit_vector: [0.0, 0.0], escape_mm: 10.0}\n"
+            + extras +
+            "  C:  # bad new-field values\n"
+            "    outline: {width: 30.0, height: 45.0}\n"
+            "    thickness: 1.0\n"
+            "    active_area: {width: 25.0, height: 39.0, offset: [2.0, 3.0]}\n"
+            "    connector: {origin: [15.0, 0.0], exit_vector: [0.0, -1.0], escape_mm: 10.0}\n"
+            "    chipset: ''\n"
+            "    palette: []\n"
+            "    refresh_s: -3\n"
+            "    price_usd: 1.0\n"
+            "    requires_facet: maybe\n"
+            "    provenance: {}\n"
         )
         with self.assertRaises(PanelSpecError) as ctx:
             load_panel_classes(tmpfile(bad))
         msg = str(ctx.exception)
-        for frag in ("unknown key(s): depth", "thickness: must be > 0",
-                     "does not fit inside the outline", "must lie on the outline perimeter",
-                     "exit_vector: must be non-zero"):
+        for frag in ("missing required key(s): chipset",
+                     "does not fit inside the outline",
+                     "must lie on the outline perimeter",
+                     "exit_vector: must be non-zero",
+                     "chipset: expected a non-empty string",
+                     "palette: expected a non-empty list",
+                     "refresh_s: expected a positive number or null",
+                     "requires_facet: expected true/false",
+                     "provenance: expected a non-empty mapping"):
             self.assertIn(frag, msg)
 
 

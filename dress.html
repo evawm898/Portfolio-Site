@@ -82,7 +82,7 @@
     <section class="project__section">
       <h2 class="project__section-title"><span>02</span>The Shell, Live</h2>
       <div class="project__section-body">
-        <p>This viewer is read-only: it loads the committed glTF export and analysis produced offline by the Python pipeline &mdash; nothing is computed at request time. Drag to orbit, scroll to zoom. The <em>max class</em> shading is the design guidance layer: each cell is tinted by the largest panel that fits it (darkest teal-blue = L, down to violet = XS only, charcoal = nothing fits within tolerance).</p>
+        <p>This viewer is read-only: it loads the committed glTF export and analysis produced offline by the Python pipeline &mdash; nothing is computed at request time; the flat facet is already baked into the exported shell. Drag to orbit, scroll to zoom. The <em>max class</em> shading is the design guidance layer: each cell is tinted by the largest panel that conforms there (teal = 3.7&Prime;, violet = 2.13&Prime; only, charcoal = nothing fits); the ochre panel is the 7.5&Prime; on its flat facet.</p>
         <figure class="dress-viewer-wrap" style="margin:0 0 0.75rem;">
           <div id="dressViewer"></div>
           <div class="dress-controls">
@@ -107,7 +107,7 @@
       <div class="project__section-body">
         <p>Numbers below are read from the committed analysis file (the same data driving the shading), not recomputed by this page.</p>
         <div class="dress-stats" id="dressStats">loading dress/dress-analysis.json &hellip;</div>
-        <p>Two findings shaped the current layout. First, the large panel class is genuinely marginal on this garment: at the hem the surface radius makes a 60&thinsp;mm-wide rigid panel lift almost exactly 2&thinsp;mm, so L seats only near center front on the lower skirt, where the elliptical cross-section is flattest. Second, the bodice&rsquo;s side-seam region forces the mirroring logic to earn its keep: the side-exit connector of the small class would fire through the seam on the mirrored side, so the derived twin flips 180&deg; &mdash; connector legality outranking symmetry, exactly as designed.</p>
+        <p>The panel library is now real hardware &mdash; three Adafruit bare e-ink modules (2.13&Prime; quad-color, 3.7&Prime; and 7.5&Prime; tri-color), dimensioned from their manufacturer datasheets. Two findings shaped the layout. First, the 7.5&Prime; is not a placeable panel on this garment at all: at 111&thinsp;mm across it needs roughly a 770&thinsp;mm local radius to stay under the 2&thinsp;mm standoff tolerance, and the flattest cell on the shell offers about 258&thinsp;mm. It is seated instead on a deliberate <strong>flat facet</strong> &mdash; the shell is locally flattened to a plane across the panel footprint (with a smooth blend band), and the silhouette cost is reported as the shell&rsquo;s deviation, ochre-flagged in the viewer. Second, the 3.7&Prime; conforms only on the lower skirt within roughly &plusmn;35&deg; of center front &mdash; and the facet occupies the very middle of that band, so the 3.7&Prime; pair sits just beside it. The 2mm tolerance itself is an untested assumption; the committed analysis carries a sweep (1.5&ndash;3&thinsp;mm) showing how the map shifts if the real number differs.</p>
       </div>
     </section>
 
@@ -160,12 +160,15 @@
     const pct = k => (100 * (d[k] || 0) / total).toFixed(0) + '%';
     document.getElementById('dressStats').textContent = [
       `grid          ${a.meta.cell_count} cells (${a.meta.grid.dtheta}° × ${a.meta.grid.ds} mm), width ${a.meta.cell_width_mm[0]}–${a.meta.cell_width_mm[2]} mm`,
-      `max class     XS ${pct('XS')} · S ${pct('S')} · M ${pct('M')} · L ${pct('L')} · none ${pct('None')}   (tolerance ${a.meta.tolerance_mm} mm)`,
+      `max class     p213 ${pct('p213')} · p370 ${pct('p370')} · none ${pct('None')}   (tolerance ${a.meta.tolerance_mm} mm; p750 = facet only)`,
       `layout        ${a.panels.filter(p => !p.is_twin).length} authored → ${a.panels.length} placed (${a.panels.filter(p => p.is_twin).length} derived twins)`,
       `mirroring     outline asymmetry worst ${a.asymmetry.worst_mm} mm · mean ${a.asymmetry.mean_mm} mm`,
       `layering      max stack ${lay.max_stack_mm} mm · visible active ${(lay.total_visible_mm2 / 100).toFixed(1)} / ${(lay.total_active_mm2 / 100).toFixed(1)} cm²`,
       `coverage      shell ${(cov.shell_area_mm2 / 100).toFixed(0)} cm² · uncovered ${cov.uncovered_pct}%`,
-    ].join('\n');
+      ...(a.facets || []).map(f => `facet         ${f.panel}: shell deviation max ${f.max_deviation_mm} mm, rms ${f.rms_deviation_mm} mm`),
+      a.electrical ? `electrical    ${a.electrical.total_panels} panels · $${a.electrical.cost_usd} · ${a.electrical.control_lines} control lines · ${a.electrical.sequential_refresh_s}s+ sequential refresh (${a.electrical.refresh_unknown_panels.length} unverified)` : '',
+      a.unverified ? `unverified    ${a.unverified.length} datasheet fields still open (see tools/dress-shell/panels.yaml)` : '',
+    ].filter(Boolean).join('\n');
   }).catch(() => {
     document.getElementById('dressStats').textContent = 'could not load dress/dress-analysis.json';
   });

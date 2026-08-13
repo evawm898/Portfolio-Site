@@ -33,6 +33,12 @@ class PanelClass:
     connector_origin: tuple  # (x, y) on the outline perimeter
     connector_exit: tuple    # unit vector, panel frame
     escape_mm: float         # required clear run of the connector exit path
+    chipset: str = ""
+    palette: tuple = ()
+    refresh_s: float = None   # full image update, seconds; None = unverified
+    price_usd: float = None   # list price; None = unknown
+    requires_facet: bool = False  # seated on a flat facet, never conformed
+    provenance: tuple = ()    # ((field, note), ...) — informational
 
     @property
     def active_center(self):
@@ -88,9 +94,35 @@ def _pair(node, key, path, errors):
 
 def _parse_class(class_id, node, errors):
     path = f"classes.{class_id}"
-    if not _require_keys(node, {"outline", "thickness", "active_area", "connector"},
+    if not _require_keys(node, {"outline", "thickness", "active_area", "connector",
+                                "chipset", "palette", "refresh_s", "price_usd",
+                                "requires_facet", "provenance"},
                          path, errors):
         return None
+
+    chipset = node.get("chipset")
+    if not isinstance(chipset, str) or not chipset:
+        errors.append(f"{path}.chipset: expected a non-empty string, got {chipset!r}")
+    palette = node.get("palette")
+    if not (isinstance(palette, list) and palette
+            and all(isinstance(c, str) for c in palette)):
+        errors.append(f"{path}.palette: expected a non-empty list of color names")
+    refresh = node.get("refresh_s")
+    if refresh is not None and (isinstance(refresh, bool)
+                                or not isinstance(refresh, (int, float)) or refresh <= 0):
+        errors.append(f"{path}.refresh_s: expected a positive number or null, got {refresh!r}")
+    price = node.get("price_usd")
+    if price is not None and (isinstance(price, bool)
+                              or not isinstance(price, (int, float)) or price <= 0):
+        errors.append(f"{path}.price_usd: expected a positive number or null, got {price!r}")
+    facet = node.get("requires_facet")
+    if not isinstance(facet, bool):
+        errors.append(f"{path}.requires_facet: expected true/false, got {facet!r}")
+    prov = node.get("provenance")
+    if not (isinstance(prov, dict) and prov
+            and all(isinstance(k, str) and isinstance(v, str) for k, v in prov.items())):
+        errors.append(f"{path}.provenance: expected a non-empty mapping of "
+                      f"field -> source note")
 
     ow = oh = None
     if _require_keys(node.get("outline"), {"width", "height"}, f"{path}.outline", errors):
@@ -145,7 +177,28 @@ def _parse_class(class_id, node, errors):
         connector_origin=origin,
         connector_exit=(exit_vec[0] / norm, exit_vec[1] / norm),
         escape_mm=escape,
+        chipset=str(chipset), palette=tuple(palette),
+        refresh_s=None if refresh is None else float(refresh),
+        price_usd=None if price is None else float(price),
+        requires_facet=bool(facet),
+        provenance=tuple(sorted((str(k), str(v)) for k, v in prov.items())),
     )
+
+
+def unverified_fields(classes):
+    """[(class_id, field, note)] for every provenance entry flagged
+    'unverified' plus every null numeric field — the honest-gaps list the
+    console report prints."""
+    gaps = []
+    for cls in classes.values():
+        for field, note in cls.provenance:
+            if "unverified" in note.lower():
+                gaps.append((cls.class_id, field, " ".join(note.split())))
+        if cls.refresh_s is None:
+            gaps.append((cls.class_id, "refresh_s", "null — no trusted source"))
+        if cls.price_usd is None:
+            gaps.append((cls.class_id, "price_usd", "null — no trusted source"))
+    return gaps
 
 
 def load_panel_classes(path):

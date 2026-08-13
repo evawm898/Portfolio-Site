@@ -28,20 +28,23 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from coords import ShellCoords
-from curvature import analyze_cells, class_distribution, seat_standoff
+from curvature import (STANDOFF_TOLERANCE_MM, TOLERANCE_SWEEP_MM, analyze_cells,
+                       class_distribution, required_radius, seat_standoff,
+                       tolerance_sweep)
+from facets import apply_facets
 from grid import GridSpec, ShellGrid
 from layering import analyze_layering, uncovered_shell_area
 from layout import (SurfaceChart, _frame_offset, asymmetry_summary,
                     connector_geometry, load_layout, resolve_layout)
-from panels import load_panel_classes
+from panels import load_panel_classes, unverified_fields
 from shell import ShellModel, ShellParams, build_meshes
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 OUT_DIR = REPO_ROOT / "dress"
 
-CLASS_COLORS = {"XS": [0.72, 0.55, 0.88], "S": [0.31, 0.72, 0.72],
-                "M": [0.18, 0.48, 0.55], "L": [0.13, 0.30, 0.42]}
+CLASS_COLORS = {"p213": [0.72, 0.55, 0.88], "p370": [0.24, 0.60, 0.62],
+                "p750": [0.13, 0.30, 0.42]}
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +184,7 @@ def panel_box(chart, coords, p, mount):
     return corners, F, aq, AF, line
 
 
-def build_export(grid_spec=GridSpec(), tolerance_mm=2.0, samples=7):
+def build_export(grid_spec=GridSpec(), tolerance_mm=STANDOFF_TOLERANCE_MM, samples=7):
     """Everything the GLB + sidecar need, computed once."""
     model = ShellModel(ShellParams())
     coords = ShellCoords(model)
@@ -195,10 +198,43 @@ def build_export(grid_spec=GridSpec(), tolerance_mm=2.0, samples=7):
     analyses = analyze_cells(coords, chart, grid, classes, tolerance_mm, samples)
     layering = analyze_layering(chart, placed)
     uncovered, total_area = uncovered_shell_area(chart, placed)
+
+    # facet deformation, applied per piece so the GLB carries the flattened
+    # shell the garment would actually be built with
+    pieces, facet_reports = {}, []
+    for name in ("FRONT", "BACK"):
+        V, F = build_meshes(model)[name]
+        theta, s = coords.inverse(V, check_mm=None)
+        ts = np.stack([theta, s], axis=-1)
+        V2, reps = apply_facets(chart, coords, V, ts, placed)
+        pieces[name] = (V2, F, ts)
+        for r in reps:
+            if r.affected_vertices:
+                facet_reports.append(r)
+    # merge per-piece reports for the same facet panel
+    merged = {}
+    for r in facet_reports:
+        m = merged.get(r.panel_id)
+        if m is None or r.affected_vertices > m.affected_vertices:
+            merged[r.panel_id] = r
     return dict(model=model, coords=coords, chart=chart, classes=classes,
                 placed=placed, grid=grid, analyses=analyses, layering=layering,
                 uncovered=uncovered, total_area=total_area,
-                tolerance=tolerance_mm)
+                tolerance=tolerance_mm, pieces=pieces,
+                facet_reports=sorted(merged.values(), key=lambda r: r.panel_id))
+
+
+def _mesh_normals(V, F):
+    """Area-weighted per-vertex normals of a triangle mesh (used after facet
+    deformation, where the analytic surface normal no longer applies)."""
+    n = np.zeros_like(V)
+    fv = V[F]
+    fn = np.cross(fv[:, 1] - fv[:, 0], fv[:, 2] - fv[:, 0])
+    for k in range(3):
+        np.add.at(n, F[:, k], fn)
+    lengths = np.linalg.norm(n, axis=1, keepdims=True)
+    lengths[lengths == 0] = 1.0
+    return n / lengths
 
 
 def build_glb(ex):
@@ -213,14 +249,13 @@ def build_glb(ex):
     class_mats = {cid: b.add_material(f"class-{cid}", rgb)
                   for cid, rgb in CLASS_COLORS.items()}
 
-    # shell pieces with per-vertex (theta, s)
+    # shell pieces with per-vertex (theta, s); facets already baked into the
+    # vertex positions, so normals come from the deformed mesh itself
     for name, mat in (("FRONT", m_front), ("BACK", m_back)):
-        V, F = build_meshes(ex["model"])[name]
-        theta, s = coords.inverse(V, check_mm=None)
-        fr = coords.forward(theta, s)
+        V, F, ts = ex["pieces"][name]
         b.add_mesh_node(f"shell/{name}",
-                        [b.tri_primitive(V, F, mat, normals=fr["normal"],
-                                         theta_s=np.stack([theta, s], axis=-1))],
+                        [b.tri_primitive(V, F, mat, normals=_mesh_normals(V, F),
+                                         theta_s=ts)],
                         extras={"piece": name})
 
     # grid overlay as LINES
@@ -246,8 +281,9 @@ def build_glb(ex):
         mount = rep.mount_mm.get(p.panel_id, 0.0)
         corners, F, aq, AF, line = panel_box(chart, coords, p, mount)
         body_mat = m_invalid if not p.valid else class_mats.get(p.cls.class_id, m_front)
-        standoff = seat_standoff(coords, chart, p.cls.outline_w, p.cls.outline_h,
-                                 p.theta, p.s)
+        standoff = (None if p.cls.requires_facet else
+                    seat_standoff(coords, chart, p.cls.outline_w, p.cls.outline_h,
+                                  p.theta, p.s))
         prims = [b.tri_primitive(corners, F, body_mat),
                  b.tri_primitive(aq, AF, m_active),
                  b.line_primitive(line, np.array([[0, 1]]), m_conn)]
@@ -256,11 +292,19 @@ def build_glb(ex):
             "layer": p.layer, "rotation": p.rotation,
             "content_rotation": p.content_rotation,
             "is_twin": p.is_twin, "valid": p.valid,
+            "facet": p.cls.requires_facet,
             "theta": round(p.theta, 6), "s": round(p.s, 6),
-            "standoff_mm": round(standoff, 3) if math.isfinite(standoff) else None,
+            "standoff_mm": (round(standoff, 3)
+                            if standoff is not None and math.isfinite(standoff)
+                            else None),
             "mount_mm": round(mount, 3),
         })
     return b.to_glb()
+
+
+def _electrical(placed):
+    from analysis_report import electrical_rollup
+    return electrical_rollup(placed)
 
 
 def build_sidecar(ex):
@@ -284,6 +328,11 @@ def build_sidecar(ex):
         "classes": {c.class_id: {
             "outline": [c.outline_w, c.outline_h], "thickness": c.thickness,
             "active": [c.active_w, c.active_h], "color": CLASS_COLORS.get(c.class_id),
+            "chipset": c.chipset, "palette": list(c.palette),
+            "refresh_s": c.refresh_s, "price_usd": c.price_usd,
+            "requires_facet": c.requires_facet,
+            "required_radius_mm": {k: r(v, 1) for k, v in
+                                   required_radius(c, ex["tolerance"]).items()},
         } for c in ex["classes"].values()},
         "cells": [{
             "i": a.cell_index, "k1": r(a.k1, 7), "k2": r(a.k2, 7),
@@ -297,10 +346,22 @@ def build_sidecar(ex):
             "s": r(p.s), "rotation": p.rotation,
             "content_rotation": p.content_rotation, "layer": p.layer,
             "is_twin": p.is_twin, "valid": p.valid,
+            "facet": p.cls.requires_facet,
             "problems": list(p.problems),
             "mount_mm": r(rep.mount_mm.get(p.panel_id, 0.0), 3),
             "visible_pct": r(rep.visible_pct.get(p.panel_id, 100.0), 1),
         } for p in ex["placed"]],
+        "facets": [{
+            "panel": fr.panel_id, "theta": r(fr.theta), "s": r(fr.s),
+            "max_deviation_mm": r(fr.max_deviation_mm, 2),
+            "rms_deviation_mm": r(fr.rms_deviation_mm, 2),
+        } for fr in ex["facet_reports"]],
+        "tolerance_sweep": {str(t): {str(k): v for k, v in d.items()}
+                            for t, d in tolerance_sweep(ex["analyses"], ex["classes"],
+                                                        TOLERANCE_SWEEP_MM).items()},
+        "electrical": _electrical(ex["placed"]),
+        "unverified": [{"class": c, "field": f, "note": " ".join(n.split())}
+                       for c, f, n in unverified_fields(ex["classes"])],
         "layering": {
             "max_stack_mm": r(rep.max_stack_mm, 3),
             "total_active_mm2": r(rep.total_active, 1),
