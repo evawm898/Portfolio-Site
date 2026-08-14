@@ -122,14 +122,42 @@ class ShellParams:
                                          # In authored mode the a/b ratio is
                                          # an OUTPUT: a(z) is solved from the
                                          # perimeter schedule via Ramanujan.
+    section_curves: object = None        # SILHOUETTE-FIRST: both semi-axes
+                                         # authored (ComposedSections); the
+                                         # perimeter is an OUTPUT and body
+                                         # circumferences become clearance
+                                         # checks. Mutually exclusive with
+                                         # depth_curve.
+
+
+_DRESS_CURVES = None
+
+
+def dress_curves():
+    """The committed SILHOUETTE-FIRST sections: side + front traces,
+    hem-pinned to the given 61 in. Cached per process (the two fits cost
+    ~a second)."""
+    global _DRESS_CURVES
+    if _DRESS_CURVES is None:
+        from pathlib import Path
+        from silhouette import ComposedSections, FittedDepth, extract_from_image
+        here = Path(__file__).resolve().parent
+        side = FittedDepth(
+            extract_from_image(here / "silhouette-trace.png")[0])
+        front = FittedDepth(
+            extract_from_image(here / "silhouette-front.png", fill="dark")[0],
+            knot_mm=60.0)
+        _DRESS_CURVES = ComposedSections(side, front, hem_perimeter_mm=1549.4)
+    return _DRESS_CURVES
 
 
 def dress_params() -> ShellParams:
-    """The committed DRESS design: skirt + bodice with the given neckline
-    (CF 250 / side 205, taper confirmed). Export, editor, and reports
-    build from this one constructor so there is a single source of truth."""
+    """The committed DRESS design: silhouette-first sections (both traces,
+    hem-pinned) with the given neckline (CF 250 / side 205). Export,
+    editor, and reports build from this one constructor so there is a
+    single source of truth."""
     from neckline import DESIGN_NECKLINE
-    return ShellParams(bodice=DESIGN_NECKLINE)
+    return ShellParams(bodice=DESIGN_NECKLINE, section_curves=dress_curves())
 
 
 class ShellModel:
@@ -209,6 +237,18 @@ class ShellModel:
                         f"{a_b / b_b:.6f}, skirt uses {skirt_ratio}")
             self.z_top = float(p.bodice.cf_height)
 
+        # -- silhouette-first mode (both axes authored, P = output) ----------
+        self.curves = p.section_curves
+        if self.curves is not None:
+            if p.depth_curve is not None:
+                raise ShellError("choose ONE of depth_curve / section_curves")
+            if (self.curves.v_lo > self.z_bottom + 1e-6
+                    or self.curves.v_hi < self.z_top - 1e-6):
+                raise ShellError(
+                    f"section curves cover [{self.curves.v_lo:.1f}, "
+                    f"{self.curves.v_hi:.1f}] mm but the shell needs "
+                    f"[{self.z_bottom:.1f}, {self.z_top:.1f}]")
+
         # -- authored-depth mode (silhouette honored) ------------------------
         self.depth = p.depth_curve
         self._a_tab = None
@@ -275,7 +315,7 @@ class ShellModel:
         solved width. RATIO mode: the skirt schedule k(u), hem value at
         u = 0 blending monotonically to the bodice waist ratio at
         u = drop (bodice sections carry their own anchor ratios)."""
-        if self.depth is not None:
+        if self.depth is not None or self.curves is not None:
             a, b = self.semi_axes(z)
             return np.asarray(a) / np.asarray(b)
         x = self._u(z) / self.params.drop
@@ -299,11 +339,15 @@ class ShellModel:
 
     def semi_axes(self, z):
         """(a, b) at height z.
-        AUTHORED mode: b from the silhouette curve, a from the perimeter
-        schedule (precomputed Newton table) — the ratio is an output.
+        SILHOUETTE-FIRST mode: both axes authored from the traces.
+        AUTHORED-DEPTH mode: b from the silhouette curve, a from the
+        perimeter schedule (precomputed Newton table).
         RATIO mode: skirt solved from the schedule and k(z); bodice from
         the interpolated anchor sections."""
         z = np.asarray(z, dtype=float)
+        if self.curves is not None:
+            return (np.asarray(self.curves.a(z), dtype=float),
+                    np.asarray(self.curves.b(z), dtype=float))
         if self.depth is not None:
             return self._a_of_z(z), np.asarray(self.depth.b(z), dtype=float)
         a_s, b_s = solve_semi_axes(
@@ -367,6 +411,8 @@ class ShellModel:
         anchor circumference schedule (authored mode) or the Ramanujan
         perimeter of the interpolated sections (ratio mode)."""
         z = np.asarray(z, dtype=float)
+        if self.curves is not None:
+            return np.asarray(self.curves.perimeter(z), dtype=float) / math.tau
         r = np.asarray(self.r_super(z), dtype=float)
         if self.sections is None:
             return r
@@ -382,8 +428,12 @@ class ShellModel:
 
     def mean_slope(self, z):
         """d(r_eq)/dz: closed-form on the skirt, guarded FD on the bodice
-        (stencils never crossing the crease)."""
+        (stencils never crossing the crease). Silhouette-first: guarded FD
+        of the authored perimeter everywhere (the curves are smooth
+        through the waist — the reference garment has no crease)."""
         z = np.asarray(z, dtype=float)
+        if self.curves is not None:
+            return self._d_guarded(self.mean_radius, z)
         sl = np.asarray(self.dr_super(z), dtype=float)
         if self.sections is None:
             return sl
@@ -504,7 +554,8 @@ class ShellModel:
         sections it varies with theta; None returns the r_eq (mean) value
         for the crease headline."""
         if theta_deg is None:
-            return math.degrees(math.atan(abs(float(self.dr_super(0.0)))))
+            return math.degrees(math.atan(abs(float(
+                self.mean_slope(np.array(-1e-9))))))
         th = math.radians(float(theta_deg))
         h = 0.5
         p1 = self.point(np.array(th), np.array(self.z_top))
@@ -524,11 +575,18 @@ class ShellModel:
         return float(np.max(np.abs(r_skirt - r_bod)))
 
     def crease_angle_deg(self):
-        """Waist crease: skirt tangent + bodice launch. The monotone bodice
-        interpolant launches vertically (see bodice.py), so the crease is
-        the skirt tangent alone — reported per theta for honesty."""
+        """Waist junction angle: the angle between the meridian tangents
+        just below and just above the waist. Silhouette-first: the traces
+        are smooth through the waist, so this reports ~0 — the reference
+        garment has no crease, and the seam band remains a construction
+        joint, not a geometric kink. Ratio mode: skirt tangent + vertical
+        bodice launch."""
         if self.sections is None:
             return None
+        if self.curves is not None:
+            s_lo = float(self.mean_slope(np.array(-1e-6)))
+            s_hi = float(self.mean_slope(np.array(1e-6)))
+            return abs(math.degrees(math.atan(s_lo) - math.atan(s_hi)))
         return self.waist_tangent_deg()   # + 0.0 bodice launch
 
     def z_top_at(self, theta_deg):

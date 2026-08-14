@@ -43,14 +43,30 @@ class TestDressModel(unittest.TestCase):
         self.assertAlmostEqual(a_lo, a_hi, places=6)
         self.assertAlmostEqual(b_lo, b_hi, places=6)
 
-    def test_crease_is_preserved(self):
-        # one-sided slopes: skirt flares (~-0.88 going down is +r), bodice
-        # launches vertically; stencils must never blend across z = 0
+    def test_waist_is_smooth_under_silhouette_first(self):
+        # the traces are smooth through the waist: the old crease is GONE
+        # by design (the seam band remains a construction joint). The
+        # one-sided slopes agree and the junction angle is ~0.
         below = float(MODEL.mean_slope(-1e-6))
         above = float(MODEL.mean_slope(1e-6))
-        self.assertLess(below, -0.8)
-        self.assertLess(abs(above), 1e-3)
-        self.assertAlmostEqual(MODEL.crease_angle_deg(), 41.29, delta=0.05)
+        self.assertLess(abs(below - above), 0.05)
+        self.assertLess(MODEL.crease_angle_deg(), 1.5)
+        # the RATIO-mode dress (no curves) still has its 41.3 deg crease
+        from shell import ShellModel, ShellParams
+        from neckline import DESIGN_NECKLINE
+        m_ratio = ShellModel(ShellParams(bodice=DESIGN_NECKLINE))
+        self.assertAlmostEqual(m_ratio.crease_angle_deg(), 41.29, delta=0.05)
+
+    def test_silhouette_first_provenance(self):
+        from shell import dress_curves
+        cv = dress_curves()
+        self.assertAlmostEqual(cv.scale, 0.975, delta=0.002)   # hem pin
+        self.assertLess(cv.hold_mm, 10.0)                      # top hold cap
+        self.assertAlmostEqual(cv.depth_estimated_above_v, 112.7, delta=0.5)
+        # every body anchor clears the shell (floor guarantees >= 2 mm
+        # in the estimated span; the measured waist clears naturally)
+        for v, P, c, standoff in cv.body_clearance():
+            self.assertGreaterEqual(standoff, 1.9, (v, standoff))
 
     def test_round_trip_on_the_bodice(self):
         rng = np.random.default_rng(5)

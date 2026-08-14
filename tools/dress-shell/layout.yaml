@@ -12,63 +12,63 @@ panels:
   - id: up-cf
     class: p213
     theta: 0.0
-    s: 45.0
+    s: 80.0
     rotation: 0
     layer: 0
     mirrored: false
   - id: up-20
     class: p213
     theta: 20.0
-    s: 45.0
+    s: 80.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: up-40
     class: p213
     theta: 40.0
-    s: 45.0
+    s: 80.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: up-55
     class: p213
     theta: 55.0
-    s: 45.0
+    s: 80.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: cf-mid
     class: p213
     theta: 0.0
-    s: 95.0
+    s: 125.0
     rotation: 0
     layer: 1
     mirrored: false
   - id: mid-15
     class: p213
     theta: 15.0
-    s: 130.0
+    s: 140.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: mid-45
     class: p213
     theta: 45.0
-    s: 130.0
+    s: 140.0
     rotation: 0
     layer: 0
     mirrored: true
-  - id: mid-70
+  - id: mid-65
     class: p213
-    theta: 70.0
-    s: 130.0
+    theta: 65.0
+    s: 140.0
     rotation: 0
     layer: 0
     mirrored: true
   - id: facet-750
     class: p750
     theta: 0.0
-    s: 250.0
+    s: 255.0
     rotation: 0
     layer: 0
     mirrored: false
@@ -96,35 +96,35 @@ panels:
   - id: bod-370
     class: p370
     theta: 0.0
-    s: -65.113
+    s: -69.958
     rotation: 180
     layer: 0
     mirrored: false
   - id: bod-a30
     class: p213
     theta: 30.0
-    s: -50.054
+    s: -46.042
     rotation: 180
     layer: 0
     mirrored: true
   - id: bod-a55
     class: p213
     theta: 55.0
-    s: -50.054
+    s: -46.042
     rotation: 180
     layer: 0
     mirrored: true
   - id: bod-b25
     class: p213
     theta: 25.0
-    s: -115.529
+    s: -87.665
     rotation: 180
-    layer: 0
+    layer: 1
     mirrored: true
   - id: bod-b50
     class: p213
     theta: 50.0
-    s: -115.529
+    s: -87.665
     rotation: 180
-    layer: 0
+    layer: 1
     mirrored: true

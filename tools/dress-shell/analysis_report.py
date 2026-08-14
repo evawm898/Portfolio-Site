@@ -31,9 +31,10 @@ from test_coords import named_points
 
 HERE = Path(__file__).resolve().parent
 
-# Previous run (skirt only, constant k = 1.5), for comparison against the
-# full dress (skirt + bodice with the given neckline).
-PREVIOUS_RUN_DISTRIBUTION = "p213 79% | p370 0% | none 21%  (skirt only, k=1.5)"
+# Previous run (full dress, RATIO mode: circumference-first sections),
+# for comparison against the silhouette-first rebuild.
+PREVIOUS_RUN_DISTRIBUTION = ("p213 66% | p370 1% | none 33%  "
+                             "(ratio-mode dress, pre-silhouette)")
 
 
 def bodice_area_accounting(model, n_theta=720, n_v=250):
@@ -117,37 +118,65 @@ def main():
     tol = STANDOFF_TOLERANCE_MM
 
     p = model.params
-    print("DRESS SHELL — full pipeline report (confirmed skirt profile)")
+    print("DRESS SHELL — full pipeline report")
     print()
-    print(f"profile       r(u) = a(1-(u/b)^n)^(1/n): a {model.hem_radius:.2f}, "
-          f"n {p.dome_n:g}, SOLVED b = {model.b_param:.2f} mm")
-    print(f"              waist r {model.waist_radius:.2f}, drop {p.drop:g}, "
-          f"s 0..{coords.s_max:.2f} mm")
-    print(f"waist         tangent {model.waist_tangent_deg():.2f} deg from vertical "
-          f"(dr/du {float(model.dr_super(0.0)):.4f}); CREASE angle "
-          f"{model.crease_angle_deg():.2f} deg (bodice launches vertically — "
-          f"monotone interpolant); fillet_radius {p.fillet_radius:g}")
+    if model.curves is not None:
+        cv = model.curves
+        print(f"SILHOUETTE-FIRST: sections authored from the two traces, "
+              f"hem-pinned (scale {cv.scale:.5f})")
+        print(f"              front trace holds its top value for the last "
+              f"{cv.hold_mm:.1f} mm; DEPTH IS RATIO-ESTIMATED above "
+              f"v = {cv.depth_estimated_above_v:.1f} (one-shoulder cut)"
+              + (f"; body-clearance floor engaged over "
+                 f"v = {cv.body_floor_raised_span[0]:.0f}.."
+                 f"{cv.body_floor_raised_span[1]:.0f}"
+                 if cv.body_floor_raised_span else ""))
+        for v, P, cbody, st in cv.body_clearance():
+            print(f"              body clearance v={v:>6.1f}: garment P "
+                  f"{P:7.1f} vs body {cbody:7.1f} -> radial standoff "
+                  f"{st:+.1f} mm")
+        print(f"              ratio OUTPUTS: "
+              + "  ".join(f"v={v:g}: {float(model.ratio(np.array(float(v)))):.3f}"
+                          for v in (-381.0, 0.0, 152.4, 203.2)))
+        print(f"waist         junction angle {model.crease_angle_deg():.2f} deg "
+              f"(SMOOTH — the reference has no crease; the seam band remains "
+              f"the cable bus), tangent {model.waist_tangent_deg():.2f} deg")
+    else:
+        print(f"profile       r(u) = a(1-(u/b)^n)^(1/n): a {model.hem_radius:.2f}, "
+              f"n {p.dome_n:g}, SOLVED b = {model.b_param:.2f} mm")
+        print(f"              waist r {model.waist_radius:.2f}, drop {p.drop:g}, "
+              f"s 0..{coords.s_max:.2f} mm")
+        print(f"waist         tangent {model.waist_tangent_deg():.2f} deg from vertical "
+              f"(dr/du {float(model.dr_super(0.0)):.4f}); CREASE angle "
+              f"{model.crease_angle_deg():.2f} deg (bodice launches vertically — "
+              f"monotone interpolant); fillet_radius {p.fillet_radius:g}")
     print(f"seam band     +-{p.waist_band_halfwidth:g} mm keep-out about s = 0; "
           f"cable bus; tails terminate at the band edge")
     aw, bw = (float(v) for v in model.semi_axes(0.0))
     ah, bh = (float(v) for v in model.semi_axes(model.z_bottom))
-    print(f"sections      ELLIPTICAL, equal-arc theta: waist {aw:.2f} x {bw:.2f} "
-          f"(k {p.waist_section_ratio:g}) -> hem {ah:.2f} x {bh:.2f} "
-          f"(k {p.skirt_hem_ratio:g}, UNVERIFIED), blend '{p.ratio_blend}'")
-    try:
-        from bodice import BodiceSections
-        wrow = BodiceSections().rows[0]
-        print(f"waist match   residual vs bodice waist ellipse: "
-              f"{model.waist_match_residual_mm(wrow['a'], wrow['b']):.2e} mm "
-              f"(zero by construction)")
-    except Exception as exc:
-        print(f"waist match   NOT COMPUTED: {exc}")
-    from shell import solve_semi_axes as _ssa
-    print(f"hem widths    (for choosing skirt_hem_ratio against the photos)")
-    for k in (1.0, 1.15, 1.3):
-        ka, kb = _ssa(p.hem_circumference, k)
-        print(f"                k={k:<5g} front-view width {2*float(ka):.0f} mm, "
-              f"side-view depth {2*float(kb):.0f} mm")
+    if model.curves is not None:
+        print(f"sections      ELLIPTICAL, equal-arc theta, AUTHORED: waist "
+              f"{aw:.2f} x {bw:.2f} (ratio {aw/bw:.3f}) -> hem {ah:.2f} x "
+              f"{bh:.2f} (ratio {ah/bh:.3f}) — ratios are outputs")
+    else:
+        print(f"sections      ELLIPTICAL, equal-arc theta: waist {aw:.2f} x {bw:.2f} "
+              f"(k {p.waist_section_ratio:g}) -> hem {ah:.2f} x {bh:.2f} "
+              f"(k {p.skirt_hem_ratio:g}, UNVERIFIED), blend '{p.ratio_blend}'")
+    if model.curves is None:
+        try:
+            from bodice import BodiceSections
+            wrow = BodiceSections().rows[0]
+            print(f"waist match   residual vs bodice waist ellipse: "
+                  f"{model.waist_match_residual_mm(wrow['a'], wrow['b']):.2e} mm "
+                  f"(zero by construction)")
+        except Exception as exc:
+            print(f"waist match   NOT COMPUTED: {exc}")
+        from shell import solve_semi_axes as _ssa
+        print(f"hem widths    (for choosing skirt_hem_ratio against the photos)")
+        for k in (1.0, 1.15, 1.3):
+            ka, kb = _ssa(p.hem_circumference, k)
+            print(f"                k={k:<5g} front-view width {2*float(ka):.0f} mm, "
+                  f"side-view depth {2*float(kb):.0f} mm")
     def _true_arc(theta_deg):
         # top edge (neckline at this azimuth) down to the hem, on-shell only
         z_hi = float(model.z_top_at(theta_deg))

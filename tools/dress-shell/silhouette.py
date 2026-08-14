@@ -173,6 +173,119 @@ class FitReport:
     extrema_v: tuple           # interior extremum locations of the fit
 
 
+class ComposedSections:
+    """SILHOUETTE-FIRST sections: both semi-axes authored from the two
+    traces, hem-pinned. The perimeter is an OUTPUT.
+
+      a(z): the front-view fit (half-width), hold-extended by at most
+            `max_hold_mm` beyond its trace top (reported).
+      b(z): the side-view fit (half-depth) up to its one-shoulder cut;
+            above it, b = a/k with k(v) PCHIP through the ratio-estimate
+            anchors, made CONTINUOUS at the cut by starting from the
+            measured ratio there (the estimate span is reported).
+      scale: ONE uniform factor on both axes so the hem perimeter equals
+            the given garment hem circumference exactly (Ramanujan is
+            homogeneous, so the factor is just the ratio).
+
+    Body circumferences are NOT inputs here — they become clearance
+    checks (`body_clearance`)."""
+
+    def __init__(self, side_fit, front_fit, hem_perimeter_mm,
+                 ratio_anchors=((152.4, 1.875), (203.2, 2.0), (254.0, 2.0)),
+                 v_top_needed=250.0, max_hold_mm=10.0, n_grid=2401,
+                 body_clearance_mm=2.0):
+        from scipy.interpolate import PchipInterpolator
+        self.v_lo = float(max(side_fit.v_lo, front_fit.v_lo))
+        hold = v_top_needed - front_fit.v_hi
+        if hold > max_hold_mm:
+            raise SilhouetteError(
+                f"front trace tops out at {front_fit.v_hi:.1f} mm; needs "
+                f"{v_top_needed:.1f} and the hold cap is {max_hold_mm} mm")
+        self.v_hi = float(v_top_needed)
+        self.hold_mm = max(0.0, float(hold))
+
+        # unscaled hem perimeter -> the one uniform pin factor
+        from bodice import _perimeter_np
+        P_hem_raw = float(_perimeter_np(front_fit.b(self.v_lo),
+                                        side_fit.b(self.v_lo)))
+        self.scale = float(hem_perimeter_mm) / P_hem_raw
+
+        # ratio schedule above the side-trace cut, continuous at the cut
+        cut = float(side_fit.v_hi)
+        self.depth_estimated_above_v = cut
+        k_cut = float(front_fit.b(cut) / side_fit.b(cut))
+        ks = [(cut, k_cut)] + [(v, k) for v, k in ratio_anchors if v > cut + 1e-9]
+        kv = np.array([p[0] for p in ks])
+        kk = np.array([p[1] for p in ks])
+        k_interp = PchipInterpolator(kv, kk)
+
+        z = np.linspace(self.v_lo, self.v_hi, n_grid)
+        a_raw = front_fit.b(np.minimum(z, front_fit.v_hi))   # hold at top
+        b_raw = np.where(
+            z <= cut, side_fit.b(z),
+            a_raw / k_interp(np.clip(z, cut, kv[-1])))
+        a = self.scale * np.asarray(a_raw, dtype=float)
+        b = self.scale * np.asarray(b_raw, dtype=float)
+        if np.any(b <= 0) or np.any(a <= 0):
+            raise SilhouetteError("composed sections dip non-positive")
+
+        # BODY-CLEARANCE FLOOR over the ESTIMATED-depth span only: where
+        # the depth is a ratio guess, it may never put the shell inside
+        # the body — the interpolated body circumference (+ clearance)
+        # is a hard lower bound on the section perimeter, so the depth
+        # floor solves Ramanujan(a, b_floor) = body + 2*pi*clearance.
+        # (In the MEASURED span a violation would be a genuine design
+        # conflict and must surface, never be silently inflated.)
+        from bodice import _perimeter_np, circumference_schedule, solve_a_given_b
+        body = circumference_schedule()
+        est = z > cut
+        self.body_floor_raised_span = None
+        if np.any(est):
+            P_floor = np.asarray(body(z[est])) + math.tau * body_clearance_mm
+            b_floor = solve_a_given_b(P_floor, a[est])
+            raised = b_floor > b[est] + 1e-12
+            if np.any(raised):
+                lo_v = float(z[est][raised].min())
+                hi_v = float(z[est][raised].max())
+                self.body_floor_raised_span = (lo_v, hi_v)
+                b[est] = np.maximum(b[est], b_floor)
+        meas_torso = (z >= 0.0) & ~est
+        if np.any(meas_torso):
+            deficit = (np.asarray(body(z[meas_torso]))
+                       - _perimeter_np(a[meas_torso], b[meas_torso]))
+            if np.any(deficit > 1e-9):
+                i = int(np.argmax(deficit))
+                raise SilhouetteError(
+                    f"MEASURED sections put the shell inside the body at "
+                    f"v = {float(z[meas_torso][i]):.1f} (deficit "
+                    f"{float(deficit[i]):.1f} mm of circumference) — a real "
+                    f"design conflict, refusing to silently inflate a "
+                    f"measurement")
+        self._a = PchipInterpolator(z, a)
+        self._b = PchipInterpolator(z, b)
+        self._P = PchipInterpolator(z, _perimeter_np(a, b))
+
+    def a(self, z):
+        return self._a(np.clip(np.asarray(z, dtype=float), self.v_lo, self.v_hi))
+
+    def b(self, z):
+        return self._b(np.clip(np.asarray(z, dtype=float), self.v_lo, self.v_hi))
+
+    def perimeter(self, z):
+        return self._P(np.clip(np.asarray(z, dtype=float), self.v_lo, self.v_hi))
+
+    def body_clearance(self, body_anchors=((0.0, 609.6), (152.4, 711.2),
+                                           (203.2, 863.6))):
+        """(v, garment P, body C, radial standoff mm) per anchor — the
+        garment must CLEAR the body everywhere; negative standoff is a
+        hard design error."""
+        out = []
+        for v, c in body_anchors:
+            P = float(self.perimeter(v))
+            out.append((v, P, c, (P - c) / math.tau))
+        return out
+
+
 class FittedDepth:
     """Smoothed authored b(v) over the traced span, with the shape
     contract asserted and the photo-vs-fit residual reported."""
