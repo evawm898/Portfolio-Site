@@ -116,7 +116,7 @@
           <select class="fl-select" id="bilEdge1">
             <option value="default">DEFAULT (GLOBAL TIP)</option>
             <option value="clean">CLEAN</option>
-            <option value="jagged">JAGGED</option>
+            <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
             <option value="fractal">FRACTAL</option>
           </select>
@@ -149,7 +149,7 @@
           <select class="fl-select" id="bilEdge2">
             <option value="default">DEFAULT (GLOBAL TIP)</option>
             <option value="clean">CLEAN</option>
-            <option value="jagged">JAGGED</option>
+            <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
             <option value="fractal">FRACTAL</option>
           </select>
@@ -181,7 +181,7 @@
           <select class="fl-select" id="bilEdge3">
             <option value="default">DEFAULT (GLOBAL TIP)</option>
             <option value="clean">CLEAN</option>
-            <option value="jagged">JAGGED</option>
+            <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
             <option value="fractal">FRACTAL</option>
           </select>
@@ -395,7 +395,7 @@
           </div>
           <select class="fl-select" id="tipStyle">
             <option value="clean">CLEAN</option>
-            <option value="jagged">JAGGED</option>
+            <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
             <option value="fractal">FRACTAL</option>
             <option value="scallop" hidden disabled>SCALLOP</option>
@@ -969,6 +969,57 @@
           </div>
           <input type="range" id="sepalEdgeProfile" min="-1" max="1" step="0.01" value="0">
           <span class="fl-ctrl__hint">edges dip &rarr; lift (parallel to centre curve)</span>
+        </div>
+
+        <!-- SEPAL TIP — an independent copy of the petal tip system, so modified-leaf
+             sepals can carry serrated edges on their own (only the serration sub-
+             controls show once SERRATED is picked). Solid sepals use the blade path,
+             which ignores the tip style, exactly like solid petals. -->
+        <div class="fl-ctrl" data-sepal>
+          <div class="fl-ctrl__row">
+            <label for="sepalTipStyle">Sepal tip style</label>
+          </div>
+          <select class="fl-select" id="sepalTipStyle">
+            <option value="clean">CLEAN</option>
+            <option value="jagged">SERRATED</option>
+          </select>
+          <span class="fl-ctrl__hint">smooth edge &rarr; serrated teeth (modified-leaf sepals)</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+          <div class="fl-ctrl__row">
+            <label for="sepalTipShape">Sepal tip shape</label>
+            <span class="fl-ctrl__val" data-value="sepalTipShape"></span>
+          </div>
+          <input type="range" id="sepalTipShape" min="0" max="1" step="0.01" value="0.9">
+          <span class="fl-ctrl__hint">round &rarr; pointed &mdash; apex &amp; teeth</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+          <div class="fl-ctrl__row">
+            <label for="sepalTipFreq">Sepal tip frequency</label>
+            <span class="fl-ctrl__val" data-value="sepalTipFreq"></span>
+          </div>
+          <input type="range" id="sepalTipFreq" min="1" max="40" step="1" value="12">
+          <span class="fl-ctrl__hint">total tips &mdash; 1 = apex only</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+          <div class="fl-ctrl__row">
+            <label for="sepalTipRegion">Sepal tip region</label>
+            <span class="fl-ctrl__val" data-value="sepalTipRegion"></span>
+          </div>
+          <input type="range" id="sepalTipRegion" min="0" max="1" step="0.01" value="0.3">
+          <span class="fl-ctrl__hint">how far teeth reach from the apex down</span>
+        </div>
+
+        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+          <div class="fl-ctrl__row">
+            <label for="sepalTipLength">Sepal tip length</label>
+            <span class="fl-ctrl__val" data-value="sepalTipLength"></span>
+          </div>
+          <input type="range" id="sepalTipLength" min="0" max="1" step="0.01" value="0.4">
+          <span class="fl-ctrl__hint">how far all teeth extend outward</span>
         </div>
 
         <div class="fl-ctrl">

@@ -1764,6 +1764,12 @@ function buildSepalsInto(acc, P, cx, cy, cz, opts, ringR) {
   const size = clamp(opts.size, 0.1, 1.5);
   const solid = opts.style === 'solid';                 // STYLE: solid leaf vs strap
   const sepR = opts.attachR != null ? Math.max(opts.attachR, 0.05) : Math.max(ringR * 0.85, 0.16);
+  // SEPAL TIP: sepals carry their OWN serrated-edge controls (independent of the
+  // petal tip system, like their edge-curve controls). Serration rides the same
+  // jagged edge path as petals but only on the skeletal MODIFIED-LEAF (strap)
+  // blade — SOLID sepals use the blade path, which ignores tip style, exactly as
+  // solid petals do. CLEAN keeps the original style-baked taper untouched.
+  const serrated = opts.tipStyle === 'jagged' && !solid;
   // SOLID sepals are broader, soft-tipped leaf blades; STRAP sepals stay narrow,
   // sharply tapered spikes. Curve is user-driven for both (centre + two edges).
   const Ps = {
@@ -1771,10 +1777,15 @@ function buildSepalsInto(acc, P, cx, cy, cz, opts, ringR) {
     L: P.L * size,
     W: P.W * size * (solid ? 0.55 : 0.3),
     taper: solid ? 0.5 : 0.78,       // solid: fuller blade; strap: taper to a point
-    tip: solid ? 0.45 : 0.97,        // solid: rounded soft tip; strap: sharp spike
+    // clean keeps the style spike/soft tip; serrated hands TIP SHAPE the teeth sharpness
+    tip: serrated ? clamp(opts.tipShape, 0, 1) : (solid ? 0.45 : 0.97),
     edgeCurve: opts.edgeCurve,       // top-down side billow (+) / pinch (-)
     edgeProfile: opts.edgeProfile,   // out-of-plane profile lift of the margins
-    tipStyle: 'clean',
+    tipStyle: serrated ? 'jagged' : 'clean',
+    tipFrequency: serrated ? clamp(Math.round(opts.tipFreq), 1, 40) : (P.tipFrequency || 1),
+    tipRegion: serrated ? clamp(opts.tipRegion, 0, 1) : 0,
+    tipLength: serrated ? clamp(opts.tipLength, 0, 1) : 0,
+    tipIrregularity: 0,              // sepal teeth stay regular (petal irregularity is petal-only)
     infillType: 'veins',
     curl: opts.centerCurve,          // centre curve -> reflex of the down-tilted sepal
     solidBlade: solid,
@@ -1981,6 +1992,11 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       edgeCurve: ui.sepalEdgeCurve,
       edgeProfile: ui.sepalEdgeProfile,
       attachR: sepalAttachR,
+      tipStyle: ui.sepalTipStyle,
+      tipShape: ui.sepalTipShape,
+      tipFreq: ui.sepalTipFreq,
+      tipRegion: ui.sepalTipRegion,
+      tipLength: ui.sepalTipLength,
     }, ringR);
   }
 
@@ -2383,6 +2399,11 @@ const inputs = {
   sepalCenterCurve: document.getElementById('sepalCenterCurve'),
   sepalEdgeCurve: document.getElementById('sepalEdgeCurve'),
   sepalEdgeProfile: document.getElementById('sepalEdgeProfile'),
+  sepalTipStyle: document.getElementById('sepalTipStyle'),
+  sepalTipShape: document.getElementById('sepalTipShape'),
+  sepalTipFreq: document.getElementById('sepalTipFreq'),
+  sepalTipRegion: document.getElementById('sepalTipRegion'),
+  sepalTipLength: document.getElementById('sepalTipLength'),
   stemType: document.getElementById('stemType'),
   stemLength: document.getElementById('stemLength'),
   stemCurve: document.getElementById('stemCurve'),
@@ -2493,6 +2514,11 @@ function readUI() {
     sepalCenterCurve: parseFloat(inputs.sepalCenterCurve.value),
     sepalEdgeCurve: parseFloat(inputs.sepalEdgeCurve.value),
     sepalEdgeProfile: parseFloat(inputs.sepalEdgeProfile.value),
+    sepalTipStyle: inputs.sepalTipStyle.value,
+    sepalTipShape: parseFloat(inputs.sepalTipShape.value),
+    sepalTipFreq: parseInt(inputs.sepalTipFreq.value, 10),
+    sepalTipRegion: parseFloat(inputs.sepalTipRegion.value),
+    sepalTipLength: parseFloat(inputs.sepalTipLength.value),
     stemType: inputs.stemType.value,
     stemLength: parseFloat(inputs.stemLength.value),
     stemCurve: parseFloat(inputs.stemCurve.value),
@@ -2594,6 +2620,10 @@ function refreshLabels() {
   setLabel('sepalEdgeCurve', (sec > 0 ? '+' : '') + sec.toFixed(2));
   const sep = +inputs.sepalEdgeProfile.value;
   setLabel('sepalEdgeProfile', (sep > 0 ? '+' : '') + sep.toFixed(2));
+  setLabel('sepalTipShape', (+inputs.sepalTipShape.value).toFixed(2));
+  setLabel('sepalTipFreq', inputs.sepalTipFreq.value);
+  setLabel('sepalTipRegion', (+inputs.sepalTipRegion.value).toFixed(2));
+  setLabel('sepalTipLength', (+inputs.sepalTipLength.value).toFixed(2));
   setLabel('stemLength', (+inputs.stemLength.value).toFixed(2));
   const scv = +inputs.stemCurve.value;
   setLabel('stemCurve', (scv > 0 ? '+' : '') + scv.toFixed(2));
@@ -2667,6 +2697,7 @@ function setBuilding(on) {
  'fillPetalCount', 'fillOuterSize', 'fillInnerSize', 'fillDensity', 'fillBloomAngle',
  'blendSmoothness', 'receptacleDepth', 'convergenceTightness',
  'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
+ 'sepalTipShape', 'sepalTipFreq', 'sepalTipRegion', 'sepalTipLength',
  'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
  'tightness', 'elevation'].forEach((k) => {
   inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
@@ -2766,7 +2797,18 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 // Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
   document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = inputs.receptacleType.value === 'none'; });
-  document.querySelectorAll('[data-sepal]').forEach((el) => { el.hidden = inputs.sepalsType.value === 'none'; });
+  // Sepal controls hide when sepals are off; the serration sub-controls
+  // (data-sepal-tip) hide further unless SEPAL TIP STYLE matches, mirroring the
+  // petal tip panel's data-tip-styles gating.
+  const sepalsOff = inputs.sepalsType.value === 'none';
+  const sepalTip = inputs.sepalTipStyle.value;
+  document.querySelectorAll('[data-sepal]').forEach((el) => {
+    let show = !sepalsOff;
+    if (show && el.hasAttribute('data-sepal-tip')) {
+      show = el.getAttribute('data-sepal-tip').split(/\s+/).includes(sepalTip);
+    }
+    el.hidden = !show;
+  });
   document.querySelectorAll('[data-stem]').forEach((el) => { el.hidden = inputs.stemType.value === 'none'; });
   // leaf sub-controls (arrangement / size) show only when a stem AND a leaf type are on
   document.querySelectorAll('[data-leaf]').forEach((el) => { el.hidden = inputs.stemType.value === 'none' || inputs.leafType.value === 'none'; });
@@ -2774,6 +2816,7 @@ function updateBaseOptions() {
 inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.sepalsType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.sepalStyle.addEventListener('change', () => { scheduleRegen(); });
+inputs.sepalTipStyle.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 // Adding / lengthening the stem grows the plant past the current framing, so
 // request a camera refit on the next rebuild to bring the whole flower into view.
 inputs.stemType.addEventListener('change', () => {
@@ -2918,6 +2961,11 @@ if (resetBtn) {
     inputs.sepalCenterCurve.value = d.sepalCenterCurve;
     inputs.sepalEdgeCurve.value = d.sepalEdgeCurve;
     inputs.sepalEdgeProfile.value = d.sepalEdgeProfile;
+    inputs.sepalTipStyle.value = d.sepalTipStyle;
+    inputs.sepalTipShape.value = d.sepalTipShape;
+    inputs.sepalTipFreq.value = d.sepalTipFreq;
+    inputs.sepalTipRegion.value = d.sepalTipRegion;
+    inputs.sepalTipLength.value = d.sepalTipLength;
     inputs.stemType.value = d.stemType;
     inputs.stemLength.value = d.stemLength;
     inputs.stemCurve.value = d.stemCurve;
@@ -2988,6 +3036,7 @@ const DEFAULTS = {
   receptacleType: 'none', blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
   sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
+  sepalTipStyle: 'clean', sepalTipShape: 0.9, sepalTipFreq: 12, sepalTipRegion: 0.3, sepalTipLength: 0.4,
   stemType: 'none', stemLength: 4, stemCurve: 0,   // stem length range 0..10 (0 = no stem, 4 = standard); stemCurve control hidden for now (see flower.html), 0 = straight (restore to 0.2 when the control returns).
   stemThickness: 1, stemNodeCount: 3, stemNodeProminence: 0.4, stemBudMode: 'none',
   leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,

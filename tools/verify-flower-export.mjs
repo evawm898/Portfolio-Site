@@ -124,6 +124,9 @@ const CONFIGS = [
   { label: 'center: STAMENS thin filament + oblong anthers', set: [{ id: 'centerType', value: 'stamens', evt: 'change' }, { id: 'centerFilThick', value: '0' }, { id: 'centerTipShape', value: '1' }, { id: 'centerTipSize', value: '0' }] },
   // Sepals with NO receptacle: bases now anchor to the stem-top surface (strap + stem).
   { label: 'sepals, no receptacle, stem-top attach (strap)', set: [{ id: 'centerLength', value: '0.5' }, { id: 'centerTipShape', value: '0' }, { id: 'centerFilThick', value: '0.5' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
+  // SERRATED modified-leaf sepals — the jagged tooth edge + per-tooth mid-veins on the
+  // sepal blade must still export watertight (skeletal path, like a serrated petal).
+  { label: 'sepals SERRATED (modified leaf) + stem', set: [{ id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'sepalTipStyle', value: 'jagged', evt: 'change' }, { id: 'sepalTipShape', value: '0.95' }, { id: 'sepalTipFreq', value: '16' }, { id: 'sepalTipRegion', value: '0.6' }, { id: 'sepalTipLength', value: '0.7' }] },
 ];
 
 const server = http.createServer((req, res) => {
