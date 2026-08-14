@@ -67,8 +67,20 @@ def load_points(path):
 
 
 def extract_from_image(path, white_thresh=240, min_run_px=6,
-                       waist_search=(0.25, 0.75)):
+                       waist_search=(0.25, 0.75), shoulder_slope_cut=0.7):
     """Measure the traced silhouette (white fill) from an image file.
+
+    Robustness: photos carry stray near-white speckles (wall highlights,
+    mannequin sheen), so the silhouette is taken as the LARGEST CONNECTED
+    COMPONENT of white pixels, and widths are edge-to-edge within that
+    component only.
+
+    One-shoulder tops: above the back-neckline corner the trace narrows
+    along the shoulder diagonal and the row width stops meaning 2*b. The
+    back edge is scanned upward from the bust; the first row where its
+    inward slope exceeds `shoulder_slope_cut` (px/px) marks the cut, and
+    rows above it are EXCLUDED from the returned points (the cut height
+    is reported so it can be sanity-checked against the side neckline).
 
     Returns (points, report): points are (v_mm, half_depth_mm) rows on
     the model's height convention (v = 0 at the WAIST, positive upward,
@@ -76,35 +88,70 @@ def extract_from_image(path, white_thresh=240, min_run_px=6,
     the implied total height for scale sanity-checking.
     """
     from PIL import Image
+    from scipy import ndimage
     img = np.asarray(Image.open(path).convert("RGB"), dtype=np.uint8)
     white = np.all(img >= white_thresh, axis=-1)
-    widths = white.sum(axis=1).astype(float)
+    labels, n = ndimage.label(white)
+    if n == 0:
+        raise SilhouetteError("no white silhouette found")
+    sizes = ndimage.sum(white, labels, range(1, n + 1))
+    blob = labels == (1 + int(np.argmax(sizes)))
+
+    x_min = np.full(blob.shape[0], -1)
+    x_max = np.full(blob.shape[0], -1)
+    counts = blob.sum(axis=1)
+    for y in np.flatnonzero(counts >= min_run_px):
+        xs = np.flatnonzero(blob[y])
+        x_min[y], x_max[y] = xs[0], xs[-1]
+    widths = np.where(x_min >= 0, x_max - x_min + 1, 0).astype(float)
     rows = np.flatnonzero(widths >= min_run_px)
     if len(rows) < 20:
-        raise SilhouetteError("no white silhouette found (or trace too small)")
-    top_px, hem_px = int(rows[0]), int(rows[-1])
+        raise SilhouetteError("silhouette component too small")
+    top_px, bottom_px = int(rows[0]), int(rows[-1])
+
+    # HEM: the traced hem edge is often drawn as a curve, so the lowest
+    # row is a narrow tip, not the hem. The hem is the WIDEST row in the
+    # lower third — where the side edges turn around. Rows below it are
+    # the traced hem-curve, excluded.
+    low_lo = int(top_px + (2.0 / 3.0) * (bottom_px - top_px))
+    hem_px = low_lo + int(np.argmax(widths[low_lo:bottom_px + 1]))
+
     # waist: narrowest row in the interior band (avoids shoulder/hem)
-    lo = int(top_px + waist_search[0] * (hem_px - top_px))
-    hi = int(top_px + waist_search[1] * (hem_px - top_px))
-    band = widths[lo:hi + 1]
-    waist_px = lo + int(np.argmin(band))
+    lo = int(top_px + waist_search[0] * (bottom_px - top_px))
+    hi = int(top_px + waist_search[1] * (bottom_px - top_px))
+    waist_px = lo + int(np.argmin(widths[lo:hi + 1]))
     if hem_px <= waist_px:
         raise SilhouetteError("hem row not below waist row — bad trace")
     mm_per_px = WAIST_TO_HEM_MM / float(hem_px - waist_px)
 
+    # one-shoulder cut: going UP from the waist the width must not
+    # COLLAPSE (the bodice swells to the bust; a genuine above-bust taper
+    # is gentle). The first sustained fast drop marks the shoulder/back
+    # neckline diagonal — full-depth rows end there.
+    cut_px = top_px
+    smooth = np.convolve(widths, np.ones(9) / 9.0, mode="same")
+    window = 8
+    for y in range(waist_px - 30, top_px + window, -1):
+        drop_per_row = (smooth[y + window] - smooth[y]) / window
+        if drop_per_row > 2.0 * shoulder_slope_cut:   # px/row, both edges
+            cut_px = y + window
+            break
     points = []
-    for y in range(top_px, hem_px + 1):
+    for y in range(max(top_px, cut_px), hem_px + 1):
         if widths[y] < min_run_px:
             continue
-        xs = np.flatnonzero(white[y])
         v_mm = (waist_px - y) * mm_per_px          # + up, 0 at the waist
-        points.append((v_mm, 0.5 * float(xs[-1] - xs[0] + 1) * mm_per_px))
+        points.append((v_mm, 0.5 * widths[y] * mm_per_px))
     report = {
         "mm_per_px": mm_per_px,
         "waist_px": waist_px, "hem_px": hem_px, "top_px": top_px,
-        "implied_total_height_mm": (hem_px - top_px) * mm_per_px,
+        "bottom_px": bottom_px, "cut_px": cut_px,
+        "full_depth_valid_up_to_v_mm": (waist_px - cut_px) * mm_per_px,
+        "implied_total_height_mm": (bottom_px - top_px) * mm_per_px,
         "waist_width_mm": float(widths[waist_px]) * mm_per_px,
+        "hem_width_mm": float(widths[hem_px]) * mm_per_px,
         "rows_measured": len(points),
+        "component_px": int(sizes.max()),
     }
     return sorted(points), report
 
