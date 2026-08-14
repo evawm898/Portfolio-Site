@@ -37,7 +37,7 @@ from layering import analyze_layering, uncovered_shell_area
 from layout import (SurfaceChart, _frame_offset, asymmetry_summary,
                     connector_geometry, load_layout, resolve_layout)
 from panels import load_panel_classes, unverified_fields
-from shell import ShellModel, ShellParams, build_meshes
+from shell import ShellModel, ShellParams, build_meshes, dress_params
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
@@ -186,8 +186,9 @@ def panel_box(chart, coords, p, mount):
 
 def build_export(grid_spec=GridSpec(), tolerance_mm=STANDOFF_TOLERANCE_MM, samples=7,
                  params=None):
-    """Everything the GLB + sidecar need, computed once."""
-    model = ShellModel(params if params is not None else ShellParams())
+    """Everything the GLB + sidecar need, computed once. Default: the
+    committed DRESS design (skirt + bodice, dress_params())."""
+    model = ShellModel(params if params is not None else dress_params())
     coords = ShellCoords(model)
     chart = SurfaceChart(model, coords)
     classes = load_panel_classes(HERE / "panels.yaml")
@@ -327,6 +328,13 @@ def build_sidecar(ex):
                 "ratio_blend": ex["model"].params.ratio_blend,
                 "waist_band_halfwidth": ex["model"].params.waist_band_halfwidth,
             },
+            "neckline": None if ex["model"].neckline is None else {
+                "cf_height": ex["model"].neckline.params.cf_height,
+                "side_height": ex["model"].neckline.params.side_height,
+                "shoulder_theta": ex["model"].neckline.params.shoulder_theta,
+                "plateau_flatness": ex["model"].neckline.params.plateau_flatness,
+                "keepout_mm": ex["model"].neckline.params.keepout_mm,
+            },
             "tolerance_mm": ex["tolerance"],
             "grid": {"dtheta": grid.spec.dtheta, "ds": grid.spec.ds},
             "s_min": r(chart.s_min, 3), "s_max": r(chart.s_max, 3),
@@ -347,8 +355,9 @@ def build_sidecar(ex):
         } for c in ex["classes"].values()},
         "cells": [{
             "i": a.cell_index, "k1": r(a.k1, 7), "k2": r(a.k2, 7),
-            "K": r(a.gaussian, 10), "rmin": r(a.r_min, 1),
-            "max_class": a.max_class,
+            "K": r(a.gaussian, 10),
+            "rmin": (r(a.r_min, 1) if math.isfinite(a.r_min) else None),
+            "max_class": a.max_class, "off_shell": a.off_shell,
         } for a in analyses],
         "class_distribution": {str(k): v for k, v in
                                class_distribution(analyses).items()},
@@ -396,8 +405,11 @@ def main(out_dir=OUT_DIR, params=None):
     glb = build_glb(ex)
     (out_dir / "dress-shell.glb").write_bytes(glb)
     sidecar = build_sidecar(ex)
+    # allow_nan=False: a NaN/Infinity anywhere would silently produce
+    # invalid JSON for the viewer — fail the publish instead
     (out_dir / "dress-analysis.json").write_text(
-        json.dumps(sidecar, separators=(",", ":")), encoding="utf-8")
+        json.dumps(sidecar, separators=(",", ":"), allow_nan=False),
+        encoding="utf-8")
     print(f"wrote {out_dir / 'dress-shell.glb'} ({len(glb) / 1024:.0f} KB)")
     print(f"wrote {out_dir / 'dress-analysis.json'} "
           f"({(out_dir / 'dress-analysis.json').stat().st_size / 1024:.0f} KB)")

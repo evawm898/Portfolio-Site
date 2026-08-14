@@ -14,7 +14,7 @@ const $ = (id) => document.getElementById(id);
 const status = (msg, cls = "") => { $("status").innerHTML = `<span class="${cls}">${msg}</span>`; };
 
 const state = await (await fetch("/api/state")).json();
-const surf = new SF.Surface(state.profile, state.bounds);
+const surf = new SF.Surface(state.profile, state.bounds, state.neckline);
 const classes = state.classes;
 const TOL = state.tolerance_mm;
 
@@ -368,9 +368,19 @@ $("pHem").value = state.params.hem_circumference;
 $("pN").value = state.params.dome_n;
 $("pKhem").value = state.params.skirt_hem_ratio;
 $("pBlend").value = state.params.ratio_blend;
+const hasNeck = !!state.neckline;
+if (hasNeck) {
+  $("pShoulder").value = state.params.shoulder_theta;
+  $("pFlat").value = state.params.plateau_flatness;
+} else {
+  $("neckRow").style.display = "none";
+}
 $("paramInfo").innerHTML =
   `waist ${state.params.waist_circumference} mm · drop ${state.params.drop} mm · ` +
-  `waist ratio ${state.params.waist_section_ratio} <span class="warn">(body — fixed)</span>`;
+  `waist ratio ${state.params.waist_section_ratio} <span class="warn">(body — fixed)</span>` +
+  (hasNeck ? `<br>neckline CF ${state.neckline.cf_height} / side ` +
+             `${state.neckline.side_height} mm <span class="warn">(given — fixed)</span> · ` +
+             `keep-out ${state.neckline.keepout_mm} mm` : "");
 $("applyParams").onclick = async () => {
   const body = {
     hem_circumference: parseFloat($("pHem").value),
@@ -378,6 +388,10 @@ $("applyParams").onclick = async () => {
     skirt_hem_ratio: parseFloat($("pKhem").value),
     ratio_blend: $("pBlend").value,
   };
+  if (hasNeck) {
+    body.shoulder_theta = parseFloat($("pShoulder").value);
+    body.plateau_flatness = parseFloat($("pFlat").value);
+  }
   status("rebuilding shell + analysis… (a few seconds)");
   $("applyParams").disabled = true;
   try {

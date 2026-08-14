@@ -113,6 +113,37 @@ class SurfaceChart:
         # waist seam band: keep-out ring around s = 0, also the cable bus
         self.band_halfwidth = float(getattr(model.params,
                                             "waist_band_halfwidth", 0.0))
+        # neckline: the physical top edge of the bodice (None = skirt only)
+        self.neckline = getattr(model, "neckline", None)
+
+    def height_of_s(self, s):
+        """z (mm above waist) for a chart s, clipped to the chart range."""
+        return float(self.coords.z_of_s(float(np_clip(s, self.s_min, self.s_max))))
+
+    def on_shell(self, theta, s, below_edge_mm=0.0):
+        """True when (theta, s) lies on the physical shell — at or below
+        the neckline edge (minus below_edge_mm) at that azimuth."""
+        if not (self.s_min - 1e-9 <= s <= self.s_max + 1e-9):
+            return False
+        if self.neckline is None:
+            return True
+        return (self.height_of_s(s)
+                <= float(self.neckline.height(theta)) - below_edge_mm + 1e-9)
+
+    def neckline_violation(self, tag, theta, s):
+        """Problem string if the point crosses the neckline KEEP-OUT band
+        (edge minus keepout_mm — room for the bound edge finish); None
+        when legal or when there is no bodice."""
+        if self.neckline is None:
+            return None
+        z = self.height_of_s(s)
+        if z <= 0.0:
+            return None
+        floor = float(self.neckline.keepout_floor(theta))
+        if z > floor + 1e-9:
+            return (f"{tag} crosses the neckline keep-out (height {z:.1f} > "
+                    f"floor {floor:.1f} at theta {wrap180(theta):.1f})")
+        return None
 
     def r_theta(self, theta_deg, s):
         """Chart metric: mm of section arc per radian of theta. theta is
@@ -199,6 +230,9 @@ def connector_problems(chart, cls, theta, s, rotation):
         if abs(_local_angle(t, center)) >= 90.0 - 1e-9:
             problems.append(f"{tag} crosses the {piece} piece seam "
                             f"(theta {wrap180(t):.1f})")
+        neck = chart.neckline_violation(tag, t, sv)
+        if neck:
+            problems.append(neck)
     return problems
 
 
@@ -219,6 +253,9 @@ def outline_problems(chart, cls, theta, s, rotation):
         if abs(_local_angle(t, center)) >= 90.0 - 1e-9:
             problems.append(f"outline crosses the {piece} piece seam "
                             f"(corner theta {wrap180(t):.1f})")
+        neck = chart.neckline_violation("outline corner", t, sv)
+        if neck:
+            problems.append(neck)
     band = chart.band_halfwidth
     if band > 0.0 and min(s_vals) < band - 1e-9 and max(s_vals) > -band + 1e-9:
         problems.append(

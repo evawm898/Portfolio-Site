@@ -126,6 +126,11 @@ class ShellCoords:
         zc = np.clip(z, self.model.z_bottom, self.model.z_top)
         theta = self.model.arc_angle_from_point(x, y, zc)   # equal-arc inverse
         s = self.s_of_z(zc)
+        if check_mm is not None and getattr(self.model, "neckline", None) is not None:
+            caps = self.model.neckline.height(np.degrees(theta))
+            if np.any(zc > caps + 1e-6):
+                raise CoordError("point lies above the neckline edge — "
+                                 "no shell exists there")
         if check_mm is not None:
             on_shell = self.model.point(theta, zc)
             residual = np.linalg.norm(on_shell - p, axis=-1)

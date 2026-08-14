@@ -26,14 +26,58 @@ from layering import LayeringError, analyze_layering, uncovered_shell_area
 from layout import (SurfaceChart, asymmetry_summary, load_layout,
                     resolve_layout)
 from panels import load_panel_classes, unverified_fields
-from shell import ShellModel, ShellParams, build_meshes
+from shell import ShellModel, ShellParams, build_meshes, dress_params
 from test_coords import named_points
 
 HERE = Path(__file__).resolve().parent
 
-# Previous run (circular sections on the confirmed profile), for
-# comparison against the elliptical-section skirt.
-PREVIOUS_RUN_DISTRIBUTION = "p213 80% | p370 0% | none 20%  (circular sections)"
+# Previous run (skirt only, constant k = 1.5), for comparison against the
+# full dress (skirt + bodice with the given neckline).
+PREVIOUS_RUN_DISTRIBUTION = "p213 79% | p370 0% | none 21%  (skirt only, k=1.5)"
+
+
+def bodice_area_accounting(model, n_theta=720, n_v=250):
+    """Gross bodice area (below the neckline edge) and usable area after
+    subtracting the neckline keep-out strip and the waist seam band.
+    The +-90 seams are lines (zero width) — they bound placement but
+    remove no area; noted in the printout."""
+    neck = model.neckline
+    band = model.params.waist_band_halfwidth
+    dtheta = math.radians(360.0 / n_theta)
+    thetas = np.linspace(-180.0, 180.0, n_theta, endpoint=False) + 180.0 / n_theta
+    gross = usable = 0.0
+    for th in thetas:
+        edge = float(neck.height(th))
+        floor = edge - neck.params.keepout_mm
+        v_edges = np.linspace(0.0, edge, n_v + 1)
+        vm = 0.5 * (v_edges[1:] + v_edges[:-1])
+        dv = np.diff(v_edges)
+        r = np.asarray(model.mean_radius(vm))
+        g = np.sqrt(1.0 + np.asarray(model.mean_slope(vm)) ** 2)
+        w = r * dtheta * g * dv
+        gross += float(w.sum())
+        usable += float(w[(vm >= band) & (vm <= floor)].sum())
+    return gross, usable
+
+
+def usable_bodice_cell_indices(chart, grid):
+    """Cells lying FULLY inside the usable bodice region: above the waist
+    band, below the neckline keep-out floor at both theta corners."""
+    keep = set()
+    neck = chart.neckline
+    band = chart.band_halfwidth
+    for cell in grid.cells:
+        if cell.s1 > 1e-9:              # skirt cell
+            continue
+        v_top = chart.height_of_s(cell.s0)
+        v_bot = chart.height_of_s(cell.s1)
+        if v_bot < band - 1e-9:
+            continue
+        floor0 = float(neck.keepout_floor(cell.theta0)) if neck else 0.0
+        floor1 = float(neck.keepout_floor(cell.theta1)) if neck else 0.0
+        if v_top <= min(floor0, floor1) + 1e-9:
+            keep.add(cell.index)
+    return keep
 
 
 def electrical_rollup(placed):
@@ -65,7 +109,7 @@ def electrical_rollup(placed):
 
 
 def main():
-    model = ShellModel(ShellParams())
+    model = ShellModel(dress_params())
     coords = ShellCoords(model)
     chart = SurfaceChart(model, coords)
     classes = load_panel_classes(HERE / "panels.yaml")
@@ -80,8 +124,9 @@ def main():
     print(f"              waist r {model.waist_radius:.2f}, drop {p.drop:g}, "
           f"s 0..{coords.s_max:.2f} mm")
     print(f"waist         tangent {model.waist_tangent_deg():.2f} deg from vertical "
-          f"(dr/du {float(model.dr_super(0.0)):.4f}); CREASE — bodice side "
-          f"unspecified, crease angle pending; fillet_radius {p.fillet_radius:g}")
+          f"(dr/du {float(model.dr_super(0.0)):.4f}); CREASE angle "
+          f"{model.crease_angle_deg():.2f} deg (bodice launches vertically — "
+          f"monotone interpolant); fillet_radius {p.fillet_radius:g}")
     print(f"seam band     +-{p.waist_band_halfwidth:g} mm keep-out about s = 0; "
           f"cable bus; tails terminate at the band edge")
     aw, bw = (float(v) for v in model.semi_axes(0.0))
@@ -103,10 +148,16 @@ def main():
         ka, kb = _ssa(p.hem_circumference, k)
         print(f"                k={k:<5g} front-view width {2*float(ka):.0f} mm, "
               f"side-view depth {2*float(kb):.0f} mm")
-    print(f"meridians     true arc waist->hem: CF "
-          f"{model.true_meridian_arc(0.0, 0.0):.1f} mm, side "
-          f"{model.true_meridian_arc(90.0, 0.0):.1f} mm; GRID RING PARAMETER "
-          f"is the r_eq meridian arc ({coords.s_max:.1f} mm) — true s(theta,u) "
+    def _true_arc(theta_deg):
+        # top edge (neckline at this azimuth) down to the hem, on-shell only
+        z_hi = float(model.z_top_at(theta_deg))
+        zs = np.linspace(z_hi, model.z_bottom, 1201)
+        pts = model.point(np.full(zs.shape, math.radians(theta_deg)), zs)
+        return float(np.linalg.norm(np.diff(pts, axis=0), axis=1).sum())
+    print(f"meridians     true arc top edge->hem: CF {_true_arc(0.0):.1f} mm "
+          f"(edge at z 250), side {_true_arc(90.0):.1f} mm (edge at z 205); "
+          f"GRID RING PARAMETER is the r_eq meridian arc "
+          f"({coords.s_max - coords.s_min:.1f} mm CF span) — true s(theta,u) "
           f"is derived/reported, never the ring parameter")
     area_m2 = model.surface_area_mm2() / 1e6
     a213 = classes["p213"].active_area          # mm^2
@@ -163,9 +214,35 @@ def main():
     parts = [f"{c.class_id} {pct(dist.get(c.class_id, 0))}" for c in seatable]
     parts.append(f"none {pct(dist.get(None, 0))}")
     print()
-    print(f"MAX CLASS     skirt: {' | '.join(parts)}   (tolerance {tol} mm)")
+    print(f"MAX CLASS     dress: {' | '.join(parts)}   (tolerance {tol} mm, "
+          f"{total} shell cells; {sum(a.off_shell for a in analyses)} cells "
+          f"above the neckline excluded)")
     print(f"              previous run was: {PREVIOUS_RUN_DISTRIBUTION}")
     print(f"              (p750 excluded from seating: requires_facet)")
+
+    if model.neckline is not None:
+        nk = model.neckline.params
+        print()
+        print(f"NECKLINE      CF {nk.cf_height:g} / side {nk.side_height:g} mm "
+              f"(GIVEN); shoulder theta {nk.shoulder_theta:g} deg, plateau "
+              f"flatness {nk.plateau_flatness:g}; keep-out {nk.keepout_mm:g} mm "
+              f"below the edge; SHELL TOPS OUT AT THE CURVE")
+        print(f"              tangent zero at CF and at the side by "
+              f"construction; monotone CF->side asserted at build")
+        gross, usable = bodice_area_accounting(model)
+        print(f"bodice area   gross {gross / 100:.0f} cm2 (below the edge) -> "
+              f"usable {usable / 100:.0f} cm2 after neckline keep-out + waist "
+              f"band ({100 * usable / gross:.0f}%); the +-90 seams are lines "
+              f"(zero area), they bound placement only")
+        keep = usable_bodice_cell_indices(chart, grid)
+        b_an = [a for a in analyses if a.cell_index in keep]
+        b_dist = class_distribution(b_an)
+        b_tot = max(sum(b_dist.values()), 1)
+        b_parts = [f"{c.class_id} {100.0 * b_dist.get(c.class_id, 0) / b_tot:.0f}%"
+                   for c in seatable]
+        b_parts.append(f"none {100.0 * b_dist.get(None, 0) / b_tot:.0f}%")
+        print(f"              usable-region max class ({len(b_an)} cells fully "
+              f"inside): {' | '.join(b_parts)}")
 
     print()
     print(f"tolerance sweep (UNVALIDATED default {tol} mm — distributions if "

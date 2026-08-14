@@ -93,3 +93,38 @@ panels:
     rotation: 0
     layer: 0
     mirrored: true
+  - id: bod-370
+    class: p370
+    theta: 0.0
+    s: -65.113
+    rotation: 180
+    layer: 0
+    mirrored: false
+  - id: bod-a30
+    class: p213
+    theta: 30.0
+    s: -50.054
+    rotation: 180
+    layer: 0
+    mirrored: true
+  - id: bod-a55
+    class: p213
+    theta: 55.0
+    s: -50.054
+    rotation: 180
+    layer: 0
+    mirrored: true
+  - id: bod-b25
+    class: p213
+    theta: 25.0
+    s: -115.529
+    rotation: 180
+    layer: 0
+    mirrored: true
+  - id: bod-b50
+    class: p213
+    theta: 50.0
+    s: -115.529
+    rotation: 180
+    layer: 0
+    mirrored: true

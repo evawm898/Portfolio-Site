@@ -17,7 +17,7 @@ from layout import (AuthoredPanel, LayoutError, SurfaceChart, assert_face_normal
                     dump_layout, load_layout, outline_problems, resolve_layout,
                     save_layout, tail_run_mm, wrap180)
 from panels import PanelClass, PanelSpecError, load_panel_classes
-from shell import ShellModel, ShellParams
+from shell import ShellModel, ShellParams, dress_params
 
 HERE = Path(__file__).resolve().parent
 MODEL = ShellModel(ShellParams())
@@ -255,16 +255,21 @@ class TestMirroring(unittest.TestCase):
         self.assertFalse(placed[0].is_twin)
 
     def test_starter_layout_resolves(self):
-        # the committed starter layout on the elliptical-section skirt:
+        # the committed starter layout on the FULL DRESS (skirt + bodice):
         # every source and every derived twin must resolve valid
+        from coords import ShellCoords
+        model = ShellModel(dress_params())
+        coords = ShellCoords(model)
+        chart = SurfaceChart(model, coords)
         authored = load_layout(HERE / "layout.yaml")
         self.assertGreater(len(authored), 0)
         self.assertTrue(all(a.theta >= 0.0 for a in authored))  # one-sided
-        placed, errors = resolve_layout(CHART, CLASSES, authored)
+        placed, errors = resolve_layout(chart, CLASSES, authored)
         self.assertEqual(errors, [])
         self.assertTrue(all(p.valid for p in placed),
                         [(p.panel_id, p.problems) for p in placed if not p.valid])
         self.assertGreater(sum(p.is_twin for p in placed), 0)
+        self.assertTrue(any(p.s < 0 for p in placed))   # bodice panels exist
 
     def test_synthetic_pair_resolves_on_the_skirt(self):
         placed, errors = resolve_layout(CHART, CLASSES, [

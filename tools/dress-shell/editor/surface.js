@@ -68,13 +68,37 @@ function arcZPartial(t, a, b, da, db) {
   return half * acc;
 }
 
+// The neckline: the physical top edge of the bodice (mirrors neckline.py's
+// piecewise cubic Hermite — knots/heights/tangents come from the server so
+// client and server evaluate the identical curve).
+export class Neckline {
+  constructor(d) {
+    this.knots = d.knots; this.heights = d.heights; this.tangents = d.tangents;
+    this.side = d.side_height; this.keepout = d.keepout_mm;
+    this.cf = d.cf_height;
+  }
+  height(thetaDeg) {
+    const t = Math.abs(wrap180(thetaDeg));
+    if (t >= 90) return this.side;
+    const i = t < this.knots[1] ? 0 : 1;
+    const t0 = this.knots[i], t1 = this.knots[i + 1], dt = t1 - t0;
+    const s = (t - t0) / dt;
+    const h00 = (1 + 2 * s) * (1 - s) ** 2, h10 = s * (1 - s) ** 2;
+    const h01 = s * s * (3 - 2 * s), h11 = s * s * (s - 1);
+    return h00 * this.heights[i] + h10 * dt * this.tangents[i]
+         + h01 * this.heights[i + 1] + h11 * dt * this.tangents[i + 1];
+  }
+  keepoutFloor(thetaDeg) { return this.height(thetaDeg) - this.keepout; }
+}
+
 export class Surface {
-  constructor(profile, bounds) {
+  constructor(profile, bounds, neckline = null) {
     this.sMin = bounds.s_min;
     this.sMax = bounds.s_max;
     this.zBottom = bounds.z_bottom;
     this.zTop = bounds.z_top;
     this.band = bounds.band_halfwidth || 0;
+    this.neckline = neckline ? new Neckline(neckline) : null;
     this.a = makeInterp(profile.z, profile.a);
     this.b = makeInterp(profile.z, profile.b);
     this.da = makeInterp(profile.z, profile.da);
@@ -147,6 +171,15 @@ export class Surface {
     const r = this.rTheta(theta, s2);
     return { theta: theta + (dxMm / r) * 180 / Math.PI, s: s2 };
   }
+
+  // neckline keep-out violation string for a chart point (null = legal)
+  neckViolation(tag, theta, s) {
+    if (!this.neckline) return null;
+    const z = this.zOfS(Math.min(Math.max(s, this.sMin), this.sMax));
+    if (z <= 0) return null;
+    const floor = this.neckline.keepoutFloor(theta);
+    return z > floor + 1e-9 ? `${tag} crosses the neckline keep-out` : null;
+  }
 }
 
 // -- class helpers ----------------------------------------------------------
@@ -207,6 +240,8 @@ export function connectorProblems(surf, cls, theta, s, rotation) {
     if (pt.s > surf.sMax + 1e-9) out.push(`${tag} runs off the hem edge`);
     if (Math.abs(localAngle(pt.theta, center)) >= 90 - 1e-9)
       out.push(`${tag} crosses the ${name} piece seam`);
+    const neck = surf.neckViolation(tag, pt.theta, pt.s);
+    if (neck) out.push(neck);
   }
   return out;
 }
@@ -224,6 +259,8 @@ export function outlineProblems(surf, cls, theta, s, rotation) {
       out.push("outline corner off the shell (top/hem edge)");
     if (Math.abs(localAngle(pt.theta, center)) >= 90 - 1e-9)
       out.push(`outline crosses the ${name} piece seam`);
+    const neck = surf.neckViolation("outline corner", pt.theta, pt.s);
+    if (neck) out.push(neck);
   }
   // waist seam band keep-out (layout.py outline_problems)
   const band = surf.band;
@@ -306,6 +343,7 @@ export function seatStandoff(surf, cls, theta, s, n = 7) {
       if (sp < surf.sMin - 1e-9 || sp > surf.sMax + 1e-9) return Infinity;
       const tp = theta + (u / r) * 180 / Math.PI;
       if (Math.abs(localAngle(tp, center)) >= 90) return Infinity;
+      if (surf.neckViolation("", tp, sp)) return Infinity;
       const q = surf.forward(tp, sp).pos;
       const d = (q[0] - f.pos[0]) * f.normal[0] + (q[1] - f.pos[1]) * f.normal[1]
               + (q[2] - f.pos[2]) * f.normal[2];

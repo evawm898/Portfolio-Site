@@ -195,6 +195,11 @@ def uncovered_shell_area(chart, placed, n_theta=720, n_s=140):
     # r varies slowly in theta; use a coarse theta sub-grid then repeat
     R = np.repeat(R, 12, axis=1)[:, :n_theta]
     w = R * math.radians(360.0 / n_theta) * ((chart.s_max - chart.s_min) / n_s)
+    if chart.neckline is not None:
+        # no shell above the neckline: those samples carry no area
+        Z = np.asarray(chart.coords.z_of_s(S[:, 0]))
+        caps = np.asarray(chart.neckline.height(ts))
+        w = np.where(Z[:, None] <= caps[None, :] + 1e-9, w, 0.0)
     covered = np.zeros(T.shape, dtype=bool)
     for rct in rects:
         covered |= ((T >= rct.theta0) & (T <= rct.theta1)

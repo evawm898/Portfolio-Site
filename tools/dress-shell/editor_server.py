@@ -36,7 +36,8 @@ from layering import LayeringError, analyze_layering, uncovered_shell_area
 from layout import (AuthoredPanel, LayoutError, SurfaceChart, asymmetry_summary,
                     dump_layout, load_layout, resolve_layout, save_layout)
 from panels import load_panel_classes
-from shell import ShellModel, ShellParams, build_meshes
+from neckline import NecklineParams
+from shell import ShellModel, ShellParams, build_meshes, dress_params
 
 VENDOR_DIR = HERE.parents[1] / "dress" / "vendor"
 LAYOUT_PATH = HERE / "layout.yaml"
@@ -49,9 +50,9 @@ class State:
     """Everything static about the shell, computed once per parameter set
     (startup and every /api/params rebuild)."""
 
-    def __init__(self, params: ShellParams = ShellParams()):
+    def __init__(self, params: ShellParams = None):
         print("building shell + analysis state ...")
-        self.model = ShellModel(params)
+        self.model = ShellModel(params if params is not None else dress_params())
         self.coords = ShellCoords(self.model)
         self.chart = SurfaceChart(self.model, self.coords)
         self.classes = load_panel_classes(HERE / "panels.yaml")
@@ -78,7 +79,10 @@ class State:
 
     def _build_static(self):
         m, c = self.model, self.coords
-        z = np.linspace(m.z_bottom, m.z_top, 601)
+        # dense table over BOTH segments; the crease at z = 0 is smoothed
+        # across at most one sample interval in the client (server stays
+        # authoritative on drag-end/save)
+        z = np.linspace(m.z_bottom, m.z_top, 1001)
         prof = {"z": np.round(z, 3).tolist(),
                 "a": np.round(m.a(z), 4).tolist(), "b": np.round(m.b(z), 4).tolist(),
                 "da": np.round(m.da(z), 6).tolist(), "db": np.round(m.db(z), 6).tolist(),
@@ -105,6 +109,18 @@ class State:
                 "waist_section_ratio": m.params.waist_section_ratio,
                 "skirt_hem_ratio": m.params.skirt_hem_ratio,
                 "ratio_blend": m.params.ratio_blend,
+                "shoulder_theta": (m.neckline.params.shoulder_theta
+                                   if m.neckline else None),
+                "plateau_flatness": (m.neckline.params.plateau_flatness
+                                     if m.neckline else None),
+            },
+            "neckline": None if m.neckline is None else {
+                "cf_height": m.neckline.params.cf_height,
+                "side_height": m.neckline.params.side_height,
+                "keepout_mm": m.neckline.params.keepout_mm,
+                "knots": [float(v) for v in m.neckline._knots],
+                "heights": [float(v) for v in m.neckline._heights],
+                "tangents": [float(v) for v in m.neckline._tangents],
             },
             "grid": {"dtheta": self.grid.spec.dtheta, "ds": self.grid.spec.ds,
                      "rings": self.grid.rings.tolist(),
@@ -253,13 +269,20 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/params":
                 # live shell parameters: only the design-adjustable subset;
-                # body measurements (waist, drop) stay fixed. ShellModel
-                # validates; on failure the old STATE stays in place.
+                # body measurements (waist, drop, neckline heights) stay
+                # fixed. ShellModel/NecklineCurve validate; on failure the
+                # old STATE stays in place.
                 allowed = ("hem_circumference", "dome_n",
                            "skirt_hem_ratio", "ratio_blend")
                 updates = {k: (str(body[k]) if k == "ratio_blend"
                                else float(body[k]))
                            for k in allowed if k in body}
+                neck_allowed = ("shoulder_theta", "plateau_flatness")
+                neck_updates = {k: float(body[k])
+                                for k in neck_allowed if k in body}
+                if neck_updates and STATE.model.params.bodice is not None:
+                    updates["bodice"] = replace(STATE.model.params.bodice,
+                                                **neck_updates)
                 new_params = replace(STATE.model.params, **updates)
                 STATE = State(new_params)   # ShellError -> 422, STATE kept
                 self._send(200, {"rebuilt": True,

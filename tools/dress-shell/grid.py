@@ -145,20 +145,42 @@ class ShellGrid:
     # -- polylines for rendering (3D, slightly off-surface) ------------------
 
     def ring_polylines(self, coords, lift_mm=0.8, step_deg=2.0):
-        """[(n,3) arrays] one closed polyline per ring, lifted along the
-        normal so overlay lines do not z-fight the shell."""
+        """[(n,3) arrays] one polyline per on-shell ring run, lifted along
+        the normal so overlay lines do not z-fight the shell. Rings above
+        the waist may be OPEN ARCS: they exist only where the ring sits
+        below the neckline edge."""
         out = []
         thetas = np.arange(-180.0, 180.0 + 1e-9, step_deg)
         for s in self.rings:
-            f = coords.forward(thetas, np.full_like(thetas, s))
-            out.append(f["position"] + lift_mm * f["normal"])
+            mask = np.array([self.chart.on_shell(float(t), float(s))
+                             for t in thetas])
+            if not np.any(mask):
+                continue
+            # contiguous on-shell runs -> separate polylines
+            idx = np.flatnonzero(mask)
+            splits = np.split(idx, np.flatnonzero(np.diff(idx) > 1) + 1)
+            for run in splits:
+                if len(run) < 2:
+                    continue
+                th = thetas[run]
+                f = coords.forward(th, np.full_like(th, s))
+                out.append(f["position"] + lift_mm * f["normal"])
         return out
 
     def radial_polylines(self, coords, lift_mm=0.8, step_mm=8.0):
+        """One polyline per radial, from the physical top edge (the
+        neckline at that azimuth, or the waist without a bodice) to the
+        hem."""
         out = []
-        n = max(int((self.chart.s_max - self.chart.s_min) / step_mm), 2)
-        ss = np.linspace(self.chart.s_min, self.chart.s_max, n)
         for t in self.thetas[:-1]:
+            if self.chart.neckline is None:
+                s_top = self.chart.s_min
+            else:
+                z_edge = min(float(self.chart.neckline.height(float(t))),
+                             self.chart.model.z_top)
+                s_top = float(coords.s_of_z(z_edge))
+            n = max(int((self.chart.s_max - s_top) / step_mm), 2)
+            ss = np.linspace(s_top, self.chart.s_max, n)
             f = coords.forward(np.full_like(ss, t), ss)
             out.append(f["position"] + lift_mm * f["normal"])
         return out

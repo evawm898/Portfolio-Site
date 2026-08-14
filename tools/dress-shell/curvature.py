@@ -80,11 +80,19 @@ def fundamental_forms_numeric(model, theta_rad, z, dt=1e-3, dz=_H):
     th, zz = np.broadcast_arrays(th, zz)
     P = lambda t, x: model.point(t, x)
 
-    z_lo, z_hi = model.z_bottom + dz, model.z_top - dz
-    z_c = np.clip(zz, z_lo, z_hi)      # centered stencil anchor, guarded:
-    # anchoring the z-stencil at a clipped interior point keeps correct
-    # spacing; the offset from the true z is <= dz and the forms are
-    # evaluated AT z via the theta row through the true z.
+    # centered stencil anchor, guarded at the profile ends AND at the
+    # waist crease: when a bodice exists the stencil never crosses z = 0,
+    # so each side of the crease keeps its own curvature. Anchoring at a
+    # clipped interior point keeps correct spacing; the offset from the
+    # true z is <= dz and the forms are evaluated AT z via the theta row
+    # through the true z.
+    if getattr(model, "sections", None) is not None:
+        below = zz <= 0.0
+        z_lo = np.where(below, model.z_bottom + dz, dz)
+        z_hi = np.where(below, -dz, model.z_top - dz)
+    else:
+        z_lo, z_hi = model.z_bottom + dz, model.z_top - dz
+    z_c = np.clip(zz, z_lo, z_hi)
     X = P(th, zz)
     Xt = (P(th + dt, zz) - P(th - dt, zz)) / (2 * dt)
     Xtt = (P(th + dt, zz) - 2 * X + P(th - dt, zz)) / dt**2
@@ -149,6 +157,7 @@ class CellAnalysis:
     standoff_by_class: dict      # class_id -> max standoff mm (inf = does not fit)
     max_class: str               # largest seatable class id, or None
     r_min_clamped: bool = False  # True where the hem singularity hit the display floor
+    off_shell: bool = False      # cell center above the neckline edge (no shell there)
 
 
 def seat_standoff(coords, chart, outline_w, outline_h, theta, s, samples=9):
@@ -177,6 +186,12 @@ def seat_standoff(coords, chart, outline_w, outline_h, theta, s, samples=9):
     lam = (t_pts - center + 180.0) % 360.0 - 180.0
     if np.any(np.abs(lam) >= 90.0):
         return float("inf")
+    # neckline keep-out: no footprint sample above edge - keepout_mm
+    if chart.neckline is not None:
+        z_pts = chart.coords.z_of_s(s_pts)
+        floors = chart.neckline.keepout_floor(t_pts)
+        if np.any(z_pts > floors + 1e-9):
+            return float("inf")
 
     fp = coords.forward(t_pts.ravel(), s_pts.ravel())
     d = (fp["position"] - p0) @ n
@@ -193,9 +208,18 @@ def analyze_cells(coords, chart, grid, classes, tolerance_mm=STANDOFF_TOLERANCE_
     tc = np.array([c.theta_c for c in cells])
     sc = np.array([c.s_c for c in cells])
     z = chart.coords.z_of_s(sc)
-    k1, k2, K = principal_curvatures(chart.model, np.radians(tc), z)
+    # cells whose center sits above the neckline edge have no shell under
+    # them at all: skip curvature/seating, mark off_shell
+    on = np.array([chart.on_shell(float(t), float(s))
+                   for t, s in zip(tc, sc)])
+    k1 = np.zeros(len(cells)); k2 = np.zeros(len(cells)); K = np.zeros(len(cells))
+    if np.any(on):
+        k1_on, k2_on, K_on = principal_curvatures(
+            chart.model, np.radians(tc[on]), z[on])
+        k1[on], k2[on], K[on] = k1_on, k2_on, K_on
     kmax = np.maximum(np.abs(k1), np.abs(k2))
-    r_min_raw = np.where(kmax > 1e-12, 1.0 / kmax, np.inf)
+    with np.errstate(divide="ignore"):
+        r_min_raw = np.where(kmax > 1e-12, 1.0 / kmax, np.inf)
     clamped = r_min_raw < R_MIN_DISPLAY_FLOOR_MM
     r_min = np.where(clamped, R_MIN_DISPLAY_FLOOR_MM, r_min_raw)
 
@@ -203,6 +227,12 @@ def analyze_cells(coords, chart, grid, classes, tolerance_mm=STANDOFF_TOLERANCE_
                      key=lambda c: c.outline_area)
     out = []
     for i, cell in enumerate(cells):
+        if not on[i]:
+            out.append(CellAnalysis(
+                cell_index=cell.index, k1=0.0, k2=0.0, gaussian=0.0,
+                r_min=float("inf"), standoff_by_class={}, max_class=None,
+                off_shell=True))
+            continue
         standoffs = {}
         best = None
         for cls in by_size:
@@ -226,16 +256,17 @@ def class_distribution(analyses, tolerance_mm=None, classes=None):
     """{class_id_or_None: cell count}. With `tolerance_mm` and `classes`
     given, re-thresholds the cached standoffs at that tolerance instead of
     using the baked max_class — the basis of the sweep mode."""
+    on_shell = [a for a in analyses if not a.off_shell]   # no shell = no cell
     if tolerance_mm is None:
         dist = {}
-        for a in analyses:
+        for a in on_shell:
             dist[a.max_class] = dist.get(a.max_class, 0) + 1
         return dist
     order = [c.class_id for c in
              sorted((c for c in classes.values() if not c.requires_facet),
                     key=lambda c: c.outline_area)]
     dist = {}
-    for a in analyses:
+    for a in on_shell:
         best = None
         for cid in order:
             if a.standoff_by_class.get(cid, float("inf")) <= tolerance_mm:

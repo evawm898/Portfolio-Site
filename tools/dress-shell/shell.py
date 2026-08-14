@@ -45,16 +45,28 @@ handled here:
     revolution formulas are invalid off k = 1 and survive only inside
     the k = 1.0 regression test.
 
-Waist junction, seam band, hem singularity, bodice status: unchanged
-from the previous revision (crease at the waist, +-8 mm band, n < 2
-meridional singularity at the hem, bodice still an unspecified segment
-with z_top = 0).
+BODICE (params.bodice = NecklineParams): the segment above the waist,
+z in (0, cf_height]. Sections are the solved/interpolated bodice
+ellipses (bodice.BodiceSections over the four anchors — waist,
+underbust, bust apex, above-bust taper). Same equal-arc theta, same
+P/2pi chart metric. The WAIST IS A CREASE: derivative stencils never
+cross z = 0, so each side keeps its own tangent (skirt ~41 deg from
+vertical, bodice launching vertically per the monotone interpolant).
+THE NECKLINE IS THE PHYSICAL TOP EDGE: the parametric sections extend
+to z = cf_height for math convenience, but every exported mesh is
+clamped to z <= neckline_height(theta) (no shell above the curve), and
+layout legality + cell analysis enforce the keep-out band below it.
+bodice=None keeps the skirt-only shell (z_top = 0) — every previous
+behavior unchanged.
 """
 
 import math
 from dataclasses import dataclass
 
 import numpy as np
+
+from bodice import BodiceSections
+from neckline import NecklineCurve, NecklineParams
 
 # 24-point Gauss-Legendre nodes/weights on [-1, 1] for ellipse-arc
 # quadrature (smooth integrand -> ~machine precision on a quarter arc).
@@ -102,7 +114,16 @@ class ShellParams:
     ratio_blend: str = "linear"          # 'linear' | 'eased' (smoothstep)
     fillet_radius: float = 0.0           # 0 = sharp waist crease (the design)
     waist_band_halfwidth: float = 8.0    # seam band / cable bus, mm each side
-    bodice: object = None                # NOT SPECIFIED — supplied later
+    bodice: object = None                # None = skirt only; NecklineParams
+                                         # activates the bodice segment
+
+
+def dress_params() -> ShellParams:
+    """The committed DRESS design: skirt + bodice with the given neckline
+    (CF 250 / side 205, taper confirmed). Export, editor, and reports
+    build from this one constructor so there is a single source of truth."""
+    from neckline import DESIGN_NECKLINE
+    return ShellParams(bodice=DESIGN_NECKLINE)
 
 
 class ShellModel:
@@ -144,10 +165,9 @@ class ShellModel:
         if p.waist_band_halfwidth < 0:
             raise ShellError(f"waist_band_halfwidth must be >= 0, "
                              f"got {p.waist_band_halfwidth}")
-        if p.bodice is not None:
+        if p.bodice is not None and not isinstance(p.bodice, NecklineParams):
             raise ShellError(
-                "bodice profile is not specified yet — refusing invented "
-                "measurements. Supply it via a future bodice segment.")
+                f"bodice must be None or NecklineParams, got {type(p.bodice)}")
 
         self.params = p
         self.hem_radius = p.hem_circumference / math.tau
@@ -156,7 +176,29 @@ class ShellModel:
         self.b_param = p.drop / (1.0 - rr ** p.dome_n) ** (1.0 / p.dome_n)
         self.n = p.dome_n
         self.z_bottom = -p.drop
-        self.z_top = 0.0
+
+        if p.bodice is None:
+            self.neckline = None
+            self.sections = None
+            self.z_top = 0.0
+        else:
+            self.neckline = NecklineCurve(p.bodice)   # validates shape params
+            self.sections = BodiceSections()          # the confirmed anchors
+            if p.bodice.cf_height > self.sections.v_top + 1e-9:
+                raise ShellError(
+                    f"neckline cf_height ({p.bodice.cf_height}) exceeds the "
+                    f"highest section anchor ({self.sections.v_top}); supply "
+                    f"a taller anchor rather than extrapolating")
+            # bodice waist section must MATCH the skirt waist section: both
+            # are solved from the same circumference, but the ratios must
+            # agree or the shells do not meet edge-to-edge at the crease
+            a_b, b_b = float(self.sections.a(0.0)), float(self.sections.b(0.0))
+            skirt_ratio = p.waist_section_ratio
+            if abs(a_b / b_b - skirt_ratio) > 1e-6:
+                raise ShellError(
+                    f"waist ratio mismatch: bodice sections give "
+                    f"{a_b / b_b:.6f}, skirt uses {skirt_ratio}")
+            self.z_top = float(p.bodice.cf_height)
 
     # -- perimeter + ratio schedules -----------------------------------------
 
@@ -176,11 +218,12 @@ class ShellModel:
                 * (1.0 - t) ** (1.0 / self.n - 1.0))
 
     def section_perimeter(self, z):
-        return math.tau * self.r_super(z)
+        return math.tau * np.asarray(self.mean_radius(z))
 
     def ratio(self, z):
-        """Section ratio schedule k(u): hem value at u = 0 blending
-        monotonically to the bodice waist ratio at u = drop."""
+        """SKIRT section ratio schedule k(u): hem value at u = 0 blending
+        monotonically to the bodice waist ratio at u = drop. (Bodice
+        sections carry their own ratios via the solved anchors.)"""
         x = self._u(z) / self.params.drop
         if self.params.ratio_blend == "eased":
             x = x * x * (3.0 - 2.0 * x)      # smoothstep, still monotone
@@ -188,8 +231,19 @@ class ShellModel:
                 + (self.params.waist_section_ratio - self.params.skirt_hem_ratio) * x)
 
     def semi_axes(self, z):
-        """(a, b) at height z: solved from the perimeter schedule and k(z)."""
-        return solve_semi_axes(self.section_perimeter(z), self.ratio(z))
+        """(a, b) at height z. Skirt (z <= 0): solved from the perimeter
+        schedule and k(z). Bodice (z > 0): the interpolated sections."""
+        z = np.asarray(z, dtype=float)
+        a_s, b_s = solve_semi_axes(
+            math.tau * self.r_super(z), self.ratio(z))
+        if self.sections is None:
+            return a_s, b_s
+        up = z > 0.0
+        if not np.any(up):
+            return a_s, b_s
+        a = np.where(up, self.sections.a(z), a_s)
+        b = np.where(up, self.sections.b(z), b_s)
+        return a, b
 
     def a(self, z):
         return self.semi_axes(z)[0]
@@ -201,13 +255,22 @@ class ShellModel:
 
     def _d_guarded(self, f, z):
         """d/dz with one-sided second-order stencils of correct spacing at
-        the profile ends (never a clamped centered difference)."""
+        the profile ends (never a clamped centered difference) AND at the
+        waist crease: stencils never cross z = 0 when a bodice exists, so
+        each side of the crease keeps its own one-sided tangent."""
         z_in = np.asarray(z, dtype=float)
         z1 = np.atleast_1d(z_in)
         h = self._DZ
+        if self.sections is None:
+            seg_lo = np.full_like(z1, self.z_bottom)
+            seg_hi = np.full_like(z1, self.z_top)
+        else:
+            below = z1 <= 0.0
+            seg_lo = np.where(below, self.z_bottom, 0.0)
+            seg_hi = np.where(below, 0.0, self.z_top)
         out = np.empty_like(z1)
-        lo = z1 < self.z_bottom + h
-        hi = z1 > self.z_top - h
+        lo = z1 < seg_lo + h
+        hi = z1 > seg_hi - h
         mid = ~(lo | hi)
         if np.any(mid):
             zm = z1[mid]
@@ -228,11 +291,32 @@ class ShellModel:
 
     def mean_radius(self, z):
         """Perimeter-equivalent radius r_eq = P/2pi — the ring-parameter
-        meridian (identical to the old profile when k = 1)."""
-        return self.r_super(z)
+        meridian. Skirt: the superellipse profile itself. Bodice: Ramanujan
+        perimeter of the interpolated sections over 2pi."""
+        z = np.asarray(z, dtype=float)
+        r = np.asarray(self.r_super(z), dtype=float)
+        if self.sections is None:
+            return r
+        up = z > 0.0
+        if not np.any(up):
+            return r
+        a_up = self.sections.a(z)
+        b_up = self.sections.b(z)
+        r_up = ellipse_perimeter(a_up, b_up) / math.tau
+        return np.where(up, r_up, r)
 
     def mean_slope(self, z):
-        return self.dr_super(z)
+        """d(r_eq)/dz: closed-form on the skirt, guarded FD on the bodice
+        (stencils never crossing the crease)."""
+        z = np.asarray(z, dtype=float)
+        sl = np.asarray(self.dr_super(z), dtype=float)
+        if self.sections is None:
+            return sl
+        up = z > 0.0
+        if not np.any(up):
+            return sl
+        sl_up = self._d_guarded(self.mean_radius, np.where(up, z, 1.0))
+        return np.where(up, sl_up, sl)
 
     # -- equal-arc theta machinery -------------------------------------------
 
@@ -305,7 +389,7 @@ class ShellModel:
 
         # d(target arc)/dz at fixed theta minus d(arc)/dz at fixed t, over speed
         speed = np.sqrt((a * cos_t) ** 2 + (b * sin_t) ** 2)
-        dP = math.tau * self.dr_super(zb)          # dP/dz
+        dP = math.tau * np.asarray(self.mean_slope(zb))   # dP/dz (crease-guarded)
         t_z = (thb / math.tau * dP - self._arc_z_partial(t, zb)) / speed
 
         p_t = np.stack([a * cos_t, -b * sin_t, np.zeros_like(t)], axis=-1)
@@ -365,12 +449,29 @@ class ShellModel:
         return float(np.max(np.abs(r_skirt - r_bod)))
 
     def crease_angle_deg(self):
-        return None   # bodice shell still unspecified
+        """Waist crease: skirt tangent + bodice launch. The monotone bodice
+        interpolant launches vertically (see bodice.py), so the crease is
+        the skirt tangent alone — reported per theta for honesty."""
+        if self.sections is None:
+            return None
+        return self.waist_tangent_deg()   # + 0.0 bodice launch
+
+    def z_top_at(self, theta_deg):
+        """The PHYSICAL top edge at this azimuth: the neckline height when
+        a bodice exists, else the waist plane."""
+        if self.neckline is None:
+            return np.zeros(np.shape(theta_deg)) if np.shape(theta_deg) else 0.0
+        return self.neckline.height(theta_deg)
 
     @property
     def rings(self):
-        return [Ring("hem", self.z_bottom, self.params.hem_circumference),
-                Ring("waist", 0.0, self.params.waist_circumference)]
+        out = [Ring("hem", self.z_bottom, self.params.hem_circumference),
+               Ring("waist", 0.0, self.params.waist_circumference)]
+        if self.sections is not None:
+            for r in self.sections.rows[1:]:
+                if r["v"] <= self.z_top + 1e-9:
+                    out.append(Ring(r["name"], r["v"], r["circumference"]))
+        return out
 
     def surface_area_mm2(self, n_theta=256, n_z=400):
         """General surface area by triangulated quadrature."""
@@ -380,10 +481,28 @@ class ShellModel:
             np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1).sum())
 
 
+def _clamp_to_neckline(model, T_rad, Z):
+    """Clamp a (theta, z) grid to the physical top edge. Rows above the
+    neckline collapse ONTO the edge curve — the trimmed cells become
+    degenerate and are filtered out by area."""
+    if model.neckline is None:
+        return Z
+    caps = model.neckline.height(np.degrees(T_rad))
+    return np.minimum(Z, caps)
+
+
+def _drop_degenerate(V, F, min_area=1e-8):
+    tri = V[F]
+    areas = 0.5 * np.linalg.norm(
+        np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1)
+    return F[areas > min_area]
+
+
 def _area_mesh(model, n_theta, n_z):
     thetas = np.linspace(-math.pi, math.pi, n_theta + 1)
     zs = np.linspace(model.z_bottom, model.z_top, n_z + 1)
     T, Z = np.meshgrid(thetas, zs)
+    Z = _clamp_to_neckline(model, T, Z)
     V = model.point(T, Z).reshape(-1, 3)
     cols = n_theta + 1
     idx = np.arange((n_z + 1) * cols).reshape(n_z + 1, cols)
@@ -391,7 +510,7 @@ def _area_mesh(model, n_theta, n_z):
     q10, q11 = idx[1:, :-1].ravel(), idx[1:, 1:].ravel()
     F = np.concatenate([np.stack([q00, q11, q01], axis=1),
                         np.stack([q00, q10, q11], axis=1)])
-    return V, F
+    return V, _drop_degenerate(V, F)
 
 
 def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0):
@@ -403,7 +522,14 @@ def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0)
     if n_theta % 4 != 0:
         raise ShellError(f"n_theta must be a multiple of 4, got {n_theta}")
 
-    z_fine = np.linspace(model.z_bottom, model.z_top, 4001)
+    # fine height grid with the crease (z = 0) exactly on a node
+    if model.z_top > 1e-9:
+        n_lo = int(3000 * -model.z_bottom / (model.z_top - model.z_bottom)) + 1
+        z_fine = np.concatenate([
+            np.linspace(model.z_bottom, 0.0, n_lo),
+            np.linspace(0.0, model.z_top, 3001 - n_lo + 1)[1:]])
+    else:
+        z_fine = np.linspace(model.z_bottom, model.z_top, 4001)
     g = np.sqrt(1.0 + model.mean_slope(z_fine) ** 2)
     arc = np.concatenate([[0.0], np.cumsum(0.5 * (g[1:] + g[:-1]) * np.diff(z_fine))])
     n_rows = max(int(math.ceil(arc[-1] / max_row_mm)) + 1, 2)
@@ -414,6 +540,7 @@ def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0)
     for name, t0 in (("FRONT", -0.5 * math.pi), ("BACK", 0.5 * math.pi)):
         thetas = t0 + np.linspace(0.0, math.pi, half + 1)
         T, Z = np.meshgrid(thetas, z_rows)
+        Z = _clamp_to_neckline(model, T, Z)   # shell tops out AT the neckline
         V = model.point(T, Z).reshape(-1, 3)
         cols = half + 1
         idx = np.arange(n_rows * cols).reshape(n_rows, cols)
@@ -423,5 +550,6 @@ def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0)
             np.stack([q00, q11, q01], axis=1),
             np.stack([q00, q10, q11], axis=1),
         ])
+        F = _drop_degenerate(V, F)
         meshes[name] = (V, F.astype(np.int32))
     return meshes
