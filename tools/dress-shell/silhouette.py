@@ -67,7 +67,8 @@ def load_points(path):
 
 
 def extract_from_image(path, white_thresh=240, min_run_px=6,
-                       waist_search=(0.25, 0.75), shoulder_slope_cut=0.7):
+                       waist_search=(0.25, 0.75), shoulder_slope_cut=0.7,
+                       fill="white", dark_thresh=70):
     """Measure the traced silhouette (white fill) from an image file.
 
     Robustness: photos carry stray near-white speckles (wall highlights,
@@ -90,7 +91,12 @@ def extract_from_image(path, white_thresh=240, min_run_px=6,
     from PIL import Image
     from scipy import ndimage
     img = np.asarray(Image.open(path).convert("RGB"), dtype=np.uint8)
-    white = np.all(img >= white_thresh, axis=-1)
+    # fill="white": white-filled trace (light garment). fill="dark":
+    # black-filled trace — same pipeline on the inverted mask.
+    if fill == "dark":
+        white = np.all(img <= dark_thresh, axis=-1)
+    else:
+        white = np.all(img >= white_thresh, axis=-1)
     labels, n = ndimage.label(white)
     if n == 0:
         raise SilhouetteError("no white silhouette found")
