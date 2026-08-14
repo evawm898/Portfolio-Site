@@ -28,7 +28,7 @@ class TestSolver(unittest.TestCase):
 
     def test_solved_anchor_values(self):
         sec = BodiceSections()
-        waist, under, bust = sec.rows
+        waist, under, bust, above = sec.rows
         self.assertAlmostEqual(waist["a"], 115.27, delta=0.02)
         self.assertAlmostEqual(waist["b"], 76.85, delta=0.02)
         self.assertAlmostEqual(under["v"], 152.4)
@@ -37,16 +37,28 @@ class TestSolver(unittest.TestCase):
         self.assertAlmostEqual(under["b"], 76.95, delta=0.02)
         self.assertAlmostEqual(bust["a"], 178.27, delta=0.02)
         self.assertAlmostEqual(bust["b"], 89.14, delta=0.02)
+        # above-bust: UNVERIFIED garment-convention circumference (32 in),
+        # ratio HELD at the bust value rather than extrapolated
+        self.assertAlmostEqual(above["v"], 254.0)
+        self.assertAlmostEqual(above["circumference"], 812.8)
+        self.assertAlmostEqual(above["ratio"], 2.0)
+        self.assertAlmostEqual(above["a"], 167.78, delta=0.02)
+        self.assertAlmostEqual(above["b"], 83.89, delta=0.02)
         self.assertTrue(all(r["estimated"] for r in sec.rows))  # ratios are estimates
 
     def test_monotone_no_overshoot(self):
+        # monotone RISE to the bust apex, monotone TAPER above it —
+        # PCHIP is shape-preserving per segment, so the crest at the bust
+        # is the global maximum with no overshoot anywhere
         sec = BodiceSections()
-        v = np.linspace(0.0, sec.v_top, 500)
-        a, b = sec.a(v), sec.b(v)
-        self.assertTrue(bool(np.all(np.diff(a) >= -1e-12)))
-        self.assertTrue(bool(np.all(np.diff(b) >= -1e-12)))
-        self.assertTrue(bool(np.all(a <= sec.rows[-1]["a"] + 1e-9)))
-        self.assertTrue(bool(np.all(b <= sec.rows[-1]["b"] + 1e-9)))
+        bust = sec.rows[2]
+        rise = np.linspace(0.0, bust["v"], 400)
+        fall = np.linspace(bust["v"], sec.v_top, 200)
+        for f in (sec.a, sec.b):
+            self.assertTrue(bool(np.all(np.diff(f(rise)) >= -1e-12)))
+            self.assertTrue(bool(np.all(np.diff(f(fall)) <= 1e-12)))
+            v = np.linspace(0.0, sec.v_top, 600)
+            self.assertTrue(bool(np.all(f(v) <= f(np.array(bust["v"])) + 1e-9)))
 
     def test_default_sections_hit_the_underbust(self):
         # the given 28 in underbust is an interpolation ANCHOR, not a wish
@@ -100,6 +112,32 @@ class TestWaistJunction(unittest.TestCase):
         st = ShellModel(ShellParams()).waist_tangent_deg()
         self.assertAlmostEqual(sec.crease_angle_deg(0.0, st), 41.29, delta=0.05)
         self.assertAlmostEqual(sec.crease_angle_deg(90.0, st), 41.29, delta=0.05)
+
+
+class TestBodiceSurface(unittest.TestCase):
+    def test_equal_arc_and_orientation(self):
+        from bodice import BodiceSurface
+        surf = BodiceSurface(BodiceSections(), v_max=250.0)
+        p = surf.point(np.array(math.pi / 2), np.array(100.0))
+        # Newton equal-arc residual bottoms out ~2e-6 mm on the k~2 sections
+        self.assertLess(abs(float(p[..., 1])), 1e-5)   # theta=90 -> major axis
+        self.assertGreater(float(p[..., 0]), 0.0)
+        n = surf.normal(np.array(0.0), np.array(100.0))
+        self.assertGreater(float(n[..., 1]), 0.9)      # CF normal points +y
+
+    def test_band_standoff_honors_neckline_keepout(self):
+        from bodice import BodiceSurface, band_seat_standoff
+        from neckline import NecklineCurve, DESIGN_NECKLINE
+        neck = NecklineCurve(DESIGN_NECKLINE)
+        surf = BodiceSurface(BodiceSections(), v_max=250.0)
+        # a 59.2mm-tall footprint centered at v=230 tops out above the
+        # keep-out floor (244 at CF) -> illegal
+        so = band_seat_standoff(surf, neck, 29.2, 59.2, 0.0, 230.0)
+        self.assertFalse(np.isfinite(so))
+        # low on the bodice the same footprint is legal and seats well
+        so = band_seat_standoff(surf, neck, 29.2, 59.2, 0.0, 100.0)
+        self.assertTrue(np.isfinite(so))
+        self.assertLess(so, 1.0)
 
 
 if __name__ == "__main__":

@@ -50,6 +50,12 @@ class NecklineParams:
     keepout_mm: float = 6.0          # keep-out band below the edge
 
 
+# The GIVEN design heights (user, 2026-08-14): CF 250 mm, side/back 205 mm
+# above the waist. shoulder_theta / plateau_flatness stay at their authored
+# defaults until tuned in the editor.
+DESIGN_NECKLINE = NecklineParams(cf_height=250.0, side_height=205.0)
+
+
 class NecklineCurve:
     def __init__(self, params: NecklineParams):
         p = params
