@@ -38,16 +38,22 @@ const CUP_AMOUNT     = 0.22;   // transverse cupping (edges curl inward)
 const CENTER_CURVE_SCALE = 0.75;  // centre-curve slider (-1..1) -> spine curl (rad);
                                   // +convex arches away, -concave bends toward centre.
                                   // default slider 0.4 -> 0.30 rad = the original curl
-const RADIAL_SEGMENTS = 8;     // tube cross-section resolution (round enough
+// PREVIEW: the saved-designs gallery embeds this page as ?preview=1 iframes to
+// render live rotating thumbnails. At thumbnail size, cross-section resolution
+// barely reads, so preview instances use coarser tubes/beads for far fewer
+// triangles. Live-only — preview instances never export STL, so the print gate
+// (full-detail main viewer) is untouched.
+const PREVIEW = new URLSearchParams(location.search).get('preview') === '1';
+const RADIAL_SEGMENTS = PREVIEW ? 6 : 8;     // tube cross-section resolution (round enough
                                // that a thickened tube doesn't read as faceted)
 // Higher resolution for the CHUNKY, close-viewed base/center primitives only
 // (anther beads, stem/bud tubes, receptacle ribs) — the hair-fine venation stays
 // at RADIAL_SEGMENTS since its faceting is never visible. Bumping only these
 // smooths the close-zoom silhouette for a few thousand extra triangles.
-const NODE_BEAD_RINGS   = 6;   // was 5 — smoother anthers / bud tips / junctions
-const NODE_BEAD_SECTORS = 16;  // was 8
-const CENTER_TUBE_SEGS  = 12;  // was 8 — stamen filaments, stem, side-bud offshoot
-const RECEPT_TUBE_SEGS  = 10;  // was 5 — receptacle ribs / rings
+const NODE_BEAD_RINGS   = PREVIEW ? 4 : 6;   // was 5 — smoother anthers / bud tips / junctions
+const NODE_BEAD_SECTORS = PREVIEW ? 10 : 16; // was 8
+const CENTER_TUBE_SEGS  = PREVIEW ? 7 : 12;  // was 8 — stamen filaments, stem, side-bud offshoot
+const RECEPT_TUBE_SEGS  = PREVIEW ? 6 : 10;  // was 5 — receptacle ribs / rings
 const LEAF_MIN_NODES    = 2;   // selecting a leaf type auto-raises 0 stem nodes to this,
                                // so leaves are visible on selection (they attach at nodes)
 const JOIN_FLARE_DIST = 0.10;  // a flared tube blends into its end bead (a soft
@@ -3186,6 +3192,127 @@ placeholderControls.forEach(({ id, fmt }) => {
 
 
 /* ===================================================================
+   7c. SHARED SAVED DESIGNS — save the current control-panel state to a public
+   gallery (Netlify Blobs via /.netlify/functions/designs), load one back, and
+   the preview handshake used by the gallery's live thumbnail iframes.
+   =================================================================== */
+const DESIGNS_ENDPOINT = '/.netlify/functions/designs';
+
+// Per-device owner token: the only secret that authorizes deleting this device's
+// own saves. Random, persisted in localStorage.
+function getOwnerToken() {
+  let t = null;
+  try { t = localStorage.getItem('flowerOwnerToken'); } catch { /* private mode */ }
+  if (!t || t.length < 8) {
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    t = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+    try { localStorage.setItem('flowerOwnerToken', t); } catch { /* ignore */ }
+  }
+  return t;
+}
+// Track ids this device created so the gallery knows which saves to offer delete on.
+function rememberMyDesign(id) {
+  try {
+    const ids = JSON.parse(localStorage.getItem('flowerMyDesigns') || '[]');
+    if (!ids.includes(id)) { ids.push(id); localStorage.setItem('flowerMyDesigns', JSON.stringify(ids)); }
+  } catch { /* ignore */ }
+}
+
+// Full saved state = every control value (readUI) minus the camera-only view preset.
+function currentDesignParams() {
+  const ui = readUI();
+  delete ui.viewPreset;
+  return ui;
+}
+
+// Apply a saved params object to every control, then rebuild. Iterates the inputs
+// map so any future control is picked up automatically (mirrors the Reset path).
+function applyDesign(params) {
+  if (!params || typeof params !== 'object') return;
+  for (const [k, v] of Object.entries(params)) {
+    const el = inputs[k];
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = v;
+  }
+  if ('autoRotate' in params) controls.autoRotate = !!params.autoRotate;
+  resetPlaceholders();
+  updateTipOptions();
+  updateInfillOptions();
+  updateBloomOptions();
+  updateLayerOptions();
+  updateCenterOptions();
+  updateBaseOptions();
+  refreshLabels();
+  scheduleRegen();
+}
+
+async function postDesign(name) {
+  const res = await fetch(DESIGNS_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, params: currentDesignParams(), ownerToken: getOwnerToken() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Save failed (${res.status}).`);
+  if (data.design && data.design.id) rememberMyDesign(data.design.id);
+  return data.design;
+}
+
+// Fetch the gallery and apply the one matching ?load=<id> (used when opening a
+// saved design in the full viewer).
+async function loadDesignById(id) {
+  try {
+    const res = await fetch(DESIGNS_ENDPOINT, { headers: { accept: 'application/json' } });
+    const data = await res.json();
+    const found = (data.designs || []).find((d) => d.id === id);
+    if (found && found.params) applyDesign(found.params);
+  } catch { /* leave the default flower on any failure */ }
+}
+
+// SAVE modal wiring (markup lives in flower.html; absent on the preview page).
+const saveBtn = document.getElementById('saveDesign');
+const saveModal = document.getElementById('saveModal');
+if (saveBtn && saveModal) {
+  const nameInput = document.getElementById('saveNameInput');
+  const confirmBtn = document.getElementById('saveConfirm');
+  const cancelBtn = document.getElementById('saveCancel');
+  const errEl = document.getElementById('saveError');
+  const closeModal = () => { saveModal.hidden = true; };
+  const openModal = () => {
+    errEl.textContent = '';
+    nameInput.value = '';
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Save';
+    saveModal.hidden = false;
+    nameInput.focus();
+  };
+  const doSave = async () => {
+    const name = nameInput.value.trim();
+    if (!name) { errEl.textContent = 'Please enter a name.'; return; }
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Saving…';
+    errEl.textContent = '';
+    try {
+      await postDesign(name);
+      confirmBtn.textContent = 'Saved ✓';
+      setTimeout(closeModal, 700);
+    } catch (err) {
+      errEl.textContent = err.message || 'Save failed.';
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Save';
+    }
+  };
+  saveBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  confirmBtn.addEventListener('click', doSave);
+  saveModal.addEventListener('click', (e) => { if (e.target === saveModal) closeModal(); });
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSave(); });
+  document.addEventListener('keydown', (e) => { if (!saveModal.hidden && e.key === 'Escape') closeModal(); });
+}
+
+
+/* ===================================================================
    8. BOOT
    =================================================================== */
 
@@ -3197,5 +3324,26 @@ updateLayerOptions();
 updateCenterOptions();
 updateBaseOptions();
 refreshLabels();
-generate();
-animate();
+
+if (PREVIEW) {
+  // Gallery thumbnail: strip the chrome, render cheaply, always auto-rotate, and
+  // render the design its parent posts in (no initial default build).
+  document.body.classList.add('fl-preview');
+  renderer.setPixelRatio(1);
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 1.1;
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin) return;
+    const d = e.data || {};
+    if (d.type === 'flowerLoad' && d.params) { applyDesign(d.params); controls.autoRotate = true; }
+  });
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'flowerPreviewReady' }, location.origin);
+  }
+  animate();
+} else {
+  const loadId = new URLSearchParams(location.search).get('load');
+  generate();
+  if (loadId) loadDesignById(loadId);
+  animate();
+}

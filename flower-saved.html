@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saved Flower Designs — Eva Maskalenko</title>
+<meta name="description" content="A shared gallery of saved parametric flower designs — each a live, rotating 3D preview you can open in the generator.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="flower.css">
+</head>
+<body id="top">
+
+<header class="fl-header">
+  <a href="flower.html" class="fl-back">&larr; Generator</a>
+  <span class="fl-tag">Flower &mdash; unlisted</span>
+</header>
+
+<main class="sv-main">
+  <div class="sv-head">
+    <div class="fl-eyebrow">Shared gallery</div>
+    <h1 class="fl-title">Saved Designs</h1>
+    <p class="sv-sub">Every save is public — anyone visiting can browse and open these. Previews rotate live; open one to load it into the generator. You can delete saves made from this device.</p>
+  </div>
+
+  <p id="svStatus" class="sv-status">Loading saved designs&hellip;</p>
+  <div id="gallery" class="sv-grid" aria-live="polite"></div>
+</main>
+
+<script type="module" src="flower-saved.js"></script>
+</body>
+</html>

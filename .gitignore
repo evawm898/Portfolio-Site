@@ -1,3 +1,7 @@
 node_modules/
-package.json
 package-lock.json
+
+# package.json is committed so Netlify installs the Function's @netlify/blobs
+# dependency at deploy time. Local dev deps (three, playwright-core) live in the
+# gitignored node_modules and are NOT listed here — the browser loads three from
+# the CDN and the verify/shot tools use whatever is already in node_modules.

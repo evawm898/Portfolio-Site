@@ -1151,10 +1151,30 @@
 
   <div class="fl-panel__foot">
     <button id="reset" class="fl-btn" type="button">Reset</button>
+    <button id="saveDesign" class="fl-btn" type="button" title="Save this design to the shared gallery">Save</button>
     <button id="exportStl" class="fl-btn" type="button" title="Download a 3D-printable STL, scaled to millimetres">Export STL</button>
     <span id="building" class="fl-building">building&hellip;</span>
   </div>
+  <div class="fl-panel__links">
+    <a href="flower-saved.html">Saved designs &rarr;</a>
+  </div>
 </aside>
+
+<!-- SAVE modal — names a design before writing it to the shared gallery. -->
+<div id="saveModal" class="fl-modal" hidden>
+  <div class="fl-modal__card" role="dialog" aria-modal="true" aria-labelledby="saveModalTitle">
+    <div class="fl-eyebrow">Shared gallery</div>
+    <h2 id="saveModalTitle" class="fl-modal__title">Save design</h2>
+    <p class="fl-modal__note">Saved to a public gallery anyone visiting this site can browse.</p>
+    <label class="fl-modal__label" for="saveNameInput">Design name</label>
+    <input id="saveNameInput" class="fl-input" type="text" maxlength="50" placeholder="e.g. Winter Ranunculus" autocomplete="off">
+    <p id="saveError" class="fl-modal__error" role="alert"></p>
+    <div class="fl-modal__actions">
+      <button id="saveCancel" class="fl-btn" type="button">Cancel</button>
+      <button id="saveConfirm" class="fl-btn fl-btn--primary" type="button">Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="fl-hint">Drag to orbit <span class="dot">&middot;</span> Scroll to zoom <span class="dot">&middot;</span> Right-drag to pan</div>
 

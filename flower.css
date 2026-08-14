@@ -424,6 +424,110 @@ input[type="checkbox"]:checked::after {
 }
 .fl-building.is-on { opacity: 1; }
 
+/* Primary action (Save-in-modal) — filled petrol accent vs the outline buttons. */
+.fl-btn--primary {
+  color: var(--petrol-bright);
+  border-color: var(--petrol);
+  background: rgba(28, 107, 107, 0.22);
+}
+.fl-btn--primary:hover { background: rgba(28, 107, 107, 0.34); }
+.fl-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Panel footer link row (to the shared saved-designs gallery). */
+.fl-panel__links {
+  margin-top: 0.9rem;
+  text-align: right;
+}
+.fl-panel__links a {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.fl-panel__links a:hover { color: var(--petrol-bright); }
+
+/* ---------------------------------------------------
+   Save modal
+--------------------------------------------------- */
+.fl-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(6, 7, 7, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.fl-modal[hidden] { display: none; }
+.fl-modal__card {
+  width: 340px;
+  max-width: 100%;
+  background: rgba(12, 14, 14, 0.96);
+  border: 1px solid var(--line-strong);
+  padding: 1.5rem 1.5rem 1.3rem;
+}
+.fl-modal__title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.4rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0.5rem 0 0.4rem;
+}
+.fl-modal__note {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  margin-bottom: 1.1rem;
+}
+.fl-modal__label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 0.5rem;
+}
+.fl-input {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--black);
+  border: 1px solid var(--line-strong);
+  padding: 0.6rem 0.7rem;
+}
+.fl-input:focus-visible { outline: none; border-color: var(--petrol-bright); }
+.fl-modal__error {
+  min-height: 1.1rem;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: #e6836b;
+  margin: 0.55rem 0 0;
+}
+.fl-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+/* Preview mode: gallery thumbnail iframes render only the canvas, no chrome. */
+body.fl-preview .fl-panel,
+body.fl-preview .fl-viewpanel,
+body.fl-preview .fl-header,
+body.fl-preview .fl-hint,
+body.fl-preview .fl-modal { display: none !important; }
+
 /* ---------------------------------------------------
    Orbit hint
 --------------------------------------------------- */
@@ -445,6 +549,91 @@ input[type="checkbox"]:checked::after {
 .fl-hint .dot { color: var(--petrol); margin: 0 0.5rem; }
 
 /* ---------------------------------------------------
+   Saved-designs gallery (flower-saved.html)
+--------------------------------------------------- */
+.sv-main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 6.5rem 1.5rem 4rem;
+}
+.sv-head { margin-bottom: 2rem; }
+.sv-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  max-width: 46rem;
+  margin-top: 0.7rem;
+}
+.sv-status {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+.sv-status[hidden] { display: none; }
+.sv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.2rem;
+}
+.sv-card {
+  border: 1px solid var(--line-strong);
+  background: rgba(12, 14, 14, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+.sv-card__preview {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #060707;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.sv-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #060707;
+}
+.sv-card__ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  color: var(--line-strong);
+}
+.sv-card__meta { padding: 0.85rem 0.95rem 1rem; }
+.sv-card__name {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  color: var(--ink);
+  word-break: break-word;
+}
+.sv-card__date {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 0.35rem;
+}
+.sv-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+.sv-del { color: #e6836b; border-color: rgba(230, 131, 107, 0.4); }
+.sv-del:hover { color: #ff9f86; border-color: #e6836b; }
+
+/* ---------------------------------------------------
    Responsive — panel becomes a bottom sheet on small screens
 --------------------------------------------------- */
 
@@ -463,4 +652,5 @@ input[type="checkbox"]:checked::after {
   }
   .fl-hint { display: none; }
   .fl-header { padding: 1rem 6vw; }
+  .sv-main { padding: 5.5rem 6vw 3rem; }
 }
