@@ -294,19 +294,29 @@ class HybridBodiceDepth:
     sections meet edge-to-edge at the waist and the bodice swells the way
     the reference does, but on the GIVEN body circumferences.
 
-      z <= 0:            b = ratio-mode skirt depth (unchanged bell)
-      0 < z <= cut:      b = b_waist * side_trace(z) / side_trace(0)
-      cut < z <= v_top:  b from the ratio-estimate schedule, continuous
-                         at the cut (estimate span, reported)
+      z <= 0:             b = ratio-mode skirt depth (unchanged bell)
+      0 < z <= cut:       b = b_waist * side_trace(z) / side_trace(0)
+      cut < z <= bust:    MONOTONE cubic continuation — starts with the
+                          MEASURED trace-end slope, levels to a zero-slope
+                          crest at the bust apex. No dent: the old
+                          underbust/bust ratio guesses are DROPPED and the
+                          ratios become outputs.
+      bust < z <= v_top:  monotone taper holding the bust ratio output
+                          against the above-bust circumference anchor.
 
     Width a(z) is NOT taken from here — the authored-depth shell mode
     solves it from the perimeter schedule, so circumferences hold and
-    the a/b ratio is an output."""
+    the a/b ratio is an output. Monotonicity (rise to the crest, fall
+    after) is asserted at build."""
+
+    BUST_V = 203.2
+    ABOVE_V = 254.0
+    ABOVE_CIRC = 812.8
 
     def __init__(self, side_fit, skirt_params=None, v_top=250.0, n_grid=2401):
         from scipy.interpolate import PchipInterpolator
         import shell as _shell
-        from bodice import circumference_schedule, solve_a_given_b
+        from bodice import solve_a_given_b, solve_semi_axes
         p = skirt_params if skirt_params is not None else _shell.ShellParams()
         skirt = _shell.ShellModel(_shell.ShellParams(
             waist_circumference=p.waist_circumference,
@@ -315,32 +325,51 @@ class HybridBodiceDepth:
             skirt_hem_ratio=p.skirt_hem_ratio, ratio_blend=p.ratio_blend))
         self.v_lo, self.v_hi = float(skirt.z_bottom), float(v_top)
         cut = float(side_fit.v_hi)
-        self.depth_estimated_above_v = cut
-        circ = circumference_schedule()
+        self.depth_extrapolated_above_v = cut
+
+        b_waist = float(skirt.b(np.array(0.0)))
+        norm = b_waist / float(side_fit.b(0.0))
+        b_cut = norm * float(side_fit.b(cut))
+        s_cut = norm * float(side_fit.db(cut))     # measured end slope
+        if s_cut <= 0:
+            raise SilhouetteError(
+                f"trace-end depth slope is {s_cut:.4f} — expected a rising "
+                f"lower bodice; cannot build a monotone continuation")
+        h = self.BUST_V - cut
+        # cubic Hermite (b_cut, s_cut) -> (b_bust, 0) is monotone rising
+        # when b_bust - b_cut is between s_cut*h/3 and s_cut*h; the
+        # midpoint s_cut*h/2 gives a natural easing to the crest
+        self.b_bust = b_cut + 0.5 * s_cut * h
+        a_bust = float(solve_a_given_b(863.6, self.b_bust))
+        self.bust_ratio_output = a_bust / self.b_bust
+        _, b_above, _ = solve_semi_axes(self.ABOVE_CIRC, self.bust_ratio_output)
+
+        def hermite(x, x0, x1, y0, y1, m0, m1):
+            t = (x - x0) / (x1 - x0)
+            hh = x1 - x0
+            return (y0 * (1 + 2 * t) * (1 - t) ** 2 + m0 * hh * t * (1 - t) ** 2
+                    + y1 * t * t * (3 - 2 * t) + m1 * hh * t * t * (t - 1))
 
         z = np.linspace(self.v_lo, self.v_hi, n_grid)
         b = np.empty_like(z)
         lo = z <= 0.0
         b[lo] = np.asarray(skirt.b(z[lo]), dtype=float)
-        b_waist = float(skirt.b(np.array(0.0)))
-        shape = z[~lo & (z <= cut)] if np.any(~lo) else np.array([])
         mid = ~lo & (z <= cut)
-        b[mid] = b_waist * np.asarray(side_fit.b(z[mid])) / float(side_fit.b(0.0))
-        hi = z > cut
-        if np.any(hi):
-            # ratio-estimate schedule, continuous at the cut
-            b_cut = b_waist * float(side_fit.b(cut)) / float(side_fit.b(0.0))
-            a_cut = float(solve_a_given_b(float(circ(cut)), b_cut))
-            k_pts = [(cut, a_cut / b_cut), (152.4, 1.875), (203.2, 2.0), (254.0, 2.0)]
-            k_pts = [(v, k) for v, k in k_pts if v >= cut - 1e-9]
-            kv = np.array([q[0] for q in k_pts])
-            kk = np.array([q[1] for q in k_pts])
-            k_interp = PchipInterpolator(kv, kk)
-            from bodice import solve_semi_axes as _ssa_scalar
-            for i in np.flatnonzero(hi):
-                _, bb, _ = _ssa_scalar(float(circ(z[i])),
-                                       float(k_interp(min(z[i], kv[-1]))))
-                b[i] = bb
+        b[mid] = norm * np.asarray(side_fit.b(z[mid]))
+        rise = (z > cut) & (z <= self.BUST_V)
+        b[rise] = hermite(z[rise], cut, self.BUST_V, b_cut, self.b_bust, s_cut, 0.0)
+        top = z > self.BUST_V
+        b[top] = hermite(z[top], self.BUST_V, self.ABOVE_V,
+                         self.b_bust, float(b_above), 0.0,
+                         2.0 * (float(b_above) - self.b_bust) / (self.ABOVE_V - self.BUST_V))
+        # shape contract: monotone rise to the crest, monotone fall after
+        bod = z >= 0.0
+        zb, bb = z[bod], b[bod]
+        up = zb <= self.BUST_V
+        if np.any(np.diff(bb[up]) < -1e-9):
+            raise SilhouetteError("hybrid bodice depth dips before the bust")
+        if np.any(np.diff(bb[~up]) > 1e-9):
+            raise SilhouetteError("hybrid bodice depth rises above the bust")
         self._b = PchipInterpolator(z, b)
 
     def b(self, z):
@@ -413,6 +442,11 @@ class FittedDepth:
     def b(self, v):
         vv = np.clip(np.asarray(v, dtype=float), self.v_lo, self.v_hi)
         return self._spl(vv)
+
+    def db(self, v):
+        """Fit derivative d(half-depth)/dv (mm/mm)."""
+        vv = np.clip(np.asarray(v, dtype=float), self.v_lo, self.v_hi)
+        return self._spl.derivative()(vv)
 
     def raw(self):
         return self._raw_v, self._raw_b

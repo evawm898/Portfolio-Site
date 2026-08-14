@@ -151,16 +151,35 @@ def dress_curves():
     return _DRESS_CURVES
 
 
+_DRESS_DEPTH = None
+
+
+def dress_depth():
+    """The committed bodice depth: the previous skirt bell untouched, the
+    bodice depth following the TRACED shape (normalized to the given
+    waist) with a monotone continuation to a zero-slope bust crest —
+    user-chosen 'traced shape, monotone to bust'. Cached per process."""
+    global _DRESS_DEPTH
+    if _DRESS_DEPTH is None:
+        from pathlib import Path
+        from silhouette import (FittedDepth, HybridBodiceDepth,
+                                extract_from_image)
+        here = Path(__file__).resolve().parent
+        side = FittedDepth(
+            extract_from_image(here / "silhouette-trace.png")[0])
+        _DRESS_DEPTH = HybridBodiceDepth(side)
+    return _DRESS_DEPTH
+
+
 def dress_params() -> ShellParams:
-    """The committed DRESS design. REVERTED to ratio mode (user: 'the
-    previous skirt shape was better') — the superellipse bell with
-    constant-ratio sections and the circumference-anchored bodice, with
-    the given neckline. The silhouette machinery (dress_curves,
-    HybridBodiceDepth) stays available for the OPEN bodice-shape work.
+    """The committed DRESS design: the ratio-mode superellipse bell skirt
+    (user: 'the previous skirt shape was better') + the TRACED-SHAPE
+    bodice depth with monotone continuation to the bust (depth authored,
+    width solved from the given circumferences, ratios as outputs).
     Export, editor, and reports build from this one constructor so there
     is a single source of truth."""
     from neckline import DESIGN_NECKLINE
-    return ShellParams(bodice=DESIGN_NECKLINE)
+    return ShellParams(bodice=DESIGN_NECKLINE, depth_curve=dress_depth())
 
 
 class ShellModel:

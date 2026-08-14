@@ -133,8 +133,11 @@ class TestDressLegalityAndAnalysis(unittest.TestCase):
         from curvature import class_distribution
         dist = class_distribution(an)
         self.assertEqual(sum(dist.values()), len(an) - len(off))
-        # p370 finally seats somewhere: the flat low bodice near CF
-        self.assertGreater(dist.get("p370", 0), 0)
+        # the traced-shape bodice is too curvy for the 3.7" at the 2 mm
+        # default (best pose ~2.33 mm) — it reappears when relaxed to 2.5
+        self.assertEqual(dist.get("p370", 0), 0)
+        relaxed = class_distribution(an, 2.5, CLASSES)
+        self.assertGreater(relaxed.get("p370", 0), 0)
 
 
 if __name__ == "__main__":
