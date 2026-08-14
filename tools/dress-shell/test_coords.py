@@ -44,7 +44,9 @@ class TestConventions(unittest.TestCase):
     def test_theta_positive_is_wearers_left(self):
         p = COORDS.forward(90.0, 100.0)["position"]
         self.assertGreater(p[0], 0.0)  # +x = wearer's left
-        self.assertAlmostEqual(p[1], 0.0, places=9)
+        # theta = 90 is the major-axis end; the equal-arc Newton solve
+        # bottoms out at quadrature roundoff (~1e-9 mm on the k=1.5 section)
+        self.assertLess(abs(float(p[1])), 1e-8)
 
     def test_s_sign_and_range(self):
         # no bodice yet: s = 0 exactly at the waist (top edge), growing
@@ -137,8 +139,10 @@ class TestShell(unittest.TestCase):
         self.assertEqual(float(MODEL.mean_slope(MODEL.z_bottom)), 0.0)
 
     def test_surface_area(self):
-        # ~0.50 m^2 for the confirmed parameters
-        self.assertAlmostEqual(MODEL.surface_area_mm2() / 1e6, 0.5005, delta=0.002)
+        # ~0.497 m^2 for the confirmed parameters (constant k = 1.5:
+        # same perimeter schedule, but an ellipse encloses less area, and
+        # the lateral area follows it down slightly vs the circular shell)
+        self.assertAlmostEqual(MODEL.surface_area_mm2() / 1e6, 0.4972, delta=0.002)
 
     def test_live_parameters_change_the_solve(self):
         m2 = ShellModel(ShellParams(hem_circumference=1400.0, dome_n=2.0))

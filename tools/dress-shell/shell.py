@@ -16,9 +16,12 @@ Ramanujan's second approximation — the same solve the bodice uses, so
 the sections MATCH EXACTLY at the waist seam:
 
     k(drop) = waist_section_ratio   (the bodice waist ratio, est. 1.5)
-    k(0)    = skirt_hem_ratio       (NEW parameter, default 1.0 —
-                                     UNVERIFIED: reference side views may
-                                     want the bell to stay flattened)
+    k(0)    = skirt_hem_ratio       (default 1.5 = the waist ratio, i.e. a
+                                     CONSTANT-ratio shell: chosen because a
+                                     more elliptical hem flattens center
+                                     front and relieves the 7.5" flat facet
+                                     — user-approved direction, exact value
+                                     chosen from the facet-deviation sweep)
     k(u) blends monotonically; ratio_blend selects 'linear' or 'eased'
     (smoothstep) so the rounding-out rate is adjustable.
 
@@ -94,7 +97,8 @@ class ShellParams:
     drop: float = 381.0                  # waist-to-hem vertical, 15 in
     dome_n: float = 1.6                  # dome fullness
     waist_section_ratio: float = 1.5     # = bodice waist ratio (user estimate)
-    skirt_hem_ratio: float = 1.0         # UNVERIFIED — photos may want > 1
+    skirt_hem_ratio: float = 1.5         # constant-ratio shell relieves the
+                                         # CF facet (dev 9.12 -> 8.09 mm)
     ratio_blend: str = "linear"          # 'linear' | 'eased' (smoothstep)
     fillet_radius: float = 0.0           # 0 = sharp waist crease (the design)
     waist_band_halfwidth: float = 8.0    # seam band / cable bus, mm each side
