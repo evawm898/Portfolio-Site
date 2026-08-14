@@ -31,10 +31,10 @@ from test_coords import named_points
 
 HERE = Path(__file__).resolve().parent
 
-# Previous run (full dress, RATIO mode: circumference-first sections),
-# for comparison against the silhouette-first rebuild.
-PREVIOUS_RUN_DISTRIBUTION = ("p213 66% | p370 1% | none 33%  "
-                             "(ratio-mode dress, pre-silhouette)")
+# Previous run: the silhouette-first experiment (sections from both
+# traces) — REVERTED by user preference; kept as the comparison point.
+PREVIOUS_RUN_DISTRIBUTION = ("p213 43% | p370 8% | none 49%  "
+                             "(silhouette-first experiment, reverted)")
 
 
 def bodice_area_accounting(model, n_theta=720, n_v=250):

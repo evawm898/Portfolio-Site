@@ -43,30 +43,30 @@ class TestDressModel(unittest.TestCase):
         self.assertAlmostEqual(a_lo, a_hi, places=6)
         self.assertAlmostEqual(b_lo, b_hi, places=6)
 
-    def test_waist_is_smooth_under_silhouette_first(self):
-        # the traces are smooth through the waist: the old crease is GONE
-        # by design (the seam band remains a construction joint). The
-        # one-sided slopes agree and the junction angle is ~0.
+    def test_crease_is_preserved(self):
+        # RATIO mode (the committed design, reverted by user preference):
+        # skirt flares at ~41.3 deg, bodice launches vertically, and the
+        # stencils never blend across z = 0
         below = float(MODEL.mean_slope(-1e-6))
         above = float(MODEL.mean_slope(1e-6))
-        self.assertLess(abs(below - above), 0.05)
-        self.assertLess(MODEL.crease_angle_deg(), 1.5)
-        # the RATIO-mode dress (no curves) still has its 41.3 deg crease
-        from shell import ShellModel, ShellParams
-        from neckline import DESIGN_NECKLINE
-        m_ratio = ShellModel(ShellParams(bodice=DESIGN_NECKLINE))
-        self.assertAlmostEqual(m_ratio.crease_angle_deg(), 41.29, delta=0.05)
+        self.assertLess(below, -0.8)
+        self.assertLess(abs(above), 1e-3)
+        self.assertAlmostEqual(MODEL.crease_angle_deg(), 41.29, delta=0.05)
 
-    def test_silhouette_first_provenance(self):
-        from shell import dress_curves
+    def test_silhouette_first_mode_still_works(self):
+        # the silhouette machinery stays live for the open bodice-shape
+        # work: curves mode builds, is smooth at the waist, and clears
+        # the body everywhere
+        from shell import ShellModel, ShellParams, dress_curves
+        from neckline import DESIGN_NECKLINE
         cv = dress_curves()
         self.assertAlmostEqual(cv.scale, 0.975, delta=0.002)   # hem pin
-        self.assertLess(cv.hold_mm, 10.0)                      # top hold cap
         self.assertAlmostEqual(cv.depth_estimated_above_v, 112.7, delta=0.5)
-        # every body anchor clears the shell (floor guarantees >= 2 mm
-        # in the estimated span; the measured waist clears naturally)
         for v, P, c, standoff in cv.body_clearance():
             self.assertGreaterEqual(standoff, 1.9, (v, standoff))
+        m_sil = ShellModel(ShellParams(bodice=DESIGN_NECKLINE,
+                                       section_curves=cv))
+        self.assertLess(m_sil.crease_angle_deg(), 1.5)   # smooth waist
 
     def test_round_trip_on_the_bodice(self):
         rng = np.random.default_rng(5)

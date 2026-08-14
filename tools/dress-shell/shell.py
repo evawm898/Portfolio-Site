@@ -152,12 +152,15 @@ def dress_curves():
 
 
 def dress_params() -> ShellParams:
-    """The committed DRESS design: silhouette-first sections (both traces,
-    hem-pinned) with the given neckline (CF 250 / side 205). Export,
-    editor, and reports build from this one constructor so there is a
-    single source of truth."""
+    """The committed DRESS design. REVERTED to ratio mode (user: 'the
+    previous skirt shape was better') — the superellipse bell with
+    constant-ratio sections and the circumference-anchored bodice, with
+    the given neckline. The silhouette machinery (dress_curves,
+    HybridBodiceDepth) stays available for the OPEN bodice-shape work.
+    Export, editor, and reports build from this one constructor so there
+    is a single source of truth."""
     from neckline import DESIGN_NECKLINE
-    return ShellParams(bodice=DESIGN_NECKLINE, section_curves=dress_curves())
+    return ShellParams(bodice=DESIGN_NECKLINE)
 
 
 class ShellModel:
