@@ -30,6 +30,25 @@
 
 <canvas id="flower-canvas"></canvas>
 
+<!-- VIEW panel — top-left, mirroring the controls panel on the right. Preset
+     camera angles (framed to the current plant) plus the Auto-rotate toggle. -->
+<aside class="fl-viewpanel" aria-label="View controls">
+  <div class="fl-eyebrow">View</div>
+  <div class="fl-ctrl">
+    <select class="fl-select" id="viewPreset" aria-label="Camera preset">
+      <option value="default">DEFAULT (3/4)</option>
+      <option value="front">FRONT</option>
+      <option value="side">SIDE</option>
+      <option value="top">TOP-DOWN</option>
+      <option value="iso">ISOMETRIC</option>
+    </select>
+  </div>
+  <div class="fl-ctrl--toggle">
+    <label for="autoRotate">Auto-rotate</label>
+    <input type="checkbox" id="autoRotate" checked>
+  </div>
+</aside>
+
 <header class="fl-header">
   <a href="index.html" class="fl-back">&larr; Index</a>
   <span class="fl-tag">Flower &mdash; unlisted</span>
@@ -40,11 +59,6 @@
     <div class="fl-eyebrow">Generative &middot; v1</div>
     <h1 class="fl-title">Flower Bloom</h1>
     <p class="fl-sub"><span id="readout">&nbsp;</span></p>
-
-    <div class="fl-ctrl--toggle fl-ctrl--head">
-      <label for="autoRotate">Auto-rotate</label>
-      <input type="checkbox" id="autoRotate" checked>
-    </div>
   </div>
 
   <div class="fl-controls">

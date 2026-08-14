@@ -1822,6 +1822,9 @@ controls.minDistance = 1.5;
 controls.maxDistance = 30;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.7;
+// Explicit mouse mapping (also the OrbitControls default): LEFT drag = orbit/rotate,
+// RIGHT drag = pan, wheel = zoom. Matches the on-screen hint at the bottom.
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
 // lighting — dark Deep-Winter ground with petrol key/rim so the lace pops
 scene.add(new THREE.HemisphereLight(0x2fa3a3, 0x050707, 0.55));
@@ -2201,6 +2204,64 @@ function refitCamera(...accs) {
   controls.update();
 }
 
+/* ---------------------------------------------------
+   VIEW PRESETS — smoothly animate the camera to a named angle, always framed
+   to the CURRENT plant bounds (any size). `dir` is the target->camera offset
+   direction; `up` sets the on-screen vertical. TOP looks straight down, so it
+   uses a horizontal up (matching the bilateral top-down convention). DEFAULT
+   reproduces the initial framing (see frameCameraOnce). `fit` pads the frame.
+--------------------------------------------------- */
+const VIEW_PRESETS = {
+  default: { dir: [0.45, 0.30, 0.85], up: [0, 1, 0], fit: 1.6 },
+  front:   { dir: [0.00, 0.15, 1.00], up: [0, 1, 0], fit: 1.5 },
+  side:    { dir: [1.00, 0.15, 0.00], up: [0, 1, 0], fit: 1.5 },
+  top:     { dir: [0.00, 1.00, 0.001], up: [1, 0, 0], fit: 1.45 },
+  iso:     { dir: [1.00, 0.85, 1.00], up: [0, 1, 0], fit: 1.6 },
+};
+let viewTween = null;
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+function applyViewPreset(name) {
+  const p = VIEW_PRESETS[name] || VIEW_PRESETS.default;
+  const box = new THREE.Box3().expandByObject(bloomGroup);
+  if (box.isEmpty()) return;                       // nothing built yet
+  const c = new THREE.Vector3(); box.getCenter(c);
+  const sz = new THREE.Vector3(); box.getSize(sz);
+  const radius = Math.max(sz.x, sz.y, sz.z) * 0.5 || 2;
+  const dist = (radius / Math.tan((camera.fov * DEG) / 2)) * p.fit;
+  const dir = new THREE.Vector3(p.dir[0], p.dir[1], p.dir[2]).normalize();
+  const endPos = c.clone().addScaledVector(dir, dist);
+  const endUp = new THREE.Vector3(p.up[0], p.up[1], p.up[2]).normalize();
+  // widen the frustum up front so nothing clips mid-flight; tightened on arrival
+  camera.far = Math.max(camera.far, dist * 20);
+  camera.updateProjectionMatrix();
+  viewTween = {
+    startPos: camera.position.clone(), endPos,
+    startTarget: controls.target.clone(), endTarget: c,
+    startUp: camera.up.clone(), endUp,
+    endNear: Math.max(0.05, dist * 0.02), endFar: dist * 20,
+    t0: performance.now(), dur: 650,
+  };
+  controls.autoRotate = false;   // paused during the flight; restored on arrival
+}
+
+// One tween step, driven by the animate loop in place of controls.update().
+function stepViewTween() {
+  const e = easeInOutCubic(Math.min(1, (performance.now() - viewTween.t0) / viewTween.dur));
+  camera.position.lerpVectors(viewTween.startPos, viewTween.endPos, e);
+  controls.target.lerpVectors(viewTween.startTarget, viewTween.endTarget, e);
+  camera.up.copy(viewTween.startUp).lerp(viewTween.endUp, e).normalize();
+  camera.lookAt(controls.target);
+  if (e >= 1) {
+    camera.up.copy(viewTween.endUp);
+    camera.near = viewTween.endNear; camera.far = viewTween.endFar;
+    camera.updateProjectionMatrix();
+    controls.update();
+    controls.autoRotate = inputs.autoRotate.checked;   // resume per the (relocated) toggle
+    viewTween = null;
+  }
+}
+
 
 /* ===================================================================
    5b. STL EXPORT (Phase 4)
@@ -2296,7 +2357,8 @@ function animate() {
   requestAnimationFrame(animate);
   if (document.hidden) return;
   resize();
-  controls.update();
+  if (viewTween) stepViewTween();   // preset fly-to owns the camera until it lands
+  else controls.update();
   renderer.render(scene, camera);
 }
 
@@ -2417,6 +2479,7 @@ const inputs = {
   tightness: document.getElementById('tightness'),
   elevation: document.getElementById('elevation'),
   autoRotate: document.getElementById('autoRotate'),
+  viewPreset: document.getElementById('viewPreset'),
 };
 
 function readUI() {
@@ -2845,7 +2908,16 @@ inputs.leafType.addEventListener('change', () => {
   scheduleRegen();
 });
 inputs.leafPhyllotaxy.addEventListener('change', () => { scheduleRegen(); });
-inputs.autoRotate.addEventListener('change', () => { controls.autoRotate = inputs.autoRotate.checked; });
+inputs.autoRotate.addEventListener('change', () => {
+  controls.autoRotate = inputs.autoRotate.checked;
+  if (viewTween) controls.autoRotate = false;   // don't fight an in-flight preset; it restores on arrival
+});
+// VIEW dropdown: fly the camera to the chosen preset, framed to the current plant.
+inputs.viewPreset.addEventListener('change', () => applyViewPreset(inputs.viewPreset.value));
+// A manual drag/zoom cancels an in-flight preset so the user takes over immediately.
+controls.addEventListener('start', () => {
+  if (viewTween) { controls.autoRotate = inputs.autoRotate.checked; viewTween = null; }
+});
 // Auto-center (top-down): frame the bloom from straight above with the mirror
 // axis (+X) pointing up on screen, so a bilateral fan reads centred and
 // left-right symmetric. Stops auto-rotate so the framing holds.

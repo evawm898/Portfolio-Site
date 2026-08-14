@@ -83,6 +83,24 @@ html, body {
   margin-bottom: 1.2rem;
 }
 
+/* VIEW panel — a compact fixed panel top-left, mirroring .fl-panel on the right. */
+.fl-viewpanel {
+  position: fixed;
+  top: 4.75rem;
+  left: 1.5rem;
+  z-index: 10;
+  width: 190px;
+  max-width: calc(100vw - 3rem);
+  background: rgba(12, 14, 14, 0.86);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  border: 1px solid var(--line-strong);
+  padding: 1rem 1.1rem 1.05rem;
+}
+.fl-viewpanel .fl-eyebrow { margin-bottom: 0.7rem; }
+.fl-viewpanel .fl-ctrl { margin-bottom: 0.85rem; }
+.fl-viewpanel .fl-ctrl--toggle { margin-bottom: 0; }
+
 .fl-eyebrow {
   font-family: var(--mono);
   font-size: 10px;
