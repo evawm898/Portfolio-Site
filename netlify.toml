@@ -1,0 +1,9 @@
+# Netlify configuration.
+#
+# The site is a static site published from the repo root (Netlify's existing
+# dashboard settings handle publish/build — intentionally not overridden here so
+# nothing about the current static deploy changes). This file only declares the
+# Functions directory so the shared Flower designs gallery endpoint is picked up.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

@@ -94,6 +94,39 @@ const CONFIGS = [
   { label: 'lobed leaves (poppy), opposite', set: [{ id: 'leafType', value: 'lobed', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'opposite', evt: 'change' }] },
   { label: 'oval leaves, whorled + tight bud', set: [{ id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'whorled', evt: 'change' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   { label: 'narrow leaves, opposite (no bud)', set: [{ id: 'leafType', value: 'narrow', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'opposite', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
+  { label: 'center: DENSE CLUSTER (150 stamens) on full plant', set: [{ id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'edgeNoise', value: '0' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'centerArch', value: 'dense', evt: 'change' }, { id: 'denseStamenCount', value: '150' }] },
+  { label: 'center: DISC (domed + ring stamens)', set: [{ id: 'centerArch', value: 'disc', evt: 'change' }, { id: 'discHeight', value: '0.8' }, { id: 'ringStamenCount', value: '60' }] },
+  { label: 'center: PETALOID FILL ranunculus (tight bloom, small inner, 120)', set: [{ id: 'centerArch', value: 'petaloid', evt: 'change' }, { id: 'fillPetalCount', value: '120' }, { id: 'fillBloomAngle', value: '6' }, { id: 'fillOuterSize', value: '0.20' }, { id: 'fillInnerSize', value: '0.05' }, { id: 'fillDensity', value: '0.8' }] },
+  { label: 'center: PETALOID FILL mum (open bloom, large inner) + lobed leaves', set: [{ id: 'centerArch', value: 'petaloid', evt: 'change' }, { id: 'fillPetalCount', value: '90' }, { id: 'fillBloomAngle', value: '60' }, { id: 'fillOuterSize', value: '0.26' }, { id: 'fillInnerSize', value: '0.22' }, { id: 'fillDensity', value: '0.4' }, { id: 'leafType', value: 'lobed', evt: 'change' }, { id: 'stemNodeCount', value: '3' }] },
+  // Unified trunk (approach D) edge cases:
+  // receptacle WITHOUT a stem — the lofted trunk must still seal (bottom cap at the neck).
+  { label: 'trunk: receptacle only, no stem, high blend', set: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '0.8' }] },
+  // many attachments (petals + solid sepals) + tight deep neck — drives the sector count M toward its cap.
+  { label: 'trunk: 20 petals + solid sepals, tight deep neck + stem', set: [{ id: 'petalCount', value: '20' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'convergenceTightness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'stemThickness', value: '2.5' }, { id: 'stemNodeCount', value: '5' }, { id: 'stemNodeProminence', value: '1' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'whorled', evt: 'change' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  // SIDE-BUD RECEPTACLE: the bud gets its own scaled receptacle (buildTrunkInto in the
+  // bud's own accumulator) when BOTH the receptacle dropdown and the side-bud dropdown
+  // are on. Its neck bottom cap seals inside the offshoot tube (overlapping closed
+  // shells) — must still export with zero boundary edges. Self-contained (sets every
+  // relevant id) so it does not depend on carried state.
+  { label: 'bud receptacle: early bud + blended receptacle + stem, deep neck', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '5' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemThickness', value: '1' }, { id: 'stemNodeCount', value: '0' }, { id: 'stemNodeProminence', value: '0' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'convergenceTightness', value: '0.7' }, { id: 'stemBudMode', value: 'early', evt: 'change' }] },
+  // low blend => sharpest bud flutes (highest sector count), plus the pricey voronoi bud.
+  { label: 'bud receptacle: tight bud + voronoi + sharp flutes (low blend)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'blendSmoothness', value: '0' }, { id: 'receptacleDepth', value: '0.6' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  // Stem length range now 0..10 (default 4). Exercise the new MAX and the 0 = no-stem edge.
+  { label: 'stem length MAX (10) + receptacle + tight bud', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '10' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  // stem length 0 with a stem + receptacle both enabled => no stem zone; the receptacle
+  // must still seal at its neck (bottom cap) and export watertight.
+  { label: 'stem length 0 (no stem) + receptacle enabled', set: [{ id: 'stemLength', value: '0' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
+  // Classic PISTIL with the new shape controls at extremes: max LENGTH (3), thickest
+  // filament, largest + fully OBLONG stigma tip — exercises addOblongBead + the floor.
+  { label: 'center: PISTIL long + thick + oblong tip (max)', set: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'centerType', value: 'pistil', evt: 'change' }, { id: 'centerLength', value: '3' }, { id: 'centerFilThick', value: '1' }, { id: 'centerTipSize', value: '1' }, { id: 'centerTipShape', value: '1' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
+  // Classic STAMENS, THINNEST filament + oblong anthers — drives the export feature
+  // floor on both the filament radius and the oblong bead minor radius.
+  { label: 'center: STAMENS thin filament + oblong anthers', set: [{ id: 'centerType', value: 'stamens', evt: 'change' }, { id: 'centerFilThick', value: '0' }, { id: 'centerTipShape', value: '1' }, { id: 'centerTipSize', value: '0' }] },
+  // Sepals with NO receptacle: bases now anchor to the stem-top surface (strap + stem).
+  { label: 'sepals, no receptacle, stem-top attach (strap)', set: [{ id: 'centerLength', value: '0.5' }, { id: 'centerTipShape', value: '0' }, { id: 'centerFilThick', value: '0.5' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
+  // SERRATED modified-leaf sepals — the jagged tooth edge + per-tooth mid-veins on the
+  // sepal blade must still export watertight (skeletal path, like a serrated petal).
+  { label: 'sepals SERRATED (modified leaf) + stem', set: [{ id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'sepalTipStyle', value: 'jagged', evt: 'change' }, { id: 'sepalTipShape', value: '0.95' }, { id: 'sepalTipFreq', value: '16' }, { id: 'sepalTipRegion', value: '0.6' }, { id: 'sepalTipLength', value: '0.7' }] },
 ];
 
 const server = http.createServer((req, res) => {
