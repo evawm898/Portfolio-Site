@@ -26,6 +26,22 @@ let serverInfo = state.resolved;  // last authoritative resolve
 let history = [], redoStack = [], dirty = false;
 let selectedId = null;       // authored id
 let activeClass = Object.keys(classes)[0];
+let suppressUnloadWarn = false;   // param-apply reload restores via sessionStorage
+
+// a shell-parameter rebuild reloads the page; unsaved work rides across
+// in sessionStorage and comes back still-unsaved
+let restoredDirty = false;
+{
+  const pending = sessionStorage.getItem("pendingLayout");
+  if (pending) {
+    sessionStorage.removeItem("pendingLayout");
+    try {
+      const st = JSON.parse(pending);
+      authored = st.authored;
+      restoredDirty = !!st.dirty;
+    } catch { /* corrupted stash: fall back to the saved layout */ }
+  }
+}
 
 const snapshot = () => JSON.parse(JSON.stringify(authored));
 function pushHistory() {
@@ -39,7 +55,7 @@ function setDirty(d) {
   $("fileState").innerHTML = `layout.yaml — <b class="${d ? "warn" : "ok"}">${d ? "unsaved changes" : "saved"}</b>`;
 }
 window.addEventListener("beforeunload", (e) => {
-  if (dirty) { e.preventDefault(); e.returnValue = ""; }
+  if (dirty && !suppressUnloadWarn) { e.preventDefault(); e.returnValue = ""; }
 });
 
 // ---------------------------------------------------------------- three.js
@@ -347,6 +363,40 @@ function updateSidebar() {
   }
 }
 
+// shell parameters (design-adjustable subset; body measurements fixed)
+$("pHem").value = state.params.hem_circumference;
+$("pN").value = state.params.dome_n;
+$("pKhem").value = state.params.skirt_hem_ratio;
+$("pBlend").value = state.params.ratio_blend;
+$("paramInfo").innerHTML =
+  `waist ${state.params.waist_circumference} mm · drop ${state.params.drop} mm · ` +
+  `waist ratio ${state.params.waist_section_ratio} <span class="warn">(body — fixed)</span>`;
+$("applyParams").onclick = async () => {
+  const body = {
+    hem_circumference: parseFloat($("pHem").value),
+    dome_n: parseFloat($("pN").value),
+    skirt_hem_ratio: parseFloat($("pKhem").value),
+    ratio_blend: $("pBlend").value,
+  };
+  status("rebuilding shell + analysis… (a few seconds)");
+  $("applyParams").disabled = true;
+  try {
+    const r = await fetch("/api/params", { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) { status(`params rejected: ${data.error}`, "err"); return; }
+    // reload against the rebuilt shell; unsaved layout rides across
+    sessionStorage.setItem("pendingLayout", JSON.stringify({ authored, dirty }));
+    suppressUnloadWarn = true;
+    location.reload();
+  } catch (e) {
+    status(`params failed: ${e}`, "err");
+  } finally {
+    $("applyParams").disabled = false;
+  }
+};
+
 // palette
 for (const cid of Object.keys(classes)) {
   const b = document.createElement("button");
@@ -575,7 +625,7 @@ document.querySelectorAll("#modes button").forEach(b =>
   b.onclick = () => { shadeMode = b.dataset.mode; applyShading(); });
 
 addEventListener("keydown", (ev) => {
-  if (ev.target.tagName === "INPUT") return;
+  if (ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
   const ctrl = ev.ctrlKey || ev.metaKey;
   if (ctrl && ev.key.toLowerCase() === "z" && !ev.shiftKey) { ev.preventDefault(); undo(); }
   else if (ctrl && (ev.key.toLowerCase() === "y" || (ev.key.toLowerCase() === "z" && ev.shiftKey))) { ev.preventDefault(); redo(); }
@@ -595,8 +645,11 @@ addEventListener("keydown", (ev) => {
 // ---------------------------------------------------------------- boot
 resolveLocal();
 applyShading();
+if (restoredDirty) { setDirty(true); scheduleServerResolve(); }
 status(`ready — ${state.grid.stats.count} cells · tolerance ${TOL} mm · ` +
-       `grid ${state.grid.dtheta}° × ${state.grid.ds} mm`);
+       `grid ${state.grid.dtheta}° × ${state.grid.ds} mm · ` +
+       `hem ${state.params.hem_circumference} mm · n ${state.params.dome_n} · ` +
+       `hem ratio ${state.params.skirt_hem_ratio} (${state.params.ratio_blend})`);
 (function loop() {
   requestAnimationFrame(loop);
   controls.update();

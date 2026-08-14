@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>E-Ink Dress Shell — Eva Maskalenko</title>
-<meta name="description" content="Design pipeline for placing rigid e-ink panels on a 3D dress shell: parametric corseted silhouette, body-centered coordinates, per-cell curvature analysis, and a mirrored panel layout — explored in an interactive 3D viewer.">
+<meta name="description" content="Design pipeline for placing rigid e-ink panels on a 3D dress shell: a bell skirt with elliptical cross-sections built from confirmed measurements, body-centered coordinates, per-cell curvature analysis, and a mirrored panel layout — explored in an interactive 3D viewer.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -66,7 +66,7 @@
       <span class="project__affiliation">Lab &mdash; Work in Progress</span>
     </div>
     <h1 class="project__title">E-Ink Dress Shell</h1>
-    <p class="project__lede">Placing rigid display panels on a rigid 3D garment &mdash; a corseted, bell-skirted shell that is formed in three dimensions from the start and never flattened. The tool answers the governing question directly: <em>what fits where?</em></p>
+    <p class="project__lede">Placing rigid display panels on a rigid 3D garment &mdash; a bell-skirted shell that is formed in three dimensions from the start and never flattened. The tool answers the governing question directly: <em>what fits where?</em></p>
   </div>
 
   <div class="project__body">
@@ -74,7 +74,7 @@
     <section class="project__section">
       <h2 class="project__section-title"><span>01</span>Premise</h2>
       <div class="project__section-body">
-        <p>Unlike the <a href="skirt.html" class="footer__link">earlier flat-pattern skirt study</a>, this shell is doubly curved &mdash; a fitted bodice, a sharp waist nip, a bell skirt &mdash; so it has no flat development at all. Every question has to be answered on the surface itself. The pipeline builds the shell parametrically from body measurements (five circumferences with heights, plus elliptical cross-sections whose axis ratio varies with height), lays a body-centered coordinate system over it &mdash; azimuth &theta; from center front, arc length <em>s</em> from the waist &mdash; and rules a snap grid in those coordinates so the grid stays honest on the curved surface.</p>
+        <p>Unlike the <a href="skirt.html" class="footer__link">earlier flat-pattern skirt study</a>, this shell is doubly curved, so it has no flat development at all. Every question has to be answered on the surface itself. The current geometry is the confirmed <strong>skirt</strong>: waist 24&Prime;, hem 61&Prime;, 15&Prime; drop, with a superellipse profile setting the <em>perimeter</em> of every level and each level solved as an ellipse &mdash; the cross-section ratio blends from the bodice&rsquo;s 1.5&nbsp;:&nbsp;1 at the waist toward circular at the hem, so the skirt meets the future bodice edge-to-edge at the waist seam. The waist itself is a crease, and an &plusmn;8&thinsp;mm seam band around it is reserved as the cable bus: panel footprints must clear it, and connector tails terminate at its edge. A body-centered coordinate system covers the surface &mdash; azimuth &theta; from center front (equal-arc, so a degree of &theta; is the same number of millimeters anywhere on a ring), arc length <em>s</em> from the waist &mdash; and a snap grid ruled in those coordinates stays honest on the curved surface. The matching bodice is measured but intentionally not yet built.</p>
         <p>For every grid cell the tool computes principal curvatures and, more usefully, the <strong>max seatable panel class</strong>: the largest rigid panel from the library that can sit tangent there without lifting more than 2&thinsp;mm off the surface. Panels are then authored on one side only; mirror twins are derived, never stored &mdash; a physical panel cannot be reflected, so each twin picks identity or 180&deg; rotation by connector legality, then by closeness to true reflection.</p>
       </div>
     </section>
@@ -82,7 +82,7 @@
     <section class="project__section">
       <h2 class="project__section-title"><span>02</span>The Shell, Live</h2>
       <div class="project__section-body">
-        <p>This viewer is read-only: it loads the committed glTF export and analysis produced offline by the Python pipeline &mdash; nothing is computed at request time; the flat facet is already baked into the exported shell. Drag to orbit, scroll to zoom. The <em>max class</em> shading is the design guidance layer: each cell is tinted by the largest panel that conforms there (teal = 3.7&Prime;, violet = 2.13&Prime; only, charcoal = nothing fits); the ochre panel is the 7.5&Prime; on its flat facet.</p>
+        <p>This viewer is read-only: it loads the committed glTF export and analysis produced offline by the Python pipeline &mdash; nothing is computed at request time; the flat facet is already baked into the exported shell. Drag to orbit, scroll to zoom. The <em>max class</em> shading is the design guidance layer: each cell is tinted by the largest panel that conforms there (violet = 2.13&Prime;, charcoal = nothing fits &mdash; on this skirt the 3.7&Prime; seats nowhere at the default tolerance); the large panel spanning center front is the 7.5&Prime; on its flat facet.</p>
         <figure class="dress-viewer-wrap" style="margin:0 0 0.75rem;">
           <div id="dressViewer"></div>
           <div class="dress-controls">
@@ -107,7 +107,7 @@
       <div class="project__section-body">
         <p>Numbers below are read from the committed analysis file (the same data driving the shading), not recomputed by this page.</p>
         <div class="dress-stats" id="dressStats">loading dress/dress-analysis.json &hellip;</div>
-        <p>The panel library is now real hardware &mdash; three Adafruit bare e-ink modules (2.13&Prime; quad-color, 3.7&Prime; and 7.5&Prime; tri-color), dimensioned from their manufacturer datasheets. Two findings shaped the layout. First, the 7.5&Prime; is not a placeable panel on this garment at all: at 111&thinsp;mm across it needs roughly a 770&thinsp;mm local radius to stay under the 2&thinsp;mm standoff tolerance, and the flattest cell on the shell offers about 258&thinsp;mm. It is seated instead on a deliberate <strong>flat facet</strong> &mdash; the shell is locally flattened to a plane across the panel footprint (with a smooth blend band), and the silhouette cost is reported as the shell&rsquo;s deviation, ochre-flagged in the viewer. Second, the 3.7&Prime; conforms only on the lower skirt within roughly &plusmn;35&deg; of center front &mdash; and the facet occupies the very middle of that band, so the 3.7&Prime; pair sits just beside it. The 2mm tolerance itself is an untested assumption; the committed analysis carries a sweep (1.5&ndash;3&thinsp;mm) showing how the map shifts if the real number differs.</p>
+        <p>The panel library is real hardware &mdash; three Adafruit bare e-ink modules (2.13&Prime; quad-color, 3.7&Prime; and 7.5&Prime; tri-color), dimensioned from their manufacturer datasheets. On the elliptical-section skirt three findings shaped the layout. First, the 7.5&Prime; is not a placeable panel on this garment at all: at 111&thinsp;mm across it needs roughly a 770&thinsp;mm local radius to stay under the 2&thinsp;mm standoff tolerance, and no cell comes close. It is seated instead on a deliberate <strong>flat facet</strong> &mdash; the shell is locally flattened to a plane across the panel footprint (with a smooth blend band), and the silhouette cost is reported as the shell&rsquo;s deviation, ochre-flagged in the viewer. Second, the 3.7&Prime; now conforms <em>nowhere</em> at the 2&thinsp;mm tolerance &mdash; the elliptical sections trade curvature toward the sides, and the sweep shows it reappearing only if the tolerance is relaxed to 2.5&thinsp;mm. Third, near the &plusmn;90&deg; side seams even the 2.13&Prime; cannot seat &mdash; the unseatable band is widest at the waist (beyond &plusmn;60&deg;), narrowing toward the hem &mdash; which lands exactly where the garment&rsquo;s physical seams are. The 2&thinsp;mm tolerance itself is an untested assumption; the committed analysis carries a sweep (1.5&ndash;3&thinsp;mm) showing how the map shifts if the real number differs.</p>
       </div>
     </section>
 

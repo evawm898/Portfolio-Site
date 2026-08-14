@@ -184,9 +184,10 @@ def panel_box(chart, coords, p, mount):
     return corners, F, aq, AF, line
 
 
-def build_export(grid_spec=GridSpec(), tolerance_mm=STANDOFF_TOLERANCE_MM, samples=7):
+def build_export(grid_spec=GridSpec(), tolerance_mm=STANDOFF_TOLERANCE_MM, samples=7,
+                 params=None):
     """Everything the GLB + sidecar need, computed once."""
-    model = ShellModel(ShellParams())
+    model = ShellModel(params if params is not None else ShellParams())
     coords = ShellCoords(model)
     chart = SurfaceChart(model, coords)
     classes = load_panel_classes(HERE / "panels.yaml")
@@ -316,6 +317,16 @@ def build_sidecar(ex):
     return {
         "meta": {
             "generator": "dress-shell export_gltf.py",
+            "shell_params": {
+                "waist_circumference": ex["model"].params.waist_circumference,
+                "hem_circumference": ex["model"].params.hem_circumference,
+                "drop": ex["model"].params.drop,
+                "dome_n": ex["model"].params.dome_n,
+                "waist_section_ratio": ex["model"].params.waist_section_ratio,
+                "skirt_hem_ratio": ex["model"].params.skirt_hem_ratio,
+                "ratio_blend": ex["model"].params.ratio_blend,
+                "waist_band_halfwidth": ex["model"].params.waist_band_halfwidth,
+            },
             "tolerance_mm": ex["tolerance"],
             "grid": {"dtheta": grid.spec.dtheta, "ds": grid.spec.ds},
             "s_min": r(chart.s_min, 3), "s_max": r(chart.s_max, 3),
@@ -379,8 +390,8 @@ def build_sidecar(ex):
     }
 
 
-def main(out_dir=OUT_DIR):
-    ex = build_export()
+def main(out_dir=OUT_DIR, params=None):
+    ex = build_export(params=params)
     out_dir.mkdir(parents=True, exist_ok=True)
     glb = build_glb(ex)
     (out_dir / "dress-shell.glb").write_bytes(glb)

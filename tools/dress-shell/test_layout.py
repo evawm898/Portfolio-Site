@@ -255,12 +255,16 @@ class TestMirroring(unittest.TestCase):
         self.assertFalse(placed[0].is_twin)
 
     def test_starter_layout_resolves(self):
-        # layout.yaml is deliberately EMPTY pending the redesign on the
-        # confirmed skirt profile; it must load and resolve cleanly as such
+        # the committed starter layout on the elliptical-section skirt:
+        # every source and every derived twin must resolve valid
         authored = load_layout(HERE / "layout.yaml")
-        self.assertEqual(authored, [])
+        self.assertGreater(len(authored), 0)
+        self.assertTrue(all(a.theta >= 0.0 for a in authored))  # one-sided
         placed, errors = resolve_layout(CHART, CLASSES, authored)
-        self.assertEqual((placed, errors), ([], []))
+        self.assertEqual(errors, [])
+        self.assertTrue(all(p.valid for p in placed),
+                        [(p.panel_id, p.problems) for p in placed if not p.valid])
+        self.assertGreater(sum(p.is_twin for p in placed), 0)
 
     def test_synthetic_pair_resolves_on_the_skirt(self):
         placed, errors = resolve_layout(CHART, CLASSES, [

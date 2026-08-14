@@ -19,6 +19,7 @@ import json
 import sys
 import tempfile
 import traceback
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -45,11 +46,12 @@ GRID_SPEC = GridSpec(dtheta=10.0, ds=25.0)
 
 
 class State:
-    """Everything static about the shell, computed once at startup."""
+    """Everything static about the shell, computed once per parameter set
+    (startup and every /api/params rebuild)."""
 
-    def __init__(self):
+    def __init__(self, params: ShellParams = ShellParams()):
         print("building shell + analysis state ...")
-        self.model = ShellModel(ShellParams())
+        self.model = ShellModel(params)
         self.coords = ShellCoords(self.model)
         self.chart = SurfaceChart(self.model, self.coords)
         self.classes = load_panel_classes(HERE / "panels.yaml")
@@ -80,6 +82,10 @@ class State:
         prof = {"z": np.round(z, 3).tolist(),
                 "a": np.round(m.a(z), 4).tolist(), "b": np.round(m.b(z), 4).tolist(),
                 "da": np.round(m.da(z), 6).tolist(), "db": np.round(m.db(z), 6).tolist(),
+                # perimeter-equivalent radius r_eq = P/2pi and its slope:
+                # the equal-arc chart metric and the frame's dt/dz term
+                "req": np.round(m.mean_radius(z), 4).tolist(),
+                "dreq": np.round(m.mean_slope(z), 6).tolist(),
                 "s": np.round(c.s_of_z(z), 4).tolist()}
         grid_lines = {
             "rings": [np.round(pl, 2).ravel().tolist()
@@ -90,7 +96,16 @@ class State:
         return {
             "tolerance_mm": TOLERANCE_MM,
             "bounds": {"s_min": c.s_min, "s_max": c.s_max,
-                       "z_bottom": m.z_bottom, "z_top": m.z_top},
+                       "z_bottom": m.z_bottom, "z_top": m.z_top,
+                       "band_halfwidth": m.params.waist_band_halfwidth},
+            "params": {
+                "waist_circumference": m.params.waist_circumference,
+                "hem_circumference": m.params.hem_circumference,
+                "drop": m.params.drop, "dome_n": m.params.dome_n,
+                "waist_section_ratio": m.params.waist_section_ratio,
+                "skirt_hem_ratio": m.params.skirt_hem_ratio,
+                "ratio_blend": m.params.ratio_blend,
+            },
             "grid": {"dtheta": self.grid.spec.dtheta, "ds": self.grid.spec.ds,
                      "rings": self.grid.rings.tolist(),
                      "thetas": self.grid.thetas.tolist(),
@@ -229,13 +244,27 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "unknown route"})
 
     def do_POST(self):
+        global STATE
         length = int(self.headers.get("Content-Length", 0))
         try:
             body = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError:
             return self._send(400, {"error": "invalid JSON body"})
         try:
-            if self.path == "/api/resolve":
+            if self.path == "/api/params":
+                # live shell parameters: only the design-adjustable subset;
+                # body measurements (waist, drop) stay fixed. ShellModel
+                # validates; on failure the old STATE stays in place.
+                allowed = ("hem_circumference", "dome_n",
+                           "skirt_hem_ratio", "ratio_blend")
+                updates = {k: (str(body[k]) if k == "ratio_blend"
+                               else float(body[k]))
+                           for k in allowed if k in body}
+                new_params = replace(STATE.model.params, **updates)
+                STATE = State(new_params)   # ShellError -> 422, STATE kept
+                self._send(200, {"rebuilt": True,
+                                 "params": STATE.static_payload["params"]})
+            elif self.path == "/api/resolve":
                 authored = STATE.parse_entries(body.get("panels", []))
                 self._send(200, STATE.resolve_payload(authored))
             elif self.path == "/api/layout":
@@ -245,7 +274,8 @@ class Handler(BaseHTTPRequestHandler):
                                  "resolved": STATE.resolve_payload(authored)})
             elif self.path == "/api/publish":
                 import export_gltf
-                sidecar = export_gltf.main()
+                # publish the shell the editor is actually showing
+                sidecar = export_gltf.main(params=STATE.model.params)
                 self._send(200, {"published": True,
                                  "summary": {
                                      "panels": len(sidecar["panels"]),

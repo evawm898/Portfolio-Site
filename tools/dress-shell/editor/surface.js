@@ -1,15 +1,32 @@
 // Pure-math port of the Python geometry/layout layer for live editing.
-// The server (layout.py et al.) stays the source of truth: every save and
-// drag-end goes through it. This port exists so dragging re-seats and
+// The server (shell.py / layout.py) stays the source of truth: every save
+// and drag-end goes through it. This port exists so dragging re-seats and
 // re-derives twins continuously without a round trip.
 //
-// Frames and conventions mirror coords.py / layout.py exactly:
+// Frames and conventions mirror shell.py / coords.py / layout.py exactly:
 //   theta deg (0 = CF, + = wearer's left), s mm from the waist (+ hemward),
 //   pieces split at theta = +-90, twins derived at -theta, rotations 0/180.
+//
+// ELLIPTICAL SECTIONS, EQUAL-ARC THETA (mirrors shell.py):
+//   - each level z is an ellipse a(z) x b(z); theta is EQUAL-ARC around the
+//     section (theta/360 of a turn == that fraction of the section
+//     perimeter), solved per point by Gauss-quadrature arc length + Newton,
+//     exactly like ShellModel.param_from_arc_angle;
+//   - the chart metric r_theta is therefore P(z)/2pi == r_eq(z), UNIFORM
+//     around each ring (layout.py's SurfaceChart.r_theta);
+//   - the meridian tangent includes the dt/dz reparameterization term
+//     (the equal-arc map shifts with height), like ShellModel.frame;
+//   - the waist seam band (cable bus) is a keep-out ring: footprints must
+//     clear it and connector escape runs terminate at its edge.
 
 export function wrap180(d) {
   return ((d + 180) % 360 + 360) % 360 - 180;
 }
+
+// 24-point Gauss-Legendre nodes/weights on [-1, 1] — same rule shell.py
+// uses, so client and server arc lengths agree to machine precision.
+const GL_X = [-0.9951872199970213, -0.9747285559713095, -0.9382745520027328, -0.8864155270044011, -0.820001985973903, -0.7401241915785544, -0.6480936519369755, -0.5454214713888396, -0.4337935076260451, -0.3150426796961634, -0.1911188674736163, -0.06405689286260563, 0.06405689286260563, 0.1911188674736163, 0.3150426796961634, 0.4337935076260451, 0.5454214713888396, 0.6480936519369755, 0.7401241915785544, 0.820001985973903, 0.8864155270044011, 0.9382745520027328, 0.9747285559713095, 0.9951872199970213];
+const GL_W = [0.01234122979998869, 0.02853138862893356, 0.04427743881741941, 0.05929858491543636, 0.07334648141108016, 0.0861901615319532, 0.09761865210411393, 0.10744427011596556, 0.11550566805372552, 0.1216704729278033, 0.12583745634682825, 0.12793819534675202, 0.12793819534675202, 0.12583745634682825, 0.1216704729278033, 0.11550566805372552, 0.10744427011596556, 0.09761865210411393, 0.0861901615319532, 0.07334648141108016, 0.05929858491543636, 0.04427743881741941, 0.02853138862893356, 0.01234122979998869];
 
 function makeInterp(xs, ys) {
   // linear interpolation over a sorted ascending xs table
@@ -26,14 +43,44 @@ function makeInterp(xs, ys) {
   };
 }
 
+// arc length from CF (tau = 0) to ellipse parameter t, plus |dX/dt| at t
+// (odd in t, like ShellModel._arc_and_speed)
+function arcAndSpeed(t, a, b) {
+  const half = 0.5 * t;
+  let arc = 0;
+  for (let i = 0; i < 24; i++) {
+    const tau = half * (GL_X[i] + 1);
+    arc += GL_W[i] * Math.hypot(a * Math.cos(tau), b * Math.sin(tau));
+  }
+  return { arc: half * arc, speed: Math.hypot(a * Math.cos(t), b * Math.sin(t)) };
+}
+
+// d(arc)/dz at FIXED ellipse parameter t (ShellModel._arc_z_partial)
+function arcZPartial(t, a, b, da, db) {
+  const half = 0.5 * t;
+  let acc = 0;
+  for (let i = 0; i < 24; i++) {
+    const tau = half * (GL_X[i] + 1);
+    const c2 = Math.cos(tau) ** 2, s2 = Math.sin(tau) ** 2;
+    acc += GL_W[i] * (a * da * c2 + b * db * s2)
+         / Math.sqrt(a * a * c2 + b * b * s2);
+  }
+  return half * acc;
+}
+
 export class Surface {
   constructor(profile, bounds) {
     this.sMin = bounds.s_min;
     this.sMax = bounds.s_max;
+    this.zBottom = bounds.z_bottom;
+    this.zTop = bounds.z_top;
+    this.band = bounds.band_halfwidth || 0;
     this.a = makeInterp(profile.z, profile.a);
     this.b = makeInterp(profile.z, profile.b);
     this.da = makeInterp(profile.z, profile.da);
     this.db = makeInterp(profile.z, profile.db);
+    this.req = makeInterp(profile.z, profile.req);    // r_eq = P/2pi
+    this.dreq = makeInterp(profile.z, profile.dreq);  // dr_eq/dz
     // s decreases as z increases: build the inverse on reversed arrays
     const sRev = [...profile.s].reverse();
     const zRev = [...profile.z].reverse();
@@ -41,21 +88,38 @@ export class Surface {
     this.sOfZ = makeInterp(profile.z, profile.s);
   }
 
+  // equal-arc ellipse parameter t for theta (radians); Newton like
+  // ShellModel.param_from_arc_angle (target arc = theta * r_eq)
+  paramFromArcAngle(thetaRad, a, b, req) {
+    let t = thetaRad;
+    for (let k = 0; k < 7; k++) {
+      const { arc, speed } = arcAndSpeed(t, a, b);
+      t -= (arc - thetaRad * req) / speed;
+    }
+    return t;
+  }
+
+  // chart metric: mm of section arc per RADIAN of theta. Equal-arc makes
+  // this P(z)/2pi — uniform around the ring (SurfaceChart.r_theta).
   rTheta(thetaDeg, s) {
     const z = this.zOfS(Math.min(Math.max(s, this.sMin), this.sMax));
-    const t = thetaDeg * Math.PI / 180;
-    const x = this.a(z) * Math.cos(t), y = this.b(z) * Math.sin(t);
-    return Math.hypot(x, y);
+    return this.req(z);
   }
 
   forward(thetaDeg, s) {
     const z = this.zOfS(s);
-    const t = thetaDeg * Math.PI / 180;
+    const thetaRad = thetaDeg * Math.PI / 180;
     const a = this.a(z), b = this.b(z), da = this.da(z), db = this.db(z);
+    const req = this.req(z), dreq = this.dreq(z);
+    const t = this.paramFromArcAngle(thetaRad, a, b, req);
     const sin = Math.sin(t), cos = Math.cos(t);
     const pos = [a * sin, b * cos, z];
+    // dt/dz: the equal-arc map shifts with height (ShellModel.frame);
+    // d(target)/dz = theta * dr_eq, minus d(arc)/dz at fixed t, over speed
+    const speed = Math.hypot(a * cos, b * sin);
+    const tz = (thetaRad * dreq - arcZPartial(t, a, b, da, db)) / speed;
     const pt = [a * cos, -b * sin, 0];
-    const pz = [da * sin, db * cos, 1];
+    const pz = [da * sin + a * cos * tz, db * cos - b * sin * tz, 1];
     let n = [pz[1] * pt[2] - pz[2] * pt[1],
              pz[2] * pt[0] - pz[0] * pt[2],
              pz[0] * pt[1] - pz[1] * pt[0]];
@@ -70,9 +134,12 @@ export class Surface {
   }
 
   inverse(p) {
-    const z = Math.min(Math.max(p[2], this.zOfS(this.sMax)), this.zOfS(this.sMin));
-    const theta = Math.atan2(p[0] / this.a(z), p[1] / this.b(z)) * 180 / Math.PI;
-    return { theta, s: this.sOfZ(z) };
+    const z = Math.min(Math.max(p[2], this.zBottom), this.zTop);
+    const a = this.a(z), b = this.b(z);
+    // equal-arc inverse (ShellModel.arc_angle_from_point)
+    const t = Math.atan2(p[0] / a, p[1] / b);
+    const { arc } = arcAndSpeed(t, a, b);
+    return { theta: (arc / this.req(z)) * 180 / Math.PI, s: this.sOfZ(z) };
   }
 
   offsetPoint(theta, s, dxMm, dyMm) {
@@ -112,7 +179,23 @@ export function connectorGeometry(surf, cls, theta, s, rotation) {
   if (rotation === 180) { ex = -ex; ey = -ey; }
   const e = surf.offsetPoint(c.theta, c.s, ex * cls.connector.escape_mm,
                              ey * cls.connector.escape_mm);
+  // the waist seam band is the cable bus: a run heading into the band
+  // TERMINATES at the band edge (layout.py connector_geometry)
+  const band = surf.band;
+  if (band > 0 && Math.abs(c.s) > band && Math.abs(e.s) < Math.abs(c.s)) {
+    const edge = c.s > 0 ? band : -band;
+    if ((c.s - edge) * (e.s - edge) < 0) {
+      const t = (c.s - edge) / (c.s - e.s);
+      e.theta = c.theta + t * (e.theta - c.theta);
+      e.s = edge;
+    }
+  }
   return { origin: c, end: e };
+}
+
+export function tailRunMm(surf, cls, theta, s, rotation) {
+  const { origin } = connectorGeometry(surf, cls, theta, s, rotation);
+  return Math.max(0, Math.abs(origin.s) - surf.band);
 }
 
 export function connectorProblems(surf, cls, theta, s, rotation) {
@@ -132,14 +215,21 @@ export function outlineProblems(surf, cls, theta, s, rotation) {
   const { center, name } = pieceOf(theta);
   const [W, H] = cls.outline;
   const out = [];
+  const sVals = [];
   for (const corner of [[0, 0], [W, 0], [W, H], [0, H]]) {
     const [dx, dy] = frameOffset(cls, rotation, corner);
     const pt = surf.offsetPoint(theta, s, dx, dy);
+    sVals.push(pt.s);
     if (pt.s < surf.sMin - 1e-9 || pt.s > surf.sMax + 1e-9)
       out.push("outline corner off the shell (top/hem edge)");
     if (Math.abs(localAngle(pt.theta, center)) >= 90 - 1e-9)
       out.push(`outline crosses the ${name} piece seam`);
   }
+  // waist seam band keep-out (layout.py outline_problems)
+  const band = surf.band;
+  if (band > 0 && Math.min(...sVals) < band - 1e-9
+      && Math.max(...sVals) > -band + 1e-9)
+    out.push(`footprint intersects the waist seam band (keep-out ±${band} mm)`);
   return out;
 }
 
