@@ -142,6 +142,41 @@ def plan_curvature_radius(a, b, theta_deg):
     return num / (a * b)
 
 
+def _perimeter_np(a, b):
+    """Ramanujan II, vectorized (numpy twin of ellipse_perimeter)."""
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    h = ((a - b) / (a + b)) ** 2
+    return np.pi * (a + b) * (1.0 + 3.0 * h / (10.0 + np.sqrt(4.0 - 3.0 * h)))
+
+
+def solve_a_given_b(perimeter, b):
+    """THE INVERTED SOLVE: semi-width a from a KNOWN circumference and an
+    AUTHORED half-depth b (the silhouette measurement). Newton on
+    Ramanujan (monotone in a); the a/b ratio becomes a reported OUTPUT.
+    Raises when the circumference cannot close over that depth (the
+    degenerate flat-ellipse perimeter ~4.14*b is the floor)."""
+    P = np.asarray(perimeter, dtype=float)
+    b = np.asarray(b, dtype=float)
+    floor = _perimeter_np(1e-9, b)
+    if np.any(P <= floor * (1.0 + 1e-9)):
+        bad = np.argmax(P <= floor)
+        raise ValueError(
+            f"circumference {float(np.atleast_1d(P)[bad]):.1f} mm cannot close "
+            f"over half-depth {float(np.atleast_1d(b)[bad]):.1f} mm "
+            f"(degenerate floor {float(np.atleast_1d(floor)[bad]):.1f} mm)")
+    a = np.maximum(P / math.pi - b, 0.05 * b)     # exact for a circle
+    for _ in range(40):
+        f = _perimeter_np(a, b) - P
+        h = 1e-6 * np.maximum(a, 1.0)
+        df = (_perimeter_np(a + h, b) - _perimeter_np(a - h, b)) / (2.0 * h)
+        a = np.maximum(a - f / df, 1e-9)
+    resid = np.max(np.abs(_perimeter_np(a, b) - P))
+    if resid > 1e-6:
+        raise ValueError(f"a-solve did not converge (residual {resid:.2e} mm)")
+    return a
+
+
 # -- analysis-grade swept surface (above-bust band comparison) ---------------
 
 _GL24 = np.polynomial.legendre.leggauss(24)
