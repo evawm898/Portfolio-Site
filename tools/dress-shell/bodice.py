@@ -60,10 +60,14 @@ class BodiceAnchor:
 
 
 # Confirmed body measurements + estimated ratios (ratios flagged).
+# Circumferences are GIVEN (waist 24 in, underbust 28 in, bust 34 in);
+# every ratio is still an estimate awaiting confirmation. The underbust
+# ratio is interpolated linearly in height between the waist and bust
+# ratio estimates (1.5 + 0.5 * 152.4/203.2 = 1.875).
 DEFAULT_ANCHORS = (
-    BodiceAnchor("waist", 0.0, 609.6, 1.5, estimated=True),      # ratio est.
+    BodiceAnchor("waist", 0.0, 609.6, 1.5, estimated=True),        # ratio est.
+    BodiceAnchor("underbust", 152.4, 711.2, 1.875, estimated=True),  # ratio est.
     BodiceAnchor("bust apex", 203.2, 863.6, 2.0, estimated=True),  # ratio est.
-    # underbust (v = 152.4): circumference NOT PROVIDED — blocked input.
 )
 
 

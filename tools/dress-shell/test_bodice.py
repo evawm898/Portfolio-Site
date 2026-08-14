@@ -28,9 +28,13 @@ class TestSolver(unittest.TestCase):
 
     def test_solved_anchor_values(self):
         sec = BodiceSections()
-        waist, bust = sec.rows[0], sec.rows[-1]
+        waist, under, bust = sec.rows
         self.assertAlmostEqual(waist["a"], 115.27, delta=0.02)
         self.assertAlmostEqual(waist["b"], 76.85, delta=0.02)
+        self.assertAlmostEqual(under["v"], 152.4)
+        self.assertAlmostEqual(under["circumference"], 711.2)   # 28 in, GIVEN
+        self.assertAlmostEqual(under["a"], 144.28, delta=0.02)  # ratio 1.875 est.
+        self.assertAlmostEqual(under["b"], 76.95, delta=0.02)
         self.assertAlmostEqual(bust["a"], 178.27, delta=0.02)
         self.assertAlmostEqual(bust["b"], 89.14, delta=0.02)
         self.assertTrue(all(r["estimated"] for r in sec.rows))  # ratios are estimates
@@ -44,14 +48,10 @@ class TestSolver(unittest.TestCase):
         self.assertTrue(bool(np.all(a <= sec.rows[-1]["a"] + 1e-9)))
         self.assertTrue(bool(np.all(b <= sec.rows[-1]["b"] + 1e-9)))
 
-    def test_underbust_anchor_slots_in_when_supplied(self):
-        # the moment the blocked circumference exists, it becomes an anchor
-        sec = BodiceSections((
-            BodiceAnchor("waist", 0.0, 609.6, 1.5, True),
-            BodiceAnchor("underbust", 152.4, 750.0, 1.85, True),
-            BodiceAnchor("bust apex", 203.2, 863.6, 2.0, True),
-        ))
-        self.assertAlmostEqual(sec.circumference(152.4), 750.0, places=6)
+    def test_default_sections_hit_the_underbust(self):
+        # the given 28 in underbust is an interpolation ANCHOR, not a wish
+        sec = BodiceSections()
+        self.assertAlmostEqual(sec.circumference(152.4), 711.2, places=6)
 
 
 class TestCurvature(unittest.TestCase):
@@ -70,28 +70,36 @@ class TestCurvature(unittest.TestCase):
             self.assertTrue(bool(np.all(np.diff(r) <= 1e-9)))  # monotone down
 
     def test_usable_band_ends_near_the_piece_seam(self):
+        # the underbust (ratio est. 1.875 on the smaller circumference) is
+        # now the tightest ring: band 74.2 deg vs ~82 waist / ~78 bust —
+        # still collapsing at the seam region, not mid-piece
         sec = BodiceSections()
         for v in (0.0, 152.4, 203.2):
             band = usable_band_deg(float(sec.a(v)), float(sec.b(v)), 53.0)
-            self.assertGreater(band, 75.0)
+            self.assertGreater(band, 70.0)
             self.assertLess(band, 85.0)   # fails right where the seam already is
 
 
 class TestWaistJunction(unittest.TestCase):
-    def test_bodice_tangent_varies_with_theta(self):
+    def test_bodice_launches_vertically_at_the_waist(self):
+        # With the underbust anchor the data is strongly convex (slow
+        # growth to v=152.4, fast growth after), so monotone PCHIP clamps
+        # the v=0 endpoint derivative to ZERO: the bodice leaves the waist
+        # vertically at every theta. The secant alternative (straight
+        # taper to the underbust) would give ~0.04 deg CF / ~10.8 deg side
+        # — an interpolation CHOICE, flagged in the analysis report.
         sec = BodiceSections()
-        cf, dr_cf = sec.waist_tangent_deg(0.0)
-        side, dr_side = sec.waist_tangent_deg(90.0)
-        self.assertAlmostEqual(cf, 3.46, delta=0.05)
-        self.assertAlmostEqual(side, 17.23, delta=0.05)
-        self.assertGreater(dr_cf, 0.0)    # bodice widens upward everywhere
-        self.assertGreater(dr_side, 0.0)
+        for th in (0.0, 45.0, 90.0):
+            tangent, dr = sec.waist_tangent_deg(th)
+            self.assertAlmostEqual(tangent, 0.0, places=9)
+            self.assertAlmostEqual(dr, 0.0, places=12)
 
     def test_crease_angle_against_the_skirt(self):
+        # vertical bodice launch -> the crease is the skirt tangent alone
         sec = BodiceSections()
         st = ShellModel(ShellParams()).waist_tangent_deg()
-        self.assertAlmostEqual(sec.crease_angle_deg(0.0, st), 44.75, delta=0.1)
-        self.assertAlmostEqual(sec.crease_angle_deg(90.0, st), 58.51, delta=0.1)
+        self.assertAlmostEqual(sec.crease_angle_deg(0.0, st), 41.29, delta=0.05)
+        self.assertAlmostEqual(sec.crease_angle_deg(90.0, st), 41.29, delta=0.05)
 
 
 if __name__ == "__main__":
