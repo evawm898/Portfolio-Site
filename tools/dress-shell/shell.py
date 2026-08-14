@@ -65,7 +65,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from bodice import BodiceSections
+from bodice import BodiceSections, circumference_schedule, solve_a_given_b
 from neckline import NecklineCurve, NecklineParams
 
 # 24-point Gauss-Legendre nodes/weights on [-1, 1] for ellipse-arc
@@ -116,6 +116,12 @@ class ShellParams:
     waist_band_halfwidth: float = 8.0    # seam band / cable bus, mm each side
     bodice: object = None                # None = skirt only; NecklineParams
                                          # activates the bodice segment
+    depth_curve: object = None           # AUTHORED half-depth b(z) from the
+                                         # traced silhouette (needs .b(z),
+                                         # .v_lo, .v_hi); None = ratio mode.
+                                         # In authored mode the a/b ratio is
+                                         # an OUTPUT: a(z) is solved from the
+                                         # perimeter schedule via Ramanujan.
 
 
 def dress_params() -> ShellParams:
@@ -189,16 +195,60 @@ class ShellModel:
                     f"neckline cf_height ({p.bodice.cf_height}) exceeds the "
                     f"highest section anchor ({self.sections.v_top}); supply "
                     f"a taller anchor rather than extrapolating")
-            # bodice waist section must MATCH the skirt waist section: both
-            # are solved from the same circumference, but the ratios must
-            # agree or the shells do not meet edge-to-edge at the crease
-            a_b, b_b = float(self.sections.a(0.0)), float(self.sections.b(0.0))
-            skirt_ratio = p.waist_section_ratio
-            if abs(a_b / b_b - skirt_ratio) > 1e-6:
-                raise ShellError(
-                    f"waist ratio mismatch: bodice sections give "
-                    f"{a_b / b_b:.6f}, skirt uses {skirt_ratio}")
+            # bodice waist section must MATCH the skirt waist section. In
+            # ratio mode both are solved from the same circumference, so
+            # the ratios must agree; in authored-depth mode both sides use
+            # the SAME b(0) and the same circumference — matched by
+            # construction, nothing to check.
+            if p.depth_curve is None:
+                a_b, b_b = float(self.sections.a(0.0)), float(self.sections.b(0.0))
+                skirt_ratio = p.waist_section_ratio
+                if abs(a_b / b_b - skirt_ratio) > 1e-6:
+                    raise ShellError(
+                        f"waist ratio mismatch: bodice sections give "
+                        f"{a_b / b_b:.6f}, skirt uses {skirt_ratio}")
             self.z_top = float(p.bodice.cf_height)
+
+        # -- authored-depth mode (silhouette honored) ------------------------
+        self.depth = p.depth_curve
+        self._a_tab = None
+        if self.depth is not None:
+            lo, hi = float(self.depth.v_lo), float(self.depth.v_hi)
+            if lo > self.z_bottom + 1e-6 or hi < self.z_top - 1e-6:
+                raise ShellError(
+                    f"authored depth covers [{lo:.1f}, {hi:.1f}] mm but the "
+                    f"shell needs [{self.z_bottom:.1f}, {self.z_top:.1f}] — "
+                    f"refusing to extrapolate a measurement")
+            self._circ_bodice = (circumference_schedule() if self.sections
+                                 else None)
+            # a(z) precomputed per segment (Newton once on a dense grid,
+            # then PCHIP) so semi_axes stays as fast as the ratio solve;
+            # segments stay separate so the waist crease survives
+            from scipy.interpolate import PchipInterpolator
+            tabs = []
+            worst = 0.0
+            segs = [(self.z_bottom, 0.0, 1401)]
+            if self.z_top > 1e-9:
+                segs.append((0.0, self.z_top, 801))
+            for z0, z1, n in segs:
+                zg = np.linspace(z0, z1, n)
+                bg = np.asarray(self.depth.b(zg), dtype=float)
+                Pg = np.asarray(self._perimeter_schedule(zg), dtype=float)
+                ag = solve_a_given_b(Pg, bg)
+                tabs.append((z0, z1, PchipInterpolator(zg, ag)))
+                worst = max(worst, float(np.max(np.abs(
+                    ellipse_perimeter(ag, bg) - Pg))))
+            self._a_tab = tabs
+            self.depth_solve_residual_mm = worst
+
+    def _perimeter_schedule(self, z):
+        """P(z): the KNOWN circumference at every height — superellipse
+        schedule on the skirt, anchor-interpolated on the bodice."""
+        z = np.asarray(z, dtype=float)
+        P = math.tau * np.asarray(self.r_super(z), dtype=float)
+        if self._circ_bodice is None:
+            return P
+        return np.where(z > 0.0, self._circ_bodice(z), P)
 
     # -- perimeter + ratio schedules -----------------------------------------
 
@@ -221,19 +271,41 @@ class ShellModel:
         return math.tau * np.asarray(self.mean_radius(z))
 
     def ratio(self, z):
-        """SKIRT section ratio schedule k(u): hem value at u = 0 blending
-        monotonically to the bodice waist ratio at u = drop. (Bodice
-        sections carry their own ratios via the solved anchors.)"""
+        """AUTHORED mode: the a/b ratio is an OUTPUT — measured depth,
+        solved width. RATIO mode: the skirt schedule k(u), hem value at
+        u = 0 blending monotonically to the bodice waist ratio at
+        u = drop (bodice sections carry their own anchor ratios)."""
+        if self.depth is not None:
+            a, b = self.semi_axes(z)
+            return np.asarray(a) / np.asarray(b)
         x = self._u(z) / self.params.drop
         if self.params.ratio_blend == "eased":
             x = x * x * (3.0 - 2.0 * x)      # smoothstep, still monotone
         return (self.params.skirt_hem_ratio
                 + (self.params.waist_section_ratio - self.params.skirt_hem_ratio) * x)
 
+    def _a_of_z(self, z):
+        """Authored mode: the precomputed a(z) table, segment-aware."""
+        z_in = np.asarray(z, dtype=float)
+        z1 = np.atleast_1d(z_in)
+        out = np.empty_like(z1)
+        if len(self._a_tab) == 1:
+            out[:] = self._a_tab[0][2](np.clip(z1, self.z_bottom, self.z_top))
+        else:
+            below = z1 <= 0.0
+            out[below] = self._a_tab[0][2](np.clip(z1[below], self.z_bottom, 0.0))
+            out[~below] = self._a_tab[1][2](np.clip(z1[~below], 0.0, self.z_top))
+        return out.reshape(z_in.shape)
+
     def semi_axes(self, z):
-        """(a, b) at height z. Skirt (z <= 0): solved from the perimeter
-        schedule and k(z). Bodice (z > 0): the interpolated sections."""
+        """(a, b) at height z.
+        AUTHORED mode: b from the silhouette curve, a from the perimeter
+        schedule (precomputed Newton table) — the ratio is an output.
+        RATIO mode: skirt solved from the schedule and k(z); bodice from
+        the interpolated anchor sections."""
         z = np.asarray(z, dtype=float)
+        if self.depth is not None:
+            return self._a_of_z(z), np.asarray(self.depth.b(z), dtype=float)
         a_s, b_s = solve_semi_axes(
             math.tau * self.r_super(z), self.ratio(z))
         if self.sections is None:
@@ -291,8 +363,9 @@ class ShellModel:
 
     def mean_radius(self, z):
         """Perimeter-equivalent radius r_eq = P/2pi — the ring-parameter
-        meridian. Skirt: the superellipse profile itself. Bodice: Ramanujan
-        perimeter of the interpolated sections over 2pi."""
+        meridian. Skirt: the superellipse profile itself. Bodice: the
+        anchor circumference schedule (authored mode) or the Ramanujan
+        perimeter of the interpolated sections (ratio mode)."""
         z = np.asarray(z, dtype=float)
         r = np.asarray(self.r_super(z), dtype=float)
         if self.sections is None:
@@ -300,9 +373,11 @@ class ShellModel:
         up = z > 0.0
         if not np.any(up):
             return r
-        a_up = self.sections.a(z)
-        b_up = self.sections.b(z)
-        r_up = ellipse_perimeter(a_up, b_up) / math.tau
+        if self.depth is not None:
+            r_up = self._circ_bodice(z) / math.tau
+        else:
+            r_up = ellipse_perimeter(self.sections.a(z),
+                                     self.sections.b(z)) / math.tau
         return np.where(up, r_up, r)
 
     def mean_slope(self, z):

@@ -142,6 +142,19 @@ def plan_curvature_radius(a, b, theta_deg):
     return num / (a * b)
 
 
+def circumference_schedule(anchors=DEFAULT_ANCHORS):
+    """P(v): section circumference over the bodice, PCHIP through the
+    anchor circumferences (monotone per segment — rises to the bust,
+    tapers above). This is the KNOWN quantity the inverted solve pairs
+    with an authored depth b(v)."""
+    rows = sorted(anchors, key=lambda a: a.v)
+    v = np.array([r.v for r in rows])
+    c = np.array([r.circumference for r in rows])
+    interp = PchipInterpolator(v, c)
+    v_top = float(v[-1])
+    return lambda vv: interp(np.clip(vv, 0.0, v_top))
+
+
 def _perimeter_np(a, b):
     """Ramanujan II, vectorized (numpy twin of ellipse_perimeter)."""
     a = np.asarray(a, dtype=float)

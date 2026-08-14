@@ -112,5 +112,69 @@ class TestImageExtraction(unittest.TestCase):
         self.assertLess(abs(vs.min() - (-381.0)), 3.0)   # hem lands at -381
 
 
+class _SyntheticDepth:
+    """Full-coverage authored depth for exercising the model mode."""
+    v_lo, v_hi = -381.0, 254.0
+
+    def b(self, z):
+        z = np.asarray(z, dtype=float)
+        return np.where(
+            z <= 0.0,
+            101.0 + (183.6 - 101.0) * (np.abs(z) / 381.0) ** 1.3,
+            101.0 + 22.0 * np.clip(z / 203.2, 0.0, None) ** 1.5
+            - 6.0 * np.clip((z - 203.2) / 50.8, 0.0, None) ** 2)
+
+
+class TestAuthoredDepthMode(unittest.TestCase):
+    def _model(self):
+        from neckline import DESIGN_NECKLINE
+        from shell import ShellModel, ShellParams
+        return ShellModel(ShellParams(bodice=DESIGN_NECKLINE,
+                                      depth_curve=_SyntheticDepth()))
+
+    def test_b_is_honored_and_perimeter_is_kept(self):
+        from bodice import _perimeter_np
+        m = self._model()
+        z = np.linspace(-380.0, 249.0, 300)
+        a, b = m.semi_axes(z)
+        self.assertLess(float(np.max(np.abs(b - _SyntheticDepth().b(z)))), 1e-9)
+        P = m._perimeter_schedule(z)
+        self.assertLess(float(np.max(np.abs(_perimeter_np(a, b) - P))), 5e-4)
+        self.assertLess(m.depth_solve_residual_mm, 1e-6)
+
+    def test_ratio_is_an_output(self):
+        m = self._model()
+        r0 = float(m.ratio(np.array(0.0)))
+        self.assertAlmostEqual(r0, float(m.a(0.0) / m.b(0.0)), places=12)
+        # the synthetic waist depth (101 mm) over 609.6 mm circumference
+        # comes out DEEPER than wide — the honored-silhouette regime
+        self.assertLess(r0, 1.0)
+
+    def test_coords_round_trip_in_authored_mode(self):
+        from coords import ShellCoords
+        m = self._model()
+        c = ShellCoords(m)
+        rng = np.random.default_rng(3)
+        th = rng.uniform(-179.0, 179.0, 150)
+        ss = rng.uniform(c.s_min, c.s_max, 150)
+        zz = c.z_of_s(ss)
+        keep = zz <= m.z_top_at(th) - 1e-6
+        f = c.forward(th[keep], ss[keep])
+        th2, s2 = c.inverse(f["position"], check_mm=0.01)
+        p2 = c.forward(th2, s2)["position"]
+        self.assertLess(float(np.max(np.linalg.norm(p2 - f["position"], axis=-1))),
+                        1e-6)
+
+    def test_partial_trace_is_refused_for_the_full_dress(self):
+        # the committed silhouette covers -381..~113 (one-shoulder cut):
+        # building the full dress from it must FAIL, not extrapolate
+        from neckline import DESIGN_NECKLINE
+        from shell import ShellError, ShellModel, ShellParams
+        pts, _ = extract_from_image(Path(__file__).parent / "silhouette-trace.png")
+        fit = FittedDepth(pts)
+        with self.assertRaises(ShellError):
+            ShellModel(ShellParams(bodice=DESIGN_NECKLINE, depth_curve=fit))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
