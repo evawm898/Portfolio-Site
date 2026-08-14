@@ -28,7 +28,19 @@ const MAX_TOKEN_LEN    = 200;
 const KEY_RE = /^[A-Za-z0-9]+$/;             // control ids are plain alphanumerics
 const CONTROL_CHARS_RE = /[\x00-\x1F\x7F]/g; // ASCII control characters
 
-const openStore = () => getStore({ name: 'flower-designs', consistency: 'strong' });
+// Deploy-context isolation. Production reads/writes the real public gallery
+// store; deploy previews and branch deploys use a SEPARATE store, so testing on
+// a PR preview never touches the public gallery. `CONTEXT` is Netlify's
+// deploy-context env var (production | deploy-preview | branch-deploy | dev),
+// available to Functions at runtime. We only switch to the preview store for an
+// EXPLICIT non-production context — an unknown/missing CONTEXT falls back to the
+// production store, so production can never silently read/write the empty preview
+// store (a preview leaking to prod would be far less harmful than that). No
+// frontend change: the endpoint and its behaviour are identical either way.
+const DEPLOY_CONTEXT = process.env.CONTEXT || '';
+const IS_PREVIEW_CONTEXT = DEPLOY_CONTEXT === 'deploy-preview' || DEPLOY_CONTEXT === 'branch-deploy' || DEPLOY_CONTEXT === 'dev';
+const STORE_NAME = IS_PREVIEW_CONTEXT ? 'flower-designs-preview' : 'flower-designs';
+const openStore = () => getStore({ name: STORE_NAME, consistency: 'strong' });
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
