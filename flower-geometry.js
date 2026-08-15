@@ -452,15 +452,17 @@ function dedupePolygon(poly) {
            SMOOTH width envelope (petalHalfWidth: taper/tip/edgeCurve/lobe), via a
            dependency-free jump-flooding feature transform, normalized by the
            petal's own max interior depth.
-     T(p)  a flow that fans with the shape — tangent to the margin near the edge,
-           parallel to the midrib inside. Deliberately NOT grad(s):
-             T = normalize( lerp( midrib(1,0), marginTangent, 1 - d ) )
-           marginTangent is the smooth-envelope tangent at the nearest boundary
-           point (carried by the feature transform), oriented tip-ward. If this
-           reads too crude in the debug overlay, the principled upgrade is a
-           Laplace solve for a separate scalar h (Dirichlet h=0 base / h=1 tip,
-           Neumann no-flux on the side margins), T = normalize(grad h) — Jacobi on
-           this same grid, no dependency. Not implemented yet.
+     T(p)  a flow that fans with the shape — parallel to the midrib on the
+           centerline, tangent to the margin near the edge. Built ANALYTICALLY
+           from the outline slope at the SAME u (see petalFlowDirection), NOT from
+           a nearest-boundary-point search: nearest-point tangent is degenerate on
+           the midrib near the base (nearest point is the base edge) and flips
+           sides across the centerline, which produced a dead patch + a seam. The
+           analytic form is seam-free and exactly (0,1) on the midrib at every u.
+           Deliberately NOT grad(s). If a globally smooth field is ever wanted the
+           principled upgrade is a Laplace solve for a separate scalar h (Dirichlet
+           h=0 base / h=1 tip, Neumann no-flux on the side margins), T =
+           normalize(grad h) — Jacobi on this same grid, no dependency. Not built.
 
    Square grid resolved finer than the finest infill feature; bilinear sample().
    The SMOOTH envelope polyline is returned too; the ACTUAL serrated/ruffled rim
@@ -471,6 +473,41 @@ function dedupePolygon(poly) {
 
 const FIELD_LONG_AXIS = 512;      // grid cells along the petal length (square cells)
 const FIELD_MAX_LAT   = 384;      // cap on cells across the width
+
+// Analytic flow direction T at a flattened point (x = L*u longitudinal, y = v
+// lateral). Returns a unit {tx, ty} in that SAME (x, y) frame — tx along the
+// midrib (+x, tip-ward), ty lateral. Derived from the outline slope dW/du at u
+// and signed by side; no nearest-point search, so it is seam-free and exactly
+// midrib-aligned on the centerline. Verified properties (see tools/test-petal-flow.mjs):
+//   - v = 0        -> exactly (tx,ty) = (1,0) at every u (midrib; no seam/patch)
+//   - slope > 0    -> off-midrib arrows fan outward (below the widest point)
+//   - slope = 0    -> (1,0) everywhere (vertical at the widest point)
+//   - slope < 0    -> off-midrib arrows converge toward the tip (above it)
+//   - T(-v,u) is the exact mirror of T(v,u)
+export function petalFlowDirection(v, u, P) {
+  const uu = clamp(u, 0, 1);
+  const w = petalHalfWidth(uu, P);
+  if (w < 1e-6) return { tx: 1, ty: 0 };            // degenerate width -> midrib
+  const frac = clamp(Math.abs(v) / w, 0, 1);         // 0 midrib -> 1 margin
+  const sgn = v < 0 ? -1 : 1;
+  // analytic outline slope d(petalHalfWidth)/du at u (central diff on the analytic
+  // envelope), clamped: halfWidth has near-infinite slope as u->0, and without the
+  // clamp the bottom rows would go horizontal.
+  const hh = 1e-3;
+  let uA = uu - hh, uB = uu + hh, denom = 2 * hh;
+  if (uA < 0) { uA = 0; denom = uB - uA; }
+  if (uB > 1) { uB = 1; denom = uB - uA; }
+  let slope = denom > 1e-9 ? (petalHalfWidth(uB, P) - petalHalfWidth(uA, P)) / denom : 0;
+  slope = clamp(slope, -3, 3);
+  // marginDir in (lateral a, longitudinal b), normalized; midrib is (0, 1)
+  let ma = sgn * slope, mb = 1;
+  const ml = Math.hypot(ma, mb) || 1; ma /= ml; mb /= ml;
+  const k = Math.pow(frac, 1.4);
+  const a = lerp(0, ma, k);                           // lateral component
+  const b = lerp(1, mb, k);                           // longitudinal component
+  const l = Math.hypot(a, b) || 1;
+  return { tx: b / l, ty: a / l };                    // (longitudinal, lateral)
+}
 
 export function computePetalFields(P) {
   const L = Math.max(P.L, 1e-4);
@@ -483,21 +520,17 @@ export function computePetalFields(P) {
     if (hw > Wmax) Wmax = hw;
     env.push({ x: L * u, y: hw });
   }
-  // Continuous boundary SITES, each tagged with a tip-ward-oriented tangent: the
-  // two side margins (tangent = d/du of the envelope) plus the base edge.
-  const sx = [], sy = [], stx = [], sty = [];
-  const pushSite = (x, y, tx, ty) => {
-    let l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
-    if (tx < 0) { tx = -tx; ty = -ty; }             // orient tip-ward (+x)
-    sx.push(x); sy.push(y); stx.push(tx); sty.push(ty);
-  };
+  // Boundary SITES for the d distance transform: the two side margins plus the
+  // base edge. Positions only — T no longer uses a nearest-boundary tangent, so
+  // the sites carry no tangent data.
+  const sx = [], sy = [];
+  const pushSite = (x, y) => { sx.push(x); sy.push(y); };
   for (let i = 0; i <= NU; i++) {
-    const a = env[Math.max(0, i - 1)], b = env[Math.min(NU, i + 1)];
-    pushSite(env[i].x,  env[i].y, b.x - a.x,  b.y - a.y);   // +Y margin
-    pushSite(env[i].x, -env[i].y, b.x - a.x, -(b.y - a.y)); // -Y margin (mirror)
+    pushSite(env[i].x,  env[i].y);   // +Y margin
+    pushSite(env[i].x, -env[i].y);   // -Y margin (mirror)
   }
   const hw0 = petalHalfWidth(0, P);
-  for (let j = 0; j <= 24; j++) pushSite(0, lerp(-hw0, hw0, j / 24), 0, 1);  // base edge
+  for (let j = 0; j <= 24; j++) pushSite(0, lerp(-hw0, hw0, j / 24));  // base edge
 
   // Square grid over the flattened bbox [0,L] x [-Wmax,+Wmax] (+ 1-cell pad).
   const h = L / FIELD_LONG_AXIS;
@@ -550,8 +583,10 @@ export function computePetalFields(P) {
     }
   }
 
-  // Fields. d normalized by the max interior distance; T = blend of midrib and the
-  // nearest margin tangent, weighted by (1 - d).
+  // Fields. s = normalized arc position; d = distance to the smooth envelope,
+  // normalized by the max interior depth; T = the analytic outline-slope flow
+  // (petalFlowDirection), defined everywhere so the bilinear sampler stays smooth
+  // across the boundary.
   const sArr = new Float32Array(N), dArr = new Float32Array(N);
   const txArr = new Float32Array(N), tyArr = new Float32Array(N);
   let dMax = 1e-6;
@@ -559,16 +594,11 @@ export function computePetalFields(P) {
   for (let j = 0; j < NY; j++) {
     for (let i = 0; i < NX; i++) {
       const k = j * NX + i;
-      const x = cellX(i);
+      const x = cellX(i), y = cellY(j);
       sArr[k] = clamp(x / L, 0, 1);
-      if (!inside[k] || seed[k] < 0) { dArr[k] = 0; txArr[k] = 1; tyArr[k] = 0; continue; }
-      const d = clamp(Math.sqrt(seedD2[k]) / dMax, 0, 1);
-      dArr[k] = d;
-      const si = seed[k];
-      const w = 1 - d;                                    // 1 at margin, 0 deep inside
-      let vx = lerp(1, stx[si], w), vy = lerp(0, sty[si], w);
-      const l = Math.hypot(vx, vy) || 1;
-      txArr[k] = vx / l; tyArr[k] = vy / l;
+      const t = petalFlowDirection(y, x / L, P);
+      txArr[k] = t.tx; tyArr[k] = t.ty;
+      dArr[k] = (!inside[k] || seed[k] < 0) ? 0 : clamp(Math.sqrt(seedD2[k]) / dMax, 0, 1);
     }
   }
 
