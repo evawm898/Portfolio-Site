@@ -108,10 +108,10 @@ const MIN_FEATURE_UNITS = MIN_FEATURE_MM / MM_PER_UNIT; // slab-thickness / wall
 const MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;        // tube/bead radius floor (diameter = feature)
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
-   layout). Petal i sits at angle i*GOLDEN_ANGLE and radius spread*sqrt(i)
-   (Vogel's model — the sunflower packing). Below EVEN_MAX petals the spiral has
-   too few points to read as a spiral and collapses into a lopsided clump, so we
-   switch to an evenly-spaced rosette there (see generate()). */
+   layout). Petal i sits at angle i*divergence and radius spread*sqrt(i)
+   (Vogel's model — the sunflower packing). The COILED bloom's DIVERGENCE ANGLE
+   control picks the angle: GOLDEN (i*GOLDEN_ANGLE, the phyllotactic spiral),
+   EVEN (i*360/n on one ring, regular at any count), or CUSTOM (a set angle). */
 const GOLDEN_ANGLE   = Math.PI * (3 - Math.sqrt(5));  // ~137.5°, the divergence angle
 const SPREAD_LOOSE   = 0.52;   // radial spacing at MAX slider (open, gappy spiral — petals spread)
 const SPREAD_TIGHT   = 0.13;   // radial spacing at MIN slider (dense, packed spiral — petals touching)
@@ -119,9 +119,6 @@ const ELEV_FACTOR    = 0.85;   // centre rise/sink at full elevation, as a fract
                                // bloom radius — keeps the cone/bowl aspect natural at any tightness
 const RECEPTACLE_TILT = 0.55;  // how strongly petals lean along the cone/bowl slope (0..1)
 const CORE_SPREAD    = 0.14;   // stamen-cluster radius at the bloom's heart
-const EVEN_MAX       = 4;      // at/below this petal count, arrange petals as an even rosette
-                               // (equal angle + equal radius) instead of the phyllotactic
-                               // spiral, so 3 or 4 petals sit evenly spaced from each other
 const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom radius
 // bilateral fan spacing is user-set (Petal spacing slider) and capped in generate()
 // so the fan never wraps past the back; max 3 petals per side.
@@ -2092,11 +2089,16 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
       }
     }
   } else {                                                      // coiled
-    const coiledEven = count <= EVEN_MAX;
+    // DIVERGENCE ANGLE: GOLDEN = the phyllotactic golden angle on the Vogel
+    // spiral; EVEN = 360/n on one ring (regular spacing at any count); CUSTOM =
+    // a user-set angle on the same Vogel radius. An absent/unknown mode resolves
+    // to GOLDEN, so pre-divergence saved designs are unchanged by this branch.
+    const divMode = ui.divergenceMode;
+    const divAngle = divMode === 'custom' ? ui.divergenceAngle * DEG : GOLDEN_ANGLE;
     for (let i = 0; i < count; i++) {
       if (count === 1) placements.push({ az: 0, r: 0, seedIdx: i });
-      else if (coiledEven) placements.push({ az: i * 2 * Math.PI / count, r: ringR, seedIdx: i });
-      else placements.push({ az: i * GOLDEN_ANGLE, r: spread * Math.sqrt(i), seedIdx: i });
+      else if (divMode === 'even') placements.push({ az: i * 2 * Math.PI / count, r: ringR, seedIdx: i });
+      else placements.push({ az: i * divAngle, r: spread * Math.sqrt(i), seedIdx: i });
     }
   }
 
@@ -2390,6 +2392,8 @@ const inputs = {
   edgeNoise: document.getElementById('edgeNoise'),
   edgeNoiseScale: document.getElementById('edgeNoiseScale'),
   bloomType: document.getElementById('bloomType'),
+  divergenceMode: document.getElementById('divergenceMode'),
+  divergenceAngle: document.getElementById('divergenceAngle'),
   layerCount: document.getElementById('layerCount'),
   petalsPerLayer: document.getElementById('petalsPerLayer'),
   layerSizeFalloff: document.getElementById('layerSizeFalloff'),
@@ -2506,6 +2510,8 @@ function readUI() {
     edgeNoise: parseFloat(inputs.edgeNoise.value),
     edgeNoiseScale: parseFloat(inputs.edgeNoiseScale.value),
     bloomType: inputs.bloomType.value,
+    divergenceMode: inputs.divergenceMode.value,
+    divergenceAngle: parseFloat(inputs.divergenceAngle.value),
     layerCount: parseInt(inputs.layerCount.value, 10),
     petalsPerLayer: inputs.petalsPerLayer.value,
     layerSizeFalloff: parseFloat(inputs.layerSizeFalloff.value),
@@ -2643,6 +2649,7 @@ function refreshLabels() {
     setLabel('bilEdgeProfile' + k, (ep > 0 ? '+' : '') + ep.toFixed(2));
   }
   setLabel('bloom', inputs.bloom.value + '°');
+  setLabel('divergenceAngle', (+inputs.divergenceAngle.value).toFixed(1) + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
   setLabel('softness', (+inputs.softness.value).toFixed(2));
@@ -2749,7 +2756,7 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'bilPerSide', 'bilSpacing',
+['petalCount', 'divergenceAngle', 'bilPerSide', 'bilSpacing',
  'bilScale1', 'bilScale2', 'bilScale3',
  'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
@@ -2817,7 +2824,22 @@ function updateBloomOptions() {
     el.hidden = !el.getAttribute('data-bloom-styles').split(/\s+/).includes(type);
   });
   updateBilateralPetals();
+  updateDivergenceOptions();
 }
+// COILED divergence: the CUSTOM angle slider shows only for CUSTOM, and the
+// low-petal-count hint shows only when a coiled bloom has fewer than 8 petals
+// (where the golden spiral reads as irregular rather than phyllotactic).
+function updateDivergenceOptions() {
+  const coiled = inputs.bloomType.value === 'coiled';
+  const custom = inputs.divergenceMode.value === 'custom';
+  const angleCtrl = document.getElementById('divergenceAngleCtrl');
+  if (angleCtrl) angleCtrl.hidden = !(coiled && custom);
+  const hint = document.getElementById('divLowCountHint');
+  if (hint) hint.hidden = !(coiled && (parseInt(inputs.petalCount.value, 10) || 0) < 8);
+}
+inputs.divergenceMode.addEventListener('change', () => { updateDivergenceOptions(); scheduleRegen(); });
+// keep the low-petal-count hint in sync as the petal slider moves
+inputs.petalCount.addEventListener('input', updateDivergenceOptions);
 // The per-petal edge dropdowns (bilateral only) show one per petal position, up to
 // the current PETALS PER SIDE — so they appear/disappear as that slider moves.
 function updateBilateralPetals() {
@@ -2970,6 +2992,8 @@ if (resetBtn) {
     inputs.edgeNoise.value = d.edgeNoise;
     inputs.edgeNoiseScale.value = d.edgeNoiseScale;
     inputs.bloomType.value = d.bloomType;
+    inputs.divergenceMode.value = d.divergenceMode;
+    inputs.divergenceAngle.value = d.divergenceAngle;
     inputs.layerCount.value = d.layerCount;
     inputs.petalsPerLayer.value = d.petalsPerLayer;
     inputs.layerSizeFalloff.value = d.layerSizeFalloff;
@@ -3092,7 +3116,8 @@ const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   edgeNoise: 0, edgeNoiseScale: 0,
-  bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
+  bloomType: 'coiled', divergenceMode: 'golden', divergenceAngle: 137.5,
+  bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
   layerCount: 1, petalsPerLayer: '', layerSizeFalloff: 0.75, layerHeightOffset: 0.05,
   layerRotationOffset: 24, layerBloomAngleDelta: 12,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
@@ -3229,7 +3254,11 @@ function currentDesignParams() {
 // map so any future control is picked up automatically (mirrors the Reset path).
 function applyDesign(params) {
   if (!params || typeof params !== 'object') return;
-  for (const [k, v] of Object.entries(params)) {
+  // Overlay the saved params on top of DEFAULTS, so any control a design omits
+  // (e.g. a pre-divergence design has no divergenceMode) resolves to its default
+  // rather than keeping the current UI value — making load fully deterministic.
+  const merged = { ...DEFAULTS, ...params };
+  for (const [k, v] of Object.entries(merged)) {
     const el = inputs[k];
     if (!el) continue;
     if (el.type === 'checkbox') el.checked = !!v;
