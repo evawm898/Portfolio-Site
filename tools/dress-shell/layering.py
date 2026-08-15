@@ -26,7 +26,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from layout import _frame_offset, connector_geometry
+from layout import _frame_offset, connector_geometry, wrap180
 
 
 class LayeringError(ValueError):
@@ -35,44 +35,73 @@ class LayeringError(ValueError):
 
 @dataclass(frozen=True)
 class ChartRect:
-    """Panel outline in chart space: theta interval (deg) x s interval (mm),
-    plus the local mm/deg scale used to build it."""
+    """A (possibly rotated) panel rectangle in chart space. theta0..s1 is
+    the AXIS-ALIGNED BOUNDING BOX of the rotated rectangle (used for the
+    conservative overlap test); the exact rotated rectangle — center,
+    half-extents in mm, rotation — backs the point-containment tests."""
     theta0: float
     theta1: float
     s0: float
     s1: float
     mm_per_deg: float
+    tc: float           # rectangle center, chart theta (deg)
+    sc: float           # rectangle center, chart s (mm)
+    half_w_mm: float
+    half_h_mm: float
+    rot_deg: float
 
     def overlaps(self, other):
         return (self.theta0 < other.theta1 and other.theta0 < self.theta1
                 and self.s0 < other.s1 and other.s0 < self.s1)
 
     def contains(self, theta, s):
-        return self.theta0 <= theta <= self.theta1 and self.s0 <= s <= self.s1
+        return bool(self.contains_arr(np.asarray(theta), np.asarray(s)))
+
+    def contains_arr(self, theta, s):
+        """Vectorized EXACT containment in the rotated rectangle. The
+        angular difference wraps so panels straddling theta = +-180 test
+        correctly."""
+        dx = wrap180(np.asarray(theta) - self.tc) * self.mm_per_deg
+        dy = np.asarray(s) - self.sc
+        c = math.cos(math.radians(self.rot_deg))
+        sn = math.sin(math.radians(self.rot_deg))
+        x = c * dx + sn * dy
+        y = -sn * dx + c * dy
+        return (np.abs(x) <= self.half_w_mm + 1e-12) \
+            & (np.abs(y) <= self.half_h_mm + 1e-12)
+
+
+def _chart_rect(chart, theta, s, rotation, center_dxy, half_w, half_h):
+    """Build a ChartRect for a rectangle whose center sits at panel-frame
+    offset center_dxy from (theta, s), rotated with the panel."""
+    r = chart.r_theta(theta, s)
+    mm_per_deg = math.pi * r / 180.0
+    tc = theta + center_dxy[0] / mm_per_deg
+    sc = s + center_dxy[1]
+    c = math.cos(math.radians(rotation))
+    sn = math.sin(math.radians(rotation))
+    # AABB of the rotated rectangle
+    ew = abs(c) * half_w + abs(sn) * half_h    # mm, lateral
+    eh = abs(sn) * half_w + abs(c) * half_h    # mm, meridian
+    return ChartRect(tc - ew / mm_per_deg, tc + ew / mm_per_deg,
+                     sc - eh, sc + eh, mm_per_deg,
+                     tc, sc, half_w, half_h, float(rotation))
 
 
 def outline_rect(chart, placed):
-    """Chart rectangle of a placed panel's outline."""
+    """Chart rectangle of a placed panel's outline (AABB + exact form)."""
     cls = placed.cls
-    dx, dy = _frame_offset(cls, placed.rotation, (cls.outline_w / 2.0, cls.outline_h / 2.0))
-    r = chart.r_theta(placed.theta, placed.s)
-    mm_per_deg = math.pi * r / 180.0
-    tc = placed.theta + dx / mm_per_deg
-    sc = placed.s + dy
-    ht = 0.5 * cls.outline_w / mm_per_deg
-    return ChartRect(tc - ht, tc + ht, sc - 0.5 * cls.outline_h, sc + 0.5 * cls.outline_h,
-                     mm_per_deg)
+    dxy = _frame_offset(cls, placed.rotation, (cls.outline_w / 2.0, cls.outline_h / 2.0))
+    return _chart_rect(chart, placed.theta, placed.s, placed.rotation, dxy,
+                       0.5 * cls.outline_w, 0.5 * cls.outline_h)
 
 
 def active_rect(chart, placed):
+    """The active rectangle is centered on (theta, s) and rotates with
+    the panel about that center."""
     cls = placed.cls
-    acx, acy = cls.active_center
-    r = chart.r_theta(placed.theta, placed.s)
-    mm_per_deg = math.pi * r / 180.0
-    ht = 0.5 * cls.active_w / mm_per_deg
-    return ChartRect(placed.theta - ht, placed.theta + ht,
-                     placed.s - 0.5 * cls.active_h, placed.s + 0.5 * cls.active_h,
-                     mm_per_deg)
+    return _chart_rect(chart, placed.theta, placed.s, placed.rotation, (0.0, 0.0),
+                       0.5 * cls.active_w, 0.5 * cls.active_h)
 
 
 @dataclass
@@ -138,13 +167,18 @@ def analyze_layering(chart, placed, occlusion_samples=24):
         outer_rects = [rects[outer_id] for inner_id, outer_id in overlaps
                        if inner_id == p.panel_id]
         n = occlusion_samples
-        ts = np.linspace(ar.theta0, ar.theta1, n)
-        ss = np.linspace(ar.s0, ar.s1, n)
-        T, S = np.meshgrid(ts, ss)
+        # sample the ACTUAL (rotated) active rectangle: uniform grid in
+        # the panel frame, mapped through the rotation into chart space
+        us = np.linspace(-ar.half_w_mm, ar.half_w_mm, n)
+        vs = np.linspace(-ar.half_h_mm, ar.half_h_mm, n)
+        U, V = np.meshgrid(us, vs)
+        cr = math.cos(math.radians(ar.rot_deg))
+        sr = math.sin(math.radians(ar.rot_deg))
+        T = ar.tc + (cr * U - sr * V) / ar.mm_per_deg
+        S = ar.sc + (sr * U + cr * V)
         covered = np.zeros(T.shape, dtype=bool)
         for orct in outer_rects:
-            covered |= ((T >= orct.theta0) & (T <= orct.theta1)
-                        & (S >= orct.s0) & (S <= orct.s1))
+            covered |= orct.contains_arr(T, S)
         frac = 1.0 - covered.mean()
         area = p.cls.active_area * frac
         visible_area[p.panel_id] = area
@@ -202,8 +236,7 @@ def uncovered_shell_area(chart, placed, n_theta=720, n_s=140):
         w = np.where(Z[:, None] <= caps[None, :] + 1e-9, w, 0.0)
     covered = np.zeros(T.shape, dtype=bool)
     for rct in rects:
-        covered |= ((T >= rct.theta0) & (T <= rct.theta1)
-                    & (S >= rct.s0) & (S <= rct.s1))
+        covered |= rct.contains_arr(T, S)
     total = float(w.sum())
     uncovered = float(w[~covered].sum())
     return uncovered, total

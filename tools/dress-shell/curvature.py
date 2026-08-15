@@ -160,13 +160,17 @@ class CellAnalysis:
     off_shell: bool = False      # cell center above the neckline edge (no shell there)
 
 
-def seat_standoff(coords, chart, outline_w, outline_h, theta, s, samples=9):
+def seat_standoff(coords, chart, outline_w, outline_h, theta, s, samples=9,
+                  rotation=0.0):
     """True max standoff of a flat outline_w x outline_h panel seated
-    tangent at (theta, s): sample the shell across the footprint and
-    measure distance from the tangent plane along its normal.
+    tangent at (theta, s) with the given in-plane rotation (degrees):
+    sample the shell across the (rotated) footprint and measure distance
+    from the tangent plane along its normal.
 
     Returns inf when the footprint runs off the shell (top/hem) or would
-    cross a piece seam — the panel simply does not fit there.
+    cross its piece's seam (the FRONT/BACK split lives on the chart as
+    split_theta — the armhole seam on the committed dress) — the panel
+    simply does not fit there.
     """
     f = coords.forward(theta, s)
     p0, n = f["position"], f["normal"]
@@ -174,17 +178,23 @@ def seat_standoff(coords, chart, outline_w, outline_h, theta, s, samples=9):
     u = np.linspace(-0.5 * outline_w, 0.5 * outline_w, samples)
     v = np.linspace(-0.5 * outline_h, 0.5 * outline_h, samples)
     U, V = np.meshgrid(u, v)
+    if rotation:
+        cr, sr = np.cos(np.radians(rotation)), np.sin(np.radians(rotation))
+        U, V = cr * U - sr * V, sr * U + cr * V
 
     s_pts = s + V
     if np.any(s_pts < chart.s_min - 1e-9) or np.any(s_pts > chart.s_max + 1e-9):
         return float("inf")
     r = chart.r_theta(theta, s)
     t_pts = theta + np.degrees(U / r)
-    # piece containment: footprint may not cross the side seams
+    # piece containment: footprint may not cross its piece's seam, with
+    # the piece anchored at the panel center
+    split = float(getattr(chart, "split_theta", 90.0))
     lam0 = (theta + 180.0) % 360.0 - 180.0
-    center = 0.0 if abs(lam0) < 90.0 else 180.0
+    center = 0.0 if abs(lam0) < split else 180.0
+    half = split if center == 0.0 else 180.0 - split
     lam = (t_pts - center + 180.0) % 360.0 - 180.0
-    if np.any(np.abs(lam) >= 90.0):
+    if np.any(np.abs(lam) >= half):
         return float("inf")
     # neckline keep-out: no footprint sample above edge - keepout_mm
     if chart.neckline is not None:

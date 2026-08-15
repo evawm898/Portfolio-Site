@@ -5,7 +5,9 @@
 # a twin DERIVED at -theta on load; twins are never stored here. theta is
 # degrees (0 = center front, + = wearer's left); s is mm of meridian arc
 # from the waist (- = bodice, + = skirt); (theta, s) is the panel's ACTIVE
-# AREA CENTER. rotation is 0 or 180. layer counts outward from the shell.
+# AREA CENTER. rotation is degrees, FREE (a proper rotation about the
+# active center; twins consider rotation and rotation + 180). layer counts
+# outward from the shell.
 
 version: 1
 panels:
@@ -13,111 +15,111 @@ panels:
     class: p213
     theta: 0.0
     s: 45.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: false
   - id: up-20
     class: p213
     theta: 20.0
     s: 45.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: up-40
     class: p213
     theta: 40.0
     s: 45.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: up-55
     class: p213
     theta: 55.0
     s: 45.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: cf-mid
     class: p213
     theta: 0.0
     s: 95.0
-    rotation: 0
+    rotation: 0.0
     layer: 1
     mirrored: false
   - id: mid-15
     class: p213
     theta: 15.0
     s: 130.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: mid-45
     class: p213
     theta: 45.0
     s: 130.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: mid-70
     class: p213
     theta: 70.0
     s: 130.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: facet-750
     class: p750
     theta: 0.0
     s: 250.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: false
   - id: lo-25
     class: p213
     theta: 25.0
     s: 330.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: lo-55
     class: p213
     theta: 55.0
     s: 330.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: lo-85
     class: p213
     theta: 85.0
     s: 330.0
-    rotation: 0
+    rotation: 0.0
     layer: 0
     mirrored: true
   - id: bod-a30
     class: p213
     theta: 30.0
     s: -50.054
-    rotation: 180
+    rotation: 180.0
     layer: 0
     mirrored: true
   - id: bod-a55
     class: p213
     theta: 55.0
     s: -50.054
-    rotation: 180
+    rotation: 180.0
     layer: 0
     mirrored: true
   - id: bod-b25
     class: p213
     theta: 25.0
     s: -115.529
-    rotation: 180
+    rotation: 180.0
     layer: 0
     mirrored: true
   - id: bod-b50
     class: p213
     theta: 50.0
     s: -115.529
-    rotation: 180
+    rotation: 180.0
     layer: 0
     mirrored: true

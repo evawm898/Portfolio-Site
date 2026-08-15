@@ -5,7 +5,9 @@
 //
 // Frames and conventions mirror shell.py / coords.py / layout.py exactly:
 //   theta deg (0 = CF, + = wearer's left), s mm from the waist (+ hemward),
-//   pieces split at theta = +-90, twins derived at -theta, rotations 0/180.
+//   pieces split at theta = +-split_theta (the SOLVED armhole angle on the
+//   committed dress), twins derived at -theta, rotation FREE (any proper
+//   rotation about the active center; twins try rotation and rotation+180).
 //
 // ELLIPTICAL SECTIONS, EQUAL-ARC THETA (mirrors shell.py):
 //   - each level z is an ellipse a(z) x b(z); theta is EQUAL-ARC around the
@@ -68,25 +70,18 @@ function arcZPartial(t, a, b, da, db) {
   return half * acc;
 }
 
-// The neckline: the physical top edge of the bodice (mirrors neckline.py's
-// piecewise cubic Hermite — knots/heights/tangents come from the server so
-// client and server evaluate the identical curve).
+// The neckline: the physical top edge of the bodice. VERSION-PROOF: the
+// server sends a densely SAMPLED height table (0.25 deg pitch) for
+// whichever neckline version is live; the client only interpolates, so
+// it never re-implements the curve.
 export class Neckline {
   constructor(d) {
-    this.knots = d.knots; this.heights = d.heights; this.tangents = d.tangents;
-    this.side = d.side_height; this.keepout = d.keepout_mm;
-    this.cf = d.cf_height;
+    this.keepout = d.keepout_mm;
+    this.vMax = d.v_max;
+    this._h = makeInterp(d.theta, d.height);
   }
   height(thetaDeg) {
-    const t = Math.abs(wrap180(thetaDeg));
-    if (t >= 90) return this.side;
-    const i = t < this.knots[1] ? 0 : 1;
-    const t0 = this.knots[i], t1 = this.knots[i + 1], dt = t1 - t0;
-    const s = (t - t0) / dt;
-    const h00 = (1 + 2 * s) * (1 - s) ** 2, h10 = s * (1 - s) ** 2;
-    const h01 = s * s * (3 - 2 * s), h11 = s * s * (s - 1);
-    return h00 * this.heights[i] + h10 * dt * this.tangents[i]
-         + h01 * this.heights[i + 1] + h11 * dt * this.tangents[i + 1];
+    return this._h(Math.abs(wrap180(thetaDeg)));
   }
   keepoutFloor(thetaDeg) { return this.height(thetaDeg) - this.keepout; }
 }
@@ -97,7 +92,15 @@ export class Surface {
     this.sMax = bounds.s_max;
     this.zBottom = bounds.z_bottom;
     this.zTop = bounds.z_top;
-    this.band = bounds.band_halfwidth || 0;
+    // waist seam band (cable bus): DERIVED fillet-zone extent [lo, hi]
+    // about s = 0 when the model has one (asymmetric), else the authored
+    // symmetric half-width
+    this.bandLo = bounds.band_s_lo !== undefined ? bounds.band_s_lo
+                : -(bounds.band_halfwidth || 0);
+    this.bandHi = bounds.band_s_hi !== undefined ? bounds.band_s_hi
+                : (bounds.band_halfwidth || 0);
+    this.splitTheta = bounds.split_theta !== undefined ? bounds.split_theta : 90;
+    this.armholeBand = bounds.armhole_band_halfwidth || 0;
     this.neckline = neckline ? new Neckline(neckline) : null;
     this.a = makeInterp(profile.z, profile.a);
     this.b = makeInterp(profile.z, profile.b);
@@ -191,55 +194,75 @@ export function activeCenter(cls) {
 
 export function frameOffset(cls, rotation, p) {
   const ac = activeCenter(cls);
-  let dx = p[0] - ac[0], dy = p[1] - ac[1];
-  if (rotation === 180) { dx = -dx; dy = -dy; }
-  return [dx, dy];
+  const dx = p[0] - ac[0], dy = p[1] - ac[1];
+  const r = rotation * Math.PI / 180;
+  const c = Math.cos(r), sn = Math.sin(r);
+  return [c * dx - sn * dy, sn * dx + c * dy];
 }
 
-export function pieceOf(theta) {
+export function pieceOf(theta, split = 90) {
   const lam = wrap180(theta);
-  return Math.abs(lam) < 90 ? { name: "FRONT", center: 0 } : { name: "BACK", center: 180 };
+  return Math.abs(lam) < split
+    ? { name: "FRONT", center: 0, half: split }
+    : { name: "BACK", center: 180, half: 180 - split };
 }
 
 const localAngle = (theta, center) => wrap180(theta - center);
+
+// seam / armhole-band legality for one chart point, with the piece
+// ANCHORED at the panel's own center (layout.py SurfaceChart.seam_problems)
+function seamProblems(surf, tag, theta, s, piece) {
+  const local = Math.abs(localAngle(theta, piece.center));
+  if (local >= piece.half - 1e-9)
+    return [`${tag} crosses the ${piece.name} piece seam`];
+  if (surf.armholeBand > 0) {
+    const gapMm = (piece.half - local) * Math.PI / 180 * surf.rTheta(theta, s);
+    if (gapMm < surf.armholeBand - 1e-9)
+      return [`${tag} enters the armhole seam band `
+              + `(${gapMm.toFixed(1)} mm from the seam; `
+              + `keep-out ±${surf.armholeBand} mm)`];
+  }
+  return [];
+}
 
 // -- legality (mirrors layout.py) -------------------------------------------
 
 export function connectorGeometry(surf, cls, theta, s, rotation) {
   const [dx, dy] = frameOffset(cls, rotation, cls.connector.origin);
   const c = surf.offsetPoint(theta, s, dx, dy);
-  let [ex, ey] = cls.connector.exit;
-  if (rotation === 180) { ex = -ex; ey = -ey; }
+  const rr = rotation * Math.PI / 180;
+  const cr = Math.cos(rr), sr = Math.sin(rr);
+  const [ex0, ey0] = cls.connector.exit;
+  const ex = cr * ex0 - sr * ey0, ey = sr * ex0 + cr * ey0;
   const e = surf.offsetPoint(c.theta, c.s, ex * cls.connector.escape_mm,
                              ey * cls.connector.escape_mm);
   // the waist seam band is the cable bus: a run heading into the band
   // TERMINATES at the band edge (layout.py connector_geometry)
-  const band = surf.band;
-  if (band > 0 && Math.abs(c.s) > band && Math.abs(e.s) < Math.abs(c.s)) {
-    const edge = c.s > 0 ? band : -band;
-    if ((c.s - edge) * (e.s - edge) < 0) {
-      const t = (c.s - edge) / (c.s - e.s);
-      e.theta = c.theta + t * (e.theta - c.theta);
-      e.s = edge;
-    }
+  const edge = c.s > surf.bandHi ? surf.bandHi
+             : c.s < surf.bandLo ? surf.bandLo : 0;
+  if (edge !== 0 && (c.s - edge) * (e.s - edge) < 0) {
+    const t = (c.s - edge) / (c.s - e.s);
+    e.theta = c.theta + t * (e.theta - c.theta);
+    e.s = edge;
   }
   return { origin: c, end: e };
 }
 
 export function tailRunMm(surf, cls, theta, s, rotation) {
   const { origin } = connectorGeometry(surf, cls, theta, s, rotation);
-  return Math.max(0, Math.abs(origin.s) - surf.band);
+  if (origin.s > surf.bandHi) return origin.s - surf.bandHi;
+  if (origin.s < surf.bandLo) return surf.bandLo - origin.s;
+  return 0;
 }
 
 export function connectorProblems(surf, cls, theta, s, rotation) {
-  const { center, name } = pieceOf(theta);
+  const piece = pieceOf(theta, surf.splitTheta);
   const { origin, end } = connectorGeometry(surf, cls, theta, s, rotation);
   const out = [];
   for (const [tag, pt] of [["connector origin", origin], ["connector escape end", end]]) {
     if (pt.s < surf.sMin - 1e-9) out.push(`${tag} runs off the top edge`);
     if (pt.s > surf.sMax + 1e-9) out.push(`${tag} runs off the hem edge`);
-    if (Math.abs(localAngle(pt.theta, center)) >= 90 - 1e-9)
-      out.push(`${tag} crosses the ${name} piece seam`);
+    out.push(...seamProblems(surf, tag, pt.theta, pt.s, piece));
     const neck = surf.neckViolation(tag, pt.theta, pt.s);
     if (neck) out.push(neck);
   }
@@ -247,7 +270,7 @@ export function connectorProblems(surf, cls, theta, s, rotation) {
 }
 
 export function outlineProblems(surf, cls, theta, s, rotation) {
-  const { center, name } = pieceOf(theta);
+  const piece = pieceOf(theta, surf.splitTheta);
   const [W, H] = cls.outline;
   const out = [];
   const sVals = [];
@@ -257,16 +280,16 @@ export function outlineProblems(surf, cls, theta, s, rotation) {
     sVals.push(pt.s);
     if (pt.s < surf.sMin - 1e-9 || pt.s > surf.sMax + 1e-9)
       out.push("outline corner off the shell (top/hem edge)");
-    if (Math.abs(localAngle(pt.theta, center)) >= 90 - 1e-9)
-      out.push(`outline crosses the ${name} piece seam`);
+    out.push(...seamProblems(surf, "outline corner", pt.theta, pt.s, piece));
     const neck = surf.neckViolation("outline corner", pt.theta, pt.s);
     if (neck) out.push(neck);
   }
-  // waist seam band keep-out (layout.py outline_problems)
-  const band = surf.band;
-  if (band > 0 && Math.min(...sVals) < band - 1e-9
-      && Math.max(...sVals) > -band + 1e-9)
-    out.push(`footprint intersects the waist seam band (keep-out ±${band} mm)`);
+  // waist seam band keep-out (layout.py outline_problems) — the DERIVED
+  // fillet-zone extent, asymmetric about s = 0
+  if (Math.min(...sVals) < surf.bandHi - 1e-9
+      && Math.max(...sVals) > surf.bandLo + 1e-9)
+    out.push(`footprint intersects the waist seam band (keep-out `
+             + `[${surf.bandLo.toFixed(1)}, ${surf.bandHi.toFixed(1)}] mm)`);
   return out;
 }
 
@@ -278,16 +301,22 @@ export function poseProblems(surf, cls, theta, s, rotation) {
 // -- mirroring (mirrors derive_twin exactly) --------------------------------
 
 export function outlineAsymmetry(cls, sourceRot, twinRot) {
+  // o = R(sourceRot) applied to the outline center's offset from the
+  // active center, in the seated frame (layout.py outline_asymmetry_mm)
   const ac = activeCenter(cls);
-  const ex = ac[0] - cls.outline[0] / 2;
-  const ey = ac[1] - cls.outline[1] / 2;
-  return twinRot === sourceRot ? 2 * Math.abs(ex) : 2 * Math.abs(ey);
+  const ex = cls.outline[0] / 2 - ac[0];
+  const ey = cls.outline[1] / 2 - ac[1];
+  const r = sourceRot * Math.PI / 180;
+  const c = Math.cos(r), sn = Math.sin(r);
+  const ox = c * ex - sn * ey, oy = sn * ex + c * ey;
+  const same = Math.abs(wrap180(twinRot - sourceRot)) < 1e-9;
+  return same ? 2 * Math.abs(ox) : 2 * Math.abs(oy);
 }
 
 export function deriveTwin(surf, classes, src) {
   const cls = classes[src.class];
   const twinTheta = -src.theta;
-  const other = src.rotation === 0 ? 180 : 0;
+  const other = (((src.rotation + 180) % 360) + 360) % 360;  // 0 -> 180, 180 -> 0
   const candidates = [], tried = [];
   for (const rot of [src.rotation, other]) {
     const probs = poseProblems(surf, cls, twinTheta, src.s, rot);
@@ -329,20 +358,24 @@ export function resolveAll(surf, classes, authored) {
 
 // -- standoff (same sampling as curvature.seat_standoff) --------------------
 
-export function seatStandoff(surf, cls, theta, s, n = 7) {
+export function seatStandoff(surf, cls, theta, s, n = 7, rotation = 0) {
   const [W, H] = cls.outline;
   const f = surf.forward(theta, s);
   const r = surf.rTheta(theta, s);
-  const { center } = pieceOf(theta);
+  const { center, half } = pieceOf(theta, surf.splitTheta);
+  const rr = rotation * Math.PI / 180;
+  const cr = Math.cos(rr), sr = Math.sin(rr);
   let maxD = 0;
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      const u = (i / (n - 1) - 0.5) * W;
-      const v = (j / (n - 1) - 0.5) * H;
+      const u0 = (i / (n - 1) - 0.5) * W;
+      const v0 = (j / (n - 1) - 0.5) * H;
+      const u = cr * u0 - sr * v0;
+      const v = sr * u0 + cr * v0;
       const sp = s + v;
       if (sp < surf.sMin - 1e-9 || sp > surf.sMax + 1e-9) return Infinity;
       const tp = theta + (u / r) * 180 / Math.PI;
-      if (Math.abs(localAngle(tp, center)) >= 90) return Infinity;
+      if (Math.abs(localAngle(tp, center)) >= half) return Infinity;
       if (surf.neckViolation("", tp, sp)) return Infinity;
       const q = surf.forward(tp, sp).pos;
       const d = (q[0] - f.pos[0]) * f.normal[0] + (q[1] - f.pos[1]) * f.normal[1]
@@ -355,21 +388,40 @@ export function seatStandoff(surf, cls, theta, s, n = 7) {
 
 // -- layering (mirrors layering.py) -----------------------------------------
 
+// Rotated chart rectangle: t0..s1 is the AABB (conservative overlap
+// test); tc/sc/halfW/halfH/rot back the EXACT point test (layering.py
+// ChartRect).
+function chartRect(surf, theta, s, rotation, cdx, cdy, halfW, halfH) {
+  const r = surf.rTheta(theta, s);
+  const mmPerDeg = Math.PI * r / 180;
+  const tc = theta + cdx / mmPerDeg, sc = s + cdy;
+  const rr = rotation * Math.PI / 180;
+  const c = Math.abs(Math.cos(rr)), sn = Math.abs(Math.sin(rr));
+  const ew = c * halfW + sn * halfH;   // mm, lateral AABB half-extent
+  const eh = sn * halfW + c * halfH;   // mm, meridian
+  return { t0: tc - ew / mmPerDeg, t1: tc + ew / mmPerDeg,
+           s0: sc - eh, s1: sc + eh,
+           tc, sc, halfW, halfH, rot: rotation, mmPerDeg };
+}
+
 export function outlineRect(surf, classes, p) {
   const cls = classes[p.class];
   const [dx, dy] = frameOffset(cls, p.rotation, [cls.outline[0] / 2, cls.outline[1] / 2]);
-  const r = surf.rTheta(p.theta, p.s);
-  const mmPerDeg = Math.PI * r / 180;
-  const tc = p.theta + dx / mmPerDeg, sc = p.s + dy;
-  const ht = 0.5 * cls.outline[0] / mmPerDeg;
-  return { t0: tc - ht, t1: tc + ht, s0: sc - cls.outline[1] / 2,
-           s1: sc + cls.outline[1] / 2 };
+  return chartRect(surf, p.theta, p.s, p.rotation, dx, dy,
+                   cls.outline[0] / 2, cls.outline[1] / 2);
 }
 
 const rectsOverlap = (a, b) =>
   a.t0 < b.t1 && b.t0 < a.t1 && a.s0 < b.s1 && b.s0 < a.s1;
-const rectContains = (r, t, s) =>
-  t >= r.t0 && t <= r.t1 && s >= r.s0 && s <= r.s1;
+const rectContains = (r, t, s) => {
+  // exact rotated-rectangle test; theta difference wraps
+  const dx = wrap180(t - r.tc) * r.mmPerDeg;
+  const dy = s - r.sc;
+  const rr = r.rot * Math.PI / 180;
+  const c = Math.cos(rr), sn = Math.sin(rr);
+  const x = c * dx + sn * dy, y = -sn * dx + c * dy;
+  return Math.abs(x) <= r.halfW + 1e-12 && Math.abs(y) <= r.halfH + 1e-12;
+};
 
 export function analyzeLayering(surf, classes, placed, nOcc = 16) {
   const panels = placed.filter(p => p.valid);
@@ -396,17 +448,19 @@ export function analyzeLayering(surf, classes, placed, nOcc = 16) {
   let totalActive = 0, totalVisible = 0;
   for (const p of panels) {
     const cls = classes[p.class];
-    const r = surf.rTheta(p.theta, p.s);
-    const mmPerDeg = Math.PI * r / 180;
-    const ht = 0.5 * cls.active[0] / mmPerDeg;
-    const ar = { t0: p.theta - ht, t1: p.theta + ht,
-                 s0: p.s - cls.active[1] / 2, s1: p.s + cls.active[1] / 2 };
+    // sample the ACTUAL (rotated) active rectangle in the panel frame
+    const ar = chartRect(surf, p.theta, p.s, p.rotation, 0, 0,
+                         cls.active[0] / 2, cls.active[1] / 2);
+    const rr = p.rotation * Math.PI / 180;
+    const cr = Math.cos(rr), sr = Math.sin(rr);
     const outers = overlaps.filter(([a]) => a === p.id).map(([, b]) => rects[b]);
     let covered = 0;
     for (let i = 0; i < nOcc; i++) {
       for (let j = 0; j < nOcc; j++) {
-        const t = ar.t0 + (ar.t1 - ar.t0) * i / (nOcc - 1);
-        const s = ar.s0 + (ar.s1 - ar.s0) * j / (nOcc - 1);
+        const u = (i / (nOcc - 1) - 0.5) * cls.active[0];
+        const v = (j / (nOcc - 1) - 0.5) * cls.active[1];
+        const t = ar.tc + (cr * u - sr * v) / ar.mmPerDeg;
+        const s = ar.sc + (sr * u + cr * v);
         if (outers.some(o => rectContains(o, t, s))) covered++;
       }
     }
@@ -467,10 +521,15 @@ export function applyFacets(surf, classes, placed, basePositions, thetaS,
     const mmPerDeg = Math.PI * surf.rTheta(p.theta, p.s) / 180;
     const tc = p.theta + dxo / mmPerDeg, sc = p.s + dyo;
     const hw = cls.outline[0] / 2, hh = cls.outline[1] / 2;
+    const rr = p.rotation * Math.PI / 180;
+    const cr = Math.cos(rr), sr = Math.sin(rr);
     const count = thetaS.length / 2;
     for (let i = 0; i < count; i++) {
-      const dt = Math.abs(wrap180(thetaS[2 * i] - tc)) * mmPerDeg;
-      const ds = Math.abs(thetaS[2 * i + 1] - sc);
+      // chart offsets rotated back into the panel frame (facets.py)
+      const dtm = wrap180(thetaS[2 * i] - tc) * mmPerDeg;
+      const dsm = thetaS[2 * i + 1] - sc;
+      const dt = Math.abs(cr * dtm + sr * dsm);
+      const ds = Math.abs(-sr * dtm + cr * dsm);
       const outd = Math.hypot(Math.max(dt - hw, 0), Math.max(ds - hh, 0));
       if (outd >= blendMm) continue;
       let t = outd / blendMm;

@@ -31,11 +31,14 @@ CLASSES = load_panel_classes(HERE / "panels.yaml")
 
 class TestDressModel(unittest.TestCase):
     def test_two_segments_with_given_neckline(self):
+        # neckline v3 (consolidated spec): CF 220 / peak 240 @ 82 /
+        # side 190 / CB 145
         self.assertEqual(MODEL.z_bottom, -381.0)
-        self.assertEqual(MODEL.z_top, 250.0)
-        self.assertAlmostEqual(float(MODEL.z_top_at(0.0)), 250.0)
-        self.assertAlmostEqual(float(MODEL.z_top_at(90.0)), 205.0)
-        self.assertAlmostEqual(float(MODEL.z_top_at(180.0)), 205.0)
+        self.assertEqual(MODEL.z_top, 240.0)
+        self.assertAlmostEqual(float(MODEL.z_top_at(0.0)), 220.0)
+        self.assertAlmostEqual(float(MODEL.z_top_at(82.0)), 240.0)
+        self.assertAlmostEqual(float(MODEL.z_top_at(90.0)), 190.0)
+        self.assertAlmostEqual(float(MODEL.z_top_at(180.0)), 145.0)
 
     def test_waist_sections_match_at_the_crease(self):
         a_lo, b_lo = (float(v) for v in MODEL.semi_axes(0.0))
@@ -43,15 +46,22 @@ class TestDressModel(unittest.TestCase):
         self.assertAlmostEqual(a_lo, a_hi, places=6)
         self.assertAlmostEqual(b_lo, b_hi, places=6)
 
-    def test_crease_is_preserved(self):
-        # RATIO mode (the committed design, reverted by user preference):
-        # skirt flares at ~41.3 deg, bodice launches vertically, and the
-        # stencils never blend across z = 0
+    def test_waist_fillet_is_smooth_and_preserves_the_waist(self):
+        # THE WAIST IS A FILLET (consolidated spec): the profiles blend
+        # smoothly through z = 0 — no crease — while the closest-approach
+        # ring still measures exactly the 609.6 mm waist (it migrates a
+        # few mm up into the fillet).
         below = float(MODEL.mean_slope(-1e-6))
         above = float(MODEL.mean_slope(1e-6))
-        self.assertLess(below, -0.8)
-        self.assertLess(abs(above), 1e-3)
-        self.assertAlmostEqual(MODEL.crease_angle_deg(), 41.29, delta=0.05)
+        self.assertLess(abs(below - above), 1e-3)          # continuous slope
+        self.assertLess(MODEL.crease_angle_deg(), 0.1)     # no crease
+        d = MODEL.params.depth_curve
+        self.assertAlmostEqual(d.waist_ring_circumference, 609.6, delta=1e-3)
+        self.assertGreater(d.waist_ring_z, 0.0)            # migrated upward
+        self.assertLess(d.waist_ring_z, d.params.fillet_radius)
+        # outside the fillet zone the skirt still flares steeply
+        z_lo, z_hi = d.fillet_zone
+        self.assertLess(float(MODEL.mean_slope(z_lo - 1.0)), -0.7)
 
     def test_silhouette_first_mode_still_works(self):
         # the silhouette machinery stays live for the open bodice-shape
@@ -89,16 +99,23 @@ class TestDressModel(unittest.TestCase):
             COORDS.inverse(np.asarray(p), check_mm=0.5)
 
     def test_meshes_top_out_at_the_neckline(self):
+        # pieces split at the SOLVED armhole angle: the 240 mm peak
+        # (theta 82) lives on the FRONT piece; the BACK piece tops out at
+        # the neckline height at the seam
         meshes = build_meshes(MODEL)
         vf = meshes["FRONT"][0]
         vb = meshes["BACK"][0]
-        self.assertAlmostEqual(float(vf[:, 2].max()), 250.0, delta=1e-6)
-        self.assertAlmostEqual(float(vb[:, 2].max()), 205.0, delta=1e-6)
-        # no vertex anywhere above its azimuth's neckline height
+        self.assertGreater(MODEL.split_theta, 90.0)
+        self.assertAlmostEqual(float(vf[:, 2].max()), 240.0, delta=0.5)
+        cap_at_seam = float(MODEL.z_top_at(MODEL.split_theta))
+        self.assertAlmostEqual(float(vb[:, 2].max()), cap_at_seam, delta=0.5)
+        # no vertex anywhere above its azimuth's neckline height (1e-3 mm
+        # slack: inverse() theta noise times the v3 curve's ~7 mm/deg
+        # descent slope near the peak)
         for V, _ in meshes.values():
             th, _s = COORDS.inverse(V, check_mm=None)
             caps = MODEL.neckline.height(th)
-            self.assertLessEqual(float(np.max(V[:, 2] - caps)), 1e-6)
+            self.assertLessEqual(float(np.max(V[:, 2] - caps)), 1e-3)
 
     def test_invalid_bodice_params_fail_loudly(self):
         from neckline import NecklineParams

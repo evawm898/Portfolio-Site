@@ -73,11 +73,17 @@ def apply_facets(chart, coords, vertices, theta_s, placed,
         half_w = 0.5 * cls.outline_w          # mm, lateral
         half_h = 0.5 * cls.outline_h          # mm, meridian
 
-        d_theta_mm = np.abs(wrap180(ts[:, 0] - tc)) * mm_per_deg
-        d_s_mm = np.abs(ts[:, 1] - sc)
+        # signed chart offsets in mm, rotated back into the panel frame so
+        # the footprint test is a plain rectangle at any rotation
+        d_theta_mm = wrap180(ts[:, 0] - tc) * mm_per_deg
+        d_s_mm = ts[:, 1] - sc
+        cr = math.cos(math.radians(p.rotation))
+        sr = math.sin(math.radians(p.rotation))
+        x_local = cr * d_theta_mm + sr * d_s_mm
+        y_local = -sr * d_theta_mm + cr * d_s_mm
         # distance outside the rectangle (0 inside), in mm
-        out = np.hypot(np.maximum(d_theta_mm - half_w, 0.0),
-                       np.maximum(d_s_mm - half_h, 0.0))
+        out = np.hypot(np.maximum(np.abs(x_local) - half_w, 0.0),
+                       np.maximum(np.abs(y_local) - half_h, 0.0))
         factor = 1.0 - _smoothstep(out / blend_mm)
         mask = factor > 1e-6
         if not np.any(mask):

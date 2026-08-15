@@ -186,7 +186,8 @@ function rebuildPanels() {
     const f = surf.forward(p.theta, p.s);
     const { u, v, n } = orthoFrame(f);
     const mount = rep && rep.mount[p.id] !== undefined ? rep.mount[p.id] : 0;
-    const so = cls.requires_facet ? null : SF.seatStandoff(surf, cls, p.theta, p.s);
+    const so = cls.requires_facet ? null
+      : SF.seatStandoff(surf, cls, p.theta, p.s, 7, p.rotation);
     panelStandoffs[p.id] = so;
     const overTol = so !== null && so > TOL;
     const buried = rep && rep.buried[p.id];
@@ -197,7 +198,12 @@ function rebuildPanels() {
     const center = new THREE.Vector3(...f.pos)
       .addScaledVector(u, dxo).addScaledVector(v, dyo)
       .addScaledVector(n, mount + cls.thickness / 2);
-    const basis = new THREE.Matrix4().makeBasis(u, v, n);
+    // in-plane basis rotated with the panel (free rotation)
+    const rr = p.rotation * Math.PI / 180;
+    const cr = Math.cos(rr), sr = Math.sin(rr);
+    const ur = u.clone().multiplyScalar(cr).addScaledVector(v, sr);
+    const vr = u.clone().multiplyScalar(-sr).addScaledVector(v, cr);
+    const basis = new THREE.Matrix4().makeBasis(ur, vr, n);
 
     let bodyColor = p.valid ? CLASS_COLORS[p.class] : INVALID_COLOR;
     const body = new THREE.Mesh(
@@ -358,39 +364,64 @@ function updateSidebar() {
         ? `· asym ${twin.asymmetry_mm.toFixed(2)} mm`
         : `· <span class="err">INVALID</span>`}` : "");
     $("selActions").style.display = "";
+    if (document.activeElement !== $("rotInput"))
+      $("rotInput").value = src.rotation;
     $("mirrorBtn").classList.toggle("on", src.mirrored);
     $("mirrorBtn").textContent = src.mirrored ? "paired" : "single";
   }
 }
 
-// shell parameters (design-adjustable subset; body measurements fixed)
-$("pHem").value = state.params.hem_circumference;
-$("pN").value = state.params.dome_n;
-$("pKhem").value = state.params.skirt_hem_ratio;
-$("pBlend").value = state.params.ratio_blend;
-const hasNeck = !!state.neckline;
+// shell parameters (consolidated spec: neckline v3 knobs + heights and
+// the waist fillet are live; body measurements + circumference anchors
+// stay fixed)
+const hasNeck = !!state.neckline && state.params.cf_height !== undefined;
+const hasFillet = state.params.fillet_radius != null;
 if (hasNeck) {
-  $("pShoulder").value = state.params.shoulder_theta;
-  $("pFlat").value = state.params.plateau_flatness;
+  $("pCf").value = state.params.cf_height;
+  $("pPeak").value = state.params.peak_height;
+  $("pSide").value = state.params.side_height;
+  $("pCb").value = state.params.cb_height;
+  $("pPeakTheta").value = state.params.peak_theta;
+  $("pBow").value = state.params.rise_bow;
+  $("pDecay").value = state.params.decay_rate;
+  $("pCfCorner").checked = !!state.params.cf_corner;
 } else {
-  $("neckRow").style.display = "none";
+  for (const id of ["neckHeights", "neckHeights2", "neckKnobs", "neckKnobs2"])
+    $(id).style.display = "none";
+}
+if (hasFillet) {
+  $("pFilletR").value = state.params.fillet_radius;
+  $("pFilletType").value = state.params.fillet_type;
+} else {
+  $("filletRow").style.display = "none";
 }
 $("paramInfo").innerHTML =
-  `waist ${state.params.waist_circumference} mm · drop ${state.params.drop} mm · ` +
-  `waist ratio ${state.params.waist_section_ratio} <span class="warn">(body — fixed)</span>` +
-  (hasNeck ? `<br>neckline CF ${state.neckline.cf_height} / side ` +
-             `${state.neckline.side_height} mm <span class="warn">(given — fixed)</span> · ` +
-             `keep-out ${state.neckline.keepout_mm} mm` : "");
+  `waist ${state.params.waist_circumference} mm · drop ${state.params.drop} mm ` +
+  `<span class="warn">(body — fixed)</span><br>` +
+  `split θ ±${state.params.split_theta.toFixed(2)}° ` +
+  `<span class="warn">(SOLVED armhole — output)</span> · ` +
+  `armhole band ±${state.bounds.armhole_band_halfwidth} mm` +
+  (state.bounds.band_derived
+    ? `<br>waist band [${state.bounds.band_s_lo.toFixed(1)}, ` +
+      `${state.bounds.band_s_hi.toFixed(1)}] mm ` +
+      `<span class="warn">(DERIVED from the fillet zone)</span>`
+    : "") +
+  (hasNeck ? `<br>neckline keep-out ${state.neckline.keepout_mm} mm` : "");
 $("applyParams").onclick = async () => {
-  const body = {
-    hem_circumference: parseFloat($("pHem").value),
-    dome_n: parseFloat($("pN").value),
-    skirt_hem_ratio: parseFloat($("pKhem").value),
-    ratio_blend: $("pBlend").value,
-  };
+  const body = {};
   if (hasNeck) {
-    body.shoulder_theta = parseFloat($("pShoulder").value);
-    body.plateau_flatness = parseFloat($("pFlat").value);
+    body.cf_height = parseFloat($("pCf").value);
+    body.peak_height = parseFloat($("pPeak").value);
+    body.side_height = parseFloat($("pSide").value);
+    body.cb_height = parseFloat($("pCb").value);
+    body.peak_theta = parseFloat($("pPeakTheta").value);
+    body.rise_bow = parseFloat($("pBow").value);
+    body.decay_rate = parseFloat($("pDecay").value);
+    body.cf_corner = $("pCfCorner").checked;
+  }
+  if (hasFillet) {
+    body.fillet_radius = parseFloat($("pFilletR").value);
+    body.fillet_type = $("pFilletType").value;
   }
   status("rebuilding shell + analysis… (a few seconds)");
   $("applyParams").disabled = true;
@@ -572,7 +603,13 @@ const withSelected = (fn) => {
   const src = authored.find(a => a.id === selectedId);
   if (src) mutate(() => fn(src));
 };
-$("rotBtn").onclick = () => withSelected(s => s.rotation = s.rotation === 0 ? 180 : 0);
+// rotation is FREE: the input sets any angle; the button quick-flips 180
+$("rotBtn").onclick = () => withSelected(s =>
+  s.rotation = SF.wrap180(s.rotation + 180));
+$("rotInput").onchange = () => withSelected(s => {
+  const v = parseFloat($("rotInput").value);
+  if (Number.isFinite(v)) s.rotation = SF.wrap180(v);
+});
 $("layerUp").onclick = () => withSelected(s => s.layer += 1);
 $("layerDown").onclick = () => withSelected(s => s.layer = Math.max(0, s.layer - 1));
 $("mirrorBtn").onclick = () => withSelected(s => {
@@ -662,8 +699,10 @@ applyShading();
 if (restoredDirty) { setDirty(true); scheduleServerResolve(); }
 status(`ready — ${state.grid.stats.count} cells · tolerance ${TOL} mm · ` +
        `grid ${state.grid.dtheta}° × ${state.grid.ds} mm · ` +
-       `hem ${state.params.hem_circumference} mm · n ${state.params.dome_n} · ` +
-       `hem ratio ${state.params.skirt_hem_ratio} (${state.params.ratio_blend})`);
+       `hem ${state.params.hem_circumference} mm · ` +
+       `split ±${state.params.split_theta.toFixed(1)}°` +
+       (hasFillet ? ` · fillet R${state.params.fillet_radius} ` +
+                    `${state.params.fillet_type}` : ""));
 (function loop() {
   requestAnimationFrame(loop);
   controls.update();

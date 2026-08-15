@@ -157,10 +157,16 @@ def panel_box(chart, coords, p, mount):
     cls = p.cls
     f = coords.forward(p.theta, p.s)
     u, v, n = orthonormal_frame(f)
+    # rotate the in-plane basis with the panel so the box edges follow the
+    # panel frame at any rotation (u3/v3 = panel x/y in 3D)
+    cr = math.cos(math.radians(p.rotation))
+    sr = math.sin(math.radians(p.rotation))
+    u3 = cr * u + sr * v
+    v3 = -sr * u + cr * v
     dxo, dyo = _frame_offset(cls, p.rotation, (cls.outline_w / 2.0, cls.outline_h / 2.0))
     center = f["position"] + dxo * u + dyo * v + (mount + 0.5 * cls.thickness) * n
     hw, hh, ht = 0.5 * cls.outline_w, 0.5 * cls.outline_h, 0.5 * cls.thickness
-    corners = np.array([center + sx * hw * u + sy * hh * v + sz * ht * n
+    corners = np.array([center + sx * hw * u3 + sy * hh * v3 + sz * ht * n
                         for sz in (-1, 1) for sy in (-1, 1) for sx in (-1, 1)])
     F = np.array([  # 12 triangles, outward wound (checked visually)
         [0, 2, 1], [1, 2, 3], [4, 5, 6], [5, 7, 6],
@@ -171,8 +177,8 @@ def panel_box(chart, coords, p, mount):
     aw, ah = 0.5 * cls.active_w, 0.5 * cls.active_h
     lift = mount + cls.thickness + 0.15
     acenter = f["position"] + lift * n
-    aq = np.array([acenter - aw * u - ah * v, acenter + aw * u - ah * v,
-                   acenter + aw * u + ah * v, acenter - aw * u + ah * v])
+    aq = np.array([acenter - aw * u3 - ah * v3, acenter + aw * u3 - ah * v3,
+                   acenter + aw * u3 + ah * v3, acenter - aw * u3 + ah * v3])
     AF = np.array([[0, 1, 2], [0, 2, 3]])
 
     # connector escape line (on the outer face level)
@@ -309,6 +315,23 @@ def _electrical(placed):
     return electrical_rollup(placed)
 
 
+def _neckline_meta(neckline):
+    """Serialize whichever neckline version the model carries: dump the
+    params dataclass field-by-field, plus a sampled height table so
+    consumers never re-implement the curve."""
+    if neckline is None:
+        return None
+    import dataclasses
+    meta = {f.name: getattr(neckline.params, f.name)
+            for f in dataclasses.fields(neckline.params)}
+    meta["version"] = type(neckline).__name__
+    th = np.linspace(0.0, 180.0, 181)
+    meta["height_table_deg"] = [round(float(t), 1) for t in th]
+    meta["height_table_mm"] = [round(float(h), 4)
+                               for h in np.atleast_1d(neckline.height(th))]
+    return meta
+
+
 def build_sidecar(ex):
     grid, analyses, rep = ex["grid"], ex["analyses"], ex["layering"]
     chart = ex["chart"]
@@ -327,14 +350,13 @@ def build_sidecar(ex):
                 "skirt_hem_ratio": ex["model"].params.skirt_hem_ratio,
                 "ratio_blend": ex["model"].params.ratio_blend,
                 "waist_band_halfwidth": ex["model"].params.waist_band_halfwidth,
+                "armhole_band_halfwidth": ex["model"].params.armhole_band_halfwidth,
+                "split_theta": r(getattr(ex["model"], "split_theta", 90.0), 4),
             },
-            "neckline": None if ex["model"].neckline is None else {
-                "cf_height": ex["model"].neckline.params.cf_height,
-                "side_height": ex["model"].neckline.params.side_height,
-                "shoulder_theta": ex["model"].neckline.params.shoulder_theta,
-                "plateau_flatness": ex["model"].neckline.params.plateau_flatness,
-                "keepout_mm": ex["model"].neckline.params.keepout_mm,
-            },
+            "waist_band_s": {"lo": r(chart.band_s_lo, 3),
+                             "hi": r(chart.band_s_hi, 3),
+                             "derived_from_fillet": chart.band_derived},
+            "neckline": _neckline_meta(ex["model"].neckline),
             "tolerance_mm": ex["tolerance"],
             "grid": {"dtheta": grid.spec.dtheta, "ds": grid.spec.ds},
             "s_min": r(chart.s_min, 3), "s_max": r(chart.s_max, 3),

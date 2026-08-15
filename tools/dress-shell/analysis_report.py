@@ -39,11 +39,16 @@ PREVIOUS_RUN_DISTRIBUTION = ("p213 43% | p370 8% | none 49%  "
 
 def bodice_area_accounting(model, n_theta=720, n_v=250):
     """Gross bodice area (below the neckline edge) and usable area after
-    subtracting the neckline keep-out strip and the waist seam band.
-    The +-90 seams are lines (zero width) — they bound placement but
-    remove no area; noted in the printout."""
+    subtracting the neckline keep-out strip and the waist seam band (the
+    fillet-zone extent when the depth model carries one). The piece seams
+    are lines (zero width) — they bound placement but remove no area;
+    the armhole band is accounted separately in the consolidated
+    report."""
     neck = model.neckline
-    band = model.params.waist_band_halfwidth
+    zone = getattr(model.params.depth_curve, "fillet_zone", None) \
+        if model.params.depth_curve is not None else None
+    band = float(zone[1]) if zone is not None \
+        else model.params.waist_band_halfwidth
     dtheta = math.radians(360.0 / n_theta)
     thetas = np.linspace(-180.0, 180.0, n_theta, endpoint=False) + 180.0 / n_theta
     gross = usable = 0.0
@@ -66,7 +71,8 @@ def usable_bodice_cell_indices(chart, grid):
     band, below the neckline keep-out floor at both theta corners."""
     keep = set()
     neck = chart.neckline
-    band = chart.band_halfwidth
+    # bodice-side edge of the waist seam band, in v (mm above the waist)
+    band = chart.height_of_s(chart.band_s_lo)
     for cell in grid.cells:
         if cell.s1 > 1e-9:              # skirt cell
             continue
@@ -141,6 +147,22 @@ def main():
         print(f"waist         junction angle {model.crease_angle_deg():.2f} deg "
               f"(SMOOTH — the reference has no crease; the seam band remains "
               f"the cable bus), tangent {model.waist_tangent_deg():.2f} deg")
+    elif p.depth_curve is not None and hasattr(p.depth_curve, "perimeter"):
+        d = p.depth_curve
+        fp = d.params
+        print(f"profile       FILLETED (consolidated spec): superellipse bell + "
+              f"traced bodice depth through the R = {fp.fillet_radius:g} mm "
+              f"{fp.fillet_type} waist fillet")
+        print(f"              waist ring z {d.waist_ring_z:+.2f} mm, "
+              f"circumference {d.waist_ring_circumference:.4f} mm (609.6 "
+              f"preserved); fillet zone z [{d.fillet_zone[0]:.2f}, "
+              f"{d.fillet_zone[1]:.2f}] mm")
+        print(f"waist         SMOOTH — junction angle "
+              f"{model.crease_angle_deg():.4f} deg (no crease; the fillet "
+              f"region is the seam band / cable bus)")
+        print(f"pieces        split at the SOLVED armhole theta "
+              f"+-{model.split_theta:.2f} deg; armhole seam band "
+              f"+-{p.armhole_band_halfwidth:g} mm")
     else:
         print(f"profile       r(u) = a(1-(u/b)^n)^(1/n): a {model.hem_radius:.2f}, "
               f"n {p.dome_n:g}, SOLVED b = {model.b_param:.2f} mm")
@@ -150,8 +172,13 @@ def main():
               f"(dr/du {float(model.dr_super(0.0)):.4f}); CREASE angle "
               f"{model.crease_angle_deg():.2f} deg (bodice launches vertically — "
               f"monotone interpolant); fillet_radius {p.fillet_radius:g}")
-    print(f"seam band     +-{p.waist_band_halfwidth:g} mm keep-out about s = 0; "
-          f"cable bus; tails terminate at the band edge")
+    if chart.band_derived:
+        print(f"seam band     s [{chart.band_s_lo:.2f}, {chart.band_s_hi:.2f}] mm "
+              f"about s = 0 — DERIVED from the waist fillet zone; cable bus; "
+              f"tails terminate at the band edge")
+    else:
+        print(f"seam band     +-{p.waist_band_halfwidth:g} mm keep-out about s = 0; "
+              f"cable bus; tails terminate at the band edge")
     aw, bw = (float(v) for v in model.semi_axes(0.0))
     ah, bh = (float(v) for v in model.semi_axes(model.z_bottom))
     if model.curves is not None:

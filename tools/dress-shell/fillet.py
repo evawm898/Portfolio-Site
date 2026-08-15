@@ -98,19 +98,33 @@ class _BodiceFamily:
 
 
 class WaistFillet:
-    """Solve the construction; expose evaluation + the report numbers."""
+    """Solve the construction; expose evaluation + the report numbers.
 
-    def __init__(self, params: FilletParams = FilletParams()):
+    By default operates on the r_eq meridian (perimeter/2pi) with the
+    skirt superellipse + bodice-schedule families. Passing `families`
+    ((skirt_fam, bodice_fam), target_min_radius, radius_mm) runs the
+    identical construction on any other profile pair — the depth b(z)
+    profile uses it with its own scaled radius."""
+
+    def __init__(self, params: FilletParams = FilletParams(), families=None,
+                 target_min_radius=None, radius_mm=None):
         p = params
         if p.fillet_radius <= 0:
             raise FilletError(f"fillet_radius must be > 0, got {p.fillet_radius}")
         if p.fillet_type not in ("circular", "conic"):
             raise FilletError(f"fillet_type must be circular|conic, got {p.fillet_type}")
         self.params = p
-        self.skirt = _SkirtFamily(p)
-        self.bodice = _BodiceFamily()
-        self.waist_r = p.waist_circumference / TAU
-        R = p.fillet_radius
+        if families is None:
+            self.skirt = _SkirtFamily(p)
+            self.bodice = _BodiceFamily()
+        else:
+            self.skirt, self.bodice = families
+        self.waist_r = (p.waist_circumference / TAU if target_min_radius is None
+                        else float(target_min_radius))
+        self._w_scale = (p.waist_circumference if target_min_radius is None
+                         else self.waist_r * TAU)
+        R = float(radius_mm) if radius_mm is not None else p.fillet_radius
+        self.radius_mm = R
         r_c = self.waist_r + R          # arc bottom exactly at the waist
 
         def residuals(x):
@@ -124,11 +138,13 @@ class WaistFillet:
                 (z2 - z_c) + (rb - r_c) * drb,
             ])
 
-        x = np.array([p.waist_circumference * 0.98, 0.0, -0.6 * R, 0.6 * R])
+        x = np.array([self._w_scale * 0.98, 0.0, -0.6 * R, 0.6 * R])
         ok = False
-        for _ in range(80):
+        for _ in range(120):
             f = residuals(x)
-            if np.max(np.abs(f)) < 1e-10:
+            # residuals are mm^2 / mm-scale: 1e-8 is sub-micron geometry
+            # (trace-spline FD derivatives floor out above 1e-10)
+            if np.max(np.abs(f)) < 1e-8:
                 ok = True
                 break
             J = np.empty((4, 4))
@@ -139,7 +155,7 @@ class WaistFillet:
             step = np.linalg.solve(J, f)
             # damped update keeps the virtual waist physical
             x = x - np.clip(step, -20.0, 20.0)
-            x[0] = min(x[0], p.waist_circumference - 1e-6)
+            x[0] = min(x[0], self._w_scale - 1e-6)
         if not ok:
             raise FilletError(
                 f"fillet Newton did not converge for R={R} (residual "
@@ -179,10 +195,10 @@ class WaistFillet:
 
         # the waist after filleting
         self.waist_after_mm = TAU * self.min_radius()
-        if abs(self.waist_after_mm - p.waist_circumference) > 1e-6:
+        if abs(self.waist_after_mm - self._w_scale) > 1e-6:
             raise FilletError(
                 f"waist drifted: {self.waist_after_mm:.6f} vs "
-                f"{p.waist_circumference} mm")
+                f"{self._w_scale} mm")
 
     # -- helpers -------------------------------------------------------------
 
@@ -200,7 +216,7 @@ class WaistFillet:
         if hi - lo < 1e-12:
             return 0.0
         zz = np.linspace(lo, hi, n)
-        rr = fam.r(zz, self.params.waist_circumference)  # the OLD curve
+        rr = fam.r(zz, self._w_scale)  # the OLD (real-waist) curve
         return float(np.sum(np.hypot(np.diff(zz), np.diff(rr))))
 
     def _g1(self, fam, zt):
@@ -287,7 +303,7 @@ class WaistFillet:
 
     def min_radius(self, n=4001):
         if self.params.fillet_type == "circular":
-            return self.r_center - self.params.fillet_radius
+            return self.r_center - self.radius_mm
         t = np.linspace(0.0, 1.0, n)
         _, rr = self._conic_eval(t)
         return float(np.min(rr))
@@ -303,7 +319,175 @@ class WaistFillet:
             if a1 < a2:
                 a1 += TAU
             aa = np.linspace(a1, a2, n)
-            return (self.z_center + self.params.fillet_radius * np.cos(aa),
-                    self.r_center + self.params.fillet_radius * np.sin(aa))
+            return (self.z_center + self.radius_mm * np.cos(aa),
+                    self.r_center + self.radius_mm * np.sin(aa))
         t = np.linspace(0.0, 1.0, n)
         return self._conic_eval(t)
+
+
+class _ScaledFamily:
+    """A profile family measured on a scaled axis: r(z, w) =
+    f * base.r(z, w / f) — lets the b(z) depth profiles reuse the r_eq
+    family machinery with w expressed in depth-circumference units."""
+
+    def __init__(self, base, factor):
+        self.base = base
+        self.f = float(factor)
+
+    def r(self, z, w):
+        return self.f * self.base.r(z, w / self.f)
+
+    def dr(self, z, w, h=1e-4):
+        return self.f * self.base.dr(z, w / self.f, h)
+
+
+class _TraceDepthFamily:
+    """Bodice depth family: b(z; w) = (w / 2pi) * shape(z), where shape
+    is the side-trace normalization (smooth through z = 0, so the
+    extension below the waist is the trace's own continuation)."""
+
+    def __init__(self, side_fit):
+        self.fit = side_fit
+        self.b0 = float(side_fit.b(0.0))
+
+    def r(self, z, w):
+        return (w / TAU) * np.asarray(self.fit.b(np.asarray(z))) / self.b0
+
+    def dr(self, z, w, h=1e-4):
+        return (self.r(np.asarray(z) + h, w) - self.r(np.asarray(z) - h, w)) / (2 * h)
+
+
+class FilletedDressProfiles:
+    """The COMPLETE filleted dress profile pair (P(z), b(z)) — plugs into
+    the shell's authored-depth mode via .b / .perimeter / .v_lo / .v_hi.
+
+    - the r_eq/P profile carries the authored-radius fillet (virtual
+      waist solved; hem + upper anchors exactly given)
+    - the depth profile carries the same construction at the axis-scaled
+      radius R_b = R * b_waist / r_eq_waist (construction choice,
+      reported), preserving the waist depth 76.85 exactly
+    - beyond its fillet zone the bodice depth follows the virtual-rebased
+      trace shape and the monotone bust-crest continuation recomputed on
+      the virtual base (sub-0.1% rebase)
+    - the two fillet bottoms land at slightly different z; the min-P
+      ring's section-shape drift vs the old waist ellipse is reported as
+      plan_closure_residual_mm (the spec asks for this residual)."""
+
+    BUST_V = 203.2
+    ABOVE_CIRC = 812.8
+    ABOVE_V = 254.0
+
+    def __init__(self, side_fit, params: FilletParams = FilletParams(),
+                 v_top=240.0, n_grid=3001):
+        from bodice import solve_a_given_b, solve_semi_axes, _perimeter_np
+        self.params = params
+        self.v_lo, self.v_hi = -params.drop, float(v_top)
+        b_waist = 76.846279          # solved skirt waist depth at k = 1.5
+        r_eq_waist = params.waist_circumference / TAU
+
+        # r_eq fillet (authored radius)
+        self.p_fillet = WaistFillet(params)
+        # depth fillet at the axis-scaled radius
+        sb = b_waist / r_eq_waist
+        self.depth_radius_mm = params.fillet_radius * sb
+        skirt_b = _ScaledFamily(_SkirtFamily(params), sb)
+        bod_b = _TraceDepthFamily(side_fit)
+        self.b_fillet = WaistFillet(
+            params, families=(skirt_b, bod_b),
+            target_min_radius=b_waist, radius_mm=self.depth_radius_mm)
+
+        w_p = self.p_fillet.virtual_waist_circumference
+        w_b = self.b_fillet.virtual_waist_circumference
+        cut = float(side_fit.v_hi)
+        self.depth_extrapolated_above_v = cut
+
+        # bodice depth beyond the fillet zone: virtual-rebased trace, then
+        # the monotone crest continuation recomputed on the virtual base
+        wb_base = w_b / TAU                    # virtual waist depth
+        shape = lambda z: np.asarray(side_fit.b(np.asarray(z))) / float(side_fit.b(0.0))
+        b_cut = wb_base * float(shape(cut))
+        s_cut = wb_base * float(side_fit.db(cut)) / float(side_fit.b(0.0)) \
+            * float(side_fit.b(0.0))           # = wb_base * shape'(cut)
+        s_cut = wb_base * (float(side_fit.db(cut)) / float(side_fit.b(0.0)))
+        h_seg = self.BUST_V - cut
+        self.b_bust = b_cut + 0.5 * s_cut * h_seg
+        a_bust = float(solve_a_given_b(863.6, self.b_bust))
+        self.bust_ratio_output = a_bust / self.b_bust
+        _, b_above, _ = solve_semi_axes(self.ABOVE_CIRC, self.bust_ratio_output)
+
+        def hermite(x, x0, x1, y0, y1, m0, m1):
+            t = (x - x0) / (x1 - x0)
+            hh = x1 - x0
+            return (y0 * (1 + 2 * t) * (1 - t) ** 2 + m0 * hh * t * (1 - t) ** 2
+                    + y1 * t * t * (3 - 2 * t) + m1 * hh * t * t * (t - 1))
+
+        # tabulate both profiles on a dense grid
+        z = np.unique(np.concatenate([
+            np.linspace(self.v_lo, self.v_hi, n_grid),
+            np.linspace(-60.0, 60.0, 1201)]))     # extra density in the zone
+        P = np.empty_like(z)
+        pf = self.p_fillet
+        m_lo = z <= pf.z1
+        m_hi = z >= pf.z2
+        m_arc = ~(m_lo | m_hi)
+        P[m_lo] = TAU * np.asarray(pf.skirt.r(z[m_lo], w_p))
+        P[m_hi] = TAU * np.asarray(pf.bodice.r(z[m_hi], w_p))
+        if np.any(m_arc):
+            az, ar = pf.arc_points(600)
+            order = np.argsort(az)
+            P[m_arc] = TAU * np.interp(z[m_arc], az[order], ar[order])
+
+        B = np.empty_like(z)
+        bf = self.b_fillet
+        n_lo = z <= bf.z1
+        n_arc = (z > bf.z1) & (z < bf.z2)
+        B[n_lo] = np.asarray(bf.skirt.r(z[n_lo], w_b))
+        if np.any(n_arc):
+            az, ar = bf.arc_points(600)
+            order = np.argsort(az)
+            B[n_arc] = np.interp(z[n_arc], az[order], ar[order])
+        n_mid = (z >= bf.z2) & (z <= cut)
+        B[n_mid] = wb_base * shape(z[n_mid])
+        n_rise = (z > cut) & (z <= self.BUST_V)
+        B[n_rise] = hermite(z[n_rise], cut, self.BUST_V, b_cut, self.b_bust,
+                            s_cut, 0.0)
+        n_top = z > self.BUST_V
+        B[n_top] = hermite(z[n_top], self.BUST_V, self.ABOVE_V, self.b_bust,
+                           float(b_above), 0.0,
+                           2.0 * (float(b_above) - self.b_bust)
+                           / (self.ABOVE_V - self.BUST_V))
+        if np.any(B <= 0) or np.any(P <= 0):
+            raise FilletError("filleted profiles dipped non-positive")
+
+        self._P = PchipInterpolator(z, P)
+        self._B = PchipInterpolator(z, B)
+
+        # the min-P (waist) ring + plan closure residual vs the old ellipse
+        zz = np.linspace(-40.0, 40.0, 4001)
+        Pz = self._P(zz)
+        i = int(np.argmin(Pz))
+        self.waist_ring_z = float(zz[i])
+        self.waist_ring_circumference = float(Pz[i])
+        a_w = float(solve_a_given_b(self.waist_ring_circumference,
+                                    float(self._B(zz[i]))))
+        b_w = float(self._B(zz[i]))
+        tt = np.linspace(0.0, TAU, 1441)
+        r_new = np.hypot(a_w * np.sin(tt), b_w * np.cos(tt))
+        r_old = np.hypot(115.269419 * np.sin(tt), 76.846279 * np.cos(tt))
+        self.plan_closure_residual_mm = float(np.max(np.abs(r_new - r_old)))
+        self.waist_section = (a_w, b_w)
+
+    @property
+    def fillet_zone(self):
+        """(z_lo, z_hi) of the blended region — the union of the P and b
+        fillet arcs. Outside this the profiles follow their families
+        exactly; inside is the waist fillet (seam band / cable bus), so
+        the layout keep-out is DERIVED from this extent."""
+        return (min(self.p_fillet.z1, self.b_fillet.z1),
+                max(self.p_fillet.z2, self.b_fillet.z2))
+
+    def b(self, z):
+        return self._B(np.clip(np.asarray(z, dtype=float), self.v_lo, self.v_hi))
+
+    def perimeter(self, z):
+        return self._P(np.clip(np.asarray(z, dtype=float), self.v_lo, self.v_hi))

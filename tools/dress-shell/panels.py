@@ -33,6 +33,9 @@ class PanelClass:
     connector_origin: tuple  # (x, y) on the outline perimeter
     connector_exit: tuple    # unit vector, panel frame
     escape_mm: float         # required clear run of the connector exit path
+    min_bend_radius_mm: float = None  # FPC minimum bend radius; None =
+                                      # unverified, the cable-bus bend
+                                      # check reports 'cannot verify'
     chipset: str = ""
     palette: tuple = ()
     refresh_s: float = None   # full image update, seconds; None = unverified
@@ -139,11 +142,19 @@ def _parse_class(class_id, node, errors):
         offset = _pair(node["active_area"], "offset", f"{path}.active_area", errors)
 
     origin = exit_vec = escape = None
-    if _require_keys(node.get("connector"), {"origin", "exit_vector", "escape_mm"},
+    bend = None
+    if _require_keys(node.get("connector"), {"origin", "exit_vector", "escape_mm",
+                                             "min_bend_radius_mm"},
                      f"{path}.connector", errors):
         origin = _pair(node["connector"], "origin", f"{path}.connector", errors)
         exit_vec = _pair(node["connector"], "exit_vector", f"{path}.connector", errors)
         escape = _number(node["connector"], "escape_mm", f"{path}.connector", errors)
+        bend = node["connector"].get("min_bend_radius_mm")
+        if bend is not None and (isinstance(bend, bool)
+                                 or not isinstance(bend, (int, float)) or bend <= 0):
+            errors.append(f"{path}.connector.min_bend_radius_mm: expected a "
+                          f"positive number or null, got {bend!r}")
+            bend = None
 
     if None in (ow, oh, thickness, aw, ah, offset, origin, exit_vec, escape):
         return None
@@ -177,6 +188,7 @@ def _parse_class(class_id, node, errors):
         connector_origin=origin,
         connector_exit=(exit_vec[0] / norm, exit_vec[1] / norm),
         escape_mm=escape,
+        min_bend_radius_mm=None if bend is None else float(bend),
         chipset=str(chipset), palette=tuple(palette),
         refresh_s=None if refresh is None else float(refresh),
         price_usd=None if price is None else float(price),
@@ -191,13 +203,16 @@ def unverified_fields(classes):
     console report prints."""
     gaps = []
     for cls in classes.values():
+        flagged = set()
         for field, note in cls.provenance:
             if "unverified" in note.lower():
                 gaps.append((cls.class_id, field, " ".join(note.split())))
-        if cls.refresh_s is None:
-            gaps.append((cls.class_id, "refresh_s", "null — no trusted source"))
-        if cls.price_usd is None:
-            gaps.append((cls.class_id, "price_usd", "null — no trusted source"))
+                flagged.add(field)
+        for field, value in (("refresh_s", cls.refresh_s),
+                             ("price_usd", cls.price_usd),
+                             ("min_bend_radius_mm", cls.min_bend_radius_mm)):
+            if value is None and field not in flagged:
+                gaps.append((cls.class_id, field, "null — no trusted source"))
     return gaps
 
 

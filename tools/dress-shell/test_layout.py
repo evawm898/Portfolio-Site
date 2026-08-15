@@ -87,10 +87,11 @@ class TestLoadValidation(unittest.TestCase):
             "panels:\n"
             "  - {id: a, class: L, theta: -5.0, s: 100.0, rotation: 0, layer: 0, mirrored: true}\n"
             "  - {id: a, class: L, theta: 10.0, s: 100.0, rotation: 0, layer: 0, mirrored: false}\n"
-            "  - {id: b, class: L, theta: 10.0, s: 100.0, rotation: 90, layer: -1, mirrored: false}\n"
+            "  - {id: b, class: L, theta: 10.0, s: 100.0, rotation: 400, layer: -1, mirrored: false}\n"
             "  - {id: c, class: L, theta: 0.0, s: 100.0, rotation: 0, layer: 0, mirrored: true}\n"
             "  - {id: d, class: L, theta: 180.0, s: 100.0, rotation: 0, layer: 0, mirrored: true}\n",
-            "must be in [0, 180]", "duplicate id 'a'", "must be 0 or 180",
+            "must be in [0, 180]", "duplicate id 'a'",
+            "rotation: degrees in [-360, 360]",
             "layer: must be >= 0", "theta == 0 panels are single",
             "theta == 180 mirrors onto itself",
         )
@@ -352,13 +353,15 @@ class TestPanelLibrary(unittest.TestCase):
             "    outline: {width: 30.0, height: 45.0}\n"
             "    thickness: 1.0\n"
             "    active_area: {width: 40.0, height: 39.0, offset: [2.0, 3.0]}\n"
-            "    connector: {origin: [15.0, 20.0], exit_vector: [0.0, 0.0], escape_mm: 10.0}\n"
+            "    connector: {origin: [15.0, 20.0], exit_vector: [0.0, 0.0], "
+            "escape_mm: 10.0, min_bend_radius_mm: null}\n"
             + extras +
             "  C:  # bad new-field values\n"
             "    outline: {width: 30.0, height: 45.0}\n"
             "    thickness: 1.0\n"
             "    active_area: {width: 25.0, height: 39.0, offset: [2.0, 3.0]}\n"
-            "    connector: {origin: [15.0, 0.0], exit_vector: [0.0, -1.0], escape_mm: 10.0}\n"
+            "    connector: {origin: [15.0, 0.0], exit_vector: [0.0, -1.0], "
+            "escape_mm: 10.0, min_bend_radius_mm: -2}\n"
             "    chipset: ''\n"
             "    palette: []\n"
             "    refresh_s: -3\n"
@@ -376,6 +379,7 @@ class TestPanelLibrary(unittest.TestCase):
                      "chipset: expected a non-empty string",
                      "palette: expected a non-empty list",
                      "refresh_s: expected a positive number or null",
+                     "min_bend_radius_mm: expected a positive number or null",
                      "requires_facet: expected true/false",
                      "provenance: expected a non-empty mapping"):
             self.assertIn(frag, msg)

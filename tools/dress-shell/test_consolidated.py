@@ -4,6 +4,7 @@ armhole solve, and the waist fillet construction.
 Run:  cd tools/dress-shell && python3 -m unittest test_consolidated -v
 """
 
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -94,6 +95,84 @@ class TestWaistFillet(unittest.TestCase):
             WaistFillet(FilletParams(fillet_radius=-1.0))
         with self.assertRaises(FilletError):
             WaistFillet(FilletParams(fillet_type="bezier"))
+
+
+class TestLayoutOnConsolidatedDress(unittest.TestCase):
+    """Free rotation, the armhole seam band, and the DERIVED waist
+    keep-out — the layout-side consequences of the consolidated spec."""
+
+    @classmethod
+    def setUpClass(cls):
+        from coords import ShellCoords
+        from layout import SurfaceChart
+        from panels import load_panel_classes
+        from pathlib import Path
+        cls.coords = ShellCoords(MODEL)
+        cls.chart = SurfaceChart(MODEL, cls.coords)
+        cls.classes = load_panel_classes(
+            Path(__file__).resolve().parent / "panels.yaml")
+
+    def test_split_and_derived_band_on_chart(self):
+        ch = self.chart
+        self.assertAlmostEqual(ch.split_theta, MODEL.split_theta, places=12)
+        self.assertGreater(ch.split_theta, 90.0)
+        self.assertTrue(ch.band_derived)
+        z_lo, z_hi = MODEL.params.depth_curve.fillet_zone
+        self.assertAlmostEqual(ch.band_s_hi, float(self.coords.s_of_z(z_lo)),
+                               places=9)
+        self.assertAlmostEqual(ch.band_s_lo, float(self.coords.s_of_z(z_hi)),
+                               places=9)
+        self.assertLess(ch.band_s_lo, 0.0)
+        self.assertGreater(ch.band_s_hi, 0.0)
+
+    def test_free_rotation_places_and_twins(self):
+        from layout import AuthoredPanel, resolve_layout
+        placed, errors = resolve_layout(self.chart, self.classes, [
+            AuthoredPanel("r37", "p213", 40.0, 200.0, 37.0, 0, True)])
+        self.assertEqual(errors, [])
+        self.assertEqual(len(placed), 2)
+        self.assertTrue(all(p.valid for p in placed), [p.problems for p in placed])
+        twin = placed[1]
+        self.assertIn(twin.rotation, (37.0, 217.0))   # src or src + 180
+        self.assertEqual(twin.content_rotation, twin.rotation)
+
+    def test_rotation_changes_footprint_legality(self):
+        # p370 is 53 x 93: near the hem edge, upright it fits, rotated 90
+        # its long side runs laterally and the meridian extent shrinks —
+        # and vice versa near the seam. Just assert rotation genuinely
+        # changes the standoff (the footprint really rotates).
+        from curvature import seat_standoff
+        cls = self.classes["p370"]
+        s0 = seat_standoff(self.coords, self.chart, cls.outline_w,
+                           cls.outline_h, 40.0, 200.0, rotation=0.0)
+        s90 = seat_standoff(self.coords, self.chart, cls.outline_w,
+                            cls.outline_h, 40.0, 200.0, rotation=90.0)
+        s180 = seat_standoff(self.coords, self.chart, cls.outline_w,
+                             cls.outline_h, 40.0, 200.0, rotation=180.0)
+        self.assertAlmostEqual(s0, s180, places=9)    # symmetric footprint
+        self.assertNotAlmostEqual(s0, s90, places=3)
+
+    def test_armhole_seam_band_keepout(self):
+        from layout import outline_problems
+        cls = self.classes["p213"]
+        split = self.chart.split_theta
+        r = self.chart.r_theta(split, 200.0)
+        w_deg = math.degrees((cls.outline_w / 2.0) / r)
+        # centered so the outline edge sits ~2 mm short of the seam:
+        # inside the 8 mm band -> flagged, but NOT crossing the seam
+        theta = split - w_deg - math.degrees(2.0 / r)
+        probs = outline_problems(self.chart, cls, theta, 200.0, 0.0)
+        self.assertTrue(any("armhole seam band" in p for p in probs), probs)
+        self.assertFalse(any("crosses the FRONT piece seam" in p for p in probs))
+        # backed off past the band it goes clean
+        clear = split - w_deg - math.degrees(12.0 / r)
+        self.assertEqual(outline_problems(self.chart, cls, clear, 200.0, 0.0), [])
+
+    def test_waist_band_blocks_straddling_footprints(self):
+        from layout import outline_problems
+        cls = self.classes["p213"]
+        probs = outline_problems(self.chart, cls, 30.0, 0.0, 0.0)
+        self.assertTrue(any("waist seam band" in p for p in probs), probs)
 
 
 if __name__ == "__main__":

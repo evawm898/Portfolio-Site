@@ -46,6 +46,11 @@ TOLERANCE_MM = STANDOFF_TOLERANCE_MM   # single named constant (curvature.py)
 GRID_SPEC = GridSpec(dtheta=10.0, ds=25.0)
 
 
+def _is_v3(model):
+    from neckline import NecklineV3
+    return isinstance(model.neckline, NecklineV3)
+
+
 class State:
     """Everything static about the shell, computed once per parameter set
     (startup and every /api/params rebuild)."""
@@ -97,31 +102,52 @@ class State:
             "radials": [np.round(pl, 2).ravel().tolist()
                         for pl in self.grid.radial_polylines(c)],
         }
+        ch = self.chart
+        neck = m.neckline
+        if neck is None:
+            neck_payload = None
+        else:
+            # version-proof: the editor consumes a SAMPLED height table
+            # (0.25 deg pitch, linear interp client-side) instead of
+            # re-implementing whichever neckline version is live
+            th = np.linspace(0.0, 180.0, 721)
+            neck_payload = {
+                "version": type(neck).__name__,
+                "keepout_mm": neck.params.keepout_mm,
+                "v_max": float(neck.v_max),
+                "theta": np.round(th, 4).tolist(),
+                "height": np.round(np.atleast_1d(neck.height(th)), 4).tolist(),
+            }
+        fillet = getattr(m.params.depth_curve, "params", None)
         return {
             "tolerance_mm": TOLERANCE_MM,
             "bounds": {"s_min": c.s_min, "s_max": c.s_max,
                        "z_bottom": m.z_bottom, "z_top": m.z_top,
-                       "band_halfwidth": m.params.waist_band_halfwidth},
+                       "band_s_lo": ch.band_s_lo, "band_s_hi": ch.band_s_hi,
+                       "band_derived": ch.band_derived,
+                       "band_halfwidth": ch.band_halfwidth,
+                       "split_theta": ch.split_theta,
+                       "armhole_band_halfwidth": ch.armhole_band_halfwidth},
             "params": {
                 "waist_circumference": m.params.waist_circumference,
                 "hem_circumference": m.params.hem_circumference,
                 "drop": m.params.drop, "dome_n": m.params.dome_n,
-                "waist_section_ratio": m.params.waist_section_ratio,
-                "skirt_hem_ratio": m.params.skirt_hem_ratio,
-                "ratio_blend": m.params.ratio_blend,
-                "shoulder_theta": (m.neckline.params.shoulder_theta
-                                   if m.neckline else None),
-                "plateau_flatness": (m.neckline.params.plateau_flatness
-                                     if m.neckline else None),
+                "split_theta": float(getattr(m, "split_theta", 90.0)),
+                "fillet_radius": (None if fillet is None
+                                  else fillet.fillet_radius),
+                "fillet_type": (None if fillet is None else fillet.fillet_type),
+                **({} if not _is_v3(m) else {
+                    "cf_height": m.neckline.params.cf_height,
+                    "peak_height": m.neckline.params.peak_height,
+                    "peak_theta": m.neckline.params.peak_theta,
+                    "side_height": m.neckline.params.side_height,
+                    "cb_height": m.neckline.params.cb_height,
+                    "cf_corner": m.neckline.params.cf_corner,
+                    "rise_bow": m.neckline.params.rise_bow,
+                    "decay_rate": m.neckline.params.decay_rate,
+                }),
             },
-            "neckline": None if m.neckline is None else {
-                "cf_height": m.neckline.params.cf_height,
-                "side_height": m.neckline.params.side_height,
-                "keepout_mm": m.neckline.params.keepout_mm,
-                "knots": [float(v) for v in m.neckline._knots],
-                "heights": [float(v) for v in m.neckline._heights],
-                "tangents": [float(v) for v in m.neckline._tangents],
-            },
+            "neckline": neck_payload,
             "grid": {"dtheta": self.grid.spec.dtheta, "ds": self.grid.spec.ds,
                      "rings": self.grid.rings.tolist(),
                      "thetas": self.grid.thetas.tolist(),
@@ -157,7 +183,7 @@ class State:
         """Round the wire format through the real loader so validation is
         identical to hand-edited files: dump canonical text, load it."""
         entries = [AuthoredPanel(e["id"], e["class"], float(e["theta"]),
-                                 float(e["s"]), int(e["rotation"]),
+                                 float(e["s"]), float(e["rotation"]),
                                  int(e["layer"]), bool(e["mirrored"]))
                    for e in raw_entries]
         text = dump_layout(entries)
@@ -268,22 +294,35 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "invalid JSON body"})
         try:
             if self.path == "/api/params":
-                # live shell parameters: only the design-adjustable subset;
-                # body measurements (waist, drop, neckline heights) stay
-                # fixed. ShellModel/NecklineCurve validate; on failure the
-                # old STATE stays in place.
-                allowed = ("hem_circumference", "dome_n",
-                           "skirt_hem_ratio", "ratio_blend")
-                updates = {k: (str(body[k]) if k == "ratio_blend"
-                               else float(body[k]))
-                           for k in allowed if k in body}
-                neck_allowed = ("shoulder_theta", "plateau_flatness")
+                # live shell parameters (consolidated spec): the neckline
+                # v3 knobs + 4 heights, and the waist fillet. Fillet or
+                # peak-height changes rebuild the depth profiles and
+                # RE-SOLVE the armhole split via dress_params(). Body
+                # measurements (waist, drop, circumference anchors) stay
+                # fixed. Validators fire on rebuild; on failure the old
+                # STATE stays in place.
+                from fillet import FilletParams
+                from shell import dress_params as _dp
+                cur_bod = STATE.model.params.bodice
+                neck_float = ("cf_height", "peak_height", "peak_theta",
+                              "side_height", "cb_height", "rise_bow",
+                              "decay_rate")
                 neck_updates = {k: float(body[k])
-                                for k in neck_allowed if k in body}
-                if neck_updates and STATE.model.params.bodice is not None:
-                    updates["bodice"] = replace(STATE.model.params.bodice,
-                                                **neck_updates)
-                new_params = replace(STATE.model.params, **updates)
+                                for k in neck_float if k in body}
+                if "cf_corner" in body:
+                    neck_updates["cf_corner"] = bool(body["cf_corner"])
+                bod = (replace(cur_bod, **neck_updates)
+                       if neck_updates and cur_bod is not None else cur_bod)
+                cur_f = getattr(STATE.model.params.depth_curve, "params", None)
+                if cur_f is not None:
+                    fp = FilletParams(
+                        fillet_radius=float(body.get("fillet_radius",
+                                                     cur_f.fillet_radius)),
+                        fillet_type=str(body.get("fillet_type",
+                                                 cur_f.fillet_type)))
+                    new_params = _dp(fillet_params=fp, bodice=bod)
+                else:
+                    new_params = replace(STATE.model.params, bodice=bod)
                 STATE = State(new_params)   # ShellError -> 422, STATE kept
                 self._send(200, {"rebuilt": True,
                                  "params": STATE.static_payload["params"]})

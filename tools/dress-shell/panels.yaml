@@ -7,8 +7,8 @@
 #
 # Panel-local frame (unchanged): origin at the OUTLINE's top-left corner,
 # +x right (width), +y down (height), viewed face-on from outside the
-# shell; at rotation 0 local +y runs hemward. Identity / 180-degree
-# rotation are the ONLY transforms — connectors are never mirrored.
+# shell; at rotation 0 local +y runs hemward. Any PROPER rotation about
+# the active center is allowed — connectors are never mirrored.
 #
 # provenance: per-field source notes. Any entry containing 'unverified'
 # is surfaced by the console report. Numeric fields may be null when no
@@ -29,12 +29,18 @@ classes:
       origin: [10.55, 0.0]
       exit_vector: [0.0, -1.0]
       escape_mm: 6.0
+      min_bend_radius_mm: null
     chipset: JD79661
     palette: [black, white, red, yellow]
     refresh_s: null
     price_usd: 9.95
     requires_facet: false
     provenance:
+      min_bend_radius_mm: "unverified: null. FPC minimum bend radius is
+        absent from every datasheet consulted (mechanical drawings give tail
+        dimensions only); the waist-bus bend-radius check reports CANNOT
+        VERIFY for this class rather than assuming an industry-typical
+        value."
       mechanical: "CROSS-VARIANT, unverified for the quad panel: dimensions
         from ZJY122250-0213BAAMFGN datasheet p4-5, which is the MONOCHROME
         SSD1680Z variant (Adafruit 6383). Same glass family; quad-color
@@ -58,12 +64,18 @@ classes:
       origin: [11.4, 0.0]
       exit_vector: [0.0, -1.0]
       escape_mm: 19.79
+      min_bend_radius_mm: null
     chipset: UC8253
     palette: [black, white, red]
     refresh_s: 22.0
     price_usd: 24.50
     requires_facet: false
     provenance:
+      min_bend_radius_mm: "unverified: null. FPC minimum bend radius is
+        absent from every datasheet consulted (mechanical drawings give tail
+        dimensions only); the waist-bus bend-radius check reports CANNOT
+        VERIFY for this class rather than assuming an industry-typical
+        value."
       mechanical: "VERIFIED: ZJY240416-037BABMFGN-R datasheet v1.1 p4-5
         (outline 53.00x92.99x1.0 +-0.20, AA 47.04x81.54, tail-side ledge
         8.47, lateral margins 2.98, FPC 12.5 wide / 24 pins @ 0.5 mm,
@@ -86,12 +98,18 @@ classes:
       origin: [0.0, 86.15]
       exit_vector: [-1.0, 0.0]
       escape_mm: 24.0
+      min_bend_radius_mm: null
     chipset: UC8179
     palette: [black, white, red]
     refresh_s: 29.0
     price_usd: 64.95
     requires_facet: true
     provenance:
+      min_bend_radius_mm: "unverified: null. FPC minimum bend radius is
+        absent from every datasheet consulted (mechanical drawings give tail
+        dimensions only); the waist-bus bend-radius check reports CANNOT
+        VERIFY for this class rather than assuming an industry-typical
+        value."
       mechanical: "VERIFIED: ZJY800480-075AABMFGN-R datasheet v1.3 p4-5
         (outline 170.20x111.20x1.25, AA 163.20x97.92, tail-side margin
         9.79, opposite 3.49, ends 3.50/3.50, FPC 12.5 connector / 24.0

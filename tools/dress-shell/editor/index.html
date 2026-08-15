@@ -68,23 +68,37 @@
 
   <h2>Shell parameters</h2>
   <div class="kv" id="paramInfo">…</div>
-  <div class="row params">
-    <label>hem circ <input id="pHem" type="number" step="10"> mm</label>
-    <label>dome n <input id="pN" type="number" step="0.1"></label>
+  <div class="row params" id="neckHeights">
+    <label>CF <input id="pCf" type="number" step="5"
+           title="cf_height — center-front height (mm)"></label>
+    <label>peak <input id="pPeak" type="number" step="5"
+           title="peak_height — the one-shoulder peak (mm)"></label>
   </div>
-  <div class="row params">
-    <label>hem ratio <input id="pKhem" type="number" step="0.05"
-           title="skirt_hem_ratio — chosen from the facet sweep"></label>
-    <label>blend <select id="pBlend">
-      <option value="linear">linear</option>
-      <option value="eased">eased</option>
+  <div class="row params" id="neckHeights2">
+    <label>side <input id="pSide" type="number" step="5"
+           title="side_height — height at theta 90 (mm)"></label>
+    <label>CB <input id="pCb" type="number" step="5"
+           title="cb_height — center-back height (mm)"></label>
+  </div>
+  <div class="row params" id="neckKnobs">
+    <label>peak θ <input id="pPeakTheta" type="number" step="1"
+           title="peak_theta — azimuth of the shoulder peak (deg)"></label>
+    <label>bow <input id="pBow" type="number" step="0.05" min="0" max="1"
+           title="rise_bow — CF-to-peak rise fullness"></label>
+  </div>
+  <div class="row params" id="neckKnobs2">
+    <label>decay <input id="pDecay" type="number" step="0.05" min="0.2" max="0.95"
+           title="decay_rate — fraction of the peak-to-CB drop in the first 30 deg"></label>
+    <label><input id="pCfCorner" type="checkbox"
+           title="cf_corner — corner (true) or smooth apex (false) at CF"> CF corner</label>
+  </div>
+  <div class="row params" id="filletRow">
+    <label>fillet R <input id="pFilletR" type="number" step="5" min="5"
+           title="fillet_radius — waist fillet radius (mm); rebuild re-solves the armhole split"> mm</label>
+    <label>type <select id="pFilletType">
+      <option value="conic">conic</option>
+      <option value="circular">circular</option>
     </select></label>
-  </div>
-  <div class="row params" id="neckRow">
-    <label>shoulder θ <input id="pShoulder" type="number" step="1"
-           title="neckline_shoulder_theta — where the plateau sits (deg)"></label>
-    <label>plateau <input id="pFlat" type="number" step="0.1" min="0" max="1"
-           title="plateau_flatness — 0 none, 1 fully flat"></label>
   </div>
   <div class="row">
     <button id="applyParams">apply — rebuilds analysis</button>
@@ -96,7 +110,9 @@
   <h2>Selected</h2>
   <div id="selected" class="kv">none — click a panel, or click the shell to place</div>
   <div class="row" id="selActions" style="display:none">
-    <button id="rotBtn">rotate 180</button>
+    <label>rot <input id="rotInput" type="number" step="5" style="width:4.5em"
+           title="rotation — degrees, free proper rotation about the active center">°</label>
+    <button id="rotBtn" title="quick flip: +180°">flip 180</button>
     <button id="layerUp">layer +</button>
     <button id="layerDown">layer −</button>
     <button id="mirrorBtn">paired</button>
@@ -119,7 +135,7 @@
   </div>
 
   <div class="keys">
-    <kbd>click</kbd> place · <kbd>drag</kbd> move · <kbd>R</kbd> rotate ·
+    <kbd>click</kbd> place · <kbd>drag</kbd> move · <kbd>R</kbd> flip 180 ·
     <kbd>[</kbd>/<kbd>]</kbd> layer · <kbd>M</kbd> paired · <kbd>Del</kbd> delete<br>
     <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo · <kbd>Ctrl+S</kbd> save ·
     <kbd>G</kbd> grid · <kbd>N</kbd> snap · <kbd>1/2/3</kbd> shading

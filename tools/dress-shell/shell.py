@@ -66,7 +66,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from bodice import BodiceSections, circumference_schedule, solve_a_given_b
-from neckline import NecklineCurve, NecklineParams
+from neckline import (NecklineCurve, NecklineParams, NecklineV3,
+                      NecklineV3Params)
 
 # 24-point Gauss-Legendre nodes/weights on [-1, 1] for ellipse-arc
 # quadrature (smooth integrand -> ~machine precision on a quarter arc).
@@ -113,7 +114,13 @@ class ShellParams:
                                          # CF facet (dev 9.12 -> 8.09 mm)
     ratio_blend: str = "linear"          # 'linear' | 'eased' (smoothstep)
     fillet_radius: float = 0.0           # 0 = sharp waist crease (the design)
-    waist_band_halfwidth: float = 8.0    # seam band / cable bus, mm each side
+    waist_band_halfwidth: float = 8.0    # seam band / cable bus, mm each
+                                         # side — FALLBACK only: when the
+                                         # depth model carries a fillet
+                                         # zone, the layout band is DERIVED
+                                         # from that extent instead
+    armhole_band_halfwidth: float = 8.0  # keep-out each side of the
+                                         # FRONT/BACK piece seam, mm
     bodice: object = None                # None = skirt only; NecklineParams
                                          # activates the bodice segment
     depth_curve: object = None           # AUTHORED half-depth b(z) from the
@@ -128,6 +135,9 @@ class ShellParams:
                                          # circumferences become clearance
                                          # checks. Mutually exclusive with
                                          # depth_curve.
+    split_theta: float = 90.0            # FRONT/BACK piece split (deg); the
+                                         # committed dress passes the SOLVED
+                                         # armhole angle here
 
 
 _DRESS_CURVES = None
@@ -151,35 +161,58 @@ def dress_curves():
     return _DRESS_CURVES
 
 
-_DRESS_DEPTH = None
+_DRESS_SIDE = None
 
 
-def dress_depth():
-    """The committed bodice depth: the previous skirt bell untouched, the
-    bodice depth following the TRACED shape (normalized to the given
-    waist) with a monotone continuation to a zero-slope bust crest —
-    user-chosen 'traced shape, monotone to bust'. Cached per process."""
-    global _DRESS_DEPTH
-    if _DRESS_DEPTH is None:
+def dress_side_fit():
+    """The committed side-silhouette depth fit, cached per process (the
+    extraction + fit cost ~a second)."""
+    global _DRESS_SIDE
+    if _DRESS_SIDE is None:
         from pathlib import Path
-        from silhouette import (FittedDepth, HybridBodiceDepth,
-                                extract_from_image)
+        from silhouette import FittedDepth, extract_from_image
         here = Path(__file__).resolve().parent
-        side = FittedDepth(
+        _DRESS_SIDE = FittedDepth(
             extract_from_image(here / "silhouette-trace.png")[0])
-        _DRESS_DEPTH = HybridBodiceDepth(side)
-    return _DRESS_DEPTH
+    return _DRESS_SIDE
 
 
-def dress_params() -> ShellParams:
-    """The committed DRESS design: the ratio-mode superellipse bell skirt
-    (user: 'the previous skirt shape was better') + the TRACED-SHAPE
-    bodice depth with monotone continuation to the bust (depth authored,
-    width solved from the given circumferences, ratios as outputs).
-    Export, editor, and reports build from this one constructor so there
-    is a single source of truth."""
-    from neckline import DESIGN_NECKLINE
-    return ShellParams(bodice=DESIGN_NECKLINE, depth_curve=dress_depth())
+_DRESS_DEPTH = {}
+
+
+def dress_depth(fillet_params=None, v_top=240.0):
+    """The committed profiles (consolidated spec): the superellipse bell
+    + traced bodice depth, joined through the WAIST FILLET (R = 25 conic
+    by default, virtual-waist construction, waist circumference
+    preserved). Cached per (radius, type, v_top) so the editor can sweep
+    the fillet live."""
+    from fillet import FilletedDressProfiles, FilletParams
+    fp = fillet_params if fillet_params is not None else FilletParams()
+    key = (fp.fillet_radius, fp.fillet_type, float(v_top))
+    if key not in _DRESS_DEPTH:
+        _DRESS_DEPTH[key] = FilletedDressProfiles(dress_side_fit(), fp,
+                                                  v_top=float(v_top))
+    return _DRESS_DEPTH[key]
+
+
+def dress_params(fillet_params=None, bodice=None) -> ShellParams:
+    """The committed DRESS design (consolidated spec, approved): filleted
+    waist (R = 25 conic), traced bodice depth with monotone bust crest,
+    width solved from the given circumferences (ratios = outputs),
+    neckline v3 (CF 220 / peak 240 @ 82 / side 190 / CB 145), and the
+    FRONT/BACK split at the SOLVED armhole angle. Export, editor, and
+    reports build from this one constructor — single source of truth.
+    The fillet/neckline overrides exist for the editor's live rebuild;
+    the armhole split re-solves whenever the fillet moves P(190)."""
+    bp = bodice if bodice is not None else NecklineV3Params()
+    v_top = max(240.0, float(getattr(bp, "peak_height", 0.0) or 0.0),
+                float(getattr(bp, "cf_height", 0.0) or 0.0))
+    d = dress_depth(fillet_params, v_top=v_top)
+    # armhole from the across-back tape on the filleted schedule:
+    # theta = 180 - 180 * arc / P(190)
+    P190 = float(np.asarray(d.perimeter(190.0)))
+    split = 180.0 - 180.0 * 360.0 / P190
+    return ShellParams(bodice=bp, depth_curve=d, split_theta=split)
 
 
 class ShellModel:
@@ -221,9 +254,13 @@ class ShellModel:
         if p.waist_band_halfwidth < 0:
             raise ShellError(f"waist_band_halfwidth must be >= 0, "
                              f"got {p.waist_band_halfwidth}")
-        if p.bodice is not None and not isinstance(p.bodice, NecklineParams):
+        if p.armhole_band_halfwidth < 0:
+            raise ShellError(f"armhole_band_halfwidth must be >= 0, "
+                             f"got {p.armhole_band_halfwidth}")
+        if p.bodice is not None and not isinstance(
+                p.bodice, (NecklineParams, NecklineV3Params)):
             raise ShellError(
-                f"bodice must be None or NecklineParams, got {type(p.bodice)}")
+                f"bodice must be None or Neckline(V3)Params, got {type(p.bodice)}")
 
         self.params = p
         self.hem_radius = p.hem_circumference / math.tau
@@ -238,11 +275,13 @@ class ShellModel:
             self.sections = None
             self.z_top = 0.0
         else:
-            self.neckline = NecklineCurve(p.bodice)   # validates shape params
+            self.neckline = (NecklineV3(p.bodice)
+                             if isinstance(p.bodice, NecklineV3Params)
+                             else NecklineCurve(p.bodice))
             self.sections = BodiceSections()          # the confirmed anchors
-            if p.bodice.cf_height > self.sections.v_top + 1e-9:
+            if self.neckline.v_max > self.sections.v_top + 1e-9:
                 raise ShellError(
-                    f"neckline cf_height ({p.bodice.cf_height}) exceeds the "
+                    f"neckline top ({self.neckline.v_max}) exceeds the "
                     f"highest section anchor ({self.sections.v_top}); supply "
                     f"a taller anchor rather than extrapolating")
             # bodice waist section must MATCH the skirt waist section. In
@@ -257,7 +296,10 @@ class ShellModel:
                     raise ShellError(
                         f"waist ratio mismatch: bodice sections give "
                         f"{a_b / b_b:.6f}, skirt uses {skirt_ratio}")
-            self.z_top = float(p.bodice.cf_height)
+            self.z_top = float(self.neckline.v_max)
+        # piece split: FRONT is |theta| < split_theta (90 by assumption
+        # historically; the solved armhole angle on the committed dress)
+        self.split_theta = float(p.split_theta)
 
         # -- silhouette-first mode (both axes authored, P = output) ----------
         self.curves = p.section_curves
@@ -305,8 +347,12 @@ class ShellModel:
 
     def _perimeter_schedule(self, z):
         """P(z): the KNOWN circumference at every height — superellipse
-        schedule on the skirt, anchor-interpolated on the bodice."""
+        schedule on the skirt, anchor-interpolated on the bodice; a depth
+        object carrying its own .perimeter (the FILLETED profiles)
+        overrides both."""
         z = np.asarray(z, dtype=float)
+        if self.depth is not None and hasattr(self.depth, "perimeter"):
+            return np.asarray(self.depth.perimeter(z), dtype=float)
         P = math.tau * np.asarray(self.r_super(z), dtype=float)
         if self._circ_bodice is None:
             return P
@@ -435,6 +481,8 @@ class ShellModel:
         z = np.asarray(z, dtype=float)
         if self.curves is not None:
             return np.asarray(self.curves.perimeter(z), dtype=float) / math.tau
+        if self.depth is not None and hasattr(self.depth, "perimeter"):
+            return np.asarray(self.depth.perimeter(z), dtype=float) / math.tau
         r = np.asarray(self.r_super(z), dtype=float)
         if self.sections is None:
             return r
@@ -455,6 +503,10 @@ class ShellModel:
         through the waist — the reference garment has no crease)."""
         z = np.asarray(z, dtype=float)
         if self.curves is not None:
+            return self._d_guarded(self.mean_radius, z)
+        if self.depth is not None and hasattr(self.depth, "perimeter"):
+            # filleted profiles: the schedule is smooth through the waist;
+            # guarded FD of the override everywhere
             return self._d_guarded(self.mean_radius, z)
         sl = np.asarray(self.dr_super(z), dtype=float)
         if self.sections is None:
@@ -605,7 +657,10 @@ class ShellModel:
         bodice launch."""
         if self.sections is None:
             return None
-        if self.curves is not None:
+        if self.curves is not None or (self.depth is not None
+                                       and hasattr(self.depth, "perimeter")):
+            # smooth-waist geometries (silhouette-first / FILLETED):
+            # the junction angle is the tangent discontinuity, ~0
             s_lo = float(self.mean_slope(np.array(-1e-6)))
             s_hi = float(self.mean_slope(np.array(1e-6)))
             return abs(math.degrees(math.atan(s_lo) - math.atan(s_hi)))
@@ -692,8 +747,10 @@ def build_meshes(model: ShellModel, n_theta: int = 192, max_row_mm: float = 6.0)
 
     half = n_theta // 2
     meshes = {}
-    for name, t0 in (("FRONT", -0.5 * math.pi), ("BACK", 0.5 * math.pi)):
-        thetas = t0 + np.linspace(0.0, math.pi, half + 1)
+    split = math.radians(getattr(model, "split_theta", 90.0))
+    for name, (t0, t1) in (("FRONT", (-split, split)),
+                           ("BACK", (split, math.tau - split))):
+        thetas = np.linspace(t0, t1, half + 1)
         T, Z = np.meshgrid(thetas, z_rows)
         Z = _clamp_to_neckline(model, T, Z)   # shell tops out AT the neckline
         V = model.point(T, Z).reshape(-1, 3)
