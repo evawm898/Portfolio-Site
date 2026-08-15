@@ -3086,6 +3086,8 @@ const resetBtn = document.getElementById('reset');
 if (resetBtn) {
   resetBtn.addEventListener('click', () => {
     const d = DEFAULTS;
+    designSchemaVersion = CURRENT_SCHEMA;   // Reset = a brand-new design
+    designExtraKeys = {};
     inputs.petalCount.value = d.petalCount;
     inputs.width.value = d.width;
     inputs.taper.value = d.taper;
@@ -3260,17 +3262,59 @@ const DEFAULTS = {
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
 
-// DEFAULTS holds the values a NEW design starts from (Reset / first load). A
-// PRE-EXISTING saved design predates some controls; the value each MISSING key
-// must resolve to — so that design reloads byte-identically — is not always the
-// new-design default. LEGACY_FALLBACKS names those two jobs separately: it equals
-// DEFAULTS except where a new-design default would silently change an old design.
-//   edgeTermination: new designs default to LOOP, but a design saved before edge
-//                    termination existed must resolve to FADE (unchanged veins).
-//   voronoiLloyd:    new designs default to 8, but a pre-Lloyd design must resolve
-//                    to 0 (the exact legacy single-pass Voronoi).
-// applyDesign() overlays saved params on LEGACY_FALLBACKS; Reset uses DEFAULTS.
-const LEGACY_FALLBACKS = { ...DEFAULTS, edgeTermination: 'fade', voronoiLloyd: 0 };
+/* ---- Saved-design schema versioning ----------------------------------------
+   Every saved design carries a `schemaVersion`. On load, migrations upgrade it
+   step by step to CURRENT_SCHEMA, baking former fallbacks in as explicit values,
+   so DEFAULTS is only ever the NEW-design starting point — never a "what does an
+   old design mean" fallback. To add a parameter from now on: give it a DEFAULTS
+   value + a control, bump CURRENT_SCHEMA, and add ONE migration that sets the
+   legacy value on designs that lack the key. Nothing else in the load path
+   changes. A design with no `schemaVersion` is v0.
+
+   MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
+   object, returns a new one). Keep them append-only and never mutate input. */
+const CURRENT_SCHEMA = 1;
+
+// v0 -> v1: the first versioned schema. A v0 design predates edge termination,
+// the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
+// explicit so it renders exactly as it did before those controls existed:
+//  - fill every control it omits with the DEFAULTS value (this alone resolves a
+//    pre-divergence design to GOLDEN, since DEFAULTS.divergenceMode is 'golden');
+//  - EXCEPT the two controls whose pre-existing behaviour differs from the new
+//    default — force FADE termination and legacy (single-pass) Voronoi.
+function migrateV0toV1(p) {
+  const out = { ...p };
+  for (const k of Object.keys(DEFAULTS)) if (!(k in out)) out[k] = DEFAULTS[k];
+  if (!('edgeTermination' in p)) out.edgeTermination = 'fade';
+  if (!('voronoiLloyd' in p)) out.voronoiLloyd = 0;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1];
+
+// Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
+// (schemaVersion stripped — it is meta, tracked separately), the keys this build
+// does not recognise (preserved verbatim on re-save so a newer deploy's fields
+// are never dropped), and the version to stamp on the next save (never a
+// downgrade). A design newer than this build loads best-effort with a warning.
+function migrateDesign(raw) {
+  const src = { ...raw };
+  const rawVersion = Number.isInteger(src.schemaVersion) ? src.schemaVersion : 0;
+  delete src.schemaVersion;
+  let p = src;
+  if (rawVersion > CURRENT_SCHEMA) {
+    console.warn(`Flower: saved design schemaVersion ${rawVersion} is newer than this build (v${CURRENT_SCHEMA}); loading best-effort and preserving unknown fields on save.`);
+  } else {
+    for (let v = rawVersion; v < CURRENT_SCHEMA; v++) p = MIGRATIONS[v](p);
+  }
+  const extras = {};
+  for (const k of Object.keys(p)) if (!(k in inputs)) extras[k] = p[k];   // keys with no control
+  return { params: p, extras, version: Math.max(CURRENT_SCHEMA, rawVersion) };
+}
+
+// The schema version + unrecognised fields of the design currently loaded, so a
+// re-save round-trips faithfully. Fresh session / Reset = a brand-new design.
+let designSchemaVersion = CURRENT_SCHEMA;
+let designExtraKeys = {};
 
 
 /* ===================================================================
@@ -3369,23 +3413,25 @@ function rememberMyDesign(id) {
   } catch { /* ignore */ }
 }
 
-// Full saved state = every control value (readUI) minus the camera-only view preset.
+// Full saved state = every control value (readUI) minus the camera-only view
+// preset, plus the schema version and any unrecognised fields carried from a
+// newer-schema design we loaded (so re-save never downgrades or drops them).
 function currentDesignParams() {
   const ui = readUI();
   delete ui.viewPreset;
-  return ui;
+  return { ...ui, ...designExtraKeys, schemaVersion: designSchemaVersion };
 }
 
-// Apply a saved params object to every control, then rebuild. Iterates the inputs
-// map so any future control is picked up automatically (mirrors the Reset path).
-function applyDesign(params) {
-  if (!params || typeof params !== 'object') return;
-  // Overlay the saved params on LEGACY_FALLBACKS (NOT DEFAULTS): any control a
-  // design omits resolves to the value that keeps that saved design unchanged
-  // (e.g. a pre-termination design gets edgeTermination = fade, voronoiLloyd = 0),
-  // rather than the new-design default — making load deterministic AND backward-
-  // compatible.
-  const merged = { ...LEGACY_FALLBACKS, ...params };
+// Apply a saved params object to every control, then rebuild. Migrates the design
+// to the current schema first, so `params` is fully explicit and DEFAULTS is only
+// a forward-compat floor (a newer-schema design missing a control this build knows
+// falls back to its new-design default, never to a stale UI value).
+function applyDesign(raw) {
+  if (!raw || typeof raw !== 'object') return;
+  const { params, extras, version } = migrateDesign(raw);
+  designSchemaVersion = version;
+  designExtraKeys = extras;
+  const merged = { ...DEFAULTS, ...params };
   for (const [k, v] of Object.entries(merged)) {
     const el = inputs[k];
     if (!el) continue;
