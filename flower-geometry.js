@@ -439,6 +439,183 @@ function dedupePolygon(poly) {
 
 
 /* -------------------------------------------------------------------
+   4b. Per-petal scalar / vector FIELDS (s, d, T) — shared infill scaffolding.
+
+   Computed ONCE per petal SHAPE in the flattened {x, y} layout space every
+   infill generator already works in (x = arc length = L*u, y = lateral). This
+   is prep only — nothing consumes these yet, so output is unchanged.
+
+     s(p)  0 at base -> 1 at tip. s = x / L. The spine is constant-speed
+           (|dP/du| = L), so x is already arc length and s is the normalized arc
+           position with no inversion. Monotone; for thresholds / taper weighting.
+     d(p)  0 on the outline -> 1 at the deepest interior point. Distance to the
+           SMOOTH width envelope (petalHalfWidth: taper/tip/edgeCurve/lobe), via a
+           dependency-free jump-flooding feature transform, normalized by the
+           petal's own max interior depth.
+     T(p)  a flow that fans with the shape — tangent to the margin near the edge,
+           parallel to the midrib inside. Deliberately NOT grad(s):
+             T = normalize( lerp( midrib(1,0), marginTangent, 1 - d ) )
+           marginTangent is the smooth-envelope tangent at the nearest boundary
+           point (carried by the feature transform), oriented tip-ward. If this
+           reads too crude in the debug overlay, the principled upgrade is a
+           Laplace solve for a separate scalar h (Dirichlet h=0 base / h=1 tip,
+           Neumann no-flux on the side margins), T = normalize(grad h) — Jacobi on
+           this same grid, no dependency. Not implemented yet.
+
+   Square grid resolved finer than the finest infill feature; bilinear sample().
+   The SMOOTH envelope polyline is returned too; the ACTUAL serrated/ruffled rim
+   is kept per-petal by the render layer (tooth positions are load-bearing for the
+   later craspedodromous termination — they must snap to real rib geometry, not a
+   d threshold).
+   ------------------------------------------------------------------- */
+
+const FIELD_LONG_AXIS = 512;      // grid cells along the petal length (square cells)
+const FIELD_MAX_LAT   = 384;      // cap on cells across the width
+
+export function computePetalFields(P) {
+  const L = Math.max(P.L, 1e-4);
+  const NU = 256;                                   // envelope / boundary sampling
+  const env = [];                                   // smooth +Y envelope, base->tip
+  let Wmax = 1e-4;
+  for (let i = 0; i <= NU; i++) {
+    const u = i / NU;
+    const hw = petalHalfWidth(u, P);
+    if (hw > Wmax) Wmax = hw;
+    env.push({ x: L * u, y: hw });
+  }
+  // Continuous boundary SITES, each tagged with a tip-ward-oriented tangent: the
+  // two side margins (tangent = d/du of the envelope) plus the base edge.
+  const sx = [], sy = [], stx = [], sty = [];
+  const pushSite = (x, y, tx, ty) => {
+    let l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+    if (tx < 0) { tx = -tx; ty = -ty; }             // orient tip-ward (+x)
+    sx.push(x); sy.push(y); stx.push(tx); sty.push(ty);
+  };
+  for (let i = 0; i <= NU; i++) {
+    const a = env[Math.max(0, i - 1)], b = env[Math.min(NU, i + 1)];
+    pushSite(env[i].x,  env[i].y, b.x - a.x,  b.y - a.y);   // +Y margin
+    pushSite(env[i].x, -env[i].y, b.x - a.x, -(b.y - a.y)); // -Y margin (mirror)
+  }
+  const hw0 = petalHalfWidth(0, P);
+  for (let j = 0; j <= 24; j++) pushSite(0, lerp(-hw0, hw0, j / 24), 0, 1);  // base edge
+
+  // Square grid over the flattened bbox [0,L] x [-Wmax,+Wmax] (+ 1-cell pad).
+  const h = L / FIELD_LONG_AXIS;
+  const x0 = -h, y0 = -(Wmax + h);
+  const NX = FIELD_LONG_AXIS + 2;
+  const NY = Math.min(FIELD_MAX_LAT, Math.max(8, Math.round((2 * (Wmax + h)) / h) + 1));
+  const N = NX * NY;
+  const cellX = (i) => x0 + (i + 0.5) * h;
+  const cellY = (j) => y0 + (j + 0.5) * ((2 * (Wmax + h)) / (NY - 1));   // span the padded height
+  const dyc = (2 * (Wmax + h)) / (NY - 1);
+
+  // inside mask: within the length and under the smooth envelope
+  const inside = new Uint8Array(N);
+  for (let j = 0; j < NY; j++) {
+    const y = cellY(j);
+    for (let i = 0; i < NX; i++) {
+      const x = cellX(i);
+      const u = x / L;
+      inside[j * NX + i] = (u >= 0 && u <= 1 && Math.abs(y) <= petalHalfWidth(clamp(u, 0, 1), P)) ? 1 : 0;
+    }
+  }
+
+  // Jump-flooding feature transform: each cell adopts the nearest boundary site.
+  // seed[k] = index into the site arrays for the nearest boundary; -1 = unset.
+  const seed = new Int32Array(N).fill(-1);
+  const seedD2 = new Float64Array(N).fill(Infinity);
+  const stamp = (i, j, siteIdx) => {
+    if (i < 0 || i >= NX || j < 0 || j >= NY) return;
+    const k = j * NX + i;
+    const dx = cellX(i) - sx[siteIdx], dy = cellY(j) - sy[siteIdx];
+    const dd = dx * dx + dy * dy;
+    if (dd < seedD2[k]) { seedD2[k] = dd; seed[k] = siteIdx; }
+  };
+  for (let s = 0; s < sx.length; s++) {
+    const i = Math.round((sx[s] - x0) / h - 0.5);
+    const j = Math.round((sy[s] - y0) / dyc - 0.5);
+    stamp(i, j, s);
+  }
+  let step = 1; while (step < Math.max(NX, NY)) step <<= 1; step >>= 1;
+  for (; step >= 1; step >>= 1) {
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const s0 = seed[j * NX + i];
+        if (s0 < 0) continue;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          stamp(i + ox * step, j + oy * step, s0);
+        }
+      }
+    }
+  }
+
+  // Fields. d normalized by the max interior distance; T = blend of midrib and the
+  // nearest margin tangent, weighted by (1 - d).
+  const sArr = new Float32Array(N), dArr = new Float32Array(N);
+  const txArr = new Float32Array(N), tyArr = new Float32Array(N);
+  let dMax = 1e-6;
+  for (let k = 0; k < N; k++) if (inside[k] && seed[k] >= 0) { const dd = Math.sqrt(seedD2[k]); if (dd > dMax) dMax = dd; }
+  for (let j = 0; j < NY; j++) {
+    for (let i = 0; i < NX; i++) {
+      const k = j * NX + i;
+      const x = cellX(i);
+      sArr[k] = clamp(x / L, 0, 1);
+      if (!inside[k] || seed[k] < 0) { dArr[k] = 0; txArr[k] = 1; tyArr[k] = 0; continue; }
+      const d = clamp(Math.sqrt(seedD2[k]) / dMax, 0, 1);
+      dArr[k] = d;
+      const si = seed[k];
+      const w = 1 - d;                                    // 1 at margin, 0 deep inside
+      let vx = lerp(1, stx[si], w), vy = lerp(0, sty[si], w);
+      const l = Math.hypot(vx, vy) || 1;
+      txArr[k] = vx / l; tyArr[k] = vy / l;
+    }
+  }
+
+  const meta = { L, x0, y0, h, dyc, NX, NY, Wmax };
+  const at = (arr, x, y) => {
+    // bilinear sample in grid space (clamped to the grid)
+    const fx = clamp((x - x0) / h - 0.5, 0, NX - 1.001);
+    const fy = clamp((y - y0) / dyc - 0.5, 0, NY - 1.001);
+    const i0 = Math.floor(fx), j0 = Math.floor(fy), tx = fx - i0, ty = fy - j0;
+    const a = arr[j0 * NX + i0], b = arr[j0 * NX + i0 + 1];
+    const c = arr[(j0 + 1) * NX + i0], e = arr[(j0 + 1) * NX + i0 + 1];
+    return lerp(lerp(a, b, tx), lerp(c, e, tx), ty);
+  };
+  const sample = (x, y) => {
+    const vx = at(txArr, x, y), vy = at(tyArr, x, y);
+    const l = Math.hypot(vx, vy) || 1;
+    return { s: at(sArr, x, y), d: at(dArr, x, y), Tx: vx / l, Ty: vy / l };
+  };
+  // full smooth outline polyline (base +Y edge -> tip -> back down -Y edge)
+  const envelope = env.map((p) => ({ x: p.x, y: p.y })).concat(env.slice().reverse().map((p) => ({ x: p.x, y: -p.y })));
+  return { meta, s: sArr, d: dArr, tx: txArr, ty: tyArr, envelope, sample };
+}
+
+// Memoized per-shape accessor. Key = the OUTLINE params the flattened fields
+// depend on, plus the SURFACE-deformation params (per the invalidation spec: the
+// fields recompute when the outline OR surface deforms) — and NEVER any infill
+// param, so fiddling infill sliders reuses the cached fields.
+const _fieldCache = new Map();
+const FIELD_CACHE_MAX = 24;
+export function getPetalFields(P) {
+  const k = [
+    P.L, P.W, P.taper, P.tip, P.edgeCurve, P.lobe || 0, P.lobeCount || 0,      // outline
+    P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,                       // surface
+    P.tipStyle, P.tipLength || 0, P.tipFrequency || 0,                          // ruffle (surface)
+    P.edgeNoise || 0, P.edgeNoiseScale || 0,
+  ].join('|');
+  let f = _fieldCache.get(k);
+  if (!f) {
+    f = computePetalFields(P);
+    _fieldCache.set(k, f);
+    if (_fieldCache.size > FIELD_CACHE_MAX) _fieldCache.delete(_fieldCache.keys().next().value);
+  }
+  return f;
+}
+
+
+/* -------------------------------------------------------------------
    5. Leaf venation — a hierarchical, bilaterally-symmetric, FRACTAL
       vein network (this is the petal infill).
 

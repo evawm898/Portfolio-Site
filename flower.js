@@ -25,6 +25,7 @@ import {
   buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
+  getPetalFields,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -44,6 +45,12 @@ const CENTER_CURVE_SCALE = 0.75;  // centre-curve slider (-1..1) -> spine curl (
 // triangles. Live-only — preview instances never export STL, so the print gate
 // (full-detail main viewer) is untouched.
 const PREVIEW = new URLSearchParams(location.search).get('preview') === '1';
+// DEV-ONLY field debug overlay: ?fields=s|d|t|all renders the per-petal s / d / T
+// fields (getPetalFields) as colour/vector overlays so they can be eyeballed
+// before anything consumes them. Off (null) in the normal path — zero effect on
+// geometry or export. Collected during the LIVE build only (never in export).
+const DEBUG_FIELDS = new URLSearchParams(location.search).get('fields');   // null | 's' | 'd' | 't' | 'all'
+const debugPetals = [];   // per-petal {P, spine, az, baseHeight, radialOffset, tilt}, live build only
 const RADIAL_SEGMENTS = PREVIEW ? 6 : 8;     // tube cross-section resolution (round enough
                                // that a thickened tube doesn't read as faceted)
 // Higher resolution for the CHUNKY, close-viewed base/center primitives only
@@ -886,6 +893,11 @@ function resolveParams(ui) {
 function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const rng = mulberry32(seed);
   const spine = buildSpine(P);
+  // DEV field overlay: record this petal's shape + placement so the debug pass can
+  // sample getPetalFields(P) and draw s/d/T on it. Live build only; never in export.
+  if (DEBUG_FIELDS && !acc.exportMode && !P.solidBlade) {
+    debugPetals.push({ P, spine, az, baseHeight, radialOffset, tilt });
+  }
   const outline = buildSilhouette(P, P.outlineSteps || 56);   // leaves use a lighter margin
   // INFILL: leaf venation (default) or a bilaterally-symmetric Voronoi mesh.
   // Both return { veins, nodes } in flattened space, rendered identically below.
@@ -1858,6 +1870,67 @@ function swapGeometry(mesh, acc) {
   mesh.geometry = acc.toGeometry() || new THREE.BufferGeometry();
 }
 
+/* DEV field-debug overlay (only built when ?fields=... is set). Renders the s / d
+   / T fields as a coloured point cloud (s or d) and short vector segments (T) over
+   every petal, mapped through the same surface + placement the render uses. Scene-
+   only — never written into the export accumulators, so STL output is unaffected. */
+const fieldDebugGroup = new THREE.Group();
+scene.add(fieldDebugGroup);
+function fieldRamp(t) {   // 0..1 -> dark-blue -> cyan -> yellow -> red
+  t = Math.max(0, Math.min(1, t));
+  const r = Math.min(1, Math.max(0, 1.5 * t - 0.4));
+  const g = Math.max(0, Math.min(1, 1 - Math.abs(t - 0.55) * 2));
+  const b = Math.max(0, Math.min(1, 1 - 1.6 * t));
+  return [r, g, b];
+}
+function renderFieldDebug() {
+  while (fieldDebugGroup.children.length) {
+    const c = fieldDebugGroup.children.pop();
+    c.geometry?.dispose(); c.material?.dispose();
+  }
+  if (!DEBUG_FIELDS || !debugPetals.length) return;
+  const showT = DEBUG_FIELDS === 't' || DEBUG_FIELDS === 'all';
+  const showScalar = DEBUG_FIELDS === 's' || DEBUG_FIELDS === 'd' || DEBUG_FIELDS === 'all';
+  const scalar = DEBUG_FIELDS === 'd' ? 'd' : 's';   // 'all' shows s as the point colour
+  const pPos = [], pCol = [], lPos = [];
+  for (const rec of debugPetals) {
+    const { P, spine, az, baseHeight, radialOffset, tilt } = rec;
+    const f = getPetalFields(P);
+    const toW = (x, y) => placePoint(mapPointToSurface({ x, y }, P, spine), az, baseHeight, radialOffset, tilt);
+    const NXs = 46, NYs = 22, band = f.meta.Wmax * 1.02;
+    for (let a = 0; a <= NXs; a++) {
+      const x = (a / NXs) * P.L;
+      for (let b = 0; b <= NYs; b++) {
+        const y = (-1 + (2 * b) / NYs) * band;        // sweep the width band; skip outside
+        const s = f.sample(x, y);
+        if (s.d <= 0.001) continue;                   // outside the petal
+        const w = toW(x, y);
+        if (showScalar) {
+          pPos.push(w.x, w.y, w.z);
+          const col = fieldRamp(scalar === 'd' ? s.d : s.s);
+          pCol.push(col[0], col[1], col[2]);
+        }
+        if (showT && a % 2 === 0 && b % 2 === 0) {
+          const eps = P.L * 0.03;
+          const w2 = toW(x + s.Tx * eps, y + s.Ty * eps);
+          lPos.push(w.x, w.y, w.z, w2.x, w2.y, w2.z);
+        }
+      }
+    }
+  }
+  if (pPos.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pPos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(pCol, 3));
+    fieldDebugGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 0.03, vertexColors: true, sizeAttenuation: true })));
+  }
+  if (lPos.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(lPos, 3));
+    fieldDebugGroup.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff })));
+  }
+}
+
 
 /* ===================================================================
    5. GENERATE (called on every parameter change)
@@ -2153,11 +2226,13 @@ function generate() {
   const P = resolveParams(ui);
   const petalAcc = new MeshAccumulator();
   const coreAcc  = new MeshAccumulator();
+  if (DEBUG_FIELDS) debugPetals.length = 0;   // collected during buildInto, drawn below
   const { placements, centerHeight } = buildInto(petalAcc, coreAcc, ui, P);
   coreGlow.position.y = centerHeight + 0.2;   // scene-only glow follows the core height
 
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
+  if (DEBUG_FIELDS) renderFieldDebug();       // dev overlay only; not in the export path
 
   frameCameraOnce(petalAcc, coreAcc);
   // Adding a stem grows the flower well past the initial framing — refit the
