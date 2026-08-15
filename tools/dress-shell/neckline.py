@@ -56,6 +56,106 @@ class NecklineParams:
 DESIGN_NECKLINE = NecklineParams(cf_height=250.0, side_height=205.0)
 
 
+@dataclass(frozen=True)
+class NecklineV2Params:
+    """Neckline v2 (user, 2026-08-15): NON-monotone front — CF rises to a
+    PEAK before the side — then an exponential decay through the side
+    into a LOW BACK (no constant-back run). Heights all mm above waist;
+    ordering peak > cf > side > cb is asserted.
+
+    peak_theta: INFERRED at 82 deg from the user's '95 mm over roughly
+    98 degrees' (180 - 98) — the position itself was never stated.
+    decay_rate: the exponential's angular constant tau (deg) for the
+    post-peak drop h = cb + (peak - cb) * exp(-(theta - peak_theta)/tau).
+    None (default) SOLVES tau so theta = 90 hits side_height exactly
+    (tau = 10.706 deg for the given heights)."""
+    cf_height: float = 220.0
+    peak_height: float = 240.0
+    peak_theta: float = 82.0         # INFERRED — confirm
+    side_height: float = 190.0
+    cb_height: float = 145.0
+    decay_rate: float = None         # None -> solved from side_height
+    keepout_mm: float = 6.0
+
+
+class NecklineV2:
+    """height(theta) for the v2 contract:
+      - theta = 0 (CF): zero tangent (mirror smoothness), height cf
+      - rises monotonically to the PEAK (zero-tangent crest)
+      - decays exponentially past the peak, hitting side at 90 and
+        arriving at CB (residual and end slope asserted tiny)
+      - mirrored exactly in theta."""
+
+    def __init__(self, params: NecklineV2Params):
+        p = params
+        if not (p.peak_height > p.cf_height > p.side_height > p.cb_height > 0):
+            raise NecklineError(
+                f"ordering peak > cf > side > cb violated: "
+                f"{p.peak_height} / {p.cf_height} / {p.side_height} / {p.cb_height}")
+        if not 0.0 < p.peak_theta < 90.0:
+            raise NecklineError(f"peak_theta must be inside (0, 90), got {p.peak_theta}")
+        if p.keepout_mm < 0.0:
+            raise NecklineError(f"keepout_mm must be >= 0, got {p.keepout_mm}")
+        drop = p.peak_height - p.cb_height
+        span = 90.0 - p.peak_theta
+        if p.decay_rate is None:
+            tau = span / math.log(drop / (p.side_height - p.cb_height))
+        else:
+            tau = float(p.decay_rate)
+            if tau <= 0:
+                raise NecklineError(f"decay_rate must be > 0, got {tau}")
+        self.decay_rate = tau
+        self.params = p
+        # contract checks
+        side_hit = p.cb_height + drop * math.exp(-span / tau)
+        self.side_residual_mm = side_hit - p.side_height
+        if abs(self.side_residual_mm) > 0.5:
+            raise NecklineError(
+                f"decay_rate {tau:.3f} misses the side height by "
+                f"{self.side_residual_mm:+.2f} mm — solve it (decay_rate=None) "
+                f"or fix the inputs")
+        self.cb_residual_mm = drop * math.exp(-(180.0 - p.peak_theta) / tau)
+        self.cb_end_slope = -drop / tau * math.exp(-(180.0 - p.peak_theta) / tau)
+        if abs(self.cb_end_slope) > 0.05:
+            raise NecklineError(
+                f"CB arrival slope {self.cb_end_slope:.3f} mm/deg would kink "
+                f"the mirror at center back")
+
+    def height(self, theta_deg):
+        p = self.params
+        t = np.abs(np.asarray(theta_deg, dtype=float))
+        t = np.where(t > 180.0, 360.0 - t, t)
+        out = np.empty(t.shape if t.shape else (1,))
+        tt = np.atleast_1d(t)
+        front = tt <= p.peak_theta
+        # zero-tangent rise CF -> peak (smoothstep)
+        s = np.clip(tt[front] / p.peak_theta, 0.0, 1.0)
+        out_f = p.cf_height + (p.peak_height - p.cf_height) * s * s * (3.0 - 2.0 * s)
+        back = ~front
+        out_b = (p.cb_height + (p.peak_height - p.cb_height)
+                 * np.exp(-(tt[back] - p.peak_theta) / self.decay_rate))
+        res = np.empty_like(tt)
+        res[front] = out_f
+        res[back] = out_b
+        return res.reshape(t.shape) if t.shape else float(res[0])
+
+    def slope(self, theta_deg, h=1e-4):
+        t = np.asarray(theta_deg, dtype=float)
+        return (self.height(t + h) - self.height(t - h)) / (2.0 * h)
+
+    def keepout_floor(self, theta_deg):
+        return self.height(theta_deg) - self.params.keepout_mm
+
+    @property
+    def v_max(self):
+        return self.params.peak_height
+
+    def drop_fraction(self, deg_past_peak):
+        """Fraction of the peak->CB drop completed this many degrees past
+        the peak (the user's distribution check)."""
+        return 1.0 - math.exp(-float(deg_past_peak) / self.decay_rate)
+
+
 class NecklineCurve:
     def __init__(self, params: NecklineParams):
         p = params
