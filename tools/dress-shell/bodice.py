@@ -155,6 +155,42 @@ def circumference_schedule(anchors=DEFAULT_ANCHORS):
     return lambda vv: interp(np.clip(vv, 0.0, v_top))
 
 
+def solve_theta_armhole(model, back_arc_mm=360.0, v=190.0):
+    """theta_armhole from the across-back measurement: the back piece
+    spans (360 - 2*theta_armhole) degrees of EQUAL-ARC azimuth, so its
+    surface arc along the level section at height v is
+
+        back_arc = P(v) * (360 - 2*theta_armhole) / 360
+
+    (equal-arc theta makes section arc proportional to angle by
+    construction — the tape lies ON the surface along the level ring).
+    Also returns the CHORD-sum comparison: a tape pulled straight across
+    the back between the armhole points (3D chord), to flag whether
+    surface-vs-chord changes the answer materially."""
+    import math as _m
+    P = float(np.asarray(model.mean_radius(float(v))) * 2.0 * np.pi)
+    theta = 180.0 - 180.0 * float(back_arc_mm) / P
+    if not 0.0 < theta < 180.0:
+        raise ValueError(f"back arc {back_arc_mm} does not fit the section "
+                         f"perimeter {P:.1f} at v={v}")
+    # chord check: straight-line distance between the two armhole points
+    th_r = _m.radians(theta)
+    p1 = model.point(np.array(th_r), np.array(float(v)))
+    p2 = model.point(np.array(_m.pi), np.array(float(v)))   # CB
+    half_chordish = float(np.linalg.norm(np.asarray(p1) - np.asarray(p2)))
+    # the tape as a series of straight spans is bounded below by the
+    # single chord armhole->CB->armhole (symmetric)
+    chord_total = 2.0 * half_chordish
+    return {
+        "theta_armhole": theta,
+        "section_perimeter": P,
+        "back_extent_deg": 360.0 - 2.0 * theta,
+        "surface_arc_mm": float(back_arc_mm),
+        "straight_chord_mm": chord_total,
+        "chord_vs_arc_mm": float(back_arc_mm) - chord_total,
+    }
+
+
 def _perimeter_np(a, b):
     """Ramanujan II, vectorized (numpy twin of ellipse_perimeter)."""
     a = np.asarray(a, dtype=float)
