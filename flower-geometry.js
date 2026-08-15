@@ -1339,35 +1339,43 @@ export function buildVoronoi(P, rng, opts = {}) {
     return arr;
   };
 
-  // --- LLOYD RELAXATION: move each seed to its cell centroid; evens the cells and
-  //     kills slivers. ONE pass only — more would drive the cells isotropic (round),
-  //     but the reference wants ELONGATED cells, which the length-biased seeding gives.
-  //     Symmetry-preserving — axis seeds are pinned to y = 0, +Y seeds stay off-axis,
-  //     and the -Y twins are rebuilt from the +Y set each pass. ---
-  for (let iter = 0; iter < 1; iter++) {
+  // --- CONSTRAINED LLOYD RELAXATION (VORONOI ITERATIONS).
+  //     lloyd = 0 reproduces the LEGACY behaviour EXACTLY: one pass clipped to the
+  //     raw silhouette (outer cells sliced by the outline). lloyd >= 1 clips every
+  //     cell to the INWARD-OFFSET outline and relaxes site -> centroid that many
+  //     times, so outer cells align their edges with the margin band instead of
+  //     being severed by the rim. Symmetry-preserving — axis seeds pinned to y = 0,
+  //     +Y seeds stay off-axis, -Y twins rebuilt from the +Y set each pass. ---
+  const lloyd = clamp(Math.round(opts.lloyd != null ? opts.lloyd : 0), 0, 20);
+  let Wmax = minHW;
+  for (let i = 0; i <= 100; i++) Wmax = Math.max(Wmax, margin(i / 100));
+  const clipPoly = lloyd === 0 ? sil : offsetPolygonInward(sil, VORONOI_MARGIN_INSET * 2 * Wmax);
+  const passes = lloyd === 0 ? 1 : lloyd;
+  for (let iter = 0; iter < passes; iter++) {
     const seeds = fullSeeds();
     for (const s of axis) {
-      const cell = voronoiCell(s, seeds, sil);
+      const cell = voronoiCell(s, seeds, clipPoly);
       if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = 0; }
     }
     for (const s of half) {
-      const cell = voronoiCell(s, seeds, sil);
+      const cell = voronoiCell(s, seeds, clipPoly);
       if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = Math.max(axisGap, c.y); }
     }
   }
 
-  // --- SOLVE + BUILD ANNULI. Axis cells are self-symmetric (built once, straddling
-  //     the axis); each +Y cell is built and its exact -Y mirror added. ---
+  // --- SOLVE + BUILD ANNULI (against the same clip polygon). Axis cells are
+  //     self-symmetric (built once, straddling the axis); each +Y cell is built
+  //     and its exact -Y mirror added. ---
   const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
   const seeds = fullSeeds();
   const slabs = [];
   for (const s of axis) {
-    const cell = voronoiCell(s, seeds, sil);
+    const cell = voronoiCell(s, seeds, clipPoly);
     const ann = cell && cellAnnulus(cell, softness);
     if (ann) slabs.push(ann);
   }
   for (const s of half) {
-    const cell = voronoiCell(s, seeds, sil);
+    const cell = voronoiCell(s, seeds, clipPoly);
     const ann = cell && cellAnnulus(cell, softness);
     if (!ann) continue;
     slabs.push(ann);                                                                   // +Y
@@ -1447,6 +1455,31 @@ function clipHalfPlane(poly, a, b, c) {
   return out;
 }
 
+// Inward offset of a simple polygon by `delta`, moving each vertex along its
+// interior bisector (miter, centroid-oriented — stable for the convex-ish petal
+// outline). Gives constrained Lloyd a margin band so outer cells stop short of the
+// rim instead of being sliced by it.
+const VORONOI_MARGIN_INSET = 0.05;   // margin band = 5% of blade width
+function offsetPolygonInward(poly, delta) {
+  const n = poly.length;
+  if (n < 3 || delta <= 0) return poly.slice();
+  const c = polyCentroid(poly);
+  const unit = (ax, ay) => { const l = Math.hypot(ax, ay) || 1; return { x: ax / l, y: ay / l }; };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const prev = poly[(i - 1 + n) % n], cur = poly[i], next = poly[(i + 1) % n];
+    const e1 = unit(cur.x - prev.x, cur.y - prev.y);
+    const e2 = unit(next.x - cur.x, next.y - cur.y);
+    let n1 = { x: -e1.y, y: e1.x }, n2 = { x: -e2.y, y: e2.x };
+    if ((c.x - cur.x) * n1.x + (c.y - cur.y) * n1.y < 0) { n1.x = -n1.x; n1.y = -n1.y; }
+    if ((c.x - cur.x) * n2.x + (c.y - cur.y) * n2.y < 0) { n2.x = -n2.x; n2.y = -n2.y; }
+    let bx = n1.x + n2.x, by = n1.y + n2.y;
+    const bl = Math.hypot(bx, by) || 1;
+    out.push({ x: cur.x + (bx / bl) * delta, y: cur.y + (by / bl) * delta });
+  }
+  return out;
+}
+
 // Even-odd point-in-polygon test for seed rejection.
 function pointInPoly(x, y, poly) {
   let inside = false;
@@ -1455,6 +1488,206 @@ function pointInPoly(x, y, poly) {
     if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
   }
   return inside;
+}
+
+
+/* -------------------------------------------------------------------
+   5e. Rib graph + EDGE TERMINATION.
+
+   The infill polylines (veins, bone ribs) form a TREE: branch tips fade in the
+   blade interior, and the margin rib is a SEPARATE closed hoop (built in the
+   render layer) with no connection to them. So the framework has almost no
+   closed cycles — little shear stiffness — and the fine free ends are the first
+   thing to snap when printed.
+
+   buildRibGraph welds the polyline vertices into an explicit node/edge graph so
+   the connectivity is measurable (cyclomatic number E - V + C, free-end count).
+   terminateEdges consumes the vein-only graph to CLOSE the network onto the
+   margin:
+     MEET  free tips within CAPTURE DISTANCE of the margin extend to meet the
+           margin rib (craspedodromous). Simpler, spikier.
+     LOOP  neighbouring near-margin tips turn and fuse to EACH OTHER into arcades
+           before touching the rim (brochidodromous). Closes cycles, so it is the
+           structurally superior mode.
+   Both return EXTRA flattened polylines (+ weld nodes) in the SAME shape as the
+   infill veins, so the render layer thickens them through the identical
+   tube/ribbon/bead path and the union stays watertight. v1 captures onto the
+   SMOOTH outline; the actual serrated/ruffled rim (tooth positions) is left for a
+   later real-tooth pass — MEET on a serrated petal will therefore approximate the
+   teeth; LOOP never touches the rim so it is unaffected. Symmetry is preserved by
+   generating +Y captures and mirroring them to -Y (axis tips meet the apex). */
+
+const RIB_WELD_EPS = 0.09;   // flattened-space weld radius (a hair over the coarsest
+                             // polyline sampling, so a branch root reliably reaches
+                             // its parent chain; still far below the blade size).
+
+// Weld the polyline vertices into an explicit graph. Each polyline is either a
+// plain point array or { points, weld } where `weld` lists which endpoints are
+// CONNECTORS that snap onto the nearest vertex of another polyline within eps
+// (0 = start, 1 = end; default both). The infill builders append root-first, so
+// a vein/rib is passed weld:[0] — its ROOT joins its parent but its TIP stays
+// free until termination connects it. This makes the constructed network a clean
+// tree (branch crossings are not junctions), so its only cycles are the ones
+// termination and the margin hoop actually close — which is what the acceptance
+// metric measures. A connector snaps to any vertex of the target (not only the
+// target's endpoints), so a root lands on its parent mid-span regardless of the
+// parent's sampling.
+export function buildRibGraph(polylines, eps = RIB_WELD_EPS) {
+  const V = [];                          // {x,y,conn,pl}
+  const chain = [];                      // [i,j] vertex-index edges
+  for (let pi = 0; pi < polylines.length; pi++) {
+    const item = polylines[pi];
+    const pts = Array.isArray(item) ? item : item.points;
+    const weld = Array.isArray(item) ? [0, 1] : (item.weld || [0, 1]);
+    const closed = !Array.isArray(item) && item.closed;
+    const base = V.length, last = pts.length - 1;
+    const wStart = weld.includes(0), wEnd = weld.includes(1);
+    for (let i = 0; i < pts.length; i++) {
+      V.push({ x: pts[i].x, y: pts[i].y, conn: (i === 0 && wStart) || (i === last && wEnd), pl: pi });
+    }
+    for (let i = 0; i < last; i++) chain.push([base + i, base + i + 1]);
+    if (closed && last >= 2) chain.push([base + last, base]);   // wrap a closed loop
+  }
+  const parent = V.map((_, i) => i);
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+  const inv = 1 / eps, cells = new Map(), bkey = (ix, iy) => ix + ',' + iy;
+  for (let i = 0; i < V.length; i++) {
+    const k = bkey(Math.round(V[i].x * inv), Math.round(V[i].y * inv));
+    if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i);
+  }
+  for (let i = 0; i < V.length; i++) {
+    if (!V[i].conn) continue;            // only flagged connectors initiate a weld
+    const ix = Math.round(V[i].x * inv), iy = Math.round(V[i].y * inv);
+    let bestJ = -1, bestD = eps * eps;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      const b = cells.get(bkey(ix + dx, iy + dy));
+      if (!b) continue;
+      for (const j of b) {
+        if (V[j].pl === V[i].pl || find(j) === find(i)) continue;   // other polyline only
+        const d = (V[j].x - V[i].x) ** 2 + (V[j].y - V[i].y) ** 2;
+        if (d <= bestD) { bestD = d; bestJ = j; }
+      }
+    }
+    if (bestJ >= 0) union(i, bestJ);
+  }
+  const nodeOf = new Map(), nodes = [];
+  const nid = (i) => {
+    const r = find(i); let id = nodeOf.get(r);
+    if (id == null) { id = nodes.length; nodes.push({ x: V[r].x, y: V[r].y, deg: 0 }); nodeOf.set(r, id); }
+    return id;
+  };
+  const eset = new Set(), edges = [];
+  for (const [a, b] of chain) {
+    const na = nid(a), nb = nid(b);
+    if (na === nb) continue;
+    const ek = na < nb ? na + '_' + nb : nb + '_' + na;
+    if (eset.has(ek)) continue;
+    eset.add(ek); edges.push([na, nb]); nodes[na].deg++; nodes[nb].deg++;
+  }
+  return { nodes, edges };
+}
+
+// Cyclomatic number E - V + C (C = connected components) and free-end (degree-1)
+// count for a rib graph — the acceptance metric for edge termination.
+export function graphStats(graph) {
+  const { nodes, edges } = graph;
+  const V = nodes.length, E = edges.length;
+  const parent = nodes.map((_, i) => i);
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  for (const [a, b] of edges) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+  let C = 0; for (let i = 0; i < V; i++) if (find(i) === i) C++;
+  let deg1 = 0; for (const n of nodes) if (n.deg === 1) deg1++;
+  return { V, E, C, cyclomatic: E - V + C, deg1 };
+}
+
+// Nearest point on a polyline: returns { x, y, param, d } where param = segIndex+t
+// is a monotic arc position used to order captures along the rim.
+function nearestOnPolyline(p, poly) {
+  let best = { x: poly[0].x, y: poly[0].y, param: 0, d: Infinity };
+  for (let i = 0; i < poly.length - 1; i++) {
+    const a = poly[i], b = poly[i + 1];
+    const abx = b.x - a.x, aby = b.y - a.y;
+    const len2 = abx * abx + aby * aby || 1e-12;
+    let t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const qx = a.x + abx * t, qy = a.y + aby * t;
+    const d = Math.hypot(p.x - qx, p.y - qy);
+    if (d < best.d) best = { x: qx, y: qy, param: i + t, d };
+  }
+  return best;
+}
+
+function quadBezier(A, C, B, n) {
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    out.push({
+      x: u * u * A.x + 2 * u * t * C.x + t * t * B.x,
+      y: u * u * A.y + 2 * u * t * C.y + t * t * B.y,
+    });
+  }
+  return out;
+}
+
+const TERM_W0 = 0.16, TERM_W1 = 0.11;   // fine-veinlet relative weights for capture struts
+
+export function terminateEdges(veins, rim, P, mode, captureFrac) {
+  const extra = [], nodes = [];
+  if ((mode !== 'meet' && mode !== 'loop') || !veins || !veins.length || !rim || rim.length < 2) {
+    return { veins: extra, nodes };
+  }
+  let Wmax = 1e-4;
+  for (let i = 0; i <= 100; i++) Wmax = Math.max(Wmax, petalHalfWidth(i / 100, P));
+  const captureDist = clamp(captureFrac, 0, 1) * (2 * Wmax);
+  const AXIS_EPS = Math.max(1e-3, 0.01 * Wmax);
+
+  // Root-only weld (weld:[0]) so every branch TIP is a degree-1 node; roots join
+  // their parents and so are not mistaken for tips.
+  const tips = buildRibGraph(veins.map((v) => ({ points: v.points, weld: [0] }))).nodes.filter((n) => n.deg === 1);
+  const mirror = (seg) => ({ points: seg.points.map((p) => ({ x: p.x, y: -p.y })), w0: seg.w0, w1: seg.w1 });
+  const meet = (T, Q, mirrored) => {
+    if (Math.hypot(Q.x - T.x, Q.y - T.y) < 1e-3) return;   // tip already on the rim
+    const seg = { points: [{ x: T.x, y: T.y }, { x: Q.x, y: Q.y }], w0: TERM_W0, w1: TERM_W1 };
+    extra.push(seg); nodes.push({ x: Q.x, y: Q.y, width: TERM_W1 });
+    if (mirrored) { extra.push(mirror(seg)); nodes.push({ x: Q.x, y: -Q.y, width: TERM_W1 }); }
+  };
+
+  // AXIS tips (on the mid-rib, self-symmetric): meet the apex in both modes.
+  for (const t of tips) {
+    if (Math.abs(t.y) > AXIS_EPS) continue;
+    const q = nearestOnPolyline(t, rim);
+    if (q.d < captureDist) meet(t, q, false);
+  }
+
+  // +Y tips near the rim (their -Y twins are produced by mirroring, keeping the
+  // network exactly bilaterally symmetric).
+  const plus = tips
+    .filter((t) => t.y > AXIS_EPS)
+    .map((t) => ({ t, q: nearestOnPolyline(t, rim) }))
+    .filter((o) => o.q.d < captureDist);
+
+  if (mode === 'meet') {
+    for (const o of plus) meet(o.t, o.q, true);
+  } else {
+    plus.sort((a, b) => a.q.param - b.q.param);   // order along the margin
+    const BOW = 0.55;                              // how far the arcade bows toward the rim
+    for (let i = 0; i < plus.length; i += 2) {
+      if (i + 1 < plus.length && Math.hypot(plus[i + 1].t.x - plus[i].t.x, plus[i + 1].t.y - plus[i].t.y) > 1e-3) {
+        const A = plus[i].t, B = plus[i + 1].t;
+        const M = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+        const Mr = nearestOnPolyline(M, rim);
+        const Ctrl = { x: lerp(M.x, Mr.x, BOW), y: lerp(M.y, Mr.y, BOW) };
+        const seg = { points: quadBezier(A, Ctrl, B, 6), w0: TERM_W0, w1: TERM_W0 };
+        extra.push(seg, mirror(seg));
+        nodes.push({ x: A.x, y: A.y, width: TERM_W0 }, { x: B.x, y: B.y, width: TERM_W0 });
+        nodes.push({ x: A.x, y: -A.y, width: TERM_W0 }, { x: B.x, y: -B.y, width: TERM_W0 });
+      } else {
+        meet(plus[i].t, plus[i].q, true);          // odd tip out -> meet the rim
+      }
+    }
+  }
+  return { veins: extra, nodes };
 }
 
 

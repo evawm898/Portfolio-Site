@@ -25,7 +25,7 @@ import {
   buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
-  getPetalFields,
+  getPetalFields, terminateEdges,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -828,6 +828,9 @@ function resolveParams(ui) {
     edgeNoise: ui.edgeNoise,                      // organic non-periodic edge crinkle (any tip style)
     edgeNoiseScale: ui.edgeNoiseScale,           // crinkle frequency: broad -> dense
     infillType: ui.infillType,                   // 'veins' (leaf venation), 'voronoi', or 'strands'
+    edgeTermination: ui.edgeTermination,         // how infill meets the margin: fade | meet | loop (veins/bone)
+    captureDist: ui.captureDist,                 // tip capture distance as a fraction of blade width
+    voronoiLloyd: ui.voronoiLloyd,               // VORONOI constrained-Lloyd iterations (0 = legacy single pass)
     density: ui.density,                          // raw density: vein depth OR voronoi cell count
     strandCount: ui.strandCount,                 // STRANDS: number of radial strands across the width
     strandWidth: ui.strandWidth,                 // STRANDS: tube thickness as a fraction of the gap
@@ -906,7 +909,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // matters at 100+ fill petals.
   const ven = P.solidBlade ? null
     : P.infillType === 'voronoi'
-    ? buildVoronoi(P, rng, { density: P.density, softness: P.softness })
+    ? buildVoronoi(P, rng, { density: P.density, softness: P.softness, lloyd: P.voronoiLloyd })
     : P.infillType === 'strands'
     ? buildStrands(P, {
         count: P.strandCount, width: P.strandWidth,
@@ -924,6 +927,20 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
         maxDepth: P.maxDepth, softness: P.softness, branchStart: P.branchStart,
       });
+
+  // EDGE TERMINATION: close the tube-infill tree onto the margin so it stops being
+  // a tree hanging off a decorative hoop. MEET runs free tips to the margin rib;
+  // LOOP fuses neighbouring tips into arcades. Applies to the tube infills whose
+  // branches have free tips (veins, bone); the resulting struts are appended as
+  // ordinary veins so they thicken (and stay watertight) through the same path.
+  // v1 captures onto the SMOOTH outline (buildSilhouette), not the serrated/ruffled
+  // rim. Off for FADE and for slab/blade infills.
+  if (ven && ven.veins && (P.infillType === 'veins' || P.infillType === 'bone')
+      && P.edgeTermination && P.edgeTermination !== 'fade') {
+    const term = terminateEdges(ven.veins, buildSilhouette(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist);
+    for (const v of term.veins) ven.veins.push(v);
+    for (const nd of term.nodes) ven.nodes.push(nd);
+  }
 
   const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
   const toWorld = (pt) => place(mapPointToSurface(pt, P, spine));
@@ -2502,6 +2519,9 @@ const inputs = {
   density: document.getElementById('density'),
   softness: document.getElementById('softness'),
   veinBranchStart: document.getElementById('veinBranchStart'),
+  edgeTermination: document.getElementById('edgeTermination'),
+  captureDist: document.getElementById('captureDist'),
+  voronoiLloyd: document.getElementById('voronoiLloyd'),
   strandCount: document.getElementById('strandCount'),
   strandWidth: document.getElementById('strandWidth'),
   strandTaper: document.getElementById('strandTaper'),
@@ -2620,6 +2640,9 @@ function readUI() {
     density: parseInt(inputs.density.value, 10),
     softness: parseFloat(inputs.softness.value),
     veinBranchStart: parseFloat(inputs.veinBranchStart.value),
+    edgeTermination: inputs.edgeTermination.value,
+    captureDist: parseFloat(inputs.captureDist.value),
+    voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
     strandCount: parseInt(inputs.strandCount.value, 10),
     strandWidth: parseFloat(inputs.strandWidth.value),
     strandTaper: parseFloat(inputs.strandTaper.value),
@@ -2729,6 +2752,8 @@ function refreshLabels() {
   setLabel('density', inputs.density.value);
   setLabel('softness', (+inputs.softness.value).toFixed(2));
   setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
+  setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
+  setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
   setLabel('strandCount', inputs.strandCount.value);
   setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
   setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
@@ -2839,7 +2864,7 @@ function setBuilding(on) {
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
  'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'captureDist', 'voronoiLloyd', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize', 'centerTipShape', 'centerFilThick',
@@ -2889,8 +2914,18 @@ function updateInfillOptions() {
       updateTipOptions();
     }
   }
+  updateTerminationOptions();   // capture-distance visibility depends on infill type too
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
+// EDGE TERMINATION: the capture-distance slider only applies to a tube infill
+// (veins / bone) with an active mode, so hide it for FADE and for slab infills.
+function updateTerminationOptions() {
+  const el = document.getElementById('captureDistCtrl');
+  if (!el) return;
+  const tubeInfill = inputs.infillType.value === 'veins' || inputs.infillType.value === 'bone';
+  el.hidden = !(tubeInfill && inputs.edgeTermination.value !== 'fade');
+}
+inputs.edgeTermination.addEventListener('change', () => { updateTerminationOptions(); scheduleRegen(); });
 // Bloom type is a <select>; like Tip/Infill, only the chosen arrangement's hints
 // are shown (data-bloom-styles), and changing it re-lays out the whole bloom.
 function updateBloomOptions() {
@@ -3094,6 +3129,9 @@ if (resetBtn) {
     inputs.density.value = d.density;
     inputs.softness.value = d.softness;
     inputs.veinBranchStart.value = d.veinBranchStart;
+    inputs.edgeTermination.value = d.edgeTermination;
+    inputs.captureDist.value = d.captureDist;
+    inputs.voronoiLloyd.value = d.voronoiLloyd;
     inputs.strandCount.value = d.strandCount;
     inputs.strandWidth.value = d.strandWidth;
     inputs.strandTaper.value = d.strandTaper;
@@ -3202,6 +3240,7 @@ const DEFAULTS = {
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
+  edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
@@ -3220,6 +3259,18 @@ const DEFAULTS = {
   leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
+
+// DEFAULTS holds the values a NEW design starts from (Reset / first load). A
+// PRE-EXISTING saved design predates some controls; the value each MISSING key
+// must resolve to — so that design reloads byte-identically — is not always the
+// new-design default. LEGACY_FALLBACKS names those two jobs separately: it equals
+// DEFAULTS except where a new-design default would silently change an old design.
+//   edgeTermination: new designs default to LOOP, but a design saved before edge
+//                    termination existed must resolve to FADE (unchanged veins).
+//   voronoiLloyd:    new designs default to 8, but a pre-Lloyd design must resolve
+//                    to 0 (the exact legacy single-pass Voronoi).
+// applyDesign() overlays saved params on LEGACY_FALLBACKS; Reset uses DEFAULTS.
+const LEGACY_FALLBACKS = { ...DEFAULTS, edgeTermination: 'fade', voronoiLloyd: 0 };
 
 
 /* ===================================================================
@@ -3329,10 +3380,12 @@ function currentDesignParams() {
 // map so any future control is picked up automatically (mirrors the Reset path).
 function applyDesign(params) {
   if (!params || typeof params !== 'object') return;
-  // Overlay the saved params on top of DEFAULTS, so any control a design omits
-  // (e.g. a pre-divergence design has no divergenceMode) resolves to its default
-  // rather than keeping the current UI value — making load fully deterministic.
-  const merged = { ...DEFAULTS, ...params };
+  // Overlay the saved params on LEGACY_FALLBACKS (NOT DEFAULTS): any control a
+  // design omits resolves to the value that keeps that saved design unchanged
+  // (e.g. a pre-termination design gets edgeTermination = fade, voronoiLloyd = 0),
+  // rather than the new-design default — making load deterministic AND backward-
+  // compatible.
+  const merged = { ...LEGACY_FALLBACKS, ...params };
   for (const [k, v] of Object.entries(merged)) {
     const el = inputs[k];
     if (!el) continue;
