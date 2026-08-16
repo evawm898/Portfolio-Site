@@ -25,7 +25,7 @@ import {
   buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
-  getPetalFields, terminateEdges,
+  getPetalFields, terminateEdges, getSpaceColonization,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -70,6 +70,18 @@ const RIM_WIDTH       = 0.34;  // petal-margin line weight, relative to the midr
                                // (the leaf edge is a fine vein, not a fat rope)
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
+const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap; export uses the full count
+
+// Deterministic per-petal network seed for SPACE COLONIZATION. Mixes the design's
+// STORED spaceSeed with a variant index cycled across the whorl by petal index, so:
+// reload is byte-identical (the seed is saved), the re-roll button changes every
+// petal together, and a whorl shows `spaceVariants` distinct networks rather than
+// one repeated stamp. No Math.random on the generation path.
+function spaceColSeed(P, petalSeed) {
+  const V = Math.max(1, Math.round(P.spaceVariants || 1));
+  const variant = ((petalSeed % V) + V) % V;
+  return (((P.spaceSeed >>> 0) ^ ((variant + 1) * 0x9e3779b1)) >>> 0);
+}
 
 /* ===================================================================
    REAL-WORLD SCALE  (STL export — Phase 1)
@@ -836,6 +848,14 @@ function resolveParams(ui) {
     voronoiWeight: ui.voronoiWeight,             // VORONOI wall weight hierarchy mix (0 = uniform)
     voronoiWeightFalloff: ui.voronoiWeightFalloff, // VORONOI base->tip wall weight exponent k
     voronoiSlabTaper: ui.voronoiSlabTaper,       // VORONOI slab depth taper base->tip (0 = constant)
+    spaceMode: ui.spaceMode,                     // SPACE COLONIZATION: open (tree) | closed (loops/areoles)
+    spaceSourceCount: Math.round(lerp(120, 1400, clamp(ui.spaceDensity, 0, 1))),  // SOURCE DENSITY -> attraction sources
+    spaceBirth: ui.spaceBirth,                   // min spacing between sources (world units)
+    spaceKill: ui.spaceKill,                     // how close a vein must get to consume a source
+    spaceStep: ui.spaceStep,                     // growth step per iteration
+    spacePattern: ui.spacePattern,               // random | lattice | phyllotactic
+    spaceSeed: ui.spaceSeed,                      // stored integer seed (re-rollable; keeps saves deterministic)
+    spaceVariants: ui.spaceVariants,             // distinct networks cycled across the whorl (1..6)
     density: ui.density,                          // raw density: vein depth OR voronoi cell count
     strandCount: ui.strandCount,                 // STRANDS: number of radial strands across the width
     strandWidth: ui.strandWidth,                 // STRANDS: tube thickness as a fraction of the gap
@@ -933,6 +953,15 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       })
     : P.infillType === 'lace'
     ? buildLace(P, rng, { density: P.density, swirl: P.laceSwirl })
+    : P.infillType === 'spacecol'
+    ? getSpaceColonization(P, spaceColSeed(P, seed), {
+        mode: P.spaceMode,
+        // live path stays interactive with a coarse-but-complete network; the
+        // export path (acc.exportMode) runs the full source count. Distinct memo keys.
+        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, SPACECOL_LIVE_CAP),
+        birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep,
+        seedPattern: P.spacePattern,
+      })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
         maxDepth: P.maxDepth, softness: P.softness, branchStart: P.branchStart,
@@ -945,7 +974,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // ordinary veins so they thicken (and stay watertight) through the same path.
   // v1 captures onto the SMOOTH outline (buildSilhouette), not the serrated/ruffled
   // rim. Off for FADE and for slab/blade infills.
-  if (ven && ven.veins && (P.infillType === 'veins' || P.infillType === 'bone')
+  if (ven && ven.veins && (P.infillType === 'veins' || P.infillType === 'bone' || P.infillType === 'spacecol')
       && P.edgeTermination && P.edgeTermination !== 'fade') {
     const term = terminateEdges(ven.veins, buildSilhouette(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist);
     for (const v of term.veins) ven.veins.push(v);
@@ -2538,6 +2567,14 @@ const inputs = {
   voronoiWeight: document.getElementById('voronoiWeight'),
   voronoiWeightFalloff: document.getElementById('voronoiWeightFalloff'),
   voronoiSlabTaper: document.getElementById('voronoiSlabTaper'),
+  spaceMode: document.getElementById('spaceMode'),
+  spaceDensity: document.getElementById('spaceDensity'),
+  spaceBirth: document.getElementById('spaceBirth'),
+  spaceKill: document.getElementById('spaceKill'),
+  spaceStep: document.getElementById('spaceStep'),
+  spacePattern: document.getElementById('spacePattern'),
+  spaceSeed: document.getElementById('spaceSeed'),
+  spaceVariants: document.getElementById('spaceVariants'),
   strandCount: document.getElementById('strandCount'),
   strandWidth: document.getElementById('strandWidth'),
   strandTaper: document.getElementById('strandTaper'),
@@ -2664,6 +2701,14 @@ function readUI() {
     voronoiWeight: parseFloat(inputs.voronoiWeight.value),
     voronoiWeightFalloff: parseFloat(inputs.voronoiWeightFalloff.value),
     voronoiSlabTaper: parseFloat(inputs.voronoiSlabTaper.value),
+    spaceMode: inputs.spaceMode.value,
+    spaceDensity: parseFloat(inputs.spaceDensity.value),
+    spaceBirth: parseFloat(inputs.spaceBirth.value),
+    spaceKill: parseFloat(inputs.spaceKill.value),
+    spaceStep: parseFloat(inputs.spaceStep.value),
+    spacePattern: inputs.spacePattern.value,
+    spaceSeed: parseInt(inputs.spaceSeed.value, 10) || 0,
+    spaceVariants: parseInt(inputs.spaceVariants.value, 10),
     strandCount: parseInt(inputs.strandCount.value, 10),
     strandWidth: parseFloat(inputs.strandWidth.value),
     strandTaper: parseFloat(inputs.strandTaper.value),
@@ -2780,6 +2825,12 @@ function refreshLabels() {
   setLabel('voronoiWeight', (+inputs.voronoiWeight.value).toFixed(2));
   setLabel('voronoiWeightFalloff', (+inputs.voronoiWeightFalloff.value).toFixed(1));
   setLabel('voronoiSlabTaper', (+inputs.voronoiSlabTaper.value).toFixed(2));
+  setLabel('spaceDensity', (+inputs.spaceDensity.value).toFixed(2));
+  setLabel('spaceBirth', (+inputs.spaceBirth.value).toFixed(3));
+  setLabel('spaceKill', (+inputs.spaceKill.value).toFixed(3));
+  setLabel('spaceStep', (+inputs.spaceStep.value).toFixed(3));
+  setLabel('spaceVariants', inputs.spaceVariants.value);
+  setLabel('spaceSeed', inputs.spaceSeed.value);
   setLabel('strandCount', inputs.strandCount.value);
   setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
   setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
@@ -2856,6 +2907,7 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : ui.infillType === 'strands' ? 'radial strands'
     : ui.infillType === 'bone' ? 'bone lattice'
     : ui.infillType === 'lace' ? 'lace filigree'
+    : ui.infillType === 'spacecol' ? `space colonization (${ui.spaceMode})`
     : 'leaf venation';
   el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
 }
@@ -2892,6 +2944,7 @@ function setBuilding(on) {
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
  'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'captureDist', 'voronoiLloyd',
  'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
+ 'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
  'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
@@ -2950,10 +3003,19 @@ inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refr
 function updateTerminationOptions() {
   const el = document.getElementById('captureDistCtrl');
   if (!el) return;
-  const tubeInfill = inputs.infillType.value === 'veins' || inputs.infillType.value === 'bone';
+  const tubeInfill = inputs.infillType.value === 'veins' || inputs.infillType.value === 'bone' || inputs.infillType.value === 'spacecol';
   el.hidden = !(tubeInfill && inputs.edgeTermination.value !== 'fade');
 }
 inputs.edgeTermination.addEventListener('change', () => { updateTerminationOptions(); scheduleRegen(); });
+// SPACE COLONIZATION: the two selects regenerate; the re-roll button draws a fresh
+// integer seed (stored in the design so the new network is saved and reproducible).
+inputs.spaceMode.addEventListener('change', scheduleRegen);
+inputs.spacePattern.addEventListener('change', scheduleRegen);
+const spaceReroll = document.getElementById('spaceReroll');
+if (spaceReroll) spaceReroll.addEventListener('click', () => {
+  inputs.spaceSeed.value = String((Math.floor(Math.random() * 0x7fffffff)) >>> 0);
+  refreshLabels(); scheduleRegen();
+});
 // Bloom type is a <select>; like Tip/Infill, only the chosen arrangement's hints
 // are shown (data-bloom-styles), and changing it re-lays out the whole bloom.
 function updateBloomOptions() {
@@ -3167,6 +3229,14 @@ if (resetBtn) {
     inputs.voronoiWeight.value = d.voronoiWeight;
     inputs.voronoiWeightFalloff.value = d.voronoiWeightFalloff;
     inputs.voronoiSlabTaper.value = d.voronoiSlabTaper;
+    inputs.spaceMode.value = d.spaceMode;
+    inputs.spaceDensity.value = d.spaceDensity;
+    inputs.spaceBirth.value = d.spaceBirth;
+    inputs.spaceKill.value = d.spaceKill;
+    inputs.spaceStep.value = d.spaceStep;
+    inputs.spacePattern.value = d.spacePattern;
+    inputs.spaceSeed.value = d.spaceSeed;
+    inputs.spaceVariants.value = d.spaceVariants;
     inputs.strandCount.value = d.strandCount;
     inputs.strandWidth.value = d.strandWidth;
     inputs.strandTaper.value = d.strandTaper;
@@ -3277,6 +3347,8 @@ const DEFAULTS = {
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
   edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
   voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
+  spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
+  spacePattern: 'phyllotactic', spaceSeed: 1, spaceVariants: 3,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
@@ -3307,7 +3379,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 2;
+const CURRENT_SCHEMA = 3;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3334,7 +3406,17 @@ function migrateV1toV2(p) {
   }
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2];
+// v2 -> v3: the SPACE COLONIZATION infill mode's controls. Purely additive — no
+// existing design uses infillType 'spacecol', so filling the new keys from
+// DEFAULTS leaves every prior design byte-identical.
+function migrateV2toV3(p) {
+  const out = { ...p };
+  for (const k of ['spaceMode', 'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spacePattern', 'spaceSeed', 'spaceVariants']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

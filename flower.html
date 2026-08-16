@@ -554,6 +554,7 @@
           </div>
           <select class="fl-select" id="infillType">
             <option value="veins">VEINS</option>
+            <option value="spacecol">SPACE COLONIZATION</option>
             <option value="voronoi">VORONOI</option>
             <option value="strands">STRANDS</option>
             <option value="bone">BONE</option>
@@ -561,6 +562,84 @@
                  path + its controls stay wired. To restore: remove `hidden disabled`. -->
             <option value="lace" hidden disabled>LACE</option>
           </select>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label for="spaceMode">Network</label>
+          </div>
+          <select class="fl-select" id="spaceMode">
+            <option value="open">OPEN</option>
+            <option value="closed" selected>CLOSED</option>
+          </select>
+          <span class="fl-ctrl__hint">open grows a pure branching tree &rarr; closed lets veins fuse into loops and areoles</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label for="spacePattern">Seed pattern</label>
+          </div>
+          <select class="fl-select" id="spacePattern">
+            <option value="phyllotactic" selected>PHYLLOTACTIC</option>
+            <option value="lattice">JITTERED LATTICE</option>
+            <option value="random">RANDOM</option>
+          </select>
+          <span class="fl-ctrl__hint">how the attraction sources are placed &mdash; phyllotactic (golden angle) is the crispest, matching the coiled bloom</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label for="spaceDensity">Source density</label>
+            <span class="fl-ctrl__val" data-value="spaceDensity"></span>
+          </div>
+          <input type="range" id="spaceDensity" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">few sources, open network &rarr; many sources, fine dense venation</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label for="spaceBirth">Birth distance</label>
+            <span class="fl-ctrl__val" data-value="spaceBirth"></span>
+          </div>
+          <input type="range" id="spaceBirth" min="0.03" max="0.2" step="0.005" value="0.06">
+          <span class="fl-ctrl__hint">minimum spacing between sources &mdash; larger spreads them out, capping how dense it can get</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label for="spaceKill">Kill distance</label>
+            <span class="fl-ctrl__val" data-value="spaceKill"></span>
+          </div>
+          <input type="range" id="spaceKill" min="0.02" max="0.15" step="0.005" value="0.045">
+          <span class="fl-ctrl__hint">how close a vein must reach a source before it is consumed &mdash; larger ends branches sooner</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label for="spaceStep">Growth step</label>
+            <span class="fl-ctrl__val" data-value="spaceStep"></span>
+          </div>
+          <input type="range" id="spaceStep" min="0.02" max="0.12" step="0.005" value="0.04">
+          <span class="fl-ctrl__hint">how far a vein advances each step &mdash; smaller is smoother and finer but heavier</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label for="spaceVariants">Network variants</label>
+            <span class="fl-ctrl__val" data-value="spaceVariants"></span>
+          </div>
+          <input type="range" id="spaceVariants" min="1" max="6" step="1" value="3">
+          <span class="fl-ctrl__hint">distinct networks cycled across the petals &mdash; 1 repeats one, more break up the repetition</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="spacecol">
+          <div class="fl-ctrl__row">
+            <label>Seed</label>
+            <span class="fl-ctrl__val" data-value="spaceSeed"></span>
+          </div>
+          <input type="hidden" id="spaceSeed" value="1">
+          <button id="spaceReroll" class="fl-btn fl-btn--wide" type="button">Re-roll</button>
+          <span class="fl-ctrl__hint">the random seed, stored with the design &mdash; re-roll for a new network, saved designs keep theirs</span>
         </div>
 
         <div class="fl-ctrl" data-infill-styles="veins voronoi lace">
@@ -593,7 +672,7 @@
           <span class="fl-ctrl__hint">where the first branch sits up the midrib &mdash; lower = closer to the base</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins bone">
+        <div class="fl-ctrl" data-infill-styles="veins bone spacecol">
           <div class="fl-ctrl__row">
             <label for="edgeTermination">Edge termination</label>
           </div>
