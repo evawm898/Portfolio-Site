@@ -1250,12 +1250,23 @@ export function buildLace(P, rng, opts = {}) {
 // One Voronoi cell: the silhouette clipped by the perpendicular bisector between
 // seed `s` and every OTHER seed. `s` must be an element of `seeds` (skipped by
 // identity). Returns the clipped polygon, or null if it collapsed.
-function voronoiCell(s, seeds, sil) {
+// ANISOTROPY (a2 = anisotropy^2, y-weight in the distance metric). a2 = 1 is the
+// isotropic case, byte-identical to the original. a2 > 1 weights lateral distance
+// more, so cells compress across the petal and ELONGATE along its long axis — the
+// bisector is computed in the weighted metric while the seeds stay in real
+// coordinates (so the cell polygon comes out in real space, walls stay isotropic).
+//
+// APPROXIMATION (see buildVoronoi): the long axis stands in for the flow field T.
+// That holds while a petal points one way. It EXPIRES the moment petals gain lobes
+// or clefts — a lobed petal points in several directions at once and a single
+// global axis is then badly wrong. Revisit this (per-region or per-point T metric)
+// when lobed/cleft petals are added.
+function voronoiCell(s, seeds, sil, a2 = 1) {
   let cell = sil;
   for (const t of seeds) {
     if (t === s) continue;
-    cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * (t.y - s.y),
-      (s.x * s.x + s.y * s.y) - (t.x * t.x + t.y * t.y));
+    cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * a2 * (t.y - s.y),
+      (s.x * s.x + a2 * s.y * s.y) - (t.x * t.x + a2 * t.y * t.y));
     if (cell.length < 3) return null;
   }
   return cell;
@@ -1281,6 +1292,32 @@ function polyCentroid(poly) {
 
 const mirrorY = (p) => ({ x: p.x, y: -p.y });
 
+// Signed area of a simple polygon (for the minimum-cell-size floor).
+function polyArea(poly) {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; a += p.x * q.y - q.x * p.y; }
+  return a * 0.5;
+}
+
+// "Spine" score of a cell: how strongly it is elongated ALONG the flow T and how
+// LONG it is — a long, T-aligned cell reads like a rib spine and earns extra wall
+// weight, mirroring how VEINS thickens its midrib/primaries. 0 = round or short,
+// 1 = a long strut running with the flow.
+function spineScore(poly, c, T, L) {
+  const tx = T.tx, ty = T.ty, px = -ty, py = tx;   // flow dir + perpendicular
+  let tMin = Infinity, tMax = -Infinity, pMin = Infinity, pMax = -Infinity;
+  for (const q of poly) {
+    const dx = q.x - c.x, dy = q.y - c.y;
+    const at = dx * tx + dy * ty, ap = dx * px + dy * py;
+    if (at < tMin) tMin = at; if (at > tMax) tMax = at;
+    if (ap < pMin) pMin = ap; if (ap > pMax) pMax = ap;
+  }
+  const spanT = tMax - tMin, spanP = (pMax - pMin) || 1e-6;
+  const elong = clamp((spanT / spanP - 1) / 2, 0, 1);        // >= 2x elongated -> 1
+  const longEnough = clamp(spanT / (0.2 * L), 0, 1);          // and a real fraction of the blade
+  return elong * longEnough;
+}
+
 export function buildVoronoi(P, rng, opts = {}) {
   const density = clamp(Math.round(opts.density || 7), 3, 12);
   const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // off-axis seeds in the +Y half
@@ -1289,6 +1326,21 @@ export function buildVoronoi(P, rng, opts = {}) {
   const xLo = P.L * 0.05, xHi = P.L * 0.96;
   const minHW = 0.06;
   const axisGap = 0.05 * P.W;                       // min |y| for an off-axis seed
+
+  // Shared-grammar controls — every one defaults to the ORIGINAL isotropic/uniform
+  // look, so a design that omits them is byte-identical.
+  const aniso     = clamp(opts.anisotropy != null ? opts.anisotropy : 1, 1, 4);
+  const a2        = aniso * aniso;                       // y-weight in the Voronoi metric
+  const cellLaw   = clamp(opts.cellDensityLaw != null ? opts.cellDensityLaw : 0, 0, 1);
+  const wHier     = clamp(opts.weightHierarchy != null ? opts.weightHierarchy : 0, 0, 1);
+  const wFall     = clamp(opts.weightFalloff != null ? opts.weightFalloff : 1.5, 0, 4);
+  const slabTaper = clamp(opts.slabTaper != null ? opts.slabTaper : 0, 0, 1);
+  let Wmax = minHW;
+  for (let i = 0; i <= 100; i++) Wmax = Math.max(Wmax, margin(i / 100));
+  // CELL DENSITY LAW: bias best-candidate spacing toward the LOCAL blade width so
+  // cells shrink as the blade narrows (constant count across, no tip crowding).
+  // law = 0 uses a constant reference width -> identical selection to the original.
+  const spaceW = (x) => { const w = lerp(Wmax, margin(x / P.L), cellLaw); return w > 1e-3 ? w : 1e-3; };
 
   // --- SEEDS ON THE AXIS: best-candidate 1-D sampling along the centreline. Their
   //     cells straddle y = 0, so the pattern is continuous across it (no seam). ---
@@ -1303,7 +1355,8 @@ export function buildVoronoi(P, rng, opts = {}) {
         if (margin(x / P.L) < minHW) continue;
         let d = 1e9;
         for (const s of axis) d = Math.min(d, (s.x - x) ** 2);
-        if (d > bestD) { bestD = d; best = { x, y: 0 }; }
+        const score = d / (spaceW(x) ** 2);          // width-scaled spacing (law=0: constant -> same pick)
+        if (score > bestD) { bestD = score; best = { x, y: 0 }; }
       }
       if (best) axis.push(best);
     }
@@ -1324,7 +1377,8 @@ export function buildVoronoi(P, rng, opts = {}) {
         let d = 1e9;
         for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
         for (const s of axis) d = Math.min(d, (s.x - x) ** 2 + y * y);
-        if (d > bestD) { bestD = d; best = { x, y }; }
+        const score = d / (spaceW(x) ** 2);          // width-scaled spacing (law=0: constant -> same pick)
+        if (score > bestD) { bestD = score; best = { x, y }; }
       }
       if (best) half.push(best);
     }
@@ -1347,43 +1401,64 @@ export function buildVoronoi(P, rng, opts = {}) {
   //     being severed by the rim. Symmetry-preserving — axis seeds pinned to y = 0,
   //     +Y seeds stay off-axis, -Y twins rebuilt from the +Y set each pass. ---
   const lloyd = clamp(Math.round(opts.lloyd != null ? opts.lloyd : 0), 0, 20);
-  let Wmax = minHW;
-  for (let i = 0; i <= 100; i++) Wmax = Math.max(Wmax, margin(i / 100));
   const clipPoly = lloyd === 0 ? sil : offsetPolygonInward(sil, VORONOI_MARGIN_INSET * 2 * Wmax);
   const passes = lloyd === 0 ? 1 : lloyd;
   for (let iter = 0; iter < passes; iter++) {
     const seeds = fullSeeds();
     for (const s of axis) {
-      const cell = voronoiCell(s, seeds, clipPoly);
+      const cell = voronoiCell(s, seeds, clipPoly, a2);
       if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = 0; }
     }
     for (const s of half) {
-      const cell = voronoiCell(s, seeds, clipPoly);
+      const cell = voronoiCell(s, seeds, clipPoly, a2);
       if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = Math.max(axisGap, c.y); }
     }
   }
 
-  // --- SOLVE + BUILD ANNULI (against the same clip polygon). Axis cells are
-  //     self-symmetric (built once, straddling the axis); each +Y cell is built
-  //     and its exact -Y mirror added. ---
+  // --- MINIMUM CELL SIZE floor: cull seeds whose cell is thinner than a few rib
+  //     widths (equivalent-circle diameter < minCellSize), so the density law /
+  //     anisotropy can't emit fragile slivers — the region is absorbed by neighbours
+  //     when the final cells re-solve. Off unless one of those features is on, so the
+  //     default look is untouched. Mirrored seeds are culled with their +Y twin. ---
+  let culled = 0;
+  const minCell = opts.minCellSize || 0;
+  if (minCell > 0 && (cellLaw > 0 || aniso > 1)) {
+    const tooSmall = (s, seeds) => {
+      const cell = voronoiCell(s, seeds, clipPoly, a2);
+      if (!cell) return true;
+      return 2 * Math.sqrt(Math.abs(polyArea(cell)) / Math.PI) < minCell;
+    };
+    for (let i = half.length - 1; i >= 0; i--) if (tooSmall(half[i], fullSeeds())) { half.splice(i, 1); culled++; }
+    for (let i = axis.length - 1; i >= 0; i--) if (axis.length > 1 && tooSmall(axis[i], fullSeeds())) { axis.splice(i, 1); culled++; }
+  }
+
+  // --- SOLVE + BUILD ANNULI with the shared WEIGHT grammar. Each cell earns a wall
+  //     weight from its base->tip position (w = (1-s)^k) and a spine boost (long,
+  //     flow-aligned cells), stepped in the SAME 0.6 ratio VEINS uses; and a slab
+  //     thickness taper by s. Both blend from the uniform default. Axis cells are
+  //     self-symmetric (built once); each +Y cell gets its exact -Y mirror. ---
   const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
   const seeds = fullSeeds();
   const slabs = [];
-  for (const s of axis) {
-    const cell = voronoiCell(s, seeds, clipPoly);
-    const ann = cell && cellAnnulus(cell, softness);
-    if (ann) slabs.push(ann);
-  }
-  for (const s of half) {
-    const cell = voronoiCell(s, seeds, clipPoly);
-    const ann = cell && cellAnnulus(cell, softness);
-    if (!ann) continue;
-    slabs.push(ann);                                                                   // +Y
-    // -Y mirror: reflecting Y reverses the ring winding, so reverse the loops back
-    // (else the mirrored slab renders inside-out).
-    slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse() });
-  }
-  return { veins: [], nodes: [], slabs };
+  const emit = (cell, mirror) => {
+    const c = polyCentroid(cell);
+    const s = clamp(c.x / P.L, 0, 1);
+    const T = petalFlowDirection(c.y, s, P);
+    const raw = Math.max(Math.pow(1 - s, wFall), spineScore(cell, c, T, P.L));
+    const tier = Math.round((1 - raw) * 3);                    // 0..3 discrete orders
+    const wallMul = lerp(1, Math.pow(0.6, tier), wHier);       // shares the vein step size
+    const thickMul = lerp(1, 1 - 0.7 * s, slabTaper);          // base thick -> tip thin (out-of-plane)
+    const ann = cellAnnulus(cell, softness, wallMul);
+    if (!ann) return;
+    ann.thickMul = thickMul;
+    slabs.push(ann);
+    if (mirror) {
+      slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse(), thickMul });
+    }
+  };
+  for (const s of axis) { const cell = voronoiCell(s, seeds, clipPoly, a2); if (cell) emit(cell, false); }
+  for (const s of half) { const cell = voronoiCell(s, seeds, clipPoly, a2); if (cell) emit(cell, true); }
+  return { veins: [], nodes: [], slabs, culled };
 }
 
 // Build one cell's ANNULUS for the perforated sheet. The OUTER loop walks the cell
@@ -1395,7 +1470,7 @@ export function buildVoronoi(P, rng, opts = {}) {
 // with its corners then rounded by SOFTNESS into smoothly-flowing curves. addSlab
 // pairs outer[k] with inner[k] on the same ray from the centroid, so both are
 // built radially from it.
-function cellAnnulus(poly, softness) {
+function cellAnnulus(poly, softness, wallMul = 1) {
   const c = polyCentroid(poly);
   const cx = c.x, cy = c.y;
   const SUB = 5;                                    // samples per cell edge
@@ -1416,7 +1491,7 @@ function cellAnnulus(poly, softness) {
   // Uniform strut: offset the boundary inward by a constant margin (a fraction of
   // the cell's mean radius). Floored so thin cells keep a hole.
   let mean = 0; for (const r of rawR) mean += r; mean /= M;
-  const strut = mean * 0.22;                        // thinner walls -> the open, airy reference look
+  const strut = mean * 0.22 * wallMul;              // wallMul (WEIGHT HIERARCHY) tapers walls base->tip / off-spine; 1 = the open, airy reference look
   let R = new Array(M);
   for (let k = 0; k < M; k++) R[k] = Math.max(rawR[k] - strut, 0.16 * mean);
   // SOFTNESS rounds the hole's corners by circularly smoothing its radial profile:

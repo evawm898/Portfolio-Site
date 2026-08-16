@@ -831,6 +831,11 @@ function resolveParams(ui) {
     edgeTermination: ui.edgeTermination,         // how infill meets the margin: fade | meet | loop (veins/bone)
     captureDist: ui.captureDist,                 // tip capture distance as a fraction of blade width
     voronoiLloyd: ui.voronoiLloyd,               // VORONOI constrained-Lloyd iterations (0 = legacy single pass)
+    voronoiAniso: ui.voronoiAniso,               // VORONOI cell elongation along the petal's long axis (1 = isotropic)
+    voronoiDensityLaw: ui.voronoiDensityLaw,     // VORONOI cell-size scaling to local blade width (0 = uniform)
+    voronoiWeight: ui.voronoiWeight,             // VORONOI wall weight hierarchy mix (0 = uniform)
+    voronoiWeightFalloff: ui.voronoiWeightFalloff, // VORONOI base->tip wall weight exponent k
+    voronoiSlabTaper: ui.voronoiSlabTaper,       // VORONOI slab depth taper base->tip (0 = constant)
     density: ui.density,                          // raw density: vein depth OR voronoi cell count
     strandCount: ui.strandCount,                 // STRANDS: number of radial strands across the width
     strandWidth: ui.strandWidth,                 // STRANDS: tube thickness as a fraction of the gap
@@ -909,7 +914,12 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // matters at 100+ fill petals.
   const ven = P.solidBlade ? null
     : P.infillType === 'voronoi'
-    ? buildVoronoi(P, rng, { density: P.density, softness: P.softness, lloyd: P.voronoiLloyd })
+    ? buildVoronoi(P, rng, {
+        density: P.density, softness: P.softness, lloyd: P.voronoiLloyd,
+        anisotropy: P.voronoiAniso, cellDensityLaw: P.voronoiDensityLaw,
+        weightHierarchy: P.voronoiWeight, weightFalloff: P.voronoiWeightFalloff,
+        slabTaper: P.voronoiSlabTaper, minCellSize: 3 * P.tubeRadius * SLAB_THICK,
+      })
     : P.infillType === 'strands'
     ? buildStrands(P, {
         count: P.strandCount, width: P.strandWidth,
@@ -1038,7 +1048,8 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   if (ven.slabs) {
     const thick = P.tubeRadius * SLAB_THICK;
     for (const slab of ven.slabs) {
-      acc.addSlab(slab.outer.map(station), slab.inner.map(station), thick);
+      // per-cell SLAB TAPER (out-of-plane): thicker at the base, thinner at the tip.
+      acc.addSlab(slab.outer.map(station), slab.inner.map(station), thick * (slab.thickMul || 1));
     }
   }
 }
@@ -2522,6 +2533,11 @@ const inputs = {
   edgeTermination: document.getElementById('edgeTermination'),
   captureDist: document.getElementById('captureDist'),
   voronoiLloyd: document.getElementById('voronoiLloyd'),
+  voronoiAniso: document.getElementById('voronoiAniso'),
+  voronoiDensityLaw: document.getElementById('voronoiDensityLaw'),
+  voronoiWeight: document.getElementById('voronoiWeight'),
+  voronoiWeightFalloff: document.getElementById('voronoiWeightFalloff'),
+  voronoiSlabTaper: document.getElementById('voronoiSlabTaper'),
   strandCount: document.getElementById('strandCount'),
   strandWidth: document.getElementById('strandWidth'),
   strandTaper: document.getElementById('strandTaper'),
@@ -2643,6 +2659,11 @@ function readUI() {
     edgeTermination: inputs.edgeTermination.value,
     captureDist: parseFloat(inputs.captureDist.value),
     voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
+    voronoiAniso: parseFloat(inputs.voronoiAniso.value),
+    voronoiDensityLaw: parseFloat(inputs.voronoiDensityLaw.value),
+    voronoiWeight: parseFloat(inputs.voronoiWeight.value),
+    voronoiWeightFalloff: parseFloat(inputs.voronoiWeightFalloff.value),
+    voronoiSlabTaper: parseFloat(inputs.voronoiSlabTaper.value),
     strandCount: parseInt(inputs.strandCount.value, 10),
     strandWidth: parseFloat(inputs.strandWidth.value),
     strandTaper: parseFloat(inputs.strandTaper.value),
@@ -2754,6 +2775,11 @@ function refreshLabels() {
   setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
   setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
   setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
+  setLabel('voronoiAniso', (+inputs.voronoiAniso.value).toFixed(1) + '×');
+  setLabel('voronoiDensityLaw', (+inputs.voronoiDensityLaw.value).toFixed(2));
+  setLabel('voronoiWeight', (+inputs.voronoiWeight.value).toFixed(2));
+  setLabel('voronoiWeightFalloff', (+inputs.voronoiWeightFalloff.value).toFixed(1));
+  setLabel('voronoiSlabTaper', (+inputs.voronoiSlabTaper.value).toFixed(2));
   setLabel('strandCount', inputs.strandCount.value);
   setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
   setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
@@ -2864,7 +2890,9 @@ function setBuilding(on) {
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
  'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'captureDist', 'voronoiLloyd', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'captureDist', 'voronoiLloyd',
+ 'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
+ 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize', 'centerTipShape', 'centerFilThick',
@@ -3134,6 +3162,11 @@ if (resetBtn) {
     inputs.edgeTermination.value = d.edgeTermination;
     inputs.captureDist.value = d.captureDist;
     inputs.voronoiLloyd.value = d.voronoiLloyd;
+    inputs.voronoiAniso.value = d.voronoiAniso;
+    inputs.voronoiDensityLaw.value = d.voronoiDensityLaw;
+    inputs.voronoiWeight.value = d.voronoiWeight;
+    inputs.voronoiWeightFalloff.value = d.voronoiWeightFalloff;
+    inputs.voronoiSlabTaper.value = d.voronoiSlabTaper;
     inputs.strandCount.value = d.strandCount;
     inputs.strandWidth.value = d.strandWidth;
     inputs.strandTaper.value = d.strandTaper;
@@ -3243,6 +3276,7 @@ const DEFAULTS = {
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
   edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
+  voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
@@ -3273,7 +3307,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 1;
+const CURRENT_SCHEMA = 2;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3289,7 +3323,18 @@ function migrateV0toV1(p) {
   if (!('voronoiLloyd' in p)) out.voronoiLloyd = 0;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1];
+// v1 -> v2: the VORONOI shared-grammar controls (anisotropy, density law, weight
+// hierarchy + falloff, slab taper). Each new key's legacy value IS its DEFAULTS
+// value (all default to the prior isotropic/uniform look), so filling from DEFAULTS
+// is enough — a migrated design is byte-identical.
+function migrateV1toV2(p) {
+  const out = { ...p };
+  for (const k of ['voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

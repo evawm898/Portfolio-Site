@@ -623,6 +623,51 @@
           <span class="fl-ctrl__hint">0 leaves cells sliced by the outline &rarr; more evens them and settles outer cells against the margin</span>
         </div>
 
+        <div class="fl-ctrl" data-infill-styles="voronoi">
+          <div class="fl-ctrl__row">
+            <label for="voronoiDensityLaw">Cell density law</label>
+            <span class="fl-ctrl__val" data-value="voronoiDensityLaw"></span>
+          </div>
+          <input type="range" id="voronoiDensityLaw" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">0 keeps cells one size (crowds the tip) &rarr; 1 shrinks them with the blade so the count across stays even</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="voronoi">
+          <div class="fl-ctrl__row">
+            <label for="voronoiAniso">Anisotropy</label>
+            <span class="fl-ctrl__val" data-value="voronoiAniso"></span>
+          </div>
+          <input type="range" id="voronoiAniso" min="1" max="4" step="0.05" value="1">
+          <span class="fl-ctrl__hint">1 round cells &rarr; higher stretches them along the petal so they flow like veins</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="voronoi">
+          <div class="fl-ctrl__row">
+            <label for="voronoiWeight">Weight hierarchy</label>
+            <span class="fl-ctrl__val" data-value="voronoiWeight"></span>
+          </div>
+          <input type="range" id="voronoiWeight" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">0 one uniform wall weight &rarr; 1 thick at the base and along spines, fine toward the tip</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="voronoi">
+          <div class="fl-ctrl__row">
+            <label for="voronoiWeightFalloff">Weight falloff</label>
+            <span class="fl-ctrl__val" data-value="voronoiWeightFalloff"></span>
+          </div>
+          <input type="range" id="voronoiWeightFalloff" min="0" max="4" step="0.1" value="1.5">
+          <span class="fl-ctrl__hint">how fast wall weight drops from base to tip &mdash; low is gradual, high stays thick then thins late</span>
+        </div>
+
+        <div class="fl-ctrl" data-infill-styles="voronoi">
+          <div class="fl-ctrl__row">
+            <label for="voronoiSlabTaper">Slab taper</label>
+            <span class="fl-ctrl__val" data-value="voronoiSlabTaper"></span>
+          </div>
+          <input type="range" id="voronoiSlabTaper" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">0 even sheet depth &rarr; 1 deeper at the base and shallower at the tip, for bending stiffness where it matters</span>
+        </div>
+
         <div class="fl-ctrl" data-infill-styles="strands">
           <div class="fl-ctrl__row">
             <label for="strandCount">Strand count</label>

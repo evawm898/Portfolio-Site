@@ -83,6 +83,7 @@ const CONFIGS = [
   { label: 'bone MEET termination', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
   { label: 'voronoi Lloyd 0 (legacy)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'voronoiLloyd', value: '0' }] },
   { label: 'voronoi Lloyd 20 (max relax) + serrated', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'voronoiLloyd', value: '20' }] },
+  { label: 'voronoi shared grammar (aniso + density law + weight + slab taper)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'density', value: '10' }, { id: 'voronoiAniso', value: '2.5' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'voronoiWeight', value: '1' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0.6' }] },
   { label: '+ strap sepals', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }] },
   { label: '+ solid sepals', set: [{ id: 'sepalStyle', value: 'solid', evt: 'change' }] },
   { label: 'full plant (blended receptacle + stem + solid sepals)', set: [{ id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
