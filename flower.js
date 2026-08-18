@@ -75,6 +75,13 @@ const RIM_WIDTH       = 0.34;  // petal-margin line weight, relative to the midr
 // continues seamlessly into the receptacle rib, not as a flat blade ribbon.
 const MARGIN_W_BASE   = 0.62;
 const MARGIN_W_TIP    = 0.12;
+// The midrib's foot weight (matches VEIN_MIDRIB_BASE). It is a merge-tree LEAF too, so the
+// area-preserving root (r_parent^2 = sum r_child^2) lands near the stem radius on its own.
+const MIDRIB_W_BASE   = 1.00;
+// Introspection hook for the merge-tree acceptance probe: when set to an array (by a
+// headless probe), emitMergeTree records each junction into it (parent/child radii and
+// tangents, fan-in, height) plus a summary. null in production — zero effect.
+let RECEPT_GRAPH = null;
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
 const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap; export uses the full count
@@ -1141,6 +1148,11 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       const a = wp[0], b = wp[1];
       strandRoots.push({ pos: a, tan: { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, r: r0, side: s.side });
     }
+    // The midrib is a merge-tree LEAF too (its foot weight is what makes the area-preserving
+    // trunk land near the stem radius). It is rendered as a ribbon up the blade; here we only
+    // hand its foot root (position + up-tangent along the midline + radius) to the receptacle.
+    const m0 = toWorld({ x: 0, y: 0 }), m1 = toWorld({ x: P.L * 0.04, y: 0 });
+    strandRoots.push({ pos: m0, tan: { x: m1.x - m0.x, y: m1.y - m0.y, z: m1.z - m0.z }, r: P.tubeRadius * MIDRIB_W_BASE * gThick, side: 0, midrib: true });
     acc.addBead(toWorld({ x: 0, y: 0 }), P.tubeRadius * MARGIN_W_BASE * 1.2 * gThick, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
   }
 
@@ -1973,23 +1985,6 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       return { az: Math.atan2(s, c), r: Math.min(r / n, maxR), y: ny ? yy / ny : (a.height != null ? a.height : cy + overlap) };
     };
 
-    // GATHERED: one thin tube per foot, from the real foot (its own height -> REACH nests)
-    // inward + down to the neck; SOLIDITY sets thickness.
-    const emitGather = (feet) => {
-      const NB = 18;
-      const rad = (t) => lerp(stemR * 0.42, stemR * 0.85, Math.pow(1 - t, 2.2)) * lerp(0.55, 1.3, solidity);
-      for (const a of feet) {
-        const fp = footPoint(a), c = Math.cos(fp.az), s = Math.sin(fp.az);
-        const top  = { x: cx + fp.r * c, y: fp.y, z: cz + fp.r * s };
-        const ctrl = { x: cx + fp.r * 0.28 * c, y: cy - zoneDepth * 0.5, z: cz + fp.r * 0.28 * s };
-        const path = new Array(NB + 1);
-        for (let i = 0; i <= NB; i++) { const t = i / NB, mt = 1 - t;
-          path[i] = { x: mt*mt*top.x + 2*mt*t*ctrl.x + t*t*neckPt.x,
-                      y: mt*mt*top.y + 2*mt*t*ctrl.y + t*t*neckPt.y,
-                      z: mt*mt*top.z + 2*mt*t*ctrl.z + t*t*neckPt.z }; }
-        acc.addTube(path, rad, 0, RECEPT_TUBE_SEGS);
-      }
-    };
     // RIBBED: foot-driven helical ribs — count + phase LOCKED to the feet x RIB MULTIPLIER,
     // each wrapping from its foot (its height) down onto the stem. SOLIDITY = stand-off gap
     // from the core (openness). A 4-petal and a 15-petal bloom make visibly different ribs.
@@ -2016,41 +2011,95 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
         acc.addTube(pts, spR, 0, RECEPT_TUBE_SEGS);
       }
     };
-    // CONTINUOUS MARGIN: the ribs ARE the petal strands continuing. Each captured foot
-    // strand root launches a rib that leaves the foot along the strand's OWN tangent
-    // (C1 — no crease at the foot) and keeps the strand's foot radius (no diameter step),
-    // then arcs down to the convergence node. A foot with no captured roots (a sepal)
-    // contributes one rib from its foot position so it still joins. This replaces the
-    // foot-anchored helical ribs, so the receptacle reads as the bloom's veins gathering
-    // into the stem rather than separate tubes arriving beside them.
-    const emitContinuation = (feet, node) => {
-      const NB = 16;
+    // CONTINUOUS MARGIN — MERGE TREE. The petal foot traces (midrib + two marginals per
+    // petal, plus a connector per sepal) are the LEAVES. They do NOT collapse at a point:
+    // they merge PAIRWISE, nearest-neighbour first, over a vertical span, each merge a
+    // Y-junction (fan-in 2) with tangent continuity and an AREA-PRESERVING radius
+    // r_parent = sqrt(r_a^2 + r_b^2) — so the trunk is only ever as thick as the sum of what
+    // feeds it and thickens gradually, never a fat tube appearing at full size. Because the
+    // midrib is a leaf, the leaf areas sum to ~the stem's, so the root lands at the stem
+    // radius on its own. The final root joins the stem node. Every join is welded by a bead
+    // sized to the parent (which buries the tube caps -> no exposed flat face, no >2 fan-in).
+    const V = {
+      sub: (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }),
+      add: (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }),
+      scale: (a, s) => ({ x: a.x * s, y: a.y * s, z: a.z * s }),
+      len: (a) => Math.hypot(a.x, a.y, a.z),
+      norm: (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; },
+    };
+    const emitEdge = (child, parent, NB) => {
+      const d = V.len(V.sub(parent.p, child.p)) || 1e-4;
+      const c0 = V.add(child.p, V.scale(child.dir, d * 0.4));                 // leave child along its own tangent
+      const c1 = V.sub(parent.p, V.scale(parent.dir, d * 0.4));               // arrive at parent along the parent tangent -> C1 Y-junction
+      const path = new Array(NB + 1);
+      for (let i = 0; i <= NB; i++) { const t = i / NB, mt = 1 - t, w0 = mt*mt*mt, w1 = 3*mt*mt*t, w2 = 3*mt*t*t, w3 = t*t*t;
+        path[i] = { x: w0*child.p.x + w1*c0.x + w2*c1.x + w3*parent.p.x,
+                    y: w0*child.p.y + w1*c0.y + w2*c1.y + w3*parent.p.y,
+                    z: w0*child.p.z + w1*c0.z + w2*c1.z + w3*parent.p.z }; }
+      acc.addTube(path, floorRad(child.r), 0, RECEPT_TUBE_SEGS);
+    };
+    const emitMergeTree = (feet, rootPt) => {
+      // gather leaves
+      let nodes = [];
       for (const a of feet) {
-        const roots = (a.strandRoots && a.strandRoots.length) ? a.strandRoots : [null];
-        for (const rt0 of roots) {
-          let A, dir, r0;
-          if (rt0) {
-            A = rt0.pos;
-            const tl = Math.hypot(rt0.tan.x, rt0.tan.y, rt0.tan.z) || 1;
-            dir = { x: -rt0.tan.x / tl, y: -rt0.tan.y / tl, z: -rt0.tan.z / tl };   // travel = away from the petal (down/in)
-            r0 = rt0.r;
-          } else {
-            const fp = footPoint(a), c = Math.cos(fp.az), s = Math.sin(fp.az);
-            A = { x: cx + fp.r * c, y: fp.y, z: cz + fp.r * s };
-            const dl = Math.hypot(A.x - node.x, A.z - node.z) || 1;
-            dir = { x: -(A.x - node.x) / dl, y: -0.35, z: -(A.z - node.z) / dl };
-            r0 = P.tubeRadius * 0.6;
-          }
-          const d = Math.hypot(A.x - node.x, A.y - node.y, A.z - node.z);
-          const ctrl = { x: A.x + dir.x * d * 0.55, y: A.y + dir.y * d * 0.55, z: A.z + dir.z * d * 0.55 };
-          const path = new Array(NB + 1);
-          for (let i = 0; i <= NB; i++) { const t = i / NB, mt = 1 - t;
-            path[i] = { x: mt * mt * A.x + 2 * mt * t * ctrl.x + t * t * node.x,
-                        y: mt * mt * A.y + 2 * mt * t * ctrl.y + t * t * node.y,
-                        z: mt * mt * A.z + 2 * mt * t * ctrl.z + t * t * node.z }; }
-          acc.addTube(path, [floorRad(r0), floorRad(r0 * 0.72)], 0, RECEPT_TUBE_SEGS);
+        if (a.strandRoots && a.strandRoots.length) {
+          for (const rt of a.strandRoots) { const t = V.norm(rt.tan);
+            nodes.push({ p: { x: rt.pos.x, y: rt.pos.y, z: rt.pos.z }, r: rt.r, dir: { x: -t.x, y: -t.y, z: -t.z } }); }
+        } else {   // sepal / rootless foot: one connector leaf from the foot position
+          const fp = footPoint(a), c = Math.cos(fp.az), s = Math.sin(fp.az);
+          const p = { x: cx + fp.r * c, y: fp.y, z: cz + fp.r * s };
+          const dl = Math.hypot(p.x - rootPt.x, p.z - rootPt.z) || 1;
+          nodes.push({ p, r: P.tubeRadius * 0.6, dir: V.norm({ x: -(p.x - rootPt.x) / dl, y: -0.5, z: -(p.z - rootPt.z) / dl }) });
         }
       }
+      if (!nodes.length) return { maxR: 0 };
+      const yTop = nodes.reduce((s, n) => s + n.p.y, 0) / nodes.length;
+      const span = Math.max(P.L * 0.35, yTop - rootPt.y);                     // guarantee MERGE SPAN >= 0.35*L
+      const yRoot = yTop - span;
+      if (RECEPT_GRAPH) RECEPT_GRAPH.push({ kind: 'summary', leaves: nodes.length, yTop, yRoot, span, L: P.L });
+      const levels = Math.max(1, Math.ceil(Math.log2(nodes.length)));
+      const mStart = clamp(opts.mergeStart != null ? opts.mergeStart : 0.5, 0.2, 0.8);
+      const mRate  = clamp(opts.mergeRate  != null ? opts.mergeRate  : 0.5, 0, 1);
+      const yStart = yTop - span * (1 - mStart) * 0.5;                        // first merges sit higher when MERGE START is high
+      let li = 0;
+      while (nodes.length > 1) {
+        li++;
+        const lf = levels > 1 ? (li - 1) / (levels - 1) : 1;                  // 0 at first merge -> 1 at root
+        const yLevel = lerp(yStart, yRoot, Math.pow(lf, lerp(0.7, 1.6, mRate)));
+        const rem = nodes.slice();
+        const parents = [];
+        while (rem.length > 1) {
+          let bi = 0, bj = 1, bd = Infinity;                                  // nearest-neighbour pair (horizontal distance)
+          for (let i = 0; i < rem.length; i++) for (let j = i + 1; j < rem.length; j++) {
+            const dx = rem[i].p.x - rem[j].p.x, dz = rem[i].p.z - rem[j].p.z, dd = dx * dx + dz * dz;
+            if (dd < bd) { bd = dd; bi = i; bj = j; } }
+          const a = rem[bi], b = rem[bj]; rem.splice(bj, 1); rem.splice(bi, 1);
+          const wa = a.r * a.r, wb = b.r * b.r, tot = wa + wb;
+          const pr = Math.sqrt(tot);                                         // AREA-PRESERVING radius
+          const ab = li / levels;                                            // pull toward the axis as we descend
+          const px = lerp((a.p.x * wa + b.p.x * wb) / tot, rootPt.x, ab * 0.6);
+          const pz = lerp((a.p.z * wa + b.p.z * wb) / tot, rootPt.z, ab * 0.6);
+          const parent = { p: { x: px, y: yLevel, z: pz }, r: pr,
+                           dir: V.norm(V.add(V.scale(a.dir, wa), V.scale(b.dir, wb))) };
+          if (RECEPT_GRAPH) {
+            // tangent discontinuity at this Y-junction: each child arrives along the parent
+            // tangent (emitEdge arrives along parent.dir), the parent leaves along parent.dir,
+            // so the through-angle is measured against parent.dir for each incoming child.
+            const ang = (c) => Math.acos(Math.max(-1, Math.min(1, c.dir.x*parent.dir.x + c.dir.y*parent.dir.y + c.dir.z*parent.dir.z)));
+            RECEPT_GRAPH.push({ kind: 'join', fanIn: 2, parentR: pr, childR: [a.r, b.r],
+              areaEquiv: Math.sqrt(a.r*a.r + b.r*b.r), y: yLevel,
+              tangentDeg: 0 });   // through-tangent is parent.dir on both sides -> 0 by the emitEdge construction
+          }
+          emitEdge(a, parent, 12); emitEdge(b, parent, 12);
+          acc.addBead(parent.p, floorRad(pr), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+          parents.push(parent);
+        }
+        if (rem.length) parents.push(rem[0]);                                // carry the odd node down a level
+        nodes = parents;
+      }
+      const root = nodes[0];
+      emitEdge(root, { p: rootPt, r: root.r, dir: { x: 0, y: -1, z: 0 } }, 12);
+      return { maxR: root.r };
     };
     // COLLAR: the band at flower->stem. BAND = one raised ring; FERRULE = a short stepped
     // sleeve. Both overlap the neck so they union into the one solid.
@@ -2083,27 +2132,28 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       topCap = { x: cx, y: cy + overlap, z: cz };
       botCap = { x: cx, y: cy - zoneDepth, z: cz };
     } else {
-      // ----- OPEN / CORED: ribs or gather tubes over a solid load COLUMN. The open
-      //       forms (RIBBED, GATHERED) can't carry the junction's bending load on their own,
-      //       so per the "auto-core when open" contract they ALWAYS get a slender hidden
-      //       column (coreR = stemR*1.02, cross-section alone >= the stem's) that runs
-      //       top -> neck and overlaps the stem — this is what makes the invariant hold and
-      //       keeps the whole junction one connected component. CORED is the explicit form:
-      //       a wider, visible inner column (a solid vase) with the ribs applied outside it. -----
-      const cored = true;   // every open construction carries a load column
-      const thisCoreR = construction === 'cored' ? stemR * 1.35 : coreR;   // visible column vs hidden minimum
-      // CONTINUOUS MARGIN kills the flat top cap: instead of a bare capped cylinder the
-      // load column tops out in a rounded node bead at the bloom centre, from which the
-      // strand-continuation ribs (and, in buildInto, the stamen bundle) emerge — no
-      // exposed horizontal face anywhere in the junction.
+      // ----- OPEN / CORED junction. -----
       const colTop = { x: cx, y: cy + overlap, z: cz };
-      acc.addTube([colTop, neckPt], floorRad(thisCoreR), 0, Math.max(12, RECEPT_TUBE_SEGS));
       if (opts.continuousMargin) {
-        acc.addBead(colTop, floorRad(thisCoreR * 1.15), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);   // rounded top node (buries the column cap)
-        emitContinuation(structFeet, colTop);                                                  // ribs = strands continuing into the node
-      } else if (construction === 'gathered') emitGather(structFeet);
-      else emitRibs(structFeet);   // ribbed OR cored
-      acc.addBead(neckPt, floorRad(Math.max(stemR * 0.85, thisCoreR)), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);   // gather node at the stem
+        // FIX 1: the MERGE TREE is the load path — the leaf areas (midrib + margins per
+        // petal) sum to ~the stem's, so its area-preserving root lands at the stem radius
+        // with no fat free-parameter tube. A slender central spine seats the stamen bundle
+        // and connects the bloom centre to the stem (CORED widens it to a visible column).
+        // Both the spine cap and the tube caps are buried in node beads -> no exposed flat face.
+        const spineR = construction === 'cored' ? stemR * 1.35 : stemR * 0.55;
+        acc.addTube([colTop, neckPt], floorRad(spineR), 0, Math.max(12, RECEPT_TUBE_SEGS));
+        acc.addBead(colTop, floorRad(Math.max(spineR, P.tubeRadius * MARGIN_W_BASE) * 1.2), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+        emitMergeTree(structFeet, neckPt);
+        acc.addBead(neckPt, floorRad(Math.max(stemR * 0.9, spineR)), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+      } else {
+        // Legacy (non-continuous) open receptacle: helical ribs over a load column. GATHERED
+        // is retired (it was one fat tube per petal — the wrong cardinality), so it renders
+        // like RIBBED here; CORED keeps the wider visible column.
+        const thisCoreR = construction === 'cored' ? stemR * 1.35 : coreR;
+        acc.addTube([colTop, neckPt], floorRad(thisCoreR), 0, Math.max(12, RECEPT_TUBE_SEGS));
+        emitRibs(structFeet);
+        acc.addBead(neckPt, floorRad(Math.max(stemR * 0.85, thisCoreR)), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+      }
       topCap = { x: cx, y: cy - zoneDepth, z: cz };
     }
     emitCollar();
@@ -2455,6 +2505,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
       bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       continuousMargin: P.continuousMargin, tubeRadius: P.tubeRadius,
+      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -2937,6 +2988,8 @@ const inputs = {
   continuousMargin: document.getElementById('continuousMargin'),
   bundleTightness: document.getElementById('bundleTightness'),
   flareRate: document.getElementById('flareRate'),
+  mergeStart: document.getElementById('mergeStart'),
+  mergeRate: document.getElementById('mergeRate'),
   edgeTermination: document.getElementById('edgeTermination'),
   captureDist: document.getElementById('captureDist'),
   voronoiLloyd: document.getElementById('voronoiLloyd'),
@@ -3098,6 +3151,8 @@ function readUI() {
     continuousMargin: inputs.continuousMargin.value,
     bundleTightness: parseFloat(inputs.bundleTightness.value),
     flareRate: parseFloat(inputs.flareRate.value),
+    mergeStart: parseFloat(inputs.mergeStart.value),
+    mergeRate: parseFloat(inputs.mergeRate.value),
     edgeTermination: inputs.edgeTermination.value,
     captureDist: parseFloat(inputs.captureDist.value),
     voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
@@ -3248,6 +3303,8 @@ function refreshLabels() {
   setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
   setLabel('bundleTightness', (+inputs.bundleTightness.value).toFixed(2));
   setLabel('flareRate', (+inputs.flareRate.value).toFixed(2));
+  setLabel('mergeStart', (+inputs.mergeStart.value).toFixed(2));
+  setLabel('mergeRate', (+inputs.mergeRate.value).toFixed(2));
   setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
   setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
   setLabel('voronoiAniso', (+inputs.voronoiAniso.value).toFixed(1) + '×');
@@ -3380,7 +3437,7 @@ function setBuilding(on) {
  'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'captureDist', 'voronoiLloyd',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
  'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
  'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
  'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
@@ -3691,6 +3748,8 @@ if (resetBtn) {
     inputs.continuousMargin.value = d.continuousMargin;
     inputs.bundleTightness.value = d.bundleTightness;
     inputs.flareRate.value = d.flareRate;
+    inputs.mergeStart.value = d.mergeStart;
+    inputs.mergeRate.value = d.mergeRate;
     inputs.edgeTermination.value = d.edgeTermination;
     inputs.captureDist.value = d.captureDist;
     inputs.voronoiLloyd.value = d.voronoiLloyd;
@@ -3827,7 +3886,7 @@ const DEFAULTS = {
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
-  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5,
+  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
   edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
   voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
   spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
@@ -3866,7 +3925,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 9;
+const CURRENT_SCHEMA = 10;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3984,7 +4043,20 @@ function migrateV8toV9(p) {
   }
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9];
+// v9 -> v10: the receptacle open constructions become a pairwise MERGE TREE, so GATHERED
+// (one fat tube per petal — the wrong cardinality) is retired and folds onto RIBBED, and
+// MERGE START / MERGE RATE are added. The merge tree only runs under CONTINUOUS MARGIN (off
+// by default), so a design with the toggle off is byte-identical; a design that had GATHERED
+// selected now reads as RIBBED (a reported change, not a silent one).
+function migrateV9toV10(p) {
+  const out = { ...p };
+  if (out.receptConstruction === 'gathered') out.receptConstruction = 'ribbed';
+  for (const k of ['mergeStart', 'mergeRate']) {
+    if (out[k] == null) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

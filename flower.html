@@ -842,6 +842,24 @@
           <span class="fl-ctrl__hint">how fast they open onto the edge as they rise &mdash; a slow spread &rarr; a quick flare</span>
         </div>
 
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="mergeStart">Merge start</label>
+            <span class="fl-ctrl__val" data-value="mergeStart"></span>
+          </div>
+          <input type="range" id="mergeStart" min="0.2" max="0.8" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how soon the strands begin merging as they descend into the receptacle &mdash; later &rarr; sooner</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="mergeRate">Merge rate</label>
+            <span class="fl-ctrl__val" data-value="mergeRate"></span>
+          </div>
+          <input type="range" id="mergeRate" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how quickly the strand count halves &mdash; a long even taper &rarr; a fast gather near the stem</span>
+        </div>
+
         <div class="fl-ctrl" id="captureDistCtrl">
           <div class="fl-ctrl__row">
             <label for="captureDist">Capture distance</label>
@@ -1246,10 +1264,9 @@
           <select class="fl-select" id="receptConstruction">
             <option value="solid">SOLID</option>
             <option value="ribbed">RIBBED</option>
-            <option value="gathered">GATHERED</option>
             <option value="cored">CORED</option>
           </select>
-          <span class="fl-ctrl__hint">how it is built &mdash; a continuous surface, open scrollwork ribs, one tube per foot, or a solid core with ribs outside</span>
+          <span class="fl-ctrl__hint">how it is built &mdash; a continuous surface, open scrollwork ribs, or a solid core with ribs outside (with continuous margin on, the open forms become the merge tree)</span>
         </div>
 
         <div class="fl-ctrl" data-recept>
@@ -1270,7 +1287,7 @@
             <span class="fl-ctrl__val" data-value="receptReach"></span>
           </div>
           <input type="range" id="receptReach" min="0" max="1" step="0.01" value="0">
-          <span class="fl-ctrl__hint">sits at the base &rarr; climbs up into the bloom, following the feet at every layer</span>
+          <span class="fl-ctrl__hint">feeds the junction the outer whorl only &rarr; the inner whorls' feet too (multi-layer blooms; no effect on a single layer)</span>
         </div>
 
         <div class="fl-ctrl" data-recept>

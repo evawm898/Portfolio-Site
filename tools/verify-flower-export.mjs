@@ -93,7 +93,7 @@ const CONFIGS = [
   { label: 'receptacle CONE/RIBBED (ex-ironwork) + stem', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'ribMultiplier', value: '1.5' }, { id: 'spiralTightness', value: '0.7' }, { id: 'spiralThickness', value: '0.6' }] },
   { label: 'receptacle RIBBED dense + thin ribs (min feature)', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'ribMultiplier', value: '3' }, { id: 'receptSolidity', value: '1' }, { id: 'spiralTightness', value: '1' }, { id: 'spiralThickness', value: '0' }] },
   { label: 'receptacle DOME/SOLID (ex-bulb) + stem', set: [{ id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'ribMultiplier', value: '1' }, { id: 'spiralThickness', value: '0.5' }, { id: 'bulbSize', value: '0.7' }, { id: 'bulbHeight', value: '0.7' }] },
-  { label: 'receptacle CONE/GATHERED (ex-soft) + open solidity', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'gathered', evt: 'change' }, { id: 'receptSolidity', value: '0.3' }, { id: 'blendSmoothness', value: '0.8' }] },
+  { label: 'receptacle CONE/RIBBED (ex-soft; GATHERED retired) + open solidity', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptSolidity', value: '0.3' }, { id: 'blendSmoothness', value: '0.8' }] },
   { label: '+ 3 layers (uniform count)', set: [{ id: 'layerCount', value: '3' }] },
   { label: '+ 4 layers, per-layer counts (rose/peony)', set: [{ id: 'layerCount', value: '4' }, { id: 'petalsPerLayer', value: '6,10,14,18' }] },
   { label: 'petal cup +1 (cupped, single layer)', set: [{ id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'petalCup', value: '1' }] },
@@ -176,7 +176,7 @@ const CONFIGS = [
 // bloom + stem so the claw/lobed state from the block above never leaks in; each matrix
 // row then sets all three axes explicitly (they persist cumulatively otherwise).
 const MPROFILES = ['flare', 'dome', 'cone', 'urn', 'gentle'];
-const MCONS = ['solid', 'ribbed', 'gathered', 'cored'];
+const MCONS = ['solid', 'ribbed', 'cored'];   // GATHERED retired (folded onto RIBBED)
 const MCOLLARS = ['none', 'band', 'ferrule'];
 const MATRIX_START = CONFIGS.length + 1;   // 1-based index of the first matrix row (for the pass fraction)
 CONFIGS.push({ label: 'matrix reset: clean 9-petal bloom + stem + receptacle ON', set: [
@@ -209,7 +209,7 @@ CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', se
   { id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' },
 ] });
 CONFIGS.push({ label: 'cont-margin CORED', matrix: false, set: [{ id: 'receptConstruction', value: 'cored', evt: 'change' }] });
-CONFIGS.push({ label: 'cont-margin GATHERED', set: [{ id: 'receptConstruction', value: 'gathered', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin merge start 0.2 / rate 0.2', set: [{ id: 'mergeStart', value: '0.2' }, { id: 'mergeRate', value: '0.2' }] });
 CONFIGS.push({ label: 'cont-margin SOLID profile', set: [{ id: 'receptConstruction', value: 'solid', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin URN + ferrule', set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptCollar', value: 'ferrule', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin voronoi infill', set: [{ id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] });
