@@ -195,6 +195,29 @@ for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOL
   ] });
 }
 
+// ===== CONTINUOUS MARGIN: the petal edge becomes two strands rooted at the foot and the
+// receptacle ribs continue them into a converged node. The junction changes topology, so
+// re-run the print-safety gate with it ON across constructions, infills, bloom types,
+// layers, sepals and the bundle/flare extremes — every one must still export watertight.
+CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', set: [
+  { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
+  { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' }, { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'loop', evt: 'change' },
+  { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' },
+  { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '5' }, { id: 'stemThickness', value: '1' },
+  { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' },
+  { id: 'receptReach', value: '0.4' }, { id: 'receptSolidity', value: '0.4' },
+  { id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' },
+] });
+CONFIGS.push({ label: 'cont-margin CORED', matrix: false, set: [{ id: 'receptConstruction', value: 'cored', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin GATHERED', set: [{ id: 'receptConstruction', value: 'gathered', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin SOLID profile', set: [{ id: 'receptConstruction', value: 'solid', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin URN + ferrule', set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptCollar', value: 'ferrule', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin voronoi infill', set: [{ id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin bone (no outline) infill', set: [{ id: 'infillType', value: 'bone', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin bundle 0 / flare 1 (loose, quick)', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'bundleTightness', value: '0' }, { id: 'flareRate', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin bundle 1 / flare 0 (tight, slow) + reach 1', set: [{ id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }, { id: 'receptReach', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin coiled bloom + 3 layers', set: [{ id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '12' }, { id: 'layerCount', value: '3' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' }] });
+
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p === '/') p = '/flower.html';

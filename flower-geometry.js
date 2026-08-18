@@ -1248,14 +1248,27 @@ export function buildVenation(P, rng, opts = {}) {
   const nodes = [];
   const ctx = { rightVeins: [], count: 0, maxCount: 1800 };
 
+  // CONTINUOUS MARGIN: root the whole tree at the FOOT node (u=0, y=0) so the midrib
+  // and both marginal strands leave the same point as a bundle, instead of the midrib
+  // starting a little up the blade with a separate closed-loop rim hooped around it.
+  const cont = !!opts.continuousMargin;
+
   // --- 1. MIDRIB — the single dominant vein, on the axis, thickest, tapering
-  //         strongly base -> tip. Added once, never mirrored. ---
-  const uBase = 0.02, uApex = 0.985, nMid = 30;
+  //         strongly base -> tip. Added once, never mirrored. In continuous mode it is
+  //         rooted at the foot (u=0) so it reaches the junction. ---
+  const uBase = cont ? 0.0 : 0.02, uApex = 0.985, nMid = 30;
   const midrib = [];
   for (let i = 0; i <= nMid; i++) midrib.push({ x: L * lerp(uBase, uApex, i / nMid), y: 0 });
   veins.push({ points: midrib, w0: VEIN_MIDRIB_BASE, w1: VEIN_MIDRIB_TIP });
   nodes.push({ x: midrib[0].x, y: 0, width: VEIN_MIDRIB_BASE });
   nodes.push({ x: midrib[nMid].x, y: 0, width: VEIN_MIDRIB_TIP });
+
+  // NOTE: the continuous MARGINAL STRANDS (the two edge traces rooted at the foot, the
+  // replacement for the closed-loop rim) are generated in the render layer's
+  // marginStrands() helper — see flower.js — because they must ride the SAME surface
+  // mapping as the rim they replace and hand their foot roots to the receptacle. They
+  // trace the outline y = ±halfWidth(u), so LOOP arcades still fuse onto them exactly as
+  // they fused onto the old rim. Here we only re-root the midrib at the foot.
 
   // --- 2. PRIMARY veins off the midrib (pinnate). Each launches near-tangent to
   //         the axis (soft T-join) and recurses into secondary / tertiary /

@@ -813,6 +813,35 @@
           <span class="fl-ctrl__hint">how the infill meets the rim &mdash; fade stops short of it, meet runs veins into the margin, loop fuses neighbouring tips into arches</span>
         </div>
 
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="continuousMargin">Continuous margin</label>
+          </div>
+          <select class="fl-select" id="continuousMargin">
+            <option value="off" selected>OFF</option>
+            <option value="on">ON</option>
+          </select>
+          <span class="fl-ctrl__hint">the edge as two strands rooted at the foot that the receptacle continues, instead of a closed-loop rim &mdash; petal, receptacle and stem read as one piece</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="bundleTightness">Bundle tightness</label>
+            <span class="fl-ctrl__val" data-value="bundleTightness"></span>
+          </div>
+          <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how close the strands stay to the axis at the foot &mdash; a loose splay &rarr; a tight neck</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="flareRate">Flare rate</label>
+            <span class="fl-ctrl__val" data-value="flareRate"></span>
+          </div>
+          <input type="range" id="flareRate" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how fast they open onto the edge as they rise &mdash; a slow spread &rarr; a quick flare</span>
+        </div>
+
         <div class="fl-ctrl" id="captureDistCtrl">
           <div class="fl-ctrl__row">
             <label for="captureDist">Capture distance</label>
