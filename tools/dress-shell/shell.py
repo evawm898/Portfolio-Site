@@ -195,23 +195,43 @@ def dress_depth(fillet_params=None, v_top=240.0):
     return _DRESS_DEPTH[key]
 
 
-def dress_params(fillet_params=None, bodice=None) -> ShellParams:
-    """The committed DRESS design (consolidated spec, approved): filleted
-    waist (R = 25 conic), traced bodice depth with monotone bust crest,
-    width solved from the given circumferences (ratios = outputs),
-    neckline v3 (CF 220 / peak 240 @ 82 / side 190 / CB 145), and the
-    FRONT/BACK split at the SOLVED armhole angle. Export, editor, and
-    reports build from this one constructor — single source of truth.
-    The fillet/neckline overrides exist for the editor's live rebuild;
-    the armhole split re-solves whenever the fillet moves P(190)."""
+def dress_params(fillet_params=None, bodice=None, compound=True,
+                 bust_point_v=181.0, bust_point_radius=30.0,
+                 join_radius=0.0, front_bow=0.1) -> ShellParams:
+    """The committed DRESS design: filleted waist (R = 25 conic), traced
+    bodice depth with monotone bust crest, width solved from the given
+    circumferences (ratios = outputs), neckline v3 (CF 220 / peak 240 @
+    82 / side 190 / CB 145), and the FRONT/BACK split at the SOLVED
+    armhole angle. Export, editor, and reports build from this one
+    constructor — single source of truth. The fillet/neckline overrides
+    exist for the editor's live rebuild; the armhole split re-solves
+    whenever the fillet moves P(190).
+
+    COMPOUND SECTIONS (approved, wired in as the default): the front
+    half of each section gets its own depth b_front(v) — a sculptural
+    bust cup authored via (v, depth) control points at v=45/bust_point_v
+    /220, joining the back half's UNCHANGED depth at v=45 — while the
+    circumference schedule P(v) stays exactly the frozen fillet schedule
+    above (a(v) is re-solved so the compound perimeter matches it). The
+    corners at bust_point_v and v=45 are independently blendable via
+    bust_point_radius / join_radius (0 = sharp; see compound.py). Pass
+    compound=False for the pre-compound single-ellipse sections (kept
+    for comparison / regression reporting)."""
     bp = bodice if bodice is not None else NecklineV3Params()
     v_top = max(240.0, float(getattr(bp, "peak_height", 0.0) or 0.0),
                 float(getattr(bp, "cf_height", 0.0) or 0.0))
     d = dress_depth(fillet_params, v_top=v_top)
     # armhole from the across-back tape on the filleted schedule:
-    # theta = 180 - 180 * arc / P(190)
+    # theta = 180 - 180 * arc / P(190). The compound wrap below FREEZES
+    # this exact schedule, so the split computed here is unaffected by
+    # whether compound sections are applied.
     P190 = float(np.asarray(d.perimeter(190.0)))
     split = 180.0 - 180.0 * 360.0 / P190
+    if compound:
+        from compound import CompoundDepth
+        d = CompoundDepth(base=d, bust_point_v=bust_point_v,
+                          bust_point_radius=bust_point_radius,
+                          join_radius=join_radius, front_bow=front_bow)
     return ShellParams(bodice=bp, depth_curve=d, split_theta=split)
 
 
@@ -222,6 +242,21 @@ class ShellModel:
     helpers coords.py builds on."""
 
     is_swept_ellipse = True   # curvature.py: use numeric fundamental forms
+
+    def __new__(cls, params: ShellParams = None, *args, **kwargs):
+        # Dispatch to CompoundShellModel when the depth curve is a
+        # CompoundDepth (dress_params()'s default) — every ShellModel(...)
+        # call site in the codebase gets compound sections automatically,
+        # with no need to know which concrete class it is. Lazy import:
+        # compound.py imports ShellModel/ShellParams from this module, so
+        # importing it at module scope here would be circular.
+        if cls is ShellModel and params is not None:
+            depth = getattr(params, "depth_curve", None)
+            if depth is not None:
+                from compound import CompoundDepth, CompoundShellModel
+                if isinstance(depth, CompoundDepth):
+                    return object.__new__(CompoundShellModel)
+        return object.__new__(cls)
 
     def __init__(self, params: ShellParams = ShellParams()):
         p = params

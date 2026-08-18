@@ -3,9 +3,13 @@
 
     cd tools/dress-shell && python3 compound_gate.py
 
-Nothing here modifies the committed shell: it builds the compound model
-as a prototype and reports every number the brief asks for, so the design
-can be accepted or rejected before geometry is rebuilt.
+APPROVED AND WIRED IN: bust_point_radius = 30 mm, join_radius = 0 (kept
+sharp — see [7b], no value closes that keep-out) are now dress_params()'s
+defaults; ShellModel(dress_params()) IS the compound design. This script
+still reports every number from the original brief, now against that
+committed geometry (`new`) vs the retained pre-compound single-ellipse
+design (`old = ShellModel(dress_params(compound=False))`), so the delta
+stays documented and reproducible after the fact.
 """
 
 import math
@@ -17,8 +21,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np
 
 from bodice import solve_theta_armhole
-from compound import (CompoundDepth, CompoundShellModel, compound_params,
-                      compound_perimeter)
 from consolidated_report import usable_area
 from coords import ShellCoords
 from curvature import (STANDOFF_TOLERANCE_MM, analyze_cells, class_distribution,
@@ -143,16 +145,16 @@ def main():
     classes = load_panel_classes(HERE / "panels.yaml")
     p213 = classes["p213"]
 
-    old = ShellModel(dress_params())
+    old = ShellModel(dress_params(compound=False))  # pre-compound, single-ellipse
     old_c = ShellCoords(old)
     old_ch = SurfaceChart(old, old_c)
 
-    # DECIDED: bust_point_radius = 30 mm. join_radius is a newly added
-    # knob (mechanism decided: a radius blend, same as the bust point) —
-    # its VALUE was not given, so it defaults to 0 (sharp) here; section
-    # [7b] sweeps it so the value can be picked with numbers in hand.
+    # WIRED IN: bust_point_radius = 30 mm, join_radius = 0 (sharp; see
+    # [7b] — no join_radius value buys seatability at v=45, so it was
+    # left at the default). This IS dress_params() now — ShellModel(...)
+    # dispatches to CompoundShellModel automatically.
     BUST_R = 30.0
-    new = CompoundShellModel(compound_params(bust_point_radius=BUST_R))
+    new = ShellModel(dress_params(bust_point_radius=BUST_R))
     cd = new.cd
     new_c = ShellCoords(new)
     new_ch = SurfaceChart(new, new_c)
@@ -265,7 +267,7 @@ def main():
     print("    R_mm  blend_halfwidth  min_merid_R   keep-out band (v)      "
           "width   arc   p213 upright  p213 rotated")
     for R in (0.0, 15.0, BUST_R, 50.0):
-        m = CompoundShellModel(compound_params(bust_point_radius=R))
+        m = ShellModel(dress_params(bust_point_radius=R))
         c = ShellCoords(m)
         ch = SurfaceChart(m, c)
         s_bp = float(c.s_of_z(m.cd.bust_point_v))
@@ -298,7 +300,7 @@ def main():
     print("    How large a radius WOULD let the upright panel cross?")
     for R in (80.0, 120.0, 200.0, 320.0):
         try:
-            m = CompoundShellModel(compound_params(bust_point_radius=R))
+            m = ShellModel(dress_params(bust_point_radius=R))
         except Exception as exc:
             print(f"      R = {R:5.0f}: NOT CONSTRUCTIBLE — {exc}")
             break
@@ -320,8 +322,8 @@ def main():
           "chosen)")
     print("    R_mm  blend_halfwidth  standoff_upright  standoff_rotated")
     for R in (0.0, 5.0, 10.0, 20.0, 30.0):
-        m = CompoundShellModel(compound_params(bust_point_radius=BUST_R,
-                                               join_radius=R))
+        m = ShellModel(dress_params(bust_point_radius=BUST_R,
+                                    join_radius=R))
         c = ShellCoords(m)
         ch = _NoNecklineChart(SurfaceChart(m, c))
         s45 = float(c.s_of_z(45.0))
@@ -332,8 +334,8 @@ def main():
         w = m.cd.front.low_blend_halfwidth
         print(f"    {R:4.0f}  {w:15.2f}  {so_up:16.3f}  {so_rot:16.3f}")
     max_r = 57.0
-    m_max = CompoundShellModel(compound_params(bust_point_radius=BUST_R,
-                                               join_radius=max_r))
+    m_max = ShellModel(dress_params(bust_point_radius=BUST_R,
+                                    join_radius=max_r))
     c_max = ShellCoords(m_max)
     ch_max = _NoNecklineChart(SurfaceChart(m_max, c_max))
     so_max = seat_standoff(c_max, ch_max, p213.outline_w, p213.outline_h,

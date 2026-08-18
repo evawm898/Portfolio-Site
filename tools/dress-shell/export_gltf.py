@@ -332,6 +332,27 @@ def _neckline_meta(neckline):
     return meta
 
 
+def _compound_meta(depth):
+    """None for a plain (pre-compound) depth object; otherwise the knobs
+    and achieved geometry of the compound bust cup — traceability for
+    what the committed shell actually built."""
+    if not hasattr(depth, "bust_point_v"):
+        return None
+    fp = depth.front
+    return {
+        "bust_point_v": depth.bust_point_v,
+        "bust_point_radius_mm": depth.bust_point_radius,
+        "bust_point_blend_halfwidth_mm": round(fp.blend_halfwidth, 4),
+        "bust_point_corner_angle_deg": round(fp.corner_angle_deg(), 4),
+        "join_v": fp.v_low,
+        "join_radius_mm": depth.join_radius,
+        "join_blend_halfwidth_mm": round(fp.low_blend_halfwidth, 4),
+        "join_angle_deg": round(fp.join_angle_deg(), 4),
+        "front_bow": depth.front_bow,
+        "perimeter_residual_mm": depth.perimeter_residual_mm,
+    }
+
+
 def build_sidecar(ex):
     grid, analyses, rep = ex["grid"], ex["analyses"], ex["layering"]
     chart = ex["chart"]
@@ -353,6 +374,7 @@ def build_sidecar(ex):
                 "armhole_band_halfwidth": ex["model"].params.armhole_band_halfwidth,
                 "split_theta": r(getattr(ex["model"], "split_theta", 90.0), 4),
             },
+            "compound_sections": _compound_meta(ex["model"].params.depth_curve),
             "waist_band_s": {"lo": r(chart.band_s_lo, 3),
                              "hi": r(chart.band_s_hi, 3),
                              "derived_from_fillet": chart.band_derived},

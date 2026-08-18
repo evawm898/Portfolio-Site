@@ -612,10 +612,22 @@ class CompoundShellModel(ShellModel):
 
 def compound_params(bust_point_v=181.0, bust_point_radius=0.0, join_radius=0.0,
                     front_bow=0.1, base_params=None):
-    """ShellParams for the compound design: the committed dress with its
-    depth object replaced by the compound one. Circumference anchors,
-    fillet, neckline and split are inherited untouched."""
-    base = base_params if base_params is not None else dress_params()
+    """ShellParams for a compound design: a single-ellipse committed dress
+    (dress_params(compound=False) — NEVER the compound default, which
+    would double-wrap: base.depth_curve would already be a CompoundDepth
+    and its .b would silently become the wrapped front, not the true
+    back) with its depth object replaced by the compound one.
+    Circumference anchors, fillet, neckline and split are inherited
+    untouched. dress_params() itself is the wired-in equivalent of this
+    call at the canonical decided values (bust_point_radius=30,
+    join_radius=0); this function exists for exploring OTHER values, as
+    compound_gate.py's sweeps do."""
+    base = base_params if base_params is not None else dress_params(compound=False)
+    if isinstance(base.depth_curve, CompoundDepth):
+        raise CompoundError(
+            "compound_params() base_params already carries a CompoundDepth "
+            "(double-wrap) — pass dress_params(compound=False) or an "
+            "explicitly single-ellipse ShellParams instead")
     cd = CompoundDepth(base=base.depth_curve, bust_point_v=bust_point_v,
                        bust_point_radius=bust_point_radius,
                        join_radius=join_radius, front_bow=front_bow)
