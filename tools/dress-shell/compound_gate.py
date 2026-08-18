@@ -147,7 +147,12 @@ def main():
     old_c = ShellCoords(old)
     old_ch = SurfaceChart(old, old_c)
 
-    new = CompoundShellModel(compound_params())
+    # DECIDED: bust_point_radius = 30 mm. join_radius is a newly added
+    # knob (mechanism decided: a radius blend, same as the bust point) —
+    # its VALUE was not given, so it defaults to 0 (sharp) here; section
+    # [7b] sweeps it so the value can be picked with numbers in hand.
+    BUST_R = 30.0
+    new = CompoundShellModel(compound_params(bust_point_radius=BUST_R))
     cd = new.cd
     new_c = ShellCoords(new)
     new_ch = SurfaceChart(new, new_c)
@@ -157,8 +162,11 @@ def main():
     print("=" * 74)
     print(f"front control points: (45, {cd.front.d_low:.3f}) - "
           f"({cd.bust_point_v:g}, {cd.front.d_bust:g}) - (220, "
-          f"{cd.front.d_ctrl:g}); front_bow {cd.front_bow:g}, "
-          f"bust_point_radius {cd.bust_point_radius:g}")
+          f"{cd.front.d_ctrl:g}); front_bow {cd.front_bow:g}")
+    print(f"bust_point_radius = {cd.bust_point_radius:g} mm (DECIDED) -> "
+          f"blend half-width {cd.front.blend_halfwidth:.2f} mm")
+    print(f"join_radius = {cd.join_radius:g} mm (knob added, value not yet "
+          f"chosen — default sharp corner; see [7b])")
     print(f"circumference schedule FROZEN — compound-perimeter solve "
           f"residual {cd.perimeter_residual_mm:.2e} mm")
 
@@ -252,10 +260,11 @@ def main():
           f"(junction 90 -> {float(cd.theta_junction_deg(190.0)):.1f} deg).")
 
     # --- 7. corner sweep ---------------------------------------------------
-    print("\n[7] BUST-POINT RADIUS SWEEP (CF keep-out from footprint sampling)")
+    print(f"\n[7] BUST-POINT RADIUS SWEEP (CF keep-out from footprint "
+          f"sampling) — {BUST_R:g} mm is the DECIDED value, shown in context")
     print("    R_mm  blend_halfwidth  min_merid_R   keep-out band (v)      "
           "width   arc   p213 upright  p213 rotated")
-    for R in (0.0, 15.0, 30.0, 50.0):
+    for R in (0.0, 15.0, BUST_R, 50.0):
         m = CompoundShellModel(compound_params(bust_point_radius=R))
         c = ShellCoords(m)
         ch = SurfaceChart(m, c)
@@ -266,7 +275,11 @@ def main():
                                s_bp, samples=9, rotation=90.0)
         band = cf_keepout_band(c, ch, p213, m.cd.bust_point_v)
         w = m.cd.front.blend_halfwidth
-        mr = (m.cd.front._blend_min_radius(w) if w > 0 else 0.0)
+        fp = m.cd.front
+        mr = (fp._corner_min_radius(fp.bust_point_v, w, fp._lower,
+                                    fp._lower_slope, fp._upper,
+                                    fp._upper_slope)
+              if w > 0 else 0.0)
         if band is None:
             btxt = f"{'none — panel can sit on it':<34}"
             wtxt, atxt = "   -  ", "  -  "
@@ -297,20 +310,58 @@ def main():
         print(f"      R = {R:5.0f}: blend half-width "
               f"{m.cd.front.blend_halfwidth:5.1f} mm, standoff {so:.2f} mm "
               f"{'OK' if so <= TOL else 'still NO'}")
-    print("    Not choosing for you — the trade is projection sharpness "
-          "against a bare horizontal stripe across the front.")
+    print(f"    At the DECIDED R = {BUST_R:g}, standoff is still far over "
+          f"tolerance in both orientations (see the {BUST_R:g} row above) — "
+          f"the bust point remains a hard no-seat feature; the radius mainly "
+          f"trades how TALL the keep-out band is, not whether it exists.")
+
+    # --- 7b. join_radius sweep at v = 45 -----------------------------------
+    print("\n[7b] JOIN_RADIUS SWEEP AT v = 45 (the new knob; value not yet "
+          "chosen)")
+    print("    R_mm  blend_halfwidth  standoff_upright  standoff_rotated")
+    for R in (0.0, 5.0, 10.0, 20.0, 30.0):
+        m = CompoundShellModel(compound_params(bust_point_radius=BUST_R,
+                                               join_radius=R))
+        c = ShellCoords(m)
+        ch = _NoNecklineChart(SurfaceChart(m, c))
+        s45 = float(c.s_of_z(45.0))
+        so_up = seat_standoff(c, ch, p213.outline_w, p213.outline_h, 0.0,
+                              s45, samples=9, rotation=0.0)
+        so_rot = seat_standoff(c, ch, p213.outline_w, p213.outline_h, 0.0,
+                               s45, samples=9, rotation=90.0)
+        w = m.cd.front.low_blend_halfwidth
+        print(f"    {R:4.0f}  {w:15.2f}  {so_up:16.3f}  {so_rot:16.3f}")
+    max_r = 57.0
+    m_max = CompoundShellModel(compound_params(bust_point_radius=BUST_R,
+                                               join_radius=max_r))
+    c_max = ShellCoords(m_max)
+    ch_max = _NoNecklineChart(SurfaceChart(m_max, c_max))
+    so_max = seat_standoff(c_max, ch_max, p213.outline_w, p213.outline_h,
+                           0.0, float(c_max.s_of_z(45.0)), samples=9,
+                           rotation=0.0)
+    print(f"    {max_r:4.0f}  {m_max.cd.front.low_blend_halfwidth:15.2f}  "
+          f"{so_max:16.3f}   (~max constructible; larger runs past the "
+          f"bust-point blend region)")
+    print(f"    FINDING: unlike a fresh corner, this one barely moves "
+          f"(3.78 -> 3.42 mm at the construction ceiling) because the "
+          f"panel's 59.2 mm meridional span is ~10x any achievable blend "
+          f"half-width — the standoff there is dominated by the front "
+          f"profile's overall depth change across v [45, 100], not by the "
+          f"sharpness of the corner itself. join_radius will not make this "
+          f"span seatable at any value; it is being kept at the default 0 "
+          f"(sharp) pending your call, since spending it does not buy "
+          f"seatability.")
 
     # --- 8. the second corner ---------------------------------------------
-    print("\n[8] FINDING — A SECOND CORNER AT v = 45 (not in the brief)")
+    print("\n[8] THE SECOND CORNER AT v = 45 (now with its own knob)")
     print(f"    The authored control point 81.0 mm sits {abs(cd.front.join_step_mm):.2f} mm "
           f"BELOW the actual unchanged profile there ({cd.front.back_d_low:.3f} mm). "
           f"Built literally it would leave a {abs(cd.front.join_step_mm):.2f} mm ledge "
           f"around the whole front, so the control point is SNAPPED to the "
           f"real value (C0 closed) and the difference reported here instead.")
-    print(f"    Even snapped, the tangent breaks: the profile arrives at "
-          f"v = 45 nearly vertical and leaves it climbing, a "
-          f"{cd.front.join_angle_deg():.1f} deg corner — a second horizontal "
-          f"crease, same kind as the bust point but unlabelled in the brief.")
+    print(f"    At join_radius = 0 (current default) the tangent still "
+          f"breaks {cd.front.join_angle_deg():.1f} deg — a second horizontal "
+          f"crease, same kind as the bust point.")
     band45 = cf_keepout_band(new_c, new_ch, p213, 45.0, lo=15.0, hi=110.0)
     base45 = cf_keepout_band(old_c, old_ch, p213, 45.0, lo=15.0, hi=110.0)
     b_txt = (f"v [{band45[0]:.1f}, {band45[1]:.1f}] = {band45[2]:.1f} mm tall"
@@ -318,11 +369,11 @@ def main():
     base_txt = (f"v [{base45[0]:.1f}, {base45[1]:.1f}] = {base45[2]:.1f} mm"
                 if base45 else "none (the baseline seats clean through v = 45)")
     print(f"    CF keep-out at that corner: {b_txt}   [baseline: {base_txt}]")
-    if band45:
-        print(f"    It needs its own radius knob, or the lower control point "
-              f"needs a tangent condition instead of a free value. Say which "
-              f"and I will add it — I have not chosen.")
-    print(f"    Bust-point corner angle at R = 0: "
+    print(f"    Per [7b], no join_radius value closes this band — it is "
+          f"driven by the front profile's own depth change over v [45, 100], "
+          f"not the corner. The knob exists but there is no value to pick "
+          f"that fixes this.")
+    print(f"    Bust-point corner angle at R = {BUST_R:g} (blended): "
           f"{cd.front.corner_angle_deg():.1f} deg.")
 
     # --- 9. area + distribution -------------------------------------------

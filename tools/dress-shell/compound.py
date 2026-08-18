@@ -37,6 +37,15 @@ THE BUST POINT IS A CORNER
   equals the requested value (solved by bisection on the blend
   half-width), so the knob means what it says in mm.
 
+THE v = 45 JOIN IS ALSO A CORNER
+  Snapping the control point to the unchanged back profile (above) fixes
+  the VALUE discontinuity but not the TANGENT: the profile arrives at
+  v = 45 climbing at the back's own slope and leaves at the lower
+  segment's slope — an 11 deg break by default. join_radius = 0 leaves
+  that corner sharp; a positive radius blends it the same way as the
+  bust point, against the (finite-differenced) back-profile tangent on
+  one side and the lower segment's tangent on the other.
+
 The sections stay symmetric in x, so the side-view occluding contour is
 still exactly theta = 0 / 180. The half-ellipses meet at (+-a, 0) with
 matching tangent (both vertical in the section plane) but DIFFERENT
@@ -98,13 +107,18 @@ def solve_a(perimeter, b_front, b_back, lo=1.0, hi=2000.0, tol=1e-11):
 # the authored front profile
 
 
+def _fd_slope(f, v, h=0.05):
+    """Central finite-difference slope of a scalar callable at v."""
+    return (float(np.asarray(f(v + h))) - float(np.asarray(f(v - h)))) / (2.0 * h)
+
+
 class FrontProfile:
     """b_front(v): two nearly-straight segments meeting at a corner (or a
     radius-controlled blend) at the bust point, joining the unchanged
-    back profile at v = 45."""
+    back profile at v = 45 (itself a corner, independently blendable)."""
 
     def __init__(self, back_b, bust_point_v=181.0, bust_point_radius=0.0,
-                 front_bow=0.1, v_top=240.0,
+                 join_radius=0.0, front_bow=0.1, v_top=240.0,
                  d_bust=D_BUST, v_low=V_LOW, d_low=D_LOW,
                  v_ctrl=V_TOP_CTRL, d_ctrl=D_TOP_CTRL, snap_low=True):
         if not (v_low < bust_point_v < v_ctrl):
@@ -113,6 +127,8 @@ class FrontProfile:
                 f"{v_ctrl:g}, got {bust_point_v}")
         if bust_point_radius < 0.0:
             raise CompoundError("bust_point_radius must be >= 0")
+        if join_radius < 0.0:
+            raise CompoundError("join_radius must be >= 0")
         if front_bow < 0.0:
             raise CompoundError("front_bow must be >= 0")
         self.back_b = back_b
@@ -121,6 +137,7 @@ class FrontProfile:
         self.v_ctrl, self.d_ctrl = float(v_ctrl), float(d_ctrl)
         self.front_bow = float(front_bow)
         self.bust_point_radius = float(bust_point_radius)
+        self.join_radius = float(join_radius)
         self.v_top = float(v_top)
         # The join at v_low. The authored 81.0 is 0.39 mm below the actual
         # unchanged profile there; honoring it literally would leave a
@@ -132,10 +149,33 @@ class FrontProfile:
         self.join_step_mm = self.authored_d_low - self.back_d_low
         if snap_low:
             self.d_low = self.back_d_low
+
+        # bust-point corner blend (right neighbour is v_ctrl-bounded)
         self.blend_halfwidth = 0.0
         if self.bust_point_radius > 0.0:
-            self.blend_halfwidth = self._solve_blend_halfwidth(
-                self.bust_point_radius)
+            self.blend_halfwidth = self._solve_corner_halfwidth(
+                self.bust_point_radius,
+                corner_v=self.bust_point_v,
+                extent=min(self.bust_point_v - self.v_low,
+                          self.v_ctrl - self.bust_point_v) * 0.98,
+                left_val=self._lower, left_slope=self._lower_slope,
+                right_val=self._upper, right_slope=self._upper_slope,
+                label="bust_point_radius")
+
+        # v = 45 join corner blend (left neighbour is the back profile,
+        # right neighbour is bounded by the bust-point blend region)
+        self.low_blend_halfwidth = 0.0
+        if self.join_radius > 0.0:
+            self.low_blend_halfwidth = self._solve_corner_halfwidth(
+                self.join_radius,
+                corner_v=self.v_low,
+                extent=min(self.v_low,
+                          self.bust_point_v - self.blend_halfwidth
+                          - self.v_low) * 0.98,
+                left_val=lambda v: np.asarray(self.back_b(v)),
+                left_slope=lambda v: _fd_slope(self.back_b, v),
+                right_val=self._lower, right_slope=self._lower_slope,
+                label="join_radius")
 
     # -- the two nearly-straight segments ---------------------------------
     def _seg(self, v, v0, d0, v1, d1):
@@ -177,42 +217,51 @@ class FrontProfile:
                                         self.v_ctrl, self.d_ctrl),
                         slope_end)
 
-    # -- corner blend ------------------------------------------------------
-    def _blended(self, v, w):
-        """Cubic Hermite across [vb - w, vb + w] matching both segments'
-        value AND slope at the ends (C1 by construction)."""
-        vb = self.bust_point_v
-        v0, v1 = vb - w, vb + w
-        y0, y1 = float(self._lower(v0)), float(self._upper(v1))
-        m0, m1 = float(self._lower_slope(v0)), float(self._upper_slope(v1))
+    # -- generic corner blend (used at both the bust point and v = 45) -----
+    @staticmethod
+    def _hermite(v, v0, y0, m0, v1, y1, m1):
+        """Cubic Hermite on [v0, v1] matching value AND slope at both
+        ends (C1 by construction)."""
         t = (np.asarray(v, dtype=float) - v0) / (v1 - v0)
         h = v1 - v0
         return (y0 * (1 + 2 * t) * (1 - t) ** 2 + m0 * h * t * (1 - t) ** 2
                 + y1 * t * t * (3 - 2 * t) + m1 * h * t * t * (t - 1))
 
-    def _blend_min_radius(self, w, n=2001):
+    def _corner_blended(self, v, corner_v, w, left_val, left_slope,
+                        right_val, right_slope):
+        v0, v1 = corner_v - w, corner_v + w
+        y0, y1 = float(left_val(v0)), float(right_val(v1))
+        m0, m1 = float(left_slope(v0)), float(right_slope(v1))
+        return self._hermite(v, v0, y0, m0, v1, y1, m1)
+
+    def _corner_min_radius(self, corner_v, w, left_val, left_slope,
+                           right_val, right_slope, n=2001):
         """Minimum radius of curvature of the blend curve (v, depth)."""
-        vb = self.bust_point_v
-        vv = np.linspace(vb - w, vb + w, n)
-        dd = self._blended(vv, w)
+        vv = np.linspace(corner_v - w, corner_v + w, n)
+        dd = self._corner_blended(vv, corner_v, w, left_val, left_slope,
+                                  right_val, right_slope)
         d1 = np.gradient(dd, vv)
         d2 = np.gradient(d1, vv)
         kappa = np.abs(d2) / (1.0 + d1 ** 2) ** 1.5
         return float(1.0 / np.max(kappa)) if np.max(kappa) > 0 else np.inf
 
-    def _solve_blend_halfwidth(self, radius, lo=1e-4, hi=None):
+    def _solve_corner_halfwidth(self, radius, corner_v, extent, left_val,
+                                left_slope, right_val, right_slope,
+                                label, lo=1e-4):
         """Blend half-width whose minimum radius of curvature equals the
-        requested bust_point_radius (monotone: wider blend = gentler)."""
-        hi = hi if hi is not None else min(self.bust_point_v - self.v_low,
-                                           self.v_ctrl - self.bust_point_v) * 0.98
-        if self._blend_min_radius(hi) < radius:
+        requested radius (monotone: wider blend = gentler)."""
+        hi = extent
+        r_at_hi = self._corner_min_radius(corner_v, hi, left_val, left_slope,
+                                          right_val, right_slope)
+        if r_at_hi < radius:
             raise CompoundError(
-                f"bust_point_radius {radius:g} mm cannot be reached without "
-                f"running past the neighbouring control points (max ~"
-                f"{self._blend_min_radius(hi):.0f} mm)")
+                f"{label} {radius:g} mm cannot be reached without running "
+                f"past the neighbouring control points (max ~{r_at_hi:.0f} mm)")
         for _ in range(80):
             mid = 0.5 * (lo + hi)
-            if self._blend_min_radius(mid) < radius:
+            r_mid = self._corner_min_radius(corner_v, mid, left_val,
+                                            left_slope, right_val, right_slope)
+            if r_mid < radius:
                 lo = mid
             else:
                 hi = mid
@@ -223,21 +272,33 @@ class FrontProfile:
         v = np.asarray(v, dtype=float)
         out = np.empty(np.shape(v), dtype=float)
         flat_v, flat_o = np.atleast_1d(v), np.atleast_1d(out)
-        w = self.blend_halfwidth
-        vb = self.bust_point_v
-        low = flat_v <= self.v_low
-        blend = (flat_v > vb - w) & (flat_v < vb + w) if w > 0 else \
+        wb, wl = self.blend_halfwidth, self.low_blend_halfwidth
+        vb, vl = self.bust_point_v, self.v_low
+
+        low_blend = (flat_v > vl - wl) & (flat_v < vl + wl) if wl > 0 else \
             np.zeros(flat_v.shape, dtype=bool)
-        lower = (~low) & (~blend) & (flat_v <= vb)
-        upper = (~low) & (~blend) & (flat_v > vb)
+        bust_blend = (flat_v > vb - wb) & (flat_v < vb + wb) if wb > 0 else \
+            np.zeros(flat_v.shape, dtype=bool)
+        low = (flat_v <= vl - wl) if wl > 0 else (flat_v <= vl)
+        lower = (~low) & (~low_blend) & (~bust_blend) & (flat_v <= vb)
+        upper = (~low) & (~low_blend) & (~bust_blend) & (flat_v > vb)
+
         if np.any(low):
             flat_o[low] = np.asarray(self.back_b(flat_v[low]))
         if np.any(lower):
             flat_o[lower] = self._lower(flat_v[lower])
         if np.any(upper):
             flat_o[upper] = self._upper(flat_v[upper])
-        if np.any(blend):
-            flat_o[blend] = self._blended(flat_v[blend], w)
+        if np.any(low_blend):
+            flat_o[low_blend] = self._corner_blended(
+                flat_v[low_blend], vl, wl,
+                lambda x: np.asarray(self.back_b(x)),
+                lambda x: _fd_slope(self.back_b, x),
+                self._lower, self._lower_slope)
+        if np.any(bust_blend):
+            flat_o[bust_blend] = self._corner_blended(
+                flat_v[bust_blend], vb, wb,
+                self._lower, self._lower_slope, self._upper, self._upper_slope)
         return flat_o.reshape(np.shape(v)) if np.shape(v) else float(flat_o[0])
 
     def corner_angle_deg(self):
@@ -250,10 +311,10 @@ class FrontProfile:
 
     def join_angle_deg(self):
         """Tangent-angle break at v = 45 where the authored front profile
-        leaves the unchanged back profile."""
-        h = 0.25
-        below = (float(np.asarray(self.back_b(self.v_low)))
-                 - float(np.asarray(self.back_b(self.v_low - h)))) / h
+        leaves the unchanged back profile (0 when blended)."""
+        if self.low_blend_halfwidth > 0.0:
+            return 0.0
+        below = _fd_slope(self.back_b, self.v_low)
         above = float(self._lower_slope(self.v_low))
         return abs(math.degrees(math.atan(above)) - math.degrees(math.atan(below)))
 
@@ -268,7 +329,7 @@ class CompoundDepth:
     compound extras (.b_front, .b_back, .a)."""
 
     def __init__(self, base=None, bust_point_v=181.0, bust_point_radius=0.0,
-                 front_bow=0.1, n_grid=4001):
+                 join_radius=0.0, front_bow=0.1, n_grid=4001):
         self.base = base if base is not None else dress_depth()
         self.v_lo, self.v_hi = self.base.v_lo, self.base.v_hi
         self.params = self.base.params
@@ -276,19 +337,22 @@ class CompoundDepth:
         self._dback = self.base._B.derivative()
         self.front = FrontProfile(self._back, bust_point_v=bust_point_v,
                                   bust_point_radius=bust_point_radius,
+                                  join_radius=join_radius,
                                   front_bow=front_bow, v_top=self.v_hi)
         self.bust_point_v = self.front.bust_point_v
         self.bust_point_radius = self.front.bust_point_radius
+        self.join_radius = self.front.join_radius
         self.front_bow = self.front.front_bow
 
-        # dense grid, extra density at the corner and at the v=45 join
+        # dense grid, extra density at the bust corner and the v=45 join
         vb, w = self.front.bust_point_v, max(self.front.blend_halfwidth, 0.0)
+        vl, wl = self.front.v_low, max(self.front.low_blend_halfwidth, 0.0)
         z = np.concatenate([
             np.linspace(self.v_lo, self.v_hi, n_grid),
             np.linspace(-60.0, 60.0, 2401),
-            np.linspace(V_LOW - 6.0, V_LOW + 6.0, 1201),
+            np.linspace(vl - max(wl, 6.0), vl + max(wl, 6.0), 1201),
             np.linspace(vb - max(w, 8.0), vb + max(w, 8.0), 3201),
-            np.array([V_LOW, vb, vb - w, vb + w, self.v_hi]),
+            np.array([vl, vb, vl - wl, vl + wl, vb - w, vb + w, self.v_hi]),
         ])
         z = np.unique(np.clip(z, self.v_lo, self.v_hi))
         P = np.asarray(self.base.perimeter(z), dtype=float)
@@ -546,14 +610,14 @@ class CompoundShellModel(ShellModel):
         return a / bf ** 2, a / bb ** 2, abs(a / bf ** 2 - a / bb ** 2)
 
 
-def compound_params(bust_point_v=181.0, bust_point_radius=0.0, front_bow=0.1,
-                    base_params=None):
+def compound_params(bust_point_v=181.0, bust_point_radius=0.0, join_radius=0.0,
+                    front_bow=0.1, base_params=None):
     """ShellParams for the compound design: the committed dress with its
     depth object replaced by the compound one. Circumference anchors,
     fillet, neckline and split are inherited untouched."""
     base = base_params if base_params is not None else dress_params()
     cd = CompoundDepth(base=base.depth_curve, bust_point_v=bust_point_v,
                        bust_point_radius=bust_point_radius,
-                       front_bow=front_bow)
+                       join_radius=join_radius, front_bow=front_bow)
     from dataclasses import replace
     return replace(base, depth_curve=cd)
