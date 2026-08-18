@@ -1530,6 +1530,9 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
       receptacle: true, stem: false,               // the offshoot branch is the bud's stem
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
+      receptType: ui.receptacleType,
+      spiralCount: ui.spiralCount, spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
+      bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       neckR: budP.tubeRadius * 4.0,                // no-stem neck, matching the main no-stem trunk
     });
   }
@@ -1822,22 +1825,71 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
     const fluteDev = new Array(M);
     for (let j = 0; j < M; j++) fluteDev[j] = sTopR[j] - meanTopR;
     const fluteCurve = lerp(0.4, 0.9, tight);                  // < curve, so the flutes persist further down
-    const STEPS = 14;                                          // axial resolution of the receptacle
+    // ---- RECEPTACLE SURFACE TREATMENT ----
+    // The attachment (top ring, above) and the stem zone (below) are shared by every
+    // type; only the body between them changes here. BLENDED is the original
+    // (persistent flutes -> "petal material continues downward"); the other three fade
+    // the flutes within the first fraction of the descent, so only the very top ring
+    // meets the petals (no gaps) and the body below is clean.
+    const receptType = opts.receptType || 'blended';
+    const bulbSize   = clamp(opts.bulbSize != null ? opts.bulbSize : 0.5, 0, 1);
+    const bulbHeight = clamp(opts.bulbHeight != null ? opts.bulbHeight : 0.5, 0, 1);
+    const zoneDepth  = receptType === 'bulb' ? depthW * lerp(0.7, 1.7, bulbHeight) : depthW;
+    const topRef     = receptType === 'ironwork' ? meanTopR * 0.6 : meanTopR;   // thin neck under the ribs
+    const bodyCurve  = receptType === 'blended' ? curve : lerp(2.2, 0.6, blend);  // SOFT/IRONWORK taper from BLEND SMOOTHNESS
+    const bulbR      = stemR * lerp(1.8, 3.8, bulbSize);       // bead radius, relative to the STEM (a knob, not a disc)
+    // Circular body radius at descent fraction t (0 top ring -> 1 neck). BULB necks the
+    // wide attachment ring in to the stem width, then swells a rounded bead back out and
+    // in again — a discrete knob between the flower head and the stem, the stem entering
+    // below it. The others are a smooth taper (byte-identical to the original `circ`
+    // when BLENDED).
+    const bodyR = (t) => {
+      if (receptType === 'bulb') {
+        if (t < 0.22) return lerp(meanTopR, stemR, smootherstep(t / 0.22));   // shoulder: attach ring -> stem
+        const u = (t - 0.22) / 0.78;
+        return stemR + (bulbR - stemR) * Math.sin(Math.PI * u);               // rounded bead, stemR at both ends
+      }
+      return lerp(stemR, topRef, Math.pow(1 - t, bodyCurve));
+    };
+    const STEPS = receptType === 'bulb' ? 20 : 14;             // axial resolution of the receptacle
     for (let k = 0; k <= STEPS; k++) {
       const t = k / STEPS;
-      const circ  = lerp(stemR, meanTopR, Math.pow(1 - t, curve));  // circular taper: meanTopR -> stemR at the neck
-      const fFade = Math.pow(1 - t, fluteCurve);                    // slower azimuthal fade -> flutes run down
+      const fFade = receptType === 'blended' ? Math.pow(1 - t, fluteCurve) : Math.pow(1 - t, 4.0);
+      const base = bodyR(t);
       const ring = new Array(M);
       for (let j = 0; j < M; j++) {
-        const rad = floorRad(Math.max(stemR, circ + fluteDev[j] * fFade));
-        const y = lerp(sTopY[j], cy - depthW, t);
+        const rad = floorRad(Math.max(stemR, base + fluteDev[j] * fFade));
+        const y = lerp(sTopY[j], cy - zoneDepth, t);
         ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
       }
       rings.push(ring);
     }
-    depth = depthW;
+    depth = zoneDepth;
     topCap = { x: cx, y: cy + overlap, z: cz };                // apex level with the relief peaks (buried under the bloom)
-    botCap = { x: cx, y: cy - depthW, z: cz };                 // neck centre (used only if no stem continues)
+    botCap = { x: cx, y: cy - zoneDepth, z: cz };              // neck centre (used only if no stem continues)
+
+    // IRONWORK SPIRAL: helical ribs applied ON the neck surface, wrapping from the
+    // attachment ring down to the stem. Closed tubes unioned with the body (each
+    // seals its own ends via addTube), so the trunk stays watertight; they read as
+    // applied wrought-iron scrollwork, distinct from the smooth neck they ride.
+    if (receptType === 'ironwork') {
+      const nSp   = clamp(Math.round(opts.spiralCount != null ? opts.spiralCount : 5), 1, 12);
+      const turns = lerp(0.5, 4, clamp(opts.spiralTightness != null ? opts.spiralTightness : 0.5, 0, 1));
+      const spR   = floorRad(P.tubeRadius * lerp(1.4, 4.5, clamp(opts.spiralThickness != null ? opts.spiralThickness : 0.5, 0, 1)));
+      const segs  = Math.max(24, Math.round(turns * 24));
+      for (let s = 0; s < nSp; s++) {
+        const phase = (s / nSp) * Math.PI * 2;
+        const pts = new Array(segs + 1);
+        for (let q = 0; q <= segs; q++) {
+          const tt = q / segs;
+          const ang = phase + tt * turns * Math.PI * 2;
+          const r = bodyR(tt) + spR * 0.5;                     // sit on the neck surface
+          const y = lerp(cy + overlap, cy - zoneDepth, tt);
+          pts[q] = { x: cx + r * Math.cos(ang), y, z: cz + r * Math.sin(ang) };
+        }
+        acc.addTube(pts, spR, 0, RECEPT_TUBE_SEGS);
+      }
+    }
   }
 
   // ---------- STEM ZONE ----------
@@ -2179,6 +2231,9 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     const trunk = buildTrunkInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
       receptacle: true, stem: hasStem,
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
+      receptType: ui.receptacleType,
+      spiralCount: ui.spiralCount, spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
+      bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -2705,6 +2760,11 @@ const inputs = {
   blendSmoothness: document.getElementById('blendSmoothness'),
   receptacleDepth: document.getElementById('receptacleDepth'),
   convergenceTightness: document.getElementById('convergenceTightness'),
+  spiralCount: document.getElementById('spiralCount'),
+  spiralTightness: document.getElementById('spiralTightness'),
+  spiralThickness: document.getElementById('spiralThickness'),
+  bulbSize: document.getElementById('bulbSize'),
+  bulbHeight: document.getElementById('bulbHeight'),
   sepalsType: document.getElementById('sepalsType'),
   sepalSize: document.getElementById('sepalSize'),
   sepalCount: document.getElementById('sepalCount'),
@@ -2853,6 +2913,11 @@ function readUI() {
     blendSmoothness: parseFloat(inputs.blendSmoothness.value),
     receptacleDepth: parseFloat(inputs.receptacleDepth.value),
     convergenceTightness: parseFloat(inputs.convergenceTightness.value),
+    spiralCount: parseInt(inputs.spiralCount.value, 10),
+    spiralTightness: parseFloat(inputs.spiralTightness.value),
+    spiralThickness: parseFloat(inputs.spiralThickness.value),
+    bulbSize: parseFloat(inputs.bulbSize.value),
+    bulbHeight: parseFloat(inputs.bulbHeight.value),
     sepalsType: inputs.sepalsType.value,
     sepalSize: parseFloat(inputs.sepalSize.value),
     sepalCount: parseInt(inputs.sepalCount.value, 10),
@@ -2972,6 +3037,11 @@ function refreshLabels() {
   setLabel('blendSmoothness', (+inputs.blendSmoothness.value).toFixed(2));
   setLabel('receptacleDepth', (+inputs.receptacleDepth.value).toFixed(2));
   setLabel('convergenceTightness', (+inputs.convergenceTightness.value).toFixed(2));
+  setLabel('spiralCount', inputs.spiralCount.value);
+  setLabel('spiralTightness', (+inputs.spiralTightness.value).toFixed(2));
+  setLabel('spiralThickness', (+inputs.spiralThickness.value).toFixed(2));
+  setLabel('bulbSize', (+inputs.bulbSize.value).toFixed(2));
+  setLabel('bulbHeight', (+inputs.bulbHeight.value).toFixed(2));
   setLabel('denseStamenCount', inputs.denseStamenCount.value);
   setLabel('denseStamenLength', (+inputs.denseStamenLength.value).toFixed(2));
   setLabel('carpelCount', inputs.carpelCount.value);
@@ -3074,6 +3144,7 @@ function setBuilding(on) {
  'discSize', 'discHeight', 'ringStamenCount', 'ringStamenLength',
  'fillPetalCount', 'fillOuterSize', 'fillInnerSize', 'fillDensity', 'fillBloomAngle',
  'blendSmoothness', 'receptacleDepth', 'convergenceTightness',
+ 'spiralCount', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight',
  'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
  'sepalTipShape', 'sepalTipFreq', 'sepalTipRegion', 'sepalTipLength',
  'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
@@ -3209,7 +3280,12 @@ inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); sche
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 // Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
-  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = inputs.receptacleType.value === 'none'; });
+  const rt = inputs.receptacleType.value;
+  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = rt === 'none'; });
+  // Per-type receptacle sub-controls: shown only for their own type.
+  document.querySelectorAll('[data-recept-blended]').forEach((el) => { el.hidden = rt !== 'blended'; });
+  document.querySelectorAll('[data-recept-ironwork]').forEach((el) => { el.hidden = rt !== 'ironwork'; });
+  document.querySelectorAll('[data-recept-bulb]').forEach((el) => { el.hidden = rt !== 'bulb'; });
   // Sepal controls hide when sepals are off; the serration sub-controls
   // (data-sepal-tip) hide further unless SEPAL TIP STYLE matches, mirroring the
   // petal tip panel's data-tip-styles gating.
@@ -3410,6 +3486,11 @@ if (resetBtn) {
     inputs.blendSmoothness.value = d.blendSmoothness;
     inputs.receptacleDepth.value = d.receptacleDepth;
     inputs.convergenceTightness.value = d.convergenceTightness;
+    inputs.spiralCount.value = d.spiralCount;
+    inputs.spiralTightness.value = d.spiralTightness;
+    inputs.spiralThickness.value = d.spiralThickness;
+    inputs.bulbSize.value = d.bulbSize;
+    inputs.bulbHeight.value = d.bulbHeight;
     inputs.sepalsType.value = d.sepalsType;
     inputs.sepalSize.value = d.sepalSize;
     inputs.sepalCount.value = d.sepalCount;
@@ -3497,6 +3578,7 @@ const DEFAULTS = {
   discSize: 0.5, discHeight: 0.5, ringStamenCount: 40, ringStamenLength: 0.35,
   fillPetalCount: 60, fillOuterSize: 0.22, fillInnerSize: 0.10, fillDensity: 0.6, fillBloomAngle: 30,
   receptacleType: 'none', blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
+  spiralCount: 5, spiralTightness: 0.5, spiralThickness: 0.5, bulbSize: 0.5, bulbHeight: 0.5,
   sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
   sepalTipStyle: 'clean', sepalTipShape: 0.9, sepalTipFreq: 12, sepalTipRegion: 0.3, sepalTipLength: 0.4,
@@ -3517,7 +3599,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 6;
+const CURRENT_SCHEMA = 7;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3587,7 +3669,18 @@ function migrateV5toV6(p) {
   }
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6];
+// v6 -> v7: the RECEPTACLE multi-style controls (ironwork spiral + bulb connector).
+// BLENDED / SOFT BLEND reuse existing keys; the new keys default to inert values, and
+// no existing design uses receptacleType 'ironwork'/'bulb', so filling from DEFAULTS
+// leaves every prior design byte-identical.
+function migrateV6toV7(p) {
+  const out = { ...p };
+  for (const k of ['spiralCount', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

@@ -1192,8 +1192,11 @@
           <select class="fl-select" id="receptacleType">
             <option value="none">NONE</option>
             <option value="blended">BLENDED</option>
+            <option value="ironwork">IRONWORK SPIRAL</option>
+            <option value="bulb">BULB CONNECTOR</option>
+            <option value="soft">SOFT BLEND</option>
           </select>
-          <span class="fl-ctrl__hint">a surface blended from the petal &amp; sepal bases &mdash; petals emerge from it</span>
+          <span class="fl-ctrl__hint">how the petals/sepals join the stem &mdash; blended surface, ironwork spirals, a bulb bead, or a clean taper</span>
         </div>
 
         <div class="fl-ctrl" data-recept>
@@ -1214,13 +1217,58 @@
           <span class="fl-ctrl__hint">how far the surface descends before the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl" data-recept-blended>
           <div class="fl-ctrl__row">
             <label for="convergenceTightness">Convergence tightness</label>
             <span class="fl-ctrl__val" data-value="convergenceTightness"></span>
           </div>
           <input type="range" id="convergenceTightness" min="0" max="1" step="0.01" value="0.5">
           <span class="fl-ctrl__hint">how sharply it narrows into the stem</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept-ironwork>
+          <div class="fl-ctrl__row">
+            <label for="spiralCount">Spiral count</label>
+            <span class="fl-ctrl__val" data-value="spiralCount"></span>
+          </div>
+          <input type="range" id="spiralCount" min="1" max="12" step="1" value="5">
+          <span class="fl-ctrl__hint">number of helical ribs spiralling down to the stem</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept-ironwork>
+          <div class="fl-ctrl__row">
+            <label for="spiralTightness">Spiral tightness</label>
+            <span class="fl-ctrl__val" data-value="spiralTightness"></span>
+          </div>
+          <input type="range" id="spiralTightness" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">rotations from the ring down to the stem</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept-ironwork>
+          <div class="fl-ctrl__row">
+            <label for="spiralThickness">Spiral thickness</label>
+            <span class="fl-ctrl__val" data-value="spiralThickness"></span>
+          </div>
+          <input type="range" id="spiralThickness" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">rib thickness of the scrollwork</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept-bulb>
+          <div class="fl-ctrl__row">
+            <label for="bulbSize">Bulb size</label>
+            <span class="fl-ctrl__val" data-value="bulbSize"></span>
+          </div>
+          <input type="range" id="bulbSize" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how far the bead swells beyond the stem</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept-bulb>
+          <div class="fl-ctrl__row">
+            <label for="bulbHeight">Bulb height</label>
+            <span class="fl-ctrl__val" data-value="bulbHeight"></span>
+          </div>
+          <input type="range" id="bulbHeight" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">flattened disc &rarr; tall round knob</span>
         </div>
 
         <div class="fl-ctrl">
