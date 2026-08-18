@@ -111,6 +111,25 @@ export function petalHalfWidth(u, P) {
   const edge = clamp(P.edgeCurve || 0, -1, 1);
   const bulge = 1 + EDGE_CURVE_AMP * edge * Math.sin(Math.PI * u);
   let w = P.W * shape * bulge;
+  // CLAW / caryophyllaceous silhouette (Dianthus, Cleome, Capparis): hold a
+  // narrow, near-constant STALK over the basal `clawLength` fraction of the
+  // petal, then WIDEN into the taper blade above — abruptly (high SHOULDER, a
+  // near-step) or gently (low SHOULDER, an hourglass/pandurate dip). The defining
+  // feature is the sharpness of that shoulder, so SHOULDER drives the width of
+  // the transition band, not just its presence. Layered strictly ON TOP of the
+  // taper: `clawLength <= 0` skips the whole block, so w is byte-identical to the
+  // pre-claw taper and every saved design renders exactly as before. The stalk is
+  // a flat neck at `clawWidth` of the blade-width scale W; above the shoulder the
+  // blend returns to the full taper·bulge width, so the blade shape is untouched.
+  const clawLen = clamp(P.clawLength || 0, 0, 0.5);
+  if (clawLen > 0) {
+    const clawW = clamp(P.clawWidth != null ? P.clawWidth : 0.3, 0.05, 0.6);
+    const shoulder = clamp(P.shoulder != null ? P.shoulder : 0.5, 0, 1);
+    const wStalk = P.W * clawW;                       // flat narrow neck half-width
+    const band = lerp(0.16, 0.01, shoulder);          // u-width of the shoulder: 0 -> gentle, 1 -> step
+    const g = smootherstep(clamp((u - clawLen) / band, 0, 1));  // 0 in stalk, 1 in blade
+    w = lerp(wStalk, w, g);
+  }
   // LOBES: periodic margin cuts along the length — a pinnatifid outline (poppy leaf)
   // when deep, a serrated margin (rose leaflet) when shallow + frequent. Applied
   // symmetrically to both sides through the SAME width profile, so the solid blade
@@ -631,6 +650,7 @@ const FIELD_CACHE_MAX = 24;
 export function getPetalFields(P) {
   const k = [
     P.L, P.W, P.taper, P.tip, P.edgeCurve, P.lobe || 0, P.lobeCount || 0,      // outline
+    P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,                       // outline (claw)
     P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,                       // surface
     P.tipStyle, P.tipLength || 0, P.tipFrequency || 0,                          // ruffle (surface)
     P.edgeNoise || 0, P.edgeNoiseScale || 0,
@@ -1157,6 +1177,7 @@ const SC_CACHE_MAX = 24;
 export function getSpaceColonization(P, seed, opts) {
   const k = [
     P.L, P.W, P.taper, P.tip, P.edgeCurve, P.lobe || 0, P.lobeCount || 0,
+    P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,
     P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,
     P.tipStyle, P.tipLength || 0, P.tipFrequency || 0, P.edgeNoise || 0, P.edgeNoiseScale || 0,
     seed, opts.mode, opts.sourceCount, opts.birthDist, opts.killDist, opts.growthStep, opts.seedPattern,

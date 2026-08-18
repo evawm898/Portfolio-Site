@@ -826,6 +826,9 @@ function resolveParams(ui) {
   return {
     W: ui.width,
     taper: ui.taper,
+    clawLength: ui.clawLength,                    // CLAW: basal stalk length (0 = no claw, exact no-op)
+    clawWidth: ui.clawWidth,                      // CLAW: stalk half-width as a fraction of blade width W
+    shoulder: ui.shoulder,                        // CLAW: shoulder sharpness (0 gentle -> 1 abrupt step)
     tip: ui.tip,                                 // TIP SHAPE: sharpness of every tip (apex + teeth)
     bloom: ui.bloom * DEG,
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
@@ -2511,6 +2514,9 @@ const inputs = {
   petalCount: document.getElementById('petalCount'),
   width: document.getElementById('width'),
   taper: document.getElementById('taper'),
+  clawLength: document.getElementById('clawLength'),
+  clawWidth: document.getElementById('clawWidth'),
+  shoulder: document.getElementById('shoulder'),
   tip: document.getElementById('tip'),
   centerCurve: document.getElementById('centerCurve'),
   edgeCurve: document.getElementById('edgeCurve'),
@@ -2645,6 +2651,9 @@ function readUI() {
     petalCount: parseInt(inputs.petalCount.value, 10),
     width: parseFloat(inputs.width.value),
     taper: parseFloat(inputs.taper.value),
+    clawLength: parseFloat(inputs.clawLength.value),
+    clawWidth: parseFloat(inputs.clawWidth.value),
+    shoulder: parseFloat(inputs.shoulder.value),
     tip: parseFloat(inputs.tip.value),
     centerCurve: parseFloat(inputs.centerCurve.value),
     edgeCurve: parseFloat(inputs.edgeCurve.value),
@@ -2779,6 +2788,9 @@ function refreshLabels() {
   setLabel('petalCount', inputs.petalCount.value);
   setLabel('width', (+inputs.width.value).toFixed(2));
   setLabel('taper', (+inputs.taper.value).toFixed(2));
+  setLabel('clawLength', (+inputs.clawLength.value).toFixed(2));
+  setLabel('clawWidth', (+inputs.clawWidth.value).toFixed(2));
+  setLabel('shoulder', (+inputs.shoulder.value).toFixed(2));
   setLabel('tip', (+inputs.tip.value).toFixed(2));
   const cc = +inputs.centerCurve.value;
   setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
@@ -2940,7 +2952,7 @@ function setBuilding(on) {
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
  'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
- 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
+ 'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
  'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'captureDist', 'voronoiLloyd',
  'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
@@ -3181,6 +3193,9 @@ if (resetBtn) {
     inputs.petalCount.value = d.petalCount;
     inputs.width.value = d.width;
     inputs.taper.value = d.taper;
+    inputs.clawLength.value = d.clawLength;
+    inputs.clawWidth.value = d.clawWidth;
+    inputs.shoulder.value = d.shoulder;
     inputs.tip.value = d.tip;
     inputs.centerCurve.value = d.centerCurve;
     inputs.edgeCurve.value = d.edgeCurve;
@@ -3331,7 +3346,7 @@ if (exportBtn) {
 }
 
 const DEFAULTS = {
-  petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
+  petalCount: 4, width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   edgeNoise: 0, edgeNoiseScale: 0,
   bloomType: 'coiled', divergenceMode: 'golden', divergenceAngle: 137.5,
@@ -3379,7 +3394,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 3;
+const CURRENT_SCHEMA = 4;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3416,7 +3431,18 @@ function migrateV2toV3(p) {
   }
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3];
+// v3 -> v4: the CLAW / caryophyllaceous silhouette controls (clawLength, clawWidth,
+// shoulder). clawLength's legacy value IS its DEFAULTS value (0 = no claw, an exact
+// no-op in petalHalfWidth), so filling the three keys from DEFAULTS leaves every
+// prior design byte-identical.
+function migrateV3toV4(p) {
+  const out = { ...p };
+  for (const k of ['clawLength', 'clawWidth', 'shoulder']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

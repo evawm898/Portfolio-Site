@@ -137,6 +137,15 @@ const CONFIGS = [
   // SERRATED modified-leaf sepals — the jagged tooth edge + per-tooth mid-veins on the
   // sepal blade must still export watertight (skeletal path, like a serrated petal).
   { label: 'sepals SERRATED (modified leaf) + stem', set: [{ id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'sepalTipStyle', value: 'jagged', evt: 'change' }, { id: 'sepalTipShape', value: '0.95' }, { id: 'sepalTipFreq', value: '16' }, { id: 'sepalTipRegion', value: '0.6' }, { id: 'sepalTipLength', value: '0.7' }] },
+  // CLAW / caryophyllaceous silhouette (kept LAST so the cumulative state these
+  // configs set never leaks into the configs above). The first config resets the
+  // scene back to a clean single-whorl petal so the claw cases stay interpretable.
+  { label: 'CLAW veins (caryophyllaceous, L.35)', set: [{ id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'edgeCurve', value: '0' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'clawLength', value: '0.35' }] },
+  { label: 'CLAW voronoi + density law (neck crowds, floor culls)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'clawLength', value: '0.35' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'density', value: '10' }] },
+  { label: 'CLAW strands', set: [{ id: 'infillType', value: 'strands', evt: 'change' }, { id: 'clawLength', value: '0.4' }] },
+  { label: 'CLAW spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'clawLength', value: '0.35' }] },
+  { label: 'CLAW extreme: narrow neck + abrupt shoulder', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'clawLength', value: '0.5' }, { id: 'clawWidth', value: '0.05' }, { id: 'shoulder', value: '1' }] },
+  { label: 'CLAW + edge-curve billow + jagged tip (outline compose)', set: [{ id: 'clawLength', value: '0.3' }, { id: 'clawWidth', value: '0.3' }, { id: 'shoulder', value: '0.5' }, { id: 'edgeCurve', value: '0.8' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.35' }] },
 ];
 
 const server = http.createServer((req, res) => {
