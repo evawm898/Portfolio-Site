@@ -427,6 +427,81 @@
           <span class="fl-ctrl__hint">across-width bowl: cupped spoon (+) &rarr; flat (0) &rarr; reflexed (&minus;)</span>
         </div>
 
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="reliefAmp">Surface relief</label>
+            <span class="fl-ctrl__val" data-value="reliefAmp"></span>
+          </div>
+          <input type="range" id="reliefAmp" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">out-of-plane corrugation: smooth &rarr; plicate/rugose</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="reliefFreq">Relief frequency</label>
+            <span class="fl-ctrl__val" data-value="reliefFreq"></span>
+          </div>
+          <input type="range" id="reliefFreq" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">broad pleats &rarr; fine crepe</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="reliefMode">Relief pattern</label>
+          </div>
+          <select id="reliefMode">
+            <option value="radial">Radial (ribs from base)</option>
+            <option value="transverse">Transverse</option>
+            <option value="irregular">Irregular (bullate)</option>
+          </select>
+          <span class="fl-ctrl__hint">rib direction (radial follows the vein flow)</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="petalTwist">Twist</label>
+            <span class="fl-ctrl__val" data-value="petalTwist"></span>
+          </div>
+          <input type="range" id="petalTwist" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">contorted bud spiral about the midrib (chirality)</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="petalSkew">Skew</label>
+            <span class="fl-ctrl__val" data-value="petalSkew"></span>
+          </div>
+          <input type="range" id="petalSkew" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">lateral midrib bend (asymmetric single petal)</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="thickTaper">Thickness taper</label>
+            <span class="fl-ctrl__val" data-value="thickTaper"></span>
+          </div>
+          <input type="range" id="thickTaper" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">base-to-tip: uniform &rarr; thick base, thin tip</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="thickEdge">Edge knife</label>
+            <span class="fl-ctrl__val" data-value="thickEdge"></span>
+          </div>
+          <input type="range" id="thickEdge" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">thin the margin to a knife edge (floored at print min)</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="thickScale">Thickness</label>
+            <span class="fl-ctrl__val" data-value="thickScale"></span>
+          </div>
+          <input type="range" id="thickScale" min="0.5" max="2" step="0.01" value="1">
+          <span class="fl-ctrl__hint">global sheet/rib thickness (floored at print min)</span>
+        </div>
+
         <!-- TUBE THICKNESS hidden from the PETAL panel — line weight is set per
              component elsewhere. Kept wired (input stays, value pinned to its 0.4
              default) so it still drives the global tube radius and readUI / reset keep

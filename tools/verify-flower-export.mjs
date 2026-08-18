@@ -146,6 +146,14 @@ const CONFIGS = [
   { label: 'CLAW spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'clawLength', value: '0.35' }] },
   { label: 'CLAW extreme: narrow neck + abrupt shoulder', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'clawLength', value: '0.5' }, { id: 'clawWidth', value: '0.05' }, { id: 'shoulder', value: '1' }] },
   { label: 'CLAW + edge-curve billow + jagged tip (outline compose)', set: [{ id: 'clawLength', value: '0.3' }, { id: 'clawWidth', value: '0.3' }, { id: 'shoulder', value: '0.5' }, { id: 'edgeCurve', value: '0.8' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.35' }] },
+  { label: 'RELIEF radial (T-aligned) + voronoi', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'reliefAmp', value: '0.7' }, { id: 'reliefMode', value: 'radial', evt: 'change' }] },
+  { label: 'RELIEF transverse fine + veins', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'reliefAmp', value: '0.8' }, { id: 'reliefFreq', value: '0.85' }, { id: 'reliefMode', value: 'transverse', evt: 'change' }] },
+  { label: 'RELIEF irregular (bullate) + bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'reliefAmp', value: '0.7' }, { id: 'reliefMode', value: 'irregular', evt: 'change' }] },
+  { label: 'TWIST + SKEW + asymmetric edge noise', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalTwist', value: '0.7' }, { id: 'petalSkew', value: '0.5' }, { id: 'edgeNoise', value: '0.6' }, { id: 'edgeNoiseScale', value: '0.5' }] },
+  { label: 'THICKNESS knife edge (b) + voronoi', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'thickEdge', value: '1' }] },
+  { label: 'THICKNESS taper + knife + thin global', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'thickTaper', value: '1' }, { id: 'thickEdge', value: '1' }, { id: 'thickScale', value: '0.6' }] },
+  { label: 'THICKNESS knife on SOLID leaf blade (b, per-vertex)', set: [{ id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemNodeCount', value: '3' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'alternate', evt: 'change' }, { id: 'thickEdge', value: '1' }, { id: 'thickTaper', value: '0.8' }] },
+  { label: 'SURFACE all: relief + twist + skew + knife', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'reliefAmp', value: '0.6' }, { id: 'petalTwist', value: '0.5' }, { id: 'petalSkew', value: '0.4' }, { id: 'thickTaper', value: '0.8' }, { id: 'thickEdge', value: '1' }] },
 ];
 
 const server = http.createServer((req, res) => {

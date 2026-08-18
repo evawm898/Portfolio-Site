@@ -21,11 +21,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import {
-  lerp, clamp, mulberry32,
+  lerp, clamp, smootherstep, mulberry32,
   buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
-  getPetalFields, terminateEdges, getSpaceColonization,
+  getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -149,6 +149,24 @@ const SLAB_FILLET    = 1.0;    // rounded-edge radius as a fraction of half-thic
 // normal. This ratio sets the lamina half-thickness as a fraction of the tube
 // radius — < 1 so the ribbon reads as a thin flat leaf vein, not a round rope.
 const LAMINA_HALF    = 0.5;
+
+// THICKNESS FIELD: petals are cantilevers, so material is best spent thick at the
+// base and thin at the tip and margin. `thickMul(u, v, P)` is a multiplier on every
+// solidify thickness; the accumulator still export-floors the result to 0.8mm, so a
+// knife edge bottoms out at the printable minimum rather than at zero. All three
+// terms default to 1 (uniform), so an untouched design is byte-identical.
+const THICK_TAPER_MIN = 0.35;   // tip thickness as a fraction of base, at thickTaper = 1
+const THICK_EDGE_MIN  = 0.16;   // edge thickness as a fraction of body, at thickEdge = 1 (pre-floor)
+const THICK_EDGE_BAND = 0.12;   // knife acts over the outer 12% of the half-width (the user's 5-10% zone)
+function thickMul(u, v, P) {
+  let t = clamp(P.thickScale != null ? P.thickScale : 1, 0.4, 2.5);              // (c) global
+  if (P.thickTaper) t *= lerp(1, THICK_TAPER_MIN, clamp(P.thickTaper, 0, 1) * smootherstep(clamp(u, 0, 1)));  // (a) base -> tip
+  if (P.thickEdge) {                                                             // (b) edge knife
+    const band = smootherstep(clamp((Math.abs(v) - (1 - THICK_EDGE_BAND)) / THICK_EDGE_BAND, 0, 1));
+    t *= lerp(1, THICK_EDGE_MIN, clamp(P.thickEdge, 0, 1) * band);
+  }
+  return t;
+}
 
 
 /* ===================================================================
@@ -489,23 +507,31 @@ class MeshAccumulator {
     if (rows < 2) return;
     const cols = grid[0].length;
     if (cols < 2) return;
-    if (this.exportMode) {
-      thick = Math.max(this.floorF, thick);                             // export: floor blade thickness
-      if (thick < this.minThick) this.minThick = thick;                 // telemetry
-    }
-    const H = thick * 0.5;
+    // `thick` may be a scalar or a per-vertex function (i, j) -> thickness, so the
+    // THICKNESS FIELD can thin the blade to a knife edge across its width. Each
+    // vertex is floored independently in export, and the top/bottom seal pairs
+    // vertices one-to-one, so a varying (floored) thickness stays watertight. A
+    // scalar reproduces the original blade exactly.
+    const fn = typeof thick === 'function';
+    const Hs = new Array(rows * cols);
+    for (let i = 0; i < rows; i++)
+      for (let j = 0; j < cols; j++) {
+        let t = fn ? thick(i, j) : thick;
+        if (this.exportMode) { t = Math.max(this.floorF, t); if (t < this.minThick) this.minThick = t; }
+        Hs[i * cols + j] = t * 0.5;
+      }
 
     // Two vertex layers: top (offset +n) then bottom (offset -n).
     const tBase = this.vcount;
     for (let i = 0; i < rows; i++)
       for (let j = 0; j < cols; j++) {
-        const { p, n } = grid[i][j];
+        const { p, n } = grid[i][j]; const H = Hs[i * cols + j];
         this._vertex(p.x + n.x * H, p.y + n.y * H, p.z + n.z * H, n.x, n.y, n.z);
       }
     const bBase = this.vcount;
     for (let i = 0; i < rows; i++)
       for (let j = 0; j < cols; j++) {
-        const { p, n } = grid[i][j];
+        const { p, n } = grid[i][j]; const H = Hs[i * cols + j];
         this._vertex(p.x - n.x * H, p.y - n.y * H, p.z - n.z * H, -n.x, -n.y, -n.z);
       }
     const T = (i, j) => tBase + i * cols + j;
@@ -835,6 +861,14 @@ function resolveParams(ui) {
     edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
     edgeProfile: ui.edgeProfile,                 // out-of-plane edge lift, parallel to the centre curve
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
+    reliefAmp: ui.reliefAmp,                      // SURFACE RELIEF amplitude (0 = smooth, exact no-op)
+    reliefFreq: ui.reliefFreq,                    // RELIEF rib count: broad pleats -> fine crepe
+    reliefMode: ui.reliefMode,                    // RELIEF pattern: radial (T-aligned) | transverse | irregular
+    petalTwist: ui.petalTwist,                    // TWIST: cross-section rotation about the midrib (chirality)
+    petalSkew: ui.petalSkew,                      // SKEW: lateral midrib bend
+    thickTaper: ui.thickTaper,                    // THICKNESS (a): base-to-tip gradient (0 = uniform)
+    thickEdge: ui.thickEdge,                      // THICKNESS (b): edge thinning toward a knife edge (0 = off)
+    thickScale: ui.thickScale,                    // THICKNESS (c): global thickness multiplier (1 = current)
     tipStyle: ui.tipStyle,                       // petal-edge tip style (clean/jagged/…)
     tipRegion: ui.tipRegion,                     // how far teeth reach from the apex down
     tipLength: ui.tipLength,                     // how far all tips extend outward
@@ -924,6 +958,10 @@ function resolveParams(ui) {
 function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const rng = mulberry32(seed);
   const spine = buildSpine(P);
+  // Global thickness multiplier for the ROUND primitives (rim, beads, tooth veins),
+  // which have no sheet face to gradient or knife — only the overall scale (c) applies.
+  // The flat-sheet primitives (blade, slabs, vein ribbons) use the full thickMul(u,v).
+  const gThick = clamp(P.thickScale != null ? P.thickScale : 1, 0.4, 2.5);
   // DEV field overlay: record this petal's shape + placement so the debug pass can
   // sample getPetalFields(P) and draw s/d/T on it. Live build only; never in export.
   if (DEBUG_FIELDS && !acc.exportMode && !P.solidBlade) {
@@ -1008,11 +1046,17 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       p: place(mapPointToSurface(pt, P, spine)),
       n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
     })));
-    acc.addBladeSolid(grid, P.tubeRadius * SLAB_THICK);   // same thickness rule as the Voronoi sheet
+    // THICKNESS FIELD: per-vertex thickness across the blade — a true continuous
+    // knife edge (thin margin) + base->tip gradient. Grid indices give (u, v)
+    // directly (buildBlade lays rows base->tip, cols margin->margin).
+    const bRows = grid.length, bCols = grid[0].length;
+    const bladeThick = (i, j) =>
+      P.tubeRadius * SLAB_THICK * thickMul(i / (bRows - 1), -1 + (2 * j) / (bCols - 1), P);
+    acc.addBladeSolid(grid, bladeThick);   // same base thickness as the Voronoi sheet
     if (!P.bladeNoRim) {
       const rim = outline.map(toWorld);
       rim.push(rim[0]);                              // close the loop at the base
-      acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0, P.rimSegments || RADIAL_SEGMENTS);
+      acc.addTube(rim, P.tubeRadius * RIM_WIDTH * gThick, 0, P.rimSegments || RADIAL_SEGMENTS);
     }
     return;
   }
@@ -1030,7 +1074,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   if (drawRim) {
     const rim = jag ? jag.rim.map(place) : outline.map(toWorld);
     rim.push(rim[0]);                            // close the loop at the petal base
-    acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0); // continuous — no join to flare
+    acc.addTube(rim, P.tubeRadius * RIM_WIDTH * gThick, 0); // continuous — no join to flare
   }
 
   // Veins: each is a flattened-space polyline with relative end line-weights.
@@ -1056,20 +1100,26 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     const halfWidth = vein.rad
       ? (t) => P.tubeRadius * vein.rad(t)
       : [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1];
-    acc.addRibbon(stations, halfWidth, lamHalf);
+    // THICKNESS FIELD (out-of-plane): one multiplier per ribbon from its midpoint
+    // (u, v) — mainly the base->tip gradient; the edge knife barely shows on a vein
+    // ribbon (it already rides near the print floor). Global scale included.
+    const mid = pts[pts.length >> 1];
+    const mu = clamp(mid.x / P.L, 0, 1);
+    const mv = clamp(mid.y / Math.max(petalHalfWidth(mu, P), 1e-4), -1, 1);
+    acc.addRibbon(stations, halfWidth, lamHalf * thickMul(mu, mv, P));
   }
   // A fine mid-vein reaching from inside the petal into each jagged tooth, so
   // the veins extend into the jagged edge along with the outline (skipped when
   // the outline is turned off).
   if (jag && drawRim) {
     for (const v of jag.teethVeins) {
-      acc.addTube(v.map(place), [P.tubeRadius * 0.30, P.tubeRadius * 0.10], 0, 6);
+      acc.addTube(v.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
     }
   }
   // Welded caps seal the open tube ends (free vein tips, and the T-junctions
   // where a secondary meets the midrib) so nothing reads as a hollow ring.
   for (const node of ven.nodes) {
-    acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15, 4, 7);
+    acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15 * gThick, 4, 7);
   }
 
   // VORONOI infill is a solid perforated SHEET, not tubes: each cell is a sealed
@@ -1081,7 +1131,16 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     const thick = P.tubeRadius * SLAB_THICK;
     for (const slab of ven.slabs) {
       // per-cell SLAB TAPER (out-of-plane): thicker at the base, thinner at the tip.
-      acc.addSlab(slab.outer.map(station), slab.inner.map(station), thick * (slab.thickMul || 1));
+      // THICKNESS FIELD: one multiplier per cell from its centroid (u, v) — the
+      // base->tip gradient plus a stepped knife (edge cells thinner). Many cells
+      // span the width, so the steps approximate the continuous across-width thinning.
+      let cx = 0, cy = 0;
+      for (const q of slab.outer) { cx += q.x; cy += q.y; }
+      cx /= slab.outer.length; cy /= slab.outer.length;
+      const cu = clamp(cx / P.L, 0, 1);
+      const cv = clamp(cy / Math.max(petalHalfWidth(cu, P), 1e-4), -1, 1);
+      acc.addSlab(slab.outer.map(station), slab.inner.map(station),
+        thick * (slab.thickMul || 1) * thickMul(cu, cv, P));
     }
   }
 }
@@ -2517,6 +2576,14 @@ const inputs = {
   clawLength: document.getElementById('clawLength'),
   clawWidth: document.getElementById('clawWidth'),
   shoulder: document.getElementById('shoulder'),
+  reliefAmp: document.getElementById('reliefAmp'),
+  reliefFreq: document.getElementById('reliefFreq'),
+  reliefMode: document.getElementById('reliefMode'),
+  petalTwist: document.getElementById('petalTwist'),
+  petalSkew: document.getElementById('petalSkew'),
+  thickTaper: document.getElementById('thickTaper'),
+  thickEdge: document.getElementById('thickEdge'),
+  thickScale: document.getElementById('thickScale'),
   tip: document.getElementById('tip'),
   centerCurve: document.getElementById('centerCurve'),
   edgeCurve: document.getElementById('edgeCurve'),
@@ -2654,6 +2721,14 @@ function readUI() {
     clawLength: parseFloat(inputs.clawLength.value),
     clawWidth: parseFloat(inputs.clawWidth.value),
     shoulder: parseFloat(inputs.shoulder.value),
+    reliefAmp: parseFloat(inputs.reliefAmp.value),
+    reliefFreq: parseFloat(inputs.reliefFreq.value),
+    reliefMode: inputs.reliefMode.value,
+    petalTwist: parseFloat(inputs.petalTwist.value),
+    petalSkew: parseFloat(inputs.petalSkew.value),
+    thickTaper: parseFloat(inputs.thickTaper.value),
+    thickEdge: parseFloat(inputs.thickEdge.value),
+    thickScale: parseFloat(inputs.thickScale.value),
     tip: parseFloat(inputs.tip.value),
     centerCurve: parseFloat(inputs.centerCurve.value),
     edgeCurve: parseFloat(inputs.edgeCurve.value),
@@ -2791,6 +2866,13 @@ function refreshLabels() {
   setLabel('clawLength', (+inputs.clawLength.value).toFixed(2));
   setLabel('clawWidth', (+inputs.clawWidth.value).toFixed(2));
   setLabel('shoulder', (+inputs.shoulder.value).toFixed(2));
+  setLabel('reliefAmp', (+inputs.reliefAmp.value).toFixed(2));
+  setLabel('reliefFreq', (+inputs.reliefFreq.value).toFixed(2));
+  setLabel('petalTwist', (() => { const t = +inputs.petalTwist.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
+  setLabel('petalSkew', (() => { const t = +inputs.petalSkew.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
+  setLabel('thickTaper', (+inputs.thickTaper.value).toFixed(2));
+  setLabel('thickEdge', (+inputs.thickEdge.value).toFixed(2));
+  setLabel('thickScale', (+inputs.thickScale.value).toFixed(2));
   setLabel('tip', (+inputs.tip.value).toFixed(2));
   const cc = +inputs.centerCurve.value;
   setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
@@ -2953,6 +3035,7 @@ function setBuilding(on) {
  'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
  'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
+ 'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
  'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'captureDist', 'voronoiLloyd',
  'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
@@ -3023,6 +3106,7 @@ inputs.edgeTermination.addEventListener('change', () => { updateTerminationOptio
 // integer seed (stored in the design so the new network is saved and reproducible).
 inputs.spaceMode.addEventListener('change', scheduleRegen);
 inputs.spacePattern.addEventListener('change', scheduleRegen);
+inputs.reliefMode.addEventListener('change', scheduleRegen);
 const spaceReroll = document.getElementById('spaceReroll');
 if (spaceReroll) spaceReroll.addEventListener('click', () => {
   inputs.spaceSeed.value = String((Math.floor(Math.random() * 0x7fffffff)) >>> 0);
@@ -3196,6 +3280,14 @@ if (resetBtn) {
     inputs.clawLength.value = d.clawLength;
     inputs.clawWidth.value = d.clawWidth;
     inputs.shoulder.value = d.shoulder;
+    inputs.reliefAmp.value = d.reliefAmp;
+    inputs.reliefFreq.value = d.reliefFreq;
+    inputs.reliefMode.value = d.reliefMode;
+    inputs.petalTwist.value = d.petalTwist;
+    inputs.petalSkew.value = d.petalSkew;
+    inputs.thickTaper.value = d.thickTaper;
+    inputs.thickEdge.value = d.thickEdge;
+    inputs.thickScale.value = d.thickScale;
     inputs.tip.value = d.tip;
     inputs.centerCurve.value = d.centerCurve;
     inputs.edgeCurve.value = d.edgeCurve;
@@ -3347,6 +3439,7 @@ if (exportBtn) {
 
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
+  reliefAmp: 0, reliefFreq: 0.5, reliefMode: 'radial', petalTwist: 0, petalSkew: 0, thickTaper: 0, thickEdge: 0, thickScale: 1,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   edgeNoise: 0, edgeNoiseScale: 0,
   bloomType: 'coiled', divergenceMode: 'golden', divergenceAngle: 137.5,
@@ -3394,7 +3487,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 4;
+const CURRENT_SCHEMA = 5;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3442,7 +3535,18 @@ function migrateV3toV4(p) {
   }
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4];
+// v4 -> v5: the SURFACE RELIEF, TWIST/SKEW and THICKNESS FIELD controls. Each new
+// key's legacy value IS its DEFAULTS value (relief/twist/skew 0, thickTaper/thickEdge
+// 0, thickScale 1, reliefMode 'radial' — all no-ops), so filling from DEFAULTS leaves
+// every prior design byte-identical.
+function migrateV4toV5(p) {
+  const out = { ...p };
+  for (const k of ['reliefAmp', 'reliefFreq', 'reliefMode', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

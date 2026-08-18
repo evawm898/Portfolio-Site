@@ -81,6 +81,19 @@ const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
 const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the (top-down) edge-curve slider
 const EDGE_PROFILE_AMP = 0.85;  // max out-of-plane edge lift from the profile edge-curve slider
 const PETAL_CUP_AMP = 0.5;   // max extra across-width cup/reflex from the Petal cup slider
+// SURFACE RELIEF: out-of-plane corrugation (plicate / rugose / bullate). Amplitude
+// is a world-unit lift on the same axis as the cup; rib count spans a broad pleat
+// to a fine crepe. Corrugating a thin sheet raises its bending stiffness ~ (depth/
+// thickness)^2, so this buys stiffness (delicacy) more than it costs material.
+const RELIEF_AMP_MAX  = 0.22;   // max normal lift at reliefAmp = 1 (world units)
+const RELIEF_RIBS_MIN = 3;      // pleat count at reliefFreq = 0
+const RELIEF_RIBS_MAX = 22;     // crepe count at reliefFreq = 1
+// TWIST + SKEW: contorted aestivation (bud spiral) + lateral midrib bend. Twist is
+// a progressive rotation of the cross-section about the midrib tangent; skew swings
+// the midrib sideways. Both intentionally break bilateral symmetry (chirality).
+const TWIST_MAX = 1.15;         // max cross-section rotation at |twist| = 1 (radians, tip)
+const SKEW_MAX  = 0.7;          // max lateral midrib swing at |skew| = 1 (fraction of W, tip)
+const RELIEF_SIDE_PHASE = 13.7; // edge-noise phase offset applied to the -v side when asymmetric
 
 export function petalHalfWidth(u, P) {
   u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
@@ -326,8 +339,45 @@ function edgeNoiseDisplace(u, v, P) {
   const band = smootherstep(clamp((av - 0.30) / 0.70, 0, 1));   // 0 at mid-rib, 1 at the edge
   if (band <= 1e-6) return 0;
   const freq = lerp(3, 40, clamp(P.edgeNoiseScale || 0, 0, 1)); // broad crinkles -> dense fine ones
-  const n = fbm1D(u * freq) * 0.8 + fbm1D(av * freq * 1.7 + 5) * 0.4;
+  // Bilateral by default (uses |v|, both margins mirror). But once TWIST or SKEW
+  // has made the petal asymmetric, a perfectly mirrored crinkle reads as a render
+  // bug, so we desync the two margins: the -v side gets a phase offset. Gated on
+  // asymmetry so symmetric petals stay byte-identical.
+  const asym = (P.petalTwist || P.petalSkew) ? (v < 0 ? RELIEF_SIDE_PHASE : 0) : 0;
+  const n = fbm1D(u * freq + asym) * 0.8 + fbm1D(av * freq * 1.7 + 5 + asym) * 0.4;
   return amt * EDGE_NOISE_AMP * band * n;
+}
+
+/* SURFACE RELIEF displacement at (u, v): a scalar out-of-plane lift, added to the
+   cup lift along the spine normal (like edge noise), faded to 0 at the base and
+   tip so the ends stay anchored and the apex — where halfWidth -> 0 — never pinches.
+     RADIAL     ribs aligned to the flow field T (getPetalFields): the phase runs
+                ACROSS T, so crest lines follow T and converge at the base — genuine
+                radial ribs from the base (iris / gentian). Uses a local linearisation
+                of T (exact where T is locally straight; bends with the fan elsewhere).
+     TRANSVERSE crests across the width, spaced along the length (u).
+     IRREGULAR  fbm lumps in both directions (bullate / rugose).
+   All three add ZERO triangles — they only displace existing vertices. */
+function reliefDisplace(u, v, P, hw) {
+  const amp = P.reliefAmp || 0;
+  if (amp <= 1e-4) return 0;
+  const uu = clamp(u, 0, 1);
+  const fade = Math.sin(Math.PI * uu);            // 0 at base & tip, 1 mid-blade
+  if (fade <= 1e-6) return 0;
+  const ribs = lerp(RELIEF_RIBS_MIN, RELIEF_RIBS_MAX, clamp(P.reliefFreq != null ? P.reliefFreq : 0.5, 0, 1));
+  const mode = P.reliefMode || 'radial';
+  let wave;
+  if (mode === 'transverse') {
+    wave = Math.sin(uu * ribs * Math.PI);
+  } else if (mode === 'irregular') {
+    const f = ribs * 0.6;
+    wave = fbm1D(uu * f) + fbm1D((v * 0.5 + 0.5) * f * 1.3 + 11);   // ~[-1.2, 1.2] bullate
+  } else { // radial — aligned to T
+    const s = getPetalFields(P).sample(P.L * uu, v * hw);
+    const perp = (-s.Ty * (P.L * uu) + s.Tx * (v * hw)) / P.L;      // coordinate ACROSS T
+    wave = Math.sin(perp * ribs * Math.PI);
+  }
+  return amp * RELIEF_AMP_MAX * fade * wave;
 }
 
 export function surfacePoint(u, v, P, spine) {
@@ -354,10 +404,28 @@ export function surfacePoint(u, v, P, spine) {
   // EDGE NOISE: organic crinkle on top of ANY tip style (adds to the ruffle when
   // both are on). 0 leaves the surface untouched.
   if (P.edgeNoise) normalLift += edgeNoiseDisplace(u, v, P);
+  // SURFACE RELIEF: corrugation on the same axis as the cup lift.
+  if (P.reliefAmp) normalLift += reliefDisplace(u, v, P, hw);
+  // The cross-section spans two axes: `lift` along the spine normal (nx, ny) and
+  // `across` along the width (world z). TWIST rotates that section about the midrib
+  // tangent, progressively from base to tip; SKEW swings the whole section sideways
+  // (a lateral midrib bend). Both break bilateral symmetry on purpose. With twist =
+  // skew = 0 this is exactly `z = v*hw + dz` and `lift = normalLift` — an exact no-op.
+  let lift = normalLift;
+  let across = v * hw + dz;
+  const tw = P.petalTwist || 0;
+  if (tw) {
+    const th = tw * TWIST_MAX * smootherstep(clamp(u, 0, 1));
+    const c = Math.cos(th), s = Math.sin(th);
+    const nl = lift * c - across * s;
+    across = lift * s + across * c;
+    lift = nl;
+  }
+  if (P.petalSkew) across += P.petalSkew * SKEW_MAX * P.W * smootherstep(clamp(u, 0, 1));
   return {
-    x: sp.s + sp.nx * normalLift,
-    y: sp.y + sp.ny * normalLift,
-    z: v * hw + dz,
+    x: sp.s + sp.nx * lift,
+    y: sp.y + sp.ny * lift,
+    z: across,
   };
 }
 
