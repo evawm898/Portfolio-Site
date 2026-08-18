@@ -1851,44 +1851,88 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       }
       return lerp(stemR, topRef, Math.pow(1 - t, bodyCurve));
     };
-    const STEPS = receptType === 'bulb' ? 20 : 14;             // axial resolution of the receptacle
-    for (let k = 0; k <= STEPS; k++) {
-      const t = k / STEPS;
-      const fFade = receptType === 'blended' ? Math.pow(1 - t, fluteCurve) : Math.pow(1 - t, 4.0);
-      const base = bodyR(t);
-      const ring = new Array(M);
-      for (let j = 0; j < M; j++) {
-        const rad = floorRad(Math.max(stemR, base + fluteDev[j] * fFade));
-        const y = lerp(sTopY[j], cy - zoneDepth, t);
-        ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
-      }
-      rings.push(ring);
-    }
-    depth = zoneDepth;
-    topCap = { x: cx, y: cy + overlap, z: cz };                // apex level with the relief peaks (buried under the bloom)
-    botCap = { x: cx, y: cy - zoneDepth, z: cz };              // neck centre (used only if no stem continues)
-
-    // IRONWORK SPIRAL: helical ribs applied ON the neck surface, wrapping from the
-    // attachment ring down to the stem. Closed tubes unioned with the body (each
-    // seals its own ends via addTube), so the trunk stays watertight; they read as
-    // applied wrought-iron scrollwork, distinct from the smooth neck they ride.
-    if (receptType === 'ironwork') {
-      const nSp   = clamp(Math.round(opts.spiralCount != null ? opts.spiralCount : 5), 1, 12);
-      const turns = lerp(0.5, 4, clamp(opts.spiralTightness != null ? opts.spiralTightness : 0.5, 0, 1));
-      const spR   = floorRad(P.tubeRadius * lerp(1.4, 4.5, clamp(opts.spiralThickness != null ? opts.spiralThickness : 0.5, 0, 1)));
-      const segs  = Math.max(24, Math.round(turns * 24));
-      for (let s = 0; s < nSp; s++) {
-        const phase = (s / nSp) * Math.PI * 2;
-        const pts = new Array(segs + 1);
-        for (let q = 0; q <= segs; q++) {
-          const tt = q / segs;
-          const ang = phase + tt * turns * Math.PI * 2;
-          const r = bodyR(tt) + spR * 0.5;                     // sit on the neck surface
-          const y = lerp(cy + overlap, cy - zoneDepth, tt);
-          pts[q] = { x: cx + r * Math.cos(ang), y, z: cz + r * Math.sin(ang) };
+    const wireRecept = receptType === 'soft' || receptType === 'ironwork';
+    if (!wireRecept) {
+      // BLENDED / BULB: a solid lofted body of revolution; the shared ring emit below
+      // stitches it watertight.
+      const STEPS = receptType === 'bulb' ? 20 : 14;           // axial resolution of the receptacle
+      for (let k = 0; k <= STEPS; k++) {
+        const t = k / STEPS;
+        const fFade = receptType === 'blended' ? Math.pow(1 - t, fluteCurve) : Math.pow(1 - t, 4.0);
+        const base = bodyR(t);
+        const ring = new Array(M);
+        for (let j = 0; j < M; j++) {
+          const rad = floorRad(Math.max(stemR, base + fluteDev[j] * fFade));
+          const y = lerp(sTopY[j], cy - zoneDepth, t);
+          ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
         }
-        acc.addTube(pts, spR, 0, RECEPT_TUBE_SEGS);
+        rings.push(ring);
       }
+      depth = zoneDepth;
+      topCap = { x: cx, y: cy + overlap, z: cz };              // apex level with the relief peaks (buried under the bloom)
+      botCap = { x: cx, y: cy - zoneDepth, z: cz };            // neck centre (used only if no stem continues)
+    } else {
+      // SOFT BLEND / IRONWORK: a THIN-TUBE receptacle in the same wireframe language as
+      // the petals/veins/stem — delicate lines gathering to the stem, not a solid funnel.
+      // No lofted rings are pushed; the stem below is the only revolved body, and these
+      // tubes overlap its top so the whole trunk unions into one watertight solid.
+      depth = depthW;
+      const neck = { x: cx, y: cy - depthW, z: cz };
+      const NB = 18;
+      // One thin GATHER tube per petal/sepal attachment: it starts ON the petal foot (so
+      // the petal base overlaps it — a clean join, no gap) and curves inward + down to the
+      // neck, its radius dropping close to stem thinness within the first fraction of the
+      // run so it reads as gently gathering, never a wide cone. Stays thinner than the stem.
+      const gather = (r0, az) => {
+        const c = Math.cos(az), s = Math.sin(az);
+        const top  = { x: cx + r0 * c, y: cy + overlap, z: cz + r0 * s };
+        const ctrl = { x: cx + r0 * 0.28 * c, y: cy - depthW * 0.5, z: cz + r0 * 0.28 * s };
+        const path = new Array(NB + 1);
+        for (let i = 0; i <= NB; i++) {
+          const t = i / NB, mt = 1 - t;
+          path[i] = {
+            x: mt * mt * top.x + 2 * mt * t * ctrl.x + t * t * neck.x,
+            y: mt * mt * top.y + 2 * mt * t * ctrl.y + t * t * neck.y,
+            z: mt * mt * top.z + 2 * mt * t * ctrl.z + t * t * neck.z,
+          };
+        }
+        acc.addTube(path, (t) => lerp(stemR * 0.5, stemR * 0.9, Math.pow(1 - t, 2.2)), 0, RECEPT_TUBE_SEGS);
+      };
+      for (const a of attachments) {
+        const pts = a.foot || [a];
+        let sc = 0, ss = 0, sr = 0;
+        for (const p of pts) { sc += Math.cos(p.az); ss += Math.sin(p.az); sr += p.r; }
+        gather(Math.min(sr / pts.length, maxR), Math.atan2(ss, sc));
+      }
+      acc.addBead(neck, floorRad(stemR * 0.75), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);  // gather node at the stem
+
+      // IRONWORK: thin helical ribs wrapping OUTSIDE the gathering bundle with a real gap,
+      // so light passes through like wrought-iron scrollwork — distinct filaments, not a
+      // twisted mass. Anchored near the petal ring at top and the neck at bottom, and only
+      // slightly wider than the stem (never the bloom width).
+      if (receptType === 'ironwork') {
+        const nSp   = clamp(Math.round(opts.spiralCount != null ? opts.spiralCount : 5), 1, 12);
+        const turns = lerp(0.5, 4, clamp(opts.spiralTightness != null ? opts.spiralTightness : 0.12, 0, 1));
+        const spR   = floorRad(P.tubeRadius * lerp(0.9, 2.2, clamp(opts.spiralThickness != null ? opts.spiralThickness : 0.5, 0, 1)));  // thin, stem/vein-like
+        const rTop  = clamp(rMean * 0.7, stemR * 2.4, maxR);   // wide at top (see-through gap from the axis)
+        const rBot  = stemR * 0.7;                             // converge ONTO the stem so each rib is solidly joined
+        const segs  = Math.max(28, Math.round(turns * 28));
+        for (let s = 0; s < nSp; s++) {
+          const phase = (s / nSp) * Math.PI * 2;
+          const pts = new Array(segs + 1);
+          for (let q = 0; q <= segs; q++) {
+            const t = q / segs;
+            const ang = phase + t * turns * Math.PI * 2;
+            const r = lerp(rTop, rBot, t);
+            const y = lerp(cy + overlap, cy - depthW, t);
+            pts[q] = { x: cx + r * Math.cos(ang), y, z: cz + r * Math.sin(ang) };
+          }
+          acc.addTube(pts, spR, 0, RECEPT_TUBE_SEGS);
+        }
+      }
+      // No lofted rings: the stem (if present) caps its own top ring at the neck; if there
+      // is no stem, the gather bead is the bottom seal. Cap sits at the neck either way.
+      topCap = { x: cx, y: cy - depthW, z: cz };
     }
   }
 
