@@ -89,11 +89,11 @@ const CONFIGS = [
   { label: 'space colonization dense + RANDOM pattern + serrated', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'spaceDensity', value: '0.9' }, { id: 'spacePattern', value: 'random', evt: 'change' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.4' }] },
   { label: '+ strap sepals', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }] },
   { label: '+ solid sepals', set: [{ id: 'sepalStyle', value: 'solid', evt: 'change' }] },
-  { label: 'full plant (blended receptacle + stem + solid sepals)', set: [{ id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
-  { label: 'receptacle IRONWORK SPIRAL + stem', set: [{ id: 'receptacleType', value: 'ironwork', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'spiralCount', value: '6' }, { id: 'spiralTightness', value: '0.7' }, { id: 'spiralThickness', value: '0.6' }] },
-  { label: 'receptacle IRONWORK dense + thin (min feature)', set: [{ id: 'receptacleType', value: 'ironwork', evt: 'change' }, { id: 'spiralCount', value: '12' }, { id: 'spiralTightness', value: '1' }, { id: 'spiralThickness', value: '0' }] },
-  { label: 'receptacle BULB CONNECTOR + stem', set: [{ id: 'receptacleType', value: 'bulb', evt: 'change' }, { id: 'bulbSize', value: '0.7' }, { id: 'bulbHeight', value: '0.7' }] },
-  { label: 'receptacle SOFT BLEND (tulip taper)', set: [{ id: 'receptacleType', value: 'soft', evt: 'change' }, { id: 'blendSmoothness', value: '0.8' }] },
+  { label: 'full plant (FLARE/SOLID receptacle + stem + solid sepals)', set: [{ id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
+  { label: 'receptacle CONE/RIBBED (ex-ironwork) + stem', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'ribMultiplier', value: '1.5' }, { id: 'spiralTightness', value: '0.7' }, { id: 'spiralThickness', value: '0.6' }] },
+  { label: 'receptacle RIBBED dense + thin ribs (min feature)', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'ribMultiplier', value: '3' }, { id: 'receptSolidity', value: '1' }, { id: 'spiralTightness', value: '1' }, { id: 'spiralThickness', value: '0' }] },
+  { label: 'receptacle DOME/SOLID (ex-bulb) + stem', set: [{ id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'ribMultiplier', value: '1' }, { id: 'spiralThickness', value: '0.5' }, { id: 'bulbSize', value: '0.7' }, { id: 'bulbHeight', value: '0.7' }] },
+  { label: 'receptacle CONE/GATHERED (ex-soft) + open solidity', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'gathered', evt: 'change' }, { id: 'receptSolidity', value: '0.3' }, { id: 'blendSmoothness', value: '0.8' }] },
   { label: '+ 3 layers (uniform count)', set: [{ id: 'layerCount', value: '3' }] },
   { label: '+ 4 layers, per-layer counts (rose/peony)', set: [{ id: 'layerCount', value: '4' }, { id: 'petalsPerLayer', value: '6,10,14,18' }] },
   { label: 'petal cup +1 (cupped, single layer)', set: [{ id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'petalCup', value: '1' }] },
@@ -114,7 +114,7 @@ const CONFIGS = [
   { label: 'center: PETALOID FILL mum (open bloom, large inner) + lobed leaves', set: [{ id: 'centerArch', value: 'petaloid', evt: 'change' }, { id: 'fillPetalCount', value: '90' }, { id: 'fillBloomAngle', value: '60' }, { id: 'fillOuterSize', value: '0.26' }, { id: 'fillInnerSize', value: '0.22' }, { id: 'fillDensity', value: '0.4' }, { id: 'leafType', value: 'lobed', evt: 'change' }, { id: 'stemNodeCount', value: '3' }] },
   // Unified trunk (approach D) edge cases:
   // receptacle WITHOUT a stem — the lofted trunk must still seal (bottom cap at the neck).
-  { label: 'trunk: receptacle only, no stem, high blend', set: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '0.8' }] },
+  { label: 'trunk: receptacle only, no stem, high blend', set: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '0.8' }] },
   // many attachments (petals + solid sepals) + tight deep neck — drives the sector count M toward its cap.
   { label: 'trunk: 20 petals + solid sepals, tight deep neck + stem', set: [{ id: 'petalCount', value: '20' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'convergenceTightness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'stemThickness', value: '2.5' }, { id: 'stemNodeCount', value: '5' }, { id: 'stemNodeProminence', value: '1' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'whorled', evt: 'change' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   // SIDE-BUD RECEPTACLE: the bud gets its own scaled receptacle (buildTrunkInto in the
@@ -122,11 +122,11 @@ const CONFIGS = [
   // are on. Its neck bottom cap seals inside the offshoot tube (overlapping closed
   // shells) — must still export with zero boundary edges. Self-contained (sets every
   // relevant id) so it does not depend on carried state.
-  { label: 'bud receptacle: early bud + blended receptacle + stem, deep neck', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '5' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemThickness', value: '1' }, { id: 'stemNodeCount', value: '0' }, { id: 'stemNodeProminence', value: '0' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'convergenceTightness', value: '0.7' }, { id: 'stemBudMode', value: 'early', evt: 'change' }] },
+  { label: 'bud receptacle: early bud + blended receptacle + stem, deep neck', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '5' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemThickness', value: '1' }, { id: 'stemNodeCount', value: '0' }, { id: 'stemNodeProminence', value: '0' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'convergenceTightness', value: '0.7' }, { id: 'stemBudMode', value: 'early', evt: 'change' }] },
   // low blend => sharpest bud flutes (highest sector count), plus the pricey voronoi bud.
   { label: 'bud receptacle: tight bud + voronoi + sharp flutes (low blend)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'blendSmoothness', value: '0' }, { id: 'receptacleDepth', value: '0.6' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   // Stem length range now 0..10 (default 4). Exercise the new MAX and the 0 = no-stem edge.
-  { label: 'stem length MAX (10) + receptacle + tight bud', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'receptacleType', value: 'blended', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '10' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  { label: 'stem length MAX (10) + receptacle + tight bud', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '10' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   // stem length 0 with a stem + receptacle both enabled => no stem zone; the receptacle
   // must still seal at its neck (bottom cap) and export watertight.
   { label: 'stem length 0 (no stem) + receptacle enabled', set: [{ id: 'stemLength', value: '0' }, { id: 'stemBudMode', value: 'none', evt: 'change' }] },
@@ -168,6 +168,32 @@ const CONFIGS = [
   { label: 'LOBED bifid bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '3' }] },
   { label: 'LOBED + CLAW compose (Dianthus superbus)', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '5' }, { id: 'clawLength', value: '0.3' }] },
 ];
+
+// ===== Receptacle JUNCTION axis matrix: PROFILE x CONSTRUCTION x COLLAR =====
+// The receptacle is three orthogonal axes now; every combination must export
+// watertight. GENTLE clamps to SOLID internally (its non-solid rows re-run the same
+// solid geometry, still exercised). A self-contained reset establishes a clean 9-petal
+// bloom + stem so the claw/lobed state from the block above never leaks in; each matrix
+// row then sets all three axes explicitly (they persist cumulatively otherwise).
+const MPROFILES = ['flare', 'dome', 'cone', 'urn', 'gentle'];
+const MCONS = ['solid', 'ribbed', 'gathered', 'cored'];
+const MCOLLARS = ['none', 'band', 'ferrule'];
+const MATRIX_START = CONFIGS.length + 1;   // 1-based index of the first matrix row (for the pass fraction)
+CONFIGS.push({ label: 'matrix reset: clean 9-petal bloom + stem + receptacle ON', set: [
+  { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
+  { id: 'cleftDepth', value: '0' }, { id: 'cleftLobes', value: '2' }, { id: 'clawLength', value: '0' }, { id: 'clawWidth', value: '0.15' }, { id: 'shoulder', value: '0' }, { id: 'edgeCurve', value: '0' },
+  { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'loop', evt: 'change' },
+  { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' },
+  { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '5' }, { id: 'stemThickness', value: '1' }, { id: 'stemNodeCount', value: '3' }, { id: 'stemNodeProminence', value: '0.4' },
+  { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptReach', value: '0.3' }, { id: 'receptSolidity', value: '0.5' }, { id: 'ribMultiplier', value: '1.5' },
+] });
+for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOLLARS) {
+  CONFIGS.push({ label: `matrix ${prof}/${con}/${collar}`, matrix: true, set: [
+    { id: 'receptProfile', value: prof, evt: 'change' },
+    { id: 'receptConstruction', value: con, evt: 'change' },
+    { id: 'receptCollar', value: collar, evt: 'change' },
+  ] });
+}
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
@@ -211,10 +237,10 @@ for (const cfg of CONFIGS) {
     page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
     page.click('#exportStl'),
   ]);
-  if (!dl) { results.push({ label: cfg.label, ok: false, note: 'no STL download' }); continue; }
+  if (!dl) { results.push({ label: cfg.label, ok: false, matrix: !!cfg.matrix, note: 'no STL download' }); continue; }
   const buf = fs.readFileSync(await dl.path());
   const a = analyzeStl(buf);
-  results.push({ label: cfg.label, ok: a.boundary === 0, ...a });
+  results.push({ label: cfg.label, ok: a.boundary === 0, matrix: !!cfg.matrix, ...a });
 }
 
 await browser.close();
@@ -227,6 +253,9 @@ for (const r of results) {
   const detail = r.note ? r.note : `${r.tris.toLocaleString()} tris, boundaryEdges=${r.boundary}, nonManifold(overlaps)=${r.nonManifold}`;
   console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label.padEnd(46)} ${detail}`);
 }
+const mat = results.filter((r) => r.matrix);
+const matPass = mat.filter((r) => r.ok).length;
+if (mat.length) console.log(`\nReceptacle PROFILE×CONSTRUCTION×COLLAR matrix: ${matPass}/${mat.length} export watertight.`);
 if (pageErrors.length) {
   const real = pageErrors.filter((e) => !/fonts\.googleapis/.test(e));
   if (real.length) { console.log('\nPage errors:'); real.forEach((e) => console.log('  ! ' + e)); failed += real.length; }

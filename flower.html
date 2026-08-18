@@ -1191,12 +1191,57 @@
           </div>
           <select class="fl-select" id="receptacleType">
             <option value="none">NONE</option>
-            <option value="blended">BLENDED</option>
-            <option value="ironwork">IRONWORK SPIRAL</option>
-            <option value="bulb">BULB CONNECTOR</option>
-            <option value="soft">SOFT BLEND</option>
+            <option value="on">ON</option>
           </select>
-          <span class="fl-ctrl__hint">how the petals/sepals join the stem &mdash; blended surface, ironwork spirals, a bulb bead, or a clean taper</span>
+          <span class="fl-ctrl__hint">the junction node that joins the petal &amp; sepal feet, the center bundle and the stem into one printable body</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept>
+          <div class="fl-ctrl__row">
+            <label for="receptProfile">Profile</label>
+          </div>
+          <select class="fl-select" id="receptProfile">
+            <option value="flare">FLARE</option>
+            <option value="dome">DOME</option>
+            <option value="cone">CONE</option>
+            <option value="urn">URN</option>
+            <option value="gentle">GENTLE</option>
+          </select>
+          <span class="fl-ctrl__hint">the silhouette &mdash; flared trumpet, round dome, straight taper, waisted urn, or a subtle solid swell</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept>
+          <div class="fl-ctrl__row">
+            <label for="receptConstruction">Construction</label>
+          </div>
+          <select class="fl-select" id="receptConstruction">
+            <option value="solid">SOLID</option>
+            <option value="ribbed">RIBBED</option>
+            <option value="gathered">GATHERED</option>
+            <option value="cored">CORED</option>
+          </select>
+          <span class="fl-ctrl__hint">how it is built &mdash; a continuous surface, open scrollwork ribs, one tube per foot, or a solid core with ribs outside</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept>
+          <div class="fl-ctrl__row">
+            <label for="receptCollar">Collar</label>
+          </div>
+          <select class="fl-select" id="receptCollar">
+            <option value="none">NONE</option>
+            <option value="band">BAND</option>
+            <option value="ferrule">FERRULE</option>
+          </select>
+          <span class="fl-ctrl__hint">an optional ring where the node meets the stem &mdash; none, a raised band, or a stepped ferrule sleeve</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept>
+          <div class="fl-ctrl__row">
+            <label for="receptReach">Reach</label>
+            <span class="fl-ctrl__val" data-value="receptReach"></span>
+          </div>
+          <input type="range" id="receptReach" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">sits at the base &rarr; climbs up into the bloom, following the feet at every layer</span>
         </div>
 
         <div class="fl-ctrl" data-recept>
@@ -1217,7 +1262,7 @@
           <span class="fl-ctrl__hint">how far the surface descends before the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-blended>
+        <div class="fl-ctrl" data-recept>
           <div class="fl-ctrl__row">
             <label for="convergenceTightness">Convergence tightness</label>
             <span class="fl-ctrl__val" data-value="convergenceTightness"></span>
@@ -1226,34 +1271,43 @@
           <span class="fl-ctrl__hint">how sharply it narrows into the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-ironwork>
+        <div class="fl-ctrl" data-recept-open>
           <div class="fl-ctrl__row">
-            <label for="spiralCount">Spiral count</label>
-            <span class="fl-ctrl__val" data-value="spiralCount"></span>
+            <label for="receptSolidity">Solidity</label>
+            <span class="fl-ctrl__val" data-value="receptSolidity"></span>
           </div>
-          <input type="range" id="spiralCount" min="1" max="12" step="1" value="5">
-          <span class="fl-ctrl__hint">number of helical ribs spiralling down to the stem</span>
+          <input type="range" id="receptSolidity" min="0" max="1" step="0.01" value="1">
+          <span class="fl-ctrl__hint">open and airy between the ribs &rarr; filled in toward a solid surface</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-ironwork>
+        <div class="fl-ctrl" data-recept-ribbed>
           <div class="fl-ctrl__row">
-            <label for="spiralTightness">Spiral tightness</label>
+            <label for="ribMultiplier">Rib multiplier</label>
+            <span class="fl-ctrl__val" data-value="ribMultiplier"></span>
+          </div>
+          <input type="range" id="ribMultiplier" min="0.5" max="3" step="0.05" value="1">
+          <span class="fl-ctrl__hint">ribs per foot &mdash; one each &rarr; several bundled together</span>
+        </div>
+
+        <div class="fl-ctrl" data-recept-ribbed>
+          <div class="fl-ctrl__row">
+            <label for="spiralTightness">Rib tightness</label>
             <span class="fl-ctrl__val" data-value="spiralTightness"></span>
           </div>
           <input type="range" id="spiralTightness" min="0" max="1" step="0.01" value="0.12">
           <span class="fl-ctrl__hint">diagonal scroll &rarr; tight coil (rotations down to the stem)</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-ironwork>
+        <div class="fl-ctrl" data-recept-ribbed>
           <div class="fl-ctrl__row">
-            <label for="spiralThickness">Spiral thickness</label>
+            <label for="spiralThickness">Rib thickness</label>
             <span class="fl-ctrl__val" data-value="spiralThickness"></span>
           </div>
           <input type="range" id="spiralThickness" min="0" max="1" step="0.01" value="0.5">
           <span class="fl-ctrl__hint">rib thickness of the scrollwork</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-bulb>
+        <div class="fl-ctrl" data-recept-dome>
           <div class="fl-ctrl__row">
             <label for="bulbSize">Bulb size</label>
             <span class="fl-ctrl__val" data-value="bulbSize"></span>
@@ -1262,7 +1316,7 @@
           <span class="fl-ctrl__hint">how far the bead swells beyond the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-bulb>
+        <div class="fl-ctrl" data-recept-dome>
           <div class="fl-ctrl__row">
             <label for="bulbHeight">Bulb height</label>
             <span class="fl-ctrl__val" data-value="bulbHeight"></span>
