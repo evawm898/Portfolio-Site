@@ -26,6 +26,7 @@ import {
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
+  cleftConfig, petalMask, clipVeinsToMask,
 } from './flower-geometry.js';
 
 const DEG = Math.PI / 180;
@@ -855,6 +856,9 @@ function resolveParams(ui) {
     clawLength: ui.clawLength,                    // CLAW: basal stalk length (0 = no claw, exact no-op)
     clawWidth: ui.clawWidth,                      // CLAW: stalk half-width as a fraction of blade width W
     shoulder: ui.shoulder,                        // CLAW: shoulder sharpness (0 gentle -> 1 abrupt step)
+    cleftDepth: ui.cleftDepth,                    // LOBED: cleft depth as a fraction of blade length (0 = entire, no-op)
+    cleftLobes: ui.cleftLobes,                    // LOBED: lobe count 2..7 (n-1 clefts)
+    cleftWidth: ui.cleftWidth,                    // LOBED: cleft slot width
     tip: ui.tip,                                 // TIP SHAPE: sharpness of every tip (apex + teeth)
     bloom: ui.bloom * DEG,
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
@@ -1008,6 +1012,16 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         maxDepth: P.maxDepth, softness: P.softness, branchStart: P.branchStart,
       });
 
+  // LOBED / CLEFT: the tube infills (veins/bone/spacecol/strands) are generated in
+  // the full single-valued envelope, so clip them to the material mask — no strut
+  // crosses a cleft, and each cut end sits on the cleft edge ready for termination.
+  // Voronoi slabs already clip to the lobed silhouette, so they are left untouched.
+  const cleft = cleftConfig(P);
+  if (cleft && ven && ven.veins && P.infillType !== 'voronoi') {
+    ven.veins = clipVeinsToMask(ven.veins, P, cleft);
+    if (ven.nodes) ven.nodes = ven.nodes.filter((nd) => petalMask(nd.x, nd.y, P, cleft) > 0);
+  }
+
   // EDGE TERMINATION: close the tube-infill tree onto the margin so it stops being
   // a tree hanging off a decorative hoop. MEET runs free tips to the margin rib;
   // LOOP fuses neighbouring tips into arcades. Applies to the tube infills whose
@@ -1054,7 +1068,10 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       P.tubeRadius * SLAB_THICK * thickMul(i / (bRows - 1), -1 + (2 * j) / (bCols - 1), P);
     acc.addBladeSolid(grid, bladeThick);   // same base thickness as the Voronoi sheet
     if (!P.bladeNoRim) {
-      const rim = outline.map(toWorld);
+      // Solid blades keep the single-valued grid (clefts here need the masked
+      // triangulation, a clean follow-up on the SAME mask/contour machinery), so
+      // the rim must trace the un-clefted outline to stay flush with the blade.
+      const rim = (cleftConfig(P) ? buildSilhouette({ ...P, cleftDepth: 0 }, P.outlineSteps || 56) : outline).map(toWorld);
       rim.push(rim[0]);                              // close the loop at the base
       acc.addTube(rim, P.tubeRadius * RIM_WIDTH * gThick, 0, P.rimSegments || RADIAL_SEGMENTS);
     }
@@ -2576,6 +2593,9 @@ const inputs = {
   clawLength: document.getElementById('clawLength'),
   clawWidth: document.getElementById('clawWidth'),
   shoulder: document.getElementById('shoulder'),
+  cleftDepth: document.getElementById('cleftDepth'),
+  cleftLobes: document.getElementById('cleftLobes'),
+  cleftWidth: document.getElementById('cleftWidth'),
   reliefAmp: document.getElementById('reliefAmp'),
   reliefFreq: document.getElementById('reliefFreq'),
   reliefMode: document.getElementById('reliefMode'),
@@ -2721,6 +2741,9 @@ function readUI() {
     clawLength: parseFloat(inputs.clawLength.value),
     clawWidth: parseFloat(inputs.clawWidth.value),
     shoulder: parseFloat(inputs.shoulder.value),
+    cleftDepth: parseFloat(inputs.cleftDepth.value),
+    cleftLobes: parseInt(inputs.cleftLobes.value, 10),
+    cleftWidth: parseFloat(inputs.cleftWidth.value),
     reliefAmp: parseFloat(inputs.reliefAmp.value),
     reliefFreq: parseFloat(inputs.reliefFreq.value),
     reliefMode: inputs.reliefMode.value,
@@ -2866,6 +2889,9 @@ function refreshLabels() {
   setLabel('clawLength', (+inputs.clawLength.value).toFixed(2));
   setLabel('clawWidth', (+inputs.clawWidth.value).toFixed(2));
   setLabel('shoulder', (+inputs.shoulder.value).toFixed(2));
+  setLabel('cleftDepth', (+inputs.cleftDepth.value).toFixed(2));
+  setLabel('cleftLobes', inputs.cleftLobes.value);
+  setLabel('cleftWidth', (+inputs.cleftWidth.value).toFixed(2));
   setLabel('reliefAmp', (+inputs.reliefAmp.value).toFixed(2));
   setLabel('reliefFreq', (+inputs.reliefFreq.value).toFixed(2));
   setLabel('petalTwist', (() => { const t = +inputs.petalTwist.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
@@ -3034,7 +3060,7 @@ function setBuilding(on) {
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
  'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
- 'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
+ 'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
  'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'captureDist', 'voronoiLloyd',
@@ -3280,6 +3306,9 @@ if (resetBtn) {
     inputs.clawLength.value = d.clawLength;
     inputs.clawWidth.value = d.clawWidth;
     inputs.shoulder.value = d.shoulder;
+    inputs.cleftDepth.value = d.cleftDepth;
+    inputs.cleftLobes.value = d.cleftLobes;
+    inputs.cleftWidth.value = d.cleftWidth;
     inputs.reliefAmp.value = d.reliefAmp;
     inputs.reliefFreq.value = d.reliefFreq;
     inputs.reliefMode.value = d.reliefMode;
@@ -3439,6 +3468,7 @@ if (exportBtn) {
 
 const DEFAULTS = {
   petalCount: 4, width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
+  cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3,
   reliefAmp: 0, reliefFreq: 0.5, reliefMode: 'radial', petalTwist: 0, petalSkew: 0, thickTaper: 0, thickEdge: 0, thickScale: 1,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   edgeNoise: 0, edgeNoiseScale: 0,
@@ -3487,7 +3517,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 5;
+const CURRENT_SCHEMA = 6;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3546,7 +3576,18 @@ function migrateV4toV5(p) {
   }
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5];
+// v5 -> v6: the LOBED / CLEFT petal controls (cleftDepth, cleftLobes, cleftWidth).
+// cleftDepth's legacy value IS its DEFAULTS value (0 = no clefts, an exact no-op —
+// buildSilhouette/fields keep the analytic single-valued path), so filling the three
+// keys from DEFAULTS leaves every prior design byte-identical.
+function migrateV5toV6(p) {
+  const out = { ...p };
+  for (const k of ['cleftDepth', 'cleftLobes', 'cleftWidth']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

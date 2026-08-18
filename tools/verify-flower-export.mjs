@@ -154,6 +154,15 @@ const CONFIGS = [
   { label: 'THICKNESS taper + knife + thin global', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'thickTaper', value: '1' }, { id: 'thickEdge', value: '1' }, { id: 'thickScale', value: '0.6' }] },
   { label: 'THICKNESS knife on SOLID leaf blade (b, per-vertex)', set: [{ id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemNodeCount', value: '3' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'alternate', evt: 'change' }, { id: 'thickEdge', value: '1' }, { id: 'thickTaper', value: '0.8' }] },
   { label: 'SURFACE all: relief + twist + skew + knife', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'reliefAmp', value: '0.6' }, { id: 'petalTwist', value: '0.5' }, { id: 'petalSkew', value: '0.4' }, { id: 'thickTaper', value: '0.8' }, { id: 'thickEdge', value: '1' }] },
+  { label: 'reset to a clean single petal (for LOBED block)', set: [{ id: 'petalCount', value: '1' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'density', value: '7' }, { id: 'voronoiAniso', value: '1' }, { id: 'voronoiDensityLaw', value: '0' }, { id: 'voronoiLloyd', value: '8' }, { id: 'voronoiWeight', value: '0' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0' }, { id: 'reliefAmp', value: '0' }, { id: 'petalTwist', value: '0' }, { id: 'petalSkew', value: '0' }, { id: 'thickTaper', value: '0' }, { id: 'thickEdge', value: '0' }, { id: 'thickScale', value: '1' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
+  { label: 'LOBED bifid voronoi (cleft 0.5)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
+  { label: 'LOBED bifid veins + LOOP termination', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }, { id: 'edgeTermination', value: 'loop', evt: 'change' }] },
+  { label: 'LOBED ragged robin (4 lobes, cleft 0.55) veins', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '4' }, { id: 'cleftWidth', value: '0.35' }] },
+  { label: 'LOBED 4-lobe voronoi + anisotropy (per-point T metric)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '4' }, { id: 'voronoiAniso', value: '2.5' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'density', value: '5' }] },
+  { label: 'LOBED fringed (7 lobes, cleft 0.6) veins', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.6' }, { id: 'cleftLobes', value: '7' }, { id: 'cleftWidth', value: '0.4' }] },
+  { label: 'LOBED bifid spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
+  { label: 'LOBED bifid bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '3' }] },
+  { label: 'LOBED + CLAW compose (Dianthus superbus)', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '5' }, { id: 'clawLength', value: '0.3' }] },
 ];
 
 const server = http.createServer((req, res) => {
@@ -173,6 +182,9 @@ const ctx = await browser.newContext({ viewport: { width: 1000, height: 800 }, a
 const page = await ctx.newPage();
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
+// Accept any export dialog (the >MAX_EXPORT_TRIS confirm, or a build alert) so a
+// heavy config still exports instead of the headless auto-dismiss aborting it.
+page.on('dialog', (d) => d.accept().catch(() => {}));
 
 // Serve the CDN three import from the local npm package (offline + pinned).
 await page.route('**cdn.jsdelivr.net/**', (route) => {

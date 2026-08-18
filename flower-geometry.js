@@ -467,6 +467,18 @@ export function placePoint(p, az, baseHeight, radialOffset = 0, tilt = 0) {
    ------------------------------------------------------------------- */
 
 export function buildSilhouette(P, n = 56) {
+  // LOBED / CLEFT: the outline is the marching-squares contour of the material
+  // mask (a single re-entrant loop weaving up each lobe and down each cleft).
+  // Off (cleftDepth <= 0) falls through to the exact analytic ±w(u) loop below.
+  const cc = getCleftContour(P);
+  if (cc && cc.loops.length) {
+    // Match the analytic outline's winding (clockwise / negative shoelace area) so
+    // every downstream orientation convention — rim tube, Voronoi cell rings, blade
+    // top/bottom faces — stays consistent (outward normals, positive solid volume).
+    let outer = cc.loops[0];
+    if (polyArea(outer) > 0) outer = outer.slice().reverse();
+    return outer;
+  }
   const right = [];
   const left = [];
   for (let i = 0; i <= n; i++) {
@@ -482,6 +494,220 @@ export function buildSilhouette(P, n = 56) {
   for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
   // drop duplicate/degenerate points at the tip (hw -> 0) and base
   return dedupePolygon(outline);
+}
+
+/* -------------------------------------------------------------------
+   4b. LOBED / CLEFT petals — a GENERIC scalar mask + marching squares.
+
+   The whole pipeline elsewhere assumes one span of material per height,
+   v in [-w(u), +w(u)]. A cleft petal (Silene, Dianthus superbus) breaks that:
+   a bifid petal has TWO spans with a gap on the midline. That is topological,
+   not an amplitude — so we stop describing the boundary as a function w(u) and
+   describe the MATERIAL as a scalar field m(x, y) > 0, then recover the outline
+   by marching squares. This machinery is deliberately generic: the mask is any
+   scalar field, so the later fused-corolla work unions petal envelopes through
+   the SAME contourer and the SAME masked-blade triangulator, written once.
+
+   m(x, y) = min( envelope , min_k cleftGap_k ):
+     envelope  = w(u) - |y|                        (>0 inside the smooth outline)
+     cleftGap  = signed distance outside a cleft slot: a wedge from a ROUNDED
+                 sinus floor at u = 1 - cleftDepth up to (past) the tip, flaring
+                 wider toward the tip as cleft depth rises so deep lobes come to
+                 points (the "antlers not doily" guard rail).
+   Clefts never pass u = 0.4 (depth capped at 0.6), so the petal stays one piece
+   joined at the base and the 0-contour is a single closed re-entrant loop. When
+   cleftDepth <= 0 none of this runs and the analytic path above is used verbatim
+   (byte-identical), so lobing costs nothing until a petal actually has clefts.
+   ------------------------------------------------------------------- */
+
+const CLEFT_DEPTH_MAX = 0.6;
+const LOBE_MIN = 2, LOBE_MAX = 7;
+
+// Bisect the mask 0-crossing between an inside point a and outside point b.
+function maskCrossing(a, b, P, cfg) {
+  let lo = a, hi = b;
+  for (let it = 0; it < 12; it++) {
+    const m = { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+    if (petalMask(m.x, m.y, P, cfg) > 0) lo = m; else hi = m;
+  }
+  return { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+}
+
+/* Clip tube-infill polylines (veins / bone / space-colonization / strands) to the
+   material mask, so no strut crosses a cleft. Generic: every infill returns
+   { veins:[{points,w0,w1,rad}], nodes }, so one pass handles them all. Each
+   polyline is split into the runs that stay inside the mask, with a boundary point
+   inserted at each crossing (so a vein ends exactly on the cleft edge, ready for
+   edge termination to capture it onto the margin rib). A clipped ribbon is still a
+   sealed solid, so watertightness is unaffected. Off (cfg null) returns the input. */
+export function clipVeinsToMask(veins, P, cfg) {
+  if (!cfg || !veins) return veins;
+  const out = [];
+  for (const v of veins) {
+    const pts = v.points;
+    if (!pts || pts.length < 2) continue;
+    const n = pts.length;
+    const w0 = v.w0 != null ? v.w0 : 1, w1 = v.w1 != null ? v.w1 : w0;
+    const wAt = (i) => (n <= 1 ? w0 : lerp(w0, w1, i / (n - 1)));
+    let run = [], rw = [];
+    const flush = () => {
+      if (run.length >= 2) out.push({ points: run, w0: rw[0], w1: rw[rw.length - 1], rad: v.rad });
+      run = []; rw = [];
+    };
+    let prevIn = null;
+    for (let i = 0; i < n; i++) {
+      const p = pts[i];
+      const inside = petalMask(p.x, p.y, P, cfg) > 0;
+      if (inside) {
+        if (prevIn === false) { const c = maskCrossing(p, pts[i - 1], P, cfg); run.push(c); rw.push(wAt(i)); }
+        run.push(p); rw.push(wAt(i));
+      } else {
+        if (prevIn === true) { const c = maskCrossing(pts[i - 1], p, P, cfg); run.push(c); rw.push(wAt(i - 1)); flush(); }
+      }
+      prevIn = inside;
+    }
+    flush();
+  }
+  return out;
+}
+
+// Resolved cleft geometry (with the guard rails baked in), or null when off.
+export function cleftConfig(P) {
+  const depth = clamp(P.cleftDepth || 0, 0, CLEFT_DEPTH_MAX);
+  if (depth <= 1e-4) return null;
+  const count = Math.round(clamp(P.cleftLobes || 2, LOBE_MIN, LOBE_MAX));   // 2..7 lobes
+  const width = clamp(P.cleftWidth != null ? P.cleftWidth : 0.3, 0.05, 1);
+  // widest half-width (clefts are placed relative to the blade width).
+  let Wpeak = 1e-4;
+  for (let i = 0; i <= 32; i++) { const w = petalHalfWidth(i / 32, P); if (w > Wpeak) Wpeak = w; }
+  const lobePitch = (2 * Wpeak) / count;                 // width budget per lobe
+  const halfW0 = clamp(width * lobePitch * 0.45, 0.02, lobePitch * 0.46);   // slot half-width at the floor
+  const uFloor = 1 - depth;
+  // n-1 cleft centres, spread across the width, bilaterally symmetric.
+  const centers = [];
+  for (let k = 1; k < count; k++) centers.push(Wpeak * (-1 + (2 * k) / count));
+  // Guard rail: lobe tips pointed at high cleft depth. Flare (slot widening toward
+  // the tip) grows with both `tip` (a pointed tip => pointed lobes) and cleft depth
+  // (deep => forced pointed regardless of tip).
+  const tip = clamp(P.tip != null ? P.tip : 0.5, 0, 1);
+  const depthNorm = depth / CLEFT_DEPTH_MAX;
+  const flare = lerp(lerp(0.15, 1.1, tip), 2.6, depthNorm);
+  return { depth, count, centers, halfW0, uFloor, flare, Wpeak, L: Math.max(P.L, 1e-4) };
+}
+
+// Signed "outside this cleft slot" distance: >0 kept, <0 removed.
+function cleftGap(x, y, c, cfg) {
+  const dy = Math.abs(y - c);
+  const xFloor = cfg.uFloor * cfg.L;
+  if (x <= xFloor) return Math.hypot(xFloor - x, dy) - cfg.halfW0;   // rounded sinus floor
+  const t = clamp((x - xFloor) / Math.max(cfg.L * 1.05 - xFloor, 1e-6), 0, 1);
+  const hwSlot = cfg.halfW0 * (1 + cfg.flare * t);                    // wedge, wide toward the tip
+  return dy - hwSlot;
+}
+
+// The material mask in flattened (x = L*u, y = lateral) space. >0 inside material.
+export function petalMask(x, y, P, cfg) {
+  const u = x / Math.max(P.L, 1e-4);
+  let m = petalHalfWidth(clamp(u, 0, 1), P) - Math.abs(y);   // envelope
+  if (u < 0) m = Math.min(m, x);                             // base edge
+  if (u > 1) m = Math.min(m, P.L - x);                       // tip edge
+  if (cfg) for (const c of cfg.centers) { const g = cleftGap(x, y, c, cfg); if (g < m) m = g; }
+  return m;
+}
+
+// Marching squares over the flattened bbox -> ordered closed loop(s) of the
+// m = 0 contour. Returns loops as arrays of {x, y}. For cleft petals (one
+// connected region) this is a single re-entrant loop; the generic multi-loop
+// return is what the fused-corolla work will use.
+export function maskContours(P, cfg, nu = 160) {
+  const L = Math.max(P.L, 1e-4);
+  let Wmax = 1e-4;
+  for (let i = 0; i <= 64; i++) { const w = petalHalfWidth(i / 64, P); if (w > Wmax) Wmax = w; }
+  const padY = Wmax * 0.08 + L / nu;
+  const y0 = -Wmax - padY, y1 = Wmax + padY;
+  const x0 = -L / nu, x1 = L + L / nu;
+  const dx = (x1 - x0) / nu;
+  const nv = Math.max(8, Math.round((y1 - y0) / dx));
+  const dy = (y1 - y0) / nv;
+  const gx = (i) => x0 + i * dx, gy = (j) => y0 + j * dy;
+  // sample m on the (nu+1) x (nv+1) lattice
+  const val = new Float64Array((nu + 1) * (nv + 1));
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) val[j * (nu + 1) + i] = petalMask(gx(i), gy(j), P, cfg);
+  const V = (i, j) => val[j * (nu + 1) + i];
+  // interpolated zero-crossing on a cell edge between corners a (va) and b (vb)
+  const lerpEdge = (xa, ya, va, xb, yb, vb) => {
+    const t = va / (va - vb);
+    return { x: xa + (xb - xa) * t, y: ya + (yb - ya) * t };
+  };
+  const segs = [];
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+    const x0c = gx(i), x1c = gx(i + 1), y0c = gy(j), y1c = gy(j + 1);
+    const v00 = V(i, j), v10 = V(i + 1, j), v11 = V(i + 1, j + 1), v01 = V(i, j + 1);
+    let code = 0;
+    if (v00 > 0) code |= 1; if (v10 > 0) code |= 2; if (v11 > 0) code |= 4; if (v01 > 0) code |= 8;
+    if (code === 0 || code === 15) continue;
+    // edge midpoints (interpolated): bottom, right, top, left
+    const eB = () => lerpEdge(x0c, y0c, v00, x1c, y0c, v10);
+    const eR = () => lerpEdge(x1c, y0c, v10, x1c, y1c, v11);
+    const eT = () => lerpEdge(x1c, y1c, v11, x0c, y1c, v01);
+    const eL = () => lerpEdge(x0c, y1c, v01, x0c, y0c, v00);
+    const push = (a, b) => segs.push([a, b]);
+    switch (code) {
+      case 1: case 14: push(eL(), eB()); break;
+      case 2: case 13: push(eB(), eR()); break;
+      case 3: case 12: push(eL(), eR()); break;
+      case 4: case 11: push(eR(), eT()); break;
+      case 6: case 9:  push(eB(), eT()); break;
+      case 7: case 8:  push(eT(), eL()); break;
+      case 5:  push(eL(), eT()); push(eB(), eR()); break;   // saddle
+      case 10: push(eL(), eB()); push(eR(), eT()); break;   // saddle
+    }
+  }
+  // Stitch segments into ordered loops by endpoint welding. Adjacency stores segment
+  // INDICES (not references), so the walk is O(1) per step -> O(n) overall (an earlier
+  // segs.indexOf here made it O(n^2) and stalled fringed petals).
+  const key = (p) => `${Math.round(p.x / (dx * 0.25))}_${Math.round(p.y / (dy * 0.25))}`;
+  const adj = new Map();
+  const add = (k, si, endIsA) => { if (!adj.has(k)) adj.set(k, []); adj.get(k).push({ si, endIsA }); };
+  for (let si = 0; si < segs.length; si++) { add(key(segs[si][0]), si, true); add(key(segs[si][1]), si, false); }
+  const used = new Uint8Array(segs.length);
+  const loops = [];
+  for (let start = 0; start < segs.length; start++) {
+    if (used[start]) continue;
+    const loop = [];
+    let curIdx = start, fromA = true;
+    while (curIdx >= 0 && !used[curIdx]) {
+      used[curIdx] = 1;
+      const cur = segs[curIdx];
+      const a = fromA ? cur[0] : cur[1], b = fromA ? cur[1] : cur[0];
+      loop.push(a);
+      const nbrs = adj.get(key(b)) || [];
+      let nextIdx = -1, nextFromA = true;
+      for (const e of nbrs) { if (!used[e.si]) { nextIdx = e.si; nextFromA = e.endIsA; break; } }
+      curIdx = nextIdx; fromA = nextFromA;
+    }
+    if (loop.length >= 3) loops.push(dedupePolygon(loop));
+  }
+  loops.sort((a, b) => Math.abs(polyArea(b)) - Math.abs(polyArea(a)));
+  return loops;
+}
+
+// Memoized contour + config accessor, so a multi-petal whorl of the same shape
+// solves the mask/marching-squares once, not per petal (buildSilhouette, the field
+// solve, and the vein clip all share it). Keyed on the outline params.
+const _cleftCache = new Map();
+export function getCleftContour(P) {
+  const cfg = cleftConfig(P);
+  if (!cfg) return null;
+  const k = [P.L, P.W, P.taper, P.tip, P.edgeCurve, P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0].join('|');
+  let v = _cleftCache.get(k);
+  if (!v) {
+    v = { cfg, loops: maskContours(P, cfg, 200) };
+    _cleftCache.set(k, v);
+    if (_cleftCache.size > 24) _cleftCache.delete(_cleftCache.keys().next().value);
+  }
+  return v;
 }
 
 /* Solid blade — a filled lamina spanning the whole silhouette, sampled as a
@@ -596,8 +822,75 @@ export function petalFlowDirection(v, u, P) {
   return { tx: b / l, ty: a / l };                    // (longitudinal, lateral)
 }
 
+/* Laplace flow field for LOBED petals (dependency the analytic T stub named at
+   ~L550). A lobed petal has no single w(u), so the analytic outline-slope T is
+   undefined — instead solve a harmonic scalar h on the material mask:
+     Dirichlet  h = 0 on the base edge, h = 1 on every lobe tip;
+     Neumann    no-flux on every side boundary, INCLUDING cleft walls (enforced by
+                relaxing only inside cells against inside neighbours);
+     T = normalize(grad h)  -> fans up each lobe independently, tangent along the
+                              cleft walls. SOR on a coarse grid (h is smooth), then
+                              bilinearly sampled. Built only when clefts are present. */
+function solveLaplaceT(P, cfg) {
+  const L = Math.max(P.L, 1e-4);
+  let Wmax = 1e-4;
+  for (let i = 0; i <= 64; i++) { const w = petalHalfWidth(i / 64, P); if (w > Wmax) Wmax = w; }
+  const NX = 150;
+  const dx = L / (NX - 1);
+  const NY = Math.max(12, Math.round((2 * Wmax) / dx) + 1);
+  const dy = (2 * Wmax) / (NY - 1);
+  const N = NX * NY;
+  const X = (i) => i * dx, Y = (j) => -Wmax + j * dy;
+  const inside = new Uint8Array(N), fixed = new Uint8Array(N);
+  const h = new Float64Array(N);
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const k = j * NX + i, x = X(i), y = Y(j);
+    if (petalMask(x, y, P, cfg) > 0) {
+      inside[k] = 1;
+      const u = x / L;
+      if (u <= 0.02) { fixed[k] = 1; h[k] = 0; }
+      else if (u >= 0.985) { fixed[k] = 1; h[k] = 1; }
+      else h[k] = u;                                   // initial guess
+    }
+  }
+  const omega = 1.85;
+  for (let it = 0; it < 800; it++) {
+    let maxd = 0;
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+      const k = j * NX + i;
+      if (!inside[k] || fixed[k]) continue;
+      const hc = h[k];
+      const nR = (i + 1 < NX && inside[k + 1]) ? h[k + 1] : hc;      // Neumann: mirror -> zero flux
+      const nL = (i - 1 >= 0 && inside[k - 1]) ? h[k - 1] : hc;
+      const nU = (j + 1 < NY && inside[k + NX]) ? h[k + NX] : hc;
+      const nD = (j - 1 >= 0 && inside[k - NX]) ? h[k - NX] : hc;
+      const nv = hc + omega * ((nR + nL + nU + nD) / 4 - hc);
+      const d = Math.abs(nv - hc); if (d > maxd) maxd = d;
+      h[k] = nv;
+    }
+    if (maxd < 1e-5) break;
+  }
+  const hAt = (i, j) => { const k = j * NX + i; return inside[k] ? h[k] : null; };
+  return {
+    sample(x, y) {
+      const fi = clamp(x / dx, 0, NX - 1.001), fj = clamp((y + Wmax) / dy, 0, NY - 1.001);
+      const i0 = Math.floor(fi), j0 = Math.floor(fj);
+      const hc = hAt(i0, j0);
+      const c = hc != null ? hc : (x / L);
+      const gx = ((hAt(Math.min(i0 + 1, NX - 1), j0) ?? c) - (hAt(Math.max(i0 - 1, 0), j0) ?? c)) / (2 * dx);
+      const gy = ((hAt(i0, Math.min(j0 + 1, NY - 1)) ?? c) - (hAt(i0, Math.max(j0 - 1, 0)) ?? c)) / (2 * dy);
+      const l = Math.hypot(gx, gy) || 1;
+      return { tx: gx / l, ty: gy / l };
+    },
+  };
+}
+
 export function computePetalFields(P) {
   const L = Math.max(P.L, 1e-4);
+  const cc = getCleftContour(P);              // LOBED: mask-aware inside / d / T when present
+  const cfg = cc ? cc.cfg : null;
+  const lap = cfg ? solveLaplaceT(P, cfg) : null;
+  const cleftLoop = cc ? (cc.loops[0] || null) : null;
   const NU = 256;                                   // envelope / boundary sampling
   const env = [];                                   // smooth +Y envelope, base->tip
   let Wmax = 1e-4;
@@ -612,12 +905,18 @@ export function computePetalFields(P) {
   // the sites carry no tangent data.
   const sx = [], sy = [];
   const pushSite = (x, y) => { sx.push(x); sy.push(y); };
-  for (let i = 0; i <= NU; i++) {
-    pushSite(env[i].x,  env[i].y);   // +Y margin
-    pushSite(env[i].x, -env[i].y);   // -Y margin (mirror)
+  if (cleftLoop) {
+    // LOBED: the true material boundary (margins + base + every cleft wall) is the
+    // mask contour, so d measures distance to the nearest lobe/cleft edge.
+    for (const p of cleftLoop) pushSite(p.x, p.y);
+  } else {
+    for (let i = 0; i <= NU; i++) {
+      pushSite(env[i].x,  env[i].y);   // +Y margin
+      pushSite(env[i].x, -env[i].y);   // -Y margin (mirror)
+    }
+    const hw0 = petalHalfWidth(0, P);
+    for (let j = 0; j <= 24; j++) pushSite(0, lerp(-hw0, hw0, j / 24));  // base edge
   }
-  const hw0 = petalHalfWidth(0, P);
-  for (let j = 0; j <= 24; j++) pushSite(0, lerp(-hw0, hw0, j / 24));  // base edge
 
   // Square grid over the flattened bbox [0,L] x [-Wmax,+Wmax] (+ 1-cell pad).
   const h = L / FIELD_LONG_AXIS;
@@ -636,7 +935,9 @@ export function computePetalFields(P) {
     for (let i = 0; i < NX; i++) {
       const x = cellX(i);
       const u = x / L;
-      inside[j * NX + i] = (u >= 0 && u <= 1 && Math.abs(y) <= petalHalfWidth(clamp(u, 0, 1), P)) ? 1 : 0;
+      inside[j * NX + i] = cfg
+        ? (petalMask(x, y, P, cfg) > 0 ? 1 : 0)                        // LOBED: mask
+        : ((u >= 0 && u <= 1 && Math.abs(y) <= petalHalfWidth(clamp(u, 0, 1), P)) ? 1 : 0);
     }
   }
 
@@ -683,7 +984,9 @@ export function computePetalFields(P) {
       const k = j * NX + i;
       const x = cellX(i), y = cellY(j);
       sArr[k] = clamp(x / L, 0, 1);
-      const t = petalFlowDirection(y, x / L, P);
+      // T: analytic outline-slope for a plain petal; the Laplace solve for a lobed
+      // one (the analytic form needs a single w(u), which a lobed petal lacks).
+      const t = lap ? lap.sample(x, y) : petalFlowDirection(y, x / L, P);
       txArr[k] = t.tx; tyArr[k] = t.ty;
       dArr[k] = (!inside[k] || seed[k] < 0) ? 0 : clamp(Math.sqrt(seedD2[k]) / dMax, 0, 1);
     }
@@ -719,6 +1022,7 @@ export function getPetalFields(P) {
   const k = [
     P.L, P.W, P.taper, P.tip, P.edgeCurve, P.lobe || 0, P.lobeCount || 0,      // outline
     P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,                       // outline (claw)
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0,                    // outline (lobed/cleft)
     P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,                       // surface
     P.tipStyle, P.tipLength || 0, P.tipFrequency || 0,                          // ruffle (surface)
     P.edgeNoise || 0, P.edgeNoiseScale || 0,
@@ -1246,6 +1550,7 @@ export function getSpaceColonization(P, seed, opts) {
   const k = [
     P.L, P.W, P.taper, P.tip, P.edgeCurve, P.lobe || 0, P.lobeCount || 0,
     P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0,
     P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,
     P.tipStyle, P.tipLength || 0, P.tipFrequency || 0, P.edgeNoise || 0, P.edgeNoiseScale || 0,
     seed, opts.mode, opts.sourceCount, opts.birthDist, opts.killDist, opts.growthStep, opts.seedPattern,
@@ -1612,20 +1917,32 @@ export function buildLace(P, rng, opts = {}) {
 // bisector is computed in the weighted metric while the seeds stay in real
 // coordinates (so the cell polygon comes out in real space, walls stay isotropic).
 //
-// APPROXIMATION (see buildVoronoi): the long axis stands in for the flow field T.
-// That holds while a petal points one way. It EXPIRES the moment petals gain lobes
-// or clefts — a lobed petal points in several directions at once and a single
-// global axis is then badly wrong. Revisit this (per-region or per-point T metric)
-// when lobed/cleft petals are added.
-function voronoiCell(s, seeds, sil, a2 = 1) {
+// The seed's anisotropy metric is a symmetric 2x2 M = {m00, m01, m11}. The cell is
+// clipped by the bisector under that metric: 2 M (t-s) . p = tᵀMt - sᵀMs. For the
+// isotropic/global case M = diag(1, a2) this reduces EXACTLY to the original y-weighted
+// formula (byte-identical). For a lobed petal M is built per seed from the LOCAL flow
+// T (see anisoMetric), so cells elongate along each lobe's own direction — the fix for
+// the global-axis approximation that expired once one petal points several ways.
+function voronoiCell(s, seeds, sil, M) {
+  const m00 = M.m00, m01 = M.m01, m11 = M.m11;
+  const sMs = m00 * s.x * s.x + 2 * m01 * s.x * s.y + m11 * s.y * s.y;
   let cell = sil;
   for (const t of seeds) {
     if (t === s) continue;
-    cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * a2 * (t.y - s.y),
-      (s.x * s.x + a2 * s.y * s.y) - (t.x * t.x + a2 * t.y * t.y));
+    const dxs = t.x - s.x, dys = t.y - s.y;
+    const tMt = m00 * t.x * t.x + 2 * m01 * t.x * t.y + m11 * t.y * t.y;
+    cell = clipHalfPlane(cell, 2 * (m00 * dxs + m01 * dys), 2 * (m01 * dxs + m11 * dys), sMs - tMt);
     if (cell.length < 3) return null;
   }
   return cell;
+}
+
+// Anisotropy metric M = T Tᵀ + a2 N Nᵀ (T unit flow dir, N its perpendicular):
+// weight 1 ALONG the flow, a2 ACROSS it, so cells elongate along T. T = (1,0)
+// gives diag(1, a2), the original global-axis behaviour.
+function anisoMetric(Tx, Ty, a2) {
+  const c = Tx, s = Ty;
+  return { m00: c * c + a2 * s * s, m01: c * s * (1 - a2), m11: s * s + a2 * c * c };
 }
 
 // Area (not vertex-average) centroid of a simple polygon; used for Lloyd
@@ -1687,6 +2004,14 @@ export function buildVoronoi(P, rng, opts = {}) {
   // look, so a design that omits them is byte-identical.
   const aniso     = clamp(opts.anisotropy != null ? opts.anisotropy : 1, 1, 4);
   const a2        = aniso * aniso;                       // y-weight in the Voronoi metric
+  // Per-seed anisotropy metric. Plain petal (or isotropic): the global diag(1, a2)
+  // for every seed (byte-identical to the original). LOBED + anisotropic: the metric
+  // is built from the LOCAL Laplace flow T at each seed, so cells elongate along each
+  // lobe's own direction instead of one global axis (dependency 2, per-point T-metric).
+  const cleftCfg  = cleftConfig(P);
+  const flowField = (cleftCfg && aniso > 1) ? getPetalFields(P) : null;
+  const globalM   = anisoMetric(1, 0, a2);
+  const metricFor = (s) => { if (!flowField) return globalM; const t = flowField.sample(s.x, s.y); return anisoMetric(t.Tx, t.Ty, a2); };
   const cellLaw   = clamp(opts.cellDensityLaw != null ? opts.cellDensityLaw : 0, 0, 1);
   const wHier     = clamp(opts.weightHierarchy != null ? opts.weightHierarchy : 0, 0, 1);
   const wFall     = clamp(opts.weightFalloff != null ? opts.weightFalloff : 1.5, 0, 4);
@@ -1762,11 +2087,11 @@ export function buildVoronoi(P, rng, opts = {}) {
   for (let iter = 0; iter < passes; iter++) {
     const seeds = fullSeeds();
     for (const s of axis) {
-      const cell = voronoiCell(s, seeds, clipPoly, a2);
+      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
       if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = 0; }
     }
     for (const s of half) {
-      const cell = voronoiCell(s, seeds, clipPoly, a2);
+      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
       if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = Math.max(axisGap, c.y); }
     }
   }
@@ -1780,7 +2105,7 @@ export function buildVoronoi(P, rng, opts = {}) {
   const minCell = opts.minCellSize || 0;
   if (minCell > 0 && (cellLaw > 0 || aniso > 1)) {
     const tooSmall = (s, seeds) => {
-      const cell = voronoiCell(s, seeds, clipPoly, a2);
+      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
       if (!cell) return true;
       return 2 * Math.sqrt(Math.abs(polyArea(cell)) / Math.PI) < minCell;
     };
@@ -1812,8 +2137,8 @@ export function buildVoronoi(P, rng, opts = {}) {
       slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse(), thickMul });
     }
   };
-  for (const s of axis) { const cell = voronoiCell(s, seeds, clipPoly, a2); if (cell) emit(cell, false); }
-  for (const s of half) { const cell = voronoiCell(s, seeds, clipPoly, a2); if (cell) emit(cell, true); }
+  for (const s of axis) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, false); }
+  for (const s of half) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, true); }
   return { veins: [], nodes: [], slabs, culled };
 }
 
