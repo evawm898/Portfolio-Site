@@ -2057,45 +2057,42 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       const span = Math.max(P.L * 0.35, yTop - rootPt.y);                     // guarantee MERGE SPAN >= 0.35*L
       const yRoot = yTop - span;
       if (RECEPT_GRAPH) RECEPT_GRAPH.push({ kind: 'summary', leaves: nodes.length, yTop, yRoot, span, L: P.L });
-      const levels = Math.max(1, Math.ceil(Math.log2(nodes.length)));
       const mStart = clamp(opts.mergeStart != null ? opts.mergeStart : 0.5, 0.2, 0.8);
       const mRate  = clamp(opts.mergeRate  != null ? opts.mergeRate  : 0.5, 0, 1);
       const yStart = yTop - span * (1 - mStart) * 0.5;                        // first merges sit higher when MERGE START is high
-      let li = 0;
+      // GLOBAL GREEDY agglomeration (not level-batched): repeatedly fuse the globally CLOSEST
+      // pair, so nearby traces merge first (within a petal, then petal-to-petal) and — crucially
+      // — each junction gets its OWN height instead of a shared per-level plane. Height descends
+      // with merge PROGRESS (MERGE RATE shapes the curve) but is always pinned below both
+      // children, so the tree cascades down organically, staggered rather than scheduled.
+      const total = Math.max(1, nodes.length - 1);
+      const minDrop = span * lerp(0.03, 0.10, mRate);
+      let done = 0;
       while (nodes.length > 1) {
-        li++;
-        const lf = levels > 1 ? (li - 1) / (levels - 1) : 1;                  // 0 at first merge -> 1 at root
-        const yLevel = lerp(yStart, yRoot, Math.pow(lf, lerp(0.7, 1.6, mRate)));
-        const rem = nodes.slice();
-        const parents = [];
-        while (rem.length > 1) {
-          let bi = 0, bj = 1, bd = Infinity;                                  // nearest-neighbour pair (horizontal distance)
-          for (let i = 0; i < rem.length; i++) for (let j = i + 1; j < rem.length; j++) {
-            const dx = rem[i].p.x - rem[j].p.x, dz = rem[i].p.z - rem[j].p.z, dd = dx * dx + dz * dz;
-            if (dd < bd) { bd = dd; bi = i; bj = j; } }
-          const a = rem[bi], b = rem[bj]; rem.splice(bj, 1); rem.splice(bi, 1);
-          const wa = a.r * a.r, wb = b.r * b.r, tot = wa + wb;
-          const pr = Math.sqrt(tot);                                         // AREA-PRESERVING radius
-          const ab = li / levels;                                            // pull toward the axis as we descend
-          const px = lerp((a.p.x * wa + b.p.x * wb) / tot, rootPt.x, ab * 0.6);
-          const pz = lerp((a.p.z * wa + b.p.z * wb) / tot, rootPt.z, ab * 0.6);
-          const parent = { p: { x: px, y: yLevel, z: pz }, r: pr,
-                           dir: V.norm(V.add(V.scale(a.dir, wa), V.scale(b.dir, wb))) };
-          if (RECEPT_GRAPH) {
-            // tangent discontinuity at this Y-junction: each child arrives along the parent
-            // tangent (emitEdge arrives along parent.dir), the parent leaves along parent.dir,
-            // so the through-angle is measured against parent.dir for each incoming child.
-            const ang = (c) => Math.acos(Math.max(-1, Math.min(1, c.dir.x*parent.dir.x + c.dir.y*parent.dir.y + c.dir.z*parent.dir.z)));
-            RECEPT_GRAPH.push({ kind: 'join', fanIn: 2, parentR: pr, childR: [a.r, b.r],
-              areaEquiv: Math.sqrt(a.r*a.r + b.r*b.r), y: yLevel,
-              tangentDeg: 0 });   // through-tangent is parent.dir on both sides -> 0 by the emitEdge construction
-          }
-          emitEdge(a, parent, 12); emitEdge(b, parent, 12);
-          acc.addBead(parent.p, floorRad(pr), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
-          parents.push(parent);
+        let bi = 0, bj = 1, bd = Infinity;                                   // globally nearest pair (horizontal)
+        for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[i].p.x - nodes[j].p.x, dz = nodes[i].p.z - nodes[j].p.z, dd = dx * dx + dz * dz;
+          if (dd < bd) { bd = dd; bi = i; bj = j; } }
+        const a = nodes[bi], b = nodes[bj]; nodes.splice(bj, 1); nodes.splice(bi, 1);
+        done++;
+        const progress = done / total;                                       // 0 first merge -> 1 last (root)
+        const wa = a.r * a.r, wb = b.r * b.r, tot = wa + wb;
+        const pr = Math.sqrt(tot);                                           // AREA-PRESERVING radius
+        const yProg = lerp(yStart, yRoot, Math.pow(progress, lerp(0.6, 1.9, mRate)));
+        const py = Math.max(yRoot, Math.min(yProg, Math.min(a.p.y, b.p.y) - minDrop));   // staggered, always below its children
+        const px = lerp((a.p.x * wa + b.p.x * wb) / tot, rootPt.x, progress * 0.6);       // pull toward the axis as we descend
+        const pz = lerp((a.p.z * wa + b.p.z * wb) / tot, rootPt.z, progress * 0.6);
+        const parent = { p: { x: px, y: py, z: pz }, r: pr,
+                         dir: V.norm(V.add(V.scale(a.dir, wa), V.scale(b.dir, wb))) };
+        if (RECEPT_GRAPH) {
+          // each child arrives along the parent tangent (emitEdge) and the parent leaves along
+          // it too, so the through-tangent at the junction is continuous (0) by construction.
+          RECEPT_GRAPH.push({ kind: 'join', fanIn: 2, parentR: pr, childR: [a.r, b.r],
+            areaEquiv: Math.sqrt(a.r * a.r + b.r * b.r), y: py, tangentDeg: 0 });
         }
-        if (rem.length) parents.push(rem[0]);                                // carry the odd node down a level
-        nodes = parents;
+        emitEdge(a, parent, 12); emitEdge(b, parent, 12);
+        acc.addBead(parent.p, floorRad(pr), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+        nodes.push(parent);
       }
       const root = nodes[0];
       emitEdge(root, { p: rootPt, r: root.r, dir: { x: 0, y: -1, z: 0 } }, 12);
