@@ -211,9 +211,11 @@ CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm
   { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' },
   { id: 'receptReach', value: '0.4' },
   { id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' },
-  { id: 'absorption', value: '0.85' }, { id: 'gatherRadius', value: '0.06' }, { id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' },
+  { id: 'absorption', value: '0.85' }, { id: 'buttonSize', value: '0.4' }, { id: 'gatherRadius', value: '0.06' }, { id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' },
 ] });
-CONFIGS.push({ label: 'cont-margin ABSORPTION low 0.15 (distinct strands)', cm: true, set: [{ id: 'absorption', value: '0.15' }] });
+CONFIGS.push({ label: 'cont-margin BUTTON 0 (bare gather web)', cm: true, set: [{ id: 'buttonSize', value: '0' }] });
+CONFIGS.push({ label: 'cont-margin BUTTON 1 (max daisy disc)', cm: true, set: [{ id: 'buttonSize', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin ABSORPTION low 0.15 (distinct strands)', cm: true, set: [{ id: 'buttonSize', value: '0.4' }, { id: 'absorption', value: '0.15' }] });
 CONFIGS.push({ label: 'cont-margin ABSORPTION high 1.0 (fully fused)', cm: true, set: [{ id: 'absorption', value: '1' }] });
 CONFIGS.push({ label: 'cont-margin GATHER tight (radius 0.03, anemone button)', cm: true, set: [{ id: 'absorption', value: '0.85' }, { id: 'gatherRadius', value: '0.03' }] });
 CONFIGS.push({ label: 'cont-margin GATHER wide (radius 0.55, degrades to splay)', cm: true, set: [{ id: 'gatherRadius', value: '0.55' }] });
@@ -268,7 +270,7 @@ for (const cfg of CONFIGS) {
   }
   await page.waitForTimeout(160); // let the double-rAF rebuild settle
   const [dl] = await Promise.all([
-    page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
+    page.waitForEvent('download', { timeout: 45000 }).catch(() => null),   // headroom for the ~1M-tri configs (STL build + download)
     page.click('#exportStl'),
   ]);
   if (!dl) { results.push({ label: cfg.label, ok: false, matrix: !!cfg.matrix, cm: !!cfg.cm, note: 'no STL download' }); continue; }

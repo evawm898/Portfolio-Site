@@ -2082,7 +2082,7 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
           sdfFeet, { p: [neckPt.x, neckPt.y, neckPt.z], r: stemR },
           { cx, cz, tubeRadius: P.tubeRadius,
             absorption: opts.absorption, gatherHeight: opts.gatherHeight, gatherRadius: opts.gatherRadius,
-            mergeStart: opts.mergeStart, mergeRate: opts.mergeRate,
+            buttonSize: opts.buttonSize, mergeStart: opts.mergeStart, mergeRate: opts.mergeRate,
             // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
             // so the preview reads as the same solid mass it prints as (export floors anyway).
             profile, collar, exportMode, floorR: acc.floorR,
@@ -2474,7 +2474,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       continuousMargin: P.continuousMargin, tubeRadius: P.tubeRadius,
       mergeStart: ui.mergeStart, mergeRate: ui.mergeRate,
-      absorption: ui.absorption, gatherHeight: ui.gatherHeight, gatherRadius: ui.gatherRadius,
+      absorption: ui.absorption, gatherHeight: ui.gatherHeight, gatherRadius: ui.gatherRadius, buttonSize: ui.buttonSize,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -2958,6 +2958,7 @@ const inputs = {
   bundleTightness: document.getElementById('bundleTightness'),
   flareRate: document.getElementById('flareRate'),
   absorption: document.getElementById('absorption'),
+  buttonSize: document.getElementById('buttonSize'),
   gatherRadius: document.getElementById('gatherRadius'),
   gatherHeight: document.getElementById('gatherHeight'),
   mergeStart: document.getElementById('mergeStart'),
@@ -3124,6 +3125,7 @@ function readUI() {
     bundleTightness: parseFloat(inputs.bundleTightness.value),
     flareRate: parseFloat(inputs.flareRate.value),
     absorption: parseFloat(inputs.absorption.value),
+    buttonSize: parseFloat(inputs.buttonSize.value),
     gatherRadius: parseFloat(inputs.gatherRadius.value),
     gatherHeight: parseFloat(inputs.gatherHeight.value),
     mergeStart: parseFloat(inputs.mergeStart.value),
@@ -3279,6 +3281,7 @@ function refreshLabels() {
   setLabel('bundleTightness', (+inputs.bundleTightness.value).toFixed(2));
   setLabel('flareRate', (+inputs.flareRate.value).toFixed(2));
   setLabel('absorption', (+inputs.absorption.value).toFixed(2));
+  setLabel('buttonSize', (+inputs.buttonSize.value).toFixed(2));
   setLabel('gatherRadius', (+inputs.gatherRadius.value).toFixed(2));
   setLabel('gatherHeight', (+inputs.gatherHeight.value).toFixed(2));
   setLabel('mergeStart', (+inputs.mergeStart.value).toFixed(2));
@@ -3420,7 +3423,7 @@ function setBuilding(on) {
  'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'absorption', 'gatherRadius', 'gatherHeight', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'absorption', 'buttonSize', 'gatherRadius', 'gatherHeight', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
  'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
  'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
  'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
@@ -3734,6 +3737,7 @@ if (resetBtn) {
     inputs.mergeStart.value = d.mergeStart;
     inputs.mergeRate.value = d.mergeRate;
     inputs.absorption.value = d.absorption;
+    inputs.buttonSize.value = d.buttonSize;
     inputs.gatherRadius.value = d.gatherRadius;
     inputs.gatherHeight.value = d.gatherHeight;
     inputs.edgeTermination.value = d.edgeTermination;
@@ -3873,7 +3877,7 @@ const DEFAULTS = {
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
   continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
-  absorption: 0.85, gatherRadius: 0.06, gatherHeight: 0.25,
+  absorption: 0.85, buttonSize: 0.4, gatherRadius: 0.06, gatherHeight: 0.25,
   edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
   voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
   spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
@@ -3912,7 +3916,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 12;
+const CURRENT_SCHEMA = 13;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -4071,7 +4075,16 @@ function migrateV11toV12(p) {
   if (out.gatherHeight == null) out.gatherHeight = DEFAULTS.gatherHeight;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12];
+// v12 -> v13: the SDF receptacle gains a BUTTON — a compact oblate solid disc at the gather
+// centre (the daisy/anemone receptacle the strands fuse into). The wide petal ring can't
+// gather to a tight point on its own, so BUTTON SIZE supplies the central mass. Fills from
+// DEFAULTS; inert for any design with continuous margin off (the legacy receptacle path).
+function migrateV12toV13(p) {
+  const out = { ...p };
+  if (out.buttonSize == null) out.buttonSize = DEFAULTS.buttonSize;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

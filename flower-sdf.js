@@ -47,6 +47,14 @@ function smin(d1, d2, k) {
   const h = _clamp(0.5 + 0.5 * (d2 - d1) / k, 0, 1);
   return d2 * (1 - h) + d1 * h - k * h * (1 - h);
 }
+// approximate signed distance to an axis-aligned ELLIPSOID (iq): a solid oblate
+// disc when ry < rx = rz — the compact daisy receptacle BUTTON the strands fuse into.
+function sdEllipsoid(px, py, pz, c, r) {
+  const x = (px - c[0]) / r[0], y = (py - c[1]) / r[1], z = (pz - c[2]) / r[2];
+  const k0 = Math.hypot(x, y, z);
+  const k1 = Math.hypot(x / r[0], y / r[1], z / r[2]) || 1e-9;
+  return k0 * (k0 - 1.0) / k1;
+}
 
 // PROFILE as a radius multiplier along the receptacle height (0 = neck bottom,
 // 1 = gather node top). Shapes the outer silhouette without touching the leaf
@@ -167,17 +175,33 @@ function buildGatherSkeleton(feet, neck, opts) {
     }
   }
 
-  return { caps, meta: { Rring, yFeet, yNeck, yNode, maxLevel, leafCount: leaves.length, root, allNodes, GR, GH } };
+  // 5) BUTTON: a compact oblate solid disc on the axis, between the feet and the gather
+  // node — the daisy receptacle the strands fuse into. The wide-ring feet can't gather to
+  // a tight point on their own (long spokes dominate), so BUTTON SIZE adds real central
+  // mass: at 0 it's absent (pure gather web); higher gives a firm daisy button. Oblate
+  // (wider than tall) so it reads as a disc, not a ball; it overlaps the inward strands and
+  // the descent so it unions into the one solid.
+  const buttonSize = _clamp(opts.buttonSize != null ? opts.buttonSize : 0, 0, 1);
+  const buttons = [];
+  if (buttonSize > 1e-3) {
+    const br = Rring * _lerp(0.08, 0.5, buttonSize);            // disc radius (fraction of the feet ring)
+    const bh = Math.max(fr(neck.r), br * 0.5);                  // oblate half-height (>= stem radius)
+    buttons.push({ c: [cx, _lerp(yFeet, yNode, 0.5), cz], r: [br, bh, br] });
+  }
+
+  return { caps, buttons, meta: { Rring, yFeet, yNeck, yNode, maxLevel, leafCount: leaves.length, root, allNodes, GR, GH, buttonSize } };
 }
 
 /* Narrow-band surface nets over a capsule list. Rasterizes each capsule into
    its expanded AABB and folds smin per grid corner, so field eval stays cheap
    even over a large grid. Returns { val, dims, mn, cell } for reuse (normals,
    Laplacian reprojection) plus the raw { verts, faces }. */
-function fieldMesh(caps, k, cell) {
+function fieldMesh(caps, buttons, k, cell) {
   let mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
   for (const c of caps) { const m = Math.max(c.ra, c.rb) + k + 3 * cell;
     for (const q of [c.a, c.b]) for (let d = 0; d < 3; d++) { mn[d] = Math.min(mn[d], q[d] - m); mx[d] = Math.max(mx[d], q[d] + m); } }
+  for (const e of buttons) { const pad = k + 3 * cell;
+    for (let d = 0; d < 3; d++) { mn[d] = Math.min(mn[d], e.c[d] - e.r[d] - pad); mx[d] = Math.max(mx[d], e.c[d] + e.r[d] + pad); } }
   const nx = Math.ceil((mx[0] - mn[0]) / cell) + 1, ny = Math.ceil((mx[1] - mn[1]) / cell) + 1, nz = Math.ceil((mx[2] - mn[2]) / cell) + 1;
   const vidx = (i, j, kk) => i + nx * (j + ny * kk); const BIG = 1e9;
   const val = new Float32Array(nx * ny * nz).fill(BIG);
@@ -188,6 +212,12 @@ function fieldMesh(caps, k, cell) {
     const k0 = Math.max(0, Math.floor((Math.min(c.a[2], c.b[2]) - m - mn[2]) / cell)), k1 = Math.min(nz - 1, Math.ceil((Math.max(c.a[2], c.b[2]) + m - mn[2]) / cell));
     for (let kk = k0; kk <= k1; kk++) for (let j = j0; j <= j1; j++) { const zz = gz(kk), yy = gy(j); let base = vidx(i0, j, kk);
       for (let i = i0; i <= i1; i++, base++) { const d = sdRoundCone(gx(i), yy, zz, c.a, c.b, c.ra, c.rb); const cur = val[base]; val[base] = cur >= BIG ? d : smin(cur, d, k); } } }
+  for (const e of buttons) { const pad = k + 3 * cell;
+    const i0 = Math.max(0, Math.floor((e.c[0] - e.r[0] - pad - mn[0]) / cell)), i1 = Math.min(nx - 1, Math.ceil((e.c[0] + e.r[0] + pad - mn[0]) / cell));
+    const j0 = Math.max(0, Math.floor((e.c[1] - e.r[1] - pad - mn[1]) / cell)), j1 = Math.min(ny - 1, Math.ceil((e.c[1] + e.r[1] + pad - mn[1]) / cell));
+    const k0 = Math.max(0, Math.floor((e.c[2] - e.r[2] - pad - mn[2]) / cell)), k1 = Math.min(nz - 1, Math.ceil((e.c[2] + e.r[2] + pad - mn[2]) / cell));
+    for (let kk = k0; kk <= k1; kk++) for (let j = j0; j <= j1; j++) { const zz = gz(kk), yy = gy(j); let base = vidx(i0, j, kk);
+      for (let i = i0; i <= i1; i++, base++) { const d = sdEllipsoid(gx(i), yy, zz, e.c, e.r); const cur = val[base]; val[base] = cur >= BIG ? d : smin(cur, d, k); } } }
   const cellVert = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1); const cidx = (i, j, kk) => i + (nx - 1) * (j + (ny - 1) * kk);
   const verts = []; const cornerOff = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
   const edgeC = [[0, 1], [1, 3], [3, 2], [2, 0], [4, 5], [5, 7], [7, 6], [6, 4], [0, 4], [1, 5], [3, 7], [2, 6]];
@@ -301,8 +331,8 @@ export function buildReceptacleField(feet, neck, opts = {}) {
   const cell = opts.cell != null ? opts.cell : (opts.exportMode ? 0.011 : 0.02);
   const iters = opts.smoothIters != null ? opts.smoothIters : (opts.exportMode ? 2 : 0);
 
-  const { caps, meta } = buildGatherSkeleton(feet, neck, opts);
-  const grid = fieldMesh(caps, k, cell);
+  const { caps, buttons, meta } = buildGatherSkeleton(feet, neck, opts);
+  const grid = fieldMesh(caps, buttons, k, cell);
   const { verts, faces } = grid;
   const sampler = makeGridSampler(grid);
   let sm = smoothConstrained(verts, faces, sampler, iters);
