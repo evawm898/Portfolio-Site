@@ -3112,13 +3112,32 @@ WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount' && c.id !== 'he
 let standardMode = true;
 const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
 const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
+// Option-level tier: a handful of select OPTIONS are Advanced-only even though the
+// control they live in (Arrangement / Edge) is a Standard picker. In Standard we hide
+// those options and, if a loaded design had one selected, fall back to a Standard-safe
+// value (and regenerate, since the geometry must follow the picker). Why each is here —
+// all three were caught by the Standard-option sweep as broken-in-Standard:
+//   - Edge FRACTAL: geometry backlog, no live geometry yet.
+//   - Edge TOOTHED / SCALLOPED: the teeth/scallops reshape the silhouette rim, but the
+//     Standard-default continuous margin replaces the rim with smooth marginal strands,
+//     so they render identically to CLEAN. They render correctly in Advanced (continuous
+//     margin OFF). Return to Standard once the margin is edge-profile-aware (#67).
+//   - Arrangement FAN (bilateral): renders as scattered debris. Advanced-only until the
+//     bilateral layout is rebuilt.
+const ADV_OPTIONS = {
+  tipStyle:  { advanced: ['fractal', 'jagged', 'scallop'], fallback: 'clean' },
+  bloomType: { advanced: ['bilateral'], fallback: 'coiled' },
+};
 function applyTier() {
-  // The FRACTAL edge is Advanced-only (a geometry-backlog item, no live geometry yet):
-  // hide its option in Standard and fall back to Clean if a loaded design selected it.
-  const fractalOpt = document.querySelector('#tipStyle option[value="fractal"]');
-  if (fractalOpt) {
-    fractalOpt.hidden = fractalOpt.disabled = standardMode;
-    if (standardMode && inputs.tipStyle.value === 'fractal') inputs.tipStyle.value = 'clean';
+  let fellBack = false;
+  for (const [id, spec] of Object.entries(ADV_OPTIONS)) {
+    const sel = inputs[id];
+    if (!sel) continue;
+    for (const val of spec.advanced) {
+      const opt = sel.querySelector(`option[value="${val}"]`);
+      if (opt) opt.hidden = opt.disabled = standardMode;
+    }
+    if (standardMode && spec.advanced.includes(sel.value)) { sel.value = spec.fallback; fellBack = true; }
   }
   if (standardMode) {
     for (const c of WIRED) if (!STANDARD_IDS.has(c.id)) { const w = ctrlWrap(c.id); if (w) w.hidden = true; }
@@ -3128,6 +3147,11 @@ function applyTier() {
     const anyVisible = [...sec.querySelectorAll('.fl-ctrl')].some((d) => !d.hidden);
     sec.hidden = standardMode && !anyVisible;
   });
+  // A fallback rewrote a picker value (e.g. a shared design's FAN arrangement in
+  // Standard); the geometry must follow, so rebuild. Debounced + deferred, so this is
+  // a no-op duplicate when a build is already pending. Only fires when an advanced
+  // value was actually selected — never on a default-value boot.
+  if (fellBack) scheduleRegen();
 }
 // Standard-tier controls currently visible — used by the headless tier probe.
 function standardVisibleCount() {
