@@ -3037,7 +3037,13 @@ const SHAPES = {
   pointed: { width: 0.7, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.4, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.15, centerCurve: 0.3, edgeCurve: -0.1, edgeProfile: 0, petalCup: 0 },
   strap: { width: 0.45, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.3, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.3, centerCurve: 0.15, edgeCurve: 0, edgeProfile: 0, petalCup: 0.05 },
   clawed: { width: 1.0, taper: 0.3, clawLength: 0.35, clawWidth: 0.25, shoulder: 0.55, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.6, centerCurve: 0.35, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.15 },
-  lobed: { width: 0.95, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.55, cleftDepth: 0.45, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.1 },
+  // LOBED (bifid, cleftDepth > 0) is intentionally NOT a picker bundle. The cleft renders
+  // correctly only when the rim is cleft-aware (continuous margin OFF); with the Standard
+  // default (margin ON) the two un-clefted marginal strands skip the sinus, so a one-click
+  // Lobed would ship a manifold-but-wrong petal (tools/verify-geometry-quality.mjs measures
+  // an ~8-19 mm unsealed gap across the whole cleftDepth range). Cleft params stay available
+  // in Advanced (a hand-dialled cleft shows as CUSTOM); Lobed returns as a named shape once
+  // #64 makes marginStrands cleft-aware.
 };
 // Write a named bundle to every silhouette param, re-detect (lands on the picked
 // shape), and rebuild. CUSTOM is never applicable — it is only ever a detected state.
