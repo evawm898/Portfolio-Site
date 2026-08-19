@@ -349,6 +349,21 @@
       </button>
       <div class="fl-acc__body" id="acc-petal">
 
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="petalShape">Petal shape</label>
+          </div>
+          <select class="fl-select" id="petalShape">
+            <option value="rounded">ROUNDED</option>
+            <option value="pointed">POINTED</option>
+            <option value="strap">STRAP</option>
+            <option value="clawed">CLAWED</option>
+            <option value="lobed">LOBED</option>
+            <option value="__custom" disabled hidden>CUSTOM</option>
+          </select>
+          <span class="fl-ctrl__hint">a named silhouette — the petal controls below fine-tune it (Advanced), which reads back as CUSTOM</span>
+        </div>
+
         <div class="fl-ctrl" data-hide-bilateral>
           <div class="fl-ctrl__row">
             <label for="width">Petal width</label>

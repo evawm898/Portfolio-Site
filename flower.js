@@ -2894,9 +2894,10 @@ function animate() {
 // spaceSeed). The `placeholder` flag excludes any control that is wired to state but
 // not yet driving geometry from WIRED (none at present), so readUI / DEFAULTS / reset /
 // refreshLabels skip it while it stays on the placeholderControls path.
-const WIRED = CONTROLS.filter((c) => !c.placeholder);
+const PANEL = CONTROLS.filter((c) => !c.placeholder);   // every panel control, incl UI-only proxies
+const WIRED = PANEL.filter((c) => !c.uiOnly);           // controls that drive readUI / DEFAULTS / reset / labels
 const inputs = {};
-for (const c of WIRED) inputs[c.id] = document.getElementById(c.id);
+for (const c of PANEL) inputs[c.id] = document.getElementById(c.id);
 for (const id of ['viewPreset', 'autoRotate', 'spaceSeed']) inputs[id] = document.getElementById(id);
 
 function readUI() {
@@ -3024,6 +3025,42 @@ if (advancedToggle) advancedToggle.addEventListener('change', () => {
   updateLayerOptions(); updateCenterOptions(); updateBaseOptions();
 });
 
+// ---- Petal shape picker (Standard) ---------------------------------------------
+// A named-shape proxy over the petal silhouette params: picking a shape writes a full
+// bundle to the (Advanced) petal controls. It is UI-only (uiOnly in the registry) —
+// derived from those params, never saved — so the params stay the single source of
+// truth. When the params match no named shape the picker shows CUSTOM (a display-only
+// state, never a pickable option), so it never lies about what the geometry is.
+const SHAPE_PARAMS = ['width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup'];
+const SHAPES = {
+  rounded: { width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, edgeProfile: 0, petalCup: 0 },
+  pointed: { width: 0.7, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.4, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.15, centerCurve: 0.3, edgeCurve: -0.1, edgeProfile: 0, petalCup: 0 },
+  strap: { width: 0.45, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.3, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.3, centerCurve: 0.15, edgeCurve: 0, edgeProfile: 0, petalCup: 0.05 },
+  clawed: { width: 1.0, taper: 0.3, clawLength: 0.35, clawWidth: 0.25, shoulder: 0.55, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.6, centerCurve: 0.35, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.15 },
+  lobed: { width: 0.95, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.55, cleftDepth: 0.45, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.1 },
+};
+// Write a named bundle to every silhouette param, re-detect (lands on the picked
+// shape), and rebuild. CUSTOM is never applicable — it is only ever a detected state.
+function applyShape(name) {
+  const b = SHAPES[name];
+  if (!b) return;
+  for (const id of SHAPE_PARAMS) inputs[id].value = b[id];
+  refreshLabels();
+  detectShape();
+  scheduleRegen();
+}
+// Show the shape whose bundle the params exactly match, else CUSTOM.
+function detectShape() {
+  if (!inputs.petalShape) return;
+  let match = '__custom';
+  for (const [name, b] of Object.entries(SHAPES)) {
+    if (SHAPE_PARAMS.every((id) => Math.abs(parseFloat(inputs[id].value) - b[id]) < 1e-6)) { match = name; break; }
+  }
+  inputs.petalShape.value = match;
+}
+if (inputs.petalShape) inputs.petalShape.addEventListener('change', () => applyShape(inputs.petalShape.value));
+SHAPE_PARAMS.forEach((id) => inputs[id].addEventListener('input', detectShape));   // a hand-edit drops to CUSTOM
+
 // Tip: like Infill, only the selected style's options are shown. Each option's
 // data-tip-styles lists the styles it belongs to; hide the rest.
 function updateTipOptions() {
@@ -3031,7 +3068,29 @@ function updateTipOptions() {
   document.querySelectorAll('[data-tip-styles]').forEach((el) => {
     el.hidden = !el.getAttribute('data-tip-styles').split(/\s+/).includes(style);
   });
+  updateEdgeAmount();
   applyTier();
+}
+// The EDGE picker's contextual "Amount": in STANDARD each edge exposes exactly one
+// amount control (1:1, a pure relabel — no proxy state): Toothed -> tipLength,
+// Scalloped -> scallopHeight, Ruffled -> edgeNoise. Show that one relabelled "Amount"
+// and hide the other two. In ADVANCED the three keep their own labels and native gating
+// (edgeNoise applies to any style there; tipLength to toothed+ruffled).
+const EDGE_AMOUNT = { jagged: 'tipLength', scallop: 'scallopHeight', ruffled: 'edgeNoise' };
+const EDGE_NATIVE = { tipLength: 'Tip length', scallopHeight: 'Scallop height', edgeNoise: 'Edge noise' };
+function setCtrlLabel(id, text) { const l = document.querySelector(`label[for="${id}"]`); if (l) l.textContent = text; }
+function updateEdgeAmount() {
+  if (standardMode) {
+    const amt = EDGE_AMOUNT[inputs.tipStyle.value];       // undefined for CLEAN
+    for (const id of Object.keys(EDGE_NATIVE)) {
+      const w = ctrlWrap(id);
+      if (w) w.hidden = (id !== amt);
+      setCtrlLabel(id, id === amt ? 'Amount' : EDGE_NATIVE[id]);
+    }
+  } else {
+    for (const id of Object.keys(EDGE_NATIVE)) setCtrlLabel(id, EDGE_NATIVE[id]);
+    const en = ctrlWrap('edgeNoise'); if (en) en.hidden = false;   // edgeNoise: any style in Advanced
+  }
 }
 // tip style is a <select>; swap the visible options and regenerate on change
 inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
@@ -3281,6 +3340,7 @@ if (resetBtn) {
     updateCenterOptions();
     updateBaseOptions();
     refreshLabels();
+    detectShape();   // Reset returns the params to Rounded, so the picker should say so
     scheduleRegen();
   });
 }
@@ -3657,6 +3717,7 @@ function applyDesign(raw) {
   updateCenterOptions();
   updateBaseOptions();
   refreshLabels();
+  detectShape();   // re-derive the shape picker from the loaded params
   scheduleRegen();
 }
 
@@ -3739,6 +3800,7 @@ updateCenterOptions();
 updateBaseOptions();
 refreshLabels();
 applyTier();
+detectShape();   // seed the petal-shape picker from the initial params (default = Rounded)
 
 if (PREVIEW) {
   // Gallery thumbnail: strip the chrome, render cheaply, always auto-rotate, and

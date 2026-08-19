@@ -58,6 +58,7 @@ export const CONTROLS = [
   {"id":"layerHeightOffset","section":"acc-layers","kind":"slider","min":-0.3,"max":0.3,"step":0.01,"default":0.05,"label":"Layer height offset","fmt":"signed2","gating":{"data-layers-multi":true}},
   {"id":"layerRotationOffset","section":"acc-layers","kind":"slider","min":0,"max":90,"step":1,"default":24,"label":"Layer rotation offset","fmt":"deg","gating":{"data-layers-multi":true}},
   {"id":"layerBloomAngleDelta","section":"acc-layers","kind":"slider","min":0,"max":40,"step":1,"default":12,"label":"Layer bloom angle delta","fmt":"deg","gating":{"data-layers-multi":true}},
+  {"id":"petalShape","section":"acc-petal","kind":"select","options":[{"value":"rounded","text":"ROUNDED"},{"value":"pointed","text":"POINTED"},{"value":"strap","text":"STRAP"},{"value":"clawed","text":"CLAWED"},{"value":"lobed","text":"LOBED"},{"value":"__custom","text":"CUSTOM","hidden":true,"disabled":true}],"default":"rounded","label":"Petal shape","tier":"standard","uiOnly":true},
   {"id":"width","section":"acc-petal","kind":"slider","min":0.45,"max":1.5,"step":0.01,"default":0.9,"label":"Petal width","fmt":"f2","gating":{"data-hide-bilateral":true}},
   {"id":"taper","section":"acc-petal","kind":"slider","min":0,"max":1,"step":0.01,"default":0.35,"label":"Taper","fmt":"f2"},
   {"id":"clawLength","section":"acc-petal","kind":"slider","min":0,"max":0.5,"step":0.01,"default":0,"label":"Claw length","fmt":"f2"},
