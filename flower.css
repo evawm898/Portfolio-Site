@@ -83,6 +83,22 @@ html, body {
   margin-bottom: 1.2rem;
 }
 
+/* Standard / Advanced mode toggle — sits in the panel head under the read-out.
+   Off (default) = Standard: the curated control set. On = Advanced: everything. */
+.fl-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.95rem;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.fl-mode input[type="checkbox"] { flex: none; }
+
 /* VIEW panel — a compact fixed panel top-left, mirroring .fl-panel on the right. */
 .fl-viewpanel {
   position: fixed;

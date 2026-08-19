@@ -59,6 +59,10 @@
     <div class="fl-eyebrow">Generative &middot; v1</div>
     <h1 class="fl-title">Flower Bloom</h1>
     <p class="fl-sub"><span id="readout">&nbsp;</span></p>
+    <label class="fl-mode" for="advancedToggle">
+      <input type="checkbox" id="advancedToggle">
+      <span>Advanced controls</span>
+    </label>
   </div>
 
   <div class="fl-controls">
@@ -252,14 +256,13 @@
           <span class="fl-ctrl__hint">closed bud &rarr; fully open</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-bloom-styles="coiled">
           <div class="fl-ctrl__row">
             <label for="tightness">Petal spacing</label>
             <span class="fl-ctrl__val" data-value="tightness"></span>
           </div>
           <input type="range" id="tightness" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint" data-bloom-styles="coiled">petals touching (packed) &rarr; petals spread (open spiral)</span>
-          <span class="fl-ctrl__hint" data-bloom-styles="radial bilateral">petals touching &rarr; petals spread</span>
+          <span class="fl-ctrl__hint">petals touching (packed) &rarr; petals spread (open spiral)</span>
         </div>
 
         <div class="fl-ctrl">
@@ -759,7 +762,7 @@
           <span class="fl-ctrl__hint">the random seed, stored with the design &mdash; re-roll for a new network, saved designs keep theirs</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins voronoi lace">
+        <div class="fl-ctrl" data-infill-styles="veins voronoi">
           <div class="fl-ctrl__row">
             <label for="density">Density</label>
             <span class="fl-ctrl__val" data-value="density"></span>

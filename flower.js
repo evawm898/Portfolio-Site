@@ -2984,6 +2984,39 @@ function setBuilding(on) {
 WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount').forEach((c) => {
   inputs[c.id].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
+// ---- Standard / Advanced tier filter -------------------------------------------
+// The registry marks a curated set of controls tier:'standard'; everything else is
+// Advanced. Standard mode (the default) force-hides Advanced controls on top of the
+// contextual gating, and collapses any accordion section left with nothing visible.
+// Each gating sweep (updateXOptions) calls applyTier() at its end, so a contextual
+// change never reveals an Advanced control while Standard is active.
+let standardMode = true;
+const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
+const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
+function applyTier() {
+  if (standardMode) {
+    for (const c of WIRED) if (!STANDARD_IDS.has(c.id)) { const w = ctrlWrap(c.id); if (w) w.hidden = true; }
+  }
+  // Collapse an accordion section (Standard only) when none of its controls show.
+  document.querySelectorAll('.fl-acc[data-acc]').forEach((sec) => {
+    const anyVisible = [...sec.querySelectorAll('.fl-ctrl')].some((d) => !d.hidden);
+    sec.hidden = standardMode && !anyVisible;
+  });
+}
+// Standard-tier controls currently visible — used by the headless tier probe.
+function standardVisibleCount() {
+  return WIRED.filter((c) => STANDARD_IDS.has(c.id)).filter((c) => { const w = ctrlWrap(c.id); return w && !w.hidden; }).length;
+}
+const advancedToggle = document.getElementById('advancedToggle');
+if (advancedToggle) advancedToggle.addEventListener('change', () => {
+  standardMode = !advancedToggle.checked;
+  document.body.classList.toggle('fl-advanced', !standardMode);
+  // Re-run every gating sweep so wrappers reflect the contextual state, then the
+  // sweeps' own applyTier() re-imposes the filter (a no-op in Advanced mode).
+  updateTipOptions(); updateInfillOptions(); updateBloomOptions();
+  updateLayerOptions(); updateCenterOptions(); updateBaseOptions();
+});
+
 // Tip: like Infill, only the selected style's options are shown. Each option's
 // data-tip-styles lists the styles it belongs to; hide the rest.
 function updateTipOptions() {
@@ -2991,6 +3024,7 @@ function updateTipOptions() {
   document.querySelectorAll('[data-tip-styles]').forEach((el) => {
     el.hidden = !el.getAttribute('data-tip-styles').split(/\s+/).includes(style);
   });
+  applyTier();
 }
 // tip style is a <select>; swap the visible options and regenerate on change
 inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
@@ -3014,6 +3048,7 @@ function updateInfillOptions() {
   const contOn = inputs.continuousMargin.value === 'on';
   document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !contOn; });
   updateTerminationOptions();   // capture-distance visibility depends on infill type too
+  applyTier();
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
 inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); scheduleRegen(); });
@@ -3045,6 +3080,7 @@ function updateBloomOptions() {
   });
   updateBilateralPetals();
   updateDivergenceOptions();
+  applyTier();
 }
 // COILED divergence: the CUSTOM angle slider shows only for CUSTOM, and the
 // low-petal-count hint shows only when a coiled bloom has fewer than 8 petals
@@ -3056,6 +3092,7 @@ function updateDivergenceOptions() {
   if (angleCtrl) angleCtrl.hidden = !(coiled && custom);
   const hint = document.getElementById('divLowCountHint');
   if (hint) hint.hidden = !(coiled && (parseInt(inputs.petalCount.value, 10) || 0) < 8);
+  applyTier();
 }
 inputs.divergenceMode.addEventListener('change', () => { updateDivergenceOptions(); scheduleRegen(); });
 // keep the low-petal-count hint in sync as the petal slider moves
@@ -3072,6 +3109,7 @@ function updateBilateralPetals() {
   // Global width / centre curve / edge curve are replaced by the per-petal
   // versions when bilateral, so hide them there.
   document.querySelectorAll('[data-hide-bilateral]').forEach((el) => { el.hidden = on; });
+  applyTier();
 }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
 // LAYERS: the per-layer controls only matter with more than one whorl, so hide
@@ -3079,6 +3117,7 @@ inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); schedu
 function updateLayerOptions() {
   const multi = (parseInt(inputs.layerCount.value, 10) || 1) > 1;
   document.querySelectorAll('[data-layers-multi]').forEach((el) => { el.hidden = !multi; });
+  applyTier();
 }
 inputs.layerCount.addEventListener('input', () => { refreshLabels(); updateLayerOptions(); scheduleRegen(); });
 // per-layer petal count is a free-text list; rebuild on edit (parsing is tolerant)
@@ -3102,6 +3141,7 @@ function updateCenterOptions() {
     }
     el.hidden = !show;
   });
+  applyTier();
 }
 inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
@@ -3129,6 +3169,7 @@ function updateBaseOptions() {
   document.querySelectorAll('[data-stem]').forEach((el) => { el.hidden = inputs.stemType.value === 'none'; });
   // leaf sub-controls (arrangement / size) show only when a stem AND a leaf type are on
   document.querySelectorAll('[data-leaf]').forEach((el) => { el.hidden = inputs.stemType.value === 'none' || inputs.leafType.value === 'none'; });
+  applyTier();
 }
 inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptProfile.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
@@ -3670,6 +3711,7 @@ if (saveBtn && saveModal) {
    =================================================================== */
 
 controls.autoRotate = inputs.autoRotate.checked;
+document.body.classList.toggle('fl-advanced', !standardMode);   // Standard by default
 updateTipOptions();
 updateInfillOptions();
 updateBloomOptions();
@@ -3677,6 +3719,7 @@ updateLayerOptions();
 updateCenterOptions();
 updateBaseOptions();
 refreshLabels();
+applyTier();
 
 if (PREVIEW) {
   // Gallery thumbnail: strip the chrome, render cheaply, always auto-rotate, and

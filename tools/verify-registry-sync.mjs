@@ -28,7 +28,7 @@ const { CONTROLS } = await import(REPO + 'flower-registry.js');
 
 // Chrome controls live in the HTML but intentionally not in the registry (handled
 // directly in flower.js). They are exempt from the "HTML has, registry lacks" check.
-const CHROME = new Set(['viewPreset', 'autoRotate', 'saveNameInput', 'spaceSeed']);
+const CHROME = new Set(['viewPreset', 'autoRotate', 'saveNameInput', 'spaceSeed', 'advancedToggle']);
 
 const fail = [];
 const err = (m) => fail.push(m);
