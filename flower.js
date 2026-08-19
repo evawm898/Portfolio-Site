@@ -2114,7 +2114,41 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       else for (let k = 0; k < 3; k++) ringAt(stemR * (1.12 + k * 0.13), neckPt.y + zoneDepth * (0.03 + k * 0.05), stemR * 0.26);   // ferrule
     };
 
-    if (construction === 'solid') {
+    if (construction === 'solid' && opts.continuousMargin) {
+      // ----- FIX 2: CROSS-SECTION MORPH (not a lathe). The top ring is the feet-driven
+      //       cross-section — the blended union of the petal bases: a radial RIDGE at each
+      //       foot (sTopR, carrying the petal's width + cup) and a HEIGHT dip between them
+      //       (sTopY). It morphs C1 to the stem circle over MORPH LENGTH: the scallop
+      //       DEVIATION (both radial and vertical) fades with a smootherstep (zero slope at
+      //       both ends -> C1 vertical, no band), so every petal's base ridge continues down
+      //       and fades out (the tulip underside) and NO horizontal slice in the transition
+      //       is a circle until the morph completes. The between-petal valleys are deepened
+      //       so the top reads as ridges, not a flat plate. -----
+      const STEPS = 30;
+      const morphFrac = clamp(opts.morphLength != null ? opts.morphLength : 0.6, 0.2, 1.0);
+      let meanTopY = 0; for (let j = 0; j < M; j++) meanTopY += sTopY[j]; meanTopY /= M;
+      // Amplify the cross-section relief so the petal ridges are a real cue (not shallow
+      // flutes that read as a circle) and the transition is graded, not abrupt: the radial
+      // ridge/valley deviation and the between-petal height dip are both deepened. The
+      // amplified valleys are floored to stemR (radial) so nothing pinches below the stem.
+      const ridgeAmp = 2.2;   // radial ridge/valley depth
+      const dipBoost = 2.4;   // between-petal height dip depth
+      for (let k = 0; k <= STEPS; k++) {
+        const t = k / STEPS;
+        const mt = clamp(t / morphFrac, 0, 1);
+        const dev = smootherstep(1 - mt);                 // 1 (full scallop) at top -> 0 (circle) at the morph end, C1
+        const meanR = bodyR(t);
+        const ring = new Array(M);
+        for (let j = 0; j < M; j++) {
+          const rad = floorRad(Math.max(stemR, meanR + (sTopR[j] - meanTopR) * ridgeAmp * dev));
+          const y = lerp(meanTopY, cy - zoneDepth, t) + (sTopY[j] - meanTopY) * dipBoost * dev;
+          ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
+        }
+        rings.push(ring);
+      }
+      topCap = { x: cx, y: cy + overlap + meanTopR * 0.3, z: cz };   // DOME the cap (no flat plate); stamens emerge through it
+      botCap = { x: cx, y: cy - zoneDepth, z: cz };
+    } else if (construction === 'solid') {
       // ----- SOLID revolved body (FLARE keeps its flutes -> blended; others fade fast). -----
       const STEPS = (profile === 'dome' || profile === 'urn') ? 20 : 14;
       for (let k = 0; k <= STEPS; k++) {
@@ -2505,7 +2539,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
       bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       continuousMargin: P.continuousMargin, tubeRadius: P.tubeRadius,
-      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate,
+      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate, morphLength: ui.morphLength,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -2990,6 +3024,7 @@ const inputs = {
   flareRate: document.getElementById('flareRate'),
   mergeStart: document.getElementById('mergeStart'),
   mergeRate: document.getElementById('mergeRate'),
+  morphLength: document.getElementById('morphLength'),
   edgeTermination: document.getElementById('edgeTermination'),
   captureDist: document.getElementById('captureDist'),
   voronoiLloyd: document.getElementById('voronoiLloyd'),
@@ -3153,6 +3188,7 @@ function readUI() {
     flareRate: parseFloat(inputs.flareRate.value),
     mergeStart: parseFloat(inputs.mergeStart.value),
     mergeRate: parseFloat(inputs.mergeRate.value),
+    morphLength: parseFloat(inputs.morphLength.value),
     edgeTermination: inputs.edgeTermination.value,
     captureDist: parseFloat(inputs.captureDist.value),
     voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
@@ -3305,6 +3341,7 @@ function refreshLabels() {
   setLabel('flareRate', (+inputs.flareRate.value).toFixed(2));
   setLabel('mergeStart', (+inputs.mergeStart.value).toFixed(2));
   setLabel('mergeRate', (+inputs.mergeRate.value).toFixed(2));
+  setLabel('morphLength', (+inputs.morphLength.value).toFixed(2));
   setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
   setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
   setLabel('voronoiAniso', (+inputs.voronoiAniso.value).toFixed(1) + '×');
@@ -3437,7 +3474,7 @@ function setBuilding(on) {
  'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'mergeStart', 'mergeRate', 'morphLength', 'captureDist', 'voronoiLloyd',
  'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
  'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
  'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
@@ -3750,6 +3787,7 @@ if (resetBtn) {
     inputs.flareRate.value = d.flareRate;
     inputs.mergeStart.value = d.mergeStart;
     inputs.mergeRate.value = d.mergeRate;
+    inputs.morphLength.value = d.morphLength;
     inputs.edgeTermination.value = d.edgeTermination;
     inputs.captureDist.value = d.captureDist;
     inputs.voronoiLloyd.value = d.voronoiLloyd;
@@ -3886,7 +3924,7 @@ const DEFAULTS = {
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
-  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
+  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5, morphLength: 0.6,
   edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
   voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
   spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
@@ -3925,7 +3963,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 10;
+const CURRENT_SCHEMA = 11;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -4056,7 +4094,16 @@ function migrateV9toV10(p) {
   }
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10];
+// v10 -> v11: the SOLID receptacle becomes a C1 CROSS-SECTION MORPH under continuous margin,
+// with a MORPH LENGTH control. It only changes SOLID + continuous-margin-ON designs (the
+// morph replaces the lathe there); every other design — and any design with the toggle off —
+// is unchanged, so filling MORPH LENGTH from DEFAULTS is inert for them.
+function migrateV10toV11(p) {
+  const out = { ...p };
+  if (out.morphLength == null) out.morphLength = DEFAULTS.morphLength;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

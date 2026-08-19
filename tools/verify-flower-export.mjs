@@ -210,7 +210,10 @@ CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', se
 ] });
 CONFIGS.push({ label: 'cont-margin CORED', matrix: false, set: [{ id: 'receptConstruction', value: 'cored', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin merge start 0.2 / rate 0.2', set: [{ id: 'mergeStart', value: '0.2' }, { id: 'mergeRate', value: '0.2' }] });
-CONFIGS.push({ label: 'cont-margin SOLID profile', set: [{ id: 'receptConstruction', value: 'solid', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin SOLID morph (flare, L0.6)', set: [{ id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'morphLength', value: '0.6' }] });
+CONFIGS.push({ label: 'cont-margin SOLID morph DOME + short L0.2', set: [{ id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'morphLength', value: '0.2' }] });
+CONFIGS.push({ label: 'cont-margin SOLID morph URN + long L1.0 + sepals', set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'morphLength', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin SOLID morph flare (reset profile)', set: [{ id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'morphLength', value: '0.6' }] });
 CONFIGS.push({ label: 'cont-margin URN + ferrule', set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptCollar', value: 'ferrule', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin voronoi infill', set: [{ id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin bone (no outline) infill', set: [{ id: 'infillType', value: 'bone', evt: 'change' }] });
