@@ -3154,6 +3154,15 @@ function updateBaseOptions() {
   document.querySelectorAll('[data-recept-dome]').forEach((el) => { el.hidden = !on || prof !== 'dome'; });
   document.querySelectorAll('[data-recept-open]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'gathered' && con !== 'cored'); });
   document.querySelectorAll('[data-recept-ribbed]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'cored'); });
+  // The SDF junction (continuous margin ON) supersedes the legacy lathe receptacle's
+  // construction controls, so hide them there. The legacy path still runs when
+  // continuous margin is OFF, so these stay wired — hidden, not deleted.
+  // BACKLOG (trigger): retire the legacy receptacle entirely — delete these controls
+  // and the continuous-margin-OFF receptacle path, making continuous margin implicit —
+  // once the SDF junction is signed off. Until then the working fallback stays.
+  const contMarginOn = inputs.continuousMargin.value === 'on';
+  const LEGACY_RECEPT = ['receptConstruction', 'receptCollar', 'receptReach', 'receptSolidity', 'ribMultiplier', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight'];
+  if (on && contMarginOn) for (const id of LEGACY_RECEPT) { const w = ctrlWrap(id); if (w) w.hidden = true; }
   // Sepal controls hide when sepals are off; the serration sub-controls
   // (data-sepal-tip) hide further unless SEPAL TIP STYLE matches, mirroring the
   // petal tip panel's data-tip-styles gating.
@@ -3410,12 +3419,14 @@ function migrateV7toV8(p) {
   return out;
 }
 // v8 -> v9: the CONTINUOUS MARGIN toggle (edge as two rooted strands the receptacle
-// continues) plus its BUNDLE TIGHTNESS / FLARE RATE. The toggle defaults OFF, whose code
-// path is byte-identical to v8, and the two scalars are inert while it is off, so filling
-// all three from DEFAULTS leaves every prior design unchanged.
+// continues) plus its BUNDLE TIGHTNESS / FLARE RATE. The toggle was introduced defaulting
+// OFF, whose code path is byte-identical to v8. That legacy OFF is baked in explicitly
+// here so a pre-v9 design is unchanged even though the NEW-design default is now ON; the
+// two scalars are inert while it is off, so they fall back to DEFAULTS.
 function migrateV8toV9(p) {
   const out = { ...p };
-  for (const k of ['continuousMargin', 'bundleTightness', 'flareRate']) {
+  if (out.continuousMargin == null) out.continuousMargin = 'off';
+  for (const k of ['bundleTightness', 'flareRate']) {
     if (out[k] == null) out[k] = DEFAULTS[k];
   }
   return out;

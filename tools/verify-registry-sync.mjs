@@ -148,6 +148,18 @@ for (const c of CONTROLS) if (c.kind === 'slider' && c.fmt) {
   if (n !== 1) err(`${c.id}: declares fmt "${c.fmt}" but has ${n} data-value span(s) (expected exactly 1)`);
 }
 
+// ---- imperative-gate exception: capped + self-policing ---------------------------
+// captureDist's visibility is a compound AND across two selects (infill type AND
+// edge-termination != fade), which the single-attribute declarative gating cannot
+// express. It is gated imperatively (updateTerminationOptions) as a documented, single
+// exception. Assert EXACTLY ONE control carries the flag — a second one must not slip
+// in undocumented; it forces the conversation about extending the gating vocabulary.
+const imperative = CONTROLS.filter((c) => c.imperativeGate);
+if (imperative.length !== 1) {
+  err(`imperativeGate exception must be EXACTLY ONE control; found ${imperative.length} (${imperative.map((c) => c.id).join(', ') || 'none'}). ` +
+      `Either restore the single allowed exception or extend the declarative gating vocabulary instead of adding another hand-gated control.`);
+}
+
 // ---- report ----------------------------------------------------------------------
 if (fail.length) {
   console.error(`registry-sync: FAIL — ${fail.length} disagreement(s) between flower-registry.js and flower.html:\n`);
