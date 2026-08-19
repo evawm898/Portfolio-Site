@@ -43,6 +43,13 @@ them as optional or experimental.
   `node tools/verify-flower-export.mjs`. It renders the page headless, exports an
   STL across a range of configurations (add yours to it), and fails if any export
   has boundary edges > 0. A change is not finished until this passes.
+- **Watertight is necessary, not sufficient — also run the geometry-quality gate:**
+  `node tools/verify-geometry-quality.mjs`. The export gate only proves manifoldness; a
+  petal can be watertight and the WRONG SHAPE (e.g. the un-clefted continuous-margin rim
+  skipping a Lobed sinus). This gate measures correctness — margin fidelity (does the
+  rendered rim trace the material boundary?), contour smoothness, and uncapped infill
+  ends — across the shape × pattern matrix. Known, tracked defects are marked xfail so
+  the gate is hard for everything that ships. Add new shape/pattern configs to it.
 - **A correct-looking screen render is not proof.** Geometry can look right live
   and still export broken. Never rely on the visual alone.
 - **If a feature cannot be built in a watertight way, STOP and flag it to the user
