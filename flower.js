@@ -22,7 +22,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import {
   lerp, clamp, smootherstep, mulberry32,
-  buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
+  buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
@@ -942,7 +942,6 @@ function resolveParams(ui) {
     boneCurve: ui.boneCurve,                     // BONE: -1 swept to base <- 0 straight out -> 1 swept to tip
     boneSpread: ui.boneSpread,                   // BONE: how far the ribs reach toward the margin
     boneOutline: ui.boneOutline,                 // BONE: draw the petal outline (rim) or not
-    laceSwirl: ui.laceSwirl,                     // LACE: 0 loose scrolls -> 1 tight coils
     scallopCount: ui.scallopCount,               // SCALLOP edge: scallops per side (width)
     scallopHeight: ui.scallopHeight,             // SCALLOP edge: how far each scallop bulges out
     centerArch: ui.centerArch,                   // CENTER architecture: classic | dense | disc | petaloid
@@ -1056,8 +1055,6 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         count: P.boneCount, width: P.boneWidth,
         curve: P.boneCurve, spread: P.boneSpread,
       })
-    : P.infillType === 'lace'
-    ? buildLace(P, rng, { density: P.density, swirl: P.laceSwirl })
     : P.infillType === 'spacecol'
     ? getSpaceColonization(P, spaceColSeed(P, seed), {
         mode: P.spaceMode,
@@ -2894,8 +2891,9 @@ function animate() {
 // tools/verify-registry-sync.mjs fails the build if the registry and flower.html
 // ever disagree. WIRED is every control the panel drives; `inputs` maps each to its
 // element, plus the chrome controls handled directly here (viewPreset / autoRotate /
-// spaceSeed). fractalGrowth is an unwired placeholder (see placeholderControls) and
-// is excluded from WIRED, so readUI / DEFAULTS / reset / refreshLabels skip it.
+// spaceSeed). The `placeholder` flag excludes any control that is wired to state but
+// not yet driving geometry from WIRED (none at present), so readUI / DEFAULTS / reset /
+// refreshLabels skip it while it stays on the placeholderControls path.
 const WIRED = CONTROLS.filter((c) => !c.placeholder);
 const inputs = {};
 for (const c of WIRED) inputs[c.id] = document.getElementById(c.id);
@@ -2950,7 +2948,6 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
   const infill = ui.infillType === 'voronoi' ? 'voronoi cells'
     : ui.infillType === 'strands' ? 'radial strands'
     : ui.infillType === 'bone' ? 'bone lattice'
-    : ui.infillType === 'lace' ? 'lace filigree'
     : ui.infillType === 'spacecol' ? `space colonization (${ui.spaceMode})`
     : 'leaf venation';
   // SDF receptacle telemetry (continuous margin on): report the field's own triangle
@@ -3013,16 +3010,6 @@ function updateInfillOptions() {
   // voronoi (cell rounding); relabel it to match the active infill.
   const softLabel = document.querySelector('label[for="softness"]');
   if (softLabel) softLabel.textContent = type === 'veins' ? 'Vein detail' : 'Softness';
-  // The SCALLOP edge pairs only with LACE: offer its tip-style option only then,
-  // and fall back to CLEAN if scallop was selected under a different infill.
-  const scOpt = inputs.tipStyle.querySelector('option[value="scallop"]');
-  if (scOpt) {
-    scOpt.hidden = scOpt.disabled = type !== 'lace';
-    if (type !== 'lace' && inputs.tipStyle.value === 'scallop') {
-      inputs.tipStyle.value = 'clean';
-      updateTipOptions();
-    }
-  }
   // CONTINUOUS MARGIN: the bundle-tightness / flare-rate sliders apply only when it is on.
   const contOn = inputs.continuousMargin.value === 'on';
   document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !contOn; });
@@ -3274,7 +3261,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 13;
+const CURRENT_SCHEMA = 14;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3442,7 +3429,18 @@ function migrateV12toV13(p) {
   if (out.buttonSize == null) out.buttonSize = DEFAULTS.buttonSize;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13];
+// v13 -> v14: retire the dead LACE infill and the unwired FRACTAL-growth placeholder.
+// Drop their keys so they are not carried forward as unknown-field extras, and remap
+// any design that somehow selected the (always hidden+disabled) lace infill to VEINS.
+// SCALLOP is NOT touched here — it is revived as a first-class edge in this version.
+function migrateV13toV14(p) {
+  const out = { ...p };
+  delete out.laceSwirl;
+  delete out.fractalGrowth;
+  if (out.infillType === 'lace') out.infillType = 'veins';
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build
@@ -3498,11 +3496,10 @@ accSections.forEach((section) => {
   });
 });
 
-// Placeholder controls — no rendering logic yet. `fmt` formats the read-out for
-// slider controls; selects (fmt: null) show their value in the control itself.
-const placeholderControls = [
-  { id: 'fractalGrowth',   fmt: (v) => (+v).toFixed(2) },
-];
+// Placeholder controls — controls wired to state but not yet driving geometry. Empty
+// now that the fractalGrowth placeholder is removed (a real fractal margin is on the
+// geometry backlog); kept as the seam where a future not-yet-rendering control lands.
+const placeholderControls = [];
 
 // current values, exposed for the future render layer / quick debugging
 const edgeParams = {};
