@@ -2994,6 +2994,13 @@ let standardMode = true;
 const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
 const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
 function applyTier() {
+  // The FRACTAL edge is Advanced-only (a geometry-backlog item, no live geometry yet):
+  // hide its option in Standard and fall back to Clean if a loaded design selected it.
+  const fractalOpt = document.querySelector('#tipStyle option[value="fractal"]');
+  if (fractalOpt) {
+    fractalOpt.hidden = fractalOpt.disabled = standardMode;
+    if (standardMode && inputs.tipStyle.value === 'fractal') inputs.tipStyle.value = 'clean';
+  }
   if (standardMode) {
     for (const c of WIRED) if (!STANDARD_IDS.has(c.id)) { const w = ctrlWrap(c.id); if (w) w.hidden = true; }
   }
@@ -3040,10 +3047,11 @@ function updateInfillOptions() {
   inputs.softness.max = type === 'voronoi' ? '5' : '1';
   inputs.softness.step = type === 'voronoi' ? '0.05' : '0.01';
   if (+inputs.softness.value > +inputs.softness.max) inputs.softness.value = inputs.softness.max;
-  // The shared slider is VEIN DETAIL for veins (branching depth) but SOFTNESS for
-  // voronoi (cell rounding); relabel it to match the active infill.
+  // The shared slider is the contextual sub of the Pattern picker: DETAIL for Veins
+  // (branching depth), ROUNDNESS for Cells (voronoi cell rounding). It only shows for
+  // those two patterns, so relabel it to match.
   const softLabel = document.querySelector('label[for="softness"]');
-  if (softLabel) softLabel.textContent = type === 'veins' ? 'Vein detail' : 'Softness';
+  if (softLabel) softLabel.textContent = type === 'veins' ? 'Detail' : 'Roundness';
   // CONTINUOUS MARGIN: the bundle-tightness / flare-rate sliders apply only when it is on.
   const contOn = inputs.continuousMargin.value === 'on';
   document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !contOn; });

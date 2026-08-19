@@ -24,7 +24,7 @@ export const SECTIONS = [
 ];
 
 export const CONTROLS = [
-  {"id":"bloomType","section":"acc-bloom","kind":"select","options":[{"value":"coiled","text":"COILED"},{"value":"radial","text":"RADIAL"},{"value":"bilateral","text":"BILATERAL"}],"default":"coiled","label":"Bloom type","tier":"standard"},
+  {"id":"bloomType","section":"acc-bloom","kind":"select","options":[{"value":"coiled","text":"SPIRAL"},{"value":"radial","text":"ROSETTE"},{"value":"bilateral","text":"FAN"}],"default":"coiled","label":"Arrangement","tier":"standard"},
   {"id":"petalCount","section":"acc-bloom","kind":"slider","min":1,"max":40,"step":1,"default":4,"label":"Number of petals","fmt":"int","gating":{"data-bloom-styles":"coiled radial"},"tier":"standard"},
   {"id":"divergenceMode","section":"acc-bloom","kind":"select","options":[{"value":"golden","text":"GOLDEN"},{"value":"even","text":"EVEN"},{"value":"custom","text":"CUSTOM"}],"default":"golden","label":"Divergence angle","gating":{"data-bloom-styles":"coiled"}},
   {"id":"divergenceAngle","section":"acc-bloom","kind":"slider","min":0,"max":180,"step":0.1,"default":137.5,"label":"Custom angle","fmt":"f1deg","divId":"divergenceAngleCtrl","permanentHidden":true},
@@ -79,7 +79,7 @@ export const CONTROLS = [
   {"id":"thickEdge","section":"acc-petal","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Edge knife","fmt":"f2"},
   {"id":"thickScale","section":"acc-petal","kind":"slider","min":0.5,"max":2,"step":0.01,"default":1,"label":"Thickness","fmt":"f2"},
   {"id":"tube","section":"acc-petal","kind":"slider","min":0,"max":1,"step":0.01,"default":0.4,"label":"Tube thickness","fmt":"f2","permanentHidden":true},
-  {"id":"tipStyle","section":"acc-tip","kind":"select","options":[{"value":"clean","text":"CLEAN"},{"value":"jagged","text":"SERRATED"},{"value":"ruffled","text":"RUFFLED"},{"value":"fractal","text":"FRACTAL"},{"value":"scallop","text":"SCALLOP"}],"default":"clean","label":"Tip style","tier":"standard"},
+  {"id":"tipStyle","section":"acc-tip","kind":"select","options":[{"value":"clean","text":"CLEAN"},{"value":"jagged","text":"TOOTHED"},{"value":"scallop","text":"SCALLOPED"},{"value":"ruffled","text":"RUFFLED"},{"value":"fractal","text":"FRACTAL"}],"default":"clean","label":"Edge","tier":"standard"},
   {"id":"tip","section":"acc-tip","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Tip shape","fmt":"f2"},
   {"id":"tipFrequency","section":"acc-tip","kind":"slider","min":1,"max":40,"step":1,"default":14,"label":"Tip frequency","fmt":"int","gating":{"data-tip-styles":"jagged ruffled fractal"}},
   {"id":"tipRegion","section":"acc-tip","kind":"slider","min":0,"max":1,"step":0.01,"default":0.25,"label":"Tip region","fmt":"f2","gating":{"data-tip-styles":"jagged fractal"}},
@@ -89,7 +89,7 @@ export const CONTROLS = [
   {"id":"scallopHeight","section":"acc-tip","kind":"slider","min":0,"max":1,"step":0.01,"default":0.4,"label":"Scallop height","fmt":"f2","gating":{"data-tip-styles":"scallop"},"tier":"standard"},
   {"id":"edgeNoise","section":"acc-tip","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Edge noise","fmt":"f2","tier":"standard"},
   {"id":"edgeNoiseScale","section":"acc-tip","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Edge noise scale","fmt":"f2"},
-  {"id":"infillType","section":"acc-infill","kind":"select","options":[{"value":"veins","text":"VEINS"},{"value":"spacecol","text":"SPACE COLONIZATION"},{"value":"voronoi","text":"VORONOI"},{"value":"strands","text":"STRANDS"},{"value":"bone","text":"BONE"}],"default":"veins","label":"Infill type","tier":"standard"},
+  {"id":"infillType","section":"acc-infill","kind":"select","options":[{"value":"veins","text":"VEINS"},{"value":"voronoi","text":"CELLS"},{"value":"strands","text":"STRANDS"},{"value":"bone","text":"LATTICE"},{"value":"spacecol","text":"GROWTH"}],"default":"veins","label":"Pattern","tier":"standard"},
   {"id":"spaceMode","section":"acc-infill","kind":"select","options":[{"value":"open","text":"OPEN"},{"value":"closed","text":"CLOSED"}],"default":"closed","label":"Network","gating":{"data-infill-styles":"spacecol"}},
   {"id":"spacePattern","section":"acc-infill","kind":"select","options":[{"value":"phyllotactic","text":"PHYLLOTACTIC"},{"value":"lattice","text":"JITTERED LATTICE"},{"value":"random","text":"RANDOM"}],"default":"phyllotactic","label":"Seed pattern","gating":{"data-infill-styles":"spacecol"}},
   {"id":"spaceDensity","section":"acc-infill","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Source density","fmt":"f2","gating":{"data-infill-styles":"spacecol"}},
