@@ -29,6 +29,7 @@ import {
   cleftConfig, petalMask, clipVeinsToMask,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
+import { CONTROLS } from './flower-registry.js';
 
 const DEG = Math.PI / 180;
 
@@ -2889,480 +2890,47 @@ function animate() {
    7. UI WIRING
    =================================================================== */
 
-const inputs = {
-  petalCount: document.getElementById('petalCount'),
-  width: document.getElementById('width'),
-  taper: document.getElementById('taper'),
-  clawLength: document.getElementById('clawLength'),
-  clawWidth: document.getElementById('clawWidth'),
-  shoulder: document.getElementById('shoulder'),
-  cleftDepth: document.getElementById('cleftDepth'),
-  cleftLobes: document.getElementById('cleftLobes'),
-  cleftWidth: document.getElementById('cleftWidth'),
-  reliefAmp: document.getElementById('reliefAmp'),
-  reliefFreq: document.getElementById('reliefFreq'),
-  reliefMode: document.getElementById('reliefMode'),
-  petalTwist: document.getElementById('petalTwist'),
-  petalSkew: document.getElementById('petalSkew'),
-  thickTaper: document.getElementById('thickTaper'),
-  thickEdge: document.getElementById('thickEdge'),
-  thickScale: document.getElementById('thickScale'),
-  tip: document.getElementById('tip'),
-  centerCurve: document.getElementById('centerCurve'),
-  edgeCurve: document.getElementById('edgeCurve'),
-  edgeProfile: document.getElementById('edgeProfile'),
-  petalCup: document.getElementById('petalCup'),
-  tipStyle: document.getElementById('tipStyle'),
-  tipRegion: document.getElementById('tipRegion'),
-  tipLength: document.getElementById('tipLength'),
-  tipFrequency: document.getElementById('tipFrequency'),
-  tipIrregularity: document.getElementById('tipIrregularity'),
-  edgeNoise: document.getElementById('edgeNoise'),
-  edgeNoiseScale: document.getElementById('edgeNoiseScale'),
-  bloomType: document.getElementById('bloomType'),
-  divergenceMode: document.getElementById('divergenceMode'),
-  divergenceAngle: document.getElementById('divergenceAngle'),
-  layerCount: document.getElementById('layerCount'),
-  petalsPerLayer: document.getElementById('petalsPerLayer'),
-  layerSizeFalloff: document.getElementById('layerSizeFalloff'),
-  layerHeightOffset: document.getElementById('layerHeightOffset'),
-  layerRotationOffset: document.getElementById('layerRotationOffset'),
-  layerBloomAngleDelta: document.getElementById('layerBloomAngleDelta'),
-  bilPerSide: document.getElementById('bilPerSide'),
-  bilSpacing: document.getElementById('bilSpacing'),
-  bilCenterPetal: document.getElementById('bilCenterPetal'),
-  bilEdge1: document.getElementById('bilEdge1'),
-  bilEdge2: document.getElementById('bilEdge2'),
-  bilEdge3: document.getElementById('bilEdge3'),
-  bilWidth1: document.getElementById('bilWidth1'),
-  bilWidth2: document.getElementById('bilWidth2'),
-  bilWidth3: document.getElementById('bilWidth3'),
-  bilCenterCurve1: document.getElementById('bilCenterCurve1'),
-  bilCenterCurve2: document.getElementById('bilCenterCurve2'),
-  bilCenterCurve3: document.getElementById('bilCenterCurve3'),
-  bilEdgeCurve1: document.getElementById('bilEdgeCurve1'),
-  bilEdgeCurve2: document.getElementById('bilEdgeCurve2'),
-  bilEdgeCurve3: document.getElementById('bilEdgeCurve3'),
-  bilScale1: document.getElementById('bilScale1'),
-  bilScale2: document.getElementById('bilScale2'),
-  bilScale3: document.getElementById('bilScale3'),
-  bilEdgeProfile1: document.getElementById('bilEdgeProfile1'),
-  bilEdgeProfile2: document.getElementById('bilEdgeProfile2'),
-  bilEdgeProfile3: document.getElementById('bilEdgeProfile3'),
-  bloom: document.getElementById('bloom'),
-  tube: document.getElementById('tube'),
-  infillType: document.getElementById('infillType'),
-  density: document.getElementById('density'),
-  softness: document.getElementById('softness'),
-  veinBranchStart: document.getElementById('veinBranchStart'),
-  continuousMargin: document.getElementById('continuousMargin'),
-  bundleTightness: document.getElementById('bundleTightness'),
-  flareRate: document.getElementById('flareRate'),
-  absorption: document.getElementById('absorption'),
-  buttonSize: document.getElementById('buttonSize'),
-  gatherRadius: document.getElementById('gatherRadius'),
-  gatherHeight: document.getElementById('gatherHeight'),
-  mergeStart: document.getElementById('mergeStart'),
-  mergeRate: document.getElementById('mergeRate'),
-  edgeTermination: document.getElementById('edgeTermination'),
-  captureDist: document.getElementById('captureDist'),
-  voronoiLloyd: document.getElementById('voronoiLloyd'),
-  voronoiAniso: document.getElementById('voronoiAniso'),
-  voronoiDensityLaw: document.getElementById('voronoiDensityLaw'),
-  voronoiWeight: document.getElementById('voronoiWeight'),
-  voronoiWeightFalloff: document.getElementById('voronoiWeightFalloff'),
-  voronoiSlabTaper: document.getElementById('voronoiSlabTaper'),
-  spaceMode: document.getElementById('spaceMode'),
-  spaceDensity: document.getElementById('spaceDensity'),
-  spaceBirth: document.getElementById('spaceBirth'),
-  spaceKill: document.getElementById('spaceKill'),
-  spaceStep: document.getElementById('spaceStep'),
-  spacePattern: document.getElementById('spacePattern'),
-  spaceSeed: document.getElementById('spaceSeed'),
-  spaceVariants: document.getElementById('spaceVariants'),
-  strandCount: document.getElementById('strandCount'),
-  strandWidth: document.getElementById('strandWidth'),
-  strandTaper: document.getElementById('strandTaper'),
-  strandCurvature: document.getElementById('strandCurvature'),
-  strandIrregularity: document.getElementById('strandIrregularity'),
-  boneCount: document.getElementById('boneCount'),
-  boneWidth: document.getElementById('boneWidth'),
-  boneCurve: document.getElementById('boneCurve'),
-  boneSpread: document.getElementById('boneSpread'),
-  boneOutline: document.getElementById('boneOutline'),
-  laceSwirl: document.getElementById('laceSwirl'),
-  scallopCount: document.getElementById('scallopCount'),
-  scallopHeight: document.getElementById('scallopHeight'),
-  centerArch: document.getElementById('centerArch'),
-  centerType: document.getElementById('centerType'),
-  centerCount: document.getElementById('centerCount'),
-  centerLength: document.getElementById('centerLength'),
-  centerTipSize: document.getElementById('centerTipSize'),
-  centerTipShape: document.getElementById('centerTipShape'),
-  centerFilThick: document.getElementById('centerFilThick'),
-  denseStamenCount: document.getElementById('denseStamenCount'),
-  denseStamenLength: document.getElementById('denseStamenLength'),
-  carpelCount: document.getElementById('carpelCount'),
-  carpelSize: document.getElementById('carpelSize'),
-  discSize: document.getElementById('discSize'),
-  discHeight: document.getElementById('discHeight'),
-  ringStamenCount: document.getElementById('ringStamenCount'),
-  ringStamenLength: document.getElementById('ringStamenLength'),
-  fillPetalCount: document.getElementById('fillPetalCount'),
-  fillOuterSize: document.getElementById('fillOuterSize'),
-  fillInnerSize: document.getElementById('fillInnerSize'),
-  fillDensity: document.getElementById('fillDensity'),
-  fillBloomAngle: document.getElementById('fillBloomAngle'),
-  receptacleType: document.getElementById('receptacleType'),
-  blendSmoothness: document.getElementById('blendSmoothness'),
-  receptacleDepth: document.getElementById('receptacleDepth'),
-  convergenceTightness: document.getElementById('convergenceTightness'),
-  receptProfile: document.getElementById('receptProfile'),
-  receptConstruction: document.getElementById('receptConstruction'),
-  receptCollar: document.getElementById('receptCollar'),
-  receptReach: document.getElementById('receptReach'),
-  receptSolidity: document.getElementById('receptSolidity'),
-  ribMultiplier: document.getElementById('ribMultiplier'),
-  spiralTightness: document.getElementById('spiralTightness'),
-  spiralThickness: document.getElementById('spiralThickness'),
-  bulbSize: document.getElementById('bulbSize'),
-  bulbHeight: document.getElementById('bulbHeight'),
-  sepalsType: document.getElementById('sepalsType'),
-  sepalSize: document.getElementById('sepalSize'),
-  sepalCount: document.getElementById('sepalCount'),
-  sepalStyle: document.getElementById('sepalStyle'),
-  sepalCenterCurve: document.getElementById('sepalCenterCurve'),
-  sepalEdgeCurve: document.getElementById('sepalEdgeCurve'),
-  sepalEdgeProfile: document.getElementById('sepalEdgeProfile'),
-  sepalTipStyle: document.getElementById('sepalTipStyle'),
-  sepalTipShape: document.getElementById('sepalTipShape'),
-  sepalTipFreq: document.getElementById('sepalTipFreq'),
-  sepalTipRegion: document.getElementById('sepalTipRegion'),
-  sepalTipLength: document.getElementById('sepalTipLength'),
-  stemType: document.getElementById('stemType'),
-  stemLength: document.getElementById('stemLength'),
-  stemCurve: document.getElementById('stemCurve'),
-  stemThickness: document.getElementById('stemThickness'),
-  stemNodeCount: document.getElementById('stemNodeCount'),
-  stemNodeProminence: document.getElementById('stemNodeProminence'),
-  stemBudMode: document.getElementById('stemBudMode'),
-  leafType: document.getElementById('leafType'),
-  leafPhyllotaxy: document.getElementById('leafPhyllotaxy'),
-  leafSize: document.getElementById('leafSize'),
-  tightness: document.getElementById('tightness'),
-  elevation: document.getElementById('elevation'),
-  autoRotate: document.getElementById('autoRotate'),
-  viewPreset: document.getElementById('viewPreset'),
-};
+// The control panel is DERIVED from flower-registry.js, the single source of truth.
+// tools/verify-registry-sync.mjs fails the build if the registry and flower.html
+// ever disagree. WIRED is every control the panel drives; `inputs` maps each to its
+// element, plus the chrome controls handled directly here (viewPreset / autoRotate /
+// spaceSeed). fractalGrowth is an unwired placeholder (see placeholderControls) and
+// is excluded from WIRED, so readUI / DEFAULTS / reset / refreshLabels skip it.
+const WIRED = CONTROLS.filter((c) => !c.placeholder);
+const inputs = {};
+for (const c of WIRED) inputs[c.id] = document.getElementById(c.id);
+for (const id of ['viewPreset', 'autoRotate', 'spaceSeed']) inputs[id] = document.getElementById(id);
 
 function readUI() {
-  return {
-    petalCount: parseInt(inputs.petalCount.value, 10),
-    width: parseFloat(inputs.width.value),
-    taper: parseFloat(inputs.taper.value),
-    clawLength: parseFloat(inputs.clawLength.value),
-    clawWidth: parseFloat(inputs.clawWidth.value),
-    shoulder: parseFloat(inputs.shoulder.value),
-    cleftDepth: parseFloat(inputs.cleftDepth.value),
-    cleftLobes: parseInt(inputs.cleftLobes.value, 10),
-    cleftWidth: parseFloat(inputs.cleftWidth.value),
-    reliefAmp: parseFloat(inputs.reliefAmp.value),
-    reliefFreq: parseFloat(inputs.reliefFreq.value),
-    reliefMode: inputs.reliefMode.value,
-    petalTwist: parseFloat(inputs.petalTwist.value),
-    petalSkew: parseFloat(inputs.petalSkew.value),
-    thickTaper: parseFloat(inputs.thickTaper.value),
-    thickEdge: parseFloat(inputs.thickEdge.value),
-    thickScale: parseFloat(inputs.thickScale.value),
-    tip: parseFloat(inputs.tip.value),
-    centerCurve: parseFloat(inputs.centerCurve.value),
-    edgeCurve: parseFloat(inputs.edgeCurve.value),
-    edgeProfile: parseFloat(inputs.edgeProfile.value),
-    petalCup: parseFloat(inputs.petalCup.value),
-    tipStyle: inputs.tipStyle.value,
-    tipRegion: parseFloat(inputs.tipRegion.value),
-    tipLength: parseFloat(inputs.tipLength.value),
-    tipFrequency: parseInt(inputs.tipFrequency.value, 10),
-    tipIrregularity: parseFloat(inputs.tipIrregularity.value),
-    edgeNoise: parseFloat(inputs.edgeNoise.value),
-    edgeNoiseScale: parseFloat(inputs.edgeNoiseScale.value),
-    bloomType: inputs.bloomType.value,
-    divergenceMode: inputs.divergenceMode.value,
-    divergenceAngle: parseFloat(inputs.divergenceAngle.value),
-    layerCount: parseInt(inputs.layerCount.value, 10),
-    petalsPerLayer: inputs.petalsPerLayer.value,
-    layerSizeFalloff: parseFloat(inputs.layerSizeFalloff.value),
-    layerHeightOffset: parseFloat(inputs.layerHeightOffset.value),
-    layerRotationOffset: parseFloat(inputs.layerRotationOffset.value),
-    layerBloomAngleDelta: parseFloat(inputs.layerBloomAngleDelta.value),
-    bilPerSide: parseInt(inputs.bilPerSide.value, 10),
-    bilSpacing: parseFloat(inputs.bilSpacing.value),
-    bilCenterPetal: inputs.bilCenterPetal.checked,
-    bilEdge1: inputs.bilEdge1.value,
-    bilEdge2: inputs.bilEdge2.value,
-    bilEdge3: inputs.bilEdge3.value,
-    bilWidth1: parseFloat(inputs.bilWidth1.value),
-    bilWidth2: parseFloat(inputs.bilWidth2.value),
-    bilWidth3: parseFloat(inputs.bilWidth3.value),
-    bilCenterCurve1: parseFloat(inputs.bilCenterCurve1.value),
-    bilCenterCurve2: parseFloat(inputs.bilCenterCurve2.value),
-    bilCenterCurve3: parseFloat(inputs.bilCenterCurve3.value),
-    bilEdgeCurve1: parseFloat(inputs.bilEdgeCurve1.value),
-    bilEdgeCurve2: parseFloat(inputs.bilEdgeCurve2.value),
-    bilEdgeCurve3: parseFloat(inputs.bilEdgeCurve3.value),
-    bilScale1: parseFloat(inputs.bilScale1.value),
-    bilScale2: parseFloat(inputs.bilScale2.value),
-    bilScale3: parseFloat(inputs.bilScale3.value),
-    bilEdgeProfile1: parseFloat(inputs.bilEdgeProfile1.value),
-    bilEdgeProfile2: parseFloat(inputs.bilEdgeProfile2.value),
-    bilEdgeProfile3: parseFloat(inputs.bilEdgeProfile3.value),
-    bloom: parseFloat(inputs.bloom.value),
-    tube: parseFloat(inputs.tube.value),
-    infillType: inputs.infillType.value,
-    density: parseInt(inputs.density.value, 10),
-    softness: parseFloat(inputs.softness.value),
-    veinBranchStart: parseFloat(inputs.veinBranchStart.value),
-    continuousMargin: inputs.continuousMargin.value,
-    bundleTightness: parseFloat(inputs.bundleTightness.value),
-    flareRate: parseFloat(inputs.flareRate.value),
-    absorption: parseFloat(inputs.absorption.value),
-    buttonSize: parseFloat(inputs.buttonSize.value),
-    gatherRadius: parseFloat(inputs.gatherRadius.value),
-    gatherHeight: parseFloat(inputs.gatherHeight.value),
-    mergeStart: parseFloat(inputs.mergeStart.value),
-    mergeRate: parseFloat(inputs.mergeRate.value),
-    edgeTermination: inputs.edgeTermination.value,
-    captureDist: parseFloat(inputs.captureDist.value),
-    voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
-    voronoiAniso: parseFloat(inputs.voronoiAniso.value),
-    voronoiDensityLaw: parseFloat(inputs.voronoiDensityLaw.value),
-    voronoiWeight: parseFloat(inputs.voronoiWeight.value),
-    voronoiWeightFalloff: parseFloat(inputs.voronoiWeightFalloff.value),
-    voronoiSlabTaper: parseFloat(inputs.voronoiSlabTaper.value),
-    spaceMode: inputs.spaceMode.value,
-    spaceDensity: parseFloat(inputs.spaceDensity.value),
-    spaceBirth: parseFloat(inputs.spaceBirth.value),
-    spaceKill: parseFloat(inputs.spaceKill.value),
-    spaceStep: parseFloat(inputs.spaceStep.value),
-    spacePattern: inputs.spacePattern.value,
-    spaceSeed: parseInt(inputs.spaceSeed.value, 10) || 0,
-    spaceVariants: parseInt(inputs.spaceVariants.value, 10),
-    strandCount: parseInt(inputs.strandCount.value, 10),
-    strandWidth: parseFloat(inputs.strandWidth.value),
-    strandTaper: parseFloat(inputs.strandTaper.value),
-    strandCurvature: parseFloat(inputs.strandCurvature.value),
-    strandIrregularity: parseFloat(inputs.strandIrregularity.value),
-    boneCount: parseInt(inputs.boneCount.value, 10),
-    boneWidth: parseFloat(inputs.boneWidth.value),
-    boneCurve: parseFloat(inputs.boneCurve.value),
-    boneSpread: parseFloat(inputs.boneSpread.value),
-    boneOutline: inputs.boneOutline.checked,
-    laceSwirl: parseFloat(inputs.laceSwirl.value),
-    scallopCount: parseInt(inputs.scallopCount.value, 10),
-    scallopHeight: parseFloat(inputs.scallopHeight.value),
-    centerArch: inputs.centerArch.value,
-    centerType: inputs.centerType.value,
-    centerCount: parseInt(inputs.centerCount.value, 10),
-    centerLength: parseFloat(inputs.centerLength.value),
-    centerTipSize: parseFloat(inputs.centerTipSize.value),
-    centerTipShape: parseFloat(inputs.centerTipShape.value),
-    centerFilThick: parseFloat(inputs.centerFilThick.value),
-    denseStamenCount: parseInt(inputs.denseStamenCount.value, 10),
-    denseStamenLength: parseFloat(inputs.denseStamenLength.value),
-    carpelCount: parseInt(inputs.carpelCount.value, 10),
-    carpelSize: parseFloat(inputs.carpelSize.value),
-    discSize: parseFloat(inputs.discSize.value),
-    discHeight: parseFloat(inputs.discHeight.value),
-    ringStamenCount: parseInt(inputs.ringStamenCount.value, 10),
-    ringStamenLength: parseFloat(inputs.ringStamenLength.value),
-    fillPetalCount: parseInt(inputs.fillPetalCount.value, 10),
-    fillOuterSize: parseFloat(inputs.fillOuterSize.value),
-    fillInnerSize: parseFloat(inputs.fillInnerSize.value),
-    fillDensity: parseFloat(inputs.fillDensity.value),
-    fillBloomAngle: parseFloat(inputs.fillBloomAngle.value),
-    receptacleType: inputs.receptacleType.value,
-    blendSmoothness: parseFloat(inputs.blendSmoothness.value),
-    receptacleDepth: parseFloat(inputs.receptacleDepth.value),
-    convergenceTightness: parseFloat(inputs.convergenceTightness.value),
-    receptProfile: inputs.receptProfile.value,
-    receptConstruction: inputs.receptConstruction.value,
-    receptCollar: inputs.receptCollar.value,
-    receptReach: parseFloat(inputs.receptReach.value),
-    receptSolidity: parseFloat(inputs.receptSolidity.value),
-    ribMultiplier: parseFloat(inputs.ribMultiplier.value),
-    spiralTightness: parseFloat(inputs.spiralTightness.value),
-    spiralThickness: parseFloat(inputs.spiralThickness.value),
-    bulbSize: parseFloat(inputs.bulbSize.value),
-    bulbHeight: parseFloat(inputs.bulbHeight.value),
-    sepalsType: inputs.sepalsType.value,
-    sepalSize: parseFloat(inputs.sepalSize.value),
-    sepalCount: parseInt(inputs.sepalCount.value, 10),
-    sepalStyle: inputs.sepalStyle.value,
-    sepalCenterCurve: parseFloat(inputs.sepalCenterCurve.value),
-    sepalEdgeCurve: parseFloat(inputs.sepalEdgeCurve.value),
-    sepalEdgeProfile: parseFloat(inputs.sepalEdgeProfile.value),
-    sepalTipStyle: inputs.sepalTipStyle.value,
-    sepalTipShape: parseFloat(inputs.sepalTipShape.value),
-    sepalTipFreq: parseInt(inputs.sepalTipFreq.value, 10),
-    sepalTipRegion: parseFloat(inputs.sepalTipRegion.value),
-    sepalTipLength: parseFloat(inputs.sepalTipLength.value),
-    stemType: inputs.stemType.value,
-    stemLength: parseFloat(inputs.stemLength.value),
-    stemCurve: parseFloat(inputs.stemCurve.value),
-    stemThickness: parseFloat(inputs.stemThickness.value),
-    stemNodeCount: parseInt(inputs.stemNodeCount.value, 10),
-    stemNodeProminence: parseFloat(inputs.stemNodeProminence.value),
-    stemBudMode: inputs.stemBudMode.value,
-    leafType: inputs.leafType.value,
-    leafPhyllotaxy: inputs.leafPhyllotaxy.value,
-    leafSize: parseFloat(inputs.leafSize.value),
-    tightness: parseFloat(inputs.tightness.value),
-    elevation: parseFloat(inputs.elevation.value),
-    autoRotate: inputs.autoRotate.checked,
-  };
+  const ui = {};
+  for (const c of WIRED) {
+    const el = inputs[c.id];
+    if (c.kind === 'checkbox') ui[c.id] = el.checked;
+    else if (c.kind === 'select' || c.kind === 'text') ui[c.id] = el.value;
+    else ui[c.id] = parseFloat(el.value);
+  }
+  ui.autoRotate = inputs.autoRotate.checked;
+  ui.spaceSeed = parseInt(inputs.spaceSeed.value, 10) || 0;
+  return ui;
 }
 
-// live numeric read-outs next to each slider
+// live numeric read-outs next to each slider — one per slider, formatted by the
+// registry `fmt` token. LABEL_FMT reproduces the former hand-written formatting.
+const LABEL_FMT = {
+  int: (v) => v,
+  f2: (v) => (+v).toFixed(2),
+  f1: (v) => (+v).toFixed(1),
+  f3: (v) => (+v).toFixed(3),
+  f2x: (v) => (+v).toFixed(2) + '×',
+  f1x: (v) => (+v).toFixed(1) + '×',
+  deg: (v) => v + '°',
+  f1deg: (v) => (+v).toFixed(1) + '°',
+  rounddeg: (v) => Math.round(+v) + '°',
+  signed2: (v) => { const n = +v; return (n > 0 ? '+' : '') + n.toFixed(2); },
+};
 function refreshLabels() {
-  setLabel('petalCount', inputs.petalCount.value);
-  setLabel('width', (+inputs.width.value).toFixed(2));
-  setLabel('taper', (+inputs.taper.value).toFixed(2));
-  setLabel('clawLength', (+inputs.clawLength.value).toFixed(2));
-  setLabel('clawWidth', (+inputs.clawWidth.value).toFixed(2));
-  setLabel('shoulder', (+inputs.shoulder.value).toFixed(2));
-  setLabel('cleftDepth', (+inputs.cleftDepth.value).toFixed(2));
-  setLabel('cleftLobes', inputs.cleftLobes.value);
-  setLabel('cleftWidth', (+inputs.cleftWidth.value).toFixed(2));
-  setLabel('reliefAmp', (+inputs.reliefAmp.value).toFixed(2));
-  setLabel('reliefFreq', (+inputs.reliefFreq.value).toFixed(2));
-  setLabel('petalTwist', (() => { const t = +inputs.petalTwist.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
-  setLabel('petalSkew', (() => { const t = +inputs.petalSkew.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
-  setLabel('thickTaper', (+inputs.thickTaper.value).toFixed(2));
-  setLabel('thickEdge', (+inputs.thickEdge.value).toFixed(2));
-  setLabel('thickScale', (+inputs.thickScale.value).toFixed(2));
-  setLabel('tip', (+inputs.tip.value).toFixed(2));
-  const cc = +inputs.centerCurve.value;
-  setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
-  const ec = +inputs.edgeCurve.value;
-  setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
-  const ep = +inputs.edgeProfile.value;
-  setLabel('edgeProfile', (ep > 0 ? '+' : '') + ep.toFixed(2));
-  const pc = +inputs.petalCup.value;
-  setLabel('petalCup', (pc > 0 ? '+' : '') + pc.toFixed(2));
-  setLabel('tipRegion', (+inputs.tipRegion.value).toFixed(2));
-  setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
-  setLabel('tipFrequency', inputs.tipFrequency.value);
-  setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
-  setLabel('edgeNoise', (+inputs.edgeNoise.value).toFixed(2));
-  setLabel('edgeNoiseScale', (+inputs.edgeNoiseScale.value).toFixed(2));
-  setLabel('bilPerSide', inputs.bilPerSide.value);
-  setLabel('bilSpacing', inputs.bilSpacing.value + '°');
-  setLabel('layerCount', inputs.layerCount.value);
-  setLabel('layerSizeFalloff', (+inputs.layerSizeFalloff.value).toFixed(2) + '×');
-  const lho = +inputs.layerHeightOffset.value;
-  setLabel('layerHeightOffset', (lho > 0 ? '+' : '') + lho.toFixed(2));
-  setLabel('layerRotationOffset', inputs.layerRotationOffset.value + '°');
-  setLabel('layerBloomAngleDelta', inputs.layerBloomAngleDelta.value + '°');
-  for (let k = 1; k <= 3; k++) {
-    setLabel('bilScale' + k, (+inputs['bilScale' + k].value).toFixed(2) + '×');
-    setLabel('bilWidth' + k, (+inputs['bilWidth' + k].value).toFixed(2));
-    const cc = +inputs['bilCenterCurve' + k].value;
-    setLabel('bilCenterCurve' + k, (cc > 0 ? '+' : '') + cc.toFixed(2));
-    const ec = +inputs['bilEdgeCurve' + k].value;
-    setLabel('bilEdgeCurve' + k, (ec > 0 ? '+' : '') + ec.toFixed(2));
-    const ep = +inputs['bilEdgeProfile' + k].value;
-    setLabel('bilEdgeProfile' + k, (ep > 0 ? '+' : '') + ep.toFixed(2));
-  }
-  setLabel('bloom', inputs.bloom.value + '°');
-  setLabel('divergenceAngle', (+inputs.divergenceAngle.value).toFixed(1) + '°');
-  setLabel('tube', (+inputs.tube.value).toFixed(2));
-  setLabel('density', inputs.density.value);
-  setLabel('softness', (+inputs.softness.value).toFixed(2));
-  setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
-  setLabel('bundleTightness', (+inputs.bundleTightness.value).toFixed(2));
-  setLabel('flareRate', (+inputs.flareRate.value).toFixed(2));
-  setLabel('absorption', (+inputs.absorption.value).toFixed(2));
-  setLabel('buttonSize', (+inputs.buttonSize.value).toFixed(2));
-  setLabel('gatherRadius', (+inputs.gatherRadius.value).toFixed(2));
-  setLabel('gatherHeight', (+inputs.gatherHeight.value).toFixed(2));
-  setLabel('mergeStart', (+inputs.mergeStart.value).toFixed(2));
-  setLabel('mergeRate', (+inputs.mergeRate.value).toFixed(2));
-  setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
-  setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
-  setLabel('voronoiAniso', (+inputs.voronoiAniso.value).toFixed(1) + '×');
-  setLabel('voronoiDensityLaw', (+inputs.voronoiDensityLaw.value).toFixed(2));
-  setLabel('voronoiWeight', (+inputs.voronoiWeight.value).toFixed(2));
-  setLabel('voronoiWeightFalloff', (+inputs.voronoiWeightFalloff.value).toFixed(1));
-  setLabel('voronoiSlabTaper', (+inputs.voronoiSlabTaper.value).toFixed(2));
-  setLabel('spaceDensity', (+inputs.spaceDensity.value).toFixed(2));
-  setLabel('spaceBirth', (+inputs.spaceBirth.value).toFixed(3));
-  setLabel('spaceKill', (+inputs.spaceKill.value).toFixed(3));
-  setLabel('spaceStep', (+inputs.spaceStep.value).toFixed(3));
-  setLabel('spaceVariants', inputs.spaceVariants.value);
-  setLabel('spaceSeed', inputs.spaceSeed.value);
-  setLabel('strandCount', inputs.strandCount.value);
-  setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
-  setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
-  setLabel('strandCurvature', (+inputs.strandCurvature.value).toFixed(2));
-  setLabel('strandIrregularity', (+inputs.strandIrregularity.value).toFixed(2));
-  setLabel('boneCount', inputs.boneCount.value);
-  setLabel('boneWidth', (+inputs.boneWidth.value).toFixed(2));
-  const bc = +inputs.boneCurve.value;
-  setLabel('boneCurve', (bc > 0 ? '+' : '') + bc.toFixed(2));
-  setLabel('boneSpread', (+inputs.boneSpread.value).toFixed(2));
-  setLabel('laceSwirl', (+inputs.laceSwirl.value).toFixed(2));
-  setLabel('scallopCount', inputs.scallopCount.value);
-  setLabel('scallopHeight', (+inputs.scallopHeight.value).toFixed(2));
-  setLabel('centerCount', inputs.centerCount.value);
-  setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
-  setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
-  setLabel('centerTipShape', (+inputs.centerTipShape.value).toFixed(2));
-  setLabel('centerFilThick', (+inputs.centerFilThick.value).toFixed(2));
-  setLabel('blendSmoothness', (+inputs.blendSmoothness.value).toFixed(2));
-  setLabel('receptacleDepth', (+inputs.receptacleDepth.value).toFixed(2));
-  setLabel('convergenceTightness', (+inputs.convergenceTightness.value).toFixed(2));
-  setLabel('receptReach', (+inputs.receptReach.value).toFixed(2));
-  setLabel('receptSolidity', (+inputs.receptSolidity.value).toFixed(2));
-  setLabel('ribMultiplier', (+inputs.ribMultiplier.value).toFixed(2));
-  setLabel('spiralTightness', (+inputs.spiralTightness.value).toFixed(2));
-  setLabel('spiralThickness', (+inputs.spiralThickness.value).toFixed(2));
-  setLabel('bulbSize', (+inputs.bulbSize.value).toFixed(2));
-  setLabel('bulbHeight', (+inputs.bulbHeight.value).toFixed(2));
-  setLabel('denseStamenCount', inputs.denseStamenCount.value);
-  setLabel('denseStamenLength', (+inputs.denseStamenLength.value).toFixed(2));
-  setLabel('carpelCount', inputs.carpelCount.value);
-  setLabel('carpelSize', (+inputs.carpelSize.value).toFixed(2));
-  setLabel('discSize', (+inputs.discSize.value).toFixed(2));
-  setLabel('discHeight', (+inputs.discHeight.value).toFixed(2));
-  setLabel('ringStamenCount', inputs.ringStamenCount.value);
-  setLabel('ringStamenLength', (+inputs.ringStamenLength.value).toFixed(2));
-  setLabel('fillPetalCount', inputs.fillPetalCount.value);
-  setLabel('fillOuterSize', (+inputs.fillOuterSize.value).toFixed(2));
-  setLabel('fillInnerSize', (+inputs.fillInnerSize.value).toFixed(2));
-  setLabel('fillDensity', (+inputs.fillDensity.value).toFixed(2));
-  setLabel('fillBloomAngle', `${Math.round(+inputs.fillBloomAngle.value)}°`);
-  setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
-  setLabel('sepalCount', inputs.sepalCount.value);
-  const scc = +inputs.sepalCenterCurve.value;
-  setLabel('sepalCenterCurve', (scc > 0 ? '+' : '') + scc.toFixed(2));
-  const sec = +inputs.sepalEdgeCurve.value;
-  setLabel('sepalEdgeCurve', (sec > 0 ? '+' : '') + sec.toFixed(2));
-  const sep = +inputs.sepalEdgeProfile.value;
-  setLabel('sepalEdgeProfile', (sep > 0 ? '+' : '') + sep.toFixed(2));
-  setLabel('sepalTipShape', (+inputs.sepalTipShape.value).toFixed(2));
-  setLabel('sepalTipFreq', inputs.sepalTipFreq.value);
-  setLabel('sepalTipRegion', (+inputs.sepalTipRegion.value).toFixed(2));
-  setLabel('sepalTipLength', (+inputs.sepalTipLength.value).toFixed(2));
-  setLabel('stemLength', (+inputs.stemLength.value).toFixed(2));
-  const scv = +inputs.stemCurve.value;
-  setLabel('stemCurve', (scv > 0 ? '+' : '') + scv.toFixed(2));
-  setLabel('stemThickness', (+inputs.stemThickness.value).toFixed(2));
-  setLabel('stemNodeCount', inputs.stemNodeCount.value);
-  setLabel('stemNodeProminence', (+inputs.stemNodeProminence.value).toFixed(2));
-  setLabel('leafSize', (+inputs.leafSize.value).toFixed(2));
-  setLabel('tightness', (+inputs.tightness.value).toFixed(2));
-  const e = +inputs.elevation.value;
-  setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
+  for (const c of WIRED) if (c.kind === 'slider' && c.fmt) setLabel(c.id, LABEL_FMT[c.fmt](inputs[c.id].value));
+  setLabel('spaceSeed', inputs.spaceSeed.value);   // chrome read-out beside the Re-roll button
 }
 function setLabel(id, text) {
   const el = document.querySelector(`[data-value="${id}"]`);
@@ -3414,33 +2982,10 @@ function setBuilding(on) {
   if (el) el.classList.toggle('is-on', on);
 }
 
-// bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'divergenceAngle', 'bilPerSide', 'bilSpacing',
- 'bilScale1', 'bilScale2', 'bilScale3',
- 'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
- 'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
- 'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
- 'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
- 'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
- 'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
- 'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'absorption', 'buttonSize', 'gatherRadius', 'gatherHeight', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
- 'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
- 'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
- 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
- 'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
- 'laceSwirl', 'scallopCount', 'scallopHeight',
- 'centerCount', 'centerLength', 'centerTipSize', 'centerTipShape', 'centerFilThick',
- 'denseStamenCount', 'denseStamenLength', 'carpelCount', 'carpelSize',
- 'discSize', 'discHeight', 'ringStamenCount', 'ringStamenLength',
- 'fillPetalCount', 'fillOuterSize', 'fillInnerSize', 'fillDensity', 'fillBloomAngle',
- 'blendSmoothness', 'receptacleDepth', 'convergenceTightness',
- 'receptReach', 'receptSolidity', 'ribMultiplier', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight',
- 'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
- 'sepalTipShape', 'sepalTipFreq', 'sepalTipRegion', 'sepalTipLength',
- 'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
- 'tightness', 'elevation'].forEach((k) => {
-  inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
+// bind: every slider except Layer count (its own combined handler is below) gets the
+// standard input -> refresh read-out + regenerate. Derived from the registry.
+WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount').forEach((c) => {
+  inputs[c.id].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // Tip: like Infill, only the selected style's options are shown. Each option's
 // data-tip-styles lists the styles it belongs to; hide the rest.
@@ -3675,159 +3220,12 @@ if (resetBtn) {
     const d = DEFAULTS;
     designSchemaVersion = CURRENT_SCHEMA;   // Reset = a brand-new design
     designExtraKeys = {};
-    inputs.petalCount.value = d.petalCount;
-    inputs.width.value = d.width;
-    inputs.taper.value = d.taper;
-    inputs.clawLength.value = d.clawLength;
-    inputs.clawWidth.value = d.clawWidth;
-    inputs.shoulder.value = d.shoulder;
-    inputs.cleftDepth.value = d.cleftDepth;
-    inputs.cleftLobes.value = d.cleftLobes;
-    inputs.cleftWidth.value = d.cleftWidth;
-    inputs.reliefAmp.value = d.reliefAmp;
-    inputs.reliefFreq.value = d.reliefFreq;
-    inputs.reliefMode.value = d.reliefMode;
-    inputs.petalTwist.value = d.petalTwist;
-    inputs.petalSkew.value = d.petalSkew;
-    inputs.thickTaper.value = d.thickTaper;
-    inputs.thickEdge.value = d.thickEdge;
-    inputs.thickScale.value = d.thickScale;
-    inputs.tip.value = d.tip;
-    inputs.centerCurve.value = d.centerCurve;
-    inputs.edgeCurve.value = d.edgeCurve;
-    inputs.edgeProfile.value = d.edgeProfile;
-    inputs.petalCup.value = d.petalCup;
-    inputs.tipStyle.value = d.tipStyle;
-    inputs.tipRegion.value = d.tipRegion;
-    inputs.tipLength.value = d.tipLength;
-    inputs.tipFrequency.value = d.tipFrequency;
-    inputs.tipIrregularity.value = d.tipIrregularity;
-    inputs.edgeNoise.value = d.edgeNoise;
-    inputs.edgeNoiseScale.value = d.edgeNoiseScale;
-    inputs.bloomType.value = d.bloomType;
-    inputs.divergenceMode.value = d.divergenceMode;
-    inputs.divergenceAngle.value = d.divergenceAngle;
-    inputs.layerCount.value = d.layerCount;
-    inputs.petalsPerLayer.value = d.petalsPerLayer;
-    inputs.layerSizeFalloff.value = d.layerSizeFalloff;
-    inputs.layerHeightOffset.value = d.layerHeightOffset;
-    inputs.layerRotationOffset.value = d.layerRotationOffset;
-    inputs.layerBloomAngleDelta.value = d.layerBloomAngleDelta;
-    inputs.bilPerSide.value = d.bilPerSide;
-    inputs.bilSpacing.value = d.bilSpacing;
-    inputs.bilCenterPetal.checked = d.bilCenterPetal;
-    inputs.bilEdge1.value = d.bilEdge1;
-    inputs.bilEdge2.value = d.bilEdge2;
-    inputs.bilEdge3.value = d.bilEdge3;
-    for (let k = 1; k <= 3; k++) {
-      inputs['bilScale' + k].value = d['bilScale' + k];
-      inputs['bilWidth' + k].value = d['bilWidth' + k];
-      inputs['bilCenterCurve' + k].value = d['bilCenterCurve' + k];
-      inputs['bilEdgeCurve' + k].value = d['bilEdgeCurve' + k];
-      inputs['bilEdgeProfile' + k].value = d['bilEdgeProfile' + k];
+    for (const c of WIRED) {
+      const el = inputs[c.id];
+      if (c.kind === 'checkbox') el.checked = d[c.id];
+      else el.value = d[c.id];
     }
-    inputs.bloom.value = d.bloom;
-    inputs.tube.value = d.tube;
-    inputs.infillType.value = d.infillType;
-    inputs.density.value = d.density;
-    inputs.softness.value = d.softness;
-    inputs.veinBranchStart.value = d.veinBranchStart;
-    inputs.continuousMargin.value = d.continuousMargin;
-    inputs.bundleTightness.value = d.bundleTightness;
-    inputs.flareRate.value = d.flareRate;
-    inputs.mergeStart.value = d.mergeStart;
-    inputs.mergeRate.value = d.mergeRate;
-    inputs.absorption.value = d.absorption;
-    inputs.buttonSize.value = d.buttonSize;
-    inputs.gatherRadius.value = d.gatherRadius;
-    inputs.gatherHeight.value = d.gatherHeight;
-    inputs.edgeTermination.value = d.edgeTermination;
-    inputs.captureDist.value = d.captureDist;
-    inputs.voronoiLloyd.value = d.voronoiLloyd;
-    inputs.voronoiAniso.value = d.voronoiAniso;
-    inputs.voronoiDensityLaw.value = d.voronoiDensityLaw;
-    inputs.voronoiWeight.value = d.voronoiWeight;
-    inputs.voronoiWeightFalloff.value = d.voronoiWeightFalloff;
-    inputs.voronoiSlabTaper.value = d.voronoiSlabTaper;
-    inputs.spaceMode.value = d.spaceMode;
-    inputs.spaceDensity.value = d.spaceDensity;
-    inputs.spaceBirth.value = d.spaceBirth;
-    inputs.spaceKill.value = d.spaceKill;
-    inputs.spaceStep.value = d.spaceStep;
-    inputs.spacePattern.value = d.spacePattern;
     inputs.spaceSeed.value = d.spaceSeed;
-    inputs.spaceVariants.value = d.spaceVariants;
-    inputs.strandCount.value = d.strandCount;
-    inputs.strandWidth.value = d.strandWidth;
-    inputs.strandTaper.value = d.strandTaper;
-    inputs.strandCurvature.value = d.strandCurvature;
-    inputs.strandIrregularity.value = d.strandIrregularity;
-    inputs.boneCount.value = d.boneCount;
-    inputs.boneWidth.value = d.boneWidth;
-    inputs.boneCurve.value = d.boneCurve;
-    inputs.boneSpread.value = d.boneSpread;
-    inputs.boneOutline.checked = d.boneOutline;
-    inputs.laceSwirl.value = d.laceSwirl;
-    inputs.scallopCount.value = d.scallopCount;
-    inputs.scallopHeight.value = d.scallopHeight;
-    inputs.centerArch.value = d.centerArch;
-    inputs.centerType.value = d.centerType;
-    inputs.centerCount.value = d.centerCount;
-    inputs.centerLength.value = d.centerLength;
-    inputs.centerTipSize.value = d.centerTipSize;
-    inputs.centerTipShape.value = d.centerTipShape;
-    inputs.centerFilThick.value = d.centerFilThick;
-    inputs.denseStamenCount.value = d.denseStamenCount;
-    inputs.denseStamenLength.value = d.denseStamenLength;
-    inputs.carpelCount.value = d.carpelCount;
-    inputs.carpelSize.value = d.carpelSize;
-    inputs.discSize.value = d.discSize;
-    inputs.discHeight.value = d.discHeight;
-    inputs.ringStamenCount.value = d.ringStamenCount;
-    inputs.ringStamenLength.value = d.ringStamenLength;
-    inputs.fillPetalCount.value = d.fillPetalCount;
-    inputs.fillOuterSize.value = d.fillOuterSize;
-    inputs.fillInnerSize.value = d.fillInnerSize;
-    inputs.fillDensity.value = d.fillDensity;
-    inputs.fillBloomAngle.value = d.fillBloomAngle;
-    inputs.receptacleType.value = d.receptacleType;
-    inputs.blendSmoothness.value = d.blendSmoothness;
-    inputs.receptacleDepth.value = d.receptacleDepth;
-    inputs.convergenceTightness.value = d.convergenceTightness;
-    inputs.receptProfile.value = d.receptProfile;
-    inputs.receptConstruction.value = d.receptConstruction;
-    inputs.receptCollar.value = d.receptCollar;
-    inputs.receptReach.value = d.receptReach;
-    inputs.receptSolidity.value = d.receptSolidity;
-    inputs.ribMultiplier.value = d.ribMultiplier;
-    inputs.spiralTightness.value = d.spiralTightness;
-    inputs.spiralThickness.value = d.spiralThickness;
-    inputs.bulbSize.value = d.bulbSize;
-    inputs.bulbHeight.value = d.bulbHeight;
-    inputs.sepalsType.value = d.sepalsType;
-    inputs.sepalSize.value = d.sepalSize;
-    inputs.sepalCount.value = d.sepalCount;
-    inputs.sepalStyle.value = d.sepalStyle;
-    inputs.sepalCenterCurve.value = d.sepalCenterCurve;
-    inputs.sepalEdgeCurve.value = d.sepalEdgeCurve;
-    inputs.sepalEdgeProfile.value = d.sepalEdgeProfile;
-    inputs.sepalTipStyle.value = d.sepalTipStyle;
-    inputs.sepalTipShape.value = d.sepalTipShape;
-    inputs.sepalTipFreq.value = d.sepalTipFreq;
-    inputs.sepalTipRegion.value = d.sepalTipRegion;
-    inputs.sepalTipLength.value = d.sepalTipLength;
-    inputs.stemType.value = d.stemType;
-    inputs.stemLength.value = d.stemLength;
-    inputs.stemCurve.value = d.stemCurve;
-    inputs.stemThickness.value = d.stemThickness;
-    inputs.stemNodeCount.value = d.stemNodeCount;
-    inputs.stemNodeProminence.value = d.stemNodeProminence;
-    inputs.stemBudMode.value = d.stemBudMode;
-    inputs.leafType.value = d.leafType;
-    inputs.leafPhyllotaxy.value = d.leafPhyllotaxy;
-    inputs.leafSize.value = d.leafSize;
-    inputs.tightness.value = d.tightness;
-    inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
     controls.autoRotate = d.autoRotate;
     resetPlaceholders();
@@ -3860,51 +3258,10 @@ if (exportBtn) {
   });
 }
 
-const DEFAULTS = {
-  petalCount: 4, width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
-  cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3,
-  reliefAmp: 0, reliefFreq: 0.5, reliefMode: 'radial', petalTwist: 0, petalSkew: 0, thickTaper: 0, thickEdge: 0, thickScale: 1,
-  tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
-  edgeNoise: 0, edgeNoiseScale: 0,
-  bloomType: 'coiled', divergenceMode: 'golden', divergenceAngle: 137.5,
-  bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
-  layerCount: 1, petalsPerLayer: '', layerSizeFalloff: 0.75, layerHeightOffset: 0.05,
-  layerRotationOffset: 24, layerBloomAngleDelta: 12,
-  bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
-  bilScale1: 1, bilScale2: 1, bilScale3: 1,
-  bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
-  bilCenterCurve1: 0.4, bilCenterCurve2: 0.4, bilCenterCurve3: 0.4,
-  bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
-  bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
-  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
-  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
-  absorption: 0.85, buttonSize: 0.3, gatherRadius: 0.06, gatherHeight: 0.25,
-  edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
-  voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
-  spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
-  spacePattern: 'phyllotactic', spaceSeed: 1, spaceVariants: 3,
-  strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
-  boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
-  laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
-  centerArch: 'classic',
-  centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
-  centerTipShape: 0, centerFilThick: 0.5,
-  denseStamenCount: 80, denseStamenLength: 0.4, carpelCount: 5, carpelSize: 0.5,
-  discSize: 0.5, discHeight: 0.5, ringStamenCount: 40, ringStamenLength: 0.35,
-  fillPetalCount: 60, fillOuterSize: 0.22, fillInnerSize: 0.10, fillDensity: 0.6, fillBloomAngle: 30,
-  receptacleType: 'none',                                        // enable: none | on
-  receptProfile: 'flare', receptConstruction: 'solid', receptCollar: 'none',
-  receptReach: 0, receptSolidity: 1, ribMultiplier: 1,
-  blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
-  spiralTightness: 0.12, spiralThickness: 0.5, bulbSize: 0.5, bulbHeight: 0.5,
-  sepalsType: 'none', sepalSize: 0.6,
-  sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
-  sepalTipStyle: 'clean', sepalTipShape: 0.9, sepalTipFreq: 12, sepalTipRegion: 0.3, sepalTipLength: 0.4,
-  stemType: 'none', stemLength: 4, stemCurve: 0,   // stem length range 0..10 (0 = no stem, 4 = standard); stemCurve control hidden for now (see flower.html), 0 = straight (restore to 0.2 when the control returns).
-  stemThickness: 1, stemNodeCount: 3, stemNodeProminence: 0.4, stemBudMode: 'none',
-  leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,
-  tightness: 0.5, elevation: 0, autoRotate: true,
-};
+const DEFAULTS = {};
+for (const c of WIRED) DEFAULTS[c.id] = c.default;
+DEFAULTS.autoRotate = true;
+DEFAULTS.spaceSeed = 1;
 
 /* ---- Saved-design schema versioning ----------------------------------------
    Every saved design carries a `schemaVersion`. On load, migrations upgrade it
