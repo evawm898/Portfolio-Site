@@ -3325,7 +3325,7 @@ inputs.bilCenterPetal.addEventListener('change', () => { scheduleRegen(); });
 function updateCenterOptions() {
   const arch = inputs.centerArch.value;
   const style = inputs.centerType.value;
-  document.querySelectorAll('#acc-center [data-center-arch]').forEach((el) => {
+  document.querySelectorAll('#acc-base [data-center-arch]').forEach((el) => {
     let show = el.getAttribute('data-center-arch').split(/\s+/).includes(arch);
     if (show && arch === 'classic' && el.hasAttribute('data-center-styles')) {
       show = el.getAttribute('data-center-styles').split(/\s+/).includes(style);
