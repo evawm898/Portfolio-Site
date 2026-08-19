@@ -1167,7 +1167,8 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     // hand its foot root (position + up-tangent along the midline + radius) to the receptacle.
     const m0 = toWorld({ x: 0, y: 0 }), m1 = toWorld({ x: P.L * 0.04, y: 0 });
     strandRoots.push({ pos: m0, tan: { x: m1.x - m0.x, y: m1.y - m0.y, z: m1.z - m0.z }, r: P.tubeRadius * MIDRIB_W_BASE * gThick, side: 0, midrib: true });
-    acc.addBead(toWorld({ x: 0, y: 0 }), P.tubeRadius * MARGIN_W_BASE * 1.2 * gThick, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+    // No foot bead here: the SDF receptacle field welds the foot bundle smoothly, and a
+    // discrete low-poly bead only read as a faceted fin poking out of the implicit surface.
   }
 
   // Rim: one continuous closed tube along the (possibly jagged) petal margin.
@@ -3877,7 +3878,7 @@ const DEFAULTS = {
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
   continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
-  absorption: 0.85, buttonSize: 0.55, gatherRadius: 0.06, gatherHeight: 0.25,
+  absorption: 0.85, buttonSize: 0.3, gatherRadius: 0.06, gatherHeight: 0.25,
   edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
   voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
   spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,

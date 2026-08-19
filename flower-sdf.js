@@ -70,126 +70,126 @@ function profileMult(profile, h) {
   }
 }
 
-/* Build the gather skeleton (round-cone capsules) from the strand feet.
+/* Build the receptacle skeleton as a NECK, from the strand feet.
    feet:   [{ p:[x,y,z], r, up:[x,y,z] }]   up = unit dir INTO the petal
    neck:   { p:[x,y,z], r }                 stem-top join point + stem radius
-   returns { caps:[{a,b,ra,rb}], meta } */
+
+   The junction is a single tapered trunk on the axis whose radius follows a PROFILE
+   law of height — narrow, swelling at a COMMON ARRIVAL height where the strands meet
+   it, then tapering continuously into the stem (the stem is the bottom of the same
+   taper, no seam). Each strand curves from its foot to the neck surface at the arrival
+   height and enters TANGENTIALLY (its arrival direction runs along the surface, so it
+   emerges from the neck instead of stabbing in). Radii are the TRUE (unfloored) foot
+   radii, so the midrib>margin grammar survives and the area-rule trunk stays ~4x a
+   strand instead of being inflated by the print floor. Printability is a final-mesh
+   check, not baked into these driving radii (the neck is well above the floor).
+   returns { caps:[{a,b,ra,rb}], buttons:[], meta } */
 function buildGatherSkeleton(feet, neck, opts) {
   const cx = opts.cx, cz = opts.cz;
   const tube = opts.tubeRadius || 0.0168;
-  const floorR = opts.floorR || 0;
-  const fr = (r) => Math.max(floorR, r);
   const profile = opts.profile || 'gentle';
 
-  // ring radius / feet plane
   const Rring = feet.reduce((s, f) => s + Math.hypot(f.p[0] - cx, f.p[2] - cz), 0) / Math.max(1, feet.length);
   const yFeet = feet.reduce((s, f) => s + f.p[1], 0) / Math.max(1, feet.length);
-  const yNeck = neck.p[1];
-  const vspan = Math.max(1e-3, yFeet - yNeck);
+  const yStem = neck.p[1];
+  const stemR = neck.r;
+  const vspan = Math.max(1e-3, yFeet - yStem);
 
-  // GATHER geometry (fractions -> absolute)
-  const GR = _clamp(opts.gatherRadius != null ? opts.gatherRadius : 0.06, 0.0, 1.0) * Rring;   // button radius
-  const GH = _clamp(opts.gatherHeight != null ? opts.gatherHeight : 0.25, 0.02, 0.9) * vspan;  // drop below feet
-  const yNode = yFeet - GH;                                     // button height
+  // area-rule trunk radius from UNFLOORED leaves (√Σr²) — the natural ~4x-a-strand trunk.
+  const Rtrunk = Math.sqrt(feet.reduce((s, f) => s + f.r * f.r, 0)) || stemR;
 
-  // leaf nodes
-  let nodes = feet.map((f) => ({
-    p: f.p.slice(), r: f.r, up: _norm(f.up),
-    az: Math.atan2(f.p[2] - cz, f.p[0] - cx),
-    leafCount: 1, level: 0, kids: [], realP: f.p.slice(),
-  }));
-  const leaves = nodes.slice();
-  const allNodes = nodes.slice();
+  // COMMON ARRIVAL height: one plane just below the feet where every strand meets the neck.
+  // GATHER HEIGHT sets how far below the feet it sits.
+  const gH = _clamp(opts.gatherHeight != null ? opts.gatherHeight : 0.25, 0.05, 0.9);
+  const yArrival = yFeet - gH * vspan * 0.5;
+  // BUTTON SIZE degrades from a solid disc to a modest ARRIVAL SWELL — how much the neck
+  // widens to receive the strands (kept near Rtrunk so the junction stays ~4x a strand).
+  const buttonSize = _clamp(opts.buttonSize != null ? opts.buttonSize : 0.3, 0, 1);
+  const swell = Rtrunk * _lerp(1.0, 1.7, buttonSize);
 
-  // CONVERGING pairwise merge by angular adjacency: neighbours fuse first, each
-  // fused node moving inward + down toward the button. Area-preserving radius.
-  const meanAz = (a, b, wa, wb) => Math.atan2(
-    wa * Math.sin(a) + wb * Math.sin(b), wa * Math.cos(a) + wb * Math.cos(b));
-  let work = nodes.slice();
-  while (work.length > 1) {
-    work.sort((p, q) => p.az - q.az);
-    const next = [];
-    for (let i = 0; i < work.length; i += 2) {
-      if (i + 1 >= work.length) { next.push(work[i]); continue; }   // odd carries up
-      const a = work[i], b = work[i + 1], wa = a.leafCount, wb = b.leafCount;
-      const node = {
-        az: meanAz(a.az, b.az, wa, wb), leafCount: wa + wb,
-        r: Math.sqrt(a.r * a.r + b.r * b.r),                    // AREA-PRESERVING
-        level: Math.max(a.level, b.level) + 1, kids: [a, b], p: null, realP: null,
-      };
-      next.push(node); allNodes.push(node);
+  // NECK radius law neckR(y): swell at the arrival zone -> taper to the stem, SHAPED by
+  // PROFILE (this is the trunk-radius function PROFILE modulates, so DOME/URN/CONE differ).
+  // t: 0 at arrival (top) -> 1 at the stem (bottom).
+  const amp = Rtrunk * 0.55;
+  const neckR = (y) => {
+    const t = _clamp((yArrival - y) / Math.max(1e-3, yArrival - yStem), 0, 1);
+    const base = _lerp(swell, stemR, t);
+    switch (profile) {
+      case 'dome':  return base + amp * Math.sin(Math.PI * t) * 0.8;                       // mid bulge
+      case 'urn':   return base + amp * (Math.sin(Math.PI * (0.15 + 0.85 * t)) - 0.3);      // waisted: pinch then swell
+      case 'cone':  return _lerp(swell, stemR, Math.pow(t, 1.7));                           // convex taper
+      case 'flare': return _lerp(swell * 1.3, stemR, 1 - Math.pow(1 - t, 1.9));             // wide top, quick pull-in
+      case 'gentle':
+      default:      return base;                                                            // near-linear neck
     }
-    work = next;
-  }
-  const root = work[0];
-  const maxLevel = root.level || 1;
-
-  // place every node: radius-from-axis and height interpolate by level fraction, so
-  // leaves stay on the true ring (frac 0) and the root sits at the button (frac 1).
-  // MERGE START curves the RADIAL pull (how early the strands turn inward); MERGE RATE
-  // curves the VERTICAL descent (how the internal-node heights stagger) — both distinct
-  // from GATHER RADIUS/HEIGHT, which set the button's final tightness and drop.
-  const mStart = _clamp((((opts.mergeStart != null ? opts.mergeStart : 0.5) - 0.2) / 0.6), 0, 1);
-  const mRate = _clamp(opts.mergeRate != null ? opts.mergeRate : 0.5, 0, 1);
-  const radExp = _lerp(1.7, 0.55, mStart);                     // small exp -> pull in earlier
-  const hExp = _lerp(0.6, 1.8, mRate);                         // small exp -> drop early, large -> even
-  (function place(n) {
-    const frac = n.level / maxLevel;
-    if (n.level === 0) { n.p = n.realP.slice(); }
-    else {
-      const Rlvl = _lerp(Rring, GR, Math.pow(frac, radExp));
-      const ylvl = _lerp(yFeet, yNode, Math.pow(frac, hExp));
-      n.p = [cx + Rlvl * Math.cos(n.az), ylvl, cz + Rlvl * Math.sin(n.az)];
-    }
-    for (const k of n.kids) place(k);
-  })(root);
-
-  // profile multiplier keyed on height between neck (0) and button (1)
-  const hOf = (y) => _clamp((y - yNeck) / Math.max(1e-3, yNode - yNeck), 0, 1);
-  const pmul = (y) => profileMult(profile, hOf(y));
+  };
+  const dNeckR = (y) => (neckR(y + 1e-3) - neckR(y - 1e-3)) / 2e-3;   // dR/dy for surface tangents/normals
 
   const caps = [];
-  // 1) up-stubs at each foot -> overlap the petal strand tubes (the join surface)
-  for (const l of leaves) caps.push({ a: l.p, b: _add(l.p, _mul(l.up, tube * 4)), ra: fr(l.r), rb: fr(l.r) });
-  // 2) every merge edge (child -> parent); merge/descent radii take the profile multiplier
-  (function emit(n) {
-    for (const k of n.kids) {
-      caps.push({ a: k.p, b: n.p, ra: fr(k.r * pmul(k.p[1])), rb: fr(n.r * pmul(n.p[1])) });
-      emit(k);
-    }
-  })(root);
-  // 3) descent: button root -> stem-top neck, then a short down-stub into the stem
-  caps.push({ a: root.p, b: neck.p, ra: fr(root.r * pmul(root.p[1])), rb: fr(neck.r) });
-  caps.push({ a: neck.p, b: [neck.p[0], neck.p[1] - tube * 10, neck.p[2]], ra: fr(neck.r), rb: fr(neck.r) });
+  // NECK: a chain of short coaxial round-cone segments = a smooth lathe. A small rounded
+  // shoulder above the arrival zone (so strands emerge from a shoulder, not a flat rim),
+  // then neckR(y) down to just past the stem top (the stem lathe continues at stemR).
+  const yTop = yArrival + gH * vspan * 0.30;
+  const yBot = yStem - tube * 8;
+  const N = 30;
+  let prev = null;
+  for (let i = 0; i <= N; i++) {
+    const y = _lerp(yTop, yBot, i / N);
+    let r;
+    if (y >= yArrival) { const u = _clamp((y - yArrival) / Math.max(1e-3, yTop - yArrival), 0, 1); r = _lerp(swell, Rtrunk * 0.4, u); }
+    else if (y >= yStem) r = neckR(y);
+    else r = stemR;
+    const p = [cx, y, cz];
+    if (prev) caps.push({ a: prev.p, b: p, ra: prev.r, rb: r });
+    prev = { p, r };
+  }
 
-  // 4) COLLAR: a radius bump at the flower->stem transition (unions in via smin)
+  // STRANDS: each foot -> a cubic bezier arriving TANGENTIALLY at the neck surface at the
+  // common arrival height. Radius = the true foot radius (grammar preserved), so a strand
+  // matches the local surface where it joins and blends in via the field's smooth union.
+  let maxEntryDeg = 0;
+  for (const f of feet) {
+    const az = Math.atan2(f.p[2] - cz, f.p[0] - cx), c = Math.cos(az), s = Math.sin(az);
+    const P0 = f.p.slice();
+    const rA = neckR(yArrival);
+    const P3 = [cx + rA * c, yArrival, cz + rA * s];                 // arrival ON the neck surface
+    const dr = dNeckR(yArrival);
+    const tanEnd = _norm([-c * dr, -1, -s * dr]);                    // down the meridian (tangent to the surface)
+    const tanStart = _norm([-c, -0.4, -s]);                         // leave the foot down-and-in
+    const d = Math.hypot(P3[0] - P0[0], P3[1] - P0[1], P3[2] - P0[2]) || 1e-3;
+    const c1 = [P0[0] + tanStart[0] * d * 0.45, P0[1] + tanStart[1] * d * 0.45, P0[2] + tanStart[2] * d * 0.45];
+    const c2 = [P3[0] - tanEnd[0] * d * 0.45, P3[1] - tanEnd[1] * d * 0.45, P3[2] - tanEnd[2] * d * 0.45];
+    const K = 9;
+    let pr = null;
+    for (let i = 0; i <= K; i++) {
+      const t = i / K, mt = 1 - t, w0 = mt*mt*mt, w1 = 3*mt*mt*t, w2 = 3*mt*t*t, w3 = t*t*t;
+      const pt = [w0*P0[0]+w1*c1[0]+w2*c2[0]+w3*P3[0], w0*P0[1]+w1*c1[1]+w2*c2[1]+w3*P3[1], w0*P0[2]+w1*c1[2]+w2*c2[2]+w3*P3[2]];
+      if (pr) caps.push({ a: pr, b: pt, ra: f.r, rb: f.r });
+      pr = pt;
+    }
+    // up-stub into the petal so the receptacle overlaps the petal strand tube
+    caps.push({ a: P0, b: _add(P0, _mul(_norm(f.up), tube * 4)), ra: f.r, rb: f.r });
+    // entry angle: bezier end direction vs the neck-surface normal (0 = tangential, 90 = stab)
+    const endDir = _norm([P3[0] - c2[0], P3[1] - c2[1], P3[2] - c2[2]]);
+    const nrm = _norm([c, -dr, s]);
+    const entry = 90 - Math.acos(Math.min(1, Math.abs(endDir[0]*nrm[0] + endDir[1]*nrm[1] + endDir[2]*nrm[2]))) * 180 / Math.PI;
+    if (entry > maxEntryDeg) maxEntryDeg = entry;
+  }
+
+  // COLLAR: a radius bump near the stem (unions in via smin). True radii, no floor.
   const collar = opts.collar || 'none';
   if (collar === 'band') {
-    const y = yNeck + vspan * 0.10;
-    caps.push({ a: [cx, y - tube * 1.2, cz], b: [cx, y + tube * 1.2, cz], ra: fr(neck.r * 1.5), rb: fr(neck.r * 1.5) });
+    const y = yStem + vspan * 0.10;
+    caps.push({ a: [cx, y - tube * 1.2, cz], b: [cx, y + tube * 1.2, cz], ra: stemR * 1.5, rb: stemR * 1.5 });
   } else if (collar === 'ferrule') {
     for (let s = 0; s < 3; s++) {
-      const y = yNeck + vspan * (0.06 + s * 0.07);
-      const rr = fr(neck.r * (1.55 - s * 0.16));
+      const y = yStem + vspan * (0.06 + s * 0.07), rr = stemR * (1.55 - s * 0.16);
       caps.push({ a: [cx, y - tube * 0.9, cz], b: [cx, y + tube * 0.9, cz], ra: rr, rb: rr });
     }
   }
 
-  // 5) BUTTON: a compact oblate solid disc on the axis, between the feet and the gather
-  // node — the daisy receptacle the strands fuse into. The wide-ring feet can't gather to
-  // a tight point on their own (long spokes dominate), so BUTTON SIZE adds real central
-  // mass: at 0 it's absent (pure gather web); higher gives a firm daisy button. Oblate
-  // (wider than tall) so it reads as a disc, not a ball; it overlaps the inward strands and
-  // the descent so it unions into the one solid.
-  const buttonSize = _clamp(opts.buttonSize != null ? opts.buttonSize : 0, 0, 1);
-  const buttons = [];
-  if (buttonSize > 1e-3) {
-    const br = Rring * _lerp(0.08, 0.5, buttonSize);            // disc radius (fraction of the feet ring)
-    const bh = Math.max(fr(neck.r), br * 0.5);                  // oblate half-height (>= stem radius)
-    buttons.push({ c: [cx, _lerp(yFeet, yNode, 0.5), cz], r: [br, bh, br] });
-  }
-
-  return { caps, buttons, meta: { Rring, yFeet, yNeck, yNode, maxLevel, leafCount: leaves.length, root, allNodes, GR, GH, buttonSize } };
+  const maxWidth = Math.max(swell, neckR(_lerp(yArrival, yStem, 0.5))) * 2;   // widest junction diameter
+  return { caps, buttons: [], meta: { Rring, yFeet, yStem, yArrival, Rtrunk, swell, stemR, maxEntryDeg, maxWidth, leafCount: feet.length, neckR } };
 }
 
 /* Narrow-band surface nets over a capsule list. Rasterizes each capsule into
