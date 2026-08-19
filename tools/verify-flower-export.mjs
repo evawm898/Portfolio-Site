@@ -195,31 +195,39 @@ for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOL
   ] });
 }
 
-// ===== CONTINUOUS MARGIN: the petal edge becomes two strands rooted at the foot and the
-// receptacle ribs continue them into a converged node. The junction changes topology, so
-// re-run the print-safety gate with it ON across constructions, infills, bloom types,
-// layers, sepals and the bundle/flare extremes — every one must still export watertight.
-CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', set: [
+// ===== CONTINUOUS MARGIN + SDF RECEPTACLE: the petal edge becomes two strands rooted at the
+// foot, and the receptacle is rebuilt as ONE implicit surface (SDF) those strands GATHER into
+// (see flower-sdf.js). ABSORPTION (blend radius) replaces CONSTRUCTION; GATHER RADIUS/HEIGHT
+// set the button; PROFILE is a radius multiplier and COLLAR a radius bump. The junction is a
+// separate polygonised solid overlapping the feet + stem, so re-run the print-safety gate with
+// it ON across absorption, gather, profile, collar, infills, bloom types, layers and sepals —
+// every one must still export watertight (0 boundary edges).
+const CM_START = CONFIGS.length + 1;   // 1-based index of the first continuous-margin row
+CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm: true, set: [
   { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
   { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' }, { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'loop', evt: 'change' },
   { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' },
   { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '5' }, { id: 'stemThickness', value: '1' },
-  { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' },
-  { id: 'receptReach', value: '0.4' }, { id: 'receptSolidity', value: '0.4' },
+  { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' },
+  { id: 'receptReach', value: '0.4' },
   { id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' },
+  { id: 'absorption', value: '0.85' }, { id: 'gatherRadius', value: '0.06' }, { id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' },
 ] });
-CONFIGS.push({ label: 'cont-margin CORED', matrix: false, set: [{ id: 'receptConstruction', value: 'cored', evt: 'change' }] });
-CONFIGS.push({ label: 'cont-margin merge start 0.2 / rate 0.2', set: [{ id: 'mergeStart', value: '0.2' }, { id: 'mergeRate', value: '0.2' }] });
-CONFIGS.push({ label: 'cont-margin SOLID morph (flare, L0.6)', set: [{ id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'morphLength', value: '0.6' }] });
-CONFIGS.push({ label: 'cont-margin SOLID morph DOME + short L0.2', set: [{ id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'morphLength', value: '0.2' }] });
-CONFIGS.push({ label: 'cont-margin SOLID morph URN + long L1.0 + sepals', set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'morphLength', value: '1' }] });
-CONFIGS.push({ label: 'cont-margin SOLID morph flare (reset profile)', set: [{ id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'morphLength', value: '0.6' }] });
-CONFIGS.push({ label: 'cont-margin URN + ferrule', set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptCollar', value: 'ferrule', evt: 'change' }] });
-CONFIGS.push({ label: 'cont-margin voronoi infill', set: [{ id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] });
-CONFIGS.push({ label: 'cont-margin bone (no outline) infill', set: [{ id: 'infillType', value: 'bone', evt: 'change' }] });
-CONFIGS.push({ label: 'cont-margin bundle 0 / flare 1 (loose, quick)', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'bundleTightness', value: '0' }, { id: 'flareRate', value: '1' }] });
-CONFIGS.push({ label: 'cont-margin bundle 1 / flare 0 (tight, slow) + reach 1', set: [{ id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }, { id: 'receptReach', value: '1' }] });
-CONFIGS.push({ label: 'cont-margin coiled bloom + 3 layers', set: [{ id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '12' }, { id: 'layerCount', value: '3' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' }] });
+CONFIGS.push({ label: 'cont-margin ABSORPTION low 0.15 (distinct strands)', cm: true, set: [{ id: 'absorption', value: '0.15' }] });
+CONFIGS.push({ label: 'cont-margin ABSORPTION high 1.0 (fully fused)', cm: true, set: [{ id: 'absorption', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin GATHER tight (radius 0.03, anemone button)', cm: true, set: [{ id: 'absorption', value: '0.85' }, { id: 'gatherRadius', value: '0.03' }] });
+CONFIGS.push({ label: 'cont-margin GATHER wide (radius 0.55, degrades to splay)', cm: true, set: [{ id: 'gatherRadius', value: '0.55' }] });
+CONFIGS.push({ label: 'cont-margin GATHER deep (height 0.55) + tight radius', cm: true, set: [{ id: 'gatherRadius', value: '0.05' }, { id: 'gatherHeight', value: '0.55' }] });
+CONFIGS.push({ label: 'cont-margin MERGE start 0.2 / rate 0.2 (early inward, early drop)', cm: true, set: [{ id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.2' }, { id: 'mergeRate', value: '0.2' }] });
+CONFIGS.push({ label: 'cont-margin MERGE start 0.8 / rate 0.9 (late inward, even)', cm: true, set: [{ id: 'mergeStart', value: '0.8' }, { id: 'mergeRate', value: '0.9' }] });
+CONFIGS.push({ label: 'cont-margin PROFILE dome (radius mult) + band collar', cm: true, set: [{ id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' }, { id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptCollar', value: 'band', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin PROFILE urn (radius mult) + ferrule collar', cm: true, set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'receptCollar', value: 'ferrule', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin PROFILE cone + collar none', cm: true, set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin voronoi infill', cm: true, set: [{ id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin bone (no outline) infill', cm: true, set: [{ id: 'infillType', value: 'bone', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin bundle 0 / flare 1 (loose, quick) + reach 1', cm: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'bundleTightness', value: '0' }, { id: 'flareRate', value: '1' }, { id: 'receptReach', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin coiled bloom + 3 layers', cm: true, set: [{ id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '12' }, { id: 'layerCount', value: '3' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' }, { id: 'receptReach', value: '0.4' }] });
+CONFIGS.push({ label: 'cont-margin no stem (SDF seals on its own)', cm: true, set: [{ id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'stemType', value: 'none', evt: 'change' }] });
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
@@ -263,10 +271,10 @@ for (const cfg of CONFIGS) {
     page.waitForEvent('download', { timeout: 20000 }).catch(() => null),
     page.click('#exportStl'),
   ]);
-  if (!dl) { results.push({ label: cfg.label, ok: false, matrix: !!cfg.matrix, note: 'no STL download' }); continue; }
+  if (!dl) { results.push({ label: cfg.label, ok: false, matrix: !!cfg.matrix, cm: !!cfg.cm, note: 'no STL download' }); continue; }
   const buf = fs.readFileSync(await dl.path());
   const a = analyzeStl(buf);
-  results.push({ label: cfg.label, ok: a.boundary === 0, matrix: !!cfg.matrix, ...a });
+  results.push({ label: cfg.label, ok: a.boundary === 0, matrix: !!cfg.matrix, cm: !!cfg.cm, ...a });
 }
 
 await browser.close();
@@ -282,6 +290,9 @@ for (const r of results) {
 const mat = results.filter((r) => r.matrix);
 const matPass = mat.filter((r) => r.ok).length;
 if (mat.length) console.log(`\nReceptacle PROFILE×CONSTRUCTION×COLLAR matrix: ${matPass}/${mat.length} export watertight.`);
+const cm = results.filter((r) => r.cm);
+const cmPass = cm.filter((r) => r.ok).length;
+if (cm.length) console.log(`Continuous-margin SDF receptacle (absorption × gather × profile × collar): ${cmPass}/${cm.length} export watertight.`);
 if (pageErrors.length) {
   const real = pageErrors.filter((e) => !/fonts\.googleapis/.test(e));
   if (real.length) { console.log('\nPage errors:'); real.forEach((e) => console.log('  ! ' + e)); failed += real.length; }

@@ -28,6 +28,7 @@ import {
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
 } from './flower-geometry.js';
+import { buildReceptacleField } from './flower-sdf.js';
 
 const DEG = Math.PI / 180;
 
@@ -78,10 +79,10 @@ const MARGIN_W_TIP    = 0.12;
 // The midrib's foot weight (matches VEIN_MIDRIB_BASE). It is a merge-tree LEAF too, so the
 // area-preserving root (r_parent^2 = sum r_child^2) lands near the stem radius on its own.
 const MIDRIB_W_BASE   = 1.00;
-// Introspection hook for the merge-tree acceptance probe: when set to an array (by a
-// headless probe), emitMergeTree records each junction into it (parent/child radii and
-// tangents, fan-in, height) plus a summary. null in production — zero effect.
-let RECEPT_GRAPH = null;
+// Per-design telemetry for the SDF receptacle (tris / verts / caps / cell), read by
+// the info readout. null until a continuous-margin receptacle is built. Introspection
+// only — no effect on geometry.
+let RECEPT_FIELD_STATS = null;
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
 const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap; export uses the full count
@@ -235,6 +236,19 @@ class MeshAccumulator {
     if (y < this.min[1]) this.min[1] = y; if (y > this.max[1]) this.max[1] = y;
     if (z < this.min[2]) this.min[2] = z; if (z > this.max[2]) this.max[2] = z;
     return this.vcount++;
+  }
+
+  /* Merge a pre-built triangle mesh (flat position/normal/index arrays, world
+     coords) straight into the accumulator. Used by the SDF receptacle, which
+     polygonises its own field: the result is a closed solid that OVERLAPS the
+     petal feet and the stem, so the union is watertight without stitching. */
+  addMesh(positions, normals, indices) {
+    const base = this.vcount;
+    for (let v = 0; v < positions.length; v += 3) {
+      this._vertex(positions[v], positions[v + 1], positions[v + 2],
+                   normals[v], normals[v + 1], normals[v + 2]);
+    }
+    for (let t = 0; t < indices.length; t++) this.idx.push(base + indices[t]);
   }
 
   /* Extrude a round tube along a 3D polyline, using a rotation-minimizing
@@ -2027,77 +2041,6 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       len: (a) => Math.hypot(a.x, a.y, a.z),
       norm: (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; },
     };
-    const emitEdge = (child, parent, NB) => {
-      const d = V.len(V.sub(parent.p, child.p)) || 1e-4;
-      const c0 = V.add(child.p, V.scale(child.dir, d * 0.4));                 // leave child along its own tangent
-      const c1 = V.sub(parent.p, V.scale(parent.dir, d * 0.4));               // arrive at parent along the parent tangent -> C1 Y-junction
-      const path = new Array(NB + 1);
-      for (let i = 0; i <= NB; i++) { const t = i / NB, mt = 1 - t, w0 = mt*mt*mt, w1 = 3*mt*mt*t, w2 = 3*mt*t*t, w3 = t*t*t;
-        path[i] = { x: w0*child.p.x + w1*c0.x + w2*c1.x + w3*parent.p.x,
-                    y: w0*child.p.y + w1*c0.y + w2*c1.y + w3*parent.p.y,
-                    z: w0*child.p.z + w1*c0.z + w2*c1.z + w3*parent.p.z }; }
-      acc.addTube(path, floorRad(child.r), 0, RECEPT_TUBE_SEGS);
-    };
-    const emitMergeTree = (feet, rootPt) => {
-      // gather leaves
-      let nodes = [];
-      for (const a of feet) {
-        if (a.strandRoots && a.strandRoots.length) {
-          for (const rt of a.strandRoots) { const t = V.norm(rt.tan);
-            nodes.push({ p: { x: rt.pos.x, y: rt.pos.y, z: rt.pos.z }, r: rt.r, dir: { x: -t.x, y: -t.y, z: -t.z } }); }
-        } else {   // sepal / rootless foot: one connector leaf from the foot position
-          const fp = footPoint(a), c = Math.cos(fp.az), s = Math.sin(fp.az);
-          const p = { x: cx + fp.r * c, y: fp.y, z: cz + fp.r * s };
-          const dl = Math.hypot(p.x - rootPt.x, p.z - rootPt.z) || 1;
-          nodes.push({ p, r: P.tubeRadius * 0.6, dir: V.norm({ x: -(p.x - rootPt.x) / dl, y: -0.5, z: -(p.z - rootPt.z) / dl }) });
-        }
-      }
-      if (!nodes.length) return { maxR: 0 };
-      const yTop = nodes.reduce((s, n) => s + n.p.y, 0) / nodes.length;
-      const span = Math.max(P.L * 0.35, yTop - rootPt.y);                     // guarantee MERGE SPAN >= 0.35*L
-      const yRoot = yTop - span;
-      if (RECEPT_GRAPH) RECEPT_GRAPH.push({ kind: 'summary', leaves: nodes.length, yTop, yRoot, span, L: P.L });
-      const mStart = clamp(opts.mergeStart != null ? opts.mergeStart : 0.5, 0.2, 0.8);
-      const mRate  = clamp(opts.mergeRate  != null ? opts.mergeRate  : 0.5, 0, 1);
-      const yStart = yTop - span * (1 - mStart) * 0.5;                        // first merges sit higher when MERGE START is high
-      // GLOBAL GREEDY agglomeration (not level-batched): repeatedly fuse the globally CLOSEST
-      // pair, so nearby traces merge first (within a petal, then petal-to-petal) and — crucially
-      // — each junction gets its OWN height instead of a shared per-level plane. Height descends
-      // with merge PROGRESS (MERGE RATE shapes the curve) but is always pinned below both
-      // children, so the tree cascades down organically, staggered rather than scheduled.
-      const total = Math.max(1, nodes.length - 1);
-      const minDrop = span * lerp(0.03, 0.10, mRate);
-      let done = 0;
-      while (nodes.length > 1) {
-        let bi = 0, bj = 1, bd = Infinity;                                   // globally nearest pair (horizontal)
-        for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[i].p.x - nodes[j].p.x, dz = nodes[i].p.z - nodes[j].p.z, dd = dx * dx + dz * dz;
-          if (dd < bd) { bd = dd; bi = i; bj = j; } }
-        const a = nodes[bi], b = nodes[bj]; nodes.splice(bj, 1); nodes.splice(bi, 1);
-        done++;
-        const progress = done / total;                                       // 0 first merge -> 1 last (root)
-        const wa = a.r * a.r, wb = b.r * b.r, tot = wa + wb;
-        const pr = Math.sqrt(tot);                                           // AREA-PRESERVING radius
-        const yProg = lerp(yStart, yRoot, Math.pow(progress, lerp(0.6, 1.9, mRate)));
-        const py = Math.max(yRoot, Math.min(yProg, Math.min(a.p.y, b.p.y) - minDrop));   // staggered, always below its children
-        const px = lerp((a.p.x * wa + b.p.x * wb) / tot, rootPt.x, progress * 0.6);       // pull toward the axis as we descend
-        const pz = lerp((a.p.z * wa + b.p.z * wb) / tot, rootPt.z, progress * 0.6);
-        const parent = { p: { x: px, y: py, z: pz }, r: pr,
-                         dir: V.norm(V.add(V.scale(a.dir, wa), V.scale(b.dir, wb))) };
-        if (RECEPT_GRAPH) {
-          // each child arrives along the parent tangent (emitEdge) and the parent leaves along
-          // it too, so the through-tangent at the junction is continuous (0) by construction.
-          RECEPT_GRAPH.push({ kind: 'join', fanIn: 2, parentR: pr, childR: [a.r, b.r],
-            areaEquiv: Math.sqrt(a.r * a.r + b.r * b.r), y: py, tangentDeg: 0 });
-        }
-        emitEdge(a, parent, 12); emitEdge(b, parent, 12);
-        acc.addBead(parent.p, floorRad(pr), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
-        nodes.push(parent);
-      }
-      const root = nodes[0];
-      emitEdge(root, { p: rootPt, r: root.r, dir: { x: 0, y: -1, z: 0 } }, 12);
-      return { maxR: root.r };
-    };
     // COLLAR: the band at flower->stem. BAND = one raised ring; FERRULE = a short stepped
     // sleeve. Both overlap the neck so they union into the one solid.
     const emitCollar = () => {
@@ -2111,39 +2054,47 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       else for (let k = 0; k < 3; k++) ringAt(stemR * (1.12 + k * 0.13), neckPt.y + zoneDepth * (0.03 + k * 0.05), stemR * 0.26);   // ferrule
     };
 
-    if (construction === 'solid' && opts.continuousMargin) {
-      // ----- FIX 2: CROSS-SECTION MORPH (not a lathe). The top ring is the feet-driven
-      //       cross-section — the blended union of the petal bases: a radial RIDGE at each
-      //       foot (sTopR, carrying the petal's width + cup) and a HEIGHT dip between them
-      //       (sTopY). It morphs C1 to the stem circle over MORPH LENGTH: the scallop
-      //       DEVIATION (both radial and vertical) fades with a smootherstep (zero slope at
-      //       both ends -> C1 vertical, no band), so every petal's base ridge continues down
-      //       and fades out (the tulip underside) and NO horizontal slice in the transition
-      //       is a circle until the morph completes. The between-petal valleys are deepened
-      //       so the top reads as ridges, not a flat plate. -----
-      const STEPS = 30;
-      const morphFrac = clamp(opts.morphLength != null ? opts.morphLength : 0.6, 0.2, 1.0);
-      let meanTopY = 0; for (let j = 0; j < M; j++) meanTopY += sTopY[j]; meanTopY /= M;
-      // Amplify the cross-section relief so the petal ridges are a real cue (not shallow
-      // flutes that read as a circle) and the transition is graded, not abrupt: the radial
-      // ridge/valley deviation and the between-petal height dip are both deepened. The
-      // amplified valleys are floored to stemR (radial) so nothing pinches below the stem.
-      const ridgeAmp = 2.2;   // radial ridge/valley depth
-      const dipBoost = 2.4;   // between-petal height dip depth
-      for (let k = 0; k <= STEPS; k++) {
-        const t = k / STEPS;
-        const mt = clamp(t / morphFrac, 0, 1);
-        const dev = smootherstep(1 - mt);                 // 1 (full scallop) at top -> 0 (circle) at the morph end, C1
-        const meanR = bodyR(t);
-        const ring = new Array(M);
-        for (let j = 0; j < M; j++) {
-          const rad = floorRad(Math.max(stemR, meanR + (sTopR[j] - meanTopR) * ridgeAmp * dev));
-          const y = lerp(meanTopY, cy - zoneDepth, t) + (sTopY[j] - meanTopY) * dipBoost * dev;
-          ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
+    if (opts.continuousMargin) {
+      // ===== SDF RECEPTACLE — the lower flower as ONE implicit surface. =====
+      // The petal strand feet (midrib + two margins per petal; a connector per sepal)
+      // are the LEAVES of a GATHER tree: they run INWARD, merging pairwise as they
+      // converge into a compact button below the bloom centre (GATHER RADIUS/HEIGHT),
+      // and only THEN does a single trunk descend into the stem neck — the way a real
+      // daisy/anemone gathers, not the wide splay of feet-descend-straight-down. A
+      // smooth union (ABSORPTION = blend radius) fields the skeleton; a narrow-band
+      // surface-nets mesher (SDF-gradient normals + floor-aware constrained Laplacian)
+      // polygonises it into a closed solid that OVERLAPS the petal feet (up-stubs) and
+      // the stem (neck stub). The slicer unions the overlap, so it is watertight with
+      // no lathe and no stitching. PROFILE is a radius multiplier along the height;
+      // COLLAR a radius bump at the neck. (See flower-sdf.js.)
+      const sdfFeet = [];
+      for (const a of structFeet) {
+        if (a.strandRoots && a.strandRoots.length) {
+          for (const rt of a.strandRoots) { const t = V.norm(rt.tan);
+            sdfFeet.push({ p: [rt.pos.x, rt.pos.y, rt.pos.z], r: rt.r, up: [t.x, t.y, t.z] }); }
+        } else {   // sepal / rootless foot: one connector leaf, stubbed up-and-out into the sepal
+          const fp = footPoint(a), c = Math.cos(fp.az), s = Math.sin(fp.az), u = V.norm({ x: c, y: 0.9, z: s });
+          sdfFeet.push({ p: [cx + fp.r * c, fp.y, cz + fp.r * s], r: P.tubeRadius * 0.6, up: [u.x, u.y, u.z] });
         }
-        rings.push(ring);
       }
-      topCap = { x: cx, y: cy + overlap + meanTopR * 0.3, z: cz };   // DOME the cap (no flat plate); stamens emerge through it
+      if (sdfFeet.length) {
+        const field = buildReceptacleField(
+          sdfFeet, { p: [neckPt.x, neckPt.y, neckPt.z], r: stemR },
+          { cx, cz, tubeRadius: P.tubeRadius,
+            absorption: opts.absorption, gatherHeight: opts.gatherHeight, gatherRadius: opts.gatherRadius,
+            mergeStart: opts.mergeStart, mergeRate: opts.mergeRate,
+            // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
+            // so the preview reads as the same solid mass it prints as (export floors anyway).
+            profile, collar, exportMode, floorR: acc.floorR,
+            cell: exportMode ? (opts.sdfCell || 0.011) : (opts.sdfCellLive || 0.02),
+            smoothIters: exportMode ? 2 : 0 });
+        acc.addMesh(field.positions, field.normals, field.indices);
+        if (exportMode && acc.floorR < acc.minRadius) acc.minRadius = acc.floorR;   // keep min-feature telemetry honest
+        RECEPT_FIELD_STATS = field.stats;
+      }
+      // The receptacle is its own closed shell; the stem lathe below caps its own top
+      // (buried inside the field), so no receptacle rings are pushed here.
+      topCap = { x: cx, y: cy - zoneDepth, z: cz };
       botCap = { x: cx, y: cy - zoneDepth, z: cz };
     } else if (construction === 'solid') {
       // ----- SOLID revolved body (FLARE keeps its flutes -> blended; others fade fast). -----
@@ -2163,31 +2114,17 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
       topCap = { x: cx, y: cy + overlap, z: cz };
       botCap = { x: cx, y: cy - zoneDepth, z: cz };
     } else {
-      // ----- OPEN / CORED junction. -----
+      // ----- OPEN / CORED junction (legacy, non-continuous). Helical ribs over a load
+      // column; GATHERED is retired (wrong cardinality) so it renders like RIBBED;
+      // CORED keeps the wider visible column. -----
       const colTop = { x: cx, y: cy + overlap, z: cz };
-      if (opts.continuousMargin) {
-        // FIX 1: the MERGE TREE is the load path — the leaf areas (midrib + margins per
-        // petal) sum to ~the stem's, so its area-preserving root lands at the stem radius
-        // with no fat free-parameter tube. A slender central spine seats the stamen bundle
-        // and connects the bloom centre to the stem (CORED widens it to a visible column).
-        // Both the spine cap and the tube caps are buried in node beads -> no exposed flat face.
-        const spineR = construction === 'cored' ? stemR * 1.35 : stemR * 0.55;
-        acc.addTube([colTop, neckPt], floorRad(spineR), 0, Math.max(12, RECEPT_TUBE_SEGS));
-        acc.addBead(colTop, floorRad(Math.max(spineR, P.tubeRadius * MARGIN_W_BASE) * 1.2), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
-        emitMergeTree(structFeet, neckPt);
-        acc.addBead(neckPt, floorRad(Math.max(stemR * 0.9, spineR)), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
-      } else {
-        // Legacy (non-continuous) open receptacle: helical ribs over a load column. GATHERED
-        // is retired (it was one fat tube per petal — the wrong cardinality), so it renders
-        // like RIBBED here; CORED keeps the wider visible column.
-        const thisCoreR = construction === 'cored' ? stemR * 1.35 : coreR;
-        acc.addTube([colTop, neckPt], floorRad(thisCoreR), 0, Math.max(12, RECEPT_TUBE_SEGS));
-        emitRibs(structFeet);
-        acc.addBead(neckPt, floorRad(Math.max(stemR * 0.85, thisCoreR)), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
-      }
+      const thisCoreR = construction === 'cored' ? stemR * 1.35 : coreR;
+      acc.addTube([colTop, neckPt], floorRad(thisCoreR), 0, Math.max(12, RECEPT_TUBE_SEGS));
+      emitRibs(structFeet);
+      acc.addBead(neckPt, floorRad(Math.max(stemR * 0.85, thisCoreR)), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
       topCap = { x: cx, y: cy - zoneDepth, z: cz };
     }
-    emitCollar();
+    if (!opts.continuousMargin) emitCollar();
   }
 
   // ---------- STEM ZONE ----------
@@ -2536,7 +2473,8 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
       bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       continuousMargin: P.continuousMargin, tubeRadius: P.tubeRadius,
-      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate, morphLength: ui.morphLength,
+      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate,
+      absorption: ui.absorption, gatherHeight: ui.gatherHeight, gatherRadius: ui.gatherRadius,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -3019,9 +2957,11 @@ const inputs = {
   continuousMargin: document.getElementById('continuousMargin'),
   bundleTightness: document.getElementById('bundleTightness'),
   flareRate: document.getElementById('flareRate'),
+  absorption: document.getElementById('absorption'),
+  gatherRadius: document.getElementById('gatherRadius'),
+  gatherHeight: document.getElementById('gatherHeight'),
   mergeStart: document.getElementById('mergeStart'),
   mergeRate: document.getElementById('mergeRate'),
-  morphLength: document.getElementById('morphLength'),
   edgeTermination: document.getElementById('edgeTermination'),
   captureDist: document.getElementById('captureDist'),
   voronoiLloyd: document.getElementById('voronoiLloyd'),
@@ -3183,9 +3123,11 @@ function readUI() {
     continuousMargin: inputs.continuousMargin.value,
     bundleTightness: parseFloat(inputs.bundleTightness.value),
     flareRate: parseFloat(inputs.flareRate.value),
+    absorption: parseFloat(inputs.absorption.value),
+    gatherRadius: parseFloat(inputs.gatherRadius.value),
+    gatherHeight: parseFloat(inputs.gatherHeight.value),
     mergeStart: parseFloat(inputs.mergeStart.value),
     mergeRate: parseFloat(inputs.mergeRate.value),
-    morphLength: parseFloat(inputs.morphLength.value),
     edgeTermination: inputs.edgeTermination.value,
     captureDist: parseFloat(inputs.captureDist.value),
     voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
@@ -3336,9 +3278,11 @@ function refreshLabels() {
   setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
   setLabel('bundleTightness', (+inputs.bundleTightness.value).toFixed(2));
   setLabel('flareRate', (+inputs.flareRate.value).toFixed(2));
+  setLabel('absorption', (+inputs.absorption.value).toFixed(2));
+  setLabel('gatherRadius', (+inputs.gatherRadius.value).toFixed(2));
+  setLabel('gatherHeight', (+inputs.gatherHeight.value).toFixed(2));
   setLabel('mergeStart', (+inputs.mergeStart.value).toFixed(2));
   setLabel('mergeRate', (+inputs.mergeRate.value).toFixed(2));
-  setLabel('morphLength', (+inputs.morphLength.value).toFixed(2));
   setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
   setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
   setLabel('voronoiAniso', (+inputs.voronoiAniso.value).toFixed(1) + '×');
@@ -3437,7 +3381,12 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : ui.infillType === 'lace' ? 'lace filigree'
     : ui.infillType === 'spacecol' ? `space colonization (${ui.spaceMode})`
     : 'leaf venation';
-  el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
+  // SDF receptacle telemetry (continuous margin on): report the field's own triangle
+  // count so its contribution to the budget stays visible on every geometry change.
+  const recept = (ui.continuousMargin === 'on' && ui.receptacleType === 'on' && RECEPT_FIELD_STATS)
+    ? ` · sdf receptacle ~${RECEPT_FIELD_STATS.tris.toLocaleString()} tris (abs ${(+ui.absorption).toFixed(2)})`
+    : '';
+  el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris${recept}`;
 }
 
 // coalesce rapid slider input into one rebuild per frame
@@ -3471,7 +3420,7 @@ function setBuilding(on) {
  'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
  'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'mergeStart', 'mergeRate', 'morphLength', 'captureDist', 'voronoiLloyd',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'absorption', 'gatherRadius', 'gatherHeight', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
  'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
  'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
  'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
@@ -3784,7 +3733,9 @@ if (resetBtn) {
     inputs.flareRate.value = d.flareRate;
     inputs.mergeStart.value = d.mergeStart;
     inputs.mergeRate.value = d.mergeRate;
-    inputs.morphLength.value = d.morphLength;
+    inputs.absorption.value = d.absorption;
+    inputs.gatherRadius.value = d.gatherRadius;
+    inputs.gatherHeight.value = d.gatherHeight;
     inputs.edgeTermination.value = d.edgeTermination;
     inputs.captureDist.value = d.captureDist;
     inputs.voronoiLloyd.value = d.voronoiLloyd;
@@ -3921,7 +3872,8 @@ const DEFAULTS = {
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
-  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5, morphLength: 0.6,
+  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
+  absorption: 0.85, gatherRadius: 0.06, gatherHeight: 0.25,
   edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
   voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
   spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
@@ -3960,7 +3912,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 11;
+const CURRENT_SCHEMA = 12;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -4097,10 +4049,29 @@ function migrateV9toV10(p) {
 // is unchanged, so filling MORPH LENGTH from DEFAULTS is inert for them.
 function migrateV10toV11(p) {
   const out = { ...p };
-  if (out.morphLength == null) out.morphLength = DEFAULTS.morphLength;
+  if (out.morphLength == null) out.morphLength = 0.6;   // former DEFAULTS.morphLength (control retired at v12)
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11];
+// v11 -> v12: the receptacle is REBUILT as a single implicit surface (SDF). Under continuous
+// margin, ABSORPTION (blend radius) replaces CONSTRUCTION (solid/ribbed/cored) and MORPH
+// LENGTH; GATHER RADIUS + GATHER HEIGHT add the daisy/anemone gather-into-a-button that the
+// old feet-descend-straight-down splay lacked; PROFILE becomes a radius multiplier and COLLAR
+// a radius bump. Old CONSTRUCTION maps to an ABSORPTION starting point (solid = fully fused,
+// cored = looser) so a saved design lands near its former look; MORPH LENGTH is left inert on
+// the record. All keys fill from DEFAULTS, so any design with the toggle OFF (the legacy
+// lathe/rib path is untouched) is unchanged.
+function migrateV11toV12(p) {
+  const out = { ...p };
+  if (out.absorption == null) {
+    out.absorption = out.receptConstruction === 'solid' ? 0.9
+                   : out.receptConstruction === 'cored' ? 0.6
+                   : DEFAULTS.absorption;   // ribbed / anything else
+  }
+  if (out.gatherRadius == null) out.gatherRadius = DEFAULTS.gatherRadius;
+  if (out.gatherHeight == null) out.gatherHeight = DEFAULTS.gatherHeight;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

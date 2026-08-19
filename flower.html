@@ -821,7 +821,7 @@
             <option value="off" selected>OFF</option>
             <option value="on">ON</option>
           </select>
-          <span class="fl-ctrl__hint">the edge as two strands rooted at the foot that the receptacle continues, instead of a closed-loop rim &mdash; petal, receptacle and stem read as one piece</span>
+          <span class="fl-ctrl__hint">the edge as two strands rooted at the foot, and the receptacle rebuilt as ONE implicit surface (SDF) those strands gather into &mdash; petal, receptacle and stem read as one continuous piece</span>
         </div>
 
         <div class="fl-ctrl" data-cont-margin>
@@ -847,8 +847,35 @@
             <label for="mergeStart">Merge start</label>
             <span class="fl-ctrl__val" data-value="mergeStart"></span>
           </div>
+          <input type="range" id="absorption" min="0" max="1" step="0.01" value="0.85">
+          <span class="fl-ctrl__hint">how much the gathered strands melt into one mass &mdash; low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="gatherRadius">Gather radius</label>
+            <span class="fl-ctrl__val" data-value="gatherRadius"></span>
+          </div>
+          <input type="range" id="gatherRadius" min="0" max="0.6" step="0.01" value="0.06">
+          <span class="fl-ctrl__hint">how tight the receptacle button is &mdash; near zero the strands run inward to a compact node on the axis (an anemone button), wide and it opens back out toward a splay</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="gatherHeight">Gather height</label>
+            <span class="fl-ctrl__val" data-value="gatherHeight"></span>
+          </div>
+          <input type="range" id="gatherHeight" min="0.05" max="0.6" step="0.01" value="0.25">
+          <span class="fl-ctrl__hint">how far below the feet the button forms before the trunk descends &mdash; small keeps it up under the bloom, large drops it toward the stem</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="mergeStart">Merge start</label>
+            <span class="fl-ctrl__val" data-value="mergeStart"></span>
+          </div>
           <input type="range" id="mergeStart" min="0.2" max="0.8" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how soon the strands begin merging as they descend into the receptacle &mdash; later &rarr; sooner</span>
+          <span class="fl-ctrl__hint">how early the strands turn inward as they gather &mdash; later &rarr; sooner</span>
         </div>
 
         <div class="fl-ctrl" data-cont-margin>
@@ -857,16 +884,7 @@
             <span class="fl-ctrl__val" data-value="mergeRate"></span>
           </div>
           <input type="range" id="mergeRate" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how quickly the strand count halves &mdash; a long even taper &rarr; a fast gather near the stem</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="morphLength">Morph length</label>
-            <span class="fl-ctrl__val" data-value="morphLength"></span>
-          </div>
-          <input type="range" id="morphLength" min="0.2" max="1" step="0.01" value="0.6">
-          <span class="fl-ctrl__hint">for a solid receptacle: how far the petal-shaped cross-section reaches down before it becomes the stem circle &mdash; short &rarr; long, more integrated</span>
+          <span class="fl-ctrl__hint">how the descent staggers &mdash; an early drop from the button &rarr; an even taper into the stem</span>
         </div>
 
         <div class="fl-ctrl" id="captureDistCtrl">
@@ -1263,7 +1281,7 @@
             <option value="urn">URN</option>
             <option value="gentle">GENTLE</option>
           </select>
-          <span class="fl-ctrl__hint">the silhouette &mdash; flared trumpet, round dome, straight taper, waisted urn, or a subtle solid swell</span>
+          <span class="fl-ctrl__hint">the silhouette &mdash; flared trumpet, round dome, straight taper, waisted urn, or a subtle solid swell (with continuous margin on, this becomes a radius multiplier along the receptacle's height)</span>
         </div>
 
         <div class="fl-ctrl" data-recept>
@@ -1275,7 +1293,7 @@
             <option value="ribbed">RIBBED</option>
             <option value="cored">CORED</option>
           </select>
-          <span class="fl-ctrl__hint">how it is built &mdash; a continuous surface, open scrollwork ribs, or a solid core with ribs outside (with continuous margin on, the open forms become the merge tree)</span>
+          <span class="fl-ctrl__hint">how it is built &mdash; a continuous surface, open scrollwork ribs, or a solid core with ribs outside &mdash; for the legacy receptacle only; with continuous margin on this is superseded by ABSORPTION (solid&nbsp;&rarr;&nbsp;fused, cored&nbsp;&rarr;&nbsp;looser)</span>
         </div>
 
         <div class="fl-ctrl" data-recept>
@@ -1287,7 +1305,7 @@
             <option value="band">BAND</option>
             <option value="ferrule">FERRULE</option>
           </select>
-          <span class="fl-ctrl__hint">an optional ring where the node meets the stem &mdash; none, a raised band, or a stepped ferrule sleeve</span>
+          <span class="fl-ctrl__hint">an optional ring where the node meets the stem &mdash; none, a raised band, or a stepped ferrule sleeve (with continuous margin on, added as a radius bump in the field)</span>
         </div>
 
         <div class="fl-ctrl" data-recept>
