@@ -47,16 +47,38 @@ const argv = process.argv.slice(2);
 const SWEEP = argv.includes('--sweep');
 const REPORT_ONLY = argv.includes('--report-only') || SWEEP;
 
-// Thresholds. Calibrated (below) from the smooth-shape baseline vs the broken cleft:
-//   marginGapMM  — the rendered rim must trace the material boundary; a skipped sinus
-//                  shows as a multi-mm gap. p95Curv — a stair-stepped contour spikes the
-//                  per-mm turn rate. freeEnds — every infill tip caps onto the boundary.
-const T = { marginGapMM: 1.5, p95CurvDegMM: 40, freeEnds: 3 };
+// Thresholds — each set with DELIBERATE headroom above the worst shipping value so a
+// small regression does not sit on the line (worst / threshold, from the 20 non-cleft
+// configs; the residuals are inherent, see notes):
+//   marginGapMM  <= 1.5   worst 0.29 (pointed) -> 5.2x. The rendered rim must trace the
+//                         material boundary; residual is TIP sampling only (worst point is
+//                         at u~0.98 where the strand polyline and the outline both collapse
+//                         to y=0 and their vertices don't quite coincide) — sub-print-floor
+//                         (0.8mm) and not reducible without denser sampling, which isn't
+//                         worth it. A skipped sinus is 8-19mm, so the guard has ~11x margin
+//                         on the thing it actually protects.
+//   p95CurvDegMM <= 40    worst 12.8 (clawed claw-shoulder) -> 3.1x. A stair-stepped contour
+//                         spikes the per-mm turn rate well past 100; 40 sits clear of both.
+//   freeEnds     <= 6     worst 2 (clawed veins) -> 3x. Deep venation tips beyond captureDist
+//                         are an inherent 0-2 baseline; 6 still catches a gross un-termination
+//                         (edge-termination breaking -> dozens of loose ends).
+const T = { marginGapMM: 1.5, p95CurvDegMM: 40, freeEnds: 6 };
 // The connectivity check applies only to the STRUCTURED infills that are meant to cap
 // onto the margin. Space-colonization's free tips are its growth frontier (bead-capped
 // and watertight per the export gate), and Voronoi is closed slab rings — neither is a
 // tree hung off the margin, so a degree-1 tip there is by design, not an uncapped end.
 const ENDS_INFILLS = new Set(['veins', 'bone', 'strands']);
+
+// Known, tracked correctness failures — each a DEBT WITH A DUE DATE, not a permanent
+// exemption. An xfail carries an issue ref + the date it was quarantined; the gate reports
+// its age and FAILS the build if any debt is older than XFAIL_MAX_AGE_DAYS, if the number of
+// distinct open debts exceeds XFAIL_MAX, or if a debt's configs all go green (fixed — the
+// marker must be DELETED, not left passing). That keeps the ledger from silently accreting.
+const XFAIL_MAX_AGE_DAYS = 30;
+const XFAIL_MAX = 3;
+const XFAILS = {
+  '#64': { since: '2026-08-19', reason: 'continuous-margin rim not cleft-aware (Lobed sinus unsealed)' },
+};
 
 // The five silhouette bundles (mirror flower.js SHAPES).
 const SHAPES = {
@@ -75,18 +97,21 @@ const PATTERNS = ['veins', 'voronoi', 'strands', 'bone', 'spacecol'];
 // xfail: they still appear in the table with their real numbers, but a known failure does
 // not break the build. When #64 makes the strands cleft-aware, drop the marker and the
 // gate goes hard. A cleft config that UNEXPECTEDLY passes (xpass) is surfaced too.
-const CLEFT_XFAIL = !process.env.GQ_MARGIN_OFF;   // margin-off routes through the good path
+// cfg.xfail holds the ISSUE REF for a known-failing config (or null). GQ_MARGIN_OFF routes
+// the cleft through the good (cleft-aware) rim, so it clears the quarantine — the configs
+// must then PASS on their own, which is the gate's credibility check.
+const CLEFT_XFAIL = process.env.GQ_MARGIN_OFF ? null : '#64';
 const CONFIGS = [];
 if (SWEEP) {
   for (const depth of [0.10, 0.15, 0.20, 0.25, 0.30, 0.35]) {
     for (const pat of PATTERNS) {
-      CONFIGS.push({ name: `d${depth.toFixed(2)}__${pat}`, ui: { ...SHAPES.lobed, cleftDepth: depth, cleftLobes: 2, infillType: pat }, xfail: CLEFT_XFAIL, ref: '#64' });
+      CONFIGS.push({ name: `d${depth.toFixed(2)}__${pat}`, ui: { ...SHAPES.lobed, cleftDepth: depth, cleftLobes: 2, infillType: pat }, xfail: CLEFT_XFAIL });
     }
   }
 } else {
   for (const shape of Object.keys(SHAPES)) for (const pat of PATTERNS) {
     const cleft = (SHAPES[shape].cleftDepth || 0) > 0;
-    CONFIGS.push({ name: `${shape}__${pat}`, ui: { ...SHAPES[shape], infillType: pat }, xfail: cleft && CLEFT_XFAIL, ref: cleft ? '#64' : undefined });
+    CONFIGS.push({ name: `${shape}__${pat}`, ui: { ...SHAPES[shape], infillType: pat }, xfail: cleft ? CLEFT_XFAIL : null });
   }
 }
 // Credibility check: GQ_MARGIN_OFF flips continuous margin off on every config, routing
@@ -140,15 +165,24 @@ window.__gq = async function() {
   if (contMargin) rendered = marginStrands(P, P.bundleTightness, P.flareRate);   // [{points,side}...]
   else rendered = matRing;                                                        // drawRim traces the contour
 
-  // (3) MARGIN FIDELITY / CLOSURE — every point of the material boundary past the neck
-  //     (x > 0.4L, i.e. the blade, clear of the tulip-neck flare that legitimately leaves
-  //     the outline near the foot) must be traced by the rendered margin. The max gap is
-  //     the unsealed-sinus depth: ~0 when the rim is cleft-aware, ~the cleft depth when
-  //     the un-clefted strands skip it. Also flag a contour that fragments into 2+ loops.
+  // (3) MARGIN FIDELITY / CLOSURE — every point of the material boundary on the BLADE must
+  //     be traced by the rendered margin. The tulip-neck flare legitimately leaves the
+  //     outline near the foot (the strands hug the axis up to flareEnd), so exclude exactly
+  //     that span — computed as marginStrands computes it — instead of a blunt 0.4L cutoff
+  //     that leaks the ramp into the residual. The floor keeps a real blade span for a fast
+  //     flare; the cleft cap guarantees a sinus is never partly skipped. The max gap is the
+  //     unsealed-sinus depth: ~0 when the rim is cleft-aware, ~the cleft depth when the
+  //     un-clefted strands skip it. Also flag a contour that fragments into 2+ loops.
   let numLoops = 1;
   if (cfg) { const cc = G.getCleftContour(P); numLoops = (cc && cc.loops) ? cc.loops.length : 0; }
-  let marginGap = 0;
-  for (const p of material) { if (p.x <= 0.4 * P.L) continue; const d = __gqDistToSegs(p, rendered); if (d > marginGap) marginGap = d; }
+  const _bt = Math.max(0, Math.min(1, P.bundleTightness != null ? P.bundleTightness : 0.5));
+  const _fr = Math.max(0, Math.min(1, P.flareRate != null ? P.flareRate : 0.5));
+  const _flareStart = 0.02 + (0.20 - 0.02) * _bt;
+  const _flareEnd = Math.min(0.96, _flareStart + (0.55 + (0.12 - 0.55) * _fr));
+  let neck = Math.max(0.42, _flareEnd);
+  if ((P.cleftDepth || 0) > 0) neck = Math.min(neck, 1 - P.cleftDepth - 0.03);   // never skip a sinus
+  let marginGap = 0, worstU = 0;
+  for (const p of material) { const u = p.x / P.L; if (u <= neck) continue; const d = __gqDistToSegs(p, rendered); if (d > marginGap) { marginGap = d; worstU = u; } }
   const marginGapMM = marginGap * MM;
   const marginClosed = numLoops === 1;
 
@@ -205,7 +239,7 @@ window.__gq = async function() {
   }
 
   return { infill: P.infillType, cleftDepth: +(P.cleftDepth || 0).toFixed(2), contMargin, numLoops, marginClosed,
-           marginGapMM: +marginGapMM.toFixed(2),
+           marginGapMM: +marginGapMM.toFixed(3), worstU: +worstU.toFixed(2), neck: +neck.toFixed(2),
            maxTurnDeg: +maxTurn.toFixed(1), p95TurnDeg: +p95Turn.toFixed(1),
            maxCurvDegMM: +maxCurv.toFixed(1), p95CurvDegMM: +p95Curv.toFixed(1),
            degree1, onMargin, atBase, freeEnds, marginPts: n, L: +P.L.toFixed(3) };
@@ -249,6 +283,7 @@ await page.waitForTimeout(300);
 
 const rows = [];
 let fails = 0, xfails = 0, xpasses = 0;
+const ledger = {};   // issue ref -> { total, failing }
 console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), '  verdict');
 for (const cfg of CONFIGS) {
   await page.evaluate((ui) => window.__gqSet(ui), cfg.ui);
@@ -260,16 +295,39 @@ for (const cfg of CONFIGS) {
   const bad = badFidelity || badSmooth || badEnds;
   const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : ''].filter(Boolean).join(',');
   let verdict;
-  if (bad && cfg.xfail) { verdict = `xfail(${cfg.ref}:${reasons})`; xfails++; }         // known, tracked — not a build failure
-  else if (!bad && cfg.xfail) { verdict = `XPASS(${cfg.ref}?)`; xpasses++; }             // known bug appears fixed — retire the marker
-  else if (bad) { verdict = `FAIL(${reasons})`; fails++; }                               // real regression — breaks the build
+  if (cfg.xfail) {
+    const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
+    s.total++;
+    if (bad) { s.failing++; xfails++; verdict = `xfail(${cfg.xfail}:${reasons})`; }        // known, tracked — not a build failure
+    else { xpasses++; verdict = `XPASS(${cfg.xfail})`; }                                    // quarantined config now passes
+  } else if (bad) { verdict = `FAIL(${reasons})`; fails++; }                               // real regression — breaks the build
   else verdict = 'ok';
-  rows.push({ name: cfg.name, xfail: !!cfg.xfail, ...q, verdict });
+  rows.push({ name: cfg.name, xfail: cfg.xfail || null, ...q, verdict });
   console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), '  ' + verdict);
 }
 if (process.env.GQ_JSON) fs.writeFileSync(process.env.GQ_JSON, JSON.stringify(rows, null, 1));
+
+// ---- xfail ledger: age each open debt, and force it to expire. A debt older than
+//      XFAIL_MAX_AGE_DAYS, a debt whose configs all now pass (fixed -> delete the marker),
+//      or more than XFAIL_MAX distinct debts each breaks the build so the quarantine list
+//      can never quietly become permanent.
+const DAY = 86400000, now = Date.now();
+const openIssues = Object.keys(ledger);
+let debtBreaks = false;
+if (openIssues.length) {
+  console.log('\nxfail ledger (debt with a due date):');
+  for (const iss of openIssues) {
+    const meta = XFAILS[iss] || {};
+    const age = meta.since ? Math.floor((now - Date.parse(meta.since + 'T00:00:00Z')) / DAY) : null;
+    const s = ledger[iss];
+    let flag = '';
+    if (s.failing === 0) { flag = ' → RESOLVED: all configs pass — DELETE this xfail marker'; debtBreaks = true; }
+    else if (age != null && age > XFAIL_MAX_AGE_DAYS) { flag = ` → EXPIRED (>${XFAIL_MAX_AGE_DAYS}d): fix ${iss} or consciously renew 'since'`; debtBreaks = true; }
+    console.log(`  ${iss}  age ${age == null ? '?' : age + 'd'} (since ${meta.since || '?'})  ${s.failing}/${s.total} failing  "${meta.reason || ''}"${flag}`);
+  }
+  if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
+}
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail(#64), ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true`);
-if (xpasses) console.log(`note: ${xpasses} xpass config(s) now pass — the tracked bug may be fixed; drop the xfail marker.`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true`);
 await browser.close(); server.close();
-process.exit(REPORT_ONLY ? 0 : (fails ? 1 : 0));
+process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));
