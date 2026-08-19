@@ -21,11 +21,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import {
-  lerp, clamp, mulberry32,
+  lerp, clamp, smootherstep, mulberry32,
   buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
+  getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
+  cleftConfig, petalMask, clipVeinsToMask,
 } from './flower-geometry.js';
+import { buildReceptacleField } from './flower-sdf.js';
 
 const DEG = Math.PI / 180;
 
@@ -44,6 +47,12 @@ const CENTER_CURVE_SCALE = 0.75;  // centre-curve slider (-1..1) -> spine curl (
 // triangles. Live-only — preview instances never export STL, so the print gate
 // (full-detail main viewer) is untouched.
 const PREVIEW = new URLSearchParams(location.search).get('preview') === '1';
+// DEV-ONLY field debug overlay: ?fields=s|d|t|all renders the per-petal s / d / T
+// fields (getPetalFields) as colour/vector overlays so they can be eyeballed
+// before anything consumes them. Off (null) in the normal path — zero effect on
+// geometry or export. Collected during the LIVE build only (never in export).
+const DEBUG_FIELDS = new URLSearchParams(location.search).get('fields');   // null | 's' | 'd' | 't' | 'all'
+const debugPetals = [];   // per-petal {P, spine, az, baseHeight, radialOffset, tilt}, live build only
 const RADIAL_SEGMENTS = PREVIEW ? 6 : 8;     // tube cross-section resolution (round enough
                                // that a thickened tube doesn't read as faceted)
 // Higher resolution for the CHUNKY, close-viewed base/center primitives only
@@ -61,8 +70,33 @@ const JOIN_FLARE_DIST = 0.10;  // a flared tube blends into its end bead (a soft
                                // butting it with a hard cylinder-into-sphere crease
 const RIM_WIDTH       = 0.34;  // petal-margin line weight, relative to the midrib
                                // (the leaf edge is a fine vein, not a fat rope)
+// CONTINUOUS-MARGIN strand weights (relative to the midrib). The marginal trace is a
+// MAJOR vein: thicker than the secondaries (0.52) at the foot so the order reads
+// midrib > margin > secondary, tapering to a fine tip. Rendered as a ROUND strand so it
+// continues seamlessly into the receptacle rib, not as a flat blade ribbon.
+const MARGIN_W_BASE   = 0.62;
+const MARGIN_W_TIP    = 0.12;
+// The midrib's foot weight (matches VEIN_MIDRIB_BASE). It is a merge-tree LEAF too, so the
+// area-preserving root (r_parent^2 = sum r_child^2) lands near the stem radius on its own.
+const MIDRIB_W_BASE   = 1.00;
+// Per-design telemetry for the SDF receptacle (tris / verts / caps / cell), read by
+// the info readout. null until a continuous-margin receptacle is built. Introspection
+// only — no effect on geometry.
+let RECEPT_FIELD_STATS = null;
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
+const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap; export uses the full count
+
+// Deterministic per-petal network seed for SPACE COLONIZATION. Mixes the design's
+// STORED spaceSeed with a variant index cycled across the whorl by petal index, so:
+// reload is byte-identical (the seed is saved), the re-roll button changes every
+// petal together, and a whorl shows `spaceVariants` distinct networks rather than
+// one repeated stamp. No Math.random on the generation path.
+function spaceColSeed(P, petalSeed) {
+  const V = Math.max(1, Math.round(P.spaceVariants || 1));
+  const variant = ((petalSeed % V) + V) % V;
+  return (((P.spaceSeed >>> 0) ^ ((variant + 1) * 0x9e3779b1)) >>> 0);
+}
 
 /* ===================================================================
    REAL-WORLD SCALE  (STL export — Phase 1)
@@ -108,10 +142,10 @@ const MIN_FEATURE_UNITS = MIN_FEATURE_MM / MM_PER_UNIT; // slab-thickness / wall
 const MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;        // tube/bead radius floor (diameter = feature)
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
-   layout). Petal i sits at angle i*GOLDEN_ANGLE and radius spread*sqrt(i)
-   (Vogel's model — the sunflower packing). Below EVEN_MAX petals the spiral has
-   too few points to read as a spiral and collapses into a lopsided clump, so we
-   switch to an evenly-spaced rosette there (see generate()). */
+   layout). Petal i sits at angle i*divergence and radius spread*sqrt(i)
+   (Vogel's model — the sunflower packing). The COILED bloom's DIVERGENCE ANGLE
+   control picks the angle: GOLDEN (i*GOLDEN_ANGLE, the phyllotactic spiral),
+   EVEN (i*360/n on one ring, regular at any count), or CUSTOM (a set angle). */
 const GOLDEN_ANGLE   = Math.PI * (3 - Math.sqrt(5));  // ~137.5°, the divergence angle
 const SPREAD_LOOSE   = 0.52;   // radial spacing at MAX slider (open, gappy spiral — petals spread)
 const SPREAD_TIGHT   = 0.13;   // radial spacing at MIN slider (dense, packed spiral — petals touching)
@@ -119,9 +153,6 @@ const ELEV_FACTOR    = 0.85;   // centre rise/sink at full elevation, as a fract
                                // bloom radius — keeps the cone/bowl aspect natural at any tightness
 const RECEPTACLE_TILT = 0.55;  // how strongly petals lean along the cone/bowl slope (0..1)
 const CORE_SPREAD    = 0.14;   // stamen-cluster radius at the bloom's heart
-const EVEN_MAX       = 4;      // at/below this petal count, arrange petals as an even rosette
-                               // (equal angle + equal radius) instead of the phyllotactic
-                               // spiral, so 3 or 4 petals sit evenly spaced from each other
 const EVEN_RING      = 0.62;   // rosette ring radius as a fraction of the bloom radius
 // bilateral fan spacing is user-set (Petal spacing slider) and capped in generate()
 // so the fan never wraps past the back; max 3 petals per side.
@@ -133,6 +164,24 @@ const SLAB_FILLET    = 1.0;    // rounded-edge radius as a fraction of half-thic
 // normal. This ratio sets the lamina half-thickness as a fraction of the tube
 // radius — < 1 so the ribbon reads as a thin flat leaf vein, not a round rope.
 const LAMINA_HALF    = 0.5;
+
+// THICKNESS FIELD: petals are cantilevers, so material is best spent thick at the
+// base and thin at the tip and margin. `thickMul(u, v, P)` is a multiplier on every
+// solidify thickness; the accumulator still export-floors the result to 0.8mm, so a
+// knife edge bottoms out at the printable minimum rather than at zero. All three
+// terms default to 1 (uniform), so an untouched design is byte-identical.
+const THICK_TAPER_MIN = 0.35;   // tip thickness as a fraction of base, at thickTaper = 1
+const THICK_EDGE_MIN  = 0.16;   // edge thickness as a fraction of body, at thickEdge = 1 (pre-floor)
+const THICK_EDGE_BAND = 0.12;   // knife acts over the outer 12% of the half-width (the user's 5-10% zone)
+function thickMul(u, v, P) {
+  let t = clamp(P.thickScale != null ? P.thickScale : 1, 0.4, 2.5);              // (c) global
+  if (P.thickTaper) t *= lerp(1, THICK_TAPER_MIN, clamp(P.thickTaper, 0, 1) * smootherstep(clamp(u, 0, 1)));  // (a) base -> tip
+  if (P.thickEdge) {                                                             // (b) edge knife
+    const band = smootherstep(clamp((Math.abs(v) - (1 - THICK_EDGE_BAND)) / THICK_EDGE_BAND, 0, 1));
+    t *= lerp(1, THICK_EDGE_MIN, clamp(P.thickEdge, 0, 1) * band);
+  }
+  return t;
+}
 
 
 /* ===================================================================
@@ -187,6 +236,19 @@ class MeshAccumulator {
     if (y < this.min[1]) this.min[1] = y; if (y > this.max[1]) this.max[1] = y;
     if (z < this.min[2]) this.min[2] = z; if (z > this.max[2]) this.max[2] = z;
     return this.vcount++;
+  }
+
+  /* Merge a pre-built triangle mesh (flat position/normal/index arrays, world
+     coords) straight into the accumulator. Used by the SDF receptacle, which
+     polygonises its own field: the result is a closed solid that OVERLAPS the
+     petal feet and the stem, so the union is watertight without stitching. */
+  addMesh(positions, normals, indices) {
+    const base = this.vcount;
+    for (let v = 0; v < positions.length; v += 3) {
+      this._vertex(positions[v], positions[v + 1], positions[v + 2],
+                   normals[v], normals[v + 1], normals[v + 2]);
+    }
+    for (let t = 0; t < indices.length; t++) this.idx.push(base + indices[t]);
   }
 
   /* Extrude a round tube along a 3D polyline, using a rotation-minimizing
@@ -473,23 +535,31 @@ class MeshAccumulator {
     if (rows < 2) return;
     const cols = grid[0].length;
     if (cols < 2) return;
-    if (this.exportMode) {
-      thick = Math.max(this.floorF, thick);                             // export: floor blade thickness
-      if (thick < this.minThick) this.minThick = thick;                 // telemetry
-    }
-    const H = thick * 0.5;
+    // `thick` may be a scalar or a per-vertex function (i, j) -> thickness, so the
+    // THICKNESS FIELD can thin the blade to a knife edge across its width. Each
+    // vertex is floored independently in export, and the top/bottom seal pairs
+    // vertices one-to-one, so a varying (floored) thickness stays watertight. A
+    // scalar reproduces the original blade exactly.
+    const fn = typeof thick === 'function';
+    const Hs = new Array(rows * cols);
+    for (let i = 0; i < rows; i++)
+      for (let j = 0; j < cols; j++) {
+        let t = fn ? thick(i, j) : thick;
+        if (this.exportMode) { t = Math.max(this.floorF, t); if (t < this.minThick) this.minThick = t; }
+        Hs[i * cols + j] = t * 0.5;
+      }
 
     // Two vertex layers: top (offset +n) then bottom (offset -n).
     const tBase = this.vcount;
     for (let i = 0; i < rows; i++)
       for (let j = 0; j < cols; j++) {
-        const { p, n } = grid[i][j];
+        const { p, n } = grid[i][j]; const H = Hs[i * cols + j];
         this._vertex(p.x + n.x * H, p.y + n.y * H, p.z + n.z * H, n.x, n.y, n.z);
       }
     const bBase = this.vcount;
     for (let i = 0; i < rows; i++)
       for (let j = 0; j < cols; j++) {
-        const { p, n } = grid[i][j];
+        const { p, n } = grid[i][j]; const H = Hs[i * cols + j];
         this._vertex(p.x - n.x * H, p.y - n.y * H, p.z - n.z * H, -n.x, -n.y, -n.z);
       }
     const T = (i, j) => tBase + i * cols + j;
@@ -810,12 +880,26 @@ function resolveParams(ui) {
   return {
     W: ui.width,
     taper: ui.taper,
+    clawLength: ui.clawLength,                    // CLAW: basal stalk length (0 = no claw, exact no-op)
+    clawWidth: ui.clawWidth,                      // CLAW: stalk half-width as a fraction of blade width W
+    shoulder: ui.shoulder,                        // CLAW: shoulder sharpness (0 gentle -> 1 abrupt step)
+    cleftDepth: ui.cleftDepth,                    // LOBED: cleft depth as a fraction of blade length (0 = entire, no-op)
+    cleftLobes: ui.cleftLobes,                    // LOBED: lobe count 2..7 (n-1 clefts)
+    cleftWidth: ui.cleftWidth,                    // LOBED: cleft slot width
     tip: ui.tip,                                 // TIP SHAPE: sharpness of every tip (apex + teeth)
     bloom: ui.bloom * DEG,
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
     edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
     edgeProfile: ui.edgeProfile,                 // out-of-plane edge lift, parallel to the centre curve
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
+    reliefAmp: ui.reliefAmp,                      // SURFACE RELIEF amplitude (0 = smooth, exact no-op)
+    reliefFreq: ui.reliefFreq,                    // RELIEF rib count: broad pleats -> fine crepe
+    reliefMode: ui.reliefMode,                    // RELIEF pattern: radial (T-aligned) | transverse | irregular
+    petalTwist: ui.petalTwist,                    // TWIST: cross-section rotation about the midrib (chirality)
+    petalSkew: ui.petalSkew,                      // SKEW: lateral midrib bend
+    thickTaper: ui.thickTaper,                    // THICKNESS (a): base-to-tip gradient (0 = uniform)
+    thickEdge: ui.thickEdge,                      // THICKNESS (b): edge thinning toward a knife edge (0 = off)
+    thickScale: ui.thickScale,                    // THICKNESS (c): global thickness multiplier (1 = current)
     tipStyle: ui.tipStyle,                       // petal-edge tip style (clean/jagged/…)
     tipRegion: ui.tipRegion,                     // how far teeth reach from the apex down
     tipLength: ui.tipLength,                     // how far all tips extend outward
@@ -824,6 +908,28 @@ function resolveParams(ui) {
     edgeNoise: ui.edgeNoise,                      // organic non-periodic edge crinkle (any tip style)
     edgeNoiseScale: ui.edgeNoiseScale,           // crinkle frequency: broad -> dense
     infillType: ui.infillType,                   // 'veins' (leaf venation), 'voronoi', or 'strands'
+    // CONTINUOUS MARGIN: the petal edge becomes two tapered strands rooted at the foot
+    // (a tree, not a hoop) and the receptacle ribs continue them. OFF = the closed-loop
+    // rim + foot-anchored ribs + capped node (today's geometry, unchanged).
+    continuousMargin: ui.continuousMargin === 'on',
+    bundleTightness: ui.bundleTightness,         // how close the foot strands stay near the axis
+    flareRate: ui.flareRate,                     // how fast they open onto the outline
+    edgeTermination: ui.edgeTermination,         // how infill meets the margin: fade | meet | loop (veins/bone)
+    captureDist: ui.captureDist,                 // tip capture distance as a fraction of blade width
+    voronoiLloyd: ui.voronoiLloyd,               // VORONOI constrained-Lloyd iterations (0 = legacy single pass)
+    voronoiAniso: ui.voronoiAniso,               // VORONOI cell elongation along the petal's long axis (1 = isotropic)
+    voronoiDensityLaw: ui.voronoiDensityLaw,     // VORONOI cell-size scaling to local blade width (0 = uniform)
+    voronoiWeight: ui.voronoiWeight,             // VORONOI wall weight hierarchy mix (0 = uniform)
+    voronoiWeightFalloff: ui.voronoiWeightFalloff, // VORONOI base->tip wall weight exponent k
+    voronoiSlabTaper: ui.voronoiSlabTaper,       // VORONOI slab depth taper base->tip (0 = constant)
+    spaceMode: ui.spaceMode,                     // SPACE COLONIZATION: open (tree) | closed (loops/areoles)
+    spaceSourceCount: Math.round(lerp(120, 1400, clamp(ui.spaceDensity, 0, 1))),  // SOURCE DENSITY -> attraction sources
+    spaceBirth: ui.spaceBirth,                   // min spacing between sources (world units)
+    spaceKill: ui.spaceKill,                     // how close a vein must get to consume a source
+    spaceStep: ui.spaceStep,                     // growth step per iteration
+    spacePattern: ui.spacePattern,               // random | lattice | phyllotactic
+    spaceSeed: ui.spaceSeed,                      // stored integer seed (re-rollable; keeps saves deterministic)
+    spaceVariants: ui.spaceVariants,             // distinct networks cycled across the whorl (1..6)
     density: ui.density,                          // raw density: vein depth OR voronoi cell count
     strandCount: ui.strandCount,                 // STRANDS: number of radial strands across the width
     strandWidth: ui.strandWidth,                 // STRANDS: tube thickness as a fraction of the gap
@@ -886,9 +992,44 @@ function resolveParams(ui) {
    tube — thick midrib down to hair-fine veinlets. `seed` seeds this petal's
    PRNG (the venation gets one stream, the edge tips an independent one so
    changing density doesn't reshuffle the tips). */
+/* CONTINUOUS MARGIN — the two marginal strands, in flattened (x,y) petal space.
+   Each is rooted at the FOOT node (u=0, y=0) and runs up one side of the blade to the
+   tip (u=1, y=0, where the two fuse). Near the foot it hugs the axis (a tight bundle
+   shared with the midrib), then flares out onto the real outline y = ±halfWidth(u):
+   BUNDLE TIGHTNESS sets how long it stays on the axis, FLARE RATE how fast it opens —
+   a tulip-underside neck that flares, not a hoop bolted on. The render layer lofts each
+   as a tapered ROUND strand so it is continuous with the receptacle rib it becomes. */
+function marginStrands(P, bundleTight, flareRate) {
+  const bt = clamp(bundleTight != null ? bundleTight : 0.5, 0, 1);
+  const fr = clamp(flareRate != null ? flareRate : 0.5, 0, 1);
+  const nMar = 30;
+  const flareStart = lerp(0.02, 0.20, bt);                     // stays on-axis longer when tight
+  const flareEnd   = Math.min(0.96, flareStart + lerp(0.55, 0.12, fr)); // reaches the outline sooner when fast
+  const ss = (x) => { const t = clamp((x - flareStart) / ((flareEnd - flareStart) || 1e-6), 0, 1); return t * t * (3 - 2 * t); };
+  const strands = [];
+  for (const side of [1, -1]) {
+    const points = [];
+    for (let i = 0; i <= nMar; i++) {
+      const u = i / nMar;
+      points.push({ x: P.L * u, y: side * petalHalfWidth(u, P) * ss(u) });
+    }
+    strands.push({ points, side });
+  }
+  return strands;
+}
+
 function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const rng = mulberry32(seed);
   const spine = buildSpine(P);
+  // Global thickness multiplier for the ROUND primitives (rim, beads, tooth veins),
+  // which have no sheet face to gradient or knife — only the overall scale (c) applies.
+  // The flat-sheet primitives (blade, slabs, vein ribbons) use the full thickMul(u,v).
+  const gThick = clamp(P.thickScale != null ? P.thickScale : 1, 0.4, 2.5);
+  // DEV field overlay: record this petal's shape + placement so the debug pass can
+  // sample getPetalFields(P) and draw s/d/T on it. Live build only; never in export.
+  if (DEBUG_FIELDS && !acc.exportMode && !P.solidBlade) {
+    debugPetals.push({ P, spine, az, baseHeight, radialOffset, tilt });
+  }
   const outline = buildSilhouette(P, P.outlineSteps || 56);   // leaves use a lighter margin
   // INFILL: leaf venation (default) or a bilaterally-symmetric Voronoi mesh.
   // Both return { veins, nodes } in flattened space, rendered identically below.
@@ -897,7 +1038,12 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // matters at 100+ fill petals.
   const ven = P.solidBlade ? null
     : P.infillType === 'voronoi'
-    ? buildVoronoi(P, rng, { density: P.density, softness: P.softness })
+    ? buildVoronoi(P, rng, {
+        density: P.density, softness: P.softness, lloyd: P.voronoiLloyd,
+        anisotropy: P.voronoiAniso, cellDensityLaw: P.voronoiDensityLaw,
+        weightHierarchy: P.voronoiWeight, weightFalloff: P.voronoiWeightFalloff,
+        slabTaper: P.voronoiSlabTaper, minCellSize: 3 * P.tubeRadius * SLAB_THICK,
+      })
     : P.infillType === 'strands'
     ? buildStrands(P, {
         count: P.strandCount, width: P.strandWidth,
@@ -911,10 +1057,44 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       })
     : P.infillType === 'lace'
     ? buildLace(P, rng, { density: P.density, swirl: P.laceSwirl })
+    : P.infillType === 'spacecol'
+    ? getSpaceColonization(P, spaceColSeed(P, seed), {
+        mode: P.spaceMode,
+        // live path stays interactive with a coarse-but-complete network; the
+        // export path (acc.exportMode) runs the full source count. Distinct memo keys.
+        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, SPACECOL_LIVE_CAP),
+        birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep,
+        seedPattern: P.spacePattern,
+      })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
         maxDepth: P.maxDepth, softness: P.softness, branchStart: P.branchStart,
+        continuousMargin: P.continuousMargin,   // roots the midrib at the foot (u=0)
       });
+
+  // LOBED / CLEFT: the tube infills (veins/bone/spacecol/strands) are generated in
+  // the full single-valued envelope, so clip them to the material mask — no strut
+  // crosses a cleft, and each cut end sits on the cleft edge ready for termination.
+  // Voronoi slabs already clip to the lobed silhouette, so they are left untouched.
+  const cleft = cleftConfig(P);
+  if (cleft && ven && ven.veins && P.infillType !== 'voronoi') {
+    ven.veins = clipVeinsToMask(ven.veins, P, cleft);
+    if (ven.nodes) ven.nodes = ven.nodes.filter((nd) => petalMask(nd.x, nd.y, P, cleft) > 0);
+  }
+
+  // EDGE TERMINATION: close the tube-infill tree onto the margin so it stops being
+  // a tree hanging off a decorative hoop. MEET runs free tips to the margin rib;
+  // LOOP fuses neighbouring tips into arcades. Applies to the tube infills whose
+  // branches have free tips (veins, bone); the resulting struts are appended as
+  // ordinary veins so they thicken (and stay watertight) through the same path.
+  // v1 captures onto the SMOOTH outline (buildSilhouette), not the serrated/ruffled
+  // rim. Off for FADE and for slab/blade infills.
+  if (ven && ven.veins && (P.infillType === 'veins' || P.infillType === 'bone' || P.infillType === 'spacecol')
+      && P.edgeTermination && P.edgeTermination !== 'fade') {
+    const term = terminateEdges(ven.veins, buildSilhouette(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist);
+    for (const v of term.veins) ven.veins.push(v);
+    for (const nd of term.nodes) ven.nodes.push(nd);
+  }
 
   const place = (localPt) => placePoint(localPt, az, baseHeight, radialOffset, tilt);
   const toWorld = (pt) => place(mapPointToSurface(pt, P, spine));
@@ -940,11 +1120,20 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       p: place(mapPointToSurface(pt, P, spine)),
       n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
     })));
-    acc.addBladeSolid(grid, P.tubeRadius * SLAB_THICK);   // same thickness rule as the Voronoi sheet
+    // THICKNESS FIELD: per-vertex thickness across the blade — a true continuous
+    // knife edge (thin margin) + base->tip gradient. Grid indices give (u, v)
+    // directly (buildBlade lays rows base->tip, cols margin->margin).
+    const bRows = grid.length, bCols = grid[0].length;
+    const bladeThick = (i, j) =>
+      P.tubeRadius * SLAB_THICK * thickMul(i / (bRows - 1), -1 + (2 * j) / (bCols - 1), P);
+    acc.addBladeSolid(grid, bladeThick);   // same base thickness as the Voronoi sheet
     if (!P.bladeNoRim) {
-      const rim = outline.map(toWorld);
+      // Solid blades keep the single-valued grid (clefts here need the masked
+      // triangulation, a clean follow-up on the SAME mask/contour machinery), so
+      // the rim must trace the un-clefted outline to stay flush with the blade.
+      const rim = (cleftConfig(P) ? buildSilhouette({ ...P, cleftDepth: 0 }, P.outlineSteps || 56) : outline).map(toWorld);
       rim.push(rim[0]);                              // close the loop at the base
-      acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0, P.rimSegments || RADIAL_SEGMENTS);
+      acc.addTube(rim, P.tubeRadius * RIM_WIDTH * gThick, 0, P.rimSegments || RADIAL_SEGMENTS);
     }
     return;
   }
@@ -956,13 +1145,39 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const tipRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
   const jag = buildJaggedEdge(P, spine, tipRng) || buildRuffledEdge(P, spine, tipRng) || buildScallopEdge(P, spine);
 
+  // CONTINUOUS MARGIN: the edge is TWO tapered round strands rooted at the foot node,
+  // not a closed hoop (see marginStrands). Each is lofted as a tube whose radius tapers
+  // foot -> tip on the margin grammar, so it reads as a real vein continuous with the
+  // receptacle rib it becomes. Their foot roots (world position + up-tangent + radius)
+  // are returned so the receptacle can continue them downward. A small bead welds the
+  // foot bundle (both strands + the foot-rooted midrib) into one node.
+  let strandRoots = null;
+  const contMargin = !!P.continuousMargin && !P.solidBlade;
+  if (contMargin) {
+    strandRoots = [];
+    const r0 = P.tubeRadius * MARGIN_W_BASE * gThick, r1 = P.tubeRadius * MARGIN_W_TIP * gThick;
+    for (const s of marginStrands(P, P.bundleTightness, P.flareRate)) {
+      const wp = s.points.map(toWorld);
+      acc.addTube(wp, [r0, r1], 0, P.rimSegments || RADIAL_SEGMENTS);
+      const a = wp[0], b = wp[1];
+      strandRoots.push({ pos: a, tan: { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, r: r0, side: s.side });
+    }
+    // The midrib is a merge-tree LEAF too (its foot weight is what makes the area-preserving
+    // trunk land near the stem radius). It is rendered as a ribbon up the blade; here we only
+    // hand its foot root (position + up-tangent along the midline + radius) to the receptacle.
+    const m0 = toWorld({ x: 0, y: 0 }), m1 = toWorld({ x: P.L * 0.04, y: 0 });
+    strandRoots.push({ pos: m0, tan: { x: m1.x - m0.x, y: m1.y - m0.y, z: m1.z - m0.z }, r: P.tubeRadius * MIDRIB_W_BASE * gThick, side: 0, midrib: true });
+    acc.addBead(toWorld({ x: 0, y: 0 }), P.tubeRadius * MARGIN_W_BASE * 1.2 * gThick, NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+  }
+
   // Rim: one continuous closed tube along the (possibly jagged) petal margin.
   // BONE can opt out of the outline entirely, leaving just the bare rib skeleton.
-  const drawRim = !(P.infillType === 'bone' && P.boneOutline === false);
+  // CONTINUOUS MARGIN replaces this hoop with the two rooted strands above.
+  const drawRim = !(P.infillType === 'bone' && P.boneOutline === false) && !contMargin;
   if (drawRim) {
     const rim = jag ? jag.rim.map(place) : outline.map(toWorld);
     rim.push(rim[0]);                            // close the loop at the petal base
-    acc.addTube(rim, P.tubeRadius * RIM_WIDTH, 0); // continuous — no join to flare
+    acc.addTube(rim, P.tubeRadius * RIM_WIDTH * gThick, 0); // continuous — no join to flare
   }
 
   // Veins: each is a flattened-space polyline with relative end line-weights.
@@ -988,20 +1203,26 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     const halfWidth = vein.rad
       ? (t) => P.tubeRadius * vein.rad(t)
       : [P.tubeRadius * vein.w0, P.tubeRadius * vein.w1];
-    acc.addRibbon(stations, halfWidth, lamHalf);
+    // THICKNESS FIELD (out-of-plane): one multiplier per ribbon from its midpoint
+    // (u, v) — mainly the base->tip gradient; the edge knife barely shows on a vein
+    // ribbon (it already rides near the print floor). Global scale included.
+    const mid = pts[pts.length >> 1];
+    const mu = clamp(mid.x / P.L, 0, 1);
+    const mv = clamp(mid.y / Math.max(petalHalfWidth(mu, P), 1e-4), -1, 1);
+    acc.addRibbon(stations, halfWidth, lamHalf * thickMul(mu, mv, P));
   }
   // A fine mid-vein reaching from inside the petal into each jagged tooth, so
   // the veins extend into the jagged edge along with the outline (skipped when
   // the outline is turned off).
   if (jag && drawRim) {
     for (const v of jag.teethVeins) {
-      acc.addTube(v.map(place), [P.tubeRadius * 0.30, P.tubeRadius * 0.10], 0, 6);
+      acc.addTube(v.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
     }
   }
   // Welded caps seal the open tube ends (free vein tips, and the T-junctions
   // where a secondary meets the midrib) so nothing reads as a hollow ring.
   for (const node of ven.nodes) {
-    acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15, 4, 7);
+    acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15 * gThick, 4, 7);
   }
 
   // VORONOI infill is a solid perforated SHEET, not tubes: each cell is a sealed
@@ -1012,9 +1233,23 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   if (ven.slabs) {
     const thick = P.tubeRadius * SLAB_THICK;
     for (const slab of ven.slabs) {
-      acc.addSlab(slab.outer.map(station), slab.inner.map(station), thick);
+      // per-cell SLAB TAPER (out-of-plane): thicker at the base, thinner at the tip.
+      // THICKNESS FIELD: one multiplier per cell from its centroid (u, v) — the
+      // base->tip gradient plus a stepped knife (edge cells thinner). Many cells
+      // span the width, so the steps approximate the continuous across-width thinning.
+      let cx = 0, cy = 0;
+      for (const q of slab.outer) { cx += q.x; cy += q.y; }
+      cx /= slab.outer.length; cy /= slab.outer.length;
+      const cu = clamp(cx / P.L, 0, 1);
+      const cv = clamp(cy / Math.max(petalHalfWidth(cu, P), 1e-4), -1, 1);
+      acc.addSlab(slab.outer.map(station), slab.inner.map(station),
+        thick * (slab.thickMul || 1) * thickMul(cu, cv, P));
     }
   }
+  // Hand the receptacle the petal's foot strand roots so its ribs can CONTINUE them
+  // (position + up-tangent + radius) instead of anchoring beside the foot. null unless
+  // continuous margin is on.
+  return { strandRoots };
 }
 
 /* The flower's central part — a cluster of filaments, each a slender tube tipped
@@ -1063,7 +1298,11 @@ function buildCoreInto(acc, P, centerHeight, rng) {
     const pts = [];
     for (let k = 0; k <= steps; k++) {
       const t = k / steps;
-      const rad = rr + lean * t;
+      // CONTINUOUS MARGIN: every filament leaves the axis NODE (radius 0 at the base) and
+      // splays out as it rises — one bundle emerging from the converged junction, not a
+      // ring of stalks planted on a disc. The node bead welds the bundle to the receptacle.
+      const rr_t = P.continuousMargin ? rr * (t * t * (3 - 2 * t)) : rr;
+      const rad = rr_t + lean * t;
       const yy = h * Math.sin((t * Math.PI) / 2);
       pts.push({ x: rad * Math.cos(a), y: centerHeight + yy, z: rad * Math.sin(a) });
     }
@@ -1385,6 +1624,10 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
       receptacle: true, stem: false,               // the offshoot branch is the bud's stem
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
+      profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
+      reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,
+      spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
+      bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       neckR: budP.tubeRadius * 4.0,                // no-stem neck, matching the main no-stem trunk
     });
   }
@@ -1567,7 +1810,11 @@ function petalBaseFootprint(Pp, az, baseHeight, radialOffset, tilt) {
     const x = Pp.L * (FOOT_U_MAX * (s / FOOT_U_STEPS));
     for (const yy of [1e6, -1e6]) {                        // +margin then -margin (v clamps to ±1)
       const w = placePoint(mapPointToSurface({ x, y: yy }, Pp, spine), az, baseHeight, radialOffset, tilt);
-      foot.push({ az: Math.atan2(w.z, w.x), r: Math.hypot(w.x, w.z) });
+      // Keep the world HEIGHT too (w.y): the receptacle is a junction, so a foot's
+      // vertical position is load-bearing — outer/inner whorls attach at different
+      // heights and the ribs should start where the foot actually is, not on one
+      // collapsed ring. (`y` is ignored by the byte-identical solid path.)
+      foot.push({ az: Math.atan2(w.z, w.x), r: Math.hypot(w.x, w.z), y: w.y });
     }
   }
   return foot;
@@ -1619,10 +1866,15 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
   // each petal/sepal base) whenever there is a receptacle — matching the old rib
   // count so bump fidelity is preserved; a plain round tube otherwise.
   const blend = clamp(opts.blend, 0, 1);
+  // The TOP attachment ring is driven by the outer whorl (layer 0) + sepals — the feet
+  // that actually meet the receptacle rim. Inner-whorl feet (captured for REACH) are
+  // excluded here so the ring, its angular resolution, and every solid profile stay
+  // byte-identical to before the multi-layer capture.
+  const rimFeet = attachments.filter((a) => a.layer == null || a.layer === 0);
   // Angular resolution: enough sectors to resolve each petal's outline as a
   // distinct flute (more per flute at low blend, where the flutes are sharpest).
   const M = wantRecept
-    ? clamp(Math.round(attachments.length * lerp(11, 7, blend)), 40, 120)
+    ? clamp(Math.round(rimFeet.length * lerp(11, 7, blend)), 40, 120)
     : Math.max(3, RADIAL_SEGMENTS * 2);
   const cosH = new Array(M), sinH = new Array(M);
   for (let j = 0; j < M; j++) { const th = (j / M) * Math.PI * 2; cosH[j] = Math.cos(th); sinH[j] = Math.sin(th); }
@@ -1645,7 +1897,7 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
     // world-polar { az, r } points of its REAL edge (a.foot); a sepal is one point.
     // These drive the top-ring radius directly, so the flutes are the petal edges.
     const samples = [];
-    for (const a of attachments) { const pts = a.foot || [a]; for (const s of pts) samples.push(s); }
+    for (const a of rimFeet) { const pts = a.foot || [a]; for (const s of pts) samples.push(s); }
     let maxR = ringR, rSum = 0;
     for (const s of samples) { if (s.r > maxR) maxR = s.r; rSum += s.r; }
     const rMean = samples.length ? rSum / samples.length : ringR;
@@ -1677,22 +1929,202 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
     const fluteDev = new Array(M);
     for (let j = 0; j < M; j++) fluteDev[j] = sTopR[j] - meanTopR;
     const fluteCurve = lerp(0.4, 0.9, tight);                  // < curve, so the flutes persist further down
-    const STEPS = 14;                                          // axial resolution of the receptacle
-    for (let k = 0; k <= STEPS; k++) {
-      const t = k / STEPS;
-      const circ  = lerp(stemR, meanTopR, Math.pow(1 - t, curve));  // circular taper: meanTopR -> stemR at the neck
-      const fFade = Math.pow(1 - t, fluteCurve);                    // slower azimuthal fade -> flutes run down
-      const ring = new Array(M);
-      for (let j = 0; j < M; j++) {
-        const rad = floorRad(Math.max(stemR, circ + fluteDev[j] * fFade));
-        const y = lerp(sTopY[j], cy - depthW, t);
-        ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
+    // ---- RECEPTACLE SURFACE TREATMENT ----
+    // The attachment (top ring, above) and the stem zone (below) are shared by every
+    // type; only the body between them changes here. BLENDED is the original
+    // (persistent flutes -> "petal material continues downward"); the other three fade
+    // the flutes within the first fraction of the descent, so only the very top ring
+    // meets the petals (no gaps) and the body below is clean.
+    // ===== RECEPTACLE AS A JUNCTION — three orthogonal axes =====
+    // PROFILE (silhouette radius law bodyR) x CONSTRUCTION (how it is realised) x COLLAR
+    // (the band at flower->stem), plus REACH (how far up the structure runs, using the inner
+    // whorls' higher feet) and SOLIDITY (how open RIBBED/GATHERED are). Legacy modes map to
+    // combos: FLARE+SOLID = blended, DOME+SOLID = bulb, CONE+GATHERED = soft, CONE+RIBBED =
+    // ironwork. FLARE/DOME + SOLID are byte-identical; the open forms change (foot-driven +
+    // the load column the cross-section invariant now demands).
+    const profile    = opts.profile || 'flare';
+    const collar     = opts.collar || 'none';
+    const reach      = clamp(opts.reach != null ? opts.reach : 0, 0, 1);
+    const solidity   = clamp(opts.solidity != null ? opts.solidity : 1, 0, 1);
+    const ribMult    = clamp(opts.ribMult != null ? opts.ribMult : 1, 0.5, 3);
+    const bulbSize   = clamp(opts.bulbSize != null ? opts.bulbSize : 0.5, 0, 1);
+    const bulbHeight = clamp(opts.bulbHeight != null ? opts.bulbHeight : 0.5, 0, 1);
+    let construction = opts.construction || 'solid';
+    if (profile === 'gentle' && construction !== 'solid') construction = 'solid';   // GENTLE is always solid (C1 seam)
+
+    const zoneDepth = profile === 'dome'   ? depthW * lerp(0.7, 1.7, bulbHeight)
+                    : profile === 'gentle' ? depthW * lerp(0.30, 0.62, blend)       // SHORT swell (tulip), not a trumpet
+                    : depthW;
+    const bodyCurve = profile === 'flare' ? curve : lerp(2.2, 0.6, blend);
+    const bulbR     = stemR * lerp(1.8, 3.8, bulbSize);
+    const urnR      = Math.max(meanTopR, stemR * 2.2) * lerp(1.02, 1.4, blend);
+    const gentleBelly = stemR * 0.30;   // subtle outward belly; sin^2 keeps zero slope at both ends (C1 seam)
+    // PROFILE radius law. t: 0 top(attach ring) -> 1 neck(stem). FLARE == the old blended
+    // circ; CONE == the old soft/ironwork taper.
+    const bodyR = (t) => {
+      switch (profile) {
+        case 'dome': {
+          if (t < 0.22) return lerp(meanTopR, stemR, smootherstep(t / 0.22));
+          return stemR + (bulbR - stemR) * Math.sin(Math.PI * ((t - 0.22) / 0.78));
+        }
+        case 'urn':
+          return t < 0.35 ? lerp(meanTopR, urnR, smootherstep(t / 0.35))
+                          : lerp(urnR, stemR, smootherstep((t - 0.35) / 0.65));
+        case 'gentle':
+          // Still reaches the feet at the top (meanTopR) so the bloom stays joined — a
+          // receptacle is a junction, not a bead — then a smootherstep taper (zero slope
+          // at the neck -> C1 into the stem) with a subtle sin^2 belly that also has zero
+          // slope at both ends, so the C1 seam is preserved. A short solid tulip swell.
+          return lerp(meanTopR, stemR, smootherstep(t)) + gentleBelly * Math.pow(Math.sin(Math.PI * t), 2);
+        case 'cone':
+          return lerp(stemR, meanTopR, Math.pow(1 - t, bodyCurve));
+        default: // flare
+          return lerp(stemR, meanTopR, Math.pow(1 - t, curve));
       }
-      rings.push(ring);
+    };
+
+    depth = zoneDepth;
+    const neckPt = { x: cx, y: cy - zoneDepth, z: cz };
+    const coreR  = stemR * 1.02;   // load-column radius: its cross-section alone >= the stem's
+
+    // Feet the STRUCTURE joins. REACH = 0 uses the rim (layer 0 + sepals) only, so the
+    // legacy forms are unchanged; REACH > 0 pulls the inner whorls' higher feet in, so their
+    // ribs start higher and nest as they converge.
+    const structFeet = reach > 1e-3 ? attachments : rimFeet;
+    const footPoint = (a) => {
+      const pts = a.foot || [a];
+      let c = 0, s = 0, r = 0, yy = 0, ny = 0;
+      for (const p of pts) { c += Math.cos(p.az); s += Math.sin(p.az); r += p.r; if (p.y != null) { yy += p.y; ny++; } }
+      const n = pts.length || 1;
+      return { az: Math.atan2(s, c), r: Math.min(r / n, maxR), y: ny ? yy / ny : (a.height != null ? a.height : cy + overlap) };
+    };
+
+    // RIBBED: foot-driven helical ribs — count + phase LOCKED to the feet x RIB MULTIPLIER,
+    // each wrapping from its foot (its height) down onto the stem. SOLIDITY = stand-off gap
+    // from the core (openness). A 4-petal and a 15-petal bloom make visibly different ribs.
+    const emitRibs = (feet) => {
+      const base = feet.map(footPoint);
+      const nF = Math.max(1, base.length);
+      const total = clamp(Math.round(nF * ribMult), 1, 64);
+      const turns = lerp(0.4, 3, clamp(opts.spiralTightness != null ? opts.spiralTightness : 0.12, 0, 1));
+      const spR   = floorRad(P.tubeRadius * lerp(0.9, 2.4, clamp(opts.spiralThickness != null ? opts.spiralThickness : 0.5, 0, 1)));
+      const gap   = lerp(stemR * 0.15, stemR * 1.5, 1 - solidity);
+      const segs  = Math.max(28, Math.round(turns * 30));
+      for (let i = 0; i < total; i++) {
+        const f = base[Math.floor(i * nF / total) % nF];
+        const dup = Math.floor(i / nF);
+        const phase = f.az + dup * (Math.PI * 2 / total);
+        const pts = new Array(segs + 1);
+        for (let q = 0; q <= segs; q++) {
+          const t = q / segs;
+          const ang = phase + t * turns * Math.PI * 2;
+          const r = lerp(Math.min(f.r, maxR) + gap, stemR * 0.72, smootherstep(t));   // converge onto the stem
+          const y = lerp(f.y, cy - zoneDepth, t);
+          pts[q] = { x: cx + r * Math.cos(ang), y, z: cz + r * Math.sin(ang) };
+        }
+        acc.addTube(pts, spR, 0, RECEPT_TUBE_SEGS);
+      }
+    };
+    // CONTINUOUS MARGIN — MERGE TREE. The petal foot traces (midrib + two marginals per
+    // petal, plus a connector per sepal) are the LEAVES. They do NOT collapse at a point:
+    // they merge PAIRWISE, nearest-neighbour first, over a vertical span, each merge a
+    // Y-junction (fan-in 2) with tangent continuity and an AREA-PRESERVING radius
+    // r_parent = sqrt(r_a^2 + r_b^2) — so the trunk is only ever as thick as the sum of what
+    // feeds it and thickens gradually, never a fat tube appearing at full size. Because the
+    // midrib is a leaf, the leaf areas sum to ~the stem's, so the root lands at the stem
+    // radius on its own. The final root joins the stem node. Every join is welded by a bead
+    // sized to the parent (which buries the tube caps -> no exposed flat face, no >2 fan-in).
+    const V = {
+      sub: (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }),
+      add: (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }),
+      scale: (a, s) => ({ x: a.x * s, y: a.y * s, z: a.z * s }),
+      len: (a) => Math.hypot(a.x, a.y, a.z),
+      norm: (a) => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; },
+    };
+    // COLLAR: the band at flower->stem. BAND = one raised ring; FERRULE = a short stepped
+    // sleeve. Both overlap the neck so they union into the one solid.
+    const emitCollar = () => {
+      if (collar === 'none') return;
+      const ringAt = (rr, yy, tr) => {
+        const seg = 26, ring = new Array(seg + 1);
+        for (let q = 0; q <= seg; q++) { const a = (q / seg) * Math.PI * 2; ring[q] = { x: cx + rr * Math.cos(a), y: yy, z: cz + rr * Math.sin(a) }; }
+        acc.addTube(ring, floorRad(tr), 0, RECEPT_TUBE_SEGS);
+      };
+      if (collar === 'band') ringAt(stemR * 1.22, neckPt.y + zoneDepth * 0.06, stemR * 0.34);
+      else for (let k = 0; k < 3; k++) ringAt(stemR * (1.12 + k * 0.13), neckPt.y + zoneDepth * (0.03 + k * 0.05), stemR * 0.26);   // ferrule
+    };
+
+    if (opts.continuousMargin) {
+      // ===== SDF RECEPTACLE — the lower flower as ONE implicit surface. =====
+      // The petal strand feet (midrib + two margins per petal; a connector per sepal)
+      // are the LEAVES of a GATHER tree: they run INWARD, merging pairwise as they
+      // converge into a compact button below the bloom centre (GATHER RADIUS/HEIGHT),
+      // and only THEN does a single trunk descend into the stem neck — the way a real
+      // daisy/anemone gathers, not the wide splay of feet-descend-straight-down. A
+      // smooth union (ABSORPTION = blend radius) fields the skeleton; a narrow-band
+      // surface-nets mesher (SDF-gradient normals + floor-aware constrained Laplacian)
+      // polygonises it into a closed solid that OVERLAPS the petal feet (up-stubs) and
+      // the stem (neck stub). The slicer unions the overlap, so it is watertight with
+      // no lathe and no stitching. PROFILE is a radius multiplier along the height;
+      // COLLAR a radius bump at the neck. (See flower-sdf.js.)
+      const sdfFeet = [];
+      for (const a of structFeet) {
+        if (a.strandRoots && a.strandRoots.length) {
+          for (const rt of a.strandRoots) { const t = V.norm(rt.tan);
+            sdfFeet.push({ p: [rt.pos.x, rt.pos.y, rt.pos.z], r: rt.r, up: [t.x, t.y, t.z] }); }
+        } else {   // sepal / rootless foot: one connector leaf, stubbed up-and-out into the sepal
+          const fp = footPoint(a), c = Math.cos(fp.az), s = Math.sin(fp.az), u = V.norm({ x: c, y: 0.9, z: s });
+          sdfFeet.push({ p: [cx + fp.r * c, fp.y, cz + fp.r * s], r: P.tubeRadius * 0.6, up: [u.x, u.y, u.z] });
+        }
+      }
+      if (sdfFeet.length) {
+        const field = buildReceptacleField(
+          sdfFeet, { p: [neckPt.x, neckPt.y, neckPt.z], r: stemR },
+          { cx, cz, tubeRadius: P.tubeRadius,
+            absorption: opts.absorption, gatherHeight: opts.gatherHeight, gatherRadius: opts.gatherRadius,
+            buttonSize: opts.buttonSize, mergeStart: opts.mergeStart, mergeRate: opts.mergeRate,
+            // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
+            // so the preview reads as the same solid mass it prints as (export floors anyway).
+            profile, collar, exportMode, floorR: acc.floorR,
+            cell: exportMode ? (opts.sdfCell || 0.011) : (opts.sdfCellLive || 0.02),
+            smoothIters: exportMode ? 2 : 0 });
+        acc.addMesh(field.positions, field.normals, field.indices);
+        if (exportMode && acc.floorR < acc.minRadius) acc.minRadius = acc.floorR;   // keep min-feature telemetry honest
+        RECEPT_FIELD_STATS = field.stats;
+      }
+      // The receptacle is its own closed shell; the stem lathe below caps its own top
+      // (buried inside the field), so no receptacle rings are pushed here.
+      topCap = { x: cx, y: cy - zoneDepth, z: cz };
+      botCap = { x: cx, y: cy - zoneDepth, z: cz };
+    } else if (construction === 'solid') {
+      // ----- SOLID revolved body (FLARE keeps its flutes -> blended; others fade fast). -----
+      const STEPS = (profile === 'dome' || profile === 'urn') ? 20 : 14;
+      for (let k = 0; k <= STEPS; k++) {
+        const t = k / STEPS;
+        const fFade = profile === 'flare' ? Math.pow(1 - t, fluteCurve) : Math.pow(1 - t, 4.0);
+        const base = bodyR(t);
+        const ring = new Array(M);
+        for (let j = 0; j < M; j++) {
+          const rad = floorRad(Math.max(stemR, base + fluteDev[j] * fFade));
+          const y = lerp(sTopY[j], cy - zoneDepth, t);
+          ring[j] = { x: cx + rad * cosH[j], y, z: cz + rad * sinH[j] };
+        }
+        rings.push(ring);
+      }
+      topCap = { x: cx, y: cy + overlap, z: cz };
+      botCap = { x: cx, y: cy - zoneDepth, z: cz };
+    } else {
+      // ----- OPEN / CORED junction (legacy, non-continuous). Helical ribs over a load
+      // column; GATHERED is retired (wrong cardinality) so it renders like RIBBED;
+      // CORED keeps the wider visible column. -----
+      const colTop = { x: cx, y: cy + overlap, z: cz };
+      const thisCoreR = construction === 'cored' ? stemR * 1.35 : coreR;
+      acc.addTube([colTop, neckPt], floorRad(thisCoreR), 0, Math.max(12, RECEPT_TUBE_SEGS));
+      emitRibs(structFeet);
+      acc.addBead(neckPt, floorRad(Math.max(stemR * 0.85, thisCoreR)), NODE_BEAD_RINGS, NODE_BEAD_SECTORS);
+      topCap = { x: cx, y: cy - zoneDepth, z: cz };
     }
-    depth = depthW;
-    topCap = { x: cx, y: cy + overlap, z: cz };                // apex level with the relief peaks (buried under the bloom)
-    botCap = { x: cx, y: cy - depthW, z: cz };                 // neck centre (used only if no stem continues)
+    if (!opts.continuousMargin) emitCollar();
   }
 
   // ---------- STEM ZONE ----------
@@ -1861,6 +2293,67 @@ function swapGeometry(mesh, acc) {
   mesh.geometry = acc.toGeometry() || new THREE.BufferGeometry();
 }
 
+/* DEV field-debug overlay (only built when ?fields=... is set). Renders the s / d
+   / T fields as a coloured point cloud (s or d) and short vector segments (T) over
+   every petal, mapped through the same surface + placement the render uses. Scene-
+   only — never written into the export accumulators, so STL output is unaffected. */
+const fieldDebugGroup = new THREE.Group();
+scene.add(fieldDebugGroup);
+function fieldRamp(t) {   // 0..1 -> dark-blue -> cyan -> yellow -> red
+  t = Math.max(0, Math.min(1, t));
+  const r = Math.min(1, Math.max(0, 1.5 * t - 0.4));
+  const g = Math.max(0, Math.min(1, 1 - Math.abs(t - 0.55) * 2));
+  const b = Math.max(0, Math.min(1, 1 - 1.6 * t));
+  return [r, g, b];
+}
+function renderFieldDebug() {
+  while (fieldDebugGroup.children.length) {
+    const c = fieldDebugGroup.children.pop();
+    c.geometry?.dispose(); c.material?.dispose();
+  }
+  if (!DEBUG_FIELDS || !debugPetals.length) return;
+  const showT = DEBUG_FIELDS === 't' || DEBUG_FIELDS === 'all';
+  const showScalar = DEBUG_FIELDS === 's' || DEBUG_FIELDS === 'd' || DEBUG_FIELDS === 'all';
+  const scalar = DEBUG_FIELDS === 'd' ? 'd' : 's';   // 'all' shows s as the point colour
+  const pPos = [], pCol = [], lPos = [];
+  for (const rec of debugPetals) {
+    const { P, spine, az, baseHeight, radialOffset, tilt } = rec;
+    const f = getPetalFields(P);
+    const toW = (x, y) => placePoint(mapPointToSurface({ x, y }, P, spine), az, baseHeight, radialOffset, tilt);
+    const NXs = 46, NYs = 22, band = f.meta.Wmax * 1.02;
+    for (let a = 0; a <= NXs; a++) {
+      const x = (a / NXs) * P.L;
+      for (let b = 0; b <= NYs; b++) {
+        const y = (-1 + (2 * b) / NYs) * band;        // sweep the width band; skip outside
+        const s = f.sample(x, y);
+        if (s.d <= 0.001) continue;                   // outside the petal
+        const w = toW(x, y);
+        if (showScalar) {
+          pPos.push(w.x, w.y, w.z);
+          const col = fieldRamp(scalar === 'd' ? s.d : s.s);
+          pCol.push(col[0], col[1], col[2]);
+        }
+        if (showT && a % 2 === 0 && b % 2 === 0) {
+          const eps = P.L * 0.03;
+          const w2 = toW(x + s.Tx * eps, y + s.Ty * eps);
+          lPos.push(w.x, w.y, w.z, w2.x, w2.y, w2.z);
+        }
+      }
+    }
+  }
+  if (pPos.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pPos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(pCol, 3));
+    fieldDebugGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 0.03, vertexColors: true, sizeAttenuation: true })));
+  }
+  if (lPos.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(lPos, 3));
+    fieldDebugGroup.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff })));
+  }
+}
+
 
 /* ===================================================================
    5. GENERATE (called on every parameter change)
@@ -1960,12 +2453,14 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     // trunk's world azimuth frame (world az = -paramAz; foot samples already carry
     // true world az via atan2), so each flute lands under its petal / sepal.
     const attach = [];
-    for (const pl of placements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
+    for (const pl of placements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot, layer: pl.footLayer, height: pl.footHeight, strandRoots: pl.strandRoots });
     if (ui.sepalsType !== 'none') {
       const sc = clamp(Math.round(ui.sepalCount), 3, 24);
       const sepR = Math.max(ringR * 0.85, 0.16);
       const off = Math.PI / sc;                      // buildSepalsInto tucks sepals between the petals
-      for (let i = 0; i < sc; i++) attach.push({ az: -(off + i * 2 * Math.PI / sc), r: sepR });
+      // Sepal feet: a second attach ring (layer 0, at the receptacle top height) so the
+      // junction joins them too — kind: 'sepal' so foot-driven ribs can phase to them.
+      for (let i = 0; i < sc; i++) attach.push({ az: -(off + i * 2 * Math.PI / sc), r: sepR, layer: 0, height: centerHeight, kind: 'sepal' });
     }
     // Neck to the STEM's actual top radius (stemRadiusFn is tubeRadius*4*thickness at
     // t=0), so the trunk flows straight into the stem at any thickness. No stem -> 4x.
@@ -1973,6 +2468,13 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     const trunk = buildTrunkInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
       receptacle: true, stem: hasStem,
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
+      profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
+      reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,
+      spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
+      bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
+      continuousMargin: P.continuousMargin, tubeRadius: P.tubeRadius,
+      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate,
+      absorption: ui.absorption, gatherHeight: ui.gatherHeight, gatherRadius: ui.gatherRadius, buttonSize: ui.buttonSize,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -2092,11 +2594,16 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
       }
     }
   } else {                                                      // coiled
-    const coiledEven = count <= EVEN_MAX;
+    // DIVERGENCE ANGLE: GOLDEN = the phyllotactic golden angle on the Vogel
+    // spiral; EVEN = 360/n on one ring (regular spacing at any count); CUSTOM =
+    // a user-set angle on the same Vogel radius. An absent/unknown mode resolves
+    // to GOLDEN, so pre-divergence saved designs are unchanged by this branch.
+    const divMode = ui.divergenceMode;
+    const divAngle = divMode === 'custom' ? ui.divergenceAngle * DEG : GOLDEN_ANGLE;
     for (let i = 0; i < count; i++) {
       if (count === 1) placements.push({ az: 0, r: 0, seedIdx: i });
-      else if (coiledEven) placements.push({ az: i * 2 * Math.PI / count, r: ringR, seedIdx: i });
-      else placements.push({ az: i * GOLDEN_ANGLE, r: spread * Math.sqrt(i), seedIdx: i });
+      else if (divMode === 'even') placements.push({ az: i * 2 * Math.PI / count, r: ringR, seedIdx: i });
+      else placements.push({ az: i * divAngle, r: spread * Math.sqrt(i), seedIdx: i });
     }
   }
 
@@ -2132,14 +2639,20 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     const az = pl.az + layer.dRot;
     const height = baseHeight * layer.scale + layer.dHeight;
     const radialOffset = (pl.r - P.r0) * layer.scale;
-    buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt,
+    const petalOut = buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt,
                    SEED_BASE + pl.seedIdx * 131 + layer.index * LAYER_SEED_STRIDE);
-    // Capture the OUTER whorl's real petal outline so the trunk's receptacle
-    // flutes are grown from it (buildTrunkInto). Only layer 0 meets the receptacle
-    // rim; inner whorls sit higher and don't touch it.
-    if (layer.index === 0 && pl.r > 1e-4) {
+    // Capture EVERY whorl's real petal outline + its attach height, so the trunk
+    // can drive its junction from what it actually joins. The byte-identical solid
+    // path consumes only layer 0 (see buildTrunkInto: REACH = 0 -> layer 0 only);
+    // REACH > 0 pulls the inner whorls' higher feet into the structure too.
+    if (pl.r > 1e-4) {
       pl.foot = petalBaseFootprint(Pp, az, height, radialOffset, tilt);
       pl.footAz = -pl.az;                          // world azimuth of the petal centre
+      pl.footLayer = layer.index;
+      pl.footHeight = height;                       // this whorl's base height (world y)
+      // CONTINUOUS MARGIN: the petal's real foot strand roots (world pos + up-tangent +
+      // radius), for the receptacle to continue downward. null when the toggle is off.
+      pl.strandRoots = petalOut ? petalOut.strandRoots : null;
     }
   }
 
@@ -2151,11 +2664,13 @@ function generate() {
   const P = resolveParams(ui);
   const petalAcc = new MeshAccumulator();
   const coreAcc  = new MeshAccumulator();
+  if (DEBUG_FIELDS) debugPetals.length = 0;   // collected during buildInto, drawn below
   const { placements, centerHeight } = buildInto(petalAcc, coreAcc, ui, P);
   coreGlow.position.y = centerHeight + 0.2;   // scene-only glow follows the core height
 
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
+  if (DEBUG_FIELDS) renderFieldDebug();       // dev overlay only; not in the export path
 
   frameCameraOnce(petalAcc, coreAcc);
   // Adding a stem grows the flower well past the initial framing — refit the
@@ -2377,6 +2892,20 @@ const inputs = {
   petalCount: document.getElementById('petalCount'),
   width: document.getElementById('width'),
   taper: document.getElementById('taper'),
+  clawLength: document.getElementById('clawLength'),
+  clawWidth: document.getElementById('clawWidth'),
+  shoulder: document.getElementById('shoulder'),
+  cleftDepth: document.getElementById('cleftDepth'),
+  cleftLobes: document.getElementById('cleftLobes'),
+  cleftWidth: document.getElementById('cleftWidth'),
+  reliefAmp: document.getElementById('reliefAmp'),
+  reliefFreq: document.getElementById('reliefFreq'),
+  reliefMode: document.getElementById('reliefMode'),
+  petalTwist: document.getElementById('petalTwist'),
+  petalSkew: document.getElementById('petalSkew'),
+  thickTaper: document.getElementById('thickTaper'),
+  thickEdge: document.getElementById('thickEdge'),
+  thickScale: document.getElementById('thickScale'),
   tip: document.getElementById('tip'),
   centerCurve: document.getElementById('centerCurve'),
   edgeCurve: document.getElementById('edgeCurve'),
@@ -2390,6 +2919,8 @@ const inputs = {
   edgeNoise: document.getElementById('edgeNoise'),
   edgeNoiseScale: document.getElementById('edgeNoiseScale'),
   bloomType: document.getElementById('bloomType'),
+  divergenceMode: document.getElementById('divergenceMode'),
+  divergenceAngle: document.getElementById('divergenceAngle'),
   layerCount: document.getElementById('layerCount'),
   petalsPerLayer: document.getElementById('petalsPerLayer'),
   layerSizeFalloff: document.getElementById('layerSizeFalloff'),
@@ -2423,6 +2954,31 @@ const inputs = {
   density: document.getElementById('density'),
   softness: document.getElementById('softness'),
   veinBranchStart: document.getElementById('veinBranchStart'),
+  continuousMargin: document.getElementById('continuousMargin'),
+  bundleTightness: document.getElementById('bundleTightness'),
+  flareRate: document.getElementById('flareRate'),
+  absorption: document.getElementById('absorption'),
+  buttonSize: document.getElementById('buttonSize'),
+  gatherRadius: document.getElementById('gatherRadius'),
+  gatherHeight: document.getElementById('gatherHeight'),
+  mergeStart: document.getElementById('mergeStart'),
+  mergeRate: document.getElementById('mergeRate'),
+  edgeTermination: document.getElementById('edgeTermination'),
+  captureDist: document.getElementById('captureDist'),
+  voronoiLloyd: document.getElementById('voronoiLloyd'),
+  voronoiAniso: document.getElementById('voronoiAniso'),
+  voronoiDensityLaw: document.getElementById('voronoiDensityLaw'),
+  voronoiWeight: document.getElementById('voronoiWeight'),
+  voronoiWeightFalloff: document.getElementById('voronoiWeightFalloff'),
+  voronoiSlabTaper: document.getElementById('voronoiSlabTaper'),
+  spaceMode: document.getElementById('spaceMode'),
+  spaceDensity: document.getElementById('spaceDensity'),
+  spaceBirth: document.getElementById('spaceBirth'),
+  spaceKill: document.getElementById('spaceKill'),
+  spaceStep: document.getElementById('spaceStep'),
+  spacePattern: document.getElementById('spacePattern'),
+  spaceSeed: document.getElementById('spaceSeed'),
+  spaceVariants: document.getElementById('spaceVariants'),
   strandCount: document.getElementById('strandCount'),
   strandWidth: document.getElementById('strandWidth'),
   strandTaper: document.getElementById('strandTaper'),
@@ -2460,6 +3016,16 @@ const inputs = {
   blendSmoothness: document.getElementById('blendSmoothness'),
   receptacleDepth: document.getElementById('receptacleDepth'),
   convergenceTightness: document.getElementById('convergenceTightness'),
+  receptProfile: document.getElementById('receptProfile'),
+  receptConstruction: document.getElementById('receptConstruction'),
+  receptCollar: document.getElementById('receptCollar'),
+  receptReach: document.getElementById('receptReach'),
+  receptSolidity: document.getElementById('receptSolidity'),
+  ribMultiplier: document.getElementById('ribMultiplier'),
+  spiralTightness: document.getElementById('spiralTightness'),
+  spiralThickness: document.getElementById('spiralThickness'),
+  bulbSize: document.getElementById('bulbSize'),
+  bulbHeight: document.getElementById('bulbHeight'),
   sepalsType: document.getElementById('sepalsType'),
   sepalSize: document.getElementById('sepalSize'),
   sepalCount: document.getElementById('sepalCount'),
@@ -2493,6 +3059,20 @@ function readUI() {
     petalCount: parseInt(inputs.petalCount.value, 10),
     width: parseFloat(inputs.width.value),
     taper: parseFloat(inputs.taper.value),
+    clawLength: parseFloat(inputs.clawLength.value),
+    clawWidth: parseFloat(inputs.clawWidth.value),
+    shoulder: parseFloat(inputs.shoulder.value),
+    cleftDepth: parseFloat(inputs.cleftDepth.value),
+    cleftLobes: parseInt(inputs.cleftLobes.value, 10),
+    cleftWidth: parseFloat(inputs.cleftWidth.value),
+    reliefAmp: parseFloat(inputs.reliefAmp.value),
+    reliefFreq: parseFloat(inputs.reliefFreq.value),
+    reliefMode: inputs.reliefMode.value,
+    petalTwist: parseFloat(inputs.petalTwist.value),
+    petalSkew: parseFloat(inputs.petalSkew.value),
+    thickTaper: parseFloat(inputs.thickTaper.value),
+    thickEdge: parseFloat(inputs.thickEdge.value),
+    thickScale: parseFloat(inputs.thickScale.value),
     tip: parseFloat(inputs.tip.value),
     centerCurve: parseFloat(inputs.centerCurve.value),
     edgeCurve: parseFloat(inputs.edgeCurve.value),
@@ -2506,6 +3086,8 @@ function readUI() {
     edgeNoise: parseFloat(inputs.edgeNoise.value),
     edgeNoiseScale: parseFloat(inputs.edgeNoiseScale.value),
     bloomType: inputs.bloomType.value,
+    divergenceMode: inputs.divergenceMode.value,
+    divergenceAngle: parseFloat(inputs.divergenceAngle.value),
     layerCount: parseInt(inputs.layerCount.value, 10),
     petalsPerLayer: inputs.petalsPerLayer.value,
     layerSizeFalloff: parseFloat(inputs.layerSizeFalloff.value),
@@ -2539,6 +3121,31 @@ function readUI() {
     density: parseInt(inputs.density.value, 10),
     softness: parseFloat(inputs.softness.value),
     veinBranchStart: parseFloat(inputs.veinBranchStart.value),
+    continuousMargin: inputs.continuousMargin.value,
+    bundleTightness: parseFloat(inputs.bundleTightness.value),
+    flareRate: parseFloat(inputs.flareRate.value),
+    absorption: parseFloat(inputs.absorption.value),
+    buttonSize: parseFloat(inputs.buttonSize.value),
+    gatherRadius: parseFloat(inputs.gatherRadius.value),
+    gatherHeight: parseFloat(inputs.gatherHeight.value),
+    mergeStart: parseFloat(inputs.mergeStart.value),
+    mergeRate: parseFloat(inputs.mergeRate.value),
+    edgeTermination: inputs.edgeTermination.value,
+    captureDist: parseFloat(inputs.captureDist.value),
+    voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
+    voronoiAniso: parseFloat(inputs.voronoiAniso.value),
+    voronoiDensityLaw: parseFloat(inputs.voronoiDensityLaw.value),
+    voronoiWeight: parseFloat(inputs.voronoiWeight.value),
+    voronoiWeightFalloff: parseFloat(inputs.voronoiWeightFalloff.value),
+    voronoiSlabTaper: parseFloat(inputs.voronoiSlabTaper.value),
+    spaceMode: inputs.spaceMode.value,
+    spaceDensity: parseFloat(inputs.spaceDensity.value),
+    spaceBirth: parseFloat(inputs.spaceBirth.value),
+    spaceKill: parseFloat(inputs.spaceKill.value),
+    spaceStep: parseFloat(inputs.spaceStep.value),
+    spacePattern: inputs.spacePattern.value,
+    spaceSeed: parseInt(inputs.spaceSeed.value, 10) || 0,
+    spaceVariants: parseInt(inputs.spaceVariants.value, 10),
     strandCount: parseInt(inputs.strandCount.value, 10),
     strandWidth: parseFloat(inputs.strandWidth.value),
     strandTaper: parseFloat(inputs.strandTaper.value),
@@ -2576,6 +3183,16 @@ function readUI() {
     blendSmoothness: parseFloat(inputs.blendSmoothness.value),
     receptacleDepth: parseFloat(inputs.receptacleDepth.value),
     convergenceTightness: parseFloat(inputs.convergenceTightness.value),
+    receptProfile: inputs.receptProfile.value,
+    receptConstruction: inputs.receptConstruction.value,
+    receptCollar: inputs.receptCollar.value,
+    receptReach: parseFloat(inputs.receptReach.value),
+    receptSolidity: parseFloat(inputs.receptSolidity.value),
+    ribMultiplier: parseFloat(inputs.ribMultiplier.value),
+    spiralTightness: parseFloat(inputs.spiralTightness.value),
+    spiralThickness: parseFloat(inputs.spiralThickness.value),
+    bulbSize: parseFloat(inputs.bulbSize.value),
+    bulbHeight: parseFloat(inputs.bulbHeight.value),
     sepalsType: inputs.sepalsType.value,
     sepalSize: parseFloat(inputs.sepalSize.value),
     sepalCount: parseInt(inputs.sepalCount.value, 10),
@@ -2609,6 +3226,19 @@ function refreshLabels() {
   setLabel('petalCount', inputs.petalCount.value);
   setLabel('width', (+inputs.width.value).toFixed(2));
   setLabel('taper', (+inputs.taper.value).toFixed(2));
+  setLabel('clawLength', (+inputs.clawLength.value).toFixed(2));
+  setLabel('clawWidth', (+inputs.clawWidth.value).toFixed(2));
+  setLabel('shoulder', (+inputs.shoulder.value).toFixed(2));
+  setLabel('cleftDepth', (+inputs.cleftDepth.value).toFixed(2));
+  setLabel('cleftLobes', inputs.cleftLobes.value);
+  setLabel('cleftWidth', (+inputs.cleftWidth.value).toFixed(2));
+  setLabel('reliefAmp', (+inputs.reliefAmp.value).toFixed(2));
+  setLabel('reliefFreq', (+inputs.reliefFreq.value).toFixed(2));
+  setLabel('petalTwist', (() => { const t = +inputs.petalTwist.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
+  setLabel('petalSkew', (() => { const t = +inputs.petalSkew.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
+  setLabel('thickTaper', (+inputs.thickTaper.value).toFixed(2));
+  setLabel('thickEdge', (+inputs.thickEdge.value).toFixed(2));
+  setLabel('thickScale', (+inputs.thickScale.value).toFixed(2));
   setLabel('tip', (+inputs.tip.value).toFixed(2));
   const cc = +inputs.centerCurve.value;
   setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
@@ -2643,10 +3273,32 @@ function refreshLabels() {
     setLabel('bilEdgeProfile' + k, (ep > 0 ? '+' : '') + ep.toFixed(2));
   }
   setLabel('bloom', inputs.bloom.value + '°');
+  setLabel('divergenceAngle', (+inputs.divergenceAngle.value).toFixed(1) + '°');
   setLabel('tube', (+inputs.tube.value).toFixed(2));
   setLabel('density', inputs.density.value);
   setLabel('softness', (+inputs.softness.value).toFixed(2));
   setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
+  setLabel('bundleTightness', (+inputs.bundleTightness.value).toFixed(2));
+  setLabel('flareRate', (+inputs.flareRate.value).toFixed(2));
+  setLabel('absorption', (+inputs.absorption.value).toFixed(2));
+  setLabel('buttonSize', (+inputs.buttonSize.value).toFixed(2));
+  setLabel('gatherRadius', (+inputs.gatherRadius.value).toFixed(2));
+  setLabel('gatherHeight', (+inputs.gatherHeight.value).toFixed(2));
+  setLabel('mergeStart', (+inputs.mergeStart.value).toFixed(2));
+  setLabel('mergeRate', (+inputs.mergeRate.value).toFixed(2));
+  setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
+  setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
+  setLabel('voronoiAniso', (+inputs.voronoiAniso.value).toFixed(1) + '×');
+  setLabel('voronoiDensityLaw', (+inputs.voronoiDensityLaw.value).toFixed(2));
+  setLabel('voronoiWeight', (+inputs.voronoiWeight.value).toFixed(2));
+  setLabel('voronoiWeightFalloff', (+inputs.voronoiWeightFalloff.value).toFixed(1));
+  setLabel('voronoiSlabTaper', (+inputs.voronoiSlabTaper.value).toFixed(2));
+  setLabel('spaceDensity', (+inputs.spaceDensity.value).toFixed(2));
+  setLabel('spaceBirth', (+inputs.spaceBirth.value).toFixed(3));
+  setLabel('spaceKill', (+inputs.spaceKill.value).toFixed(3));
+  setLabel('spaceStep', (+inputs.spaceStep.value).toFixed(3));
+  setLabel('spaceVariants', inputs.spaceVariants.value);
+  setLabel('spaceSeed', inputs.spaceSeed.value);
   setLabel('strandCount', inputs.strandCount.value);
   setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
   setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
@@ -2668,6 +3320,13 @@ function refreshLabels() {
   setLabel('blendSmoothness', (+inputs.blendSmoothness.value).toFixed(2));
   setLabel('receptacleDepth', (+inputs.receptacleDepth.value).toFixed(2));
   setLabel('convergenceTightness', (+inputs.convergenceTightness.value).toFixed(2));
+  setLabel('receptReach', (+inputs.receptReach.value).toFixed(2));
+  setLabel('receptSolidity', (+inputs.receptSolidity.value).toFixed(2));
+  setLabel('ribMultiplier', (+inputs.ribMultiplier.value).toFixed(2));
+  setLabel('spiralTightness', (+inputs.spiralTightness.value).toFixed(2));
+  setLabel('spiralThickness', (+inputs.spiralThickness.value).toFixed(2));
+  setLabel('bulbSize', (+inputs.bulbSize.value).toFixed(2));
+  setLabel('bulbHeight', (+inputs.bulbHeight.value).toFixed(2));
   setLabel('denseStamenCount', inputs.denseStamenCount.value);
   setLabel('denseStamenLength', (+inputs.denseStamenLength.value).toFixed(2));
   setLabel('carpelCount', inputs.carpelCount.value);
@@ -2723,8 +3382,14 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : ui.infillType === 'strands' ? 'radial strands'
     : ui.infillType === 'bone' ? 'bone lattice'
     : ui.infillType === 'lace' ? 'lace filigree'
+    : ui.infillType === 'spacecol' ? `space colonization (${ui.spaceMode})`
     : 'leaf venation';
-  el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris`;
+  // SDF receptacle telemetry (continuous margin on): report the field's own triangle
+  // count so its contribution to the budget stays visible on every geometry change.
+  const recept = (ui.continuousMargin === 'on' && ui.receptacleType === 'on' && RECEPT_FIELD_STATS)
+    ? ` · sdf receptacle ~${RECEPT_FIELD_STATS.tris.toLocaleString()} tris (abs ${(+ui.absorption).toFixed(2)})`
+    : '';
+  el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris${recept}`;
 }
 
 // coalesce rapid slider input into one rebuild per frame
@@ -2749,15 +3414,19 @@ function setBuilding(on) {
 }
 
 // bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'bilPerSide', 'bilSpacing',
+['petalCount', 'divergenceAngle', 'bilPerSide', 'bilSpacing',
  'bilScale1', 'bilScale2', 'bilScale3',
  'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
  'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
  'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
  'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
- 'width', 'taper', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
+ 'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
+ 'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
  'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
+ 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'absorption', 'buttonSize', 'gatherRadius', 'gatherHeight', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
+ 'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
+ 'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
+ 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
  'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
  'laceSwirl', 'scallopCount', 'scallopHeight',
  'centerCount', 'centerLength', 'centerTipSize', 'centerTipShape', 'centerFilThick',
@@ -2765,6 +3434,7 @@ function setBuilding(on) {
  'discSize', 'discHeight', 'ringStamenCount', 'ringStamenLength',
  'fillPetalCount', 'fillOuterSize', 'fillInnerSize', 'fillDensity', 'fillBloomAngle',
  'blendSmoothness', 'receptacleDepth', 'convergenceTightness',
+ 'receptReach', 'receptSolidity', 'ribMultiplier', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight',
  'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
  'sepalTipShape', 'sepalTipFreq', 'sepalTipRegion', 'sepalTipLength',
  'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
@@ -2807,8 +3477,32 @@ function updateInfillOptions() {
       updateTipOptions();
     }
   }
+  // CONTINUOUS MARGIN: the bundle-tightness / flare-rate sliders apply only when it is on.
+  const contOn = inputs.continuousMargin.value === 'on';
+  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !contOn; });
+  updateTerminationOptions();   // capture-distance visibility depends on infill type too
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
+inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); scheduleRegen(); });
+// EDGE TERMINATION: the capture-distance slider only applies to a tube infill
+// (veins / bone) with an active mode, so hide it for FADE and for slab infills.
+function updateTerminationOptions() {
+  const el = document.getElementById('captureDistCtrl');
+  if (!el) return;
+  const tubeInfill = inputs.infillType.value === 'veins' || inputs.infillType.value === 'bone' || inputs.infillType.value === 'spacecol';
+  el.hidden = !(tubeInfill && inputs.edgeTermination.value !== 'fade');
+}
+inputs.edgeTermination.addEventListener('change', () => { updateTerminationOptions(); scheduleRegen(); });
+// SPACE COLONIZATION: the two selects regenerate; the re-roll button draws a fresh
+// integer seed (stored in the design so the new network is saved and reproducible).
+inputs.spaceMode.addEventListener('change', scheduleRegen);
+inputs.spacePattern.addEventListener('change', scheduleRegen);
+inputs.reliefMode.addEventListener('change', scheduleRegen);
+const spaceReroll = document.getElementById('spaceReroll');
+if (spaceReroll) spaceReroll.addEventListener('click', () => {
+  inputs.spaceSeed.value = String((Math.floor(Math.random() * 0x7fffffff)) >>> 0);
+  refreshLabels(); scheduleRegen();
+});
 // Bloom type is a <select>; like Tip/Infill, only the chosen arrangement's hints
 // are shown (data-bloom-styles), and changing it re-lays out the whole bloom.
 function updateBloomOptions() {
@@ -2817,7 +3511,22 @@ function updateBloomOptions() {
     el.hidden = !el.getAttribute('data-bloom-styles').split(/\s+/).includes(type);
   });
   updateBilateralPetals();
+  updateDivergenceOptions();
 }
+// COILED divergence: the CUSTOM angle slider shows only for CUSTOM, and the
+// low-petal-count hint shows only when a coiled bloom has fewer than 8 petals
+// (where the golden spiral reads as irregular rather than phyllotactic).
+function updateDivergenceOptions() {
+  const coiled = inputs.bloomType.value === 'coiled';
+  const custom = inputs.divergenceMode.value === 'custom';
+  const angleCtrl = document.getElementById('divergenceAngleCtrl');
+  if (angleCtrl) angleCtrl.hidden = !(coiled && custom);
+  const hint = document.getElementById('divLowCountHint');
+  if (hint) hint.hidden = !(coiled && (parseInt(inputs.petalCount.value, 10) || 0) < 8);
+}
+inputs.divergenceMode.addEventListener('change', () => { updateDivergenceOptions(); scheduleRegen(); });
+// keep the low-petal-count hint in sync as the petal slider moves
+inputs.petalCount.addEventListener('input', updateDivergenceOptions);
 // The per-petal edge dropdowns (bilateral only) show one per petal position, up to
 // the current PETALS PER SIDE — so they appear/disappear as that slider moves.
 function updateBilateralPetals() {
@@ -2865,7 +3574,13 @@ inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); sche
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 // Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
-  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = inputs.receptacleType.value === 'none'; });
+  const on = inputs.receptacleType.value !== 'none';
+  const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
+  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
+  // Per-axis sub-controls: only shown when the receptacle is on AND that axis is selected.
+  document.querySelectorAll('[data-recept-dome]').forEach((el) => { el.hidden = !on || prof !== 'dome'; });
+  document.querySelectorAll('[data-recept-open]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'gathered' && con !== 'cored'); });
+  document.querySelectorAll('[data-recept-ribbed]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'cored'); });
   // Sepal controls hide when sepals are off; the serration sub-controls
   // (data-sepal-tip) hide further unless SEPAL TIP STYLE matches, mirroring the
   // petal tip panel's data-tip-styles gating.
@@ -2883,6 +3598,9 @@ function updateBaseOptions() {
   document.querySelectorAll('[data-leaf]').forEach((el) => { el.hidden = inputs.stemType.value === 'none' || inputs.leafType.value === 'none'; });
 }
 inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+inputs.receptProfile.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+inputs.receptConstruction.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+inputs.receptCollar.addEventListener('change', scheduleRegen);
 inputs.sepalsType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.sepalStyle.addEventListener('change', () => { scheduleRegen(); });
 inputs.sepalTipStyle.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
@@ -2954,9 +3672,25 @@ const resetBtn = document.getElementById('reset');
 if (resetBtn) {
   resetBtn.addEventListener('click', () => {
     const d = DEFAULTS;
+    designSchemaVersion = CURRENT_SCHEMA;   // Reset = a brand-new design
+    designExtraKeys = {};
     inputs.petalCount.value = d.petalCount;
     inputs.width.value = d.width;
     inputs.taper.value = d.taper;
+    inputs.clawLength.value = d.clawLength;
+    inputs.clawWidth.value = d.clawWidth;
+    inputs.shoulder.value = d.shoulder;
+    inputs.cleftDepth.value = d.cleftDepth;
+    inputs.cleftLobes.value = d.cleftLobes;
+    inputs.cleftWidth.value = d.cleftWidth;
+    inputs.reliefAmp.value = d.reliefAmp;
+    inputs.reliefFreq.value = d.reliefFreq;
+    inputs.reliefMode.value = d.reliefMode;
+    inputs.petalTwist.value = d.petalTwist;
+    inputs.petalSkew.value = d.petalSkew;
+    inputs.thickTaper.value = d.thickTaper;
+    inputs.thickEdge.value = d.thickEdge;
+    inputs.thickScale.value = d.thickScale;
     inputs.tip.value = d.tip;
     inputs.centerCurve.value = d.centerCurve;
     inputs.edgeCurve.value = d.edgeCurve;
@@ -2970,6 +3704,8 @@ if (resetBtn) {
     inputs.edgeNoise.value = d.edgeNoise;
     inputs.edgeNoiseScale.value = d.edgeNoiseScale;
     inputs.bloomType.value = d.bloomType;
+    inputs.divergenceMode.value = d.divergenceMode;
+    inputs.divergenceAngle.value = d.divergenceAngle;
     inputs.layerCount.value = d.layerCount;
     inputs.petalsPerLayer.value = d.petalsPerLayer;
     inputs.layerSizeFalloff.value = d.layerSizeFalloff;
@@ -2995,6 +3731,31 @@ if (resetBtn) {
     inputs.density.value = d.density;
     inputs.softness.value = d.softness;
     inputs.veinBranchStart.value = d.veinBranchStart;
+    inputs.continuousMargin.value = d.continuousMargin;
+    inputs.bundleTightness.value = d.bundleTightness;
+    inputs.flareRate.value = d.flareRate;
+    inputs.mergeStart.value = d.mergeStart;
+    inputs.mergeRate.value = d.mergeRate;
+    inputs.absorption.value = d.absorption;
+    inputs.buttonSize.value = d.buttonSize;
+    inputs.gatherRadius.value = d.gatherRadius;
+    inputs.gatherHeight.value = d.gatherHeight;
+    inputs.edgeTermination.value = d.edgeTermination;
+    inputs.captureDist.value = d.captureDist;
+    inputs.voronoiLloyd.value = d.voronoiLloyd;
+    inputs.voronoiAniso.value = d.voronoiAniso;
+    inputs.voronoiDensityLaw.value = d.voronoiDensityLaw;
+    inputs.voronoiWeight.value = d.voronoiWeight;
+    inputs.voronoiWeightFalloff.value = d.voronoiWeightFalloff;
+    inputs.voronoiSlabTaper.value = d.voronoiSlabTaper;
+    inputs.spaceMode.value = d.spaceMode;
+    inputs.spaceDensity.value = d.spaceDensity;
+    inputs.spaceBirth.value = d.spaceBirth;
+    inputs.spaceKill.value = d.spaceKill;
+    inputs.spaceStep.value = d.spaceStep;
+    inputs.spacePattern.value = d.spacePattern;
+    inputs.spaceSeed.value = d.spaceSeed;
+    inputs.spaceVariants.value = d.spaceVariants;
     inputs.strandCount.value = d.strandCount;
     inputs.strandWidth.value = d.strandWidth;
     inputs.strandTaper.value = d.strandTaper;
@@ -3032,6 +3793,16 @@ if (resetBtn) {
     inputs.blendSmoothness.value = d.blendSmoothness;
     inputs.receptacleDepth.value = d.receptacleDepth;
     inputs.convergenceTightness.value = d.convergenceTightness;
+    inputs.receptProfile.value = d.receptProfile;
+    inputs.receptConstruction.value = d.receptConstruction;
+    inputs.receptCollar.value = d.receptCollar;
+    inputs.receptReach.value = d.receptReach;
+    inputs.receptSolidity.value = d.receptSolidity;
+    inputs.ribMultiplier.value = d.ribMultiplier;
+    inputs.spiralTightness.value = d.spiralTightness;
+    inputs.spiralThickness.value = d.spiralThickness;
+    inputs.bulbSize.value = d.bulbSize;
+    inputs.bulbHeight.value = d.bulbHeight;
     inputs.sepalsType.value = d.sepalsType;
     inputs.sepalSize.value = d.sepalSize;
     inputs.sepalCount.value = d.sepalCount;
@@ -3089,10 +3860,13 @@ if (exportBtn) {
 }
 
 const DEFAULTS = {
-  petalCount: 4, width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
+  petalCount: 4, width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
+  cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3,
+  reliefAmp: 0, reliefFreq: 0.5, reliefMode: 'radial', petalTwist: 0, petalSkew: 0, thickTaper: 0, thickEdge: 0, thickScale: 1,
   tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
   edgeNoise: 0, edgeNoiseScale: 0,
-  bloomType: 'coiled', bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
+  bloomType: 'coiled', divergenceMode: 'golden', divergenceAngle: 137.5,
+  bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
   layerCount: 1, petalsPerLayer: '', layerSizeFalloff: 0.75, layerHeightOffset: 0.05,
   layerRotationOffset: 24, layerBloomAngleDelta: 12,
   bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
@@ -3102,6 +3876,12 @@ const DEFAULTS = {
   bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
   bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
   bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
+  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
+  absorption: 0.85, buttonSize: 0.55, gatherRadius: 0.06, gatherHeight: 0.25,
+  edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
+  voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
+  spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
+  spacePattern: 'phyllotactic', spaceSeed: 1, spaceVariants: 3,
   strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
   boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
   laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
@@ -3111,7 +3891,11 @@ const DEFAULTS = {
   denseStamenCount: 80, denseStamenLength: 0.4, carpelCount: 5, carpelSize: 0.5,
   discSize: 0.5, discHeight: 0.5, ringStamenCount: 40, ringStamenLength: 0.35,
   fillPetalCount: 60, fillOuterSize: 0.22, fillInnerSize: 0.10, fillDensity: 0.6, fillBloomAngle: 30,
-  receptacleType: 'none', blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
+  receptacleType: 'none',                                        // enable: none | on
+  receptProfile: 'flare', receptConstruction: 'solid', receptCollar: 'none',
+  receptReach: 0, receptSolidity: 1, ribMultiplier: 1,
+  blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
+  spiralTightness: 0.12, spiralThickness: 0.5, bulbSize: 0.5, bulbHeight: 0.5,
   sepalsType: 'none', sepalSize: 0.6,
   sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
   sepalTipStyle: 'clean', sepalTipShape: 0.9, sepalTipFreq: 12, sepalTipRegion: 0.3, sepalTipLength: 0.4,
@@ -3120,6 +3904,212 @@ const DEFAULTS = {
   leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,
   tightness: 0.5, elevation: 0, autoRotate: true,
 };
+
+/* ---- Saved-design schema versioning ----------------------------------------
+   Every saved design carries a `schemaVersion`. On load, migrations upgrade it
+   step by step to CURRENT_SCHEMA, baking former fallbacks in as explicit values,
+   so DEFAULTS is only ever the NEW-design starting point — never a "what does an
+   old design mean" fallback. To add a parameter from now on: give it a DEFAULTS
+   value + a control, bump CURRENT_SCHEMA, and add ONE migration that sets the
+   legacy value on designs that lack the key. Nothing else in the load path
+   changes. A design with no `schemaVersion` is v0.
+
+   MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
+   object, returns a new one). Keep them append-only and never mutate input. */
+const CURRENT_SCHEMA = 13;
+
+// v0 -> v1: the first versioned schema. A v0 design predates edge termination,
+// the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
+// explicit so it renders exactly as it did before those controls existed:
+//  - fill every control it omits with the DEFAULTS value (this alone resolves a
+//    pre-divergence design to GOLDEN, since DEFAULTS.divergenceMode is 'golden');
+//  - EXCEPT the two controls whose pre-existing behaviour differs from the new
+//    default — force FADE termination and legacy (single-pass) Voronoi.
+function migrateV0toV1(p) {
+  const out = { ...p };
+  for (const k of Object.keys(DEFAULTS)) if (!(k in out)) out[k] = DEFAULTS[k];
+  if (!('edgeTermination' in p)) out.edgeTermination = 'fade';
+  if (!('voronoiLloyd' in p)) out.voronoiLloyd = 0;
+  return out;
+}
+// v1 -> v2: the VORONOI shared-grammar controls (anisotropy, density law, weight
+// hierarchy + falloff, slab taper). Each new key's legacy value IS its DEFAULTS
+// value (all default to the prior isotropic/uniform look), so filling from DEFAULTS
+// is enough — a migrated design is byte-identical.
+function migrateV1toV2(p) {
+  const out = { ...p };
+  for (const k of ['voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v2 -> v3: the SPACE COLONIZATION infill mode's controls. Purely additive — no
+// existing design uses infillType 'spacecol', so filling the new keys from
+// DEFAULTS leaves every prior design byte-identical.
+function migrateV2toV3(p) {
+  const out = { ...p };
+  for (const k of ['spaceMode', 'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spacePattern', 'spaceSeed', 'spaceVariants']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v3 -> v4: the CLAW / caryophyllaceous silhouette controls (clawLength, clawWidth,
+// shoulder). clawLength's legacy value IS its DEFAULTS value (0 = no claw, an exact
+// no-op in petalHalfWidth), so filling the three keys from DEFAULTS leaves every
+// prior design byte-identical.
+function migrateV3toV4(p) {
+  const out = { ...p };
+  for (const k of ['clawLength', 'clawWidth', 'shoulder']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v4 -> v5: the SURFACE RELIEF, TWIST/SKEW and THICKNESS FIELD controls. Each new
+// key's legacy value IS its DEFAULTS value (relief/twist/skew 0, thickTaper/thickEdge
+// 0, thickScale 1, reliefMode 'radial' — all no-ops), so filling from DEFAULTS leaves
+// every prior design byte-identical.
+function migrateV4toV5(p) {
+  const out = { ...p };
+  for (const k of ['reliefAmp', 'reliefFreq', 'reliefMode', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v5 -> v6: the LOBED / CLEFT petal controls (cleftDepth, cleftLobes, cleftWidth).
+// cleftDepth's legacy value IS its DEFAULTS value (0 = no clefts, an exact no-op —
+// buildSilhouette/fields keep the analytic single-valued path), so filling the three
+// keys from DEFAULTS leaves every prior design byte-identical.
+function migrateV5toV6(p) {
+  const out = { ...p };
+  for (const k of ['cleftDepth', 'cleftLobes', 'cleftWidth']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v6 -> v7: the RECEPTACLE multi-style controls (ironwork spiral + bulb connector).
+// BLENDED / SOFT BLEND reuse existing keys; the new keys default to inert values, and
+// no existing design uses receptacleType 'ironwork'/'bulb', so filling from DEFAULTS
+// leaves every prior design byte-identical.
+function migrateV6toV7(p) {
+  const out = { ...p };
+  for (const k of ['spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight']) {
+    if (!(k in out)) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v7 -> v8: the receptacle becomes three orthogonal axes (PROFILE x CONSTRUCTION x
+// COLLAR) plus REACH / SOLIDITY / RIB MULTIPLIER. The old four-mode `receptacleType`
+// collapses to an on/off enable; each old mode maps to the axis combo that reproduces
+// it (FLARE+SOLID = blended, DOME+SOLID = bulb, CONE+GATHERED = soft, CONE+RIBBED =
+// ironwork). spiralCount is retired (RIB MULTIPLIER replaces it).
+function migrateV7toV8(p) {
+  const out = { ...p };
+  const map = {
+    blended:  { profile: 'flare', construction: 'solid' },
+    bulb:     { profile: 'dome',  construction: 'solid' },
+    soft:     { profile: 'cone',  construction: 'gathered' },
+    ironwork: { profile: 'cone',  construction: 'ribbed' },
+  };
+  const old = out.receptacleType;
+  const m = map[old];
+  if (out.receptProfile == null) out.receptProfile = m ? m.profile : DEFAULTS.receptProfile;
+  if (out.receptConstruction == null) out.receptConstruction = m ? m.construction : DEFAULTS.receptConstruction;
+  for (const k of ['receptCollar', 'receptReach', 'receptSolidity', 'ribMultiplier']) {
+    if (out[k] == null) out[k] = DEFAULTS[k];
+  }
+  // collapse the mode enum onto the enable
+  if (m) out.receptacleType = 'on';
+  else if (old !== 'none' && old !== 'on') out.receptacleType = 'none';
+  delete out.spiralCount;
+  return out;
+}
+// v8 -> v9: the CONTINUOUS MARGIN toggle (edge as two rooted strands the receptacle
+// continues) plus its BUNDLE TIGHTNESS / FLARE RATE. The toggle defaults OFF, whose code
+// path is byte-identical to v8, and the two scalars are inert while it is off, so filling
+// all three from DEFAULTS leaves every prior design unchanged.
+function migrateV8toV9(p) {
+  const out = { ...p };
+  for (const k of ['continuousMargin', 'bundleTightness', 'flareRate']) {
+    if (out[k] == null) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v9 -> v10: the receptacle open constructions become a pairwise MERGE TREE, so GATHERED
+// (one fat tube per petal — the wrong cardinality) is retired and folds onto RIBBED, and
+// MERGE START / MERGE RATE are added. The merge tree only runs under CONTINUOUS MARGIN (off
+// by default), so a design with the toggle off is byte-identical; a design that had GATHERED
+// selected now reads as RIBBED (a reported change, not a silent one).
+function migrateV9toV10(p) {
+  const out = { ...p };
+  if (out.receptConstruction === 'gathered') out.receptConstruction = 'ribbed';
+  for (const k of ['mergeStart', 'mergeRate']) {
+    if (out[k] == null) out[k] = DEFAULTS[k];
+  }
+  return out;
+}
+// v10 -> v11: the SOLID receptacle becomes a C1 CROSS-SECTION MORPH under continuous margin,
+// with a MORPH LENGTH control. It only changes SOLID + continuous-margin-ON designs (the
+// morph replaces the lathe there); every other design — and any design with the toggle off —
+// is unchanged, so filling MORPH LENGTH from DEFAULTS is inert for them.
+function migrateV10toV11(p) {
+  const out = { ...p };
+  if (out.morphLength == null) out.morphLength = 0.6;   // former DEFAULTS.morphLength (control retired at v12)
+  return out;
+}
+// v11 -> v12: the receptacle is REBUILT as a single implicit surface (SDF). Under continuous
+// margin, ABSORPTION (blend radius) replaces CONSTRUCTION (solid/ribbed/cored) and MORPH
+// LENGTH; GATHER RADIUS + GATHER HEIGHT add the daisy/anemone gather-into-a-button that the
+// old feet-descend-straight-down splay lacked; PROFILE becomes a radius multiplier and COLLAR
+// a radius bump. Old CONSTRUCTION maps to an ABSORPTION starting point (solid = fully fused,
+// cored = looser) so a saved design lands near its former look; MORPH LENGTH is left inert on
+// the record. All keys fill from DEFAULTS, so any design with the toggle OFF (the legacy
+// lathe/rib path is untouched) is unchanged.
+function migrateV11toV12(p) {
+  const out = { ...p };
+  if (out.absorption == null) {
+    out.absorption = out.receptConstruction === 'solid' ? 0.9
+                   : out.receptConstruction === 'cored' ? 0.6
+                   : DEFAULTS.absorption;   // ribbed / anything else
+  }
+  if (out.gatherRadius == null) out.gatherRadius = DEFAULTS.gatherRadius;
+  if (out.gatherHeight == null) out.gatherHeight = DEFAULTS.gatherHeight;
+  return out;
+}
+// v12 -> v13: the SDF receptacle gains a BUTTON — a compact oblate solid disc at the gather
+// centre (the daisy/anemone receptacle the strands fuse into). The wide petal ring can't
+// gather to a tight point on its own, so BUTTON SIZE supplies the central mass. Fills from
+// DEFAULTS; inert for any design with continuous margin off (the legacy receptacle path).
+function migrateV12toV13(p) {
+  const out = { ...p };
+  if (out.buttonSize == null) out.buttonSize = DEFAULTS.buttonSize;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13];
+
+// Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
+// (schemaVersion stripped — it is meta, tracked separately), the keys this build
+// does not recognise (preserved verbatim on re-save so a newer deploy's fields
+// are never dropped), and the version to stamp on the next save (never a
+// downgrade). A design newer than this build loads best-effort with a warning.
+function migrateDesign(raw) {
+  const src = { ...raw };
+  const rawVersion = Number.isInteger(src.schemaVersion) ? src.schemaVersion : 0;
+  delete src.schemaVersion;
+  let p = src;
+  if (rawVersion > CURRENT_SCHEMA) {
+    console.warn(`Flower: saved design schemaVersion ${rawVersion} is newer than this build (v${CURRENT_SCHEMA}); loading best-effort and preserving unknown fields on save.`);
+  } else {
+    for (let v = rawVersion; v < CURRENT_SCHEMA; v++) p = MIGRATIONS[v](p);
+  }
+  const extras = {};
+  for (const k of Object.keys(p)) if (!(k in inputs)) extras[k] = p[k];   // keys with no control
+  return { params: p, extras, version: Math.max(CURRENT_SCHEMA, rawVersion) };
+}
+
+// The schema version + unrecognised fields of the design currently loaded, so a
+// re-save round-trips faithfully. Fresh session / Reset = a brand-new design.
+let designSchemaVersion = CURRENT_SCHEMA;
+let designExtraKeys = {};
 
 
 /* ===================================================================
@@ -3218,18 +4208,26 @@ function rememberMyDesign(id) {
   } catch { /* ignore */ }
 }
 
-// Full saved state = every control value (readUI) minus the camera-only view preset.
+// Full saved state = every control value (readUI) minus the camera-only view
+// preset, plus the schema version and any unrecognised fields carried from a
+// newer-schema design we loaded (so re-save never downgrades or drops them).
 function currentDesignParams() {
   const ui = readUI();
   delete ui.viewPreset;
-  return ui;
+  return { ...ui, ...designExtraKeys, schemaVersion: designSchemaVersion };
 }
 
-// Apply a saved params object to every control, then rebuild. Iterates the inputs
-// map so any future control is picked up automatically (mirrors the Reset path).
-function applyDesign(params) {
-  if (!params || typeof params !== 'object') return;
-  for (const [k, v] of Object.entries(params)) {
+// Apply a saved params object to every control, then rebuild. Migrates the design
+// to the current schema first, so `params` is fully explicit and DEFAULTS is only
+// a forward-compat floor (a newer-schema design missing a control this build knows
+// falls back to its new-design default, never to a stale UI value).
+function applyDesign(raw) {
+  if (!raw || typeof raw !== 'object') return;
+  const { params, extras, version } = migrateDesign(raw);
+  designSchemaVersion = version;
+  designExtraKeys = extras;
+  const merged = { ...DEFAULTS, ...params };
+  for (const [k, v] of Object.entries(merged)) {
     const el = inputs[k];
     if (!el) continue;
     if (el.type === 'checkbox') el.checked = !!v;
