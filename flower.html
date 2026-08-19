@@ -1630,12 +1630,53 @@
       </div>
     </section>
 
+    <section class="fl-acc" data-acc>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-make">
+        <span class="fl-acc__label">Make</span>
+        <span class="fl-acc__chev" aria-hidden="true"></span>
+      </button>
+      <div class="fl-acc__body" id="acc-make">
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="heightMM">Size</label>
+            <span class="fl-ctrl__val" data-value="heightMM"></span>
+          </div>
+          <input type="range" id="heightMM" min="40" max="300" step="5" value="120">
+          <span class="fl-ctrl__hint">largest dimension of the print</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="process">Process</label>
+          </div>
+          <select class="fl-select" id="process">
+            <option value="sls" selected>SLS NYLON</option>
+            <option value="sla">RESIN SLA</option>
+            <option value="fdm">FDM 0.4MM</option>
+          </select>
+          <span class="fl-ctrl__hint">sets the smallest printable feature (SLS 1.0 &middot; SLA 0.4 &middot; FDM 0.8 mm)</span>
+        </div>
+
+        <div id="printBadge" class="fl-badge" data-state="ok">
+          <span class="fl-badge__dot" aria-hidden="true"></span>
+          <span id="printBadgeText" class="fl-badge__text">checking&hellip;</span>
+        </div>
+        <div id="fitReadout" class="fl-fit"></div>
+
+        <div class="fl-make__actions">
+          <button id="saveDesign" class="fl-btn" type="button" title="Save this design to the shared gallery">Save&hellip;</button>
+          <button id="shareLink" class="fl-btn" type="button" title="Copy a link that encodes this whole design">Share link</button>
+          <button id="exportStl" class="fl-btn fl-btn--primary" type="button" title="Download a 3D-printable STL, scaled to millimetres">Get STL &darr;</button>
+        </div>
+
+      </div>
+    </section>
+
   </div>
 
   <div class="fl-panel__foot">
     <button id="reset" class="fl-btn" type="button">Reset</button>
-    <button id="saveDesign" class="fl-btn" type="button" title="Save this design to the shared gallery">Save</button>
-    <button id="exportStl" class="fl-btn" type="button" title="Download a 3D-printable STL, scaled to millimetres">Export STL</button>
     <span id="building" class="fl-building">building&hellip;</span>
   </div>
   <div class="fl-panel__links">

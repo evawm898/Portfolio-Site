@@ -138,9 +138,32 @@ const MM_PER_UNIT = 26;   // millimetres per Three.js world unit (single scale k
    floor ≈ 0.0154 u. For reference the thinnest tube slider gives radius
    0.008 u (0.42 mm dia) and the default rim 0.0057 u (0.30 mm dia) —
    both below the floor, so both are lifted to 0.8 mm on export. */
-const MIN_FEATURE_MM    = 0.8;                          // smallest reliable SLS/MJF feature
-const MIN_FEATURE_UNITS = MIN_FEATURE_MM / MM_PER_UNIT; // slab-thickness / wall floor, in world units
-const MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;        // tube/bead radius floor (diameter = feature)
+// The floor is per-PROCESS now (the Make block's Process picker): SLS PA12 unsupported
+// wire needs 1.0 mm, resin SLA resolves ~0.4 mm, an FDM 0.4 nozzle wants ~0.8 mm. It is
+// therefore mutable (setFloorMM) rather than a frozen const; PROCESS_FLOOR_MM holds the
+// per-process values and activeFloorMM the one currently in force. Defaults preserve the
+// original 0.8 mm behaviour until the Make block sets a process. MIN_FEATURE_UNITS /
+// MIN_RADIUS_UNITS are read at BUILD time (new accumulator per build), so updating the
+// floor before an export build is enough — no accumulator caches a stale value.
+const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no process set
+const PROCESS_FLOOR_MM  = { sls: 1.0, sla: 0.4, fdm: 0.8 };
+const PROCESS_LABEL     = { sls: 'SLS nylon', sla: 'resin SLA', fdm: 'FDM 0.4 mm' };
+let   activeFloorMM     = MIN_FEATURE_MM;
+// mm-per-unit is DERIVED from the Make block's Size (target largest dimension in mm) and
+// the bloom's own extent in world units, so the floor is computed at the TRUE printed
+// size: a feature must be >= activeFloorMM mm AFTER the export scale, i.e. its unit radius
+// is floored to activeFloorMM / activeMMPerUnit. Both default to the original constants
+// until the Make block runs applyMake(). MIN_FEATURE_UNITS / MIN_RADIUS_UNITS are read at
+// BUILD time (fresh accumulator per build), so refreshing them before an export is enough.
+let   activeMMPerUnit   = MM_PER_UNIT;
+let   MIN_FEATURE_UNITS = activeFloorMM / activeMMPerUnit;  // slab / wall floor, world units
+let   MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;            // tube/bead radius floor (Ø = feature)
+function refreshFloorUnits() {
+  MIN_FEATURE_UNITS = activeFloorMM / activeMMPerUnit;
+  MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;
+}
+function setFloorMM(mm) { activeFloorMM = mm > 0 ? mm : MIN_FEATURE_MM; refreshFloorUnits(); }
+function setMMPerUnit(k) { activeMMPerUnit = k > 1e-6 ? k : MM_PER_UNIT; refreshFloorUnits(); }
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
    layout). Petal i sits at angle i*divergence and radius spread*sqrt(i)
@@ -2803,17 +2826,42 @@ function stepViewTween() {
 const MAX_EXPORT_TRIS = 1500000;   // binary STL ~50 B/tri; ~75 MB here — confirm past this
 
 // Build the current UI/params into one merged, export-mode geometry.
+// Largest dimension of the CURRENT bloom in world units, from the live (un-floored)
+// meshes — floor-independent, so it can set the export scale without a circular rebuild.
+function currentMaxDimUnits() {
+  const box = new THREE.Box3(); box.makeEmpty();
+  for (const m of [meshPetals, meshCore]) {
+    if (!m || !m.geometry || !m.geometry.attributes || !m.geometry.attributes.position) continue;
+    m.geometry.computeBoundingBox();
+    if (m.geometry.boundingBox && isFinite(m.geometry.boundingBox.min.x)) box.union(m.geometry.boundingBox);
+  }
+  if (box.isEmpty()) return 0;
+  const s = new THREE.Vector3(); box.getSize(s);
+  return Math.max(s.x, s.y, s.z);
+}
+
+// Apply the Make block's Size + Process to the export scale + feature floor, so the
+// exported STL is `heightMM` at its largest dimension and every feature clears the
+// process floor at that real size. Falls back to the original 26 mm/unit, 0.8 mm floor
+// when the controls are absent (e.g. an old saved design mid-migration).
+function applyMake(ui) {
+  const md = currentMaxDimUnits();
+  setMMPerUnit(ui && ui.heightMM && md > 1e-6 ? ui.heightMM / md : MM_PER_UNIT);
+  setFloorMM((ui && PROCESS_FLOOR_MM[ui.process]) || MIN_FEATURE_MM);
+}
+
 function buildExportGeometry() {
   const ui = readUI();
   const P = resolveParams(ui);
+  applyMake(ui);                 // set scale + floor for THIS design's size/process BEFORE building
   const acc = new MeshAccumulator({ exportMode: true });
   buildInto(acc, acc, ui, P);   // petals AND core into a single accumulator
   const geo = acc.toGeometry() || new THREE.BufferGeometry();
   const tris = acc.idx.length / 3;
   // Thinnest real-world feature: round Ø = 2·minRadius; ribbon/slab = minThick.
   const minDia = isFinite(acc.minRadius) ? 2 * acc.minRadius : Infinity;
-  const minFeatureMM = MM_PER_UNIT * Math.min(minDia, isFinite(acc.minThick) ? acc.minThick : Infinity);
-  return { geo, tris, minFeatureMM };
+  const minFeatureMM = activeMMPerUnit * Math.min(minDia, isFinite(acc.minThick) ? acc.minThick : Infinity);
+  return { geo, tris, minFeatureMM, mmPerUnit: activeMMPerUnit };
 }
 
 function exportSTL() {
@@ -2838,7 +2886,7 @@ function exportSTL() {
   // Bake world-unit -> millimetre scale into a temp mesh's matrix; STLExporter
   // applies it and writes per-facet normals from the scaled positions.
   const mesh = new THREE.Mesh(geo, matPetals);
-  mesh.scale.setScalar(MM_PER_UNIT);
+  mesh.scale.setScalar(built.mmPerUnit);
   mesh.updateMatrixWorld(true);
   const stl = new STLExporter().parse(mesh, { binary: true });
   geo.dispose();
@@ -2851,8 +2899,75 @@ function exportSTL() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   console.log(`[STL] exported ${tris.toLocaleString()} tris, ` +
     `${(blob.size / 1e6).toFixed(1)} MB, thinnest feature ${minFeatureMM.toFixed(2)} mm ` +
-    `at ${MM_PER_UNIT} mm/unit`);
+    `at ${built.mmPerUnit.toFixed(1)} mm/unit`);
   return true;
+}
+
+/* ---- MAKE: live printability badge + fits readout + share link ----------------------
+   Structural soundness (ONE watertight solid) is guaranteed for every reachable design by
+   the export gate (tools/verify-flower-export.mjs holds boundaryEdges = 0 across the whole
+   matrix), so this badge does NOT rebuild the mesh on each tick. It reports what actually
+   varies with the Make block: SIZE, the process feature floor, whether the print fits a
+   real SLS build volume, and whether the FIXED physical floor is coarse relative to the
+   chosen size (a hair-fine lace whose floored struts are a large fraction of the whole
+   merges into a blob). Red is reserved for a genuine non-watertight export and is surfaced
+   at Get-STL time. Build volumes are cross-checked printer specs; the Shapeways figures are
+   marked TODO until their (currently unreachable) material pages can be confirmed. */
+const FITS = [
+  { max: 100, name: 'benchtop SLS (Sharebot SnowWhite 2, 100 mm cube)' },
+  { max: 165, name: 'Formlabs Fuse 1+ (165 × 165 × 300)' },
+  { max: 180, name: 'Shapeways dyed / black PA12 ceiling (180 × 230 × 320)' },   // TODO confirm Shapeways spec
+  { max: 200, name: 'EOS Formiga P110 (200 × 250 × 330)' },
+  { max: 300, name: 'industrial SLS / bureau standard white' },
+];
+const DYED_CEILING_MM = 180;   // TODO confirm: largest dyed/coloured PA12 offered by Shapeways
+const FIDELITY_MAX = 0.02;     // a floored feature past ~2% of the whole size reads as chunky
+function updatePrintability() {
+  const badge = document.getElementById('printBadge');
+  const text = document.getElementById('printBadgeText');
+  const fitEl = document.getElementById('fitReadout');
+  if (!badge || !text) return;   // absent on the preview page
+  const ui = readUI();
+  const size = Math.round(ui.heightMM || 120);
+  const proc = ui.process || 'sls';
+  const floor = PROCESS_FLOOR_MM[proc] || MIN_FEATURE_MM;
+  const ratio = floor / size;
+  const tier = FITS.find((f) => size <= f.max);
+  let state = 'ok', msg;
+  if (!tier) {
+    state = 'warn';
+    msg = `${size} mm is larger than common SLS build volumes — scale down or split the model`;
+  } else if (ratio > FIDELITY_MAX) {
+    state = 'warn';
+    msg = `at ${size} mm the ${floor} mm ${PROCESS_LABEL[proc]} floor is ${Math.round(ratio * 100)}% of the print — fine lace merges; scale up or thicken`;
+  } else if (size > DYED_CEILING_MM) {
+    state = 'warn';
+    msg = `over the ${DYED_CEILING_MM} mm dyed ceiling — standard white only, no dyed black`;
+  } else {
+    msg = `one watertight solid · ${size} mm · ${PROCESS_LABEL[proc]} · features floored to ${floor} mm`;
+  }
+  badge.setAttribute('data-state', state);
+  text.textContent = (state === 'ok' ? '✓ ' : '! ') + msg;
+  if (fitEl) {
+    const t = tier || FITS[FITS.length - 1];
+    const dyed = size <= DYED_CEILING_MM;
+    fitEl.textContent = `fits ${t.name}${t.max < 300 ? ' and up' : ''} · ` +
+      (dyed ? 'dyed / black available' : `white only above ${DYED_CEILING_MM} mm`);
+  }
+}
+
+// Share link: encode the whole design (the exact object the gallery saves) into the URL,
+// base64url so it survives a paste. On boot ?d=<design> re-applies it (no backend needed).
+function encodeDesignParam() {
+  const d = (typeof currentDesignParams === 'function') ? currentDesignParams() : readUI();
+  return btoa(unescape(encodeURIComponent(JSON.stringify(d))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeDesignParam(s) {
+  try {
+    const b = s.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(b))));
+  } catch { return null; }
 }
 
 
@@ -2926,6 +3041,7 @@ const LABEL_FMT = {
   f1deg: (v) => (+v).toFixed(1) + '°',
   rounddeg: (v) => Math.round(+v) + '°',
   signed2: (v) => { const n = +v; return (n > 0 ? '+' : '') + n.toFixed(2); },
+  mm: (v) => Math.round(+v) + ' mm',
 };
 function refreshLabels() {
   for (const c of WIRED) if (c.kind === 'slider' && c.fmt) setLabel(c.id, LABEL_FMT[c.fmt](inputs[c.id].value));
@@ -2982,7 +3098,9 @@ function setBuilding(on) {
 
 // bind: every slider except Layer count (its own combined handler is below) gets the
 // standard input -> refresh read-out + regenerate. Derived from the registry.
-WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount').forEach((c) => {
+// heightMM (Make · Size) is EXPORT-only — the live view stays unitless, so it must not
+// trigger a geometry rebuild; it refreshes its label + the printability badge instead.
+WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount' && c.id !== 'heightMM').forEach((c) => {
   inputs[c.id].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
 // ---- Standard / Advanced tier filter -------------------------------------------
@@ -3347,6 +3465,7 @@ if (resetBtn) {
     updateBaseOptions();
     refreshLabels();
     detectShape();   // Reset returns the params to Rounded, so the picker should say so
+    updatePrintability();
     scheduleRegen();
   });
 }
@@ -3385,7 +3504,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 14;
+const CURRENT_SCHEMA = 15;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3566,7 +3685,17 @@ function migrateV13toV14(p) {
   if (out.infillType === 'lace') out.infillType = 'veins';
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14];
+// v14 -> v15: the Make block's Size (mm) + Process. A design saved before the Make block
+// had no target size — it printed at the old fixed 26 mm/unit — so bake in the equivalent
+// real size (its extent x 26, clamped to the slider) and the SLS default process, so an
+// old design loads at roughly its former physical size.
+function migrateV14toV15(p) {
+  const out = { ...p };
+  if (out.heightMM == null) out.heightMM = 120;   // slider default; ~the old default bloom's size
+  if (out.process == null) out.process = 'sls';
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build
@@ -3724,6 +3853,7 @@ function applyDesign(raw) {
   updateBaseOptions();
   refreshLabels();
   detectShape();   // re-derive the shape picker from the loaded params
+  updatePrintability();
   scheduleRegen();
 }
 
@@ -3808,6 +3938,20 @@ refreshLabels();
 applyTier();
 detectShape();   // seed the petal-shape picker from the initial params (default = Rounded)
 
+// MAKE wiring: Size + Process feed the printability badge only (export-only, no rebuild);
+// Share link copies a self-contained URL of the whole design.
+if (inputs.heightMM) inputs.heightMM.addEventListener('input', () => { refreshLabels(); updatePrintability(); });
+if (inputs.process) inputs.process.addEventListener('change', updatePrintability);
+const shareBtn = document.getElementById('shareLink');
+if (shareBtn) {
+  shareBtn.addEventListener('click', async () => {
+    const url = location.origin + location.pathname + '?d=' + encodeDesignParam();
+    const done = (label) => { const t = shareBtn.textContent; shareBtn.textContent = label; setTimeout(() => { shareBtn.textContent = t; }, 1400); };
+    try { await navigator.clipboard.writeText(url); done('Copied ✓'); }
+    catch { window.prompt('Copy this share link:', url); }
+  });
+}
+
 if (PREVIEW) {
   // Gallery thumbnail: strip the chrome, render cheaply, always auto-rotate, and
   // render the design its parent posts in (no initial default build).
@@ -3825,8 +3969,12 @@ if (PREVIEW) {
   }
   animate();
 } else {
-  const loadId = new URLSearchParams(location.search).get('load');
+  const q = new URLSearchParams(location.search);
+  const loadId = q.get('load');
+  const shared = q.get('d');
   generate();
   if (loadId) loadDesignById(loadId);
+  else if (shared) { const obj = decodeDesignParam(shared); if (obj) applyDesign(obj); }
+  updatePrintability();
   animate();
 }

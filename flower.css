@@ -449,6 +449,50 @@ input[type="checkbox"]:checked::after {
 .fl-btn--primary:hover { background: rgba(28, 107, 107, 0.34); }
 .fl-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* MAKE block — live printability badge, fits readout, and the save/share/get action row.
+   Green (petrol) = one watertight solid that fits and reads at this size; amber = prints
+   but caveated (over the dyed ceiling, over a build volume, or the floor is coarse for the
+   size). No red state in the live view — a non-watertight export is caught at Get-STL. */
+.fl-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.35rem;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+}
+.fl-badge__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transform: translateY(1px);
+  background: var(--petrol-bright);
+  box-shadow: 0 0 6px rgba(47, 163, 163, 0.7);
+}
+.fl-badge__text { color: var(--ink); }
+.fl-badge[data-state="warn"] .fl-badge__dot {
+  background: #d8a53f;
+  box-shadow: 0 0 6px rgba(216, 165, 63, 0.65);
+}
+.fl-badge[data-state="warn"] .fl-badge__text { color: #e7c887; }
+.fl-fit {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ink-dim);
+  margin-bottom: 0.7rem;
+}
+.fl-make__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.fl-make__actions .fl-btn { flex: 1 1 auto; text-align: center; }
+
 /* Panel footer link row (to the shared saved-designs gallery). */
 .fl-panel__links {
   margin-top: 0.9rem;

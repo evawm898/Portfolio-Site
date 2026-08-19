@@ -184,4 +184,6 @@ export const CONTROLS = [
   {"id":"leafType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"compound","text":"COMPOUND (ROSE)"},{"value":"lobed","text":"LOBED (POPPY)"},{"value":"oval","text":"OVAL ON PETIOLE"},{"value":"narrow","text":"NARROW"}],"default":"none","label":"Leaves","gating":{"data-stem":true},"tier":"standard"},
   {"id":"leafPhyllotaxy","section":"acc-base","kind":"select","options":[{"value":"alternate","text":"ALTERNATE"},{"value":"opposite","text":"OPPOSITE"},{"value":"whorled","text":"WHORLED"}],"default":"alternate","label":"Leaf arrangement","gating":{"data-stem":true,"data-leaf":true}},
   {"id":"leafSize","section":"acc-base","kind":"slider","min":0.2,"max":3,"step":0.05,"default":1,"label":"Leaf size","fmt":"f2","gating":{"data-stem":true,"data-leaf":true}},
+  {"id":"heightMM","section":"acc-make","kind":"slider","min":40,"max":300,"step":5,"default":120,"label":"Size","fmt":"mm","tier":"standard"},
+  {"id":"process","section":"acc-make","kind":"select","options":[{"value":"sls","text":"SLS NYLON"},{"value":"sla","text":"RESIN SLA"},{"value":"fdm","text":"FDM 0.4MM"}],"default":"sls","label":"Process","tier":"standard"},
 ];

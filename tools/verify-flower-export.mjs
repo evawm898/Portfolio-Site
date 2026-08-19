@@ -263,6 +263,13 @@ await page.route('**cdn.jsdelivr.net/**', (route) => {
 await page.goto(`http://localhost:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
 await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
 
+// Export STL now lives inside the collapsed "Make" accordion — open it so the click lands.
+await page.evaluate(() => {
+  const head = document.querySelector('.fl-acc__head[aria-controls="acc-make"]');
+  if (head && head.getAttribute('aria-expanded') !== 'true') head.click();
+});
+await page.waitForTimeout(120);
+
 const results = [];
 for (const cfg of CONFIGS) {
   for (const s of cfg.set) {
