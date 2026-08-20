@@ -1645,8 +1645,9 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // it with the bloom, so it's automatically sized to the bud. It reads the MAIN ui's
   // receptacle sliders (blend / depth / tightness) so its flutes match the big one.
   // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
-  // gating here on the receptacle dropdown makes it appear exactly when BOTH are on.
-  if (ui.receptacleType !== 'none') {
+  // the bud's receptacle follows the same derived rule as the main bloom's (stem/sepals
+  // present, or the migration override), so a budded plant with a stem grows a bud base too.
+  if (ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on') {
     const attach = [];
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
@@ -2461,7 +2462,12 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // the stem and its tip — no seam. SEPALS remain an independent whorl. A stem
   // WITHOUT a receptacle has no junction to seam, so it keeps the standalone stem
   // tube (buildStemInto). Everything builds into the petal mesh, same teal tubes.
-  const hasRecept = ui.receptacleType !== 'none';
+  // DERIVED junction: the receptacle exists whenever there is something below the bloom to
+  // connect to — a stem or sepals. It is plumbing, not a feature, so there is no visitor
+  // control; it appears because of course it does. `receptacleType === 'on'` survives only
+  // as a migration override, so an old design that set it explicitly keeps its receptacle
+  // even with no stem/sepals.
+  const hasRecept = ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
     length: clamp(ui.stemLength, 0, 10),
@@ -3380,7 +3386,10 @@ inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); sche
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 // Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
-  const on = inputs.receptacleType.value !== 'none';
+  // The junction is DERIVED (stem or sepals present), not a control — so the Advanced
+  // sculpting controls (data-recept + the junction cluster) appear exactly when the
+  // derived receptacle is active. receptacleType is a hidden migration override only.
+  const on = inputs.stemType.value !== 'none' || inputs.sepalsType.value !== 'none' || inputs.receptacleType.value === 'on';
   const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
   document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
   // JUNCTION cluster (absorption / neck swell / gather height / bundle tightness / flare
@@ -3680,9 +3689,10 @@ function migrateV8toV9(p) {
 function migrateV9toV10(p) {
   const out = { ...p };
   if (out.receptConstruction === 'gathered') out.receptConstruction = 'ribbed';
-  for (const k of ['mergeStart', 'mergeRate']) {
-    if (out[k] == null) out[k] = DEFAULTS[k];
-  }
+  // former DEFAULTS.mergeStart / .mergeRate (both controls retired at v17 — dead wiring);
+  // baked as literals so this step is self-contained, then v16->v17 drops the keys.
+  if (out.mergeStart == null) out.mergeStart = 0.5;
+  if (out.mergeRate == null) out.mergeRate = 0.5;
   return out;
 }
 // v10 -> v11: the SOLID receptacle becomes a C1 CROSS-SECTION MORPH under continuous margin,
@@ -3709,7 +3719,7 @@ function migrateV11toV12(p) {
                    : out.receptConstruction === 'cored' ? 0.6
                    : DEFAULTS.absorption;   // ribbed / anything else
   }
-  if (out.gatherRadius == null) out.gatherRadius = DEFAULTS.gatherRadius;
+  if (out.gatherRadius == null) out.gatherRadius = 0.06;   // former DEFAULTS.gatherRadius (control retired at v17 — dead wiring); v16->v17 drops the key
   if (out.gatherHeight == null) out.gatherHeight = DEFAULTS.gatherHeight;
   return out;
 }

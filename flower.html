@@ -1167,7 +1167,7 @@
             <label for="bundleTightness">Bundle tightness</label>
             <span class="fl-ctrl__val" data-value="bundleTightness"></span>
           </div>
-          <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.5">
+          <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.75">
           <span class="fl-ctrl__hint">how close the strands stay to the axis at the foot &mdash; a loose splay &rarr; a tight neck</span>
         </div>
 
@@ -1185,7 +1185,7 @@
             <label for="absorption">Absorption</label>
             <span class="fl-ctrl__val" data-value="absorption"></span>
           </div>
-          <input type="range" id="absorption" min="0" max="1" step="0.01" value="0.85">
+          <input type="range" id="absorption" min="0" max="1" step="0.01" value="0.6">
           <span class="fl-ctrl__hint">how much the gathered strands melt into one mass &mdash; low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)</span>
         </div>
 
@@ -1194,7 +1194,7 @@
             <label for="buttonSize">Neck swell</label>
             <span class="fl-ctrl__val" data-value="buttonSize"></span>
           </div>
-          <input type="range" id="buttonSize" min="0" max="1" step="0.01" value="0.3">
+          <input type="range" id="buttonSize" min="0" max="1" step="0.01" value="0.05">
           <span class="fl-ctrl__hint">how much the neck widens at the arrival zone to receive the strands &mdash; zero is a straight taper (~4&times; a strand), higher swells the shoulder the strands emerge from</span>
         </div>
 
@@ -1204,13 +1204,15 @@
             <label for="gatherHeight">Gather height</label>
             <span class="fl-ctrl__val" data-value="gatherHeight"></span>
           </div>
-          <input type="range" id="gatherHeight" min="0.05" max="0.6" step="0.01" value="0.25">
+          <input type="range" id="gatherHeight" min="0.05" max="0.6" step="0.01" value="0.15">
           <span class="fl-ctrl__hint">how far below the feet the button forms before the trunk descends &mdash; small keeps it up under the bloom, large drops it toward the stem</span>
         </div>
 
 
 
-        <div class="fl-ctrl">
+        <!-- Receptacle is DERIVED (stem or sepals present) — this control is retired from the
+             UI and kept only as a hidden migration override for old designs that set it. -->
+        <div class="fl-ctrl" id="receptacleTypeCtrl" hidden>
           <div class="fl-ctrl__row">
             <label for="receptacleType">Receptacle</label>
           </div>

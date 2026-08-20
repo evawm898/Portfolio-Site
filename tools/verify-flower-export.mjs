@@ -197,10 +197,11 @@ for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOL
 
 // ===== CONTINUOUS MARGIN + SDF RECEPTACLE: the petal edge becomes two strands rooted at the
 // foot, and the receptacle is rebuilt as ONE implicit surface (SDF) those strands GATHER into
-// (see flower-sdf.js). ABSORPTION (blend radius) replaces CONSTRUCTION; GATHER RADIUS/HEIGHT
-// set the button; PROFILE is a radius multiplier and COLLAR a radius bump. The junction is a
-// separate polygonised solid overlapping the feet + stem, so re-run the print-safety gate with
-// it ON across absorption, gather, profile, collar, infills, bloom types, layers and sepals —
+// (see flower-sdf.js). ABSORPTION (blend radius) replaces CONSTRUCTION; BUTTON SIZE (neck swell)
+// and GATHER HEIGHT shape the button; BUNDLE TIGHTNESS / FLARE RATE set the strand splay; PROFILE
+// is a radius multiplier and COLLAR a radius bump. The junction is a separate polygonised solid
+// overlapping the feet + stem, so re-run the print-safety gate with it ON across those junction
+// params, profile, collar, infills, bloom types, layers and sepals —
 // every one must still export watertight (0 boundary edges).
 const CM_START = CONFIGS.length + 1;   // 1-based index of the first continuous-margin row
 CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm: true, set: [
@@ -211,18 +212,19 @@ CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm
   { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' },
   { id: 'receptReach', value: '0.4' },
   { id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' },
-  { id: 'absorption', value: '0.85' }, { id: 'buttonSize', value: '0.4' }, { id: 'gatherRadius', value: '0.06' }, { id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' },
+  { id: 'absorption', value: '0.85' }, { id: 'buttonSize', value: '0.4' }, { id: 'gatherHeight', value: '0.25' },
 ] });
 CONFIGS.push({ label: 'cont-margin BUTTON 0 (bare gather web)', cm: true, set: [{ id: 'buttonSize', value: '0' }] });
 CONFIGS.push({ label: 'cont-margin BUTTON 1 (max daisy disc)', cm: true, set: [{ id: 'buttonSize', value: '1' }] });
 CONFIGS.push({ label: 'cont-margin ABSORPTION low 0.15 (distinct strands)', cm: true, set: [{ id: 'buttonSize', value: '0.4' }, { id: 'absorption', value: '0.15' }] });
 CONFIGS.push({ label: 'cont-margin ABSORPTION high 1.0 (fully fused)', cm: true, set: [{ id: 'absorption', value: '1' }] });
-CONFIGS.push({ label: 'cont-margin GATHER tight (radius 0.03, anemone button)', cm: true, set: [{ id: 'absorption', value: '0.85' }, { id: 'gatherRadius', value: '0.03' }] });
-CONFIGS.push({ label: 'cont-margin GATHER wide (radius 0.55, degrades to splay)', cm: true, set: [{ id: 'gatherRadius', value: '0.55' }] });
-CONFIGS.push({ label: 'cont-margin GATHER deep (height 0.55) + tight radius', cm: true, set: [{ id: 'gatherRadius', value: '0.05' }, { id: 'gatherHeight', value: '0.55' }] });
-CONFIGS.push({ label: 'cont-margin MERGE start 0.2 / rate 0.2 (early inward, early drop)', cm: true, set: [{ id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.2' }, { id: 'mergeRate', value: '0.2' }] });
-CONFIGS.push({ label: 'cont-margin MERGE start 0.8 / rate 0.9 (late inward, even)', cm: true, set: [{ id: 'mergeStart', value: '0.8' }, { id: 'mergeRate', value: '0.9' }] });
-CONFIGS.push({ label: 'cont-margin PROFILE dome (radius mult) + band collar', cm: true, set: [{ id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' }, { id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptCollar', value: 'band', evt: 'change' }] });
+// gatherRadius/mergeStart/mergeRate were dead wiring (passed to the SDF builder, never read)
+// and have been removed; these rows now sweep the LIVE junction params at their extremes.
+CONFIGS.push({ label: 'cont-margin GATHER shallow (height 0.05, up under bloom)', cm: true, set: [{ id: 'absorption', value: '0.6' }, { id: 'buttonSize', value: '0.4' }, { id: 'gatherHeight', value: '0.05' }] });
+CONFIGS.push({ label: 'cont-margin GATHER deep (height 0.6, dropped toward stem)', cm: true, set: [{ id: 'gatherHeight', value: '0.6' }] });
+CONFIGS.push({ label: 'cont-margin BUNDLE tight 1 / flare 0 (max neck, quick taper)', cm: true, set: [{ id: 'gatherHeight', value: '0.15' }, { id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }] });
+CONFIGS.push({ label: 'cont-margin NECK swell max (buttonSize 1) + bundle default', cm: true, set: [{ id: 'bundleTightness', value: '0.75' }, { id: 'flareRate', value: '0.5' }, { id: 'buttonSize', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin PROFILE dome (radius mult) + band collar', cm: true, set: [{ id: 'buttonSize', value: '0.4' }, { id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptCollar', value: 'band', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin PROFILE urn (radius mult) + ferrule collar', cm: true, set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'receptCollar', value: 'ferrule', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin PROFILE cone + collar none', cm: true, set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin voronoi infill', cm: true, set: [{ id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] });
