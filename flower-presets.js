@@ -22,6 +22,20 @@
    clean/ruffled (the only two that render under the Standard-default continuous
    margin — Toothed/Scalloped are Advanced, see flower.js ADV_OPTIONS).
 
+   NOT EXERCISED — the cleanup backlog. No preset drives these ON PURPOSE: each is
+   a known-weak or in-flux feature we keep out of the shop window until it is
+   overhauled. This list IS the plan.
+     · bilateral (FAN) arrangement  — renders as scattered debris (#68)
+     · Lobed / cleft margin         — continuous-margin rim not cleft-aware (#64)
+     · Toothed / Scalloped edges    — inert under the continuous margin (#67)
+     · receptacle / junction        — DERIVED from a stem or sepals; no preset
+                                       carries either, so none builds a junction
+     · sepals                       — Rose & Thistle carried sepalsType:'sepals'
+                                       until the derived-receptacle rule turned that
+                                       into a grown base; dropped from both so the
+                                       approved bloom renders stand, pending the
+                                       whorl-unification overhaul (then reinstate).
+
    AUTHORED DATA — taste, not derived. Thumbnails are the derived artifact
    (build-time, CI-checked); these params are hand-tuned and frozen. Regenerate
    the paste-ready form of this file from the running app via MAKE ▸ Presets ▸
@@ -43,7 +57,7 @@ export const PRESETS = [
     ui: { bloomType: 'coiled', petalCount: 24, tightness: 0.2, bloom: 44, elevation: 0.12,
       width: 1.0, taper: 0.3, tip: 0.55, petalCup: 0.3, centerCurve: 0.45, shoulder: 0.55, edgeCurve: 0.1,
       tipStyle: 'clean', infillType: 'veins', density: 6, softness: 0.7,
-      centerArch: 'petaloid', centerType: 'none', sepalsType: 'sepals', stemType: 'none' } },
+      centerArch: 'petaloid', centerType: 'none', sepalsType: 'none', stemType: 'none' } },
 
   // 3 — deliberately SPARE: six long narrow reflexed straps + open growth lace.
   { name: 'Lily', note: 'deliberately spare', slug: 'lily',
@@ -73,7 +87,7 @@ export const PRESETS = [
     ui: { bloomType: 'coiled', petalCount: 40, tightness: 0.4, bloom: 24, elevation: 0.35,
       width: 0.45, taper: 0.55, tip: 0.2, petalCup: 0.08, centerCurve: 0.2, shoulder: 0.3,
       tipStyle: 'clean', infillType: 'strands', softness: 0.4,
-      centerArch: 'dense', centerType: 'none', sepalsType: 'sepals', stemType: 'none' } },
+      centerArch: 'dense', centerType: 'none', sepalsType: 'none', stemType: 'none' } },
 
   // 7 — frilly clawed ruffle, Lattice bone. Nine petals (calmed from sixteen).
   { name: 'Carnation', note: 'frilly clawed ruffle', slug: 'carnation',

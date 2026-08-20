@@ -137,7 +137,7 @@ export const CONTROLS = [
   {"id":"fillDensity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Fill density","fmt":"f2","gating":{"data-center-arch":"petaloid"}},
   {"id":"fillBloomAngle","section":"acc-base","kind":"slider","min":0,"max":90,"step":1,"default":30,"label":"Fill bloom angle","fmt":"rounddeg","gating":{"data-center-arch":"petaloid"}},
   {"id":"continuousMargin","section":"acc-base","kind":"select","options":[{"value":"off","text":"OFF"},{"value":"on","text":"ON"}],"default":"on","label":"Continuous margin"},
-  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.75,"label":"Bundle tightness","fmt":"f2","gating":{"data-cont-margin":true}},
+  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bundle tightness","fmt":"f2","gating":{"data-cont-margin":true}},
   {"id":"flareRate","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Flare rate","fmt":"f2","gating":{"data-cont-margin":true}},
   {"id":"absorption","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Absorption","fmt":"f2","gating":{"data-cont-margin":true}},
   {"id":"buttonSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.05,"label":"Neck swell","fmt":"f2","gating":{"data-cont-margin":true}},
