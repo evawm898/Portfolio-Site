@@ -31,6 +31,7 @@ import {
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
 import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
+import { VIEW_PRESETS } from './flower-view-presets.js';
 
 const DEG = Math.PI / 180;
 
@@ -2772,18 +2773,10 @@ function refitCamera(...accs) {
 
 /* ---------------------------------------------------
    VIEW PRESETS — smoothly animate the camera to a named angle, always framed
-   to the CURRENT plant bounds (any size). `dir` is the target->camera offset
-   direction; `up` sets the on-screen vertical. TOP looks straight down, so it
-   uses a horizontal up (matching the bilateral top-down convention). DEFAULT
+   to the CURRENT plant bounds (any size). Vectors live in flower-view-presets.js
+   (shared with headless audit tooling — see that file's header). DEFAULT
    reproduces the initial framing (see frameCameraOnce). `fit` pads the frame.
 --------------------------------------------------- */
-const VIEW_PRESETS = {
-  default: { dir: [0.45, 0.30, 0.85], up: [0, 1, 0], fit: 1.6 },
-  front:   { dir: [0.00, 0.15, 1.00], up: [0, 1, 0], fit: 1.5 },
-  side:    { dir: [1.00, 0.15, 0.00], up: [0, 1, 0], fit: 1.5 },
-  top:     { dir: [0.00, 1.00, 0.001], up: [1, 0, 0], fit: 1.45 },
-  iso:     { dir: [1.00, 0.85, 1.00], up: [0, 1, 0], fit: 1.6 },
-};
 let viewTween = null;
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
