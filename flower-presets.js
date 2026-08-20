@@ -28,7 +28,7 @@
    Export.
    =================================================================== */
 
-export const PRESET_SCHEMA = 15;
+export const PRESET_SCHEMA = 16;
 
 export const PRESETS = [
   // 1 — the friendly default. Flat radial rosette of slender rays + disc eye.

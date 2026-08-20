@@ -3117,16 +3117,17 @@ const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ct
 // control they live in (Arrangement / Edge) is a Standard picker. In Standard we hide
 // those options and, if a loaded design had one selected, fall back to a Standard-safe
 // value (and regenerate, since the geometry must follow the picker). Why each is here —
-// all three were caught by the Standard-option sweep as broken-in-Standard:
-//   - Edge FRACTAL: geometry backlog, no live geometry yet.
+// caught by the Standard-option sweep as broken-in-Standard:
 //   - Edge TOOTHED / SCALLOPED: the teeth/scallops reshape the silhouette rim, but the
 //     Standard-default continuous margin replaces the rim with smooth marginal strands,
 //     so they render identically to CLEAN. They render correctly in Advanced (continuous
 //     margin OFF). Return to Standard once the margin is edge-profile-aware (#67).
 //   - Arrangement FAN (bilateral): renders as scattered debris. Advanced-only until the
 //     bilateral layout is rebuilt.
+// (The FRACTAL edge was DELETED outright — no live geometry ever existed — so it is gone
+//  from the enum, not listed here; the v15->v16 migration maps any saved fractal to clean.)
 const ADV_OPTIONS = {
-  tipStyle:  { advanced: ['fractal', 'jagged', 'scallop'], fallback: 'clean' },
+  tipStyle:  { advanced: ['jagged', 'scallop'], fallback: 'clean' },
   bloomType: { advanced: ['bilateral'], fallback: 'coiled' },
 };
 function applyTier() {
@@ -3529,7 +3530,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 15;
+const CURRENT_SCHEMA = 16;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3720,7 +3721,17 @@ function migrateV14toV15(p) {
   if (out.process == null) out.process = 'sls';
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15];
+// v15 -> v16: the FRACTAL edge option was deleted (it never had live geometry — it
+// rendered as clean). Map any saved fractal edge to clean, on the global tip style and
+// on the three bilateral per-petal edges, so a design that selected it loads unchanged
+// (it already looked clean) instead of onto a now-missing option.
+function migrateV15toV16(p) {
+  const out = { ...p };
+  if (out.tipStyle === 'fractal') out.tipStyle = 'clean';
+  for (const k of ['bilEdge1', 'bilEdge2', 'bilEdge3']) if (out[k] === 'fractal') out[k] = 'clean';
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

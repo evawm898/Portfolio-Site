@@ -174,7 +174,6 @@
             <option value="clean">CLEAN</option>
             <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
           </select>
           <span class="fl-ctrl__hint">applies to the centre petal too, if on</span>
         </div>
@@ -207,7 +206,6 @@
             <option value="clean">CLEAN</option>
             <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
           </select>
         </div>
         <div class="fl-ctrl" data-bil-petal="2">
@@ -239,7 +237,6 @@
             <option value="clean">CLEAN</option>
             <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
           </select>
         </div>
         <div class="fl-ctrl" data-bil-petal="3">
@@ -697,89 +694,6 @@
           <span class="fl-ctrl__hint">how the infill meets the rim &mdash; fade stops short of it, meet runs veins into the margin, loop fuses neighbouring tips into arches</span>
         </div>
 
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="continuousMargin">Continuous margin</label>
-          </div>
-          <select class="fl-select" id="continuousMargin">
-            <option value="off">OFF</option>
-            <option value="on" selected>ON</option>
-          </select>
-          <span class="fl-ctrl__hint">the edge as two strands rooted at the foot, and the receptacle rebuilt as ONE implicit surface (SDF) those strands gather into &mdash; petal, receptacle and stem read as one continuous piece</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="bundleTightness">Bundle tightness</label>
-            <span class="fl-ctrl__val" data-value="bundleTightness"></span>
-          </div>
-          <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how close the strands stay to the axis at the foot &mdash; a loose splay &rarr; a tight neck</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="flareRate">Flare rate</label>
-            <span class="fl-ctrl__val" data-value="flareRate"></span>
-          </div>
-          <input type="range" id="flareRate" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how fast they open onto the edge as they rise &mdash; a slow spread &rarr; a quick flare</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="absorption">Absorption</label>
-            <span class="fl-ctrl__val" data-value="absorption"></span>
-          </div>
-          <input type="range" id="absorption" min="0" max="1" step="0.01" value="0.85">
-          <span class="fl-ctrl__hint">how much the gathered strands melt into one mass &mdash; low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="buttonSize">Neck swell</label>
-            <span class="fl-ctrl__val" data-value="buttonSize"></span>
-          </div>
-          <input type="range" id="buttonSize" min="0" max="1" step="0.01" value="0.3">
-          <span class="fl-ctrl__hint">how much the neck widens at the arrival zone to receive the strands &mdash; zero is a straight taper (~4&times; a strand), higher swells the shoulder the strands emerge from</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="gatherRadius">Gather radius</label>
-            <span class="fl-ctrl__val" data-value="gatherRadius"></span>
-          </div>
-          <input type="range" id="gatherRadius" min="0" max="0.6" step="0.01" value="0.06">
-          <span class="fl-ctrl__hint">how tight the receptacle button is &mdash; near zero the strands run inward to a compact node on the axis (an anemone button), wide and it opens back out toward a splay</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="gatherHeight">Gather height</label>
-            <span class="fl-ctrl__val" data-value="gatherHeight"></span>
-          </div>
-          <input type="range" id="gatherHeight" min="0.05" max="0.6" step="0.01" value="0.25">
-          <span class="fl-ctrl__hint">how far below the feet the button forms before the trunk descends &mdash; small keeps it up under the bloom, large drops it toward the stem</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="mergeStart">Merge start</label>
-            <span class="fl-ctrl__val" data-value="mergeStart"></span>
-          </div>
-          <input type="range" id="mergeStart" min="0.2" max="0.8" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how early the strands turn inward as they gather &mdash; later &rarr; sooner</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="mergeRate">Merge rate</label>
-            <span class="fl-ctrl__val" data-value="mergeRate"></span>
-          </div>
-          <input type="range" id="mergeRate" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how the descent staggers &mdash; an early drop from the button &rarr; an even taper into the stem</span>
-        </div>
-
         <div class="fl-ctrl" id="captureDistCtrl">
           <div class="fl-ctrl__row">
             <label for="captureDist">Capture distance</label>
@@ -953,7 +867,6 @@
             <option value="jagged">TOOTHED</option>
             <option value="scallop">SCALLOPED</option>
             <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
           </select>
         </div>
 
@@ -963,28 +876,28 @@
             <span class="fl-ctrl__val" data-value="tip"></span>
           </div>
           <input type="range" id="tip" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint" data-tip-styles="clean fractal">round &rarr; pointed tip</span>
+          <span class="fl-ctrl__hint" data-tip-styles="clean">round &rarr; pointed tip</span>
           <span class="fl-ctrl__hint" data-tip-styles="jagged">round &rarr; pointed &mdash; apex &amp; teeth</span>
           <span class="fl-ctrl__hint" data-tip-styles="ruffled">soft sine &rarr; tight gathered crest</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled">
           <div class="fl-ctrl__row">
             <label for="tipFrequency">Tip frequency</label>
             <span class="fl-ctrl__val" data-value="tipFrequency"></span>
           </div>
           <input type="range" id="tipFrequency" min="1" max="40" step="1" value="14">
-          <span class="fl-ctrl__hint" data-tip-styles="jagged fractal">total tips &mdash; 1 = apex only</span>
+          <span class="fl-ctrl__hint" data-tip-styles="jagged">total tips &mdash; 1 = apex only</span>
           <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle waves &mdash; fine control low, caps at the densest</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="jagged fractal">
+        <div class="fl-ctrl" data-tip-styles="jagged">
           <div class="fl-ctrl__row">
             <label for="tipRegion">Tip region</label>
             <span class="fl-ctrl__val" data-value="tipRegion"></span>
           </div>
           <input type="range" id="tipRegion" min="0" max="1" step="0.01" value="0.25">
-          <span class="fl-ctrl__hint" data-tip-styles="jagged fractal">how far teeth reach from the apex down</span>
+          <span class="fl-ctrl__hint" data-tip-styles="jagged">how far teeth reach from the apex down</span>
         </div>
 
         <div class="fl-ctrl" data-tip-styles="jagged ruffled">
@@ -997,7 +910,7 @@
           <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle depth &mdash; how far the edge folds in/out</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="jagged fractal">
+        <div class="fl-ctrl" data-tip-styles="jagged">
           <div class="fl-ctrl__row">
             <label for="tipIrregularity">Tip irregularity</label>
             <span class="fl-ctrl__val" data-value="tipIrregularity"></span>
@@ -1045,7 +958,6 @@
 
         <p class="fl-tip-note" data-tip-styles="clean">Smooth petal edge.</p>
         <p class="fl-tip-note" data-tip-styles="scallop">Scalloped doily edge &mdash; pairs with the LACE infill.</p>
-        <p class="fl-tip-note" data-tip-styles="fractal">This style isn&rsquo;t built yet &mdash; controls are placeholders.</p>
 
       </div>
     </section>
@@ -1245,6 +1157,89 @@
         </div>
         <p class="fl-tip-note" data-center-arch="petaloid">Tiny petals use a simplified PETAL shape (outline, centre curve, cup) as clean solid blades &mdash; tip style, edge noise and infill are omitted. Stamens/pistil are hidden.</p>
 
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="continuousMargin">Continuous margin</label>
+          </div>
+          <select class="fl-select" id="continuousMargin">
+            <option value="off">OFF</option>
+            <option value="on" selected>ON</option>
+          </select>
+          <span class="fl-ctrl__hint">the edge as two strands rooted at the foot, and the receptacle rebuilt as ONE implicit surface (SDF) those strands gather into &mdash; petal, receptacle and stem read as one continuous piece</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="bundleTightness">Bundle tightness</label>
+            <span class="fl-ctrl__val" data-value="bundleTightness"></span>
+          </div>
+          <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how close the strands stay to the axis at the foot &mdash; a loose splay &rarr; a tight neck</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="flareRate">Flare rate</label>
+            <span class="fl-ctrl__val" data-value="flareRate"></span>
+          </div>
+          <input type="range" id="flareRate" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how fast they open onto the edge as they rise &mdash; a slow spread &rarr; a quick flare</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="absorption">Absorption</label>
+            <span class="fl-ctrl__val" data-value="absorption"></span>
+          </div>
+          <input type="range" id="absorption" min="0" max="1" step="0.01" value="0.85">
+          <span class="fl-ctrl__hint">how much the gathered strands melt into one mass &mdash; low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="buttonSize">Neck swell</label>
+            <span class="fl-ctrl__val" data-value="buttonSize"></span>
+          </div>
+          <input type="range" id="buttonSize" min="0" max="1" step="0.01" value="0.3">
+          <span class="fl-ctrl__hint">how much the neck widens at the arrival zone to receive the strands &mdash; zero is a straight taper (~4&times; a strand), higher swells the shoulder the strands emerge from</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="gatherRadius">Gather radius</label>
+            <span class="fl-ctrl__val" data-value="gatherRadius"></span>
+          </div>
+          <input type="range" id="gatherRadius" min="0" max="0.6" step="0.01" value="0.06">
+          <span class="fl-ctrl__hint">how tight the receptacle button is &mdash; near zero the strands run inward to a compact node on the axis (an anemone button), wide and it opens back out toward a splay</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="gatherHeight">Gather height</label>
+            <span class="fl-ctrl__val" data-value="gatherHeight"></span>
+          </div>
+          <input type="range" id="gatherHeight" min="0.05" max="0.6" step="0.01" value="0.25">
+          <span class="fl-ctrl__hint">how far below the feet the button forms before the trunk descends &mdash; small keeps it up under the bloom, large drops it toward the stem</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="mergeStart">Merge start</label>
+            <span class="fl-ctrl__val" data-value="mergeStart"></span>
+          </div>
+          <input type="range" id="mergeStart" min="0.2" max="0.8" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how early the strands turn inward as they gather &mdash; later &rarr; sooner</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="mergeRate">Merge rate</label>
+            <span class="fl-ctrl__val" data-value="mergeRate"></span>
+          </div>
+          <input type="range" id="mergeRate" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how the descent staggers &mdash; an early drop from the button &rarr; an even taper into the stem</span>
+        </div>
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
