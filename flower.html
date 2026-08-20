@@ -489,13 +489,6 @@
              component elsewhere. Kept wired (input stays, value pinned to its 0.4
              default) so it still drives the global tube radius and readUI / reset keep
              working. To restore: remove `hidden`. -->
-        <div class="fl-ctrl" hidden>
-          <div class="fl-ctrl__row">
-            <label for="tube">Tube thickness</label>
-            <span class="fl-ctrl__val" data-value="tube"></span>
-          </div>
-          <input type="range" id="tube" min="0" max="1" step="0.01" value="0.4">
-        </div>
 
 
         <div class="fl-ctrl">
@@ -1205,14 +1198,6 @@
           <span class="fl-ctrl__hint">how much the neck widens at the arrival zone to receive the strands &mdash; zero is a straight taper (~4&times; a strand), higher swells the shoulder the strands emerge from</span>
         </div>
 
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="gatherRadius">Gather radius</label>
-            <span class="fl-ctrl__val" data-value="gatherRadius"></span>
-          </div>
-          <input type="range" id="gatherRadius" min="0" max="0.6" step="0.01" value="0.06">
-          <span class="fl-ctrl__hint">how tight the receptacle button is &mdash; near zero the strands run inward to a compact node on the axis (an anemone button), wide and it opens back out toward a splay</span>
-        </div>
 
         <div class="fl-ctrl" data-cont-margin>
           <div class="fl-ctrl__row">
@@ -1223,23 +1208,7 @@
           <span class="fl-ctrl__hint">how far below the feet the button forms before the trunk descends &mdash; small keeps it up under the bloom, large drops it toward the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="mergeStart">Merge start</label>
-            <span class="fl-ctrl__val" data-value="mergeStart"></span>
-          </div>
-          <input type="range" id="mergeStart" min="0.2" max="0.8" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how early the strands turn inward as they gather &mdash; later &rarr; sooner</span>
-        </div>
 
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="mergeRate">Merge rate</label>
-            <span class="fl-ctrl__val" data-value="mergeRate"></span>
-          </div>
-          <input type="range" id="mergeRate" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how the descent staggers &mdash; an early drop from the button &rarr; an even taper into the stem</span>
-        </div>
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
@@ -1636,6 +1605,14 @@
             <option value="fdm">FDM 0.4MM</option>
           </select>
           <span class="fl-ctrl__hint">sets the smallest printable feature (SLS 1.0 &middot; SLA 0.4 &middot; FDM 0.8 mm)</span>
+        </div>
+
+        <div class="fl-ctrl" hidden>
+          <div class="fl-ctrl__row">
+            <label for="tube">Tube thickness</label>
+            <span class="fl-ctrl__val" data-value="tube"></span>
+          </div>
+          <input type="range" id="tube" min="0" max="1" step="0.01" value="0.4">
         </div>
 
         <div id="printBadge" class="fl-badge" data-state="ok">

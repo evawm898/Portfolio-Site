@@ -87,7 +87,11 @@ const MIDRIB_W_BASE   = 1.00;
 let RECEPT_FIELD_STATS = null;
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
-const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap; export uses the full count
+const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap PER PETAL; export uses the full count
+const SPACECOL_LIVE_TOTAL = 5000;   // ...but bound the TOTAL across petals: a dense network on every one of
+// 40 petals is millions of live tris and can exhaust memory mid-build. Scale the per-petal cap down as the
+// petal count rises so the whole bloom stays within budget (export is unaffected — it uses the full count).
+const spacecolLiveCap = (petalCount) => Math.max(80, Math.min(SPACECOL_LIVE_CAP, Math.floor(SPACECOL_LIVE_TOTAL / Math.max(1, petalCount || 1))));
 
 // Deterministic per-petal network seed for SPACE COLONIZATION. Mixes the design's
 // STORED spaceSeed with a variant index cycled across the whorl by petal index, so:
@@ -903,6 +907,7 @@ function rodrigues(v, k, angle) {
 
 function resolveParams(ui) {
   return {
+    petalCount: ui.petalCount,                    // bloom petal count (drives the live spacecol source budget)
     W: ui.width,
     taper: ui.taper,
     clawLength: ui.clawLength,                    // CLAW: basal stalk length (0 = no claw, exact no-op)
@@ -1084,7 +1089,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         mode: P.spaceMode,
         // live path stays interactive with a coarse-but-complete network; the
         // export path (acc.exportMode) runs the full source count. Distinct memo keys.
-        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, SPACECOL_LIVE_CAP),
+        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, spacecolLiveCap(P.petalCount)),
         birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep,
         seedPattern: P.spacePattern,
       })
@@ -2104,8 +2109,7 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
         const field = buildReceptacleField(
           sdfFeet, { p: [neckPt.x, neckPt.y, neckPt.z], r: stemR },
           { cx, cz, tubeRadius: P.tubeRadius,
-            absorption: opts.absorption, gatherHeight: opts.gatherHeight, gatherRadius: opts.gatherRadius,
-            buttonSize: opts.buttonSize, mergeStart: opts.mergeStart, mergeRate: opts.mergeRate,
+            absorption: opts.absorption, gatherHeight: opts.gatherHeight, buttonSize: opts.buttonSize,
             // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
             // so the preview reads as the same solid mass it prints as (export floors anyway).
             profile, collar, exportMode, floorR: acc.floorR,
@@ -2496,8 +2500,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
       bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       continuousMargin: P.continuousMargin, tubeRadius: P.tubeRadius,
-      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate,
-      absorption: ui.absorption, gatherHeight: ui.gatherHeight, gatherRadius: ui.gatherRadius, buttonSize: ui.buttonSize,
+      absorption: ui.absorption, gatherHeight: ui.gatherHeight, buttonSize: ui.buttonSize,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -2684,11 +2687,24 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
 
 function generate() {
   const ui = readUI();
-  const P = resolveParams(ui);
-  const petalAcc = new MeshAccumulator();
-  const coreAcc  = new MeshAccumulator();
-  if (DEBUG_FIELDS) debugPetals.length = 0;   // collected during buildInto, drawn below
-  const { placements, centerHeight } = buildInto(petalAcc, coreAcc, ui, P);
+  // BUILD GUARD: an extreme combination (e.g. max petals × the Growth pattern) can
+  // exhaust memory mid-build and throw. Never let that break the page — build into fresh
+  // accumulators, and only swap them into the scene if the build succeeds; on failure keep
+  // the last-good mesh and surface a non-fatal note. A visitor can drag any slider freely.
+  let P, petalAcc, coreAcc, built;
+  try {
+    P = resolveParams(ui);
+    petalAcc = new MeshAccumulator();
+    coreAcc  = new MeshAccumulator();
+    if (DEBUG_FIELDS) debugPetals.length = 0;   // collected during buildInto, drawn below
+    built = buildInto(petalAcc, coreAcc, ui, P);
+  } catch (e) {
+    console.error('Flower build failed (kept previous geometry):', e);
+    const el = document.getElementById('readout');
+    if (el) el.textContent = 'That combination was too heavy to build — showing the previous flower. Try fewer petals or a lighter pattern.';
+    return;
+  }
+  const { placements, centerHeight } = built;
   coreGlow.position.y = centerHeight + 0.2;   // scene-only glow follows the core height
 
   swapGeometry(meshPetals, petalAcc);
@@ -3261,14 +3277,14 @@ function updateInfillOptions() {
   // those two patterns, so relabel it to match.
   const softLabel = document.querySelector('label[for="softness"]');
   if (softLabel) softLabel.textContent = type === 'veins' ? 'Detail' : 'Roundness';
-  // CONTINUOUS MARGIN: the bundle-tightness / flare-rate sliders apply only when it is on.
-  const contOn = inputs.continuousMargin.value === 'on';
-  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !contOn; });
+  // The junction-cluster controls (data-cont-margin) are gated in updateBaseOptions — they
+  // shape the SDF receptacle, so they need BOTH continuous margin ON and the Receptacle on.
   updateTerminationOptions();   // capture-distance visibility depends on infill type too
   applyTier();
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
-inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); scheduleRegen(); });
+// Continuous margin drives both the infill edge AND the junction gating (updateBaseOptions).
+inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); updateBaseOptions(); scheduleRegen(); });
 // EDGE TERMINATION: the capture-distance slider only applies to a tube infill
 // (veins / bone) with an active mode, so hide it for FADE and for slab infills.
 function updateTerminationOptions() {
@@ -3367,6 +3383,12 @@ function updateBaseOptions() {
   const on = inputs.receptacleType.value !== 'none';
   const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
   document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
+  // JUNCTION cluster (absorption / neck swell / gather height / bundle tightness / flare
+  // rate): these shape the SDF receptacle, which only exists when continuous margin is ON
+  // AND the Receptacle is on. Gating on continuous margin alone left them inert in the
+  // default config (Receptacle off) — so require both, or they do nothing when shown.
+  const contMarginOnJ = inputs.continuousMargin.value === 'on';
+  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !(contMarginOnJ && on); });
   // Per-axis sub-controls: only shown when the receptacle is on AND that axis is selected.
   document.querySelectorAll('[data-recept-dome]').forEach((el) => { el.hidden = !on || prof !== 'dome'; });
   document.querySelectorAll('[data-recept-open]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'gathered' && con !== 'cored'); });
@@ -3530,7 +3552,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 16;
+const CURRENT_SCHEMA = 17;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3731,7 +3753,15 @@ function migrateV15toV16(p) {
   for (const k of ['bilEdge1', 'bilEdge2', 'bilEdge3']) if (out[k] === 'fractal') out[k] = 'clean';
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16];
+// v16 -> v17: the receptacle-junction controls gatherRadius / mergeStart / mergeRate were
+// deleted — they were passed to the SDF field builder but never read (dead wiring), so
+// removing them changes no geometry. Drop the keys so a saved design carries nothing stale.
+function migrateV16toV17(p) {
+  const out = { ...p };
+  delete out.gatherRadius; delete out.mergeStart; delete out.mergeRate;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build
