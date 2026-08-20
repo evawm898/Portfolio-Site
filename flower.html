@@ -65,6 +65,22 @@
     </label>
   </div>
 
+  <!-- PRESETS — the shop window. A read-only gallery of curated starting points;
+       clicking one loads it through the normal design path. The dev row (Save /
+       Export / Import) is revealed only with ?dev in the URL — visitors never see
+       it. Cells are rendered from flower-presets.js by flower.js. -->
+  <div class="fl-presets" id="presetGallery">
+    <div class="fl-presets__head">
+      <div class="fl-eyebrow">Start from a preset</div>
+      <div class="fl-presets__dev" id="presetDev" hidden>
+        <button id="presetSaveAs" class="fl-btn fl-btn--mini" type="button" title="Save the current design as a draft preset (dev)">+ Save</button>
+        <button id="presetExport" class="fl-btn fl-btn--mini" type="button" title="Download every preset as paste-ready flower-presets.js (dev)">Export</button>
+        <button id="presetImport" class="fl-btn fl-btn--mini" type="button" title="Load a flower-presets.js file into draft slots (dev)">Import</button>
+      </div>
+    </div>
+    <div class="fl-presets__row" id="presetRow" role="listbox" aria-label="Presets"></div>
+  </div>
+
   <div class="fl-controls">
 
     <!-- ============================ FORM ============================ -->

@@ -39,7 +39,7 @@ import { chromium } from 'playwright-core';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const THREE_DIR = path.join(ROOT, 'node_modules', 'three');
@@ -118,6 +118,16 @@ if (SWEEP) {
 // the rim through the cleft-aware contour. The fidelity gap must then collapse to ~0 —
 // proof the gate measures the RENDERED margin, not merely the presence of a cleft.
 if (process.env.GQ_MARGIN_OFF) for (const c of CONFIGS) c.ui.continuousMargin = 'off';
+
+// SHIPPED PRESETS as named correctness fixtures. Each preset's PETAL (its shape + infill +
+// edge, measured with the shipping continuous-margin ON) must trace its rim, stay smooth,
+// and cap its infill ends — the same bar as the matrix, but reported by name ("preset:
+// thistle"). A preset is a full design, so it loads via applyDesign (window.__gqApply),
+// not the partial __gqSet the matrix uses. No xfail: a preset that fails IS a regression.
+if (!SWEEP && !process.env.GQ_MARGIN_OFF) {
+  const { PRESETS, PRESET_SCHEMA } = await import(pathToFileURL(path.join(ROOT, 'flower-presets.js')).href);
+  for (const p of PRESETS) CONFIGS.push({ name: `preset:${p.slug}`, preset: true, ui: { ...p.ui, schemaVersion: PRESET_SCHEMA }, xfail: null });
+}
 
 // ---- the geometry-quality hook, appended to the served flower.js (module scope, so it
 //      shares resolveParams / readUI / inputs / the imported geometry fns). Exports
@@ -244,6 +254,9 @@ window.__gq = async function() {
            maxCurvDegMM: +maxCurv.toFixed(1), p95CurvDegMM: +p95Curv.toFixed(1),
            degree1, onMargin, atBase, freeEnds, marginPts: n, L: +P.L.toFixed(3) };
 };
+// A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
+// petal params are set cleanly, not layered on the previous config's partial state.
+window.__gqApply = function(d) { applyDesign(d); };
 window.__gqReady = true;
 `;
 
@@ -286,7 +299,8 @@ let fails = 0, xfails = 0, xpasses = 0;
 const ledger = {};   // issue ref -> { total, failing }
 console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), '  verdict');
 for (const cfg of CONFIGS) {
-  await page.evaluate((ui) => window.__gqSet(ui), cfg.ui);
+  if (cfg.preset) await page.evaluate((d) => window.__gqApply(d), cfg.ui);
+  else await page.evaluate((ui) => window.__gqSet(ui), cfg.ui);
   const q = await page.evaluate(() => window.__gq());
   if (q.error) { console.log(cfg.name.padEnd(20), 'ERROR', q.error); rows.push({ name: cfg.name, error: q.error }); fails++; continue; }
   const badFidelity = q.marginGapMM > T.marginGapMM || !q.marginClosed;

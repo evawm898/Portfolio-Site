@@ -30,6 +30,7 @@ import {
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
+import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
 
 const DEG = Math.PI / 180;
 
@@ -3976,6 +3977,164 @@ if (shareBtn) {
   });
 }
 
+/* ---- PRESETS gallery ----------------------------------------------------------
+   The shop window: a read-only strip of curated starting points (flower-presets.js),
+   plus a dev-only authoring row (?dev) to save the current design as a draft, export
+   every preset as paste-ready flower-presets.js source, and import such a file back.
+   A preset loads through applyDesign (migrate + merge over DEFAULTS), so it can never
+   desync from the control set. Shipped presets are immutable; drafts live in a
+   namespaced localStorage key and never leave the browser until exported. */
+const PRESET_DEV = new URLSearchParams(location.search).has('dev');
+const PRESET_STORE = 'flowerBloom.presets.draft.v1';
+const PRESET_SKIP = new Set(['autoRotate']);   // view pref, not a design trait
+const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'preset';
+
+function loadDrafts() {
+  try { const raw = JSON.parse(localStorage.getItem(PRESET_STORE) || 'null'); if (raw && Array.isArray(raw.presets)) return raw.presets; }
+  catch { /* corrupt / unavailable — treat as empty */ }
+  return [];
+}
+function saveDrafts(list) {
+  try { localStorage.setItem(PRESET_STORE, JSON.stringify({ schemaVersion: PRESET_SCHEMA, presets: list })); }
+  catch { /* storage blocked / full — dev tool, fail quietly */ }
+}
+// The minimal design delta vs DEFAULTS — the readable `ui` form the shipped presets use.
+function presetDelta(full) {
+  const ui = {};
+  for (const [k, v] of Object.entries(full)) {
+    if (k === 'schemaVersion' || PRESET_SKIP.has(k) || !(k in DEFAULTS)) continue;
+    if (DEFAULTS[k] !== v) ui[k] = v;
+  }
+  return ui;
+}
+function allPresets() {
+  return [
+    ...PRESETS.map((p) => ({ ...p, kind: 'shipped' })),
+    ...loadDrafts().map((p) => ({ ...p, kind: 'draft' })),
+  ];
+}
+
+const presetRow = document.getElementById('presetRow');
+let activePresetCell = null;
+function markPreset(cell) {
+  if (activePresetCell) { activePresetCell.classList.remove('is-active'); activePresetCell.setAttribute('aria-selected', 'false'); }
+  activePresetCell = cell || null;
+  if (cell) { cell.classList.add('is-active'); cell.setAttribute('aria-selected', 'true'); }
+}
+function applyPreset(p, cell) {
+  applyDesign({ ...p.ui, schemaVersion: p.schemaVersion || PRESET_SCHEMA });
+  markPreset(cell);
+}
+function buildPresetGallery() {
+  if (!presetRow) return;
+  presetRow.textContent = '';
+  for (const p of allPresets()) {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'fl-preset' + (p.kind === 'draft' ? ' fl-preset--draft' : '');
+    cell.dataset.slug = p.slug;   // stable hook for the gate matrices
+    cell.setAttribute('role', 'option');
+    cell.setAttribute('aria-selected', 'false');
+    cell.title = `${p.name}${p.note ? ' — ' + p.note : ''}`;
+    let thumb;
+    if (p.kind === 'shipped') {
+      thumb = document.createElement('img');
+      thumb.src = `assets/presets/${p.slug}.png`;
+      thumb.alt = ''; thumb.loading = 'lazy';
+    } else {
+      thumb = document.createElement('span');
+      thumb.textContent = '❋';
+    }
+    thumb.className = 'fl-preset__thumb';
+    const name = document.createElement('span');
+    name.className = 'fl-preset__name';
+    name.textContent = p.name;
+    const note = document.createElement('span');
+    note.className = 'fl-preset__note';
+    note.textContent = p.kind === 'draft' ? 'draft' : (p.note || '');
+    cell.append(thumb, name, note);
+    // dev: shift-click a draft deletes it (checked first, in the capture phase)
+    if (PRESET_DEV && p.kind === 'draft') {
+      cell.title += '  (shift-click to delete)';
+      cell.addEventListener('click', (e) => {
+        if (!e.shiftKey) return;
+        e.stopImmediatePropagation();
+        saveDrafts(loadDrafts().filter((d) => d.slug !== p.slug));
+        buildPresetGallery();
+      }, true);
+    }
+    cell.addEventListener('click', () => applyPreset(p, cell));
+    presetRow.appendChild(cell);
+  }
+}
+// A manual control edit means the design is no longer "a preset" — drop the highlight.
+// (applyDesign sets values programmatically, which fires no input/change, so loading a
+//  preset never trips this — only a real user edit does.)
+for (const c of WIRED) {
+  const el = inputs[c.id];
+  if (el) el.addEventListener(c.kind === 'slider' ? 'input' : 'change', () => markPreset(null));
+}
+
+// dev authoring row (?dev): save current as draft, export all as source, import a file.
+function presetsSource() {
+  const body = allPresets().map((p) =>
+    `  { name: ${JSON.stringify(p.name)}, note: ${JSON.stringify(p.note || '')}, slug: ${JSON.stringify(p.slug)},\n    ui: ${JSON.stringify(p.ui)} },`
+  ).join('\n');
+  return `/* flower-presets.js — exported from the running app (Presets ▸ Export). */\nexport const PRESET_SCHEMA = ${PRESET_SCHEMA};\nexport const PRESETS = [\n${body}\n];\n`;
+}
+function downloadPresetsSource() {
+  const blob = new Blob([presetsSource()], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'flower-presets.js';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function importPresetsFile() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.js,text/javascript,application/javascript,text/plain';
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+      const mod = await import(url);
+      URL.revokeObjectURL(url);
+      const incoming = Array.isArray(mod.PRESETS) ? mod.PRESETS : [];
+      if (!incoming.length) { window.alert('No PRESETS array found in that file.'); return; }
+      const shippedSlugs = new Set(PRESETS.map((p) => p.slug));
+      const drafts = incoming
+        .filter((p) => p && p.ui && !shippedSlugs.has(p.slug || slugify(p.name)))
+        .map((p) => ({ name: p.name || 'Imported', note: p.note || '', slug: p.slug || slugify(p.name), ui: p.ui }));
+      saveDrafts(drafts);
+      buildPresetGallery();
+      window.alert(`Imported ${drafts.length} draft preset(s) (shipped presets skipped).`);
+    } catch (e) { window.alert('Could not import that file: ' + (e && e.message || e)); }
+  });
+  input.click();
+}
+if (PRESET_DEV) {
+  const dev = document.getElementById('presetDev');
+  if (dev) dev.hidden = false;
+  const saveAs = document.getElementById('presetSaveAs');
+  if (saveAs) saveAs.addEventListener('click', () => {
+    const name = (window.prompt('Preset name:') || '').trim();
+    if (!name) return;
+    const slug = slugify(name);
+    const note = (window.prompt('One-line note (optional):') || '').trim();
+    const drafts = loadDrafts().filter((d) => d.slug !== slug);   // overwrite same-name
+    drafts.push({ name, note, slug, ui: presetDelta(currentDesignParams()) });
+    saveDrafts(drafts);
+    buildPresetGallery();
+  });
+  const expBtn = document.getElementById('presetExport');
+  if (expBtn) expBtn.addEventListener('click', downloadPresetsSource);
+  const impBtn = document.getElementById('presetImport');
+  if (impBtn) impBtn.addEventListener('click', importPresetsFile);
+}
+
 if (PREVIEW) {
   // Gallery thumbnail: strip the chrome, render cheaply, always auto-rotate, and
   // render the design its parent posts in (no initial default build).
@@ -3996,6 +4155,7 @@ if (PREVIEW) {
   const q = new URLSearchParams(location.search);
   const loadId = q.get('load');
   const shared = q.get('d');
+  buildPresetGallery();
   generate();
   if (loadId) loadDesignById(loadId);
   else if (shared) { const obj = decodeDesignParam(shared); if (obj) applyDesign(obj); }
