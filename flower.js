@@ -1036,6 +1036,8 @@ function resolveParams(ui) {
     edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
     edgeProfile: ui.edgeProfile,                 // out-of-plane edge lift, parallel to the centre curve
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
+    crossSection: ui.crossSection,               // CROSS-SECTION: flat (0) -> channelled -> quilled (|1|); sign picks roll direction
+    crossSectionTaper: ui.crossSectionTaper,     // CROSS-SECTION TAPER: 0 uniform -> +1 opens to a spoon at the tip, -1 opens at the base
     reliefAmp: ui.reliefAmp,                      // SURFACE RELIEF amplitude (0 = smooth, exact no-op)
     reliefFreq: ui.reliefFreq,                    // RELIEF rib count: broad pleats -> fine crepe
     reliefMode: ui.reliefMode,                    // RELIEF pattern: radial (T-aligned) | transverse | irregular
@@ -1338,10 +1340,29 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const ruffled = P.tipStyle === 'ruffled';
   // finer than the flute spacing so infill rides the coil + its second-scale
   // frills (~2.7x the base frequency) without faceting.
-  const veinStep = ruffled ? clamp(PETAL_LENGTH * 0.8 / (Math.max(1, P.tipFrequency) * 9), 0.03, 0.14) : 0;
+  const ruffleStep = ruffled ? clamp(PETAL_LENGTH * 0.8 / (Math.max(1, P.tipFrequency) * 9), 0.03, 0.14) : Infinity;
+  // CROSS SECTION rolls the surface through surfacePoint, so every vein point
+  // already lands in the right place at no extra cost (same substitution as the
+  // cup) — but a tightly rolled cross-section is real curvature between existing
+  // vein points, and a straight ribbon segment between two coarse stations will
+  // visibly facet across it (a chord across the roll, not a curve riding it).
+  // Densify the same way RUFFLED already does (same [0.03, 0.14] step range),
+  // scaled by how tight the roll is; take whichever step (ruffle's or the roll's)
+  // is finer when both are active. Anchored so the step is exactly ROLL_STEP_MAX
+  // at the activation threshold (continuous, no jump) and eases toward
+  // ROLL_STEP_MIN as the roll tightens toward a closed quill.
+  const ROLL_DENSIFY_MAG   = 0.12;   // below this, no extra sampling (matches the auto-dampen's own scale)
+  const ROLL_STEP_MAX      = 0.14;
+  const ROLL_STEP_MIN      = 0.02;
+  const rollMag = Math.abs(P.crossSection || 0);
+  const rollStep = rollMag > ROLL_DENSIFY_MAG
+    ? clamp(ROLL_STEP_MAX * ROLL_DENSIFY_MAG / rollMag, ROLL_STEP_MIN, ROLL_STEP_MAX)
+    : Infinity;
+  const veinStep = Math.min(ruffleStep, rollStep);
+  const densify = veinStep < Infinity;
   const lamHalf = P.tubeRadius * LAMINA_HALF;    // lamina half-thickness (flat sheet)
   for (const vein of ven.veins) {
-    const pts = ruffled ? densifyByStep(vein.points, veinStep) : vein.points;
+    const pts = densify ? densifyByStep(vein.points, veinStep) : vein.points;
     const stations = pts.map(station);
     // Ribbon half-WIDTH (across the vein, in the surface) = the old tube radius,
     // so the vein keeps its exact width taper. vein.rad (Voronoi junction bulge)

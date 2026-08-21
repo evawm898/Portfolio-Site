@@ -63,6 +63,8 @@ export const CONTROLS = [
   {"id":"edgeCurve","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Edge curve — top-down","fmt":"signed2","gating":{"data-hide-bilateral":true}},
   {"id":"edgeProfile","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Edge curve — profile","fmt":"signed2","gating":{"data-hide-bilateral":true}},
   {"id":"petalCup","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Petal cup","fmt":"signed2"},
+  {"id":"crossSection","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section roll","fmt":"signed2"},
+  {"id":"crossSectionTaper","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section taper","fmt":"signed2"},
   {"id":"reliefAmp","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Surface relief","fmt":"f2"},
   {"id":"reliefFreq","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Relief frequency","fmt":"f2"},
   {"id":"reliefMode","section":"acc-form","kind":"select","options":[{"value":"radial","text":"Radial (ribs from base)"},{"value":"transverse","text":"Transverse"},{"value":"irregular","text":"Irregular (bullate)"}],"default":"radial","label":"Relief pattern"},
