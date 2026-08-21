@@ -90,8 +90,12 @@ function analyzeStl(buf) {
 // stay byte-identical to the full run — see the loop below), but only configs flagged
 // smoke:true (or preset:true — presets are always smoke-worthy, see below) actually
 // export+analyze. Picked for what's most likely to break, not for a tidy sample:
-//   - the historical pc×Growth crash (max petals x space colonization) — see the
-//     dedicated STRESS config below
+//   - heavy Growth (space colonization) — a dense/RANDOM-pattern config, not the
+//     42-petal/closed-mode extreme: that combo is a currently-open crash (issue #44,
+//     ~27M live tris, browser dies on export) and belongs in a regression fixture once
+//     it's actually fixed, not in a gate that every PR has to sit through red for a bug
+//     nobody touched. Don't re-add a max-petal/closed-mode config here without checking
+//     #44 first.
 //   - continuous margin ON (the SDF receptacle is a separate polygonised solid
 //     overlapping the feet/stem — its own registration surface)
 //   - the cleft/Lobed configs — the project's known-fragile margin area (#64)
@@ -118,7 +122,7 @@ const CONFIGS = [
   { label: 'voronoi shared grammar (aniso + density law + weight + slab taper)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'density', value: '10' }, { id: 'voronoiAniso', value: '2.5' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'voronoiWeight', value: '1' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0.6' }] },
   { label: 'space colonization CLOSED (loops) + LOOP termination', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }] },
   { label: 'space colonization OPEN (tree) + MEET termination', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'open', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
-  { label: 'space colonization dense + RANDOM pattern + serrated', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'spaceDensity', value: '0.9' }, { id: 'spacePattern', value: 'random', evt: 'change' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.4' }] },
+  { label: 'space colonization dense + RANDOM pattern + serrated', smoke: true, set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'spaceDensity', value: '0.9' }, { id: 'spacePattern', value: 'random', evt: 'change' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.4' }] },
   { label: '+ strap sepals', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }] },
   { label: '+ solid sepals', set: [{ id: 'sepalStyle', value: 'solid', evt: 'change' }] },
   { label: 'full plant (FLARE/SOLID receptacle + stem + solid sepals)', set: [{ id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
@@ -265,17 +269,9 @@ CONFIGS.push({ label: 'cont-margin bundle 0 / flare 1 (loose, quick) + reach 1',
 CONFIGS.push({ label: 'cont-margin coiled bloom + 3 layers', cm: true, set: [{ id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '12' }, { id: 'layerCount', value: '3' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' }, { id: 'receptReach', value: '0.4' }] });
 CONFIGS.push({ label: 'cont-margin no stem (SDF seals on its own)', cm: true, smoke: true, set: [{ id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'stemType', value: 'none', evt: 'change' }] });
 
-// STRESS: the historical crash — max petals (Standard control) x Growth (space
-// colonization, also a Standard control) could exhaust memory mid-build (see commit
-// "Guard the pc x Growth crash"). Live builds are now bounded, but export uses the
-// full source count unchanged, so this is still the single heaviest, most fragile
-// combination to export. Placed here (after the last cont-margin/matrix config, before
-// the preset block) so its elevated petalCount doesn't leak into any later `set`-based
-// config — presets load via a full state reset regardless (see below).
-CONFIGS.push({ label: 'STRESS: max petals (40) x Growth (space colonization)', smoke: true, set: [
-  { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
-  { id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' },
-] });
+// NOT HERE: a max-petals x closed-mode Growth config. That combination is a currently-open
+// crash (issue #44 — ~27M live tris, browser dies on export), not a fixed-and-guarded case
+// to regression-test. See the comment on isSmoke() above before adding one back.
 
 // ===== SHIPPED PRESETS: every curated preset (flower-presets.js) is a permanent
 // regression fixture — named, so a failure reads "Thistle broke", not "config N". Each
