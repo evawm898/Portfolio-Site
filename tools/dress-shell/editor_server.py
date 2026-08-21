@@ -41,6 +41,7 @@ from shell import ShellModel, ShellParams, build_meshes, dress_params
 
 VENDOR_DIR = HERE.parents[1] / "dress" / "vendor"
 LAYOUT_PATH = HERE / "layout.yaml"
+SHAPE_PATH = HERE / "shape.yaml"
 
 TOLERANCE_MM = STANDOFF_TOLERANCE_MM   # single named constant (curvature.py)
 GRID_SPEC = GridSpec(dtheta=10.0, ds=25.0)
@@ -51,13 +52,34 @@ def _is_v3(model):
     return isinstance(model.neckline, NecklineV3)
 
 
+def _apply_shape_if_present(params):
+    """Milestone-3 integration point: "the placement editor reads that
+    file for its shell." If shape.yaml exists (saved from the shape
+    editor), its a(v)/b(v) curves become this shell's semi-axes —
+    section_curves mode, exactly what shape_editor_server.py builds.
+    shape.yaml's neckline is deliberately NOT reapplied here: the
+    placement editor keeps its own authority over neckline/fillet knobs
+    (this file's /api/params) rather than the two tools fighting over the
+    same control. When shape.yaml is absent this is a no-op — every
+    existing behavior (dress_params(), the fillet/neckline live-rebuild)
+    is unchanged."""
+    if not SHAPE_PATH.exists():
+        return params
+    from dataclasses import replace as _replace
+    from shape_state import build_params_from_shape, load_shape
+    saved = _replace(load_shape(SHAPE_PATH), neckline={})
+    probe = ShellModel(params)   # domain (z_bottom/z_top) only; cheap
+    return build_params_from_shape(params, saved, probe.z_bottom, probe.z_top)
+
+
 class State:
     """Everything static about the shell, computed once per parameter set
     (startup and every /api/params rebuild)."""
 
     def __init__(self, params: ShellParams = None):
         print("building shell + analysis state ...")
-        self.model = ShellModel(params if params is not None else dress_params())
+        base = params if params is not None else dress_params()
+        self.model = ShellModel(_apply_shape_if_present(base))
         self.coords = ShellCoords(self.model)
         self.chart = SurfaceChart(self.model, self.coords)
         self.classes = load_panel_classes(HERE / "panels.yaml")

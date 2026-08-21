@@ -14,47 +14,109 @@
   body { background: var(--bg); color: var(--ink); font-family: var(--mono);
          font-size: 12px; overflow: hidden; }
   #layout { position: fixed; inset: 0; display: flex; }
-  #curvePane { width: 420px; flex: none; border-right: 1px solid var(--line);
-               display: flex; flex-direction: column; }
+  #curvePane { width: 700px; flex: none; border-right: 1px solid var(--line);
+               overflow-y: auto; }
   #view { flex: 1; position: relative; }
   h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.12em;
        text-transform: uppercase; color: var(--petrol); padding: 10px 12px 6px; }
-  h2 { font-size: 11px; font-weight: 500; color: var(--dim); margin: 8px 12px 4px;
+  h2 { font-size: 11px; font-weight: 500; color: var(--dim); margin: 10px 12px 4px;
        text-transform: uppercase; letter-spacing: 0.08em; }
-  #curveCanvas { flex: none; display: block; margin: 0 auto; cursor: default; }
+  h3 { font-size: 10px; font-weight: 500; color: var(--dim); margin: 6px 12px 2px; }
+  .curveRow { display: flex; gap: 0; }
+  .curveBlock { flex: 1; min-width: 0; }
+  canvas.curve { display: block; margin: 0 auto; }
   .kv { color: var(--dim); padding: 0 12px; line-height: 1.7; }
   .kv b { color: var(--ink); font-weight: 500; }
   .ok { color: var(--petrol); } .warn { color: var(--amber); } .err { color: var(--red); }
-  .legend { padding: 6px 12px 10px; color: var(--dim); line-height: 1.8; }
-  .legend .sw { display: inline-block; width: 18px; height: 2px; margin-right: 5px;
-                vertical-align: middle; }
-  #readouts { border-top: 1px solid var(--line); padding-bottom: 10px; }
+  .legend { padding: 4px 12px 8px; color: var(--dim); font-size: 10px; line-height: 1.7; }
+  table { border-collapse: collapse; width: calc(100% - 24px); margin: 2px 12px; }
+  td, th { padding: 1px 6px 1px 0; text-align: left; font-size: 11px; }
+  th { color: var(--dim); font-weight: 500; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 12px; }
+  .row label { display: flex; align-items: center; gap: 4px; color: var(--dim); }
+  input, select { background: var(--bg); border: 1px solid var(--line);
+                  color: var(--ink); font: inherit; padding: 2px 5px;
+                  border-radius: 2px; width: 64px; }
+  .inert input, .inert select { border-color: #5a4a30; color: var(--amber); }
+  .inertNote { color: var(--amber); font-size: 10px; padding: 0 12px 6px; }
+  button { background: none; border: 1px solid var(--line); color: var(--ink);
+           font: inherit; padding: 3px 8px; cursor: pointer; border-radius: 2px; margin: 0 12px 8px; }
+  button:hover { border-color: var(--petrol); }
   .hud { position: absolute; background: color-mix(in srgb, var(--panel) 92%, transparent);
          border: 1px solid var(--line); padding: 8px 10px; border-radius: 3px;
          line-height: 1.7; }
   #status { left: 12px; bottom: 12px; max-width: 70%; }
   #modeTag { top: 12px; left: 12px; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 8px 12px; }
 </style>
 </head>
 <body>
 <div id="layout">
   <div id="curvePane">
-    <h1>Dress Shape Editor — a(v) slice</h1>
-    <div class="kv">Milestone 3 vertical slice. Only <b>a(v)</b> (lateral half-width) is
-      editable here — b_front/b_back, neckline, skirt, and every scalar stay exactly as
-      committed. Drag a handle on the right side of the curve.</div>
-    <h2>a(v) — half-width (mm) vs v — height above waist (mm)</h2>
-    <canvas id="curveCanvas" width="396" height="560"></canvas>
+    <h1>Dress Shape Editor</h1>
+    <div class="kv">Left: draggable curves + scalar controls (v fixed, only value
+      drags). Right: live 3D shell. See the mode tag (top-right of the 3D pane) for
+      COARSE (client, live) vs FULL (server, on release).</div>
+
+    <div class="curveRow">
+      <div class="curveBlock">
+        <h2>a(v) — lateral half-width</h2>
+        <canvas id="canvasA" class="curve" width="340" height="480"></canvas>
+      </div>
+      <div class="curveBlock">
+        <h2>b(v) — front/back depth (shared)</h2>
+        <canvas id="canvasB" class="curve" width="340" height="480"></canvas>
+      </div>
+    </div>
     <div class="legend">
-      <span class="sw" style="background:#4a5252;border-top:1px dashed #4a5252;height:0"></span>committed (frozen reference)<br>
-      <span class="sw" style="background:#2fa3a3"></span>edited a(v) — drag the dots<br>
-      <span class="sw" style="background:#d98a35"></span>waist (v=0) / bust apex (v=181)
+      committed (dashed) · edited (solid) · waist / bust-apex landmarks (amber) ·
+      backdrop: silhouette-front.png / silhouette-trace.png, <b class="warn">uncalibrated
+      — visual reference only, not pixel-accurate</b><br>
+      b(v) is drawn mirrored like a(v) for a side-view reading, but it is ONE shared
+      value — the committed ellipse model has no independent b_front/b_back (that split
+      only exists in compound.py's rejected CompoundDepth).
     </div>
-    <div id="readouts">
-      <h2>Live readouts</h2>
-      <div class="kv" id="coarseReadout">…</div>
-      <div class="kv" id="fullReadout" style="margin-top:6px">…</div>
+
+    <hr>
+    <h2>Neckline height(θ) — live, composes independently of a(v)/b(v)</h2>
+    <div class="row">
+      <label>CF <input id="nCf" type="number" step="5"></label>
+      <label>peak <input id="nPeak" type="number" step="5"></label>
+      <label>side <input id="nSide" type="number" step="5"></label>
+      <label>CB <input id="nCb" type="number" step="5"></label>
+      <label>peak θ <input id="nPeakTheta" type="number" step="1"></label>
+      <label>bow <input id="nBow" type="number" step="0.05" min="0" max="1"></label>
+      <label>decay <input id="nDecay" type="number" step="0.05" min="0.2" max="0.95"></label>
+      <label><input id="nCorner" type="checkbox"> CF corner</label>
     </div>
+
+    <h2>Skirt / fillet — <span class="warn">INERT while a(v)/b(v) curves are active</span></h2>
+    <div class="inertNote">section_curves overrides semi_axes() unconditionally across the
+      whole domain (shell.py) — these no longer shape anything. Shown for reference /
+      comparison only, not sent to the server as geometry inputs.</div>
+    <div class="row inert">
+      <label>hem circ <input id="sHem" type="number" step="10" disabled></label>
+      <label>dome n <input id="sDomeN" type="number" step="0.1" disabled></label>
+      <label>fillet R <input id="sFilletR" type="number" step="5" disabled></label>
+      <label>type <select id="sFilletType" disabled>
+        <option value="conic">conic</option><option value="circular">circular</option>
+      </select></label>
+    </div>
+    <div class="row"><span class="kv" style="padding:0">armhole split θ:
+      <b id="armholeReadout">…</b> <span class="warn">(SOLVED output, not a control)</span></span></div>
+
+    <button id="applyBtn">apply neckline + regenerate (full)</button>
+    <button id="saveBtn">save shape.yaml</button>
+    <div class="kv" id="saveStatus"></div>
+
+    <hr>
+    <h2>Live readouts</h2>
+    <div id="monoReadout" class="kv">…</div>
+    <h3>Circumference vs tape</h3>
+    <table id="circTable"></table>
+    <h3>Shell (full pass only)</h3>
+    <div id="shellReadout" class="kv">…</div>
+    <div id="devReadout" class="kv" style="margin-top:4px">…</div>
   </div>
   <div id="view">
     <div id="modeTag" class="hud kv">loading…</div>

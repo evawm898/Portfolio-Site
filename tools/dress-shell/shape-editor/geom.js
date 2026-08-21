@@ -53,19 +53,8 @@ export function pchipFit(xs, ys) {
   };
 }
 
-function linInterp(xs, ys) {
-  const n = xs.length;
-  return (x) => {
-    x = Math.max(xs[0], Math.min(xs[n - 1], x));
-    let lo = 0, hi = n - 1;
-    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= x) lo = m; else hi = m; }
-    const t = (x - xs[lo]) / (xs[hi] - xs[lo]);
-    return ys[lo] + t * (ys[hi] - ys[lo]);
-  };
-}
-
 // Ramanujan II — same formula as bodice.ellipse_perimeter / _perimeter_np
-function ellipsePerimeter(a, b) {
+export function ellipsePerimeter(a, b) {
   const h = ((a - b) / (a + b)) ** 2;
   return Math.PI * (a + b) * (1 + 3 * h / (10 + Math.sqrt(4 - 3 * h)));
 }
@@ -95,17 +84,18 @@ function paramFromArcAngle(thetaRad, a, b, req) {
   return t;
 }
 
-// A coarse ShellModel-equivalent, built directly from an edited a(v)
-// fit + the frozen committed b(z) table. Mirrors shell.py's
-// ShellModel.point() (equal-arc elliptical sections) — mesh triangulation
-// only, no frame()/curvature (that stays server-side, out of scope for
-// this slice's one readout).
+// A coarse ShellModel-equivalent, built directly from edited a(v)/b(v)
+// fits (both now genuinely authored — see shape_editor_server.py's
+// ShapeCurves). Mirrors shell.py's ShellModel.point() (equal-arc
+// elliptical sections) — mesh triangulation only, no frame()/curvature
+// (that stays server-side: the full curvature/seatability sweep is
+// expensive and only ever runs on release, see editor.js).
 export class CoarseShell {
-  constructor(aFit, bTable, splitThetaDeg) {
+  constructor(aFit, bFit, zLo, zHi, splitThetaDeg) {
     this.aFit = aFit;
-    this.bOf = linInterp(bTable.z, bTable.b);
-    this.zLo = bTable.z[0];
-    this.zHi = bTable.z[bTable.z.length - 1];
+    this.bOf = bFit;
+    this.zLo = zLo;
+    this.zHi = zHi;
     this.splitTheta = splitThetaDeg * Math.PI / 180;
   }
 
@@ -164,4 +154,22 @@ export function monotonicityReport(aFit, vHi, n = 400) {
     worst_positive_slope_mm_per_mm: Math.max(worst, 0),
     worst_at_v: worstAt,
   };
+}
+
+// Derived circumference at the standard tape anchors — pure Ramanujan,
+// same anchors as front_silhouette.DEFAULT_TAPE_ANCHORS (kept in sync by
+// hand here since this file has no server import; the FULL pass is the
+// authoritative source of truth for this table).
+export const TAPE_ANCHORS = [
+  ["waist", 0.0, 609.6], ["underbust", 152.4, 711.2],
+  ["bust", 203.2, 825.5], ["above-bust", 254.0, 812.8],
+];
+
+export function coarseCircumferenceReport(aFit, bFit, vLo, vHi) {
+  return TAPE_ANCHORS.map(([label, v, tapeMm]) => {
+    const vv = Math.max(vLo, Math.min(vHi, v));
+    const derived = ellipsePerimeter(aFit(vv), bFit(vv));
+    return { label, v, derived_mm: derived, tape_mm: tapeMm,
+             delta_mm: derived - tapeMm, in_range: v >= vLo && v <= vHi };
+  });
 }
