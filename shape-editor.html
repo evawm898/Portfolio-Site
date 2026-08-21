@@ -4,13 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dress Shape Editor — Eva Maskalenko</title>
-<meta name="description" content="Browser-only dress-shell shape editor: drag a(v)/b_front(v)/b_back(v) control points, regenerate the 3D shell live, read circumference and monotonicity as you go. No server — everything computes in this page.">
+<meta name="description" content="Browser-only dress-shell workflow: trace a garment from photos, edit the shell curves live, and place rigid panels — three stages, one page, no server.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
   :root {
     --bg: #0c0e0e; --panel: #141717; --line: #2a2f2f; --ink: #e9ecec;
     --dim: #8b9494; --petrol: #2fa3a3; --amber: #d98a35; --red: #e05545;
+    --violet: #8a63d9; --sky: #4fb0e0;
     --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   }
   * { box-sizing: border-box; margin: 0; }
@@ -40,6 +41,7 @@
   button { background: none; border: 1px solid var(--line); color: var(--ink);
            font: inherit; padding: 3px 8px; cursor: pointer; border-radius: 2px; margin: 4px 12px 4px 0; }
   button:hover { border-color: var(--petrol); }
+  button.active { border-color: var(--petrol); color: var(--petrol); }
   .primaryBtn { background: var(--petrol); border-color: var(--petrol); color: #0c0e0e;
                 font-weight: 600; padding: 6px 14px; }
   .primaryBtn:hover { background: color-mix(in srgb, var(--petrol) 85%, white); }
@@ -72,141 +74,288 @@
   .miniBtn { font-size: 10px; padding: 2px 6px; margin: 2px 6px 2px 0; }
   input[type="number"].mmInput { width: 4.5em; background: var(--bg); color: var(--ink);
                                  border: 1px solid var(--line); font: inherit; padding: 1px 4px; }
+
+  /* -- tab shell ------------------------------------------------------- */
+  #tabBar { display: flex; border-bottom: 1px solid var(--line); }
+  .tabBtn { flex: 1; margin: 0; border: none; border-radius: 0; background: var(--panel);
+            color: var(--dim); padding: 10px 6px; font-size: 11px; letter-spacing: 0.06em;
+            text-transform: uppercase; border-bottom: 2px solid transparent; }
+  .tabBtn.current { color: var(--petrol); border-bottom-color: var(--petrol); background: var(--bg); }
+  .tabBtn:hover { color: var(--ink); }
+  .tabSection { display: none; }
+  .tabSection.current { display: block; }
+  .stageWarnBanner { background: color-mix(in srgb, var(--red) 16%, var(--bg)); border: 1px solid var(--red);
+                      color: var(--ink); padding: 8px 10px; margin: 10px 12px; border-radius: 3px;
+                      line-height: 1.6; display: none; }
+  .viewGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .viewSlot { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .layerRow button { padding: 2px 8px; font-size: 10px; }
+  .layerRow button[data-layer="silhouette"].active { border-color: var(--petrol); color: var(--petrol); }
+  .layerRow button[data-layer="neckline"].active { border-color: var(--amber); color: var(--amber); }
+  .layerRow button[data-layer="hemline"].active { border-color: var(--red); color: var(--red); }
+  .layerRow button[data-layer="waist"].active { border-color: var(--violet); color: var(--violet); }
+  .layerRow button[data-layer="armhole"].active { border-color: var(--sky); color: var(--sky); }
+  .fileRow input[type="file"] { color: var(--dim); font: inherit; font-size: 10px; max-width: 190px; }
+
+  /* -- backward-navigation confirm modal -------------------------------- */
+  #navModal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 50;
+              display: none; align-items: center; justify-content: center; }
+  #navModal.open { display: flex; }
+  .modalBox { background: var(--panel); border: 1px solid var(--red); border-radius: 4px;
+              max-width: 480px; padding: 16px; line-height: 1.6; }
+  .modalBox .row { padding: 10px 0 0; justify-content: flex-end; }
 </style>
 </head>
 <body>
 <div id="layout">
   <div id="curvePane">
-    <h1>Dress Shape Editor</h1>
-    <div class="banner">This page has no server — reachable from any browser via this deploy preview
-      (not the local dev tool). Curve editing, 3D regeneration, circumference, and monotonicity are
-      genuinely live here, and so is the neckline trim on the 3D view (heights themselves are still
-      reference-only, not draggable — see below). The full curvature/seatability sweep and the "seed
-      from parameters" generator still need Python — they show a labeled, bake-time snapshot rather
-      than a live number.</div>
+    <div id="tabBar">
+      <button class="tabBtn" data-tab="trace">1 · Trace</button>
+      <button class="tabBtn" data-tab="shape">2 · Shape</button>
+      <button class="tabBtn" data-tab="place">3 · Place</button>
+    </div>
 
-    <div class="legend" id="imageDimsReadout">…</div>
+    <!-- ============================================================ -->
+    <!-- STAGE 1 — TRACE                                               -->
+    <!-- ============================================================ -->
+    <section id="tab-trace" class="tabSection">
+      <h1>Stage 1 · Trace</h1>
+      <div class="banner">Load photos, calibrate each one by clicking two landmarks, then trace the
+        silhouette edge. Front gives a(v). Side gives BOTH b_front(v) (right of centerline) and
+        b_back(v) (left of centerline) — one photo, two independent traces. Back and top-down are
+        load + calibrate only in this first cut: back doesn't add new curve data (this shell family
+        has no left/right asymmetry) and top-down's "sets the section shape between the extremes" is
+        not implemented yet — a known gap, not a silent omission.</div>
 
-    <div class="curveRow">
-      <div class="curveBlock">
-        <h2>a(v) — shared lateral half-width</h2>
-        <canvas id="canvasA" class="curve" width="340" height="480"></canvas>
-        <div class="calibBlock">
-          <div class="calibStatus uncal" id="calibStatusA">uncalibrated — backdrop is a visual reference only, not a measurement</div>
-          <div class="row" style="padding:2px 0">
-            <button class="miniBtn" id="calibBtnA">calibrate waist/hem</button>
-            <button class="miniBtn" id="calibClearA" style="display:none">clear calibration</button>
+      <div class="viewGrid">
+        <div class="viewSlot">
+          <h2>Front → a(v)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileFront" accept="image/*"></label></div>
+          <canvas id="canvasTraceFront" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusTF">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnTF">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearTF" style="display:none">clear calibration</button>
+            </div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="hrefBtnTF">add horizontal reference (breast tip distance)</button>
+              <button class="miniBtn" id="hrefClearTF" style="display:none">clear h-ref</button>
+              <label style="color:var(--dim)">real distance
+                <input type="number" class="mmInput" id="hrefMmTF" value="175" min="1" step="0.5"> mm</label>
+            </div>
           </div>
-          <div class="row" style="padding:2px 0">
-            <button class="miniBtn" id="hrefBtnA">add horizontal reference (breast tip distance)</button>
-            <button class="miniBtn" id="hrefClearA" style="display:none">clear h-ref</button>
-            <label style="color:var(--dim)">real distance
-              <input type="number" class="mmInput" id="hrefMmA" value="175" min="1" step="0.5"> mm</label>
+        </div>
+        <div class="viewSlot">
+          <h2>Side → b_front(v) / b_back(v)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileSide" accept="image/*"></label></div>
+          <canvas id="canvasTraceSide" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusTS">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnTS">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearTS" style="display:none">clear calibration</button>
+            </div>
           </div>
-          <div class="calibCaveat">Perspective photo — even calibrated, this is accurate near camera
-            height and worst at the top and bottom of frame. Calibration fixes scale, not projection;
-            keep that in mind dragging near the neckline and hem.</div>
         </div>
       </div>
-      <div class="curveBlock">
-        <h2>b(v) — front / back depth (independent)</h2>
-        <canvas id="canvasB" class="curve" width="340" height="480"></canvas>
-        <div class="calibBlock">
-          <div class="calibStatus uncal" id="calibStatusB">uncalibrated — backdrop is a visual reference only, not a measurement</div>
-          <div class="row" style="padding:2px 0">
-            <button class="miniBtn" id="calibBtnB">calibrate waist/hem</button>
-            <button class="miniBtn" id="calibClearB" style="display:none">clear calibration</button>
-          </div>
-          <div class="calibCaveat">Single side-profile trace, mirrored for both front and back —
-            calibration confirms only the traced edge's own scale, not that the back truly matches it.
-            Perspective photo — even calibrated, accurate near camera height, worst at top/bottom of
-            frame. Calibration fixes scale, not projection; keep that in mind near the neckline and hem.</div>
+
+      <div class="row layerRow">
+        marking:
+        <button data-layer="silhouette" class="active">silhouette</button>
+        <button data-layer="neckline">neckline</button>
+        <button data-layer="hemline">hemline</button>
+        <button data-layer="waist">waist</button>
+        <button data-layer="armhole">armhole</button>
+      </div>
+      <div class="legend">Click an empty spot on either canvas above to add a point to the active
+        layer; drag an existing point to move it; right-click a point to delete it (silhouette layers
+        keep a minimum of 2). Only <b>silhouette</b> points become a(v)/b_front(v)/b_back(v) — the
+        other four are visual/reference markers this first pass records but does not yet feed into
+        the neckline model or any derived quantity.</div>
+      <div class="row">
+        <button class="miniBtn" id="clearLayerBtn">clear active layer (this canvas pair)</button>
+      </div>
+
+      <hr>
+      <h2>Back / top-down — reference only</h2>
+      <div class="viewGrid">
+        <div class="viewSlot">
+          <h3>Back</h3>
+          <div class="row fileRow"><label>photo <input type="file" id="fileBack" accept="image/*"></label></div>
+          <canvas id="canvasTraceBack" class="curve" width="340" height="480"></canvas>
+        </div>
+        <div class="viewSlot">
+          <h3>Top-down</h3>
+          <div class="row fileRow"><label>photo <input type="file" id="fileTop" accept="image/*"></label></div>
+          <canvas id="canvasTraceTop" class="curve" width="340" height="480"></canvas>
         </div>
       </div>
-    </div>
-    <div class="legend">
-      a(v): committed (dashed) · edited (solid) · mirrored, ONE shared value both sides.<br>
-      b(v): <span style="color:#2fa3a3">front (right = CF)</span> ·
-      <span style="color:#d98a35">back (left = CB)</span> · each independently draggable.<br>
-      backdrop: real photos of the reference garment (1589×2128px originals, moved into the repo but
-      not cropped/edited by this pipeline — see the calibration status under each canvas). Grey and
-      un-scaled until calibrated; a dragged point only measures something once it is.
-    </div>
 
-    <hr>
-    <h2>Neckline height(θ) — heights reference only, trim is live below</h2>
-    <div id="neckRef" class="kv">…</div>
+      <hr>
+      <h2>Tape measurements — live check, not a constraint</h2>
+      <div class="legend">Enter the tape circumference at each anchor; the table compares it to what
+        the traced curves currently imply. A big Δ means the trace and the tape disagree — it does
+        not adjust the trace for you.</div>
+      <table id="traceTapeTable"></table>
+      <div class="row">
+        <label>waist <input type="number" class="mmInput" id="tapeWaist" value="609.6"> mm</label>
+        <label>underbust <input type="number" class="mmInput" id="tapeUnderbust" value="711.2"> mm</label>
+        <label>bust <input type="number" class="mmInput" id="tapeBust" value="825.5"> mm</label>
+        <label>above-bust <input type="number" class="mmInput" id="tapeAboveBust" value="812.8"> mm</label>
+      </div>
 
-    <h2>Generator — reference only (needs Python to re-solve)</h2>
-    <div class="kv">These are the parameters the starting curves were generated from
-      (bust="plateau" at the approved settings). Ask for a fresh
-      export_shape_editor_static.py run + republish to change them and reseed.</div>
-    <div id="genRef" class="kv">…</div>
+      <hr>
+      <div class="legend" id="traceCounts">…</div>
+      <button class="primaryBtn" id="sendTraceBtn">use this trace for Stage 2 →</button>
+      <div class="kv" id="traceSendStatus"></div>
+    </section>
 
-    <div class="row"><span class="kv" style="padding:0">armhole split θ:
-      <b id="armholeReadout">…</b></span></div>
+    <!-- ============================================================ -->
+    <!-- STAGE 2 — SHAPE                                               -->
+    <!-- ============================================================ -->
+    <section id="tab-shape" class="tabSection current">
+      <h1>Stage 2 · Shape</h1>
+      <div class="banner">This page has no server — reachable from any browser via this deploy preview
+        (not the local dev tool). Curve editing, 3D regeneration, circumference, and monotonicity are
+        genuinely live here, and so is the neckline trim on the 3D view (heights themselves are still
+        reference-only, not draggable — see below). The full curvature/seatability sweep and the "seed
+        from parameters" generator still need Python — they show a labeled, bake-time snapshot rather
+        than a live number.</div>
+      <div class="row">
+        <span class="kv" style="padding:0" id="shapeSourceReadout">opened from: …</span>
+      </div>
+      <div class="row">
+        <button class="miniBtn" id="resetToSeedBtn">reset to generator seed</button>
+      </div>
 
-    <h3>Get this into the repo</h3>
-    <div class="legend">This page has no backend — it cannot write to the repo itself. The one
-      obvious path: <b>copy to clipboard</b>, paste the YAML into your Claude Code conversation,
-      and ask it to commit as <code>tools/dress-shell/shape.yaml</code>. No file to hand-place,
-      no guessing where it goes.</div>
-    <div class="legend" id="exportGuard"></div>
-    <label class="row" id="exportOverrideRow">
-      <input type="checkbox" id="exportOverride">
-      I understand — a named feature is not represented at this density; allow export anyway
-    </label>
-    <button id="copyBtn" class="primaryBtn">copy shape.yaml to clipboard</button>
-    <button id="exportBtn" class="miniBtn">or download the file instead</button>
-    <div class="kv" id="exportStatus"></div>
-    <textarea id="exportArea" readonly></textarea>
+      <div class="legend" id="imageDimsReadout">…</div>
 
-    <hr>
-    <h2>Point density (adaptive placement)</h2>
-    <div class="legend" id="densityReport">…</div>
-    <div class="legend">Points are placed adaptively (worst-residual-first against a dense reference),
-      not uniformly — fewer points where the curve is straight, more where it bends. Moving a slider
-      <b>resamples the curve as it stands right now</b> (hand edits included) at the new count — it does
-      not just add or remove handles at fixed spots. Scrubbing a slider back and forth is lossless; a
-      fresh hand-drag on the canvas resets what "now" means for the next resample.</div>
-    <div class="row">a(v) <input type="range" id="densityA" style="flex:1"> <b id="densityAVal"></b> pts</div>
-    <div id="densityAReadout" class="kv">…</div>
-    <div class="row">b_front <input type="range" id="densityBf" style="flex:1"> <b id="densityBfVal"></b> pts</div>
-    <div id="densityBfReadout" class="kv">…</div>
-    <div class="row">b_back <input type="range" id="densityBb" style="flex:1"> <b id="densityBbVal"></b> pts</div>
-    <div id="densityBbReadout" class="kv">…</div>
+      <div class="curveRow">
+        <div class="curveBlock">
+          <h2>a(v) — shared lateral half-width</h2>
+          <canvas id="canvasA" class="curve" width="340" height="480"></canvas>
+          <div class="calibCaveat">Backdrop and calibration for this curve are set on the Trace tab —
+            this view is read-only here (drag the a(v) points themselves, not the photo).</div>
+        </div>
+        <div class="curveBlock">
+          <h2>b(v) — front / back depth (independent)</h2>
+          <canvas id="canvasB" class="curve" width="340" height="480"></canvas>
+          <div class="calibCaveat">Backdrop and calibration for this curve are set on the Trace tab —
+            this view is read-only here (drag the b(v) points themselves, not the photo).</div>
+        </div>
+      </div>
+      <div class="legend">
+        a(v): committed (dashed) · edited (solid) · mirrored, ONE shared value both sides.<br>
+        b(v): <span style="color:#2fa3a3">front (right = CF)</span> ·
+        <span style="color:#d98a35">back (left = CB)</span> · each independently draggable.
+      </div>
 
-    <h2>Smoothing (control-point cleanup, not reshaping)</h2>
-    <div class="legend">Neighbor-averages control-point <i>values</i> in place — for trace/digitization
-      noise (small zig-zags), not for intentionally reshaping a curve. Endpoints held fixed.
-      <span class="warn">b_back is visibly noisy near the bust in the baked seed — a trace artifact, not
-      shape</span> — this cleans it without hand-dragging every point.</div>
-    <div class="row">amount <input type="number" id="smoothAmount" value="0.5" min="0" max="1" step="0.1" style="width:4em">
-      passes <input type="number" id="smoothPasses" value="2" min="1" max="10" step="1" style="width:4em"></div>
-    <div class="row">
-      <button id="smoothA">smooth a(v)</button>
-      <button id="smoothBf">smooth b_front</button>
-      <button id="smoothBb">smooth b_back</button>
-    </div>
+      <hr>
+      <h2>Neckline height(θ) — heights reference only, trim is live below</h2>
+      <div id="neckRef" class="kv">…</div>
 
-    <hr>
-    <h2>Live readouts</h2>
-    <div id="monoReadout" class="kv">…</div>
-    <h3>Circumference vs tape (compound: mean of front + back Ramanujan)</h3>
-    <table id="circTable"></table>
-    <div class="legend" id="circCalibCaveat">…</div>
-    <h3>Shell (snapshot — see banner above)</h3>
-    <div class="legend">Adaptive placement does NOT close this gap: min-radius/seatable-area are
-      curvature (2nd-derivative) readouts, and PCHIP through control points is only C1-continuous —
-      any numeric curvature estimate on it is unstable regardless of point count or placement, not
-      just under-sampled. More/better-placed points cannot fix a smoothness-class mismatch, so this
-      block stays a labeled Python snapshot rather than a live number.</div>
-    <div id="shellReadout" class="kv">…</div>
-    <div id="baselineReadout" class="kv" style="margin-top:8px">…</div>
+      <h2>Generator — reference only (needs Python to re-solve)</h2>
+      <div class="kv">These are the parameters the starting curves were generated from
+        (bust="plateau" at the approved settings). Ask for a fresh
+        export_shape_editor_static.py run + republish to change them and reseed.</div>
+      <div id="genRef" class="kv">…</div>
+
+      <div class="row"><span class="kv" style="padding:0">armhole split θ:
+        <b id="armholeReadout">…</b></span></div>
+
+      <h3>Get this into the repo</h3>
+      <div class="legend">This page has no backend — it cannot write to the repo itself. The one
+        obvious path: <b>copy to clipboard</b>, paste the YAML into your Claude Code conversation,
+        and ask it to commit as <code>tools/dress-shell/shape.yaml</code>. No file to hand-place,
+        no guessing where it goes.</div>
+      <div class="legend" id="exportGuard"></div>
+      <label class="row" id="exportOverrideRow">
+        <input type="checkbox" id="exportOverride">
+        I understand — a named feature is not represented at this density; allow export anyway
+      </label>
+      <button id="copyBtn" class="primaryBtn">copy shape.yaml to clipboard</button>
+      <button id="exportBtn" class="miniBtn">or download the file instead</button>
+      <div class="kv" id="exportStatus"></div>
+      <textarea id="exportArea" readonly></textarea>
+
+      <hr>
+      <h2>Point density (adaptive placement)</h2>
+      <div class="legend" id="densityReport">…</div>
+      <div class="legend">Points are placed adaptively (worst-residual-first against a dense reference),
+        not uniformly — fewer points where the curve is straight, more where it bends. Moving a slider
+        <b>resamples the curve as it stands right now</b> (hand edits included) at the new count — it does
+        not just add or remove handles at fixed spots. Scrubbing a slider back and forth is lossless; a
+        fresh hand-drag on the canvas resets what "now" means for the next resample.</div>
+      <div class="row">a(v) <input type="range" id="densityA" style="flex:1"> <b id="densityAVal"></b> pts</div>
+      <div id="densityAReadout" class="kv">…</div>
+      <div class="row">b_front <input type="range" id="densityBf" style="flex:1"> <b id="densityBfVal"></b> pts</div>
+      <div id="densityBfReadout" class="kv">…</div>
+      <div class="row">b_back <input type="range" id="densityBb" style="flex:1"> <b id="densityBbVal"></b> pts</div>
+      <div id="densityBbReadout" class="kv">…</div>
+
+      <h2>Smoothing (control-point cleanup, not reshaping)</h2>
+      <div class="legend">Neighbor-averages control-point <i>values</i> in place — for trace/digitization
+        noise (small zig-zags), not for intentionally reshaping a curve. Endpoints held fixed.</div>
+      <div class="row">amount <input type="number" id="smoothAmount" value="0.5" min="0" max="1" step="0.1" style="width:4em">
+        passes <input type="number" id="smoothPasses" value="2" min="1" max="10" step="1" style="width:4em"></div>
+      <div class="row">
+        <button id="smoothA">smooth a(v)</button>
+        <button id="smoothBf">smooth b_front</button>
+        <button id="smoothBb">smooth b_back</button>
+      </div>
+
+      <hr>
+      <h2>Live readouts</h2>
+      <div id="monoReadout" class="kv">…</div>
+      <h3>Circumference vs tape (compound: mean of front + back Ramanujan)</h3>
+      <table id="circTable"></table>
+      <div class="legend" id="circCalibCaveat">…</div>
+      <h3>Shell (snapshot — see banner above)</h3>
+      <div class="legend">Adaptive placement does NOT close this gap: min-radius/seatable-area are
+        curvature (2nd-derivative) readouts, and PCHIP through control points is only C1-continuous —
+        any numeric curvature estimate on it is unstable regardless of point count or placement, not
+        just under-sampled. More/better-placed points cannot fix a smoothness-class mismatch, so this
+        block stays a labeled Python snapshot rather than a live number.</div>
+      <div id="shellReadout" class="kv">…</div>
+      <div id="baselineReadout" class="kv" style="margin-top:8px">…</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- STAGE 3 — PLACE                                               -->
+    <!-- ============================================================ -->
+    <section id="tab-place" class="tabSection">
+      <h1>Stage 3 · Place</h1>
+      <div class="banner">Scoped down this round: this is a read-only view of the committed
+        <code>layout.yaml</code>, not yet the interactive placement editor. The full port —
+        dragging panels in (θ, s), connector/outline legality, mirror-twin derivation, layering/DAG
+        checks, seat-standoff footprint — lives in <code>tools/dress-shell/editor_server.py</code> and
+        has not been moved to client-side JS yet. Built this round: the tab itself, the shared-shell
+        wiring, and the forward-navigation shape-change flag below.</div>
+      <div class="stageWarnBanner" id="placeImpactBanner"></div>
+      <div class="legend" id="layoutStatus">loading tools/dress-shell/layout.yaml…</div>
+      <div class="row">
+        <button class="primaryBtn" id="copyLayoutBtn">copy layout.yaml to clipboard</button>
+      </div>
+      <div class="kv" id="layoutCopyStatus"></div>
+      <h2>Committed panels</h2>
+      <div id="layoutPanelList" class="kv">…</div>
+      <textarea id="layoutArea" readonly style="height:260px"></textarea>
+    </section>
   </div>
   <div id="view">
     <div id="modeTag" class="hud kv">loading…</div>
     <div id="status" class="hud kv">loading…</div>
+  </div>
+</div>
+
+<div id="navModal">
+  <div class="modalBox">
+    <div id="navModalText"></div>
+    <div class="row">
+      <button id="navModalCancel">cancel</button>
+      <button id="navModalConfirm" class="primaryBtn">continue</button>
+    </div>
   </div>
 </div>
 
