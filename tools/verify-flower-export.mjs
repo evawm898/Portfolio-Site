@@ -41,10 +41,17 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 // quantised so coincident corners of adjacent closed shells weld; an undirected
 // edge used by exactly one triangle is a boundary (open) edge — the failure we
 // guard against. `shells` is the connected-component count over that same welded
-// vertex graph (union-find): the flower-project invariant is that every build is
-// ONE connected solid, not merely a set of individually-closed pieces, so
-// boundary=0 alone is necessary but not sufficient — two disjoint watertight
-// shells both pass boundary=0 and are still two separate printed objects.
+// vertex graph (union-find).
+//
+// IMPORTANT — what `shells` does and does NOT measure: this codebase's geometry
+// is built from many individually-closed primitives (tube segments, beads, slab
+// panels) that physically INTERPENETRATE rather than share welded vertices —
+// CLAUDE.md is explicit that "overlapping closed shells are fine, the slicer
+// unions them." A vertex-welding graph cannot see that kind of fusion, so
+// `shells` is always in the hundreds-to-thousands range even for correct,
+// print-safe designs (measured: min 15, max 26684 across the full sweep, all
+// boundary=0). It is NOT a connected-solid gate — see the report-only note where
+// it's printed below for why, and what a real one would need to measure instead.
 function analyzeStl(buf) {
   const tris = buf.readUInt32LE(80);
   const edges = new Map();
@@ -334,16 +341,27 @@ if (pageErrors.length) {
   const real = pageErrors.filter((e) => !/fonts\.googleapis/.test(e));
   if (real.length) { console.log('\nPage errors:'); real.forEach((e) => console.log('  ! ' + e)); failed += real.length; }
 }
-// CONNECTED-COMPONENT GATE: the flower-project invariant is ONE connected solid
-// per build, not merely N individually-closed shells. Reported for every config
-// that actually produced an STL (shells > 0 skips 'no STL download' rows).
+// CONNECTED-COMPONENT MEASUREMENT (report-only — NOT gated, see below).
+// `shells` above is a union-find over EXACT welded (quantised) vertices. Measured
+// against the full sweep, every config reports shells in the hundreds to tens of
+// thousands (e.g. 'default (veins)': 1624, '+ 4 layers': 26684) despite
+// boundaryEdges=0 everywhere. That is NOT 142 disconnection bugs — it is this
+// architecture working as designed: CLAUDE.md is explicit that "overlapping
+// closed shells are fine — the slicer unions them," and the geometry is built
+// from many individually-closed primitives (tube segments, beads, slab panels)
+// that physically INTERPENETRATE without sharing a single welded vertex. A
+// vertex-welding graph can never see that kind of fusion — it under-counts
+// connectivity by construction, so it cannot be the gate this invariant needs.
+// Left in as a diagnostic only; a real gate needs spatial/volumetric overlap
+// (e.g. proximity-bucketed shell-vs-shell AABB or surface intersection), which
+// is a different and more expensive algorithm. Not implemented here — flagging
+// per the standing rule to stop before shipping a gate that would fail every
+// correct design.
 const withShells = results.filter((r) => r.shells != null);
-const multiShell = withShells.filter((r) => r.shells !== 1);
-console.log(`\nConnected-component count: ${withShells.length - multiShell.length}/${withShells.length} configs export as a single shell.`);
-if (multiShell.length) {
-  console.log('  Configs with shells != 1 (a real disconnection, not a manifoldness issue):');
-  for (const r of multiShell) console.log(`    ${r.label}: shells=${r.shells}`);
-  failed += multiShell.length;
+if (withShells.length) {
+  const counts = withShells.map((r) => r.shells).sort((a, b) => a - b);
+  console.log(`\nConnected-component count (vertex-welding only, NOT a pass/fail gate — see comment above): `
+    + `min=${counts[0]} max=${counts[counts.length - 1]} median=${counts[Math.floor(counts.length / 2)]} across ${counts.length} configs.`);
 }
-console.log(failed === 0 ? '\nAll configurations export watertight (0 boundary edges) as a single connected solid. ✓' : `\n${failed} FAILURE(S) — geometry is not print-safe. ✗`);
+console.log(failed === 0 ? '\nAll configurations export watertight (0 boundary edges). ✓' : `\n${failed} FAILURE(S) — geometry is not print-safe. ✗`);
 process.exit(failed === 0 ? 0 : 1);
