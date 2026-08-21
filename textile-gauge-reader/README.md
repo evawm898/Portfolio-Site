@@ -1,4 +1,4 @@
-# AI Textile Gauge Reader — V0
+# Automatic Textile Gauge Reader — V0
 
 An experimental computer-vision tool for measuring knitted-textile gauge
 (wales per inch / courses per inch) from a single photograph.

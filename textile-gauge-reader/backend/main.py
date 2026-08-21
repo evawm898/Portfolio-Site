@@ -80,7 +80,7 @@ async def _lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="AI Textile Gauge Reader",
+    title="Automatic Textile Gauge Reader",
     description="Estimate knitted-textile gauge (wales/inch, courses/inch) from a photograph.",
     version="0.1.0",
     lifespan=_lifespan,
