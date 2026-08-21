@@ -1,72 +1,29 @@
-"""APEX-BASED BUST CURVATURE — prototype (NOT wired into dress_params()).
+"""APEX-BASED BUST CURVATURE.
 
-Replaces the compound model's "front half always deeper than back half"
-scheme with what the brief actually asked for: two apex points (left and
-right, at a real height AND azimuth off center front — not one bump
-smeared across CF), and curvature that radiates outward from EACH apex
-and decays with true 2D distance across the surface (meridian height AND
-lateral arc, not a v-height band applied uniformly in theta).
+  ApexBustDepth   -- APPROVED, WIRED IN (dress_params()'s default, bust=
+                      "apex"). Two off-axis apex points, bumps summed.
+                      UNCHANGED by the refactor below (byte-identical
+                      geometry) -- see its own docstring further down.
 
-WHY THE OLD compound.py MODEL WAS WRONG
-  CompoundDepth authored b_front(v) — a function of height ONLY — and
-  applied it identically across the ENTIRE front half-ellipse (roughly
-  theta in [-103, 103] deg). Its only "decay away from center" was the
-  ellipse's own cos(t) shape, which is gentle: cos(30deg) = 0.87,
-  cos(55deg) = 0.57 — so a panel 30-55 degrees off CF still saw most of
-  the bump. There was never a concept of an apex, let alone two.
+  PlateauBustDepth -- NEW, PROTOTYPE, NOT WIRED IN. Fixes a defect the
+                      user found by inspecting the rendered shell: ApexBustDepth's
+                      two summed off-axis bumps leave a LOCAL MINIMUM at
+                      center front (the two lobes have a dip between
+                      them) -- wrong, not recoverable by tuning amplitude/
+                      radius, so the theta distribution is rebuilt from
+                      scratch here under a hard constraint: center front
+                      must be the max of the front projection, everywhere,
+                      never a local minimum. See PlateauBustDepth's own
+                      docstring for the fix (a single crest/plateau
+                      anchored at CF, replacing the two-point sum). Build
+                      explicitly (ApexShellModel(plateau_params(...)) or
+                      PlateauBustDepth(...) directly) -- gated behind
+                      plateau_gate.py's sweep/report until approved.
 
-THIS MODEL
-  Base depth b_base(v): the single ORIGINAL traced/fillet profile
-  (dress_params(bust="plain")'s depth_curve), used identically all the
-  way around the ring — front and back are the SAME surface by default.
-  No more front/back split, no more v=45 join corner: those existed only
-  to express "the front is generically deeper," which a real apex field
-  makes unnecessary.
-
-  Two apexes at (+-apex_theta_deg, apex_v), each adding a RADIAL bump
-  in the depth (front-to-back) direction only:
-      bump(theta, v) = amplitude_mm * falloff(d / radius_mm)
-      d = sqrt(dv^2 + dtheta_mm^2)   -- an approximate local-tangent-
-          plane Euclidean distance: dv is meridian height difference,
-          dtheta_mm is the lateral arc-length difference converted
-          through a FIXED reference radius r_ref = P(apex_v) / 2pi (the
-          apex height's own r_eq) so iso-distance contours are honest
-          circles in mm around each apex, not degree-bands.
-      falloff(u) = 0.5*(1 + cos(pi*u))  for u <= 1, else EXACTLY 0
-          (a raised-cosine bump: C1 continuous — zero value AND zero
-          slope at the cutoff, so no new sharp corner is introduced —
-          and, unlike a Gaussian, truly zero beyond the radius, which is
-          what "falls to zero well before reaching the back panel"
-          requires: an exact cutoff, not just a small tail.)
-  The two apex fields are summed (so CF, sitting between them, gets the
-  combined-but-attenuated contribution of both, not the full peak of
-  either — anatomically two separate forms, not one central mound).
-
-CIRCUMFERENCE SCHEDULE STAYS FROZEN
-  a(v) (the shared half-width) is re-solved, per height, so the ring's
-  TRUE perimeter (numerically integrated around the bumped, no-longer-
-  elliptical curve) still matches the committed P(v) schedule exactly —
-  same discipline as compound.py's compound_perimeter() solve, just
-  generalized from a closed-form (two half-ellipses) to a numeric
-  integral (arbitrary bump field).
-
-REFERENCE AZIMUTH
-  The bump is authored against a REFERENCE equal-arc azimuth computed
-  from the plain (bump-free, pre-compound) model's own closed-form
-  equal-arc map — not the final bumped curve's own equal-arc theta,
-  which would be circular (the bump changes local arc length, which
-  would change equal-arc theta, which is the bump's own input). The
-  discrepancy this introduces is small (the bump is a minor perturbation
-  relative to the whole ring) and is reported by verify_apex_placement()
-  below: the ACTUAL equal-arc azimuth of each apex, after the true
-  equal-arc solve, compared to the authored target.
-
-STATUS: APPROVED AND WIRED IN
-  dress_params() defaults to bust="apex", dispatching ShellModel(...) to
-  ApexShellModel automatically (see shell.py's ShellModel.__new__ and
-  the _APEX_DEPTH build cache). apex_params() below remains as a
-  standalone convenience builder but is no longer the only path to this
-  geometry — most callers should just use dress_params().
+Both share the numeric machinery in _BumpedDepth: freeze the committed
+P(v) schedule, re-solve a(v) numerically against whatever additive bump
+field .bump(theta_deg, v) the subclass defines, and tabulate the
+equal-arc inverse theta -> ellipse-parameter t. Only .bump() differs.
 """
 
 import math
@@ -80,7 +37,9 @@ TAU = math.tau
 
 
 class ApexError(ValueError):
-    """Raised when the apex construction is inconsistent."""
+    """Raised when a bump-field bust construction is inconsistent, or
+    (assert_cf_is_max) when the hard center-front-is-max constraint is
+    numerically violated."""
 
 
 def _wrap180(deg):
@@ -93,70 +52,34 @@ def _falloff(d_mm, radius_mm):
     return np.where(u <= 1.0, 0.5 * (1.0 + np.cos(math.pi * np.clip(u, 0.0, 1.0))), 0.0)
 
 
-class ApexBustDepth:
-    """The bumped depth field. Exposes the authored-depth interface
-    (.b, .perimeter, .v_lo, .v_hi) plus the apex-specific extras."""
+class _BumpedDepth:
+    """Shared machinery for an additive depth bump field over the base
+    single-ellipse profile: numeric perimeter-freezing solve for a(v) +
+    tabulated equal-arc inverse theta -> t. A subclass sets
+    self.base_params / self.apex_v / self.radius_mm / self.amplitude_mm
+    (whatever its own .bump() needs) and self.r_ref BEFORE calling
+    self._finish_init(n_v, n_t); it must implement .bump(theta_deg, v).
 
-    def __init__(self, base_params=None, apex_v=181.0, apex_theta_deg=35.0,
-                amplitude_mm=None, radius_mm=70.0, n_v=1201, n_t=481):
-        self.base_params = (base_params if base_params is not None
-                           else dress_params(bust="plain"))
-        if isinstance(self.base_params.depth_curve, ApexBustDepth):
-            raise ApexError("base_params already carries an ApexBustDepth "
-                            "(double-wrap) — pass a single-ellipse base")
-        if not hasattr(self.base_params.depth_curve, "b"):
-            raise ApexError("base_params.depth_curve must expose .b(v)")
-        if radius_mm <= 0.0:
-            raise ApexError(f"radius_mm must be > 0, got {radius_mm}")
-        if not (0.0 < apex_theta_deg < 90.0):
-            raise ApexError("apex_theta_deg must lie strictly between 0 "
-                            "(CF — a single central bump, not two apexes) "
-                            f"and 90 (the side), got {apex_theta_deg}")
+    Public interface expected by *ShellModel / ShellParams: .a(v), .b(v),
+    .t_of(theta_deg, v), .y_of(t, v), .depth_at(theta_deg, v),
+    .perimeter(v), .fillet_zone, .waist_ring_z, .waist_ring_circumference.
+    """
 
+    def _finish_init(self, n_v, n_t):
         self.ref_model = ShellModel(self.base_params)
         base = self.base_params.depth_curve
         self.base = base
         self.v_lo, self.v_hi = base.v_lo, base.v_hi
         self.params = base.params
-
-        self.apex_v = float(apex_v)
-        self.apex_theta_deg = float(apex_theta_deg)
-        self.radius_mm = float(radius_mm)
-        # default amplitude: SOLVED (bisection, off-line — not re-solved on
-        # every construction, that would be circular) so that the actual
-        # surface depth AT the apex point equals 121.08mm, the OLD compound
-        # model's peak projection. That number is the right target to
-        # preserve, not the old model's naive v-only DELTA (19.44mm): once
-        # the apex sits off-axis, the base ellipse's own cos(t) falloff has
-        # already reduced the surface depth there before any bump is added
-        # (86.3mm at apex_theta_deg=35 vs 101.6mm at CF), so carrying the
-        # old delta forward under-delivers by more than 15mm. 35.4mm is
-        # what's actually needed to reach the same peak, correctly located.
-        self.amplitude_mm = float(
-            35.4 if amplitude_mm is None else amplitude_mm)
-        if self.amplitude_mm < 0.0:
-            raise ApexError("amplitude_mm must be >= 0")
-        # fixed reference radius for converting degrees to mm around each
-        # apex: the apex height's own perimeter-equivalent radius
-        self.r_ref = float(np.asarray(self.ref_model.mean_radius(self.apex_v)))
-
         self._solve(n_v=n_v, n_t=n_t)
 
-    # -- the bump field ------------------------------------------------
+    # -- the bump field (subclass-defined) ------------------------------
     def bump(self, theta_deg, v):
-        theta_deg = np.asarray(theta_deg, dtype=float)
-        v = np.asarray(v, dtype=float)
-        total = np.zeros(np.broadcast(theta_deg, v).shape, dtype=float)
-        for ta in (self.apex_theta_deg, -self.apex_theta_deg):
-            dtheta_mm = np.radians(_wrap180(theta_deg - ta)) * self.r_ref
-            dv = v - self.apex_v
-            d = np.hypot(dtheta_mm, dv)
-            total = total + self.amplitude_mm * _falloff(d, self.radius_mm)
-        return total
+        raise NotImplementedError
 
     def _theta_ref(self, t, v):
         """Reference equal-arc azimuth (degrees, [0, 180]) of ellipse
-        parameter t >= 0 at height v, from the PLAIN pre-compound model."""
+        parameter t >= 0 at height v, from the PLAIN pre-bump model."""
         arc, _ = self.ref_model._arc_and_speed(np.abs(t), v)
         P = np.asarray(self.ref_model.section_perimeter(v))
         return np.degrees(TAU * arc / P)
@@ -221,12 +144,12 @@ class ApexBustDepth:
                                              bounds_error=False,
                                              fill_value=None)
         self._v_grid = v_grid
-        # The achieved (true equal-arc) azimuth of each apex, vs the
-        # authored reference target, is computed on demand by the
-        # module-level verify_apex_placement() — it needs a finer,
-        # apex-height-specific solve than this construction-time grid.
+        # The achieved (true equal-arc) azimuth of any authored reference
+        # feature is computed on demand by the module-level verify_*()
+        # helpers below — they need a finer, height-specific solve than
+        # this construction-time grid.
 
-    # -- public interface expected by ApexShellModel / ShellParams -----
+    # -- public interface expected by *ShellModel / ShellParams --------
     def perimeter(self, v):
         return self.ref_model.section_perimeter(v)   # frozen, unchanged
 
@@ -294,11 +217,221 @@ class ApexBustDepth:
                       self.params.waist_circumference)
 
 
+class ApexBustDepth(_BumpedDepth):
+    """APPROVED, WIRED IN — dress_params()'s default (bust="apex").
+
+    Two apexes at (+-apex_theta_deg, apex_v), each adding a RADIAL bump
+    in the depth (front-to-back) direction only:
+        bump(theta, v) = amplitude_mm * falloff(d / radius_mm)
+        d = sqrt(dv^2 + dtheta_mm^2)   -- an approximate local-tangent-
+            plane Euclidean distance: dv is meridian height difference,
+            dtheta_mm is the lateral arc-length difference converted
+            through a FIXED reference radius r_ref = P(apex_v) / 2pi.
+        falloff(u) = 0.5*(1 + cos(pi*u))  for u <= 1, else EXACTLY 0.
+    The two apex fields are SUMMED, so CF (between them) gets a lesser,
+    combined-but-attenuated contribution rather than either peak.
+
+    KNOWN DEFECT (found by inspection of the rendered shell, not by this
+    module's own numeric checks — summing two separate off-axis bumps
+    that both decay toward CF can leave CF as a LOCAL MINIMUM, "two lobes
+    with a dip between them," if the apexes are far enough apart /
+    narrow enough relative to their separation — which is exactly what
+    the committed defaults (35 deg apart, 70mm radius) produce: CF reads
+    101.6mm at v=181 while each apex reads 121.0mm, a real dip. Left
+    unchanged here — see PlateauBustDepth for the fix; this class is kept
+    byte-identical because it is still the committed default until the
+    fix is reviewed and wired in.
+    """
+
+    def __init__(self, base_params=None, apex_v=181.0, apex_theta_deg=35.0,
+                amplitude_mm=None, radius_mm=70.0, n_v=1201, n_t=481):
+        self.base_params = (base_params if base_params is not None
+                           else dress_params(bust="plain"))
+        if isinstance(self.base_params.depth_curve, _BumpedDepth):
+            raise ApexError("base_params already carries a bump-field depth "
+                            "(double-wrap) — pass a single-ellipse base")
+        if not hasattr(self.base_params.depth_curve, "b"):
+            raise ApexError("base_params.depth_curve must expose .b(v)")
+        if radius_mm <= 0.0:
+            raise ApexError(f"radius_mm must be > 0, got {radius_mm}")
+        if not (0.0 < apex_theta_deg < 90.0):
+            raise ApexError("apex_theta_deg must lie strictly between 0 "
+                            "(CF — a single central bump, not two apexes) "
+                            f"and 90 (the side), got {apex_theta_deg}")
+
+        self.apex_v = float(apex_v)
+        self.apex_theta_deg = float(apex_theta_deg)
+        self.radius_mm = float(radius_mm)
+        # default amplitude: SOLVED (bisection, off-line — not re-solved on
+        # every construction, that would be circular) so that the actual
+        # surface depth AT the apex point equals 121.08mm, the OLD compound
+        # model's peak projection. That number is the right target to
+        # preserve, not the old model's naive v-only DELTA (19.44mm): once
+        # the apex sits off-axis, the base ellipse's own cos(t) falloff has
+        # already reduced the surface depth there before any bump is added
+        # (86.3mm at apex_theta_deg=35 vs 101.6mm at CF), so carrying the
+        # old delta forward under-delivers by more than 15mm. 35.4mm is
+        # what's actually needed to reach the same peak, correctly located.
+        self.amplitude_mm = float(
+            35.4 if amplitude_mm is None else amplitude_mm)
+        if self.amplitude_mm < 0.0:
+            raise ApexError("amplitude_mm must be >= 0")
+        # fixed reference radius for converting degrees to mm around each
+        # apex: the apex height's own perimeter-equivalent radius
+        ref_model = ShellModel(self.base_params)
+        self.r_ref = float(np.asarray(ref_model.mean_radius(self.apex_v)))
+
+        self._finish_init(n_v=n_v, n_t=n_t)
+
+    # -- the bump field ------------------------------------------------
+    def bump(self, theta_deg, v):
+        theta_deg = np.asarray(theta_deg, dtype=float)
+        v = np.asarray(v, dtype=float)
+        total = np.zeros(np.broadcast(theta_deg, v).shape, dtype=float)
+        for ta in (self.apex_theta_deg, -self.apex_theta_deg):
+            dtheta_mm = np.radians(_wrap180(theta_deg - ta)) * self.r_ref
+            dv = v - self.apex_v
+            d = np.hypot(dtheta_mm, dv)
+            total = total + self.amplitude_mm * _falloff(d, self.radius_mm)
+        return total
+
+
+class PlateauBustDepth(_BumpedDepth):
+    """NEW, PROTOTYPE — NOT wired into dress_params(). Fixes ApexBustDepth's
+    center-front dip by rebuilding the theta distribution under a hard
+    constraint: depth_at(0, v) >= depth_at(theta, v) for every theta, at
+    every v — center front is the max of the front projection, or tied
+    for it, never a local minimum. Verified numerically after every
+    construction (assert_cf_is_max below); the underlying field is also
+    provably monotone by construction (see the distance metric).
+
+    ONE bump, anchored at center front (theta=0), not two off-axis
+    points summed:
+        bump(theta, v) = amplitude_mm * falloff(d / radius_mm)
+        dtheta_mm = radians(wrap180(theta)) * r_ref        (signed, CF=0)
+        dv        = v - apex_v
+        lateral   = max(0, |dtheta_mm| - plateau_mm)   -- 0 INSIDE the
+                    flat core, distance PAST its edge outside it
+        d         = hypot(lateral, dv)
+        plateau_mm = radians(bust_plateau_theta) * r_ref
+
+    d is the Euclidean distance to a flat horizontal CORE SEGMENT
+    spanning [-plateau_mm, +plateau_mm] at v = apex_v (a "capsule" /
+    stadium shape), not to a single point — a direct, minimal
+    generalization of ApexBustDepth's own point-distance formula.
+    bust_plateau_theta = 0 collapses the segment to a point exactly at
+    (CF, apex_v): "a single crest at CF, monotone decreasing outward."
+    bust_plateau_theta > 0 gives "a flat forward face" of that many
+    degrees each side of CF, THEN the same raised-cosine falloff over
+    the next radius_mm of lateral distance.
+
+    WHY THIS IS PROVABLY MONOTONE FROM CF, AT EVERY v (not tuned to be —
+    a structural guarantee): at any fixed v, `lateral` is non-decreasing
+    in |dtheta_mm| (it's exactly 0 up to the plateau edge, then rises
+    1:1), so d = hypot(lateral, dv) is non-decreasing in |dtheta_mm| too
+    (hypot is non-decreasing in either argument), and falloff(d/radius)
+    is non-increasing in d. The composition is therefore non-increasing
+    as |theta| grows from 0, at every v — CF (or the flat core) is
+    always the max. No amount of retuning the old two-point-sum design
+    could have this property (each apex's own bump necessarily rises
+    again on the far side of its own center, and CF sits between two
+    such rises); this is the "not recoverable by tuning" the user named.
+
+    C1 CONTINUITY, INCLUDING AT THE PLATEAU EDGE: max(0, x)^2 is C1 at
+    x=0 (both value and slope match: 0 and 0), so d^2 = lateral^2 + dv^2
+    is C1 in (theta, v) everywhere; falloff as a function of d^2 is a
+    smooth (even, in d) function near d=0 (raised-cosine's Taylor series
+    in d^2 has no odd terms), so the composition falloff(d(theta,v)) is
+    C1 everywhere, including exactly at the plateau's flat-top corners —
+    no new sharp edge is introduced by flattening the top.
+    """
+
+    def __init__(self, base_params=None, apex_v=181.0, bust_plateau_theta=0.0,
+                amplitude_mm=35.4, radius_mm=70.0, n_v=1201, n_t=481,
+                check_cf_is_max=True):
+        self.base_params = (base_params if base_params is not None
+                           else dress_params(bust="plain"))
+        if isinstance(self.base_params.depth_curve, _BumpedDepth):
+            raise ApexError("base_params already carries a bump-field depth "
+                            "(double-wrap) — pass a single-ellipse base")
+        if not hasattr(self.base_params.depth_curve, "b"):
+            raise ApexError("base_params.depth_curve must expose .b(v)")
+        if radius_mm <= 0.0:
+            raise ApexError(f"radius_mm must be > 0, got {radius_mm}")
+        if not (0.0 <= bust_plateau_theta < 90.0):
+            raise ApexError("bust_plateau_theta must lie in [0, 90) — 0 is "
+                            "a single crest at CF, >=90 would reach the "
+                            f"side seam, got {bust_plateau_theta}")
+        if amplitude_mm < 0.0:
+            raise ApexError("amplitude_mm must be >= 0")
+
+        self.apex_v = float(apex_v)
+        self.bust_plateau_theta = float(bust_plateau_theta)
+        self.radius_mm = float(radius_mm)
+        self.amplitude_mm = float(amplitude_mm)
+        ref_model = ShellModel(self.base_params)
+        self.r_ref = float(np.asarray(ref_model.mean_radius(self.apex_v)))
+        self.plateau_mm = math.radians(self.bust_plateau_theta) * self.r_ref
+
+        self._finish_init(n_v=n_v, n_t=n_t)
+
+        if check_cf_is_max:
+            self.cf_max_violation_mm = assert_cf_is_max(self)
+        else:
+            self.cf_max_violation_mm = None
+
+    # -- the bump field ------------------------------------------------
+    def bump(self, theta_deg, v):
+        theta_deg = np.asarray(theta_deg, dtype=float)
+        v = np.asarray(v, dtype=float)
+        dtheta_mm = np.radians(_wrap180(theta_deg)) * self.r_ref
+        dv = v - self.apex_v
+        lateral = np.maximum(0.0, np.abs(dtheta_mm) - self.plateau_mm)
+        d = np.hypot(lateral, dv)
+        return self.amplitude_mm * _falloff(d, self.radius_mm)
+
+
+def assert_cf_is_max(depth, n_theta=721, n_v=41, tol_mm=2e-3):
+    """HARD CONSTRAINT, checked numerically after every PlateauBustDepth
+    build: depth_at(0, v) >= depth_at(theta, v) for every theta, over the
+    full vertical reach the bump could plausibly affect. Raises
+    ApexError loudly (naming the exact worst offender) if violated.
+    Should never fire — the field is provably monotone by construction
+    (see PlateauBustDepth's docstring) — this guards against the ONE
+    remaining source of error: the tabulated equal-arc inverse (PCHIP
+    resample + RegularGridInterpolator) introducing numerical wiggle the
+    continuous math doesn't have. Returns the worst (signed) margin found
+    (<= 0 means CF-is-max held everywhere sampled; the more negative, the
+    more comfortably)."""
+    v_lo = max(depth.v_lo, depth.apex_v - depth.radius_mm - 5.0)
+    v_hi = min(depth.v_hi, depth.apex_v + depth.radius_mm + 5.0)
+    vv = np.linspace(v_lo, v_hi, n_v)
+    th = np.linspace(-180.0, 180.0, n_theta)
+    worst = -np.inf
+    worst_at = None
+    for v in vv:
+        cf = float(np.asarray(depth.depth_at(0.0, v)))
+        d = np.asarray(depth.depth_at(th, np.full_like(th, v)))
+        i = int(np.argmax(d))
+        viol = float(d[i] - cf)
+        if viol > worst:
+            worst = viol
+            worst_at = (float(v), float(th[i]))
+    if worst > tol_mm:
+        raise ApexError(
+            f"HARD CONSTRAINT VIOLATED: depth_at(theta, v) exceeds "
+            f"depth_at(0, v) [center front] by {worst:.4f} mm at "
+            f"v={worst_at[0]:.2f}, theta={worst_at[1]:.2f} deg — CF must "
+            f"be the max of the front projection, never a local minimum")
+    return worst
+
+
 def verify_apex_placement(depth):
-    """Solve for the true equal-arc azimuth of each apex (t such that
-    theta_ref(t, apex_v) == apex_theta_deg is the AUTHORING target; the
-    FINAL equal-arc theta at that same t, on the bumped curve, is what a
-    panel author would actually see) and report the discrepancy."""
+    """ApexBustDepth only: solve for the true equal-arc azimuth of each
+    apex (t such that theta_ref(t, apex_v) == apex_theta_deg is the
+    AUTHORING target; the FINAL equal-arc theta at that same t, on the
+    bumped curve, is what a panel author would actually see) and report
+    the discrepancy."""
     v = depth.apex_v
     # find t where the reference azimuth equals the authored target
     t_grid = np.linspace(0.0, math.pi, 4001)
@@ -317,14 +450,51 @@ def verify_apex_placement(depth):
            "residual_deg": theta_true - depth.apex_theta_deg}
 
 
+def verify_plateau_placement(depth):
+    """PlateauBustDepth only: crest depth at CF, and — if
+    bust_plateau_theta > 0 — where the plateau's authored edge (in the
+    reference frame) actually lands in TRUE equal-arc terms. CF itself
+    needs no placement check: theta=0 is the EXACT fixed point of the
+    mirror symmetry in both the reference and the true equal-arc maps
+    (dtheta_mm = 0 identically, by construction, not by solve) — unlike
+    the old off-axis apex, there is no reference-frame approximation to
+    report for the crest itself."""
+    v = depth.apex_v
+    crest_depth = float(np.asarray(depth.depth_at(0.0, v)))
+    out = {"apex_v": v, "bust_plateau_theta": depth.bust_plateau_theta,
+          "crest_depth_mm": crest_depth}
+    if depth.bust_plateau_theta <= 0.0:
+        out["plateau_true_equal_arc_deg"] = 0.0
+        out["plateau_residual_deg"] = 0.0
+        return out
+    t_grid = np.linspace(0.0, math.pi, 4001)
+    theta_ref = depth._theta_ref(t_grid, np.full_like(t_grid, v))
+    t_edge = float(np.interp(depth.bust_plateau_theta, theta_ref, t_grid))
+    a_v = float(depth.a(v))
+    X = a_v * np.sin(t_grid)
+    Y = depth.y_of(t_grid, np.full_like(t_grid, v))
+    ds = np.hypot(np.gradient(X, t_grid), np.gradient(Y, t_grid))
+    arc = np.concatenate([[0.0], np.cumsum(0.5 * (ds[:-1] + ds[1:])
+                                           * np.diff(t_grid))])
+    P = arc[-1] * 2.0
+    theta_true = np.degrees(TAU * np.interp(t_edge, t_grid, arc) / P)
+    out["plateau_true_equal_arc_deg"] = theta_true
+    out["plateau_residual_deg"] = theta_true - depth.bust_plateau_theta
+    return out
+
+
 class ApexShellModel(ShellModel):
-    """ShellModel with the two-apex bump field. Section geometry only —
-    equal-arc theta convention, the fillet, the neckline and the split
-    are inherited from the base (bust="plain") params, unaffected."""
+    """ShellModel with a bump-field bust curvature (ApexBustDepth OR the
+    new PlateauBustDepth — both share the same .a/.b/.t_of/.y_of
+    interface via _BumpedDepth, so one ShellModel subclass serves both).
+    Section geometry only — equal-arc theta convention, the fillet, the
+    neckline and the split are inherited from the base (bust="plain")
+    params, unaffected."""
 
     def __init__(self, params: ShellParams):
-        if not isinstance(params.depth_curve, ApexBustDepth):
-            raise ApexError("ApexShellModel needs an ApexBustDepth")
+        if not isinstance(params.depth_curve, _BumpedDepth):
+            raise ApexError("ApexShellModel needs a bump-field depth "
+                            "(ApexBustDepth or PlateauBustDepth)")
         super().__init__(params)
         self.apex_depth = params.depth_curve
 
@@ -394,12 +564,27 @@ class ApexShellModel(ShellModel):
 
 def apex_params(apex_v=181.0, apex_theta_deg=35.0, amplitude_mm=None,
                 radius_mm=70.0, base_params=None):
-    """ShellParams for the apex-based design: a single-ellipse committed
-    dress (dress_params(bust="plain") by default) with its depth object
-    replaced by the two-apex bumped field."""
+    """ShellParams for the (committed) two-apex design: a single-ellipse
+    committed dress (dress_params(bust="plain") by default) with its
+    depth object replaced by the two-apex bumped field."""
     from dataclasses import replace
     base = base_params if base_params is not None else dress_params(bust="plain")
     d = ApexBustDepth(base_params=base, apex_v=apex_v,
                       apex_theta_deg=apex_theta_deg,
                       amplitude_mm=amplitude_mm, radius_mm=radius_mm)
+    return replace(base, depth_curve=d)
+
+
+def plateau_params(apex_v=181.0, bust_plateau_theta=0.0, amplitude_mm=35.4,
+                   radius_mm=70.0, base_params=None):
+    """ShellParams for the NEW plateau design (prototype, not wired in):
+    a single-ellipse committed dress (dress_params(bust="plain") by
+    default) with its depth object replaced by the CF-anchored bumped
+    field. Build a model with ApexShellModel(plateau_params(...)) —
+    ApexShellModel works for either bump-field depth."""
+    from dataclasses import replace
+    base = base_params if base_params is not None else dress_params(bust="plain")
+    d = PlateauBustDepth(base_params=base, apex_v=apex_v,
+                         bust_plateau_theta=bust_plateau_theta,
+                         amplitude_mm=amplitude_mm, radius_mm=radius_mm)
     return replace(base, depth_curve=d)
