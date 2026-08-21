@@ -412,6 +412,24 @@
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
+            <label for="crossSection">Cross-section roll</label>
+            <span class="fl-ctrl__val" data-value="crossSection"></span>
+          </div>
+          <input type="range" id="crossSection" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">flat (0) &rarr; channelled &rarr; closed quill (&plusmn;1); sign picks which way it rolls</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="crossSectionTaper">Cross-section taper</label>
+            <span class="fl-ctrl__val" data-value="crossSectionTaper"></span>
+          </div>
+          <input type="range" id="crossSectionTaper" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">uniform (0) &rarr; opens to a spoon at the tip (+) or the base (&minus;)</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
             <label for="reliefAmp">Surface relief</label>
             <span class="fl-ctrl__val" data-value="reliefAmp"></span>
           </div>

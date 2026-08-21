@@ -203,6 +203,32 @@ const CONFIGS = [
   { label: 'LOBED bifid spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
   { label: 'LOBED bifid bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '3' }] },
   { label: 'LOBED + CLAW compose (Dianthus superbus)', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '5' }, { id: 'clawLength', value: '0.3' }] },
+  // ===== CROSS-SECTION: rolls the flat blade into a channel / quill (flat ->
+  // channelled -> quilled), with a second axis (TAPER) that opens the roll into a
+  // spoon near one end. It is a pure per-point displacement through surfacePoint
+  // (flower-geometry.js) — no new triangles for the default wire infill (veins),
+  // so most of these exercise CORRECTNESS (seam normals at v=+-1, margin
+  // registration, the solid-blade rolled end cap) rather than budget; the
+  // high-petal-count and solid-sepal rows are the ones actually worth flagging.
+  { label: 'reset to a clean strap petal (for CROSS-SECTION block)', smoke: true, set: [
+    { id: 'petalShape', value: 'strap', evt: 'change' },
+    { id: 'petalCount', value: '6' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
+    { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' },
+    { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' },
+    { id: 'petalCup', value: '0' }, { id: 'crossSection', value: '0' }, { id: 'crossSectionTaper', value: '0' },
+    { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' },
+    { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' },
+    { id: 'stemBudMode', value: 'none', evt: 'change' },
+  ] },
+  { label: 'CROSS-SECTION channelled (0.35)', set: [{ id: 'crossSection', value: '0.35' }] },
+  { label: 'CROSS-SECTION quilled (1, near-closed tube)', set: [{ id: 'crossSection', value: '1' }] },
+  { label: 'CROSS-SECTION quilled, reverse roll direction (-1)', set: [{ id: 'crossSection', value: '-1' }] },
+  { label: 'CROSS-SECTION spoon: rolled at the base, opening flat at the tip (taper +1)', set: [{ id: 'crossSection', value: '1' }, { id: 'crossSectionTaper', value: '1' }] },
+  { label: 'CROSS-SECTION spoon mirror: flat base, rolled tip (taper -1)', set: [{ id: 'crossSectionTaper', value: '-1' }] },
+  { label: 'CROSS-SECTION quilled + max petal cup (auto-dampen stress)', set: [{ id: 'crossSectionTaper', value: '0' }, { id: 'petalCup', value: '1' }] },
+  { label: 'CROSS-SECTION quilled + voronoi infill (rolled slab normals)', smoke: true, set: [{ id: 'petalCup', value: '0' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] },
+  { label: 'CROSS-SECTION quilled + 30 petals (triangle-budget stress)', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '30' }] },
+  { label: 'CROSS-SECTION quilled + solid sepals (rolled solid-blade end caps)', smoke: true, set: [{ id: 'petalCount', value: '6' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'solid', evt: 'change' }] },
 ];
 
 // ===== Receptacle JUNCTION axis matrix: PROFILE x CONSTRUCTION x COLLAR =====

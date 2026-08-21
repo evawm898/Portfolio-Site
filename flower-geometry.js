@@ -81,6 +81,19 @@ const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
 const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the (top-down) edge-curve slider
 const EDGE_PROFILE_AMP = 0.85;  // max out-of-plane edge lift from the profile edge-curve slider
 const PETAL_CUP_AMP = 0.5;   // max extra across-width cup/reflex from the Petal cup slider
+// CROSS-SECTION: rolls the flat (v * halfWidth) cross-section into a genuine arc —
+// flat -> a shallow U channel -> a closed quill — instead of the parabolic v^2
+// approximation cup/edgeProfile use. Capped just under a full turn so the two
+// margins (v = -1 / +1) never exactly coincide: that keeps surfaceNormalAt's
+// finite-difference stencil non-degenerate at the seam and leaves a persistent
+// sliver gap (also how a real rolled paper quill's seam reads). CROSS_SECTION_TAPER
+// varies the roll along u (see crossSectionEnvelope) so a tube can open into a
+// spoon near the tip (or the mirror: open at the base). CROSS_SECTION_CUP_DAMP
+// scales petalCup's own lift down as the roll tightens — the two displace the
+// same (lift, across) plane, and summing them unscaled at max cup + max quill can
+// over-curve one side of the tube past its own seam.
+const CROSS_SECTION_MAX_ANGLE = 2 * Math.PI * 0.975;   // ~351 deg turn at |crossSection| = 1
+const CROSS_SECTION_CUP_DAMP = 0.85;   // fraction of petalCup's lift removed at |crossSection| = 1
 // SURFACE RELIEF: out-of-plane corrugation (plicate / rugose / bullate). Amplitude
 // is a world-unit lift on the same axis as the cup; rib count spans a broad pleat
 // to a fine crepe. Corrugating a thin sheet raises its bending stiffness ~ (depth/
@@ -380,6 +393,45 @@ function reliefDisplace(u, v, P, hw) {
   return amp * RELIEF_AMP_MAX * fade * wave;
 }
 
+// How much of the roll angle applies at u, so CROSS-SECTION TAPER can open the
+// tube into a spoon near one end. taper = 0: uniform along the whole length
+// (channelled / quilled read the same everywhere). taper > 0: full roll at the
+// base (u=0) easing to flat by the tip (u=1) — a quill opening into a spoon.
+// taper < 0: the mirror — flat at the base, full roll by the tip. Exact 1 at
+// taper = 0, so CROSS SECTION alone (taper untouched) rolls uniformly.
+function crossSectionEnvelope(u, taper) {
+  const t = clamp(taper || 0, -1, 1);
+  if (Math.abs(t) < 1e-4) return 1;
+  const uu = t > 0 ? clamp(u, 0, 1) : clamp(1 - u, 0, 1);
+  return 1 - Math.abs(t) * smootherstep(uu);
+}
+
+// Roll the flat cross-section (across = v * hw) into an arc of angle Θ(u), by
+// bending the flat strip WITHOUT stretching it: the strip's half-width hw(u) is
+// exactly the arc length from the midrib to the margin, so a strip bent through
+// angle Θ sits on a circle of radius r = hw / (Θ/2) and a point at v lands at the
+// angle φ = v·Θ/2 around it — the same isometric roll a real strip of paper or
+// paper-quilling makes; every infill point maps through this same substitution,
+// so it curls with the sheet at no extra cost (see surfacePoint).
+//   Θ = 0 (flat)     : r -> infinity, but r·sin(φ) -> hw·v and r·(1-cos(φ)) -> 0 —
+//                      the two limits below are exact, not just close, at Θ = 0.
+//   |Θ| = MAX (quill): margins land ~351° apart, not exactly coincident (see
+//                      CROSS_SECTION_MAX_ANGLE) — always a hairline seam gap.
+// `dir` (the sign of P.crossSection) picks which way the tube opens — toward the
+// flower centre (+, matching petalCup's convention) or away (-) — independent of
+// Θ's magnitude, since 1 - cos(φ) is the same for +φ and -φ.
+function crossSectionRoll(u, v, hw, P) {
+  const mag = Math.abs(P.crossSection || 0);
+  if (mag <= 1e-4 || hw <= 1e-6) return { across: v * hw, lift: 0 };
+  const dir = Math.sign(P.crossSection);
+  const theta = mag * CROSS_SECTION_MAX_ANGLE * crossSectionEnvelope(u, P.crossSectionTaper);
+  const K = theta / 2;
+  if (K <= 1e-4) return { across: v * hw, lift: 0 };
+  const r = hw / K;
+  const phi = v * K;
+  return { across: r * Math.sin(phi), lift: dir * r * (1 - Math.cos(phi)) };
+}
+
 export function surfacePoint(u, v, P, spine) {
   const sp = sampleSpine(spine, u);
   const hw = petalHalfWidth(u, P);
@@ -389,7 +441,13 @@ export function surfacePoint(u, v, P, spine) {
   // the flower centre, like a rose/tulip); -ve reverses it convex (sides curl
   // down/out, like a reflexed lily). 0 leaves the surface exactly as before. Because
   // every vein / infill point is mapped through surfacePoint, they cup with it.
-  if (P.petalCup) normalLift += P.petalCup * PETAL_CUP_AMP * hw * v * v;
+  if (P.petalCup) {
+    // Auto-dampen: CROSS SECTION rolls the same (lift, across) plane cup does, so
+    // an un-damped sum at max cup + max quill over-curves one side of the tube
+    // past its own seam. Fades cup toward (not to) zero as the roll tightens.
+    const cupDamp = 1 - CROSS_SECTION_CUP_DAMP * clamp(Math.abs(P.crossSection || 0), 0, 1);
+    normalLift += P.petalCup * PETAL_CUP_AMP * hw * v * v * cupDamp;
+  }
   // Profile edge curve: an out-of-plane lift of the margins in the SAME plane the
   // centre curve bends (along the spine normal), growing from base toward the tip,
   // so the edges curl up (+) or down (-) along the length, independent of the
@@ -412,7 +470,14 @@ export function surfacePoint(u, v, P, spine) {
   // (a lateral midrib bend). Both break bilateral symmetry on purpose. With twist =
   // skew = 0 this is exactly `z = v*hw + dz` and `lift = normalLift` — an exact no-op.
   let lift = normalLift;
-  let across = v * hw + dz;
+  let across;
+  if (P.crossSection) {
+    const roll = crossSectionRoll(u, v, hw, P);
+    across = roll.across + dz;
+    lift += roll.lift;
+  } else {
+    across = v * hw + dz;
+  }
   const tw = P.petalTwist || 0;
   if (tw) {
     const th = tw * TWIST_MAX * smootherstep(clamp(u, 0, 1));
@@ -2496,9 +2561,19 @@ export function surfaceNormalAt(pt, P, spine) {
   const v = hw > 1e-4 ? clamp(pt.y / hw, -1, 1) : 0;
   const p = surfacePoint(u, v, P, spine);
   const pu = surfacePoint(clamp(u + 0.004, 0, 0.9995), v, P, spine);
-  const pv = surfacePoint(u, clamp(v + 0.02, -1, 1), P, spine);
+  // Backward difference at the v = +1 margin: a forward step there used to clamp
+  // right back to v (pv === p), so the cross product degenerated to a zero normal
+  // exactly on the boundary — harmless while the margin was gently curved, but
+  // CROSS SECTION can make the margin the tightest-curvature seam of the whole
+  // surface, so a real (non-zero) normal there now matters. Sampling backward
+  // flips which side the tangent estimate is taken from, so `sign` flips the
+  // delta back — bx/by/bz still approximate the +v tangent (not -v), so the
+  // normal's outward orientation is unchanged at the boundary.
+  const vFwd = v + 0.02 <= 1;
+  const pv = surfacePoint(u, clamp(v + (vFwd ? 0.02 : -0.02), -1, 1), P, spine);
+  const sign = vFwd ? 1 : -1;
   const ax = pu.x - p.x, ay = pu.y - p.y, az = pu.z - p.z;
-  const bx = pv.x - p.x, by = pv.y - p.y, bz = pv.z - p.z;
+  const bx = (pv.x - p.x) * sign, by = (pv.y - p.y) * sign, bz = (pv.z - p.z) * sign;
   let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
   const l = Math.hypot(nx, ny, nz) || 1;
   return { x: nx / l, y: ny / l, z: nz / l };
