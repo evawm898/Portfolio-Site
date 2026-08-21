@@ -2,6 +2,12 @@
 approximation), answering the width-floor / series-artifact / keep-out /
 panel-dims corrections.
 
+STATUS: this whole facet approach was REJECTED after this report (hard
+corners in plan + net seatable-area loss) — see plateau_gate2.py for the
+current front construction (widened, depth-pinned PlateauBustDepth).
+Kept as a record of the exact-X and C1-taper fixes, both real bugs
+independent of the facet-vs-plateau decision.
+
 Nothing here modifies the committed shell: dress_params() is untouched.
 
 [1] width floor: theta for exactly 87.5mm half-width at v=181

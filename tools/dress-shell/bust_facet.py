@@ -1,4 +1,17 @@
-"""ANALYTIC FLAT BUST FACET — prototype, NOT wired into dress_params().
+"""ANALYTIC FLAT BUST FACET — REJECTED as the front construction, NOT
+wired into dress_params(). Kept for reference (the exact-X and C1-taper
+fixes below are real, reused by bust_apex.py's shared machinery for
+PlateauBustDepth too — see that module for the current front
+construction). Rejected because: (1) its plan sections have a hard
+corner where the flat chord meets the surrounding curve — reads as a
+box, not a corset; (2) net p213-seatable area vs the unfaceted baseline
+was -21,900mm^2 even once construction bugs were fixed, which defeats
+the reason to want flatness in the first place. PlateauBustDepth (in
+bust_apex.py), widened to the measured bust-point span and depth-pinned,
+is the current front construction: smooth in plan (no corners), CF is
+still guaranteed to be the max (no dip) by the same structural argument,
+and its own net area cost turns out to be no worse than the currently
+committed design's.
 
 REBUILT TWICE now, each time from a real correction:
   v1: anchored the plane's vertical slope to the base curve's LOCAL
