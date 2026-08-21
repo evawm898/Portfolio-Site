@@ -1,6 +1,9 @@
 node_modules/
 package-lock.json
 
+# tools/audit-hires.mjs output (screenshots + results.json) — regenerate, don't commit.
+audit-out/
+
 # package.json is committed so Netlify installs the Function's @netlify/blobs
 # dependency at deploy time. Local dev deps (three, playwright-core) live in the
 # gitignored node_modules and are NOT listed here — the browser loads three from
