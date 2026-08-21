@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dress Shape Editor — local dev</title>
+<style>
+  :root {
+    --bg: #0c0e0e; --panel: #141717; --line: #2a2f2f; --ink: #e9ecec;
+    --dim: #8b9494; --petrol: #2fa3a3; --amber: #d98a35; --red: #e05545;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--mono);
+         font-size: 12px; overflow: hidden; }
+  #layout { position: fixed; inset: 0; display: flex; }
+  #curvePane { width: 420px; flex: none; border-right: 1px solid var(--line);
+               display: flex; flex-direction: column; }
+  #view { flex: 1; position: relative; }
+  h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.12em;
+       text-transform: uppercase; color: var(--petrol); padding: 10px 12px 6px; }
+  h2 { font-size: 11px; font-weight: 500; color: var(--dim); margin: 8px 12px 4px;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  #curveCanvas { flex: none; display: block; margin: 0 auto; cursor: default; }
+  .kv { color: var(--dim); padding: 0 12px; line-height: 1.7; }
+  .kv b { color: var(--ink); font-weight: 500; }
+  .ok { color: var(--petrol); } .warn { color: var(--amber); } .err { color: var(--red); }
+  .legend { padding: 6px 12px 10px; color: var(--dim); line-height: 1.8; }
+  .legend .sw { display: inline-block; width: 18px; height: 2px; margin-right: 5px;
+                vertical-align: middle; }
+  #readouts { border-top: 1px solid var(--line); padding-bottom: 10px; }
+  .hud { position: absolute; background: color-mix(in srgb, var(--panel) 92%, transparent);
+         border: 1px solid var(--line); padding: 8px 10px; border-radius: 3px;
+         line-height: 1.7; }
+  #status { left: 12px; bottom: 12px; max-width: 70%; }
+  #modeTag { top: 12px; left: 12px; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <div id="curvePane">
+    <h1>Dress Shape Editor — a(v) slice</h1>
+    <div class="kv">Milestone 3 vertical slice. Only <b>a(v)</b> (lateral half-width) is
+      editable here — b_front/b_back, neckline, skirt, and every scalar stay exactly as
+      committed. Drag a handle on the right side of the curve.</div>
+    <h2>a(v) — half-width (mm) vs v — height above waist (mm)</h2>
+    <canvas id="curveCanvas" width="396" height="560"></canvas>
+    <div class="legend">
+      <span class="sw" style="background:#4a5252;border-top:1px dashed #4a5252;height:0"></span>committed (frozen reference)<br>
+      <span class="sw" style="background:#2fa3a3"></span>edited a(v) — drag the dots<br>
+      <span class="sw" style="background:#d98a35"></span>waist (v=0) / bust apex (v=181)
+    </div>
+    <div id="readouts">
+      <h2>Live readouts</h2>
+      <div class="kv" id="coarseReadout">…</div>
+      <div class="kv" id="fullReadout" style="margin-top:6px">…</div>
+    </div>
+  </div>
+  <div id="view">
+    <div id="modeTag" class="hud kv">loading…</div>
+    <div id="status" class="hud kv">loading state…</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "/vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "/vendor/controls/OrbitControls.js"
+} }
+</script>
+<script type="module" src="/editor.js"></script>
+</body>
+</html>
