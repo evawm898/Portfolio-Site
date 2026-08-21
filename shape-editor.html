@@ -58,6 +58,15 @@
   #exportGuard { display: none; background: color-mix(in srgb, var(--red) 18%, var(--bg));
                  border: 1px solid var(--red); }
   #exportOverrideRow { display: none; color: var(--dim); gap: 6px; }
+  .calibBlock { padding: 2px 12px 8px; }
+  .calibStatus { font-size: 10px; line-height: 1.6; }
+  .calibStatus.uncal { color: var(--red); }
+  .calibStatus.pending { color: var(--amber); }
+  .calibStatus.cal { color: var(--petrol); }
+  .calibCaveat { font-size: 10px; color: var(--dim); line-height: 1.5; padding: 2px 0 4px; }
+  .miniBtn { font-size: 10px; padding: 2px 6px; margin: 2px 6px 2px 0; }
+  input[type="number"].mmInput { width: 4.5em; background: var(--bg); color: var(--ink);
+                                 border: 1px solid var(--line); font: inherit; padding: 1px 4px; }
 </style>
 </head>
 <body>
@@ -75,17 +84,46 @@
       <div class="curveBlock">
         <h2>a(v) — shared lateral half-width</h2>
         <canvas id="canvasA" class="curve" width="340" height="480"></canvas>
+        <div class="calibBlock">
+          <div class="calibStatus uncal" id="calibStatusA">uncalibrated — backdrop is a visual reference only, not a measurement</div>
+          <div class="row" style="padding:2px 0">
+            <button class="miniBtn" id="calibBtnA">calibrate waist/hem</button>
+            <button class="miniBtn" id="calibClearA" style="display:none">clear calibration</button>
+          </div>
+          <div class="row" style="padding:2px 0">
+            <button class="miniBtn" id="hrefBtnA">add horizontal reference (breast tip distance)</button>
+            <button class="miniBtn" id="hrefClearA" style="display:none">clear h-ref</button>
+            <label style="color:var(--dim)">real distance
+              <input type="number" class="mmInput" id="hrefMmA" value="175" min="1" step="0.5"> mm</label>
+          </div>
+          <div class="calibCaveat">Perspective photo — even calibrated, this is accurate near camera
+            height and worst at the top and bottom of frame. Calibration fixes scale, not projection;
+            keep that in mind dragging near the neckline and hem.</div>
+        </div>
       </div>
       <div class="curveBlock">
         <h2>b(v) — front / back depth (independent)</h2>
         <canvas id="canvasB" class="curve" width="340" height="480"></canvas>
+        <div class="calibBlock">
+          <div class="calibStatus uncal" id="calibStatusB">uncalibrated — backdrop is a visual reference only, not a measurement</div>
+          <div class="row" style="padding:2px 0">
+            <button class="miniBtn" id="calibBtnB">calibrate waist/hem</button>
+            <button class="miniBtn" id="calibClearB" style="display:none">clear calibration</button>
+          </div>
+          <div class="calibCaveat">Single side-profile trace, mirrored for both front and back —
+            calibration confirms only the traced edge's own scale, not that the back truly matches it.
+            Perspective photo — even calibrated, accurate near camera height, worst at top/bottom of
+            frame. Calibration fixes scale, not projection; keep that in mind near the neckline and hem.</div>
+        </div>
       </div>
     </div>
     <div class="legend">
       a(v): committed (dashed) · edited (solid) · mirrored, ONE shared value both sides.<br>
       b(v): <span style="color:#2fa3a3">front (right = CF)</span> ·
       <span style="color:#d98a35">back (left = CB)</span> · each independently draggable.<br>
-      backdrop: traced silhouettes, <b class="warn">uncalibrated — visual reference only</b>.
+      backdrop: real photos of the reference garment (1589×2128px originals, moved into the repo but
+      not cropped/edited by this pipeline — see the calibration status under each canvas). Grey and
+      un-scaled until calibrated; a dragged point only measures something once it is.
     </div>
 
     <hr>

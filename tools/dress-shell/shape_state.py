@@ -65,6 +65,20 @@ _GENERATOR_FIELDS = ("hem_circumference", "dome_n", "fillet_radius",
                      "fillet_type", "plateau_theta_deg", "plateau_cf_depth_mm",
                      "plateau_radius_mm")
 
+# Backdrop calibration — per-backdrop px<->mm registration from the shape
+# editor's interactive calibration step (click the waist and hem
+# landmarks, state their real heights). Storage-only, exactly like
+# `generator`: it records how the backdrop images were registered when
+# the curves were dragged, but is NEVER consumed by build_params_from_shape
+# — the curves themselves are the source of truth, the calibration is
+# provenance for whoever opens the shape next. "front" is the front-view
+# backdrop (canvasA / a(v)); "trace" is the side-view backdrop (canvasB /
+# b_front+b_back, a single profile trace shown mirrored on both sides).
+_CALIB_BACKDROPS = ("front", "trace")
+_CALIB_FIELDS = ("calibrated", "image", "image_natural_size", "waist_px", "hem_px",
+                 "mm_per_px_v", "mm_per_px_h", "x_origin_px", "h_ref_method",
+                 "h_ref", "implied_height_mm")
+
 
 class ShapeError(ValueError):
     """Raised on a malformed/invalid shape.yaml — fails loudly, like
@@ -83,6 +97,11 @@ class ShapeState:
                                                         # from (see module
                                                         # docstring); never
                                                         # reapplied on load
+    backdrop_calibration: dict = field(default_factory=dict)  # provenance
+                                                        # only — see
+                                                        # _CALIB_BACKDROPS
+                                                        # above; keyed
+                                                        # "front"/"trace"
 
 
 class CompoundShapeCurves:
@@ -214,6 +233,39 @@ def _dump_points(lines, key, points):
         lines.append(f"  - [{_yaml_float(v)}, {_yaml_float(y)}]")
 
 
+def _dump_px(lines, key, indent, px):
+    pad = "  " * indent
+    lines.append(f"{pad}{key}: [{_yaml_float(px[0])}, {_yaml_float(px[1])}]")
+
+
+def _dump_calibration(lines, calibration):
+    lines.append("backdrop_calibration:" if calibration else "backdrop_calibration: {}")
+    for name in _CALIB_BACKDROPS:
+        c = calibration.get(name)
+        if not c:
+            continue
+        lines.append(f"  {name}:")
+        for k in _CALIB_FIELDS:
+            if k not in c or c[k] is None:
+                continue
+            v = c[k]
+            if k in ("waist_px", "hem_px"):
+                _dump_px(lines, k, 2, v)
+            elif k == "h_ref":
+                lines.append("    h_ref:")
+                _dump_px(lines, "left_px", 3, v["left_px"])
+                _dump_px(lines, "right_px", 3, v["right_px"])
+                lines.append(f"      mm: {_yaml_float(v['mm'])}")
+            elif k == "image_natural_size":
+                lines.append(f"    image_natural_size: [{int(v[0])}, {int(v[1])}]")
+            elif k == "calibrated":
+                lines.append(f"    calibrated: {'true' if v else 'false'}")
+            elif k in ("image", "h_ref_method"):
+                lines.append(f"    {k}: {v}")
+            else:
+                lines.append(f"    {k}: {_yaml_float(v)}")
+
+
 def dump_shape(shape: ShapeState) -> str:
     """Canonical text for shape.yaml. Same input -> byte-identical
     output, so save(load(x)) is a fixed point."""
@@ -231,6 +283,7 @@ def dump_shape(shape: ShapeState) -> str:
         if k in shape.generator and shape.generator[k] is not None:
             v = shape.generator[k]
             lines.append(f"  {k}: {v if isinstance(v, str) else _yaml_float(v)}")
+    _dump_calibration(lines, shape.backdrop_calibration)
     return "\n".join(lines) + "\n"
 
 
@@ -275,7 +328,57 @@ def load_shape(path) -> ShapeState:
     return ShapeState(a_points=_points("a_points"),
                       b_front_points=_points("b_front_points"),
                       b_back_points=_points("b_back_points"),
-                      neckline=dict(neckline), generator=dict(generator))
+                      neckline=dict(neckline), generator=dict(generator),
+                      backdrop_calibration=_load_calibration(data))
+
+
+def _load_px(row, name):
+    if (not isinstance(row, (list, tuple)) or len(row) != 2
+            or not all(isinstance(x, (int, float)) for x in row)):
+        raise ShapeError(f"{name}: expected [x, y] numbers, got {row!r}")
+    return (float(row[0]), float(row[1]))
+
+
+def _load_calibration(data):
+    raw = data.get("backdrop_calibration") or {}
+    if not isinstance(raw, dict):
+        raise ShapeError(f"backdrop_calibration must be a mapping, got {raw!r}")
+    out = {}
+    for name in _CALIB_BACKDROPS:
+        c = raw.get(name)
+        if not c:
+            continue
+        if not isinstance(c, dict):
+            raise ShapeError(f"backdrop_calibration.{name} must be a mapping, got {c!r}")
+        entry = {}
+        if "calibrated" in c:
+            entry["calibrated"] = bool(c["calibrated"])
+        if "image" in c:
+            entry["image"] = str(c["image"])
+        if c.get("image_natural_size") is not None:
+            v = c["image_natural_size"]
+            if not isinstance(v, (list, tuple)) or len(v) != 2:
+                raise ShapeError(f"backdrop_calibration.{name}.image_natural_size: expected [w, h]")
+            entry["image_natural_size"] = (int(v[0]), int(v[1]))
+        for k in ("waist_px", "hem_px"):
+            if c.get(k) is not None:
+                entry[k] = _load_px(c[k], f"backdrop_calibration.{name}.{k}")
+        for k in ("mm_per_px_v", "mm_per_px_h", "x_origin_px", "implied_height_mm"):
+            if c.get(k) is not None:
+                entry[k] = float(c[k])
+        if "h_ref_method" in c:
+            entry["h_ref_method"] = str(c["h_ref_method"])
+        if c.get("h_ref"):
+            href = c["h_ref"]
+            if not isinstance(href, dict):
+                raise ShapeError(f"backdrop_calibration.{name}.h_ref must be a mapping")
+            entry["h_ref"] = {
+                "left_px": _load_px(href.get("left_px"), f"backdrop_calibration.{name}.h_ref.left_px"),
+                "right_px": _load_px(href.get("right_px"), f"backdrop_calibration.{name}.h_ref.right_px"),
+                "mm": float(href["mm"]),
+            }
+        out[name] = entry
+    return out
 
 
 def save_shape(path, shape: ShapeState) -> str:

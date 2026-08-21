@@ -122,11 +122,30 @@ def resize_backdrop(src, dst, max_dim=640):
     from PIL import Image
     im = Image.open(src)
     scale = max_dim / max(im.size)
-    im2 = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))),
-                    Image.LANCZOS)
+    resized_size = (max(1, round(im.width * scale)), max(1, round(im.height * scale)))
+    im2 = im.resize(resized_size, Image.LANCZOS)
     dst.parent.mkdir(parents=True, exist_ok=True)
     im2.save(dst, optimize=True)
-    return dst.stat().st_size
+    return dst.stat().st_size, scale, resized_size
+
+
+def calibration_reference(src_path, resize_scale, fill):
+    """Python's OWN auto-detected waist/hem calibration for this backdrop
+    (silhouette.extract_from_image's existing waist->hem = 381mm scale,
+    already used to fit a(v)/b(v) from these same photos — see
+    silhouette.WAIST_TO_HEM_MM), converted into the RESIZED image's pixel
+    space. Baked so the browser's manual click-calibration has a concrete
+    independent number to check itself against, not just trust — a large
+    mismatch means either the click was off or the image was cropped/
+    stretched differently than what this pipeline already fit against."""
+    from silhouette import extract_from_image
+    _, report = extract_from_image(src_path, fill=fill)
+    return {
+        "mm_per_px": report["mm_per_px"] / resize_scale,
+        "waist_row_px": report["waist_px"] * resize_scale,
+        "hem_row_px": report["hem_px"] * resize_scale,
+        "implied_total_height_mm": report["implied_total_height_mm"],
+    }
 
 
 def main():
@@ -170,6 +189,17 @@ def main():
     print("running initial (plateau-seeded) full analysis ...")
     initial_analysis = full_shell_analysis(seed_model, classes)
 
+    print("resizing backdrops + computing calibration reference ...")
+    backdrop_sizes = {}
+    calib_ref = {}
+    for key, name, fill in (("front", "silhouette-front.png", "dark"),
+                            ("trace", "silhouette-trace.png", "white")):
+        size, resize_scale, resized_size = resize_backdrop(HERE / name, OUT_IMG_DIR / name)
+        backdrop_sizes[key] = size
+        calib_ref[key] = calibration_reference(HERE / name, resize_scale, fill)
+        calib_ref[key]["resized_size_px"] = list(resized_size)
+        calib_ref[key]["source_file"] = f"tools/dress-shell/{name}"
+
     payload = {
         "note": ("STATIC SNAPSHOT — baked by export_shape_editor_static.py. "
                 "Curve/mesh/circumference/monotonicity are live in the browser; "
@@ -198,6 +228,7 @@ def main():
         "circumference_initial": circumference_report(seed_model, z_bottom, z_top),
         "baseline_shell_analysis": baseline_analysis,
         "initial_shell_analysis": initial_analysis,
+        "backdrop_calibration_reference": calib_ref,
     }
 
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -205,8 +236,8 @@ def main():
     print(f"wrote {OUT_JSON} ({OUT_JSON.stat().st_size} bytes)")
 
     for name in ("silhouette-front.png", "silhouette-trace.png"):
-        size = resize_backdrop(HERE / name, OUT_IMG_DIR / name)
-        print(f"wrote {OUT_IMG_DIR / name} ({size} bytes)")
+        key = "front" if "front" in name else "trace"
+        print(f"wrote {OUT_IMG_DIR / name} ({backdrop_sizes[key]} bytes)")
 
 
 if __name__ == "__main__":

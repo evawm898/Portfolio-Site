@@ -10113,5 +10113,29 @@
    "None": 138,
    "p213": 238
   }
+ },
+ "backdrop_calibration_reference": {
+  "front": {
+   "mm_per_px": 2.5696247464503044,
+   "waist_row_px": 343.7593984962406,
+   "hem_row_px": 492.0300751879699,
+   "implied_total_height_mm": 730.314401622718,
+   "resized_size_px": [
+    478,
+    640
+   ],
+   "source_file": "tools/dress-shell/silhouette-front.png"
+  },
+  "trace": {
+   "mm_per_px": 2.270295698924731,
+   "waist_row_px": 344.9624060150376,
+   "hem_row_px": 512.781954887218,
+   "implied_total_height_mm": 688.9408602150537,
+   "resized_size_px": [
+    478,
+    640
+   ],
+   "source_file": "tools/dress-shell/silhouette-trace.png"
+  }
  }
 }

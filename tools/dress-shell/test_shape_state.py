@@ -37,7 +37,26 @@ def tmpfile():
     return Path(fd.name)
 
 
-def _seeded_shape(back_offset=0.0):
+_SAMPLE_CALIBRATION = {
+    "front": {
+        "calibrated": True, "image": "assets/shape-editor/silhouette-front.png",
+        "image_natural_size": (478, 640), "waist_px": (239.0, 343.76),
+        "hem_px": (239.0, 492.03), "mm_per_px_v": 2.5696, "mm_per_px_h": 2.4,
+        "x_origin_px": 239.5, "h_ref_method": "independent",
+        "h_ref": {"left_px": (203.0, 260.0), "right_px": (275.0, 260.0), "mm": 175.0},
+        "implied_height_mm": 730.31,
+    },
+    "trace": {
+        "calibrated": True, "image": "assets/shape-editor/silhouette-trace.png",
+        "image_natural_size": (478, 640), "waist_px": (200.0, 344.96),
+        "hem_px": (200.0, 512.78), "mm_per_px_v": 2.2703, "mm_per_px_h": 2.2703,
+        "x_origin_px": 239.0, "h_ref_method": "aspect", "h_ref": None,
+        "implied_height_mm": 688.94,
+    },
+}
+
+
+def _seeded_shape(back_offset=0.0, calibration=None):
     """A real shape, sampled from the committed model. back_offset != 0
     diverges b_back from b_front above the waist (v > 100), simulating a
     CB neckline shallower than the CF bust projection."""
@@ -49,7 +68,8 @@ def _seeded_shape(back_offset=0.0):
     bb = list(zip(vs, [y - (back_offset if v > 100 else 0.0) for v, y in zip(vs, b)]))
     return ShapeState(a_points=list(zip(vs, a)), b_front_points=bf, b_back_points=bb,
                       neckline={"cf_height": 220.0, "cf_corner": False},
-                      generator={"hem_circumference": 1549.4, "dome_n": 1.6})
+                      generator={"hem_circumference": 1549.4, "dome_n": 1.6},
+                      backdrop_calibration=calibration or {})
 
 
 class TestLosslessRoundTrip(unittest.TestCase):
@@ -77,6 +97,37 @@ class TestLosslessRoundTrip(unittest.TestCase):
             self.assertEqual(loaded.neckline["cf_height"], 220.0)
             self.assertEqual(loaded.neckline["cf_corner"], False)
             self.assertEqual(loaded.generator["hem_circumference"], 1549.4)
+        finally:
+            path.unlink()
+
+    def test_calibration_round_trips(self):
+        shape = _seeded_shape(calibration=_SAMPLE_CALIBRATION)
+        path = tmpfile()
+        try:
+            text1 = save_shape(path, shape)
+            loaded = load_shape(path)
+            text2 = dump_shape(loaded)
+            self.assertEqual(text1, text2)
+            front = loaded.backdrop_calibration["front"]
+            self.assertTrue(front["calibrated"])
+            self.assertEqual(front["image_natural_size"], (478, 640))
+            self.assertAlmostEqual(front["waist_px"][1], 343.76, places=2)
+            self.assertAlmostEqual(front["mm_per_px_v"], 2.5696, places=4)
+            self.assertEqual(front["h_ref_method"], "independent")
+            self.assertAlmostEqual(front["h_ref"]["mm"], 175.0, places=6)
+            trace = loaded.backdrop_calibration["trace"]
+            self.assertEqual(trace["h_ref_method"], "aspect")
+            self.assertNotIn("h_ref", trace)   # h_ref was None -> dropped, not stored as null
+        finally:
+            path.unlink()
+
+    def test_missing_calibration_defaults_empty(self):
+        shape = _seeded_shape()   # no calibration passed
+        path = tmpfile()
+        try:
+            save_shape(path, shape)
+            loaded = load_shape(path)
+            self.assertEqual(loaded.backdrop_calibration, {})
         finally:
             path.unlink()
 
@@ -121,6 +172,18 @@ class TestLoadValidation(unittest.TestCase):
         try:
             path.write_text("version: 1\na_points: [[0,1],[1,2]]\n"
                             "b_front_points: [[0,1],[1,2]]\n")
+            with self.assertRaises(ShapeError):
+                load_shape(path)
+        finally:
+            path.unlink()
+
+    def test_malformed_calibration_px_rejected(self):
+        path = tmpfile()
+        try:
+            path.write_text(
+                "version: 1\na_points: [[0,1],[1,2]]\n"
+                "b_front_points: [[0,1],[1,2]]\nb_back_points: [[0,1],[1,2]]\n"
+                "backdrop_calibration:\n  front:\n    waist_px: [1, 2, 3]\n")
             with self.assertRaises(ShapeError):
                 load_shape(path)
         finally:
@@ -188,6 +251,18 @@ class TestBuildParamsFromShape(unittest.TestCase):
                                          COMMITTED.z_bottom, COMMITTED.z_top)
         self.assertEqual(params.hem_circumference, COMMITTED.params.hem_circumference)
         self.assertEqual(params.dome_n, COMMITTED.params.dome_n)
+
+    def test_calibration_provenance_is_not_reapplied(self):
+        # backdrop calibration is storage-only, same as generator — it
+        # must not affect the built model at all, regardless of content
+        shape = _seeded_shape(calibration=_SAMPLE_CALIBRATION)
+        plain = _seeded_shape()
+        z_bottom, z_top = COMMITTED.z_bottom, COMMITTED.z_top
+        params = build_params_from_shape(COMMITTED.params, shape, z_bottom, z_top)
+        plain_params = build_params_from_shape(COMMITTED.params, plain, z_bottom, z_top)
+        model, plain_model = ShellModel(params), ShellModel(plain_params)
+        zz = np.linspace(z_bottom, z_top, 101)
+        np.testing.assert_array_equal(np.asarray(model.a(zz)), np.asarray(plain_model.a(zz)))
 
 
 if __name__ == "__main__":
