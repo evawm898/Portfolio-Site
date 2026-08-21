@@ -22,8 +22,11 @@
  * at a chrome binary, else it auto-detects a pre-installed one, else it falls
  * back to playwright-core's default resolution.
  *
- * RUN:  node tools/verify-flower-export.mjs
- * When you add a geometry feature, add a config below that exercises it.
+ * RUN:  node tools/verify-flower-export.mjs           # full matrix (all configs)
+ *       node tools/verify-flower-export.mjs --smoke   # smoke subset only (see isSmoke() below)
+ * When you add a geometry feature, add a config below that exercises it. If it's a
+ * likely-to-break case (heaviest, a new junction/margin combo, a new fragile shape),
+ * flag it smoke:true too.
  */
 import { chromium } from 'playwright-core';
 import http from 'node:http';
@@ -82,6 +85,22 @@ function analyzeStl(buf) {
   const shells = tris > 0 ? roots.size : 0;
   return { tris, boundary, nonManifold, shells };
 }
+
+// --smoke: every config's mutations still get applied in order (cumulative state must
+// stay byte-identical to the full run — see the loop below), but only configs flagged
+// smoke:true (or preset:true — presets are always smoke-worthy, see below) actually
+// export+analyze. Picked for what's most likely to break, not for a tidy sample:
+//   - the historical pc×Growth crash (max petals x space colonization) — see the
+//     dedicated STRESS config below
+//   - continuous margin ON (the SDF receptacle is a separate polygonised solid
+//     overlapping the feet/stem — its own registration surface)
+//   - the cleft/Lobed configs — the project's known-fragile margin area (#64)
+//   - all 7 shipped presets — what a visitor actually clicks; a preset break is
+//     user-facing and gets caught on every PR, not just on dispatch/schedule
+// Full 142-config matrix still runs on workflow_dispatch and a schedule.
+const argv = process.argv.slice(2);
+const SMOKE = argv.includes('--smoke');
+const isSmoke = (cfg) => !!(cfg.smoke || cfg.preset);
 
 // Each config: a label + UI mutations {id, value, evt}. 'change' for <select>,
 // 'input' (default) for sliders. Applied on top of the previous config's state.
@@ -171,15 +190,15 @@ const CONFIGS = [
   { label: 'THICKNESS taper + knife + thin global', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'thickTaper', value: '1' }, { id: 'thickEdge', value: '1' }, { id: 'thickScale', value: '0.6' }] },
   { label: 'THICKNESS knife on SOLID leaf blade (b, per-vertex)', set: [{ id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemNodeCount', value: '3' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'alternate', evt: 'change' }, { id: 'thickEdge', value: '1' }, { id: 'thickTaper', value: '0.8' }] },
   { label: 'SURFACE all: relief + twist + skew + knife', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'reliefAmp', value: '0.6' }, { id: 'petalTwist', value: '0.5' }, { id: 'petalSkew', value: '0.4' }, { id: 'thickTaper', value: '0.8' }, { id: 'thickEdge', value: '1' }] },
-  { label: 'reset to a clean single petal (for LOBED block)', set: [{ id: 'petalCount', value: '1' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'density', value: '7' }, { id: 'voronoiAniso', value: '1' }, { id: 'voronoiDensityLaw', value: '0' }, { id: 'voronoiLloyd', value: '8' }, { id: 'voronoiWeight', value: '0' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0' }, { id: 'reliefAmp', value: '0' }, { id: 'petalTwist', value: '0' }, { id: 'petalSkew', value: '0' }, { id: 'thickTaper', value: '0' }, { id: 'thickEdge', value: '0' }, { id: 'thickScale', value: '1' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
+  { label: 'reset to a clean single petal (for LOBED block)', smoke: true, set: [{ id: 'petalCount', value: '1' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'density', value: '7' }, { id: 'voronoiAniso', value: '1' }, { id: 'voronoiDensityLaw', value: '0' }, { id: 'voronoiLloyd', value: '8' }, { id: 'voronoiWeight', value: '0' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0' }, { id: 'reliefAmp', value: '0' }, { id: 'petalTwist', value: '0' }, { id: 'petalSkew', value: '0' }, { id: 'thickTaper', value: '0' }, { id: 'thickEdge', value: '0' }, { id: 'thickScale', value: '1' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
   { label: 'LOBED bifid voronoi (cleft 0.5)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
-  { label: 'LOBED bifid veins + LOOP termination', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }, { id: 'edgeTermination', value: 'loop', evt: 'change' }] },
+  { label: 'LOBED bifid veins + LOOP termination', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }, { id: 'edgeTermination', value: 'loop', evt: 'change' }] },
   { label: 'LOBED ragged robin (4 lobes, cleft 0.55) veins', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '4' }, { id: 'cleftWidth', value: '0.35' }] },
-  { label: 'LOBED 4-lobe voronoi + anisotropy (per-point T metric)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '4' }, { id: 'voronoiAniso', value: '2.5' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'density', value: '5' }] },
+  { label: 'LOBED 4-lobe voronoi + anisotropy (per-point T metric)', smoke: true, set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '4' }, { id: 'voronoiAniso', value: '2.5' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'density', value: '5' }] },
   { label: 'LOBED fringed (7 lobes, cleft 0.6) veins', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.6' }, { id: 'cleftLobes', value: '7' }, { id: 'cleftWidth', value: '0.4' }] },
   { label: 'LOBED bifid spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
   { label: 'LOBED bifid bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '3' }] },
-  { label: 'LOBED + CLAW compose (Dianthus superbus)', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '5' }, { id: 'clawLength', value: '0.3' }] },
+  { label: 'LOBED + CLAW compose (Dianthus superbus)', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '5' }, { id: 'clawLength', value: '0.3' }] },
 ];
 
 // ===== Receptacle JUNCTION axis matrix: PROFILE x CONSTRUCTION x COLLAR =====
@@ -217,7 +236,7 @@ for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOL
 // params, profile, collar, infills, bloom types, layers and sepals —
 // every one must still export watertight (0 boundary edges).
 const CM_START = CONFIGS.length + 1;   // 1-based index of the first continuous-margin row
-CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm: true, set: [
+CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm: true, smoke: true, set: [
   { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
   { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' }, { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'loop', evt: 'change' },
   { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' },
@@ -244,7 +263,19 @@ CONFIGS.push({ label: 'cont-margin voronoi infill', cm: true, set: [{ id: 'recep
 CONFIGS.push({ label: 'cont-margin bone (no outline) infill', cm: true, set: [{ id: 'infillType', value: 'bone', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin bundle 0 / flare 1 (loose, quick) + reach 1', cm: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'bundleTightness', value: '0' }, { id: 'flareRate', value: '1' }, { id: 'receptReach', value: '1' }] });
 CONFIGS.push({ label: 'cont-margin coiled bloom + 3 layers', cm: true, set: [{ id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '12' }, { id: 'layerCount', value: '3' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' }, { id: 'receptReach', value: '0.4' }] });
-CONFIGS.push({ label: 'cont-margin no stem (SDF seals on its own)', cm: true, set: [{ id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'stemType', value: 'none', evt: 'change' }] });
+CONFIGS.push({ label: 'cont-margin no stem (SDF seals on its own)', cm: true, smoke: true, set: [{ id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'stemType', value: 'none', evt: 'change' }] });
+
+// STRESS: the historical crash — max petals (Standard control) x Growth (space
+// colonization, also a Standard control) could exhaust memory mid-build (see commit
+// "Guard the pc x Growth crash"). Live builds are now bounded, but export uses the
+// full source count unchanged, so this is still the single heaviest, most fragile
+// combination to export. Placed here (after the last cont-margin/matrix config, before
+// the preset block) so its elevated petalCount doesn't leak into any later `set`-based
+// config — presets load via a full state reset regardless (see below).
+CONFIGS.push({ label: 'STRESS: max petals (40) x Growth (space colonization)', smoke: true, set: [
+  { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
+  { id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' },
+] });
 
 // ===== SHIPPED PRESETS: every curated preset (flower-presets.js) is a permanent
 // regression fixture — named, so a failure reads "Thistle broke", not "config N". Each
@@ -301,13 +332,17 @@ for (const cfg of CONFIGS) {
       const cell = document.querySelector(`#presetRow .fl-preset[data-slug="${slug}"]`);
       if (!cell) return false; cell.click(); return true;
     }, cfg.presetSlug);
-    if (!clicked) { results.push({ label: cfg.label, ok: false, preset: true, note: 'gallery cell not found' }); continue; }
+    if (!clicked) { if (isSmoke(cfg)) results.push({ label: cfg.label, ok: false, preset: true, note: 'gallery cell not found' }); continue; }
   } else {
     for (const s of cfg.set) {
       await page.evaluate(({ id, value, evt }) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event(evt || 'input', { bubbles: true })); }, s);
     }
   }
   await page.waitForTimeout(160); // let the double-rAF rebuild settle
+  // SMOKE MODE: still walk every config's mutations above (cheap — cumulative state must
+  // stay byte-identical to the full run) but only export+download+analyze the ones flagged
+  // smoke-worthy — that's the expensive part. See isSmoke() for what's selected and why.
+  if (SMOKE && !isSmoke(cfg)) continue;
   const [dl] = await Promise.all([
     page.waitForEvent('download', { timeout: 45000 }).catch(() => null),   // headroom for the ~1M-tri configs (STL build + download)
     page.click('#exportStl'),
