@@ -64,6 +64,8 @@
   .calibStatus.pending { color: var(--amber); }
   .calibStatus.cal { color: var(--petrol); }
   .calibCaveat { font-size: 10px; color: var(--dim); line-height: 1.5; padding: 2px 0 4px; }
+  .calibDiag { font-size: 10px; color: var(--dim); line-height: 1.6; margin-top: 4px;
+               padding: 4px 6px; border: 1px solid var(--line); border-radius: 3px; }
   .miniBtn { font-size: 10px; padding: 2px 6px; margin: 2px 6px 2px 0; }
   input[type="number"].mmInput { width: 4.5em; background: var(--bg); color: var(--ink);
                                  border: 1px solid var(--line); font: inherit; padding: 1px 4px; }
@@ -79,6 +81,8 @@
       reference-only, not draggable — see below). The full curvature/seatability sweep and the "seed
       from parameters" generator still need Python — they show a labeled, bake-time snapshot rather
       than a live number.</div>
+
+    <div class="legend" id="imageDimsReadout">…</div>
 
     <div class="curveRow">
       <div class="curveBlock">
@@ -182,6 +186,7 @@
     <div id="monoReadout" class="kv">…</div>
     <h3>Circumference vs tape (compound: mean of front + back Ramanujan)</h3>
     <table id="circTable"></table>
+    <div class="legend" id="circCalibCaveat">…</div>
     <h3>Shell (snapshot — see banner above)</h3>
     <div class="legend">Adaptive placement does NOT close this gap: min-radius/seatable-area are
       curvature (2nd-derivative) readouts, and PCHIP through control points is only C1-continuous —

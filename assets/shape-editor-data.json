@@ -10120,6 +10120,10 @@
    "waist_row_px": 343.7593984962406,
    "hem_row_px": 492.0300751879699,
    "implied_total_height_mm": 730.314401622718,
+   "original_size_px": [
+    1589,
+    2128
+   ],
    "resized_size_px": [
     478,
     640
@@ -10131,6 +10135,10 @@
    "waist_row_px": 344.9624060150376,
    "hem_row_px": 512.781954887218,
    "implied_total_height_mm": 688.9408602150537,
+   "original_size_px": [
+    1589,
+    2128
+   ],
    "resized_size_px": [
     478,
     640

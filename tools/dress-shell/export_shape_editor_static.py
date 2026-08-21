@@ -137,14 +137,20 @@ def calibration_reference(src_path, resize_scale, fill):
     space. Baked so the browser's manual click-calibration has a concrete
     independent number to check itself against, not just trust — a large
     mismatch means either the click was off or the image was cropped/
-    stretched differently than what this pipeline already fit against."""
+    stretched differently than what this pipeline already fit against.
+    waist_row_px/hem_row_px are ROW positions only (Python's extraction
+    scans rows for min/max width — it never clicks a specific x,y point),
+    so they're only directly comparable to a manual click's own y."""
+    from PIL import Image
     from silhouette import extract_from_image
     _, report = extract_from_image(src_path, fill=fill)
+    original_size = Image.open(src_path).size
     return {
         "mm_per_px": report["mm_per_px"] / resize_scale,
         "waist_row_px": report["waist_px"] * resize_scale,
         "hem_row_px": report["hem_px"] * resize_scale,
         "implied_total_height_mm": report["implied_total_height_mm"],
+        "original_size_px": list(original_size),
     }
 
 

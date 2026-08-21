@@ -554,6 +554,32 @@ const paneB = new DualCurvePane({
 });
 paneA.onLive = paneB.onLive = () => liveUpdate();
 
+// Derived circumference reflects whatever the curve control points
+// currently are — if they were dragged against an uncalibrated or
+// mis-scaled backdrop, part of the tape-anchor delta below can be a
+// calibration artifact, not a real shape disagreement. Flagged loudly
+// when either backdrop's own calibration is measurably off Python's fit.
+function updateCircCaveat() {
+  const flags = [];
+  for (const [label, calib, refKey] of [["a(v)/front", calibFront, "front"], ["b(v)/trace", calibTrace, "trace"]]) {
+    const ref = state.backdrop_calibration_reference?.[refKey];
+    if (calib.calibrated && ref) {
+      const pct = 100 * (calib.mmPerPxV - ref.mm_per_px) / ref.mm_per_px;
+      if (Math.abs(pct) > 5) flags.push(`${label} ${pct > 0 ? "+" : ""}${pct.toFixed(0)}%`);
+    }
+  }
+  const el = $("circCalibCaveat");
+  if (!el) return;
+  el.innerHTML = flags.length
+    ? `<span class="warn">⚠ backdrop calibration is off from Python's own fit on the same photo ` +
+      `(${flags.join(", ")}) — if the curves were dragged against that mis-scaled backdrop, part of ` +
+      `the delta below may be a calibration artifact, not a real shape disagreement. Recalibrate the ` +
+      `flagged backdrop(s) above before trusting this table.</span>`
+    : "Reflects whatever the curve control points currently are — if they were dragged against an " +
+      "uncalibrated or mis-scaled backdrop, part of the delta below can be that, not a real shape " +
+      "disagreement. Calibrate the backdrops above first.";
+}
+
 // -- calibration UI wiring -------------------------------------------------
 function setupCalibration(pane, refKey, suffix, hasHRef) {
   const calib = pane.calib;
@@ -579,11 +605,29 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
     if (step === "hrefRight") { setStatus("pending", "click the RIGHT bust point on the image"); return; }
     if (!calib.calibrated) {
       setStatus("uncal", "uncalibrated — backdrop is a visual reference only, not a measurement");
+      updateCircCaveat();
       return;
     }
-    const hrefLine = calib.hRef
-      ? ` · horizontal: independent ref (${calib.hRef.mm.toFixed(1)}mm) → <b>${calib.mmPerPxH.toFixed(3)}</b> mm/px`
-      : " · horizontal: = vertical (aspect assumed intact)";
+    let hrefLine;
+    if (calib.hRef) {
+      // The diagnostic the user asked for: an INDEPENDENT horizontal
+      // scale from a real horizontal reference, compared directly to the
+      // vertical scale. Close agreement -> aspect is intact and the
+      // vertical clicks are the likelier source of any remaining error.
+      // Large divergence -> the image itself is stretched/cropped
+      // non-uniformly, not just a click issue.
+      const hvDelta = 100 * (calib.mmPerPxH - calib.mmPerPxV) / calib.mmPerPxV;
+      const verdict = Math.abs(hvDelta) < 3
+        ? '<span class="ok">within noise — aspect looks intact; the vertical clicks are the more ' +
+          "likely source of any remaining gap</span>"
+        : '<span class="warn">large divergence — the image itself may be stretched/cropped non-' +
+          "uniformly, this is not just a click-precision issue</span>";
+      hrefLine = ` · horizontal: independent ref (${calib.hRef.mm.toFixed(1)}mm) → ` +
+        `<b>${calib.mmPerPxH.toFixed(3)}</b> mm/px · vs vertical: ` +
+        `<b>${hvDelta > 0 ? "+" : ""}${hvDelta.toFixed(1)}%</b> — ${verdict}`;
+    } else {
+      hrefLine = " · horizontal: = vertical (aspect assumed intact)";
+    }
     // Python's own extract_from_image already fits THIS same photo
     // (silhouette.WAIST_TO_HEM_MM = 381, same convention) — mm/px is
     // directly comparable to that fit and is the real cross-check.
@@ -605,10 +649,28 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
           `differently than what Python fit against</span>`;
       }
     }
+    // Diagnostics: the exact pixel coordinates behind the numbers above,
+    // in the SAME (resized-image) pixel space as Python's own reference,
+    // so a click can be checked directly against the image and against
+    // what Python's row-scan found — isolating a bad click from a real
+    // image-scale problem instead of just reporting a percentage.
+    const fmtPx = (p) => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
+    const dy = Math.abs(calib.hemPx.y - calib.waistPx.y);
+    let diag = `<div class="calibDiag">your clicks — waist ${fmtPx(calib.waistPx)} px, ` +
+      `hem ${fmtPx(calib.hemPx)} px → Δy = <b>${dy.toFixed(1)}</b> px`;
+    if (ref) {
+      const refDy = Math.abs(ref.hem_row_px - ref.waist_row_px);
+      diag += `<br>Python's reference (row-scan — x doesn't apply) — waist row y=` +
+        `${ref.waist_row_px.toFixed(1)}, hem row y=${ref.hem_row_px.toFixed(1)} → Δy = ` +
+        `<b>${refDy.toFixed(1)}</b> px`;
+    }
+    diag += "</div>";
+
     setStatus("cal", `calibrated — vertical <b>${calib.mmPerPxV.toFixed(3)}</b> mm/px, ` +
       `implied FULL-FRAME height <b>${calib.impliedHeightMm().toFixed(0)}</b> mm (top-to-bottom of the ` +
       `whole image, not just the garment — a badly cropped/stretched image shows up here as an ` +
-      `unreasonable number)${hrefLine}${refLine}${deltaFlag}`);
+      `unreasonable number)${hrefLine}${refLine}${deltaFlag}${diag}`);
+    updateCircCaveat();
   }
   refresh();
 
@@ -675,6 +737,31 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
 }
 setupCalibration(paneA, "front", "A", true);
 setupCalibration(paneB, "trace", "B", false);
+
+// Raw pixel dimensions of both backdrop files, and whether they share an
+// aspect ratio — independent of any calibration, straight from what
+// export_shape_editor_static.py baked (PIL's own Image.size on each
+// original, plus the resize it actually served). A mismatch here would
+// mean the two photos were framed/cropped differently from each other,
+// not a click or scale problem.
+{
+  const refF = state.backdrop_calibration_reference?.front;
+  const refT = state.backdrop_calibration_reference?.trace;
+  if (refF && refT) {
+    const aspect = (wh) => wh[0] / wh[1];
+    const aF = aspect(refF.original_size_px), aT = aspect(refT.original_size_px);
+    const match = Math.abs(aF - aT) / aF < 0.01;
+    $("imageDimsReadout").innerHTML =
+      `backdrop files — front: <b>${refF.original_size_px[0]}×${refF.original_size_px[1]}</b> px ` +
+      `original (aspect ${aF.toFixed(4)}) → resized ${refF.resized_size_px[0]}×${refF.resized_size_px[1]} px · ` +
+      `trace: <b>${refT.original_size_px[0]}×${refT.original_size_px[1]}</b> px original ` +
+      `(aspect ${aT.toFixed(4)}) → resized ${refT.resized_size_px[0]}×${refT.resized_size_px[1]} px · ` +
+      (match
+        ? '<span class="ok">same aspect ratio</span>'
+        : `<span class="warn">⚠ aspect ratios differ by ${(100 * Math.abs(aF - aT) / aF).toFixed(1)}% — ` +
+          "the two photos were framed/cropped differently from each other</span>");
+  }
+}
 
 // ---------------------------------------------------------------- 3D pane
 const view = $("view");
