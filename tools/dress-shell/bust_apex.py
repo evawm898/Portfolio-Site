@@ -77,11 +77,12 @@ class _BumpedDepth:
     def bump(self, theta_deg, v):
         raise NotImplementedError
 
-    def _field(self, T, theta_ref, V):
+    def _field(self, T, theta_ref, V, X):
         """Y(T, V) using the TRUE ellipse parameter T for the base term
         (exact) and theta_ref only for whatever distance/weight .bump()
-        needs (approximate, reference-frame). Default: the additive-bump
-        convention (ApexBustDepth, PlateauBustDepth) — Y = base*cos(T) +
+        needs (approximate, reference-frame — see the X argument below
+        for the alternative). Default: the additive-bump convention
+        (ApexBustDepth, PlateauBustDepth) — Y = base*cos(T) +
         bump(theta_ref, V). A subclass that BLENDS TOWARD a value that
         itself depends on theta_ref (e.g. FacetBustDepth blending toward
         a fixed plane) MUST override this: using .bump()'s theta_ref-
@@ -90,7 +91,23 @@ class _BumpedDepth:
         T==theta_ref fixed point (CF) and produces small local hard-
         constraint violations near the flat core's edge that the
         additive convention never has (found by assert_cf_is_max —
-        that's why this hook exists)."""
+        that's why this hook exists).
+
+        X is the TRUE lateral coordinate at THIS TRIAL half-width
+        (X = a_trial*sin(T), recomputed every bisection iteration in
+        _solve() — see its docstring) — an EXACT quantity, unlike
+        theta_ref, which is only ever an approximation of the true
+        equal-arc azimuth (see bust_apex.py's module docstring on the
+        reference-frame convention, and the ~2deg residual it produces
+        at the old off-axis apex). A subclass that needs to define a
+        region by literal Cartesian distance (a flat chord over
+        |x| <= w(v), not an angular window) MUST use X, not theta_ref,
+        for that region test — using theta_ref there reintroduces the
+        same reference-frame error the X argument exists to avoid (found
+        empirically: deviation-from-plane scaled roughly as the 5th
+        power of the facet's angular half-width, the signature of a
+        truncated small-angle series, not a real geometric limit — see
+        FacetBustDepth's docstring)."""
         b_base_v = np.asarray(self.base.b(V))
         return b_base_v * np.cos(T) + self.bump(theta_ref, V)
 
@@ -113,14 +130,23 @@ class _BumpedDepth:
         # negative toward CB (t=pi). The bump only ever raises Y toward
         # CF, so no positivity check applies here — the real correctness
         # guard is arc-length monotonicity, checked below.
-        Y = self._field(T, theta_ref, V)
-
+        #
+        # Y is recomputed EVERY bisection iteration, from THAT iteration's
+        # trial X = mid*sin(T) — not once, before the loop, from an
+        # a-independent approximation. A subclass whose _field() only
+        # uses (T, theta_ref, V) (the additive-bump classes) is unaffected
+        # either way, since its Y doesn't depend on X; a subclass whose
+        # _field() uses X (FacetBustDepth) gets an EXACT lateral
+        # coordinate at the actual half-width being tested, not a
+        # reference-frame stand-in for it — see _field()'s docstring for
+        # why this distinction matters.
         target_P = np.asarray(self.ref_model.section_perimeter(v_grid))  # frozen
         lo = np.full(n_v, 1.0)
         hi = np.full(n_v, 2000.0)
         for _ in range(70):
             mid = 0.5 * (lo + hi)
             X = mid[:, None] * np.sin(T)
+            Y = self._field(T, theta_ref, V, X)
             dX = np.gradient(X, t_grid, axis=1)
             dY = np.gradient(Y, t_grid, axis=1)
             ds = np.hypot(dX, dY)
@@ -131,9 +157,11 @@ class _BumpedDepth:
         a_grid = 0.5 * (lo + hi)
         self.perimeter_residual_mm = float(np.max(np.abs(perim - target_P)))
 
-        # final arc-length table at the solved a(v), for the equal-arc
-        # inverse theta -> t (needed by point()/frame())
+        # final arc-length table at the CONVERGED a(v) — recompute Y one
+        # more time at this exact half-width, for consistency with the
+        # perimeter that was actually solved for
         X = a_grid[:, None] * np.sin(t_grid)[None, :]
+        Y = self._field(T, theta_ref, V, X)
         dX = np.gradient(X, t_grid, axis=1)
         dY = np.gradient(Y, t_grid, axis=1)
         ds = np.hypot(dX, dY)
@@ -206,7 +234,8 @@ class _BumpedDepth:
         t = np.asarray(t, dtype=float)
         v = np.asarray(v, dtype=float)
         theta_ref = self._theta_ref(t, v)
-        return self._field(t, theta_ref, v)
+        x = np.asarray(self.a(v)) * np.sin(t)
+        return self._field(t, theta_ref, v, x)
 
     def b(self, v):
         """Depth AT CF (theta=0) — kept for interface compatibility with
