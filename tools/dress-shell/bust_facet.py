@@ -1,22 +1,36 @@
 """ANALYTIC FLAT BUST FACET — prototype, NOT wired into dress_params().
 
-PlateauBustDepth (bust_apex.py) does not make the front genuinely straight
-in plan: adding a CONSTANT amplitude to a curved base section translates
-the arc — same curvature, just pushed outward — it does not flatten it
-(confirmed numerically: max deviation from a best-fit straight line
-across the plateau core is ~3.5mm at bust_plateau_theta=25). This module
-fixes that by REPLACING the surface within a capsule-shaped core with a
-genuine PLANE (constant lateral slope, so any constant-v cross-section
-through the core is a true straight line/chord), pinned so its value at
-(CF, apex_v) is an EXPLICIT target depth (not a free/solved amplitude),
-then blending back to the base curved surface outside the core using the
-SAME raised-cosine falloff and capsule (distance-to-segment) metric as
-PlateauBustDepth — reused verbatim per instruction, since its
-monotonicity proof still applies here (see FacetBustDepth's docstring).
+REBUILT after a real correction: the first version anchored the plane's
+vertical slope to the base curve's LOCAL tangent at apex_v — that is a
+RULED surface (developable, following the base curve's own gradient
+pointwise), not a plane. A true plane needs b_front(v) LINEAR from the
+waist to the bust point, not merely tangent to the curve at one height.
 
-STATUS: prototype. Build explicitly via ApexShellModel(facet_params(...))
-or FacetBustDepth(...) directly — gated behind facet_gate.py's sweep/
-report until approved, exactly like plateau_gate.py before it.
+NOTE ON PROVENANCE: this file does not have direct record of "the
+inverted-triangle spec" it's being corrected against — reconstructed here
+from the concrete formulas given in review (b_front(v) linear waist->bust
+point via compound.py's own front_bow mechanic; a facet described as an
+INVERTED TRIANGLE: full lateral width at the bust-point height, tapering
+to a POINT at the waist). Flagged, not silently assumed correct.
+
+THE PLANE (vertical profile, b_front(v)): reuses compound.py's FrontProfile
+_seg()/_seg_slope() formula verbatim — a quadratic-Bezier-shaped "nearly
+straight" segment from (v=0, Y_waist=base.b(0)) to (apex_v, depth_mm),
+sagitta = front_bow * |depth_mm - Y_waist| / 2. front_bow=0 collapses it
+to an EXACT straight line (a genuine plane, not merely developable).
+Above apex_v the segment continues linearly with its own end slope
+(compound.py's _upper() convention), the way it did before.
+
+THE FOOTPRINT (INVERTED TRIANGLE): below apex_v, the flat core's lateral
+half-width tapers LINEARLY from plateau_mm (at v=apex_v, the bust-point
+line) to 0 (at v=0, the waist) — full width at the bust points, a single
+point at the waist, hence "inverted triangle." Above apex_v, the old
+symmetric capsule falloff (constant plateau_mm width, raised-cosine
+falloff over radius_mm in both directions jointly) is unchanged. The
+raised-cosine blend still governs the lateral excess beyond whichever
+half-width applies at that height, so the same C1/monotonicity argument
+carries over (see FacetBustDepth's docstring for the proof, updated for
+the v-dependent core width).
 """
 
 import math
@@ -30,55 +44,64 @@ from shell import ShellModel, dress_params
 TAU = math.tau
 
 
+def _seg(v, v0, d0, v1, d1, front_bow):
+    """compound.py's FrontProfile._seg() verbatim: a quadratic-Bezier
+    'nearly straight' segment from (v0,d0) to (v1,d1). front_bow=0 is an
+    EXACT straight line."""
+    v = np.asarray(v, dtype=float)
+    s = (v - v0) / (v1 - v0)
+    delta = front_bow * abs(d1 - d0)
+    return d0 + (d1 - d0) * s + 2.0 * s * (1.0 - s) * delta
+
+
+def _seg_slope(v, v0, d0, v1, d1, front_bow):
+    v = np.asarray(v, dtype=float)
+    s = (v - v0) / (v1 - v0)
+    delta = front_bow * abs(d1 - d0)
+    return ((d1 - d0) + 2.0 * delta * (1.0 - 2.0 * s)) / (v1 - v0)
+
+
 class FacetBustDepth(_BumpedDepth):
-    """A genuine flat plane across the bust, capsule-blended into the
-    base curved surface.
+    """A genuine flat plane across the bust: b_front(v) is LINEAR (or
+    front_bow-bowed) from the waist to the bust point, capsule-blended
+    into the base curved surface via an INVERTED-TRIANGLE footprint
+    (full width at the bust-point line, a point at the waist).
 
-    THE PLANE: passes through (theta=0, v=apex_v) at Y=depth_mm exactly
-    (pinned, not solved), with slope inherited from the base surface's
-    own local tangent at that point:
-      - LATERAL slope is 0 by construction: at theta=0, dY/dX = 0
-        exactly for any symmetric section (dY/dt and dX/dt both vanish
-        the right way at t=0 -- CF is a stationary point of Y in X by
-        the sin/cos parameterization), so "flat, tangent to the surface
-        there" already means zero lateral tilt -- no separate solve
-        needed, this is a symmetry fact, not a choice.
-      - VERTICAL slope is the base curve's own db/dv at apex_v (a plain
-        finite difference), so the plane meets the surrounding surface's
-        general climb/descent rather than being level in v too.
-      Y_plane(v) = depth_mm + v_slope * (v - apex_v)
+    THE PLANE:
+      v <= apex_v:  Y_plane(v) = _seg(v, 0, Y_waist, apex_v, depth_mm,
+                                      front_bow)   -- Y_waist = base.b(0)
+      v >  apex_v:  continues linearly at the segment's own v=apex_v end
+                    slope (matches compound.py's FrontProfile._upper()
+                    convention for what happens above the bust point).
+      LATERAL slope is 0 everywhere by construction (independent of X) —
+      not merely at CF: within the triangle every ring's flat core is
+      centered and symmetric about theta=0, so this is a genuine
+      developable-free plane only when front_bow=0 (see [1] in the gate
+      report for the measured deviation at front_bow=0 vs the default).
 
-    THE BLEND: identical capsule distance metric to PlateauBustDepth --
-    lateral = max(0, |dtheta_mm| - plateau_mm), d = hypot(lateral, dv) --
-    and the identical raised-cosine falloff w = falloff(d, radius_mm),
-    now used as a BLEND WEIGHT toward the plane rather than an additive
-    bump amplitude:
-      bump(theta, v) = w * (Y_plane(v) - Y_base_ref(theta, v))
-    so that base.b(v)*cos(t) + bump == (1-w)*Y_base + w*Y_plane: w=1
-    (inside the core) gives the pure plane; w=0 (beyond radius_mm)
-    gives the untouched base surface; the raised-cosine w in between is
-    C1 at both ends, same as before.
+    THE FOOTPRINT (inverted triangle):
+      v <= apex_v:  half_width(v) = plateau_mm * clip(v / apex_v, 0, 1)
+                    -- 0 at the waist, plateau_mm at the bust-point line.
+      v >  apex_v:  half_width(v) = plateau_mm (constant, unchanged).
+      lateral_excess = max(0, |dtheta_mm| - half_width(v))
+      dv_excess      = max(0, v - apex_v)   -- ONLY blends vertically
+                       ABOVE the bust-point line; below it the triangle
+                       itself already closes to a point at the waist, no
+                       separate vertical falloff needed there.
+      d = hypot(lateral_excess, dv_excess);  w = falloff(d, radius_mm)
 
-    MONOTONICITY IS NOT AUTOMATIC HERE (unlike PlateauBustDepth's
-    additive bump, which was provably monotone by construction) --
-    blending toward a FIXED target instead of adding a distance-based
-    amount does not carry the same proof over directly. Checked
-    numerically after every build via assert_cf_is_max(), same as
-    PlateauBustDepth, and reported.
-
-    THE FLAT CORE IS A RIDGE AT v=apex_v, NOT A RECTANGLE: w=1 only
-    exactly at v=apex_v (dv=0); moving away in v, even at theta=0,
-    starts blending immediately (same radius governs both directions
-    jointly, exactly as PlateauBustDepth's capsule did). If a panel
-    needs a genuine flat RECTANGLE (independent theta half-width and v
-    half-height, like facets.py's per-panel footprint) rather than a
-    ridge that blends immediately in v, that is a straightforward
-    extension not built here -- flagged, not guessed at.
+    MONOTONICITY: at every FIXED v, lateral_excess is still
+    max(0, |dtheta_mm| - a v-dependent but theta-independent constant) —
+    the same non-decreasing-in-|theta| structure PlateauBustDepth's proof
+    relies on, just with a v-varying width. CF is therefore still the
+    max at every v-level by the identical construction argument. Checked
+    numerically via assert_cf_is_max() regardless, same discipline as
+    before.
     """
 
     def __init__(self, base_params=None, apex_v=181.0, bust_plateau_theta=25.0,
-                depth_mm=123.0, radius_mm=70.0, n_v=1201, n_t=481,
-                check_cf_is_max=True):
+                depth_mm=123.0, front_bow=0.1, radius_mm=70.0,
+                n_v=1201, n_t=481, check_cf_is_max=True):
         self.base_params = (base_params if base_params is not None
                            else dress_params(bust="plain"))
         if isinstance(self.base_params.depth_curve, _BumpedDepth):
@@ -93,20 +116,23 @@ class FacetBustDepth(_BumpedDepth):
                             f"{bust_plateau_theta}")
         if depth_mm <= 0.0:
             raise ApexError(f"depth_mm must be > 0, got {depth_mm}")
+        if front_bow < 0.0:
+            raise ApexError("front_bow must be >= 0")
 
         self.apex_v = float(apex_v)
         self.bust_plateau_theta = float(bust_plateau_theta)
         self.depth_mm = float(depth_mm)
         self.radius_mm = float(radius_mm)
+        self.front_bow = float(front_bow)
 
         ref_model = ShellModel(self.base_params)
         self.r_ref = float(np.asarray(ref_model.mean_radius(self.apex_v)))
         self.plateau_mm = math.radians(self.bust_plateau_theta) * self.r_ref
 
-        base = self.base_params.depth_curve
-        h = 0.5
-        self.v_slope = (float(np.asarray(base.b(self.apex_v + h)))
-                        - float(np.asarray(base.b(self.apex_v - h)))) / (2.0 * h)
+        self.Y_waist = float(np.asarray(self.base_params.depth_curve.b(0.0)))
+        self._end_slope = float(_seg_slope(self.apex_v, 0.0, self.Y_waist,
+                                           self.apex_v, self.depth_mm,
+                                           self.front_bow))
 
         self._finish_init(n_v=n_v, n_t=n_t)
 
@@ -117,31 +143,39 @@ class FacetBustDepth(_BumpedDepth):
 
     def plane_Y(self, v):
         v = np.asarray(v, dtype=float)
-        return self.depth_mm + self.v_slope * (v - self.apex_v)
+        below = _seg(np.clip(v, 0.0, self.apex_v), 0.0, self.Y_waist,
+                    self.apex_v, self.depth_mm, self.front_bow)
+        above = self.depth_mm + self._end_slope * (v - self.apex_v)
+        return np.where(v <= self.apex_v, below, above)
+
+    def _half_width(self, v):
+        """Inverted-triangle taper, EASED (raised-cosine) rather than
+        linear: a literal linear ramp (0 at the waist to plateau_mm at
+        apex_v) meets the constant band above apex_v with a SLOPE
+        discontinuity exactly at the bust-point line — a genuine crease
+        in the footprint boundary that produced a 4.8mm meridional
+        radius there (found and fixed here, not shipped: see the gate
+        report). The raised-cosine ramp has zero slope at BOTH ends
+        (v=0 and v=apex_v), matching the constant band's zero slope
+        above apex_v exactly — C1 at the join, same discipline as every
+        other blend in this file."""
+        v = np.asarray(v, dtype=float)
+        u = np.clip(v / self.apex_v, 0.0, 1.0)
+        tri = self.plateau_mm * 0.5 * (1.0 - np.cos(math.pi * u))
+        return np.where(v <= self.apex_v, tri, self.plateau_mm)
 
     def _weight(self, theta_deg, v):
-        """Blend weight toward the plane: 1 inside the capsule core, 0
-        beyond radius_mm, raised-cosine in between. theta_deg here is the
-        REFERENCE azimuth (approximate) -- fine for a WEIGHT (it only
-        needs to be monotone in true distance, which it is up to the
-        same small reference-frame jitter every bump in this file
-        accepts), unlike the VALUE being blended (see ._field())."""
         theta_deg = np.asarray(theta_deg, dtype=float)
         v = np.asarray(v, dtype=float)
         dtheta_mm = np.radians(_wrap180(theta_deg)) * self.r_ref
-        dv = v - self.apex_v
-        lateral = np.maximum(0.0, np.abs(dtheta_mm) - self.plateau_mm)
-        d = np.hypot(lateral, dv)
+        half_width = self._half_width(v)
+        lateral = np.maximum(0.0, np.abs(dtheta_mm) - half_width)
+        dv_excess = np.maximum(0.0, v - self.apex_v)
+        d = np.hypot(lateral, dv_excess)
         return _falloff(d, self.radius_mm)
 
     def bump(self, theta_deg, v):
-        """Kept for interface completeness (some callers may still probe
-        .bump() directly), but NOT used by ._field()/the solve/tabulate
-        path — see ._field()'s override below and its docstring on
-        _BumpedDepth for why the additive-bump formula Y = base*cos(T) +
-        bump(theta_ref, V) is the wrong shape for a blend-toward-a-value
-        construction (theta_ref != T away from CF, and the mismatch does
-        not cancel)."""
+        """Kept for interface completeness — not used by ._field()."""
         v = np.asarray(v, dtype=float)
         w = self._weight(theta_deg, v)
         base_v = np.asarray(self.base_params.depth_curve.b(v))
@@ -149,13 +183,11 @@ class FacetBustDepth(_BumpedDepth):
         return w * (self.plane_Y(v) - Y_base_ref)
 
     def _field(self, T, theta_ref, V):
-        """Override: blend using the TRUE ellipse parameter T for the
-        base term (exact — this is what makes the plane pin exact at CF
-        for every v, not just v=apex_v, and removes the small hard-
-        constraint violations the naive bump()-based formula had near
-        the core edge, ~2.75mm at v=183/theta=-24 with
-        bust_plateau_theta=25 — found by assert_cf_is_max, fixed by this
-        override, not by tuning)."""
+        """Override (see _BumpedDepth._field()'s docstring): use the TRUE
+        ellipse parameter T for the base term, theta_ref only for the
+        blend weight — required for the plane pin to be exact and for
+        the hard constraint to hold (found and fixed in the first
+        version of this file)."""
         T = np.asarray(T, dtype=float)
         V = np.asarray(V, dtype=float)
         w = self._weight(theta_ref, V)
@@ -163,31 +195,38 @@ class FacetBustDepth(_BumpedDepth):
         return (1.0 - w) * Y_base + w * self.plane_Y(V)
 
 
-def verify_facet_flatness(depth, half_span_deg=None, n=41):
-    """Numeric proof (not assumed): sample the plan-view (X, Y) curve at
-    v=apex_v across the flat core and report the max perpendicular
-    deviation from a best-fit straight line -- this is what to compare
-    against PlateauBustDepth's ~3.5mm curved result."""
-    span = (depth.bust_plateau_theta if half_span_deg is None
-           else half_span_deg)
-    if span <= 0.0:
-        return {"max_dev_from_line_mm": 0.0, "note": "plateau=0, a single "
-               "point has no line to deviate from"}
-    th = np.linspace(-span, span, n)
-    v = depth.apex_v
-    t = depth.t_of(th, np.full_like(th, v))
-    X = np.asarray(depth.a(v)) * np.sin(t)
-    Y = np.asarray(depth.y_of(t, np.full_like(t, v)))
-    A = np.stack([X, np.ones_like(X)], axis=1)
-    m, c = np.linalg.lstsq(A, Y, rcond=None)[0]
-    resid = Y - (m * X + c)
-    return {"max_dev_from_line_mm": float(np.max(np.abs(resid))),
-           "Y_range_mm": float(Y.max() - Y.min()),
-           "fitted_slope": float(m)}
+def verify_plane_flatness(depth, n_theta=25, n_v=25, v_hi=None):
+    """Full 2D plane-fit: sample (X, Y, v) across the facet's triangular
+    core (v from a hair above 0 to apex_v by default, theta from -width
+    to +width at each v), fit the BEST 3D PLANE Y = A*X + B*v + C by
+    least squares, and report the max deviation from THAT plane — the
+    literal "maximum deviation from a true plane" metric, not just a
+    single ring's line-fit."""
+    v_hi = depth.apex_v if v_hi is None else v_hi
+    vv = np.linspace(1.0, v_hi, n_v)   # avoid the exact waist point (0 width)
+    rows = []
+    for v in vv:
+        hw_deg = math.degrees(depth._half_width(np.array(v)) / depth.r_ref)
+        if hw_deg <= 0.0:
+            continue
+        th = np.linspace(-hw_deg, hw_deg, n_theta)
+        t = depth.t_of(th, np.full_like(th, v))
+        X = np.asarray(depth.a(v)) * np.sin(t)
+        Y = np.asarray(depth.y_of(t, np.full_like(t, v)))
+        for x, y in zip(X, Y):
+            rows.append((x, y, v))
+    X, Y, V = (np.array(c) for c in zip(*rows))
+    A = np.stack([X, V, np.ones_like(X)], axis=1)
+    coef, *_ = np.linalg.lstsq(A, Y, rcond=None)
+    fit = A @ coef
+    resid = Y - fit
+    return {"max_dev_mm": float(np.max(np.abs(resid))),
+           "rms_dev_mm": float(np.sqrt(np.mean(resid ** 2))),
+           "n_points": len(rows), "plane_coef_A_B_C": tuple(coef.tolist())}
 
 
 def facet_params(apex_v=181.0, bust_plateau_theta=25.0, depth_mm=123.0,
-                 radius_mm=70.0, base_params=None):
+                 front_bow=0.1, radius_mm=70.0, base_params=None):
     """ShellParams for the flat-facet design: a single-ellipse committed
     dress (dress_params(bust="plain") by default) with its depth object
     replaced by the plane-blended field. Build with
@@ -197,5 +236,6 @@ def facet_params(apex_v=181.0, bust_plateau_theta=25.0, depth_mm=123.0,
     base = base_params if base_params is not None else dress_params(bust="plain")
     d = FacetBustDepth(base_params=base, apex_v=apex_v,
                        bust_plateau_theta=bust_plateau_theta,
-                       depth_mm=depth_mm, radius_mm=radius_mm)
+                       depth_mm=depth_mm, front_bow=front_bow,
+                       radius_mm=radius_mm)
     return replace(base, depth_curve=d)

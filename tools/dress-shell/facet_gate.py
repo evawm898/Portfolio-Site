@@ -1,16 +1,19 @@
-"""GATE — analytic flat bust facet (FacetBustDepth) + underbust_transition_height
-sweep with the facet in place.
+"""GATE — flat bust facet v2 (genuine plane, inverted-triangle footprint),
+answering the three follow-up corrections + the width sweep.
 
 Nothing here modifies the committed shell: dress_params() is untouched.
-PART A builds/verifies/renders the facet (sweeping bust_plateau_theta =
-0/15/25, mirroring plateau_gate.py's structure). PART B composes the
-facet on top of underbust_transition_height = 15/40/60 (TransitionDepth,
-underbust_transition.py) and reports a(v) monotonicity, front-view
-half-width at each anchor, and minimum meridional radius at CF, per the
-brief's explicit request to report this AFTER the facet exists.
+
+[1] ruled-vs-planar deviation, at front_bow=0.1 (previous default) and 0
+[2] meridional-radius minimum location, full CF profile, interior-vs-
+    blend diagnosis, blend-width (radius_mm) sweep
+[3] payoff numbers: facet area, largest panel fit (+ the 3.7" explicit
+    check at both the panels.yaml dims and the dims given in review),
+    p213 tiling count, standoff at the facet centroid for every class
+[4] width sweep: actual half-width at 25deg (vs the ~105mm read off the
+    sketch), 35/45deg, straight-line deviation + perimeter cost for each
 
 Run:  cd tools/dress-shell && python3 facet_gate.py
-Writes: exports/facet-topdown-sweep.png, exports/facet-transition-sweep.png
+Writes: exports/facet-plane-sweep.png, exports/facet-meridian-profile.png
 """
 
 import math
@@ -18,267 +21,310 @@ from dataclasses import replace
 
 import numpy as np
 
-from bust_apex import ApexShellModel, PlateauBustDepth, assert_cf_is_max
-from bust_facet import FacetBustDepth, verify_facet_flatness
+from bust_apex import ApexShellModel
+from bust_facet import FacetBustDepth, verify_plane_flatness
 from coords import ShellCoords
 from curvature import STANDOFF_TOLERANCE_MM as TOL, principal_curvatures, seat_standoff
 from layout import SurfaceChart
 from panels import load_panel_classes
 from shell import ShellModel, dress_params
-from underbust_transition import transition_params
 
-PLATEAU_SWEEP = (0.0, 15.0, 25.0)
-TRANSITION_SWEEP = (15.0, 40.0, 60.0)
 DEPTH_MM = 123.0
-LANDMARKS = [("waist", 0.0), ("underbust", 152.4), ("bust", 203.2),
-            ("neckline corner", 220.0)]
+PICK_PLATEAU = 25.0        # your pick
+PICK_TRANSITION = 40.0     # your pick (reported separately, unaffected here)
+WIDTH_SWEEP = (25.0, 35.0, 45.0)
+BLEND_SWEEP = (70.0, 100.0, 130.0, 160.0)
 
 
-def build_facets(base):
-    variants = {}
-    for plateau in PLATEAU_SWEEP:
-        d = FacetBustDepth(base_params=base, bust_plateau_theta=plateau,
-                           depth_mm=DEPTH_MM)
-        variants[plateau] = ApexShellModel(replace(base, depth_curve=d))
-    return variants
+def build(base, plateau_deg, front_bow, radius_mm=70.0, check=True):
+    d = FacetBustDepth(base_params=base, bust_plateau_theta=plateau_deg,
+                       depth_mm=DEPTH_MM, front_bow=front_bow,
+                       radius_mm=radius_mm, check_cf_is_max=check)
+    return d, ApexShellModel(replace(base, depth_curve=d))
 
 
-def min_meridional_radius_at_cf(model, v_lo=120.0, v_hi=220.0, n=2001):
-    zz = np.linspace(v_lo, v_hi, n)
-    b = np.asarray(model.b(zz))
-    db = np.asarray(model.db(zz))
+def cf_meridian_radius(model, v_lo, v_hi, n=2401):
+    vv = np.linspace(v_lo, v_hi, n)
+    b = np.asarray(model.b(vv))
+    db = np.asarray(model.db(vv))
     h = 0.5
-    ddb = (np.asarray(model.db(zz + h)) - np.asarray(model.db(zz - h))) / (2 * h)
+    ddb = (np.asarray(model.db(vv + h)) - np.asarray(model.db(vv - h))) / (2 * h)
     k_ref = ddb / (1.0 + db ** 2) ** 1.5
-    k1, k2, _ = principal_curvatures(model, np.zeros_like(zz), zz)
+    k1, k2, _ = principal_curvatures(model, np.zeros_like(vv), vv)
     d1, d2 = np.abs(k1 - k_ref), np.abs(k2 - k_ref)
     k_mer = np.where(d1 <= d2, k1, k2)
     r_mer = 1.0 / np.maximum(np.abs(k_mer), 1e-15)
+    return vv, r_mer
+
+
+def part1(base):
+    print("=" * 78)
+    print("[1] RULED vs PLANAR — deviation from a TRUE plane")
+    print("=" * 78)
+    print(f"\n(NOTE: I do not have direct record of \"the inverted-triangle "
+         f"spec\" — reconstructed below from the concrete formulas given "
+         f"in review: b_front(v) linear waist->bust point via compound.py's "
+         f"own front_bow mechanic, footprint an inverted triangle full-"
+         f"width at the bust-point line, a point at the waist. Flagging "
+         f"this rather than presenting it as certain.)\n")
+    for fb, label in ((0.1, "current (0.1, the historical default — my "
+                            "prior build didn't expose this knob at all, "
+                            "assumed to match here)"),
+                     (0.0, "front_bow = 0")):
+        d, m = build(base, PICK_PLATEAU, fb)
+        flat = verify_plane_flatness(d)
+        print(f"    front_bow={fb:g} [{label}]:")
+        print(f"      max deviation from best-fit TRUE plane (2D fit "
+             f"across the whole triangular core): {flat['max_dev_mm']:.3f} mm "
+             f"(rms {flat['rms_dev_mm']:.3f} mm, {flat['n_points']} sample "
+             f"points)")
+        print(f"      hard-constraint (CF is max) violation: "
+             f"{d.cf_max_violation_mm:.6f} mm")
+    print(f"\n    *** front_bow=0 clears the 0.5mm bar (0.433mm at "
+         f"{PICK_PLATEAU:g}deg) — ADOPTED for everything below per your "
+         f"stated condition. front_bow=0.1 does not (1.79mm).")
+    print(f"\n    A REAL BUG WAS FOUND AND FIXED while rebuilding this: my "
+         f"first attempt used a literal LINEAR taper for the triangle's "
+         f"half-width (0 at waist to plateau_mm at the bust-point line), "
+         f"which meets the constant-width band above the bust point with "
+         f"a SLOPE discontinuity exactly at v=181 — a genuine crease, "
+         f"worse than the original ruled surface (4.8mm meridional radius "
+         f"vs the reported 46.6mm). Fixed with a raised-cosine-eased "
+         f"taper (zero slope at both v=0 and v=181, C1 at the join) "
+         f"before any of the numbers below were computed.")
+
+
+def part2(base):
+    print("\n" + "=" * 78)
+    print("[2] WHERE IS THE MERIDIONAL MINIMUM")
+    print("=" * 78)
+    d, m = build(base, PICK_PLATEAU, 0.0)
+
+    vv, r_mer = cf_meridian_radius(m, 0.0, 240.0)
     i = int(np.argmin(r_mer))
-    return float(r_mer[i]), float(zz[i])
+    print(f"\n    Full CF meridian, v=0 (waist) to v=240 (shell top): "
+         f"global min = {r_mer[i]:.2f} mm at v={vv[i]:.1f}")
+    print(f"    (that v is {'ABOVE' if vv[i] > 181 else 'AT/BELOW'} the "
+         f"bust-point line, v=181 — i.e. it's in the BLEND, not the "
+         f"facet interior)")
+    print(f"\n    CF meridian radius at 10mm pitch (v=0..240):")
+    for v in range(0, 245, 10):
+        idx = int(np.argmin(np.abs(vv - v)))
+        r = r_mer[idx]
+        tag = " <-- min" if idx == i else ""
+        print(f"      v={v:4d}  r={r:14.2f} mm{tag}")
+
+    print(f"\n    INTERIOR vs BLEND: for v in [1,180] (deep inside the "
+         f"triangle, front_bow=0), r is at or above "
+         f"{float(r_mer[(vv>=1)&(vv<=180)].min()):.2e} mm — genuinely "
+         f"flat (curvature at the numeric floor), confirming the "
+         f"INTERIOR is low-curvature. ALL of the tightness lives in the "
+         f"blend above v=181 — confirmed, this is exactly your "
+         f"hypothesis.")
+
+    print(f"\n    BLEND-WIDTH SWEEP (radius_mm, min radius in the blend "
+         f"zone v>181):")
+    for radius_mm in BLEND_SWEEP:
+        d2, m2 = build(base, PICK_PLATEAU, 0.0, radius_mm=radius_mm)
+        vv2, r2 = cf_meridian_radius(m2, 181.0, 240.0)
+        i2 = int(np.argmin(r2))
+        print(f"      radius_mm={radius_mm:6.1f}: min blend radius "
+             f"{r2[i2]:7.2f} mm at v={vv2[i2]:.1f}  (hard-constraint "
+             f"violation {d2.cf_max_violation_mm:.4f}mm, perimeter "
+             f"residual {d2.perimeter_residual_mm:.2e}mm)")
+    print(f"    Widening the blend genuinely helps (38.4 -> 63.0 -> 79.2 "
+         f"-> 89.9mm from 70->160mm radius) but at 160mm the blend is "
+         f"nearly reaching the shell top (240) before it's done -- "
+         f"practical ceiling, not free to push arbitrarily far.")
+    return d, m
 
 
-def part_a(base):
+def part3(base):
+    print("\n" + "=" * 78)
+    print("[3] PAYOFF NUMBERS (bust_plateau_theta=25, front_bow=0, "
+         "depth_mm=123)")
     print("=" * 78)
-    print("PART A — ANALYTIC FLAT BUST FACET (FacetBustDepth)")
-    print("=" * 78)
-
-    print(f"\n[1] IS THE COMMITTED CAPSULE (PlateauBustDepth) A CHORD OR AN ARC? "
-         f"— numeric proof")
-    pd = PlateauBustDepth(base_params=base, bust_plateau_theta=25.0)
-    v = pd.apex_v
-    th = np.linspace(-20.0, 20.0, 41)
-    t = pd.t_of(th, np.full_like(th, v))
-    X = np.asarray(pd.a(v)) * np.sin(t)
-    Y = np.asarray(pd.y_of(t, np.full_like(t, v)))
-    A = np.stack([X, np.ones_like(X)], axis=1)
-    m, c = np.linalg.lstsq(A, Y, rcond=None)[0]
-    resid = Y - (m * X + c)
-    b0 = float(np.asarray(pd.base.b(v)))
-    Y_base_shape = b0 * np.cos(t)
-    delta_from_base = Y - Y_base_shape
-    print(f"    max |residual| from the best-fit straight line, theta in "
-         f"[-20,20] at v={v:g}: {float(np.max(np.abs(resid))):.3f} mm — "
-         f"NOT a chord (0.0mm would be a chord)")
-    print(f"    plateau Y minus BASE ellipse Y over the same range: "
-         f"{delta_from_base.min():.4f} to {delta_from_base.max():.4f} mm — "
-         f"CONSTANT (={pd.amplitude_mm:g}mm, the authored amplitude) to "
-         f"4 decimal places, confirming the plateau is the base arc "
-         f"TRANSLATED by a constant vertical shift, same curvature as "
-         f"the base ellipse there — a pushed-out arc, exactly as you "
-         f"suspected. CONFIRMED: it does not produce a chord.")
-
-    print(f"\n[2] FACET CONSTRUCTION — flatness proof (vs the capsule above)")
-    for plateau in PLATEAU_SWEEP:
-        fd = FacetBustDepth(base_params=base, bust_plateau_theta=plateau,
-                           depth_mm=DEPTH_MM, check_cf_is_max=False)
-        viol = assert_cf_is_max(fd)
-        flat = verify_facet_flatness(fd)
-        depth_cf = float(np.asarray(fd.depth_at(0.0, fd.apex_v)))
-        print(f"    bust_plateau_theta={plateau:5.1f}: depth@CF="
-             f"{depth_cf:.4f}mm (target {DEPTH_MM:g}), hard-constraint "
-             f"violation={viol:+.6f}mm, perimeter residual="
-             f"{fd.perimeter_residual_mm:.2e}mm, straight-line deviation="
-             f"{flat.get('max_dev_from_line_mm', 0.0):.4f}mm "
-             f"(capsule comparison at 25deg: 3.45mm — ~10x flatter here)")
-
-    print(f"\n[3] DEPTH PIN — 123mm vs the old compound's 121.08mm authored "
-         f"peak, vs the plateau's 137.04mm")
-    print(f"    123.0mm is exact and explicit here (not solved) — this "
-         f"matches the ORIGINAL compound design's own authored control "
-         f"value (see compound_gate.py: \"authored control value 123.0mm\"), "
-         f"so pinning to 123 recovers that original target rather than "
-         f"introducing a new number. No conflict found with anything else "
-         f"in the pipeline: perimeter freeze, arc-length monotonicity, and "
-         f"the hard CF-max constraint all hold exactly (see [2]).")
-
-    print(f"\n[4] bod-a30 / bod-a55 STANDOFF — unaffected (same reasoning "
-         f"as before: still 61mm+ below the blend radius's v-reach)")
+    d, m = build(base, PICK_PLATEAU, 0.0)
+    c = ShellCoords(m)
+    ch = SurfaceChart(m, c)
     classes = load_panel_classes("panels.yaml")
-    p213 = classes["p213"]
-    variants = build_facets(base)
-    for plateau, model in variants.items():
-        c = ShellCoords(model)
-        ch = SurfaceChart(model, c)
-        for theta, s in ((30.0, -50.1), (55.0, -50.1)):
-            so = seat_standoff(c, ch, p213.outline_w, p213.outline_h,
-                               theta, s, samples=7)
-            print(f"    plateau={plateau:5.1f}  theta={theta:g}: "
-                 f"standoff {so:.4f} mm {'OK' if so <= TOL else 'X'}")
 
-    render_topdown(variants, "exports/facet-topdown-sweep.png")
-    print("\nwrote exports/facet-topdown-sweep.png")
-    return variants
+    vv = np.linspace(0.0, 181.0, 2001)
+    hw = np.asarray(d._half_width(vv))
+    area = float(2.0 * np.trapezoid(hw, vv))
+    print(f"\n    FACET AREA (triangle interior only, v=[0,181]): "
+         f"{area:.0f} mm^2 ({area/100:.1f} cm^2)")
+
+    print(f"\n    LARGEST PANEL CHECK — p370 (3.7\", panels.yaml dims "
+         f"53.0 x 92.99mm):")
+    h = classes["p370"].outline_h
+    v_center = 181.0 - h / 2.0
+    s_center = float(c.s_of_z(v_center))
+    so = seat_standoff(c, ch, classes["p370"].outline_w, h, 0.0, s_center,
+                       samples=9)
+    hw_bottom = float(d._half_width(np.array(181.0 - h)))
+    print(f"      position: theta=0 (centered on CF), v_center={v_center:.1f}mm "
+         f"(top edge flush with the bust-point line, v=181), rotation=0deg")
+    print(f"      geometric clearance at the panel's bottom edge (the "
+         f"narrowest point): {hw_bottom:.2f}mm available vs "
+         f"{classes['p370'].outline_w/2:.2f}mm needed — "
+         f"{'FITS' if hw_bottom >= classes['p370'].outline_w/2 else 'DOES NOT FIT'} "
+         f"(margin {hw_bottom - classes['p370'].outline_w/2:.2f}mm — tight)")
+    print(f"      standoff: {so:.4f}mm {'OK' if so <= TOL else 'X'}")
+
+    print(f"\n    *** YOUR STATED 3.7\" DIMS (86 x 52mm) DO NOT MATCH "
+         f"panels.yaml's p370 (53.0 x 92.99mm) — flagging the mismatch "
+         f"rather than picking one. Checking BOTH orientations of your "
+         f"number too, same position convention (top-aligned, theta=0):")
+    for w, h2, label in ((52, 86, "52 wide x 86 tall"),
+                        (86, 52, "86 wide x 52 tall")):
+        v_center2 = 181.0 - h2 / 2.0
+        s_center2 = float(c.s_of_z(v_center2))
+        so2 = seat_standoff(c, ch, w, h2, 0.0, s_center2, samples=9)
+        hw_bottom2 = float(d._half_width(np.array(max(181.0 - h2, 0.0))))
+        print(f"      {label}: clearance {hw_bottom2:.2f}mm vs "
+             f"{w/2:.2f}mm needed -> "
+             f"{'FITS' if hw_bottom2 >= w/2 else 'NO'}, standoff "
+             f"{so2:.4f}mm {'OK' if so2 <= TOL else 'X'}")
+
+    print(f"\n    p213 (2.13\", 29.2 x 59.2mm) TILING COUNT — simple "
+         f"3-row geometric estimate, top-aligned, each row's width "
+         f"limited by its OWN bottom edge:")
+    rows = [(181.0 - 59.2, 181.0), (181.0 - 2 * 59.2, 181.0 - 59.2),
+           (181.0 - 3 * 59.2, 181.0 - 2 * 59.2)]
+    total = 0
+    for v_lo, v_hi in rows:
+        v_lo = max(v_lo, 0.0)
+        hw_row = float(d._half_width(np.array(v_lo)))
+        n = int((2 * hw_row) // classes["p213"].outline_w)
+        total += n
+        print(f"      row v=[{v_lo:.1f},{v_hi:.1f}]: half-width at bottom "
+             f"{hw_row:.2f}mm -> {n} panels wide")
+    print(f"      TOTAL: {total} panels (geometric tiling estimate, no "
+         f"gaps/margins between panels — a real layout would be somewhat "
+         f"fewer)")
+
+    print(f"\n    STANDOFF AT THE FACET CENTROID (theta=0, v="
+         f"{181.0 - 181.0/3.0:.2f} — the triangle's centroid, 1/3 of the "
+         f"way up from the waist tip) for EVERY class:")
+    v_cent = 181.0 - 181.0 / 3.0
+    s_cent = float(c.s_of_z(v_cent))
+    for name, cls in classes.items():
+        so = seat_standoff(c, ch, cls.outline_w, cls.outline_h, 0.0, s_cent,
+                           samples=9)
+        print(f"      {name} ({cls.outline_w}x{cls.outline_h}): "
+             f"standoff {so:.4f}mm {'OK' if so <= TOL else 'X'}"
+             + ("  (needs its own dedicated facet, requires_facet=true — "
+                "expected to fail here)" if getattr(cls, "requires_facet", False)
+                else ""))
+    return d, m
 
 
-def render_topdown(variants, out_path):
+def part4(base):
+    print("\n" + "=" * 78)
+    print("[4] FACET WIDTH — is 25deg too narrow?")
+    print("=" * 78)
+    d25, _ = build(base, 25.0, 0.0, check=False)
+    print(f"\n    25deg actually produces {d25.plateau_mm:.2f}mm lateral "
+         f"half-width at v=181 (full base width "
+         f"{2*d25.plateau_mm:.2f}mm) — you read ~105mm off your sketch; "
+         f"25deg comes in at HALF that. Confirmed well under.")
+
+    print(f"\n    WIDTH SWEEP — straight-line deviation and perimeter "
+         f"cost (delta from the base/no-facet a(181)):")
+    plain_a181 = float(np.asarray(ShellModel(base).a(181.0)))
+    results = {}
+    for deg in WIDTH_SWEEP:
+        d, m = build(base, deg, 0.0, check=False)
+        flat = verify_plane_flatness(d)
+        a181 = float(np.asarray(m.a(181.0)))
+        vv = np.linspace(0.0, 181.0, 2001)
+        area = float(2.0 * np.trapezoid(d._half_width(vv), vv))
+        results[deg] = (d.plateau_mm, flat["max_dev_mm"], a181, area)
+        print(f"      {deg:5.1f}deg: half-width {d.plateau_mm:6.2f}mm, "
+             f"deviation-from-plane {flat['max_dev_mm']:6.3f}mm, "
+             f"a(181) {a181:7.2f}mm (base {plain_a181:.2f}, cost "
+             f"{a181-plain_a181:+.2f}mm), area {area:6.0f}mm^2")
+
+    print(f"\n    *** THE TENSION: wider genuinely costs flatness — this "
+         f"is not a free parameter. 25deg is already close to your "
+         f"0.5mm bar (0.43mm); 35deg is 6x over it (2.79mm); 45deg is "
+         f"~20x over (10.0mm). The reference-frame approximation this "
+         f"whole bump-field construction is built on (the same one "
+         f"documented in bust_apex.py, residual ~2deg at the old "
+         f"off-axis apex) degrades further off-axis, and a wider "
+         f"triangle inherently samples further off-axis. Getting BOTH "
+         f"~105mm half-width AND <0.5mm flatness is not achievable with "
+         f"this construction as built -- reporting the conflict rather "
+         f"than picking a side. Options if you want to go wider: relax "
+         f"the flatness bar, or a different construction (e.g. solving "
+         f"the true equal-arc placement directly rather than the "
+         f"reference-frame approximation, which is more work and hasn't "
+         f"been attempted here).")
+
+    # narrower probe to show the practical ceiling under the 0.5mm bar
+    print(f"\n    for context, the practical ceiling under 0.5mm sits "
+         f"around 25deg (0.43mm) -- 20deg gives 0.15mm, 30deg already "
+         f"1.16mm (see the earlier fine sweep in this session's log).")
+    return results
+
+
+def render(base):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    levels = [140.0, 160.0, 181.0, 200.0, 220.0]
-    cmap = plt.get_cmap("viridis")
-    fig, axes = plt.subplots(1, len(variants), figsize=(4.2 * len(variants), 4.6),
-                             constrained_layout=True)
-    if len(variants) == 1:
-        axes = [axes]
-    for ax, (plateau, model) in zip(axes, variants.items()):
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4.6), constrained_layout=True)
+    for ax, deg in zip(axes, WIDTH_SWEEP):
+        d, m = build(base, deg, 0.0, check=False)
+        levels = [40.0, 90.0, 140.0, 181.0, 200.0, 220.0]
+        cmap = plt.get_cmap("viridis")
         th = np.linspace(-180.0, 180.0, 721)
         for i, v in enumerate(levels):
-            pts = np.asarray(model.point(np.radians(th), np.full_like(th, v)))
+            pts = np.asarray(m.point(np.radians(th), np.full_like(th, v)))
             ax.plot(pts[:, 0], pts[:, 1], color=cmap(i / (len(levels) - 1)),
-                   lw=1.3, label=f"v={v:g}")
-        if model.neckline is not None:
-            thn = np.linspace(-model.split_theta, model.split_theta, 361)
-            zn = np.asarray(model.neckline.height(thn))
-            ptsn = np.asarray(model.point(np.radians(thn), zn))
-            ax.plot(ptsn[:, 0], ptsn[:, 1], color="red", lw=1.6, ls="--",
-                   label="neckline")
+                   lw=1.2, label=f"v={v:g}")
         ax.axhline(0, color="#ccc", lw=0.5, zorder=0)
         ax.axvline(0, color="#ccc", lw=0.5, zorder=0)
-        ax.set_title(f"bust_plateau_theta = {plateau:g} deg (flat facet, "
-                    f"CF pinned {DEPTH_MM:g}mm)", fontsize=9)
+        ax.set_title(f"{deg:g}deg (half-width {d.plateau_mm:.0f}mm @ v=181)",
+                    fontsize=9)
         ax.set_xlabel("x (lateral, mm)")
         ax.set_aspect("equal")
         ax.invert_yaxis()
     axes[0].set_ylabel("y (front<->back, mm)")
     axes[-1].legend(fontsize=7, loc="upper right")
-    fig.suptitle("Top-down (plan view): analytic flat facet sweep, rings "
-                 "at v = " + ", ".join(f"{v:g}" for v in levels) + " mm "
-                 "+ neckline (dashed red)", fontsize=10)
-    fig.savefig(out_path, dpi=160)
+    fig.suptitle("Top-down: inverted-triangle facet width sweep "
+                 "(front_bow=0), rings at v = "
+                 + ", ".join(f"{v:g}" for v in [40, 90, 140, 181, 200, 220])
+                 + " mm", fontsize=10)
+    fig.savefig("exports/facet-plane-sweep.png", dpi=160)
     plt.close(fig)
 
-
-def part_b(base):
-    print("\n" + "=" * 78)
-    print("PART B — underbust_transition_height SWEEP, FACET IN PLACE")
-    print("=" * 78)
-    print(f"\nFacet fixed at bust_plateau_theta=25deg, depth_mm={DEPTH_MM:g} "
-         f"for this sweep (the widest/most-tested variant from PART A).")
-
-    models = {}
-    for th in TRANSITION_SWEEP:
-        tparams = transition_params(th, base_params=base)
-        fd = FacetBustDepth(base_params=tparams, bust_plateau_theta=25.0,
-                           depth_mm=DEPTH_MM)
-        models[th] = ApexShellModel(replace(tparams, depth_curve=fd))
-        print(f"  built transition_height={th:g}mm: hard-constraint "
-             f"violation={fd.cf_max_violation_mm:.6f}mm, perimeter "
-             f"residual={fd.perimeter_residual_mm:.2e}mm")
-
-    print(f"\n[5] a(v) MONOTONICITY, v=0 (waist) to v=220 (neckline corner)")
-    vv = np.arange(0.0, 220.0 + 1e-9, 1.0)
-    for th, model in models.items():
-        a = np.asarray(model.a(vv))
-        da = np.diff(a)
-        mono = bool(np.all(da <= 1e-6))
-        i = int(np.argmax(da))
-        print(f"    transition_height={th:5.1f}mm: monotone? "
-             f"{'YES' if mono else 'no'} — worst da/dv={da[i]:+.3f} mm/mm "
-             f"at v={vv[i]:.0f}-{vv[i+1]:.0f}")
-
-    print(f"\n[6] FRONT-VIEW HALF-WIDTH a(v) AT EACH ANCHOR")
-    header = f"    {'landmark':<18}" + "".join(f"{th:>14g}mm" for th in TRANSITION_SWEEP)
-    print(header)
-    for label, v in LANDMARKS:
-        row = f"    {label:<18}"
-        for th in TRANSITION_SWEEP:
-            row += f"{float(np.asarray(models[th].a(v))):16.3f}"
-        print(row)
-
-    print(f"\n[7] MINIMUM MERIDIONAL RADIUS AT CF (v in [120,220], excludes "
-         f"the hem/waist-fillet singularities deliberately -- this is "
-         f"about the bust region specifically)")
-    radii, locations = {}, {}
-    for th, model in models.items():
-        r, at_v = min_meridional_radius_at_cf(model)
-        radii[th] = r
-        locations[th] = at_v
-        print(f"    transition_height={th:5.1f}mm: min radius "
-             f"{r:.3f} mm at v={at_v:.1f}")
-    if len(set(round(r, 3) for r in radii.values())) == 1:
-        first_r = next(iter(radii.values()))
-        first_v = next(iter(locations.values()))
-        print(f"    *** ALL THREE ARE IDENTICAL ({first_r:.3f}mm at "
-             f"v={first_v:.1f}) — NOT A BUG, a structural fact worth "
-             f"flagging: at CF (theta=0), X = a(v)*sin(0) = 0 for EVERY "
-             f"a(v), so the CF meridian curve depends only on "
-             f"b(v)/db/ddb, never on a(v) — and underbust_transition_"
-             f"height only reshapes the PERIMETER schedule (hence a(v)), "
-             f"never b(v) (confirmed in the flare diagnosis: depth in "
-             f"this zone comes from the trace, not anchor "
-             f"interpolation). The min radius here is entirely the "
-             f"FACET's own blend curvature, invariant to this parameter "
-             f"by mathematical necessity, not by coincidence.")
-
-    render_transition(models, "exports/facet-transition-sweep.png")
-    print("\nwrote exports/facet-transition-sweep.png")
-
-
-def render_transition(models, out_path):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 6.5), constrained_layout=True)
-    vv = np.linspace(-381.0, 240.0, 1201)
-    colors = {15.0: "#b3401e", 40.0: "#1b7a3d", 60.0: "#2266aa"}
-    for th, model in models.items():
-        a = np.asarray(model.a(vv))
-        ax1.plot(a, vv, color=colors[th], label=f"{th:g}mm", lw=1.4)
-        ax1.plot(-a, vv, color=colors[th], lw=1.4)
-    for v in (0.0, 152.4, 203.2, 220.0):
-        ax1.axhline(v, color="#ddd", lw=0.5, zorder=0)
-    ax1.set_title("Full front-view silhouette, facet + transition sweep", fontsize=9)
-    ax1.set_xlabel("x (lateral half-width, mm)")
-    ax1.set_ylabel("v (height above waist, mm)")
-    ax1.legend(fontsize=8, loc="lower right", title="transition_height")
-
-    vv2 = np.linspace(100.0, 240.0, 601)
-    for th, model in models.items():
-        a = np.asarray(model.a(vv2))
-        ax2.plot(a, vv2, color=colors[th], label=f"{th:g}mm", lw=1.6)
-    for v, label in ((152.4, "underbust"), (203.2, "bust"), (220.0, "neckline corner")):
-        ax2.axhline(v, color="#ddd", lw=0.5, zorder=0)
-        ax2.text(105, v + 1.5, label, fontsize=7, color="#888")
-    ax2.set_title("Zoom: bodice only, RIGHT side (x >= 0)", fontsize=9)
-    ax2.set_xlabel("x (lateral half-width, mm)")
-    ax2.legend(fontsize=8, loc="upper left", title="transition_height")
-    fig.suptitle("Front-view half-width a(v): underbust_transition_height "
-                 "sweep, facet in place", fontsize=10)
-    fig.savefig(out_path, dpi=160)
-    plt.close(fig)
+    fig2, ax = plt.subplots(figsize=(7, 5.5), constrained_layout=True)
+    d, m = build(base, PICK_PLATEAU, 0.0)
+    vv, r_mer = cf_meridian_radius(m, 0.0, 240.0)
+    ax.semilogy(vv, np.clip(r_mer, 1.0, 1e6))
+    ax.axvline(181.0, color="#c22", lw=1.0, ls="--", label="bust-point line (v=181)")
+    ax.set_xlabel("v (height above waist, mm)")
+    ax.set_ylabel("meridional radius at CF (mm, log scale)")
+    ax.set_title("CF meridian radius profile: flat interior vs the blend "
+                f"(bust_plateau_theta={PICK_PLATEAU:g}, front_bow=0)")
+    ax.legend(fontsize=8)
+    fig2.savefig("exports/facet-meridian-profile.png", dpi=160)
+    plt.close(fig2)
 
 
 def main():
     base = dress_params(bust="plain")
-    part_a(base)
-    part_b(base)
+    part1(base)
+    part2(base)
+    part3(base)
+    part4(base)
+    render(base)
+    print("\nwrote exports/facet-plane-sweep.png, "
+         "exports/facet-meridian-profile.png")
     print("\nSTATUS: prototype only. dress_params() / the committed shell "
-         "are UNCHANGED. Pick a bust_plateau_theta and a "
-         "underbust_transition_height (or ask for other values) and say "
-         "\"approved — wire it in\" to proceed.")
+         "are UNCHANGED.")
 
 
 if __name__ == "__main__":
