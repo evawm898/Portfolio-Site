@@ -51,6 +51,13 @@
   hr { border: none; border-top: 1px solid var(--line); margin: 8px 12px; }
   .banner { background: color-mix(in srgb, var(--amber) 14%, var(--bg)); border: 1px solid var(--amber);
             color: var(--ink); padding: 8px 10px; margin: 10px 12px; border-radius: 3px; line-height: 1.6; }
+  /* A lost named feature is a different CATEGORY of event than a worse
+     residual number — this must not read as just another stat. */
+  .featureWarn { background: color-mix(in srgb, var(--red) 20%, var(--bg)); border: 1px solid var(--red);
+                 color: var(--ink); padding: 6px 8px; margin: 2px 0 4px; border-radius: 3px; line-height: 1.6; }
+  #exportGuard { display: none; background: color-mix(in srgb, var(--red) 18%, var(--bg));
+                 border: 1px solid var(--red); }
+  #exportOverrideRow { display: none; color: var(--dim); gap: 6px; }
 </style>
 </head>
 <body>
@@ -59,10 +66,10 @@
     <h1>Dress Shape Editor</h1>
     <div class="banner">This page has no server — reachable from any browser via this deploy preview
       (not the local dev tool). Curve editing, 3D regeneration, circumference, and monotonicity are
-      genuinely live here. The full curvature/seatability sweep and the "seed from parameters"
-      generator still need Python — they show a labeled, bake-time snapshot rather than a live number.
-      The neckline trim is not yet applied to this 3D view (you'll see more surface near center-back
-      than the true shell has) — flagged, not fixed in this pass.</div>
+      genuinely live here, and so is the neckline trim on the 3D view (heights themselves are still
+      reference-only, not draggable — see below). The full curvature/seatability sweep and the "seed
+      from parameters" generator still need Python — they show a labeled, bake-time snapshot rather
+      than a live number.</div>
 
     <div class="curveRow">
       <div class="curveBlock">
@@ -82,7 +89,7 @@
     </div>
 
     <hr>
-    <h2>Neckline height(θ) — reference only (not yet live on this page)</h2>
+    <h2>Neckline height(θ) — heights reference only, trim is live below</h2>
     <div id="neckRef" class="kv">…</div>
 
     <h2>Generator — reference only (needs Python to re-solve)</h2>
@@ -94,6 +101,11 @@
     <div class="row"><span class="kv" style="padding:0">armhole split θ:
       <b id="armholeReadout">…</b></span></div>
 
+    <div class="legend" id="exportGuard"></div>
+    <label class="row" id="exportOverrideRow">
+      <input type="checkbox" id="exportOverride">
+      I understand — a named feature is not represented at this density; allow export anyway
+    </label>
     <button id="exportBtn">export shape.yaml</button>
     <button id="copyBtn">copy to clipboard</button>
     <div class="kv" id="exportStatus"></div>

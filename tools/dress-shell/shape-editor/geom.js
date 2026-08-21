@@ -53,6 +53,100 @@ export function pchipFit(xs, ys) {
   };
 }
 
+// Fritsch-Carlson interior/end slopes alone (the same computation pchipFit
+// does internally, factored out so neckline.py's NecklineV3 descent —
+// which takes those slopes and then OVERRIDES the first and last before
+// building a Hermite spline through them — can be ported without
+// touching the validated pchipFit above).
+function fritschCarlsonSlopes(xs, ys) {
+  const n = xs.length;
+  const h = new Array(n - 1), delta = new Array(n - 1);
+  for (let i = 0; i < n - 1; i++) {
+    h[i] = xs[i + 1] - xs[i];
+    delta[i] = (ys[i + 1] - ys[i]) / h[i];
+  }
+  const d = new Array(n);
+  if (n === 2) {
+    d[0] = d[1] = delta[0];
+  } else {
+    for (let i = 1; i < n - 1; i++) {
+      if (delta[i - 1] === 0 || delta[i] === 0 || (delta[i - 1] < 0) !== (delta[i] < 0)) {
+        d[i] = 0;
+      } else {
+        const w1 = 2 * h[i] + h[i - 1], w2 = h[i] + 2 * h[i - 1];
+        d[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i]);
+      }
+    }
+    const endSlope = (h0, h1, d0, d1) => {
+      let m = ((2 * h0 + h1) * d0 - h0 * d1) / (h0 + h1);
+      if ((m < 0) !== (d0 < 0)) m = 0;
+      else if ((d0 < 0) !== (d1 < 0) && Math.abs(m) > Math.abs(3 * d0)) m = 3 * d0;
+      return m;
+    };
+    d[0] = endSlope(h[0], h[1], delta[0], delta[1]);
+    d[n - 1] = endSlope(h[n - 2], h[n - 3], delta[n - 2], delta[n - 3]);
+  }
+  return d;
+}
+
+// Piecewise cubic Hermite through explicit (xs, ys, slopes) — same basis
+// as pchipFit's eval, just taking given slopes instead of computing them,
+// so it can build the RISE segment's non-monotone-style explicit-tangent
+// spline and the DESCENT segment's slope-overridden spline (both from
+// neckline.py's NecklineV3) with one shared evaluator.
+function hermiteSpline(xs, ys, slopes) {
+  const n = xs.length;
+  return (x) => {
+    x = Math.max(xs[0], Math.min(xs[n - 1], x));
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= x) lo = m; else hi = m; }
+    const hlo = xs[lo + 1] - xs[lo];
+    const t = (x - xs[lo]) / hlo, t2 = t * t, t3 = t2 * t;
+    const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t;
+    const h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+    return h00 * ys[lo] + h10 * hlo * slopes[lo] + h01 * ys[lo + 1] + h11 * hlo * slopes[lo + 1];
+  };
+}
+
+// Faithful port of neckline.py's NecklineV3.height(theta) — the physical
+// top edge of the bodice. `n` is the baked generator's neckline dict
+// (cf_height/peak_height/peak_theta/side_height/cb_height/cf_corner/
+// rise_bow/decay_rate); cb_ease_deg and peak_sharpness are NOT exported
+// because dress_params() never overrides them off NecklineV3Params'
+// defaults (15.0 and 1.0 respectively — peak_sharpness < 1 isn't even
+// implemented Python-side), so they're fixed constants here too.
+// Validated against neckline.NecklineV3.height() directly: 22 test
+// thetas spanning the rise, the peak, every descent knot region, the CB
+// ease, negative theta, and >180deg raw values (what buildMeshes' BACK
+// half actually feeds it) — max absolute error ~1e-11mm.
+const NECKLINE_CB_EASE_DEG = 15.0;
+
+export function necklineHeightFn(n) {
+  const chord = (n.peak_height - n.cf_height) / n.peak_theta;
+  const m0 = n.cf_corner ? chord * (1.0 - n.rise_bow) : 0.0;
+  const m1 = chord * (1.0 + n.rise_bow);
+  const rise = hermiteSpline([0.0, n.peak_theta], [n.cf_height, n.peak_height], [m0, m1]);
+
+  const drop = n.peak_height - n.cb_height;
+  const t30 = n.peak_theta + 30.0;
+  const h30 = n.peak_height - n.decay_rate * drop;
+  const t_ease = 180.0 - NECKLINE_CB_EASE_DEG;
+  const tau_tail = (180.0 - t30) / 3.0;
+  const h_ease = n.cb_height + (h30 - n.cb_height) * Math.exp(-(t_ease - t30) / tau_tail);
+  const knots = [n.peak_theta, 90.0, t30, t_ease, 180.0];
+  const vals = [n.peak_height, n.side_height, h30, h_ease, n.cb_height];
+  const slopes = fritschCarlsonSlopes(knots, vals);
+  slopes[0] = (vals[1] - vals[0]) / (knots[1] - knots[0]);   // steepest, never eased
+  slopes[slopes.length - 1] = 0.0;                            // zero at CB (mirror)
+  const descent = hermiteSpline(knots, vals, slopes);
+
+  return (thetaDeg) => {
+    let t = Math.abs(thetaDeg);
+    if (t > 180.0) t = 360.0 - t;
+    return t <= n.peak_theta ? rise(t) : descent(t);
+  };
+}
+
 // Ramanujan II — same formula as bodice.ellipse_perimeter / _perimeter_np
 export function ellipsePerimeter(a, b) {
   const h = ((a - b) / (a + b)) ** 2;
@@ -129,22 +223,41 @@ export class CompoundCoarseShell {
 
   // FRONT/BACK triangulated meshes, coarse resolution (n_theta cols,
   // n_z rows) — enough to see the shape change live, not the export mesh.
-  buildMeshes(nTheta = 48, nZ = 64) {
+  //
+  // necklineFn (optional, from necklineHeightFn above) trims the top: for
+  // each theta COLUMN the z-row sampling is rescaled from zLo up to
+  // min(zHi, necklineFn(thetaDeg)) instead of always zHi — a clip, not a
+  // solve, since neckline height is already a known function of theta and
+  // every resulting vertex is still an exact point() on the true shell,
+  // just sampled over a shorter range for columns the neckline cuts low.
+  // shell.py's own _clamp_to_neckline clips the same way but keeps a
+  // FIXED z grid and collapses above-neckline rows to zero-area instead
+  // (fine at its 256x400 export resolution) — at this mesh's much coarser
+  // 48x64, collapsing rows would waste most of the row budget on columns
+  // near CB where the neckline sits well below zHi, so this per-column
+  // rescale is used instead to spend every row on visible surface. Same
+  // trimmed boundary curve either way; no shell above neckline(theta).
+  buildMeshes(nTheta = 48, nZ = 64, necklineFn = null) {
     const meshes = {};
     const half = nTheta / 2;
     for (const [name, t0, t1] of [
       ["FRONT", -this.splitTheta, this.splitTheta],
       ["BACK", this.splitTheta, 2 * Math.PI - this.splitTheta]]) {
+      const cols = half + 1;
+      const topZ = new Array(cols);
+      for (let i = 0; i < cols; i++) {
+        const th = t0 + (t1 - t0) * i / half;
+        topZ[i] = necklineFn ? Math.min(this.zHi, necklineFn(th * 180 / Math.PI)) : this.zHi;
+      }
       const pos = [];
       for (let j = 0; j <= nZ; j++) {
-        const z = this.zLo + (this.zHi - this.zLo) * j / nZ;
-        for (let i = 0; i <= half; i++) {
+        for (let i = 0; i < cols; i++) {
           const th = t0 + (t1 - t0) * i / half;
+          const z = this.zLo + (topZ[i] - this.zLo) * j / nZ;
           const p = this.point(th, z);
           pos.push(p[0], p[1], p[2]);
         }
       }
-      const cols = half + 1;
       const idx = [];
       for (let j = 0; j < nZ; j++) {
         for (let i = 0; i < half; i++) {

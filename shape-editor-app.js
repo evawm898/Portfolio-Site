@@ -20,8 +20,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { pchipFit, CompoundCoarseShell, monotonicityReport,
-        coarseCircumferenceReport, buildAdaptiveOrder, minimumPointsForResidual,
-        checkNamedFeatures, smoothPoints } from "./shape-editor-geom.js";
+        coarseCircumferenceReport, buildAdaptiveOrder, checkNamedFeatures,
+        smoothPoints, necklineHeightFn } from "./shape-editor-geom.js";
 
 // -- adaptive point density ---------------------------------------------
 // "Too many control points" — the flat ~31-point seed is replaced ONCE,
@@ -37,16 +37,43 @@ import { pchipFit, CompoundCoarseShell, monotonicityReport,
 // is lossless; only a real hand edit on the canvas (or a smoothing pass)
 // invalidates the cache and forces the next slider move to rebuild from
 // the edited curve.
+//
+// A named feature going missing is a DIFFERENT CATEGORY of event than a
+// fit getting slightly worse — a residual number can't stand in for it.
+// Every cache also records its "floor": the smallest point count (over
+// the same adaptive order) at which no named feature reads lost, so the
+// UI can show where that line is instead of it being found by scrubbing
+// past it. Crossing it is flagged loudly (not styled the same as the
+// residual line) and blocks export until an explicit override is set.
 const MAX_POINTS = 40;
 const MIN_POINTS = 4;
 const DEFAULT_TARGET_RESIDUAL_MM = 0.7;
 const FEATURE_LOST_THRESHOLD_MM = 1.5;
 
+function computeFeatureFloor(cache, thresholdMm) {
+  for (let n = MIN_POINTS; n <= cache.order.length; n++) {
+    const pts = [...cache.order.slice(0, n)].sort((a, b) => a.v - b.v);
+    const fit = pchipFit(pts.map(p => p.v), pts.map(p => p.y));
+    if (!checkNamedFeatures(fit, cache.baseFit, thresholdMm).some(f => f.lost)) return n;
+  }
+  return null;   // not reached within MAX_POINTS
+}
+function buildDensityCacheFromFit(fit) {
+  const built = buildAdaptiveOrder(fit, V_LO, V_HI, { maxPoints: MAX_POINTS, minResidual: 0 });
+  const cache = { ...built, baseFit: fit };
+  cache.floor = computeFeatureFloor(cache, FEATURE_LOST_THRESHOLD_MM);
+  return cache;
+}
 function buildDensityCache(points) {
   const sorted = [...points].sort((a, b) => a.v - b.v);
-  const baseFit = pchipFit(sorted.map(p => p.v), sorted.map(p => p.y));
-  const built = buildAdaptiveOrder(baseFit, V_LO, V_HI, { maxPoints: MAX_POINTS, minResidual: 0 });
-  return { ...built, baseFit };
+  return buildDensityCacheFromFit(pchipFit(sorted.map(p => p.v), sorted.map(p => p.y)));
+}
+function firstCountMeetingResidual(cache, targetMm) {
+  for (let n = 2; n <= cache.order.length; n++) {
+    const r = cache.residualAtCount.get(n);
+    if (r && r.max <= targetMm) return n;
+  }
+  return cache.order.length;
 }
 function applyDensityTo(cache, targetCount) {
   const n = Math.max(MIN_POINTS, Math.min(targetCount, cache.order.length));
@@ -56,13 +83,19 @@ function applyDensityTo(cache, targetCount) {
   const features = checkNamedFeatures(newFit, cache.baseFit, FEATURE_LOST_THRESHOLD_MM);
   return { points: newPts, count: n, residual, features };
 }
-function fmtDensity(r, label) {
+function fmtDensity(r, label, floor) {
   const lost = r.features.filter(f => f.lost);
-  const featStr = lost.length
-    ? `<span class="warn">lost: ${lost.map(f => f.name).join(", ")}</span>`
-    : (r.features.length ? '<span class="ok">named features intact</span>' : "");
-  return `${label}: <b>${r.count}</b> pts · between-point residual (vs the curve before this resample) ` +
-    `max <b>${r.residual.max.toFixed(2)}</b> mm, rms <b>${r.residual.rms.toFixed(2)}</b> mm · ${featStr}`;
+  const floorText = floor != null
+    ? `floor <b>${floor}</b> pts (all named features intact at/above this)`
+    : `floor not reached within ${MAX_POINTS} pts`;
+  const residualText = `between-point residual (vs the curve this was resampled from) ` +
+    `max ${r.residual.max.toFixed(2)} mm, rms ${r.residual.rms.toFixed(2)} mm`;
+  if (lost.length) {
+    return `<div class="featureWarn">⚠ <b>${label}: ${r.count} pts — ` +
+      `LOST ${lost.map(f => f.name).join(", ")}</b> — ${floorText}</div>${residualText}`;
+  }
+  return `${label}: <b>${r.count}</b> pts · ${residualText} · ` +
+    `<span class="ok">named features intact</span> · ${floorText}`;
 }
 
 const $ = (id) => document.getElementById(id);
@@ -310,18 +343,51 @@ class DualCurvePane {
 // generated curve (seed_a_dense/seed_b_dense, 1601 points) — a one-time
 // operation, done once here at load. Every later density-slider move
 // resamples against whatever's on screen, never against this dense table
-// again (see the adaptive-density block above).
+// again (see the adaptive-density block above). The initial caches are
+// built directly from the dense ground truth (not from a PCHIP-through-
+// the-seed reconstruction of it), so the reported floor and residual at
+// load are against the true curve, not an already-lossy stand-in.
 const groundTruthA = defFitOf({ z: state.seed_a_dense.z, y: state.seed_a_dense.a });
 const groundTruthB = defFitOf({ z: state.seed_b_dense.z, y: state.seed_b_dense.b });
-const initA = minimumPointsForResidual(groundTruthA, V_LO, V_HI, DEFAULT_TARGET_RESIDUAL_MM, { maxPoints: MAX_POINTS });
-const initBf = minimumPointsForResidual(groundTruthB, V_LO, V_HI, DEFAULT_TARGET_RESIDUAL_MM, { maxPoints: MAX_POINTS });
-const initBb = minimumPointsForResidual(groundTruthB, V_LO, V_HI, DEFAULT_TARGET_RESIDUAL_MM, { maxPoints: MAX_POINTS });
+let cacheA = buildDensityCacheFromFit(groundTruthA);
+let cacheBf = buildDensityCacheFromFit(groundTruthB);
+let cacheBb = buildDensityCacheFromFit(groundTruthB);   // separate object — front/back diverge on edits
+const initACount = firstCountMeetingResidual(cacheA, DEFAULT_TARGET_RESIDUAL_MM);
+const initBfCount = firstCountMeetingResidual(cacheBf, DEFAULT_TARGET_RESIDUAL_MM);
+const initBbCount = firstCountMeetingResidual(cacheBb, DEFAULT_TARGET_RESIDUAL_MM);
+const initA = applyDensityTo(cacheA, initACount);
+const initBf = applyDensityTo(cacheBf, initBfCount);
+const initBb = applyDensityTo(cacheBb, initBbCount);
 const seedAPoints = initA.points.map(p => [p.v, p.y]);
 const seedBfPoints = initBf.points.map(p => [p.v, p.y]);
 const seedBbPoints = initBb.points.map(p => [p.v, p.y]);
 const bakedSeedCount = state.seed_a_points.length;
 
-let cacheA = null, cacheBf = null, cacheBb = null;
+// Per-curve "named feature currently lost" state — set by a density
+// resample or a smoothing pass (the two actions that can silently erase
+// a feature), never by a hand-drag (an intentional edit is out of scope
+// for this guard). Drives both the loud on-page warning and the export
+// block below.
+const lostFeatures = { a: [], bf: [], bb: [] };
+function exportBlocked() {
+  return (lostFeatures.a.length || lostFeatures.bf.length || lostFeatures.bb.length) > 0
+    && !$("exportOverride").checked;
+}
+function updateExportGuard() {
+  const parts = [];
+  if (lostFeatures.a.length) parts.push(`a(v): ${lostFeatures.a.join(", ")}`);
+  if (lostFeatures.bf.length) parts.push(`b_front: ${lostFeatures.bf.join(", ")}`);
+  if (lostFeatures.bb.length) parts.push(`b_back: ${lostFeatures.bb.join(", ")}`);
+  const anyLost = parts.length > 0;
+  $("exportGuard").style.display = anyLost ? "block" : "none";
+  if (anyLost) {
+    $("exportGuard").innerHTML = `<b class="err">⚠ named feature lost</b> at the current density — ` +
+      `${parts.join(" · ")}. Export is blocked until the density is raised (see the floor under each ` +
+      `slider) or the override below is checked.`;
+  }
+  $("exportOverrideRow").style.display = anyLost ? "flex" : "none";
+  if (!anyLost) $("exportOverride").checked = false;
+}
 
 const noop = () => {};
 const paneA = new CurvePane({
@@ -444,26 +510,28 @@ $("densityReport").innerHTML = `adaptive seed replaced the flat ${bakedSeedCount
   `b_back <b>${bakedSeedCount}→${initBb.count}</b> pts (≤${DEFAULT_TARGET_RESIDUAL_MM}mm target, sampled ` +
   `between control points against the true generated curve, never just at knots).`;
 
-function fmtInitDensity(label, r) {
-  return `${label}: <b>${r.count}</b> pts · seeded at ≤${DEFAULT_TARGET_RESIDUAL_MM}mm target ` +
-    `(max ${r.residual.max.toFixed(2)}mm, rms ${r.residual.rms.toFixed(2)}mm vs the true generated curve)`;
-}
 $("densityA").min = String(MIN_POINTS); $("densityA").max = String(MAX_POINTS); $("densityA").value = String(initA.count);
 $("densityAVal").textContent = String(initA.count);
-$("densityAReadout").innerHTML = fmtInitDensity("a(v)", initA);
+$("densityAReadout").innerHTML = fmtDensity(initA, "a(v)", cacheA.floor);
+lostFeatures.a = initA.features.filter(f => f.lost).map(f => f.name);
 $("densityBf").min = String(MIN_POINTS); $("densityBf").max = String(MAX_POINTS); $("densityBf").value = String(initBf.count);
 $("densityBfVal").textContent = String(initBf.count);
-$("densityBfReadout").innerHTML = fmtInitDensity("b_front", initBf);
+$("densityBfReadout").innerHTML = fmtDensity(initBf, "b_front", cacheBf.floor);
+lostFeatures.bf = initBf.features.filter(f => f.lost).map(f => f.name);
 $("densityBb").min = String(MIN_POINTS); $("densityBb").max = String(MAX_POINTS); $("densityBb").value = String(initBb.count);
 $("densityBbVal").textContent = String(initBb.count);
-$("densityBbReadout").innerHTML = fmtInitDensity("b_back", initBb);
+$("densityBbReadout").innerHTML = fmtDensity(initBb, "b_back", cacheBb.floor);
+lostFeatures.bb = initBb.features.filter(f => f.lost).map(f => f.name);
+updateExportGuard();
 
 $("densityA").addEventListener("input", (ev) => {
   if (!cacheA) cacheA = buildDensityCache(paneA.points);
   const r = applyDensityTo(cacheA, parseInt(ev.target.value, 10));
   paneA.points = r.points;
   $("densityAVal").textContent = String(r.count);
-  $("densityAReadout").innerHTML = fmtDensity(r, "a(v)");
+  $("densityAReadout").innerHTML = fmtDensity(r, "a(v)", cacheA.floor);
+  lostFeatures.a = r.features.filter(f => f.lost).map(f => f.name);
+  updateExportGuard();
   paneA.draw(); liveUpdate();
 });
 $("densityBf").addEventListener("input", (ev) => {
@@ -471,7 +539,9 @@ $("densityBf").addEventListener("input", (ev) => {
   const r = applyDensityTo(cacheBf, parseInt(ev.target.value, 10));
   paneB.front = r.points;
   $("densityBfVal").textContent = String(r.count);
-  $("densityBfReadout").innerHTML = fmtDensity(r, "b_front");
+  $("densityBfReadout").innerHTML = fmtDensity(r, "b_front", cacheBf.floor);
+  lostFeatures.bf = r.features.filter(f => f.lost).map(f => f.name);
+  updateExportGuard();
   paneB.draw(); liveUpdate();
 });
 $("densityBb").addEventListener("input", (ev) => {
@@ -479,18 +549,32 @@ $("densityBb").addEventListener("input", (ev) => {
   const r = applyDensityTo(cacheBb, parseInt(ev.target.value, 10));
   paneB.back = r.points;
   $("densityBbVal").textContent = String(r.count);
-  $("densityBbReadout").innerHTML = fmtDensity(r, "b_back");
+  $("densityBbReadout").innerHTML = fmtDensity(r, "b_back", cacheBb.floor);
+  lostFeatures.bb = r.features.filter(f => f.lost).map(f => f.name);
+  updateExportGuard();
   paneB.draw(); liveUpdate();
 });
 
 // ---------------------------------------------------------------- smoothing (control-point cleanup)
+// Smoothing is checked against the TRUE dense ground truth (not "the
+// curve before this smoothing pass" the way resampling is) — the point
+// of smoothing is removing trace noise while staying close to the real
+// shape, so the real shape is the right reference for whether a feature
+// survived it.
 function smoothAmountPasses() {
   return [parseFloat($("smoothAmount").value) || 0, parseInt($("smoothPasses").value, 10) || 1];
+}
+function featuresAfterSmooth(points, groundTruth) {
+  const sorted = [...points].sort((a, b) => a.v - b.v);
+  const fit = pchipFit(sorted.map(p => p.v), sorted.map(p => p.y));
+  return checkNamedFeatures(fit, groundTruth, FEATURE_LOST_THRESHOLD_MM).filter(f => f.lost).map(f => f.name);
 }
 $("smoothA").onclick = () => {
   const [amt, passes] = smoothAmountPasses();
   paneA.points = smoothPoints(paneA.points, amt, passes);
   cacheA = null;
+  lostFeatures.a = featuresAfterSmooth(paneA.points, groundTruthA);
+  updateExportGuard();
   paneA.draw(); liveUpdate();
   status("smoothed a(v)", "ok");
 };
@@ -498,6 +582,8 @@ $("smoothBf").onclick = () => {
   const [amt, passes] = smoothAmountPasses();
   paneB.front = smoothPoints(paneB.front, amt, passes);
   cacheBf = null;
+  lostFeatures.bf = featuresAfterSmooth(paneB.front, groundTruthB);
+  updateExportGuard();
   paneB.draw(); liveUpdate();
   status("smoothed b_front", "ok");
 };
@@ -505,16 +591,22 @@ $("smoothBb").onclick = () => {
   const [amt, passes] = smoothAmountPasses();
   paneB.back = smoothPoints(paneB.back, amt, passes);
   cacheBb = null;
+  lostFeatures.bb = featuresAfterSmooth(paneB.back, groundTruthB);
+  updateExportGuard();
   paneB.draw(); liveUpdate();
   status("smoothed b_back", "ok");
 };
 
-// neckline: display only (rebuilding the neckline surface needs Python
-// too, in this first cut) — shown for reference, not editable live yet.
+// neckline: heights are still reference-only (not draggable in this
+// first cut — rebuilding the neckline SHAPE needs Python), but the trim
+// itself is applied to the 3D view: it's a known function of theta, so
+// clipping the mesh to it is a clip, not a solve. Faithful port of
+// neckline.NecklineV3.height (validated to ~1e-11mm, see geom.js).
 const n = state.neckline;
 $("neckRef").innerHTML = `CF ${n.cf_height} · peak ${n.peak_height} · side ${n.side_height} · ` +
   `CB ${n.cb_height} · peak θ ${n.peak_theta}° · bow ${n.rise_bow} · decay ${n.decay_rate} · ` +
-  `${n.cf_corner ? "corner" : "smooth apex"}`;
+  `${n.cf_corner ? "corner" : "smooth apex"} · trimmed live in the 3D view below, heights not yet draggable`;
+const necklineFn = necklineHeightFn(n);
 
 function liveUpdate() {
   edited = true;
@@ -523,7 +615,7 @@ function liveUpdate() {
   $("circTable").innerHTML = fmtCircTable(
     coarseCircumferenceReport(aFit, bfFit, bbFit, V_LO, V_HI), "LIVE");
   const shell = new CompoundCoarseShell(aFit, bfFit, bbFit, V_LO, V_HI, SPLIT);
-  setMeshes(shell.buildMeshes(), 0xc9cfcc);
+  setMeshes(shell.buildMeshes(48, 64, necklineFn), 0xc9cfcc);
   $("shellReadout").innerHTML = fmtShell(state.initial_shell_analysis, "SNAPSHOT (baked at export)", true);
   status("live", "ok");
 }
@@ -531,7 +623,7 @@ function liveUpdate() {
 // initial mesh
 {
   const shell = new CompoundCoarseShell(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT);
-  setMeshes(shell.buildMeshes(), 0xc9cfcc);
+  setMeshes(shell.buildMeshes(48, 64, necklineFn), 0xc9cfcc);
 }
 
 // ---------------------------------------------------------------- export (no server to save to)
@@ -563,7 +655,15 @@ function dumpShapeYaml() {
   return lines.join("\n") + "\n";
 }
 
+$("exportOverride").addEventListener("change", updateExportGuard);
+
 $("exportBtn").onclick = () => {
+  if (exportBlocked()) {
+    $("exportStatus").innerHTML = '<span class="err">export blocked — a named feature is lost at the ' +
+      "current density (see the warning above); raise the density or check the override</span>";
+    return;
+  }
+  const overridden = lostFeatures.a.length || lostFeatures.bf.length || lostFeatures.bb.length;
   const text = dumpShapeYaml();
   const blob = new Blob([text], { type: "text/yaml" });
   const url = URL.createObjectURL(blob);
@@ -573,10 +673,18 @@ $("exportBtn").onclick = () => {
   URL.revokeObjectURL(url);
   $("exportArea").value = text;
   $("exportArea").style.display = "block";
-  $("exportStatus").innerHTML = '<span class="ok">downloaded shape.yaml — send it back to have it committed ' +
-    "as tools/dress-shell/shape.yaml, or copy the text below</span>";
+  $("exportStatus").innerHTML = overridden
+    ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used) — ' +
+      "send it back to have it committed as tools/dress-shell/shape.yaml, or copy the text below</span>"
+    : '<span class="ok">downloaded shape.yaml — send it back to have it committed ' +
+      "as tools/dress-shell/shape.yaml, or copy the text below</span>";
 };
 $("copyBtn").onclick = async () => {
+  if (exportBlocked()) {
+    $("exportStatus").innerHTML = '<span class="err">copy blocked — a named feature is lost at the ' +
+      "current density (see the warning above); raise the density or check the override</span>";
+    return;
+  }
   const text = dumpShapeYaml();
   try {
     await navigator.clipboard.writeText(text);
