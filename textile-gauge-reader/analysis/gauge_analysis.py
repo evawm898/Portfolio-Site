@@ -4411,3 +4411,404 @@ def analyze_multi_roi(
         primary_label=primary.label,
         primary_roi_px=(primary.x, primary.y, primary.width, primary.height),
     )
+
+
+# --- Automatic ruler/scale-bar calibration detection ----------------------
+#
+# Most photos taken for this tool already have a ruler or tape measure in
+# frame (the app's own upload hint suggests including one). Manual two-
+# point-plus-known-distance calibration is the one step in this whole
+# workflow that can't be sanity-checked after the fact -- get it wrong and
+# every downstream wale/course number is silently wrong by the same
+# factor, with nothing in the UI that would look "off." This section
+# tries to detect the ruler automatically and propose a calibration for
+# the user to review/confirm, the same auto-propose-then-human-confirms
+# pattern propose_measurement_rois already uses for measurement areas --
+# never a silent skip of the confirm step.
+#
+# Deliberately classical CV, no OCR / no reading of printed numerals: a
+# ruler's tick pattern is itself a strong, generic signal -- a dense,
+# very regular sequence of high-contrast marks, distinguishable from
+# fabric texture by scale and crispness alone, reusing the exact
+# autocorrelation/peak-detection primitives already used for wale/course
+# spacing (_autocorrelation_spacing, _detect_peaks). Metric vs. imperial
+# is inferred structurally (how many minor ticks fall between two major/
+# numbered ticks -- 10 or 5 for metric, 8 or 16 for imperial) rather than
+# by reading a digit, which keeps the detector generic across ruler
+# brands/fonts but means the unit is a HINT, not a certainty -- the
+# suggested calibration always still needs the user's one-click
+# confirmation (or override) before it's used for anything.
+
+RULER_BAND_HEIGHT_FRACTIONS = [0.06, 0.09, 0.12, 0.16]  # candidate ruler-band thickness, as a fraction of the perpendicular image dimension
+RULER_BAND_STRIDE_FRACTION = 0.5    # candidate band position step, as a fraction of band height
+RULER_MIN_PEAKS = 6                 # need at least this many tick peaks in a band to trust it as a ruler at all
+RULER_MAJOR_TICK_LENGTH_RATIO = 2.0  # a tick reaching at least this many times the median tick's dark-run length counts as "major" -- real rulers often have an intermediate half-unit tick too (longer than the finest ticks but shorter than the numbered ones), so this needs to sit above that tier, not just above the numbered ticks
+RULER_MIN_MAJOR_TICKS = 2           # need at least 2 major ticks to suggest a major-tick-spaced calibration
+RULER_MAX_MAJOR_FRACTION = 0.35     # majors must stay a sparse minority of all ticks (real rulers number every 4th-16th tick, never anywhere close to half) -- if more than this fraction of ticks look "long", the length signal is unreliable (e.g. picked up fabric texture, not a real ruler), so treat it as no major/minor split found at all rather than trust it
+RULER_REACH_EXTENSION_MULTIPLIER = 3.0  # how many multiples of the tight tick-band's own height to extend into, when measuring how far ticks reach (see _build_reach_strip)
+
+
+@dataclass
+class RulerCalibrationResult:
+    """
+    A proposed two-point calibration detected automatically from a ruler/
+    tape measure in the photo -- see the module comment above. Never
+    read/acted on without the user confirming (or overriding) it first,
+    the same as ProposedRoi.
+    """
+
+    success: bool
+    message: str = ""
+    point1_px: Optional[Tuple[float, float]] = None
+    point2_px: Optional[Tuple[float, float]] = None
+    suggested_distance: float = 1.0
+    suggested_unit: Literal["mm", "cm", "in"] = "cm"
+    minor_tick_spacing_px: Optional[float] = None
+    major_tick_count: int = 0
+    confidence: float = 0.0
+
+
+def _ruler_band_score(band_gray: np.ndarray) -> Tuple[float, float, float]:
+    """
+    How strongly does this band look like a ruler -- a dense, regular,
+    high-contrast tick pattern -- along its LENGTH (axis=1, i.e. this
+    function assumes `band_gray` is already oriented with the ruler's
+    length running horizontally; _scan_for_ruler_band transposes vertical
+    candidate bands before calling this, the same convention used
+    elsewhere in this file for orientation-generic code).
+
+    Returns (score, spacing_px, strength) -- spacing_px/strength are the
+    autocorrelation-based tick-spacing estimate this score is built from,
+    passed back so a winning band doesn't need to redo the computation.
+    Score is 0.0 for a band with no plausible periodicity at all.
+    """
+    min_w = int(MIN_PLAUSIBLE_SPACING_PX * 2 * RULER_MIN_PEAKS)
+    if band_gray.shape[0] < 4 or band_gray.shape[1] < min_w:
+        return 0.0, 0.0, 0.0
+    signal = band_gray.mean(axis=0).astype(np.float64)
+    signal = detrend(signal, type="linear")
+    contrast = float(np.std(band_gray))
+    spacing, strength = _autocorrelation_spacing(signal)
+    if spacing is None:
+        return 0.0, 0.0, 0.0
+    # Reward high periodicity strength AND non-trivial contrast -- rules
+    # out a long, flat, faintly-periodic stretch of background/table from
+    # scoring well just because whatever weak texture it has happens to
+    # repeat (the same "periodicity alone isn't enough" lesson this file
+    # has learned repeatedly for fabric detection, applied here too).
+    score = strength * float(np.clip(contrast / 40.0, 0.0, 1.0))
+    return score, float(spacing), float(strength)
+
+
+def _scan_for_ruler_band(gray_full: np.ndarray, orientation_horizontal: bool) -> Optional[dict]:
+    """
+    Slide a band of several candidate thicknesses along the perpendicular
+    axis, scoring each with _ruler_band_score, and return the best-
+    scoring band's position/thickness/estimated tick spacing -- or None
+    if nothing scored above zero anywhere.
+
+    `orientation_horizontal=True` searches for a band whose LENGTH runs
+    along image x (a ruler lying along the top/bottom edge); False
+    searches top-to-bottom bands (a ruler along the left/right edge),
+    via the same transpose trick used throughout this file
+    (`work_gray = gray if along_x else gray.T`) so the actual scoring
+    logic only has to be written once.
+    """
+    work = gray_full if orientation_horizontal else gray_full.T
+    h, w = work.shape
+    best: Optional[dict] = None
+    for frac in RULER_BAND_HEIGHT_FRACTIONS:
+        band_h = max(8, int(round(h * frac)))
+        if band_h >= h:
+            continue
+        stride = max(1, int(round(band_h * RULER_BAND_STRIDE_FRACTION)))
+        for y0 in range(0, h - band_h + 1, stride):
+            band = work[y0 : y0 + band_h, :]
+            score, spacing, strength = _ruler_band_score(band)
+            if score <= 0:
+                continue
+            if best is None or score > best["score"]:
+                best = {"score": score, "y0": y0, "band_h": band_h, "spacing_px": spacing, "strength": strength}
+    return best
+
+
+def _find_tick_positions(band_gray: np.ndarray, spacing_hint: float) -> List[float]:
+    """
+    Detect individual tick positions along a ruler band's length (axis=1).
+    The band passed in should be the tight, high-SNR band that
+    _scan_for_ruler_band found (best periodicity score) -- that's the
+    right band for finding WHERE the ticks are, even though (see
+    _build_reach_strip) it's usually too short to tell major ticks from
+    minor ones by length.
+    """
+    # Ticks are dark marks on a light ruler body -- invert so ticks
+    # become positive peaks in the projected signal, the same convention
+    # _detect_peaks callers elsewhere in this file rely on.
+    inverted = 255.0 - band_gray.astype(np.float64)
+    signal = inverted.mean(axis=0)
+    signal = signal - signal.min()
+    return _detect_peaks(signal, spacing_hint)
+
+
+def _build_reach_strip(work: np.ndarray, y0: int, band_h: int) -> Tuple[np.ndarray, bool]:
+    """
+    Build a taller crop of `work` (same x-range as the tight tick band,
+    more rows) to measure tick length in, instead of reusing the tight
+    band itself. Returns (strip, baseline_at_top) -- see below for what
+    the baseline is.
+
+    The tight band _scan_for_ruler_band picks is deliberately as short as
+    possible -- that's what makes its periodicity score high -- which on
+    a real ruler tends to land it right against the ruler's own working
+    edge (the edge nearest whatever's being measured), where EVERY tick,
+    major or minor, is present and darkest -- the strongest possible
+    periodic signal. That's great for finding tick x-positions, but
+    leaves no headroom on that side to tell a tick's length: it's
+    already touching the band's edge, so reach/max_reach collapses
+    toward 1.0 for everything (see the diagnostic notes above
+    detect_ruler_calibration). The headroom major ticks actually need is
+    on the OTHER side, extending further into the ruler body.
+
+    A ruler's printed body (the blank strip the ticks are drawn on, plus
+    its numerals) is close to a single flat brightness -- almost always
+    much brighter than both the shadowed border line at its working edge
+    and whatever sits past that edge (fabric, background). So: look at a
+    wide neighborhood around the tight band, find the brightest and
+    darkest row averages in it, and grow outward from the tight band's
+    own brightest row until brightness drops below the midpoint between
+    those two extremes, independently in each direction. The direction
+    that grows LESS is the one already blocked by the working edge --
+    that's the baseline ticks are anchored to; the direction that grows
+    MORE is the ruler's body interior, i.e. the headroom major ticks
+    need.
+
+    Falls back to a small fixed extension around the tight band if no
+    clear plateau is found in either direction (e.g. a low-contrast or
+    unusually lit photo), still preferring whichever side grew further.
+    """
+    h = work.shape[0]
+    neigh_radius = int(round(band_h * RULER_REACH_EXTENSION_MULTIPLIER))
+    n_y0 = max(0, y0 - neigh_radius)
+    n_y1 = min(h, y0 + band_h + neigh_radius)
+    neighborhood = work[n_y0:n_y1, :]
+    local_y0, local_y1 = y0 - n_y0, (y0 - n_y0) + band_h
+    if neighborhood.shape[0] < 2:
+        return work[y0 : y0 + band_h, :], True
+
+    row_mean = neighborhood.mean(axis=1)
+    threshold = (row_mean.max() + row_mean.min()) / 2.0
+
+    # Seed from the single brightest row INSIDE the tight band -- almost
+    # certainly a genuine ruler-body pixel row -- rather than the band's
+    # own edges, since the tight band can already overshoot the plateau
+    # on one side and walking outward from that edge would never pull
+    # back in from a starting point that's already off the plateau.
+    band_rows = row_mean[local_y0:local_y1]
+    seed = local_y0 + int(np.argmax(band_rows)) if band_rows.size else local_y0
+
+    top = seed
+    while top > 0 and row_mean[top - 1] > threshold:
+        top -= 1
+    bottom = seed + 1
+    while bottom < len(row_mean) and row_mean[bottom] > threshold:
+        bottom += 1
+
+    grew_up, grew_down = seed - top, bottom - (seed + 1)
+    if (grew_up + grew_down) < band_h // 2:
+        # No real plateau found beyond the tight band itself -- fall
+        # back to a small fixed extension rather than the unextended
+        # (too-short) band, still asymmetric in the same direction sense
+        # (extend more on whichever side had any headroom at all).
+        extend = max(1, band_h // 2)
+        if grew_up >= grew_down:
+            top, bottom = max(0, local_y0 - extend), local_y1
+        else:
+            top, bottom = local_y0, min(len(row_mean), local_y1 + extend)
+        grew_up, grew_down = local_y0 - top, bottom - local_y1
+
+    # Baseline is the side that grew LESS -- the tick-anchoring working
+    # edge, already hard against the band; the other side is the body
+    # interior ticks reach into.
+    baseline_at_top = grew_up <= grew_down
+    return neighborhood[top:bottom, :], baseline_at_top
+
+
+def _measure_tick_reach(
+    reach_strip_gray: np.ndarray, positions: List[float], baseline_at_top: bool
+) -> List[Tuple[float, float]]:
+    """
+    For each tick x-position, measure how far its dark mark reaches into
+    `reach_strip_gray` as a CONTIGUOUS dark run starting at the baseline
+    edge (see _build_reach_strip) and extending toward the far edge,
+    normalized to the single longest run found. A contiguous run --
+    rather than "any dark pixel's distance from some reference row", the
+    earlier approach -- avoids being thrown off by unrelated dark
+    content elsewhere in the strip (numerals, adjacent print) that isn't
+    actually connected to the tick mark itself. Returns
+    [(position_px, reach_fraction), ...]; reach_fraction is 0..1.
+    """
+    if not positions or reach_strip_gray.size == 0:
+        return [(p, 0.0) for p in positions]
+
+    inverted = 255.0 - reach_strip_gray.astype(np.float64)
+    n_rows = inverted.shape[0]
+    ticks = []
+    for p in positions:
+        col_idx = int(np.clip(round(p), 0, inverted.shape[1] - 1))
+        col = inverted[:, col_idx]
+        dark_thresh = col.max() * 0.5
+        row_order = range(n_rows) if baseline_at_top else range(n_rows - 1, -1, -1)
+        run = 0
+        for r in row_order:
+            if col[r] >= dark_thresh:
+                run += 1
+            else:
+                break
+        ticks.append((p, float(run)))
+
+    max_reach = max((r for _, r in ticks), default=0.0) or 1.0
+    return [(p, r / max_reach) for p, r in ticks]
+
+
+def _classify_major_ticks(ticks: List[Tuple[float, float]]) -> List[float]:
+    """
+    Positions of ticks whose reach is a clear outlier above the median --
+    see RULER_MAJOR_TICK_LENGTH_RATIO. Also requires the outliers to stay
+    a sparse minority (RULER_MAX_MAJOR_FRACTION) -- on a real ruler,
+    numbered ticks are always a small fraction of all ticks, so if
+    "long" ticks turn out to be a big chunk of everything found, that's
+    a sign the reach measurement locked onto something that isn't
+    actually a major/minor tick hierarchy (e.g. fabric texture mixed
+    into the band), not a real one -- safer to report no confident split
+    at all than a wrong one.
+    """
+    if len(ticks) < RULER_MIN_MAJOR_TICKS:
+        return []
+    reaches = np.array([r for _, r in ticks])
+    median_reach = float(np.median(reaches))
+    if median_reach <= 1e-6:
+        return []
+    threshold = median_reach * RULER_MAJOR_TICK_LENGTH_RATIO
+    majors = [p for p, r in ticks if r >= threshold]
+    if len(majors) > len(ticks) * RULER_MAX_MAJOR_FRACTION:
+        return []
+    return majors
+
+
+def detect_ruler_calibration(image_bgr: np.ndarray) -> RulerCalibrationResult:
+    """
+    Look for a ruler/tape measure anywhere in the photo and, if found,
+    propose a two-point calibration from it (see the module comment
+    above for the full rationale and the classical-CV/no-OCR approach).
+
+    Tries both a horizontal-band search (a ruler along the top/bottom
+    edge) and a vertical-band search (left/right edge), keeps whichever
+    scored higher, then finds individual tick marks in that band and
+    classifies major vs. minor by tick length. Prefers spacing two
+    adjacent MAJOR ticks (a clean, human-recognizable "1 unit" span) for
+    the suggested calibration; falls back to a short run of minor ticks
+    if no confident major/minor split was found, still auto-placing both
+    points even though the caller will need to supply how many minor-
+    tick units that span covers.
+
+    Never returns a fabricated result: success=False with a human-
+    readable reason if no plausible ruler pattern is found at all.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return RulerCalibrationResult(success=False, message="No image data to detect a ruler from.")
+
+    gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+
+    candidate_h = _scan_for_ruler_band(gray_full, orientation_horizontal=True)
+    candidate_v = _scan_for_ruler_band(gray_full, orientation_horizontal=False)
+
+    if candidate_h and (not candidate_v or candidate_h["score"] >= candidate_v["score"]):
+        chosen, horizontal = candidate_h, True
+    elif candidate_v:
+        chosen, horizontal = candidate_v, False
+    else:
+        return RulerCalibrationResult(success=False, message="No ruler-like pattern found in this photo.")
+
+    work = gray_full if horizontal else gray_full.T
+    y0, band_h, spacing_hint = chosen["y0"], chosen["band_h"], chosen["spacing_px"]
+    band = work[y0 : y0 + band_h, :]
+
+    positions = _find_tick_positions(band, spacing_hint)
+    if len(positions) < RULER_MIN_PEAKS:
+        return RulerCalibrationResult(success=False, message="Found a possible ruler, but not enough clear tick marks to calibrate from.")
+
+    reach_strip, baseline_at_top = _build_reach_strip(work, y0, band_h)
+    ticks = _measure_tick_reach(reach_strip, positions, baseline_at_top)
+    positions = sorted(positions)
+    diffs = np.diff(positions)
+    minor_spacing = float(np.median(diffs)) if diffs.size else spacing_hint
+
+    band_mid = y0 + band_h / 2.0
+
+    def _to_full_image(pos_along_length: float) -> Tuple[float, float]:
+        return (pos_along_length, band_mid) if horizontal else (band_mid, pos_along_length)
+
+    majors = sorted(_classify_major_ticks(ticks))
+    minor_count_per_major: Optional[int] = None
+
+    if len(majors) >= RULER_MIN_MAJOR_TICKS:
+        major_diffs = np.diff(majors)
+        major_spacing = float(np.median(major_diffs))
+        # The two MIDDLE major ticks (away from the band's own edges,
+        # where a partially-visible unit right at the frame boundary
+        # could throw off the spacing) become the suggested points.
+        mid_idx = len(majors) // 2
+        i1 = max(0, mid_idx - 1)
+        i2 = i1 + 1 if i1 + 1 < len(majors) else max(0, i1 - 1)
+        i1, i2 = min(i1, i2), max(i1, i2)
+        p1, p2 = _to_full_image(majors[i1]), _to_full_image(majors[i2])
+        if minor_spacing > 0:
+            minor_count_per_major = int(round(major_spacing / minor_spacing))
+    else:
+        # No confidently-classified major ticks -- fall back to a short
+        # run of minor ticks so the two points are still auto-placed;
+        # the caller supplies how many minor-tick units that span is
+        # (suggested_distance stays 1.0, same as the major-tick case, but
+        # callers surfacing this to a user should say "N ticks" instead
+        # of "1 <unit>" when minor_tick_spacing_px is the only anchor).
+        span = min(5, len(positions) - 1)
+        mid_idx = len(positions) // 2
+        i1 = max(0, mid_idx - span // 2)
+        i2 = min(len(positions) - 1, i1 + span) if span > 0 else i1
+        p1, p2 = _to_full_image(positions[i1]), _to_full_image(positions[i2])
+
+    # Metric rulers mark 10 (or 5) minor ticks per major (mm -> cm);
+    # imperial commonly marks 8 or 16 (fractions of an inch), sometimes
+    # 4. This is a HINT from tick-count structure, not a read of any
+    # printed numeral -- the caller still lets the user confirm/override
+    # the unit.
+    suggested_unit: Literal["mm", "cm", "in"] = "cm"
+    if minor_count_per_major is not None:
+        imperial_candidates = (4, 8, 16)
+        metric_candidates = (5, 10)
+        nearest_imperial = min(imperial_candidates, key=lambda n: abs(n - minor_count_per_major))
+        nearest_metric = min(metric_candidates, key=lambda n: abs(n - minor_count_per_major))
+        if abs(nearest_imperial - minor_count_per_major) < abs(nearest_metric - minor_count_per_major):
+            suggested_unit = "in"
+
+    spacing_consistency = 1.0
+    if diffs.size >= 2 and np.mean(diffs) > 0:
+        cv = float(np.std(diffs) / np.mean(diffs))
+        spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
+    confidence = float(np.clip(
+        0.4 * chosen["strength"] + 0.3 * spacing_consistency + 0.3 * min(1.0, len(positions) / 15.0),
+        0.0, 1.0,
+    ))
+
+    message = f"Detected a likely ruler with {len(positions)} tick marks ({len(majors)} major)."
+    return RulerCalibrationResult(
+        success=True,
+        message=message,
+        point1_px=p1,
+        point2_px=p2,
+        suggested_distance=1.0,
+        suggested_unit=suggested_unit,
+        minor_tick_spacing_px=round(minor_spacing, 3),
+        major_tick_count=len(majors),
+        confidence=round(confidence, 4),
+    )

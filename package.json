@@ -1,0 +1,9 @@
+{
+  "name": "portfolio-site-functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Netlify Functions for the portfolio site (shared Flower designs gallery). The site itself is static; this only exists so Netlify installs the Function's dependency at deploy time.",
+  "dependencies": {
+    "@netlify/blobs": "^10.7.0"
+  }
+}

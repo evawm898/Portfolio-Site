@@ -81,6 +81,19 @@ const BASE_FLOOR = 0.12;   // petal base half-width as a fraction of max
 const EDGE_CURVE_AMP = 0.6;  // max side billow / pinch from the (top-down) edge-curve slider
 const EDGE_PROFILE_AMP = 0.85;  // max out-of-plane edge lift from the profile edge-curve slider
 const PETAL_CUP_AMP = 0.5;   // max extra across-width cup/reflex from the Petal cup slider
+// SURFACE RELIEF: out-of-plane corrugation (plicate / rugose / bullate). Amplitude
+// is a world-unit lift on the same axis as the cup; rib count spans a broad pleat
+// to a fine crepe. Corrugating a thin sheet raises its bending stiffness ~ (depth/
+// thickness)^2, so this buys stiffness (delicacy) more than it costs material.
+const RELIEF_AMP_MAX  = 0.22;   // max normal lift at reliefAmp = 1 (world units)
+const RELIEF_RIBS_MIN = 3;      // pleat count at reliefFreq = 0
+const RELIEF_RIBS_MAX = 22;     // crepe count at reliefFreq = 1
+// TWIST + SKEW: contorted aestivation (bud spiral) + lateral midrib bend. Twist is
+// a progressive rotation of the cross-section about the midrib tangent; skew swings
+// the midrib sideways. Both intentionally break bilateral symmetry (chirality).
+const TWIST_MAX = 1.15;         // max cross-section rotation at |twist| = 1 (radians, tip)
+const SKEW_MAX  = 0.7;          // max lateral midrib swing at |skew| = 1 (fraction of W, tip)
+const RELIEF_SIDE_PHASE = 13.7; // edge-noise phase offset applied to the -v side when asymmetric
 
 export function petalHalfWidth(u, P) {
   u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
@@ -110,7 +123,39 @@ export function petalHalfWidth(u, P) {
   // base and tip, so the claw and apex stay anchored while the sides bow.
   const edge = clamp(P.edgeCurve || 0, -1, 1);
   const bulge = 1 + EDGE_CURVE_AMP * edge * Math.sin(Math.PI * u);
-  return Math.max(0, P.W * shape * bulge);
+  let w = P.W * shape * bulge;
+  // CLAW / caryophyllaceous silhouette (Dianthus, Cleome, Capparis): hold a
+  // narrow, near-constant STALK over the basal `clawLength` fraction of the
+  // petal, then WIDEN into the taper blade above — abruptly (high SHOULDER, a
+  // near-step) or gently (low SHOULDER, an hourglass/pandurate dip). The defining
+  // feature is the sharpness of that shoulder, so SHOULDER drives the width of
+  // the transition band, not just its presence. Layered strictly ON TOP of the
+  // taper: `clawLength <= 0` skips the whole block, so w is byte-identical to the
+  // pre-claw taper and every saved design renders exactly as before. The stalk is
+  // a flat neck at `clawWidth` of the blade-width scale W; above the shoulder the
+  // blend returns to the full taper·bulge width, so the blade shape is untouched.
+  const clawLen = clamp(P.clawLength || 0, 0, 0.5);
+  if (clawLen > 0) {
+    const clawW = clamp(P.clawWidth != null ? P.clawWidth : 0.3, 0.05, 0.6);
+    const shoulder = clamp(P.shoulder != null ? P.shoulder : 0.5, 0, 1);
+    const wStalk = P.W * clawW;                       // flat narrow neck half-width
+    const band = lerp(0.16, 0.01, shoulder);          // u-width of the shoulder: 0 -> gentle, 1 -> step
+    const g = smootherstep(clamp((u - clawLen) / band, 0, 1));  // 0 in stalk, 1 in blade
+    w = lerp(wStalk, w, g);
+  }
+  // LOBES: periodic margin cuts along the length — a pinnatifid outline (poppy leaf)
+  // when deep, a serrated margin (rose leaflet) when shallow + frequent. Applied
+  // symmetrically to both sides through the SAME width profile, so the solid blade
+  // grid and its rim both follow the lobes and stay watertight. The cut envelope
+  // vanishes at the base and tip so the blade stays one connected leaf. Off
+  // (P.lobe falsy) leaves the outline exactly as before — petals/sepals unchanged.
+  if (P.lobe) {
+    const c = Math.max(1, Math.round(P.lobeCount || 5));
+    const cut = Math.abs(Math.sin(u * c * Math.PI));      // c lobes along the length
+    const env = Math.sin(Math.PI * u);                    // 0 at base & tip, 1 mid-blade
+    w *= 1 - clamp(P.lobe, 0, 1) * 0.6 * cut * env;       // 0.6 cap keeps a printable neck at each sinus
+  }
+  return Math.max(0, w);
 }
 
 
@@ -294,8 +339,45 @@ function edgeNoiseDisplace(u, v, P) {
   const band = smootherstep(clamp((av - 0.30) / 0.70, 0, 1));   // 0 at mid-rib, 1 at the edge
   if (band <= 1e-6) return 0;
   const freq = lerp(3, 40, clamp(P.edgeNoiseScale || 0, 0, 1)); // broad crinkles -> dense fine ones
-  const n = fbm1D(u * freq) * 0.8 + fbm1D(av * freq * 1.7 + 5) * 0.4;
+  // Bilateral by default (uses |v|, both margins mirror). But once TWIST or SKEW
+  // has made the petal asymmetric, a perfectly mirrored crinkle reads as a render
+  // bug, so we desync the two margins: the -v side gets a phase offset. Gated on
+  // asymmetry so symmetric petals stay byte-identical.
+  const asym = (P.petalTwist || P.petalSkew) ? (v < 0 ? RELIEF_SIDE_PHASE : 0) : 0;
+  const n = fbm1D(u * freq + asym) * 0.8 + fbm1D(av * freq * 1.7 + 5 + asym) * 0.4;
   return amt * EDGE_NOISE_AMP * band * n;
+}
+
+/* SURFACE RELIEF displacement at (u, v): a scalar out-of-plane lift, added to the
+   cup lift along the spine normal (like edge noise), faded to 0 at the base and
+   tip so the ends stay anchored and the apex — where halfWidth -> 0 — never pinches.
+     RADIAL     ribs aligned to the flow field T (getPetalFields): the phase runs
+                ACROSS T, so crest lines follow T and converge at the base — genuine
+                radial ribs from the base (iris / gentian). Uses a local linearisation
+                of T (exact where T is locally straight; bends with the fan elsewhere).
+     TRANSVERSE crests across the width, spaced along the length (u).
+     IRREGULAR  fbm lumps in both directions (bullate / rugose).
+   All three add ZERO triangles — they only displace existing vertices. */
+function reliefDisplace(u, v, P, hw) {
+  const amp = P.reliefAmp || 0;
+  if (amp <= 1e-4) return 0;
+  const uu = clamp(u, 0, 1);
+  const fade = Math.sin(Math.PI * uu);            // 0 at base & tip, 1 mid-blade
+  if (fade <= 1e-6) return 0;
+  const ribs = lerp(RELIEF_RIBS_MIN, RELIEF_RIBS_MAX, clamp(P.reliefFreq != null ? P.reliefFreq : 0.5, 0, 1));
+  const mode = P.reliefMode || 'radial';
+  let wave;
+  if (mode === 'transverse') {
+    wave = Math.sin(uu * ribs * Math.PI);
+  } else if (mode === 'irregular') {
+    const f = ribs * 0.6;
+    wave = fbm1D(uu * f) + fbm1D((v * 0.5 + 0.5) * f * 1.3 + 11);   // ~[-1.2, 1.2] bullate
+  } else { // radial — aligned to T
+    const s = getPetalFields(P).sample(P.L * uu, v * hw);
+    const perp = (-s.Ty * (P.L * uu) + s.Tx * (v * hw)) / P.L;      // coordinate ACROSS T
+    wave = Math.sin(perp * ribs * Math.PI);
+  }
+  return amp * RELIEF_AMP_MAX * fade * wave;
 }
 
 export function surfacePoint(u, v, P, spine) {
@@ -322,10 +404,28 @@ export function surfacePoint(u, v, P, spine) {
   // EDGE NOISE: organic crinkle on top of ANY tip style (adds to the ruffle when
   // both are on). 0 leaves the surface untouched.
   if (P.edgeNoise) normalLift += edgeNoiseDisplace(u, v, P);
+  // SURFACE RELIEF: corrugation on the same axis as the cup lift.
+  if (P.reliefAmp) normalLift += reliefDisplace(u, v, P, hw);
+  // The cross-section spans two axes: `lift` along the spine normal (nx, ny) and
+  // `across` along the width (world z). TWIST rotates that section about the midrib
+  // tangent, progressively from base to tip; SKEW swings the whole section sideways
+  // (a lateral midrib bend). Both break bilateral symmetry on purpose. With twist =
+  // skew = 0 this is exactly `z = v*hw + dz` and `lift = normalLift` — an exact no-op.
+  let lift = normalLift;
+  let across = v * hw + dz;
+  const tw = P.petalTwist || 0;
+  if (tw) {
+    const th = tw * TWIST_MAX * smootherstep(clamp(u, 0, 1));
+    const c = Math.cos(th), s = Math.sin(th);
+    const nl = lift * c - across * s;
+    across = lift * s + across * c;
+    lift = nl;
+  }
+  if (P.petalSkew) across += P.petalSkew * SKEW_MAX * P.W * smootherstep(clamp(u, 0, 1));
   return {
-    x: sp.s + sp.nx * normalLift,
-    y: sp.y + sp.ny * normalLift,
-    z: v * hw + dz,
+    x: sp.s + sp.nx * lift,
+    y: sp.y + sp.ny * lift,
+    z: across,
   };
 }
 
@@ -367,6 +467,18 @@ export function placePoint(p, az, baseHeight, radialOffset = 0, tilt = 0) {
    ------------------------------------------------------------------- */
 
 export function buildSilhouette(P, n = 56) {
+  // LOBED / CLEFT: the outline is the marching-squares contour of the material
+  // mask (a single re-entrant loop weaving up each lobe and down each cleft).
+  // Off (cleftDepth <= 0) falls through to the exact analytic ±w(u) loop below.
+  const cc = getCleftContour(P);
+  if (cc && cc.loops.length) {
+    // Match the analytic outline's winding (clockwise / negative shoelace area) so
+    // every downstream orientation convention — rim tube, Voronoi cell rings, blade
+    // top/bottom faces — stays consistent (outward normals, positive solid volume).
+    let outer = cc.loops[0];
+    if (polyArea(outer) > 0) outer = outer.slice().reverse();
+    return outer;
+  }
   const right = [];
   const left = [];
   for (let i = 0; i <= n; i++) {
@@ -382,6 +494,311 @@ export function buildSilhouette(P, n = 56) {
   for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
   // drop duplicate/degenerate points at the tip (hw -> 0) and base
   return dedupePolygon(outline);
+}
+
+/* -------------------------------------------------------------------
+   4a. THE MARGIN RIB — the ONE curve every infill pattern must register
+   against, shared with the actual tube the rib renders as.
+
+   Previously every infill pattern invented its own clip boundary — a
+   constant inward offset (Voronoi), a constant field-distance threshold
+   (Growth), zero inset (Veins termination, Strands), a proportional cap
+   (Lattice) — none of them derived from where the rib tube actually sits.
+   Under CONTINUOUS MARGIN (the Standard default) the rib isn't even a
+   constant-radius hoop on the true outline: it's a tapered strand (fat at
+   the base, thin at the tip) that itself bundles toward the axis near the
+   foot instead of riding the outline at all (see marginStrands). A fixed
+   inset can't track that, which is exactly why the gap varied around the
+   perimeter and the rib crossed over the infill near the base.
+
+   These functions are the single source of truth for the rib's geometry.
+   marginStrands() (flower.js) — what actually gets lofted into a tube —
+   calls ribCenterline() below rather than re-deriving the flare curve, so
+   the rendered rib and the boundary every infill clips to CANNOT diverge:
+   it's the same function, not a second copy that happens to agree today.
+   ------------------------------------------------------------------- */
+
+// The bundle/flare smoothstep: 0 (on-axis, bundled with the midrib) near
+// the foot, ramping to 1 (exactly on the true outline) by `flareEnd`. Used
+// by marginStrands (flower.js) to place the rib's own centerline, and by
+// ribCenterline below for the boundary — the identical curve both places.
+export function marginFlareFactor(u, bundleTight, flareRate) {
+  const bt = clamp(bundleTight != null ? bundleTight : 0.5, 0, 1);
+  const fr = clamp(flareRate != null ? flareRate : 0.5, 0, 1);
+  const flareStart = lerp(0.02, 0.20, bt);
+  const flareEnd = Math.min(0.96, flareStart + lerp(0.55, 0.12, fr));
+  const t = clamp((u - flareStart) / ((flareEnd - flareStart) || 1e-6), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+// Rim-hoop line weight (non-continuous-margin) and the continuous-margin
+// strand's base/tip radii. Canonical here; flower.js imports these instead
+// of keeping its own copies, so the render and the boundary check can never
+// drift apart by editing one and forgetting the other.
+export const RIM_WIDTH = 0.34;      // constant hoop radius, relative to tubeRadius
+export const MARGIN_W_BASE = 0.62;  // continuous-margin strand radius at the foot
+export const MARGIN_W_TIP = 0.12;   // continuous-margin strand radius at the tip
+
+// The rib's physical tube radius at u — exactly what addTube renders it at
+// (continuous margin: linear taper base->tip; otherwise: the constant hoop
+// radius). Approximation note: addTube tapers linearly by ARC LENGTH along
+// the strand, this taper is linear in u; the two differ only inside the
+// base bundle/flare transition (see marginFlareFactor), where the strand's
+// arc-length-to-u relationship is non-linear. Negligible outside that band.
+export function ribRadius(u, P, contMargin) {
+  const gThick = clamp(P.thickScale != null ? P.thickScale : 1, 0.4, 2.5);
+  if (!contMargin) return P.tubeRadius * RIM_WIDTH * gThick;
+  return lerp(P.tubeRadius * MARGIN_W_BASE, P.tubeRadius * MARGIN_W_TIP, clamp(u, 0, 1)) * gThick;
+}
+
+// Where the rib's tube is CENTRED at u, before subtracting its own radius:
+// the true outline under a constant-radius hoop, or the bundled/flared
+// strand curve under continuous margin — the exact curve marginStrands
+// plots (flower.js calls this function directly for that purpose).
+export function ribCenterline(u, P, contMargin) {
+  const hw = petalHalfWidth(clamp(u, 0, 1), P);
+  if (!contMargin) return hw;
+  return hw * marginFlareFactor(u, P.bundleTightness, P.flareRate);
+}
+
+// THE inner edge of the rib as actually drawn: every infill pattern should
+// terminate flush against this, by construction, not by coincidence. Floored
+// at 0 (the axis) — near the foot, under continuous margin, the bundled
+// strand's centerline can sit closer to the axis than its own radius.
+export function ribInnerEdge(u, P) {
+  const contMargin = !!P.continuousMargin && !P.solidBlade;
+  return Math.max(0, ribCenterline(u, P, contMargin) - ribRadius(u, P, contMargin));
+}
+
+// A closed polyline tracing ribInnerEdge(u) on both sides, same format as
+// buildSilhouette (base(+Y) -> tip -> base(-Y)) — for callers that need a
+// clip polygon or a termination target (Voronoi's cell clip, terminateEdges'
+// rim) rather than a pointwise half-width test.
+export function ribMarginPolyline(P, n = 56) {
+  const right = [], left = [];
+  for (let i = 0; i <= n; i++) {
+    const u = i / n, X = P.L * u, r = ribInnerEdge(u, P);
+    right.push({ x: X, y: r });
+    left.push({ x: X, y: -r });
+  }
+  const outline = [];
+  for (let i = 0; i < right.length; i++) outline.push(right[i]);
+  for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
+  return dedupePolygon(outline);
+}
+
+/* -------------------------------------------------------------------
+   4b. LOBED / CLEFT petals — a GENERIC scalar mask + marching squares.
+
+   The whole pipeline elsewhere assumes one span of material per height,
+   v in [-w(u), +w(u)]. A cleft petal (Silene, Dianthus superbus) breaks that:
+   a bifid petal has TWO spans with a gap on the midline. That is topological,
+   not an amplitude — so we stop describing the boundary as a function w(u) and
+   describe the MATERIAL as a scalar field m(x, y) > 0, then recover the outline
+   by marching squares. This machinery is deliberately generic: the mask is any
+   scalar field, so the later fused-corolla work unions petal envelopes through
+   the SAME contourer and the SAME masked-blade triangulator, written once.
+
+   m(x, y) = min( envelope , min_k cleftGap_k ):
+     envelope  = w(u) - |y|                        (>0 inside the smooth outline)
+     cleftGap  = signed distance outside a cleft slot: a wedge from a ROUNDED
+                 sinus floor at u = 1 - cleftDepth up to (past) the tip, flaring
+                 wider toward the tip as cleft depth rises so deep lobes come to
+                 points (the "antlers not doily" guard rail).
+   Clefts never pass u = 0.4 (depth capped at 0.6), so the petal stays one piece
+   joined at the base and the 0-contour is a single closed re-entrant loop. When
+   cleftDepth <= 0 none of this runs and the analytic path above is used verbatim
+   (byte-identical), so lobing costs nothing until a petal actually has clefts.
+   ------------------------------------------------------------------- */
+
+const CLEFT_DEPTH_MAX = 0.6;
+const LOBE_MIN = 2, LOBE_MAX = 7;
+
+// Bisect the mask 0-crossing between an inside point a and outside point b.
+function maskCrossing(a, b, P, cfg) {
+  let lo = a, hi = b;
+  for (let it = 0; it < 12; it++) {
+    const m = { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+    if (petalMask(m.x, m.y, P, cfg) > 0) lo = m; else hi = m;
+  }
+  return { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+}
+
+/* Clip tube-infill polylines (veins / bone / space-colonization / strands) to the
+   material mask, so no strut crosses a cleft. Generic: every infill returns
+   { veins:[{points,w0,w1,rad}], nodes }, so one pass handles them all. Each
+   polyline is split into the runs that stay inside the mask, with a boundary point
+   inserted at each crossing (so a vein ends exactly on the cleft edge, ready for
+   edge termination to capture it onto the margin rib). A clipped ribbon is still a
+   sealed solid, so watertightness is unaffected. Off (cfg null) returns the input. */
+export function clipVeinsToMask(veins, P, cfg) {
+  if (!cfg || !veins) return veins;
+  const out = [];
+  for (const v of veins) {
+    const pts = v.points;
+    if (!pts || pts.length < 2) continue;
+    const n = pts.length;
+    const w0 = v.w0 != null ? v.w0 : 1, w1 = v.w1 != null ? v.w1 : w0;
+    const wAt = (i) => (n <= 1 ? w0 : lerp(w0, w1, i / (n - 1)));
+    let run = [], rw = [];
+    const flush = () => {
+      if (run.length >= 2) out.push({ points: run, w0: rw[0], w1: rw[rw.length - 1], rad: v.rad });
+      run = []; rw = [];
+    };
+    let prevIn = null;
+    for (let i = 0; i < n; i++) {
+      const p = pts[i];
+      const inside = petalMask(p.x, p.y, P, cfg) > 0;
+      if (inside) {
+        if (prevIn === false) { const c = maskCrossing(p, pts[i - 1], P, cfg); run.push(c); rw.push(wAt(i)); }
+        run.push(p); rw.push(wAt(i));
+      } else {
+        if (prevIn === true) { const c = maskCrossing(pts[i - 1], p, P, cfg); run.push(c); rw.push(wAt(i - 1)); flush(); }
+      }
+      prevIn = inside;
+    }
+    flush();
+  }
+  return out;
+}
+
+// Resolved cleft geometry (with the guard rails baked in), or null when off.
+export function cleftConfig(P) {
+  const depth = clamp(P.cleftDepth || 0, 0, CLEFT_DEPTH_MAX);
+  if (depth <= 1e-4) return null;
+  const count = Math.round(clamp(P.cleftLobes || 2, LOBE_MIN, LOBE_MAX));   // 2..7 lobes
+  const width = clamp(P.cleftWidth != null ? P.cleftWidth : 0.3, 0.05, 1);
+  // widest half-width (clefts are placed relative to the blade width).
+  let Wpeak = 1e-4;
+  for (let i = 0; i <= 32; i++) { const w = petalHalfWidth(i / 32, P); if (w > Wpeak) Wpeak = w; }
+  const lobePitch = (2 * Wpeak) / count;                 // width budget per lobe
+  const halfW0 = clamp(width * lobePitch * 0.45, 0.02, lobePitch * 0.46);   // slot half-width at the floor
+  const uFloor = 1 - depth;
+  // n-1 cleft centres, spread across the width, bilaterally symmetric.
+  const centers = [];
+  for (let k = 1; k < count; k++) centers.push(Wpeak * (-1 + (2 * k) / count));
+  // Guard rail: lobe tips pointed at high cleft depth. Flare (slot widening toward
+  // the tip) grows with both `tip` (a pointed tip => pointed lobes) and cleft depth
+  // (deep => forced pointed regardless of tip).
+  const tip = clamp(P.tip != null ? P.tip : 0.5, 0, 1);
+  const depthNorm = depth / CLEFT_DEPTH_MAX;
+  const flare = lerp(lerp(0.15, 1.1, tip), 2.6, depthNorm);
+  return { depth, count, centers, halfW0, uFloor, flare, Wpeak, L: Math.max(P.L, 1e-4) };
+}
+
+// Signed "outside this cleft slot" distance: >0 kept, <0 removed.
+function cleftGap(x, y, c, cfg) {
+  const dy = Math.abs(y - c);
+  const xFloor = cfg.uFloor * cfg.L;
+  if (x <= xFloor) return Math.hypot(xFloor - x, dy) - cfg.halfW0;   // rounded sinus floor
+  const t = clamp((x - xFloor) / Math.max(cfg.L * 1.05 - xFloor, 1e-6), 0, 1);
+  const hwSlot = cfg.halfW0 * (1 + cfg.flare * t);                    // wedge, wide toward the tip
+  return dy - hwSlot;
+}
+
+// The material mask in flattened (x = L*u, y = lateral) space. >0 inside material.
+export function petalMask(x, y, P, cfg) {
+  const u = x / Math.max(P.L, 1e-4);
+  let m = petalHalfWidth(clamp(u, 0, 1), P) - Math.abs(y);   // envelope
+  if (u < 0) m = Math.min(m, x);                             // base edge
+  if (u > 1) m = Math.min(m, P.L - x);                       // tip edge
+  if (cfg) for (const c of cfg.centers) { const g = cleftGap(x, y, c, cfg); if (g < m) m = g; }
+  return m;
+}
+
+// Marching squares over the flattened bbox -> ordered closed loop(s) of the
+// m = 0 contour. Returns loops as arrays of {x, y}. For cleft petals (one
+// connected region) this is a single re-entrant loop; the generic multi-loop
+// return is what the fused-corolla work will use.
+export function maskContours(P, cfg, nu = 160) {
+  const L = Math.max(P.L, 1e-4);
+  let Wmax = 1e-4;
+  for (let i = 0; i <= 64; i++) { const w = petalHalfWidth(i / 64, P); if (w > Wmax) Wmax = w; }
+  const padY = Wmax * 0.08 + L / nu;
+  const y0 = -Wmax - padY, y1 = Wmax + padY;
+  const x0 = -L / nu, x1 = L + L / nu;
+  const dx = (x1 - x0) / nu;
+  const nv = Math.max(8, Math.round((y1 - y0) / dx));
+  const dy = (y1 - y0) / nv;
+  const gx = (i) => x0 + i * dx, gy = (j) => y0 + j * dy;
+  // sample m on the (nu+1) x (nv+1) lattice
+  const val = new Float64Array((nu + 1) * (nv + 1));
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) val[j * (nu + 1) + i] = petalMask(gx(i), gy(j), P, cfg);
+  const V = (i, j) => val[j * (nu + 1) + i];
+  // interpolated zero-crossing on a cell edge between corners a (va) and b (vb)
+  const lerpEdge = (xa, ya, va, xb, yb, vb) => {
+    const t = va / (va - vb);
+    return { x: xa + (xb - xa) * t, y: ya + (yb - ya) * t };
+  };
+  const segs = [];
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+    const x0c = gx(i), x1c = gx(i + 1), y0c = gy(j), y1c = gy(j + 1);
+    const v00 = V(i, j), v10 = V(i + 1, j), v11 = V(i + 1, j + 1), v01 = V(i, j + 1);
+    let code = 0;
+    if (v00 > 0) code |= 1; if (v10 > 0) code |= 2; if (v11 > 0) code |= 4; if (v01 > 0) code |= 8;
+    if (code === 0 || code === 15) continue;
+    // edge midpoints (interpolated): bottom, right, top, left
+    const eB = () => lerpEdge(x0c, y0c, v00, x1c, y0c, v10);
+    const eR = () => lerpEdge(x1c, y0c, v10, x1c, y1c, v11);
+    const eT = () => lerpEdge(x1c, y1c, v11, x0c, y1c, v01);
+    const eL = () => lerpEdge(x0c, y1c, v01, x0c, y0c, v00);
+    const push = (a, b) => segs.push([a, b]);
+    switch (code) {
+      case 1: case 14: push(eL(), eB()); break;
+      case 2: case 13: push(eB(), eR()); break;
+      case 3: case 12: push(eL(), eR()); break;
+      case 4: case 11: push(eR(), eT()); break;
+      case 6: case 9:  push(eB(), eT()); break;
+      case 7: case 8:  push(eT(), eL()); break;
+      case 5:  push(eL(), eT()); push(eB(), eR()); break;   // saddle
+      case 10: push(eL(), eB()); push(eR(), eT()); break;   // saddle
+    }
+  }
+  // Stitch segments into ordered loops by endpoint welding. Adjacency stores segment
+  // INDICES (not references), so the walk is O(1) per step -> O(n) overall (an earlier
+  // segs.indexOf here made it O(n^2) and stalled fringed petals).
+  const key = (p) => `${Math.round(p.x / (dx * 0.25))}_${Math.round(p.y / (dy * 0.25))}`;
+  const adj = new Map();
+  const add = (k, si, endIsA) => { if (!adj.has(k)) adj.set(k, []); adj.get(k).push({ si, endIsA }); };
+  for (let si = 0; si < segs.length; si++) { add(key(segs[si][0]), si, true); add(key(segs[si][1]), si, false); }
+  const used = new Uint8Array(segs.length);
+  const loops = [];
+  for (let start = 0; start < segs.length; start++) {
+    if (used[start]) continue;
+    const loop = [];
+    let curIdx = start, fromA = true;
+    while (curIdx >= 0 && !used[curIdx]) {
+      used[curIdx] = 1;
+      const cur = segs[curIdx];
+      const a = fromA ? cur[0] : cur[1], b = fromA ? cur[1] : cur[0];
+      loop.push(a);
+      const nbrs = adj.get(key(b)) || [];
+      let nextIdx = -1, nextFromA = true;
+      for (const e of nbrs) { if (!used[e.si]) { nextIdx = e.si; nextFromA = e.endIsA; break; } }
+      curIdx = nextIdx; fromA = nextFromA;
+    }
+    if (loop.length >= 3) loops.push(dedupePolygon(loop));
+  }
+  loops.sort((a, b) => Math.abs(polyArea(b)) - Math.abs(polyArea(a)));
+  return loops;
+}
+
+// Memoized contour + config accessor, so a multi-petal whorl of the same shape
+// solves the mask/marching-squares once, not per petal (buildSilhouette, the field
+// solve, and the vein clip all share it). Keyed on the outline params.
+const _cleftCache = new Map();
+export function getCleftContour(P) {
+  const cfg = cleftConfig(P);
+  if (!cfg) return null;
+  const k = [P.L, P.W, P.taper, P.tip, P.edgeCurve, P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0].join('|');
+  let v = _cleftCache.get(k);
+  if (!v) {
+    v = { cfg, loops: maskContours(P, cfg, 200) };
+    _cleftCache.set(k, v);
+    if (_cleftCache.size > 24) _cleftCache.delete(_cleftCache.keys().next().value);
+  }
+  return v;
 }
 
 /* Solid blade — a filled lamina spanning the whole silhouette, sampled as a
@@ -426,6 +843,292 @@ function dedupePolygon(poly) {
 
 
 /* -------------------------------------------------------------------
+   4b. Per-petal scalar / vector FIELDS (s, d, T) — shared infill scaffolding.
+
+   Computed ONCE per petal SHAPE in the flattened {x, y} layout space every
+   infill generator already works in (x = arc length = L*u, y = lateral). This
+   is prep only — nothing consumes these yet, so output is unchanged.
+
+     s(p)  0 at base -> 1 at tip. s = x / L. The spine is constant-speed
+           (|dP/du| = L), so x is already arc length and s is the normalized arc
+           position with no inversion. Monotone; for thresholds / taper weighting.
+     d(p)  0 on the outline -> 1 at the deepest interior point. Distance to the
+           SMOOTH width envelope (petalHalfWidth: taper/tip/edgeCurve/lobe), via a
+           dependency-free jump-flooding feature transform, normalized by the
+           petal's own max interior depth.
+     T(p)  a flow that fans with the shape — parallel to the midrib on the
+           centerline, tangent to the margin near the edge. Built ANALYTICALLY
+           from the outline slope at the SAME u (see petalFlowDirection), NOT from
+           a nearest-boundary-point search: nearest-point tangent is degenerate on
+           the midrib near the base (nearest point is the base edge) and flips
+           sides across the centerline, which produced a dead patch + a seam. The
+           analytic form is seam-free and exactly (0,1) on the midrib at every u.
+           Deliberately NOT grad(s). If a globally smooth field is ever wanted the
+           principled upgrade is a Laplace solve for a separate scalar h (Dirichlet
+           h=0 base / h=1 tip, Neumann no-flux on the side margins), T =
+           normalize(grad h) — Jacobi on this same grid, no dependency. Not built.
+
+   Square grid resolved finer than the finest infill feature; bilinear sample().
+   The SMOOTH envelope polyline is returned too; the ACTUAL serrated/ruffled rim
+   is kept per-petal by the render layer (tooth positions are load-bearing for the
+   later craspedodromous termination — they must snap to real rib geometry, not a
+   d threshold).
+   ------------------------------------------------------------------- */
+
+const FIELD_LONG_AXIS = 512;      // grid cells along the petal length (square cells)
+const FIELD_MAX_LAT   = 384;      // cap on cells across the width
+
+// Analytic flow direction T at a flattened point (x = L*u longitudinal, y = v
+// lateral). Returns a unit {tx, ty} in that SAME (x, y) frame — tx along the
+// midrib (+x, tip-ward), ty lateral. Derived from the outline slope dW/du at u
+// and signed by side; no nearest-point search, so it is seam-free and exactly
+// midrib-aligned on the centerline. Verified properties (see tools/test-petal-flow.mjs):
+//   - v = 0        -> exactly (tx,ty) = (1,0) at every u (midrib; no seam/patch)
+//   - slope > 0    -> off-midrib arrows fan outward (below the widest point)
+//   - slope = 0    -> (1,0) everywhere (vertical at the widest point)
+//   - slope < 0    -> off-midrib arrows converge toward the tip (above it)
+//   - T(-v,u) is the exact mirror of T(v,u)
+export function petalFlowDirection(v, u, P) {
+  const uu = clamp(u, 0, 1);
+  const w = petalHalfWidth(uu, P);
+  if (w < 1e-6) return { tx: 1, ty: 0 };            // degenerate width -> midrib
+  const frac = clamp(Math.abs(v) / w, 0, 1);         // 0 midrib -> 1 margin
+  const sgn = v < 0 ? -1 : 1;
+  // analytic outline slope d(petalHalfWidth)/du at u (central diff on the analytic
+  // envelope), clamped: halfWidth has near-infinite slope as u->0, and without the
+  // clamp the bottom rows would go horizontal.
+  const hh = 1e-3;
+  let uA = uu - hh, uB = uu + hh, denom = 2 * hh;
+  if (uA < 0) { uA = 0; denom = uB - uA; }
+  if (uB > 1) { uB = 1; denom = uB - uA; }
+  let slope = denom > 1e-9 ? (petalHalfWidth(uB, P) - petalHalfWidth(uA, P)) / denom : 0;
+  slope = clamp(slope, -3, 3);
+  // marginDir in (lateral a, longitudinal b), normalized; midrib is (0, 1)
+  let ma = sgn * slope, mb = 1;
+  const ml = Math.hypot(ma, mb) || 1; ma /= ml; mb /= ml;
+  const k = Math.pow(frac, 1.4);
+  const a = lerp(0, ma, k);                           // lateral component
+  const b = lerp(1, mb, k);                           // longitudinal component
+  const l = Math.hypot(a, b) || 1;
+  return { tx: b / l, ty: a / l };                    // (longitudinal, lateral)
+}
+
+/* Laplace flow field for LOBED petals (dependency the analytic T stub named at
+   ~L550). A lobed petal has no single w(u), so the analytic outline-slope T is
+   undefined — instead solve a harmonic scalar h on the material mask:
+     Dirichlet  h = 0 on the base edge, h = 1 on every lobe tip;
+     Neumann    no-flux on every side boundary, INCLUDING cleft walls (enforced by
+                relaxing only inside cells against inside neighbours);
+     T = normalize(grad h)  -> fans up each lobe independently, tangent along the
+                              cleft walls. SOR on a coarse grid (h is smooth), then
+                              bilinearly sampled. Built only when clefts are present. */
+function solveLaplaceT(P, cfg) {
+  const L = Math.max(P.L, 1e-4);
+  let Wmax = 1e-4;
+  for (let i = 0; i <= 64; i++) { const w = petalHalfWidth(i / 64, P); if (w > Wmax) Wmax = w; }
+  const NX = 150;
+  const dx = L / (NX - 1);
+  const NY = Math.max(12, Math.round((2 * Wmax) / dx) + 1);
+  const dy = (2 * Wmax) / (NY - 1);
+  const N = NX * NY;
+  const X = (i) => i * dx, Y = (j) => -Wmax + j * dy;
+  const inside = new Uint8Array(N), fixed = new Uint8Array(N);
+  const h = new Float64Array(N);
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const k = j * NX + i, x = X(i), y = Y(j);
+    if (petalMask(x, y, P, cfg) > 0) {
+      inside[k] = 1;
+      const u = x / L;
+      if (u <= 0.02) { fixed[k] = 1; h[k] = 0; }
+      else if (u >= 0.985) { fixed[k] = 1; h[k] = 1; }
+      else h[k] = u;                                   // initial guess
+    }
+  }
+  const omega = 1.85;
+  for (let it = 0; it < 800; it++) {
+    let maxd = 0;
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+      const k = j * NX + i;
+      if (!inside[k] || fixed[k]) continue;
+      const hc = h[k];
+      const nR = (i + 1 < NX && inside[k + 1]) ? h[k + 1] : hc;      // Neumann: mirror -> zero flux
+      const nL = (i - 1 >= 0 && inside[k - 1]) ? h[k - 1] : hc;
+      const nU = (j + 1 < NY && inside[k + NX]) ? h[k + NX] : hc;
+      const nD = (j - 1 >= 0 && inside[k - NX]) ? h[k - NX] : hc;
+      const nv = hc + omega * ((nR + nL + nU + nD) / 4 - hc);
+      const d = Math.abs(nv - hc); if (d > maxd) maxd = d;
+      h[k] = nv;
+    }
+    if (maxd < 1e-5) break;
+  }
+  const hAt = (i, j) => { const k = j * NX + i; return inside[k] ? h[k] : null; };
+  return {
+    sample(x, y) {
+      const fi = clamp(x / dx, 0, NX - 1.001), fj = clamp((y + Wmax) / dy, 0, NY - 1.001);
+      const i0 = Math.floor(fi), j0 = Math.floor(fj);
+      const hc = hAt(i0, j0);
+      const c = hc != null ? hc : (x / L);
+      const gx = ((hAt(Math.min(i0 + 1, NX - 1), j0) ?? c) - (hAt(Math.max(i0 - 1, 0), j0) ?? c)) / (2 * dx);
+      const gy = ((hAt(i0, Math.min(j0 + 1, NY - 1)) ?? c) - (hAt(i0, Math.max(j0 - 1, 0)) ?? c)) / (2 * dy);
+      const l = Math.hypot(gx, gy) || 1;
+      return { tx: gx / l, ty: gy / l };
+    },
+  };
+}
+
+export function computePetalFields(P) {
+  const L = Math.max(P.L, 1e-4);
+  const cc = getCleftContour(P);              // LOBED: mask-aware inside / d / T when present
+  const cfg = cc ? cc.cfg : null;
+  const lap = cfg ? solveLaplaceT(P, cfg) : null;
+  const cleftLoop = cc ? (cc.loops[0] || null) : null;
+  const NU = 256;                                   // envelope / boundary sampling
+  const env = [];                                   // smooth +Y envelope, base->tip
+  let Wmax = 1e-4;
+  for (let i = 0; i <= NU; i++) {
+    const u = i / NU;
+    const hw = petalHalfWidth(u, P);
+    if (hw > Wmax) Wmax = hw;
+    env.push({ x: L * u, y: hw });
+  }
+  // Boundary SITES for the d distance transform: the two side margins plus the
+  // base edge. Positions only — T no longer uses a nearest-boundary tangent, so
+  // the sites carry no tangent data.
+  const sx = [], sy = [];
+  const pushSite = (x, y) => { sx.push(x); sy.push(y); };
+  if (cleftLoop) {
+    // LOBED: the true material boundary (margins + base + every cleft wall) is the
+    // mask contour, so d measures distance to the nearest lobe/cleft edge.
+    for (const p of cleftLoop) pushSite(p.x, p.y);
+  } else {
+    for (let i = 0; i <= NU; i++) {
+      pushSite(env[i].x,  env[i].y);   // +Y margin
+      pushSite(env[i].x, -env[i].y);   // -Y margin (mirror)
+    }
+    const hw0 = petalHalfWidth(0, P);
+    for (let j = 0; j <= 24; j++) pushSite(0, lerp(-hw0, hw0, j / 24));  // base edge
+  }
+
+  // Square grid over the flattened bbox [0,L] x [-Wmax,+Wmax] (+ 1-cell pad).
+  const h = L / FIELD_LONG_AXIS;
+  const x0 = -h, y0 = -(Wmax + h);
+  const NX = FIELD_LONG_AXIS + 2;
+  const NY = Math.min(FIELD_MAX_LAT, Math.max(8, Math.round((2 * (Wmax + h)) / h) + 1));
+  const N = NX * NY;
+  const cellX = (i) => x0 + (i + 0.5) * h;
+  const cellY = (j) => y0 + (j + 0.5) * ((2 * (Wmax + h)) / (NY - 1));   // span the padded height
+  const dyc = (2 * (Wmax + h)) / (NY - 1);
+
+  // inside mask: within the length and under the smooth envelope
+  const inside = new Uint8Array(N);
+  for (let j = 0; j < NY; j++) {
+    const y = cellY(j);
+    for (let i = 0; i < NX; i++) {
+      const x = cellX(i);
+      const u = x / L;
+      inside[j * NX + i] = cfg
+        ? (petalMask(x, y, P, cfg) > 0 ? 1 : 0)                        // LOBED: mask
+        : ((u >= 0 && u <= 1 && Math.abs(y) <= petalHalfWidth(clamp(u, 0, 1), P)) ? 1 : 0);
+    }
+  }
+
+  // Jump-flooding feature transform: each cell adopts the nearest boundary site.
+  // seed[k] = index into the site arrays for the nearest boundary; -1 = unset.
+  const seed = new Int32Array(N).fill(-1);
+  const seedD2 = new Float64Array(N).fill(Infinity);
+  const stamp = (i, j, siteIdx) => {
+    if (i < 0 || i >= NX || j < 0 || j >= NY) return;
+    const k = j * NX + i;
+    const dx = cellX(i) - sx[siteIdx], dy = cellY(j) - sy[siteIdx];
+    const dd = dx * dx + dy * dy;
+    if (dd < seedD2[k]) { seedD2[k] = dd; seed[k] = siteIdx; }
+  };
+  for (let s = 0; s < sx.length; s++) {
+    const i = Math.round((sx[s] - x0) / h - 0.5);
+    const j = Math.round((sy[s] - y0) / dyc - 0.5);
+    stamp(i, j, s);
+  }
+  let step = 1; while (step < Math.max(NX, NY)) step <<= 1; step >>= 1;
+  for (; step >= 1; step >>= 1) {
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const s0 = seed[j * NX + i];
+        if (s0 < 0) continue;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          stamp(i + ox * step, j + oy * step, s0);
+        }
+      }
+    }
+  }
+
+  // Fields. s = normalized arc position; d = distance to the smooth envelope,
+  // normalized by the max interior depth; T = the analytic outline-slope flow
+  // (petalFlowDirection), defined everywhere so the bilinear sampler stays smooth
+  // across the boundary.
+  const sArr = new Float32Array(N), dArr = new Float32Array(N);
+  const txArr = new Float32Array(N), tyArr = new Float32Array(N);
+  let dMax = 1e-6;
+  for (let k = 0; k < N; k++) if (inside[k] && seed[k] >= 0) { const dd = Math.sqrt(seedD2[k]); if (dd > dMax) dMax = dd; }
+  for (let j = 0; j < NY; j++) {
+    for (let i = 0; i < NX; i++) {
+      const k = j * NX + i;
+      const x = cellX(i), y = cellY(j);
+      sArr[k] = clamp(x / L, 0, 1);
+      // T: analytic outline-slope for a plain petal; the Laplace solve for a lobed
+      // one (the analytic form needs a single w(u), which a lobed petal lacks).
+      const t = lap ? lap.sample(x, y) : petalFlowDirection(y, x / L, P);
+      txArr[k] = t.tx; tyArr[k] = t.ty;
+      dArr[k] = (!inside[k] || seed[k] < 0) ? 0 : clamp(Math.sqrt(seedD2[k]) / dMax, 0, 1);
+    }
+  }
+
+  const meta = { L, x0, y0, h, dyc, NX, NY, Wmax };
+  const at = (arr, x, y) => {
+    // bilinear sample in grid space (clamped to the grid)
+    const fx = clamp((x - x0) / h - 0.5, 0, NX - 1.001);
+    const fy = clamp((y - y0) / dyc - 0.5, 0, NY - 1.001);
+    const i0 = Math.floor(fx), j0 = Math.floor(fy), tx = fx - i0, ty = fy - j0;
+    const a = arr[j0 * NX + i0], b = arr[j0 * NX + i0 + 1];
+    const c = arr[(j0 + 1) * NX + i0], e = arr[(j0 + 1) * NX + i0 + 1];
+    return lerp(lerp(a, b, tx), lerp(c, e, tx), ty);
+  };
+  const sample = (x, y) => {
+    const vx = at(txArr, x, y), vy = at(tyArr, x, y);
+    const l = Math.hypot(vx, vy) || 1;
+    return { s: at(sArr, x, y), d: at(dArr, x, y), Tx: vx / l, Ty: vy / l };
+  };
+  // full smooth outline polyline (base +Y edge -> tip -> back down -Y edge)
+  const envelope = env.map((p) => ({ x: p.x, y: p.y })).concat(env.slice().reverse().map((p) => ({ x: p.x, y: -p.y })));
+  return { meta, s: sArr, d: dArr, tx: txArr, ty: tyArr, envelope, sample };
+}
+
+// Memoized per-shape accessor. Key = the OUTLINE params the flattened fields
+// depend on, plus the SURFACE-deformation params (per the invalidation spec: the
+// fields recompute when the outline OR surface deforms) — and NEVER any infill
+// param, so fiddling infill sliders reuses the cached fields.
+const _fieldCache = new Map();
+const FIELD_CACHE_MAX = 24;
+export function getPetalFields(P) {
+  const k = [
+    P.L, P.W, P.taper, P.tip, P.edgeCurve, P.lobe || 0, P.lobeCount || 0,      // outline
+    P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,                       // outline (claw)
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0,                    // outline (lobed/cleft)
+    P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,                       // surface
+    P.tipStyle, P.tipLength || 0, P.tipFrequency || 0,                          // ruffle (surface)
+    P.edgeNoise || 0, P.edgeNoiseScale || 0,
+  ].join('|');
+  let f = _fieldCache.get(k);
+  if (!f) {
+    f = computePetalFields(P);
+    _fieldCache.set(k, f);
+    if (_fieldCache.size > FIELD_CACHE_MAX) _fieldCache.delete(_fieldCache.keys().next().value);
+  }
+  return f;
+}
+
+
+/* -------------------------------------------------------------------
    5. Leaf venation — a hierarchical, bilaterally-symmetric, FRACTAL
       vein network (this is the petal infill).
 
@@ -465,11 +1168,11 @@ function dedupePolygon(poly) {
    ------------------------------------------------------------------- */
 
 const VEIN_MIDRIB_BASE = 1.00;
-const VEIN_MIDRIB_TIP  = 0.42;
-const VEIN_TERTIARY    = 0.28;
-// relative line-weight by branch order (0 = midrib). Deeper orders are finer;
-// the last entry is the floor so very deep fractal twigs stay visible.
-const VEIN_WIDTH_BY_ORDER = [1.00, 0.56, 0.38, 0.28, 0.22, 0.18];
+const VEIN_MIDRIB_TIP  = 0.32;   // strong base->tip taper so the midrib clearly dominates
+// relative line-weight by branch order (0 = midrib, 1 = primary, 2 = secondary,
+// 3 = tertiary, 4+ = capillary). Each generation is markedly finer than its parent
+// so the hierarchy reads clearly; the deepest are hair-fine.
+const VEIN_WIDTH_BY_ORDER = [1.00, 0.52, 0.32, 0.19, 0.12, 0.075];
 const D2R = Math.PI / 180;
 
 function widthOfOrder(o) {
@@ -569,10 +1272,10 @@ function softenVein(pts, softness) {
 function growBranch(start, launchHeading, branchHeading, length, order, env, rng, ctx) {
   if (ctx.count >= ctx.maxCount) return null;
   ctx.count++;
-  const { P, L, maxDepth, softness } = env;
+  const { P, L, maxDepth, detail } = env;
   const ds = 0.07;
   const n = Math.max(2, Math.round(length / ds));
-  const easeFrac = 0.22 + 0.4 * softness;      // longer, gentler peel-off when softer
+  const easeFrac = 0.28;                       // fixed gentle peel-off -> smooth forks
   const tipTarget = branchHeading * 0.5;       // curl gently forward toward the tip
   const wanderAmp = 0.02 + 0.014 * order;      // deeper veins wander a little more
   const pts = [{ x: start.x, y: start.y }];
@@ -585,27 +1288,43 @@ function growBranch(start, launchHeading, branchHeading, length, order, env, rng
     theta = lerp(theta, target, 0.3) + (rng() - 0.5) * wanderAmp;
     x += ds * Math.cos(theta);
     y += ds * Math.sin(theta);
-    const marg = petalHalfWidth(clamp(x / L, 0, 1), P);
+    // ribInnerEdge, not petalHalfWidth: under continuous margin the rib's real inner
+    // edge sits well inside the true outline (a tapering, base-bundled strand, not a
+    // hoop on the outline) — growing veins out to the raw outline overshot past where
+    // the rib tube actually sits, the same class of mismatch Voronoi/Growth had.
+    const marg = ribInnerEdge(clamp(x / L, 0, 1), P);
     if (marg <= 1e-3 || x >= L * 0.99) break;
     // run right out to the margin (a hair inside it) so veins reach the edge
     if (y > 0.985 * marg) { pts.push({ x, y: 0.985 * marg }); break; }
-    if (y < 0.02) y = 0.02;                    // keep this half on its own side
+    if (y < 0.015) y = 0.015;                  // keep this half on its own side
     pts.push({ x, y });
   }
   if (pts.length < 2) return null;
 
+  // Continuous taper ALONG this vein: from its own order's weight down toward the
+  // next order's, so a vein thins over its length, not just at each junction.
   ctx.rightVeins.push({ points: pts, w0: widthOfOrder(order), w1: widthOfOrder(order + 1) });
 
-  if (order < maxDepth && length > 0.14) {
-    const kids = 2;
+  // Recurse into finer children — the branching hierarchy. Children spawn on the
+  // OUTER part of this vein and sweep toward the margin, so the network densifies
+  // outward (large cells near the midrib, fine cells toward the edge). `maxDepth`
+  // (VEIN DETAIL) caps how many generations grow: low = midrib + primaries only,
+  // high = down to hair-fine capillaries.
+  if (order < maxDepth && length > 0.11) {
+    const kids = order <= 1 ? 3 : 2;                          // primaries fan a little more
+    // Higher VEIN DETAIL pushes the FIRST child EARLIER along the parent (toward its
+    // base), so branching cascades through more of every vein's length — the network
+    // densifies overall, not just finer near the tips. Low detail keeps children out
+    // near the tip (sparse base). Applies at every generation (growBranch recurses).
+    const fStart = lerp(0.58, 0.16, detail);
     for (let c = 0; c < kids; c++) {
-      const f = kids === 1 ? 0.7 : 0.5 + 0.32 * c;        // spawn mid- and near-tip
+      const f = kids === 1 ? lerp(0.7, 0.32, detail) : lerp(fStart, 0.92, c / (kids - 1));
       const { p, theta: h } = veinPointHeading(pts, f);
-      const side = (c % 2 === 0) ? 1 : -1;                // alternate sides
-      const branchAngle = (46 - 5 * order + (rng() - 0.5) * 10) * D2R;
+      const side = (c % 2 === 0) ? 1 : -1;                   // alternate sides
+      const branchAngle = (50 - 5 * order + (rng() - 0.5) * 12) * D2R;
       const full = h + side * branchAngle;
-      const launch = h + side * branchAngle * (1 - 0.7 * softness);   // soft -> leave near-tangent
-      growBranch(p, launch, full, length * (0.52 + rng() * 0.16), order + 1, env, rng, ctx);
+      const launch = h + side * branchAngle * 0.4;           // launch near-tangent -> smooth fork
+      growBranch(p, launch, full, length * (0.5 + rng() * 0.16), order + 1, env, rng, ctx);
     }
   }
   return pts;
@@ -613,94 +1332,350 @@ function growBranch(start, launchHeading, branchHeading, length, order, env, rng
 
 export function buildVenation(P, rng, opts = {}) {
   const L = P.L;
-  const secCount  = clamp(Math.round(opts.secondaries || 6), 3, 11);
-  const crossBase = clamp(Math.round(opts.crossPerStrip || 3), 1, 8);
-  const maxDepth  = clamp(Math.round(opts.maxDepth || 3), 1, 5);
-  const softness  = clamp(opts.softness != null ? opts.softness : 0.5, 0, 1);
-  const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
-  const env = { P, L, maxDepth, softness };
+  const primaryCount = clamp(Math.round(opts.secondaries || 6), 3, 12);  // DENSITY -> primaries off the midrib
+  const maxDepth = clamp(Math.round(opts.maxDepth || 3), 1, 5);          // VEIN DETAIL -> branching generations
+  const detail = clamp(opts.softness != null ? opts.softness : 0.75, 0, 1); // raw VEIN DETAIL (0..1)
+  const branchStart = clamp(opts.branchStart != null ? opts.branchStart : 0.05, 0, 0.85); // first primary's u along the midrib
+  const SMOOTH = 0.55;                     // FIXED gentle vein curvature (detail no longer controls smoothing)
+  const env = { P, L, maxDepth, detail };
 
   const veins = [];
   const nodes = [];
-  const ctx = { rightVeins: [], count: 0, maxCount: 1200 };
+  const ctx = { rightVeins: [], count: 0, maxCount: 1800 };
 
-  // --- 1. midrib (on the axis; added once, never mirrored) ----------
-  const uBase = 0.02, uApex = 0.985, nMid = 30;
+  // CONTINUOUS MARGIN: root the whole tree at the FOOT node (u=0, y=0) so the midrib
+  // and both marginal strands leave the same point as a bundle, instead of the midrib
+  // starting a little up the blade with a separate closed-loop rim hooped around it.
+  const cont = !!opts.continuousMargin;
+
+  // --- 1. MIDRIB — the single dominant vein, on the axis, thickest, tapering
+  //         strongly base -> tip. Added once, never mirrored. In continuous mode it is
+  //         rooted at the foot (u=0) so it reaches the junction. ---
+  const uBase = cont ? 0.0 : 0.02, uApex = 0.985, nMid = 30;
   const midrib = [];
   for (let i = 0; i <= nMid; i++) midrib.push({ x: L * lerp(uBase, uApex, i / nMid), y: 0 });
   veins.push({ points: midrib, w0: VEIN_MIDRIB_BASE, w1: VEIN_MIDRIB_TIP });
   nodes.push({ x: midrib[0].x, y: 0, width: VEIN_MIDRIB_BASE });
   nodes.push({ x: midrib[nMid].x, y: 0, width: VEIN_MIDRIB_TIP });
 
-  // --- 2. secondary veins off the midrib, each a recursive fractal ---
-  //         Launch each one near-tangent to the midrib (soft T-join) and let it
-  //         ease out to its branch angle. A couple of extra basal veins plus a
-  //         base-biased station spread keep the narrow petal base from reading
-  //         empty (leaves are densest where the veins fan off the petiole).
-  const secList = [];   // { u0, pts }
-  const addSecondary = (u0, branchDeg) => {
+  // NOTE: the continuous MARGINAL STRANDS (the two edge traces rooted at the foot, the
+  // replacement for the closed-loop rim) are generated in the render layer's
+  // marginStrands() helper — see flower.js — because they must ride the SAME surface
+  // mapping as the rim they replace and hand their foot roots to the receptacle. They
+  // trace the outline y = ±halfWidth(u), so LOOP arcades still fuse onto them exactly as
+  // they fused onto the old rim. Here we only re-root the midrib at the foot.
+
+  // --- 2. PRIMARY veins off the midrib (pinnate). Each launches near-tangent to
+  //         the axis (soft T-join) and recurses into secondary / tertiary /
+  //         capillary generations (growBranch, capped by VEIN DETAIL). Stations are
+  //         base-biased (a leaf fans densest off the lower midrib), the branch angle
+  //         is wider near the base and shallower toward the apex, and the primary
+  //         reaches farther where the petal is wide. No cross-vein ladder — the
+  //         cells are the gaps the branching itself leaves, which shrink outward. ---
+  const addPrimary = (u0, branchDeg) => {
     const branchHeading = branchDeg * D2R;
-    const launchHeading = branchHeading * (1 - 0.7 * softness);   // soft junction on the axis
-    const len = L * (0.96 - 0.5 * u0);
+    const launchHeading = branchHeading * 0.45;              // soft junction on the axis
+    const len = L * (0.94 - 0.5 * u0);
     const main = growBranch({ x: L * u0, y: 0 }, launchHeading, branchHeading, len, 1, env, rng, ctx);
-    if (main) { secList.push({ u0, pts: main }); nodes.push({ x: L * u0, y: 0, width: widthOfOrder(1) }); }
+    if (main) nodes.push({ x: L * u0, y: 0, width: widthOfOrder(1) });
   };
-  // basal fan — short, wider-angle veins that populate the claw / base region
-  addSecondary(0.05, 70 + (rng() - 0.5) * 8);
-  addSecondary(0.09, 64 + (rng() - 0.5) * 8);
-  // main pinnate secondaries, biased toward the base so the lower petal fills in
-  for (let i = 0; i < secCount; i++) {
-    const frac = Math.pow((i + 0.5) / secCount, 1.25);
-    const u0 = clamp(lerp(0.12, 0.9, frac) + (rng() - 0.5) * 0.02, 0.1, 0.92);
-    addSecondary(u0, lerp(58, 46, u0) + (rng() - 0.5) * 6);
-  }
-  secList.sort((a, b) => a.u0 - b.u0);
-  const secMain = secList.map((s) => s.pts);
-
-  // --- 3. tertiary cross-veins + marginal loops between neighbours ---
-  //         (these close the polygonal cells; the fractal branches fill them)
-  for (let i = 0; i < secMain.length - 1; i++) {
-    const A = secMain[i], B = secMain[i + 1];
-    const rungs = clamp(crossBase - Math.floor(i / 2), 1, crossBase);
-    for (let k = 1; k <= rungs; k++) {
-      const t = Math.pow(k / (rungs + 1), 0.7);          // tighter toward the margin
-      const a = veinSample(A, t), b = veinSample(B, t);
-      const mid = {
-        x: (a.x + b.x) / 2 + (rng() - 0.5) * 0.05,
-        y: (a.y + b.y) / 2 + (rng() - 0.5) * 0.05,
-      };
-      ctx.rightVeins.push({ points: [a, mid, b], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
-    }
-    // marginal loop joining the two tips, riding right up against the margin
-    const tipA = A[A.length - 1];
-    const anchor = veinSample(B, 0.82);
-    const cx = (tipA.x + anchor.x) / 2;
-    const um = clamp(cx / L, 0, 1);
-    const midY = (tipA.y + anchor.y) / 2;
-    const crest = { x: cx, y: Math.min(margin(um) * 0.99, midY + 0.55 * (margin(um) - midY)) };
-    ctx.rightVeins.push({ points: [tipA, crest, anchor], w0: VEIN_TERTIARY, w1: VEIN_TERTIARY });
-    // a fine veinlet from the loop crest out to touch the petal edge
-    ctx.rightVeins.push({ points: [crest, { x: cx, y: margin(um) * 0.997 }], w0: VEIN_TERTIARY, w1: 0.16 });
+  // The FIRST primary's position along the midrib is a dedicated control
+  // (`branchStart`, a proportion from the base), INDEPENDENT of DENSITY and VEIN
+  // DETAIL: lower drops the whole primary fan down toward the base so it covers more
+  // of the midrib's length. The fan spreads from there to the tip region; the count
+  // is DENSITY and the sub-branch starts are VEIN DETAIL (growBranch), so moving this
+  // changes neither.
+  const baseU = branchStart;
+  const biasExp = 1.2;                                       // fixed base-bias -> the control just translates the fan
+  for (let i = 0; i < primaryCount; i++) {
+    const frac = Math.pow((i + 0.5) / primaryCount, biasExp);
+    const u0 = clamp(lerp(baseU, 0.94, frac) + (rng() - 0.5) * 0.02, 0.03, 0.95);
+    addPrimary(u0, lerp(64, 44, u0) + (rng() - 0.5) * 6);
   }
 
-  // fine marginal spurs so any secondary tip still shy of the rim reaches it
-  for (const s of secMain) {
-    const tip = s[s.length - 1];
-    const um = clamp(tip.x / L, 0, 1);
-    const edgeY = margin(um) * 0.997;
-    if (tip.y < edgeY - 0.03) {
-      ctx.rightVeins.push({ points: [tip, { x: tip.x, y: edgeY }], w0: widthOfOrder(2), w1: 0.16 });
-    }
-  }
-
-  // --- 4. soften every right-half vein, then MIRROR it to the left ---
+  // --- 3. fixed gentle smoothing, then MIRROR each right-half vein to the left ---
   for (const v of ctx.rightVeins) {
-    const soft = softenVein(v.points, softness);
+    const soft = softenVein(v.points, SMOOTH);
     veins.push({ points: soft, w0: v.w0, w1: v.w1 });
     veins.push({ points: soft.map((p) => ({ x: p.x, y: -p.y })), w0: v.w0, w1: v.w1 });
   }
 
   return { veins, nodes };
+}
+
+
+/* -------------------------------------------------------------------
+   5a2. SPACE COLONIZATION venation (Runions, Fuhrer, Lane, Federl,
+        Rolland-Lagan & Prusinkiewicz, "Modeling and visualization of leaf
+        venation patterns", SIGGRAPH 2005).
+
+   A SIBLING to the fractal VEINS generator, not a replacement. Attraction
+   SOURCES are seeded INSIDE the petal outline (so the network is generated by
+   the shape, reaching the tip / future lobes for free — not clipped to it).
+   Vein nodes grow from an explicit MID-RIB ROOT toward the sources; a source is
+   consumed once a vein reaches within KILL DISTANCE.
+
+     OPEN model    each source pulls only its single nearest node -> a pure tree.
+     CLOSED model  a source pulls every node in its RELATIVE NEIGHBOURHOOD (no
+                   other node lies in the source-node lune) -> veins converge on
+                   shared sources and fuse, giving anastomoses / areoles / loops.
+
+   Returns the SAME { veins, nodes } shape buildVenation does, so it reuses the
+   whole thickening / termination / export path. Rib widths follow CANALIZATION:
+   thicker where more sources drain through, i.e. width from subtree tip-count.
+   Deterministic: the caller passes a seeded PRNG (mulberry32) derived from the
+   design's stored seed — no Math.random on this path. Nearest-source / nearest-
+   node queries use a uniform-grid spatial hash so it stays ~O(n).
+   ------------------------------------------------------------------- */
+
+const SC_GOLDEN = 137.508 * Math.PI / 180;
+
+// uniform-grid spatial hash for 2D point queries (cell >= query radius so a 3x3
+// neighbourhood covers it). Items are appended, never removed.
+function scGrid(cell) {
+  const map = new Map();
+  const bk = (ix, iy) => ix + ',' + iy;
+  return {
+    add(x, y, item) {
+      const k = bk(Math.floor(x / cell), Math.floor(y / cell));
+      let b = map.get(k); if (!b) { b = []; map.set(k, b); } b.push(item);
+    },
+    // scan the (2r+1)^2 block of cells around (x,y). cell is sized to the query
+    // radius (r rings) so neighbourhoods stay small even when nodes pack densely.
+    near(x, y, r, fn) {
+      const ix = Math.floor(x / cell), iy = Math.floor(y / cell);
+      for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+        const b = map.get(bk(ix + dx, iy + dy)); if (!b) continue;
+        for (const it of b) fn(it);
+      }
+    },
+  };
+}
+
+export function buildSpaceColonization(P, rng, opts = {}) {
+  const L = P.L;
+  const closed = opts.mode === 'closed';
+  const step  = clamp(opts.growthStep != null ? opts.growthStep : 0.04, 0.015, 0.15);
+  const killD = clamp(opts.killDist   != null ? opts.killDist   : 0.055, step * 0.8, 0.2);
+  const birthD = clamp(opts.birthDist != null ? opts.birthDist  : 0.09, 0.03, 0.3);
+  const infl  = Math.max(2.2 * birthD, 4 * killD);         // attraction radius (a few source spacings)
+  const inflRings = Math.max(1, Math.ceil(infl / killD));  // node-grid cell = killD, so query this many rings
+  const fuseRings = Math.max(1, Math.ceil(step * 1.35 / killD));
+  const target = Math.max(0, Math.round(opts.sourceCount != null ? opts.sourceCount : 500));
+  const pattern = opts.seedPattern || 'phyllotactic';
+  const fields = getPetalFields(P);
+  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+  let Wmax = 0.01; for (let i = 0; i <= 64; i++) Wmax = Math.max(Wmax, hw(i / 64));
+  // inside the blade, kept off the rim so branches stop short and the margin
+  // rib / termination owns the edge: the real bound is ribInnerEdge(u, P) — the
+  // rib's actual inner edge, the same curve Voronoi/Veins-termination clip to —
+  // not a flat 0.05-world-unit band (which was constant regardless of how fat
+  // or thin the rib tube actually is at that u). `d` (Euclidean distance to the
+  // nearest true-outline/cleft-wall site) is kept only for its original job —
+  // staying off a cleft wall on lobed petals — at a small epsilon now that the
+  // margin band itself is owned by ribInnerEdge.
+  const inside = (x, y) => {
+    const u = x / L; if (u <= 0.012 || u >= 0.99) return false;
+    if (Math.abs(y) >= ribInnerEdge(u, P)) return false;
+    return fields.sample(x, y).d > 1e-3;
+  };
+
+  // ---- 1. SOURCES (birth-distance rejection; d-gated; per SEED PATTERN) ----
+  const srcGrid = scGrid(Math.max(birthD, 1e-3));
+  const sources = [];
+  const tryAdd = (x, y) => {
+    if (!inside(x, y)) return false;
+    let ok = true;
+    srcGrid.near(x, y, 1, (o) => { if ((o.x - x) ** 2 + (o.y - y) ** 2 < birthD * birthD) ok = false; });
+    if (!ok) return false;
+    const s = { x, y, alive: true };
+    sources.push(s); srcGrid.add(x, y, s); return true;
+  };
+  if (pattern === 'lattice') {
+    const g = birthD;
+    for (let x = g; x < L && sources.length < target; x += g) {
+      for (let y = -Wmax; y <= Wmax && sources.length < target; y += g) {
+        tryAdd(x + (rng() - 0.5) * g * 0.7, y + (rng() - 0.5) * g * 0.7);
+      }
+    }
+  } else if (pattern === 'random') {
+    let guard = 0;
+    while (sources.length < target && guard < target * 60 + 400) {
+      guard++; tryAdd(rng() * L, (rng() * 2 - 1) * Wmax);
+    }
+  } else {   // phyllotactic — golden-angle spiral centred at the BASE (0,0)
+    const c = birthD * 0.9;               // Vogel spacing ~ birth distance
+    // The golden angle itself is deterministic, so without a seeded PHASE every
+    // NETWORK VARIANT (and every re-roll) would be identical. A per-seed rotation
+    // (+ small radial offset) keeps the crisp golden-angle packing while making
+    // each seed a distinct network.
+    const phase = rng() * Math.PI * 2, n0 = 1 + Math.floor(rng() * 12);
+    let n = n0, guard = 0;
+    while (sources.length < target && guard < target * 40 + 400) {
+      guard++;
+      const r = c * Math.sqrt(n), th = n * SC_GOLDEN + phase; n++;
+      if (r > L * 1.5) break;             // spiral outran the petal -> capacity reached
+      tryAdd(r * Math.cos(th), r * Math.sin(th));
+    }
+  }
+
+  // ---- 2. NODES: explicit mid-rib root chain (y = 0), base -> ~tip ----
+  const nodes = [];
+  const nodeGrid = scGrid(killD);        // small cells; queries scan `inflRings` rings
+  const addNode = (x, y, parent) => {
+    const i = nodes.length;
+    nodes.push({ x, y, parent, children: [] });
+    if (parent >= 0) nodes[parent].children.push(i);
+    nodeGrid.add(x, y, i);
+    return i;
+  };
+  let prev = addNode(0.02 * L, 0, -1);
+  for (let x = 0.02 * L + step; x < 0.9 * L; x += step) prev = addNode(x, 0, prev);
+
+  // ---- 3. GROW: attract -> add nodes (or fuse, in CLOSED) -> consume sources ----
+  const links = [];                        // anastomoses: cross-edges that close loops
+  const nodeBudget = opts.nodeBudget || 60000;   // hard cap (perf + safety); live uses a small one
+  // enough iterations for the growth front to sweep the blade, then stop —
+  // unreachable sources are abandoned rather than spun on forever.
+  const maxIter = clamp(Math.ceil(L / step) * 3, 40, 500);
+  for (let iter = 0; iter < maxIter; iter++) {
+    if (nodes.length >= nodeBudget) break;
+    const grow = new Map();                // nodeIdx -> {dx, dy}
+    let anyAlive = false;
+    for (const s of sources) {
+      if (!s.alive) continue; anyAlive = true;
+      let nearest = -1, nd = infl * infl;
+      const cand = [];
+      nodeGrid.near(s.x, s.y, inflRings, (ni) => {
+        const n = nodes[ni];
+        if (n.done || n.children.length >= 2) return;    // only nodes that can still branch grow
+        const dd = (n.x - s.x) ** 2 + (n.y - s.y) ** 2;
+        if (dd < infl * infl) { cand.push(ni); if (dd < nd) { nd = dd; nearest = ni; } }
+      });
+      if (nearest < 0) continue;
+      let influenced;
+      if (!closed) {
+        influenced = [nearest];
+      } else {
+        // RELATIVE NEIGHBOUR test: v is influenced if no other candidate w is
+        // closer to BOTH the source and v than v is to the source (empty lune).
+        influenced = [];
+        for (const vi of cand) {
+          const v = nodes[vi]; const dsv = (v.x - s.x) ** 2 + (v.y - s.y) ** 2;
+          let ok = true;
+          for (const wi of cand) {
+            if (wi === vi) continue; const w = nodes[wi];
+            if ((w.x - s.x) ** 2 + (w.y - s.y) ** 2 < dsv && (w.x - v.x) ** 2 + (w.y - v.y) ** 2 < dsv) { ok = false; break; }
+          }
+          if (ok) influenced.push(vi);
+        }
+      }
+      for (const vi of influenced) {
+        const v = nodes[vi]; let dx = s.x - v.x, dy = s.y - v.y; const l = Math.hypot(dx, dy) || 1;
+        let g = grow.get(vi); if (!g) { g = { dx: 0, dy: 0 }; grow.set(vi, g); }
+        g.dx += dx / l; g.dy += dy / l;
+      }
+    }
+    if (!anyAlive || grow.size === 0) break;
+    let progressed = 0;                    // new nodes + fusions this iteration
+    for (const [vi, g] of grow) {
+      const l = Math.hypot(g.dx, g.dy) || 1;
+      const nx = nodes[vi].x + (g.dx / l) * step, ny = nodes[vi].y + (g.dy / l) * step;
+      if (!inside(nx, ny)) continue;       // a source pulling a node off the blade is unreachable
+      if (closed) {
+        // ANASTOMOSIS: if the advancing tip would land on an existing node of
+        // ANOTHER branch, fuse to it (a cross-link) instead of forking — this is
+        // what closes loops / areoles. Exclude self, parent and children so it
+        // makes a real cycle, not a degenerate back-edge.
+        let best = -1, bd = (step * 1.3) ** 2;
+        nodeGrid.near(nx, ny, fuseRings, (ni) => {
+          if (ni === vi || ni === nodes[vi].parent || nodes[ni].parent === vi) return;
+          const dd = (nodes[ni].x - nx) ** 2 + (nodes[ni].y - ny) ** 2;
+          if (dd < bd) { bd = dd; best = ni; }
+        });
+        if (best >= 0) { links.push([vi, best]); nodes[vi].done = true; progressed++; continue; }
+      }
+      addNode(nx, ny, vi); progressed++;
+    }
+    for (const s of sources) {
+      if (!s.alive) continue;
+      let hit = false;
+      nodeGrid.near(s.x, s.y, 1, (ni) => { const n = nodes[ni]; if ((n.x - s.x) ** 2 + (n.y - s.y) ** 2 < killD * killD) hit = true; });
+      if (hit) s.alive = false;
+    }
+    if (progressed === 0) break;            // stagnation: only unreachable sources remain
+  }
+
+  // ---- 4. WIDTHS by CANALIZATION structure -> Strahler order.
+  // Subtree tip-count is the canalization signal (real veins thicken toward the
+  // root because more sources drain through), but the raw radius~sqrt(tip-count)
+  // rule lands the order-to-order ratio at ~0.37, reading as a THIRD grammar next
+  // to the fractal veins' 0.60. So map the tip-count-derived Strahler order to
+  // width stepping by exactly VEIN_ORDER_RATIO (0.6) — same ordering, veins' step.
+  const ord = new Int32Array(nodes.length);
+  for (let i = nodes.length - 1; i >= 0; i--) {                 // children always have a higher index
+    if (!nodes[i].children.length) { ord[i] = 1; continue; }
+    let mx = 0, cnt = 0;
+    for (const c of nodes[i].children) { if (ord[c] > mx) { mx = ord[c]; cnt = 1; } else if (ord[c] === mx) cnt++; }
+    ord[i] = mx + (cnt >= 2 ? 1 : 0);
+  }
+  let maxOrder = 1; for (let i = 0; i < nodes.length; i++) maxOrder = Math.max(maxOrder, ord[i]);
+  const relW = (i) => Math.max(0.08, Math.pow(0.6, maxOrder - ord[i]));   // shares the fractal veins' 0.6 step
+
+  let debugOrders = null;
+  if (opts.debug) {
+    const sum = {}, num = {};
+    for (let i = 0; i < nodes.length; i++) { const o = ord[i]; sum[o] = (sum[o] || 0) + relW(i); num[o] = (num[o] || 0) + 1; }
+    const orders = Object.keys(sum).map(Number).sort((a, b) => a - b);
+    const means = orders.map((o) => sum[o] / num[o]);
+    const ratios = []; for (let i = 1; i < means.length; i++) ratios.push(means[i - 1] / means[i]);
+    debugOrders = { orders, means, ratioGeoMean: ratios.length ? Math.pow(ratios.reduce((s, x) => s * x, 1), 1 / ratios.length) : NaN };
+  }
+
+  // ---- trace maximal single-child runs into polylines (break at junctions) ----
+  const veins = [], outNodes = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].parent < 0) continue;
+    const p = nodes[i].parent;
+    const startsRun = nodes[p].parent < 0 || nodes[p].children.length !== 1;
+    if (!startsRun) continue;
+    const run = [p, i]; let cur = i;
+    while (nodes[cur].children.length === 1) { cur = nodes[cur].children[0]; run.push(cur); }
+    veins.push({ points: run.map((k) => ({ x: nodes[k].x, y: nodes[k].y })), w0: relW(p), w1: relW(cur) });
+  }
+  // anastomosis cross-links (CLOSED) as short veins — they close the loops
+  for (const [a, b] of links) {
+    veins.push({ points: [{ x: nodes[a].x, y: nodes[a].y }, { x: nodes[b].x, y: nodes[b].y }], w0: relW(a), w1: relW(b) });
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    const c = nodes[i].children.length;
+    if (c === 0 || c >= 2 || nodes[i].parent < 0) outNodes.push({ x: nodes[i].x, y: nodes[i].y, width: relW(i) });
+  }
+  return { veins, nodes: outNodes, sourceCount: sources.length, nodeCount: nodes.length, linkCount: links.length, debugOrders };
+}
+
+// Memoized per (shape + seed + variant + opts) accessor — a petal shape solves a
+// SMALL number of distinct networks (NETWORK VARIANTS) and cycles them across the
+// whorl, so a 15-petal bloom is a few solves, not fifteen. Shape params are in the
+// key, so changing the petal invalidates rather than reusing a stale network.
+const _scCache = new Map();
+const SC_CACHE_MAX = 24;
+export function getSpaceColonization(P, seed, opts) {
+  const k = [
+    P.L, P.W, P.taper, P.tip, P.edgeCurve, P.lobe || 0, P.lobeCount || 0,
+    P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0,
+    P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,
+    P.tipStyle, P.tipLength || 0, P.tipFrequency || 0, P.edgeNoise || 0, P.edgeNoiseScale || 0,
+    seed, opts.mode, opts.sourceCount, opts.birthDist, opts.killDist, opts.growthStep, opts.seedPattern,
+  ].join('|');
+  let v = _scCache.get(k);
+  if (!v) {
+    v = buildSpaceColonization(P, mulberry32(seed >>> 0), opts);
+    _scCache.set(k, v);
+    if (_scCache.size > SC_CACHE_MAX) _scCache.delete(_scCache.keys().next().value);
+  }
+  return v;
 }
 
 
@@ -796,7 +1771,10 @@ export function buildStrands(P, opts = {}) {
     const cz = smootherstep(clamp((frac - apexZone) / (1 - apexZone), 0, 1));
     const E = {
       x: lerp(L * uE, L * uApex, cz),
-      y: lerp(side * hw(uE), 0, cz),                       // pulled onto the axis at the apex
+      // Terminates at the rib's actual inner edge (ribInnerEdge), not the true
+      // outline (hw) — otherwise the strand tip runs out past where the rib
+      // tube actually sits under continuous margin.
+      y: lerp(side * ribInnerEdge(uE, P), 0, cz),           // pulled onto the axis at the apex
     };
     const dx = E.x - O.x, dy = E.y - O.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -824,8 +1802,8 @@ export function buildStrands(P, opts = {}) {
       let x = O.x + dx * s + px * b;
       let y = O.y + dy * s + py * b;
       const u = clamp(x / L, 0, 1);
-      const room = hw(u);
-      if (Math.abs(y) > room * 0.999) y = Math.sign(y) * room * 0.999;   // keep inside the outline
+      const room = ribInnerEdge(u, P);   // keep inside the rib's actual inner edge, not the raw outline
+      if (Math.abs(y) > room * 0.999) y = Math.sign(y) * room * 0.999;
       pts[i] = { x, y };
       // thin, ~uniform line with extra taper, tapering to a point where it meets
       // the rim (edgeRoom -> 0), so nothing crosses the outline.
@@ -838,7 +1816,7 @@ export function buildStrands(P, opts = {}) {
   }
   // welded beads cap the two convergences: the base hub and the apex gather,
   // so both ends read as clean nodes rather than a bundle of overlapping tips.
-  const apexR = Math.min(rBase, hw(uApex) * 0.7);
+  const apexR = Math.min(rBase, ribInnerEdge(uApex, P) * 0.7);
   nodes.push({ x: O.x, y: 0, width: (rBase / tubeR) * 1.7 });
   nodes.push({ x: L * uApex, y: 0, width: (apexR / tubeR) * 1.5 });
   return { veins, nodes };
@@ -896,7 +1874,6 @@ export function buildBone(P, opts = {}) {
   const width  = clamp(opts.width  != null ? opts.width  : 0.5, 0, 3);
   const curve  = clamp(opts.curve  != null ? opts.curve  : 0.55, -1, 1);  // +sweep to tip, -sweep to base
   const spread = clamp(opts.spread != null ? opts.spread : 0.85, 0, 1);
-  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
 
   const uBase = 0.04, uTip = 0.985;
   // 0..1 runs fine -> heavy bones (the old range); 1..3 then scales that heaviest
@@ -934,8 +1911,12 @@ export function buildBone(P, opts = {}) {
         const t = i / nRib;
         const uu = clamp(uk + sweepU * Math.pow(t, 1.3), uBase, uTip);
         const f = Math.sin(t * Math.PI / 2);      // lateral eases out to `reach`
-        const y = s * reach * f * hw(uu);
-        const cap = 0.97 * hw(uu);
+        // `reach` and the safety cap are fractions of ribInnerEdge, not the raw
+        // half-width: the rib's real inner edge tapers/bundles independently of
+        // hw(u) under continuous margin, so a hw-relative reach drifted from it
+        // exactly like Voronoi's old constant inset did.
+        const cap = ribInnerEdge(uu, P);
+        const y = s * reach * f * cap;
         pts[i] = { x: L * uu, y: Math.abs(y) > cap ? s * cap : y };
       }
       veins.push({ points: pts, w0: ribW, w1: wTip });
@@ -1033,128 +2014,306 @@ export function buildLace(P, rng, opts = {}) {
 /* -------------------------------------------------------------------
    5c. Voronoi infill — an alternative petal fill to the leaf venation.
 
-   Seeds are scattered only in the +Y half of the petal and MIRRORED to the
-   -Y half, so the whole diagram — and therefore every cell — is symmetric
-   across the centre axis. With no seed sitting on the axis, the midline turns
-   into a continuous run of cell walls (a clean central seam) and each +Y cell
-   has an exact mirror twin below it. Each cell is the petal silhouette clipped
-   by that seed's perpendicular-bisector half-planes against every other seed;
-   interior walls (shared by two cells) are drawn once, and walls that fall on
-   the silhouette are left to the rim. Returns the same { veins, nodes } shape
-   as buildVenation, so the render layer treats it identically.
+   Seeds are generated ALREADY SYMMETRIC about the centre axis before the diagram
+   is built — off-axis seeds live in the +Y half and are mirrored to -Y, PLUS a
+   run of seeds sitting ON the axis (y = 0). The on-axis seeds own cells that
+   straddle the centreline, so the pattern flows continuously across it with no
+   reflect-a-finished-half seam; the mirror pairs keep the whole diagram bilaterally
+   symmetric. A couple of Lloyd relaxation passes even the cells out (organic, no
+   slivers), like the reference. Each cell is the petal silhouette clipped by its
+   perpendicular-bisector half-planes; it becomes a solid ANNULUS (cell polygon
+   outside — shared with neighbours, so the tiles fuse into one sheet — around a
+   rounded hole), lofted by addSlab. SOFTNESS rounds the hole boundary (the visible
+   wall) from the raw angular cell toward smoothly-flowing organic curves. Returns
+   the same { veins, nodes, slabs } shape as buildVenation.
    ------------------------------------------------------------------- */
-export function buildVoronoi(P, rng, opts = {}) {
-  const density = clamp(Math.round(opts.density || 7), 3, 12);
-  const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // seeds in the +Y half
-  const sil = buildSilhouette(P, 72);
-  const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
 
-  // blue-noise-ish seeds in the +Y half (best-candidate sampling for even cells)
-  const half = [];
-  const xLo = P.L * 0.05, xHi = P.L * 0.96;
-  let guard = 0;
-  while (half.length < perHalf && guard < perHalf * 600) {
-    let best = null, bestD = -1;
-    for (let c = 0; c < 10; c++) {
-      guard++;
-      const x = lerp(xLo, xHi, rng());
-      const hw = margin(x / P.L);
-      if (hw < 0.06) continue;
-      const y = lerp(0.02 * hw + 0.015, hw * 0.95, rng());     // strictly +Y, inside the edge
-      if (!pointInPoly(x, y, sil)) continue;
-      let d = 1e9;
-      for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
-      if (d > bestD) { bestD = d; best = { x, y }; }
-    }
-    if (best) half.push(best);
+// One Voronoi cell: the silhouette clipped by the perpendicular bisector between
+// seed `s` and every OTHER seed. `s` must be an element of `seeds` (skipped by
+// identity). Returns the clipped polygon, or null if it collapsed.
+// ANISOTROPY (a2 = anisotropy^2, y-weight in the distance metric). a2 = 1 is the
+// isotropic case, byte-identical to the original. a2 > 1 weights lateral distance
+// more, so cells compress across the petal and ELONGATE along its long axis — the
+// bisector is computed in the weighted metric while the seeds stay in real
+// coordinates (so the cell polygon comes out in real space, walls stay isotropic).
+//
+// The seed's anisotropy metric is a symmetric 2x2 M = {m00, m01, m11}. The cell is
+// clipped by the bisector under that metric: 2 M (t-s) . p = tᵀMt - sᵀMs. For the
+// isotropic/global case M = diag(1, a2) this reduces EXACTLY to the original y-weighted
+// formula (byte-identical). For a lobed petal M is built per seed from the LOCAL flow
+// T (see anisoMetric), so cells elongate along each lobe's own direction — the fix for
+// the global-axis approximation that expired once one petal points several ways.
+function voronoiCell(s, seeds, sil, M) {
+  const m00 = M.m00, m01 = M.m01, m11 = M.m11;
+  const sMs = m00 * s.x * s.x + 2 * m01 * s.x * s.y + m11 * s.y * s.y;
+  let cell = sil;
+  for (const t of seeds) {
+    if (t === s) continue;
+    const dxs = t.x - s.x, dys = t.y - s.y;
+    const tMt = m00 * t.x * t.x + 2 * m01 * t.x * t.y + m11 * t.y * t.y;
+    cell = clipHalfPlane(cell, 2 * (m00 * dxs + m01 * dys), 2 * (m01 * dxs + m11 * dys), sMs - tMt);
+    if (cell.length < 3) return null;
   }
+  return cell;
+}
 
-  // mirror to a fully symmetric seed set (no seed on the axis)
-  const seeds = [];
-  for (const s of half) { seeds.push({ x: s.x, y: s.y }); seeds.push({ x: s.x, y: -s.y }); }
+// Anisotropy metric M = T Tᵀ + a2 N Nᵀ (T unit flow dir, N its perpendicular):
+// weight 1 ALONG the flow, a2 ACROSS it, so cells elongate along T. T = (1,0)
+// gives diag(1, a2), the original global-axis behaviour.
+function anisoMetric(Tx, Ty, a2) {
+  const c = Tx, s = Ty;
+  return { m00: c * c + a2 * s * s, m01: c * s * (1 - a2), m11: s * s + a2 * c * c };
+}
 
-  // Each cell = silhouette clipped by every perpendicular-bisector half-plane.
-  // Only the +Y seed of each mirror pair (even indices) is solved; its -Y twin's
-  // cell is the exact mirror, added later — this guarantees bilateral symmetry
-  // instead of leaving it to float-identical clipping of mirrored inputs.
-  const cells = [];
-  for (let i = 0; i < seeds.length; i += 2) {
-    const s = seeds[i];
-    let cell = sil;
-    for (let j = 0; j < seeds.length && cell.length >= 3; j++) {
-      if (j === i) continue;
-      const t = seeds[j];
-      // keep the side closer to s:  2(t-s)·p + (|s|^2 - |t|^2) <= 0
-      cell = clipHalfPlane(cell, 2 * (t.x - s.x), 2 * (t.y - s.y),
-        (s.x * s.x + s.y * s.y) - (t.x * t.x + t.y * t.y));
-    }
-    if (cell.length >= 3) cells.push(cell);
+// Area (not vertex-average) centroid of a simple polygon; used for Lloyd
+// relaxation and as the annulus centre. Falls back to the vertex mean if the
+// polygon is degenerate (near-zero area).
+function polyCentroid(poly) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    const cr = p.x * q.y - q.x * p.y;
+    a += cr; cx += (p.x + q.x) * cr; cy += (p.y + q.y) * cr;
   }
-
-  // SOFTNESS turns each cell into a solid ANNULUS: the full cell polygon on the
-  // outside (adjacent cells share edges, so the annuli tile into one continuous
-  // sheet) around a ROUND hole on the inside. The render layer lofts a sealed
-  // slab between the two rings — top face, bottom face and both rims — so the web
-  // is a real perforated sheet, not tube outlines. `round` blends the hole from
-  // the cell's own shape toward its fitted ellipse; `holeScale` sets the hole
-  // size (a smaller hole = a thicker strut) and shrinks as softness rises. Only
-  // the +Y cells are solved; each annulus is mirrored to the -Y half, so the
-  // whole sheet stays exactly symmetric across the axis.
-  const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
-  const round = clamp(softness / 5, 0, 1);                       // hole: cell shape -> ellipse
-  const holeScale = lerp(0.9, 0.58, clamp(softness, 0, 5) / 5);  // hole size (strut thickness)
-
-  const slabs = [];
-  for (const cell of cells) {
-    const ann = cellAnnulus(cell, round, holeScale);
-    if (!ann) continue;
-    slabs.push(ann);                                                                   // +Y
-    // -Y mirror: reflecting Y reverses the ring order (winding), so reverse the
-    // loops back — otherwise the mirrored slab renders inside-out (its faces cull
-    // and shade backwards, which is why half of every petal looked wrong).
-    slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse() });
+  if (Math.abs(a) < 1e-9) {
+    let vx = 0, vy = 0; for (const p of poly) { vx += p.x; vy += p.y; }
+    return { x: vx / poly.length, y: vy / poly.length };
   }
-  return { veins: [], nodes: [], slabs };
+  a *= 0.5;
+  return { x: cx / (6 * a), y: cy / (6 * a) };
 }
 
 const mirrorY = (p) => ({ x: p.x, y: -p.y });
 
-// Build one cell's ANNULUS for the perforated sheet. The outer loop walks the
-// cell polygon's EXACT edges (subdivided) — so corners are kept and, since two
-// neighbours subdivide their shared edge identically, their outer boundaries
-// coincide and the tiles stay watertight (no gaps at the junctions). The inner
-// loop is the round hole: for each outer point, the cell shape blended toward
-// the fitted ellipse in that radial direction, scaled in by holeScale.
-function cellAnnulus(poly, round, holeScale) {
-  const n = poly.length;
-  let cx = 0, cy = 0;
-  for (const p of poly) { cx += p.x; cy += p.y; }
-  cx /= n; cy /= n;
-  let Cxx = 0, Cyy = 0, Cxy = 0;                    // vertex covariance -> fitted ellipse
-  for (const p of poly) { const dx = p.x - cx, dy = p.y - cy; Cxx += dx * dx; Cyy += dy * dy; Cxy += dx * dy; }
-  Cxx /= n; Cyy /= n; Cxy /= n;
-  const tr = Cxx + Cyy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (Cxx * Cyy - Cxy * Cxy)));
-  const ELL = 1.32;
-  const a = Math.sqrt(Math.max(tr / 2 + disc, 1e-9)) * ELL;
-  const b = Math.sqrt(Math.max(tr / 2 - disc, 1e-9)) * ELL;
-  const ang = 0.5 * Math.atan2(2 * Cxy, Cxx - Cyy);
-  const ca = Math.cos(ang), sa = Math.sin(ang);
-  const SUB = 5;                                    // samples per cell edge (holes read round)
-  const outer = [], inner = [];
-  for (let i = 0; i < n; i++) {
-    const A = poly[i], B = poly[(i + 1) % n];
+// Signed area of a simple polygon (for the minimum-cell-size floor).
+function polyArea(poly) {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; a += p.x * q.y - q.x * p.y; }
+  return a * 0.5;
+}
+
+// "Spine" score of a cell: how strongly it is elongated ALONG the flow T and how
+// LONG it is — a long, T-aligned cell reads like a rib spine and earns extra wall
+// weight, mirroring how VEINS thickens its midrib/primaries. 0 = round or short,
+// 1 = a long strut running with the flow.
+function spineScore(poly, c, T, L) {
+  const tx = T.tx, ty = T.ty, px = -ty, py = tx;   // flow dir + perpendicular
+  let tMin = Infinity, tMax = -Infinity, pMin = Infinity, pMax = -Infinity;
+  for (const q of poly) {
+    const dx = q.x - c.x, dy = q.y - c.y;
+    const at = dx * tx + dy * ty, ap = dx * px + dy * py;
+    if (at < tMin) tMin = at; if (at > tMax) tMax = at;
+    if (ap < pMin) pMin = ap; if (ap > pMax) pMax = ap;
+  }
+  const spanT = tMax - tMin, spanP = (pMax - pMin) || 1e-6;
+  const elong = clamp((spanT / spanP - 1) / 2, 0, 1);        // >= 2x elongated -> 1
+  const longEnough = clamp(spanT / (0.2 * L), 0, 1);          // and a real fraction of the blade
+  return elong * longEnough;
+}
+
+export function buildVoronoi(P, rng, opts = {}) {
+  const density = clamp(Math.round(opts.density || 7), 3, 12);
+  const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // off-axis seeds in the +Y half
+  const sil = buildSilhouette(P, 72);
+  const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+  const xLo = P.L * 0.05, xHi = P.L * 0.96;
+  const minHW = 0.06;
+  const axisGap = 0.05 * P.W;                       // min |y| for an off-axis seed
+
+  // Shared-grammar controls — every one defaults to the ORIGINAL isotropic/uniform
+  // look, so a design that omits them is byte-identical.
+  const aniso     = clamp(opts.anisotropy != null ? opts.anisotropy : 1, 1, 4);
+  const a2        = aniso * aniso;                       // y-weight in the Voronoi metric
+  // Per-seed anisotropy metric. Plain petal (or isotropic): the global diag(1, a2)
+  // for every seed (byte-identical to the original). LOBED + anisotropic: the metric
+  // is built from the LOCAL Laplace flow T at each seed, so cells elongate along each
+  // lobe's own direction instead of one global axis (dependency 2, per-point T-metric).
+  const cleftCfg  = cleftConfig(P);
+  const flowField = (cleftCfg && aniso > 1) ? getPetalFields(P) : null;
+  const globalM   = anisoMetric(1, 0, a2);
+  const metricFor = (s) => { if (!flowField) return globalM; const t = flowField.sample(s.x, s.y); return anisoMetric(t.Tx, t.Ty, a2); };
+  const cellLaw   = clamp(opts.cellDensityLaw != null ? opts.cellDensityLaw : 0, 0, 1);
+  const wHier     = clamp(opts.weightHierarchy != null ? opts.weightHierarchy : 0, 0, 1);
+  const wFall     = clamp(opts.weightFalloff != null ? opts.weightFalloff : 1.5, 0, 4);
+  const slabTaper = clamp(opts.slabTaper != null ? opts.slabTaper : 0, 0, 1);
+  let Wmax = minHW;
+  for (let i = 0; i <= 100; i++) Wmax = Math.max(Wmax, margin(i / 100));
+  // CELL DENSITY LAW: bias best-candidate spacing toward the LOCAL blade width so
+  // cells shrink as the blade narrows (constant count across, no tip crowding).
+  // law = 0 uses a constant reference width -> identical selection to the original.
+  const spaceW = (x) => { const w = lerp(Wmax, margin(x / P.L), cellLaw); return w > 1e-3 ? w : 1e-3; };
+
+  // --- SEEDS ON THE AXIS: best-candidate 1-D sampling along the centreline. Their
+  //     cells straddle y = 0, so the pattern is continuous across it (no seam). ---
+  const nAxis = clamp(Math.round(perHalf * 0.4), 2, 14);
+  const axis = [];
+  { let guard = 0;
+    while (axis.length < nAxis && guard < nAxis * 400) {
+      let best = null, bestD = -1;
+      for (let c = 0; c < 12; c++) {
+        guard++;
+        const x = lerp(xLo, xHi, rng());
+        if (margin(x / P.L) < minHW) continue;
+        let d = 1e9;
+        for (const s of axis) d = Math.min(d, (s.x - x) ** 2);
+        const score = d / (spaceW(x) ** 2);          // width-scaled spacing (law=0: constant -> same pick)
+        if (score > bestD) { bestD = score; best = { x, y: 0 }; }
+      }
+      if (best) axis.push(best);
+    }
+  }
+  // --- OFF-AXIS +Y SEEDS: blue-noise, kept clear of the axis seeds (distance is
+  //     measured to axis seeds too, whose mirror is themselves). Mirrored to -Y. ---
+  const half = [];
+  { let guard = 0;
+    while (half.length < perHalf && guard < perHalf * 800) {
+      let best = null, bestD = -1;
+      for (let c = 0; c < 10; c++) {
+        guard++;
+        const x = lerp(xLo, xHi, rng());
+        const hw = margin(x / P.L);
+        if (hw < minHW) continue;
+        const y = lerp(Math.max(axisGap, 0.02 * hw + 0.015), hw * 0.95, rng());
+        if (!pointInPoly(x, y, sil)) continue;
+        let d = 1e9;
+        for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
+        for (const s of axis) d = Math.min(d, (s.x - x) ** 2 + y * y);
+        const score = d / (spaceW(x) ** 2);          // width-scaled spacing (law=0: constant -> same pick)
+        if (score > bestD) { bestD = score; best = { x, y }; }
+      }
+      if (best) half.push(best);
+    }
+  }
+
+  // Assemble the full symmetric seed set: axis seeds once, each +Y seed with a
+  // fresh -Y twin. The +Y / axis objects are the SAME references voronoiCell skips.
+  const fullSeeds = () => {
+    const arr = [];
+    for (const s of axis) arr.push(s);
+    for (const s of half) { arr.push(s); arr.push({ x: s.x, y: -s.y }); }
+    return arr;
+  };
+
+  // --- CONSTRAINED LLOYD RELAXATION (VORONOI ITERATIONS).
+  //     Every pass — including lloyd = 0's single pass — clips cells to
+  //     ribMarginPolyline(P): the rib's ACTUAL inner edge (see flower-geometry.js's
+  //     "THE MARGIN RIB" section), not a guessed inward offset. lloyd >= 1 additionally
+  //     relaxes site -> centroid against that same boundary that many times, so outer
+  //     cells align their edges with it instead of just being severed by it once.
+  //     Previously this was `offsetPolygonInward(sil, VORONOI_MARGIN_INSET*2*Wmax)` —
+  //     a constant inset unrelated to the rib's actual (tapering, base-bundled) radius,
+  //     which is why the gap between rib and cells varied around the perimeter and
+  //     the rib crossed over the cells near the base. Symmetry-preserving — axis seeds
+  //     pinned to y = 0, +Y seeds stay off-axis, -Y twins rebuilt from the +Y set each
+  //     pass. ---
+  const lloyd = clamp(Math.round(opts.lloyd != null ? opts.lloyd : 0), 0, 20);
+  const clipPoly = ribMarginPolyline(P, 72);
+  const passes = lloyd === 0 ? 1 : lloyd;
+  for (let iter = 0; iter < passes; iter++) {
+    const seeds = fullSeeds();
+    for (const s of axis) {
+      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
+      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = 0; }
+    }
+    for (const s of half) {
+      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
+      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = Math.max(axisGap, c.y); }
+    }
+  }
+
+  // --- MINIMUM CELL SIZE floor: cull seeds whose cell is thinner than a few rib
+  //     widths (equivalent-circle diameter < minCellSize), so the density law /
+  //     anisotropy can't emit fragile slivers — the region is absorbed by neighbours
+  //     when the final cells re-solve. Off unless one of those features is on, so the
+  //     default look is untouched. Mirrored seeds are culled with their +Y twin. ---
+  let culled = 0;
+  const minCell = opts.minCellSize || 0;
+  if (minCell > 0 && (cellLaw > 0 || aniso > 1)) {
+    const tooSmall = (s, seeds) => {
+      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
+      if (!cell) return true;
+      return 2 * Math.sqrt(Math.abs(polyArea(cell)) / Math.PI) < minCell;
+    };
+    for (let i = half.length - 1; i >= 0; i--) if (tooSmall(half[i], fullSeeds())) { half.splice(i, 1); culled++; }
+    for (let i = axis.length - 1; i >= 0; i--) if (axis.length > 1 && tooSmall(axis[i], fullSeeds())) { axis.splice(i, 1); culled++; }
+  }
+
+  // --- SOLVE + BUILD ANNULI with the shared WEIGHT grammar. Each cell earns a wall
+  //     weight from its base->tip position (w = (1-s)^k) and a spine boost (long,
+  //     flow-aligned cells), stepped in the SAME 0.6 ratio VEINS uses; and a slab
+  //     thickness taper by s. Both blend from the uniform default. Axis cells are
+  //     self-symmetric (built once); each +Y cell gets its exact -Y mirror. ---
+  const softness = clamp(opts.softness != null ? opts.softness : 0, 0, 5);
+  const seeds = fullSeeds();
+  const slabs = [];
+  const emit = (cell, mirror) => {
+    const c = polyCentroid(cell);
+    const s = clamp(c.x / P.L, 0, 1);
+    const T = petalFlowDirection(c.y, s, P);
+    const raw = Math.max(Math.pow(1 - s, wFall), spineScore(cell, c, T, P.L));
+    const tier = Math.round((1 - raw) * 3);                    // 0..3 discrete orders
+    const wallMul = lerp(1, Math.pow(0.6, tier), wHier);       // shares the vein step size
+    const thickMul = lerp(1, 1 - 0.7 * s, slabTaper);          // base thick -> tip thin (out-of-plane)
+    const ann = cellAnnulus(cell, softness, wallMul);
+    if (!ann) return;
+    ann.thickMul = thickMul;
+    slabs.push(ann);
+    if (mirror) {
+      slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse(), thickMul });
+    }
+  };
+  for (const s of axis) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, false); }
+  for (const s of half) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, true); }
+  return { veins: [], nodes: [], slabs, culled };
+}
+
+// Build one cell's ANNULUS for the perforated sheet. The OUTER loop walks the cell
+// polygon's EXACT edges (subdivided) — two neighbours subdivide their shared edge
+// identically, so their outer boundaries coincide and the tiles fuse flush. That
+// wall is interior/invisible; the visible wall is the HOLE rim (+ the petal edge).
+// The INNER loop is the hole: the cell offset inward by a roughly CONSTANT margin
+// (so the strut is a uniform width, not bulging at corners / pinching at edges),
+// with its corners then rounded by SOFTNESS into smoothly-flowing curves. addSlab
+// pairs outer[k] with inner[k] on the same ray from the centroid, so both are
+// built radially from it.
+function cellAnnulus(poly, softness, wallMul = 1) {
+  const c = polyCentroid(poly);
+  const cx = c.x, cy = c.y;
+  const SUB = 5;                                    // samples per cell edge
+  const outer = [], ux = [], uy = [], rawR = [];
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i], B = poly[(i + 1) % poly.length];
     for (let s = 0; s < SUB; s++) {
       const t = s / SUB;
       const ox = lerp(A.x, B.x, t), oy = lerp(A.y, B.y, t);     // on the exact cell edge
       const dx = ox - cx, dy = oy - cy;
-      const rOut = Math.hypot(dx, dy) || 1;
-      const ux = dx / rOut, uy = dy / rOut;                     // radial direction
-      const eu = ux * ca + uy * sa, ev = -ux * sa + uy * ca;    // ellipse hit distance, same ray
-      const tEll = 1 / Math.hypot(eu / a, ev / b);
-      const tHole = Math.min(lerp(rOut, tEll, round) * holeScale, rOut * 0.95);
+      const r = Math.hypot(dx, dy) || 1e-6;
       outer.push({ x: ox, y: oy });
-      inner.push({ x: cx + ux * tHole, y: cy + uy * tHole });
+      ux.push(dx / r); uy.push(dy / r); rawR.push(r);
     }
+  }
+  const M = outer.length;
+  if (M < 3) return null;
+  // Uniform strut: offset the boundary inward by a constant margin (a fraction of
+  // the cell's mean radius). Floored so thin cells keep a hole.
+  let mean = 0; for (const r of rawR) mean += r; mean /= M;
+  const strut = mean * 0.22 * wallMul;              // wallMul (WEIGHT HIERARCHY) tapers walls base->tip / off-spine; 1 = the open, airy reference look
+  let R = new Array(M);
+  for (let k = 0; k < M; k++) R[k] = Math.max(rawR[k] - strut, 0.16 * mean);
+  // SOFTNESS rounds the hole's corners by circularly smoothing its radial profile:
+  // 0 passes = the raw (offset) angular cell; more passes = smoothly-flowing curves
+  // with no sharp vertices (the reference look). The broad cell shape / elongation
+  // survives because only the high-frequency corner spikes are averaged away.
+  const passes = Math.round(clamp(softness, 0, 5) * 1.8);       // 0 .. ~9
+  for (let p = 0; p < passes; p++) {
+    const S = new Array(M);
+    for (let k = 0; k < M; k++) S[k] = 0.25 * R[(k - 1 + M) % M] + 0.5 * R[k] + 0.25 * R[(k + 1) % M];
+    R = S;
+  }
+  const inner = new Array(M);
+  for (let k = 0; k < M; k++) {
+    const hr = Math.min(R[k], rawR[k] * 0.9);       // keep the hole strictly inside the cell
+    inner[k] = { x: cx + ux[k] * hr, y: cy + uy[k] * hr };
   }
   return { outer, inner };
 }
@@ -1185,6 +2344,206 @@ function pointInPoly(x, y, poly) {
     if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
   }
   return inside;
+}
+
+
+/* -------------------------------------------------------------------
+   5e. Rib graph + EDGE TERMINATION.
+
+   The infill polylines (veins, bone ribs) form a TREE: branch tips fade in the
+   blade interior, and the margin rib is a SEPARATE closed hoop (built in the
+   render layer) with no connection to them. So the framework has almost no
+   closed cycles — little shear stiffness — and the fine free ends are the first
+   thing to snap when printed.
+
+   buildRibGraph welds the polyline vertices into an explicit node/edge graph so
+   the connectivity is measurable (cyclomatic number E - V + C, free-end count).
+   terminateEdges consumes the vein-only graph to CLOSE the network onto the
+   margin:
+     MEET  free tips within CAPTURE DISTANCE of the margin extend to meet the
+           margin rib (craspedodromous). Simpler, spikier.
+     LOOP  neighbouring near-margin tips turn and fuse to EACH OTHER into arcades
+           before touching the rim (brochidodromous). Closes cycles, so it is the
+           structurally superior mode.
+   Both return EXTRA flattened polylines (+ weld nodes) in the SAME shape as the
+   infill veins, so the render layer thickens them through the identical
+   tube/ribbon/bead path and the union stays watertight. v1 captures onto the
+   SMOOTH outline; the actual serrated/ruffled rim (tooth positions) is left for a
+   later real-tooth pass — MEET on a serrated petal will therefore approximate the
+   teeth; LOOP never touches the rim so it is unaffected. Symmetry is preserved by
+   generating +Y captures and mirroring them to -Y (axis tips meet the apex). */
+
+const RIB_WELD_EPS = 0.09;   // flattened-space weld radius (a hair over the coarsest
+                             // polyline sampling, so a branch root reliably reaches
+                             // its parent chain; still far below the blade size).
+
+// Weld the polyline vertices into an explicit graph. Each polyline is either a
+// plain point array or { points, weld } where `weld` lists which endpoints are
+// CONNECTORS that snap onto the nearest vertex of another polyline within eps
+// (0 = start, 1 = end; default both). The infill builders append root-first, so
+// a vein/rib is passed weld:[0] — its ROOT joins its parent but its TIP stays
+// free until termination connects it. This makes the constructed network a clean
+// tree (branch crossings are not junctions), so its only cycles are the ones
+// termination and the margin hoop actually close — which is what the acceptance
+// metric measures. A connector snaps to any vertex of the target (not only the
+// target's endpoints), so a root lands on its parent mid-span regardless of the
+// parent's sampling.
+export function buildRibGraph(polylines, eps = RIB_WELD_EPS) {
+  const V = [];                          // {x,y,conn,pl}
+  const chain = [];                      // [i,j] vertex-index edges
+  for (let pi = 0; pi < polylines.length; pi++) {
+    const item = polylines[pi];
+    const pts = Array.isArray(item) ? item : item.points;
+    const weld = Array.isArray(item) ? [0, 1] : (item.weld || [0, 1]);
+    const closed = !Array.isArray(item) && item.closed;
+    const base = V.length, last = pts.length - 1;
+    const wStart = weld.includes(0), wEnd = weld.includes(1);
+    for (let i = 0; i < pts.length; i++) {
+      V.push({ x: pts[i].x, y: pts[i].y, conn: (i === 0 && wStart) || (i === last && wEnd), pl: pi });
+    }
+    for (let i = 0; i < last; i++) chain.push([base + i, base + i + 1]);
+    if (closed && last >= 2) chain.push([base + last, base]);   // wrap a closed loop
+  }
+  const parent = V.map((_, i) => i);
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+  const inv = 1 / eps, cells = new Map(), bkey = (ix, iy) => ix + ',' + iy;
+  for (let i = 0; i < V.length; i++) {
+    const k = bkey(Math.round(V[i].x * inv), Math.round(V[i].y * inv));
+    if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i);
+  }
+  for (let i = 0; i < V.length; i++) {
+    if (!V[i].conn) continue;            // only flagged connectors initiate a weld
+    const ix = Math.round(V[i].x * inv), iy = Math.round(V[i].y * inv);
+    let bestJ = -1, bestD = eps * eps;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      const b = cells.get(bkey(ix + dx, iy + dy));
+      if (!b) continue;
+      for (const j of b) {
+        if (V[j].pl === V[i].pl || find(j) === find(i)) continue;   // other polyline only
+        const d = (V[j].x - V[i].x) ** 2 + (V[j].y - V[i].y) ** 2;
+        if (d <= bestD) { bestD = d; bestJ = j; }
+      }
+    }
+    if (bestJ >= 0) union(i, bestJ);
+  }
+  const nodeOf = new Map(), nodes = [];
+  const nid = (i) => {
+    const r = find(i); let id = nodeOf.get(r);
+    if (id == null) { id = nodes.length; nodes.push({ x: V[r].x, y: V[r].y, deg: 0 }); nodeOf.set(r, id); }
+    return id;
+  };
+  const eset = new Set(), edges = [];
+  for (const [a, b] of chain) {
+    const na = nid(a), nb = nid(b);
+    if (na === nb) continue;
+    const ek = na < nb ? na + '_' + nb : nb + '_' + na;
+    if (eset.has(ek)) continue;
+    eset.add(ek); edges.push([na, nb]); nodes[na].deg++; nodes[nb].deg++;
+  }
+  return { nodes, edges };
+}
+
+// Cyclomatic number E - V + C (C = connected components) and free-end (degree-1)
+// count for a rib graph — the acceptance metric for edge termination.
+export function graphStats(graph) {
+  const { nodes, edges } = graph;
+  const V = nodes.length, E = edges.length;
+  const parent = nodes.map((_, i) => i);
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  for (const [a, b] of edges) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+  let C = 0; for (let i = 0; i < V; i++) if (find(i) === i) C++;
+  let deg1 = 0; for (const n of nodes) if (n.deg === 1) deg1++;
+  return { V, E, C, cyclomatic: E - V + C, deg1 };
+}
+
+// Nearest point on a polyline: returns { x, y, param, d } where param = segIndex+t
+// is a monotic arc position used to order captures along the rim.
+function nearestOnPolyline(p, poly) {
+  let best = { x: poly[0].x, y: poly[0].y, param: 0, d: Infinity };
+  for (let i = 0; i < poly.length - 1; i++) {
+    const a = poly[i], b = poly[i + 1];
+    const abx = b.x - a.x, aby = b.y - a.y;
+    const len2 = abx * abx + aby * aby || 1e-12;
+    let t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const qx = a.x + abx * t, qy = a.y + aby * t;
+    const d = Math.hypot(p.x - qx, p.y - qy);
+    if (d < best.d) best = { x: qx, y: qy, param: i + t, d };
+  }
+  return best;
+}
+
+function quadBezier(A, C, B, n) {
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    out.push({
+      x: u * u * A.x + 2 * u * t * C.x + t * t * B.x,
+      y: u * u * A.y + 2 * u * t * C.y + t * t * B.y,
+    });
+  }
+  return out;
+}
+
+const TERM_W0 = 0.16, TERM_W1 = 0.11;   // fine-veinlet relative weights for capture struts
+
+export function terminateEdges(veins, rim, P, mode, captureFrac) {
+  const extra = [], nodes = [];
+  if ((mode !== 'meet' && mode !== 'loop') || !veins || !veins.length || !rim || rim.length < 2) {
+    return { veins: extra, nodes };
+  }
+  let Wmax = 1e-4;
+  for (let i = 0; i <= 100; i++) Wmax = Math.max(Wmax, petalHalfWidth(i / 100, P));
+  const captureDist = clamp(captureFrac, 0, 1) * (2 * Wmax);
+  const AXIS_EPS = Math.max(1e-3, 0.01 * Wmax);
+
+  // Root-only weld (weld:[0]) so every branch TIP is a degree-1 node; roots join
+  // their parents and so are not mistaken for tips.
+  const tips = buildRibGraph(veins.map((v) => ({ points: v.points, weld: [0] }))).nodes.filter((n) => n.deg === 1);
+  const mirror = (seg) => ({ points: seg.points.map((p) => ({ x: p.x, y: -p.y })), w0: seg.w0, w1: seg.w1 });
+  const meet = (T, Q, mirrored) => {
+    if (Math.hypot(Q.x - T.x, Q.y - T.y) < 1e-3) return;   // tip already on the rim
+    const seg = { points: [{ x: T.x, y: T.y }, { x: Q.x, y: Q.y }], w0: TERM_W0, w1: TERM_W1 };
+    extra.push(seg); nodes.push({ x: Q.x, y: Q.y, width: TERM_W1 });
+    if (mirrored) { extra.push(mirror(seg)); nodes.push({ x: Q.x, y: -Q.y, width: TERM_W1 }); }
+  };
+
+  // AXIS tips (on the mid-rib, self-symmetric): meet the apex in both modes.
+  for (const t of tips) {
+    if (Math.abs(t.y) > AXIS_EPS) continue;
+    const q = nearestOnPolyline(t, rim);
+    if (q.d < captureDist) meet(t, q, false);
+  }
+
+  // +Y tips near the rim (their -Y twins are produced by mirroring, keeping the
+  // network exactly bilaterally symmetric).
+  const plus = tips
+    .filter((t) => t.y > AXIS_EPS)
+    .map((t) => ({ t, q: nearestOnPolyline(t, rim) }))
+    .filter((o) => o.q.d < captureDist);
+
+  if (mode === 'meet') {
+    for (const o of plus) meet(o.t, o.q, true);
+  } else {
+    plus.sort((a, b) => a.q.param - b.q.param);   // order along the margin
+    const BOW = 0.55;                              // how far the arcade bows toward the rim
+    for (let i = 0; i < plus.length; i += 2) {
+      if (i + 1 < plus.length && Math.hypot(plus[i + 1].t.x - plus[i].t.x, plus[i + 1].t.y - plus[i].t.y) > 1e-3) {
+        const A = plus[i].t, B = plus[i + 1].t;
+        const M = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+        const Mr = nearestOnPolyline(M, rim);
+        const Ctrl = { x: lerp(M.x, Mr.x, BOW), y: lerp(M.y, Mr.y, BOW) };
+        const seg = { points: quadBezier(A, Ctrl, B, 6), w0: TERM_W0, w1: TERM_W0 };
+        extra.push(seg, mirror(seg));
+        nodes.push({ x: A.x, y: A.y, width: TERM_W0 }, { x: B.x, y: B.y, width: TERM_W0 });
+        nodes.push({ x: A.x, y: -A.y, width: TERM_W0 }, { x: B.x, y: -B.y, width: TERM_W0 });
+      } else {
+        meet(plus[i].t, plus[i].q, true);          // odd tip out -> meet the rim
+      }
+    }
+  }
+  return { veins: extra, nodes };
 }
 
 

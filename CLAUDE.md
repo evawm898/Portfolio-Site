@@ -43,6 +43,26 @@ them as optional or experimental.
   `node tools/verify-flower-export.mjs`. It renders the page headless, exports an
   STL across a range of configurations (add yours to it), and fails if any export
   has boundary edges > 0. A change is not finished until this passes.
+- **Watertight is necessary, not sufficient — also run the geometry-quality gate:**
+  `node tools/verify-geometry-quality.mjs`. The export gate only proves manifoldness; a
+  petal can be watertight and the WRONG SHAPE (e.g. the un-clefted continuous-margin rim
+  skipping a Lobed sinus). This gate measures correctness — margin fidelity (does the
+  rendered rim trace the material boundary?), contour smoothness, and uncapped infill
+  ends — across the shape × pattern matrix. Known, tracked defects are marked xfail so
+  the gate is hard for everything that ships. Add new shape/pattern configs to it.
+- **Presets are permanent, named fixtures in BOTH gates.** Every shipped preset in
+  `flower-presets.js` is loaded by name in `verify-flower-export.mjs` (must export
+  watertight) and `verify-geometry-quality.mjs` (its petal must trace, stay smooth, cap
+  its ends) — so a preset regression reads "preset: thistle", not "config N". A preset is
+  authored data (taste), so it is a readable DELTA over DEFAULTS and loads through the
+  normal `applyDesign` path; it can never desync from the control set. When you add or
+  change a preset, both gates cover it automatically — just re-run them.
+- **Preset thumbnails are a build-time artifact, never rendered at runtime.** Regenerate
+  them (and the drift manifest) with `node tools/gen-preset-thumbs.mjs` and commit
+  `assets/presets/`; the `preset-thumbs` CI job runs `--check` (a deterministic tris + bbox
+  diff, GPU-independent) and fails if a preset's shape drifted without the thumbnails being
+  regenerated. The shipped gallery is read-only for visitors; the `?dev` authoring row
+  (save-as / export paste-ready source / import) is the tool for editing the set.
 - **A correct-looking screen render is not proof.** Geometry can look right live
   and still export broken. Never rely on the visual alone.
 - **If a feature cannot be built in a watertight way, STOP and flag it to the user
