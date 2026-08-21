@@ -286,7 +286,13 @@ class ShellModel:
                 if isinstance(depth, ApexBustDepth):
                     return object.__new__(ApexShellModel)
                 from compound import CompoundDepth, CompoundShellModel
-                if isinstance(depth, CompoundDepth):
+                # duck-typed: an authored (not frozen-perimeter-solved)
+                # front/back curves object — shape_state.CompoundShapeCurves
+                # — carries the same is_compound marker rather than
+                # inheriting CompoundDepth (whose __init__ solves a(v)
+                # against a frozen schedule; the shape editor authors a(v)
+                # directly). Same theta-aware section geometry either way.
+                if isinstance(depth, CompoundDepth) or getattr(depth, "is_compound", False):
                     return object.__new__(CompoundShellModel)
         return object.__new__(cls)
 
@@ -390,27 +396,43 @@ class ShellModel:
                     f"authored depth covers [{lo:.1f}, {hi:.1f}] mm but the "
                     f"shell needs [{self.z_bottom:.1f}, {self.z_top:.1f}] — "
                     f"refusing to extrapolate a measurement")
-            self._circ_bodice = (circumference_schedule() if self.sections
-                                 else None)
-            # a(z) precomputed per segment (Newton once on a dense grid,
-            # then PCHIP) so semi_axes stays as fast as the ratio solve;
-            # segments stay separate so the waist crease survives
-            from scipy.interpolate import PchipInterpolator
-            tabs = []
-            worst = 0.0
-            segs = [(self.z_bottom, 0.0, 1401)]
-            if self.z_top > 1e-9:
-                segs.append((0.0, self.z_top, 801))
-            for z0, z1, n in segs:
-                zg = np.linspace(z0, z1, n)
-                bg = np.asarray(self.depth.b(zg), dtype=float)
-                Pg = np.asarray(self._perimeter_schedule(zg), dtype=float)
-                ag = solve_a_given_b(Pg, bg)
-                tabs.append((z0, z1, PchipInterpolator(zg, ag)))
-                worst = max(worst, float(np.max(np.abs(
-                    ellipse_perimeter(ag, bg) - Pg))))
-            self._a_tab = tabs
-            self.depth_solve_residual_mm = worst
+            # This block builds a(z) by solving a SINGLE ellipse against
+            # depth.b() and the ratio/anchor perimeter schedule -- only
+            # meaningful when the base semi_axes() (which reads _a_tab)
+            # is actually what's in force. Subclasses with their own
+            # theta-aware section geometry (ApexShellModel,
+            # CompoundShellModel and the compound-curves shape-editor
+            # variant) override semi_axes() completely and never consult
+            # _a_tab, so skip it there -- it's not just wasted work, it
+            # can raise spuriously for an AUTHORED (not frozen-perimeter-
+            # solved) depth: it would solve for the `a` a single ellipse
+            # (depth.b() alone) needs to reproduce THIS depth's own
+            # derived perimeter, which for a compound front/back depth is
+            # a different (and sometimes infeasible) target than the
+            # true compound solve two independent half-ellipses actually
+            # satisfy.
+            if type(self).semi_axes is ShellModel.semi_axes:
+                self._circ_bodice = (circumference_schedule() if self.sections
+                                     else None)
+                # a(z) precomputed per segment (Newton once on a dense grid,
+                # then PCHIP) so semi_axes stays as fast as the ratio solve;
+                # segments stay separate so the waist crease survives
+                from scipy.interpolate import PchipInterpolator
+                tabs = []
+                worst = 0.0
+                segs = [(self.z_bottom, 0.0, 1401)]
+                if self.z_top > 1e-9:
+                    segs.append((0.0, self.z_top, 801))
+                for z0, z1, n in segs:
+                    zg = np.linspace(z0, z1, n)
+                    bg = np.asarray(self.depth.b(zg), dtype=float)
+                    Pg = np.asarray(self._perimeter_schedule(zg), dtype=float)
+                    ag = solve_a_given_b(Pg, bg)
+                    tabs.append((z0, z1, PchipInterpolator(zg, ag)))
+                    worst = max(worst, float(np.max(np.abs(
+                        ellipse_perimeter(ag, bg) - Pg))))
+                self._a_tab = tabs
+                self.depth_solve_residual_mm = worst
 
     def _perimeter_schedule(self, z):
         """P(z): the KNOWN circumference at every height — superellipse

@@ -445,11 +445,19 @@ class CompoundShellModel(ShellModel):
     """ShellModel with compound sections. Everything that depends only on
     the FROZEN perimeter schedule (mean_radius, mean_slope, the neckline,
     the fillet, the equal-arc angle definition) is inherited unchanged;
-    the section geometry is overridden."""
+    the section geometry is overridden.
+
+    Needs a CompoundDepth OR anything duck-typing the same interface
+    (.a/.da/.b_front/.db_front/.b_back/.db_back/.perimeter/.P_front/
+    .P_back/.dP_front/.dP_back/.v_lo/.v_hi) with an `is_compound = True`
+    marker — shape_state.CompoundShapeCurves is the authored-not-solved
+    variant the shape editor uses; this class doesn't care which."""
 
     def __init__(self, params: ShellParams):
-        if not isinstance(params.depth_curve, CompoundDepth):
-            raise CompoundError("CompoundShellModel needs a CompoundDepth")
+        depth = params.depth_curve
+        if not (isinstance(depth, CompoundDepth) or getattr(depth, "is_compound", False)):
+            raise CompoundError("CompoundShellModel needs a CompoundDepth "
+                                "(or an is_compound duck-type)")
         super().__init__(params)
         self.cd = params.depth_curve
 

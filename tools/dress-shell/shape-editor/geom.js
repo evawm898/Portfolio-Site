@@ -75,35 +75,49 @@ function arcAndSpeed(t, a, b) {
   return { arc: half * arc, speed: Math.hypot(a * Math.cos(t), b * Math.sin(t)) };
 }
 
-function paramFromArcAngle(thetaRad, a, b, req) {
-  let t = thetaRad;
-  for (let k = 0; k < 7; k++) {
-    const { arc, speed } = arcAndSpeed(t, a, b);
-    t -= (arc - thetaRad * req) / speed;
-  }
-  return t;
+// Compound mean-Ramanujan perimeter — same formula as compound.py's
+// compound_perimeter (front half-ellipse + back half-ellipse, mean).
+export function compoundPerimeter(a, bf, bb) {
+  return 0.5 * (ellipsePerimeter(a, bf) + ellipsePerimeter(a, bb));
 }
 
-// A coarse ShellModel-equivalent, built directly from edited a(v)/b(v)
-// fits (both now genuinely authored — see shape_editor_server.py's
-// ShapeCurves). Mirrors shell.py's ShellModel.point() (equal-arc
-// elliptical sections) — mesh triangulation only, no frame()/curvature
-// (that stays server-side: the full curvature/seatability sweep is
-// expensive and only ever runs on release, see editor.js).
-export class CoarseShell {
-  constructor(aFit, bFit, zLo, zHi, splitThetaDeg) {
-    this.aFit = aFit;
-    this.bOf = bFit;
-    this.zLo = zLo;
-    this.zHi = zHi;
+// A coarse CompoundShellModel-equivalent, built directly from edited
+// a(v)/b_front(v)/b_back(v) fits. Ports compound.py's CompoundShellModel
+// .param_from_arc_angle/.point: front half-ellipse (a, b_front) owns
+// |theta| <= 90deg, back half-ellipse (a, b_back) owns the rest, target
+// arc rebased through the junction — same per-half Newton solve, just
+// fewer iterations (coarse). Mesh triangulation only, no frame()/
+// curvature (that stays server-side — the full sweep is expensive and
+// only ever runs on release, see editor.js).
+export class CompoundCoarseShell {
+  constructor(aFit, bfFit, bbFit, zLo, zHi, splitThetaDeg) {
+    this.aFit = aFit; this.bfFit = bfFit; this.bbFit = bbFit;
+    this.zLo = zLo; this.zHi = zHi;
     this.splitTheta = splitThetaDeg * Math.PI / 180;
   }
 
+  paramFromArcAngle(thetaRad, a, bf, bb) {
+    const theta = ((thetaRad + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    const P = ellipsePerimeter(a, bf) + ellipsePerimeter(a, bb);   // = 2x compound mean
+    const target = P * Math.abs(theta) / (2 * Math.PI);
+    const quarterF = arcAndSpeed(0.5 * Math.PI, a, bf).arc;
+    const quarterB = arcAndSpeed(0.5 * Math.PI, a, bb).arc;
+    const front = target <= quarterF;
+    const tgt = front ? target : target - quarterF + quarterB;
+    const bUse = front ? bf : bb;
+    let t = Math.min(Math.abs(theta), Math.PI);
+    for (let k = 0; k < 7; k++) {
+      const { arc, speed } = arcAndSpeed(t, a, bUse);
+      t = Math.max(0, Math.min(Math.PI, t - (arc - tgt) / speed));
+    }
+    return Math.sign(theta) * t;
+  }
+
   point(thetaRad, z) {
-    const a = this.aFit(z), b = this.bOf(z);
-    const req = ellipsePerimeter(a, b) / (2 * Math.PI);
-    const t = paramFromArcAngle(thetaRad, a, b, req);
-    return [a * Math.sin(t), b * Math.cos(t), z];
+    const a = this.aFit(z), bf = this.bfFit(z), bb = this.bbFit(z);
+    const t = this.paramFromArcAngle(thetaRad, a, bf, bb);
+    const bSel = Math.cos(t) >= 0 ? bf : bb;
+    return [a * Math.sin(t), bSel * Math.cos(t), z];
   }
 
   // FRONT/BACK triangulated meshes, coarse resolution (n_theta cols,
@@ -165,10 +179,10 @@ export const TAPE_ANCHORS = [
   ["bust", 203.2, 825.5], ["above-bust", 254.0, 812.8],
 ];
 
-export function coarseCircumferenceReport(aFit, bFit, vLo, vHi) {
+export function coarseCircumferenceReport(aFit, bfFit, bbFit, vLo, vHi) {
   return TAPE_ANCHORS.map(([label, v, tapeMm]) => {
     const vv = Math.max(vLo, Math.min(vHi, v));
-    const derived = ellipsePerimeter(aFit(vv), bFit(vv));
+    const derived = compoundPerimeter(aFit(vv), bfFit(vv), bbFit(vv));
     return { label, v, derived_mm: derived, tape_mm: tapeMm,
              delta_mm: derived - tapeMm, in_range: v >= vLo && v <= vHi };
   });
