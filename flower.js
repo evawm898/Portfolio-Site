@@ -27,6 +27,7 @@ import {
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
+  ribRadius, ribCenterline, ribMarginPolyline,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
@@ -71,14 +72,10 @@ const LEAF_MIN_NODES    = 2;   // selecting a leaf type auto-raises 0 stem nodes
 const JOIN_FLARE_DIST = 0.10;  // a flared tube blends into its end bead (a soft
                                // fillet) over this world distance rather than
                                // butting it with a hard cylinder-into-sphere crease
-const RIM_WIDTH       = 0.34;  // petal-margin line weight, relative to the midrib
-                               // (the leaf edge is a fine vein, not a fat rope)
-// CONTINUOUS-MARGIN strand weights (relative to the midrib). The marginal trace is a
-// MAJOR vein: thicker than the secondaries (0.52) at the foot so the order reads
-// midrib > margin > secondary, tapering to a fine tip. Rendered as a ROUND strand so it
-// continues seamlessly into the receptacle rib, not as a flat blade ribbon.
-const MARGIN_W_BASE   = 0.62;
-const MARGIN_W_TIP    = 0.12;
+// RIM_WIDTH / MARGIN_W_BASE / MARGIN_W_TIP (the petal-margin line weight, relative to
+// the midrib, and the continuous-margin strand's foot->tip taper) now live in
+// flower-geometry.js as the canonical rib geometry every infill pattern also clips
+// to (ribRadius/ribCenterline) — imported above, not redefined here.
 // The midrib's foot weight (matches VEIN_MIDRIB_BASE). It is a merge-tree LEAF too, so the
 // area-preserving root (r_parent^2 = sum r_child^2) lands near the stem radius on its own.
 const MIDRIB_W_BASE   = 1.00;
@@ -1029,19 +1026,18 @@ function resolveParams(ui) {
    BUNDLE TIGHTNESS sets how long it stays on the axis, FLARE RATE how fast it opens —
    a tulip-underside neck that flares, not a hoop bolted on. The render layer lofts each
    as a tapered ROUND strand so it is continuous with the receptacle rib it becomes. */
-function marginStrands(P, bundleTight, flareRate) {
-  const bt = clamp(bundleTight != null ? bundleTight : 0.5, 0, 1);
-  const fr = clamp(flareRate != null ? flareRate : 0.5, 0, 1);
+function marginStrands(P) {
+  // Centerline curve: ribCenterline(u, P, true) — the SAME function every infill
+  // pattern's boundary derives from (via ribInnerEdge), so the rendered rib and
+  // what infill clips to can never diverge. Reads P.bundleTightness/P.flareRate
+  // internally (via marginFlareFactor) rather than taking them as params.
   const nMar = 30;
-  const flareStart = lerp(0.02, 0.20, bt);                     // stays on-axis longer when tight
-  const flareEnd   = Math.min(0.96, flareStart + lerp(0.55, 0.12, fr)); // reaches the outline sooner when fast
-  const ss = (x) => { const t = clamp((x - flareStart) / ((flareEnd - flareStart) || 1e-6), 0, 1); return t * t * (3 - 2 * t); };
   const strands = [];
   for (const side of [1, -1]) {
     const points = [];
     for (let i = 0; i <= nMar; i++) {
       const u = i / nMar;
-      points.push({ x: P.L * u, y: side * petalHalfWidth(u, P) * ss(u) });
+      points.push({ x: P.L * u, y: side * ribCenterline(u, P, true) });
     }
     strands.push({ points, side });
   }
@@ -1115,11 +1111,13 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // LOOP fuses neighbouring tips into arcades. Applies to the tube infills whose
   // branches have free tips (veins, bone); the resulting struts are appended as
   // ordinary veins so they thicken (and stay watertight) through the same path.
-  // v1 captures onto the SMOOTH outline (buildSilhouette), not the serrated/ruffled
-  // rim. Off for FADE and for slab/blade infills.
+  // Captures onto ribMarginPolyline (the rib's actual INNER edge — same curve
+  // Voronoi clips to and the rendered rib occupies), not the smooth/serrated true
+  // outline: a tip that ran out to buildSilhouette would overshoot past where the
+  // rib tube actually sits. Off for FADE and for slab/blade infills.
   if (ven && ven.veins && (P.infillType === 'veins' || P.infillType === 'bone' || P.infillType === 'spacecol')
       && P.edgeTermination && P.edgeTermination !== 'fade') {
-    const term = terminateEdges(ven.veins, buildSilhouette(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist);
+    const term = terminateEdges(ven.veins, ribMarginPolyline(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist);
     for (const v of term.veins) ven.veins.push(v);
     for (const nd of term.nodes) ven.nodes.push(nd);
   }
@@ -1161,7 +1159,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       // the rim must trace the un-clefted outline to stay flush with the blade.
       const rim = (cleftConfig(P) ? buildSilhouette({ ...P, cleftDepth: 0 }, P.outlineSteps || 56) : outline).map(toWorld);
       rim.push(rim[0]);                              // close the loop at the base
-      acc.addTube(rim, P.tubeRadius * RIM_WIDTH * gThick, 0, P.rimSegments || RADIAL_SEGMENTS);
+      acc.addTube(rim, ribRadius(0, P, false), 0, P.rimSegments || RADIAL_SEGMENTS);
     }
     return;
   }
@@ -1183,8 +1181,8 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const contMargin = !!P.continuousMargin && !P.solidBlade;
   if (contMargin) {
     strandRoots = [];
-    const r0 = P.tubeRadius * MARGIN_W_BASE * gThick, r1 = P.tubeRadius * MARGIN_W_TIP * gThick;
-    for (const s of marginStrands(P, P.bundleTightness, P.flareRate)) {
+    const r0 = ribRadius(0, P, true), r1 = ribRadius(1, P, true);
+    for (const s of marginStrands(P)) {
       const wp = s.points.map(toWorld);
       acc.addTube(wp, [r0, r1], 0, P.rimSegments || RADIAL_SEGMENTS);
       const a = wp[0], b = wp[1];
@@ -1206,7 +1204,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   if (drawRim) {
     const rim = jag ? jag.rim.map(place) : outline.map(toWorld);
     rim.push(rim[0]);                            // close the loop at the petal base
-    acc.addTube(rim, P.tubeRadius * RIM_WIDTH * gThick, 0); // continuous — no join to flare
+    acc.addTube(rim, ribRadius(0, P, false), 0); // continuous — no join to flare
   }
 
   // Veins: each is a flattened-space polyline with relative end line-weights.
