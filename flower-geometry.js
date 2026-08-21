@@ -1534,7 +1534,12 @@ export function buildSpaceColonization(P, rng, opts = {}) {
 
   // ---- 3. GROW: attract -> add nodes (or fuse, in CLOSED) -> consume sources ----
   const links = [];                        // anastomoses: cross-edges that close loops
-  const nodeBudget = opts.nodeBudget || 60000;   // hard cap (perf + safety); live uses a small one
+  // Hard cap on this ONE petal's network — the only sub-step whose output can't be
+  // known ahead of time (it's a simulation, not a formula), so it can only be bounded
+  // by interrupting it, not by predicting it. flower.js derives this from the actual
+  // live/export triangle budget (#44) via a fixed nodes->triangles conversion; the
+  // 60000 fallback below only matters for a caller that doesn't pass one.
+  const nodeBudget = opts.nodeBudget || 60000;
   // enough iterations for the growth front to sweep the blade, then stop —
   // unreachable sources are abandoned rather than spun on forever.
   const maxIter = clamp(Math.ceil(L / step) * 3, 40, 500);
@@ -1667,7 +1672,11 @@ export function getSpaceColonization(P, seed, opts) {
     P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0,
     P.petalCup || 0, P.edgeProfile || 0, P.bloom, P.curl,
     P.tipStyle, P.tipLength || 0, P.tipFrequency || 0, P.edgeNoise || 0, P.edgeNoiseScale || 0,
-    seed, opts.mode, opts.sourceCount, opts.birthDist, opts.killDist, opts.growthStep, opts.seedPattern,
+    // nodeBudget is IN the key (not just a perf knob): flower.js now derives it from
+    // the live/export triangle budget (#44), so the same shape+seed+sourceCount can
+    // legitimately resolve to two different networks depending on which budget is
+    // asking — caching past that would silently hand one path the other's result.
+    seed, opts.mode, opts.sourceCount, opts.birthDist, opts.killDist, opts.growthStep, opts.seedPattern, opts.nodeBudget,
   ].join('|');
   let v = _scCache.get(k);
   if (!v) {
