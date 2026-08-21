@@ -33,6 +33,7 @@ import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
 import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
 import { VIEW_PRESETS } from './flower-view-presets.js';
+import { SHAPES, SHAPE_PARAMS } from './flower-shapes.js';
 
 const DEG = Math.PI / 180;
 
@@ -89,6 +90,10 @@ const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap P
 const SPACECOL_LIVE_TOTAL = 5000;   // ...but bound the TOTAL across petals: a dense network on every one of
 // 40 petals is millions of live tris and can exhaust memory mid-build. Scale the per-petal cap down as the
 // petal count rises so the whole bloom stays within budget (export is unaffected — it uses the full count).
+// MUST be called with the TOTAL petal count actually being built (P.totalPetalCount — every layer's petals
+// summed, not just the base "Number of petals" slider): a multi-layer Advanced flower with per-layer
+// overrides (petalsPerLayer) can build far more petals than that one slider says, and this cap is the only
+// thing standing between that and a live-preview memory exhaustion (see the "pc x Growth" incident).
 const spacecolLiveCap = (petalCount) => Math.max(80, Math.min(SPACECOL_LIVE_CAP, Math.floor(SPACECOL_LIVE_TOTAL / Math.max(1, petalCount || 1))));
 
 // Deterministic per-petal network seed for SPACE COLONIZATION. Mixes the design's
@@ -903,9 +908,30 @@ function rodrigues(v, k, angle) {
    geometry module. One place maps sliders to internal ranges.
    =================================================================== */
 
+// DERIVED junction: the receptacle exists whenever there is something below the
+// bloom to connect to — a stem or sepals. It's plumbing, not a feature, so there is
+// no visitor control; `receptacleType === 'on'` survives only as a migration override
+// for an old saved design that set it explicitly with no stem/sepals. ONE helper —
+// buildInto, buildBudInto, updateBaseOptions and updateReadout all call this same
+// derivation instead of each re-writing the three-clause check, which is what let one
+// copy (the receptacle-tris readout) drift stale after the others were updated.
+function resolveHasReceptacle(stemType, sepalsType, receptacleType) {
+  return stemType !== 'none' || sepalsType !== 'none' || receptacleType === 'on';
+}
+
+// Total petals actually built across every whorl — the real denominator for the live
+// space-colonization source budget (spacecolLiveCap). The base "Number of petals" slider
+// (ui.petalCount) is only layer 0's count; resolveLayerCounts is where per-layer overrides
+// (petalsPerLayer, Advanced) can push the true total well past it.
+function resolveTotalPetalCount(ui) {
+  const layerCount = clamp(Math.round(ui.layerCount), 1, 6);
+  return resolveLayerCounts(ui, layerCount).reduce((sum, n) => sum + n, 0);
+}
+
 function resolveParams(ui) {
   return {
-    petalCount: ui.petalCount,                    // bloom petal count (drives the live spacecol source budget)
+    petalCount: ui.petalCount,                    // layer-0 bloom petal count (the "Number of petals" slider)
+    totalPetalCount: resolveTotalPetalCount(ui),   // ALL petals across every layer — drives the live spacecol source budget
     W: ui.width,
     taper: ui.taper,
     clawLength: ui.clawLength,                    // CLAW: basal stalk length (0 = no claw, exact no-op)
@@ -1086,7 +1112,10 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         mode: P.spaceMode,
         // live path stays interactive with a coarse-but-complete network; the
         // export path (acc.exportMode) runs the full source count. Distinct memo keys.
-        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, spacecolLiveCap(P.petalCount)),
+        // Capped by TOTAL petals across every layer (P.totalPetalCount), not just the base
+        // slider (P.petalCount) — a multi-layer Advanced flower with per-layer overrides
+        // can build far more petals than that one slider says.
+        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, spacecolLiveCap(P.totalPetalCount)),
         birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep,
         seedPattern: P.spacePattern,
       })
@@ -1646,7 +1675,7 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
   // the bud's receptacle follows the same derived rule as the main bloom's (stem/sepals
   // present, or the migration override), so a budded plant with a stem grows a bud base too.
-  if (ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on') {
+  if (resolveHasReceptacle(ui.stemType, ui.sepalsType, ui.receptacleType)) {
     const attach = [];
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
@@ -2461,12 +2490,8 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // the stem and its tip — no seam. SEPALS remain an independent whorl. A stem
   // WITHOUT a receptacle has no junction to seam, so it keeps the standalone stem
   // tube (buildStemInto). Everything builds into the petal mesh, same teal tubes.
-  // DERIVED junction: the receptacle exists whenever there is something below the bloom to
-  // connect to — a stem or sepals. It is plumbing, not a feature, so there is no visitor
-  // control; it appears because of course it does. `receptacleType === 'on'` survives only
-  // as a migration override, so an old design that set it explicitly keeps its receptacle
-  // even with no stem/sepals.
-  const hasRecept = ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
+  // DERIVED junction — see resolveHasReceptacle's own comment for the rule.
+  const hasRecept = resolveHasReceptacle(ui.stemType, ui.sepalsType, ui.receptacleType);
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
     length: clamp(ui.stemLength, 0, 10),
@@ -3081,9 +3106,13 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : ui.infillType === 'bone' ? 'bone lattice'
     : ui.infillType === 'spacecol' ? `space colonization (${ui.spaceMode})`
     : 'leaf venation';
-  // SDF receptacle telemetry (continuous margin on): report the field's own triangle
-  // count so its contribution to the budget stays visible on every geometry change.
-  const recept = (ui.continuousMargin === 'on' && ui.receptacleType === 'on' && RECEPT_FIELD_STATS)
+  // SDF receptacle telemetry (continuous margin on, receptacle derived on): report the
+  // field's own triangle count so its contribution to the budget stays visible on every
+  // geometry change. Was gated on the retired `receptacleType === 'on'` toggle alone,
+  // which is only ever true for a migrated design — so this silently stopped firing for
+  // the shipped derived-receptacle path (stem/sepals present). Use the same derivation
+  // every other receptacle consumer uses.
+  const recept = (ui.continuousMargin === 'on' && resolveHasReceptacle(ui.stemType, ui.sepalsType, ui.receptacleType) && RECEPT_FIELD_STATS)
     ? ` · sdf receptacle ~${RECEPT_FIELD_STATS.tris.toLocaleString()} tris (abs ${(+ui.absorption).toFixed(2)})`
     : '';
   el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris${recept}`;
@@ -3188,20 +3217,17 @@ if (advancedToggle) advancedToggle.addEventListener('change', () => {
 // derived from those params, never saved — so the params stay the single source of
 // truth. When the params match no named shape the picker shows CUSTOM (a display-only
 // state, never a pickable option), so it never lies about what the geometry is.
-const SHAPE_PARAMS = ['width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup'];
-const SHAPES = {
-  rounded: { width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, edgeProfile: 0, petalCup: 0 },
-  pointed: { width: 0.7, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.4, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.15, centerCurve: 0.3, edgeCurve: -0.1, edgeProfile: 0, petalCup: 0 },
-  strap: { width: 0.45, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.3, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.3, centerCurve: 0.15, edgeCurve: 0, edgeProfile: 0, petalCup: 0.05 },
-  clawed: { width: 1.0, taper: 0.3, clawLength: 0.35, clawWidth: 0.25, shoulder: 0.55, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.6, centerCurve: 0.35, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.15 },
-  // LOBED (bifid, cleftDepth > 0) is intentionally NOT a picker bundle. The cleft renders
-  // correctly only when the rim is cleft-aware (continuous margin OFF); with the Standard
-  // default (margin ON) the two un-clefted marginal strands skip the sinus, so a one-click
-  // Lobed would ship a manifold-but-wrong petal (tools/verify-geometry-quality.mjs measures
-  // an ~8-19 mm unsealed gap across the whole cleftDepth range). Cleft params stay available
-  // in Advanced (a hand-dialled cleft shows as CUSTOM); Lobed returns as a named shape once
-  // #64 makes marginStrands cleft-aware.
-};
+// SHAPE_PARAMS / SHAPES (the ROUNDED/POINTED/STRAP/CLAWED bundles) now live in
+// flower-shapes.js — the single copy this picker and its correctness gate
+// (tools/verify-geometry-quality.mjs) both import, so they can't drift the way a
+// second hand-kept copy already had. LOBED (bifid, cleftDepth > 0) is intentionally
+// NOT one of these bundles: the cleft renders correctly only when the rim is
+// cleft-aware (continuous margin OFF); with the Standard default (margin ON) the two
+// un-clefted marginal strands skip the sinus, so a one-click Lobed would ship a
+// manifold-but-wrong petal (tools/verify-geometry-quality.mjs measures an ~8-19 mm
+// unsealed gap across the whole cleftDepth range). Cleft params stay available in
+// Advanced (a hand-dialled cleft shows as CUSTOM); Lobed returns as a named shape
+// once #64 makes marginStrands cleft-aware.
 // Write a named bundle to every silhouette param, re-detect (lands on the picked
 // shape), and rebuild. CUSTOM is never applicable — it is only ever a detected state.
 function applyShape(name) {
@@ -3378,17 +3404,24 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 // Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
   // The junction is DERIVED (stem or sepals present), not a control — so the Advanced
-  // sculpting controls (data-recept + the junction cluster) appear exactly when the
-  // derived receptacle is active. receptacleType is a hidden migration override only.
-  const on = inputs.stemType.value !== 'none' || inputs.sepalsType.value !== 'none' || inputs.receptacleType.value === 'on';
+  // sculpting controls (data-recept + the receptacle-only part of the junction cluster)
+  // appear exactly when the derived receptacle is active. receptacleType is a hidden
+  // migration override only.
+  const on = resolveHasReceptacle(inputs.stemType.value, inputs.sepalsType.value, inputs.receptacleType.value);
   const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
   document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
-  // JUNCTION cluster (absorption / neck swell / gather height / bundle tightness / flare
-  // rate): these shape the SDF receptacle, which only exists when continuous margin is ON
-  // AND the Receptacle is on. Gating on continuous margin alone left them inert in the
-  // default config (Receptacle off) — so require both, or they do nothing when shown.
+  // JUNCTION cluster splits in two, by what each control actually shapes:
+  //   - BUNDLE TIGHTNESS / FLARE RATE (data-cont-margin) set the petal-edge marginStrand
+  //     splay on EVERY continuous-margin petal, receptacle or not (marginStrands(P,
+  //     P.bundleTightness, P.flareRate) runs whenever continuous margin is on — see
+  //     flower.js's petal build). Gating these on the receptacle too hid two live,
+  //     functional controls on the common bloom-only flower with no way to reach them.
+  //   - ABSORPTION / NECK SWELL / GATHER HEIGHT (data-recept-margin) shape the SDF
+  //     receptacle field itself (buildReceptacleField), which only exists when continuous
+  //     margin is ON AND the receptacle is derived on — so these three need both.
   const contMarginOnJ = inputs.continuousMargin.value === 'on';
-  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !(contMarginOnJ && on); });
+  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !contMarginOnJ; });
+  document.querySelectorAll('[data-recept-margin]').forEach((el) => { el.hidden = !(contMarginOnJ && on); });
   // Per-axis sub-controls: only shown when the receptacle is on AND that axis is selected.
   document.querySelectorAll('[data-recept-dome]').forEach((el) => { el.hidden = !on || prof !== 'dome'; });
   document.querySelectorAll('[data-recept-open]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'gathered' && con !== 'cored'); });

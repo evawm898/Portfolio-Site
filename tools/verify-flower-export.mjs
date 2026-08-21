@@ -22,31 +22,24 @@
  * at a chrome binary, else it auto-detects a pre-installed one, else it falls
  * back to playwright-core's default resolution.
  *
- * RUN:  node tools/verify-flower-export.mjs
- * When you add a geometry feature, add a config below that exercises it.
+ * RUN:  node tools/verify-flower-export.mjs           # full sweep (~140 configs, several minutes)
+ *       node tools/verify-flower-export.mjs --smoke   # curated subset (configs marked smoke:true
+ *                                                      # below, plus every shipped preset) for fast
+ *                                                      # per-commit CI — see .github/workflows/
+ *                                                      # flower-gates.yml. The full sweep still runs
+ *                                                      # on demand (workflow_dispatch) and locally.
+ * When you add a geometry feature, add a config below that exercises it; mark it smoke:true too
+ * if it is a headline case worth catching on every commit rather than only on demand.
  */
 import { chromium } from 'playwright-core';
-import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { findChromium, serveRepo, routeThreeCDN } from './flower-gate-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const THREE_VERSION = '0.161.0';   // must match the importmap in flower.html
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
-
-function findChromium() {
-  if (process.env.CHROMIUM_EXECUTABLE && fs.existsSync(process.env.CHROMIUM_EXECUTABLE)) return process.env.CHROMIUM_EXECUTABLE;
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  try {
-    for (const d of fs.readdirSync(base)) {
-      if (!d.startsWith('chromium-')) continue;
-      const p = path.join(base, d, 'chrome-linux', 'chrome');
-      if (fs.existsSync(p)) return p;
-    }
-  } catch { /* fall through */ }
-  return undefined;   // let playwright-core resolve its default
-}
+const SMOKE = process.argv.includes('--smoke');
 
 // Boundary/non-manifold analysis of a binary STL. Vertices are quantised so
 // coincident corners of adjacent closed shells weld; an undirected edge used by
@@ -72,10 +65,10 @@ function analyzeStl(buf) {
 // Each config: a label + UI mutations {id, value, evt}. 'change' for <select>,
 // 'input' (default) for sliders. Applied on top of the previous config's state.
 const CONFIGS = [
-  { label: 'default (veins)', set: [] },
-  { label: 'voronoi', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }] },
-  { label: 'strands', set: [{ id: 'infillType', value: 'strands', evt: 'change' }] },
-  { label: 'bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }] },
+  { label: 'default (veins)', smoke: true, set: [] },
+  { label: 'voronoi', smoke: true, set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }] },
+  { label: 'strands', smoke: true, set: [{ id: 'infillType', value: 'strands', evt: 'change' }] },
+  { label: 'bone', smoke: true, set: [{ id: 'infillType', value: 'bone', evt: 'change' }] },
   { label: 'lace', set: [{ id: 'infillType', value: 'lace', evt: 'change' }] },
   { label: 'veins FADE (legacy termination)', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'fade', evt: 'change' }] },
   { label: 'veins MEET termination', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
@@ -86,16 +79,20 @@ const CONFIGS = [
   { label: 'voronoi shared grammar (aniso + density law + weight + slab taper)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'density', value: '10' }, { id: 'voronoiAniso', value: '2.5' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'voronoiWeight', value: '1' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0.6' }] },
   { label: 'space colonization CLOSED (loops) + LOOP termination', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }] },
   { label: 'space colonization OPEN (tree) + MEET termination', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'open', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
-  { label: 'space colonization dense + RANDOM pattern + serrated', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'spaceDensity', value: '0.9' }, { id: 'spacePattern', value: 'random', evt: 'change' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.4' }] },
+  { label: 'space colonization dense + RANDOM pattern + serrated', smoke: true, set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'spaceDensity', value: '0.9' }, { id: 'spacePattern', value: 'random', evt: 'change' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.4' }] },
   { label: '+ strap sepals', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }] },
   { label: '+ solid sepals', set: [{ id: 'sepalStyle', value: 'solid', evt: 'change' }] },
-  { label: 'full plant (FLARE/SOLID receptacle + stem + solid sepals)', set: [{ id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
+  // infillType reset to veins: in the full sequential run this inherits 'veins' from
+  // '+ strap sepals' (two configs up); --smoke skips that config, so this must be
+  // self-contained or it silently inherits 'spacecol' from the smoke-tagged
+  // space-colonization config above and builds a far heavier export than intended.
+  { label: 'full plant (FLARE/SOLID receptacle + stem + solid sepals)', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }] },
   { label: 'receptacle CONE/RIBBED (ex-ironwork) + stem', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'ribMultiplier', value: '1.5' }, { id: 'spiralTightness', value: '0.7' }, { id: 'spiralThickness', value: '0.6' }] },
   { label: 'receptacle RIBBED dense + thin ribs (min feature)', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'ribMultiplier', value: '3' }, { id: 'receptSolidity', value: '1' }, { id: 'spiralTightness', value: '1' }, { id: 'spiralThickness', value: '0' }] },
   { label: 'receptacle DOME/SOLID (ex-bulb) + stem', set: [{ id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'ribMultiplier', value: '1' }, { id: 'spiralThickness', value: '0.5' }, { id: 'bulbSize', value: '0.7' }, { id: 'bulbHeight', value: '0.7' }] },
   { label: 'receptacle CONE/RIBBED (ex-soft; GATHERED retired) + open solidity', set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptConstruction', value: 'ribbed', evt: 'change' }, { id: 'receptSolidity', value: '0.3' }, { id: 'blendSmoothness', value: '0.8' }] },
   { label: '+ 3 layers (uniform count)', set: [{ id: 'layerCount', value: '3' }] },
-  { label: '+ 4 layers, per-layer counts (rose/peony)', set: [{ id: 'layerCount', value: '4' }, { id: 'petalsPerLayer', value: '6,10,14,18' }] },
+  { label: '+ 4 layers, per-layer counts (rose/peony)', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'layerCount', value: '4' }, { id: 'petalsPerLayer', value: '6,10,14,18' }] },
   { label: 'petal cup +1 (cupped, single layer)', set: [{ id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'petalCup', value: '1' }] },
   { label: 'petal cup -1 (reflexed) + solid sepals', set: [{ id: 'petalCup', value: '-1' }] },
   { label: 'radial rosette (flat, no sphere)', set: [{ id: 'petalCup', value: '0' }, { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '8' }] },
@@ -116,7 +113,9 @@ const CONFIGS = [
   // receptacle WITHOUT a stem — the lofted trunk must still seal (bottom cap at the neck).
   { label: 'trunk: receptacle only, no stem, high blend', set: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '0.8' }] },
   // many attachments (petals + solid sepals) + tight deep neck — drives the sector count M toward its cap.
-  { label: 'trunk: 20 petals + solid sepals, tight deep neck + stem', set: [{ id: 'petalCount', value: '20' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'convergenceTightness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'stemThickness', value: '2.5' }, { id: 'stemNodeCount', value: '5' }, { id: 'stemNodeProminence', value: '1' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'whorled', evt: 'change' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  // infillType reset to veins for the same reason as 'full plant' above (see its comment) —
+  // with tight stemBudMode this also builds a spacecol side bud, compounding the cost.
+  { label: 'trunk: 20 petals + solid sepals, tight deep neck + stem', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '20' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'convergenceTightness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'stemThickness', value: '2.5' }, { id: 'stemNodeCount', value: '5' }, { id: 'stemNodeProminence', value: '1' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'whorled', evt: 'change' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   // SIDE-BUD RECEPTACLE: the bud gets its own scaled receptacle (buildTrunkInto in the
   // bud's own accumulator) when BOTH the receptacle dropdown and the side-bud dropdown
   // are on. Its neck bottom cap seals inside the offshoot tube (overlapping closed
@@ -124,7 +123,7 @@ const CONFIGS = [
   // relevant id) so it does not depend on carried state.
   { label: 'bud receptacle: early bud + blended receptacle + stem, deep neck', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '5' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemThickness', value: '1' }, { id: 'stemNodeCount', value: '0' }, { id: 'stemNodeProminence', value: '0' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'convergenceTightness', value: '0.7' }, { id: 'stemBudMode', value: 'early', evt: 'change' }] },
   // low blend => sharpest bud flutes (highest sector count), plus the pricey voronoi bud.
-  { label: 'bud receptacle: tight bud + voronoi + sharp flutes (low blend)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'blendSmoothness', value: '0' }, { id: 'receptacleDepth', value: '0.6' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
+  { label: 'bud receptacle: tight bud + voronoi + sharp flutes (low blend)', smoke: true, set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'blendSmoothness', value: '0' }, { id: 'receptacleDepth', value: '0.6' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   // Stem length range now 0..10 (default 4). Exercise the new MAX and the 0 = no-stem edge.
   { label: 'stem length MAX (10) + receptacle + tight bud', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'blendSmoothness', value: '1' }, { id: 'receptacleDepth', value: '1' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptConstruction', value: 'solid', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemLength', value: '10' }, { id: 'stemBudMode', value: 'tight', evt: 'change' }] },
   // stem length 0 with a stem + receptacle both enabled => no stem zone; the receptacle
@@ -144,7 +143,7 @@ const CONFIGS = [
   // CLAW / caryophyllaceous silhouette (kept LAST so the cumulative state these
   // configs set never leaks into the configs above). The first config resets the
   // scene back to a clean single-whorl petal so the claw cases stay interpretable.
-  { label: 'CLAW veins (caryophyllaceous, L.35)', set: [{ id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'edgeCurve', value: '0' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'clawLength', value: '0.35' }] },
+  { label: 'CLAW veins (caryophyllaceous, L.35)', smoke: true, set: [{ id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'edgeCurve', value: '0' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'clawLength', value: '0.35' }] },
   { label: 'CLAW voronoi + density law (neck crowds, floor culls)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'clawLength', value: '0.35' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'density', value: '10' }] },
   { label: 'CLAW strands', set: [{ id: 'infillType', value: 'strands', evt: 'change' }, { id: 'clawLength', value: '0.4' }] },
   { label: 'CLAW spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'clawLength', value: '0.35' }] },
@@ -158,8 +157,8 @@ const CONFIGS = [
   { label: 'THICKNESS taper + knife + thin global', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'thickTaper', value: '1' }, { id: 'thickEdge', value: '1' }, { id: 'thickScale', value: '0.6' }] },
   { label: 'THICKNESS knife on SOLID leaf blade (b, per-vertex)', set: [{ id: 'stemType', value: 'stem', evt: 'change' }, { id: 'stemNodeCount', value: '3' }, { id: 'leafType', value: 'oval', evt: 'change' }, { id: 'leafPhyllotaxy', value: 'alternate', evt: 'change' }, { id: 'thickEdge', value: '1' }, { id: 'thickTaper', value: '0.8' }] },
   { label: 'SURFACE all: relief + twist + skew + knife', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'reliefAmp', value: '0.6' }, { id: 'petalTwist', value: '0.5' }, { id: 'petalSkew', value: '0.4' }, { id: 'thickTaper', value: '0.8' }, { id: 'thickEdge', value: '1' }] },
-  { label: 'reset to a clean single petal (for LOBED block)', set: [{ id: 'petalCount', value: '1' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'density', value: '7' }, { id: 'voronoiAniso', value: '1' }, { id: 'voronoiDensityLaw', value: '0' }, { id: 'voronoiLloyd', value: '8' }, { id: 'voronoiWeight', value: '0' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0' }, { id: 'reliefAmp', value: '0' }, { id: 'petalTwist', value: '0' }, { id: 'petalSkew', value: '0' }, { id: 'thickTaper', value: '0' }, { id: 'thickEdge', value: '0' }, { id: 'thickScale', value: '1' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
-  { label: 'LOBED bifid voronoi (cleft 0.5)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
+  { label: 'reset to a clean single petal (for LOBED block)', smoke: true, set: [{ id: 'petalCount', value: '1' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'density', value: '7' }, { id: 'voronoiAniso', value: '1' }, { id: 'voronoiDensityLaw', value: '0' }, { id: 'voronoiLloyd', value: '8' }, { id: 'voronoiWeight', value: '0' }, { id: 'voronoiWeightFalloff', value: '1.5' }, { id: 'voronoiSlabTaper', value: '0' }, { id: 'reliefAmp', value: '0' }, { id: 'petalTwist', value: '0' }, { id: 'petalSkew', value: '0' }, { id: 'thickTaper', value: '0' }, { id: 'thickEdge', value: '0' }, { id: 'thickScale', value: '1' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
+  { label: 'LOBED bifid voronoi (cleft 0.5)', smoke: true, set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
   { label: 'LOBED bifid veins + LOOP termination', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }, { id: 'edgeTermination', value: 'loop', evt: 'change' }] },
   { label: 'LOBED ragged robin (4 lobes, cleft 0.55) veins', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '4' }, { id: 'cleftWidth', value: '0.35' }] },
   { label: 'LOBED 4-lobe voronoi + anisotropy (per-point T metric)', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '4' }, { id: 'voronoiAniso', value: '2.5' }, { id: 'voronoiDensityLaw', value: '1' }, { id: 'density', value: '5' }] },
@@ -179,7 +178,7 @@ const MPROFILES = ['flare', 'dome', 'cone', 'urn', 'gentle'];
 const MCONS = ['solid', 'ribbed', 'cored'];   // GATHERED retired (folded onto RIBBED)
 const MCOLLARS = ['none', 'band', 'ferrule'];
 const MATRIX_START = CONFIGS.length + 1;   // 1-based index of the first matrix row (for the pass fraction)
-CONFIGS.push({ label: 'matrix reset: clean 9-petal bloom + stem + receptacle ON', set: [
+CONFIGS.push({ label: 'matrix reset: clean 9-petal bloom + stem + receptacle ON', smoke: true, set: [
   { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
   { id: 'cleftDepth', value: '0' }, { id: 'cleftLobes', value: '2' }, { id: 'clawLength', value: '0' }, { id: 'clawWidth', value: '0.15' }, { id: 'shoulder', value: '0' }, { id: 'edgeCurve', value: '0' },
   { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'loop', evt: 'change' },
@@ -188,7 +187,9 @@ CONFIGS.push({ label: 'matrix reset: clean 9-petal bloom + stem + receptacle ON'
   { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptReach', value: '0.3' }, { id: 'receptSolidity', value: '0.5' }, { id: 'ribMultiplier', value: '1.5' },
 ] });
 for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOLLARS) {
-  CONFIGS.push({ label: `matrix ${prof}/${con}/${collar}`, matrix: true, set: [
+  // One representative row (dome/ribbed/band) also runs in --smoke; the full 45-row sweep
+  // is workflow_dispatch-only (see .github/workflows/flower-gates.yml).
+  CONFIGS.push({ label: `matrix ${prof}/${con}/${collar}`, matrix: true, smoke: prof === 'dome' && con === 'ribbed' && collar === 'band', set: [
     { id: 'receptProfile', value: prof, evt: 'change' },
     { id: 'receptConstruction', value: con, evt: 'change' },
     { id: 'receptCollar', value: collar, evt: 'change' },
@@ -204,7 +205,7 @@ for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOL
 // params, profile, collar, infills, bloom types, layers and sepals —
 // every one must still export watertight (0 boundary edges).
 const CM_START = CONFIGS.length + 1;   // 1-based index of the first continuous-margin row
-CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm: true, set: [
+CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm: true, smoke: true, set: [
   { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
   { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' }, { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'loop', evt: 'change' },
   { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'strap', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' },
@@ -241,17 +242,13 @@ const { PRESETS } = await import(pathToFileURL(path.join(ROOT, 'flower-presets.j
 const PRESET_START = CONFIGS.length + 1;   // 1-based index of the first preset row
 for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, preset: true, presetSlug: p.slug });
 
-const server = http.createServer((req, res) => {
-  let p = decodeURIComponent(req.url.split('?')[0]);
-  if (p === '/') p = '/flower.html';
-  fs.readFile(path.join(ROOT, p), (err, data) => {
-    if (err) { res.writeHead(404); res.end('not found'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream' });
-    res.end(data);
-  });
-});
-await new Promise((r) => server.listen(0, r));
-const port = server.address().port;
+// --smoke: a curated subset (configs marked smoke:true above) plus every shipped preset
+// (they're the named regression fixtures — always worth the few extra seconds) — fast
+// enough for per-commit CI. Runs against the SAME CONFIGS list built above, cumulative
+// state and all, so it's exercising real reachable combinations, not a separate scenario.
+const RUN_CONFIGS = SMOKE ? CONFIGS.filter((c) => c.smoke || c.preset) : CONFIGS;
+
+const { server, port } = await serveRepo(ROOT);
 
 const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ viewport: { width: 1000, height: 800 }, acceptDownloads: true });
@@ -263,14 +260,9 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('dialog', (d) => d.accept().catch(() => {}));
 
 // Serve the CDN three import from the local npm package (offline + pinned).
-await page.route('**cdn.jsdelivr.net/**', (route) => {
-  const rel = new URL(route.request().url()).pathname.replace(`/npm/three@${THREE_VERSION}/`, '');
-  const fp = path.join(ROOT, 'node_modules/three', rel);
-  try { route.fulfill({ status: 200, contentType: 'text/javascript', body: fs.readFileSync(fp) }); }
-  catch { route.abort(); }
-});
+await routeThreeCDN(page, ROOT, THREE_VERSION);
 
-await page.goto(`http://localhost:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
+await page.goto(`http://127.0.0.1:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
 await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
 
 // Export STL now lives inside the collapsed "Make" accordion — open it so the click lands.
@@ -281,7 +273,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(120);
 
 const results = [];
-for (const cfg of CONFIGS) {
+for (const cfg of RUN_CONFIGS) {
   if (cfg.presetSlug) {
     // Load the preset by clicking its gallery cell — the real applyDesign path.
     const clicked = await page.evaluate((slug) => {
@@ -303,13 +295,14 @@ for (const cfg of CONFIGS) {
   const buf = fs.readFileSync(await dl.path());
   const a = analyzeStl(buf);
   results.push({ label: cfg.label, ok: a.boundary === 0, matrix: !!cfg.matrix, cm: !!cfg.cm, preset: !!cfg.preset, ...a });
+  process.stderr.write(`  [${results.length}/${RUN_CONFIGS.length}] ${a.boundary === 0 ? 'ok' : 'FAIL'}  ${cfg.label}\n`);   // live progress — this run is several minutes
 }
 
 await browser.close();
 server.close();
 
 let failed = 0;
-console.log('Flower STL export — watertightness gate\n');
+console.log(`Flower STL export — watertightness gate${SMOKE ? ` (--smoke: ${RUN_CONFIGS.length}/${CONFIGS.length} configs)` : ''}\n`);
 for (const r of results) {
   if (!r.ok) failed++;
   const detail = r.note ? r.note : `${r.tris.toLocaleString()} tris, boundaryEdges=${r.boundary}, nonManifold(overlaps)=${r.nonManifold}`;

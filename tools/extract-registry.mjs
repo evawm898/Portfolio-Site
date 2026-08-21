@@ -37,7 +37,7 @@ for (const c of controls) {
   const divAt = before.lastIndexOf('<div class="fl-ctrl"');
   const divTag = H.slice(divAt, H.indexOf('>', divAt) + 1);
   const gating = {};
-  for (const g of ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral']) {
+  for (const g of ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-recept-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral']) {
     const v = attr(divTag, g); if (v !== null) gating[g] = v;
   }
   c.divId = attr(divTag, 'id') || null;                 // imperative-gated wrapper (e.g. captureDistCtrl)
@@ -71,7 +71,7 @@ const row = (c) => {
   if (c.permanentHidden) o.permanentHidden = true;
   return o;
 };
-const header = `/* ===================================================================\n   flower-registry.js — SINGLE SOURCE OF TRUTH for the control panel.\n\n   Auto-extracted base (id / kind / range / default / label / hint / options /\n   section / gating) from flower.html by tools/extract-registry.mjs. Augmentation\n   (tier, standardLabel, declarative gate predicates) is layered on in the fields\n   marked below. The DOM, readUI, DEFAULTS, applyDesign, reset, labels, listeners\n   and the Standard/Advanced filter are all derived from this one array, so adding\n   or removing a control is a single edit here.  [P1 — work in progress]\n   =================================================================== */\n\n`;
+const header = `/* ===================================================================\n   flower-registry.js — SINGLE SOURCE OF TRUTH for the control panel.\n\n   Auto-extracted base (id / kind / range / default / label / hint / options /\n   section / gating) from flower.html by tools/extract-registry.mjs. Augmentation\n   (tier, standardLabel, declarative gate predicates) is layered on in the fields\n   marked below. readUI, DEFAULTS, applyDesign, reset, labels, listeners and the\n   Standard/Advanced filter are all DERIVED from this one array, so adding or\n   removing a control is a single edit here. The DOM itself is still hand-kept in\n   flower.html — tools/verify-registry-sync.mjs fails the build if it and this\n   array ever disagree.\n   =================================================================== */\n\n`;
 const secLine = 'export const SECTIONS = [\n' + Object.entries(SEC_LABEL).map(([id, label]) => `  { id: ${JSON.stringify(id)}, label: ${JSON.stringify(label)} },`).join('\n') + '\n];\n\n';
 const ctrlLine = 'export const CONTROLS = [\n' + params.map((c) => '  ' + JSON.stringify(row(c))).join(',\n') + ',\n];\n';
 writeFileSync(new URL('../flower-registry.js', import.meta.url), header + secLine + ctrlLine);

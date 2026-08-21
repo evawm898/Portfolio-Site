@@ -22,25 +22,16 @@
  * gates (which also load flower-presets.js by name); this script guards the pictures.
  */
 import { chromium } from 'playwright-core';
-import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { findChromium, serveRepo, routeThreeCDN } from './flower-gate-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const THREE_VERSION = '0.161.0';
 const OUT_DIR = path.join(ROOT, 'assets', 'presets');
 const CHECK = process.argv.includes('--check');
 const THUMB_PX = 400;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
-
-function findChromium() {
-  if (process.env.CHROMIUM_EXECUTABLE && fs.existsSync(process.env.CHROMIUM_EXECUTABLE)) return process.env.CHROMIUM_EXECUTABLE;
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  try { for (const d of fs.readdirSync(base)) { if (!d.startsWith('chromium-')) continue; const p = path.join(base, d, 'chrome-linux', 'chrome'); if (fs.existsSync(p)) return p; } }
-  catch { /* fall through */ }
-  return undefined;
-}
 
 // A compact, read-only hook appended to the SERVED copy of flower.js (the file on
 // disk is never touched) — enough to load a design and frame it for a screenshot.
@@ -70,30 +61,12 @@ window.__thumb = {
 };
 `;
 
-const server = http.createServer((req, res) => {
-  let u = decodeURIComponent(req.url.split('?')[0]);
-  if (u === '/') u = '/flower.html';
-  const abs = path.join(ROOT, u);
-  if (!abs.startsWith(ROOT)) { res.writeHead(403); return res.end('no'); }
-  fs.readFile(abs, (err, buf) => {
-    if (err) { res.writeHead(404); return res.end('nf'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(abs).toLowerCase()] || 'application/octet-stream' });
-    if (abs.endsWith('flower.js')) res.end(buf.toString('utf8') + '\n' + THUMB_HOOK); else res.end(buf);
-  });
-});
-
 const { PRESETS, PRESET_SCHEMA } = await import(pathToFileURL(path.join(ROOT, 'flower-presets.js')).href);
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const port = server.address().port;
+const { server, port } = await serveRepo(ROOT, { hook: THUMB_HOOK });
 const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage();
 await page.setViewportSize({ width: THUMB_PX, height: THUMB_PX });
-await page.route('**/cdn.jsdelivr.net/**', (route) => {
-  const m = route.request().url().match(new RegExp(`three@${THREE_VERSION.replace(/\./g, '\\.')}/(.*)$`));
-  if (!m) return route.continue();
-  try { return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(ROOT, 'node_modules', 'three', m[1])) }); }
-  catch { return route.fulfill({ status: 404, body: 'nf' }); }
-});
+await routeThreeCDN(page, ROOT, THREE_VERSION);
 await page.goto(`http://127.0.0.1:${port}/flower.html`, { waitUntil: 'load', timeout: 45000 });
 await page.waitForFunction('window.__thumb && window.__thumb.ready === true', { timeout: 45000 });
 await page.evaluate(() => document.body.classList.add('fl-preview'));

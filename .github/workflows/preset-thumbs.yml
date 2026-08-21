@@ -5,9 +5,11 @@
 # geometry pipeline shifted under it) without the thumbnails + manifest being regenerated.
 #
 # The check is deterministic: triangle counts and bounds are CPU-computed geometry, not
-# rasterised pixels, so it does not depend on the CI runner's GPU. It is the only
-# browser-based CI job (the export + geometry-quality gates run locally per CLAUDE.md);
-# if you regenerate presets, run `node tools/gen-preset-thumbs.mjs` and commit the result.
+# rasterised pixels, so it does not depend on the CI runner's GPU. The watertight-export
+# and geometry-quality gates also run in CI now (see flower-gates.yml — a fast smoke
+# subset per commit, the full sweep on demand); this job stays separate since it checks
+# a different thing (the committed pictures, not print-safety or shape correctness). If
+# you regenerate presets, run `node tools/gen-preset-thumbs.mjs` and commit the result.
 name: preset-thumbs
 
 on:
