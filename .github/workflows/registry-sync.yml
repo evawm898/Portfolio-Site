@@ -1,0 +1,31 @@
+# Build gate: the control registry (flower-registry.js) is the single source of
+# truth from which flower.js derives its inputs map, readUI, DEFAULTS, reset,
+# refreshLabels and the slider-listener set. This check fails the build if the
+# registry and the hand-written control markup in flower.html ever disagree, so the
+# two representations can never silently drift. Pure Node — no browser, no install.
+name: registry-sync
+
+on:
+  pull_request:
+    paths:
+      - flower.html
+      - flower-registry.js
+      - tools/verify-registry-sync.mjs
+      - .github/workflows/registry-sync.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.html
+      - flower-registry.js
+      - tools/verify-registry-sync.mjs
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Registry ⇄ flower.html must agree
+        run: node tools/verify-registry-sync.mjs

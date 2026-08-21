@@ -1,4 +1,4 @@
-# AI Textile Gauge Reader — V0
+# Automatic Textile Gauge Reader — V0
 
 An experimental computer-vision tool for measuring knitted-textile gauge
 (wales per inch / courses per inch) from a single photograph.
@@ -804,13 +804,24 @@ good one:**
 
 **Never feeds back into automatic detection.** This is a separate,
 human-in-the-loop measurement surfaced alongside the automatic wale/
-course numbers in a new "Verify by counting a repeat" panel on the
-Results step (`POST /count-repeats`) — the same spirit as the loop-
-lattice debug view being comparison-only. The user marks two points on
-the image; the panel reports the counted per-inch value, match count,
-and confidence, letting a low-confidence automatic result be checked
-against a second, independently-derived number rather than just a
-warning label.
+course numbers in a "Verify by counting a repeat" panel on the Results
+step (`POST /count-repeats`) — the same spirit as the loop-lattice debug
+view being comparison-only. The user marks two points on the image; the
+panel reports the counted per-inch value, match count, and confidence,
+letting a low-confidence automatic result be checked against a second,
+independently-derived number rather than just a warning label.
+
+**Hidden unless the automatic result is already Low confidence.** The
+panel used to be visible on every result, collapsed by default but
+always present. A real user report surfaced the problem with that: when
+this OPTIONAL secondary check itself failed (a deployment mismatch left
+`/count-repeats` unreachable on one preview), the failure read as "the
+tool doesn't work" rather than "this one extra check didn't run" — a
+confident automatic result has no need for it in the first place. The
+panel (and its own `hidden` state) is now driven by the exact same
+`overallConfidence()` threshold that already decides the "Low confidence
+— verify the detected loops" warning message, so it only appears at all
+when there's an actual reason to reach for it.
 
 ### Automatic candidate cross-checking: the same walking match, self-anchored
 
@@ -984,6 +995,100 @@ covered by a synthetic curled/distorted band still scored 0.88 overall
 consistency was only 0.50, because that term is only 20% of the weighted
 average and got diluted by everything else in the window scoring fine.
 
+### Automatic ruler calibration detection
+
+Most photos taken for this tool already have a ruler or tape measure in
+frame — the upload hint suggests including one, and manual two-point-plus-
+known-distance calibration is the one step in the whole workflow that
+can't be sanity-checked after the fact: get it wrong and every downstream
+wale/course number is silently wrong by the same factor, with nothing in
+the UI that would look "off." `detect_ruler_calibration` (analysis/
+gauge_analysis.py) tries to find the ruler automatically and propose a
+calibration for the user to review/confirm/override — `POST /detect-
+ruler` needs nothing but the uploaded file (it runs before any
+calibration exists, since its whole point is to suggest one) — same auto-
+propose-then-human-confirm pattern `propose_measurement_rois` already
+uses for measurement areas, never a silent skip of the confirm step.
+
+Deliberately classical CV, no OCR / no reading of printed numerals: a
+ruler's tick pattern is a strong, generic signal — a dense, very regular,
+high-contrast sequence of marks — reusing the same autocorrelation/peak-
+detection primitives already used for wale/course spacing
+(`_autocorrelation_spacing`, `_detect_peaks`). Metric vs. imperial is
+inferred structurally (how many minor ticks fall between two major/
+numbered ticks — ~5 or 10 → "cm", ~4/8/16 → "in") rather than by reading a
+digit, which keeps the detector generic across ruler brands/fonts but
+means the unit is always a hint, not a certainty.
+
+**A real design flaw, found and fixed during development.** The first
+version located tick X-positions correctly (`_scan_for_ruler_band` finds
+the band with the strongest tick periodicity) but couldn't tell a major
+(numbered) tick from a minor one: it measured each tick's dark-pixel
+"reach" inside that *same* tight band and normalized to the longest reach
+found. On both real fixtures every tick's reach came out ≈1.0 — the tight
+band is deliberately as short as possible (that's what makes its
+periodicity score highest), so on a real ruler it lands right against the
+ruler's own working edge, where *every* tick, major or minor, is already
+present and already touching the band's far edge. There was no headroom
+left for a longer tick to visibly stand out.
+
+The fix, `_build_reach_strip`: grow a taller strip specifically for
+measuring reach, separate from the tight band used to find tick
+X-positions. A ruler's printed body (ticks plus numerals) is close to a
+single flat brightness, almost always much brighter than both its own
+shadowed edge and whatever sits past that edge — so growing outward from
+the tight band's own brightest row, independently in each direction,
+until brightness drops below the midpoint of a wide neighborhood's
+brightest/darkest rows finds that plateau without needing to guess which
+side is "the ruler" up front. The direction that grew *less* is the
+working edge ticks are anchored to (already blocked, hard against it);
+the other is the headroom major ticks need. Reach itself changed from
+"any dark pixel's distance from some reference row" to a **contiguous**
+dark run starting at that working edge — the earlier form could be thrown
+off by unrelated dark content elsewhere in the strip (a numeral's stroke
+sitting in the same column as a short tick) that isn't actually connected
+to the tick mark.
+
+One more real failure mode, caught by inspecting the fixed output: a
+single length-ratio threshold above the median (`RULER_MAJOR_TICK_
+LENGTH_RATIO`) correctly separated whole-unit ticks from the rest on the
+jersey fixture, but also swept up half-unit ticks (longer than the finest
+ticks, shorter than whole-unit ones) as "major" — spacing between
+consecutive detected majors alternated between a full unit and a half
+unit, which would silently miscalibrate by 2x if the auto-suggested "1
+unit" span landed on a half-unit pair. `_classify_major_ticks` now also
+requires majors to stay a sparse minority of all ticks found (`RULER_MAX_
+MAJOR_FRACTION = 0.35`) — a real ruler never numbers anywhere close to
+half its ticks, so if "long" ticks are a big chunk of everything, that's
+a sign the split isn't a real major/minor hierarchy at all, and it's
+safer to report no confident split than a wrong one.
+
+**What this reliably does, and what it honestly doesn't.** On the
+`real_jersey_sample.jpg` fixture — a single ruler laid directly against
+the fabric, the ordinary case this feature targets — the suggested points
+land visually right on the real "1 inch" and "2 inch" tick marks, with
+the correct unit inferred. On `sarahmaker-knitting-gauge.jpg` — a much
+busier reference-card-style photo with rulers on multiple edges plus an
+unrelated row of yarn-wrap swatches — the periodicity-only band scorer
+sometimes locks onto that other regular content instead of either ruler;
+the majority-fraction gate above stops it from confidently mislabeling
+that as a clean major/minor split, and confidence scores measurably lower
+for this photo (~0.6 vs. ~0.85 for the clean case), but the suggested
+points themselves can still land somewhere that isn't a ruler at all.
+Disclosed as open work, not hidden — this is exactly why the frontend
+always requires the user's own confirm/override before anything gets
+used, the same safety net `propose_measurement_rois` relies on.
+
+**Tests:** `tests/test_ruler_calibration.py` — synthetic-ruler tests
+(major-tick spacing recovered, imperial/metric unit inference, confidence,
+point placement), negative/edge cases (no ruler present, `None`/empty/
+tiny images never crash), direct coverage of the reach-measurement fix
+(`_build_reach_strip` grows taller than the tight band; major and minor
+reach are actually separable; `_classify_major_ticks` rejects a non-
+sparse "majority" and accepts a sparse one), and a real-fixture regression
+locking in the jersey result. `tests/test_detect_ruler_api.py` covers the
+`POST /detect-ruler` request/response wiring.
+
 ### Image viewer pan/zoom
 
 The viewer supports panning (drag, or scroll) and zooming (Ctrl+scroll/
@@ -998,6 +1103,49 @@ the viewer's center at the current zoom (half the image's current
 on-screen size in each direction from its default centered position) —
 not just the older, much tighter "nudge the edge past the boundary by a
 fixed slack" bound.
+
+### On-image ruler overlay
+
+Once calibration is confirmed, a "Ruler" toggle appears in the viewer
+(bottom-left, next to the zoom controls). Turning it on drops a movable
+ruler graphic onto the photo, drawn at the CALIBRATED scale, so the user
+can drag it anywhere over the fabric to sanity-check the calibration
+against a feature they can see directly (a seam, a known-size object,
+their own tape measure still in frame), independent of trusting the
+numbers alone.
+
+It's drawn as a single rigid corner bracket — one arm running along
+image x, one along image y, sharing a draggable origin corner — rather
+than a lone horizontal bar, so both the wale (x) and course (y)
+directions can be checked against the same reference point at once. Each
+arm is 60mm long (enough room for a full 5cm scale AND a full 2in scale
+with some headroom) and shows BOTH a cm row and an in row simultaneously
+— like a real dual-marked ruler prints both scales on opposite edges —
+with major/minor ticks matching each system's real structure (10 minor
+per cm, 8 per inch, the same split `detect_ruler_calibration` infers
+automatically on the backend). Both scales come straight from
+`currentPixelsPerMm()`, with no dependence on which unit the user
+happened to calibrate in — the calibration is exact in either system
+regardless.
+
+Only each arm's LENGTH is drawn to scale (in natural image pixels, so it
+stays accurate at any zoom level); bar thickness and tick lengths are
+fixed display pixels, like the calibration point markers and ROI resize
+handles already are, so ticks stay legible rather than shrinking away
+when zoomed out. Dragging anywhere on either arm (or the corner handle)
+moves the whole bracket as one unit.
+
+Deliberately gated to appear only AFTER Confirm Calibration — before
+that there's no scale to draw it at — and stays available (and
+draggable) across every later step (Review Measurement Areas,
+Select Orientation, Analyze, Results) via `currentPixelsPerMm()`, the
+same live calibration helper `/analyze-multi` and `/count-repeats`
+already use, rather than a separately-stored value that could drift out
+of sync with it. A plain click-drag already pans the image on some of
+those steps (see above); `isPanTrigger` reserves the gesture for the
+ruler the same way it already reserves it for ROI/calibration
+interactions, but only when the drag actually starts on the ruler
+itself, so panning elsewhere on those steps is unaffected.
 
 ## Two deployments of the same idea
 
@@ -1196,6 +1344,14 @@ independent, user-anchored evidence source that never feeds into
 automatic detection, see [Verify by counting a repeat](
 #verify-by-counting-a-repeat-user-anchored-template-matching).
 
+`POST /detect-ruler` — multipart form: `file` only (no calibration fields
+— this runs BEFORE any calibration exists). Returns `success`,
+`point1_px`/`point2_px` (suggested calibration points), `suggested_
+distance`/`suggested_unit`, `minor_tick_spacing_px`, `major_tick_count`,
+and `confidence` — a suggestion to pre-fill the Calibrate Scale step,
+never applied without the user's own confirm/override. See [Automatic
+ruler calibration detection](#automatic-ruler-calibration-detection).
+
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.
 
@@ -1209,6 +1365,192 @@ automatic detection, see [Verify by counting a repeat](
 pip install pytest
 pytest tests/
 ```
+
+### Test harness: synthetic ground truth + metamorphic invariants
+
+Two complementary additions that test the detector in ways hand-labeled
+photos can't:
+
+**Synthetic stitch-primitive fabrics** (`tests/synthetic_fabric.py` +
+`tests/test_synthetic_fabric_gauge.py`). Renders jersey / 1×1 rib /
+garter from actual stitch primitives — a jersey stitch is a real
+two-legged V, so the leg-to-leg half-period harmonic (this project's
+single most damaging failure mode) genuinely exists in the image, unlike
+the older sinusoid fixtures which structurally cannot contain it — at
+EXACT known gauge, with composable degradations (perspective warp,
+lighting gradient, blur, JPEG round-trip, an optional yarn-ply harmonic
+trap). Ground truth lives only in `tests/`; nothing in `analysis/` can
+see it. Structures with a legitimate reading ambiguity (rib's hidden
+purl wales, garter's ridge pairs) carry BOTH truth values, and the
+scorer records which one matched rather than pretending the ambiguity
+away.
+
+Every expectation in the grid was calibrated against the real detector
+before being committed, and the calibration itself produced findings —
+encoded as **strict xfails** (they fail CI the moment a future change
+fixes them, forcing the documentation to update):
+
+- Mildly degraded jersey at 5×7 gauge flips BOTH axes to the confident
+  (~0.67) leg half-harmonic — isolated to a blur+perspective interaction
+  with one specific warp geometry (seed 7); identical degradation levels
+  at seeds 8–10 stay correct, no single degradation alone flips it, and
+  the `structure="jersey"` hint does not rescue it. The classic
+  real-photo failure, now reproducible on demand (and regression-pinned
+  from both sides: a companion test asserts seeds 8–10 stay correct).
+- Fine-gauge course axes flip to half period under mild degradation
+  (jersey) or even clean (rib); rib's course axis also reads ~18% high
+  at coarse gauge — genuinely unreliable on rib, cause not yet
+  diagnosed.
+- Fine-gauge garter wale reads the 2× bump-lattice period.
+- The ply-twist trap on clean jersey is correctly resisted (locked in
+  as a passing test — the anti-harmonic machinery earning its keep
+  against ground truth for the first time).
+
+A full degradation sweep (blur × warp × seed, diagnostic table output)
+is gated behind `TGR_FULL_SWEEP=1`.
+
+**Metamorphic invariants** (`tests/metamorphic.py` +
+`tests/test_metamorphic_fixtures.py`). For photos with NO known gauge —
+i.e. any real photo — the detector is checked against how its output
+must co-vary with known transforms: 1.5× resize scales pixel spacing by
+exactly 1.5× (tol 4%: sub-pixel refinement jitters 1–2% on these
+periods, resampling ~1%); 90° rotation with the orientation parameter
+held fixed swaps wale↔course (tol 2% — lossless, so more means
+axis-asymmetric processing); horizontal mirror is identical (tol 1%);
+halving the ROI holds density (tol 10%, and SKIPPED per axis when the
+half window would span <5 periods — below that the estimate is
+legitimately unstable, and either pass or fail would be a lie); a
+quality-60 JPEG round-trip moves the result <5%. Outcomes are
+classified, not just pass/failed: `harmonic_flip` (ratio near 0.5×/2×)
+is its own status regardless of tolerance, and `lost` another, because
+a 6% drift and a 2× flip are different bugs. Runnable on any photo
+without writing a test:
+
+```bash
+python tests/metamorphic.py path/to/photo.jpg [--roi X,Y,W,H] [--orientation vertical]
+```
+
+First run against the real jersey fixture: 7/10 outcomes passed; all
+three violations were diagnosed to a mechanism before being encoded as
+strict xfails. The biggest was a previously-unknown root cause: **the
+post-selection spacing refinement was boundary-phase sensitive** — on
+mirror, both directions selected the same 35.0px candidate with
+near-identical evidence, but the old mean-of-all-gaps refinement pulled
+it to 37.2 on the original and 34.4 on the mirror (±2.3px in opposite
+directions, straddling the candidate).
+
+**That finding has since been fixed** (see `_refine_spacing_from_
+positions`' docstring for the full account): the refinement now uses
+per-step-normalized gaps — each gap counts `round(gap/period)` whole
+periods, and only contributes if its per-step value is inside the same
+log tolerance the old design applied once at the end. A missed peak's
+~2× gap now contributes correctly instead of poisoning the mean;
+spurious ~0.5× and ambiguous ~1.5× gaps are excluded under either
+rounding; and since the gap multiset is reversal-invariant, identical
+detections mirror to identical spacing exactly. Verified before/after
+on real data: the mirror disagreement fell from 7.6% to 0.6% (inside
+the 1% bound — the strict xfail XPASSed and was removed, exactly the
+designed mechanism); across five ROI phases on the real jersey photo,
+mean wale error vs the hand-counted truth HALVED (+12.4% → +6.6%) and
+course swing collapsed (8.2% → 4.7%) with mean error unchanged — no
+phase-swing was traded for a systematic offset. As a bonus the same fix
+XPASSed two synthetic rib-course xfails: their "reads ~18% high, cause
+unknown" was the old estimator's inflation all along. (The recorded-
+corrections SQLite export could not be checked directly — the local DB
+is empty and the production copy lives on Render's ephemeral disk,
+unreachable from the development sandbox — so the before/after used
+the hand-established fixture ground truths instead: jersey ~5.0 WPI /
+~7.35 CPI, teal 3.8 WPI, against which the fix moved every prediction
+closer or left it unchanged.)
+
+**The rotate90 violation has since been fixed too — after its diagnosis
+was revised twice, each time by measurement.** First guessed as
+refinement boundary phase (the estimator fix left it at 4.5%), then as
+a wale-vs-course position-source asymmetry (also wrong: both axes were
+refining from 1D peaks on this fixture, and the two sources refine
+identically). The real cause: the projected 1D signals are **signed**
+Sobel derivatives — deliberately signed, since rectifying would
+frequency-double the periodicity analysis — and a mirror or 90°
+rotation NEGATES the mapped axis's signal (measured correlation
+−0.9999 between the reversed course signal and the rotated wale
+signal). Peak detection on a negated signal locks onto the opposite
+edge of each ridge — the valley lattice — which on an asymmetric stitch
+profile refines a measurable 4.5% differently from the peak lattice.
+`_canonical_sign_signal` now flips each projected signal so its
+skewness is non-negative before positions are extracted (a global sign
+flip, never `abs()`, so no frequency doubling; autocorrelation-based
+selection is inherently sign-invariant and untouched). Rotate90 wale
+agreement went 4.5% → 0.7% and mirror became exact. The honest cost,
+measured rather than hidden: the canonical landmark on the real
+fixture's course axis is the valley lattice (24.9px, +11% vs the ~22.4
+hand count) where the lucky pre-fix sign draw read 24.0 (+7%) — but
+that luck was orientation-dependent (a mirrored upload always read
+24.9), which is exactly what the invariant forbids; on synthetics with
+exact truth, all landmark choices agree within 0.1px.
+
+**The resize seed-doubling has since been fixed as well — and the first
+attempt was withdrawn by the harness itself.** The failure: a truly
+periodic signal's autocorrelation peaks at T and 2T are near-equal
+(measured strength ratios 0.977–0.996 across upscales — a coin flip
+decided by interpolation crumbs), and the course path deliberately
+takes its seed as-is, so at 1.5× the course reading doubled. A
+strength-threshold-only preference for the half-lag was tried first
+and immediately broken by the rotate90 invariant: the wale
+leg-harmonic's half-peak measures 0.969 of its fundamental —
+inseparable from the genuine ties in 1D autocorrelation, which is this
+project's oldest lesson re-learned at the seed level. The landed fix
+(`_prefer_fundamental_seed`, course seed only) resolves a detected
+near-tie with 2D template-walk evidence instead: a genuine repeat
+walks consistently (0.66–0.70 measured), while leg half-periods
+alternate between mirror-image patches and fail outright (0.0
+measured), and the 0.55 acceptance sits above the score's own 0.5
+"couldn't measure" neutral so the seed only ever moves on positive
+evidence. Verified a byte-identical no-op on every 1× fixture reading;
+metamorphic is now 9/10 with rotate90 fully passing. Still open (and
+strictly xfailed with its own pin against seed-flip regression): a
+residual ~5% refinement drift at 1.5×, from fixed-pixel smoothing and
+peak-prominence parameters making the upscaled gap set relatively
+noisier — a scale-parameterization question for a future pass.
+
+**The nine real `knit_sample` fixtures then generalized the rotate90
+finding — and split it into three distinct mechanisms**, each measured
+before anything was fixed. Running the invariants over all nine photos
+showed half-period flips under rotation on five (ratios pinned at
+0.49–0.51):
+
+1. **Seed lands directly on the leg lattice** (samples 05/06/08, course
+   axis after rotation): at coarse gauges the legs' autocorrelation
+   peak outright BEATS the fundamental (0.755 vs 0.735 measured at
+   34–73px leg spacing) — the jersey fixture only escapes because its
+   fine 17.5px legs are partially attenuated by the fixed-pixel
+   smoothing, an accidental and unreliable suppressor. Unrotated, the
+   wale axis's candidate family climbs back up; the course path
+   (seed-as-is) cannot. **Fixed for crisp-leg fabrics** by extending
+   `_prefer_fundamental_seed` with a template-gated ASCENT symmetric to
+   its descent: the seed only ascends when its own template walk fails
+   outright (crisp mirror-image legs measured 0.000, far below the 0.5
+   neutral) and the double-lag near-ties its strength and walks well
+   (0.704). Sample 05's flip is gone and regression-pinned;
+   byte-identical no-op on every 1× reading of all eleven photos.
+   **Honest limitation:** samples 06/08 are chunky plied stockinette
+   whose fat legs correlate with their own mirror twins at template
+   scale (0.70 measured) — the discriminator saturates and they still
+   flip; documented open.
+2. **v3 halves rotated course structure** (samples 01/03/04, wale axis
+   after rotation): course rows genuinely carry two edge lines per
+   repeat (loop-head arc + inter-row shadow), the half-lag's
+   autocorrelation legitimately dominates (0.132 vs 0.009 measured on
+   sample 04), and the structural evidence stream (loop centers, fold
+   pairing) is all-zero for row structure, so nothing overrules it. A
+   design gap, not a scoring bug — open, needs its own pass.
+3. **knit_sample_03's baseline wale (287px) is wrong independent of any
+   transform**: clean-fabric autocorrelation shows a textbook harmonic
+   comb with the fundamental at 142px (strength 0.800) and multiples at
+   287/429/571/712, while the raw peak lattice sits at the ~67px legs;
+   by the tape measure in the photo itself (317px/cm), truth is
+   ~5.7 WPI and the 287px reading is an implausible ~2.8 WPI. The
+   selection confidently took the 2× family at this large pitch —
+   reserved for its own PR.
 
 ## Deploying the backend to Render
 

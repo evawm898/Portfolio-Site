@@ -1,5 +1,5 @@
 """
-Analysis package for the AI Textile Gauge Reader.
+Analysis package for the Automatic Textile Gauge Reader.
 
 This package contains only image-analysis logic (OpenCV / NumPy / SciPy).
 It has no knowledge of HTTP, FastAPI, file uploads, or the frontend —

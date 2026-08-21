@@ -1,5 +1,5 @@
 /**
- * AI Textile Gauge Reader — frontend controller (experimental lab page).
+ * Automatic Textile Gauge Reader — frontend controller (experimental lab page).
  *
  * Pure UI/interaction code: image upload, two-point calibration, ROI
  * selection, orientation choice, calling the analysis API, and drawing
@@ -75,6 +75,9 @@
   const zoomResetBtn = document.getElementById("zoomResetBtn");
   const zoomLevelEl = document.getElementById("zoomLevel");
 
+  const rulerControls = document.getElementById("rulerControls");
+  const rulerToggleBtn = document.getElementById("rulerToggleBtn");
+
   const panelEl = document.getElementById("panel");
   const panelToggle = document.getElementById("panelToggle");
   const appEl = document.querySelector(".tgr-app");
@@ -84,6 +87,7 @@
   const uploadError = document.getElementById("uploadError");
 
   const calStatus = document.getElementById("calStatus");
+  const calAutoHint = document.getElementById("calAutoHint");
   const knownDistanceInput = document.getElementById("knownDistance");
   const unitSelect = document.getElementById("unitSelect");
   const ppmPreview = document.getElementById("ppmPreview");
@@ -125,8 +129,8 @@
   const roiDiagContent = document.getElementById("roiDiagContent");
 
   // User-anchored repeat counting ("Verify by counting a repeat")
-  const markWaleRepeatBtn = document.getElementById("markWaleRepeatBtn");
-  const markCourseRepeatBtn = document.getElementById("markCourseRepeatBtn");
+  const repeatCountPanel = document.getElementById("repeatCountPanel");
+  const markRepeatBtn = document.getElementById("markRepeatBtn");
   const cancelRepeatMarkBtn = document.getElementById("cancelRepeatMarkBtn");
   const repeatMarkStatus = document.getElementById("repeatMarkStatus");
   const repeatMatchResult = document.getElementById("repeatMatchResult");
@@ -169,6 +173,21 @@
       unit: "cm",
       pixelsPerMm: null,
     },
+    calAutoDetectPending: false, // true while a /detect-ruler request for the CURRENT image is in flight --
+                                  // guards against a late response overwriting points the user has since
+                                  // started marking manually, or landing on a since-replaced image
+    calAutoDetected: false, // true once auto-detected points are showing, still awaiting the user's own confirm
+    ruler: {
+      visible: false, // the on-image ruler overlay -- a movable, to-scale physical ruler drawn over
+                       // the photo so the user can sanity-check the calibration against real fabric
+                       // features, distinct from the (also draggable) calibration POINTS themselves.
+                       // Only ever available once currentPixelsPerMm() is non-null, i.e. AFTER
+                       // Confirm Calibration -- see updateRulerUI.
+      x: null, // natural coords, left end of the ruler bar; null until first shown (see ensureRulerPosition)
+      y: null,
+      dragging: false,
+      dragOffset: null, // {dx, dy} from the pointer to state.ruler.{x,y} at drag start, in natural px
+    },
     roi: null, // {x, y, width, height} in natural coords -- the PRIMARY approved measurement
                // area, derived from rois[0] on approval. Multi-region independent analysis is
                // a later stage, not yet built; the existing single-ROI /analyze call downstream
@@ -187,9 +206,10 @@
     showMeasurementAreas: false, // "Show measurement areas" toggle -- all approved ROI outlines, results step
     selectedDiagnosticRoiLabel: null, // which region's own detail is shown in Developer diagnostics' per-region panel
     repeatMark: {
-      active: false, // true while armed -- next two canvas clicks are collected as anchor points
-      axis: null, // "wale" | "course"
-      points: [], // [{x,y}] in natural coords, max 2, cleared once a match request fires
+      active: false, // true while armed -- next canvas drag draws the repeat-cell box
+      dragging: false, // true mid-drag, between pointerdown and pointerup
+      anchor: null, // {x,y} natural coords, drag start corner
+      box: null, // {x,y,width,height} natural coords -- one full repeat cell (one wale-to-wale span, one course-to-course span), cleared once a match request fires
     },
     serviceOnline: null, // null = unknown/not configured, true/false once checked
   };
@@ -290,6 +310,7 @@
     }
     updateZoomUI(); // pan-cursor affordance depends on the step (roi/calibrate reserve plain drag)
     updateRoiAddModeUI(); // add-mode crosshair cursor only applies while actually on the roi step
+    updateRulerUI(); // ruler overlay only becomes available once calibration is confirmed
     render();
   }
 
@@ -450,7 +471,20 @@
     // Marking a repeat anchor point is a plain left-click on the results
     // step too -- same reservation roi/calibrate already get below.
     if (state.repeatMark.active) return false;
-    return state.currentStep !== "roi" && state.currentStep !== "calibrate";
+    if (state.currentStep === "roi" || state.currentStep === "calibrate") return false;
+    // The ruler overlay is draggable on every step it's available in,
+    // which includes the steps (orientation/analyze/results) where a
+    // plain drag otherwise pans -- reserve the gesture the same way
+    // roi/calibrate already do, but only when the click actually starts
+    // on the ruler itself, so panning elsewhere on those steps is unaffected.
+    if (state.ruler.visible) {
+      const spec = rulerSpec();
+      if (spec) {
+        ensureRulerPosition(spec);
+        if (pointInRulerDisplay(eventToDisplayPoint(evt), spec)) return false;
+      }
+    }
+    return true;
   }
 
   canvas.addEventListener("pointerdown", (evt) => {
@@ -548,27 +582,37 @@
     } else if (state.currentStep === "results") {
       drawRoi(false);
       drawResultOverlay();
-      drawRepeatMarkPoints();
+      drawRepeatMarkBox();
     }
+    // Drawn last (on top of everything else) on whichever step it's
+    // available in -- see updateRulerUI / rulerControls.
+    drawRuler();
   }
 
-  function drawRepeatMarkPoints() {
-    const pts = state.repeatMark.points.map(naturalToDisplay);
-    if (!pts.length) return;
-    const color = state.repeatMark.axis === "course" ? COURSE_COLOR : WALE_COLOR;
-    if (pts.length === 2) {
+  function drawRepeatMarkBox() {
+    const box = state.repeatMark.box;
+    if (!box || box.width <= 0 || box.height <= 0) return;
+    const tl = naturalToDisplay({ x: box.x, y: box.y });
+    const br = naturalToDisplay({ x: box.x + box.width, y: box.y + box.height });
+    ctx.save();
+    ctx.strokeStyle = "#565e60";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    ctx.restore();
+    // Small ticks on the midpoints of each edge, colored by which axis
+    // that edge's span maps to (see repeatBoxAnchorPoints) -- a quick
+    // visual hint that the box's WIDTH becomes one repeat measurement
+    // and its HEIGHT becomes the other, not just a generic selection.
+    const anchors = repeatBoxAnchorPoints(box);
+    ctx.lineWidth = 3;
+    [["wale", WALE_COLOR], ["course", COURSE_COLOR]].forEach(([axis, color]) => {
+      const [a, b] = anchors[axis].map(naturalToDisplay);
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      ctx.lineTo(pts[1].x, pts[1].y);
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
       ctx.stroke();
-    }
-    pts.forEach((p) => {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-      ctx.fill();
     });
   }
 
@@ -893,6 +937,9 @@
       zoomControls.hidden = false;
       // Reset any prior interaction state for a fresh image.
       state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null };
+      state.calAutoDetectPending = false;
+      state.calAutoDetected = false;
+      state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
       state.roi = null;
       state.result = null;
       state.showMeasurementAreas = false;
@@ -902,6 +949,7 @@
       resetView();
       syncCanvasSize();
       goToStep("calibrate");
+      detectRulerCalibration();
     };
     img.src = state.objectUrl;
   }
@@ -938,6 +986,8 @@
     ppmPreview.textContent = "";
     calError.hidden = true;
     knownDistanceInput.value = "";
+    calAutoHint.hidden = true;
+    calAutoHint.textContent = "";
   }
 
   function updateCalibrationUI() {
@@ -973,8 +1023,79 @@
   knownDistanceInput.addEventListener("input", updatePpmPreview);
   unitSelect.addEventListener("change", updatePpmPreview);
 
+  // Automatic ruler calibration detection (see backend /detect-ruler,
+  // which wraps analysis.gauge_analysis.detect_ruler_calibration). Runs
+  // as soon as an image is uploaded, BEFORE the user clicks anything, and
+  // -- if it finds a plausible ruler -- pre-fills the two calibration
+  // points, known distance, and unit as a SUGGESTION only: the Confirm
+  // Calibration button still requires the user's own click (same as
+  // every other value on this step, auto-filled or not), and clicking
+  // "Redo Points" or marking a point manually always wins over a
+  // still-in-flight or already-applied auto-detection. Best-effort only
+  // -- any failure here just leaves manual calibration exactly as it
+  // already was, with no error shown (this is a convenience, not a
+  // required step).
+  async function detectRulerCalibration() {
+    if (!CONFIG.API_BASE_URL) return;
+    const forFile = state.file;
+    state.calAutoDetectPending = true;
+
+    let data;
+    try {
+      const fd = new FormData();
+      fd.append("file", forFile);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+      let res;
+      try {
+        res = await fetch(`${CONFIG.API_BASE_URL}/detect-ruler`, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      data = await res.json();
+      if (!res.ok || !data.success) return;
+    } catch {
+      return;
+    } finally {
+      // Only this request's own "in flight" claim is cleared here -- if
+      // the user already took over manually, they've already flipped
+      // this back to false themselves, and the check below still catches it.
+      if (state.file === forFile) state.calAutoDetectPending = false;
+    }
+
+    // The image may have changed, or the user may already be calibrating
+    // manually, since this request went out -- never overwrite either.
+    if (state.file !== forFile || state.cal.points.length > 0) return;
+
+    state.cal.points = [
+      { x: data.point1_px[0], y: data.point1_px[1] },
+      { x: data.point2_px[0], y: data.point2_px[1] },
+    ];
+    knownDistanceInput.value = data.suggested_distance;
+    unitSelect.value = data.suggested_unit;
+    state.calAutoDetected = true;
+
+    const confidencePct = Math.round((data.confidence || 0) * 100);
+    const spanDesc =
+      data.major_tick_count >= 2
+        ? `${data.suggested_distance} ${data.suggested_unit} between two numbered tick marks`
+        : "a short span of ruler tick marks";
+    calAutoHint.textContent =
+      `Auto-detected from a ruler in your photo (${spanDesc}, ~${confidencePct}% confidence). ` +
+      `Review the two points and known distance below, then confirm — or click "Redo Points" to mark manually.`;
+    calAutoHint.hidden = false;
+
+    updateCalibrationUI();
+    render();
+  }
+
   calRedoBtn.addEventListener("click", () => {
     state.cal.points = [];
+    state.calAutoDetectPending = false; // user is taking over manually -- don't let a late auto-detect response overwrite this
     resetCalibrationUI();
     render();
   });
@@ -1048,6 +1169,195 @@
     const mm = state.cal.knownDistance * unitToMm[state.cal.unit];
     return mm > 0 ? pxDist / mm : null;
   }
+
+  // --- On-image ruler overlay ---------------------------------------------
+  //
+  // A movable, physically-proportioned ruler drawn over the photo once
+  // calibration is confirmed (currentPixelsPerMm() is only non-null AFTER
+  // that click -- see calConfirmBtn's handler -- which is what "available
+  // only after calibration" means here). It's drawn as a single rigid
+  // corner bracket -- one arm running along image x, one along image y,
+  // sharing a draggable origin corner -- so both the wale (x) and course
+  // (y) directions can be checked against the same reference point at
+  // once, rather than needing two separately-positioned rulers. Each arm
+  // shows BOTH a cm scale and an in scale simultaneously (like a real
+  // dual-marked ruler prints both scales on opposite edges), computed
+  // straight from currentPixelsPerMm() -- no dependence on state.cal.unit,
+  // since the calibration is exact in either system regardless of which
+  // unit the user happened to enter it in.
+  //
+  // Every length here is exact: computed from currentPixelsPerMm() so
+  // the tick spacing really does match the calibrated scale, same as
+  // every other overlay measurement in this file. Bar thickness/tick
+  // lengths are fixed DISPLAY pixels instead (like the calibration point
+  // markers and ROI resize handles already are) so ticks stay legible at
+  // any zoom level rather than shrinking to nothing when zoomed out --
+  // only the measurement axis itself needs to be "to scale."
+  const RULER_ARM_LENGTH_MM = 60; // per arm -- fits a full 5cm scale AND a full 2in scale (50.8mm) with a little headroom
+  const RULER_BAR_THICKNESS = 26; // display px, shared by both arms; each arm's thickness is split between its two unit scales
+  const RULER_TICK_MINOR = 5; // display px, tick length measured in from each edge toward the shared centerline
+  const RULER_TICK_MAJOR = 10;
+  const RULER_SCALES = [
+    { label: "cm", minorMm: 1, minorPerMajor: 10 }, // metric: major per cm, minor per mm
+    { label: "in", minorMm: 25.4 / 8, minorPerMajor: 8 }, // imperial: major per inch, minor per eighth-inch
+  ];
+
+  function rulerSpec() {
+    const ppm = currentPixelsPerMm();
+    if (!ppm) return null;
+    return { ppm, armLengthPx: RULER_ARM_LENGTH_MM * ppm };
+  }
+
+  function rulerTicksForScale(scale) {
+    const n = Math.floor(RULER_ARM_LENGTH_MM / scale.minorMm + 1e-6);
+    const ticks = [];
+    for (let i = 0; i <= n; i++) {
+      ticks.push({ mm: i * scale.minorMm, isMajor: i % scale.minorPerMajor === 0, majorNum: i / scale.minorPerMajor });
+    }
+    return ticks;
+  }
+
+  function ensureRulerPosition(spec) {
+    if (state.ruler.x !== null && state.ruler.y !== null) return;
+    state.ruler.x = clamp(state.naturalWidth / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
+    state.ruler.y = clamp(state.naturalHeight / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
+  }
+
+  function pointInRulerDisplay(displayPt, spec) {
+    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
+    const armLenDisplay = spec.armLengthPx * getScale();
+    const inRect = (x, y, w, h) => displayPt.x >= x && displayPt.x <= x + w && displayPt.y >= y && displayPt.y <= y + h;
+    return (
+      inRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS) || // horizontal (x) arm
+      inRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay) // vertical (y) arm
+    );
+  }
+
+  function drawRulerArm(origin, armLenDisplay, mmToDisplayPx, axis) {
+    const half = RULER_BAR_THICKNESS / 2;
+    const horizontal = axis === "x";
+
+    ctx.fillStyle = "rgba(233, 236, 236, 0.92)";
+    ctx.strokeStyle = "rgba(6, 7, 7, 0.7)";
+    ctx.lineWidth = 1;
+    if (horizontal) {
+      ctx.fillRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
+      ctx.strokeRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y + half);
+      ctx.lineTo(origin.x + armLenDisplay, origin.y + half);
+      ctx.stroke();
+    } else {
+      ctx.fillRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
+      ctx.strokeRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
+      ctx.beginPath();
+      ctx.moveTo(origin.x + half, origin.y);
+      ctx.lineTo(origin.x + half, origin.y + armLenDisplay);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "#060707";
+    ctx.font = "9px monospace";
+    RULER_SCALES.forEach((scale, idx) => {
+      // idx 0 (cm) draws in the "outer" half -- above the bar for the x
+      // arm, left of the bar for the y arm; idx 1 (in) draws in the
+      // "inner" half -- below/right -- mirroring how real dual-marked
+      // rulers print one scale per edge.
+      rulerTicksForScale(scale).forEach((t) => {
+        const pos = t.mm * mmToDisplayPx;
+        const tickLen = t.isMajor ? RULER_TICK_MAJOR : RULER_TICK_MINOR;
+        ctx.lineWidth = t.isMajor ? 1.6 : 1;
+        ctx.beginPath();
+        if (horizontal) {
+          const x = origin.x + pos;
+          if (idx === 0) {
+            ctx.moveTo(x, origin.y);
+            ctx.lineTo(x, origin.y + tickLen);
+          } else {
+            ctx.moveTo(x, origin.y + RULER_BAR_THICKNESS);
+            ctx.lineTo(x, origin.y + RULER_BAR_THICKNESS - tickLen);
+          }
+        } else {
+          const y = origin.y + pos;
+          if (idx === 0) {
+            ctx.moveTo(origin.x, y);
+            ctx.lineTo(origin.x + tickLen, y);
+          } else {
+            ctx.moveTo(origin.x + RULER_BAR_THICKNESS, y);
+            ctx.lineTo(origin.x + RULER_BAR_THICKNESS - tickLen, y);
+          }
+        }
+        ctx.stroke();
+
+        if (!t.isMajor || t.majorNum === 0) return;
+        const label = String(t.majorNum);
+        if (horizontal) {
+          const x = origin.x + pos;
+          ctx.textAlign = "center";
+          ctx.textBaseline = idx === 0 ? "bottom" : "top";
+          ctx.fillText(label, x, idx === 0 ? origin.y - 2 : origin.y + RULER_BAR_THICKNESS + 2);
+        } else {
+          const y = origin.y + pos;
+          ctx.textAlign = idx === 0 ? "right" : "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, idx === 0 ? origin.x - 3 : origin.x + RULER_BAR_THICKNESS + 3, y);
+        }
+      });
+    });
+
+    // Unit tag at the far end of each scale row -- past the last tick,
+    // so it never collides with a numbered label near the origin.
+    ctx.font = "8px monospace";
+    ctx.fillStyle = "#565e60";
+    if (horizontal) {
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("cm", origin.x + armLenDisplay + 3, origin.y + half);
+      ctx.textBaseline = "top";
+      ctx.fillText("in", origin.x + armLenDisplay + 3, origin.y + half);
+    } else {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("cm", origin.x + half, origin.y + armLenDisplay + 3);
+      ctx.fillText("in", origin.x + half, origin.y + armLenDisplay + 12);
+    }
+  }
+
+  function drawRuler() {
+    if (!state.ruler.visible) return;
+    const spec = rulerSpec();
+    if (!spec) return;
+    ensureRulerPosition(spec);
+
+    const s = getScale();
+    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
+    const armLenDisplay = spec.armLengthPx * s;
+    const mmToDisplayPx = spec.ppm * s;
+
+    ctx.save();
+    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "x");
+    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "y");
+    // Corner drag handle, drawn last so it sits on top of both arms.
+    ctx.fillStyle = "rgba(6, 7, 7, 0.85)";
+    ctx.beginPath();
+    ctx.arc(origin.x, origin.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function updateRulerUI() {
+    const available = currentPixelsPerMm() !== null;
+    rulerControls.hidden = !available;
+    if (!available) state.ruler.visible = false;
+    rulerToggleBtn.classList.toggle("is-active", state.ruler.visible);
+    rulerToggleBtn.setAttribute("aria-pressed", String(state.ruler.visible));
+  }
+
+  rulerToggleBtn.addEventListener("click", () => {
+    state.ruler.visible = !state.ruler.visible;
+    updateRulerUI();
+    render();
+  });
 
   function renderRoiList() {
     if (!state.rois.length) {
@@ -1278,20 +1588,40 @@
   canvas.addEventListener("pointerdown", (evt) => {
     if (state.panDrag) return; // the viewer-pan listener above already claimed this gesture
 
+    // The ruler overlay (if visible) sits on top of every other
+    // interaction on every step it's available in -- hit-test it first
+    // so dragging it never gets shadowed by whatever the current step
+    // would otherwise do with this same click.
+    if (state.ruler.visible) {
+      const spec = rulerSpec();
+      if (spec) {
+        ensureRulerPosition(spec);
+        const dispPt = eventToDisplayPoint(evt);
+        if (pointInRulerDisplay(dispPt, spec)) {
+          const natPt = displayToNatural(dispPt);
+          state.ruler.dragging = true;
+          state.ruler.dragOffset = { dx: natPt.x - state.ruler.x, dy: natPt.y - state.ruler.y };
+          canvas.setPointerCapture(evt.pointerId);
+          render();
+          return;
+        }
+      }
+    }
+
     if (state.currentStep === "results" && state.repeatMark.active) {
       const pt = displayToNatural(eventToDisplayPoint(evt));
-      state.repeatMark.points.push(pt);
+      state.repeatMark.dragging = true;
+      state.repeatMark.anchor = pt;
+      state.repeatMark.box = { x: pt.x, y: pt.y, width: 0, height: 0 };
+      canvas.setPointerCapture(evt.pointerId);
+      repeatMarkStatus.textContent = "Drag to the diagonally opposite corner of the same repeat cell, then release.";
       render();
-      if (state.repeatMark.points.length === 1) {
-        repeatMarkStatus.textContent = "Click the same point on the very next repeat over.";
-      } else if (state.repeatMark.points.length === 2) {
-        performRepeatMatch();
-      }
       return;
     }
 
     if (state.currentStep === "calibrate") {
       if (state.cal.points.length >= 2) return; // must Redo first
+      state.calAutoDetectPending = false; // user is marking manually -- don't let a late auto-detect response overwrite this
       const pt = displayToNatural(eventToDisplayPoint(evt));
       state.cal.points.push(pt);
       updateCalibrationUI();
@@ -1356,6 +1686,29 @@
       state.selectedRoiId = newRoi.id;
       state.roiDrag = { mode: "create", roiId: newRoi.id, anchor: startNatural };
     }
+  });
+
+  const MIN_REPEAT_BOX_PX = 8; // a drag smaller than this in either dimension is treated as an accidental click, not a real box
+
+  canvas.addEventListener("pointermove", (evt) => {
+    if (state.currentStep !== "results" || !state.repeatMark.dragging) return;
+    const pt = displayToNatural(eventToDisplayPoint(evt));
+    state.repeatMark.box = normalizeRect(state.repeatMark.anchor, pt);
+    render();
+  });
+
+  canvas.addEventListener("pointerup", (evt) => {
+    if (state.currentStep !== "results" || !state.repeatMark.dragging) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.repeatMark.dragging = false;
+    const box = state.repeatMark.box;
+    if (!box || box.width < MIN_REPEAT_BOX_PX || box.height < MIN_REPEAT_BOX_PX) {
+      repeatMarkStatus.textContent = "That box was too small -- drag a larger one spanning one full repeat cell.";
+      state.repeatMark.box = null;
+      render();
+      return;
+    }
+    performRepeatMatch();
   });
 
   canvas.addEventListener("pointermove", (evt) => {
@@ -1458,6 +1811,30 @@
   }
   canvas.addEventListener("pointerup", endRoiDrag);
   canvas.addEventListener("pointercancel", endRoiDrag);
+
+  // Ruler overlay drag -- unlike the roi/repeat-mark drags above, this
+  // isn't gated to one currentStep, since the ruler stays available (and
+  // draggable) across roi/orientation/analyze/results once calibration
+  // is confirmed.
+  canvas.addEventListener("pointermove", (evt) => {
+    if (!state.ruler.dragging) return;
+    const spec = rulerSpec();
+    if (!spec) {
+      state.ruler.dragging = false;
+      return;
+    }
+    const natPt = displayToNatural(eventToDisplayPoint(evt));
+    state.ruler.x = clamp(natPt.x - state.ruler.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
+    state.ruler.y = clamp(natPt.y - state.ruler.dragOffset.dy, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
+    render();
+  });
+  function endRulerDrag(evt) {
+    if (!state.ruler.dragging) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.ruler.dragging = false;
+  }
+  canvas.addEventListener("pointerup", endRulerDrag);
+  canvas.addEventListener("pointercancel", endRulerDrag);
 
   // --- Step 4: Orientation -----------------------------------------------
 
@@ -1725,11 +2102,21 @@
 
     resultsGrid.innerHTML = html;
 
+    // "Verify by counting a repeat" is an optional, secondary check --
+    // real material for a normal user only when the automatic result is
+    // already flagged uncertain. Surfacing it unconditionally on every
+    // result (even a confident one) invited exactly the wrong reading if
+    // it ever failed on its own (e.g. a transient backend issue): a
+    // failure in this OPTIONAL cross-check looked like the primary
+    // detection itself was broken. Hidden entirely otherwise; still
+    // collapsed by default even when shown, so using it is still opt-in.
     if (level === "Low") {
-      resultsWarning.textContent = "Low confidence — verify the detected loops.";
+      resultsWarning.textContent = "Low confidence — try “Verify by counting a repeat” below to double-check.";
       resultsWarning.hidden = false;
+      repeatCountPanel.hidden = false;
     } else {
       resultsWarning.hidden = true;
+      repeatCountPanel.hidden = true;
     }
 
     const axisDiagnosticsContent = document.getElementById("axisDiagnosticsContent");
@@ -1814,33 +2201,92 @@
   // the automatic result -- shown alongside it as a second opinion the
   // user can compare against, same spirit as the loop-lattice debug view.
 
-  function resetRepeatMarkUI() {
-    state.repeatMark = { active: false, axis: null, points: [] };
-    cancelRepeatMarkBtn.hidden = true;
-    repeatMarkStatus.hidden = true;
-    markWaleRepeatBtn.disabled = false;
-    markCourseRepeatBtn.disabled = false;
+  // A repeat-cell box's width spans one wale-to-wale repeat and its
+  // height spans one course-to-course repeat, but WHICH image axis (x or
+  // y) that corresponds to depends on orientation -- wales are vertical
+  // columns whose SPACING is measured horizontally, courses are
+  // horizontal rows whose spacing is measured vertically (see the
+  // backend's _direction_for docstring; this mirrors it exactly so the
+  // two count-repeats calls below measure the same thing the backend
+  // itself would call "wale" and "course"). Returns anchor point PAIRS
+  // (not periods) since /count-repeats takes two points spanning one
+  // repeat, same contract count_repeats_by_template_match always has.
+  function repeatBoxAnchorPoints(box) {
+    const midX = box.x + box.width / 2;
+    const midY = box.y + box.height / 2;
+    const horizontalPair = [{ x: box.x, y: midY }, { x: box.x + box.width, y: midY }];
+    const verticalPair = [{ x: midX, y: box.y }, { x: midX, y: box.y + box.height }];
+    const waleDir = state.orientation === "vertical" ? "horizontal" : "vertical";
+    return {
+      wale: waleDir === "horizontal" ? horizontalPair : verticalPair,
+      course: waleDir === "horizontal" ? verticalPair : horizontalPair,
+    };
   }
 
-  function armRepeatMark(axis) {
-    state.repeatMark = { active: true, axis, points: [] };
+  function resetRepeatMarkUI() {
+    state.repeatMark = { active: false, dragging: false, anchor: null, box: null };
+    cancelRepeatMarkBtn.hidden = true;
+    repeatMarkStatus.hidden = true;
+    markRepeatBtn.disabled = false;
+  }
+
+  function armRepeatMark() {
+    state.repeatMark = { active: true, dragging: false, anchor: null, box: null };
     cancelRepeatMarkBtn.hidden = false;
-    markWaleRepeatBtn.disabled = true;
-    markCourseRepeatBtn.disabled = true;
+    markRepeatBtn.disabled = true;
     repeatMarkStatus.hidden = false;
-    repeatMarkStatus.textContent = `Click one point on a ${axis === "course" ? "course row" : "wale column"}.`;
+    repeatMarkStatus.textContent = "Drag a box around one full repeat cell -- corner to the same corner on the diagonally adjacent stitch.";
     render();
   }
 
-  markWaleRepeatBtn.addEventListener("click", () => armRepeatMark("wale"));
-  markCourseRepeatBtn.addEventListener("click", () => armRepeatMark("course"));
+  markRepeatBtn.addEventListener("click", armRepeatMark);
   cancelRepeatMarkBtn.addEventListener("click", () => {
     resetRepeatMarkUI();
     render();
   });
 
+  async function fetchRepeatCount(axis, anchorStart, anchorEnd, ppm) {
+    const fd = new FormData();
+    fd.append("file", state.file);
+    fd.append("roi_x", 0);
+    fd.append("roi_y", 0);
+    fd.append("roi_width", state.naturalWidth);
+    fd.append("roi_height", state.naturalHeight);
+    fd.append("anchor_start_x", anchorStart.x);
+    fd.append("anchor_start_y", anchorStart.y);
+    fd.append("anchor_end_x", anchorEnd.x);
+    fd.append("anchor_end_y", anchorEnd.y);
+    fd.append("orientation", state.orientation);
+    fd.append("axis", axis);
+    fd.append("pixels_per_mm", ppm);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/count-repeats`, {
+        method: "POST",
+        body: fd,
+        signal: controller.signal,
+      });
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+      }
+      if (!res.ok) {
+        throw new Error(data.message || `Counting repeats failed (HTTP ${res.status}).`);
+      }
+      return { axis, data };
+    } catch (err) {
+      return { axis, error: err.message || String(err) };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function performRepeatMatch() {
-    const { axis, points } = state.repeatMark;
+    const box = state.repeatMark.box;
     const ppm = currentPixelsPerMm();
     repeatMarkStatus.textContent = "Counting repeats…";
 
@@ -1851,68 +2297,44 @@
       return;
     }
 
-    try {
-      const fd = new FormData();
-      fd.append("file", state.file);
-      fd.append("roi_x", 0);
-      fd.append("roi_y", 0);
-      fd.append("roi_width", state.naturalWidth);
-      fd.append("roi_height", state.naturalHeight);
-      fd.append("anchor_start_x", points[0].x);
-      fd.append("anchor_start_y", points[0].y);
-      fd.append("anchor_end_x", points[1].x);
-      fd.append("anchor_end_y", points[1].y);
-      fd.append("orientation", state.orientation);
-      fd.append("axis", axis);
-      fd.append("pixels_per_mm", ppm);
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/count-repeats`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok) {
-        throw new Error(data.message || `Counting repeats failed (HTTP ${res.status}).`);
-      }
-      renderRepeatMatchResult(axis, data);
-    } catch (err) {
-      repeatMatchResult.innerHTML = `<p class="tgr-error">${escapeHtml(err.message || String(err))}</p>`;
-      repeatMatchResult.hidden = false;
-    }
+    const anchors = repeatBoxAnchorPoints(box);
+    const [waleResult, courseResult] = await Promise.all([
+      fetchRepeatCount("wale", anchors.wale[0], anchors.wale[1], ppm),
+      fetchRepeatCount("course", anchors.course[0], anchors.course[1], ppm),
+    ]);
+    renderRepeatMatchResults(waleResult, courseResult);
 
     resetRepeatMarkUI();
     render();
   }
 
-  function renderRepeatMatchResult(axis, data) {
-    const label = axis === "course" ? "Courses" : "Wales";
-    const color = axis === "course" ? COURSE_COLOR : WALE_COLOR;
+  function repeatMatchResultCard(result) {
+    const label = result.axis === "course" ? "Courses" : "Wales";
+    const color = result.axis === "course" ? COURSE_COLOR : WALE_COLOR;
+    if (result.error) {
+      return `<p class="tgr-error">${escapeHtml(label)}: ${escapeHtml(result.error)}</p>`;
+    }
+    const { data } = result;
     if (!data.success) {
-      repeatMatchResult.innerHTML = `<p class="tgr-hint">${escapeHtml(data.message || "No matches found.")}</p>`;
-      return;
+      return `<p class="tgr-hint">${escapeHtml(label)}: ${escapeHtml(data.message || "No matches found.")}</p>`;
     }
     const perInch = data.per_inch != null ? data.per_inch.toFixed(2) : "—";
-    repeatMatchResult.innerHTML = `
+    return `
       <div class="tgr-result-card" style="border-color:${color}">
-        <div class="tgr-result-card__label">${label} / inch (counted)</div>
+        <div class="tgr-result-card__label">${escapeHtml(label)} / inch (counted)</div>
         <div class="tgr-result-card__value" style="color:${color}">${perInch}</div>
         <div class="tgr-result-card__sub">${data.match_count} repeats matched · ${(data.confidence * 100).toFixed(0)}% confidence</div>
       </div>
       <p class="tgr-hint">${escapeHtml(data.message || "")}</p>
+    `;
+  }
+
+  function renderRepeatMatchResults(waleResult, courseResult) {
+    repeatMatchResult.innerHTML = `
+      <div class="tgr-repeat-result-row">
+        <div>${repeatMatchResultCard(waleResult)}</div>
+        <div>${repeatMatchResultCard(courseResult)}</div>
+      </div>
     `;
   }
 
@@ -2366,6 +2788,9 @@
     state.naturalWidth = 0;
     state.naturalHeight = 0;
     state.cal = { points: [], knownDistance: null, unit: "cm", pixelsPerMm: null };
+    state.calAutoDetectPending = false;
+    state.calAutoDetected = false;
+    state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
     state.roi = null;
     state.roiDrag = null;
     state.orientation = "vertical";

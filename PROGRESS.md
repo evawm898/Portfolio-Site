@@ -19,6 +19,110 @@ phases land.
 
 ---
 
+## Unified trunk — receptacle + stem as one lofted body (approach D)
+
+**Problem.** The RECEPTACLE was a lattice of separate longitudinal rib-tubes that
+converged to the neck, and the STEM was a *separate* smooth tube starting at that
+neck. Where the ribbed basket met the smooth tube there was a visible **seam** —
+a change of both surface character (ribs → tube) and topology.
+
+**Change.** The receptacle now **owns a single continuous, watertight lofted trunk**
+(`buildTrunkInto`) that replaces the rib-lattice receptacle *and* — when a stem is
+present — the separate stem tube. It grows from the petal/sepal attachment ring at
+the top, necks down through the receptacle, and flows without a break into the stem
+and its tip. The old builders are gone from the render path: orchestration in
+`buildInto` no longer calls `buildReceptacleInto` (removed) and, when a receptacle
+is present, no longer calls the standalone `buildStemInto` — it grows one body.
+
+- **Ribs → fading surface relief.** The trunk is a body of revolution whose *top
+  ring* still bulges out to meet each petal/sepal base (radius sampled from the
+  attachments exactly as the old ribs were) and dips between them. That relief
+  fades to a smooth circular neck as the surface descends (`pow(1−t, curve)`
+  collapses every azimuth onto `stemR` at the neck), so there is nothing to seam.
+- **Print-safety (hard invariant — upheld).** The trunk is **one closed solid**:
+  a stack of closed rings stitched with wall quads, sealed by a top cap (buried
+  under the bloom/core) and a bottom cap (the neck, or the stem tip). Every rim
+  edge is shared, so the export has **zero boundary edges**. Every emitted radius
+  honours the `MIN_FEATURE_MM = 0.8` export floor, exactly like `addTube`. The
+  gate (`node tools/verify-flower-export.mjs`, now with two added trunk configs)
+  passes **0 boundary edges across all 27 configurations**.
+- **Leaves + side bud unchanged.** They attach on stem *nodes*. The trunk's stem
+  zone is built by the **same `stemCenterline()`** as before and `buildTrunkInto`
+  returns `cl` in the **identical shape** `buildStemInto` returned
+  (`{ pts, nodes, N, length }`), computed from the identical neck height, so
+  `buildLeafInto` / `buildBudBranchInto` consume it untouched — attachment points
+  are byte-identical to before. A stem *without* a receptacle has no junction to
+  seam, so it keeps the standalone `buildStemInto` (no change, no regression).
+- **Default output is unaffected.** The default flower is bloom-only
+  (`receptacleType: 'none'`, `stemType: 'none'`), so `buildTrunkInto` never runs
+  for it. This is **not** gated behind a new control — it changes how the
+  receptacle/stem are built **whenever the user enables them**, but every
+  bloom-only export is byte-for-byte identical (verified: `default` and every
+  infill config export the exact same triangle count before and after).
+
+**Triangle counts (this approach reduces them — confirmed).**
+- *Live* (full plant, 4 petals + receptacle + stem + oval leaves):
+  **41,948 → 36,524 tris** (−5,424, −12.9%).
+- *Export* (gate config "full plant: blended receptacle + stem + solid sepals"):
+  **52,612 → 46,030 tris** (−6,582, −12.5%) → binary STL **2.63 → 2.30 MB**
+  (`84 + 50·tris`).
+- Savings grow with the rib count the old lattice used: +3 layers
+  100,140 → 88,806 (−11,334); +4 layers 287,556 → 267,312 (−20,244);
+  receptacle-only 54,316 → 43,672 (−10,644); 20-petal + solid sepals stress
+  203,884 → 183,640 (−20,244). No trunked config increased.
+- *Unchanged* (no trunk built): default veins 26,616; voronoi 163,952; strands
+  32,688; bone 35,344; lace 59,744 — identical before/after.
+
+**Files.** `flower.js` (`buildReceptacleInto` → `buildTrunkInto`; `buildInto`
+orchestration; `buildStemInto` kept for the receptacle-less stem);
+`tools/verify-flower-export.mjs` (two trunk edge-case configs added).
+
+**Verification.** `node --check flower.js` passes; watertight gate passes (0
+boundary edges, all 27 configs); before/after full + zoomed-on-seam renders
+confirm the seam is gone and leaves/bud still seat cleanly.
+
+### Flutes derived from the REAL petal outline (approach D, part 2)
+
+The trunk's receptacle flutes were an idealized gaussian-averaged ring. They now
+derive from each petal's **actual outline**: `petalBaseFootprint` samples the two
+margins of every outer-whorl petal (`u ∈ [0, 0.35]`) through the SAME
+`buildSpine` + `mapPointToSurface` + `placePoint` the petal render uses, as
+world-polar `{az, r}` points. Those samples drive the top-ring radius, so each
+flute is that petal's real edge — its width taper and edge curve included — not a
+generic bump. Because the azimuths are read from real world positions
+(`atan2(z, x)`), a flute lands under its petal for **any** arrangement (spiral /
+bilateral, not just symmetric rosettes) — a latent mirror-misalignment in the old
+point-attachment path is fixed.
+
+- **Flutes run DOWN the trunk.** The top profile is split into a circular mean +
+  an azimuthal flute deviation that fades on a **slower** curve than the radius
+  taper (`fluteCurve < curve`), so the petal-edge ridges continue a good way
+  toward the stem and gather into the round neck — the "petal material continues
+  downward into the vessel" look of the ivory reference — instead of dying at the
+  rim. Valleys between petals dip toward a floor between `stemR` and the mean.
+- **Print-safety unchanged.** Still ONE closed lofted solid (rings + wall quads +
+  caps); only the top-ring radius/azimuth profile and its downward blend changed.
+  Radii are floored to `max(stemR, …)` then the export feature-floor. Gate passes
+  **0 boundary edges across all 27 configs**.
+- **Leaves + side bud untouched.** This only changes the receptacle top profile;
+  the stem centreline/radius and `cl` are identical, so attachment is unchanged
+  (confirmed in the full-plant render).
+- **Triangles.** Sector count `M` scales with the flute (petal/sepal) count.
+  Export full plant **46,030 → 52,942 tris** (+6,912 for real flutes) — i.e.
+  **≈ the ORIGINAL rib-lattice receptacle** (52,612, +0.6%), and multi-layer /
+  stress configs land *below* their pre-approach-D originals (3 layers
+  100,140→92,790; 4 layers 287,556→266,940; 20-petal 203,884→187,048). Bloom-only
+  configs (incl. default 26,616) still identical — the trunk never builds for them.
+
+**Investigation note — leaf vs petal outline (no change made).** Both use the
+same `buildSilhouette`/`petalHalfWidth` curve (perfectly symmetric, no noise at
+defaults). The leaf margin looks coarser only because leaves deliberately sample
+it lighter — `outlineSteps: 30` (vs petals' 56) and a `rimSegments: 5` pentagonal
+rim tube (vs 8) — plus a rim-vs-blade sample-count mismatch, all visible in
+silhouette because the blade is near-flat (`bloom = 90°`). Left as-is per request.
+
+---
+
 ## Summary — all four phases complete ✅
 
 The flower generator now exports a 3D-printable STL. Click **Export STL** in the
