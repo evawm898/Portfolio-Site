@@ -59,26 +59,46 @@
     <div class="fl-eyebrow">Generative &middot; v1</div>
     <h1 class="fl-title">Flower Bloom</h1>
     <p class="fl-sub"><span id="readout">&nbsp;</span></p>
+    <label class="fl-mode" for="advancedToggle">
+      <input type="checkbox" id="advancedToggle">
+      <span>Advanced controls</span>
+    </label>
+  </div>
+
+  <!-- PRESETS — the shop window. A read-only gallery of curated starting points;
+       clicking one loads it through the normal design path. The dev row (Save /
+       Export / Import) is revealed only with ?dev in the URL — visitors never see
+       it. Cells are rendered from flower-presets.js by flower.js. -->
+  <div class="fl-presets" id="presetGallery">
+    <div class="fl-presets__head">
+      <div class="fl-eyebrow">Start from a preset</div>
+      <div class="fl-presets__dev" id="presetDev" hidden>
+        <button id="presetSaveAs" class="fl-btn fl-btn--mini" type="button" title="Save the current design as a draft preset (dev)">+ Save</button>
+        <button id="presetExport" class="fl-btn fl-btn--mini" type="button" title="Download every preset as paste-ready flower-presets.js (dev)">Export</button>
+        <button id="presetImport" class="fl-btn fl-btn--mini" type="button" title="Load a flower-presets.js file into draft slots (dev)">Import</button>
+      </div>
+    </div>
+    <div class="fl-presets__row" id="presetRow" role="listbox" aria-label="Presets"></div>
   </div>
 
   <div class="fl-controls">
 
-    <!-- ============================ BLOOM ============================ -->
+    <!-- ============================ FORM ============================ -->
     <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-bloom">
-        <span class="fl-acc__label">Bloom</span>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-form">
+        <span class="fl-acc__label">Form</span>
         <span class="fl-acc__chev" aria-hidden="true"></span>
       </button>
-      <div class="fl-acc__body" id="acc-bloom">
+      <div class="fl-acc__body" id="acc-form">
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
-            <label for="bloomType">Bloom type</label>
+            <label for="bloomType">Arrangement</label>
           </div>
           <select class="fl-select" id="bloomType">
-            <option value="coiled">COILED</option>
-            <option value="radial">RADIAL</option>
-            <option value="bilateral">BILATERAL</option>
+            <option value="coiled">SPIRAL</option>
+            <option value="radial">ROSETTE</option>
+            <option value="bilateral">FAN</option>
           </select>
           <span class="fl-ctrl__hint" data-bloom-styles="coiled">phyllotactic spiral (golden angle)</span>
           <span class="fl-ctrl__hint" data-bloom-styles="radial">evenly spread around one ring</span>
@@ -154,7 +174,6 @@
             <option value="clean">CLEAN</option>
             <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
           </select>
           <span class="fl-ctrl__hint">applies to the centre petal too, if on</span>
         </div>
@@ -187,7 +206,6 @@
             <option value="clean">CLEAN</option>
             <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
           </select>
         </div>
         <div class="fl-ctrl" data-bil-petal="2">
@@ -219,7 +237,6 @@
             <option value="clean">CLEAN</option>
             <option value="jagged">SERRATED</option>
             <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
           </select>
         </div>
         <div class="fl-ctrl" data-bil-petal="3">
@@ -252,14 +269,13 @@
           <span class="fl-ctrl__hint">closed bud &rarr; fully open</span>
         </div>
 
-        <div class="fl-ctrl">
+        <div class="fl-ctrl" data-bloom-styles="coiled">
           <div class="fl-ctrl__row">
             <label for="tightness">Petal spacing</label>
             <span class="fl-ctrl__val" data-value="tightness"></span>
           </div>
           <input type="range" id="tightness" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint" data-bloom-styles="coiled">petals touching (packed) &rarr; petals spread (open spiral)</span>
-          <span class="fl-ctrl__hint" data-bloom-styles="radial bilateral">petals touching &rarr; petals spread</span>
+          <span class="fl-ctrl__hint">petals touching (packed) &rarr; petals spread (open spiral)</span>
         </div>
 
         <div class="fl-ctrl">
@@ -271,80 +287,20 @@
           <span class="fl-ctrl__hint">sunken bowl &rarr; flat &rarr; raised cone</span>
         </div>
 
-      </div>
-    </section>
-
-    <!-- ============================ LAYERS =========================== -->
-    <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-layers">
-        <span class="fl-acc__label">Layers</span>
-        <span class="fl-acc__chev" aria-hidden="true"></span>
-      </button>
-      <div class="fl-acc__body" id="acc-layers">
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
-            <label for="layerCount">Layer count</label>
-            <span class="fl-ctrl__val" data-value="layerCount"></span>
+            <label for="petalShape">Petal shape</label>
           </div>
-          <input type="range" id="layerCount" min="1" max="6" step="1" value="1">
-          <span class="fl-ctrl__hint">concentric petal whorls (1 = single ring, unchanged)</span>
+          <select class="fl-select" id="petalShape">
+            <option value="rounded">ROUNDED</option>
+            <option value="pointed">POINTED</option>
+            <option value="strap">STRAP</option>
+            <option value="clawed">CLAWED</option>
+            <option value="__custom" disabled hidden>CUSTOM</option>
+          </select>
+          <span class="fl-ctrl__hint">a named silhouette — the petal controls below fine-tune it (Advanced), which reads back as CUSTOM</span>
         </div>
-
-        <div class="fl-ctrl" data-layers-multi>
-          <div class="fl-ctrl__row">
-            <label for="petalsPerLayer">Petals per layer</label>
-          </div>
-          <input type="text" id="petalsPerLayer" class="fl-text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="blank = Bloom petal count" value="">
-          <span class="fl-ctrl__hint">comma list, outer&rarr;inner (e.g. 8,12,16); blank slots use the Bloom petal count</span>
-        </div>
-
-        <div class="fl-ctrl" data-layers-multi>
-          <div class="fl-ctrl__row">
-            <label for="layerSizeFalloff">Layer size falloff</label>
-            <span class="fl-ctrl__val" data-value="layerSizeFalloff"></span>
-          </div>
-          <input type="range" id="layerSizeFalloff" min="0.3" max="1" step="0.01" value="0.75">
-          <span class="fl-ctrl__hint">each inner layer's size, as a fraction of the one outside it (1 = uniform)</span>
-        </div>
-
-        <div class="fl-ctrl" data-layers-multi>
-          <div class="fl-ctrl__row">
-            <label for="layerHeightOffset">Layer height offset</label>
-            <span class="fl-ctrl__val" data-value="layerHeightOffset"></span>
-          </div>
-          <input type="range" id="layerHeightOffset" min="-0.3" max="0.3" step="0.01" value="0.05">
-          <span class="fl-ctrl__hint">vertical stacking distance between layers (+ raises the inner layers)</span>
-        </div>
-
-        <div class="fl-ctrl" data-layers-multi>
-          <div class="fl-ctrl__row">
-            <label for="layerRotationOffset">Layer rotation offset</label>
-            <span class="fl-ctrl__val" data-value="layerRotationOffset"></span>
-          </div>
-          <input type="range" id="layerRotationOffset" min="0" max="90" step="1" value="24">
-          <span class="fl-ctrl__hint">angular stagger per layer, so inner petals fall in the outer gaps</span>
-        </div>
-
-        <div class="fl-ctrl" data-layers-multi>
-          <div class="fl-ctrl__row">
-            <label for="layerBloomAngleDelta">Layer bloom angle delta</label>
-            <span class="fl-ctrl__val" data-value="layerBloomAngleDelta"></span>
-          </div>
-          <input type="range" id="layerBloomAngleDelta" min="0" max="40" step="1" value="12">
-          <span class="fl-ctrl__hint">how much more closed/cupped each inner layer is (rose/peony centre)</span>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ============================ PETAL ============================ -->
-    <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-petal">
-        <span class="fl-acc__label">Petal shape</span>
-        <span class="fl-acc__chev" aria-hidden="true"></span>
-      </button>
-      <div class="fl-acc__body" id="acc-petal">
 
         <div class="fl-ctrl" data-hide-bilateral>
           <div class="fl-ctrl__row">
@@ -533,163 +489,82 @@
              component elsewhere. Kept wired (input stays, value pinned to its 0.4
              default) so it still drives the global tube radius and readUI / reset keep
              working. To restore: remove `hidden`. -->
-        <div class="fl-ctrl" hidden>
+
+
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
-            <label for="tube">Tube thickness</label>
-            <span class="fl-ctrl__val" data-value="tube"></span>
+            <label for="layerCount">Layer count</label>
+            <span class="fl-ctrl__val" data-value="layerCount"></span>
           </div>
-          <input type="range" id="tube" min="0" max="1" step="0.01" value="0.4">
+          <input type="range" id="layerCount" min="1" max="6" step="1" value="1">
+          <span class="fl-ctrl__hint">concentric petal whorls (1 = single ring, unchanged)</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="petalsPerLayer">Petals per layer</label>
+          </div>
+          <input type="text" id="petalsPerLayer" class="fl-text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="blank = Bloom petal count" value="">
+          <span class="fl-ctrl__hint">comma list, outer&rarr;inner (e.g. 8,12,16); blank slots use the Bloom petal count</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerSizeFalloff">Layer size falloff</label>
+            <span class="fl-ctrl__val" data-value="layerSizeFalloff"></span>
+          </div>
+          <input type="range" id="layerSizeFalloff" min="0.3" max="1" step="0.01" value="0.75">
+          <span class="fl-ctrl__hint">each inner layer's size, as a fraction of the one outside it (1 = uniform)</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerHeightOffset">Layer height offset</label>
+            <span class="fl-ctrl__val" data-value="layerHeightOffset"></span>
+          </div>
+          <input type="range" id="layerHeightOffset" min="-0.3" max="0.3" step="0.01" value="0.05">
+          <span class="fl-ctrl__hint">vertical stacking distance between layers (+ raises the inner layers)</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerRotationOffset">Layer rotation offset</label>
+            <span class="fl-ctrl__val" data-value="layerRotationOffset"></span>
+          </div>
+          <input type="range" id="layerRotationOffset" min="0" max="90" step="1" value="24">
+          <span class="fl-ctrl__hint">angular stagger per layer, so inner petals fall in the outer gaps</span>
+        </div>
+
+        <div class="fl-ctrl" data-layers-multi>
+          <div class="fl-ctrl__row">
+            <label for="layerBloomAngleDelta">Layer bloom angle delta</label>
+            <span class="fl-ctrl__val" data-value="layerBloomAngleDelta"></span>
+          </div>
+          <input type="range" id="layerBloomAngleDelta" min="0" max="40" step="1" value="12">
+          <span class="fl-ctrl__hint">how much more closed/cupped each inner layer is (rose/peony centre)</span>
         </div>
 
       </div>
     </section>
 
-    <!-- ============================= TIP ============================= -->
-    <!-- The tip is a feature with a STYLE (clean / jagged / ruffled / fractal),
-         mirroring INFILL: pick a style, then only that style's options show. -->
+    <!-- ============================ LACE ============================ -->
     <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-tip">
-        <span class="fl-acc__label">Tip</span>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-lace">
+        <span class="fl-acc__label">Lace</span>
         <span class="fl-acc__chev" aria-hidden="true"></span>
       </button>
-      <div class="fl-acc__body" id="acc-tip">
+      <div class="fl-acc__body" id="acc-lace">
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
-            <label for="tipStyle">Tip style</label>
-          </div>
-          <select class="fl-select" id="tipStyle">
-            <option value="clean">CLEAN</option>
-            <option value="jagged">SERRATED</option>
-            <option value="ruffled">RUFFLED</option>
-            <option value="fractal">FRACTAL</option>
-            <option value="scallop" hidden disabled>SCALLOP</option>
-          </select>
-        </div>
-
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="tip">Tip shape</label>
-            <span class="fl-ctrl__val" data-value="tip"></span>
-          </div>
-          <input type="range" id="tip" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint" data-tip-styles="clean fractal">round &rarr; pointed tip</span>
-          <span class="fl-ctrl__hint" data-tip-styles="jagged">round &rarr; pointed &mdash; apex &amp; teeth</span>
-          <span class="fl-ctrl__hint" data-tip-styles="ruffled">soft sine &rarr; tight gathered crest</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="jagged ruffled fractal">
-          <div class="fl-ctrl__row">
-            <label for="tipFrequency">Tip frequency</label>
-            <span class="fl-ctrl__val" data-value="tipFrequency"></span>
-          </div>
-          <input type="range" id="tipFrequency" min="1" max="40" step="1" value="14">
-          <span class="fl-ctrl__hint" data-tip-styles="jagged fractal">total tips &mdash; 1 = apex only</span>
-          <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle waves &mdash; fine control low, caps at the densest</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="jagged fractal">
-          <div class="fl-ctrl__row">
-            <label for="tipRegion">Tip region</label>
-            <span class="fl-ctrl__val" data-value="tipRegion"></span>
-          </div>
-          <input type="range" id="tipRegion" min="0" max="1" step="0.01" value="0.25">
-          <span class="fl-ctrl__hint" data-tip-styles="jagged fractal">how far teeth reach from the apex down</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="jagged ruffled">
-          <div class="fl-ctrl__row">
-            <label for="tipLength">Tip length</label>
-            <span class="fl-ctrl__val" data-value="tipLength"></span>
-          </div>
-          <input type="range" id="tipLength" min="0" max="1" step="0.01" value="0.3">
-          <span class="fl-ctrl__hint" data-tip-styles="jagged">how far all tips extend outward</span>
-          <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle depth &mdash; how far the edge folds in/out</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="jagged fractal">
-          <div class="fl-ctrl__row">
-            <label for="tipIrregularity">Tip irregularity</label>
-            <span class="fl-ctrl__val" data-value="tipIrregularity"></span>
-          </div>
-          <input type="range" id="tipIrregularity" min="0" max="1" step="0.01" value="0">
-          <span class="fl-ctrl__hint">regular &rarr; organic, varied</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="fractal">
-          <div class="fl-ctrl__row">
-            <label for="fractalGrowth">Fractal growth</label>
-            <span class="fl-ctrl__val" data-value="fractalGrowth"></span>
-          </div>
-          <input type="range" id="fractalGrowth" min="0" max="1" step="0.01" value="0">
-          <span class="fl-ctrl__hint">edge dissolves into branching filaments</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="scallop">
-          <div class="fl-ctrl__row">
-            <label for="scallopCount">Scallop count</label>
-            <span class="fl-ctrl__val" data-value="scallopCount"></span>
-          </div>
-          <input type="range" id="scallopCount" min="2" max="30" step="1" value="9">
-          <span class="fl-ctrl__hint">few, wide scallops &rarr; many, narrow</span>
-        </div>
-
-        <div class="fl-ctrl" data-tip-styles="scallop">
-          <div class="fl-ctrl__row">
-            <label for="scallopHeight">Scallop height</label>
-            <span class="fl-ctrl__val" data-value="scallopHeight"></span>
-          </div>
-          <input type="range" id="scallopHeight" min="0" max="1" step="0.01" value="0.4">
-          <span class="fl-ctrl__hint">shallow &rarr; deep bulge</span>
-        </div>
-
-        <!-- EDGE NOISE applies to every tip style (no data-tip-styles) -->
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="edgeNoise">Edge noise</label>
-            <span class="fl-ctrl__val" data-value="edgeNoise"></span>
-          </div>
-          <input type="range" id="edgeNoise" min="0" max="1" step="0.01" value="0">
-          <span class="fl-ctrl__hint">organic micro-crinkle (crepe paper), layered on top of any tip style</span>
-        </div>
-
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="edgeNoiseScale">Edge noise scale</label>
-            <span class="fl-ctrl__val" data-value="edgeNoiseScale"></span>
-          </div>
-          <input type="range" id="edgeNoiseScale" min="0" max="1" step="0.01" value="0">
-          <span class="fl-ctrl__hint">a few broad crinkles &rarr; dense fine crinkling</span>
-        </div>
-
-        <p class="fl-tip-note" data-tip-styles="clean">Smooth petal edge.</p>
-        <p class="fl-tip-note" data-tip-styles="scallop">Scalloped doily edge &mdash; pairs with the LACE infill.</p>
-        <p class="fl-tip-note" data-tip-styles="fractal">This style isn&rsquo;t built yet &mdash; controls are placeholders.</p>
-
-      </div>
-    </section>
-
-    <!-- =========================== INFILL ============================ -->
-    <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-infill">
-        <span class="fl-acc__label">Infill</span>
-        <span class="fl-acc__chev" aria-hidden="true"></span>
-      </button>
-      <div class="fl-acc__body" id="acc-infill">
-
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="infillType">Infill type</label>
+            <label for="infillType">Pattern</label>
           </div>
           <select class="fl-select" id="infillType">
             <option value="veins">VEINS</option>
-            <option value="spacecol">SPACE COLONIZATION</option>
-            <option value="voronoi">VORONOI</option>
+            <option value="voronoi">CELLS</option>
             <option value="strands">STRANDS</option>
-            <option value="bone">BONE</option>
-            <!-- LACE hidden from the dropdown for now (may return later); the buildLace
-                 path + its controls stay wired. To restore: remove `hidden disabled`. -->
-            <option value="lace" hidden disabled>LACE</option>
+            <option value="bone">LATTICE</option>
+            <option value="spacecol">GROWTH</option>
           </select>
         </div>
 
@@ -771,7 +646,7 @@
           <span class="fl-ctrl__hint">the random seed, stored with the design &mdash; re-roll for a new network, saved designs keep theirs</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins voronoi lace">
+        <div class="fl-ctrl" data-infill-styles="veins voronoi">
           <div class="fl-ctrl__row">
             <label for="density">Density</label>
             <span class="fl-ctrl__val" data-value="density"></span>
@@ -779,7 +654,6 @@
           <input type="range" id="density" min="3" max="12" step="1" value="7">
           <span class="fl-ctrl__hint" data-infill-styles="veins">few &rarr; many primary veins off the midrib</span>
           <span class="fl-ctrl__hint" data-infill-styles="voronoi">few, large cells &rarr; many, small</span>
-          <span class="fl-ctrl__hint" data-infill-styles="lace">sparse &rarr; densely packed scrolls</span>
         </div>
 
         <div class="fl-ctrl" data-infill-styles="veins voronoi">
@@ -811,89 +685,6 @@
             <option value="loop" selected>LOOP</option>
           </select>
           <span class="fl-ctrl__hint">how the infill meets the rim &mdash; fade stops short of it, meet runs veins into the margin, loop fuses neighbouring tips into arches</span>
-        </div>
-
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="continuousMargin">Continuous margin</label>
-          </div>
-          <select class="fl-select" id="continuousMargin">
-            <option value="off" selected>OFF</option>
-            <option value="on">ON</option>
-          </select>
-          <span class="fl-ctrl__hint">the edge as two strands rooted at the foot, and the receptacle rebuilt as ONE implicit surface (SDF) those strands gather into &mdash; petal, receptacle and stem read as one continuous piece</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="bundleTightness">Bundle tightness</label>
-            <span class="fl-ctrl__val" data-value="bundleTightness"></span>
-          </div>
-          <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how close the strands stay to the axis at the foot &mdash; a loose splay &rarr; a tight neck</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="flareRate">Flare rate</label>
-            <span class="fl-ctrl__val" data-value="flareRate"></span>
-          </div>
-          <input type="range" id="flareRate" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how fast they open onto the edge as they rise &mdash; a slow spread &rarr; a quick flare</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="absorption">Absorption</label>
-            <span class="fl-ctrl__val" data-value="absorption"></span>
-          </div>
-          <input type="range" id="absorption" min="0" max="1" step="0.01" value="0.85">
-          <span class="fl-ctrl__hint">how much the gathered strands melt into one mass &mdash; low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="buttonSize">Neck swell</label>
-            <span class="fl-ctrl__val" data-value="buttonSize"></span>
-          </div>
-          <input type="range" id="buttonSize" min="0" max="1" step="0.01" value="0.3">
-          <span class="fl-ctrl__hint">how much the neck widens at the arrival zone to receive the strands &mdash; zero is a straight taper (~4&times; a strand), higher swells the shoulder the strands emerge from</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="gatherRadius">Gather radius</label>
-            <span class="fl-ctrl__val" data-value="gatherRadius"></span>
-          </div>
-          <input type="range" id="gatherRadius" min="0" max="0.6" step="0.01" value="0.06">
-          <span class="fl-ctrl__hint">how tight the receptacle button is &mdash; near zero the strands run inward to a compact node on the axis (an anemone button), wide and it opens back out toward a splay</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="gatherHeight">Gather height</label>
-            <span class="fl-ctrl__val" data-value="gatherHeight"></span>
-          </div>
-          <input type="range" id="gatherHeight" min="0.05" max="0.6" step="0.01" value="0.25">
-          <span class="fl-ctrl__hint">how far below the feet the button forms before the trunk descends &mdash; small keeps it up under the bloom, large drops it toward the stem</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="mergeStart">Merge start</label>
-            <span class="fl-ctrl__val" data-value="mergeStart"></span>
-          </div>
-          <input type="range" id="mergeStart" min="0.2" max="0.8" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how early the strands turn inward as they gather &mdash; later &rarr; sooner</span>
-        </div>
-
-        <div class="fl-ctrl" data-cont-margin>
-          <div class="fl-ctrl__row">
-            <label for="mergeRate">Merge rate</label>
-            <span class="fl-ctrl__val" data-value="mergeRate"></span>
-          </div>
-          <input type="range" id="mergeRate" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">how the descent staggers &mdash; an early drop from the button &rarr; an even taper into the stem</span>
         </div>
 
         <div class="fl-ctrl" id="captureDistCtrl">
@@ -1045,30 +836,132 @@
           <input type="checkbox" id="boneOutline" checked>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="lace">
-          <div class="fl-ctrl__row">
-            <label for="laceSwirl">Lace swirl</label>
-            <span class="fl-ctrl__val" data-value="laceSwirl"></span>
-          </div>
-          <input type="range" id="laceSwirl" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">loose open scrolls &rarr; tight coils</span>
-        </div>
-
         <p class="fl-tip-note" data-infill-styles="voronoi">Cells are mirrored across the petal centre.</p>
         <p class="fl-tip-note" data-infill-styles="strands">Strands are mirrored across the petal centre.</p>
         <p class="fl-tip-note" data-infill-styles="bone">A central spine with ribbed bones, mirrored across the petal centre.</p>
-        <p class="fl-tip-note" data-infill-styles="lace">Filigree scrolls, mirrored across the petal centre. Pairs with the SCALLOP tip edge.</p>
 
       </div>
     </section>
 
-    <!-- =========================== CENTER ============================ -->
+    <!-- ============================ EDGE ============================ -->
     <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-center">
-        <span class="fl-acc__label">Center</span>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-edge">
+        <span class="fl-acc__label">Edge</span>
         <span class="fl-acc__chev" aria-hidden="true"></span>
       </button>
-      <div class="fl-acc__body" id="acc-center">
+      <div class="fl-acc__body" id="acc-edge">
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="tipStyle">Edge</label>
+          </div>
+          <select class="fl-select" id="tipStyle">
+            <option value="clean">CLEAN</option>
+            <option value="jagged">TOOTHED</option>
+            <option value="scallop">SCALLOPED</option>
+            <option value="ruffled">RUFFLED</option>
+          </select>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="tip">Tip shape</label>
+            <span class="fl-ctrl__val" data-value="tip"></span>
+          </div>
+          <input type="range" id="tip" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint" data-tip-styles="clean">round &rarr; pointed tip</span>
+          <span class="fl-ctrl__hint" data-tip-styles="jagged">round &rarr; pointed &mdash; apex &amp; teeth</span>
+          <span class="fl-ctrl__hint" data-tip-styles="ruffled">soft sine &rarr; tight gathered crest</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled">
+          <div class="fl-ctrl__row">
+            <label for="tipFrequency">Tip frequency</label>
+            <span class="fl-ctrl__val" data-value="tipFrequency"></span>
+          </div>
+          <input type="range" id="tipFrequency" min="1" max="40" step="1" value="14">
+          <span class="fl-ctrl__hint" data-tip-styles="jagged">total tips &mdash; 1 = apex only</span>
+          <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle waves &mdash; fine control low, caps at the densest</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="jagged">
+          <div class="fl-ctrl__row">
+            <label for="tipRegion">Tip region</label>
+            <span class="fl-ctrl__val" data-value="tipRegion"></span>
+          </div>
+          <input type="range" id="tipRegion" min="0" max="1" step="0.01" value="0.25">
+          <span class="fl-ctrl__hint" data-tip-styles="jagged">how far teeth reach from the apex down</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="jagged ruffled">
+          <div class="fl-ctrl__row">
+            <label for="tipLength">Tip length</label>
+            <span class="fl-ctrl__val" data-value="tipLength"></span>
+          </div>
+          <input type="range" id="tipLength" min="0" max="1" step="0.01" value="0.3">
+          <span class="fl-ctrl__hint" data-tip-styles="jagged">how far all tips extend outward</span>
+          <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle depth &mdash; how far the edge folds in/out</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="jagged">
+          <div class="fl-ctrl__row">
+            <label for="tipIrregularity">Tip irregularity</label>
+            <span class="fl-ctrl__val" data-value="tipIrregularity"></span>
+          </div>
+          <input type="range" id="tipIrregularity" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">regular &rarr; organic, varied</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="scallop">
+          <div class="fl-ctrl__row">
+            <label for="scallopCount">Scallop count</label>
+            <span class="fl-ctrl__val" data-value="scallopCount"></span>
+          </div>
+          <input type="range" id="scallopCount" min="2" max="30" step="1" value="9">
+          <span class="fl-ctrl__hint">few, wide scallops &rarr; many, narrow</span>
+        </div>
+
+        <div class="fl-ctrl" data-tip-styles="scallop">
+          <div class="fl-ctrl__row">
+            <label for="scallopHeight">Scallop height</label>
+            <span class="fl-ctrl__val" data-value="scallopHeight"></span>
+          </div>
+          <input type="range" id="scallopHeight" min="0" max="1" step="0.01" value="0.4">
+          <span class="fl-ctrl__hint">shallow &rarr; deep bulge</span>
+        </div>
+
+        <!-- EDGE NOISE applies to every tip style (no data-tip-styles) -->
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="edgeNoise">Edge noise</label>
+            <span class="fl-ctrl__val" data-value="edgeNoise"></span>
+          </div>
+          <input type="range" id="edgeNoise" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">organic micro-crinkle (crepe paper), layered on top of any tip style</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="edgeNoiseScale">Edge noise scale</label>
+            <span class="fl-ctrl__val" data-value="edgeNoiseScale"></span>
+          </div>
+          <input type="range" id="edgeNoiseScale" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">a few broad crinkles &rarr; dense fine crinkling</span>
+        </div>
+
+        <p class="fl-tip-note" data-tip-styles="clean">Smooth petal edge.</p>
+        <p class="fl-tip-note" data-tip-styles="scallop">Scalloped doily edge &mdash; pairs with the LACE infill.</p>
+
+      </div>
+    </section>
+
+    <!-- ============================ BASE ============================ -->
+    <section class="fl-acc" data-acc>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-base">
+        <span class="fl-acc__label">Base</span>
+        <span class="fl-acc__chev" aria-hidden="true"></span>
+      </button>
+      <div class="fl-acc__body" id="acc-base">
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
@@ -1257,18 +1150,69 @@
         </div>
         <p class="fl-tip-note" data-center-arch="petaloid">Tiny petals use a simplified PETAL shape (outline, centre curve, cup) as clean solid blades &mdash; tip style, edge noise and infill are omitted. Stamens/pistil are hidden.</p>
 
-      </div>
-    </section>
-
-    <!-- ============================ BASE ============================= -->
-    <section class="fl-acc" data-acc>
-      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-base">
-        <span class="fl-acc__label">Base</span>
-        <span class="fl-acc__chev" aria-hidden="true"></span>
-      </button>
-      <div class="fl-acc__body" id="acc-base">
 
         <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="continuousMargin">Continuous margin</label>
+          </div>
+          <select class="fl-select" id="continuousMargin">
+            <option value="off">OFF</option>
+            <option value="on" selected>ON</option>
+          </select>
+          <span class="fl-ctrl__hint">the edge as two strands rooted at the foot, and the receptacle rebuilt as ONE implicit surface (SDF) those strands gather into &mdash; petal, receptacle and stem read as one continuous piece</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="bundleTightness">Bundle tightness</label>
+            <span class="fl-ctrl__val" data-value="bundleTightness"></span>
+          </div>
+          <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how close the strands stay to the axis at the foot &mdash; a loose splay &rarr; a tight neck</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="flareRate">Flare rate</label>
+            <span class="fl-ctrl__val" data-value="flareRate"></span>
+          </div>
+          <input type="range" id="flareRate" min="0" max="1" step="0.01" value="0.5">
+          <span class="fl-ctrl__hint">how fast they open onto the edge as they rise &mdash; a slow spread &rarr; a quick flare</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="absorption">Absorption</label>
+            <span class="fl-ctrl__val" data-value="absorption"></span>
+          </div>
+          <input type="range" id="absorption" min="0" max="1" step="0.01" value="0.6">
+          <span class="fl-ctrl__hint">how much the gathered strands melt into one mass &mdash; low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)</span>
+        </div>
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="buttonSize">Neck swell</label>
+            <span class="fl-ctrl__val" data-value="buttonSize"></span>
+          </div>
+          <input type="range" id="buttonSize" min="0" max="1" step="0.01" value="0.05">
+          <span class="fl-ctrl__hint">how much the neck widens at the arrival zone to receive the strands &mdash; zero is a straight taper (~4&times; a strand), higher swells the shoulder the strands emerge from</span>
+        </div>
+
+
+        <div class="fl-ctrl" data-cont-margin>
+          <div class="fl-ctrl__row">
+            <label for="gatherHeight">Gather height</label>
+            <span class="fl-ctrl__val" data-value="gatherHeight"></span>
+          </div>
+          <input type="range" id="gatherHeight" min="0.05" max="0.6" step="0.01" value="0.15">
+          <span class="fl-ctrl__hint">how far below the feet the button forms before the trunk descends &mdash; small keeps it up under the bloom, large drops it toward the stem</span>
+        </div>
+
+
+
+        <!-- Receptacle is DERIVED (stem or sepals present) — this control is retired from the
+             UI and kept only as a hidden migration override for old designs that set it. -->
+        <div class="fl-ctrl" id="receptacleTypeCtrl" hidden>
           <div class="fl-ctrl__row">
             <label for="receptacleType">Receptacle</label>
           </div>
@@ -1636,12 +1580,62 @@
       </div>
     </section>
 
+    <!-- ============================ MAKE ============================ -->
+    <section class="fl-acc" data-acc>
+      <button class="fl-acc__head" type="button" aria-expanded="false" aria-controls="acc-make">
+        <span class="fl-acc__label">Make</span>
+        <span class="fl-acc__chev" aria-hidden="true"></span>
+      </button>
+      <div class="fl-acc__body" id="acc-make">
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="heightMM">Size</label>
+            <span class="fl-ctrl__val" data-value="heightMM"></span>
+          </div>
+          <input type="range" id="heightMM" min="40" max="300" step="5" value="120">
+          <span class="fl-ctrl__hint">largest dimension of the print</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="process">Process</label>
+          </div>
+          <select class="fl-select" id="process">
+            <option value="sls" selected>SLS NYLON</option>
+            <option value="sla">RESIN SLA</option>
+            <option value="fdm">FDM 0.4MM</option>
+          </select>
+          <span class="fl-ctrl__hint">sets the smallest printable feature (SLS 1.0 &middot; SLA 0.4 &middot; FDM 0.8 mm)</span>
+        </div>
+
+        <div class="fl-ctrl" hidden>
+          <div class="fl-ctrl__row">
+            <label for="tube">Tube thickness</label>
+            <span class="fl-ctrl__val" data-value="tube"></span>
+          </div>
+          <input type="range" id="tube" min="0" max="1" step="0.01" value="0.4">
+        </div>
+
+        <div id="printBadge" class="fl-badge" data-state="ok">
+          <span class="fl-badge__dot" aria-hidden="true"></span>
+          <span id="printBadgeText" class="fl-badge__text">checking&hellip;</span>
+        </div>
+        <div id="fitReadout" class="fl-fit"></div>
+
+        <div class="fl-make__actions">
+          <button id="saveDesign" class="fl-btn" type="button" title="Save this design to the shared gallery">Save&hellip;</button>
+          <button id="shareLink" class="fl-btn" type="button" title="Copy a link that encodes this whole design">Share link</button>
+          <button id="exportStl" class="fl-btn fl-btn--primary" type="button" title="Download a 3D-printable STL, scaled to millimetres">Get STL &darr;</button>
+        </div>
+
+      </div>
+    </section>
+
   </div>
 
   <div class="fl-panel__foot">
     <button id="reset" class="fl-btn" type="button">Reset</button>
-    <button id="saveDesign" class="fl-btn" type="button" title="Save this design to the shared gallery">Save</button>
-    <button id="exportStl" class="fl-btn" type="button" title="Download a 3D-printable STL, scaled to millimetres">Export STL</button>
     <span id="building" class="fl-building">building&hellip;</span>
   </div>
   <div class="fl-panel__links">

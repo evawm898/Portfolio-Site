@@ -22,13 +22,16 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import {
   lerp, clamp, smootherstep, mulberry32,
-  buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone, buildLace,
+  buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
+import { CONTROLS } from './flower-registry.js';
+import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
+import { VIEW_PRESETS } from './flower-view-presets.js';
 
 const DEG = Math.PI / 180;
 
@@ -85,7 +88,11 @@ const MIDRIB_W_BASE   = 1.00;
 let RECEPT_FIELD_STATS = null;
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
-const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap; export uses the full count
+const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap PER PETAL; export uses the full count
+const SPACECOL_LIVE_TOTAL = 5000;   // ...but bound the TOTAL across petals: a dense network on every one of
+// 40 petals is millions of live tris and can exhaust memory mid-build. Scale the per-petal cap down as the
+// petal count rises so the whole bloom stays within budget (export is unaffected — it uses the full count).
+const spacecolLiveCap = (petalCount) => Math.max(80, Math.min(SPACECOL_LIVE_CAP, Math.floor(SPACECOL_LIVE_TOTAL / Math.max(1, petalCount || 1))));
 
 // Deterministic per-petal network seed for SPACE COLONIZATION. Mixes the design's
 // STORED spaceSeed with a variant index cycled across the whorl by petal index, so:
@@ -137,9 +144,32 @@ const MM_PER_UNIT = 26;   // millimetres per Three.js world unit (single scale k
    floor ≈ 0.0154 u. For reference the thinnest tube slider gives radius
    0.008 u (0.42 mm dia) and the default rim 0.0057 u (0.30 mm dia) —
    both below the floor, so both are lifted to 0.8 mm on export. */
-const MIN_FEATURE_MM    = 0.8;                          // smallest reliable SLS/MJF feature
-const MIN_FEATURE_UNITS = MIN_FEATURE_MM / MM_PER_UNIT; // slab-thickness / wall floor, in world units
-const MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;        // tube/bead radius floor (diameter = feature)
+// The floor is per-PROCESS now (the Make block's Process picker): SLS PA12 unsupported
+// wire needs 1.0 mm, resin SLA resolves ~0.4 mm, an FDM 0.4 nozzle wants ~0.8 mm. It is
+// therefore mutable (setFloorMM) rather than a frozen const; PROCESS_FLOOR_MM holds the
+// per-process values and activeFloorMM the one currently in force. Defaults preserve the
+// original 0.8 mm behaviour until the Make block sets a process. MIN_FEATURE_UNITS /
+// MIN_RADIUS_UNITS are read at BUILD time (new accumulator per build), so updating the
+// floor before an export build is enough — no accumulator caches a stale value.
+const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no process set
+const PROCESS_FLOOR_MM  = { sls: 1.0, sla: 0.4, fdm: 0.8 };
+const PROCESS_LABEL     = { sls: 'SLS nylon', sla: 'resin SLA', fdm: 'FDM 0.4 mm' };
+let   activeFloorMM     = MIN_FEATURE_MM;
+// mm-per-unit is DERIVED from the Make block's Size (target largest dimension in mm) and
+// the bloom's own extent in world units, so the floor is computed at the TRUE printed
+// size: a feature must be >= activeFloorMM mm AFTER the export scale, i.e. its unit radius
+// is floored to activeFloorMM / activeMMPerUnit. Both default to the original constants
+// until the Make block runs applyMake(). MIN_FEATURE_UNITS / MIN_RADIUS_UNITS are read at
+// BUILD time (fresh accumulator per build), so refreshing them before an export is enough.
+let   activeMMPerUnit   = MM_PER_UNIT;
+let   MIN_FEATURE_UNITS = activeFloorMM / activeMMPerUnit;  // slab / wall floor, world units
+let   MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;            // tube/bead radius floor (Ø = feature)
+function refreshFloorUnits() {
+  MIN_FEATURE_UNITS = activeFloorMM / activeMMPerUnit;
+  MIN_RADIUS_UNITS  = MIN_FEATURE_UNITS / 2;
+}
+function setFloorMM(mm) { activeFloorMM = mm > 0 ? mm : MIN_FEATURE_MM; refreshFloorUnits(); }
+function setMMPerUnit(k) { activeMMPerUnit = k > 1e-6 ? k : MM_PER_UNIT; refreshFloorUnits(); }
 
 /* Phyllotactic-spiral arrangement (replaces the old outer-ring + inner-whorl
    layout). Petal i sits at angle i*divergence and radius spread*sqrt(i)
@@ -878,6 +908,7 @@ function rodrigues(v, k, angle) {
 
 function resolveParams(ui) {
   return {
+    petalCount: ui.petalCount,                    // bloom petal count (drives the live spacecol source budget)
     W: ui.width,
     taper: ui.taper,
     clawLength: ui.clawLength,                    // CLAW: basal stalk length (0 = no claw, exact no-op)
@@ -941,7 +972,6 @@ function resolveParams(ui) {
     boneCurve: ui.boneCurve,                     // BONE: -1 swept to base <- 0 straight out -> 1 swept to tip
     boneSpread: ui.boneSpread,                   // BONE: how far the ribs reach toward the margin
     boneOutline: ui.boneOutline,                 // BONE: draw the petal outline (rim) or not
-    laceSwirl: ui.laceSwirl,                     // LACE: 0 loose scrolls -> 1 tight coils
     scallopCount: ui.scallopCount,               // SCALLOP edge: scallops per side (width)
     scallopHeight: ui.scallopHeight,             // SCALLOP edge: how far each scallop bulges out
     centerArch: ui.centerArch,                   // CENTER architecture: classic | dense | disc | petaloid
@@ -1055,14 +1085,12 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
         count: P.boneCount, width: P.boneWidth,
         curve: P.boneCurve, spread: P.boneSpread,
       })
-    : P.infillType === 'lace'
-    ? buildLace(P, rng, { density: P.density, swirl: P.laceSwirl })
     : P.infillType === 'spacecol'
     ? getSpaceColonization(P, spaceColSeed(P, seed), {
         mode: P.spaceMode,
         // live path stays interactive with a coarse-but-complete network; the
         // export path (acc.exportMode) runs the full source count. Distinct memo keys.
-        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, SPACECOL_LIVE_CAP),
+        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, spacecolLiveCap(P.petalCount)),
         birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep,
         seedPattern: P.spacePattern,
       })
@@ -1618,8 +1646,9 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // it with the bloom, so it's automatically sized to the bud. It reads the MAIN ui's
   // receptacle sliders (blend / depth / tightness) so its flutes match the big one.
   // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
-  // gating here on the receptacle dropdown makes it appear exactly when BOTH are on.
-  if (ui.receptacleType !== 'none') {
+  // the bud's receptacle follows the same derived rule as the main bloom's (stem/sepals
+  // present, or the migration override), so a budded plant with a stem grows a bud base too.
+  if (ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on') {
     const attach = [];
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
@@ -2082,8 +2111,7 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
         const field = buildReceptacleField(
           sdfFeet, { p: [neckPt.x, neckPt.y, neckPt.z], r: stemR },
           { cx, cz, tubeRadius: P.tubeRadius,
-            absorption: opts.absorption, gatherHeight: opts.gatherHeight, gatherRadius: opts.gatherRadius,
-            buttonSize: opts.buttonSize, mergeStart: opts.mergeStart, mergeRate: opts.mergeRate,
+            absorption: opts.absorption, gatherHeight: opts.gatherHeight, buttonSize: opts.buttonSize,
             // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
             // so the preview reads as the same solid mass it prints as (export floors anyway).
             profile, collar, exportMode, floorR: acc.floorR,
@@ -2435,7 +2463,12 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // the stem and its tip — no seam. SEPALS remain an independent whorl. A stem
   // WITHOUT a receptacle has no junction to seam, so it keeps the standalone stem
   // tube (buildStemInto). Everything builds into the petal mesh, same teal tubes.
-  const hasRecept = ui.receptacleType !== 'none';
+  // DERIVED junction: the receptacle exists whenever there is something below the bloom to
+  // connect to — a stem or sepals. It is plumbing, not a feature, so there is no visitor
+  // control; it appears because of course it does. `receptacleType === 'on'` survives only
+  // as a migration override, so an old design that set it explicitly keeps its receptacle
+  // even with no stem/sepals.
+  const hasRecept = ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
     length: clamp(ui.stemLength, 0, 10),
@@ -2474,8 +2507,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       spiralTightness: ui.spiralTightness, spiralThickness: ui.spiralThickness,
       bulbSize: ui.bulbSize, bulbHeight: ui.bulbHeight,
       continuousMargin: P.continuousMargin, tubeRadius: P.tubeRadius,
-      mergeStart: ui.mergeStart, mergeRate: ui.mergeRate,
-      absorption: ui.absorption, gatherHeight: ui.gatherHeight, gatherRadius: ui.gatherRadius, buttonSize: ui.buttonSize,
+      absorption: ui.absorption, gatherHeight: ui.gatherHeight, buttonSize: ui.buttonSize,
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
@@ -2662,11 +2694,24 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
 
 function generate() {
   const ui = readUI();
-  const P = resolveParams(ui);
-  const petalAcc = new MeshAccumulator();
-  const coreAcc  = new MeshAccumulator();
-  if (DEBUG_FIELDS) debugPetals.length = 0;   // collected during buildInto, drawn below
-  const { placements, centerHeight } = buildInto(petalAcc, coreAcc, ui, P);
+  // BUILD GUARD: an extreme combination (e.g. max petals × the Growth pattern) can
+  // exhaust memory mid-build and throw. Never let that break the page — build into fresh
+  // accumulators, and only swap them into the scene if the build succeeds; on failure keep
+  // the last-good mesh and surface a non-fatal note. A visitor can drag any slider freely.
+  let P, petalAcc, coreAcc, built;
+  try {
+    P = resolveParams(ui);
+    petalAcc = new MeshAccumulator();
+    coreAcc  = new MeshAccumulator();
+    if (DEBUG_FIELDS) debugPetals.length = 0;   // collected during buildInto, drawn below
+    built = buildInto(petalAcc, coreAcc, ui, P);
+  } catch (e) {
+    console.error('Flower build failed (kept previous geometry):', e);
+    const el = document.getElementById('readout');
+    if (el) el.textContent = 'That combination was too heavy to build — showing the previous flower. Try fewer petals or a lighter pattern.';
+    return;
+  }
+  const { placements, centerHeight } = built;
   coreGlow.position.y = centerHeight + 0.2;   // scene-only glow follows the core height
 
   swapGeometry(meshPetals, petalAcc);
@@ -2728,18 +2773,10 @@ function refitCamera(...accs) {
 
 /* ---------------------------------------------------
    VIEW PRESETS — smoothly animate the camera to a named angle, always framed
-   to the CURRENT plant bounds (any size). `dir` is the target->camera offset
-   direction; `up` sets the on-screen vertical. TOP looks straight down, so it
-   uses a horizontal up (matching the bilateral top-down convention). DEFAULT
+   to the CURRENT plant bounds (any size). Vectors live in flower-view-presets.js
+   (shared with headless audit tooling — see that file's header). DEFAULT
    reproduces the initial framing (see frameCameraOnce). `fit` pads the frame.
 --------------------------------------------------- */
-const VIEW_PRESETS = {
-  default: { dir: [0.45, 0.30, 0.85], up: [0, 1, 0], fit: 1.6 },
-  front:   { dir: [0.00, 0.15, 1.00], up: [0, 1, 0], fit: 1.5 },
-  side:    { dir: [1.00, 0.15, 0.00], up: [0, 1, 0], fit: 1.5 },
-  top:     { dir: [0.00, 1.00, 0.001], up: [1, 0, 0], fit: 1.45 },
-  iso:     { dir: [1.00, 0.85, 1.00], up: [0, 1, 0], fit: 1.6 },
-};
 let viewTween = null;
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
@@ -2805,17 +2842,42 @@ function stepViewTween() {
 const MAX_EXPORT_TRIS = 1500000;   // binary STL ~50 B/tri; ~75 MB here — confirm past this
 
 // Build the current UI/params into one merged, export-mode geometry.
+// Largest dimension of the CURRENT bloom in world units, from the live (un-floored)
+// meshes — floor-independent, so it can set the export scale without a circular rebuild.
+function currentMaxDimUnits() {
+  const box = new THREE.Box3(); box.makeEmpty();
+  for (const m of [meshPetals, meshCore]) {
+    if (!m || !m.geometry || !m.geometry.attributes || !m.geometry.attributes.position) continue;
+    m.geometry.computeBoundingBox();
+    if (m.geometry.boundingBox && isFinite(m.geometry.boundingBox.min.x)) box.union(m.geometry.boundingBox);
+  }
+  if (box.isEmpty()) return 0;
+  const s = new THREE.Vector3(); box.getSize(s);
+  return Math.max(s.x, s.y, s.z);
+}
+
+// Apply the Make block's Size + Process to the export scale + feature floor, so the
+// exported STL is `heightMM` at its largest dimension and every feature clears the
+// process floor at that real size. Falls back to the original 26 mm/unit, 0.8 mm floor
+// when the controls are absent (e.g. an old saved design mid-migration).
+function applyMake(ui) {
+  const md = currentMaxDimUnits();
+  setMMPerUnit(ui && ui.heightMM && md > 1e-6 ? ui.heightMM / md : MM_PER_UNIT);
+  setFloorMM((ui && PROCESS_FLOOR_MM[ui.process]) || MIN_FEATURE_MM);
+}
+
 function buildExportGeometry() {
   const ui = readUI();
   const P = resolveParams(ui);
+  applyMake(ui);                 // set scale + floor for THIS design's size/process BEFORE building
   const acc = new MeshAccumulator({ exportMode: true });
   buildInto(acc, acc, ui, P);   // petals AND core into a single accumulator
   const geo = acc.toGeometry() || new THREE.BufferGeometry();
   const tris = acc.idx.length / 3;
   // Thinnest real-world feature: round Ø = 2·minRadius; ribbon/slab = minThick.
   const minDia = isFinite(acc.minRadius) ? 2 * acc.minRadius : Infinity;
-  const minFeatureMM = MM_PER_UNIT * Math.min(minDia, isFinite(acc.minThick) ? acc.minThick : Infinity);
-  return { geo, tris, minFeatureMM };
+  const minFeatureMM = activeMMPerUnit * Math.min(minDia, isFinite(acc.minThick) ? acc.minThick : Infinity);
+  return { geo, tris, minFeatureMM, mmPerUnit: activeMMPerUnit };
 }
 
 function exportSTL() {
@@ -2840,7 +2902,7 @@ function exportSTL() {
   // Bake world-unit -> millimetre scale into a temp mesh's matrix; STLExporter
   // applies it and writes per-facet normals from the scaled positions.
   const mesh = new THREE.Mesh(geo, matPetals);
-  mesh.scale.setScalar(MM_PER_UNIT);
+  mesh.scale.setScalar(built.mmPerUnit);
   mesh.updateMatrixWorld(true);
   const stl = new STLExporter().parse(mesh, { binary: true });
   geo.dispose();
@@ -2853,8 +2915,75 @@ function exportSTL() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   console.log(`[STL] exported ${tris.toLocaleString()} tris, ` +
     `${(blob.size / 1e6).toFixed(1)} MB, thinnest feature ${minFeatureMM.toFixed(2)} mm ` +
-    `at ${MM_PER_UNIT} mm/unit`);
+    `at ${built.mmPerUnit.toFixed(1)} mm/unit`);
   return true;
+}
+
+/* ---- MAKE: live printability badge + fits readout + share link ----------------------
+   Structural soundness (ONE watertight solid) is guaranteed for every reachable design by
+   the export gate (tools/verify-flower-export.mjs holds boundaryEdges = 0 across the whole
+   matrix), so this badge does NOT rebuild the mesh on each tick. It reports what actually
+   varies with the Make block: SIZE, the process feature floor, whether the print fits a
+   real SLS build volume, and whether the FIXED physical floor is coarse relative to the
+   chosen size (a hair-fine lace whose floored struts are a large fraction of the whole
+   merges into a blob). Red is reserved for a genuine non-watertight export and is surfaced
+   at Get-STL time. Build volumes are cross-checked printer specs; the Shapeways figures are
+   marked TODO until their (currently unreachable) material pages can be confirmed. */
+const FITS = [
+  { max: 100, name: 'benchtop SLS (Sharebot SnowWhite 2, 100 mm cube)' },
+  { max: 165, name: 'Formlabs Fuse 1+ (165 × 165 × 300)' },
+  { max: 180, name: 'Shapeways dyed / black PA12 ceiling (180 × 230 × 320)' },   // TODO confirm Shapeways spec
+  { max: 200, name: 'EOS Formiga P110 (200 × 250 × 330)' },
+  { max: 300, name: 'industrial SLS / bureau standard white' },
+];
+const DYED_CEILING_MM = 180;   // TODO confirm: largest dyed/coloured PA12 offered by Shapeways
+const FIDELITY_MAX = 0.02;     // a floored feature past ~2% of the whole size reads as chunky
+function updatePrintability() {
+  const badge = document.getElementById('printBadge');
+  const text = document.getElementById('printBadgeText');
+  const fitEl = document.getElementById('fitReadout');
+  if (!badge || !text) return;   // absent on the preview page
+  const ui = readUI();
+  const size = Math.round(ui.heightMM || 120);
+  const proc = ui.process || 'sls';
+  const floor = PROCESS_FLOOR_MM[proc] || MIN_FEATURE_MM;
+  const ratio = floor / size;
+  const tier = FITS.find((f) => size <= f.max);
+  let state = 'ok', msg;
+  if (!tier) {
+    state = 'warn';
+    msg = `${size} mm is larger than common SLS build volumes — scale down or split the model`;
+  } else if (ratio > FIDELITY_MAX) {
+    state = 'warn';
+    msg = `at ${size} mm the ${floor} mm ${PROCESS_LABEL[proc]} floor is ${Math.round(ratio * 100)}% of the print — fine lace merges; scale up or thicken`;
+  } else if (size > DYED_CEILING_MM) {
+    state = 'warn';
+    msg = `over the ${DYED_CEILING_MM} mm dyed ceiling — standard white only, no dyed black`;
+  } else {
+    msg = `one watertight solid · ${size} mm · ${PROCESS_LABEL[proc]} · features floored to ${floor} mm`;
+  }
+  badge.setAttribute('data-state', state);
+  text.textContent = (state === 'ok' ? '✓ ' : '! ') + msg;
+  if (fitEl) {
+    const t = tier || FITS[FITS.length - 1];
+    const dyed = size <= DYED_CEILING_MM;
+    fitEl.textContent = `fits ${t.name}${t.max < 300 ? ' and up' : ''} · ` +
+      (dyed ? 'dyed / black available' : `white only above ${DYED_CEILING_MM} mm`);
+  }
+}
+
+// Share link: encode the whole design (the exact object the gallery saves) into the URL,
+// base64url so it survives a paste. On boot ?d=<design> re-applies it (no backend needed).
+function encodeDesignParam() {
+  const d = (typeof currentDesignParams === 'function') ? currentDesignParams() : readUI();
+  return btoa(unescape(encodeURIComponent(JSON.stringify(d))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeDesignParam(s) {
+  try {
+    const b = s.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(b))));
+  } catch { return null; }
 }
 
 
@@ -2889,480 +3018,50 @@ function animate() {
    7. UI WIRING
    =================================================================== */
 
-const inputs = {
-  petalCount: document.getElementById('petalCount'),
-  width: document.getElementById('width'),
-  taper: document.getElementById('taper'),
-  clawLength: document.getElementById('clawLength'),
-  clawWidth: document.getElementById('clawWidth'),
-  shoulder: document.getElementById('shoulder'),
-  cleftDepth: document.getElementById('cleftDepth'),
-  cleftLobes: document.getElementById('cleftLobes'),
-  cleftWidth: document.getElementById('cleftWidth'),
-  reliefAmp: document.getElementById('reliefAmp'),
-  reliefFreq: document.getElementById('reliefFreq'),
-  reliefMode: document.getElementById('reliefMode'),
-  petalTwist: document.getElementById('petalTwist'),
-  petalSkew: document.getElementById('petalSkew'),
-  thickTaper: document.getElementById('thickTaper'),
-  thickEdge: document.getElementById('thickEdge'),
-  thickScale: document.getElementById('thickScale'),
-  tip: document.getElementById('tip'),
-  centerCurve: document.getElementById('centerCurve'),
-  edgeCurve: document.getElementById('edgeCurve'),
-  edgeProfile: document.getElementById('edgeProfile'),
-  petalCup: document.getElementById('petalCup'),
-  tipStyle: document.getElementById('tipStyle'),
-  tipRegion: document.getElementById('tipRegion'),
-  tipLength: document.getElementById('tipLength'),
-  tipFrequency: document.getElementById('tipFrequency'),
-  tipIrregularity: document.getElementById('tipIrregularity'),
-  edgeNoise: document.getElementById('edgeNoise'),
-  edgeNoiseScale: document.getElementById('edgeNoiseScale'),
-  bloomType: document.getElementById('bloomType'),
-  divergenceMode: document.getElementById('divergenceMode'),
-  divergenceAngle: document.getElementById('divergenceAngle'),
-  layerCount: document.getElementById('layerCount'),
-  petalsPerLayer: document.getElementById('petalsPerLayer'),
-  layerSizeFalloff: document.getElementById('layerSizeFalloff'),
-  layerHeightOffset: document.getElementById('layerHeightOffset'),
-  layerRotationOffset: document.getElementById('layerRotationOffset'),
-  layerBloomAngleDelta: document.getElementById('layerBloomAngleDelta'),
-  bilPerSide: document.getElementById('bilPerSide'),
-  bilSpacing: document.getElementById('bilSpacing'),
-  bilCenterPetal: document.getElementById('bilCenterPetal'),
-  bilEdge1: document.getElementById('bilEdge1'),
-  bilEdge2: document.getElementById('bilEdge2'),
-  bilEdge3: document.getElementById('bilEdge3'),
-  bilWidth1: document.getElementById('bilWidth1'),
-  bilWidth2: document.getElementById('bilWidth2'),
-  bilWidth3: document.getElementById('bilWidth3'),
-  bilCenterCurve1: document.getElementById('bilCenterCurve1'),
-  bilCenterCurve2: document.getElementById('bilCenterCurve2'),
-  bilCenterCurve3: document.getElementById('bilCenterCurve3'),
-  bilEdgeCurve1: document.getElementById('bilEdgeCurve1'),
-  bilEdgeCurve2: document.getElementById('bilEdgeCurve2'),
-  bilEdgeCurve3: document.getElementById('bilEdgeCurve3'),
-  bilScale1: document.getElementById('bilScale1'),
-  bilScale2: document.getElementById('bilScale2'),
-  bilScale3: document.getElementById('bilScale3'),
-  bilEdgeProfile1: document.getElementById('bilEdgeProfile1'),
-  bilEdgeProfile2: document.getElementById('bilEdgeProfile2'),
-  bilEdgeProfile3: document.getElementById('bilEdgeProfile3'),
-  bloom: document.getElementById('bloom'),
-  tube: document.getElementById('tube'),
-  infillType: document.getElementById('infillType'),
-  density: document.getElementById('density'),
-  softness: document.getElementById('softness'),
-  veinBranchStart: document.getElementById('veinBranchStart'),
-  continuousMargin: document.getElementById('continuousMargin'),
-  bundleTightness: document.getElementById('bundleTightness'),
-  flareRate: document.getElementById('flareRate'),
-  absorption: document.getElementById('absorption'),
-  buttonSize: document.getElementById('buttonSize'),
-  gatherRadius: document.getElementById('gatherRadius'),
-  gatherHeight: document.getElementById('gatherHeight'),
-  mergeStart: document.getElementById('mergeStart'),
-  mergeRate: document.getElementById('mergeRate'),
-  edgeTermination: document.getElementById('edgeTermination'),
-  captureDist: document.getElementById('captureDist'),
-  voronoiLloyd: document.getElementById('voronoiLloyd'),
-  voronoiAniso: document.getElementById('voronoiAniso'),
-  voronoiDensityLaw: document.getElementById('voronoiDensityLaw'),
-  voronoiWeight: document.getElementById('voronoiWeight'),
-  voronoiWeightFalloff: document.getElementById('voronoiWeightFalloff'),
-  voronoiSlabTaper: document.getElementById('voronoiSlabTaper'),
-  spaceMode: document.getElementById('spaceMode'),
-  spaceDensity: document.getElementById('spaceDensity'),
-  spaceBirth: document.getElementById('spaceBirth'),
-  spaceKill: document.getElementById('spaceKill'),
-  spaceStep: document.getElementById('spaceStep'),
-  spacePattern: document.getElementById('spacePattern'),
-  spaceSeed: document.getElementById('spaceSeed'),
-  spaceVariants: document.getElementById('spaceVariants'),
-  strandCount: document.getElementById('strandCount'),
-  strandWidth: document.getElementById('strandWidth'),
-  strandTaper: document.getElementById('strandTaper'),
-  strandCurvature: document.getElementById('strandCurvature'),
-  strandIrregularity: document.getElementById('strandIrregularity'),
-  boneCount: document.getElementById('boneCount'),
-  boneWidth: document.getElementById('boneWidth'),
-  boneCurve: document.getElementById('boneCurve'),
-  boneSpread: document.getElementById('boneSpread'),
-  boneOutline: document.getElementById('boneOutline'),
-  laceSwirl: document.getElementById('laceSwirl'),
-  scallopCount: document.getElementById('scallopCount'),
-  scallopHeight: document.getElementById('scallopHeight'),
-  centerArch: document.getElementById('centerArch'),
-  centerType: document.getElementById('centerType'),
-  centerCount: document.getElementById('centerCount'),
-  centerLength: document.getElementById('centerLength'),
-  centerTipSize: document.getElementById('centerTipSize'),
-  centerTipShape: document.getElementById('centerTipShape'),
-  centerFilThick: document.getElementById('centerFilThick'),
-  denseStamenCount: document.getElementById('denseStamenCount'),
-  denseStamenLength: document.getElementById('denseStamenLength'),
-  carpelCount: document.getElementById('carpelCount'),
-  carpelSize: document.getElementById('carpelSize'),
-  discSize: document.getElementById('discSize'),
-  discHeight: document.getElementById('discHeight'),
-  ringStamenCount: document.getElementById('ringStamenCount'),
-  ringStamenLength: document.getElementById('ringStamenLength'),
-  fillPetalCount: document.getElementById('fillPetalCount'),
-  fillOuterSize: document.getElementById('fillOuterSize'),
-  fillInnerSize: document.getElementById('fillInnerSize'),
-  fillDensity: document.getElementById('fillDensity'),
-  fillBloomAngle: document.getElementById('fillBloomAngle'),
-  receptacleType: document.getElementById('receptacleType'),
-  blendSmoothness: document.getElementById('blendSmoothness'),
-  receptacleDepth: document.getElementById('receptacleDepth'),
-  convergenceTightness: document.getElementById('convergenceTightness'),
-  receptProfile: document.getElementById('receptProfile'),
-  receptConstruction: document.getElementById('receptConstruction'),
-  receptCollar: document.getElementById('receptCollar'),
-  receptReach: document.getElementById('receptReach'),
-  receptSolidity: document.getElementById('receptSolidity'),
-  ribMultiplier: document.getElementById('ribMultiplier'),
-  spiralTightness: document.getElementById('spiralTightness'),
-  spiralThickness: document.getElementById('spiralThickness'),
-  bulbSize: document.getElementById('bulbSize'),
-  bulbHeight: document.getElementById('bulbHeight'),
-  sepalsType: document.getElementById('sepalsType'),
-  sepalSize: document.getElementById('sepalSize'),
-  sepalCount: document.getElementById('sepalCount'),
-  sepalStyle: document.getElementById('sepalStyle'),
-  sepalCenterCurve: document.getElementById('sepalCenterCurve'),
-  sepalEdgeCurve: document.getElementById('sepalEdgeCurve'),
-  sepalEdgeProfile: document.getElementById('sepalEdgeProfile'),
-  sepalTipStyle: document.getElementById('sepalTipStyle'),
-  sepalTipShape: document.getElementById('sepalTipShape'),
-  sepalTipFreq: document.getElementById('sepalTipFreq'),
-  sepalTipRegion: document.getElementById('sepalTipRegion'),
-  sepalTipLength: document.getElementById('sepalTipLength'),
-  stemType: document.getElementById('stemType'),
-  stemLength: document.getElementById('stemLength'),
-  stemCurve: document.getElementById('stemCurve'),
-  stemThickness: document.getElementById('stemThickness'),
-  stemNodeCount: document.getElementById('stemNodeCount'),
-  stemNodeProminence: document.getElementById('stemNodeProminence'),
-  stemBudMode: document.getElementById('stemBudMode'),
-  leafType: document.getElementById('leafType'),
-  leafPhyllotaxy: document.getElementById('leafPhyllotaxy'),
-  leafSize: document.getElementById('leafSize'),
-  tightness: document.getElementById('tightness'),
-  elevation: document.getElementById('elevation'),
-  autoRotate: document.getElementById('autoRotate'),
-  viewPreset: document.getElementById('viewPreset'),
-};
+// The control panel is DERIVED from flower-registry.js, the single source of truth.
+// tools/verify-registry-sync.mjs fails the build if the registry and flower.html
+// ever disagree. WIRED is every control the panel drives; `inputs` maps each to its
+// element, plus the chrome controls handled directly here (viewPreset / autoRotate /
+// spaceSeed). The `placeholder` flag excludes any control that is wired to state but
+// not yet driving geometry from WIRED (none at present), so readUI / DEFAULTS / reset /
+// refreshLabels skip it while it stays on the placeholderControls path.
+const PANEL = CONTROLS.filter((c) => !c.placeholder);   // every panel control, incl UI-only proxies
+const WIRED = PANEL.filter((c) => !c.uiOnly);           // controls that drive readUI / DEFAULTS / reset / labels
+const inputs = {};
+for (const c of PANEL) inputs[c.id] = document.getElementById(c.id);
+for (const id of ['viewPreset', 'autoRotate', 'spaceSeed']) inputs[id] = document.getElementById(id);
 
 function readUI() {
-  return {
-    petalCount: parseInt(inputs.petalCount.value, 10),
-    width: parseFloat(inputs.width.value),
-    taper: parseFloat(inputs.taper.value),
-    clawLength: parseFloat(inputs.clawLength.value),
-    clawWidth: parseFloat(inputs.clawWidth.value),
-    shoulder: parseFloat(inputs.shoulder.value),
-    cleftDepth: parseFloat(inputs.cleftDepth.value),
-    cleftLobes: parseInt(inputs.cleftLobes.value, 10),
-    cleftWidth: parseFloat(inputs.cleftWidth.value),
-    reliefAmp: parseFloat(inputs.reliefAmp.value),
-    reliefFreq: parseFloat(inputs.reliefFreq.value),
-    reliefMode: inputs.reliefMode.value,
-    petalTwist: parseFloat(inputs.petalTwist.value),
-    petalSkew: parseFloat(inputs.petalSkew.value),
-    thickTaper: parseFloat(inputs.thickTaper.value),
-    thickEdge: parseFloat(inputs.thickEdge.value),
-    thickScale: parseFloat(inputs.thickScale.value),
-    tip: parseFloat(inputs.tip.value),
-    centerCurve: parseFloat(inputs.centerCurve.value),
-    edgeCurve: parseFloat(inputs.edgeCurve.value),
-    edgeProfile: parseFloat(inputs.edgeProfile.value),
-    petalCup: parseFloat(inputs.petalCup.value),
-    tipStyle: inputs.tipStyle.value,
-    tipRegion: parseFloat(inputs.tipRegion.value),
-    tipLength: parseFloat(inputs.tipLength.value),
-    tipFrequency: parseInt(inputs.tipFrequency.value, 10),
-    tipIrregularity: parseFloat(inputs.tipIrregularity.value),
-    edgeNoise: parseFloat(inputs.edgeNoise.value),
-    edgeNoiseScale: parseFloat(inputs.edgeNoiseScale.value),
-    bloomType: inputs.bloomType.value,
-    divergenceMode: inputs.divergenceMode.value,
-    divergenceAngle: parseFloat(inputs.divergenceAngle.value),
-    layerCount: parseInt(inputs.layerCount.value, 10),
-    petalsPerLayer: inputs.petalsPerLayer.value,
-    layerSizeFalloff: parseFloat(inputs.layerSizeFalloff.value),
-    layerHeightOffset: parseFloat(inputs.layerHeightOffset.value),
-    layerRotationOffset: parseFloat(inputs.layerRotationOffset.value),
-    layerBloomAngleDelta: parseFloat(inputs.layerBloomAngleDelta.value),
-    bilPerSide: parseInt(inputs.bilPerSide.value, 10),
-    bilSpacing: parseFloat(inputs.bilSpacing.value),
-    bilCenterPetal: inputs.bilCenterPetal.checked,
-    bilEdge1: inputs.bilEdge1.value,
-    bilEdge2: inputs.bilEdge2.value,
-    bilEdge3: inputs.bilEdge3.value,
-    bilWidth1: parseFloat(inputs.bilWidth1.value),
-    bilWidth2: parseFloat(inputs.bilWidth2.value),
-    bilWidth3: parseFloat(inputs.bilWidth3.value),
-    bilCenterCurve1: parseFloat(inputs.bilCenterCurve1.value),
-    bilCenterCurve2: parseFloat(inputs.bilCenterCurve2.value),
-    bilCenterCurve3: parseFloat(inputs.bilCenterCurve3.value),
-    bilEdgeCurve1: parseFloat(inputs.bilEdgeCurve1.value),
-    bilEdgeCurve2: parseFloat(inputs.bilEdgeCurve2.value),
-    bilEdgeCurve3: parseFloat(inputs.bilEdgeCurve3.value),
-    bilScale1: parseFloat(inputs.bilScale1.value),
-    bilScale2: parseFloat(inputs.bilScale2.value),
-    bilScale3: parseFloat(inputs.bilScale3.value),
-    bilEdgeProfile1: parseFloat(inputs.bilEdgeProfile1.value),
-    bilEdgeProfile2: parseFloat(inputs.bilEdgeProfile2.value),
-    bilEdgeProfile3: parseFloat(inputs.bilEdgeProfile3.value),
-    bloom: parseFloat(inputs.bloom.value),
-    tube: parseFloat(inputs.tube.value),
-    infillType: inputs.infillType.value,
-    density: parseInt(inputs.density.value, 10),
-    softness: parseFloat(inputs.softness.value),
-    veinBranchStart: parseFloat(inputs.veinBranchStart.value),
-    continuousMargin: inputs.continuousMargin.value,
-    bundleTightness: parseFloat(inputs.bundleTightness.value),
-    flareRate: parseFloat(inputs.flareRate.value),
-    absorption: parseFloat(inputs.absorption.value),
-    buttonSize: parseFloat(inputs.buttonSize.value),
-    gatherRadius: parseFloat(inputs.gatherRadius.value),
-    gatherHeight: parseFloat(inputs.gatherHeight.value),
-    mergeStart: parseFloat(inputs.mergeStart.value),
-    mergeRate: parseFloat(inputs.mergeRate.value),
-    edgeTermination: inputs.edgeTermination.value,
-    captureDist: parseFloat(inputs.captureDist.value),
-    voronoiLloyd: parseInt(inputs.voronoiLloyd.value, 10),
-    voronoiAniso: parseFloat(inputs.voronoiAniso.value),
-    voronoiDensityLaw: parseFloat(inputs.voronoiDensityLaw.value),
-    voronoiWeight: parseFloat(inputs.voronoiWeight.value),
-    voronoiWeightFalloff: parseFloat(inputs.voronoiWeightFalloff.value),
-    voronoiSlabTaper: parseFloat(inputs.voronoiSlabTaper.value),
-    spaceMode: inputs.spaceMode.value,
-    spaceDensity: parseFloat(inputs.spaceDensity.value),
-    spaceBirth: parseFloat(inputs.spaceBirth.value),
-    spaceKill: parseFloat(inputs.spaceKill.value),
-    spaceStep: parseFloat(inputs.spaceStep.value),
-    spacePattern: inputs.spacePattern.value,
-    spaceSeed: parseInt(inputs.spaceSeed.value, 10) || 0,
-    spaceVariants: parseInt(inputs.spaceVariants.value, 10),
-    strandCount: parseInt(inputs.strandCount.value, 10),
-    strandWidth: parseFloat(inputs.strandWidth.value),
-    strandTaper: parseFloat(inputs.strandTaper.value),
-    strandCurvature: parseFloat(inputs.strandCurvature.value),
-    strandIrregularity: parseFloat(inputs.strandIrregularity.value),
-    boneCount: parseInt(inputs.boneCount.value, 10),
-    boneWidth: parseFloat(inputs.boneWidth.value),
-    boneCurve: parseFloat(inputs.boneCurve.value),
-    boneSpread: parseFloat(inputs.boneSpread.value),
-    boneOutline: inputs.boneOutline.checked,
-    laceSwirl: parseFloat(inputs.laceSwirl.value),
-    scallopCount: parseInt(inputs.scallopCount.value, 10),
-    scallopHeight: parseFloat(inputs.scallopHeight.value),
-    centerArch: inputs.centerArch.value,
-    centerType: inputs.centerType.value,
-    centerCount: parseInt(inputs.centerCount.value, 10),
-    centerLength: parseFloat(inputs.centerLength.value),
-    centerTipSize: parseFloat(inputs.centerTipSize.value),
-    centerTipShape: parseFloat(inputs.centerTipShape.value),
-    centerFilThick: parseFloat(inputs.centerFilThick.value),
-    denseStamenCount: parseInt(inputs.denseStamenCount.value, 10),
-    denseStamenLength: parseFloat(inputs.denseStamenLength.value),
-    carpelCount: parseInt(inputs.carpelCount.value, 10),
-    carpelSize: parseFloat(inputs.carpelSize.value),
-    discSize: parseFloat(inputs.discSize.value),
-    discHeight: parseFloat(inputs.discHeight.value),
-    ringStamenCount: parseInt(inputs.ringStamenCount.value, 10),
-    ringStamenLength: parseFloat(inputs.ringStamenLength.value),
-    fillPetalCount: parseInt(inputs.fillPetalCount.value, 10),
-    fillOuterSize: parseFloat(inputs.fillOuterSize.value),
-    fillInnerSize: parseFloat(inputs.fillInnerSize.value),
-    fillDensity: parseFloat(inputs.fillDensity.value),
-    fillBloomAngle: parseFloat(inputs.fillBloomAngle.value),
-    receptacleType: inputs.receptacleType.value,
-    blendSmoothness: parseFloat(inputs.blendSmoothness.value),
-    receptacleDepth: parseFloat(inputs.receptacleDepth.value),
-    convergenceTightness: parseFloat(inputs.convergenceTightness.value),
-    receptProfile: inputs.receptProfile.value,
-    receptConstruction: inputs.receptConstruction.value,
-    receptCollar: inputs.receptCollar.value,
-    receptReach: parseFloat(inputs.receptReach.value),
-    receptSolidity: parseFloat(inputs.receptSolidity.value),
-    ribMultiplier: parseFloat(inputs.ribMultiplier.value),
-    spiralTightness: parseFloat(inputs.spiralTightness.value),
-    spiralThickness: parseFloat(inputs.spiralThickness.value),
-    bulbSize: parseFloat(inputs.bulbSize.value),
-    bulbHeight: parseFloat(inputs.bulbHeight.value),
-    sepalsType: inputs.sepalsType.value,
-    sepalSize: parseFloat(inputs.sepalSize.value),
-    sepalCount: parseInt(inputs.sepalCount.value, 10),
-    sepalStyle: inputs.sepalStyle.value,
-    sepalCenterCurve: parseFloat(inputs.sepalCenterCurve.value),
-    sepalEdgeCurve: parseFloat(inputs.sepalEdgeCurve.value),
-    sepalEdgeProfile: parseFloat(inputs.sepalEdgeProfile.value),
-    sepalTipStyle: inputs.sepalTipStyle.value,
-    sepalTipShape: parseFloat(inputs.sepalTipShape.value),
-    sepalTipFreq: parseInt(inputs.sepalTipFreq.value, 10),
-    sepalTipRegion: parseFloat(inputs.sepalTipRegion.value),
-    sepalTipLength: parseFloat(inputs.sepalTipLength.value),
-    stemType: inputs.stemType.value,
-    stemLength: parseFloat(inputs.stemLength.value),
-    stemCurve: parseFloat(inputs.stemCurve.value),
-    stemThickness: parseFloat(inputs.stemThickness.value),
-    stemNodeCount: parseInt(inputs.stemNodeCount.value, 10),
-    stemNodeProminence: parseFloat(inputs.stemNodeProminence.value),
-    stemBudMode: inputs.stemBudMode.value,
-    leafType: inputs.leafType.value,
-    leafPhyllotaxy: inputs.leafPhyllotaxy.value,
-    leafSize: parseFloat(inputs.leafSize.value),
-    tightness: parseFloat(inputs.tightness.value),
-    elevation: parseFloat(inputs.elevation.value),
-    autoRotate: inputs.autoRotate.checked,
-  };
+  const ui = {};
+  for (const c of WIRED) {
+    const el = inputs[c.id];
+    if (c.kind === 'checkbox') ui[c.id] = el.checked;
+    else if (c.kind === 'select' || c.kind === 'text') ui[c.id] = el.value;
+    else ui[c.id] = parseFloat(el.value);
+  }
+  ui.autoRotate = inputs.autoRotate.checked;
+  ui.spaceSeed = parseInt(inputs.spaceSeed.value, 10) || 0;
+  return ui;
 }
 
-// live numeric read-outs next to each slider
+// live numeric read-outs next to each slider — one per slider, formatted by the
+// registry `fmt` token. LABEL_FMT reproduces the former hand-written formatting.
+const LABEL_FMT = {
+  int: (v) => v,
+  f2: (v) => (+v).toFixed(2),
+  f1: (v) => (+v).toFixed(1),
+  f3: (v) => (+v).toFixed(3),
+  f2x: (v) => (+v).toFixed(2) + '×',
+  f1x: (v) => (+v).toFixed(1) + '×',
+  deg: (v) => v + '°',
+  f1deg: (v) => (+v).toFixed(1) + '°',
+  rounddeg: (v) => Math.round(+v) + '°',
+  signed2: (v) => { const n = +v; return (n > 0 ? '+' : '') + n.toFixed(2); },
+  mm: (v) => Math.round(+v) + ' mm',
+};
 function refreshLabels() {
-  setLabel('petalCount', inputs.petalCount.value);
-  setLabel('width', (+inputs.width.value).toFixed(2));
-  setLabel('taper', (+inputs.taper.value).toFixed(2));
-  setLabel('clawLength', (+inputs.clawLength.value).toFixed(2));
-  setLabel('clawWidth', (+inputs.clawWidth.value).toFixed(2));
-  setLabel('shoulder', (+inputs.shoulder.value).toFixed(2));
-  setLabel('cleftDepth', (+inputs.cleftDepth.value).toFixed(2));
-  setLabel('cleftLobes', inputs.cleftLobes.value);
-  setLabel('cleftWidth', (+inputs.cleftWidth.value).toFixed(2));
-  setLabel('reliefAmp', (+inputs.reliefAmp.value).toFixed(2));
-  setLabel('reliefFreq', (+inputs.reliefFreq.value).toFixed(2));
-  setLabel('petalTwist', (() => { const t = +inputs.petalTwist.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
-  setLabel('petalSkew', (() => { const t = +inputs.petalSkew.value; return (t > 0 ? '+' : '') + t.toFixed(2); })());
-  setLabel('thickTaper', (+inputs.thickTaper.value).toFixed(2));
-  setLabel('thickEdge', (+inputs.thickEdge.value).toFixed(2));
-  setLabel('thickScale', (+inputs.thickScale.value).toFixed(2));
-  setLabel('tip', (+inputs.tip.value).toFixed(2));
-  const cc = +inputs.centerCurve.value;
-  setLabel('centerCurve', (cc > 0 ? '+' : '') + cc.toFixed(2));
-  const ec = +inputs.edgeCurve.value;
-  setLabel('edgeCurve', (ec > 0 ? '+' : '') + ec.toFixed(2));
-  const ep = +inputs.edgeProfile.value;
-  setLabel('edgeProfile', (ep > 0 ? '+' : '') + ep.toFixed(2));
-  const pc = +inputs.petalCup.value;
-  setLabel('petalCup', (pc > 0 ? '+' : '') + pc.toFixed(2));
-  setLabel('tipRegion', (+inputs.tipRegion.value).toFixed(2));
-  setLabel('tipLength', (+inputs.tipLength.value).toFixed(2));
-  setLabel('tipFrequency', inputs.tipFrequency.value);
-  setLabel('tipIrregularity', (+inputs.tipIrregularity.value).toFixed(2));
-  setLabel('edgeNoise', (+inputs.edgeNoise.value).toFixed(2));
-  setLabel('edgeNoiseScale', (+inputs.edgeNoiseScale.value).toFixed(2));
-  setLabel('bilPerSide', inputs.bilPerSide.value);
-  setLabel('bilSpacing', inputs.bilSpacing.value + '°');
-  setLabel('layerCount', inputs.layerCount.value);
-  setLabel('layerSizeFalloff', (+inputs.layerSizeFalloff.value).toFixed(2) + '×');
-  const lho = +inputs.layerHeightOffset.value;
-  setLabel('layerHeightOffset', (lho > 0 ? '+' : '') + lho.toFixed(2));
-  setLabel('layerRotationOffset', inputs.layerRotationOffset.value + '°');
-  setLabel('layerBloomAngleDelta', inputs.layerBloomAngleDelta.value + '°');
-  for (let k = 1; k <= 3; k++) {
-    setLabel('bilScale' + k, (+inputs['bilScale' + k].value).toFixed(2) + '×');
-    setLabel('bilWidth' + k, (+inputs['bilWidth' + k].value).toFixed(2));
-    const cc = +inputs['bilCenterCurve' + k].value;
-    setLabel('bilCenterCurve' + k, (cc > 0 ? '+' : '') + cc.toFixed(2));
-    const ec = +inputs['bilEdgeCurve' + k].value;
-    setLabel('bilEdgeCurve' + k, (ec > 0 ? '+' : '') + ec.toFixed(2));
-    const ep = +inputs['bilEdgeProfile' + k].value;
-    setLabel('bilEdgeProfile' + k, (ep > 0 ? '+' : '') + ep.toFixed(2));
-  }
-  setLabel('bloom', inputs.bloom.value + '°');
-  setLabel('divergenceAngle', (+inputs.divergenceAngle.value).toFixed(1) + '°');
-  setLabel('tube', (+inputs.tube.value).toFixed(2));
-  setLabel('density', inputs.density.value);
-  setLabel('softness', (+inputs.softness.value).toFixed(2));
-  setLabel('veinBranchStart', (+inputs.veinBranchStart.value).toFixed(2));
-  setLabel('bundleTightness', (+inputs.bundleTightness.value).toFixed(2));
-  setLabel('flareRate', (+inputs.flareRate.value).toFixed(2));
-  setLabel('absorption', (+inputs.absorption.value).toFixed(2));
-  setLabel('buttonSize', (+inputs.buttonSize.value).toFixed(2));
-  setLabel('gatherRadius', (+inputs.gatherRadius.value).toFixed(2));
-  setLabel('gatherHeight', (+inputs.gatherHeight.value).toFixed(2));
-  setLabel('mergeStart', (+inputs.mergeStart.value).toFixed(2));
-  setLabel('mergeRate', (+inputs.mergeRate.value).toFixed(2));
-  setLabel('captureDist', (+inputs.captureDist.value).toFixed(2));
-  setLabel('voronoiLloyd', inputs.voronoiLloyd.value);
-  setLabel('voronoiAniso', (+inputs.voronoiAniso.value).toFixed(1) + '×');
-  setLabel('voronoiDensityLaw', (+inputs.voronoiDensityLaw.value).toFixed(2));
-  setLabel('voronoiWeight', (+inputs.voronoiWeight.value).toFixed(2));
-  setLabel('voronoiWeightFalloff', (+inputs.voronoiWeightFalloff.value).toFixed(1));
-  setLabel('voronoiSlabTaper', (+inputs.voronoiSlabTaper.value).toFixed(2));
-  setLabel('spaceDensity', (+inputs.spaceDensity.value).toFixed(2));
-  setLabel('spaceBirth', (+inputs.spaceBirth.value).toFixed(3));
-  setLabel('spaceKill', (+inputs.spaceKill.value).toFixed(3));
-  setLabel('spaceStep', (+inputs.spaceStep.value).toFixed(3));
-  setLabel('spaceVariants', inputs.spaceVariants.value);
-  setLabel('spaceSeed', inputs.spaceSeed.value);
-  setLabel('strandCount', inputs.strandCount.value);
-  setLabel('strandWidth', (+inputs.strandWidth.value).toFixed(2));
-  setLabel('strandTaper', (+inputs.strandTaper.value).toFixed(2));
-  setLabel('strandCurvature', (+inputs.strandCurvature.value).toFixed(2));
-  setLabel('strandIrregularity', (+inputs.strandIrregularity.value).toFixed(2));
-  setLabel('boneCount', inputs.boneCount.value);
-  setLabel('boneWidth', (+inputs.boneWidth.value).toFixed(2));
-  const bc = +inputs.boneCurve.value;
-  setLabel('boneCurve', (bc > 0 ? '+' : '') + bc.toFixed(2));
-  setLabel('boneSpread', (+inputs.boneSpread.value).toFixed(2));
-  setLabel('laceSwirl', (+inputs.laceSwirl.value).toFixed(2));
-  setLabel('scallopCount', inputs.scallopCount.value);
-  setLabel('scallopHeight', (+inputs.scallopHeight.value).toFixed(2));
-  setLabel('centerCount', inputs.centerCount.value);
-  setLabel('centerLength', (+inputs.centerLength.value).toFixed(2));
-  setLabel('centerTipSize', (+inputs.centerTipSize.value).toFixed(2));
-  setLabel('centerTipShape', (+inputs.centerTipShape.value).toFixed(2));
-  setLabel('centerFilThick', (+inputs.centerFilThick.value).toFixed(2));
-  setLabel('blendSmoothness', (+inputs.blendSmoothness.value).toFixed(2));
-  setLabel('receptacleDepth', (+inputs.receptacleDepth.value).toFixed(2));
-  setLabel('convergenceTightness', (+inputs.convergenceTightness.value).toFixed(2));
-  setLabel('receptReach', (+inputs.receptReach.value).toFixed(2));
-  setLabel('receptSolidity', (+inputs.receptSolidity.value).toFixed(2));
-  setLabel('ribMultiplier', (+inputs.ribMultiplier.value).toFixed(2));
-  setLabel('spiralTightness', (+inputs.spiralTightness.value).toFixed(2));
-  setLabel('spiralThickness', (+inputs.spiralThickness.value).toFixed(2));
-  setLabel('bulbSize', (+inputs.bulbSize.value).toFixed(2));
-  setLabel('bulbHeight', (+inputs.bulbHeight.value).toFixed(2));
-  setLabel('denseStamenCount', inputs.denseStamenCount.value);
-  setLabel('denseStamenLength', (+inputs.denseStamenLength.value).toFixed(2));
-  setLabel('carpelCount', inputs.carpelCount.value);
-  setLabel('carpelSize', (+inputs.carpelSize.value).toFixed(2));
-  setLabel('discSize', (+inputs.discSize.value).toFixed(2));
-  setLabel('discHeight', (+inputs.discHeight.value).toFixed(2));
-  setLabel('ringStamenCount', inputs.ringStamenCount.value);
-  setLabel('ringStamenLength', (+inputs.ringStamenLength.value).toFixed(2));
-  setLabel('fillPetalCount', inputs.fillPetalCount.value);
-  setLabel('fillOuterSize', (+inputs.fillOuterSize.value).toFixed(2));
-  setLabel('fillInnerSize', (+inputs.fillInnerSize.value).toFixed(2));
-  setLabel('fillDensity', (+inputs.fillDensity.value).toFixed(2));
-  setLabel('fillBloomAngle', `${Math.round(+inputs.fillBloomAngle.value)}°`);
-  setLabel('sepalSize', (+inputs.sepalSize.value).toFixed(2));
-  setLabel('sepalCount', inputs.sepalCount.value);
-  const scc = +inputs.sepalCenterCurve.value;
-  setLabel('sepalCenterCurve', (scc > 0 ? '+' : '') + scc.toFixed(2));
-  const sec = +inputs.sepalEdgeCurve.value;
-  setLabel('sepalEdgeCurve', (sec > 0 ? '+' : '') + sec.toFixed(2));
-  const sep = +inputs.sepalEdgeProfile.value;
-  setLabel('sepalEdgeProfile', (sep > 0 ? '+' : '') + sep.toFixed(2));
-  setLabel('sepalTipShape', (+inputs.sepalTipShape.value).toFixed(2));
-  setLabel('sepalTipFreq', inputs.sepalTipFreq.value);
-  setLabel('sepalTipRegion', (+inputs.sepalTipRegion.value).toFixed(2));
-  setLabel('sepalTipLength', (+inputs.sepalTipLength.value).toFixed(2));
-  setLabel('stemLength', (+inputs.stemLength.value).toFixed(2));
-  const scv = +inputs.stemCurve.value;
-  setLabel('stemCurve', (scv > 0 ? '+' : '') + scv.toFixed(2));
-  setLabel('stemThickness', (+inputs.stemThickness.value).toFixed(2));
-  setLabel('stemNodeCount', inputs.stemNodeCount.value);
-  setLabel('stemNodeProminence', (+inputs.stemNodeProminence.value).toFixed(2));
-  setLabel('leafSize', (+inputs.leafSize.value).toFixed(2));
-  setLabel('tightness', (+inputs.tightness.value).toFixed(2));
-  const e = +inputs.elevation.value;
-  setLabel('elevation', (e > 0 ? '+' : '') + e.toFixed(2));
+  for (const c of WIRED) if (c.kind === 'slider' && c.fmt) setLabel(c.id, LABEL_FMT[c.fmt](inputs[c.id].value));
+  setLabel('spaceSeed', inputs.spaceSeed.value);   // chrome read-out beside the Re-roll button
 }
 function setLabel(id, text) {
   const el = document.querySelector(`[data-value="${id}"]`);
@@ -3382,7 +3081,6 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
   const infill = ui.infillType === 'voronoi' ? 'voronoi cells'
     : ui.infillType === 'strands' ? 'radial strands'
     : ui.infillType === 'bone' ? 'bone lattice'
-    : ui.infillType === 'lace' ? 'lace filigree'
     : ui.infillType === 'spacecol' ? `space colonization (${ui.spaceMode})`
     : 'leaf venation';
   // SDF receptacle telemetry (continuous margin on): report the field's own triangle
@@ -3414,34 +3112,120 @@ function setBuilding(on) {
   if (el) el.classList.toggle('is-on', on);
 }
 
-// bind: geometry sliders regenerate; toggles that don't affect geometry don't
-['petalCount', 'divergenceAngle', 'bilPerSide', 'bilSpacing',
- 'bilScale1', 'bilScale2', 'bilScale3',
- 'bilWidth1', 'bilWidth2', 'bilWidth3', 'bilCenterCurve1', 'bilCenterCurve2', 'bilCenterCurve3',
- 'bilEdgeCurve1', 'bilEdgeCurve2', 'bilEdgeCurve3',
- 'bilEdgeProfile1', 'bilEdgeProfile2', 'bilEdgeProfile3',
- 'layerSizeFalloff', 'layerHeightOffset', 'layerRotationOffset', 'layerBloomAngleDelta',
- 'width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup',
- 'reliefAmp', 'reliefFreq', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale',
- 'tipRegion', 'tipLength', 'tipFrequency', 'tipIrregularity', 'edgeNoise', 'edgeNoiseScale',
- 'bloom', 'tube', 'density', 'softness', 'veinBranchStart', 'bundleTightness', 'flareRate', 'absorption', 'buttonSize', 'gatherRadius', 'gatherHeight', 'mergeStart', 'mergeRate', 'captureDist', 'voronoiLloyd',
- 'voronoiAniso', 'voronoiDensityLaw', 'voronoiWeight', 'voronoiWeightFalloff', 'voronoiSlabTaper',
- 'spaceDensity', 'spaceBirth', 'spaceKill', 'spaceStep', 'spaceVariants',
- 'strandCount', 'strandWidth', 'strandTaper', 'strandCurvature',
- 'strandIrregularity', 'boneCount', 'boneWidth', 'boneCurve', 'boneSpread',
- 'laceSwirl', 'scallopCount', 'scallopHeight',
- 'centerCount', 'centerLength', 'centerTipSize', 'centerTipShape', 'centerFilThick',
- 'denseStamenCount', 'denseStamenLength', 'carpelCount', 'carpelSize',
- 'discSize', 'discHeight', 'ringStamenCount', 'ringStamenLength',
- 'fillPetalCount', 'fillOuterSize', 'fillInnerSize', 'fillDensity', 'fillBloomAngle',
- 'blendSmoothness', 'receptacleDepth', 'convergenceTightness',
- 'receptReach', 'receptSolidity', 'ribMultiplier', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight',
- 'sepalSize', 'sepalCount', 'sepalCenterCurve', 'sepalEdgeCurve', 'sepalEdgeProfile',
- 'sepalTipShape', 'sepalTipFreq', 'sepalTipRegion', 'sepalTipLength',
- 'stemLength', 'stemCurve', 'stemThickness', 'stemNodeCount', 'stemNodeProminence', 'leafSize',
- 'tightness', 'elevation'].forEach((k) => {
-  inputs[k].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
+// bind: every slider except Layer count (its own combined handler is below) gets the
+// standard input -> refresh read-out + regenerate. Derived from the registry.
+// heightMM (Make · Size) is EXPORT-only — the live view stays unitless, so it must not
+// trigger a geometry rebuild; it refreshes its label + the printability badge instead.
+WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount' && c.id !== 'heightMM').forEach((c) => {
+  inputs[c.id].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
+// ---- Standard / Advanced tier filter -------------------------------------------
+// The registry marks a curated set of controls tier:'standard'; everything else is
+// Advanced. Standard mode (the default) force-hides Advanced controls on top of the
+// contextual gating, and collapses any accordion section left with nothing visible.
+// Each gating sweep (updateXOptions) calls applyTier() at its end, so a contextual
+// change never reveals an Advanced control while Standard is active.
+let standardMode = true;
+const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
+const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
+// Option-level tier: a handful of select OPTIONS are Advanced-only even though the
+// control they live in (Arrangement / Edge) is a Standard picker. In Standard we hide
+// those options and, if a loaded design had one selected, fall back to a Standard-safe
+// value (and regenerate, since the geometry must follow the picker). Why each is here —
+// caught by the Standard-option sweep as broken-in-Standard:
+//   - Edge TOOTHED / SCALLOPED: the teeth/scallops reshape the silhouette rim, but the
+//     Standard-default continuous margin replaces the rim with smooth marginal strands,
+//     so they render identically to CLEAN. They render correctly in Advanced (continuous
+//     margin OFF). Return to Standard once the margin is edge-profile-aware (#67).
+//   - Arrangement FAN (bilateral): renders as scattered debris. Advanced-only until the
+//     bilateral layout is rebuilt.
+// (The FRACTAL edge was DELETED outright — no live geometry ever existed — so it is gone
+//  from the enum, not listed here; the v15->v16 migration maps any saved fractal to clean.)
+const ADV_OPTIONS = {
+  tipStyle:  { advanced: ['jagged', 'scallop'], fallback: 'clean' },
+  bloomType: { advanced: ['bilateral'], fallback: 'coiled' },
+};
+function applyTier() {
+  let fellBack = false;
+  for (const [id, spec] of Object.entries(ADV_OPTIONS)) {
+    const sel = inputs[id];
+    if (!sel) continue;
+    for (const val of spec.advanced) {
+      const opt = sel.querySelector(`option[value="${val}"]`);
+      if (opt) opt.hidden = opt.disabled = standardMode;
+    }
+    if (standardMode && spec.advanced.includes(sel.value)) { sel.value = spec.fallback; fellBack = true; }
+  }
+  if (standardMode) {
+    for (const c of WIRED) if (!STANDARD_IDS.has(c.id)) { const w = ctrlWrap(c.id); if (w) w.hidden = true; }
+  }
+  // Collapse an accordion section (Standard only) when none of its controls show.
+  document.querySelectorAll('.fl-acc[data-acc]').forEach((sec) => {
+    const anyVisible = [...sec.querySelectorAll('.fl-ctrl')].some((d) => !d.hidden);
+    sec.hidden = standardMode && !anyVisible;
+  });
+  // A fallback rewrote a picker value (e.g. a shared design's FAN arrangement in
+  // Standard); the geometry must follow, so rebuild. Debounced + deferred, so this is
+  // a no-op duplicate when a build is already pending. Only fires when an advanced
+  // value was actually selected — never on a default-value boot.
+  if (fellBack) scheduleRegen();
+}
+// Standard-tier controls currently visible — used by the headless tier probe.
+function standardVisibleCount() {
+  return WIRED.filter((c) => STANDARD_IDS.has(c.id)).filter((c) => { const w = ctrlWrap(c.id); return w && !w.hidden; }).length;
+}
+const advancedToggle = document.getElementById('advancedToggle');
+if (advancedToggle) advancedToggle.addEventListener('change', () => {
+  standardMode = !advancedToggle.checked;
+  document.body.classList.toggle('fl-advanced', !standardMode);
+  // Re-run every gating sweep so wrappers reflect the contextual state, then the
+  // sweeps' own applyTier() re-imposes the filter (a no-op in Advanced mode).
+  updateTipOptions(); updateInfillOptions(); updateBloomOptions();
+  updateLayerOptions(); updateCenterOptions(); updateBaseOptions();
+});
+
+// ---- Petal shape picker (Standard) ---------------------------------------------
+// A named-shape proxy over the petal silhouette params: picking a shape writes a full
+// bundle to the (Advanced) petal controls. It is UI-only (uiOnly in the registry) —
+// derived from those params, never saved — so the params stay the single source of
+// truth. When the params match no named shape the picker shows CUSTOM (a display-only
+// state, never a pickable option), so it never lies about what the geometry is.
+const SHAPE_PARAMS = ['width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup'];
+const SHAPES = {
+  rounded: { width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, edgeProfile: 0, petalCup: 0 },
+  pointed: { width: 0.7, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.4, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.15, centerCurve: 0.3, edgeCurve: -0.1, edgeProfile: 0, petalCup: 0 },
+  strap: { width: 0.45, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.3, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.3, centerCurve: 0.15, edgeCurve: 0, edgeProfile: 0, petalCup: 0.05 },
+  clawed: { width: 1.0, taper: 0.3, clawLength: 0.35, clawWidth: 0.25, shoulder: 0.55, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.6, centerCurve: 0.35, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.15 },
+  // LOBED (bifid, cleftDepth > 0) is intentionally NOT a picker bundle. The cleft renders
+  // correctly only when the rim is cleft-aware (continuous margin OFF); with the Standard
+  // default (margin ON) the two un-clefted marginal strands skip the sinus, so a one-click
+  // Lobed would ship a manifold-but-wrong petal (tools/verify-geometry-quality.mjs measures
+  // an ~8-19 mm unsealed gap across the whole cleftDepth range). Cleft params stay available
+  // in Advanced (a hand-dialled cleft shows as CUSTOM); Lobed returns as a named shape once
+  // #64 makes marginStrands cleft-aware.
+};
+// Write a named bundle to every silhouette param, re-detect (lands on the picked
+// shape), and rebuild. CUSTOM is never applicable — it is only ever a detected state.
+function applyShape(name) {
+  const b = SHAPES[name];
+  if (!b) return;
+  for (const id of SHAPE_PARAMS) inputs[id].value = b[id];
+  refreshLabels();
+  detectShape();
+  scheduleRegen();
+}
+// Show the shape whose bundle the params exactly match, else CUSTOM.
+function detectShape() {
+  if (!inputs.petalShape) return;
+  let match = '__custom';
+  for (const [name, b] of Object.entries(SHAPES)) {
+    if (SHAPE_PARAMS.every((id) => Math.abs(parseFloat(inputs[id].value) - b[id]) < 1e-6)) { match = name; break; }
+  }
+  inputs.petalShape.value = match;
+}
+if (inputs.petalShape) inputs.petalShape.addEventListener('change', () => applyShape(inputs.petalShape.value));
+SHAPE_PARAMS.forEach((id) => inputs[id].addEventListener('input', detectShape));   // a hand-edit drops to CUSTOM
+
 // Tip: like Infill, only the selected style's options are shown. Each option's
 // data-tip-styles lists the styles it belongs to; hide the rest.
 function updateTipOptions() {
@@ -3449,6 +3233,29 @@ function updateTipOptions() {
   document.querySelectorAll('[data-tip-styles]').forEach((el) => {
     el.hidden = !el.getAttribute('data-tip-styles').split(/\s+/).includes(style);
   });
+  updateEdgeAmount();
+  applyTier();
+}
+// The EDGE picker's contextual "Amount": in STANDARD each edge exposes exactly one
+// amount control (1:1, a pure relabel — no proxy state): Toothed -> tipLength,
+// Scalloped -> scallopHeight, Ruffled -> edgeNoise. Show that one relabelled "Amount"
+// and hide the other two. In ADVANCED the three keep their own labels and native gating
+// (edgeNoise applies to any style there; tipLength to toothed+ruffled).
+const EDGE_AMOUNT = { jagged: 'tipLength', scallop: 'scallopHeight', ruffled: 'edgeNoise' };
+const EDGE_NATIVE = { tipLength: 'Tip length', scallopHeight: 'Scallop height', edgeNoise: 'Edge noise' };
+function setCtrlLabel(id, text) { const l = document.querySelector(`label[for="${id}"]`); if (l) l.textContent = text; }
+function updateEdgeAmount() {
+  if (standardMode) {
+    const amt = EDGE_AMOUNT[inputs.tipStyle.value];       // undefined for CLEAN
+    for (const id of Object.keys(EDGE_NATIVE)) {
+      const w = ctrlWrap(id);
+      if (w) w.hidden = (id !== amt);
+      setCtrlLabel(id, id === amt ? 'Amount' : EDGE_NATIVE[id]);
+    }
+  } else {
+    for (const id of Object.keys(EDGE_NATIVE)) setCtrlLabel(id, EDGE_NATIVE[id]);
+    const en = ctrlWrap('edgeNoise'); if (en) en.hidden = false;   // edgeNoise: any style in Advanced
+  }
 }
 // tip style is a <select>; swap the visible options and regenerate on change
 inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
@@ -3464,27 +3271,19 @@ function updateInfillOptions() {
   inputs.softness.max = type === 'voronoi' ? '5' : '1';
   inputs.softness.step = type === 'voronoi' ? '0.05' : '0.01';
   if (+inputs.softness.value > +inputs.softness.max) inputs.softness.value = inputs.softness.max;
-  // The shared slider is VEIN DETAIL for veins (branching depth) but SOFTNESS for
-  // voronoi (cell rounding); relabel it to match the active infill.
+  // The shared slider is the contextual sub of the Pattern picker: DETAIL for Veins
+  // (branching depth), ROUNDNESS for Cells (voronoi cell rounding). It only shows for
+  // those two patterns, so relabel it to match.
   const softLabel = document.querySelector('label[for="softness"]');
-  if (softLabel) softLabel.textContent = type === 'veins' ? 'Vein detail' : 'Softness';
-  // The SCALLOP edge pairs only with LACE: offer its tip-style option only then,
-  // and fall back to CLEAN if scallop was selected under a different infill.
-  const scOpt = inputs.tipStyle.querySelector('option[value="scallop"]');
-  if (scOpt) {
-    scOpt.hidden = scOpt.disabled = type !== 'lace';
-    if (type !== 'lace' && inputs.tipStyle.value === 'scallop') {
-      inputs.tipStyle.value = 'clean';
-      updateTipOptions();
-    }
-  }
-  // CONTINUOUS MARGIN: the bundle-tightness / flare-rate sliders apply only when it is on.
-  const contOn = inputs.continuousMargin.value === 'on';
-  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !contOn; });
+  if (softLabel) softLabel.textContent = type === 'veins' ? 'Detail' : 'Roundness';
+  // The junction-cluster controls (data-cont-margin) are gated in updateBaseOptions — they
+  // shape the SDF receptacle, so they need BOTH continuous margin ON and the Receptacle on.
   updateTerminationOptions();   // capture-distance visibility depends on infill type too
+  applyTier();
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
-inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); scheduleRegen(); });
+// Continuous margin drives both the infill edge AND the junction gating (updateBaseOptions).
+inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); updateBaseOptions(); scheduleRegen(); });
 // EDGE TERMINATION: the capture-distance slider only applies to a tube infill
 // (veins / bone) with an active mode, so hide it for FADE and for slab infills.
 function updateTerminationOptions() {
@@ -3513,6 +3312,7 @@ function updateBloomOptions() {
   });
   updateBilateralPetals();
   updateDivergenceOptions();
+  applyTier();
 }
 // COILED divergence: the CUSTOM angle slider shows only for CUSTOM, and the
 // low-petal-count hint shows only when a coiled bloom has fewer than 8 petals
@@ -3524,6 +3324,7 @@ function updateDivergenceOptions() {
   if (angleCtrl) angleCtrl.hidden = !(coiled && custom);
   const hint = document.getElementById('divLowCountHint');
   if (hint) hint.hidden = !(coiled && (parseInt(inputs.petalCount.value, 10) || 0) < 8);
+  applyTier();
 }
 inputs.divergenceMode.addEventListener('change', () => { updateDivergenceOptions(); scheduleRegen(); });
 // keep the low-petal-count hint in sync as the petal slider moves
@@ -3540,6 +3341,7 @@ function updateBilateralPetals() {
   // Global width / centre curve / edge curve are replaced by the per-petal
   // versions when bilateral, so hide them there.
   document.querySelectorAll('[data-hide-bilateral]').forEach((el) => { el.hidden = on; });
+  applyTier();
 }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
 // LAYERS: the per-layer controls only matter with more than one whorl, so hide
@@ -3547,6 +3349,7 @@ inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); schedu
 function updateLayerOptions() {
   const multi = (parseInt(inputs.layerCount.value, 10) || 1) > 1;
   document.querySelectorAll('[data-layers-multi]').forEach((el) => { el.hidden = !multi; });
+  applyTier();
 }
 inputs.layerCount.addEventListener('input', () => { refreshLabels(); updateLayerOptions(); scheduleRegen(); });
 // per-layer petal count is a free-text list; rebuild on edit (parsing is tolerant)
@@ -3563,25 +3366,44 @@ inputs.bilCenterPetal.addEventListener('change', () => { scheduleRegen(); });
 function updateCenterOptions() {
   const arch = inputs.centerArch.value;
   const style = inputs.centerType.value;
-  document.querySelectorAll('#acc-center [data-center-arch]').forEach((el) => {
+  document.querySelectorAll('#acc-base [data-center-arch]').forEach((el) => {
     let show = el.getAttribute('data-center-arch').split(/\s+/).includes(arch);
     if (show && arch === 'classic' && el.hasAttribute('data-center-styles')) {
       show = el.getAttribute('data-center-styles').split(/\s+/).includes(style);
     }
     el.hidden = !show;
   });
+  applyTier();
 }
 inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 // Base parts are independent: each part's sliders show only when it's not NONE.
 function updateBaseOptions() {
-  const on = inputs.receptacleType.value !== 'none';
+  // The junction is DERIVED (stem or sepals present), not a control — so the Advanced
+  // sculpting controls (data-recept + the junction cluster) appear exactly when the
+  // derived receptacle is active. receptacleType is a hidden migration override only.
+  const on = inputs.stemType.value !== 'none' || inputs.sepalsType.value !== 'none' || inputs.receptacleType.value === 'on';
   const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
   document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
+  // JUNCTION cluster (absorption / neck swell / gather height / bundle tightness / flare
+  // rate): these shape the SDF receptacle, which only exists when continuous margin is ON
+  // AND the Receptacle is on. Gating on continuous margin alone left them inert in the
+  // default config (Receptacle off) — so require both, or they do nothing when shown.
+  const contMarginOnJ = inputs.continuousMargin.value === 'on';
+  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !(contMarginOnJ && on); });
   // Per-axis sub-controls: only shown when the receptacle is on AND that axis is selected.
   document.querySelectorAll('[data-recept-dome]').forEach((el) => { el.hidden = !on || prof !== 'dome'; });
   document.querySelectorAll('[data-recept-open]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'gathered' && con !== 'cored'); });
   document.querySelectorAll('[data-recept-ribbed]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'cored'); });
+  // The SDF junction (continuous margin ON) supersedes the legacy lathe receptacle's
+  // construction controls, so hide them there. The legacy path still runs when
+  // continuous margin is OFF, so these stay wired — hidden, not deleted.
+  // BACKLOG (trigger): retire the legacy receptacle entirely — delete these controls
+  // and the continuous-margin-OFF receptacle path, making continuous margin implicit —
+  // once the SDF junction is signed off. Until then the working fallback stays.
+  const contMarginOn = inputs.continuousMargin.value === 'on';
+  const LEGACY_RECEPT = ['receptConstruction', 'receptCollar', 'receptReach', 'receptSolidity', 'ribMultiplier', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight'];
+  if (on && contMarginOn) for (const id of LEGACY_RECEPT) { const w = ctrlWrap(id); if (w) w.hidden = true; }
   // Sepal controls hide when sepals are off; the serration sub-controls
   // (data-sepal-tip) hide further unless SEPAL TIP STYLE matches, mirroring the
   // petal tip panel's data-tip-styles gating.
@@ -3597,6 +3419,7 @@ function updateBaseOptions() {
   document.querySelectorAll('[data-stem]').forEach((el) => { el.hidden = inputs.stemType.value === 'none'; });
   // leaf sub-controls (arrangement / size) show only when a stem AND a leaf type are on
   document.querySelectorAll('[data-leaf]').forEach((el) => { el.hidden = inputs.stemType.value === 'none' || inputs.leafType.value === 'none'; });
+  applyTier();
 }
 inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptProfile.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
@@ -3675,159 +3498,12 @@ if (resetBtn) {
     const d = DEFAULTS;
     designSchemaVersion = CURRENT_SCHEMA;   // Reset = a brand-new design
     designExtraKeys = {};
-    inputs.petalCount.value = d.petalCount;
-    inputs.width.value = d.width;
-    inputs.taper.value = d.taper;
-    inputs.clawLength.value = d.clawLength;
-    inputs.clawWidth.value = d.clawWidth;
-    inputs.shoulder.value = d.shoulder;
-    inputs.cleftDepth.value = d.cleftDepth;
-    inputs.cleftLobes.value = d.cleftLobes;
-    inputs.cleftWidth.value = d.cleftWidth;
-    inputs.reliefAmp.value = d.reliefAmp;
-    inputs.reliefFreq.value = d.reliefFreq;
-    inputs.reliefMode.value = d.reliefMode;
-    inputs.petalTwist.value = d.petalTwist;
-    inputs.petalSkew.value = d.petalSkew;
-    inputs.thickTaper.value = d.thickTaper;
-    inputs.thickEdge.value = d.thickEdge;
-    inputs.thickScale.value = d.thickScale;
-    inputs.tip.value = d.tip;
-    inputs.centerCurve.value = d.centerCurve;
-    inputs.edgeCurve.value = d.edgeCurve;
-    inputs.edgeProfile.value = d.edgeProfile;
-    inputs.petalCup.value = d.petalCup;
-    inputs.tipStyle.value = d.tipStyle;
-    inputs.tipRegion.value = d.tipRegion;
-    inputs.tipLength.value = d.tipLength;
-    inputs.tipFrequency.value = d.tipFrequency;
-    inputs.tipIrregularity.value = d.tipIrregularity;
-    inputs.edgeNoise.value = d.edgeNoise;
-    inputs.edgeNoiseScale.value = d.edgeNoiseScale;
-    inputs.bloomType.value = d.bloomType;
-    inputs.divergenceMode.value = d.divergenceMode;
-    inputs.divergenceAngle.value = d.divergenceAngle;
-    inputs.layerCount.value = d.layerCount;
-    inputs.petalsPerLayer.value = d.petalsPerLayer;
-    inputs.layerSizeFalloff.value = d.layerSizeFalloff;
-    inputs.layerHeightOffset.value = d.layerHeightOffset;
-    inputs.layerRotationOffset.value = d.layerRotationOffset;
-    inputs.layerBloomAngleDelta.value = d.layerBloomAngleDelta;
-    inputs.bilPerSide.value = d.bilPerSide;
-    inputs.bilSpacing.value = d.bilSpacing;
-    inputs.bilCenterPetal.checked = d.bilCenterPetal;
-    inputs.bilEdge1.value = d.bilEdge1;
-    inputs.bilEdge2.value = d.bilEdge2;
-    inputs.bilEdge3.value = d.bilEdge3;
-    for (let k = 1; k <= 3; k++) {
-      inputs['bilScale' + k].value = d['bilScale' + k];
-      inputs['bilWidth' + k].value = d['bilWidth' + k];
-      inputs['bilCenterCurve' + k].value = d['bilCenterCurve' + k];
-      inputs['bilEdgeCurve' + k].value = d['bilEdgeCurve' + k];
-      inputs['bilEdgeProfile' + k].value = d['bilEdgeProfile' + k];
+    for (const c of WIRED) {
+      const el = inputs[c.id];
+      if (c.kind === 'checkbox') el.checked = d[c.id];
+      else el.value = d[c.id];
     }
-    inputs.bloom.value = d.bloom;
-    inputs.tube.value = d.tube;
-    inputs.infillType.value = d.infillType;
-    inputs.density.value = d.density;
-    inputs.softness.value = d.softness;
-    inputs.veinBranchStart.value = d.veinBranchStart;
-    inputs.continuousMargin.value = d.continuousMargin;
-    inputs.bundleTightness.value = d.bundleTightness;
-    inputs.flareRate.value = d.flareRate;
-    inputs.mergeStart.value = d.mergeStart;
-    inputs.mergeRate.value = d.mergeRate;
-    inputs.absorption.value = d.absorption;
-    inputs.buttonSize.value = d.buttonSize;
-    inputs.gatherRadius.value = d.gatherRadius;
-    inputs.gatherHeight.value = d.gatherHeight;
-    inputs.edgeTermination.value = d.edgeTermination;
-    inputs.captureDist.value = d.captureDist;
-    inputs.voronoiLloyd.value = d.voronoiLloyd;
-    inputs.voronoiAniso.value = d.voronoiAniso;
-    inputs.voronoiDensityLaw.value = d.voronoiDensityLaw;
-    inputs.voronoiWeight.value = d.voronoiWeight;
-    inputs.voronoiWeightFalloff.value = d.voronoiWeightFalloff;
-    inputs.voronoiSlabTaper.value = d.voronoiSlabTaper;
-    inputs.spaceMode.value = d.spaceMode;
-    inputs.spaceDensity.value = d.spaceDensity;
-    inputs.spaceBirth.value = d.spaceBirth;
-    inputs.spaceKill.value = d.spaceKill;
-    inputs.spaceStep.value = d.spaceStep;
-    inputs.spacePattern.value = d.spacePattern;
     inputs.spaceSeed.value = d.spaceSeed;
-    inputs.spaceVariants.value = d.spaceVariants;
-    inputs.strandCount.value = d.strandCount;
-    inputs.strandWidth.value = d.strandWidth;
-    inputs.strandTaper.value = d.strandTaper;
-    inputs.strandCurvature.value = d.strandCurvature;
-    inputs.strandIrregularity.value = d.strandIrregularity;
-    inputs.boneCount.value = d.boneCount;
-    inputs.boneWidth.value = d.boneWidth;
-    inputs.boneCurve.value = d.boneCurve;
-    inputs.boneSpread.value = d.boneSpread;
-    inputs.boneOutline.checked = d.boneOutline;
-    inputs.laceSwirl.value = d.laceSwirl;
-    inputs.scallopCount.value = d.scallopCount;
-    inputs.scallopHeight.value = d.scallopHeight;
-    inputs.centerArch.value = d.centerArch;
-    inputs.centerType.value = d.centerType;
-    inputs.centerCount.value = d.centerCount;
-    inputs.centerLength.value = d.centerLength;
-    inputs.centerTipSize.value = d.centerTipSize;
-    inputs.centerTipShape.value = d.centerTipShape;
-    inputs.centerFilThick.value = d.centerFilThick;
-    inputs.denseStamenCount.value = d.denseStamenCount;
-    inputs.denseStamenLength.value = d.denseStamenLength;
-    inputs.carpelCount.value = d.carpelCount;
-    inputs.carpelSize.value = d.carpelSize;
-    inputs.discSize.value = d.discSize;
-    inputs.discHeight.value = d.discHeight;
-    inputs.ringStamenCount.value = d.ringStamenCount;
-    inputs.ringStamenLength.value = d.ringStamenLength;
-    inputs.fillPetalCount.value = d.fillPetalCount;
-    inputs.fillOuterSize.value = d.fillOuterSize;
-    inputs.fillInnerSize.value = d.fillInnerSize;
-    inputs.fillDensity.value = d.fillDensity;
-    inputs.fillBloomAngle.value = d.fillBloomAngle;
-    inputs.receptacleType.value = d.receptacleType;
-    inputs.blendSmoothness.value = d.blendSmoothness;
-    inputs.receptacleDepth.value = d.receptacleDepth;
-    inputs.convergenceTightness.value = d.convergenceTightness;
-    inputs.receptProfile.value = d.receptProfile;
-    inputs.receptConstruction.value = d.receptConstruction;
-    inputs.receptCollar.value = d.receptCollar;
-    inputs.receptReach.value = d.receptReach;
-    inputs.receptSolidity.value = d.receptSolidity;
-    inputs.ribMultiplier.value = d.ribMultiplier;
-    inputs.spiralTightness.value = d.spiralTightness;
-    inputs.spiralThickness.value = d.spiralThickness;
-    inputs.bulbSize.value = d.bulbSize;
-    inputs.bulbHeight.value = d.bulbHeight;
-    inputs.sepalsType.value = d.sepalsType;
-    inputs.sepalSize.value = d.sepalSize;
-    inputs.sepalCount.value = d.sepalCount;
-    inputs.sepalStyle.value = d.sepalStyle;
-    inputs.sepalCenterCurve.value = d.sepalCenterCurve;
-    inputs.sepalEdgeCurve.value = d.sepalEdgeCurve;
-    inputs.sepalEdgeProfile.value = d.sepalEdgeProfile;
-    inputs.sepalTipStyle.value = d.sepalTipStyle;
-    inputs.sepalTipShape.value = d.sepalTipShape;
-    inputs.sepalTipFreq.value = d.sepalTipFreq;
-    inputs.sepalTipRegion.value = d.sepalTipRegion;
-    inputs.sepalTipLength.value = d.sepalTipLength;
-    inputs.stemType.value = d.stemType;
-    inputs.stemLength.value = d.stemLength;
-    inputs.stemCurve.value = d.stemCurve;
-    inputs.stemThickness.value = d.stemThickness;
-    inputs.stemNodeCount.value = d.stemNodeCount;
-    inputs.stemNodeProminence.value = d.stemNodeProminence;
-    inputs.stemBudMode.value = d.stemBudMode;
-    inputs.leafType.value = d.leafType;
-    inputs.leafPhyllotaxy.value = d.leafPhyllotaxy;
-    inputs.leafSize.value = d.leafSize;
-    inputs.tightness.value = d.tightness;
-    inputs.elevation.value = d.elevation;
     inputs.autoRotate.checked = d.autoRotate;
     controls.autoRotate = d.autoRotate;
     resetPlaceholders();
@@ -3838,6 +3514,8 @@ if (resetBtn) {
     updateCenterOptions();
     updateBaseOptions();
     refreshLabels();
+    detectShape();   // Reset returns the params to Rounded, so the picker should say so
+    updatePrintability();
     scheduleRegen();
   });
 }
@@ -3860,51 +3538,10 @@ if (exportBtn) {
   });
 }
 
-const DEFAULTS = {
-  petalCount: 4, width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, petalCup: 0,
-  cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3,
-  reliefAmp: 0, reliefFreq: 0.5, reliefMode: 'radial', petalTwist: 0, petalSkew: 0, thickTaper: 0, thickEdge: 0, thickScale: 1,
-  tipStyle: 'clean', tipRegion: 0.25, tipLength: 0.3, tipFrequency: 14, tipIrregularity: 0, edgeProfile: 0,
-  edgeNoise: 0, edgeNoiseScale: 0,
-  bloomType: 'coiled', divergenceMode: 'golden', divergenceAngle: 137.5,
-  bilPerSide: 3, bilSpacing: 45, bilCenterPetal: false,
-  layerCount: 1, petalsPerLayer: '', layerSizeFalloff: 0.75, layerHeightOffset: 0.05,
-  layerRotationOffset: 24, layerBloomAngleDelta: 12,
-  bilEdge1: 'default', bilEdge2: 'default', bilEdge3: 'default',
-  bilScale1: 1, bilScale2: 1, bilScale3: 1,
-  bilWidth1: 0.9, bilWidth2: 0.9, bilWidth3: 0.9,
-  bilCenterCurve1: 0.4, bilCenterCurve2: 0.4, bilCenterCurve3: 0.4,
-  bilEdgeCurve1: 0, bilEdgeCurve2: 0, bilEdgeCurve3: 0,
-  bilEdgeProfile1: 0, bilEdgeProfile2: 0, bilEdgeProfile3: 0,
-  bloom: 55, tube: 0.4, infillType: 'veins', density: 7, softness: 0.75, veinBranchStart: 0.05,
-  continuousMargin: 'off', bundleTightness: 0.5, flareRate: 0.5, mergeStart: 0.5, mergeRate: 0.5,
-  absorption: 0.85, buttonSize: 0.3, gatherRadius: 0.06, gatherHeight: 0.25,
-  edgeTermination: 'loop', captureDist: 0.12, voronoiLloyd: 8,
-  voronoiAniso: 1, voronoiDensityLaw: 0, voronoiWeight: 0, voronoiWeightFalloff: 1.5, voronoiSlabTaper: 0,
-  spaceMode: 'closed', spaceDensity: 0.5, spaceBirth: 0.06, spaceKill: 0.045, spaceStep: 0.04,
-  spacePattern: 'phyllotactic', spaceSeed: 1, spaceVariants: 3,
-  strandCount: 20, strandWidth: 0.5, strandTaper: 0.5, strandCurvature: 0.4, strandIrregularity: 0.35,
-  boneCount: 18, boneWidth: 0.5, boneCurve: 0.55, boneSpread: 0.85, boneOutline: true,
-  laceSwirl: 0.5, scallopCount: 9, scallopHeight: 0.4,
-  centerArch: 'classic',
-  centerType: 'stamens', centerCount: 14, centerLength: 0.5, centerTipSize: 0.35,
-  centerTipShape: 0, centerFilThick: 0.5,
-  denseStamenCount: 80, denseStamenLength: 0.4, carpelCount: 5, carpelSize: 0.5,
-  discSize: 0.5, discHeight: 0.5, ringStamenCount: 40, ringStamenLength: 0.35,
-  fillPetalCount: 60, fillOuterSize: 0.22, fillInnerSize: 0.10, fillDensity: 0.6, fillBloomAngle: 30,
-  receptacleType: 'none',                                        // enable: none | on
-  receptProfile: 'flare', receptConstruction: 'solid', receptCollar: 'none',
-  receptReach: 0, receptSolidity: 1, ribMultiplier: 1,
-  blendSmoothness: 0.5, receptacleDepth: 0.5, convergenceTightness: 0.5,
-  spiralTightness: 0.12, spiralThickness: 0.5, bulbSize: 0.5, bulbHeight: 0.5,
-  sepalsType: 'none', sepalSize: 0.6,
-  sepalCount: 5, sepalStyle: 'strap', sepalCenterCurve: 0.85, sepalEdgeCurve: -0.25, sepalEdgeProfile: 0,
-  sepalTipStyle: 'clean', sepalTipShape: 0.9, sepalTipFreq: 12, sepalTipRegion: 0.3, sepalTipLength: 0.4,
-  stemType: 'none', stemLength: 4, stemCurve: 0,   // stem length range 0..10 (0 = no stem, 4 = standard); stemCurve control hidden for now (see flower.html), 0 = straight (restore to 0.2 when the control returns).
-  stemThickness: 1, stemNodeCount: 3, stemNodeProminence: 0.4, stemBudMode: 'none',
-  leafType: 'none', leafPhyllotaxy: 'alternate', leafSize: 1,
-  tightness: 0.5, elevation: 0, autoRotate: true,
-};
+const DEFAULTS = {};
+for (const c of WIRED) DEFAULTS[c.id] = c.default;
+DEFAULTS.autoRotate = true;
+DEFAULTS.spaceSeed = 1;
 
 /* ---- Saved-design schema versioning ----------------------------------------
    Every saved design carries a `schemaVersion`. On load, migrations upgrade it
@@ -3917,7 +3554,7 @@ const DEFAULTS = {
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 13;
+const CURRENT_SCHEMA = 17;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -4025,12 +3662,14 @@ function migrateV7toV8(p) {
   return out;
 }
 // v8 -> v9: the CONTINUOUS MARGIN toggle (edge as two rooted strands the receptacle
-// continues) plus its BUNDLE TIGHTNESS / FLARE RATE. The toggle defaults OFF, whose code
-// path is byte-identical to v8, and the two scalars are inert while it is off, so filling
-// all three from DEFAULTS leaves every prior design unchanged.
+// continues) plus its BUNDLE TIGHTNESS / FLARE RATE. The toggle was introduced defaulting
+// OFF, whose code path is byte-identical to v8. That legacy OFF is baked in explicitly
+// here so a pre-v9 design is unchanged even though the NEW-design default is now ON; the
+// two scalars are inert while it is off, so they fall back to DEFAULTS.
 function migrateV8toV9(p) {
   const out = { ...p };
-  for (const k of ['continuousMargin', 'bundleTightness', 'flareRate']) {
+  if (out.continuousMargin == null) out.continuousMargin = 'off';
+  for (const k of ['bundleTightness', 'flareRate']) {
     if (out[k] == null) out[k] = DEFAULTS[k];
   }
   return out;
@@ -4043,9 +3682,10 @@ function migrateV8toV9(p) {
 function migrateV9toV10(p) {
   const out = { ...p };
   if (out.receptConstruction === 'gathered') out.receptConstruction = 'ribbed';
-  for (const k of ['mergeStart', 'mergeRate']) {
-    if (out[k] == null) out[k] = DEFAULTS[k];
-  }
+  // former DEFAULTS.mergeStart / .mergeRate (both controls retired at v17 — dead wiring);
+  // baked as literals so this step is self-contained, then v16->v17 drops the keys.
+  if (out.mergeStart == null) out.mergeStart = 0.5;
+  if (out.mergeRate == null) out.mergeRate = 0.5;
   return out;
 }
 // v10 -> v11: the SOLID receptacle becomes a C1 CROSS-SECTION MORPH under continuous margin,
@@ -4072,7 +3712,7 @@ function migrateV11toV12(p) {
                    : out.receptConstruction === 'cored' ? 0.6
                    : DEFAULTS.absorption;   // ribbed / anything else
   }
-  if (out.gatherRadius == null) out.gatherRadius = DEFAULTS.gatherRadius;
+  if (out.gatherRadius == null) out.gatherRadius = 0.06;   // former DEFAULTS.gatherRadius (control retired at v17 — dead wiring); v16->v17 drops the key
   if (out.gatherHeight == null) out.gatherHeight = DEFAULTS.gatherHeight;
   return out;
 }
@@ -4085,7 +3725,46 @@ function migrateV12toV13(p) {
   if (out.buttonSize == null) out.buttonSize = DEFAULTS.buttonSize;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13];
+// v13 -> v14: retire the dead LACE infill and the unwired FRACTAL-growth placeholder.
+// Drop their keys so they are not carried forward as unknown-field extras, and remap
+// any design that somehow selected the (always hidden+disabled) lace infill to VEINS.
+// SCALLOP is NOT touched here — it is revived as a first-class edge in this version.
+function migrateV13toV14(p) {
+  const out = { ...p };
+  delete out.laceSwirl;
+  delete out.fractalGrowth;
+  if (out.infillType === 'lace') out.infillType = 'veins';
+  return out;
+}
+// v14 -> v15: the Make block's Size (mm) + Process. A design saved before the Make block
+// had no target size — it printed at the old fixed 26 mm/unit — so bake in the equivalent
+// real size (its extent x 26, clamped to the slider) and the SLS default process, so an
+// old design loads at roughly its former physical size.
+function migrateV14toV15(p) {
+  const out = { ...p };
+  if (out.heightMM == null) out.heightMM = 120;   // slider default; ~the old default bloom's size
+  if (out.process == null) out.process = 'sls';
+  return out;
+}
+// v15 -> v16: the FRACTAL edge option was deleted (it never had live geometry — it
+// rendered as clean). Map any saved fractal edge to clean, on the global tip style and
+// on the three bilateral per-petal edges, so a design that selected it loads unchanged
+// (it already looked clean) instead of onto a now-missing option.
+function migrateV15toV16(p) {
+  const out = { ...p };
+  if (out.tipStyle === 'fractal') out.tipStyle = 'clean';
+  for (const k of ['bilEdge1', 'bilEdge2', 'bilEdge3']) if (out[k] === 'fractal') out[k] = 'clean';
+  return out;
+}
+// v16 -> v17: the receptacle-junction controls gatherRadius / mergeStart / mergeRate were
+// deleted — they were passed to the SDF field builder but never read (dead wiring), so
+// removing them changes no geometry. Drop the keys so a saved design carries nothing stale.
+function migrateV16toV17(p) {
+  const out = { ...p };
+  delete out.gatherRadius; delete out.mergeStart; delete out.mergeRate;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build
@@ -4141,11 +3820,10 @@ accSections.forEach((section) => {
   });
 });
 
-// Placeholder controls — no rendering logic yet. `fmt` formats the read-out for
-// slider controls; selects (fmt: null) show their value in the control itself.
-const placeholderControls = [
-  { id: 'fractalGrowth',   fmt: (v) => (+v).toFixed(2) },
-];
+// Placeholder controls — controls wired to state but not yet driving geometry. Empty
+// now that the fractalGrowth placeholder is removed (a real fractal margin is on the
+// geometry backlog); kept as the seam where a future not-yet-rendering control lands.
+const placeholderControls = [];
 
 // current values, exposed for the future render layer / quick debugging
 const edgeParams = {};
@@ -4243,6 +3921,8 @@ function applyDesign(raw) {
   updateCenterOptions();
   updateBaseOptions();
   refreshLabels();
+  detectShape();   // re-derive the shape picker from the loaded params
+  updatePrintability();
   scheduleRegen();
 }
 
@@ -4316,6 +3996,7 @@ if (saveBtn && saveModal) {
    =================================================================== */
 
 controls.autoRotate = inputs.autoRotate.checked;
+document.body.classList.toggle('fl-advanced', !standardMode);   // Standard by default
 updateTipOptions();
 updateInfillOptions();
 updateBloomOptions();
@@ -4323,6 +4004,180 @@ updateLayerOptions();
 updateCenterOptions();
 updateBaseOptions();
 refreshLabels();
+applyTier();
+detectShape();   // seed the petal-shape picker from the initial params (default = Rounded)
+
+// MAKE wiring: Size + Process feed the printability badge only (export-only, no rebuild);
+// Share link copies a self-contained URL of the whole design.
+if (inputs.heightMM) inputs.heightMM.addEventListener('input', () => { refreshLabels(); updatePrintability(); });
+if (inputs.process) inputs.process.addEventListener('change', updatePrintability);
+const shareBtn = document.getElementById('shareLink');
+if (shareBtn) {
+  shareBtn.addEventListener('click', async () => {
+    const url = location.origin + location.pathname + '?d=' + encodeDesignParam();
+    const done = (label) => { const t = shareBtn.textContent; shareBtn.textContent = label; setTimeout(() => { shareBtn.textContent = t; }, 1400); };
+    try { await navigator.clipboard.writeText(url); done('Copied ✓'); }
+    catch { window.prompt('Copy this share link:', url); }
+  });
+}
+
+/* ---- PRESETS gallery ----------------------------------------------------------
+   The shop window: a read-only strip of curated starting points (flower-presets.js),
+   plus a dev-only authoring row (?dev) to save the current design as a draft, export
+   every preset as paste-ready flower-presets.js source, and import such a file back.
+   A preset loads through applyDesign (migrate + merge over DEFAULTS), so it can never
+   desync from the control set. Shipped presets are immutable; drafts live in a
+   namespaced localStorage key and never leave the browser until exported. */
+const PRESET_DEV = new URLSearchParams(location.search).has('dev');
+const PRESET_STORE = 'flowerBloom.presets.draft.v1';
+const PRESET_SKIP = new Set(['autoRotate']);   // view pref, not a design trait
+const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'preset';
+
+function loadDrafts() {
+  try { const raw = JSON.parse(localStorage.getItem(PRESET_STORE) || 'null'); if (raw && Array.isArray(raw.presets)) return raw.presets; }
+  catch { /* corrupt / unavailable — treat as empty */ }
+  return [];
+}
+function saveDrafts(list) {
+  try { localStorage.setItem(PRESET_STORE, JSON.stringify({ schemaVersion: PRESET_SCHEMA, presets: list })); }
+  catch { /* storage blocked / full — dev tool, fail quietly */ }
+}
+// The minimal design delta vs DEFAULTS — the readable `ui` form the shipped presets use.
+function presetDelta(full) {
+  const ui = {};
+  for (const [k, v] of Object.entries(full)) {
+    if (k === 'schemaVersion' || PRESET_SKIP.has(k) || !(k in DEFAULTS)) continue;
+    if (DEFAULTS[k] !== v) ui[k] = v;
+  }
+  return ui;
+}
+function allPresets() {
+  return [
+    ...PRESETS.map((p) => ({ ...p, kind: 'shipped' })),
+    ...loadDrafts().map((p) => ({ ...p, kind: 'draft' })),
+  ];
+}
+
+const presetRow = document.getElementById('presetRow');
+let activePresetCell = null;
+function markPreset(cell) {
+  if (activePresetCell) { activePresetCell.classList.remove('is-active'); activePresetCell.setAttribute('aria-selected', 'false'); }
+  activePresetCell = cell || null;
+  if (cell) { cell.classList.add('is-active'); cell.setAttribute('aria-selected', 'true'); }
+}
+function applyPreset(p, cell) {
+  applyDesign({ ...p.ui, schemaVersion: p.schemaVersion || PRESET_SCHEMA });
+  markPreset(cell);
+}
+function buildPresetGallery() {
+  if (!presetRow) return;
+  presetRow.textContent = '';
+  for (const p of allPresets()) {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'fl-preset' + (p.kind === 'draft' ? ' fl-preset--draft' : '');
+    cell.dataset.slug = p.slug;   // stable hook for the gate matrices
+    cell.setAttribute('role', 'option');
+    cell.setAttribute('aria-selected', 'false');
+    cell.title = `${p.name}${p.note ? ' — ' + p.note : ''}`;
+    let thumb;
+    if (p.kind === 'shipped') {
+      thumb = document.createElement('img');
+      thumb.src = `assets/presets/${p.slug}.png`;
+      thumb.alt = ''; thumb.loading = 'lazy';
+    } else {
+      thumb = document.createElement('span');
+      thumb.textContent = '❋';
+    }
+    thumb.className = 'fl-preset__thumb';
+    const name = document.createElement('span');
+    name.className = 'fl-preset__name';
+    name.textContent = p.name;
+    const note = document.createElement('span');
+    note.className = 'fl-preset__note';
+    note.textContent = p.kind === 'draft' ? 'draft' : (p.note || '');
+    cell.append(thumb, name, note);
+    // dev: shift-click a draft deletes it (checked first, in the capture phase)
+    if (PRESET_DEV && p.kind === 'draft') {
+      cell.title += '  (shift-click to delete)';
+      cell.addEventListener('click', (e) => {
+        if (!e.shiftKey) return;
+        e.stopImmediatePropagation();
+        saveDrafts(loadDrafts().filter((d) => d.slug !== p.slug));
+        buildPresetGallery();
+      }, true);
+    }
+    cell.addEventListener('click', () => applyPreset(p, cell));
+    presetRow.appendChild(cell);
+  }
+}
+// A manual control edit means the design is no longer "a preset" — drop the highlight.
+// (applyDesign sets values programmatically, which fires no input/change, so loading a
+//  preset never trips this — only a real user edit does.)
+for (const c of WIRED) {
+  const el = inputs[c.id];
+  if (el) el.addEventListener(c.kind === 'slider' ? 'input' : 'change', () => markPreset(null));
+}
+
+// dev authoring row (?dev): save current as draft, export all as source, import a file.
+function presetsSource() {
+  const body = allPresets().map((p) =>
+    `  { name: ${JSON.stringify(p.name)}, note: ${JSON.stringify(p.note || '')}, slug: ${JSON.stringify(p.slug)},\n    ui: ${JSON.stringify(p.ui)} },`
+  ).join('\n');
+  return `/* flower-presets.js — exported from the running app (Presets ▸ Export). */\nexport const PRESET_SCHEMA = ${PRESET_SCHEMA};\nexport const PRESETS = [\n${body}\n];\n`;
+}
+function downloadPresetsSource() {
+  const blob = new Blob([presetsSource()], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'flower-presets.js';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function importPresetsFile() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.js,text/javascript,application/javascript,text/plain';
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+      const mod = await import(url);
+      URL.revokeObjectURL(url);
+      const incoming = Array.isArray(mod.PRESETS) ? mod.PRESETS : [];
+      if (!incoming.length) { window.alert('No PRESETS array found in that file.'); return; }
+      const shippedSlugs = new Set(PRESETS.map((p) => p.slug));
+      const drafts = incoming
+        .filter((p) => p && p.ui && !shippedSlugs.has(p.slug || slugify(p.name)))
+        .map((p) => ({ name: p.name || 'Imported', note: p.note || '', slug: p.slug || slugify(p.name), ui: p.ui }));
+      saveDrafts(drafts);
+      buildPresetGallery();
+      window.alert(`Imported ${drafts.length} draft preset(s) (shipped presets skipped).`);
+    } catch (e) { window.alert('Could not import that file: ' + (e && e.message || e)); }
+  });
+  input.click();
+}
+if (PRESET_DEV) {
+  const dev = document.getElementById('presetDev');
+  if (dev) dev.hidden = false;
+  const saveAs = document.getElementById('presetSaveAs');
+  if (saveAs) saveAs.addEventListener('click', () => {
+    const name = (window.prompt('Preset name:') || '').trim();
+    if (!name) return;
+    const slug = slugify(name);
+    const note = (window.prompt('One-line note (optional):') || '').trim();
+    const drafts = loadDrafts().filter((d) => d.slug !== slug);   // overwrite same-name
+    drafts.push({ name, note, slug, ui: presetDelta(currentDesignParams()) });
+    saveDrafts(drafts);
+    buildPresetGallery();
+  });
+  const expBtn = document.getElementById('presetExport');
+  if (expBtn) expBtn.addEventListener('click', downloadPresetsSource);
+  const impBtn = document.getElementById('presetImport');
+  if (impBtn) impBtn.addEventListener('click', importPresetsFile);
+}
 
 if (PREVIEW) {
   // Gallery thumbnail: strip the chrome, render cheaply, always auto-rotate, and
@@ -4341,8 +4196,13 @@ if (PREVIEW) {
   }
   animate();
 } else {
-  const loadId = new URLSearchParams(location.search).get('load');
+  const q = new URLSearchParams(location.search);
+  const loadId = q.get('load');
+  const shared = q.get('d');
+  buildPresetGallery();
   generate();
   if (loadId) loadDesignById(loadId);
+  else if (shared) { const obj = decodeDesignParam(shared); if (obj) applyDesign(obj); }
+  updatePrintability();
   animate();
 }

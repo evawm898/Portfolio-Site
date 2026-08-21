@@ -29,7 +29,7 @@ import { chromium } from 'playwright-core';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const THREE_VERSION = '0.161.0';   // must match the importmap in flower.html
@@ -197,10 +197,11 @@ for (const prof of MPROFILES) for (const con of MCONS) for (const collar of MCOL
 
 // ===== CONTINUOUS MARGIN + SDF RECEPTACLE: the petal edge becomes two strands rooted at the
 // foot, and the receptacle is rebuilt as ONE implicit surface (SDF) those strands GATHER into
-// (see flower-sdf.js). ABSORPTION (blend radius) replaces CONSTRUCTION; GATHER RADIUS/HEIGHT
-// set the button; PROFILE is a radius multiplier and COLLAR a radius bump. The junction is a
-// separate polygonised solid overlapping the feet + stem, so re-run the print-safety gate with
-// it ON across absorption, gather, profile, collar, infills, bloom types, layers and sepals —
+// (see flower-sdf.js). ABSORPTION (blend radius) replaces CONSTRUCTION; BUTTON SIZE (neck swell)
+// and GATHER HEIGHT shape the button; BUNDLE TIGHTNESS / FLARE RATE set the strand splay; PROFILE
+// is a radius multiplier and COLLAR a radius bump. The junction is a separate polygonised solid
+// overlapping the feet + stem, so re-run the print-safety gate with it ON across those junction
+// params, profile, collar, infills, bloom types, layers and sepals —
 // every one must still export watertight (0 boundary edges).
 const CM_START = CONFIGS.length + 1;   // 1-based index of the first continuous-margin row
 CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm: true, set: [
@@ -211,18 +212,19 @@ CONFIGS.push({ label: 'cont-margin reset: 9-petal veins + sepals + stem, ON', cm
   { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' },
   { id: 'receptReach', value: '0.4' },
   { id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' },
-  { id: 'absorption', value: '0.85' }, { id: 'buttonSize', value: '0.4' }, { id: 'gatherRadius', value: '0.06' }, { id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' },
+  { id: 'absorption', value: '0.85' }, { id: 'buttonSize', value: '0.4' }, { id: 'gatherHeight', value: '0.25' },
 ] });
 CONFIGS.push({ label: 'cont-margin BUTTON 0 (bare gather web)', cm: true, set: [{ id: 'buttonSize', value: '0' }] });
 CONFIGS.push({ label: 'cont-margin BUTTON 1 (max daisy disc)', cm: true, set: [{ id: 'buttonSize', value: '1' }] });
 CONFIGS.push({ label: 'cont-margin ABSORPTION low 0.15 (distinct strands)', cm: true, set: [{ id: 'buttonSize', value: '0.4' }, { id: 'absorption', value: '0.15' }] });
 CONFIGS.push({ label: 'cont-margin ABSORPTION high 1.0 (fully fused)', cm: true, set: [{ id: 'absorption', value: '1' }] });
-CONFIGS.push({ label: 'cont-margin GATHER tight (radius 0.03, anemone button)', cm: true, set: [{ id: 'absorption', value: '0.85' }, { id: 'gatherRadius', value: '0.03' }] });
-CONFIGS.push({ label: 'cont-margin GATHER wide (radius 0.55, degrades to splay)', cm: true, set: [{ id: 'gatherRadius', value: '0.55' }] });
-CONFIGS.push({ label: 'cont-margin GATHER deep (height 0.55) + tight radius', cm: true, set: [{ id: 'gatherRadius', value: '0.05' }, { id: 'gatherHeight', value: '0.55' }] });
-CONFIGS.push({ label: 'cont-margin MERGE start 0.2 / rate 0.2 (early inward, early drop)', cm: true, set: [{ id: 'gatherHeight', value: '0.25' }, { id: 'mergeStart', value: '0.2' }, { id: 'mergeRate', value: '0.2' }] });
-CONFIGS.push({ label: 'cont-margin MERGE start 0.8 / rate 0.9 (late inward, even)', cm: true, set: [{ id: 'mergeStart', value: '0.8' }, { id: 'mergeRate', value: '0.9' }] });
-CONFIGS.push({ label: 'cont-margin PROFILE dome (radius mult) + band collar', cm: true, set: [{ id: 'mergeStart', value: '0.5' }, { id: 'mergeRate', value: '0.5' }, { id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptCollar', value: 'band', evt: 'change' }] });
+// gatherRadius/mergeStart/mergeRate were dead wiring (passed to the SDF builder, never read)
+// and have been removed; these rows now sweep the LIVE junction params at their extremes.
+CONFIGS.push({ label: 'cont-margin GATHER shallow (height 0.05, up under bloom)', cm: true, set: [{ id: 'absorption', value: '0.6' }, { id: 'buttonSize', value: '0.4' }, { id: 'gatherHeight', value: '0.05' }] });
+CONFIGS.push({ label: 'cont-margin GATHER deep (height 0.6, dropped toward stem)', cm: true, set: [{ id: 'gatherHeight', value: '0.6' }] });
+CONFIGS.push({ label: 'cont-margin BUNDLE tight 1 / flare 0 (max neck, quick taper)', cm: true, set: [{ id: 'gatherHeight', value: '0.15' }, { id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }] });
+CONFIGS.push({ label: 'cont-margin NECK swell max (buttonSize 1) + bundle default', cm: true, set: [{ id: 'bundleTightness', value: '0.75' }, { id: 'flareRate', value: '0.5' }, { id: 'buttonSize', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin PROFILE dome (radius mult) + band collar', cm: true, set: [{ id: 'buttonSize', value: '0.4' }, { id: 'receptProfile', value: 'dome', evt: 'change' }, { id: 'receptCollar', value: 'band', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin PROFILE urn (radius mult) + ferrule collar', cm: true, set: [{ id: 'receptProfile', value: 'urn', evt: 'change' }, { id: 'receptCollar', value: 'ferrule', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin PROFILE cone + collar none', cm: true, set: [{ id: 'receptProfile', value: 'cone', evt: 'change' }, { id: 'receptCollar', value: 'none', evt: 'change' }] });
 CONFIGS.push({ label: 'cont-margin voronoi infill', cm: true, set: [{ id: 'receptProfile', value: 'flare', evt: 'change' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] });
@@ -230,6 +232,14 @@ CONFIGS.push({ label: 'cont-margin bone (no outline) infill', cm: true, set: [{ 
 CONFIGS.push({ label: 'cont-margin bundle 0 / flare 1 (loose, quick) + reach 1', cm: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'bundleTightness', value: '0' }, { id: 'flareRate', value: '1' }, { id: 'receptReach', value: '1' }] });
 CONFIGS.push({ label: 'cont-margin coiled bloom + 3 layers', cm: true, set: [{ id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '12' }, { id: 'layerCount', value: '3' }, { id: 'bundleTightness', value: '0.6' }, { id: 'flareRate', value: '0.5' }, { id: 'receptReach', value: '0.4' }] });
 CONFIGS.push({ label: 'cont-margin no stem (SDF seals on its own)', cm: true, set: [{ id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'stemType', value: 'none', evt: 'change' }] });
+
+// ===== SHIPPED PRESETS: every curated preset (flower-presets.js) is a permanent
+// regression fixture — named, so a failure reads "Thistle broke", not "config N". Each
+// is loaded the way a visitor loads it: by clicking its gallery cell (the real
+// applyDesign path), which fully replaces state, so no cumulative leak between them. =====
+const { PRESETS } = await import(pathToFileURL(path.join(ROOT, 'flower-presets.js')).href);
+const PRESET_START = CONFIGS.length + 1;   // 1-based index of the first preset row
+for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, preset: true, presetSlug: p.slug });
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
@@ -263,10 +273,26 @@ await page.route('**cdn.jsdelivr.net/**', (route) => {
 await page.goto(`http://localhost:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
 await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
 
+// Export STL now lives inside the collapsed "Make" accordion — open it so the click lands.
+await page.evaluate(() => {
+  const head = document.querySelector('.fl-acc__head[aria-controls="acc-make"]');
+  if (head && head.getAttribute('aria-expanded') !== 'true') head.click();
+});
+await page.waitForTimeout(120);
+
 const results = [];
 for (const cfg of CONFIGS) {
-  for (const s of cfg.set) {
-    await page.evaluate(({ id, value, evt }) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event(evt || 'input', { bubbles: true })); }, s);
+  if (cfg.presetSlug) {
+    // Load the preset by clicking its gallery cell — the real applyDesign path.
+    const clicked = await page.evaluate((slug) => {
+      const cell = document.querySelector(`#presetRow .fl-preset[data-slug="${slug}"]`);
+      if (!cell) return false; cell.click(); return true;
+    }, cfg.presetSlug);
+    if (!clicked) { results.push({ label: cfg.label, ok: false, preset: true, note: 'gallery cell not found' }); continue; }
+  } else {
+    for (const s of cfg.set) {
+      await page.evaluate(({ id, value, evt }) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event(evt || 'input', { bubbles: true })); }, s);
+    }
   }
   await page.waitForTimeout(160); // let the double-rAF rebuild settle
   const [dl] = await Promise.all([
@@ -276,7 +302,7 @@ for (const cfg of CONFIGS) {
   if (!dl) { results.push({ label: cfg.label, ok: false, matrix: !!cfg.matrix, cm: !!cfg.cm, note: 'no STL download' }); continue; }
   const buf = fs.readFileSync(await dl.path());
   const a = analyzeStl(buf);
-  results.push({ label: cfg.label, ok: a.boundary === 0, matrix: !!cfg.matrix, cm: !!cfg.cm, ...a });
+  results.push({ label: cfg.label, ok: a.boundary === 0, matrix: !!cfg.matrix, cm: !!cfg.cm, preset: !!cfg.preset, ...a });
 }
 
 await browser.close();
@@ -295,6 +321,9 @@ if (mat.length) console.log(`\nReceptacle PROFILE×CONSTRUCTION×COLLAR matrix: 
 const cm = results.filter((r) => r.cm);
 const cmPass = cm.filter((r) => r.ok).length;
 if (cm.length) console.log(`Continuous-margin SDF receptacle (absorption × gather × profile × collar): ${cmPass}/${cm.length} export watertight.`);
+const pre = results.filter((r) => r.preset);
+const prePass = pre.filter((r) => r.ok).length;
+if (pre.length) console.log(`Shipped presets (flower-presets.js): ${prePass}/${pre.length} export watertight.`);
 if (pageErrors.length) {
   const real = pageErrors.filter((e) => !/fonts\.googleapis/.test(e));
   if (real.length) { console.log('\nPage errors:'); real.forEach((e) => console.log('  ! ' + e)); failed += real.length; }
