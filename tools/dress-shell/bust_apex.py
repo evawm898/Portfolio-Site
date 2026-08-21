@@ -77,6 +77,23 @@ class _BumpedDepth:
     def bump(self, theta_deg, v):
         raise NotImplementedError
 
+    def _field(self, T, theta_ref, V):
+        """Y(T, V) using the TRUE ellipse parameter T for the base term
+        (exact) and theta_ref only for whatever distance/weight .bump()
+        needs (approximate, reference-frame). Default: the additive-bump
+        convention (ApexBustDepth, PlateauBustDepth) — Y = base*cos(T) +
+        bump(theta_ref, V). A subclass that BLENDS TOWARD a value that
+        itself depends on theta_ref (e.g. FacetBustDepth blending toward
+        a fixed plane) MUST override this: using .bump()'s theta_ref-
+        based reference term as an approximation of base*cos(T), rather
+        than base*cos(T) itself, doesn't cancel exactly away from the
+        T==theta_ref fixed point (CF) and produces small local hard-
+        constraint violations near the flat core's edge that the
+        additive convention never has (found by assert_cf_is_max —
+        that's why this hook exists)."""
+        b_base_v = np.asarray(self.base.b(V))
+        return b_base_v * np.cos(T) + self.bump(theta_ref, V)
+
     def _theta_ref(self, t, v):
         """Reference equal-arc azimuth (degrees, [0, 180]) of ellipse
         parameter t >= 0 at height v, from the PLAIN pre-bump model."""
@@ -91,13 +108,12 @@ class _BumpedDepth:
         V, T = np.meshgrid(v_grid, t_grid, indexing="ij")   # (n_v, n_t)
 
         theta_ref = self._theta_ref(T, V)
-        b_base_v = np.asarray(self.base.b(v_grid))
         # Y is the SIGNED front-to-back coordinate (matches the plain
         # model's b*cos(t) convention): positive toward CF (t=0),
         # negative toward CB (t=pi). The bump only ever raises Y toward
         # CF, so no positivity check applies here — the real correctness
         # guard is arc-length monotonicity, checked below.
-        Y = b_base_v[:, None] * np.cos(T) + self.bump(theta_ref, V)
+        Y = self._field(T, theta_ref, V)
 
         target_P = np.asarray(self.ref_model.section_perimeter(v_grid))  # frozen
         lo = np.full(n_v, 1.0)
@@ -185,11 +201,12 @@ class _BumpedDepth:
         return (np.broadcast_to(sign, out_shape) * t_flat.reshape(out_shape))
 
     def y_of(self, t, v):
-        """Depth Y(t, v) = b_base(v)*cos(t) + bump(theta_ref(t,v), v)."""
+        """Depth Y(t, v) — see ._field()'s docstring for the default
+        (additive-bump) vs overridden (blend-toward-a-value) formulas."""
         t = np.asarray(t, dtype=float)
         v = np.asarray(v, dtype=float)
         theta_ref = self._theta_ref(t, v)
-        return np.asarray(self.base.b(v)) * np.cos(t) + self.bump(theta_ref, v)
+        return self._field(t, theta_ref, v)
 
     def b(self, v):
         """Depth AT CF (theta=0) — kept for interface compatibility with
