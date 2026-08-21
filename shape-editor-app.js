@@ -1068,10 +1068,12 @@ $("exportBtn").onclick = () => {
   $("exportArea").value = text;
   $("exportArea").style.display = "block";
   $("exportStatus").innerHTML = overridden
-    ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used) — ' +
-      "send it back to have it committed as tools/dress-shell/shape.yaml, or copy the text below</span>"
-    : '<span class="ok">downloaded shape.yaml — send it back to have it committed ' +
-      "as tools/dress-shell/shape.yaml, or copy the text below</span>";
+    ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used).</span> ' +
+      "This file has to reach Claude Code some other way (paste its contents, attach it, etc.) — " +
+      "the button above (copy to clipboard) is the more direct path."
+    : '<span class="ok">downloaded shape.yaml.</span> This file has to reach Claude Code some ' +
+      "other way (paste its contents, attach it, etc.) — the button above (copy to clipboard) " +
+      "is the more direct path.";
 };
 $("copyBtn").onclick = async () => {
   if (exportBlocked()) {
@@ -1082,11 +1084,14 @@ $("copyBtn").onclick = async () => {
   const text = dumpShapeYaml();
   try {
     await navigator.clipboard.writeText(text);
-    $("exportStatus").innerHTML = '<span class="ok">copied to clipboard</span>';
+    $("exportStatus").innerHTML = '<span class="ok">✓ copied to clipboard</span> — paste it into your ' +
+      "Claude Code conversation and ask it to commit as tools/dress-shell/shape.yaml. That's the one " +
+      "path from this page into the repo — there's no direct write from a static site.";
   } catch {
     $("exportArea").value = text;
     $("exportArea").style.display = "block";
-    $("exportStatus").innerHTML = '<span class="warn">clipboard blocked — select the text below</span>';
+    $("exportStatus").innerHTML = '<span class="warn">clipboard blocked — select the text below, copy it, ' +
+      "and paste it into your Claude Code conversation to have it committed</span>";
   }
 };
 

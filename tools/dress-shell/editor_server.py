@@ -6,15 +6,28 @@ site — run it by hand:
 
 Serves the editor page, computes the full shell/analysis state, and owns
 the two write paths:
-  POST /api/layout   validate + save layout.yaml (canonical, lossless)
-  POST /api/publish  run the explicit publish step (committed glTF for
-                     /dress) — separate from save on purpose
-  POST /api/resolve  authoritative re-resolve of an unsaved layout (the
-                     editor's client-side math is a port; the server is
-                     the source of truth)
+  POST /api/layout        validate + save layout.yaml (canonical, lossless)
+  POST /api/publish       run the explicit publish step (committed glTF for
+                          /dress) — separate from save on purpose. Publishes
+                          "the shell the editor is actually showing"
+                          (STATE.model.params), which already has shape.yaml
+                          applied if it was present when STATE was built.
+  POST /api/resolve       authoritative re-resolve of an unsaved layout (the
+                          editor's client-side math is a port; the server is
+                          the source of truth)
+  POST /api/reload-shape  re-read shape.yaml, rebuild the shell, and
+                          RE-VALIDATE every placement in layout.yaml against
+                          it — reports named standoff/connector/twin/DAG
+                          regressions, never silently re-seats anything
+                          (shape_impact.report_shape_change_impact)
+  GET  /api/shape-status  which shape.yaml is loaded, when, and whether a
+                          newer one has been committed since (STATE stays
+                          on whatever it loaded until /api/reload-shape is
+                          called — it never silently picks up a change)
 """
 
 import argparse
+import datetime
 import json
 import sys
 import tempfile
@@ -53,23 +66,12 @@ def _is_v3(model):
 
 
 def _apply_shape_if_present(params):
-    """Milestone-3 integration point: "the placement editor reads that
-    file for its shell." If shape.yaml exists (saved from the shape
-    editor), its a(v)/b(v) curves become this shell's semi-axes —
-    section_curves mode, exactly what shape_editor_server.py builds.
-    shape.yaml's neckline is deliberately NOT reapplied here: the
-    placement editor keeps its own authority over neckline/fillet knobs
-    (this file's /api/params) rather than the two tools fighting over the
-    same control. When shape.yaml is absent this is a no-op — every
-    existing behavior (dress_params(), the fillet/neckline live-rebuild)
-    is unchanged."""
-    if not SHAPE_PATH.exists():
-        return params
-    from dataclasses import replace as _replace
-    from shape_state import build_params_from_shape, load_shape
-    saved = _replace(load_shape(SHAPE_PATH), neckline={})
-    probe = ShellModel(params)   # domain (z_bottom/z_top) only; cheap
-    return build_params_from_shape(params, saved, probe.z_bottom, probe.z_top)
+    """Thin wrapper over shape_state.apply_shape_if_present (now shared
+    with export_gltf.py, so publish is never independent of shape.yaml —
+    see that function's docstring). Kept as a local name since State below
+    and the shape-status reporting need this exact SHAPE_PATH."""
+    from shape_state import apply_shape_if_present
+    return apply_shape_if_present(params, SHAPE_PATH)
 
 
 class State:
@@ -79,6 +81,15 @@ class State:
     def __init__(self, params: ShellParams = None):
         print("building shell + analysis state ...")
         base = params if params is not None else dress_params()
+        # Shape status captured at THIS moment, independent of
+        # _apply_shape_if_present's own file read below — so /api/state can
+        # answer "which shape.yaml, loaded when" and, on every poll,
+        # whether a NEWER one has since been committed (see shape_status())
+        # rather than silently keeping whatever was true at startup.
+        self.shape_path = SHAPE_PATH
+        self.shape_loaded = SHAPE_PATH.exists()
+        self.shape_mtime_at_load = SHAPE_PATH.stat().st_mtime if self.shape_loaded else None
+        self.state_built_at = datetime.datetime.now(datetime.timezone.utc)
         self.model = ShellModel(_apply_shape_if_present(base))
         self.coords = ShellCoords(self.model)
         self.chart = SurfaceChart(self.model, self.coords)
@@ -94,6 +105,35 @@ class State:
             self._facet_mesh.append((V, np.stack([th, s], axis=-1)))
         self.static_payload = self._build_static()
         print(f"ready: {len(self.grid.cells)} cells analyzed")
+
+    def _iso(self, epoch):
+        return (datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).isoformat()
+                if epoch is not None else None)
+
+    def shape_status(self):
+        """"State, visibly, which shape.yaml it loaded and when. If a
+        newer one has been committed since it started, say so rather than
+        silently using a stale shell" — computed FRESH on every call
+        (never baked into static_payload, which is built once at startup/
+        rebuild), so a shape.yaml committed or edited after this server
+        started is caught the moment anyone asks, not silently missed."""
+        now_exists = self.shape_path.exists()
+        now_mtime = self.shape_path.stat().st_mtime if now_exists else None
+        stale = (now_exists != self.shape_loaded) or (
+            now_exists and self.shape_loaded and now_mtime != self.shape_mtime_at_load)
+        try:
+            rel_path = str(self.shape_path.relative_to(HERE.parents[1]))
+        except ValueError:
+            rel_path = str(self.shape_path)
+        return {
+            "path": rel_path,
+            "loaded": self.shape_loaded,
+            "state_built_at": self.state_built_at.isoformat(),
+            "mtime_at_load": self._iso(self.shape_mtime_at_load),
+            "current_mtime": self._iso(now_mtime),
+            "currently_exists": now_exists,
+            "stale": stale,
+        }
 
     def _mesh(self, name):
         V, F = build_meshes(self.model)[name]
@@ -303,7 +343,10 @@ class Handler(BaseHTTPRequestHandler):
         elif p == "/api/state":
             payload = dict(STATE.static_payload)
             payload["resolved"] = STATE.resolve_payload(load_layout(LAYOUT_PATH))
+            payload["shape_status"] = STATE.shape_status()   # live, not cached — see docstring
             self._send(200, payload)
+        elif p == "/api/shape-status":
+            self._send(200, STATE.shape_status())
         else:
             self._send(404, {"error": "unknown route"})
 
@@ -366,6 +409,41 @@ class Handler(BaseHTTPRequestHandler):
                                      "uncovered_pct": sidecar["coverage"]["uncovered_pct"],
                                      "max_stack_mm": sidecar["layering"]["max_stack_mm"],
                                  }})
+            elif self.path == "/api/reload-shape":
+                # "When a new shape.yaml is applied, re-validate every
+                # existing placement against the new shell and report
+                # what broke. Do not silently re-seat them." This is that
+                # integration point: re-read shape.yaml, rebuild the
+                # shell, and diff EVERY layout.yaml placement between the
+                # shell this server was showing a moment ago and the one
+                # it's showing now — before the caller does anything else
+                # with the new STATE.
+                from shape_impact import report_shape_change_impact
+                old_params = STATE.model.params
+                new_state = State(old_params)   # re-reads SHAPE_PATH fresh; see docstring above
+                authored = load_layout(LAYOUT_PATH)
+                impact = report_shape_change_impact(
+                    old_params, new_state.model.params, STATE.classes, authored)
+                STATE = new_state
+                self._send(200, {
+                    "reloaded": True,
+                    "shape_status": STATE.shape_status(),
+                    "impact": {
+                        "clean": impact.clean,
+                        "standoff_regressions": impact.standoff_regressions,
+                        "now_exceeds_tolerance": impact.now_exceeds_tolerance,
+                        "new_connector_or_outline_problems": impact.new_connector_or_outline_problems,
+                        "twin_became_invalid": impact.twin_became_invalid,
+                        "dag_broke": impact.dag_broke,
+                        # None (not NaN) when the DAG is invalid — NaN isn't
+                        # valid JSON and would break the client's parse
+                        "old_max_stack_mm": (impact.old_max_stack_mm
+                                             if impact.old_dag_valid else None),
+                        "new_max_stack_mm": (impact.new_max_stack_mm
+                                             if impact.new_dag_valid else None),
+                        "summary_lines": impact.summary_lines(),
+                    },
+                })
             else:
                 self._send(404, {"error": "unknown route"})
         except (LayoutError, LayeringError, KeyError, TypeError, ValueError) as exc:

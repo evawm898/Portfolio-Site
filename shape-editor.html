@@ -40,6 +40,9 @@
   button { background: none; border: 1px solid var(--line); color: var(--ink);
            font: inherit; padding: 3px 8px; cursor: pointer; border-radius: 2px; margin: 4px 12px 4px 0; }
   button:hover { border-color: var(--petrol); }
+  .primaryBtn { background: var(--petrol); border-color: var(--petrol); color: #0c0e0e;
+                font-weight: 600; padding: 6px 14px; }
+  .primaryBtn:hover { background: color-mix(in srgb, var(--petrol) 85%, white); }
   textarea { width: calc(100% - 24px); margin: 4px 12px; height: 140px;
              background: var(--bg); color: var(--ink); border: 1px solid var(--line);
              font: inherit; font-size: 10px; display: none; }
@@ -143,13 +146,18 @@
     <div class="row"><span class="kv" style="padding:0">armhole split θ:
       <b id="armholeReadout">…</b></span></div>
 
+    <h3>Get this into the repo</h3>
+    <div class="legend">This page has no backend — it cannot write to the repo itself. The one
+      obvious path: <b>copy to clipboard</b>, paste the YAML into your Claude Code conversation,
+      and ask it to commit as <code>tools/dress-shell/shape.yaml</code>. No file to hand-place,
+      no guessing where it goes.</div>
     <div class="legend" id="exportGuard"></div>
     <label class="row" id="exportOverrideRow">
       <input type="checkbox" id="exportOverride">
       I understand — a named feature is not represented at this density; allow export anyway
     </label>
-    <button id="exportBtn">export shape.yaml</button>
-    <button id="copyBtn">copy to clipboard</button>
+    <button id="copyBtn" class="primaryBtn">copy shape.yaml to clipboard</button>
+    <button id="exportBtn" class="miniBtn">or download the file instead</button>
     <div class="kv" id="exportStatus"></div>
     <textarea id="exportArea" readonly></textarea>
 

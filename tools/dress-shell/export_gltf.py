@@ -192,9 +192,20 @@ def panel_box(chart, coords, p, mount):
 
 def build_export(grid_spec=GridSpec(), tolerance_mm=STANDOFF_TOLERANCE_MM, samples=7,
                  params=None):
-    """Everything the GLB + sidecar need, computed once. Default: the
-    committed DRESS design (skirt + bodice, dress_params())."""
-    model = ShellModel(params if params is not None else dress_params())
+    """Everything the GLB + sidecar need, computed once. Default (params
+    not given): the committed DRESS design (skirt + bodice, dress_params())
+    WITH shape.yaml applied on top if it exists — see
+    shape_state.apply_shape_if_present. This is what closes the "one
+    publish, not two" gap: a direct `python3 export_gltf.py` now picks up
+    shape.yaml exactly like the live editor's /api/publish always has,
+    instead of silently baking the plain committed shell regardless of
+    what's been dragged in the shape editor. Pass params explicitly (e.g.
+    a live editor's already-resolved STATE.model.params) to publish that
+    exact shell instead and skip re-reading the file."""
+    if params is None:
+        from shape_state import apply_shape_if_present
+        params = apply_shape_if_present(dress_params())
+    model = ShellModel(params)
     coords = ShellCoords(model)
     chart = SurfaceChart(model, coords)
     classes = load_panel_classes(HERE / "panels.yaml")
