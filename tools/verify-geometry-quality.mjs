@@ -21,6 +21,23 @@
         the STRUCTURED infills (veins/bone/strands) that are meant to cap onto the margin;
         space-colonization's growth-frontier tips and Voronoi's closed slab rings are
         exempt (bead-capped and watertight by design, not trees hung off the margin).
+     4. MARGIN REGISTRATION — does the INFILL meet the rib it's supposed to terminate
+        against? This is a DIFFERENT failure from #1: fidelity/closure asks whether the
+        rendered rim traces the material boundary; this asks whether the infill's own
+        outer edge coincides with where that rib tube actually sits (ribInnerEdge in
+        flower-geometry.js), not some other guessed boundary (a constant inset, the raw
+        outline, a proportional-to-halfwidth cap). A config can pass #1-#3 — rim closed,
+        smooth, infill tips capped somewhere — while the infill still clips to the WRONG
+        curve, which reads as a visible gap or crossover between the rib and the pattern.
+        Reported as SIGNED gap (rib - outermost infill point) in u-buckets around the
+        blade, split into two different failure modes with different baselines:
+          OVERSHOOT (infill runs past the rib) is gated for every pattern — every infill
+          builder now hard-clamps to ribInnerEdge at generation time, so this should be
+          ~0 by construction; a regression means a clamp broke.
+          UNDERSHOOT (infill falls short) is gated only for Voronoi, a dense tiled
+          pattern meant to have no gaps. Veins/bone/strands/spacecol are sparse tree/fan
+          patterns by design — a fractal vein network legitimately doesn't touch the
+          margin at every u — so their undershoot is reported, not gated.
 
    Browser-based (like verify-flower-export): serves flower.js with an appended hook that
    calls the real resolveParams + exported geometry fns (reaching the two exports flower.js
@@ -62,7 +79,33 @@ const REPORT_ONLY = argv.includes('--report-only') || SWEEP;
 //   freeEnds     <= 6     worst 2 (clawed veins) -> 3x. Deep venation tips beyond captureDist
 //                         are an inherent 0-2 baseline; 6 still catches a gross un-termination
 //                         (edge-termination breaking -> dozens of loose ends).
-const T = { marginGapMM: 1.5, p95CurvDegMM: 40, freeEnds: 6 };
+//   regOvershootMM <= 3.0  worst 1.275 (preset:rose, veins+loop termination) -> 2.4x. Every
+//                         infill builder hard-clamps to ribInnerEdge at generation time
+//                         (growBranch, buildBone, buildStrands, buildSpaceColonization's
+//                         inside(), buildVoronoi's clipPoly), so this is near-0 almost
+//                         everywhere (25/27 configs < 0.5mm); the Rose residual is
+//                         terminateEdges' MEET/LOOP projecting onto ribMarginPolyline's
+//                         56-segment polygon approximation on a sharp-curvature preset —
+//                         the same class of sub-print-floor polygon-sampling residual
+//                         marginGapMM's own note above already documents and tolerates,
+//                         not an unclamped path. A nonzero jump past this means a clamp
+//                         broke, which is exactly the failure mode the Poppy/Growth bug
+//                         report was about. Gated for every pattern.
+//   regUndershootVoronoiMM <= 2  worst 0.001 (all configs) -> ~2000x, deliberately loose:
+//                         Voronoi's cell clip is an exact geometric constraint (Lloyd
+//                         relaxation against ribMarginPolyline), so it is essentially always
+//                         ~0 today; the threshold has slack for param combinations this
+//                         sweep didn't cover (extreme density/lloyd/anisotropy), while still
+//                         catching the original bug class (was several mm, see PR history).
+//                         Voronoi is a dense TILED sheet meant to have no gaps, so undershoot
+//                         here is diagnostic the same way it is for Cells specifically.
+//                         Gated ONLY for voronoi — veins/
+//                         strands/bone/spacecol are SPARSE tree/fan patterns by design (a
+//                         fractal vein network or a strand fan legitimately doesn't touch
+//                         the margin at every u), so their undershoot (measured worst ~27mm,
+//                         clawed__strands) reflects the pattern's own open structure, not a
+//                         registration bug — reported per-config, not gated.
+const T = { marginGapMM: 1.5, p95CurvDegMM: 40, freeEnds: 6, regOvershootMM: 3.0, regUndershootVoronoiMM: 2 };
 // The connectivity check applies only to the STRUCTURED infills that are meant to cap
 // onto the margin. Space-colonization's free tips are its growth frontier (bead-capped
 // and watertight per the export gate), and Voronoi is closed slab rings — neither is a
@@ -232,7 +275,11 @@ window.__gq = async function() {
     } catch (e) { return { error: 'infill:' + e.message }; }
     if (cfg && veins.length) { try { veins = clipVeinsToMask(veins, P, cfg) || veins; } catch (e) {} }
     if ((P.infillType === 'veins' || P.infillType === 'bone' || P.infillType === 'spacecol') && P.edgeTermination && P.edgeTermination !== 'fade') {
-      try { const term = terminateEdges(veins, material, P, P.edgeTermination, P.captureDist); for (const v of term.veins) veins.push(v); } catch (e) {}
+      // Must match the real render path (flower.js's buildPetalInto) exactly: captures
+      // onto ribMarginPolyline (the rib's actual inner edge), not 'material' (the true
+      // outline) — using 'material' here was the gate's OWN stale copy of the bug this
+      // metric exists to catch, pulling free tips out past where the rib really sits.
+      try { const term = terminateEdges(veins, G.ribMarginPolyline(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist); for (const v of term.veins) veins.push(v); } catch (e) {}
     }
   }
   let degree1 = 0, onMargin = 0, atBase = 0, freeEnds = 0;
@@ -248,11 +295,86 @@ window.__gq = async function() {
     }
   }
 
+  // (4) MARGIN REGISTRATION — does the infill actually terminate AT the rib's real
+  //     inner edge, or against some other guessed boundary? This is the check the
+  //     other three miss: margin fidelity/closure is about the RIM tracing the
+  //     material boundary; this is about the INFILL meeting the RIM. A petal can
+  //     pass all three above with the infill clipped to a constant inset, the raw
+  //     outline, or a proportional-to-halfwidth guess — any curve OTHER than the
+  //     rib's actual inner edge — and still show a visible gap or crossover, which
+  //     is exactly what the Cells/Growth bug this metric was added for looked like.
+  //
+  //     Method: bucket every infill boundary vertex by u (veins/bone/strands/
+  //     spacecol polyline points; Voronoi's outer slab-ring points), keep the
+  //     OUTERMOST |y| per bucket, and diff it against G.ribInnerEdge(u, P) — the
+  //     SAME curve the renderer's rib tube actually occupies (flower-geometry.js's
+  //     "THE MARGIN RIB" section). ~0 = flush by construction. Buckets where the
+  //     rib itself has collapsed toward the axis (the base bundle, u below the
+  //     flare) are skipped — there is no meaningful "margin" to register against
+  //     there, by design (see marginFlareFactor).
+  // Two different measurements, deliberately NOT the same computation:
+  //   OVERSHOOT is a LOCAL violation test — does THIS point exceed ribInnerEdge
+  //   evaluated at THIS point's own exact u? Comparing a point to the curve at its
+  //   own parameter (not a bucket-centre approximation) means zero discretization
+  //   noise: a straight per-point inequality, exact regardless of curvature.
+  //   UNDERSHOOT is a REGIONAL coverage question — is there infill roughly out
+  //   here at all? That needs bucketing (the outermost point in a u-band), because
+  //   sparse patterns have real, deliberate gaps BETWEEN individual veins/strands
+  //   that a per-point test would misread as "no coverage" everywhere.
+  // (Using bucket-vs-bucket-centre for BOTH directions was tried first — it over-
+  // reported "overshoot" on high-curvature shapes like Clawed purely from comparing
+  // a 72-segment clip polygon against an 80-bin curve evaluation at a different
+  // phase, the same class of sampling residual marginGapMM's own header notes
+  // already document for this gate. The per-point test below has no such residual.)
+  const NBIN = 80;
+  const outerY = new Array(NBIN).fill(null);
+  let regOverMax = 0, regOverU = 0;
+  const recordPt = (x, y) => {
+    const u = Math.max(0, Math.min(1, x / P.L));
+    const ay = Math.abs(y);
+    const bi = Math.min(NBIN - 1, Math.floor(u * NBIN));
+    if (outerY[bi] == null || ay > outerY[bi]) outerY[bi] = ay;
+    const rib = G.ribInnerEdge(u, P);
+    if (rib < 1e-4) return;             // rib collapsed to the axis here — no meaningful target
+    const over = ay - rib;              // > 0 means this exact point sits past the rib
+    if (over > regOverMax) { regOverMax = over; regOverU = u; }
+  };
+  if (P.infillType === 'voronoi') {
+    try {
+      const vor = buildVoronoi(P, mulberry32(seed), {
+        density: P.density, softness: P.softness, lloyd: P.voronoiLloyd,
+        anisotropy: P.voronoiAniso, cellDensityLaw: P.voronoiDensityLaw,
+        weightHierarchy: P.voronoiWeight, weightFalloff: P.voronoiWeightFalloff,
+        slabTaper: P.voronoiSlabTaper, minCellSize: 3 * P.tubeRadius * SLAB_THICK,
+      });
+      for (const slab of (vor.slabs || [])) for (const pt of slab.outer) recordPt(pt.x, pt.y);
+    } catch (e) {}
+  } else {
+    for (const v of veins) for (const pt of v.points) recordPt(pt.x, pt.y);
+  }
+  let regUnderSum = 0, regUnderCount = 0, regUnderMax = 0, regUnderU = 0;
+  for (let bi = 0; bi < NBIN; bi++) {
+    if (outerY[bi] == null) continue;
+    const u = (bi + 0.5) / NBIN;
+    const rib = G.ribInnerEdge(u, P);
+    if (rib < 1e-4) continue;
+    const under = rib - outerY[bi];       // > 0 means this u-band's outermost point falls short
+    if (under <= 0) continue;             // this band already meets/exceeds the rib (no gap here)
+    regUnderSum += under; regUnderCount++;
+    if (under > regUnderMax) { regUnderMax = under; regUnderU = u; }
+  }
+  const regOvershootMaxMM = regOverMax * MM;
+  const regUndershootMaxMM = regUnderMax * MM;
+  const regUndershootMeanMM = (regUnderCount ? regUnderSum / regUnderCount : 0) * MM;
+  const regWorstU = regOverMax * MM >= regUndershootMaxMM ? regOverU : regUnderU;
+
   return { infill: P.infillType, cleftDepth: +(P.cleftDepth || 0).toFixed(2), contMargin, numLoops, marginClosed,
            marginGapMM: +marginGapMM.toFixed(3), worstU: +worstU.toFixed(2), neck: +neck.toFixed(2),
            maxTurnDeg: +maxTurn.toFixed(1), p95TurnDeg: +p95Turn.toFixed(1),
            maxCurvDegMM: +maxCurv.toFixed(1), p95CurvDegMM: +p95Curv.toFixed(1),
-           degree1, onMargin, atBase, freeEnds, marginPts: n, L: +P.L.toFixed(3) };
+           degree1, onMargin, atBase, freeEnds, marginPts: n, L: +P.L.toFixed(3),
+           regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
+           regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2) };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
@@ -297,7 +419,7 @@ await page.waitForTimeout(300);
 const rows = [];
 let fails = 0, xfails = 0, xpasses = 0;
 const ledger = {};   // issue ref -> { total, failing }
-console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), '  verdict');
+console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), '  verdict');
 for (const cfg of CONFIGS) {
   if (cfg.preset) await page.evaluate((d) => window.__gqApply(d), cfg.ui);
   else await page.evaluate((ui) => window.__gqSet(ui), cfg.ui);
@@ -306,8 +428,18 @@ for (const cfg of CONFIGS) {
   const badFidelity = q.marginGapMM > T.marginGapMM || !q.marginClosed;
   const badSmooth = q.p95CurvDegMM > T.p95CurvDegMM;
   const badEnds = ENDS_INFILLS.has(q.infill) && q.freeEnds > T.freeEnds;
-  const bad = badFidelity || badSmooth || badEnds;
-  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : ''].filter(Boolean).join(',');
+  // MARGIN REGISTRATION — does the infill meet the rib it's supposed to terminate
+  // against? Overshoot (infill crossing past the rib) is gated for every pattern —
+  // it should be structurally impossible now (every builder hard-clamps to
+  // ribInnerEdge), so any nonzero regression here is real. Undershoot is gated only
+  // for Voronoi, the one dense/tiled pattern where a gap is diagnostic the same way
+  // it was for the original Poppy bug report; the sparse tree/fan patterns (veins/
+  // bone/strands/spacecol) leave legitimate open structure by design, so their
+  // undershoot is reported per-config but not gated.
+  const badOvershoot = q.regOvershootMaxMM > T.regOvershootMM;
+  const badUndershoot = q.infill === 'voronoi' && q.regUndershootMaxMM > T.regUndershootVoronoiMM;
+  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot;
+  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : ''].filter(Boolean).join(',');
   let verdict;
   if (cfg.xfail) {
     const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
@@ -317,7 +449,7 @@ for (const cfg of CONFIGS) {
   } else if (bad) { verdict = `FAIL(${reasons})`; fails++; }                               // real regression — breaks the build
   else verdict = 'ok';
   rows.push({ name: cfg.name, xfail: cfg.xfail || null, ...q, verdict });
-  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), '  ' + verdict);
+  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), '  ' + verdict);
 }
 if (process.env.GQ_JSON) fs.writeFileSync(process.env.GQ_JSON, JSON.stringify(rows, null, 1));
 
@@ -342,6 +474,6 @@ if (openIssues.length) {
   if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
 }
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm`);
 await browser.close(); server.close();
 process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));

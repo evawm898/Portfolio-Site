@@ -497,6 +497,97 @@ export function buildSilhouette(P, n = 56) {
 }
 
 /* -------------------------------------------------------------------
+   4a. THE MARGIN RIB — the ONE curve every infill pattern must register
+   against, shared with the actual tube the rib renders as.
+
+   Previously every infill pattern invented its own clip boundary — a
+   constant inward offset (Voronoi), a constant field-distance threshold
+   (Growth), zero inset (Veins termination, Strands), a proportional cap
+   (Lattice) — none of them derived from where the rib tube actually sits.
+   Under CONTINUOUS MARGIN (the Standard default) the rib isn't even a
+   constant-radius hoop on the true outline: it's a tapered strand (fat at
+   the base, thin at the tip) that itself bundles toward the axis near the
+   foot instead of riding the outline at all (see marginStrands). A fixed
+   inset can't track that, which is exactly why the gap varied around the
+   perimeter and the rib crossed over the infill near the base.
+
+   These functions are the single source of truth for the rib's geometry.
+   marginStrands() (flower.js) — what actually gets lofted into a tube —
+   calls ribCenterline() below rather than re-deriving the flare curve, so
+   the rendered rib and the boundary every infill clips to CANNOT diverge:
+   it's the same function, not a second copy that happens to agree today.
+   ------------------------------------------------------------------- */
+
+// The bundle/flare smoothstep: 0 (on-axis, bundled with the midrib) near
+// the foot, ramping to 1 (exactly on the true outline) by `flareEnd`. Used
+// by marginStrands (flower.js) to place the rib's own centerline, and by
+// ribCenterline below for the boundary — the identical curve both places.
+export function marginFlareFactor(u, bundleTight, flareRate) {
+  const bt = clamp(bundleTight != null ? bundleTight : 0.5, 0, 1);
+  const fr = clamp(flareRate != null ? flareRate : 0.5, 0, 1);
+  const flareStart = lerp(0.02, 0.20, bt);
+  const flareEnd = Math.min(0.96, flareStart + lerp(0.55, 0.12, fr));
+  const t = clamp((u - flareStart) / ((flareEnd - flareStart) || 1e-6), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+// Rim-hoop line weight (non-continuous-margin) and the continuous-margin
+// strand's base/tip radii. Canonical here; flower.js imports these instead
+// of keeping its own copies, so the render and the boundary check can never
+// drift apart by editing one and forgetting the other.
+export const RIM_WIDTH = 0.34;      // constant hoop radius, relative to tubeRadius
+export const MARGIN_W_BASE = 0.62;  // continuous-margin strand radius at the foot
+export const MARGIN_W_TIP = 0.12;   // continuous-margin strand radius at the tip
+
+// The rib's physical tube radius at u — exactly what addTube renders it at
+// (continuous margin: linear taper base->tip; otherwise: the constant hoop
+// radius). Approximation note: addTube tapers linearly by ARC LENGTH along
+// the strand, this taper is linear in u; the two differ only inside the
+// base bundle/flare transition (see marginFlareFactor), where the strand's
+// arc-length-to-u relationship is non-linear. Negligible outside that band.
+export function ribRadius(u, P, contMargin) {
+  const gThick = clamp(P.thickScale != null ? P.thickScale : 1, 0.4, 2.5);
+  if (!contMargin) return P.tubeRadius * RIM_WIDTH * gThick;
+  return lerp(P.tubeRadius * MARGIN_W_BASE, P.tubeRadius * MARGIN_W_TIP, clamp(u, 0, 1)) * gThick;
+}
+
+// Where the rib's tube is CENTRED at u, before subtracting its own radius:
+// the true outline under a constant-radius hoop, or the bundled/flared
+// strand curve under continuous margin — the exact curve marginStrands
+// plots (flower.js calls this function directly for that purpose).
+export function ribCenterline(u, P, contMargin) {
+  const hw = petalHalfWidth(clamp(u, 0, 1), P);
+  if (!contMargin) return hw;
+  return hw * marginFlareFactor(u, P.bundleTightness, P.flareRate);
+}
+
+// THE inner edge of the rib as actually drawn: every infill pattern should
+// terminate flush against this, by construction, not by coincidence. Floored
+// at 0 (the axis) — near the foot, under continuous margin, the bundled
+// strand's centerline can sit closer to the axis than its own radius.
+export function ribInnerEdge(u, P) {
+  const contMargin = !!P.continuousMargin && !P.solidBlade;
+  return Math.max(0, ribCenterline(u, P, contMargin) - ribRadius(u, P, contMargin));
+}
+
+// A closed polyline tracing ribInnerEdge(u) on both sides, same format as
+// buildSilhouette (base(+Y) -> tip -> base(-Y)) — for callers that need a
+// clip polygon or a termination target (Voronoi's cell clip, terminateEdges'
+// rim) rather than a pointwise half-width test.
+export function ribMarginPolyline(P, n = 56) {
+  const right = [], left = [];
+  for (let i = 0; i <= n; i++) {
+    const u = i / n, X = P.L * u, r = ribInnerEdge(u, P);
+    right.push({ x: X, y: r });
+    left.push({ x: X, y: -r });
+  }
+  const outline = [];
+  for (let i = 0; i < right.length; i++) outline.push(right[i]);
+  for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
+  return dedupePolygon(outline);
+}
+
+/* -------------------------------------------------------------------
    4b. LOBED / CLEFT petals — a GENERIC scalar mask + marching squares.
 
    The whole pipeline elsewhere assumes one span of material per height,
@@ -1197,7 +1288,11 @@ function growBranch(start, launchHeading, branchHeading, length, order, env, rng
     theta = lerp(theta, target, 0.3) + (rng() - 0.5) * wanderAmp;
     x += ds * Math.cos(theta);
     y += ds * Math.sin(theta);
-    const marg = petalHalfWidth(clamp(x / L, 0, 1), P);
+    // ribInnerEdge, not petalHalfWidth: under continuous margin the rib's real inner
+    // edge sits well inside the true outline (a tapering, base-bundled strand, not a
+    // hoop on the outline) — growing veins out to the raw outline overshot past where
+    // the rib tube actually sits, the same class of mismatch Voronoi/Growth had.
+    const marg = ribInnerEdge(clamp(x / L, 0, 1), P);
     if (marg <= 1e-3 || x >= L * 0.99) break;
     // run right out to the margin (a hair inside it) so veins reach the edge
     if (y > 0.985 * marg) { pts.push({ x, y: 0.985 * marg }); break; }
@@ -1371,12 +1466,18 @@ export function buildSpaceColonization(P, rng, opts = {}) {
   const fields = getPetalFields(P);
   const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
   let Wmax = 0.01; for (let i = 0; i <= 64; i++) Wmax = Math.max(Wmax, hw(i / 64));
-  // inside the blade, kept off the rim (leave a band, via d) so branches stop
-  // short and the margin rib / termination owns the edge.
+  // inside the blade, kept off the rim so branches stop short and the margin
+  // rib / termination owns the edge: the real bound is ribInnerEdge(u, P) — the
+  // rib's actual inner edge, the same curve Voronoi/Veins-termination clip to —
+  // not a flat 0.05-world-unit band (which was constant regardless of how fat
+  // or thin the rib tube actually is at that u). `d` (Euclidean distance to the
+  // nearest true-outline/cleft-wall site) is kept only for its original job —
+  // staying off a cleft wall on lobed petals — at a small epsilon now that the
+  // margin band itself is owned by ribInnerEdge.
   const inside = (x, y) => {
     const u = x / L; if (u <= 0.012 || u >= 0.99) return false;
-    if (Math.abs(y) >= hw(u)) return false;
-    return fields.sample(x, y).d > 0.05;
+    if (Math.abs(y) >= ribInnerEdge(u, P)) return false;
+    return fields.sample(x, y).d > 1e-3;
   };
 
   // ---- 1. SOURCES (birth-distance rejection; d-gated; per SEED PATTERN) ----
@@ -1670,7 +1771,10 @@ export function buildStrands(P, opts = {}) {
     const cz = smootherstep(clamp((frac - apexZone) / (1 - apexZone), 0, 1));
     const E = {
       x: lerp(L * uE, L * uApex, cz),
-      y: lerp(side * hw(uE), 0, cz),                       // pulled onto the axis at the apex
+      // Terminates at the rib's actual inner edge (ribInnerEdge), not the true
+      // outline (hw) — otherwise the strand tip runs out past where the rib
+      // tube actually sits under continuous margin.
+      y: lerp(side * ribInnerEdge(uE, P), 0, cz),           // pulled onto the axis at the apex
     };
     const dx = E.x - O.x, dy = E.y - O.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -1698,8 +1802,8 @@ export function buildStrands(P, opts = {}) {
       let x = O.x + dx * s + px * b;
       let y = O.y + dy * s + py * b;
       const u = clamp(x / L, 0, 1);
-      const room = hw(u);
-      if (Math.abs(y) > room * 0.999) y = Math.sign(y) * room * 0.999;   // keep inside the outline
+      const room = ribInnerEdge(u, P);   // keep inside the rib's actual inner edge, not the raw outline
+      if (Math.abs(y) > room * 0.999) y = Math.sign(y) * room * 0.999;
       pts[i] = { x, y };
       // thin, ~uniform line with extra taper, tapering to a point where it meets
       // the rim (edgeRoom -> 0), so nothing crosses the outline.
@@ -1712,7 +1816,7 @@ export function buildStrands(P, opts = {}) {
   }
   // welded beads cap the two convergences: the base hub and the apex gather,
   // so both ends read as clean nodes rather than a bundle of overlapping tips.
-  const apexR = Math.min(rBase, hw(uApex) * 0.7);
+  const apexR = Math.min(rBase, ribInnerEdge(uApex, P) * 0.7);
   nodes.push({ x: O.x, y: 0, width: (rBase / tubeR) * 1.7 });
   nodes.push({ x: L * uApex, y: 0, width: (apexR / tubeR) * 1.5 });
   return { veins, nodes };
@@ -1770,7 +1874,6 @@ export function buildBone(P, opts = {}) {
   const width  = clamp(opts.width  != null ? opts.width  : 0.5, 0, 3);
   const curve  = clamp(opts.curve  != null ? opts.curve  : 0.55, -1, 1);  // +sweep to tip, -sweep to base
   const spread = clamp(opts.spread != null ? opts.spread : 0.85, 0, 1);
-  const hw = (u) => petalHalfWidth(clamp(u, 0, 1), P);
 
   const uBase = 0.04, uTip = 0.985;
   // 0..1 runs fine -> heavy bones (the old range); 1..3 then scales that heaviest
@@ -1808,8 +1911,12 @@ export function buildBone(P, opts = {}) {
         const t = i / nRib;
         const uu = clamp(uk + sweepU * Math.pow(t, 1.3), uBase, uTip);
         const f = Math.sin(t * Math.PI / 2);      // lateral eases out to `reach`
-        const y = s * reach * f * hw(uu);
-        const cap = 0.97 * hw(uu);
+        // `reach` and the safety cap are fractions of ribInnerEdge, not the raw
+        // half-width: the rib's real inner edge tapers/bundles independently of
+        // hw(u) under continuous margin, so a hw-relative reach drifted from it
+        // exactly like Voronoi's old constant inset did.
+        const cap = ribInnerEdge(uu, P);
+        const y = s * reach * f * cap;
         pts[i] = { x: L * uu, y: Math.abs(y) > cap ? s * cap : y };
       }
       veins.push({ points: pts, w0: ribW, w1: wTip });
@@ -2088,14 +2195,19 @@ export function buildVoronoi(P, rng, opts = {}) {
   };
 
   // --- CONSTRAINED LLOYD RELAXATION (VORONOI ITERATIONS).
-  //     lloyd = 0 reproduces the LEGACY behaviour EXACTLY: one pass clipped to the
-  //     raw silhouette (outer cells sliced by the outline). lloyd >= 1 clips every
-  //     cell to the INWARD-OFFSET outline and relaxes site -> centroid that many
-  //     times, so outer cells align their edges with the margin band instead of
-  //     being severed by the rim. Symmetry-preserving — axis seeds pinned to y = 0,
-  //     +Y seeds stay off-axis, -Y twins rebuilt from the +Y set each pass. ---
+  //     Every pass — including lloyd = 0's single pass — clips cells to
+  //     ribMarginPolyline(P): the rib's ACTUAL inner edge (see flower-geometry.js's
+  //     "THE MARGIN RIB" section), not a guessed inward offset. lloyd >= 1 additionally
+  //     relaxes site -> centroid against that same boundary that many times, so outer
+  //     cells align their edges with it instead of just being severed by it once.
+  //     Previously this was `offsetPolygonInward(sil, VORONOI_MARGIN_INSET*2*Wmax)` —
+  //     a constant inset unrelated to the rib's actual (tapering, base-bundled) radius,
+  //     which is why the gap between rib and cells varied around the perimeter and
+  //     the rib crossed over the cells near the base. Symmetry-preserving — axis seeds
+  //     pinned to y = 0, +Y seeds stay off-axis, -Y twins rebuilt from the +Y set each
+  //     pass. ---
   const lloyd = clamp(Math.round(opts.lloyd != null ? opts.lloyd : 0), 0, 20);
-  const clipPoly = lloyd === 0 ? sil : offsetPolygonInward(sil, VORONOI_MARGIN_INSET * 2 * Wmax);
+  const clipPoly = ribMarginPolyline(P, 72);
   const passes = lloyd === 0 ? 1 : lloyd;
   for (let iter = 0; iter < passes; iter++) {
     const seeds = fullSeeds();
@@ -2220,31 +2332,6 @@ function clipHalfPlane(poly, a, b, c) {
       const t = dp / (dp - dq);
       out.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
     }
-  }
-  return out;
-}
-
-// Inward offset of a simple polygon by `delta`, moving each vertex along its
-// interior bisector (miter, centroid-oriented — stable for the convex-ish petal
-// outline). Gives constrained Lloyd a margin band so outer cells stop short of the
-// rim instead of being sliced by it.
-const VORONOI_MARGIN_INSET = 0.05;   // margin band = 5% of blade width
-function offsetPolygonInward(poly, delta) {
-  const n = poly.length;
-  if (n < 3 || delta <= 0) return poly.slice();
-  const c = polyCentroid(poly);
-  const unit = (ax, ay) => { const l = Math.hypot(ax, ay) || 1; return { x: ax / l, y: ay / l }; };
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const prev = poly[(i - 1 + n) % n], cur = poly[i], next = poly[(i + 1) % n];
-    const e1 = unit(cur.x - prev.x, cur.y - prev.y);
-    const e2 = unit(next.x - cur.x, next.y - cur.y);
-    let n1 = { x: -e1.y, y: e1.x }, n2 = { x: -e2.y, y: e2.x };
-    if ((c.x - cur.x) * n1.x + (c.y - cur.y) * n1.y < 0) { n1.x = -n1.x; n1.y = -n1.y; }
-    if ((c.x - cur.x) * n2.x + (c.y - cur.y) * n2.y < 0) { n2.x = -n2.x; n2.y = -n2.y; }
-    let bx = n1.x + n2.x, by = n1.y + n2.y;
-    const bl = Math.hypot(bx, by) || 1;
-    out.push({ x: cur.x + (bx / bl) * delta, y: cur.y + (by / bl) * delta });
   }
   return out;
 }
