@@ -298,8 +298,10 @@ const ctx = await browser.newContext({ viewport: { width: 1000, height: 800 }, a
 const page = await ctx.newPage();
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
-// Accept any export dialog (the >MAX_EXPORT_TRIS confirm, or a build alert) so a
-// heavy config still exports instead of the headless auto-dismiss aborting it.
+// Accept any export dialog (a build-failure/refusal alert, #44) so a heavy config
+// still runs to completion instead of the headless auto-dismiss aborting it. The
+// export gate no longer confirm()s past a heavy model — it's a plain on-screen
+// line under EXPORT_TRI_BUDGET, a hard alert()-and-refuse over it (flower.js).
 page.on('dialog', (d) => d.accept().catch(() => {}));
 
 // Serve the CDN three import from the local npm package (offline + pinned).

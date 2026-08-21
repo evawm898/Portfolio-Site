@@ -267,7 +267,11 @@ window.__gq = async function() {
     try {
       if (P.infillType === 'strands') veins = (buildStrands(P, { count: P.strandCount, width: P.strandWidth, taper: P.strandTaper, curvature: P.strandCurvature, irregularity: P.strandIrregularity, seed }).veins) || [];
       else if (P.infillType === 'bone') veins = (buildBone(P, { count: P.boneCount, width: P.boneWidth, curve: P.boneCurve, spread: P.boneSpread }).veins) || [];
-      else if (P.infillType === 'spacecol') veins = (getSpaceColonization(P, spaceColSeed(P, seed), { mode: P.spaceMode, sourceCount: Math.min(P.spaceSourceCount, SPACECOL_LIVE_CAP), birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep, seedPattern: P.spacePattern }).veins) || [];
+      // #44: SPACECOL_LIVE_CAP (an input-side source-count cap) is gone from flower.js —
+      // the real render path now passes the FULL source count on both live and export,
+      // bounded instead by nodeBudget (an OUTPUT triangle budget). Match that exactly so
+      // this gate measures the same network the renderer builds, not a stale proxy.
+      else if (P.infillType === 'spacecol') veins = (getSpaceColonization(P, spaceColSeed(P, seed), { mode: P.spaceMode, sourceCount: P.spaceSourceCount, birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep, seedPattern: P.spacePattern, nodeBudget: SC_NODE_BUDGET_LIVE }).veins) || [];
       else veins = (buildVenation(P, rng, { secondaries: P.secondaries, crossPerStrip: P.crossPerStrip, maxDepth: P.maxDepth, softness: P.softness, branchStart: P.branchStart, continuousMargin: P.continuousMargin }).veins) || [];
     } catch (e) { return { error: 'infill:' + e.message }; }
     if (cfg && veins.length) { try { veins = clipVeinsToMask(veins, P, cfg) || veins; } catch (e) {} }

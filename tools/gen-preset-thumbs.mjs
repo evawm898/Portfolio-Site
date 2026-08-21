@@ -43,6 +43,10 @@ window.__thumb = {
   ready: true,
   apply: (d) => { applyDesign(d); return true; },
   tris() { const p = meshPetals.geometry.index ? meshPetals.geometry.index.count : 0; const c = meshCore.geometry.index ? meshCore.geometry.index.count : 0; return (p + c) / 3; },
+  // #44: LIVE_TRI_BUDGET straight from flower.js's own module scope (this hook is
+  // appended to the served copy of it) -- never a value copied into this tool, which
+  // would silently drift the moment the constant changes there.
+  liveTriBudget: LIVE_TRI_BUDGET,
   bbox() {
     const b = new THREE.Box3(); b.makeEmpty();
     for (const m of [meshPetals, meshCore]) { if (!m.geometry || !m.geometry.attributes.position) continue; m.geometry.computeBoundingBox(); if (m.geometry.boundingBox && isFinite(m.geometry.boundingBox.min.x)) b.union(m.geometry.boundingBox); }
@@ -95,7 +99,16 @@ await page.waitForTimeout(300);
 
 const writeDir = CHECK ? path.join(ROOT, 'assets', 'presets', '.check') : OUT_DIR;
 fs.mkdirSync(writeDir, { recursive: true });
+const liveTriBudget = await page.evaluate(() => window.__thumb.liveTriBudget);
 const manifest = {};
+// #44: the shipped presets are the "shop window" — the first thing a visitor
+// clicks. LIVE_TRI_BUDGET refuses over-budget LIVE builds with an on-screen
+// message; a preset that drifted over it would refuse SILENTLY on load (no
+// slider to blame it on, no message the visitor asked for) instead of failing a
+// build someone can see. Gated here, every time this script runs (not just
+// --check), because this is the one place that already knows every preset's
+// real triangle count.
+let budgetFail = 0;
 for (const p of PRESETS) {
   await page.evaluate((d) => window.__thumb.apply(d), { ...p.ui, schemaVersion: PRESET_SCHEMA });
   await page.waitForTimeout(280);   // let the deferred regen settle
@@ -105,19 +118,29 @@ for (const p of PRESETS) {
   const tris = await page.evaluate(() => window.__thumb.tris());
   const bbox = await page.evaluate(() => window.__thumb.bbox());
   manifest[p.slug] = { name: p.name, tris, bbox };
-  process.stdout.write(`${p.slug.padEnd(12)} ${tris.toLocaleString().padStart(9)} tris\n`);
+  const margin = tris > 0 ? liveTriBudget / tris : Infinity;
+  if (tris > liveTriBudget) {
+    console.log(`FAIL ${p.slug.padEnd(12)} ${tris.toLocaleString().padStart(9)} tris — OVER the live budget (${liveTriBudget.toLocaleString()}), #44`);
+    budgetFail++;
+  } else {
+    process.stdout.write(`${p.slug.padEnd(12)} ${tris.toLocaleString().padStart(9)} tris   (${margin.toFixed(2)}x under the ${liveTriBudget.toLocaleString()} live budget)\n`);
+  }
 }
 await browser.close(); server.close();
+
+if (budgetFail > 0) {
+  console.log(`\n${budgetFail} preset(s) exceed LIVE_TRI_BUDGET — a visitor's first click would be refused. Lighten the preset or raise the budget deliberately (flower.js), don't ship this.`);
+}
 
 if (!CHECK) {
   fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   console.log(`\nwrote ${PRESETS.length} thumbnails + manifest.json to assets/presets/`);
-  process.exit(0);
+  process.exit(budgetFail > 0 ? 1 : 0);
 }
 
 // --check: diff the freshly-rendered manifest against the committed one. Triangle
 // count is exact (GPU-independent); bbox is compared with a small tolerance.
-let fail = 0;
+let fail = budgetFail;
 const committed = JSON.parse(fs.readFileSync(path.join(OUT_DIR, 'manifest.json'), 'utf8'));
 const bboxDrift = (a, b) => {
   let d = 0; for (const side of ['min', 'max']) for (let i = 0; i < 3; i++) d = Math.max(d, Math.abs(a[side][i] - b[side][i]));
@@ -132,5 +155,11 @@ for (const p of PRESETS) {
   console.log(`ok   ${p.slug}`);
 }
 fs.rmSync(writeDir, { recursive: true, force: true });
-console.log(`\n${fail === 0 ? 'PASS — preset thumbnails match committed manifest' : 'DRIFT: ' + fail + ' preset(s) changed; regenerate with `node tools/gen-preset-thumbs.mjs` and commit'}`);
+if (fail === 0) {
+  console.log('\nPASS — preset thumbnails match committed manifest, all under LIVE_TRI_BUDGET');
+} else if (budgetFail === fail) {
+  console.log(`\nFAIL: ${budgetFail} preset(s) over LIVE_TRI_BUDGET (see above) — not a thumbnail drift, fix the preset or the budget`);
+} else {
+  console.log(`\nDRIFT: ${fail} preset(s) changed or over budget; regenerate with \`node tools/gen-preset-thumbs.mjs\` and commit`);
+}
 process.exit(fail === 0 ? 0 : 1);

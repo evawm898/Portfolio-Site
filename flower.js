@@ -86,11 +86,126 @@ const MIDRIB_W_BASE   = 1.00;
 let RECEPT_FIELD_STATS = null;
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
-const SPACECOL_LIVE_CAP = 400;   // SPACE COLONIZATION live-preview source cap PER PETAL; export uses the full count
-const SPACECOL_LIVE_TOTAL = 5000;   // ...but bound the TOTAL across petals: a dense network on every one of
-// 40 petals is millions of live tris and can exhaust memory mid-build. Scale the per-petal cap down as the
-// petal count rises so the whole bloom stays within budget (export is unaffected — it uses the full count).
-const spacecolLiveCap = (petalCount) => Math.max(80, Math.min(SPACECOL_LIVE_CAP, Math.floor(SPACECOL_LIVE_TOTAL / Math.max(1, petalCount || 1))));
+
+/* ---------------------------------------------------------------------
+   TRIANGLE BUDGET (issue #44) — cap the OUTPUT mesh, never an input proxy.
+
+   History: this is the THIRD attempt. #1 divided by the base petal slider
+   instead of the total across layers. #2 (the SPACECOL_LIVE_CAP this replaces)
+   capped the space-colonization SOURCE COUNT — but CLOSED mode's loop-closure
+   step blows up independently of source count (a denser existing node lattice
+   recruits more neighbours per source per iteration — a positive-feedback
+   effect with no relationship to how many sources seeded it), so the source
+   cap never bounded what actually costs memory. Petal count / source count /
+   density all relate to final triangle count through code that changes over
+   time (a new mode, a new termination rule); the triangle count is the only
+   quantity that actually costs memory and actually crashes the tab, so it's
+   the only thing worth capping directly. Whoever touches this next: do not
+   add a fourth input-side cap.
+
+   LIVE_TRI_BUDGET — measured against the 7 shipped presets (flower-presets.js),
+   each loaded via its real gallery cell, live tris read from the on-screen
+   readout (tools/probe-presets, see PR for #44):
+     Daisy 103,656   Rose 286,378   Lily 68,352   Poppy 234,480
+     Dahlia 330,500 (heaviest)   Thistle 257,280   Carnation 154,650
+   500,000 clears Dahlia by 1.51x, Thistle by 1.94x. Measured warm full-rebuild
+   time at that scale (pure slider drag, JIT already hot, no preset-switch
+   overhead): 505,596 tris -> 2.7s. Chromium's own "Page Unresponsive" hang
+   detector fires at roughly 5s of continuously blocked main thread, so that's
+   ~1.85x headroom before a maxed-out (500k) custom design risks the hang
+   dialog; a Dahlia-weight design keeps ~2.8x. gen-preset-thumbs.mjs asserts
+   every preset stays under this budget, in CI, with a stated margin — a
+   preset drifting over it (e.g. once petal cross-sections roll a sheet into a
+   tube and add geometry) fails the build instead of surfacing on a visitor's
+   first click.
+
+   EXPORT_TRI_BUDGET / EXPORT_INFO_TRIS — found by launching headless Chromium
+   with a capped V8 heap (a stand-in for a memory-constrained tab) and finding
+   where STL export actually crashes the renderer — a real `Page crashed`
+   event, not a timeout. At a 256MB heap cap: 4,910,848 tris survived,
+   5,452,886 tris crashed. The real threshold sits in [4.91M, 5.45M], ~11%
+   wide. 3,000,000 holds 1.64x headroom under the tightest surviving point
+   measured, 1.82x under the nearest crash — and a lower-RAM real device could
+   still fail below that 4.91M floor, which is exactly why the ceiling holds
+   well under it rather than creeping toward it. (Binary STL is ~50 bytes/tri:
+   3M tris ~= 150MB, 1M ~= 50MB — also close to what online print bureaus
+   commonly cap uploads around, a second reason not to push this higher.)
+   EXPORT_INFO_TRIS is a plain on-screen line (never a modal) for anything
+   over it but still under the hard ceiling — a big file isn't dangerous, it's
+   just big, so it doesn't need refusing or dismissing, only disclosing.
+
+   Both crash points were found WITHOUT the MAX_EXPORT_TRIS confirm dialog
+   this budget replaces ever firing — the renderer died inside
+   buildExportGeometry(), before `tris` was known JS-side. A check gated on
+   the finished count is structurally too late by construction; enforcement
+   below is incremental (checked while building, not after) for exactly that
+   reason.
+
+   THE CLIFF: while narrowing the export bracket, one config reproduced #44's
+   filed number almost to the digit —
+     birth 0.055 / kill 0.040        -> 7.03M tris   stable
+     birth 0.060 / kill 0.045 (dflt) -> 4.05M tris   stable
+     birth 0.0575 / kill 0.0425      -> 26.8M tris   RUNAWAY (tab died, 94s)
+   — a discontinuity sitting exactly BETWEEN two stable neighbours, on a
+   Standard-reachable slider (spaceBirth / spaceKill). No input-space guard
+   rail can fence that off even in principle: there is no "extreme" end of
+   these sliders to clamp, the dangerous region is in the middle. This is the
+   clearest evidence yet for capping the output.
+   --------------------------------------------------------------------- */
+const LIVE_TRI_BUDGET   = 500000;    // refuse over this, live — keep the last-good mesh on screen
+const EXPORT_INFO_TRIS  = 1000000;   // plain on-screen line above this (never a modal)
+const EXPORT_TRI_BUDGET = 3000000;   // refuse over this, export — no override
+
+// Per-petal safety valve for buildSpaceColonization's growth loop (flower-geometry.js)
+// — the one sub-step whose output can't be predicted ahead of time, only interrupted
+// mid-simulation. RADIAL_SEGMENTS*4 is a deliberately conservative (over-, not under-
+// estimating) per-node/per-anastomosis-link triangle cost: a side quad (2 tris) both
+// directions plus export end caps. No single petal may use more than half of either
+// budget on its own, so the exact per-petal check below (buildLayerInto) is always
+// able to catch a runaway within the first petal or two, not the whole whorl.
+const TRIS_PER_SC_NODE = RADIAL_SEGMENTS * 4;
+const SC_NODE_BUDGET_LIVE   = Math.max(200, Math.floor(LIVE_TRI_BUDGET   / 2 / TRIS_PER_SC_NODE));
+const SC_NODE_BUDGET_EXPORT = Math.max(200, Math.floor(EXPORT_TRI_BUDGET / 2 / TRIS_PER_SC_NODE));
+
+// Thrown the moment a build's RUNNING triangle count crosses its budget — caught by
+// the live (generate) and export (exportSTL) callers to refuse cleanly with an
+// actionable message, instead of continuing to build a mesh nobody will see (or,
+// worse, finding the real ceiling the hard way).
+class TriBudgetExceededError extends Error {
+  constructor(tris, budget) {
+    super(`~${tris.toLocaleString()} triangles, over the ${budget.toLocaleString()} budget`);
+    this.name = 'TriBudgetExceededError';
+    this.tris = tris;
+    this.budget = budget;
+  }
+}
+// Exact, cheap, and the real ground truth: acc.idx.length/3 IS the mesh built so far,
+// not an estimate of it. Called after each petal (buildLayerInto) and after each major
+// structural addition (buildInto) — coreAcc may be the SAME object as petalAcc (export
+// merges both into one accumulator), so guard against double-counting that case.
+function checkTriBudget(petalAcc, coreAcc) {
+  const tris = petalAcc === coreAcc ? petalAcc.idx.length / 3 : (petalAcc.idx.length + coreAcc.idx.length) / 3;
+  const budget = petalAcc.exportMode ? EXPORT_TRI_BUDGET : LIVE_TRI_BUDGET;
+  if (tris > budget) throw new TriBudgetExceededError(tris, budget);
+}
+// ACTIONABLE refusal text: names the controls actually driving the weight, so "too
+// complex" is never the whole message. Kept to the real levers, not every slider.
+function triBudgetMessage(e, ui) {
+  const growthClosed = ui.infillType === 'spacecol' && ui.spaceMode === 'closed';
+  const levers = [];
+  if (Math.round(ui.petalCount) > 12) levers.push('Petal Count');
+  if (growthClosed) {
+    levers.push('Source Density (or the Birth / Kill Distance sliders under Advanced)');
+    levers.push('switching Network from Closed to Open');
+  } else if (ui.infillType === 'spacecol') {
+    levers.push('Source Density');
+  } else if (ui.infillType !== 'veins') {
+    levers.push('a lighter Infill pattern');
+  }
+  if (Math.round(ui.layerCount) > 1) levers.push('Layer Count');
+  const ask = levers.length ? levers.join(', ') : 'a lighter combination of settings';
+  return `~${e.tris.toLocaleString()} triangles — over the ${e.budget.toLocaleString()} budget. Lower ${ask}.`;
+}
 
 // Deterministic per-petal network seed for SPACE COLONIZATION. Mixes the design's
 // STORED spaceSeed with a variant index cycled across the whorl by petal index, so:
@@ -1085,11 +1200,14 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     : P.infillType === 'spacecol'
     ? getSpaceColonization(P, spaceColSeed(P, seed), {
         mode: P.spaceMode,
-        // live path stays interactive with a coarse-but-complete network; the
-        // export path (acc.exportMode) runs the full source count. Distinct memo keys.
-        sourceCount: acc.exportMode ? P.spaceSourceCount : Math.min(P.spaceSourceCount, spacecolLiveCap(P.petalCount)),
+        // Full source count on BOTH paths now (#44) — sourceCount was never the
+        // thing that needed capping (see the TRIANGLE BUDGET comment above); what
+        // actually bounds the growth loop is nodeBudget, sized from the real
+        // triangle budget below, not from a proxy input.
+        sourceCount: P.spaceSourceCount,
         birthDist: P.spaceBirth, killDist: P.spaceKill, growthStep: P.spaceStep,
         seedPattern: P.spacePattern,
+        nodeBudget: acc.exportMode ? SC_NODE_BUDGET_EXPORT : SC_NODE_BUDGET_LIVE,
       })
     : buildVenation(P, rng, {
         secondaries: P.secondaries, crossPerStrip: P.crossPerStrip,
@@ -2464,6 +2582,7 @@ function buildBloomInto(petalAcc, coreAcc, ui, P) {
 
   const centerHeight = ui.elevation * outer.elevAmp;         // core sits at the outer receptacle centre
   buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
+  checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): the whole bloom (petals + core) so far
   return { placements, centerHeight, ringR: outer.ringR };
 }
 
@@ -2524,6 +2643,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   } else if (hasStem) {
     cl = buildStemInto(petalAcc, P, 0, centerHeight, 0, stemOpts);
   }
+  checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + receptacle/trunk or stem
 
   if (ui.sepalsType !== 'none') {
     // Sepal base attachment radius. WITH a receptacle, the fluted funnel fills the
@@ -2552,6 +2672,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       tipRegion: ui.sepalTipRegion,
       tipLength: ui.sepalTipLength,
     }, ringR);
+    checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + sepals
   }
 
   if (hasStem && cl) {
@@ -2561,6 +2682,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     if (ui.leafType && ui.leafType !== 'none') {
       buildLeafInto(petalAcc, P, ui, cl);   // a leaf at each stem node
     }
+    checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + bud branch / leaves — final tally
   }
 
   return { placements, centerHeight };
@@ -2684,6 +2806,12 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     const radialOffset = (pl.r - P.r0) * layer.scale;
     const petalOut = buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt,
                    SEED_BASE + pl.seedIdx * 131 + layer.index * LAYER_SEED_STRIDE);
+    // TRIANGLE BUDGET (#44): exact running-total check after EVERY petal — core
+    // hasn't been built yet at this point (buildCoreInto runs once, after every
+    // layer, in buildBloomInto), so petalAcc alone is the whole running mesh.
+    // Throws and unwinds out of the whole build the moment it's over, so a runaway
+    // whorl is caught within a petal or two, never built out to all 40.
+    checkTriBudget(petalAcc, petalAcc);
     // Capture EVERY whorl's real petal outline + its attach height, so the trunk
     // can drive its junction from what it actually joins. The byte-identical solid
     // path consumes only layer 0 (see buildTrunkInto: REACH = 0 -> layer 0 only);
@@ -2716,8 +2844,17 @@ function generate() {
     if (DEBUG_FIELDS) debugPetals.length = 0;   // collected during buildInto, drawn below
     built = buildInto(petalAcc, coreAcc, ui, P);
   } catch (e) {
-    console.error('Flower build failed (kept previous geometry):', e);
     const el = document.getElementById('readout');
+    if (e instanceof TriBudgetExceededError) {
+      // TRIANGLE BUDGET (#44): a clean, expected refusal, not a build failure —
+      // ACTIONABLE (names the controls to change) and keeps the last-good mesh on
+      // screen (no swapGeometry below), never a half-built flower or a silent
+      // truncation to something the sliders don't describe.
+      console.warn('[flower] live build refused (over the triangle budget):', e.message);
+      if (el) el.textContent = triBudgetMessage(e, ui);
+      return;
+    }
+    console.error('Flower build failed (kept previous geometry):', e);
     if (el) el.textContent = 'That combination was too heavy to build — showing the previous flower. Try fewer petals or a lighter pattern.';
     return;
   }
@@ -2849,8 +2986,6 @@ function stepViewTween() {
    overlapping closed shells, which every slicer does. See PROGRESS.md.
    =================================================================== */
 
-const MAX_EXPORT_TRIS = 1500000;   // binary STL ~50 B/tri; ~75 MB here — confirm past this
-
 // Build the current UI/params into one merged, export-mode geometry.
 // Largest dimension of the CURRENT bloom in world units, from the live (un-floored)
 // meshes — floor-independent, so it can set the export scale without a circular rebuild.
@@ -2876,12 +3011,11 @@ function applyMake(ui) {
   setFloorMM((ui && PROCESS_FLOOR_MM[ui.process]) || MIN_FEATURE_MM);
 }
 
-function buildExportGeometry() {
-  const ui = readUI();
+function buildExportGeometry(ui) {
   const P = resolveParams(ui);
   applyMake(ui);                 // set scale + floor for THIS design's size/process BEFORE building
   const acc = new MeshAccumulator({ exportMode: true });
-  buildInto(acc, acc, ui, P);   // petals AND core into a single accumulator
+  buildInto(acc, acc, ui, P);   // petals AND core into a single accumulator; throws TriBudgetExceededError over budget
   const geo = acc.toGeometry() || new THREE.BufferGeometry();
   const tris = acc.idx.length / 3;
   // Thinnest real-world feature: round Ø = 2·minRadius; ribbon/slab = minThick.
@@ -2890,25 +3024,44 @@ function buildExportGeometry() {
   return { geo, tris, minFeatureMM, mmPerUnit: activeMMPerUnit };
 }
 
+// TRIANGLE BUDGET (#44): a plain, non-blocking fact for a large-but-safe export —
+// never a modal. A big STL isn't dangerous, it's just big, and a "continue anyway"
+// dialog people learn to reflexively click through only makes the HARD refusal
+// (buildExportGeometry throwing over EXPORT_TRI_BUDGET) less credible when it
+// matters. Absent element (older/preview pages) is a silent no-op.
+function updateExportSizeInfo(tris) {
+  const el = document.getElementById('exportSizeInfo');
+  if (!el) return;
+  if (tris > EXPORT_INFO_TRIS) {
+    const mb = Math.round(tris * 50 / 1e6);
+    el.textContent = `large file — ${tris.toLocaleString()} triangles, ~${mb} MB, may take a minute to download`;
+    el.hidden = false;
+  } else {
+    el.textContent = '';
+    el.hidden = true;
+  }
+}
+
 function exportSTL() {
+  const ui = readUI();
   let built;
   try {
-    built = buildExportGeometry();
+    built = buildExportGeometry(ui);
   } catch (e) {
+    if (e instanceof TriBudgetExceededError) {
+      // Hard refusal, no override (#44) — the crash this replaces happens INSIDE
+      // buildExportGeometry, before tris is known JS-side, so there is no "confirm
+      // and proceed anyway" that could ever be honest here.
+      window.alert(`Can't export: ${triBudgetMessage(e, ui)}`);
+      return false;
+    }
     console.error('[STL] build failed:', e);
     window.alert('STL export failed while building the model — see the console.');
     return false;
   }
   const { geo, tris, minFeatureMM } = built;
   if (tris === 0) { window.alert('Nothing to export yet.'); return false; }
-  if (tris > MAX_EXPORT_TRIS) {
-    const mb = Math.round(tris * 50 / 1e6);
-    if (!window.confirm(`This model is ${tris.toLocaleString()} triangles ` +
-        `(~${mb} MB STL) and may be slow to save and slice. Export anyway?`)) {
-      geo.dispose();
-      return false;
-    }
-  }
+  updateExportSizeInfo(tris);
   // Bake world-unit -> millimetre scale into a temp mesh's matrix; STLExporter
   // applies it and writes per-facet normals from the scaled positions.
   const mesh = new THREE.Mesh(geo, matPetals);
