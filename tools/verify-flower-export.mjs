@@ -29,24 +29,13 @@ import { chromium } from 'playwright-core';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { findChromium } from './chromium-harness.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const THREE_VERSION = '0.161.0';   // must match the importmap in flower.html
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 
-function findChromium() {
-  if (process.env.CHROMIUM_EXECUTABLE && fs.existsSync(process.env.CHROMIUM_EXECUTABLE)) return process.env.CHROMIUM_EXECUTABLE;
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  try {
-    for (const d of fs.readdirSync(base)) {
-      if (!d.startsWith('chromium-')) continue;
-      const p = path.join(base, d, 'chrome-linux', 'chrome');
-      if (fs.existsSync(p)) return p;
-    }
-  } catch { /* fall through */ }
-  return undefined;   // let playwright-core resolve its default
-}
 
 // Boundary/non-manifold analysis of a binary STL. Vertices are quantised so
 // coincident corners of adjacent closed shells weld; an undirected edge used by
