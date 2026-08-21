@@ -1,12 +1,25 @@
-// Coarse client-side math for the shape editor's LIVE (drag) pass — a
-// standalone port, deliberately NOT importing editor/surface.js: the two
-// pages stay fully separate per the milestone-3 instruction ("shared
-// shell code, separate pages" means shared math class, not a shared
-// file). The authoritative FULL pass is always the server
-// (/api/curve -> shell.py's real PchipInterpolator + ShellModel), fired
-// once on pointerup. This module exists only to make dragging feel live;
-// never trust its numbers as final — see the "COARSE (live" labels in
-// editor.js.
+// Deployed copy of tools/dress-shell/shape-editor/geom.js — served as
+// part of the static site (this route, /shape-editor.html, is the ONLY
+// way to reach the shape editor; there is no reachable Python backend
+// for a Netlify deploy preview or the built site). Keep the two files in
+// sync by hand; this one is the one that ships.
+//
+// On THIS page, the math here is not a "coarse preview" ahead of an
+// authoritative server pass — there is no server pass. This IS the
+// geometry: cross-validated against shell.py's ShellModel.point() /
+// compound.CompoundShellModel.point() directly (120 (theta, z) probes
+// spanning the full domain and both an identical and a diverged
+// b_front/b_back case) down to ~1e-13mm, floating-point noise. That
+// check caught a real bug before it shipped here: the target arc length
+// used Ram(a,b_front) + Ram(a,b_back) (double the true section
+// perimeter) instead of compound_perimeter's MEAN — a max 352mm position
+// error before the fix. The local dev server's copy had the same bug
+// (this file started as a copy of it); this is a shared fix, not a
+// static-page-only patch — the local copy has it too.
+//
+// mesh resolution (buildMeshes' defaults) is higher here than the local
+// tool's original "coarse, drag-preview" tuning, since this is the only
+// tier a viewer of this page ever sees.
 
 // -- PCHIP (Fritsch-Carlson monotone cubic Hermite) -------------------------
 // Same interpolant class scipy.interpolate.PchipInterpolator uses server

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dress Shape Editor — Eva Maskalenko</title>
+<meta name="description" content="Browser-only dress-shell shape editor: drag a(v)/b_front(v)/b_back(v) control points, regenerate the 3D shell live, read circumference and monotonicity as you go. No server — everything computes in this page.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root {
+    --bg: #0c0e0e; --panel: #141717; --line: #2a2f2f; --ink: #e9ecec;
+    --dim: #8b9494; --petrol: #2fa3a3; --amber: #d98a35; --red: #e05545;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: var(--mono);
+               font-size: 12px; height: 100%; }
+  body { overflow: hidden; }
+  #layout { position: fixed; inset: 0; display: flex; }
+  #curvePane { width: 720px; flex: none; border-right: 1px solid var(--line);
+               overflow-y: auto; }
+  #view { flex: 1; position: relative; min-width: 0; }
+  h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.12em;
+       text-transform: uppercase; color: var(--petrol); padding: 10px 12px 6px; }
+  h2 { font-size: 11px; font-weight: 500; color: var(--dim); margin: 10px 12px 4px;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  h3 { font-size: 10px; font-weight: 500; color: var(--dim); margin: 6px 12px 2px; }
+  .curveRow { display: flex; gap: 0; }
+  .curveBlock { flex: 1; min-width: 0; }
+  canvas.curve { display: block; margin: 0 auto; }
+  .kv { color: var(--dim); padding: 0 12px; line-height: 1.7; }
+  .kv b { color: var(--ink); font-weight: 500; }
+  .ok { color: var(--petrol); } .warn { color: var(--amber); } .err { color: var(--red); }
+  .legend { padding: 4px 12px 8px; color: var(--dim); font-size: 10px; line-height: 1.7; }
+  table { border-collapse: collapse; width: calc(100% - 24px); margin: 2px 12px; }
+  td, th { padding: 1px 6px 1px 0; text-align: left; font-size: 11px; }
+  th { color: var(--dim); font-weight: 500; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 12px; align-items: center; }
+  button { background: none; border: 1px solid var(--line); color: var(--ink);
+           font: inherit; padding: 3px 8px; cursor: pointer; border-radius: 2px; margin: 4px 12px 4px 0; }
+  button:hover { border-color: var(--petrol); }
+  textarea { width: calc(100% - 24px); margin: 4px 12px; height: 140px;
+             background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+             font: inherit; font-size: 10px; display: none; }
+  .hud { position: absolute; background: color-mix(in srgb, var(--panel) 92%, transparent);
+         border: 1px solid var(--line); padding: 8px 10px; border-radius: 3px;
+         line-height: 1.7; max-width: 60vw; }
+  #status { left: 12px; bottom: 12px; }
+  #modeTag { top: 12px; left: 12px; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 8px 12px; }
+  .banner { background: color-mix(in srgb, var(--amber) 14%, var(--bg)); border: 1px solid var(--amber);
+            color: var(--ink); padding: 8px 10px; margin: 10px 12px; border-radius: 3px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <div id="curvePane">
+    <h1>Dress Shape Editor</h1>
+    <div class="banner">This page has no server — reachable from any browser via this deploy preview
+      (not the local dev tool). Curve editing, 3D regeneration, circumference, and monotonicity are
+      genuinely live here. The full curvature/seatability sweep and the "seed from parameters"
+      generator still need Python — they show a labeled, bake-time snapshot rather than a live number.
+      The neckline trim is not yet applied to this 3D view (you'll see more surface near center-back
+      than the true shell has) — flagged, not fixed in this pass.</div>
+
+    <div class="curveRow">
+      <div class="curveBlock">
+        <h2>a(v) — shared lateral half-width</h2>
+        <canvas id="canvasA" class="curve" width="340" height="480"></canvas>
+      </div>
+      <div class="curveBlock">
+        <h2>b(v) — front / back depth (independent)</h2>
+        <canvas id="canvasB" class="curve" width="340" height="480"></canvas>
+      </div>
+    </div>
+    <div class="legend">
+      a(v): committed (dashed) · edited (solid) · mirrored, ONE shared value both sides.<br>
+      b(v): <span style="color:#2fa3a3">front (right = CF)</span> ·
+      <span style="color:#d98a35">back (left = CB)</span> · each independently draggable.<br>
+      backdrop: traced silhouettes, <b class="warn">uncalibrated — visual reference only</b>.
+    </div>
+
+    <hr>
+    <h2>Neckline height(θ) — reference only (not yet live on this page)</h2>
+    <div id="neckRef" class="kv">…</div>
+
+    <h2>Generator — reference only (needs Python to re-solve)</h2>
+    <div class="kv">These are the parameters the starting curves were generated from
+      (bust="plateau" at the approved settings). Ask for a fresh
+      export_shape_editor_static.py run + republish to change them and reseed.</div>
+    <div id="genRef" class="kv">…</div>
+
+    <div class="row"><span class="kv" style="padding:0">armhole split θ:
+      <b id="armholeReadout">…</b></span></div>
+
+    <button id="exportBtn">export shape.yaml</button>
+    <button id="copyBtn">copy to clipboard</button>
+    <div class="kv" id="exportStatus"></div>
+    <textarea id="exportArea" readonly></textarea>
+
+    <hr>
+    <h2>Live readouts</h2>
+    <div id="monoReadout" class="kv">…</div>
+    <h3>Circumference vs tape (compound: mean of front + back Ramanujan)</h3>
+    <table id="circTable"></table>
+    <h3>Shell (snapshot — see banner above)</h3>
+    <div id="shellReadout" class="kv">…</div>
+    <div id="baselineReadout" class="kv" style="margin-top:8px">…</div>
+  </div>
+  <div id="view">
+    <div id="modeTag" class="hud kv">loading…</div>
+    <div id="status" class="hud kv">loading…</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "./dress/vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./dress/vendor/controls/OrbitControls.js"
+} }
+</script>
+<script type="module" src="./shape-editor-app.js"></script>
+</body>
+</html>
