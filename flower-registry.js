@@ -137,25 +137,40 @@ export const CONTROLS = [
   {"id":"fillDensity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Fill density","fmt":"f2","gating":{"data-center-arch":"petaloid"}},
   {"id":"fillBloomAngle","section":"acc-base","kind":"slider","min":0,"max":90,"step":1,"default":30,"label":"Fill bloom angle","fmt":"rounddeg","gating":{"data-center-arch":"petaloid"}},
   {"id":"continuousMargin","section":"acc-base","kind":"select","options":[{"value":"off","text":"OFF"},{"value":"on","text":"ON"}],"default":"on","label":"Continuous margin"},
-  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bundle tightness","fmt":"f2","gating":{"data-cont-margin":true}},
-  {"id":"flareRate","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Flare rate","fmt":"f2","gating":{"data-cont-margin":true}},
-  {"id":"absorption","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Absorption","fmt":"f2","gating":{"data-cont-margin":true}},
-  {"id":"buttonSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.05,"label":"Neck swell","fmt":"f2","gating":{"data-cont-margin":true}},
-  {"id":"gatherHeight","section":"acc-base","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.15,"label":"Gather height","fmt":"f2","gating":{"data-cont-margin":true}},
-  {"id":"receptacleType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"on","text":"ON"}],"default":"none","label":"Receptacle","divId":"receptacleTypeCtrl","permanentHidden":true},
-  {"id":"receptProfile","section":"acc-base","kind":"select","options":[{"value":"flare","text":"FLARE"},{"value":"dome","text":"DOME"},{"value":"cone","text":"CONE"},{"value":"urn","text":"URN"},{"value":"gentle","text":"GENTLE"}],"default":"flare","label":"Profile","gating":{"data-recept":true}},
-  {"id":"receptConstruction","section":"acc-base","kind":"select","options":[{"value":"solid","text":"SOLID"},{"value":"ribbed","text":"RIBBED"},{"value":"cored","text":"CORED"}],"default":"solid","label":"Construction","gating":{"data-recept":true}},
-  {"id":"receptCollar","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"band","text":"BAND"},{"value":"ferrule","text":"FERRULE"}],"default":"none","label":"Collar","gating":{"data-recept":true}},
-  {"id":"receptReach","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Reach","fmt":"f2","gating":{"data-recept":true}},
-  {"id":"blendSmoothness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Blend smoothness","fmt":"f2","gating":{"data-recept":true}},
-  {"id":"receptacleDepth","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Receptacle depth","fmt":"f2","gating":{"data-recept":true}},
-  {"id":"convergenceTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Convergence tightness","fmt":"f2","gating":{"data-recept":true}},
-  {"id":"receptSolidity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":1,"label":"Solidity","fmt":"f2","gating":{"data-recept-open":true}},
-  {"id":"ribMultiplier","section":"acc-base","kind":"slider","min":0.5,"max":3,"step":0.05,"default":1,"label":"Rib multiplier","fmt":"f2","gating":{"data-recept-ribbed":true}},
-  {"id":"spiralTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.12,"label":"Rib tightness","fmt":"f2","gating":{"data-recept-ribbed":true}},
-  {"id":"spiralThickness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Rib thickness","fmt":"f2","gating":{"data-recept-ribbed":true}},
-  {"id":"bulbSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb size","fmt":"f2","gating":{"data-recept-dome":true}},
-  {"id":"bulbHeight","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb height","fmt":"f2","gating":{"data-recept-dome":true}},
+  // ---- JUNCTION vs ORNAMENT ------------------------------------------------------
+  // The controls below (through bulbHeight) all sit under one flat "Receptacle"
+  // block, but they are two different things wearing one name:
+  //   role:"junction"  — shapes the minimal connective geometry that makes the
+  //     model one watertight solid. Its PRESENCE is never a control (see
+  //     hasReceptacle() in flower.js — stem/sepals present, or the receptacleType
+  //     migration override, decides that); these tags only shape how that
+  //     necessarily-existing connective mass blends and tapers.
+  //   role:"ornament"  — decorative choices about what the base LOOKS like
+  //     (profile silhouette, wall construction, collar, rib styling). Optional in
+  //     spirit even though today's gating ties their visibility to the derived
+  //     junction being present; per the flower-project skill, this is the same
+  //     "decorative structure below the bloom" family as sepals.
+  // No ids, defaults, gating, or behaviour change here — annotation only, so the
+  // future base-ornament work extends this block instead of untangling it first.
+  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bundle tightness","fmt":"f2","gating":{"data-cont-margin":true},"role":"junction"},
+  {"id":"flareRate","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Flare rate","fmt":"f2","gating":{"data-cont-margin":true},"role":"junction"},
+  {"id":"absorption","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Absorption","fmt":"f2","gating":{"data-cont-margin":true},"role":"junction"},
+  {"id":"buttonSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.05,"label":"Neck swell","fmt":"f2","gating":{"data-cont-margin":true},"role":"junction"},
+  {"id":"gatherHeight","section":"acc-base","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.15,"label":"Gather height","fmt":"f2","gating":{"data-cont-margin":true},"role":"junction"},
+  {"id":"receptacleType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"on","text":"ON"}],"default":"none","label":"Receptacle","divId":"receptacleTypeCtrl","permanentHidden":true,"role":"junction"},
+  {"id":"receptProfile","section":"acc-base","kind":"select","options":[{"value":"flare","text":"FLARE"},{"value":"dome","text":"DOME"},{"value":"cone","text":"CONE"},{"value":"urn","text":"URN"},{"value":"gentle","text":"GENTLE"}],"default":"flare","label":"Profile","gating":{"data-recept":true},"role":"ornament"},
+  {"id":"receptConstruction","section":"acc-base","kind":"select","options":[{"value":"solid","text":"SOLID"},{"value":"ribbed","text":"RIBBED"},{"value":"cored","text":"CORED"}],"default":"solid","label":"Construction","gating":{"data-recept":true},"role":"ornament"},
+  {"id":"receptCollar","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"band","text":"BAND"},{"value":"ferrule","text":"FERRULE"}],"default":"none","label":"Collar","gating":{"data-recept":true},"role":"ornament"},
+  {"id":"receptReach","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Reach","fmt":"f2","gating":{"data-recept":true},"role":"ornament"},
+  {"id":"blendSmoothness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Blend smoothness","fmt":"f2","gating":{"data-recept":true},"role":"junction"},
+  {"id":"receptacleDepth","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Receptacle depth","fmt":"f2","gating":{"data-recept":true},"role":"junction"},
+  {"id":"convergenceTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Convergence tightness","fmt":"f2","gating":{"data-recept":true},"role":"junction"},
+  {"id":"receptSolidity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":1,"label":"Solidity","fmt":"f2","gating":{"data-recept-open":true},"role":"ornament"},
+  {"id":"ribMultiplier","section":"acc-base","kind":"slider","min":0.5,"max":3,"step":0.05,"default":1,"label":"Rib multiplier","fmt":"f2","gating":{"data-recept-ribbed":true},"role":"ornament"},
+  {"id":"spiralTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.12,"label":"Rib tightness","fmt":"f2","gating":{"data-recept-ribbed":true},"role":"ornament"},
+  {"id":"spiralThickness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Rib thickness","fmt":"f2","gating":{"data-recept-ribbed":true},"role":"ornament"},
+  {"id":"bulbSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb size","fmt":"f2","gating":{"data-recept-dome":true},"role":"ornament"},
+  {"id":"bulbHeight","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb height","fmt":"f2","gating":{"data-recept-dome":true},"role":"ornament"},
   {"id":"sepalsType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"sepals","text":"SEPALS"}],"default":"none","label":"Sepals","tier":"standard"},
   {"id":"sepalSize","section":"acc-base","kind":"slider","min":0.1,"max":1.5,"step":0.05,"default":0.6,"label":"Sepal size","fmt":"f2","gating":{"data-sepal":true}},
   {"id":"sepalCount","section":"acc-base","kind":"slider","min":3,"max":24,"step":1,"default":5,"label":"Sepal count","fmt":"int","gating":{"data-sepal":true}},

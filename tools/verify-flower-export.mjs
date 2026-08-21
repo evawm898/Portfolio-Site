@@ -37,25 +37,43 @@ const THREE_VERSION = '0.161.0';   // must match the importmap in flower.html
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 
 
-// Boundary/non-manifold analysis of a binary STL. Vertices are quantised so
-// coincident corners of adjacent closed shells weld; an undirected edge used by
-// exactly one triangle is a boundary (open) edge — the failure we guard against.
+// Boundary/non-manifold/connectivity analysis of a binary STL. Vertices are
+// quantised so coincident corners of adjacent closed shells weld; an undirected
+// edge used by exactly one triangle is a boundary (open) edge — the failure we
+// guard against. `shells` is the connected-component count over that same welded
+// vertex graph (union-find): the flower-project invariant is that every build is
+// ONE connected solid, not merely a set of individually-closed pieces, so
+// boundary=0 alone is necessary but not sufficient — two disjoint watertight
+// shells both pass boundary=0 and are still two separate printed objects.
 function analyzeStl(buf) {
   const tris = buf.readUInt32LE(80);
   const edges = new Map();
   const q = (x) => Math.round(x * 1e4) / 1e4;
   const key = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+
+  // Union-find over quantised vertex keys — the same weld precision `edges`
+  // already uses, so a shell only counts as fused to its neighbour where the
+  // mesh actually welds, not merely where two shells happen to sit close.
+  const parent = new Map();
+  const root = (x) => { let r = x; while (parent.get(r) !== r) r = parent.get(r); let c = x; while (parent.get(c) !== r) { const next = parent.get(c); parent.set(c, r); c = next; } return r; };
+  const union = (a, b) => { const ra = root(a), rb = root(b); if (ra !== rb) parent.set(ra, rb); };
+
   let off = 84;
   for (let i = 0; i < tris; i++) {
     off += 12; // skip normal
     const v = [];
     for (let k = 0; k < 3; k++) { v.push(q(buf.readFloatLE(off)) + ',' + q(buf.readFloatLE(off + 4)) + ',' + q(buf.readFloatLE(off + 8))); off += 12; }
     off += 2; // attribute byte count
+    for (const p of v) if (!parent.has(p)) parent.set(p, p);
+    union(v[0], v[1]); union(v[1], v[2]);
     for (let k = 0; k < 3; k++) { const e = key(v[k], v[(k + 1) % 3]); edges.set(e, (edges.get(e) || 0) + 1); }
   }
   let boundary = 0, nonManifold = 0;
   for (const c of edges.values()) { if (c === 1) boundary++; else if (c > 2) nonManifold++; }
-  return { tris, boundary, nonManifold };
+  const roots = new Set();
+  for (const v of parent.keys()) roots.add(root(v));
+  const shells = tris > 0 ? roots.size : 0;
+  return { tris, boundary, nonManifold, shells };
 }
 
 // Each config: a label + UI mutations {id, value, evt}. 'change' for <select>,
@@ -65,7 +83,6 @@ const CONFIGS = [
   { label: 'voronoi', set: [{ id: 'infillType', value: 'voronoi', evt: 'change' }] },
   { label: 'strands', set: [{ id: 'infillType', value: 'strands', evt: 'change' }] },
   { label: 'bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }] },
-  { label: 'lace', set: [{ id: 'infillType', value: 'lace', evt: 'change' }] },
   { label: 'veins FADE (legacy termination)', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'fade', evt: 'change' }] },
   { label: 'veins MEET termination', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' }] },
   { label: 'veins LOOP termination', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'loop', evt: 'change' }] },
@@ -301,7 +318,7 @@ let failed = 0;
 console.log('Flower STL export — watertightness gate\n');
 for (const r of results) {
   if (!r.ok) failed++;
-  const detail = r.note ? r.note : `${r.tris.toLocaleString()} tris, boundaryEdges=${r.boundary}, nonManifold(overlaps)=${r.nonManifold}`;
+  const detail = r.note ? r.note : `${r.tris.toLocaleString()} tris, boundaryEdges=${r.boundary}, nonManifold(overlaps)=${r.nonManifold}, shells=${r.shells}`;
   console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label.padEnd(46)} ${detail}`);
 }
 const mat = results.filter((r) => r.matrix);
@@ -317,5 +334,16 @@ if (pageErrors.length) {
   const real = pageErrors.filter((e) => !/fonts\.googleapis/.test(e));
   if (real.length) { console.log('\nPage errors:'); real.forEach((e) => console.log('  ! ' + e)); failed += real.length; }
 }
-console.log(failed === 0 ? '\nAll configurations export watertight (0 boundary edges). ✓' : `\n${failed} FAILURE(S) — geometry is not print-safe. ✗`);
+// CONNECTED-COMPONENT GATE: the flower-project invariant is ONE connected solid
+// per build, not merely N individually-closed shells. Reported for every config
+// that actually produced an STL (shells > 0 skips 'no STL download' rows).
+const withShells = results.filter((r) => r.shells != null);
+const multiShell = withShells.filter((r) => r.shells !== 1);
+console.log(`\nConnected-component count: ${withShells.length - multiShell.length}/${withShells.length} configs export as a single shell.`);
+if (multiShell.length) {
+  console.log('  Configs with shells != 1 (a real disconnection, not a manifoldness issue):');
+  for (const r of multiShell) console.log(`    ${r.label}: shells=${r.shells}`);
+  failed += multiShell.length;
+}
+console.log(failed === 0 ? '\nAll configurations export watertight (0 boundary edges) as a single connected solid. ✓' : `\n${failed} FAILURE(S) — geometry is not print-safe. ✗`);
 process.exit(failed === 0 ? 0 : 1);

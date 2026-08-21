@@ -1611,6 +1611,10 @@ function buildBudBranchInto(acc, P, ui, cl, stemOpts) {
 // explicitly keeps its receptacle even with no stem/sepals.
 // The single source of truth for "does this design need a junction below the
 // bloom" — every call site reads this, none re-derives it.
+// JUNCTION vs ORNAMENT: everything under this presence check is one flat
+// "Receptacle" control block, but only some of it IS the junction — the rest is
+// decoration riding on top of it. flower-registry.js's acc-base entries carry a
+// role:"junction" / role:"ornament" tag marking which is which.
 function hasReceptacle(ui) {
   return ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
 }
