@@ -229,6 +229,21 @@ const CONFIGS = [
   { label: 'CROSS-SECTION quilled + voronoi infill (rolled slab normals)', smoke: true, set: [{ id: 'petalCup', value: '0' }, { id: 'infillType', value: 'voronoi', evt: 'change' }] },
   { label: 'CROSS-SECTION quilled + 30 petals (triangle-budget stress)', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'petalCount', value: '30' }] },
   { label: 'CROSS-SECTION quilled + solid sepals (rolled solid-blade end caps)', smoke: true, set: [{ id: 'petalCount', value: '6' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'solid', evt: 'change' }] },
+  // CHRYSANTHEMUM reachability (#gaps): the new width floor (0.1), TIP FINENESS
+  // (relative tip sharpness), and per-petal VARIANCE all stack on the quilled
+  // cross-section at once — the combination a quilled-mum design actually needs.
+  // Self-contained so it doesn't depend on the CROSS-SECTION block's carried state.
+  { label: 'CHRYSANTHEMUM: min width + tip fineness + variance on a quilled tube', smoke: true, set: [
+    { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' },
+    { id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' },
+    { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' },
+    { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' }, { id: 'petalCount', value: '30' },
+    { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' },
+    { id: 'width', value: '0.1' }, { id: 'taper', value: '1' },
+    { id: 'tip', value: '1' }, { id: 'tipFineness', value: '1' },
+    { id: 'crossSection', value: '1' }, { id: 'crossSectionTaper', value: '0' }, { id: 'petalCup', value: '0' },
+    { id: 'variance', value: '0.6' },
+  ] },
 ];
 
 // ===== Receptacle JUNCTION axis matrix: PROFILE x CONSTRUCTION x COLLAR =====

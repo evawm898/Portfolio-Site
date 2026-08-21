@@ -86,6 +86,19 @@ const MIDRIB_W_BASE   = 1.00;
 let RECEPT_FIELD_STATS = null;
 const SEED_BASE      = 20250808;
 const LAYER_SEED_STRIDE = 9973;  // per-layer seed offset so inner whorls vary (0 for layer 0)
+// ORGANIC VARIANCE: real florets (a chrysanthemum most of all) are never
+// identical — each one differs slightly in length, opening angle and curl.
+// Deliberately NOT uniform noise on every parameter (that reads as a
+// rendering fault, not a flower) — only these three axes jitter; width,
+// taper, tip, twist etc. stay exact. Deterministic per petal off the SAME
+// seed already keyed to petal index (see buildLayerInto), salted so it
+// doesn't correlate with that seed's OTHER use (infill RNG) — reload and
+// save/share reproduce the exact same jitter. Bilateral mirror pairs share
+// one seedIdx already, so they draw identical jitter and stay exact mirrors.
+const VARIANCE_SALT       = 0x51ed270b;
+const VARIANCE_LENGTH_MAX = 0.15;   // +/- 15% of petal length at variance = 1
+const VARIANCE_ANGLE_MAX  = 0.12;   // +/- ~7deg of opening (bloom) angle, radians, at variance = 1
+const VARIANCE_ROLL_MAX   = 0.15;   // +/- 15% of the cross-section roll amount at variance = 1
 
 /* ---------------------------------------------------------------------
    TRIANGLE BUDGET (issue #44) — cap the OUTPUT mesh, never an input proxy.
@@ -1031,6 +1044,7 @@ function resolveParams(ui) {
     cleftLobes: ui.cleftLobes,                    // LOBED: lobe count 2..7 (n-1 clefts)
     cleftWidth: ui.cleftWidth,                    // LOBED: cleft slot width
     tip: ui.tip,                                 // TIP SHAPE: sharpness of every tip (apex + teeth)
+    tipFineness: ui.tipFineness,                 // TIP FINENESS: extends the outline's tip sharpness ceiling, relative to petal width
     bloom: ui.bloom * DEG,
     curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
     edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
@@ -2822,11 +2836,24 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     if (layer.scale !== 1 || layer.dBloom !== 0) {
       Pp = { ...Pp, L: Pp.L * layer.scale, W: Pp.W * layer.scale, bloom: Math.max(0, Pp.bloom - layer.dBloom) };
     }
+    const petalSeed = SEED_BASE + pl.seedIdx * 131 + layer.index * LAYER_SEED_STRIDE;
+    // ORGANIC VARIANCE (see constants above): length, opening angle, roll only —
+    // deterministic off this petal's own seed, salted so it doesn't correlate
+    // with that seed's other use (infill RNG below). variance = 0 is an exact
+    // no-op (jL = 1, jBloom = 0, jRoll = 1 -> Pp unchanged).
+    const variance = clamp(ui.variance || 0, 0, 1);
+    if (variance > 0) {
+      const vrng = mulberry32((petalSeed ^ VARIANCE_SALT) >>> 0);
+      const jL = 1 + VARIANCE_LENGTH_MAX * variance * (vrng() * 2 - 1);
+      const jBloom = VARIANCE_ANGLE_MAX * variance * (vrng() * 2 - 1);
+      const jRoll = 1 + VARIANCE_ROLL_MAX * variance * (vrng() * 2 - 1);
+      Pp = { ...Pp, L: Pp.L * jL, bloom: Math.max(0, Pp.bloom + jBloom),
+             crossSection: clamp((Pp.crossSection || 0) * jRoll, -1, 1) };
+    }
     const az = pl.az + layer.dRot;
     const height = baseHeight * layer.scale + layer.dHeight;
     const radialOffset = (pl.r - P.r0) * layer.scale;
-    const petalOut = buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt,
-                   SEED_BASE + pl.seedIdx * 131 + layer.index * LAYER_SEED_STRIDE);
+    const petalOut = buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt, petalSeed);
     // TRIANGLE BUDGET (#44): exact running-total check after EVERY petal — core
     // hasn't been built yet at this point (buildCoreInto runs once, after every
     // layer, in buildBloomInto), so petalAcc alone is the whole running mesh.
