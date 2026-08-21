@@ -76,7 +76,7 @@ function divInfo(idx) {
   const divAt = before.lastIndexOf('<div class="fl-ctrl"');
   const divTag = H.slice(divAt, H.indexOf('>', divAt) + 1);
   const gating = {};
-  const GATES = ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral'];
+  const GATES = ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-recept-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral'];
   for (const g of GATES) { const v = attr(divTag, g); if (v !== null) gating[g] = v; }
   return { gating, divId: attr(divTag, 'id') || null, permanentHidden: attr(divTag, 'hidden') === true };
 }

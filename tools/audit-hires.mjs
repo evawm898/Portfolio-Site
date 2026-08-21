@@ -24,15 +24,14 @@
    RUN:  node tools/audit-hires.mjs [--size=1200] [--out=<dir>]
    =================================================================== */
 import { chromium } from 'playwright-core';
-import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decodePNG } from './pngdec.mjs';
 import { AUDIT_VIEWPOINTS } from '../flower-view-presets.js';
+import { findChromium, serveRepo, routeThreeCDN } from './flower-gate-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const THREE_DIR = path.join(ROOT, 'node_modules', 'three');
 const THREE_VERSION = '0.161.0';
 const argv = process.argv.slice(2);
 const SIZE = parseInt((argv.find((a) => a.startsWith('--size=')) || '--size=1200').split('=')[1], 10);
@@ -101,28 +100,7 @@ window.__dbgView = function(name, pad) {
 window.__dbgReady = true;
 `;
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
-const server = http.createServer((req, res) => {
-  let u = decodeURIComponent(req.url.split('?')[0]);
-  if (u === '/') u = '/flower.html';
-  const abs = path.join(ROOT, u);
-  if (!abs.startsWith(ROOT)) { res.writeHead(403); return res.end('no'); }
-  fs.readFile(abs, (err, buf) => {
-    if (err) { res.writeHead(404); return res.end('nf'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(abs).toLowerCase()] || 'application/octet-stream' });
-    if (abs.endsWith('flower.js')) res.end(buf.toString('utf8') + '\n' + DBG_HOOK); else res.end(buf);
-  });
-});
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const port = server.address().port;
-
-function findChromium() {
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  for (const d of fs.readdirSync(base)) if (d.startsWith('chromium-') && !d.includes('headless')) {
-    const p = path.join(base, d, 'chrome-linux', 'chrome'); if (fs.existsSync(p)) return p;
-  }
-  return undefined;
-}
+const { server, port } = await serveRepo(ROOT, { hook: DBG_HOOK });
 
 // ---- box-blur (radius 1) + changed-pixel-fraction diff ----
 function boxBlur(px, w, h) {
@@ -160,12 +138,7 @@ try {
     for (const which of ['min', 'max']) {
       const ctx = await browser.newContext({ viewport: { width: SIZE, height: SIZE }, deviceScaleFactor: 1 });
       const page = await ctx.newPage();
-      await page.route('**/cdn.jsdelivr.net/**', (route) => {
-        const m = route.request().url().match(new RegExp('three@' + THREE_VERSION.replace(/\./g, '\\.') + '/(.*)$'));
-        if (!m) return route.continue();
-        try { return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(THREE_DIR, m[1])) }); }
-        catch { return route.fulfill({ status: 404, body: 'nf' }); }
-      });
+      await routeThreeCDN(page, ROOT, THREE_VERSION);
       await page.goto(`http://127.0.0.1:${port}/flower.html`, { waitUntil: 'load', timeout: 30000 });
       await page.waitForFunction('window.__dbgReady === true', { timeout: 30000 });
       // strip the chrome (control panel / view panel / header) so the canvas capture is

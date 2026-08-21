@@ -1,0 +1,81 @@
+# Print-safety + geometry-correctness gates for the Flower Bloom generator.
+#
+# Two speeds, per CLAUDE.md's print-safety invariant:
+#   - "smoke" runs on every relevant PR/push: a curated ~22-config subset of the
+#     watertight-export gate (tools/verify-flower-export.mjs --smoke — the configs
+#     marked smoke:true, plus every shipped preset, the named regression fixtures)
+#     and the FULL geometry-quality gate (tools/verify-geometry-quality.mjs — only
+#     ~30 configs, already fast enough to run in full on every commit).
+#   - "full" runs only on demand (workflow_dispatch): the complete ~140-config
+#     export sweep (receptacle PROFILE×CONSTRUCTION×COLLAR matrix, the full
+#     continuous-margin SDF sweep, every named edge case) — several minutes, not
+#     meant to gate every commit.
+#
+# Neither gate ran in CI before this workflow (both were local-only, per CLAUDE.md
+# and the project's own working agreements); registry-sync and preset-thumbs
+# already run in CI (see the other workflows in this directory).
+name: flower-gates
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower.html
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-shapes.js
+      - flower-presets.js
+      - flower-registry.js
+      - tools/verify-flower-export.mjs
+      - tools/verify-geometry-quality.mjs
+      - tools/flower-gate-harness.mjs
+      - .github/workflows/flower-gates.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower.html
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-shapes.js
+      - flower-presets.js
+      - flower-registry.js
+      - tools/verify-flower-export.mjs
+      - tools/verify-geometry-quality.mjs
+      - tools/flower-gate-harness.mjs
+  workflow_dispatch: {}
+
+jobs:
+  smoke:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Watertight export — smoke subset
+        run: node tools/verify-flower-export.mjs --smoke
+      - name: Geometry-quality gate — full (fast enough for every commit)
+        run: node tools/verify-geometry-quality.mjs
+
+  full:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Watertight export — full sweep (matrix + continuous-margin + presets)
+        run: node tools/verify-flower-export.mjs
+      - name: Geometry-quality gate — full
+        run: node tools/verify-geometry-quality.mjs

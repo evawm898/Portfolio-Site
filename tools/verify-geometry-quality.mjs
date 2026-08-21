@@ -53,13 +53,13 @@
    Exits non-zero only on a NON-xfail failure (unless --report-only / --sweep).
    =================================================================== */
 import { chromium } from 'playwright-core';
-import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { SHAPES as SHIPPED_SHAPES } from '../flower-shapes.js';
+import { findChromium, serveRepo, routeThreeCDN } from './flower-gate-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const THREE_DIR = path.join(ROOT, 'node_modules', 'three');
 const argv = process.argv.slice(2);
 const SWEEP = argv.includes('--sweep');
 const REPORT_ONLY = argv.includes('--report-only') || SWEEP;
@@ -123,12 +123,15 @@ const XFAILS = {
   '#64': { since: '2026-08-19', reason: 'continuous-margin rim not cleft-aware (Lobed sinus unsealed)' },
 };
 
-// The five silhouette bundles (mirror flower.js SHAPES).
+// The four shipped silhouette bundles now come from flower-shapes.js — the same
+// object the live picker imports, so this gate can no longer drift from what it's
+// meant to be measuring (it previously carried its own hand-copied 'rounded' that
+// nothing checked against the picker's). LOBED is added back in locally: it is
+// deliberately NOT a picker bundle (see flower-shapes.js), so it has no shared
+// source — this gate keeps its own copy purely to regression-test the known #64
+// defect (cleft renders wrong under continuous margin).
 const SHAPES = {
-  rounded: { width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, edgeProfile: 0, petalCup: 0 },
-  pointed: { width: 0.7, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.4, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.15, centerCurve: 0.3, edgeCurve: -0.1, edgeProfile: 0, petalCup: 0 },
-  strap: { width: 0.45, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.3, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.3, centerCurve: 0.15, edgeCurve: 0, edgeProfile: 0, petalCup: 0.05 },
-  clawed: { width: 1.0, taper: 0.3, clawLength: 0.35, clawWidth: 0.25, shoulder: 0.55, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.6, centerCurve: 0.35, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.15 },
+  ...SHIPPED_SHAPES,
   lobed: { width: 0.95, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.55, cleftDepth: 0.45, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.1 },
 };
 const PATTERNS = ['veins', 'voronoi', 'strands', 'bone', 'spacecol'];
@@ -382,36 +385,11 @@ window.__gqApply = function(d) { applyDesign(d); };
 window.__gqReady = true;
 `;
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
-const server = http.createServer((req, res) => {
-  let u = decodeURIComponent(req.url.split('?')[0]);
-  if (u === '/') u = '/flower.html';
-  const abs = path.join(ROOT, u);
-  if (!abs.startsWith(ROOT)) { res.writeHead(403); return res.end('no'); }
-  fs.readFile(abs, (err, buf) => {
-    if (err) { res.writeHead(404); return res.end('nf'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(abs).toLowerCase()] || 'application/octet-stream' });
-    if (abs.endsWith('flower.js')) res.end(buf.toString('utf8') + '\n' + GQ_HOOK); else res.end(buf);
-  });
-});
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const port = server.address().port;
 const THREE_VERSION = '0.161.0';
-function findChromium() {
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  for (const d of fs.readdirSync(base)) if (d.startsWith('chromium-') && !d.includes('headless')) {
-    const p = path.join(base, d, 'chrome-linux', 'chrome'); if (fs.existsSync(p)) return p;
-  }
-  return undefined;
-}
+const { server, port } = await serveRepo(ROOT, { hook: GQ_HOOK });
 const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage();
-await page.route('**/cdn.jsdelivr.net/**', (route) => {
-  const m = route.request().url().match(new RegExp('three@' + THREE_VERSION.replace(/\./g, '\\.') + '/(.*)$'));
-  if (!m) return route.continue();
-  try { return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(THREE_DIR, m[1])) }); }
-  catch { return route.fulfill({ status: 404, body: 'nf' }); }
-});
+await routeThreeCDN(page, ROOT, THREE_VERSION);
 await page.goto(`http://127.0.0.1:${port}/flower.html`, { waitUntil: 'load', timeout: 30000 });
 await page.waitForFunction('window.__gqReady === true', { timeout: 30000 });
 await page.waitForTimeout(300);
