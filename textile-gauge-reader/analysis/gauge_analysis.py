@@ -133,6 +133,23 @@ MIN_PLAUSIBLE_SPACING_PX = 3.0   # ignore periodicities finer than this (likely 
 # this tolerance only ever discards refinements that look like exactly
 # that failure, never ordinary sub-pixel jitter. log(1.20) =~ 0.18.
 SPACING_REFINEMENT_MAX_LOG_DEVIATION = 0.18
+# A half-lag autocorrelation peak at >= this fraction of the seed peak's
+# height counts as a T-vs-2T near-tie worth resolving with 2D template
+# evidence (see _prefer_fundamental_seed). Calibrated before commit:
+# genuine ties measured >= 0.969 (including the leg-harmonic trap, which
+# is why strength alone can NOT decide the winner), legitimate
+# non-ties <= 0.64 (garter ridge pairs) and <= 0.47 (clean sub-features).
+AUTOCORR_SUBHARMONIC_PREFERENCE = 0.95
+# Template-walk acceptance for switching the seed to its half-lag: must
+# exceed _template_match_consistency_score's 0.5 "couldn't measure"
+# neutral, so the switch only ever happens on POSITIVE 2D evidence.
+# Measured: genuine repeats 0.66-0.70, leg half-periods 0.0.
+SEED_HALF_TEMPLATE_MIN = 0.55
+# Ascending (seed -> its double) additionally requires the seed's OWN
+# template walk to fail outright -- genuine negative evidence that the
+# seed is a false repeat (crisp leg lattices measured 0.0), far below
+# the 0.5 "couldn't measure" neutral. See _prefer_fundamental_seed.
+SEED_ASCEND_TEMPLATE_FAIL_MAX = 0.05
 SMOOTHING_WINDOW_PX = 3          # 1D smoothing window applied to projection signals
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_TILE_GRID = (8, 8)
@@ -510,6 +527,17 @@ def analyze_gauge(
     # repeat — see the module docstring.
     p0_wale, _ = _autocorrelation_spacing(wale_signal_for_period)
     p0_course, _ = _autocorrelation_spacing(course_signal_for_period)
+    # T-vs-2T near-tie resolution for the COURSE seed only (see
+    # _prefer_fundamental_seed): the course path deliberately takes its
+    # seed as-is (no v3 candidate family to rescue a doubled seed — see
+    # the course comment below), so the seed itself must land on the
+    # fundamental. The wale seed is left alone: its 0.5x/1x/2x family +
+    # evidence scoring already resolves harmonic seeds either way.
+    # Checked on the UNROTATED signal/2D pair so template-walk anchors
+    # stay coordinate-consistent with `normalized`.
+    p0_course = _prefer_fundamental_seed(
+        course_signal, normalized, p0_course, course_direction == "horizontal"
+    )
 
     # Detect approximate loop-center points once for the whole ROI (not
     # per-direction — a loop center is a single 2D feature). Use the
@@ -741,7 +769,118 @@ def _autocorrelation_spacing(signal: np.ndarray) -> Tuple[Optional[float], float
     best_local_idx = peaks[np.argmax(search_region[peaks])]
     spacing = float(best_local_idx + lo)
     strength = float(np.clip(search_region[best_local_idx], 0.0, 1.0))
+
     return spacing, strength
+
+
+def _prefer_fundamental_seed(
+    signal: np.ndarray,
+    normalized_2d: Optional[np.ndarray],
+    p0: Optional[float],
+    lag_dx: bool,
+) -> Optional[float]:
+    """
+    Resolve a T-vs-2T near-tie in the coarse autocorrelation seed using
+    2D template evidence — for the course axis, which (deliberately —
+    see analyze_gauge's course comment) takes the seed as-is instead of
+    running the v3 candidate family.
+
+    The problem, caught by the resize metamorphic invariant: a truly
+    periodic signal at period T has autocorrelation peaks at T, 2T,
+    3T... of near-equal height, so which one the argmax lands on is
+    decided by interpolation crumbs. On the real jersey fixture's
+    course signal the T-vs-2T strength ratio measured 0.977–0.996
+    across 1.25x/1.5x/2x upscales — a coin flip that fell to T at 1x
+    and to 2T at every upscale, doubling the reported course spacing.
+
+    A strength threshold ALONE cannot fix this — tried first, and the
+    rotate90 invariant immediately broke it: the wale structure's
+    leg-harmonic half-peak measures 0.969 of its fundamental, i.e.
+    INSIDE any threshold loose enough to catch the genuine ties
+    (>= 0.977). The two situations are indistinguishable in the 1D
+    autocorrelation, which is this project's oldest lesson. What DOES
+    separate them, measured on the real fixture before this landed, is
+    the template-walk score at the half-lag (_template_match_
+    consistency_score, the task-#44 machinery): a genuine repeat walks
+    consistently (0.66–0.70 measured), while leg half-periods alternate
+    between mirror-image patches and fail the walk outright (0.0
+    measured). The 0.55 acceptance sits above the function's own 0.5
+    "couldn't measure" neutral, so the seed only ever switches on
+    POSITIVE 2D evidence, never on absence of evidence.
+
+    Single step (never chains to a quarter-lag), and a no-op whenever
+    there is no half-lag peak at >= AUTOCORR_SUBHARMONIC_PREFERENCE of
+    the seed's own peak strength — garter's legitimate ridge-pair
+    double (half-peak ratios 0.52–0.64) and clean signals' minor
+    sub-features (<= 0.47) never reach the template check at all.
+    """
+    if p0 is None or p0 <= 2 * MIN_PLAUSIBLE_SPACING_PX:
+        return p0
+    n = len(signal)
+    if n < 2 * MIN_PLAUSIBLE_SPACING_PX or np.std(signal) < 1e-6:
+        return p0
+    full_corr = correlate(signal, signal, mode="full")
+    autocorr = full_corr[n - 1 :]
+    if autocorr[0] <= 0:
+        return p0
+    autocorr_norm = autocorr / autocorr[0]
+    lo = int(MIN_PLAUSIBLE_SPACING_PX)
+    hi = max(lo + 1, n // 2)
+    search_region = autocorr_norm[lo:hi]
+    if len(search_region) < 2:
+        return p0
+    peaks, _ = find_peaks(search_region, prominence=0.01)
+    if len(peaks) == 0:
+        return p0
+    lags = peaks + lo
+
+    def _strength_near(target: float, tolerance: float):
+        candidates = [(float(l), float(search_region[p])) for p, l in zip(peaks, lags) if abs(l - target) <= tolerance]
+        return max(candidates, key=lambda t: t[1]) if candidates else None
+
+    at_seed = _strength_near(p0, max(2.0, 0.12 * p0))
+    if at_seed is None:
+        return p0
+
+    # DESCENT: the seed may be the 2x of a near-tie fundamental below it.
+    at_half = _strength_near(p0 / 2.0, max(2.0, 0.12 * (p0 / 2.0)))
+    if at_half is not None and at_half[1] >= AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]:
+        half_lag = at_half[0]
+        if _template_match_consistency_score(normalized_2d, signal, half_lag, lag_dx) >= SEED_HALF_TEMPLATE_MIN:
+            return half_lag
+
+    # ASCENT: the seed may itself BE a false half-period (a leg lattice)
+    # of a near-tie fundamental above it. Found via the rotate90
+    # metamorphic invariant on the real knit_sample photos: at coarse
+    # gauges (34-73px leg spacing) the leg lattice's autocorrelation
+    # peak outright BEATS the fundamental (e.g. 0.755 vs 0.735), so the
+    # raw seed lands directly on the legs -- the jersey fixture only
+    # escapes because its fine 17.5px legs are partially attenuated by
+    # the fixed-pixel smoothing, an accidental and unreliable
+    # suppressor. Unrotated, the wale axis's candidate family climbs
+    # back up; the course path (seed-as-is) cannot, so physical wale
+    # structure viewed through it after rotation flips to half.
+    #
+    # Gate, deliberately strict on BOTH sides: the seed's own template
+    # walk must return genuine NEGATIVE evidence (<= SEED_ASCEND_
+    # TEMPLATE_FAIL_MAX, far below the 0.5 "couldn't measure" neutral
+    # -- crisp mirror-image leg patches fail the walk outright at 0.0
+    # measured), AND the double-lag must both near-tie the seed's
+    # autocorrelation strength and walk well itself. A genuine repeat
+    # at the seed (garter ridge rows, true course pitch, chunky-yarn
+    # legs whose mirror twins correlate anyway -- 0.70 measured on two
+    # real chunky samples, an honest limitation of this discriminator)
+    # never ascends, because its own walk succeeds.
+    at_double = _strength_near(p0 * 2.0, max(2.0, 0.12 * (p0 * 2.0)))
+    if (
+        at_double is not None
+        and at_double[1] >= AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]
+        and _template_match_consistency_score(normalized_2d, signal, p0, lag_dx) <= SEED_ASCEND_TEMPLATE_FAIL_MAX
+        and _template_match_consistency_score(normalized_2d, signal, at_double[0], lag_dx) >= SEED_HALF_TEMPLATE_MIN
+    ):
+        return at_double[0]
+
+    return p0
 
 
 def _detect_peaks(signal: np.ndarray, spacing_hint: float) -> List[float]:
@@ -1137,6 +1276,49 @@ def _cluster_positions(coords: np.ndarray, period: float) -> List[float]:
     return [float(np.mean(g)) for g in groups]
 
 
+def _canonical_sign_signal(signal: np.ndarray) -> np.ndarray:
+    """
+    Flip the projected 1D signal's global sign, if needed, so its
+    skewness is non-negative -- making the LANDMARK that peak detection
+    locks onto invariant under image mirroring and 90-degree rotation.
+
+    Why this exists (found by the metamorphic rotate90 invariant, and
+    initially misdiagnosed as a position-source asymmetry): the 1D
+    signals are projections of SIGNED Sobel derivatives -- deliberately
+    signed, see _enhance_texture, because rectifying with abs() would
+    frequency-double the periodicity analysis. But a horizontal mirror
+    (for the wale axis) or a 90-degree rotation (mapping one axis onto
+    the other) negates the mapped derivative, so the transformed signal
+    is the NEGATED reversal of the original (measured: correlation
+    -0.9999 on the real jersey fixture). Peak detection on a negated
+    signal locks onto the opposite edge of each ridge -- the valleys --
+    and on an asymmetric stitch profile the valley lattice refines to a
+    measurably different spacing than the peak lattice (24.0px vs
+    25.1px, 4.5%, on the real fixture's course structure).
+
+    Multiplying by the sign of the skewness picks the same physical
+    edge either way: skew(-s) = -skew(s), so original and transformed
+    signals canonicalize to exact reversals of each other, whose peak
+    lattices mirror exactly. A near-zero skew makes the choice
+    unstable, but also harmless: a sign-symmetric profile's peak and
+    valley lattices refine identically, which is precisely why the
+    wale axis passed the mirror invariant while the more asymmetric
+    course profile failed rotate90.
+
+    Global sign flip only -- never abs() -- so no frequency doubling is
+    introduced, and autocorrelation-based candidate selection (which is
+    inherently sign-invariant) is unaffected. Applied ONLY where
+    positions are extracted for refinement/overlay; the candidate-
+    scoring internals keep the raw signal, since re-anchoring their
+    evidence would shift calibrated selection scores for no invariance
+    benefit.
+    """
+    centered = signal - float(np.mean(signal))
+    if float(np.mean(centered**3)) < 0:
+        return -signal
+    return signal
+
+
 def _refine_spacing_from_positions(positions: List[float], period: float) -> Tuple[float, float]:
     """
     Try to refine a candidate period into a sub-pixel-accurate spacing
@@ -1147,19 +1329,45 @@ def _refine_spacing_from_positions(positions: List[float], period: float) -> Tup
     clean synthetic signal its gaps cluster tightly around `period` and
     refining toward their mean is a strict improvement. On a real photo it
     can occasionally miss a peak (inflating the gaps on both sides toward
-    ~2x period) or insert a spurious one (deflating a gap toward ~0.5x),
-    and those bad gaps get averaged in right alongside the good ones --
-    silently smuggling a harmonic-sized error into a period that evidence
-    scoring already got right. (Found via real-photo diagnostics: a large,
-    clean crop of a real swatch correctly selected 35px as the winning
-    candidate, but this refinement then overwrote it with 43px -- a ~23%
-    inflation -- from a handful of noisy gaps mixed in with mostly-good
-    ones.)
+    a multiple of the period) or insert a spurious one (deflating a gap
+    toward ~0.5x). Two generations of this function have dealt with that:
 
-    Only accept the refinement if its result is still close to the
-    period it was meant to refine (see SPACING_REFINEMENT_MAX_LOG_
-    DEVIATION); otherwise the noisy positions aren't trustworthy for this
-    and the caller should keep the original candidate period as-is.
+    1. The original unconditionally averaged ALL gaps -- on a real jersey
+       crop that silently overwrote a correctly-selected 35px candidate
+       with 43px (~23% inflation) from a handful of missed-peak gaps.
+    2. The first fix gated the mean-of-all-gaps result against the
+       candidate (SPACING_REFINEMENT_MAX_LOG_DEVIATION), which stopped
+       the catastrophic overwrite but kept the fragile estimator: any
+       single missed/spurious position still tilted the mean, and WHICH
+       boundary positions get detected depends on the crop's phase. The
+       metamorphic mirror invariant caught the consequence: mirroring the
+       real jersey fixture selected the SAME 35.0px candidate yet refined
+       to 37.2 one way and 34.4 the other (+/-2.3px, opposite
+       directions), because the two runs detected slightly different
+       boundary positions and mean-of-all-gaps has no defense.
+
+    Current estimator -- per-step-normalized gaps: each consecutive gap g
+    is assigned k = round(g / period) whole periods; a gap only counts if
+    k >= 1 AND its per-step value g/k is within the SAME log tolerance of
+    the candidate that the old design applied once at the end
+    (|ln((g/k)/period)| <= SPACING_REFINEMENT_MAX_LOG_DEVIATION). The
+    refined spacing is sum(g)/sum(k) over accepted gaps. Properties, all
+    verified against the real fixture's actual detected positions before
+    this landed:
+      - a missed peak's ~2x gap now CONTRIBUTES correctly (k=2) instead
+        of poisoning the mean;
+      - a spurious insertion's two ~0.5x gaps are rejected (ln 0.5 is far
+        outside the band), as are ambiguous ~1.5x gaps under either
+        rounding (ln 0.75 and ln 1.5 both fall outside);
+      - the gap multiset is reversal-invariant, so identical detections
+        mirror to identical spacing exactly, and the one-position
+        boundary differences that remain moved the real-fixture mirror
+        disagreement from 8.2% to 0.6%;
+      - because every accepted per-step value lies within the log band
+        around the candidate, their weighted mean does too -- the
+        refinement structurally cannot wander off the evidence-selected
+        candidate (the final gate below is kept as belt-and-braces).
+
     Returns (spacing_px, spacing_consistency) -- consistency is 0.0
     whenever no refinement was attempted or accepted.
     """
@@ -1169,10 +1377,18 @@ def _refine_spacing_from_positions(positions: List[float], period: float) -> Tup
     diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
     if len(diffs) == 0:
         return period, 0.0
-    refined = float(np.mean(diffs))
+    steps = np.round(diffs / period)
+    per_step = diffs / np.maximum(steps, 1.0)
+    accepted = (steps >= 1) & (
+        np.abs(np.log(per_step / period)) <= SPACING_REFINEMENT_MAX_LOG_DEVIATION
+    )
+    if not np.any(accepted):
+        return period, 0.0
+    refined = float(np.sum(diffs[accepted]) / np.sum(steps[accepted]))
     if refined <= 0 or abs(math.log(refined / period)) > SPACING_REFINEMENT_MAX_LOG_DEVIATION:
         return period, 0.0
-    cv = float(np.std(diffs) / np.mean(diffs)) if np.mean(diffs) > 0 else 1.0
+    kept = per_step[accepted]
+    cv = float(np.std(kept) / np.mean(kept)) if np.mean(kept) > 0 else 1.0
     spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
     return refined, spacing_consistency
 
@@ -1222,7 +1438,7 @@ def _finalize_axis(
         positions = _cluster_positions(loop_centers[:, center_axis_index], period)
         position_source = "loop-center clustering"
     else:
-        positions = _detect_peaks(signal, period)
+        positions = _detect_peaks(_canonical_sign_signal(signal), period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
     spacing_px, spacing_consistency = _refine_spacing_from_positions(positions, period)
@@ -1977,7 +2193,7 @@ def _finalize_axis_v3(
         positions = _cluster_positions(loop_centers[:, center_axis_index], period)
         position_source = "loop-center clustering"
     else:
-        positions = _detect_peaks(signal, period)
+        positions = _detect_peaks(_canonical_sign_signal(signal), period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
     spacing_px, _ = _refine_spacing_from_positions(positions, period)
