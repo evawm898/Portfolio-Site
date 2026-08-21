@@ -17,7 +17,7 @@ WHY THE OLD compound.py MODEL WAS WRONG
 
 THIS MODEL
   Base depth b_base(v): the single ORIGINAL traced/fillet profile
-  (dress_params(compound=False)'s depth_curve), used identically all the
+  (dress_params(bust="plain")'s depth_curve), used identically all the
   way around the ring — front and back are the SAME surface by default.
   No more front/back split, no more v=45 join corner: those existed only
   to express "the front is generically deeper," which a real apex field
@@ -61,10 +61,12 @@ REFERENCE AZIMUTH
   below: the ACTUAL equal-arc azimuth of each apex, after the true
   equal-arc solve, compared to the authored target.
 
-PROTOTYPE STATUS
-  Nothing here is wired into dress_params(). Building an ApexShellModel
-  is explicit (via apex_params()), exactly like compound.py's earlier
-  prototype stage — the committed shell is unaffected until accepted.
+STATUS: APPROVED AND WIRED IN
+  dress_params() defaults to bust="apex", dispatching ShellModel(...) to
+  ApexShellModel automatically (see shell.py's ShellModel.__new__ and
+  the _APEX_DEPTH build cache). apex_params() below remains as a
+  standalone convenience builder but is no longer the only path to this
+  geometry — most callers should just use dress_params().
 """
 
 import math
@@ -98,7 +100,7 @@ class ApexBustDepth:
     def __init__(self, base_params=None, apex_v=181.0, apex_theta_deg=35.0,
                 amplitude_mm=None, radius_mm=70.0, n_v=1201, n_t=481):
         self.base_params = (base_params if base_params is not None
-                           else dress_params(compound=False))
+                           else dress_params(bust="plain"))
         if isinstance(self.base_params.depth_curve, ApexBustDepth):
             raise ApexError("base_params already carries an ApexBustDepth "
                             "(double-wrap) — pass a single-ellipse base")
@@ -237,8 +239,18 @@ class ApexBustDepth:
         (the TRUE equal-arc solve on the final bumped curve). Preserves
         the broadcast input shape — RegularGridInterpolator always
         returns a flat 1-D array, which numpy 2.x refuses to float()
-        unless it's truly 0-d, so scalar-in must mean scalar(0-d)-out."""
-        theta_deg = np.asarray(theta_deg, dtype=float)
+        unless it's truly 0-d, so scalar-in must mean scalar(0-d)-out.
+
+        theta_deg is WRAPPED to (-180, 180] first: build_meshes() passes
+        the BACK piece's grid as CONTINUOUS unwrapped theta (up to
+        2pi - split, i.e. past 180 deg) to avoid a seam artifact, and the
+        inverse table only covers [0, 180] — feeding it un-wrapped values
+        silently extrapolated past the table edge (verified: a vertex at
+        the nominal 245 deg landed 2.96mm above its own neckline cap
+        because it was placed as if at ~262 deg instead of the true
+        -114.76 deg). sin/cos are periodic, so the wrapped angle gives
+        the identical (x, y) — this loses nothing."""
+        theta_deg = _wrap180(np.asarray(theta_deg, dtype=float))
         v = np.asarray(v, dtype=float)
         out_shape = np.broadcast(theta_deg, v).shape
         sign = np.sign(theta_deg)
@@ -308,7 +320,7 @@ def verify_apex_placement(depth):
 class ApexShellModel(ShellModel):
     """ShellModel with the two-apex bump field. Section geometry only —
     equal-arc theta convention, the fillet, the neckline and the split
-    are inherited from the base (compound=False) params, unaffected."""
+    are inherited from the base (bust="plain") params, unaffected."""
 
     def __init__(self, params: ShellParams):
         if not isinstance(params.depth_curve, ApexBustDepth):
@@ -383,10 +395,10 @@ class ApexShellModel(ShellModel):
 def apex_params(apex_v=181.0, apex_theta_deg=35.0, amplitude_mm=None,
                 radius_mm=70.0, base_params=None):
     """ShellParams for the apex-based design: a single-ellipse committed
-    dress (dress_params(compound=False) by default) with its depth object
+    dress (dress_params(bust="plain") by default) with its depth object
     replaced by the two-apex bumped field."""
     from dataclasses import replace
-    base = base_params if base_params is not None else dress_params(compound=False)
+    base = base_params if base_params is not None else dress_params(bust="plain")
     d = ApexBustDepth(base_params=base, apex_v=apex_v,
                       apex_theta_deg=apex_theta_deg,
                       amplitude_mm=amplitude_mm, radius_mm=radius_mm)

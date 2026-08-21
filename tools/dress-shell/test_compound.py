@@ -1,5 +1,7 @@
-"""Tests for the compound-section bust cup, wired in as the committed
-design (bust_point_radius = 30 mm, join_radius = 0 mm — approved).
+"""Tests for the compound-section bust cup — SUPERSEDED by the apex-based
+design (see test_apex.py) but kept buildable via bust="compound" for
+regression/comparison, exercised here explicitly rather than through the
+(no longer default) dress_params().
 
 Run:  cd tools/dress-shell && python3 -m unittest test_compound -v
 """
@@ -22,16 +24,21 @@ from shell import ShellModel, dress_params
 HERE = Path(__file__).resolve().parent
 
 
-class TestWiredInDispatch(unittest.TestCase):
-    """dress_params() defaults to compound; ShellModel(...) must dispatch
-    to CompoundShellModel with no call-site changes anywhere else."""
+class TestExplicitDispatch(unittest.TestCase):
+    """dress_params(bust="compound") must dispatch ShellModel(...) to
+    CompoundShellModel with no other call-site changes; dress_params()
+    bare no longer builds compound (apex is the default now)."""
 
-    def test_dress_params_is_compound_by_default(self):
+    def test_dress_params_default_is_no_longer_compound(self):
         m = ShellModel(dress_params())
+        self.assertNotIsInstance(m, CompoundShellModel)
+
+    def test_explicit_compound_dispatches(self):
+        m = ShellModel(dress_params(bust="compound"))
         self.assertIsInstance(m, CompoundShellModel)
 
-    def test_compound_false_is_the_plain_single_ellipse_model(self):
-        m = ShellModel(dress_params(compound=False))
+    def test_plain_is_the_single_ellipse_model(self):
+        m = ShellModel(dress_params(bust="plain"))
         self.assertIs(type(m), ShellModel)   # exactly ShellModel, no dispatch
 
     def test_plain_shellparams_never_dispatches(self):
@@ -42,11 +49,11 @@ class TestWiredInDispatch(unittest.TestCase):
     def test_subclass_construction_is_not_re_dispatched(self):
         # CompoundShellModel(params) must not recurse back through the
         # dispatch check (cls is ShellModel is False for the subclass)
-        m = CompoundShellModel(dress_params())
+        m = CompoundShellModel(dress_params(bust="compound"))
         self.assertIs(type(m), CompoundShellModel)
 
-    def test_decided_values_are_the_default(self):
-        m = ShellModel(dress_params())
+    def test_decided_values_still_reachable(self):
+        m = ShellModel(dress_params(bust="compound"))
         self.assertAlmostEqual(m.cd.bust_point_radius, 30.0)
         self.assertAlmostEqual(m.cd.join_radius, 0.0)
         self.assertAlmostEqual(m.cd.bust_point_v, 181.0)
@@ -54,13 +61,13 @@ class TestWiredInDispatch(unittest.TestCase):
 
 class TestFrozenSchedule(unittest.TestCase):
     """The whole point of the compound construction: circumferences,
-    armhole angle, and the waist fillet are UNCHANGED by wiring in the
-    bust cup — only the front/back depth distribution moves."""
+    armhole angle, and the waist fillet are UNCHANGED by the bust cup —
+    only the front/back depth distribution moves."""
 
     @classmethod
     def setUpClass(cls):
-        cls.old = ShellModel(dress_params(compound=False))
-        cls.new = ShellModel(dress_params())
+        cls.old = ShellModel(dress_params(bust="plain"))
+        cls.new = ShellModel(dress_params(bust="compound"))
 
     def test_perimeter_schedule_frozen(self):
         for v in (-381.0, 0.0, 100.0, 152.4, 181.0, 203.2, 220.0, 240.0):
@@ -100,7 +107,7 @@ class TestFrozenSchedule(unittest.TestCase):
 
 class TestOccludingContourAndOrientation(unittest.TestCase):
     def setUp(self):
-        self.m = ShellModel(dress_params())
+        self.m = ShellModel(dress_params(bust="compound"))
         self.c = ShellCoords(self.m)
 
     def test_contour_still_exactly_0_180(self):
@@ -139,7 +146,7 @@ class TestOccludingContourAndOrientation(unittest.TestCase):
 
 class TestBustPointCorner(unittest.TestCase):
     def test_blended_corner_reaches_requested_radius(self):
-        d = CompoundDepth(base=dress_params(compound=False).depth_curve,
+        d = CompoundDepth(base=dress_params(bust="plain").depth_curve,
                           bust_point_radius=30.0)
         fp = d.front
         mr = fp._corner_min_radius(fp.bust_point_v, fp.blend_halfwidth,
@@ -149,18 +156,18 @@ class TestBustPointCorner(unittest.TestCase):
         self.assertEqual(fp.corner_angle_deg(), 0.0)   # blended away
 
     def test_sharp_at_zero_radius(self):
-        d = CompoundDepth(base=dress_params(compound=False).depth_curve,
+        d = CompoundDepth(base=dress_params(bust="plain").depth_curve,
                           bust_point_radius=0.0)
         self.assertEqual(d.front.blend_halfwidth, 0.0)
         self.assertGreater(d.front.corner_angle_deg(), 30.0)
 
     def test_join_defaults_sharp(self):
-        d = CompoundDepth(base=dress_params(compound=False).depth_curve)
+        d = CompoundDepth(base=dress_params(bust="plain").depth_curve)
         self.assertEqual(d.join_radius, 0.0)
         self.assertGreater(d.front.join_angle_deg(), 5.0)
 
     def test_bad_radius_rejected(self):
-        base = dress_params(compound=False).depth_curve
+        base = dress_params(bust="plain").depth_curve
         with self.assertRaises(CompoundError):
             CompoundDepth(base=base, bust_point_radius=-1.0)
         with self.assertRaises(CompoundError):
@@ -169,24 +176,23 @@ class TestBustPointCorner(unittest.TestCase):
 
 class TestCompoundParamsGuards(unittest.TestCase):
     def test_double_wrap_rejected(self):
-        # dress_params()'s default already carries a CompoundDepth;
-        # compound_params() must refuse to wrap it again
+        # a compound-flavored dress_params() already carries a
+        # CompoundDepth; compound_params() must refuse to wrap it again
         with self.assertRaises(CompoundError):
-            compound_params(base_params=dress_params())
+            compound_params(base_params=dress_params(bust="compound"))
 
     def test_explicit_single_ellipse_base_ok(self):
-        p = compound_params(base_params=dress_params(compound=False))
+        p = compound_params(base_params=dress_params(bust="plain"))
         self.assertIsInstance(p.depth_curve, CompoundDepth)
 
 
 class TestLayoutStillLoads(unittest.TestCase):
-    """The committed layout.yaml must remain structurally legal on the
-    wired-in compound shell (seating quality is a separate, informational
-    concern reported by curvature.py — see the standoff regression on
-    bod-a30/bod-a55 the editor now flags)."""
+    """layout.yaml must remain structurally legal on the (superseded but
+    still buildable) compound shell — regression coverage, not a claim
+    about the committed geometry."""
 
     def test_layout_resolves_with_no_errors(self):
-        model = ShellModel(dress_params())
+        model = ShellModel(dress_params(bust="compound"))
         coords = ShellCoords(model)
         chart = SurfaceChart(model, coords)
         classes = load_panel_classes(HERE / "panels.yaml")

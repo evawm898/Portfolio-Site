@@ -11,21 +11,27 @@ Writes to exports/:
   front-piece-boundary.csv   3D closed loop of the FRONT piece edge with
                              per-segment arc lengths
 
-The side-view occluding contour IS theta = 0/180 here: every section is an
-axis-centered COMPOUND section (two half-ellipses sharing a(v): front
-depth b_front(v), back depth b_back(v)), so the surface normal's side
-component still vanishes exactly on those meridians (each half is itself
-symmetric in x) — verified numerically (residual < 3e-6 from the
-equal-arc Newton solve, i.e. solver noise, not geometry).
+The side-view occluding contour IS theta = 0/180 here: for the committed
+APEX-based bust curvature, the whole surface is mirror-symmetric under
+theta -> -theta (the bump field is the SUM of a symmetric +-apex_theta_deg
+pair), so the normal's side component still vanishes exactly on those
+meridians — verified numerically (residual < 1e-4, see test_apex.py).
 
-UNLIKE THE PRE-COMPOUND SHELL, front and back profiles are NOT mirror
-images above v = 45 (the committed design's sculptural bust cup): below
-v = 45 they are identical (b_front == b_back == the traced shape,
-unchanged); above it b_front follows the new authored control points
-(a corner at v = 45 itself, blended R = 30 at the v = 181 bust point) and
-b_back keeps the original single-ellipse depth exactly. Both CSVs and the
-SVG report the correct side-specific depth (see _depth_fn below), rather
-than assuming symmetry the way this module did before compound sections.
+THE COMMITTED DESIGN'S TWO BUST APEXES ARE OFF-MERIDIAN, NOT ON CF/CB.
+Unlike the earlier (superseded) compound design — which deepened the
+entire front half uniformly, so CF showed the bust cup directly — the
+apex bumps are centered at theta = +-35 deg, 70 mm falloff radius. At
+theta = 0 (CF) that's ~78.6 mm of lateral distance alone, already outside
+the 70 mm radius, so CF and CB below are numerically IDENTICAL to the
+pre-bust baseline profile (residual ~1e-6 mm, see the validation section
+of the console output) — the apexes simply don't touch these two
+meridians. This is expected, not a bug: see bust_apex.py's module
+docstring and test_apex.py::test_cf_and_cb_unaffected_far_from_the_apex.
+These exports do NOT show the bust curvature; they show the shell exactly
+where the apexes don't reach. _depth_fn below still supports front/back
+divergence generically (compound-style depth objects, if ever selected
+via dress_params(bust="compound")), it's simply a no-op for the apex
+default.
 """
 
 import csv
@@ -58,22 +64,31 @@ def _base_profiles(d):
 
 
 def _depth_fn(d, side):
-    """b(v) for the requested side. Below v = 45 front and back are
-    identical by construction; above it a compound depth diverges. Falls
-    back to the single symmetric .b for a non-compound depth object."""
+    """UNSIGNED depth-from-axis b(v) for the requested side (theta = 0
+    front / theta = 180 back). Compound depths expose b_front/b_back
+    directly. Apex depths only expose the signed theta-dependent
+    depth_at(theta_deg, v) (positive toward CF, negative toward CB), so
+    the back side is recovered as its absolute value. Falls back to the
+    single symmetric .b for a plain (no bust feature) depth object."""
     if side == "front" and hasattr(d, "b_front"):
         return d.b_front
     if side == "back" and hasattr(d, "b_back"):
         return d.b_back
+    if hasattr(d, "depth_at"):
+        theta = 0.0 if side == "front" else 180.0
+        return lambda v: np.abs(np.asarray(d.depth_at(theta, v)))
     return d.b
 
 
 def landmarks(model, side):
     """(height, label) landmark list from the committed model, for the
     given side ('front' or 'back'). The waist fillet lives on the shared
-    (compound-unaffected) base depth, so its tangent lines and minimum
-    are identical for both sides; the bust point is FRONT-ONLY (the back
-    profile has no such feature — the design leaves it untouched)."""
+    base depth, so its tangent lines and minimum are identical for both
+    sides. A compound-style bust point (front-only, if that design is
+    selected) is added below; the committed apex design has no analogous
+    landmark HERE because both apexes sit off the CF/CB meridian entirely
+    (see the module docstring) — they simply never appear on this
+    profile, at any height."""
     d = model.params.depth_curve
     base = _base_profiles(d)
     z1, z2 = getattr(d, "fillet_zone", (base.b_fillet.z1, base.b_fillet.z2))
@@ -295,7 +310,8 @@ def main():
     model = ShellModel(dress_params())
     d = model.params.depth_curve
     base = _base_profiles(d)
-    is_compound = base is not d
+    is_compound = hasattr(d, "bust_point_v")
+    is_apex = hasattr(d, "apex_v")
     front_marks = landmarks(model, "front")
     back_marks = landmarks(model, "back")
 
@@ -322,6 +338,27 @@ def main():
         print(f"  COMPOUND SECTIONS: front and back are NOT mirror images "
               f"above v = 45 — front follows the new bust-cup control "
               f"points, back is the unchanged single-ellipse depth.")
+    if is_apex:
+        check = None
+        try:
+            from bust_apex import verify_apex_placement
+            check = verify_apex_placement(d)
+        except Exception:
+            pass
+        print(f"  APEX BUST CURVATURE: two apexes at theta = "
+              f"+-{d.apex_theta_deg:g} deg, v = {d.apex_v:g}, radius "
+              f"{d.radius_mm:g} mm — BOTH are off the CF/CB meridian "
+              f"(>= 78 mm lateral distance from CF alone, outside the "
+              f"radius), so this export's front/back profiles are "
+              f"numerically identical to the pre-apex baseline (see "
+              f"VALIDATION below). The bust curvature itself is NOT "
+              f"visible in these two CSVs/the SVG by construction.")
+        if check is not None:
+            print(f"  apex achieved depth {float(np.asarray(d.depth_at(d.apex_theta_deg, d.apex_v))):.2f} mm "
+                  f"at true equal-arc theta {check['true_equal_arc_deg']:.2f} deg "
+                  f"(authored {check['authored_deg']:.1f} deg, residual "
+                  f"{check['residual_deg']:+.2f} deg) — full apex geometry "
+                  f"is recorded in dress-analysis.json's meta.apex_sections")
     print(f"  total height          {381.0 + 240.0:.1f} mm "
           f"(hem -381 to neckline peak +240; CF meridian ends at +220, "
           f"CB at +145)")
@@ -404,6 +441,14 @@ def main():
             actual = float(np.asarray(fx(v)))
             print(f"  {label}: authored {target:.3f} mm, actual "
                   f"{actual:.3f} mm, residual {actual - target:+.3f} mm")
+    if is_apex:
+        print(f"\nVALIDATION (CF/CB vs the pre-apex baseline — expected "
+              f"identical, both apexes are off-meridian)")
+        vv = np.linspace(base.v_lo, base.v_hi, 4001)
+        res_f = np.asarray(fx(vv)) - np.abs(np.asarray(base.b(vv)))
+        res_b = np.asarray(bx(vv)) - np.abs(np.asarray(base.b(vv)))
+        print(f"  CF vs baseline: max |res| {float(np.max(np.abs(res_f))):.2e} mm")
+        print(f"  CB vs baseline: max |res| {float(np.max(np.abs(res_b))):.2e} mm")
     dB = base._B.derivative()
     for zt, name in ((z1, "skirt-side tangent"), (z2, "bodice-side tangent")):
         eps = 0.05

@@ -195,9 +195,14 @@ def dress_depth(fillet_params=None, v_top=240.0):
     return _DRESS_DEPTH[key]
 
 
-def dress_params(fillet_params=None, bodice=None, compound=True,
+_APEX_DEPTH = {}
+
+
+def dress_params(fillet_params=None, bodice=None, bust="apex",
                  bust_point_v=181.0, bust_point_radius=30.0,
-                 join_radius=0.0, front_bow=0.1) -> ShellParams:
+                 join_radius=0.0, front_bow=0.1,
+                 apex_v=181.0, apex_theta_deg=35.0, apex_amplitude_mm=None,
+                 apex_radius_mm=70.0) -> ShellParams:
     """The committed DRESS design: filleted waist (R = 25 conic), traced
     bodice depth with monotone bust crest, width solved from the given
     circumferences (ratios = outputs), neckline v3 (CF 220 / peak 240 @
@@ -207,32 +212,54 @@ def dress_params(fillet_params=None, bodice=None, compound=True,
     exist for the editor's live rebuild; the armhole split re-solves
     whenever the fillet moves P(190).
 
-    COMPOUND SECTIONS (approved, wired in as the default): the front
-    half of each section gets its own depth b_front(v) — a sculptural
-    bust cup authored via (v, depth) control points at v=45/bust_point_v
-    /220, joining the back half's UNCHANGED depth at v=45 — while the
-    circumference schedule P(v) stays exactly the frozen fillet schedule
-    above (a(v) is re-solved so the compound perimeter matches it). The
-    corners at bust_point_v and v=45 are independently blendable via
-    bust_point_radius / join_radius (0 = sharp; see compound.py). Pass
-    compound=False for the pre-compound single-ellipse sections (kept
-    for comparison / regression reporting)."""
+    BUST CURVATURE — bust="apex" (approved, wired in as the default):
+    two apex points (+-apex_theta_deg, apex_v) each add a radial,
+    compact-support raised-cosine bump (amplitude/radius) to the shared
+    base depth (front == back everywhere the bumps don't reach) — see
+    bust_apex.py. Circumference schedule P(v) stays exactly the frozen
+    fillet schedule above; a(v) is re-solved numerically so the bumped
+    ring's true perimeter still matches it.
+
+    bust="compound" builds the SUPERSEDED front/back half-ellipse split
+    (a uniform bump across the whole front half in v-bands — see
+    compound.py; kept only for comparison, apex replaced it because that
+    scheme applied curvature far past where a real bust reaches).
+    bust="plain" gives the pre-bust single-ellipse sections."""
     bp = bodice if bodice is not None else NecklineV3Params()
     v_top = max(240.0, float(getattr(bp, "peak_height", 0.0) or 0.0),
                 float(getattr(bp, "cf_height", 0.0) or 0.0))
     d = dress_depth(fillet_params, v_top=v_top)
     # armhole from the across-back tape on the filleted schedule:
-    # theta = 180 - 180 * arc / P(190). The compound wrap below FREEZES
-    # this exact schedule, so the split computed here is unaffected by
-    # whether compound sections are applied.
+    # theta = 180 - 180 * arc / P(190). Both bust wraps below FREEZE this
+    # exact schedule, so the split computed here is unaffected by them.
     P190 = float(np.asarray(d.perimeter(190.0)))
     split = 180.0 - 180.0 * 360.0 / P190
-    if compound:
+    plain = ShellParams(bodice=bp, depth_curve=d, split_theta=split)
+    if bust == "apex":
+        # ApexBustDepth's numeric perimeter solve costs ~seconds; cache
+        # per (base depth identity, apex knobs) — the base is itself a
+        # long-lived cached singleton (dress_depth()'s own cache), so
+        # id(d) is a stable key for the process lifetime.
+        key = (id(d), float(apex_v), float(apex_theta_deg),
+              None if apex_amplitude_mm is None else float(apex_amplitude_mm),
+              float(apex_radius_mm))
+        if key not in _APEX_DEPTH:
+            from bust_apex import ApexBustDepth
+            _APEX_DEPTH[key] = ApexBustDepth(
+                base_params=plain, apex_v=apex_v, apex_theta_deg=apex_theta_deg,
+                amplitude_mm=apex_amplitude_mm, radius_mm=apex_radius_mm)
+        return ShellParams(bodice=bp, depth_curve=_APEX_DEPTH[key],
+                           split_theta=split)
+    if bust == "compound":
         from compound import CompoundDepth
-        d = CompoundDepth(base=d, bust_point_v=bust_point_v,
-                          bust_point_radius=bust_point_radius,
-                          join_radius=join_radius, front_bow=front_bow)
-    return ShellParams(bodice=bp, depth_curve=d, split_theta=split)
+        d2 = CompoundDepth(base=d, bust_point_v=bust_point_v,
+                           bust_point_radius=bust_point_radius,
+                           join_radius=join_radius, front_bow=front_bow)
+        return ShellParams(bodice=bp, depth_curve=d2, split_theta=split)
+    if bust != "plain":
+        raise ShellError(f"bust must be 'apex', 'compound', or 'plain', "
+                         f"got {bust!r}")
+    return plain
 
 
 class ShellModel:
@@ -244,15 +271,20 @@ class ShellModel:
     is_swept_ellipse = True   # curvature.py: use numeric fundamental forms
 
     def __new__(cls, params: ShellParams = None, *args, **kwargs):
-        # Dispatch to CompoundShellModel when the depth curve is a
-        # CompoundDepth (dress_params()'s default) — every ShellModel(...)
-        # call site in the codebase gets compound sections automatically,
-        # with no need to know which concrete class it is. Lazy import:
-        # compound.py imports ShellModel/ShellParams from this module, so
-        # importing it at module scope here would be circular.
+        # Dispatch to ApexShellModel/CompoundShellModel when the depth
+        # curve is an ApexBustDepth/CompoundDepth (ApexBustDepth is
+        # dress_params()'s default) — every ShellModel(...) call site in
+        # the codebase gets the right bust geometry automatically, with
+        # no need to know which concrete class it is. Lazy imports:
+        # bust_apex.py/compound.py import ShellModel/ShellParams from
+        # this module, so importing them at module scope here would be
+        # circular.
         if cls is ShellModel and params is not None:
             depth = getattr(params, "depth_curve", None)
             if depth is not None:
+                from bust_apex import ApexBustDepth, ApexShellModel
+                if isinstance(depth, ApexBustDepth):
+                    return object.__new__(ApexShellModel)
                 from compound import CompoundDepth, CompoundShellModel
                 if isinstance(depth, CompoundDepth):
                     return object.__new__(CompoundShellModel)

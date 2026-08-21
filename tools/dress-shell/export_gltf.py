@@ -353,6 +353,27 @@ def _compound_meta(depth):
     }
 
 
+def _apex_meta(depth):
+    """None for a non-apex depth object; otherwise the knobs and achieved
+    geometry of the two-apex bust curvature — traceability for what the
+    committed shell actually built."""
+    if not hasattr(depth, "apex_v"):
+        return None
+    from bust_apex import verify_apex_placement
+    check = verify_apex_placement(depth)
+    return {
+        "apex_v": depth.apex_v,
+        "apex_theta_deg": depth.apex_theta_deg,
+        "apex_true_equal_arc_theta_deg": round(check["true_equal_arc_deg"], 4),
+        "amplitude_mm": round(depth.amplitude_mm, 4),
+        "radius_mm": depth.radius_mm,
+        "r_ref_mm": round(depth.r_ref, 4),
+        "apex_depth_mm": round(float(depth.depth_at(depth.apex_theta_deg,
+                                                    depth.apex_v)), 4),
+        "perimeter_residual_mm": depth.perimeter_residual_mm,
+    }
+
+
 def build_sidecar(ex):
     grid, analyses, rep = ex["grid"], ex["analyses"], ex["layering"]
     chart = ex["chart"]
@@ -375,6 +396,7 @@ def build_sidecar(ex):
                 "split_theta": r(getattr(ex["model"], "split_theta", 90.0), 4),
             },
             "compound_sections": _compound_meta(ex["model"].params.depth_curve),
+            "apex_sections": _apex_meta(ex["model"].params.depth_curve),
             "waist_band_s": {"lo": r(chart.band_s_lo, 3),
                              "hi": r(chart.band_s_hi, 3),
                              "derived_from_fillet": chart.band_derived},

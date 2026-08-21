@@ -4,10 +4,13 @@ falloff, replacing the compound model's uniform front-half bump.
 
     cd tools/dress-shell && python3 apex_gate.py
 
-Nothing here modifies the committed shell: it builds the apex model as a
-prototype and reports every number needed to accept or reject it,
-including the specific check requested — do bod-a30/bod-a55 fall back
-within the 2mm standoff tolerance on their own, with no repositioning.
+APPROVED AND WIRED IN: dress_params() now defaults to bust="apex" —
+ShellModel(dress_params()) IS the apex-based design. This script still
+reports every number from the original gate, now against that committed
+geometry (`new`) vs the pre-bust single-ellipse baseline (`old`) and the
+superseded compound design (`compound`, built explicitly via
+bust="compound" since it's no longer the default), so the full history
+of deltas stays documented and reproducible.
 """
 
 import math
@@ -18,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
 
-from bust_apex import ApexBustDepth, ApexShellModel, apex_params, verify_apex_placement
+from bust_apex import ApexBustDepth, ApexShellModel, verify_apex_placement
 from coords import ShellCoords
 from curvature import STANDOFF_TOLERANCE_MM as TOL, analyze_cells, class_distribution, seat_standoff
 from grid import GridSpec, ShellGrid
@@ -33,14 +36,14 @@ def main():
     classes = load_panel_classes(HERE / "panels.yaml")
     p213 = classes["p213"]
 
-    old = ShellModel(dress_params(compound=False))   # pre-compound baseline
+    old = ShellModel(dress_params(bust="plain"))      # pre-bust baseline
     old_c = ShellCoords(old)
-    compound = ShellModel(dress_params())            # the currently-committed compound design
+    compound = ShellModel(dress_params(bust="compound"))  # superseded design
     compound_c = ShellCoords(compound)
 
-    params = apex_params()
+    params = dress_params()                            # WIRED IN default (apex)
     d = params.depth_curve
-    new = ApexShellModel(params)
+    new = ShellModel(params)
     new_c = ShellCoords(new)
     new_ch = SurfaceChart(new, new_c)
 
@@ -191,8 +194,9 @@ def main():
           "off-axis points and is exactly zero beyond a 70mm radius, "
           "instead of being applied uniformly across the whole front half "
           "in v-bands")
-    print("    NOT wired into dress_params() — compound.py/compound_gate.py "
-          "remain the committed design pending your decision.")
+    print("    WIRED IN as dress_params()'s default (bust=\"apex\"); "
+          "compound.py/compound_gate.py are retained for comparison only "
+          "(bust=\"compound\"), no longer the committed design.")
 
 
 if __name__ == "__main__":

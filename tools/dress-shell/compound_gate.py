@@ -3,13 +3,14 @@
 
     cd tools/dress-shell && python3 compound_gate.py
 
-APPROVED AND WIRED IN: bust_point_radius = 30 mm, join_radius = 0 (kept
-sharp — see [7b], no value closes that keep-out) are now dress_params()'s
-defaults; ShellModel(dress_params()) IS the compound design. This script
-still reports every number from the original brief, now against that
-committed geometry (`new`) vs the retained pre-compound single-ellipse
-design (`old = ShellModel(dress_params(compound=False))`), so the delta
-stays documented and reproducible after the fact.
+SUPERSEDED: this design was wired in (bust_point_radius=30, join_radius=0)
+and then REPLACED by the apex-based bust curvature (see bust_apex.py /
+apex_gate.py) — the uniform-across-the-front-half bump this script
+documents let curvature reach panels far from any real bust apex
+(bod-a30/bod-a55 at v=49.83 broke their standoff tolerance under it).
+dress_params() no longer defaults here; this script now builds the
+compound design EXPLICITLY (`bust="compound"`) purely so its numbers
+stay reproducible for comparison, and is not the committed geometry.
 """
 
 import math
@@ -145,7 +146,7 @@ def main():
     classes = load_panel_classes(HERE / "panels.yaml")
     p213 = classes["p213"]
 
-    old = ShellModel(dress_params(compound=False))  # pre-compound, single-ellipse
+    old = ShellModel(dress_params(bust="plain"))  # pre-compound, single-ellipse
     old_c = ShellCoords(old)
     old_ch = SurfaceChart(old, old_c)
 
@@ -154,7 +155,7 @@ def main():
     # left at the default). This IS dress_params() now — ShellModel(...)
     # dispatches to CompoundShellModel automatically.
     BUST_R = 30.0
-    new = ShellModel(dress_params(bust_point_radius=BUST_R))
+    new = ShellModel(dress_params(bust="compound", bust_point_radius=BUST_R))
     cd = new.cd
     new_c = ShellCoords(new)
     new_ch = SurfaceChart(new, new_c)
@@ -267,7 +268,7 @@ def main():
     print("    R_mm  blend_halfwidth  min_merid_R   keep-out band (v)      "
           "width   arc   p213 upright  p213 rotated")
     for R in (0.0, 15.0, BUST_R, 50.0):
-        m = ShellModel(dress_params(bust_point_radius=R))
+        m = ShellModel(dress_params(bust="compound", bust_point_radius=R))
         c = ShellCoords(m)
         ch = SurfaceChart(m, c)
         s_bp = float(c.s_of_z(m.cd.bust_point_v))
@@ -300,7 +301,7 @@ def main():
     print("    How large a radius WOULD let the upright panel cross?")
     for R in (80.0, 120.0, 200.0, 320.0):
         try:
-            m = ShellModel(dress_params(bust_point_radius=R))
+            m = ShellModel(dress_params(bust="compound", bust_point_radius=R))
         except Exception as exc:
             print(f"      R = {R:5.0f}: NOT CONSTRUCTIBLE — {exc}")
             break
@@ -322,7 +323,7 @@ def main():
           "chosen)")
     print("    R_mm  blend_halfwidth  standoff_upright  standoff_rotated")
     for R in (0.0, 5.0, 10.0, 20.0, 30.0):
-        m = ShellModel(dress_params(bust_point_radius=BUST_R,
+        m = ShellModel(dress_params(bust="compound", bust_point_radius=BUST_R,
                                     join_radius=R))
         c = ShellCoords(m)
         ch = _NoNecklineChart(SurfaceChart(m, c))
@@ -334,7 +335,7 @@ def main():
         w = m.cd.front.low_blend_halfwidth
         print(f"    {R:4.0f}  {w:15.2f}  {so_up:16.3f}  {so_rot:16.3f}")
     max_r = 57.0
-    m_max = ShellModel(dress_params(bust_point_radius=BUST_R,
+    m_max = ShellModel(dress_params(bust="compound", bust_point_radius=BUST_R,
                                     join_radius=max_r))
     c_max = ShellCoords(m_max)
     ch_max = _NoNecklineChart(SurfaceChart(m_max, c_max))
