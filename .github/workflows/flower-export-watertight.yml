@@ -1,0 +1,60 @@
+# Print-safety gate: every flower design must export as a watertight STL (zero
+# boundary edges) — see CLAUDE.md and the flower-project skill. tools/verify-flower-export.mjs
+# does the actual check (headless Chromium, real Export STL click, real STL parse).
+#
+# TWO-TIER: the full config matrix (142 configs as of writing) takes ~9.5 minutes on a
+# 4-core box and is expected to be slower on a shared CI runner, so it does not run on
+# every PR. Instead:
+#   - pull_request / push: --smoke — a subset picked for what's most likely to break
+#     (the historical pc x Growth crash, continuous-margin-on, the fragile cleft/Lobed
+#     area, and all 7 shipped presets since a preset break is user-facing), not a tidy
+#     sample. See isSmoke() in the script for the exact list and why.
+#   - workflow_dispatch / schedule: the full matrix.
+# Path-scoped generously (every geometry source AND tools/**) so a change to a dev tool
+# or a preset can't silently skip this the way the stale 'lace' config once could have.
+name: flower-export-watertight
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-presets.js
+      - flower-registry.js
+      - flower.html
+      - 'tools/**'
+      - .github/workflows/flower-export-watertight.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-presets.js
+      - flower-registry.js
+      - flower.html
+      - 'tools/**'
+  schedule:
+    - cron: '0 7 * * 0'   # weekly, Sunday 07:00 UTC — full matrix, catches drift between touches
+  workflow_dispatch: {}    # run the full matrix on demand, no PR needed
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Export STL watertightness (smoke subset on PR/push, full matrix on dispatch/schedule)
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            node tools/verify-flower-export.mjs
+          else
+            node tools/verify-flower-export.mjs --smoke
+          fi

@@ -25,6 +25,7 @@ import { chromium } from 'playwright-core';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { findChromium } from './chromium-harness.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,13 +35,6 @@ const CHECK = process.argv.includes('--check');
 const THUMB_PX = 400;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
-function findChromium() {
-  if (process.env.CHROMIUM_EXECUTABLE && fs.existsSync(process.env.CHROMIUM_EXECUTABLE)) return process.env.CHROMIUM_EXECUTABLE;
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  try { for (const d of fs.readdirSync(base)) { if (!d.startsWith('chromium-')) continue; const p = path.join(base, d, 'chrome-linux', 'chrome'); if (fs.existsSync(p)) return p; } }
-  catch { /* fall through */ }
-  return undefined;
-}
 
 // A compact, read-only hook appended to the SERVED copy of flower.js (the file on
 // disk is never touched) — enough to load a design and frame it for a screenshot.

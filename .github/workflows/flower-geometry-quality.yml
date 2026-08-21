@@ -1,0 +1,51 @@
+# Correctness gate: watertight is necessary but not sufficient — a petal can export with
+# zero boundary edges and still be the WRONG SHAPE (e.g. the un-clefted continuous-margin
+# rim skipping a Lobed sinus, #64). tools/verify-geometry-quality.mjs measures margin
+# fidelity, contour smoothness, and uncapped infill ends across the shape x pattern matrix
+# plus every shipped preset by name. See CLAUDE.md and the flower-project skill.
+#
+# Fast enough (32 configs, ~24s on a 4-core box) to run the full matrix on every PR — no
+# smoke/full split needed here, unlike the export-watertight gate. Known, tracked defects
+# (currently #64) are xfail — the gate still fails if a debt goes stale, its config count
+# exceeds the cap, or one unexpectedly starts passing (the ledger's own self-policing).
+# Path-scoped generously (every geometry source AND tools/**) so a change to a dev tool or
+# a preset can't silently skip this.
+name: flower-geometry-quality
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-presets.js
+      - flower-registry.js
+      - flower.html
+      - 'tools/**'
+      - .github/workflows/flower-geometry-quality.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-presets.js
+      - flower-registry.js
+      - flower.html
+      - 'tools/**'
+  workflow_dispatch: {}    # run on demand, no PR needed
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Petal shape x pattern correctness (full matrix + presets)
+        run: node tools/verify-geometry-quality.mjs

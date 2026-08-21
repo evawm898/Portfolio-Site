@@ -27,6 +27,7 @@ import { chromium } from 'playwright-core';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { findChromium } from './chromium-harness.mjs';
 import { fileURLToPath } from 'node:url';
 import { decodePNG } from './pngdec.mjs';
 import { AUDIT_VIEWPOINTS } from '../flower-view-presets.js';
@@ -116,13 +117,6 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 
-function findChromium() {
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
-  for (const d of fs.readdirSync(base)) if (d.startsWith('chromium-') && !d.includes('headless')) {
-    const p = path.join(base, d, 'chrome-linux', 'chrome'); if (fs.existsSync(p)) return p;
-  }
-  return undefined;
-}
 
 // ---- box-blur (radius 1) + changed-pixel-fraction diff ----
 function boxBlur(px, w, h) {

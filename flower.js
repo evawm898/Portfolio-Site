@@ -33,6 +33,7 @@ import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
 import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
 import { VIEW_PRESETS } from './flower-view-presets.js';
+import { SHAPES as SHAPE_BUNDLES, SHAPE_PARAMS, PICKER_SHAPE_NAMES } from './flower-shapes.js';
 
 const DEG = Math.PI / 180;
 
@@ -1603,6 +1604,21 @@ function buildBudBranchInto(acc, P, ui, cl, stemOpts) {
   buildBudInto(acc, P, ui, tip, { x: dx / dl, y: dy / dl, z: dz / dl }, ui.stemBudMode, rTip);
 }
 
+// DERIVED JUNCTION: the receptacle exists whenever there is something below the
+// bloom to connect to — a stem or sepals. It is plumbing, not a feature, so there
+// is no visitor control; it appears because of course it does. `receptacleType
+// === 'on'` survives only as a migration override, so an old design that set it
+// explicitly keeps its receptacle even with no stem/sepals.
+// The single source of truth for "does this design need a junction below the
+// bloom" — every call site reads this, none re-derives it.
+// JUNCTION vs ORNAMENT: everything under this presence check is one flat
+// "Receptacle" control block, but only some of it IS the junction — the rest is
+// decoration riding on top of it. flower-registry.js's acc-base entries carry a
+// role:"junction" / role:"ornament" tag marking which is which.
+function hasReceptacle(ui) {
+  return ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
+}
+
 // Grow the simplified bud bloom into its own accumulator and merge it onto the
 // offshoot tip (position `tipPos`, axis `tipDir`). `rTip` is the offshoot's tip
 // radius, used to seat the bud so no gap shows.
@@ -1646,7 +1662,7 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
   // the bud's receptacle follows the same derived rule as the main bloom's (stem/sepals
   // present, or the migration override), so a budded plant with a stem grows a bud base too.
-  if (ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on') {
+  if (hasReceptacle(ui)) {
     const attach = [];
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
@@ -2461,12 +2477,8 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // the stem and its tip — no seam. SEPALS remain an independent whorl. A stem
   // WITHOUT a receptacle has no junction to seam, so it keeps the standalone stem
   // tube (buildStemInto). Everything builds into the petal mesh, same teal tubes.
-  // DERIVED junction: the receptacle exists whenever there is something below the bloom to
-  // connect to — a stem or sepals. It is plumbing, not a feature, so there is no visitor
-  // control; it appears because of course it does. `receptacleType === 'on'` survives only
-  // as a migration override, so an old design that set it explicitly keeps its receptacle
-  // even with no stem/sepals.
-  const hasRecept = ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
+  // DERIVED junction — see hasReceptacle() for the rule.
+  const hasRecept = hasReceptacle(ui);
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
     length: clamp(ui.stemLength, 0, 10),
@@ -3188,20 +3200,10 @@ if (advancedToggle) advancedToggle.addEventListener('change', () => {
 // derived from those params, never saved — so the params stay the single source of
 // truth. When the params match no named shape the picker shows CUSTOM (a display-only
 // state, never a pickable option), so it never lies about what the geometry is.
-const SHAPE_PARAMS = ['width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'centerCurve', 'edgeCurve', 'edgeProfile', 'petalCup'];
-const SHAPES = {
-  rounded: { width: 0.9, taper: 0.35, clawLength: 0, clawWidth: 0.3, shoulder: 0.5, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.5, centerCurve: 0.4, edgeCurve: 0, edgeProfile: 0, petalCup: 0 },
-  pointed: { width: 0.7, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.4, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.15, centerCurve: 0.3, edgeCurve: -0.1, edgeProfile: 0, petalCup: 0 },
-  strap: { width: 0.45, taper: 0.5, clawLength: 0, clawWidth: 0.3, shoulder: 0.3, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.3, centerCurve: 0.15, edgeCurve: 0, edgeProfile: 0, petalCup: 0.05 },
-  clawed: { width: 1.0, taper: 0.3, clawLength: 0.35, clawWidth: 0.25, shoulder: 0.55, cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3, tip: 0.6, centerCurve: 0.35, edgeCurve: 0.05, edgeProfile: 0, petalCup: 0.15 },
-  // LOBED (bifid, cleftDepth > 0) is intentionally NOT a picker bundle. The cleft renders
-  // correctly only when the rim is cleft-aware (continuous margin OFF); with the Standard
-  // default (margin ON) the two un-clefted marginal strands skip the sinus, so a one-click
-  // Lobed would ship a manifold-but-wrong petal (tools/verify-geometry-quality.mjs measures
-  // an ~8-19 mm unsealed gap across the whole cleftDepth range). Cleft params stay available
-  // in Advanced (a hand-dialled cleft shows as CUSTOM); Lobed returns as a named shape once
-  // #64 makes marginStrands cleft-aware.
-};
+// The bundles themselves live in flower-shapes.js (shared with the geometry-quality
+// gate's shape fixtures, so the two can't drift apart); PICKER_SHAPE_NAMES excludes
+// LOBED — see that module for why.
+const SHAPES = Object.fromEntries(PICKER_SHAPE_NAMES.map((name) => [name, SHAPE_BUNDLES[name]]));
 // Write a named bundle to every silhouette param, re-detect (lands on the picked
 // shape), and rebuild. CUSTOM is never applicable — it is only ever a detected state.
 function applyShape(name) {
@@ -3380,7 +3382,9 @@ function updateBaseOptions() {
   // The junction is DERIVED (stem or sepals present), not a control — so the Advanced
   // sculpting controls (data-recept + the junction cluster) appear exactly when the
   // derived receptacle is active. receptacleType is a hidden migration override only.
-  const on = inputs.stemType.value !== 'none' || inputs.sepalsType.value !== 'none' || inputs.receptacleType.value === 'on';
+  const on = hasReceptacle({
+    stemType: inputs.stemType.value, sepalsType: inputs.sepalsType.value, receptacleType: inputs.receptacleType.value,
+  });
   const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
   document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
   // JUNCTION cluster (absorption / neck swell / gather height / bundle tightness / flare
