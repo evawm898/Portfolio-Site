@@ -69,6 +69,7 @@
       <h2>Calibrate scale</h2>
       <p class="tgr-hint">Click two points on the image that span a <strong>known physical distance</strong> (e.g. two marks on a ruler).</p>
       <p class="tgr-status" id="calStatus">Click the first point.</p>
+      <p class="tgr-hint" id="calAutoHint" hidden></p>
       <div class="tgr-field-row">
         <label for="knownDistance">Known distance</label>
         <input type="number" id="knownDistance" min="0" step="any" placeholder="e.g. 50">
@@ -165,20 +166,21 @@
       <div class="tgr-results-grid" id="resultsGrid"></div>
       <div id="resultsWarning" class="tgr-warning" hidden></div>
 
-      <details class="tgr-debug-panel tgr-repeat-count-panel" id="repeatCountPanel">
+      <details class="tgr-debug-panel tgr-repeat-count-panel" id="repeatCountPanel" hidden>
         <summary>Verify by counting a repeat</summary>
         <p class="tgr-hint">
-          Not sure the number above is right? Click the same point on two
-          adjacent wale columns (or course rows) in the image, and this
-          counts how many times that exact patch actually repeats across
-          the photo -- directly, by matching real pixels, not inferred
-          from periodicity the way the automatic result above is. An
-          independent second opinion, not a replacement for the number
-          above.
+          Not sure the numbers above are right? Drag a box around ONE full
+          repeat cell -- corner to the same corner on the diagonally
+          adjacent stitch, so the box's width spans one wale-to-wale
+          repeat and its height spans one course-to-course repeat -- and
+          this counts how many times that exact patch actually repeats
+          across the photo in both directions, directly, by matching real
+          pixels, not inferred from periodicity the way the automatic
+          result above is. An independent second opinion, not a
+          replacement for the numbers above.
         </p>
         <div class="tgr-field-row">
-          <button type="button" class="tgr-btn tgr-btn--secondary" id="markWaleRepeatBtn">Mark one wale repeat</button>
-          <button type="button" class="tgr-btn tgr-btn--secondary" id="markCourseRepeatBtn">Mark one course repeat</button>
+          <button type="button" class="tgr-btn tgr-btn--secondary" id="markRepeatBtn">Mark one repeat</button>
           <button type="button" class="tgr-btn tgr-btn--secondary" id="cancelRepeatMarkBtn" hidden>Cancel</button>
         </div>
         <p class="tgr-status" id="repeatMarkStatus" hidden></p>
@@ -320,6 +322,9 @@
       <span class="tgr-zoom-controls__level" id="zoomLevel">100%</span>
       <button type="button" id="zoomInBtn" class="tgr-zoom-controls__btn" aria-label="Zoom in">+</button>
       <button type="button" id="zoomResetBtn" class="tgr-zoom-controls__reset" aria-label="Reset zoom and position">Reset</button>
+    </div>
+    <div class="tgr-ruler-controls" id="rulerControls" hidden title="Show a ruler scaled to your calibration, to check against the fabric -- drag it anywhere on the image">
+      <button type="button" id="rulerToggleBtn" class="tgr-ruler-controls__btn" aria-pressed="false">Ruler</button>
     </div>
   </section>
 

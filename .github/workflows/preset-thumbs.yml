@@ -1,0 +1,45 @@
+# Drift gate for the shipped preset gallery. The thumbnails in assets/presets/ are a
+# BUILD-TIME artifact rendered from flower-presets.js; this job regenerates each preset's
+# geometry and fails if a preset's triangle count or bounding box has moved away from the
+# committed assets/presets/manifest.json — i.e. a preset silently changed shape (or the
+# geometry pipeline shifted under it) without the thumbnails + manifest being regenerated.
+#
+# The check is deterministic: triangle counts and bounds are CPU-computed geometry, not
+# rasterised pixels, so it does not depend on the CI runner's GPU. It is the only
+# browser-based CI job (the export + geometry-quality gates run locally per CLAUDE.md);
+# if you regenerate presets, run `node tools/gen-preset-thumbs.mjs` and commit the result.
+name: preset-thumbs
+
+on:
+  pull_request:
+    paths:
+      - flower-presets.js
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - tools/gen-preset-thumbs.mjs
+      - assets/presets/**
+      - .github/workflows/preset-thumbs.yml
+  push:
+    branches: [main]
+    paths:
+      - flower-presets.js
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - tools/gen-preset-thumbs.mjs
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Preset thumbnails must match committed manifest
+        run: node tools/gen-preset-thumbs.mjs --check

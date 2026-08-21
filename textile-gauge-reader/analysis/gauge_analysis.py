@@ -133,6 +133,23 @@ MIN_PLAUSIBLE_SPACING_PX = 3.0   # ignore periodicities finer than this (likely 
 # this tolerance only ever discards refinements that look like exactly
 # that failure, never ordinary sub-pixel jitter. log(1.20) =~ 0.18.
 SPACING_REFINEMENT_MAX_LOG_DEVIATION = 0.18
+# A half-lag autocorrelation peak at >= this fraction of the seed peak's
+# height counts as a T-vs-2T near-tie worth resolving with 2D template
+# evidence (see _prefer_fundamental_seed). Calibrated before commit:
+# genuine ties measured >= 0.969 (including the leg-harmonic trap, which
+# is why strength alone can NOT decide the winner), legitimate
+# non-ties <= 0.64 (garter ridge pairs) and <= 0.47 (clean sub-features).
+AUTOCORR_SUBHARMONIC_PREFERENCE = 0.95
+# Template-walk acceptance for switching the seed to its half-lag: must
+# exceed _template_match_consistency_score's 0.5 "couldn't measure"
+# neutral, so the switch only ever happens on POSITIVE 2D evidence.
+# Measured: genuine repeats 0.66-0.70, leg half-periods 0.0.
+SEED_HALF_TEMPLATE_MIN = 0.55
+# Ascending (seed -> its double) additionally requires the seed's OWN
+# template walk to fail outright -- genuine negative evidence that the
+# seed is a false repeat (crisp leg lattices measured 0.0), far below
+# the 0.5 "couldn't measure" neutral. See _prefer_fundamental_seed.
+SEED_ASCEND_TEMPLATE_FAIL_MAX = 0.05
 SMOOTHING_WINDOW_PX = 3          # 1D smoothing window applied to projection signals
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_TILE_GRID = (8, 8)
@@ -510,6 +527,17 @@ def analyze_gauge(
     # repeat — see the module docstring.
     p0_wale, _ = _autocorrelation_spacing(wale_signal_for_period)
     p0_course, _ = _autocorrelation_spacing(course_signal_for_period)
+    # T-vs-2T near-tie resolution for the COURSE seed only (see
+    # _prefer_fundamental_seed): the course path deliberately takes its
+    # seed as-is (no v3 candidate family to rescue a doubled seed — see
+    # the course comment below), so the seed itself must land on the
+    # fundamental. The wale seed is left alone: its 0.5x/1x/2x family +
+    # evidence scoring already resolves harmonic seeds either way.
+    # Checked on the UNROTATED signal/2D pair so template-walk anchors
+    # stay coordinate-consistent with `normalized`.
+    p0_course = _prefer_fundamental_seed(
+        course_signal, normalized, p0_course, course_direction == "horizontal"
+    )
 
     # Detect approximate loop-center points once for the whole ROI (not
     # per-direction — a loop center is a single 2D feature). Use the
@@ -741,7 +769,118 @@ def _autocorrelation_spacing(signal: np.ndarray) -> Tuple[Optional[float], float
     best_local_idx = peaks[np.argmax(search_region[peaks])]
     spacing = float(best_local_idx + lo)
     strength = float(np.clip(search_region[best_local_idx], 0.0, 1.0))
+
     return spacing, strength
+
+
+def _prefer_fundamental_seed(
+    signal: np.ndarray,
+    normalized_2d: Optional[np.ndarray],
+    p0: Optional[float],
+    lag_dx: bool,
+) -> Optional[float]:
+    """
+    Resolve a T-vs-2T near-tie in the coarse autocorrelation seed using
+    2D template evidence — for the course axis, which (deliberately —
+    see analyze_gauge's course comment) takes the seed as-is instead of
+    running the v3 candidate family.
+
+    The problem, caught by the resize metamorphic invariant: a truly
+    periodic signal at period T has autocorrelation peaks at T, 2T,
+    3T... of near-equal height, so which one the argmax lands on is
+    decided by interpolation crumbs. On the real jersey fixture's
+    course signal the T-vs-2T strength ratio measured 0.977–0.996
+    across 1.25x/1.5x/2x upscales — a coin flip that fell to T at 1x
+    and to 2T at every upscale, doubling the reported course spacing.
+
+    A strength threshold ALONE cannot fix this — tried first, and the
+    rotate90 invariant immediately broke it: the wale structure's
+    leg-harmonic half-peak measures 0.969 of its fundamental, i.e.
+    INSIDE any threshold loose enough to catch the genuine ties
+    (>= 0.977). The two situations are indistinguishable in the 1D
+    autocorrelation, which is this project's oldest lesson. What DOES
+    separate them, measured on the real fixture before this landed, is
+    the template-walk score at the half-lag (_template_match_
+    consistency_score, the task-#44 machinery): a genuine repeat walks
+    consistently (0.66–0.70 measured), while leg half-periods alternate
+    between mirror-image patches and fail the walk outright (0.0
+    measured). The 0.55 acceptance sits above the function's own 0.5
+    "couldn't measure" neutral, so the seed only ever switches on
+    POSITIVE 2D evidence, never on absence of evidence.
+
+    Single step (never chains to a quarter-lag), and a no-op whenever
+    there is no half-lag peak at >= AUTOCORR_SUBHARMONIC_PREFERENCE of
+    the seed's own peak strength — garter's legitimate ridge-pair
+    double (half-peak ratios 0.52–0.64) and clean signals' minor
+    sub-features (<= 0.47) never reach the template check at all.
+    """
+    if p0 is None or p0 <= 2 * MIN_PLAUSIBLE_SPACING_PX:
+        return p0
+    n = len(signal)
+    if n < 2 * MIN_PLAUSIBLE_SPACING_PX or np.std(signal) < 1e-6:
+        return p0
+    full_corr = correlate(signal, signal, mode="full")
+    autocorr = full_corr[n - 1 :]
+    if autocorr[0] <= 0:
+        return p0
+    autocorr_norm = autocorr / autocorr[0]
+    lo = int(MIN_PLAUSIBLE_SPACING_PX)
+    hi = max(lo + 1, n // 2)
+    search_region = autocorr_norm[lo:hi]
+    if len(search_region) < 2:
+        return p0
+    peaks, _ = find_peaks(search_region, prominence=0.01)
+    if len(peaks) == 0:
+        return p0
+    lags = peaks + lo
+
+    def _strength_near(target: float, tolerance: float):
+        candidates = [(float(l), float(search_region[p])) for p, l in zip(peaks, lags) if abs(l - target) <= tolerance]
+        return max(candidates, key=lambda t: t[1]) if candidates else None
+
+    at_seed = _strength_near(p0, max(2.0, 0.12 * p0))
+    if at_seed is None:
+        return p0
+
+    # DESCENT: the seed may be the 2x of a near-tie fundamental below it.
+    at_half = _strength_near(p0 / 2.0, max(2.0, 0.12 * (p0 / 2.0)))
+    if at_half is not None and at_half[1] >= AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]:
+        half_lag = at_half[0]
+        if _template_match_consistency_score(normalized_2d, signal, half_lag, lag_dx) >= SEED_HALF_TEMPLATE_MIN:
+            return half_lag
+
+    # ASCENT: the seed may itself BE a false half-period (a leg lattice)
+    # of a near-tie fundamental above it. Found via the rotate90
+    # metamorphic invariant on the real knit_sample photos: at coarse
+    # gauges (34-73px leg spacing) the leg lattice's autocorrelation
+    # peak outright BEATS the fundamental (e.g. 0.755 vs 0.735), so the
+    # raw seed lands directly on the legs -- the jersey fixture only
+    # escapes because its fine 17.5px legs are partially attenuated by
+    # the fixed-pixel smoothing, an accidental and unreliable
+    # suppressor. Unrotated, the wale axis's candidate family climbs
+    # back up; the course path (seed-as-is) cannot, so physical wale
+    # structure viewed through it after rotation flips to half.
+    #
+    # Gate, deliberately strict on BOTH sides: the seed's own template
+    # walk must return genuine NEGATIVE evidence (<= SEED_ASCEND_
+    # TEMPLATE_FAIL_MAX, far below the 0.5 "couldn't measure" neutral
+    # -- crisp mirror-image leg patches fail the walk outright at 0.0
+    # measured), AND the double-lag must both near-tie the seed's
+    # autocorrelation strength and walk well itself. A genuine repeat
+    # at the seed (garter ridge rows, true course pitch, chunky-yarn
+    # legs whose mirror twins correlate anyway -- 0.70 measured on two
+    # real chunky samples, an honest limitation of this discriminator)
+    # never ascends, because its own walk succeeds.
+    at_double = _strength_near(p0 * 2.0, max(2.0, 0.12 * (p0 * 2.0)))
+    if (
+        at_double is not None
+        and at_double[1] >= AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]
+        and _template_match_consistency_score(normalized_2d, signal, p0, lag_dx) <= SEED_ASCEND_TEMPLATE_FAIL_MAX
+        and _template_match_consistency_score(normalized_2d, signal, at_double[0], lag_dx) >= SEED_HALF_TEMPLATE_MIN
+    ):
+        return at_double[0]
+
+    return p0
 
 
 def _detect_peaks(signal: np.ndarray, spacing_hint: float) -> List[float]:
@@ -1137,6 +1276,49 @@ def _cluster_positions(coords: np.ndarray, period: float) -> List[float]:
     return [float(np.mean(g)) for g in groups]
 
 
+def _canonical_sign_signal(signal: np.ndarray) -> np.ndarray:
+    """
+    Flip the projected 1D signal's global sign, if needed, so its
+    skewness is non-negative -- making the LANDMARK that peak detection
+    locks onto invariant under image mirroring and 90-degree rotation.
+
+    Why this exists (found by the metamorphic rotate90 invariant, and
+    initially misdiagnosed as a position-source asymmetry): the 1D
+    signals are projections of SIGNED Sobel derivatives -- deliberately
+    signed, see _enhance_texture, because rectifying with abs() would
+    frequency-double the periodicity analysis. But a horizontal mirror
+    (for the wale axis) or a 90-degree rotation (mapping one axis onto
+    the other) negates the mapped derivative, so the transformed signal
+    is the NEGATED reversal of the original (measured: correlation
+    -0.9999 on the real jersey fixture). Peak detection on a negated
+    signal locks onto the opposite edge of each ridge -- the valleys --
+    and on an asymmetric stitch profile the valley lattice refines to a
+    measurably different spacing than the peak lattice (24.0px vs
+    25.1px, 4.5%, on the real fixture's course structure).
+
+    Multiplying by the sign of the skewness picks the same physical
+    edge either way: skew(-s) = -skew(s), so original and transformed
+    signals canonicalize to exact reversals of each other, whose peak
+    lattices mirror exactly. A near-zero skew makes the choice
+    unstable, but also harmless: a sign-symmetric profile's peak and
+    valley lattices refine identically, which is precisely why the
+    wale axis passed the mirror invariant while the more asymmetric
+    course profile failed rotate90.
+
+    Global sign flip only -- never abs() -- so no frequency doubling is
+    introduced, and autocorrelation-based candidate selection (which is
+    inherently sign-invariant) is unaffected. Applied ONLY where
+    positions are extracted for refinement/overlay; the candidate-
+    scoring internals keep the raw signal, since re-anchoring their
+    evidence would shift calibrated selection scores for no invariance
+    benefit.
+    """
+    centered = signal - float(np.mean(signal))
+    if float(np.mean(centered**3)) < 0:
+        return -signal
+    return signal
+
+
 def _refine_spacing_from_positions(positions: List[float], period: float) -> Tuple[float, float]:
     """
     Try to refine a candidate period into a sub-pixel-accurate spacing
@@ -1147,19 +1329,45 @@ def _refine_spacing_from_positions(positions: List[float], period: float) -> Tup
     clean synthetic signal its gaps cluster tightly around `period` and
     refining toward their mean is a strict improvement. On a real photo it
     can occasionally miss a peak (inflating the gaps on both sides toward
-    ~2x period) or insert a spurious one (deflating a gap toward ~0.5x),
-    and those bad gaps get averaged in right alongside the good ones --
-    silently smuggling a harmonic-sized error into a period that evidence
-    scoring already got right. (Found via real-photo diagnostics: a large,
-    clean crop of a real swatch correctly selected 35px as the winning
-    candidate, but this refinement then overwrote it with 43px -- a ~23%
-    inflation -- from a handful of noisy gaps mixed in with mostly-good
-    ones.)
+    a multiple of the period) or insert a spurious one (deflating a gap
+    toward ~0.5x). Two generations of this function have dealt with that:
 
-    Only accept the refinement if its result is still close to the
-    period it was meant to refine (see SPACING_REFINEMENT_MAX_LOG_
-    DEVIATION); otherwise the noisy positions aren't trustworthy for this
-    and the caller should keep the original candidate period as-is.
+    1. The original unconditionally averaged ALL gaps -- on a real jersey
+       crop that silently overwrote a correctly-selected 35px candidate
+       with 43px (~23% inflation) from a handful of missed-peak gaps.
+    2. The first fix gated the mean-of-all-gaps result against the
+       candidate (SPACING_REFINEMENT_MAX_LOG_DEVIATION), which stopped
+       the catastrophic overwrite but kept the fragile estimator: any
+       single missed/spurious position still tilted the mean, and WHICH
+       boundary positions get detected depends on the crop's phase. The
+       metamorphic mirror invariant caught the consequence: mirroring the
+       real jersey fixture selected the SAME 35.0px candidate yet refined
+       to 37.2 one way and 34.4 the other (+/-2.3px, opposite
+       directions), because the two runs detected slightly different
+       boundary positions and mean-of-all-gaps has no defense.
+
+    Current estimator -- per-step-normalized gaps: each consecutive gap g
+    is assigned k = round(g / period) whole periods; a gap only counts if
+    k >= 1 AND its per-step value g/k is within the SAME log tolerance of
+    the candidate that the old design applied once at the end
+    (|ln((g/k)/period)| <= SPACING_REFINEMENT_MAX_LOG_DEVIATION). The
+    refined spacing is sum(g)/sum(k) over accepted gaps. Properties, all
+    verified against the real fixture's actual detected positions before
+    this landed:
+      - a missed peak's ~2x gap now CONTRIBUTES correctly (k=2) instead
+        of poisoning the mean;
+      - a spurious insertion's two ~0.5x gaps are rejected (ln 0.5 is far
+        outside the band), as are ambiguous ~1.5x gaps under either
+        rounding (ln 0.75 and ln 1.5 both fall outside);
+      - the gap multiset is reversal-invariant, so identical detections
+        mirror to identical spacing exactly, and the one-position
+        boundary differences that remain moved the real-fixture mirror
+        disagreement from 8.2% to 0.6%;
+      - because every accepted per-step value lies within the log band
+        around the candidate, their weighted mean does too -- the
+        refinement structurally cannot wander off the evidence-selected
+        candidate (the final gate below is kept as belt-and-braces).
+
     Returns (spacing_px, spacing_consistency) -- consistency is 0.0
     whenever no refinement was attempted or accepted.
     """
@@ -1169,10 +1377,18 @@ def _refine_spacing_from_positions(positions: List[float], period: float) -> Tup
     diffs = diffs[diffs >= MIN_PLAUSIBLE_SPACING_PX]
     if len(diffs) == 0:
         return period, 0.0
-    refined = float(np.mean(diffs))
+    steps = np.round(diffs / period)
+    per_step = diffs / np.maximum(steps, 1.0)
+    accepted = (steps >= 1) & (
+        np.abs(np.log(per_step / period)) <= SPACING_REFINEMENT_MAX_LOG_DEVIATION
+    )
+    if not np.any(accepted):
+        return period, 0.0
+    refined = float(np.sum(diffs[accepted]) / np.sum(steps[accepted]))
     if refined <= 0 or abs(math.log(refined / period)) > SPACING_REFINEMENT_MAX_LOG_DEVIATION:
         return period, 0.0
-    cv = float(np.std(diffs) / np.mean(diffs)) if np.mean(diffs) > 0 else 1.0
+    kept = per_step[accepted]
+    cv = float(np.std(kept) / np.mean(kept)) if np.mean(kept) > 0 else 1.0
     spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
     return refined, spacing_consistency
 
@@ -1222,7 +1438,7 @@ def _finalize_axis(
         positions = _cluster_positions(loop_centers[:, center_axis_index], period)
         position_source = "loop-center clustering"
     else:
-        positions = _detect_peaks(signal, period)
+        positions = _detect_peaks(_canonical_sign_signal(signal), period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
     spacing_px, spacing_consistency = _refine_spacing_from_positions(positions, period)
@@ -1977,7 +2193,7 @@ def _finalize_axis_v3(
         positions = _cluster_positions(loop_centers[:, center_axis_index], period)
         position_source = "loop-center clustering"
     else:
-        positions = _detect_peaks(signal, period)
+        positions = _detect_peaks(_canonical_sign_signal(signal), period)
         position_source = "1D edge-signal peak detection (no loop-center evidence available)"
 
     spacing_px, _ = _refine_spacing_from_positions(positions, period)
@@ -4194,4 +4410,405 @@ def analyze_multi_roi(
         course_consensus=course_consensus,
         primary_label=primary.label,
         primary_roi_px=(primary.x, primary.y, primary.width, primary.height),
+    )
+
+
+# --- Automatic ruler/scale-bar calibration detection ----------------------
+#
+# Most photos taken for this tool already have a ruler or tape measure in
+# frame (the app's own upload hint suggests including one). Manual two-
+# point-plus-known-distance calibration is the one step in this whole
+# workflow that can't be sanity-checked after the fact -- get it wrong and
+# every downstream wale/course number is silently wrong by the same
+# factor, with nothing in the UI that would look "off." This section
+# tries to detect the ruler automatically and propose a calibration for
+# the user to review/confirm, the same auto-propose-then-human-confirms
+# pattern propose_measurement_rois already uses for measurement areas --
+# never a silent skip of the confirm step.
+#
+# Deliberately classical CV, no OCR / no reading of printed numerals: a
+# ruler's tick pattern is itself a strong, generic signal -- a dense,
+# very regular sequence of high-contrast marks, distinguishable from
+# fabric texture by scale and crispness alone, reusing the exact
+# autocorrelation/peak-detection primitives already used for wale/course
+# spacing (_autocorrelation_spacing, _detect_peaks). Metric vs. imperial
+# is inferred structurally (how many minor ticks fall between two major/
+# numbered ticks -- 10 or 5 for metric, 8 or 16 for imperial) rather than
+# by reading a digit, which keeps the detector generic across ruler
+# brands/fonts but means the unit is a HINT, not a certainty -- the
+# suggested calibration always still needs the user's one-click
+# confirmation (or override) before it's used for anything.
+
+RULER_BAND_HEIGHT_FRACTIONS = [0.06, 0.09, 0.12, 0.16]  # candidate ruler-band thickness, as a fraction of the perpendicular image dimension
+RULER_BAND_STRIDE_FRACTION = 0.5    # candidate band position step, as a fraction of band height
+RULER_MIN_PEAKS = 6                 # need at least this many tick peaks in a band to trust it as a ruler at all
+RULER_MAJOR_TICK_LENGTH_RATIO = 2.0  # a tick reaching at least this many times the median tick's dark-run length counts as "major" -- real rulers often have an intermediate half-unit tick too (longer than the finest ticks but shorter than the numbered ones), so this needs to sit above that tier, not just above the numbered ticks
+RULER_MIN_MAJOR_TICKS = 2           # need at least 2 major ticks to suggest a major-tick-spaced calibration
+RULER_MAX_MAJOR_FRACTION = 0.35     # majors must stay a sparse minority of all ticks (real rulers number every 4th-16th tick, never anywhere close to half) -- if more than this fraction of ticks look "long", the length signal is unreliable (e.g. picked up fabric texture, not a real ruler), so treat it as no major/minor split found at all rather than trust it
+RULER_REACH_EXTENSION_MULTIPLIER = 3.0  # how many multiples of the tight tick-band's own height to extend into, when measuring how far ticks reach (see _build_reach_strip)
+
+
+@dataclass
+class RulerCalibrationResult:
+    """
+    A proposed two-point calibration detected automatically from a ruler/
+    tape measure in the photo -- see the module comment above. Never
+    read/acted on without the user confirming (or overriding) it first,
+    the same as ProposedRoi.
+    """
+
+    success: bool
+    message: str = ""
+    point1_px: Optional[Tuple[float, float]] = None
+    point2_px: Optional[Tuple[float, float]] = None
+    suggested_distance: float = 1.0
+    suggested_unit: Literal["mm", "cm", "in"] = "cm"
+    minor_tick_spacing_px: Optional[float] = None
+    major_tick_count: int = 0
+    confidence: float = 0.0
+
+
+def _ruler_band_score(band_gray: np.ndarray) -> Tuple[float, float, float]:
+    """
+    How strongly does this band look like a ruler -- a dense, regular,
+    high-contrast tick pattern -- along its LENGTH (axis=1, i.e. this
+    function assumes `band_gray` is already oriented with the ruler's
+    length running horizontally; _scan_for_ruler_band transposes vertical
+    candidate bands before calling this, the same convention used
+    elsewhere in this file for orientation-generic code).
+
+    Returns (score, spacing_px, strength) -- spacing_px/strength are the
+    autocorrelation-based tick-spacing estimate this score is built from,
+    passed back so a winning band doesn't need to redo the computation.
+    Score is 0.0 for a band with no plausible periodicity at all.
+    """
+    min_w = int(MIN_PLAUSIBLE_SPACING_PX * 2 * RULER_MIN_PEAKS)
+    if band_gray.shape[0] < 4 or band_gray.shape[1] < min_w:
+        return 0.0, 0.0, 0.0
+    signal = band_gray.mean(axis=0).astype(np.float64)
+    signal = detrend(signal, type="linear")
+    contrast = float(np.std(band_gray))
+    spacing, strength = _autocorrelation_spacing(signal)
+    if spacing is None:
+        return 0.0, 0.0, 0.0
+    # Reward high periodicity strength AND non-trivial contrast -- rules
+    # out a long, flat, faintly-periodic stretch of background/table from
+    # scoring well just because whatever weak texture it has happens to
+    # repeat (the same "periodicity alone isn't enough" lesson this file
+    # has learned repeatedly for fabric detection, applied here too).
+    score = strength * float(np.clip(contrast / 40.0, 0.0, 1.0))
+    return score, float(spacing), float(strength)
+
+
+def _scan_for_ruler_band(gray_full: np.ndarray, orientation_horizontal: bool) -> Optional[dict]:
+    """
+    Slide a band of several candidate thicknesses along the perpendicular
+    axis, scoring each with _ruler_band_score, and return the best-
+    scoring band's position/thickness/estimated tick spacing -- or None
+    if nothing scored above zero anywhere.
+
+    `orientation_horizontal=True` searches for a band whose LENGTH runs
+    along image x (a ruler lying along the top/bottom edge); False
+    searches top-to-bottom bands (a ruler along the left/right edge),
+    via the same transpose trick used throughout this file
+    (`work_gray = gray if along_x else gray.T`) so the actual scoring
+    logic only has to be written once.
+    """
+    work = gray_full if orientation_horizontal else gray_full.T
+    h, w = work.shape
+    best: Optional[dict] = None
+    for frac in RULER_BAND_HEIGHT_FRACTIONS:
+        band_h = max(8, int(round(h * frac)))
+        if band_h >= h:
+            continue
+        stride = max(1, int(round(band_h * RULER_BAND_STRIDE_FRACTION)))
+        for y0 in range(0, h - band_h + 1, stride):
+            band = work[y0 : y0 + band_h, :]
+            score, spacing, strength = _ruler_band_score(band)
+            if score <= 0:
+                continue
+            if best is None or score > best["score"]:
+                best = {"score": score, "y0": y0, "band_h": band_h, "spacing_px": spacing, "strength": strength}
+    return best
+
+
+def _find_tick_positions(band_gray: np.ndarray, spacing_hint: float) -> List[float]:
+    """
+    Detect individual tick positions along a ruler band's length (axis=1).
+    The band passed in should be the tight, high-SNR band that
+    _scan_for_ruler_band found (best periodicity score) -- that's the
+    right band for finding WHERE the ticks are, even though (see
+    _build_reach_strip) it's usually too short to tell major ticks from
+    minor ones by length.
+    """
+    # Ticks are dark marks on a light ruler body -- invert so ticks
+    # become positive peaks in the projected signal, the same convention
+    # _detect_peaks callers elsewhere in this file rely on.
+    inverted = 255.0 - band_gray.astype(np.float64)
+    signal = inverted.mean(axis=0)
+    signal = signal - signal.min()
+    return _detect_peaks(signal, spacing_hint)
+
+
+def _build_reach_strip(work: np.ndarray, y0: int, band_h: int) -> Tuple[np.ndarray, bool]:
+    """
+    Build a taller crop of `work` (same x-range as the tight tick band,
+    more rows) to measure tick length in, instead of reusing the tight
+    band itself. Returns (strip, baseline_at_top) -- see below for what
+    the baseline is.
+
+    The tight band _scan_for_ruler_band picks is deliberately as short as
+    possible -- that's what makes its periodicity score high -- which on
+    a real ruler tends to land it right against the ruler's own working
+    edge (the edge nearest whatever's being measured), where EVERY tick,
+    major or minor, is present and darkest -- the strongest possible
+    periodic signal. That's great for finding tick x-positions, but
+    leaves no headroom on that side to tell a tick's length: it's
+    already touching the band's edge, so reach/max_reach collapses
+    toward 1.0 for everything (see the diagnostic notes above
+    detect_ruler_calibration). The headroom major ticks actually need is
+    on the OTHER side, extending further into the ruler body.
+
+    A ruler's printed body (the blank strip the ticks are drawn on, plus
+    its numerals) is close to a single flat brightness -- almost always
+    much brighter than both the shadowed border line at its working edge
+    and whatever sits past that edge (fabric, background). So: look at a
+    wide neighborhood around the tight band, find the brightest and
+    darkest row averages in it, and grow outward from the tight band's
+    own brightest row until brightness drops below the midpoint between
+    those two extremes, independently in each direction. The direction
+    that grows LESS is the one already blocked by the working edge --
+    that's the baseline ticks are anchored to; the direction that grows
+    MORE is the ruler's body interior, i.e. the headroom major ticks
+    need.
+
+    Falls back to a small fixed extension around the tight band if no
+    clear plateau is found in either direction (e.g. a low-contrast or
+    unusually lit photo), still preferring whichever side grew further.
+    """
+    h = work.shape[0]
+    neigh_radius = int(round(band_h * RULER_REACH_EXTENSION_MULTIPLIER))
+    n_y0 = max(0, y0 - neigh_radius)
+    n_y1 = min(h, y0 + band_h + neigh_radius)
+    neighborhood = work[n_y0:n_y1, :]
+    local_y0, local_y1 = y0 - n_y0, (y0 - n_y0) + band_h
+    if neighborhood.shape[0] < 2:
+        return work[y0 : y0 + band_h, :], True
+
+    row_mean = neighborhood.mean(axis=1)
+    threshold = (row_mean.max() + row_mean.min()) / 2.0
+
+    # Seed from the single brightest row INSIDE the tight band -- almost
+    # certainly a genuine ruler-body pixel row -- rather than the band's
+    # own edges, since the tight band can already overshoot the plateau
+    # on one side and walking outward from that edge would never pull
+    # back in from a starting point that's already off the plateau.
+    band_rows = row_mean[local_y0:local_y1]
+    seed = local_y0 + int(np.argmax(band_rows)) if band_rows.size else local_y0
+
+    top = seed
+    while top > 0 and row_mean[top - 1] > threshold:
+        top -= 1
+    bottom = seed + 1
+    while bottom < len(row_mean) and row_mean[bottom] > threshold:
+        bottom += 1
+
+    grew_up, grew_down = seed - top, bottom - (seed + 1)
+    if (grew_up + grew_down) < band_h // 2:
+        # No real plateau found beyond the tight band itself -- fall
+        # back to a small fixed extension rather than the unextended
+        # (too-short) band, still asymmetric in the same direction sense
+        # (extend more on whichever side had any headroom at all).
+        extend = max(1, band_h // 2)
+        if grew_up >= grew_down:
+            top, bottom = max(0, local_y0 - extend), local_y1
+        else:
+            top, bottom = local_y0, min(len(row_mean), local_y1 + extend)
+        grew_up, grew_down = local_y0 - top, bottom - local_y1
+
+    # Baseline is the side that grew LESS -- the tick-anchoring working
+    # edge, already hard against the band; the other side is the body
+    # interior ticks reach into.
+    baseline_at_top = grew_up <= grew_down
+    return neighborhood[top:bottom, :], baseline_at_top
+
+
+def _measure_tick_reach(
+    reach_strip_gray: np.ndarray, positions: List[float], baseline_at_top: bool
+) -> List[Tuple[float, float]]:
+    """
+    For each tick x-position, measure how far its dark mark reaches into
+    `reach_strip_gray` as a CONTIGUOUS dark run starting at the baseline
+    edge (see _build_reach_strip) and extending toward the far edge,
+    normalized to the single longest run found. A contiguous run --
+    rather than "any dark pixel's distance from some reference row", the
+    earlier approach -- avoids being thrown off by unrelated dark
+    content elsewhere in the strip (numerals, adjacent print) that isn't
+    actually connected to the tick mark itself. Returns
+    [(position_px, reach_fraction), ...]; reach_fraction is 0..1.
+    """
+    if not positions or reach_strip_gray.size == 0:
+        return [(p, 0.0) for p in positions]
+
+    inverted = 255.0 - reach_strip_gray.astype(np.float64)
+    n_rows = inverted.shape[0]
+    ticks = []
+    for p in positions:
+        col_idx = int(np.clip(round(p), 0, inverted.shape[1] - 1))
+        col = inverted[:, col_idx]
+        dark_thresh = col.max() * 0.5
+        row_order = range(n_rows) if baseline_at_top else range(n_rows - 1, -1, -1)
+        run = 0
+        for r in row_order:
+            if col[r] >= dark_thresh:
+                run += 1
+            else:
+                break
+        ticks.append((p, float(run)))
+
+    max_reach = max((r for _, r in ticks), default=0.0) or 1.0
+    return [(p, r / max_reach) for p, r in ticks]
+
+
+def _classify_major_ticks(ticks: List[Tuple[float, float]]) -> List[float]:
+    """
+    Positions of ticks whose reach is a clear outlier above the median --
+    see RULER_MAJOR_TICK_LENGTH_RATIO. Also requires the outliers to stay
+    a sparse minority (RULER_MAX_MAJOR_FRACTION) -- on a real ruler,
+    numbered ticks are always a small fraction of all ticks, so if
+    "long" ticks turn out to be a big chunk of everything found, that's
+    a sign the reach measurement locked onto something that isn't
+    actually a major/minor tick hierarchy (e.g. fabric texture mixed
+    into the band), not a real one -- safer to report no confident split
+    at all than a wrong one.
+    """
+    if len(ticks) < RULER_MIN_MAJOR_TICKS:
+        return []
+    reaches = np.array([r for _, r in ticks])
+    median_reach = float(np.median(reaches))
+    if median_reach <= 1e-6:
+        return []
+    threshold = median_reach * RULER_MAJOR_TICK_LENGTH_RATIO
+    majors = [p for p, r in ticks if r >= threshold]
+    if len(majors) > len(ticks) * RULER_MAX_MAJOR_FRACTION:
+        return []
+    return majors
+
+
+def detect_ruler_calibration(image_bgr: np.ndarray) -> RulerCalibrationResult:
+    """
+    Look for a ruler/tape measure anywhere in the photo and, if found,
+    propose a two-point calibration from it (see the module comment
+    above for the full rationale and the classical-CV/no-OCR approach).
+
+    Tries both a horizontal-band search (a ruler along the top/bottom
+    edge) and a vertical-band search (left/right edge), keeps whichever
+    scored higher, then finds individual tick marks in that band and
+    classifies major vs. minor by tick length. Prefers spacing two
+    adjacent MAJOR ticks (a clean, human-recognizable "1 unit" span) for
+    the suggested calibration; falls back to a short run of minor ticks
+    if no confident major/minor split was found, still auto-placing both
+    points even though the caller will need to supply how many minor-
+    tick units that span covers.
+
+    Never returns a fabricated result: success=False with a human-
+    readable reason if no plausible ruler pattern is found at all.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return RulerCalibrationResult(success=False, message="No image data to detect a ruler from.")
+
+    gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+
+    candidate_h = _scan_for_ruler_band(gray_full, orientation_horizontal=True)
+    candidate_v = _scan_for_ruler_band(gray_full, orientation_horizontal=False)
+
+    if candidate_h and (not candidate_v or candidate_h["score"] >= candidate_v["score"]):
+        chosen, horizontal = candidate_h, True
+    elif candidate_v:
+        chosen, horizontal = candidate_v, False
+    else:
+        return RulerCalibrationResult(success=False, message="No ruler-like pattern found in this photo.")
+
+    work = gray_full if horizontal else gray_full.T
+    y0, band_h, spacing_hint = chosen["y0"], chosen["band_h"], chosen["spacing_px"]
+    band = work[y0 : y0 + band_h, :]
+
+    positions = _find_tick_positions(band, spacing_hint)
+    if len(positions) < RULER_MIN_PEAKS:
+        return RulerCalibrationResult(success=False, message="Found a possible ruler, but not enough clear tick marks to calibrate from.")
+
+    reach_strip, baseline_at_top = _build_reach_strip(work, y0, band_h)
+    ticks = _measure_tick_reach(reach_strip, positions, baseline_at_top)
+    positions = sorted(positions)
+    diffs = np.diff(positions)
+    minor_spacing = float(np.median(diffs)) if diffs.size else spacing_hint
+
+    band_mid = y0 + band_h / 2.0
+
+    def _to_full_image(pos_along_length: float) -> Tuple[float, float]:
+        return (pos_along_length, band_mid) if horizontal else (band_mid, pos_along_length)
+
+    majors = sorted(_classify_major_ticks(ticks))
+    minor_count_per_major: Optional[int] = None
+
+    if len(majors) >= RULER_MIN_MAJOR_TICKS:
+        major_diffs = np.diff(majors)
+        major_spacing = float(np.median(major_diffs))
+        # The two MIDDLE major ticks (away from the band's own edges,
+        # where a partially-visible unit right at the frame boundary
+        # could throw off the spacing) become the suggested points.
+        mid_idx = len(majors) // 2
+        i1 = max(0, mid_idx - 1)
+        i2 = i1 + 1 if i1 + 1 < len(majors) else max(0, i1 - 1)
+        i1, i2 = min(i1, i2), max(i1, i2)
+        p1, p2 = _to_full_image(majors[i1]), _to_full_image(majors[i2])
+        if minor_spacing > 0:
+            minor_count_per_major = int(round(major_spacing / minor_spacing))
+    else:
+        # No confidently-classified major ticks -- fall back to a short
+        # run of minor ticks so the two points are still auto-placed;
+        # the caller supplies how many minor-tick units that span is
+        # (suggested_distance stays 1.0, same as the major-tick case, but
+        # callers surfacing this to a user should say "N ticks" instead
+        # of "1 <unit>" when minor_tick_spacing_px is the only anchor).
+        span = min(5, len(positions) - 1)
+        mid_idx = len(positions) // 2
+        i1 = max(0, mid_idx - span // 2)
+        i2 = min(len(positions) - 1, i1 + span) if span > 0 else i1
+        p1, p2 = _to_full_image(positions[i1]), _to_full_image(positions[i2])
+
+    # Metric rulers mark 10 (or 5) minor ticks per major (mm -> cm);
+    # imperial commonly marks 8 or 16 (fractions of an inch), sometimes
+    # 4. This is a HINT from tick-count structure, not a read of any
+    # printed numeral -- the caller still lets the user confirm/override
+    # the unit.
+    suggested_unit: Literal["mm", "cm", "in"] = "cm"
+    if minor_count_per_major is not None:
+        imperial_candidates = (4, 8, 16)
+        metric_candidates = (5, 10)
+        nearest_imperial = min(imperial_candidates, key=lambda n: abs(n - minor_count_per_major))
+        nearest_metric = min(metric_candidates, key=lambda n: abs(n - minor_count_per_major))
+        if abs(nearest_imperial - minor_count_per_major) < abs(nearest_metric - minor_count_per_major):
+            suggested_unit = "in"
+
+    spacing_consistency = 1.0
+    if diffs.size >= 2 and np.mean(diffs) > 0:
+        cv = float(np.std(diffs) / np.mean(diffs))
+        spacing_consistency = float(np.clip(1.0 - cv, 0.0, 1.0))
+    confidence = float(np.clip(
+        0.4 * chosen["strength"] + 0.3 * spacing_consistency + 0.3 * min(1.0, len(positions) / 15.0),
+        0.0, 1.0,
+    ))
+
+    message = f"Detected a likely ruler with {len(positions)} tick marks ({len(majors)} major)."
+    return RulerCalibrationResult(
+        success=True,
+        message=message,
+        point1_px=p1,
+        point2_px=p2,
+        suggested_distance=1.0,
+        suggested_unit=suggested_unit,
+        minor_tick_spacing_px=round(minor_spacing, 3),
+        major_tick_count=len(majors),
+        confidence=round(confidence, 4),
     )
