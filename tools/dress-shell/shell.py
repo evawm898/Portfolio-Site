@@ -196,13 +196,31 @@ def dress_depth(fillet_params=None, v_top=240.0):
 
 
 _APEX_DEPTH = {}
+_PLATEAU_DEPTH = {}
+
+# APPROVED plateau settings (review round: "WIRE IN PlateauBustDepth
+# with: plateau spanning exactly the bust points: +/-87.5 mm lateral at
+# v=181, from the measured 175 mm breast tip distance ... CF depth
+# pinned to 123.0mm"). plateau_theta_deg is the SOLVED azimuth that
+# achieves exactly 87.5mm TRUE (equal-arc) lateral width at v=181 over
+# the plain base depth — solved once via brentq against
+# PlateauBustDepth._theta_ref/a(v) (naive degrees(87.5/r_ref) only
+# reaches ~80.1mm; see the historical gate scripts for the derivation).
+# Re-verify with bust_apex.verify_plateau_placement if dress_depth()'s
+# base ever changes — these are pinned NUMBERS, not a live solve, same
+# as apex_theta_deg=35.0 being a fixed default rather than re-derived.
+PLATEAU_THETA_DEG = 43.00219711928081
+PLATEAU_CF_DEPTH_MM = 123.0
 
 
 def dress_params(fillet_params=None, bodice=None, bust="apex",
                  bust_point_v=181.0, bust_point_radius=30.0,
                  join_radius=0.0, front_bow=0.1,
                  apex_v=181.0, apex_theta_deg=35.0, apex_amplitude_mm=None,
-                 apex_radius_mm=70.0) -> ShellParams:
+                 apex_radius_mm=70.0,
+                 plateau_v=181.0, plateau_theta_deg=PLATEAU_THETA_DEG,
+                 plateau_cf_depth_mm=PLATEAU_CF_DEPTH_MM,
+                 plateau_radius_mm=70.0) -> ShellParams:
     """The committed DRESS design: filleted waist (R = 25 conic), traced
     bodice depth with monotone bust crest, width solved from the given
     circumferences (ratios = outputs), neckline v3 (CF 220 / peak 240 @
@@ -212,13 +230,25 @@ def dress_params(fillet_params=None, bodice=None, bust="apex",
     exist for the editor's live rebuild; the armhole split re-solves
     whenever the fillet moves P(190).
 
-    BUST CURVATURE — bust="apex" (approved, wired in as the default):
-    two apex points (+-apex_theta_deg, apex_v) each add a radial,
-    compact-support raised-cosine bump (amplitude/radius) to the shared
-    base depth (front == back everywhere the bumps don't reach) — see
-    bust_apex.py. Circumference schedule P(v) stays exactly the frozen
-    fillet schedule above; a(v) is re-solved numerically so the bumped
-    ring's true perimeter still matches it.
+    BUST CURVATURE — bust="apex" stays the DEFAULT (unchanged; this is
+    still what the committed /dress shell renders): two apex points
+    (+-apex_theta_deg, apex_v) each add a radial, compact-support
+    raised-cosine bump (amplitude/radius) to the shared base depth
+    (front == back everywhere the bumps don't reach) — see bust_apex.py.
+    Circumference schedule P(v) stays exactly the frozen fillet schedule
+    above; a(v) is re-solved numerically so the bumped ring's true
+    perimeter still matches it.
+
+    bust="plateau" (APPROVED, now wired in as a selectable option — NOT
+    the default, since switching the committed shell is a separate
+    decision from making the construction available): one bump anchored
+    at center front, CF-is-max by construction (see
+    bust_apex.PlateauBustDepth), authored by CF DEPTH (plateau_cf_depth_mm)
+    rather than amplitude — amplitude is derived (cf_depth - base.b(v))
+    since amplitude was never the free parameter, CF depth was.
+    plateau_theta_deg defaults to the solved azimuth giving exactly
+    87.5mm true lateral width at v=181 (half the measured 175mm breast
+    tip distance).
 
     bust="compound" builds the SUPERSEDED front/back half-ellipse split
     (a uniform bump across the whole front half in v-bands — see
@@ -230,7 +260,7 @@ def dress_params(fillet_params=None, bodice=None, bust="apex",
                 float(getattr(bp, "cf_height", 0.0) or 0.0))
     d = dress_depth(fillet_params, v_top=v_top)
     # armhole from the across-back tape on the filleted schedule:
-    # theta = 180 - 180 * arc / P(190). Both bust wraps below FREEZE this
+    # theta = 180 - 180 * arc / P(190). All bust wraps below FREEZE this
     # exact schedule, so the split computed here is unaffected by them.
     P190 = float(np.asarray(d.perimeter(190.0)))
     split = 180.0 - 180.0 * 360.0 / P190
@@ -250,6 +280,19 @@ def dress_params(fillet_params=None, bodice=None, bust="apex",
                 amplitude_mm=apex_amplitude_mm, radius_mm=apex_radius_mm)
         return ShellParams(bodice=bp, depth_curve=_APEX_DEPTH[key],
                            split_theta=split)
+    if bust == "plateau":
+        key = (id(d), float(plateau_v), float(plateau_theta_deg),
+              float(plateau_cf_depth_mm), float(plateau_radius_mm))
+        if key not in _PLATEAU_DEPTH:
+            from bust_apex import PlateauBustDepth
+            base_b = float(np.asarray(ShellModel(plain).b(plateau_v)))
+            amplitude_mm = plateau_cf_depth_mm - base_b
+            _PLATEAU_DEPTH[key] = PlateauBustDepth(
+                base_params=plain, apex_v=plateau_v,
+                bust_plateau_theta=plateau_theta_deg,
+                amplitude_mm=amplitude_mm, radius_mm=plateau_radius_mm)
+        return ShellParams(bodice=bp, depth_curve=_PLATEAU_DEPTH[key],
+                           split_theta=split)
     if bust == "compound":
         from compound import CompoundDepth
         d2 = CompoundDepth(base=d, bust_point_v=bust_point_v,
@@ -257,8 +300,8 @@ def dress_params(fillet_params=None, bodice=None, bust="apex",
                            join_radius=join_radius, front_bow=front_bow)
         return ShellParams(bodice=bp, depth_curve=d2, split_theta=split)
     if bust != "plain":
-        raise ShellError(f"bust must be 'apex', 'compound', or 'plain', "
-                         f"got {bust!r}")
+        raise ShellError(f"bust must be 'apex', 'plateau', 'compound', or "
+                         f"'plain', got {bust!r}")
     return plain
 
 
@@ -272,18 +315,20 @@ class ShellModel:
 
     def __new__(cls, params: ShellParams = None, *args, **kwargs):
         # Dispatch to ApexShellModel/CompoundShellModel when the depth
-        # curve is an ApexBustDepth/CompoundDepth (ApexBustDepth is
-        # dress_params()'s default) — every ShellModel(...) call site in
-        # the codebase gets the right bust geometry automatically, with
-        # no need to know which concrete class it is. Lazy imports:
-        # bust_apex.py/compound.py import ShellModel/ShellParams from
-        # this module, so importing them at module scope here would be
-        # circular.
+        # curve is a _BumpedDepth (ApexBustDepth OR PlateauBustDepth —
+        # both share the same .a/.b/.t_of/.y_of bump-field interface;
+        # ApexBustDepth is dress_params()'s default, plateau is a
+        # selectable option) or a CompoundDepth — every ShellModel(...)
+        # call site in the codebase gets the right bust geometry
+        # automatically, with no need to know which concrete class it
+        # is. Lazy imports: bust_apex.py/compound.py import ShellModel/
+        # ShellParams from this module, so importing them at module
+        # scope here would be circular.
         if cls is ShellModel and params is not None:
             depth = getattr(params, "depth_curve", None)
             if depth is not None:
-                from bust_apex import ApexBustDepth, ApexShellModel
-                if isinstance(depth, ApexBustDepth):
+                from bust_apex import ApexShellModel, _BumpedDepth
+                if isinstance(depth, _BumpedDepth):
                     return object.__new__(ApexShellModel)
                 from compound import CompoundDepth, CompoundShellModel
                 # duck-typed: an authored (not frozen-perimeter-solved)

@@ -15,16 +15,19 @@ plumbing. Neckline heights stay live (independent of a/b — only clips
 the mesh top). theta_armhole is a SOLVED output, never a control.
 
 GENERATORS, NOT LIVE CONTROLS: hem_circumference, dome_n, fillet_radius/
-type, and the bust apex span/depth used to shape a(z)/b(z) directly —
+type, and the bust plateau span/depth used to shape a(z)/b(z) directly —
 now that those are drawn, a control that no longer does anything is
 worse than none. POST /api/generate builds the ordinary analytic
 committed-family shell (dress_params()) from these parameters and
 resamples the seed grid from it — a STARTING POINT to drag from, not a
 persistent binding (see shape_state.py's module docstring). The
-generator note commits ONE apex bust knob set matching the actual
-committed bust construction (bust="apex", dress_params()'s default) —
-NOT the never-wired PlateauBustDepth "bust plateau" class from earlier
-project history; flagged explicitly rather than silently assumed.
+generator seeds from bust="plateau" (PlateauBustDepth, now wired into
+dress_params() as a selectable option) at the APPROVED settings — theta
+pinned to the value giving exactly 87.5mm true lateral width at v=181,
+CF depth pinned to 123.0mm — NOT bust="apex", which is still
+dress_params()'s own DEFAULT for the committed /dress shell (wiring
+plateau in as an option is a separate decision from repointing the
+shipped shell's default, and this round only did the former).
 
 STANDING RULE (from the 72,000 mm^2 finding): never validate a curve fit
 only at its control points — PCHIP interpolates, so the at-point
@@ -57,7 +60,8 @@ sys.path.insert(0, str(HERE))
 
 from compound import compound_perimeter
 from coords import ShellCoords
-from curvature import STANDOFF_TOLERANCE_MM, analyze_cells, class_distribution
+from curvature import (HEM_SINGULAR_BAND_MM, STANDOFF_TOLERANCE_MM, analyze_cells,
+                       class_distribution)
 from fillet import FilletParams
 from front_silhouette import DEFAULT_TAPE_ANCHORS
 from grid import GridSpec, ShellGrid
@@ -65,7 +69,8 @@ from layout import SurfaceChart
 from panels import load_panel_classes
 from shape_state import (ShapeError, ShapeState, build_params_from_shape,
                          load_shape, save_shape)
-from shell import ShellError, ShellModel, build_meshes, dress_params
+from shell import (PLATEAU_CF_DEPTH_MM, PLATEAU_THETA_DEG, ShellError, ShellModel,
+                  build_meshes, dress_params)
 
 VENDOR_DIR = HERE.parents[1] / "dress" / "vendor"
 STATIC_DIR = HERE / "shape-editor"
@@ -90,14 +95,17 @@ _SEED_V_INTERIOR = [-370.0, -340.0, -300.0, -260.0, -220.0, -180.0, -140.0,
                     60.0, 90.0, 120.0, 145.0, 155.0, 165.0, 175.0, 181.0,
                     190.0, 200.0, 210.0, 220.0, 230.0]
 
-# committed-family bust construction: bust="apex" (ApexBustDepth), the
-# ACTUAL dress_params() default — NOT the never-wired PlateauBustDepth
-# "bust plateau" class from earlier project history. Flagged here so the
-# generator's naming stays honest about which construction it seeds from.
+# bust="plateau" (PlateauBustDepth), now wired into dress_params() as a
+# selectable option, at the APPROVED settings — NOT bust="apex", which
+# stays dress_params()'s own default for the committed /dress shell.
+# PLATEAU_THETA_DEG/PLATEAU_CF_DEPTH_MM live in shell.py (single source
+# of truth, shared with dress_params()'s own defaults) so this generator
+# can never silently drift from what "approved" actually means.
 _DEFAULT_GENERATOR = {
     "hem_circumference": 1549.4, "dome_n": 1.6,
     "fillet_radius": 25.0, "fillet_type": "conic",
-    "apex_theta_deg": 35.0, "apex_amplitude_mm": 35.4, "apex_radius_mm": 70.0,
+    "plateau_theta_deg": PLATEAU_THETA_DEG,
+    "plateau_cf_depth_mm": PLATEAU_CF_DEPTH_MM, "plateau_radius_mm": 70.0,
 }
 
 
@@ -152,7 +160,19 @@ def _full_shell_analysis(model, classes):
     """The SAME analysis pipeline editor_server.py runs for the placement
     editor (coords/chart/grid/analyze_cells at the same GRID_SPEC), so
     every number here is directly comparable to the committed baseline.
-    Costs real time — full tier only."""
+    Costs real time — full tier only.
+
+    min_radius_mm/min_radius_at is the whole-grid minimum OUTSIDE a
+    HEM_SINGULAR_BAND_MM band of the hem edge (coords.s_max — confirmed
+    the hem end, not s_min, by checking z_of_s at both bounds) — same
+    exclusion curvature.meridional_radius_profile already applies to its
+    CF-only scan, applied here to the full grid. dome_n < 2 makes r''
+    genuinely diverge as u -> 0 at the hem (a known, harmless property
+    of the superellipse family, not a defect); reporting a hem-adjacent
+    cell as "the" minimum without saying so reads as an error it isn't.
+    If the true global minimum (including the band) is smaller, it's
+    reported separately as hem_band_min_radius_mm, labeled, never
+    silently substituted for the genuine one."""
     coords = ShellCoords(model)
     chart = SurfaceChart(model, coords)
     grid = ShellGrid(chart, GRID_SPEC)
@@ -166,6 +186,7 @@ def _full_shell_analysis(model, classes):
     usable_area = 0.0
     total_area = 0.0
     min_r, min_r_at = float("inf"), None
+    band_min_r, band_min_r_at = float("inf"), None
     for a, c in zip(analyses, cells):
         r = chart.r_theta(c.theta_c, c.s_c)
         area = np.radians(c.theta1 - c.theta0) * r * (c.s1 - c.s0)
@@ -176,7 +197,13 @@ def _full_shell_analysis(model, classes):
             p213_area += area
         if a.max_class is not None:
             usable_area += area
-        if np.isfinite(a.r_min) and a.r_min < min_r:
+        if not np.isfinite(a.r_min):
+            continue
+        near_hem = (coords.s_max - c.s_c) <= HEM_SINGULAR_BAND_MM
+        if near_hem:
+            if a.r_min < band_min_r:
+                band_min_r, band_min_r_at = a.r_min, (float(c.theta_c), float(c.s_c))
+        elif a.r_min < min_r:
             min_r, min_r_at = a.r_min, (float(c.theta_c), float(c.s_c))
 
     front = [a for a, f in zip(analyses, front_mask) if f]
@@ -187,6 +214,10 @@ def _full_shell_analysis(model, classes):
         "total_shell_area_mm2": float(total_area),
         "min_radius_mm": None if not np.isfinite(min_r) else float(min_r),
         "min_radius_at": min_r_at,
+        "hem_singular": bool(model.n < 2.0),
+        "hem_band_mm": HEM_SINGULAR_BAND_MM,
+        "hem_band_min_radius_mm": None if not np.isfinite(band_min_r) else float(band_min_r),
+        "hem_band_min_radius_at": band_min_r_at,
         "class_distribution_front": {str(k): v for k, v in class_distribution(front).items()},
         "class_distribution_back": {str(k): v for k, v in class_distribution(back).items()},
     }
@@ -200,12 +231,12 @@ def _is_v3(model):
 def generate_seed_curves(gen, z_bottom, z_top):
     """The "seed curve from parameters" action. Builds the ordinary
     analytic committed-family shell from `gen` (hem_circumference,
-    dome_n, fillet_radius, fillet_type, apex_theta_deg,
-    apex_amplitude_mm, apex_radius_mm) and samples it at the dense seed
-    grid. b_front and b_back start IDENTICAL — the analytic model has no
-    front/back split (that's the whole reason #2 asked for one); this is
-    a starting point to drag apart, not a claim that front and back are
-    the same.
+    dome_n, fillet_radius, fillet_type, plateau_theta_deg,
+    plateau_cf_depth_mm, plateau_radius_mm) and samples it at the dense
+    seed grid. b_front and b_back start IDENTICAL — the analytic model
+    has no front/back split (that's the whole reason #2 asked for one);
+    this is a starting point to drag apart, not a claim that front and
+    back are the same.
 
     Returns (a_points, b_front_points, b_back_points, residual_report).
     residual_report is the STANDING-RULE check: fit-vs-analytic residual
@@ -215,10 +246,10 @@ def generate_seed_curves(gen, z_bottom, z_top):
                       fillet_type=str(gen["fillet_type"]),
                       hem_circumference=float(gen["hem_circumference"]),
                       dome_n=float(gen["dome_n"]))
-    params = dress_params(fillet_params=fp, bust="apex",
-                          apex_theta_deg=float(gen["apex_theta_deg"]),
-                          apex_amplitude_mm=float(gen["apex_amplitude_mm"]),
-                          apex_radius_mm=float(gen["apex_radius_mm"]))
+    params = dress_params(fillet_params=fp, bust="plateau",
+                          plateau_theta_deg=float(gen["plateau_theta_deg"]),
+                          plateau_cf_depth_mm=float(gen["plateau_cf_depth_mm"]),
+                          plateau_radius_mm=float(gen["plateau_radius_mm"]))
     model = ShellModel(params)
     if abs(model.z_bottom - z_bottom) > 1e-3 or abs(model.z_top - z_top) > 1e-3:
         raise ShapeError(

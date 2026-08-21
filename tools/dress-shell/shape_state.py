@@ -26,9 +26,16 @@ but authors a(v) directly and derives perimeter as the mean of the two
 Ramanujan formulas (compound.compound_perimeter) -- nothing is solved.
 
 GENERATORS, NOT LIVE CONTROLS (review round 1): hem_circumference,
-dome_n, fillet_radius/type, and the bust apex span/depth used to shape
-a(z)/b(z) directly; now that those are drawn, a live control that no
-longer does anything is worse than no control. generate_seed_curves()
+dome_n, fillet_radius/type, and the bust plateau span/depth used to
+shape a(z)/b(z) directly; now that those are drawn, a live control that
+no longer does anything is worse than no control. The bust construction
+is bust="plateau" (PlateauBustDepth, wired into dress_params() as a
+selectable option in round 3 -- the committed /dress shell's own
+default is unchanged, still bust="apex") at the APPROVED settings:
+theta pinned to the value that gives exactly 87.5mm true lateral width
+at v=181 (half the measured 175mm breast tip distance), CF depth pinned
+to 123.0mm (see shell.py's PLATEAU_THETA_DEG/PLATEAU_CF_DEPTH_MM).
+generate_seed_curves()
 below is the "seed curve from parameters" action -- it builds the
 ordinary analytic committed-family shell (dress_params()) from those
 parameters and samples it at the seed grid, producing a STARTING POINT
@@ -55,8 +62,8 @@ _HEADER = ("# shape.yaml — dress shape editor state (milestone 3).\n"
 _NECK_FIELDS = ("cf_height", "peak_height", "peak_theta", "side_height",
                 "cb_height", "rise_bow", "decay_rate", "cf_corner")
 _GENERATOR_FIELDS = ("hem_circumference", "dome_n", "fillet_radius",
-                     "fillet_type", "apex_theta_deg", "apex_amplitude_mm",
-                     "apex_radius_mm")
+                     "fillet_type", "plateau_theta_deg", "plateau_cf_depth_mm",
+                     "plateau_radius_mm")
 
 
 class ShapeError(ValueError):

@@ -1,7 +1,7 @@
 // Shape editor — milestone 3. a(v) shared; b(v) splits into independently
 // draggable b_front(v)/b_back(v) on one canvas (compound half-ellipse
 // sections, see shape_state.CompoundShapeCurves). Neckline stays live.
-// Skirt/fillet/bust-apex scalars are GENERATORS, not live controls: they
+// Skirt/fillet/bust-plateau scalars are GENERATORS, not live controls: they
 // seed control points (replacing the current ones), never bind. Two
 // speeds, always labeled:
 //   COARSE — this file's own geom.js port, every pointermove, no network.
@@ -364,8 +364,17 @@ function fmtCircTable(rows, label) {
 function fmtShell(s, base) {
   const df = s.class_distribution_front, db = s.class_distribution_back;
   const dstr = (d) => Object.entries(d).map(([k, v]) => `${k === "null" ? "none" : k}×${v}`).join(" ");
-  return `min meridional radius <b>${s.min_radius_mm?.toFixed(1) ?? "?"} mm</b>` +
+  let hemNote = "";
+  if (s.hem_band_min_radius_mm != null) {
+    hemNote = `<br><span class="warn">hem band (≤${s.hem_band_mm} mm from the hem edge) min radius ` +
+      `${s.hem_band_min_radius_mm.toFixed(1)} mm at θ ${s.hem_band_min_radius_at[0].toFixed(0)}° ` +
+      `s ${s.hem_band_min_radius_at[1].toFixed(0)} mm — ${s.hem_singular
+        ? "known superellipse singularity (dome_n < 2, r'' diverges as u→0), not a defect"
+        : "dome_n ≥ 2, not the singular regime"}</span>`;
+  }
+  return `min meridional radius (outside the hem band) <b>${s.min_radius_mm?.toFixed(1) ?? "?"} mm</b>` +
     (s.min_radius_at ? ` at θ ${s.min_radius_at[0].toFixed(0)}° s ${s.min_radius_at[1].toFixed(0)} mm` : "") +
+    hemNote +
     `<br>max-class front: ${dstr(df)}<br>max-class back: ${dstr(db)}` +
     `<br>p213 area <b>${(s.p213_area_mm2 / 100).toFixed(0)} cm²</b>` +
     (base ? ` (Δ ${((s.p213_area_mm2 - base.p213_area_mm2) / 100).toFixed(0)} cm² vs committed)` : "") +
@@ -410,14 +419,14 @@ function neckBody() {
 const g = state.generator;
 $("gHem").value = g.hem_circumference; $("gDomeN").value = g.dome_n;
 $("gFilletR").value = g.fillet_radius; $("gFilletType").value = g.fillet_type;
-$("gApexTheta").value = g.apex_theta_deg; $("gApexAmp").value = g.apex_amplitude_mm;
-$("gApexR").value = g.apex_radius_mm;
+$("gPlateauTheta").value = g.plateau_theta_deg; $("gPlateauCf").value = g.plateau_cf_depth_mm;
+$("gPlateauR").value = g.plateau_radius_mm;
 function generatorBody() {
   return { hem_circumference: parseFloat($("gHem").value), dome_n: parseFloat($("gDomeN").value),
           fillet_radius: parseFloat($("gFilletR").value), fillet_type: $("gFilletType").value,
-          apex_theta_deg: parseFloat($("gApexTheta").value),
-          apex_amplitude_mm: parseFloat($("gApexAmp").value),
-          apex_radius_mm: parseFloat($("gApexR").value) };
+          plateau_theta_deg: parseFloat($("gPlateauTheta").value),
+          plateau_cf_depth_mm: parseFloat($("gPlateauCf").value),
+          plateau_radius_mm: parseFloat($("gPlateauR").value) };
 }
 
 function coarseUpdate() {

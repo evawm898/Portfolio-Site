@@ -93,12 +93,15 @@
     <button id="applyBtn">apply neckline + regenerate (full)</button>
 
     <h2>Generator — seeds control points, not a live control</h2>
-    <div class="kv">hem_circumference / dome_n / fillet radius+type / bust apex span+depth
-      used to shape a(z)/b(z) directly before this editor existed. Set them, press
-      generate: it builds the ordinary analytic shell from these values and REPLACES the
-      current control points with samples from it — a starting point to drag from, not a
-      binding. b_front and b_back both seed from the same analytic b(z) (it has no
-      front/back split) — diverge them by dragging.</div>
+    <div class="kv">hem_circumference / dome_n / fillet radius+type / bust plateau
+      theta+CF depth used to shape a(z)/b(z) directly before this editor existed. Bust
+      construction is bust="plateau" (PlateauBustDepth, CF is structurally the max —
+      no center-front dip), at the approved settings by default: theta pinned to give
+      exactly 87.5mm true lateral width at v=181, CF depth pinned to 123.0mm. Set them,
+      press generate: it builds the ordinary analytic shell from these values and
+      REPLACES the current control points with samples from it — a starting point to
+      drag from, not a binding. b_front and b_back both seed from the same analytic
+      b(z) (it has no front/back split) — diverge them by dragging.</div>
     <div class="row">
       <label>hem circ <input id="gHem" type="number" step="10"></label>
       <label>dome n <input id="gDomeN" type="number" step="0.1"></label>
@@ -108,9 +111,9 @@
       </select></label>
     </div>
     <div class="row">
-      <label>bust apex θ <input id="gApexTheta" type="number" step="1"></label>
-      <label>bust apex depth <input id="gApexAmp" type="number" step="1"></label>
-      <label>bust apex radius <input id="gApexR" type="number" step="5"></label>
+      <label>plateau θ <input id="gPlateauTheta" type="number" step="0.5"></label>
+      <label>plateau CF depth <input id="gPlateauCf" type="number" step="1"></label>
+      <label>plateau radius <input id="gPlateauR" type="number" step="5"></label>
     </div>
     <button id="generateBtn" class="gen">seed curve from parameters</button>
     <div class="kv" id="generatorStatus"></div>
