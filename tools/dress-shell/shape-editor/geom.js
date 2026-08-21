@@ -194,3 +194,193 @@ export function coarseCircumferenceReport(aFit, bfFit, bbFit, vLo, vHi) {
              delta_mm: derived - tapeMm, in_range: v >= vLo && v <= vHi };
   });
 }
+
+// -- adaptive point placement -------------------------------------------
+// Greedy worst-residual insertion: builds an ORDERED sequence (insertion
+// order, NOT sorted by v) that approximates `groundTruth` ever more
+// closely. Endpoints (vLo, vHi) are always the first two. Every prefix
+// length K's max/rms residual gets recorded as it's built, so a caller
+// can look up "residual at K points" for any K up to the built length
+// without recomputing — that's what makes the density SLIDER O(1) per
+// move: build once (on load, or whenever the underlying curve changes
+// via an edit), then the slider only takes a prefix.
+//
+// STANDING RULE, enforced structurally here, not just by convention: the
+// residual driving both point SELECTION and the reported number is
+// always measured on a dense probe grid BETWEEN points, never AT them
+// (PCHIP interpolates exactly at knots, so an at-knot check would always
+// read ~0 regardless of how badly the curve wanders between them — this
+// is exactly what hid the 72,000 mm^2 finding the first time).
+export function buildAdaptiveOrder(groundTruth, vLo, vHi, opts = {}) {
+  const { maxPoints = 60, probeCount = 1201, minResidual = 0.02 } = opts;
+  const probe = new Array(probeCount);
+  for (let i = 0; i < probeCount; i++) probe[i] = vLo + (vHi - vLo) * i / (probeCount - 1);
+  const gt = probe.map(groundTruth);
+
+  const order = [{ v: vLo, y: groundTruth(vLo) }, { v: vHi, y: groundTruth(vHi) }];
+  const residualAtCount = new Map();
+
+  function measure(pts) {
+    const sorted = [...pts].sort((a, b) => a.v - b.v);
+    const fit = pchipFit(sorted.map(p => p.v), sorted.map(p => p.y));
+    let maxErr = 0, sumSq = 0, worstIdx = -1;
+    for (let i = 0; i < probe.length; i++) {
+      const err = Math.abs(fit(probe[i]) - gt[i]);
+      if (err > maxErr) { maxErr = err; worstIdx = i; }
+      sumSq += err * err;
+    }
+    return { max: maxErr, rms: Math.sqrt(sumSq / probe.length), fit, worstIdx };
+  }
+
+  let m = measure(order);
+  residualAtCount.set(order.length, { max: m.max, rms: m.rms });
+  while (order.length < maxPoints && m.max > minResidual) {
+    const v = probe[m.worstIdx];
+    if (order.some(p => Math.abs(p.v - v) < 1e-6)) break;   // degenerate: stop, don't loop forever
+    order.push({ v, y: gt[m.worstIdx] });
+    m = measure(order);
+    residualAtCount.set(order.length, { max: m.max, rms: m.rms });
+  }
+  return { order, residualAtCount, probe, gt };
+}
+
+// "Solve for the minimum number of points meeting a target residual" —
+// the same greedy build, just reporting where it naturally stopped.
+export function minimumPointsForResidual(groundTruth, vLo, vHi, targetResidualMm, opts = {}) {
+  const { order, residualAtCount } = buildAdaptiveOrder(
+    groundTruth, vLo, vHi, { ...opts, minResidual: targetResidualMm });
+  const count = order.length;
+  return { count, points: [...order].sort((a, b) => a.v - b.v),
+          residual: residualAtCount.get(count) };
+}
+
+// Named features this shell is known to have (from this project's own
+// history — the waist fillet crease and the bust-bump ramp are the two
+// regions dense uniform seeding was originally added FOR). Checking
+// these explicitly means a density choice that loses one gets named
+// ("below 14 points the waist crease is lost"), not just a bare
+// aggregate residual a viewer has to interpret themselves.
+export const NAMED_FEATURES = [
+  { name: "waist crease", vRange: [-25, 25] },
+  { name: "bust ramp", vRange: [150, 212] },
+];
+
+export function checkNamedFeatures(fit, groundTruth, thresholdMm, probeStep = 1.0) {
+  return NAMED_FEATURES.map(({ name, vRange }) => {
+    let maxErr = 0;
+    for (let v = vRange[0]; v <= vRange[1]; v += probeStep) {
+      const err = Math.abs(fit(v) - groundTruth(v));
+      if (err > maxErr) maxErr = err;
+    }
+    return { name, vRange, maxErrorMm: maxErr, lost: maxErr > thresholdMm };
+  });
+}
+
+// -- smoothing -------------------------------------------------------------
+// Laplacian (neighbor-averaging) smoothing directly on the CONTROL
+// POINTS' y-values — for cleaning up trace/digitization noise (e.g. a
+// b_back seed with small zig-zags that aren't real shape, just noise in
+// how it was authored) without hand-dragging every point. Endpoints
+// held fixed so the domain boundary values never drift. `amount` in
+// [0, 1] blends each point toward its neighbor average per pass;
+// `passes` repeats it — same idea as a box-blur iterated.
+export function smoothPoints(points, amount = 0.5, passes = 1) {
+  let pts = points.map(p => ({ v: p.v, y: p.y })).sort((a, b) => a.v - b.v);
+  for (let k = 0; k < passes; k++) {
+    const next = pts.map((p, i) => {
+      if (i === 0 || i === pts.length - 1) return { ...p };
+      const prev = pts[i - 1], nxt = pts[i + 1];
+      // distance-weighted neighbor average (uneven v-spacing after
+      // adaptive placement — a plain unweighted average would bias
+      // toward whichever neighbor happens to sit closer)
+      const wPrev = 1 / Math.max(p.v - prev.v, 1e-6);
+      const wNext = 1 / Math.max(nxt.v - p.v, 1e-6);
+      const avg = (prev.y * wPrev + nxt.y * wNext) / (wPrev + wNext);
+      return { v: p.v, y: p.y + amount * (avg - p.y) };
+    });
+    pts = next;
+  }
+  return pts;
+}
+
+// -- true principal curvatures (faithful port of curvature.py) -------------
+// fundamental_forms_numeric/principal_curvatures, ported term for term:
+// same finite-difference steps (dt=1e-3 rad, dz=0.5mm — curvature.py's
+// _H), same z-stencil guard against crossing the waist crease (z=0) that
+// exists whenever a bodice is set (true for every model in this family).
+// Built on point() alone, exactly like the Python original (is_swept_ellipse
+// is true for every model in this family, so this numeric path — not an
+// analytic revolution formula — is what Python actually runs too).
+function sub3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function add3(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+function scale3(a, s) { return [a[0] * s, a[1] * s, a[2] * s]; }
+function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function cross3(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function norm3(a) { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; }
+
+export function principalCurvatures(pointFn, thetaRad, z, zBottom, zTop, dt = 1e-3, dz = 0.5) {
+  const below = z <= 0.0;
+  const zLo = below ? zBottom + dz : dz;
+  const zHi = below ? -dz : zTop - dz;
+  const zc = Math.max(zLo, Math.min(z, zHi));
+
+  const X = pointFn(thetaRad, z);
+  const Ptp = pointFn(thetaRad + dt, z), Ptm = pointFn(thetaRad - dt, z);
+  const Xt = scale3(sub3(Ptp, Ptm), 1 / (2 * dt));
+  const Xtt = scale3(add3(sub3(Ptp, scale3(X, 2)), Ptm), 1 / (dt * dt));
+  const Pzcp = pointFn(thetaRad, zc + dz), Pzcm = pointFn(thetaRad, zc - dz);
+  const Xzc = scale3(sub3(Pzcp, Pzcm), 1 / (2 * dz));
+  const Pzc = pointFn(thetaRad, zc);
+  const Xzz = scale3(add3(sub3(Pzcp, scale3(Pzc, 2)), Pzcm), 1 / (dz * dz));
+  const Ptpzp = pointFn(thetaRad + dt, zc + dz), Ptmzp = pointFn(thetaRad - dt, zc + dz);
+  const Ptpzm = pointFn(thetaRad + dt, zc - dz), Ptmzm = pointFn(thetaRad - dt, zc - dz);
+  const Xtz = scale3(
+    add3(sub3(sub3(Ptpzp, Ptmzp), Ptpzm), Ptmzm), 1 / (4 * dt * dz));
+
+  const n = norm3(cross3(Xzc, Xt));
+  const E = dot3(Xt, Xt), F = dot3(Xt, Xzc), G = dot3(Xzc, Xzc);
+  const L = dot3(Xtt, n), M = dot3(Xtz, n), N = dot3(Xzz, n);
+  const denom = E * G - F * F;
+  const K = (L * N - M * M) / denom;
+  const H = (E * N - 2 * F * M + G * L) / (2 * denom);
+  const disc = Math.sqrt(Math.max(H * H - K, 0));
+  return { k1: H + disc, k2: H - disc, K };
+}
+
+// Whole-shell min meridional radius, hem band separated exactly like
+// shape_editor_server._full_shell_analysis (same HEM_SINGULAR_BAND_MM,
+// same "outside the band" vs "inside, and is dome_n < 2 the reason"
+// split) — but computed LIVE, client-side, from principalCurvatures
+// above rather than a Python baked snapshot. domeN is passed in (not
+// re-derived) since the compound curves architecture has no superellipse
+// exponent of its own; the hem_singular label reflects the COMMITTED
+// shell's skirt family, carried from the baked snapshot.
+export const HEM_SINGULAR_BAND_MM = 5.0;
+
+export function scanMinRadius(pointFn, zLo, zHi, splitThetaDeg, domeN,
+                              { nTheta = 36, nZ = 48 } = {}) {
+  const split = splitThetaDeg * Math.PI / 180;
+  let minR = Infinity, minAt = null;
+  let bandMinR = Infinity, bandMinAt = null;
+  for (let j = 0; j <= nZ; j++) {
+    const z = zLo + (zHi - zLo) * j / nZ;
+    const nearHemZ = (z - zLo) <= HEM_SINGULAR_BAND_MM;   // hem is at z = zLo (z_bottom)
+    for (let i = 0; i <= nTheta; i++) {
+      const theta = -Math.PI + (2 * Math.PI) * i / nTheta;
+      const { k1, k2 } = principalCurvatures(pointFn, theta, z, zLo, zHi);
+      const r = 1 / Math.max(Math.abs(k1), Math.abs(k2), 1e-12);
+      if (nearHemZ) {
+        if (r < bandMinR) { bandMinR = r; bandMinAt = { thetaDeg: theta * 180 / Math.PI, z }; }
+      } else if (r < minR) {
+        minR = r; minAt = { thetaDeg: theta * 180 / Math.PI, z };
+      }
+    }
+  }
+  return {
+    minRadiusMm: Number.isFinite(minR) ? minR : null, minRadiusAt: minAt,
+    hemBandMinRadiusMm: Number.isFinite(bandMinR) ? bandMinR : null, hemBandMinRadiusAt: bandMinAt,
+    hemSingular: domeN < 2.0, hemBandMm: HEM_SINGULAR_BAND_MM,
+  };
+}

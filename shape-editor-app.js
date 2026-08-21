@@ -20,7 +20,50 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { pchipFit, CompoundCoarseShell, monotonicityReport,
-        coarseCircumferenceReport } from "./shape-editor-geom.js";
+        coarseCircumferenceReport, buildAdaptiveOrder, minimumPointsForResidual,
+        checkNamedFeatures, smoothPoints } from "./shape-editor-geom.js";
+
+// -- adaptive point density ---------------------------------------------
+// "Too many control points" — the flat ~31-point seed is replaced ONCE,
+// at load, by the fewest adaptively-placed points meeting a target
+// between-point residual against the TRUE dense generated curve (1601
+// points, baked by export_shape_editor_static.py — see seed_a_dense/
+// seed_b_dense). After that one-time replacement, EVERY subsequent
+// density-slider move resamples against whatever curve currently exists
+// on screen (hand edits included), never against the original dense
+// table again — "resample, don't redistribute," per the standing
+// instruction. A slider session (mousedown to mouseup on the <input>)
+// reuses one stable adaptive order so scrubbing back and forth within it
+// is lossless; only a real hand edit on the canvas (or a smoothing pass)
+// invalidates the cache and forces the next slider move to rebuild from
+// the edited curve.
+const MAX_POINTS = 40;
+const MIN_POINTS = 4;
+const DEFAULT_TARGET_RESIDUAL_MM = 0.7;
+const FEATURE_LOST_THRESHOLD_MM = 1.5;
+
+function buildDensityCache(points) {
+  const sorted = [...points].sort((a, b) => a.v - b.v);
+  const baseFit = pchipFit(sorted.map(p => p.v), sorted.map(p => p.y));
+  const built = buildAdaptiveOrder(baseFit, V_LO, V_HI, { maxPoints: MAX_POINTS, minResidual: 0 });
+  return { ...built, baseFit };
+}
+function applyDensityTo(cache, targetCount) {
+  const n = Math.max(MIN_POINTS, Math.min(targetCount, cache.order.length));
+  const newPts = cache.order.slice(0, n).map(p => ({ v: p.v, y: p.y })).sort((a, b) => a.v - b.v);
+  const newFit = pchipFit(newPts.map(p => p.v), newPts.map(p => p.y));
+  const residual = cache.residualAtCount.get(n) || { max: 0, rms: 0 };
+  const features = checkNamedFeatures(newFit, cache.baseFit, FEATURE_LOST_THRESHOLD_MM);
+  return { points: newPts, count: n, residual, features };
+}
+function fmtDensity(r, label) {
+  const lost = r.features.filter(f => f.lost);
+  const featStr = lost.length
+    ? `<span class="warn">lost: ${lost.map(f => f.name).join(", ")}</span>`
+    : (r.features.length ? '<span class="ok">named features intact</span>' : "");
+  return `${label}: <b>${r.count}</b> pts · between-point residual (vs the curve before this resample) ` +
+    `max <b>${r.residual.max.toFixed(2)}</b> mm, rms <b>${r.residual.rms.toFixed(2)}</b> mm · ${featStr}`;
+}
 
 const $ = (id) => document.getElementById(id);
 const status = (msg, cls = "") => { $("status").innerHTML = `<span class="${cls}">${msg}</span>`; };
@@ -73,7 +116,7 @@ function defFitOf(table) {
 
 // ---------------------------------------------------------------- a(v): mirrored single curve
 class CurvePane {
-  constructor({ canvas, seed, defaultTable, backdropSrc, onLive }) {
+  constructor({ canvas, seed, defaultTable, backdropSrc, onLive, onDragEnd }) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
     this.points = seed.map(([v, y]) => ({ v, y }));
     this.defaultTable = defaultTable;
@@ -83,6 +126,7 @@ class CurvePane {
     this.mmPerPxY = this.yMax / (this.CX - PAD);
     this.dragPoint = null;
     this.onLive = onLive;
+    this.onDragEnd = onDragEnd;
     this.backdrop = loadBackdrop(backdropSrc, () => this.draw());
     this._wire();
   }
@@ -155,13 +199,17 @@ class CurvePane {
       }
       c.style.cursor = this._pick(mx, ev.clientY - r.top) ? "grab" : "default";
     });
-    addEventListener("pointerup", () => { this.dragPoint = null; this.draw(); });
+    addEventListener("pointerup", () => {
+      const wasDragging = this.dragPoint !== null;
+      this.dragPoint = null; this.draw();
+      if (wasDragging) this.onDragEnd?.();
+    });
   }
 }
 
 // ---------------------------------------------------------------- b(v): front (right) / back (left)
 class DualCurvePane {
-  constructor({ canvas, seedFront, seedBack, defaultTable, backdropSrc, onLive }) {
+  constructor({ canvas, seedFront, seedBack, defaultTable, backdropSrc, onLive, onDragEnd }) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
     this.front = seedFront.map(([v, y]) => ({ v, y }));
     this.back = seedBack.map(([v, y]) => ({ v, y }));
@@ -172,6 +220,7 @@ class DualCurvePane {
     this.mmPerPxY = this.yMax / (this.CX - PAD);
     this.dragPoint = null; this.dragSide = null;
     this.onLive = onLive;
+    this.onDragEnd = onDragEnd;
     this.backdrop = loadBackdrop(backdropSrc, () => this.draw());
     this._wire();
   }
@@ -248,20 +297,44 @@ class DualCurvePane {
       }
       c.style.cursor = this._pick(mx, ev.clientY - r.top) ? "grab" : "default";
     });
-    addEventListener("pointerup", () => { this.dragPoint = null; this.dragSide = null; this.draw(); });
+    addEventListener("pointerup", () => {
+      const wasDragging = this.dragPoint !== null, side = this.dragSide;
+      this.dragPoint = null; this.dragSide = null; this.draw();
+      if (wasDragging) this.onDragEnd?.(side);
+    });
   }
 }
 
+// Replace the flat ~31-point baked seed with the fewest adaptively-placed
+// points that meet DEFAULT_TARGET_RESIDUAL_MM against the TRUE dense
+// generated curve (seed_a_dense/seed_b_dense, 1601 points) — a one-time
+// operation, done once here at load. Every later density-slider move
+// resamples against whatever's on screen, never against this dense table
+// again (see the adaptive-density block above).
+const groundTruthA = defFitOf({ z: state.seed_a_dense.z, y: state.seed_a_dense.a });
+const groundTruthB = defFitOf({ z: state.seed_b_dense.z, y: state.seed_b_dense.b });
+const initA = minimumPointsForResidual(groundTruthA, V_LO, V_HI, DEFAULT_TARGET_RESIDUAL_MM, { maxPoints: MAX_POINTS });
+const initBf = minimumPointsForResidual(groundTruthB, V_LO, V_HI, DEFAULT_TARGET_RESIDUAL_MM, { maxPoints: MAX_POINTS });
+const initBb = minimumPointsForResidual(groundTruthB, V_LO, V_HI, DEFAULT_TARGET_RESIDUAL_MM, { maxPoints: MAX_POINTS });
+const seedAPoints = initA.points.map(p => [p.v, p.y]);
+const seedBfPoints = initBf.points.map(p => [p.v, p.y]);
+const seedBbPoints = initBb.points.map(p => [p.v, p.y]);
+const bakedSeedCount = state.seed_a_points.length;
+
+let cacheA = null, cacheBf = null, cacheBb = null;
+
 const noop = () => {};
 const paneA = new CurvePane({
-  canvas: $("canvasA"), seed: state.seed_a_points,
+  canvas: $("canvasA"), seed: seedAPoints,
   defaultTable: { z: state.default_a_table.z, y: state.default_a_table.a },
   backdropSrc: "./assets/shape-editor/silhouette-front.png", onLive: noop,
+  onDragEnd: () => { cacheA = null; },
 });
 const paneB = new DualCurvePane({
-  canvas: $("canvasB"), seedFront: state.seed_bf_points, seedBack: state.seed_bb_points,
+  canvas: $("canvasB"), seedFront: seedBfPoints, seedBack: seedBbPoints,
   defaultTable: { z: state.default_b_table.z, y: state.default_b_table.b },
   backdropSrc: "./assets/shape-editor/silhouette-trace.png", onLive: noop,
+  onDragEnd: (side) => { if (side === 1) cacheBf = null; else cacheBb = null; },
 });
 paneA.onLive = paneB.onLive = () => liveUpdate();
 
@@ -364,6 +437,77 @@ const g = state.generator;
 $("genRef").innerHTML = `hem circ ${g.hem_circumference} · dome n ${g.dome_n} · ` +
   `fillet R ${g.fillet_radius} (${g.fillet_type}) · plateau θ ${g.plateau_theta_deg.toFixed(3)}° · ` +
   `plateau CF depth ${g.plateau_cf_depth_mm} mm · plateau radius ${g.plateau_radius_mm} mm`;
+
+// ---------------------------------------------------------------- adaptive density UI
+$("densityReport").innerHTML = `adaptive seed replaced the flat ${bakedSeedCount}-point baked seed: ` +
+  `a(v) <b>${bakedSeedCount}→${initA.count}</b> pts · b_front <b>${bakedSeedCount}→${initBf.count}</b> pts · ` +
+  `b_back <b>${bakedSeedCount}→${initBb.count}</b> pts (≤${DEFAULT_TARGET_RESIDUAL_MM}mm target, sampled ` +
+  `between control points against the true generated curve, never just at knots).`;
+
+function fmtInitDensity(label, r) {
+  return `${label}: <b>${r.count}</b> pts · seeded at ≤${DEFAULT_TARGET_RESIDUAL_MM}mm target ` +
+    `(max ${r.residual.max.toFixed(2)}mm, rms ${r.residual.rms.toFixed(2)}mm vs the true generated curve)`;
+}
+$("densityA").min = String(MIN_POINTS); $("densityA").max = String(MAX_POINTS); $("densityA").value = String(initA.count);
+$("densityAVal").textContent = String(initA.count);
+$("densityAReadout").innerHTML = fmtInitDensity("a(v)", initA);
+$("densityBf").min = String(MIN_POINTS); $("densityBf").max = String(MAX_POINTS); $("densityBf").value = String(initBf.count);
+$("densityBfVal").textContent = String(initBf.count);
+$("densityBfReadout").innerHTML = fmtInitDensity("b_front", initBf);
+$("densityBb").min = String(MIN_POINTS); $("densityBb").max = String(MAX_POINTS); $("densityBb").value = String(initBb.count);
+$("densityBbVal").textContent = String(initBb.count);
+$("densityBbReadout").innerHTML = fmtInitDensity("b_back", initBb);
+
+$("densityA").addEventListener("input", (ev) => {
+  if (!cacheA) cacheA = buildDensityCache(paneA.points);
+  const r = applyDensityTo(cacheA, parseInt(ev.target.value, 10));
+  paneA.points = r.points;
+  $("densityAVal").textContent = String(r.count);
+  $("densityAReadout").innerHTML = fmtDensity(r, "a(v)");
+  paneA.draw(); liveUpdate();
+});
+$("densityBf").addEventListener("input", (ev) => {
+  if (!cacheBf) cacheBf = buildDensityCache(paneB.front);
+  const r = applyDensityTo(cacheBf, parseInt(ev.target.value, 10));
+  paneB.front = r.points;
+  $("densityBfVal").textContent = String(r.count);
+  $("densityBfReadout").innerHTML = fmtDensity(r, "b_front");
+  paneB.draw(); liveUpdate();
+});
+$("densityBb").addEventListener("input", (ev) => {
+  if (!cacheBb) cacheBb = buildDensityCache(paneB.back);
+  const r = applyDensityTo(cacheBb, parseInt(ev.target.value, 10));
+  paneB.back = r.points;
+  $("densityBbVal").textContent = String(r.count);
+  $("densityBbReadout").innerHTML = fmtDensity(r, "b_back");
+  paneB.draw(); liveUpdate();
+});
+
+// ---------------------------------------------------------------- smoothing (control-point cleanup)
+function smoothAmountPasses() {
+  return [parseFloat($("smoothAmount").value) || 0, parseInt($("smoothPasses").value, 10) || 1];
+}
+$("smoothA").onclick = () => {
+  const [amt, passes] = smoothAmountPasses();
+  paneA.points = smoothPoints(paneA.points, amt, passes);
+  cacheA = null;
+  paneA.draw(); liveUpdate();
+  status("smoothed a(v)", "ok");
+};
+$("smoothBf").onclick = () => {
+  const [amt, passes] = smoothAmountPasses();
+  paneB.front = smoothPoints(paneB.front, amt, passes);
+  cacheBf = null;
+  paneB.draw(); liveUpdate();
+  status("smoothed b_front", "ok");
+};
+$("smoothBb").onclick = () => {
+  const [amt, passes] = smoothAmountPasses();
+  paneB.back = smoothPoints(paneB.back, amt, passes);
+  cacheBb = null;
+  paneB.draw(); liveUpdate();
+  status("smoothed b_back", "ok");
+};
 
 // neckline: display only (rebuilding the neckline surface needs Python
 // too, in this first cut) — shown for reference, not editable live yet.

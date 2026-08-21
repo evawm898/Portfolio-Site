@@ -100,11 +100,44 @@
     <textarea id="exportArea" readonly></textarea>
 
     <hr>
+    <h2>Point density (adaptive placement)</h2>
+    <div class="legend" id="densityReport">…</div>
+    <div class="legend">Points are placed adaptively (worst-residual-first against a dense reference),
+      not uniformly — fewer points where the curve is straight, more where it bends. Moving a slider
+      <b>resamples the curve as it stands right now</b> (hand edits included) at the new count — it does
+      not just add or remove handles at fixed spots. Scrubbing a slider back and forth is lossless; a
+      fresh hand-drag on the canvas resets what "now" means for the next resample.</div>
+    <div class="row">a(v) <input type="range" id="densityA" style="flex:1"> <b id="densityAVal"></b> pts</div>
+    <div id="densityAReadout" class="kv">…</div>
+    <div class="row">b_front <input type="range" id="densityBf" style="flex:1"> <b id="densityBfVal"></b> pts</div>
+    <div id="densityBfReadout" class="kv">…</div>
+    <div class="row">b_back <input type="range" id="densityBb" style="flex:1"> <b id="densityBbVal"></b> pts</div>
+    <div id="densityBbReadout" class="kv">…</div>
+
+    <h2>Smoothing (control-point cleanup, not reshaping)</h2>
+    <div class="legend">Neighbor-averages control-point <i>values</i> in place — for trace/digitization
+      noise (small zig-zags), not for intentionally reshaping a curve. Endpoints held fixed.
+      <span class="warn">b_back is visibly noisy near the bust in the baked seed — a trace artifact, not
+      shape</span> — this cleans it without hand-dragging every point.</div>
+    <div class="row">amount <input type="number" id="smoothAmount" value="0.5" min="0" max="1" step="0.1" style="width:4em">
+      passes <input type="number" id="smoothPasses" value="2" min="1" max="10" step="1" style="width:4em"></div>
+    <div class="row">
+      <button id="smoothA">smooth a(v)</button>
+      <button id="smoothBf">smooth b_front</button>
+      <button id="smoothBb">smooth b_back</button>
+    </div>
+
+    <hr>
     <h2>Live readouts</h2>
     <div id="monoReadout" class="kv">…</div>
     <h3>Circumference vs tape (compound: mean of front + back Ramanujan)</h3>
     <table id="circTable"></table>
     <h3>Shell (snapshot — see banner above)</h3>
+    <div class="legend">Adaptive placement does NOT close this gap: min-radius/seatable-area are
+      curvature (2nd-derivative) readouts, and PCHIP through control points is only C1-continuous —
+      any numeric curvature estimate on it is unstable regardless of point count or placement, not
+      just under-sampled. More/better-placed points cannot fix a smoothness-class mismatch, so this
+      block stays a labeled Python snapshot rather than a live number.</div>
     <div id="shellReadout" class="kv">…</div>
     <div id="baselineReadout" class="kv" style="margin-top:8px">…</div>
   </div>

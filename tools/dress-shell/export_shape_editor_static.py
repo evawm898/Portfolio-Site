@@ -151,6 +151,17 @@ def main():
     seed_a = np.asarray(seed_model.a(np.array(seed_v)), dtype=float).tolist()
     seed_b = np.asarray(seed_model.b(np.array(seed_v)), dtype=float).tolist()
 
+    # DENSE ground truth for the plateau-seeded curves specifically (not
+    # just the sparse 31-point seed) — the adaptive point-placement
+    # algorithm needs a much finer reference than 31 points to solve
+    # "minimum points for <= 0.7mm residual" against, or it would just
+    # be adaptively resampling its own already-coarse approximation.
+    # 1601 points keeps quantization error two orders of magnitude below
+    # the 0.7mm target.
+    z_dense = np.linspace(z_bottom, z_top, 1601)
+    seed_a_dense = np.asarray(seed_model.a(z_dense), dtype=float)
+    seed_b_dense = np.asarray(seed_model.b(z_dense), dtype=float)
+
     z = np.linspace(z_bottom, z_top, 801)
     n = committed.neckline.params
 
@@ -170,6 +181,10 @@ def main():
         "seed_a_points": list(zip(seed_v, seed_a)),
         "seed_bf_points": list(zip(seed_v, seed_b)),
         "seed_bb_points": list(zip(seed_v, seed_b)),
+        "seed_a_dense": {"z": np.round(z_dense, 3).tolist(),
+                        "a": np.round(seed_a_dense, 5).tolist()},
+        "seed_b_dense": {"z": np.round(z_dense, 3).tolist(),
+                        "b": np.round(seed_b_dense, 5).tolist()},
         "default_a_table": {"z": np.round(z, 3).tolist(),
                             "a": np.round(np.asarray(committed.a(z)), 4).tolist()},
         "default_b_table": {"z": np.round(z, 3).tolist(),
