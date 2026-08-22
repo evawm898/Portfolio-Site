@@ -298,6 +298,24 @@
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
+            <label for="curlGradient">Curl gradient (edge &rarr; centre)</label>
+            <span class="fl-ctrl__val" data-value="curlGradient"></span>
+          </div>
+          <input type="range" id="curlGradient" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">+ outer curls less / inner curls more &mdash; sign reverses it</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="sizeGradient">Size gradient (centre &rarr; edge, single whorl only)</label>
+            <span class="fl-ctrl__val" data-value="sizeGradient"></span>
+          </div>
+          <input type="range" id="sizeGradient" min="-1" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">+ inner petals smaller / outer bigger &mdash; sign reverses it</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
             <label for="petalShape">Petal shape</label>
           </div>
           <select class="fl-select" id="petalShape">
@@ -398,6 +416,15 @@
           </div>
           <input type="range" id="curlBias" min="0" max="1" step="0.01" value="0">
           <span class="fl-ctrl__hint">uniform (hoop) &rarr; tip-loaded (crozier)</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="curlStart">Curl start</label>
+            <span class="fl-ctrl__val" data-value="curlStart"></span>
+          </div>
+          <input type="range" id="curlStart" min="0" max="0.95" step="0.01" value="0">
+          <span class="fl-ctrl__hint">0 = whole petal curls &rarr; higher = only the outer portion</span>
         </div>
 
         <div class="fl-ctrl" data-hide-bilateral>

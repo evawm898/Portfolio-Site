@@ -1,0 +1,39 @@
+# Build gate: every WIRED control the registry marks Advanced (or Standard) must
+# actually be reachable when the visitor switches to Advanced — see
+# tools/verify-tier-visibility.mjs for the failure this catches (applyTier() only ever
+# ADDED hidden=true on entering Standard; nothing cleared it on leaving Standard, so an
+# Advanced control with no contextual gating attribute stayed stuck hidden forever).
+name: flower-tier-visibility
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower-registry.js
+      - flower.html
+      - tools/verify-tier-visibility.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/flower-tier-visibility.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower-registry.js
+      - flower.html
+      - tools/verify-tier-visibility.mjs
+      - tools/chromium-harness.mjs
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every ungated Advanced control must show in Advanced mode
+        run: node tools/verify-tier-visibility.mjs
