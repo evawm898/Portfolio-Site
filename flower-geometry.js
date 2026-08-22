@@ -3129,41 +3129,88 @@ export function buildJaggedEdge(P, spine, rng) {
   const apexPeak = { x: tipC.x + ax * aLen, y: tipC.y + ay * aLen, z: tipC.z + az * aLen };
 
   // ---- rim: smooth edge, detouring through each tooth (foot -> profile -> foot)
+  // Dual-written. `rim` is the closed hoop, built exactly as before (byte-identical).
+  // `half[+1]` / `half[-1]` collect the SAME points per side, each tagged with the u it
+  // was taken at, so CONTINUOUS MARGIN can splice its two strands onto this one walk
+  // instead of a second tooth generator. Nothing is recomputed for them: a tooth exists
+  // once, and both rim styles read it. Issue #53 was two producers for the petal edge;
+  // this is the same lesson one level in — the treatment gets one producer too.
   const rim = [];
+  const half = { 1: [], '-1': [] };
   const uBase = 0.004;
+  const push = (p, u, s) => { rim.push(p); if (s) half[s].push({ p, u }); };
   const edgeTo = (from, to, s) => {              // append edge samples for u in (from, to]
     const steps = Math.max(1, Math.round(Math.abs(to - from) * nEdge));
-    for (let i = 1; i <= steps; i++) rim.push(surfacePoint(clamp(lerp(from, to, i / steps), 0, 0.9995), s, P, spine));
+    for (let i = 1; i <= steps; i++) {
+      const uu = clamp(lerp(from, to, i / steps), 0, 0.9995);
+      push(surfacePoint(uu, s, P, spine), uu, s);
+    }
   };
 
-  rim.push(surfacePoint(uBase, 1, P, spine));    // +Y base, then base -> tip
+  push(surfacePoint(uBase, 1, P, spine), uBase, 1);    // +Y base, then base -> tip
   let cur = uBase;
   for (const t of plus) {
     edgeTo(cur, t.uc - hb, 1);                    // smooth edge up to the near foot
-    for (const p of toothRim(t.nearFoot, t.peak, t.farFoot)) rim.push(p);
-    rim.push(t.farFoot);                          // ...and back down to the far foot
+    for (const p of toothRim(t.nearFoot, t.peak, t.farFoot)) push(p, t.uc, 1);
+    push(t.farFoot, t.uc + hb, 1);                // ...and back down to the far foot
     cur = t.uc + hb;
   }
   edgeTo(cur, uEnd, 1);                           // +Y edge up to the apex tooth's foot
-  for (const p of toothRim(apF0, apexPeak, apF1)) rim.push(p);   // wrap the very tip
+  for (const p of toothRim(apF0, apexPeak, apF1)) push(p, uEnd, 1);   // wrap the very tip
   rim.push(apF1);                                 // down onto the -Y side
+  half['-1'].push({ p: apF1, u: uEnd });
   cur = uEnd;
   for (let i = minus.length - 1; i >= 0; i--) {   // -Y side, tip -> base (descending)
     const t = minus[i];
     edgeTo(cur, t.uc + hb, -1);                   // down to the far foot first
     const seg = toothRim(t.nearFoot, t.peak, t.farFoot);  // built near->far; walk it far->near
-    for (let j = seg.length - 1; j >= 0; j--) rim.push(seg[j]);
-    rim.push(t.nearFoot);
+    for (let j = seg.length - 1; j >= 0; j--) push(seg[j], t.uc, -1);
+    push(t.nearFoot, t.uc - hb, -1);
     cur = t.uc - hb;
   }
   edgeTo(cur, uBase, -1);                         // smooth edge back to the base
+  half['-1'].reverse();                           // -Y was walked tip -> base; store base -> tip
 
   // ---- a fine mid-vein running from inside the petal into each tooth's peak --
   const teethVeins = [];
   for (const t of [...plus, ...minus]) teethVeins.push([t.footInner, t.peak]);
   teethVeins.push([surfacePoint(0.9, 0, P, spine), apexPeak]);  // into the apex tooth
 
-  return { rim, teethVeins };
+  return { rim, teethVeins, half, uStart };
+}
+
+/* The one place a rim treatment is spliced onto a marginal strand.
+
+   CONTINUOUS MARGIN replaces the closed hoop with two strands, so a treatment that
+   lives in the rim polyline has to ride them instead. Above the flare the strand IS
+   the outline — marginFlareFactor reaches 1, so v = side and the strand point equals
+   surfacePoint(u, side) — which makes the seam exact; below it the strand is bundled
+   toward the axis for the receptacle junction and must stay there, or a tooth lands as
+   a spike off the neck. The splice station is FOUND by scanning marginFlareFactor
+   rather than re-deriving its formula, so it cannot drift from the curve ribPath uses.
+
+   This function exists so the renderer and the geometry-quality gate assemble the
+   treated strand the SAME way. The gate previously modelled the rendered margin as the
+   bare strands, which is how a fixed renderer can still read as broken (or a broken one
+   as fixed) — the gate measuring its own copy instead of the real path.  */
+export function rimSpliceU(P, treat) {
+  let u = 1;
+  for (let i = 0; i <= 1000; i++) {
+    const uu = i / 1000;
+    if (marginFlareFactor(uu, P.bundleTightness, P.flareRate) >= 1 - 1e-9) { u = uu; break; }
+  }
+  return (treat && treat.half) ? Math.max(u, treat.uStart) : u;
+}
+
+// Ordered LOCAL-frame points for one treated strand: the bundled stretch of the strand
+// (mapped through `mapFlat`), then the treatment's own half above the splice.
+export function treatedStrandPoints(strandPoints, side, treat, P, mapFlat) {
+  if (!treat || !treat.half) return strandPoints.map(mapFlat);
+  const uS = rimSpliceU(P, treat);
+  const out = [];
+  for (const p of strandPoints) if ((p.x / Math.max(P.L, 1e-6)) < uS) out.push(mapFlat(p));
+  for (const q of treat.half[String(side)]) if (q.u >= uS) out.push(q.p);
+  return out;
 }
 
 /* -------------------------------------------------------------------
@@ -3247,5 +3294,9 @@ export function buildScallopEdge(P, spine) {
   for (const q of plusRim) rim.push(q);
   rim.push(surfacePoint(uApex, 0, P, spine));// the apex point
   for (let i = minusRim.length - 1; i >= 0; i--) rim.push(minusRim[i]);   // -Y tip -> base
-  return { rim, teethVeins: [] };
+  // The two halves, base -> tip, each point tagged with the u it was taken at — the same
+  // points the hoop above is made of, so CONTINUOUS MARGIN splices its strands onto this
+  // one walk rather than running a second scallop generator. See buildJaggedEdge.
+  const tagged = (arr) => arr.map((q, i) => ({ p: q, u: lerp(uBase, uApex, i / Math.max(1, arr.length - 1)) }));
+  return { rim, teethVeins: [], half: { 1: tagged(plusRim), '-1': tagged(minusRim) }, uStart: uBase };
 }

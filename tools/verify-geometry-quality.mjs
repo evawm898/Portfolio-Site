@@ -469,8 +469,14 @@ window.__gq = async function() {
       // whole.
       let lofted = [];
       if (contMargin) {
+        // Assembled by the SAME function the renderer uses (treatedStrandPoints), not by
+        // this hook's own idea of what a strand is — a gate modelling the rendered margin
+        // itself is how a fixed renderer still reads as broken, and vice versa.
         for (const st of marginStrands(P)) {
-          for (const p of st.points) if ((p.x / P.L) >= neck) lofted.push(G.mapPointToSurface(p, P, spine3));
+          const pts = G.treatedStrandPoints(st.points, st.side, jag, P, (p) => G.mapPointToSurface(p, P, spine3));
+          const uS = G.rimSpliceU(P, jag);
+          const flatCount = st.points.filter((p) => (p.x / P.L) < uS).length;
+          pts.forEach((q, i) => { if (i >= flatCount || (st.points[i] && st.points[i].x / P.L >= neck)) lofted.push(q); });
         }
       } else {
         lofted = (jag && drawRim3) ? jag.rim : smooth3;

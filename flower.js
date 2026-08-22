@@ -27,7 +27,7 @@ import {
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
-  ribRadius, ribCenterline, ribMarginPolyline, ribPath,
+  ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
@@ -1336,11 +1336,25 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // foot bundle (both strands + the foot-rooted midrib) into one node.
   let strandRoots = null;
   const contMargin = !!P.continuousMargin && !P.solidBlade;
+  // RIM TREATMENT ON THE STRANDS (issue #53). TOOTHED and SCALLOPED live entirely in the
+  // rim polyline, so under continuous margin — where the hoop is replaced by two strands —
+  // they used to be generated and then dropped, rendering identically to CLEAN. The teeth
+  // are not rebuilt here: buildJaggedEdge / buildScallopEdge hand back the SAME walk they
+  // build the hoop from, split into a +Y and a -Y half with each point tagged by its u,
+  // and the strand splices onto that half. One producer for the boundary (ribPath), one
+  // for the treatment.
+  //
+  // Where to splice: above the flare the strand IS the outline (marginFlareFactor reaches
+  // 1, so v = side and the strand point equals surfacePoint(u, side)), which makes the
+  // seam exact. Below it the strand is bundled toward the axis for the receptacle
+  // junction and must stay there — a tooth down in the bundle would be a spike off the
+  // neck. The flare end is FOUND by scanning marginFlareFactor rather than re-deriving
+  // its formula, so it cannot drift from the curve ribPath actually uses.
   if (contMargin) {
     strandRoots = [];
     const r0 = ribRadius(0, P, true), r1 = ribRadius(1, P, true);
     for (const s of marginStrands(P)) {
-      const wp = s.points.map(toWorld);
+      const wp = treatedStrandPoints(s.points, s.side, jag, P, (pt) => mapPointToSurface(pt, P, spine)).map(place);
       acc.addTube(wp, [r0, r1], 0, P.rimSegments || RADIAL_SEGMENTS);
       const a = wp[0], b = wp[1];
       strandRoots.push({ pos: a, tan: { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, r: r0, side: s.side });
@@ -1428,7 +1442,9 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // A fine mid-vein reaching from inside the petal into each jagged tooth, so
   // the veins extend into the jagged edge along with the outline (skipped when
   // the outline is turned off).
-  if (jag && drawRim) {
+  // The tooth mid-veins follow the teeth, so they are drawn whenever the teeth are —
+  // under continuous margin too. Only BONE-with-the-outline-off has no rim to carry them.
+  if (jag && (drawRim || (contMargin && jag.half))) {
     for (const v of jag.teethVeins) {
       acc.addTube(v.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
     }
