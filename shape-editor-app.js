@@ -1,41 +1,42 @@
-// Shape editor — STATIC PAGE, three stages, one page, one shell state
-// shared in memory across them, plus a fourth read-only "Panels" tab left
-// as-is (see below). There is no server: this file, geom.js's math,
+// Shape editor — STATIC PAGE, three stages, one page (plus a Panels tab),
+// backed by an in-browser shell/layout LIBRARY (IndexedDB via
+// shape-editor-db.js). There is no server: this file, geom.js's math,
 // shape-editor-yaml.js's tiny parser, shape-editor-chart.js's (theta, s)
-// port, and a baked JSON snapshot are the whole application.
+// port, shape-editor-db.js's library, and a baked JSON snapshot are the
+// whole application.
 //
-// STAGE 1 (Upload) -> STAGE 2 (Shape) -> STAGE 3 (Export Shell).
+// STAGE 1 (Upload) -> STAGE 2 (Shape) -> STAGE 3 (Shells) -> Panels.
 //
-// Upload is pure input: load photos, calibrate by clicking two landmarks,
-// nothing else — no curves, no tracing, no 3D. Shape is where tracing and
-// editing MERGE into one action: dragging a point against the calibrated
-// backdrop IS both, live, on the same two curve editors. There is no
-// separate "send trace to shape" handoff — Upload's calibration and
-// Shape's curves are the same in-memory state, always. Export Shell is
-// the commitment point: it shows what would be exported, and pressing
-// export/copy is the moment that becomes the "old" shell every later
-// backward trip from Export gets compared against.
+// Upload is pure input: load photos, calibrate by clicking two landmarks.
+// Shape is where tracing and editing merge into one action: dragging a
+// point against the calibrated backdrop IS both, live. Shells is a
+// LIBRARY, not a single slot — "Save" creates a named, timestamped entry
+// (with a 3D-view thumbnail); the library lists every saved shell with
+// open/duplicate/rename/delete. Opening loads it into Shape; duplicating
+// forks it so a variant can be explored without touching the original.
 //
-// GOING BACK IS THE CONSEQUENTIAL MOVE, and only from Export: returning
-// to Shape after a shell has been exported re-validates every authored
-// layout.yaml panel's standoff against the shell as it stands now, using
-// a real (scoped) port of shape_impact.py's seat_standoff machinery —
-// see shape-editor-chart.js — and reports which panels are affected and
-// by how much, worst first. Upload<->Shape carries no such warning:
-// Upload no longer holds curve data, so revisiting it never overwrites a
-// hand edit.
+// LAYOUTS BELONG TO SHELLS: each shell owns its own set of named layouts
+// (Panels tab). A layout is only meaningful against the (theta, s) chart
+// of the shell it was placed on. Two actions are gated by a REAL,
+// per-panel standoff impact report (shape-editor-chart.js's scoped port
+// of shape_impact.py's seat_standoff), worst first, before proceeding:
+//   - saving OVER a shell that owns layouts (their (theta, s) still
+//     means something, but what it means just changed)
+//   - duplicating a layout onto a DIFFERENT shell
+// Nothing else is gated — tab navigation itself is free.
 //
-// The Panels tab is UNCHANGED from the previous round on purpose — a
-// read-only view of the committed layout.yaml. The interactive placement
-// editor is out of scope until the shell pipeline above is finished.
+// STORAGE: the library lives in IndexedDB (thumbnails + curve sets would
+// outgrow localStorage). Export/import the whole library as one JSON file
+// for backup — a browser reset wipes IndexedDB same as it wipes
+// localStorage, so that's the actual disaster-recovery path, not a nice-
+// to-have. A one-time migration lifts the old single-slot localStorage
+// save (from before the library existed) into the first library entry.
 //
 // LIVE vs SNAPSHOT, the one thing this page cannot blur: curve editing,
 // 3D regeneration, circumference, and monotonicity are computed in this
 // browser on every drag — genuinely live. The curvature/seatability sweep
-// (min radius, max-seatable-class, seatable area) is NOT — it's baked at
-// export time (grid.py/curvature.py need Python) and goes stale the
-// instant you drag. This file never lets the two look the same: the
-// snapshot block gets a "may be stale" banner the moment any point moves.
+// is NOT — it's baked at export time and goes stale the instant you drag;
+// the snapshot block gets a "may be stale" note the moment any point moves.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -44,21 +45,15 @@ import { pchipFit, CompoundCoarseShell, monotonicityReport,
         checkNamedFeatures, smoothPoints, necklineHeightFn } from "./shape-editor-geom.js";
 import { parseShapeYaml, shapeYamlToInitialCurves } from "./shape-editor-yaml.js";
 import { buildSurfaceChart, computeStandoffImpact, computeStandoffs, parsePanelClasses, parseLayoutPanels } from "./shape-editor-chart.js";
+import * as db from "./shape-editor-db.js";
 
 // -- adaptive point density ---------------------------------------------
-// "Too many control points" — the flat ~31-point seed is replaced ONCE,
-// at load, by the fewest adaptively-placed points meeting a target
-// between-point residual against the TRUE dense generated curve (1601
-// points, baked by export_shape_editor_static.py — see seed_a_dense/
-// seed_b_dense). After that one-time replacement, EVERY subsequent
-// density-slider move resamples against whatever curve currently exists
-// on screen (hand edits included), never against the original dense
-// table again — "resample, don't redistribute," per the standing
-// instruction. A slider session (mousedown to mouseup on the <input>)
-// reuses one stable adaptive order so scrubbing back and forth within it
-// is lossless; only a real hand edit on the canvas (or a smoothing pass)
-// invalidates the cache and forces the next slider move to rebuild from
-// the edited curve.
+// The flat ~31-point seed is replaced ONCE, at load, by the fewest
+// adaptively-placed points meeting a target between-point residual
+// against the TRUE dense generated curve (1601 points, baked by
+// export_shape_editor_static.py). After that, every density-slider move
+// resamples against whatever curve currently exists on screen (hand
+// edits included), never against the original dense table again.
 const MAX_POINTS = 40;
 const MIN_POINTS = 4;
 const DEFAULT_TARGET_RESIDUAL_MM = 0.7;
@@ -70,7 +65,7 @@ function computeFeatureFloor(cache, thresholdMm) {
     const fit = pchipFit(pts.map(p => p.v), pts.map(p => p.y));
     if (!checkNamedFeatures(fit, cache.baseFit, thresholdMm).some(f => f.lost)) return n;
   }
-  return null;   // not reached within MAX_POINTS
+  return null;
 }
 function buildDensityCacheFromFit(fit) {
   const built = buildAdaptiveOrder(fit, V_LO, V_HI, { maxPoints: MAX_POINTS, minResidual: 0 });
@@ -102,8 +97,7 @@ function fmtDensity(r, label, floor) {
   const floorText = floor != null
     ? `floor <b>${floor}</b> pts (all named features intact at/above this)`
     : `floor not reached within ${MAX_POINTS} pts`;
-  const residualText = `between-point residual (vs the curve this was resampled from) ` +
-    `max ${r.residual.max.toFixed(2)} mm, rms ${r.residual.rms.toFixed(2)} mm`;
+  const residualText = `between-point residual max ${r.residual.max.toFixed(2)} mm, rms ${r.residual.rms.toFixed(2)} mm`;
   if (lost.length) {
     return `<div class="featureWarn">⚠ <b>${label}: ${r.count} pts — ` +
       `LOST ${lost.map(f => f.name).join(", ")}</b> — ${floorText}</div>${residualText}`;
@@ -130,15 +124,6 @@ function axes(canvas) {
 }
 
 // -- backdrop calibration -------------------------------------------------
-// Uncalibrated, a backdrop's px-to-mm scale is unknown — dragging a point
-// onto its silhouette edge is a visual match, not a measurement. Two
-// clicked landmarks (waist v=0, hem v=V_LO=-381 — the SAME waist->hem=
-// 381mm reference silhouette.py's own extract_from_image already uses to
-// fit these exact images server-side) solve the vertical mm/px scale
-// directly. Horizontal defaults to the vertical scale (assumes the
-// image's aspect ratio survived whatever cropping it went through) and
-// can be overridden by an independent reference: breast tip distance
-// (175mm), horizontal only in the FRONT view.
 const BREAST_TIP_DEFAULT_MM = 175.0;
 
 function containFit(naturalW, naturalH, boxX, boxY, boxW, boxH) {
@@ -221,11 +206,8 @@ class BackdropCalibration {
       implied_height_mm: this.impliedHeightMm(),
     };
   }
-  // Reads a shape.yaml-shaped calibration dict back into live state — the
-  // read half of toShapeYaml(), used when Stage 2 opens on the committed
-  // file so its backdrop shows as already-calibrated, not reset to blank.
   hydrateFromYaml(c) {
-    if (!c) return;
+    if (!c) { this.reset(); this.imageLabel = null; return; }
     this.calibrated = !!c.calibrated;
     if (c.image) this.imageLabel = c.image;
     if (Array.isArray(c.image_natural_size)) {
@@ -259,15 +241,6 @@ function drawLandmarkDot(ctx, imgPx, calib, yOf, xOf, color, label) {
   ctx.lineWidth = 1; ctx.strokeStyle = "#0c0e0e"; ctx.stroke();
   if (label) { ctx.fillStyle = color; ctx.font = "9px monospace"; ctx.fillText(label, cx + 6, cy - 6); }
 }
-
-// Uncalibrated: contain-fit (preserves the image's own aspect ratio),
-// greyed out, low alpha. Calibrated: re-registered through the SAME
-// yOf/xOf the curve points use. The fit rect self-heals whenever the
-// image actually shown doesn't match what's cached on the calibration
-// object — needed because Upload's reference pane and Shape's curve pane
-// pass the SAME <img> element (and the same BackdropCalibration) through
-// this function; only the fit-rect display needs refreshing per canvas
-// size, the measurement itself is shared and correct either way.
 function drawBackdrop(ctx, canvas, img, calib, yOf, xOf) {
   if (!(img.complete && img.naturalWidth)) return;
   if (!calib.uncalFitRect || calib.naturalWidth !== img.naturalWidth || calib.naturalHeight !== img.naturalHeight) {
@@ -316,16 +289,10 @@ function defFitOf(table) {
   };
 }
 
-// Feature-line marker layers — visual/reference only in this first pass,
-// they do not feed a(v)/b(v), the neckline model, or any derived quantity.
 const MARK_LAYER_COLORS = { neckline: "#d98a35", hemline: "#e05545", waist: "#8a63d9", armhole: "#4fb0e0" };
 const MARK_LAYER_NAMES = Object.keys(MARK_LAYER_COLORS);
 
 // ---------------------------------------------------------------- a(v): mirrored single curve
-// traceMode merges tracing and editing into one action (Stage 2's own
-// framing): a miss-click on empty canvas ADDS a point instead of no-op;
-// a hit drags it; right-click deletes it. Always true for canvasA/canvasB
-// now — there's no longer a separate non-interactive display mode.
 class CurvePane {
   constructor({ canvas, seed, defaultTable, backdrop, onLive, onDragEnd, calib, traceMode = false }) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
@@ -623,7 +590,6 @@ class DualCurvePane {
 }
 
 // ---------------------------------------------------------------- Stage 1: reference-only pane
-// Load + calibrate, no curves, no tracing, no 3D — Upload is pure input.
 class ReferencePane {
   constructor({ canvas, calib, backdrop }) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
@@ -656,13 +622,9 @@ class ReferencePane {
   }
 }
 
-// Replace the flat ~31-point baked seed with the fewest adaptively-placed
-// points that meet DEFAULT_TARGET_RESIDUAL_MM against the TRUE dense
-// generated curve (seed_a_dense/seed_b_dense, 1601 points) — a one-time
-// operation, done once here at load. This is the GENERATOR SEED fallback:
-// used only if the committed shape.yaml isn't available, and always
-// reachable again afterward via the explicit "reset to generator seed"
-// action.
+// Generator-seed fallback: adaptively-reduced points against the TRUE
+// dense generated curve. Used only when neither a library shell nor the
+// committed shape.yaml is available.
 const groundTruthA = defFitOf({ z: state.seed_a_dense.z, y: state.seed_a_dense.a });
 const groundTruthB = defFitOf({ z: state.seed_b_dense.z, y: state.seed_b_dense.b });
 let cacheA = buildDensityCacheFromFit(groundTruthA);
@@ -679,44 +641,48 @@ const seedBfPoints = initBf.points.map(p => [p.v, p.y]);
 const seedBbPoints = initBb.points.map(p => [p.v, p.y]);
 const bakedSeedCount = state.seed_a_points.length;
 
-// -- saved shell: localStorage, not a file -------------------------------
-// "Save shell -> Panels" (Stage 3) persists the shell HERE, in this
-// browser, so closing the tab and coming back lands you on your saved
-// shell rather than back at the committed shape.yaml. This is entirely
-// separate from getting a shell into the repo (the quiet clipboard/
-// download action on Stage 3) — nothing here ever leaves the app.
-const SAVED_SHELL_KEY = "dress-shell:shape-editor:saved-shell:v1";
-function loadSavedShellFromStorage() {
-  try {
-    const raw = localStorage.getItem(SAVED_SHELL_KEY);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!Array.isArray(obj.aPoints) || !Array.isArray(obj.bFrontPoints) || !Array.isArray(obj.bBackPoints)) return null;
-    return { ...obj, savedAt: new Date(obj.savedAt) };
-  } catch (e) {
-    console.warn("could not read the saved shell from localStorage:", e);
-    return null;
-  }
-}
-function persistSavedShellToStorage(saved) {
-  try {
-    localStorage.setItem(SAVED_SHELL_KEY, JSON.stringify({ ...saved, savedAt: saved.savedAt.toISOString() }));
-  } catch (e) {
-    console.warn("could not persist the saved shell to localStorage (private browsing / quota?):", e);
-  }
-}
-const storedSavedShell = loadSavedShellFromStorage();
+// ---------------------------------------------------------------- cold-load resolution
+// Priority: the last-open shell in THIS BROWSER'S library > the committed
+// tools/dress-shell/shape.yaml > the generator seed. A one-time migration
+// lifts the old (pre-library) single-slot localStorage save into the
+// library's first entry, so nobody's prior work vanishes.
+const CURRENT_SHELL_POINTER_KEY = "dress-shell:shape-editor:current-shell-id:v2";
+const OLD_SAVED_SHELL_KEY = "dress-shell:shape-editor:saved-shell:v1";
 
-// ---------------------------------------------------------------- Stage 2's initial source
-// Priority: a shell saved in THIS browser (Stage 3's "Save shell") > the
-// committed tools/dress-shell/shape.yaml (fetchable directly — Netlify
-// serves the whole repo as static files) > the generator seed. "Reset to
-// generator seed" is an explicit action regardless of source.
+async function migrateOldSingleSavedShell() {
+  try {
+    const raw = localStorage.getItem(OLD_SAVED_SHELL_KEY);
+    if (!raw) return;
+    const old = JSON.parse(raw);
+    localStorage.removeItem(OLD_SAVED_SHELL_KEY);
+    if (!Array.isArray(old.aPoints)) return;
+    const existing = await db.listShells();
+    if (existing.length) return;   // library already has content — don't clobber
+    const now = new Date().toISOString();
+    const shell = {
+      id: db.genId(), name: old.label || "Migrated shell", createdAt: now, updatedAt: now,
+      aPoints: old.aPoints, bFrontPoints: old.bFrontPoints, bBackPoints: old.bBackPoints,
+      neckline: old.neckline, backdropCalibration: old.backdropCalibration || null, thumbnail: null,
+    };
+    await db.putShell(shell);
+    localStorage.setItem(CURRENT_SHELL_POINTER_KEY, shell.id);
+  } catch (e) {
+    console.warn("could not migrate the old single saved shell:", e);
+  }
+}
+
 async function resolveInitialShapePoints() {
-  if (storedSavedShell) {
-    return { source: "saved", aPoints: storedSavedShell.aPoints, bFrontPoints: storedSavedShell.bFrontPoints,
-              bBackPoints: storedSavedShell.bBackPoints, neckline: storedSavedShell.neckline,
-              generator: null, backdropCalibration: storedSavedShell.backdropCalibration };
+  await migrateOldSingleSavedShell();
+  const pointerId = localStorage.getItem(CURRENT_SHELL_POINTER_KEY);
+  if (pointerId) {
+    try {
+      const shell = await db.getShell(pointerId);
+      if (shell) {
+        return { source: "library", shell, aPoints: shell.aPoints, bFrontPoints: shell.bFrontPoints,
+                  bBackPoints: shell.bBackPoints, neckline: shell.neckline, generator: null,
+                  backdropCalibration: shell.backdropCalibration };
+      }
+    } catch (e) { console.warn("could not load the pointed-to library shell:", e); }
   }
   try {
     const resp = await fetch("./tools/dress-shell/shape.yaml");
@@ -734,10 +700,12 @@ async function resolveInitialShapePoints() {
             neckline: null, generator: null, backdropCalibration: null };
 }
 const initialShape = await resolveInitialShapePoints();
+let shapeSource = initialShape.source;
+let currentShell = initialShape.source === "library"
+  ? { id: initialShape.shell.id, name: initialShape.shell.name, dirty: false }
+  : null;
 
-// Per-curve "named feature currently lost" state — set by a density
-// resample or a smoothing pass, never by a hand-drag. Drives both the
-// loud on-page warning and the export block on Stage 3.
+// Per-curve "named feature currently lost" state.
 const lostFeatures = { a: [], bf: [], bb: [] };
 function exportBlocked() {
   return (lostFeatures.a.length || lostFeatures.bf.length || lostFeatures.bb.length) > 0
@@ -752,17 +720,14 @@ function updateExportGuard() {
   $("exportGuard").style.display = anyLost ? "block" : "none";
   if (anyLost) {
     $("exportGuard").innerHTML = `<b class="err">⚠ named feature lost</b> at the current density — ` +
-      `${parts.join(" · ")}. Export is blocked until the density is raised (see the floor under each ` +
-      `slider on Stage 2) or the override below is checked.`;
+      `${parts.join(" · ")}. Saving is blocked until the density is raised (see Shape) or the override below is checked.`;
   }
   $("exportOverrideRow").style.display = anyLost ? "flex" : "none";
   if (!anyLost) $("exportOverride").checked = false;
 }
 
 // -- shared images: ONE Image per photo slot, referenced by BOTH Upload's
-// reference pane and Shape's curve pane. A file picker swap on either
-// side is instantly visible on the other — genuinely one shell state, not
-// a handoff between two copies. -----------------------------------------
+// reference pane and Shape's curve pane. -----------------------------------
 const frontImg = new Image(); frontImg.src = "./assets/shape-editor/silhouette-front.png";
 const sideImg = new Image(); sideImg.src = "./assets/shape-editor/silhouette-trace.png";
 const backImg = new Image();
@@ -777,26 +742,17 @@ if (initialShape.backdropCalibration) {
   calibTrace.hydrateFromYaml(initialShape.backdropCalibration.trace);
 }
 
-// -- shape-change / saved-shell tracking ----------------------------------
+// -- shape-change tracking -------------------------------------------------
 let shapeHandEdited = false;
-function markShapeChanged() { shapeHandEdited = true; }
+function markShapeChanged() {
+  shapeHandEdited = true;
+  if (currentShell) currentShell.dirty = true;
+  updateShellStatusPill();
+}
 
 function fitOfPoints(pts) {
   const s = [...pts].sort((a, b) => a[0] - b[0]);
   return pchipFit(s.map(p => p[0]), s.map(p => p[1]));
-}
-
-// savedShell / savedShellChart: the shell "Save shell -> Panels" last
-// snapshotted — Panels works against this, and it's what the Export(Save)
-// -> Shape backward warning compares the current shell against. Hydrated
-// from localStorage at load if one exists (see storedSavedShell above),
-// so a reload keeps the same baseline a fresh save would have used.
-let savedShell = null, savedShellChart = null;
-if (storedSavedShell) {
-  savedShell = storedSavedShell;
-  savedShellChart = buildSurfaceChart(
-    fitOfPoints(savedShell.aPoints), fitOfPoints(savedShell.bFrontPoints), fitOfPoints(savedShell.bBackPoints),
-    V_LO, V_HI, SPLIT, necklineHeightFn(savedShell.neckline));
 }
 
 const noop = () => {};
@@ -835,7 +791,7 @@ function wireFileInput(inputId, img, calib) {
     calib.uncalFitRect = null;
     calib.naturalWidth = null; calib.naturalHeight = null;
     calib.imageLabel = `uploaded: ${file.name}`;
-    img.src = URL.createObjectURL(file);   // reuses the onload already wired above
+    img.src = URL.createObjectURL(file);
     status(`loaded ${file.name}`, "ok");
     updateUploadChecklist();
   });
@@ -845,16 +801,82 @@ wireFileInput("fileSide", sideImg, calibTrace);
 wireFileInput("fileBack", backImg, calibBack);
 wireFileInput("fileTop", topImg, calibTop);
 
-function updateShapeSourceReadout() {
-  const labels = {
-    "saved": '<span class="ok">your saved shell (from this browser)</span>',
-    "shape.yaml": '<span class="ok">committed tools/dress-shell/shape.yaml</span>',
-    "seed": '<span class="warn">generator seed (fallback)</span>',
-  };
-  $("shapeSourceReadout").innerHTML = `opened from: ${labels[shapeSource] || shapeSource}`;
+// ---------------------------------------------------------------- modal (confirm + prompt)
+function confirmModal(html, onConfirm) {
+  $("navModalText").innerHTML = html;
+  $("navModalConfirm").textContent = "continue";
+  $("navModalCancel").textContent = "cancel";
+  $("navModal").classList.add("open");
+  $("navModalConfirm").onclick = () => { $("navModal").classList.remove("open"); onConfirm(); };
+  $("navModalCancel").onclick = () => { $("navModal").classList.remove("open"); };
 }
-let shapeSource = initialShape.source;
-updateShapeSourceReadout();
+function promptModal(title, defaultValue) {
+  return new Promise((resolve) => {
+    $("navModalText").innerHTML = `<div style="margin-bottom:8px">${title}</div>` +
+      `<input type="text" id="navModalInput" class="labelInput">`;
+    $("navModal").classList.add("open");
+    const input = $("navModalInput");
+    input.value = defaultValue || "";
+    setTimeout(() => { input.focus(); input.select(); }, 0);
+    $("navModalConfirm").textContent = "OK";
+    $("navModalCancel").textContent = "cancel";
+    const finish = (val) => { $("navModal").classList.remove("open"); resolve(val); };
+    $("navModalConfirm").onclick = () => finish(input.value.trim() || defaultValue || "");
+    $("navModalCancel").onclick = () => finish(null);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(input.value.trim() || defaultValue || ""); }
+      if (ev.key === "Escape") finish(null);
+    });
+  });
+}
+
+// ---------------------------------------------------------------- current-shell status + tab progress
+function updateShellStatusPill() {
+  let text, dotClass;
+  if (!currentShell) {
+    text = `working from ${shapeSource === "shape.yaml" ? "committed shape.yaml" : "the generator seed"} — not saved to the library yet`;
+    dotClass = "";
+  } else {
+    text = `<b>${currentShell.name}</b>${currentShell.dirty ? " — unsaved edits" : " — saved"}`;
+    dotClass = currentShell.dirty ? "dirty" : "clean";
+  }
+  for (const id of ["shellStatusDot", "shellStatusDot2", "shellStatusDot3"]) {
+    const el = $(id); if (el) el.className = `dot ${dotClass}`;
+  }
+  for (const id of ["shellStatusText", "shellStatusText2", "shellStatusText3"]) {
+    const el = $(id); if (el) el.innerHTML = text;
+  }
+  updateTabProgress();
+}
+function updateTabProgress() {
+  const uploadDone = calibFront.calibrated && calibTrace.calibrated && calibTop.calibrated;
+  $("dotUpload")?.classList.toggle("done", uploadDone);
+  $("dotShape")?.classList.toggle("done", !!currentShell || shapeHandEdited);
+  $("dotShells")?.classList.toggle("done", !!currentShell);
+  if (currentShell) {
+    db.listLayoutsForShell(currentShell.id).then((layouts) => {
+      $("dotPanels")?.classList.toggle("done", layouts.length > 0);
+    }).catch(() => {});
+  } else {
+    $("dotPanels")?.classList.toggle("done", false);
+  }
+}
+
+// ---------------------------------------------------------------- open a shell into the editor
+function openShellIntoEditor(shell, sourceLabel) {
+  paneA.points = shell.aPoints.map(([v, y]) => ({ v, y }));
+  paneB.front = shell.bFrontPoints.map(([v, y]) => ({ v, y }));
+  paneB.back = shell.bBackPoints.map(([v, y]) => ({ v, y }));
+  cacheA = cacheBf = cacheBb = null;
+  lostFeatures.a = lostFeatures.bf = lostFeatures.bb = [];
+  calibFront.hydrateFromYaml(shell.backdropCalibration?.front);
+  calibTrace.hydrateFromYaml(shell.backdropCalibration?.trace);
+  applyNeckline(shell.neckline);
+  shapeSource = sourceLabel;
+  updateExportGuard();
+  paneA.draw(); paneB.draw();
+  liveUpdate();
+}
 
 $("resetToSeedBtn").onclick = () => {
   paneA.points = seedAPoints.map(([v, y]) => ({ v, y }));
@@ -862,16 +884,19 @@ $("resetToSeedBtn").onclick = () => {
   paneB.back = seedBbPoints.map(([v, y]) => ({ v, y }));
   cacheA = cacheBf = cacheBb = null;
   lostFeatures.a = lostFeatures.bf = lostFeatures.bb = [];
-  shapeSource = "seed"; updateShapeSourceReadout();
+  shapeSource = "seed";
+  currentShell = null;
+  localStorage.removeItem(CURRENT_SHELL_POINTER_KEY);
+  applyNeckline(state.neckline);
   shapeHandEdited = false;
   paneA.draw(); paneB.draw(); updateExportGuard(); liveUpdate();
+  updateShellStatusPill();
   status("reset to generator seed", "warn");
 };
 
 // Derived circumference reflects whatever the curve control points
-// currently are — if they were dragged against an uncalibrated or
-// mis-scaled backdrop, part of the tape-anchor delta below can be a
-// calibration artifact, not a real shape disagreement.
+// currently are — flagged loudly when the backdrop's own calibration is
+// measurably off Python's fit on the same photo.
 function updateCircCaveat() {
   const flags = [];
   for (const [label, calib, refKey] of [["a(v)/front", calibFront, "front"], ["b(v)/trace", calibTrace, "trace"]]) {
@@ -885,12 +910,8 @@ function updateCircCaveat() {
   if (!el) return;
   el.innerHTML = flags.length
     ? `<span class="warn">⚠ backdrop calibration is off from Python's own fit on the same photo ` +
-      `(${flags.join(", ")}) — if the curves were dragged against that mis-scaled backdrop, part of ` +
-      `the delta below may be a calibration artifact, not a real shape disagreement. Recalibrate the ` +
-      `flagged backdrop(s) on Stage 1 before trusting this table.</span>`
-    : "Reflects whatever the curve control points currently are — if they were dragged against an " +
-      "uncalibrated or mis-scaled backdrop, part of the delta below can be that, not a real shape " +
-      "disagreement. Calibrate the backdrops on Stage 1 first.";
+      `(${flags.join(", ")}) — recalibrate the flagged backdrop(s) on Upload before trusting this table.</span>`
+    : "Reflects whatever the curve control points currently are — calibrate the backdrops on Upload first.";
 }
 
 // -- calibration UI wiring (Stage 1) -------------------------------------
@@ -925,10 +946,8 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
     if (calib.hRef) {
       const hvDelta = 100 * (calib.mmPerPxH - calib.mmPerPxV) / calib.mmPerPxV;
       const verdict = Math.abs(hvDelta) < 3
-        ? '<span class="ok">within noise — aspect looks intact; the vertical clicks are the more ' +
-          "likely source of any remaining gap</span>"
-        : '<span class="warn">large divergence — the image itself may be stretched/cropped non-' +
-          "uniformly, this is not just a click-precision issue</span>";
+        ? '<span class="ok">within noise</span>'
+        : '<span class="warn">large divergence — the image may be stretched/cropped non-uniformly</span>';
       hrefLine = ` · horizontal: independent ref (${calib.hRef.mm.toFixed(1)}mm) → ` +
         `<b>${calib.mmPerPxH.toFixed(3)}</b> mm/px · vs vertical: ` +
         `<b>${hvDelta > 0 ? "+" : ""}${hvDelta.toFixed(1)}%</b> — ${verdict}`;
@@ -937,15 +956,10 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
     }
     let refLine = "", deltaFlag = "";
     if (ref) {
-      refLine = ` · Python's own auto-fit on this image: <b>${ref.mm_per_px.toFixed(3)}</b> mm/px ` +
-        `(cross-check — compare to the mm/px above, NOT the height below: Python's own "implied ` +
-        `height" of ${ref.implied_total_height_mm.toFixed(0)} mm measures only the detected ` +
-        `silhouette's own top-to-bottom extent, not the full frame)`;
+      refLine = ` · Python's own auto-fit: <b>${ref.mm_per_px.toFixed(3)}</b> mm/px`;
       const pctOff = 100 * (calib.mmPerPxV - ref.mm_per_px) / ref.mm_per_px;
       if (Math.abs(pctOff) > 5) {
-        deltaFlag = ` <span class="warn">⚠ ${pctOff > 0 ? "+" : ""}${pctOff.toFixed(0)}% off Python's ` +
-          `own fit on this same image — check the clicks, or the image may be cropped/scaled ` +
-          `differently than what Python fit against</span>`;
+        deltaFlag = ` <span class="warn">⚠ ${pctOff > 0 ? "+" : ""}${pctOff.toFixed(0)}% off Python's own fit</span>`;
       }
     }
     const fmtPx = (p) => `(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
@@ -954,15 +968,12 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
       `hem ${fmtPx(calib.hemPx)} px → Δy = <b>${dy.toFixed(1)}</b> px`;
     if (ref) {
       const refDy = Math.abs(ref.hem_row_px - ref.waist_row_px);
-      diag += `<br>Python's reference (row-scan — x doesn't apply) — waist row y=` +
-        `${ref.waist_row_px.toFixed(1)}, hem row y=${ref.hem_row_px.toFixed(1)} → Δy = ` +
-        `<b>${refDy.toFixed(1)}</b> px`;
+      diag += `<br>Python's reference — Δy = <b>${refDy.toFixed(1)}</b> px`;
     }
     diag += "</div>";
 
     setStatus("cal", `calibrated — vertical <b>${calib.mmPerPxV.toFixed(3)}</b> mm/px, ` +
-      `implied FULL-FRAME height <b>${calib.impliedHeightMm().toFixed(0)}</b> mm (top-to-bottom of the ` +
-      `whole image, not just the garment)${hrefLine}${refLine}${deltaFlag}${diag}`);
+      `implied FULL-FRAME height <b>${calib.impliedHeightMm().toFixed(0)}</b> mm${hrefLine}${refLine}${deltaFlag}${diag}`);
     updateCircCaveat(); updateUploadChecklist();
   }
   refresh();
@@ -975,8 +986,7 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
       const ok = calib.setVertical(pendingWaist, imgPx);
       step = null; pendingWaist = null;
       if (!ok) {
-        setStatus("uncal", "calibration failed — the hem click must be BELOW the waist click in the " +
-          "image — click “calibrate waist/hem” to try again");
+        setStatus("uncal", "calibration failed — the hem click must be BELOW the waist click — try again");
       } else {
         calibBtn.textContent = "recalibrate waist/hem";
         calibClearBtn.style.display = "inline-block";
@@ -991,8 +1001,7 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
       const ok = calib.setHorizontalRef(pendingHrefLeft, imgPx, mm);
       step = null; pendingHrefLeft = null;
       if (!ok) {
-        setStatus("cal", "horizontal reference failed — the two clicks must be apart and the " +
-          "distance positive — try again");
+        setStatus("cal", "horizontal reference failed — the two clicks must be apart and the distance positive — try again");
       } else {
         hrefBtn.textContent = "redo horizontal reference";
         hrefClearBtn.style.display = "inline-block";
@@ -1053,14 +1062,12 @@ function updateUploadChecklist() {
       `${done ? "" : " — not calibrated"}</div>`;
   }
   const doneAll = requiredDone === requiredTotal;
-  html = `<div class="${doneAll ? "done" : "todo"}"><b>${doneAll ? "Stage 1 complete" : `Stage 1: ${requiredDone}/${requiredTotal} required images calibrated`}</b></div>` + html;
+  html = `<div class="${doneAll ? "done" : "todo"}"><b>${doneAll ? "Upload complete" : `${requiredDone}/${requiredTotal} required images calibrated`}</b></div>` + html;
   $("uploadChecklist").innerHTML = html;
+  updateTabProgress();
 }
 updateUploadChecklist();
 
-// Raw pixel dimensions of both backdrop files, and whether they share an
-// aspect ratio — independent of any calibration, straight from what
-// export_shape_editor_static.py baked.
 {
   const refF = state.backdrop_calibration_reference?.front;
   const refT = state.backdrop_calibration_reference?.trace;
@@ -1070,13 +1077,11 @@ updateUploadChecklist();
     const match = Math.abs(aF - aT) / aF < 0.01;
     $("imageDimsReadout").innerHTML =
       `backdrop files — front: <b>${refF.original_size_px[0]}×${refF.original_size_px[1]}</b> px ` +
-      `original (aspect ${aF.toFixed(4)}) → resized ${refF.resized_size_px[0]}×${refF.resized_size_px[1]} px · ` +
+      `original → resized ${refF.resized_size_px[0]}×${refF.resized_size_px[1]} px · ` +
       `trace: <b>${refT.original_size_px[0]}×${refT.original_size_px[1]}</b> px original ` +
-      `(aspect ${aT.toFixed(4)}) → resized ${refT.resized_size_px[0]}×${refT.resized_size_px[1]} px · ` +
-      (match
-        ? '<span class="ok">same aspect ratio</span>'
-        : `<span class="warn">⚠ aspect ratios differ by ${(100 * Math.abs(aF - aT) / aF).toFixed(1)}% — ` +
-          "the two photos were framed/cropped differently from each other</span>");
+      `→ resized ${refT.resized_size_px[0]}×${refT.resized_size_px[1]} px · ` +
+      (match ? '<span class="ok">same aspect ratio</span>'
+        : `<span class="warn">⚠ aspect ratios differ by ${(100 * Math.abs(aF - aT) / aF).toFixed(1)}%</span>`);
   }
 }
 
@@ -1114,7 +1119,7 @@ for (const [, , inputId] of TRACE_TAPE_ANCHORS) $(inputId).addEventListener("inp
 
 // ---------------------------------------------------------------- 3D pane
 const view = $("view");
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(devicePixelRatio);
 renderer.setSize(view.clientWidth, view.clientHeight);
 view.appendChild(renderer.domElement);
@@ -1152,6 +1157,19 @@ function setMeshes(payload, color) {
     shellMeshes.push(mesh);
   }
 }
+function captureThumbnail() {
+  try {
+    const tc = document.createElement("canvas");
+    tc.width = 160; tc.height = 120;
+    const tctx = tc.getContext("2d");
+    tctx.fillStyle = "#0c0e0e"; tctx.fillRect(0, 0, 160, 120);
+    tctx.drawImage(renderer.domElement, 0, 0, 160, 120);
+    return tc.toDataURL("image/jpeg", 0.72);
+  } catch (e) {
+    console.warn("thumbnail capture failed:", e);
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------- readouts
 function fmtMono(r, label) {
@@ -1173,23 +1191,21 @@ function fmtCircTable(rows, label) {
   return html;
 }
 function fmtShell(s, label, stale) {
-  const df = s.class_distribution_front, db = s.class_distribution_back;
+  const df = s.class_distribution_front, db_ = s.class_distribution_back;
   const dstr = (d) => Object.entries(d).map(([k, v]) => `${k === "null" ? "none" : k}×${v}`).join(" ");
   let hemNote = "";
   if (s.hem_band_min_radius_mm != null) {
-    hemNote = `<br><span class="warn">hem band (≤${s.hem_band_mm} mm from the hem edge) min radius ` +
+    hemNote = `<br><span class="warn">hem band min radius ` +
       `${s.hem_band_min_radius_mm.toFixed(1)} mm at θ ${s.hem_band_min_radius_at[0].toFixed(0)}° ` +
       `s ${s.hem_band_min_radius_at[1].toFixed(0)} mm — ${s.hem_singular
-        ? "known superellipse singularity (dome_n < 2, r'' diverges as u→0), not a defect"
-        : "dome_n ≥ 2, not the singular regime"}</span>`;
+        ? "known superellipse singularity, not a defect" : "dome_n ≥ 2, not the singular regime"}</span>`;
   }
   const staleTag = stale
-    ? `<br><span class="err">⚠ STALE — this is the pre-edit snapshot; the curves have moved since. ` +
-      `Curvature/seatability need Python — ask to regenerate + republish for a fresh number.</span>` : "";
+    ? `<br><span class="err">⚠ STALE — pre-edit snapshot; the curves have moved since.</span>` : "";
   return `<b>${label}</b><br>min meridional radius (outside the hem band) <b>${s.min_radius_mm?.toFixed(1) ?? "?"} mm</b>` +
     (s.min_radius_at ? ` at θ ${s.min_radius_at[0].toFixed(0)}° s ${s.min_radius_at[1].toFixed(0)} mm` : "") +
     hemNote +
-    `<br>max-class front: ${dstr(df)}<br>max-class back: ${dstr(db)}` +
+    `<br>max-class front: ${dstr(df)}<br>max-class back: ${dstr(db_)}` +
     `<br>p213 area <b>${(s.p213_area_mm2 / 100).toFixed(0)} cm²</b>` +
     `<br>usable area <b>${(s.usable_area_mm2 / 100).toFixed(0)} cm²</b> / ` +
     `${(s.total_shell_area_mm2 / 100).toFixed(0)} cm² total` + staleTag;
@@ -1203,7 +1219,7 @@ $("baselineReadout").innerHTML = fmtShell(state.baseline_shell_analysis, "commit
 $("armholeReadout").textContent = `${SPLIT.toFixed(2)}° (frozen from the snapshot — armhole re-solve needs Python)`;
 $("modeTag").innerHTML = `<b class="ok">LIVE</b> — client-computed, cross-validated to ~1e-13mm`;
 
-const g = initialShape.generator || state.generator;
+let g = initialShape.generator || state.generator;
 $("genRef").innerHTML = `hem circ ${g.hem_circumference} · dome n ${g.dome_n} · ` +
   `fillet R ${g.fillet_radius} (${g.fillet_type}) · plateau θ ${g.plateau_theta_deg.toFixed(3)}° · ` +
   `plateau CF depth ${g.plateau_cf_depth_mm} mm · plateau radius ${g.plateau_radius_mm} mm`;
@@ -1211,8 +1227,7 @@ $("genRef").innerHTML = `hem circ ${g.hem_circumference} · dome n ${g.dome_n} �
 // ---------------------------------------------------------------- adaptive density UI
 $("densityReport").innerHTML = `adaptive seed replaced the flat ${bakedSeedCount}-point baked seed: ` +
   `a(v) <b>${bakedSeedCount}→${initA.count}</b> pts · b_front <b>${bakedSeedCount}→${initBf.count}</b> pts · ` +
-  `b_back <b>${bakedSeedCount}→${initBb.count}</b> pts (≤${DEFAULT_TARGET_RESIDUAL_MM}mm target — applies to the ` +
-  `generator seed only; a curve opened from shape.yaml keeps its own point count).`;
+  `b_back <b>${bakedSeedCount}→${initBb.count}</b> pts (applies to the generator seed only).`;
 
 $("densityA").min = String(MIN_POINTS); $("densityA").max = String(MAX_POINTS); $("densityA").value = String(paneA.points.length);
 $("densityAVal").textContent = String(paneA.points.length);
@@ -1256,7 +1271,7 @@ $("densityBb").addEventListener("input", (ev) => {
   paneB.draw(); liveUpdate();
 });
 
-// ---------------------------------------------------------------- smoothing (control-point cleanup)
+// ---------------------------------------------------------------- smoothing
 function smoothAmountPasses() {
   return [parseFloat($("smoothAmount").value) || 0, parseInt($("smoothPasses").value, 10) || 1];
 }
@@ -1293,13 +1308,16 @@ $("smoothBb").onclick = () => {
   status("smoothed b_back", "ok");
 };
 
-// neckline: heights are still reference-only (not draggable in this
-// first cut), but the trim itself is applied to the 3D view.
-const n = initialShape.neckline || state.neckline;
-$("neckRef").innerHTML = `CF ${n.cf_height} · peak ${n.peak_height} · side ${n.side_height} · ` +
-  `CB ${n.cb_height} · peak θ ${n.peak_theta}° · bow ${n.rise_bow} · decay ${n.decay_rate} · ` +
-  `${n.cf_corner ? "corner" : "smooth apex"} · trimmed live in the 3D view below, heights not yet draggable`;
-const necklineFn = necklineHeightFn(n);
+// -- neckline: mutable, since opening a different library shell can swap it
+let n, necklineFn;
+function applyNeckline(necklineObj) {
+  n = necklineObj || state.neckline;
+  necklineFn = necklineHeightFn(n);
+  $("neckRef").innerHTML = `CF ${n.cf_height} · peak ${n.peak_height} · side ${n.side_height} · ` +
+    `CB ${n.cb_height} · peak θ ${n.peak_theta}° · bow ${n.rise_bow} · decay ${n.decay_rate} · ` +
+    `${n.cf_corner ? "corner" : "smooth apex"} · trimmed live in the 3D view, heights not yet draggable`;
+}
+applyNeckline(initialShape.neckline);
 
 function liveUpdate() {
   const aFit = paneA.fit(), bfFit = paneB.fitFront(), bbFit = paneB.fitBack();
@@ -1316,7 +1334,6 @@ function liveUpdate() {
   status("live", "ok");
 }
 
-// initial mesh
 {
   const shell = new CompoundCoarseShell(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT);
   setMeshes(shell.buildMeshes(48, 64, necklineFn), 0xc9cfcc);
@@ -1325,34 +1342,18 @@ $("exportMonoReadout").innerHTML = $("monoReadout").innerHTML;
 $("exportCircTable").innerHTML = $("circTable").innerHTML;
 $("exportShellReadout").innerHTML = $("shellReadout").innerHTML;
 
-// ---------------------------------------------------------------- Stage 3: Save Shell
-function fmtSavedLabel(saved) {
-  return `${saved.label ? `"${saved.label}"` : "(unlabeled)"} at ${saved.savedAt.toLocaleString()}`;
-}
+// ---------------------------------------------------------------- Stage 3: Shells (save + library)
 function updateExportSummary() {
   const calibSummary = (label, calib) => `${label}: ${calib.calibrated
     ? `<span class="ok">calibrated</span> (${calib.imageLabel || "default asset"})`
     : '<span class="warn">not calibrated</span>'}`;
   $("exportSummary").innerHTML =
-    `source: ${shapeSource === "saved" ? "your saved shell" : shapeSource === "shape.yaml" ? "committed shape.yaml" : shapeSource === "seed" ? "generator seed" : "hand-edited this session"}<br>` +
     `points: a(v) <b>${paneA.points.length}</b> · b_front <b>${paneB.front.length}</b> · b_back <b>${paneB.back.length}</b><br>` +
     `${calibSummary("front backdrop", calibFront)} · ${calibSummary("side backdrop", calibTrace)}<br>` +
-    `neckline: CF ${n.cf_height} · peak ${n.peak_height} · CB ${n.cb_height}<br>` +
-    (savedShell
-      ? `last saved: ${fmtSavedLabel(savedShell)}` +
-        (shapeHandEditedSinceSave() ? ' — <span class="warn">shape has changed since</span>' : ' — <span class="ok">matches the current shell</span>')
-      : '<span class="dim">nothing saved yet — Panels has no shell to work against until you save</span>');
-}
-function shapeHandEditedSinceSave() {
-  if (!savedShell) return false;
-  const same = (a, b) => a.length === b.length && a.every((p, i) => p[0] === b[i][0] && p[1] === b[i][1]);
-  const curA = paneA.points.map(p => [p.v, p.y]);
-  const curBf = paneB.front.map(p => [p.v, p.y]);
-  const curBb = paneB.back.map(p => [p.v, p.y]);
-  return !(same(curA, savedShell.aPoints) && same(curBf, savedShell.bFrontPoints) && same(curBb, savedShell.bBackPoints));
+    `neckline: CF ${n.cf_height} · peak ${n.peak_height} · CB ${n.cb_height}`;
 }
 
-// ---------------------------------------------------------------- export (no server to save to)
+// ---------------------------------------------------------------- export text (shape.yaml)
 function yamlFloat(x) { return String(x); }
 function yamlPx(px) { return `[${yamlFloat(px[0])}, ${yamlFloat(px[1])}]`; }
 function dumpCalibrationYaml(lines, calibration) {
@@ -1381,6 +1382,12 @@ function dumpCalibrationYaml(lines, calibration) {
     if (c.implied_height_mm != null) lines.push(`    implied_height_mm: ${yamlFloat(c.implied_height_mm)}`);
   }
 }
+function currentCalibrationYaml() {
+  return {
+    front: calibFront.toShapeYaml(calibFront.imageLabel || "assets/shape-editor/silhouette-front.png"),
+    trace: calibTrace.toShapeYaml(calibTrace.imageLabel || "assets/shape-editor/silhouette-trace.png"),
+  };
+}
 function dumpShapeYaml() {
   const lines = [
     "# shape.yaml — dress shape editor state (milestone 3).",
@@ -1399,181 +1406,11 @@ function dumpShapeYaml() {
   lines.push("generator:");
   for (const [k, v] of Object.entries(g))
     lines.push(`  ${k}: ${typeof v === "string" ? v : yamlFloat(v)}`);
-  dumpCalibrationYaml(lines, {
-    front: calibFront.toShapeYaml(calibFront.imageLabel || "assets/shape-editor/silhouette-front.png"),
-    trace: calibTrace.toShapeYaml(calibTrace.imageLabel || "assets/shape-editor/silhouette-trace.png"),
-  });
+  dumpCalibrationYaml(lines, currentCalibrationYaml());
   return lines.join("\n") + "\n";
 }
 
-// The ONE action on Stage 3: snapshot the current shell as the saved
-// shell (persisted to localStorage — survives a reload), and switch to
-// Panels. Nothing leaves the app. This is what the Save<->Shape backward
-// warning compares against, and what Panels works against — not a file,
-// not the clipboard.
-function saveShell() {
-  savedShell = {
-    aPoints: paneA.points.map(p => [p.v, p.y]),
-    bFrontPoints: paneB.front.map(p => [p.v, p.y]),
-    bBackPoints: paneB.back.map(p => [p.v, p.y]),
-    neckline: { ...n },
-    backdropCalibration: {
-      front: calibFront.toShapeYaml(calibFront.imageLabel || "assets/shape-editor/silhouette-front.png"),
-      trace: calibTrace.toShapeYaml(calibTrace.imageLabel || "assets/shape-editor/silhouette-trace.png"),
-    },
-    label: $("exportLabel").value.trim(),
-    savedAt: new Date(),
-  };
-  savedShellChart = buildSurfaceChart(
-    fitOfPoints(savedShell.aPoints), fitOfPoints(savedShell.bFrontPoints), fitOfPoints(savedShell.bBackPoints),
-    V_LO, V_HI, SPLIT, necklineHeightFn(savedShell.neckline));
-  persistSavedShellToStorage(savedShell);
-  shapeSource = "saved"; updateShapeSourceReadout();
-  updateExportSummary();
-}
-
-$("exportOverride").addEventListener("change", updateExportGuard);
-
-$("saveShellBtn").onclick = () => {
-  if (exportBlocked()) {
-    $("exportStatus").innerHTML = '<span class="err">save blocked — a named feature is lost at the ' +
-      "current density (see Stage 2); raise the density or check the override</span>";
-    return;
-  }
-  saveShell();
-  $("exportStatus").innerHTML = '<span class="ok">✓ shell saved</span> — switching to Panels.';
-  goToTab("place");
-};
-
-// -- quiet secondary: getting a shell into the repo. Separate concern,
-// separate action — does NOT save the shell for Panels. -----------------
-$("exportBtn").onclick = () => {
-  if (exportBlocked()) {
-    $("exportStatus").innerHTML = '<span class="err">blocked — a named feature is lost at the ' +
-      "current density (see Stage 2); raise the density or check the override</span>";
-    return;
-  }
-  const overridden = lostFeatures.a.length || lostFeatures.bf.length || lostFeatures.bb.length;
-  const text = dumpShapeYaml();
-  const blob = new Blob([text], { type: "text/yaml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "shape.yaml";
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-  $("exportArea").value = text;
-  $("exportArea").style.display = "block";
-  $("exportStatus").innerHTML = (overridden
-    ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used).</span> '
-    : '<span class="ok">downloaded shape.yaml.</span> ') +
-    "This does not save the shell for Panels — use “Save shell → Panels” above for that.";
-};
-$("copyBtn").onclick = async () => {
-  if (exportBlocked()) {
-    $("exportStatus").innerHTML = '<span class="err">blocked — a named feature is lost at the ' +
-      "current density (see Stage 2); raise the density or check the override</span>";
-    return;
-  }
-  const text = dumpShapeYaml();
-  try {
-    await navigator.clipboard.writeText(text);
-    $("exportStatus").innerHTML = '<span class="ok">✓ copied shape.yaml to clipboard.</span> Paste it into your ' +
-      "Claude Code conversation and ask it to commit as tools/dress-shell/shape.yaml. This does not save the " +
-      "shell for Panels — use “Save shell → Panels” above for that.";
-  } catch {
-    $("exportArea").value = text;
-    $("exportArea").style.display = "block";
-    $("exportStatus").innerHTML = '<span class="warn">clipboard blocked — select the text below and copy it. ' +
-      "This does not save the shell for Panels — use “Save shell → Panels” above for that.</span>";
-  }
-};
-
-// ---------------------------------------------------------------- Panels tab
-// Read-only for EDITING (no interactive placement — out of scope, see the
-// tab's own banner), but no longer inert: once a shell is saved, this
-// renders each committed panel's real standoff against THAT shell —
-// shape-editor-chart.js's seatStandoff, single-shell (no comparison).
-function summarizeLayoutYaml(text) {
-  const panels = [];
-  let cur = null;
-  for (const line of text.split("\n")) {
-    const idMatch = line.match(/^\s*-\s*id:\s*(.+)$/);
-    if (idMatch) { if (cur) panels.push(cur); cur = { id: idMatch[1].trim() }; continue; }
-    if (!cur) continue;
-    const kv = line.match(/^\s*([a-z_]+):\s*(.+)$/);
-    if (kv) cur[kv[1]] = kv[2].trim();
-  }
-  if (cur) panels.push(cur);
-  return panels;
-}
-let layoutYamlText = null;
-let displayPanels = [];
-async function renderPanelList() {
-  if (savedShellChart) {
-    await ensureImpactData();
-    if (impactClasses && impactPanels && impactPanels.length) {
-      const results = computeStandoffs(savedShellChart, impactClasses, impactPanels);
-      $("layoutPanelList").innerHTML = results.map((r) => {
-        if (r.error) return `${r.id} — <span class="err">${r.error}</span>`;
-        const tag = r.withinTolerance ? '<span class="ok">fits</span>' : '<span class="warn">exceeds tolerance</span>';
-        const so = Number.isFinite(r.standoffMm) ? `${r.standoffMm.toFixed(2)} mm` : "off-shell";
-        return `${r.id} — class ${r.classId} · standoff <b>${so}</b> · ${tag}`;
-      }).join("<br>") + '<div class="legend" style="padding:4px 0 0">worst first · tolerance 2.0 mm · ' +
-        "standoff only — connector/outline legality, mirror-twin validity, and the layering DAG still " +
-        "need the Python shape_impact.py machinery, not ported here.</div>";
-      return;
-    }
-  }
-  $("layoutPanelList").innerHTML = displayPanels.map(p =>
-    `${p.id} — class ${p.class ?? "?"} · θ ${p.theta ?? "?"}° · s ${p.s ?? "?"}mm · ` +
-    `layer ${p.layer ?? "?"} · mirrored ${p.mirrored ?? "?"}`).join("<br>");
-}
-(async () => {
-  try {
-    const resp = await fetch("./tools/dress-shell/layout.yaml");
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    layoutYamlText = await resp.text();
-    displayPanels = summarizeLayoutYaml(layoutYamlText);
-    $("layoutStatus").innerHTML = `<span class="ok">loaded tools/dress-shell/layout.yaml</span> — ` +
-      `${displayPanels.length} committed panels. Read-only: this page cannot edit or re-place them yet.`;
-    $("layoutArea").value = layoutYamlText;
-    await renderPanelList();
-  } catch (e) {
-    $("layoutStatus").innerHTML = `<span class="err">could not load tools/dress-shell/layout.yaml (${e.message})</span>`;
-  }
-})();
-$("copyLayoutBtn").onclick = async () => {
-  if (!layoutYamlText) { $("layoutCopyStatus").innerHTML = '<span class="err">layout.yaml has not loaded yet</span>'; return; }
-  try {
-    await navigator.clipboard.writeText(layoutYamlText);
-    $("layoutCopyStatus").innerHTML = '<span class="ok">✓ copied to clipboard</span> — this is the ' +
-      "committed file verbatim (read-only in this round).";
-  } catch {
-    $("layoutArea").style.display = "block";
-    $("layoutCopyStatus").innerHTML = '<span class="warn">clipboard blocked — select the text above and copy it</span>';
-  }
-};
-async function enterPlaceTab() {
-  const banner = $("savedShellBanner");
-  if (savedShell) {
-    banner.className = "banner commit";
-    banner.innerHTML = `Shell saved: <b>${fmtSavedLabel(savedShell)}</b> — panel standoff below is computed ` +
-      `against this shell, live.`;
-  } else {
-    banner.className = "banner";
-    banner.innerHTML = `No shell saved yet — save one from Stage 3 to see live per-panel standoff here. The ` +
-      `list below is layout.yaml as committed, not yet validated against any particular shell.`;
-  }
-  await renderPanelList();
-}
-
-// ---------------------------------------------------------------- Save/Panels <-> Shape impact
-// The consequential backward move: leaving Save Shell or Panels for
-// Upload/Shape re-validates every authored layout.yaml panel's standoff
-// against the CURRENT shell, using shape-editor-chart.js's scoped port of
-// shape_impact.py's seat_standoff. Only meaningful once a shell has
-// actually been saved (in this browser) — before that there is nothing
-// to invalidate.
+// ---------------------------------------------------------------- impact machinery (shared)
 let impactClasses = null, impactPanels = null;
 async function ensureImpactData() {
   if (impactClasses && impactPanels) return;
@@ -1589,51 +1426,473 @@ async function ensureImpactData() {
     impactClasses = null; impactPanels = null;
   }
 }
-async function buildImpactModalHtml() {
-  await ensureImpactData();
-  const newChart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
+function buildStandoffImpactHtml(oldChart, newChart, panels, contextLabel) {
+  const results = computeStandoffImpact(oldChart, newChart, impactClasses, panels);
+  const flagged = results.filter(r => r.error || r.regressed || !r.nowWithinTolerance);
   let body;
-  if (!impactClasses || !impactPanels) {
-    body = '<span class="warn">could not load panels.yaml/layout.yaml — showing the generic warning only. ' +
-      "Panel placements live in (θ, s) on the shell and will move if it changes.</span>";
-  } else if (impactPanels.length === 0) {
-    body = "no authored panels in layout.yaml — nothing to re-validate.";
+  if (flagged.length === 0) {
+    body = '<span class="ok">no panels affected — standoff essentially unchanged.</span>';
   } else {
-    const results = computeStandoffImpact(savedShellChart, newChart, impactClasses, impactPanels);
+    let rows = "";
+    for (const r of flagged) {
+      if (r.error) { rows += `<tr><td>${r.id}</td><td colspan=3 class="err">${r.error}</td></tr>`; continue; }
+      const tag = r.regressed ? '<span class="err">REGRESSED</span>' : '<span class="warn">still exceeds</span>';
+      const delta = r.deltaMm != null ? `${r.deltaMm >= 0 ? "+" : ""}${r.deltaMm.toFixed(2)}` : "—";
+      rows += `<tr><td>${r.id}</td><td>${r.oldStandoffMm.toFixed(2)}→${r.newStandoffMm.toFixed(2)} mm</td><td>Δ${delta} mm</td><td>${tag}</td></tr>`;
+    }
+    body = `<table><tr><th>panel</th><th>standoff</th><th>Δ</th><th></th></tr>${rows}</table>`;
+  }
+  return `${contextLabel}:<br><br>${body}<br><br><div class="legend" style="padding:0">worst first · tolerance 2.0 mm · ` +
+    `standoff only — connector/outline legality, mirror-twin validity, and the layering DAG still need the Python ` +
+    `shape_impact.py machinery, not ported here.</div><br>Continue?`;
+}
+async function buildShellOverwriteImpactHtml(oldChart, newChart, layouts, shellName) {
+  await ensureImpactData();
+  if (!impactClasses) {
+    return `Saving over "${shellName}" will change the shell that ${layouts.length} layout(s) depend on. ` +
+      `Could not load panels.yaml — proceeding will NOT re-check them. Continue?`;
+  }
+  let sections = "";
+  for (const layout of layouts) {
+    const results = computeStandoffImpact(oldChart, newChart, impactClasses, layout.panels);
     const flagged = results.filter(r => r.error || r.regressed || !r.nowWithinTolerance);
+    sections += `<h3 style="margin:10px 0 2px;color:var(--dim)">${layout.name}</h3>`;
     if (flagged.length === 0) {
-      body = '<span class="ok">no panels affected — every panel that fit at save still fits, standoff essentially unchanged.</span>';
+      sections += '<span class="ok">no panels affected</span>';
     } else {
       let rows = "";
       for (const r of flagged) {
         if (r.error) { rows += `<tr><td>${r.id}</td><td colspan=3 class="err">${r.error}</td></tr>`; continue; }
         const tag = r.regressed ? '<span class="err">REGRESSED</span>' : '<span class="warn">still exceeds</span>';
         const delta = r.deltaMm != null ? `${r.deltaMm >= 0 ? "+" : ""}${r.deltaMm.toFixed(2)}` : "—";
-        rows += `<tr><td>${r.id}</td><td>${r.oldStandoffMm.toFixed(2)}→${r.newStandoffMm.toFixed(2)} mm</td>` +
-          `<td>Δ${delta} mm</td><td>${tag}</td></tr>`;
+        rows += `<tr><td>${r.id}</td><td>${r.oldStandoffMm.toFixed(2)}→${r.newStandoffMm.toFixed(2)} mm</td><td>Δ${delta} mm</td><td>${tag}</td></tr>`;
       }
-      body = `<table><tr><th>panel</th><th>standoff</th><th>Δ</th><th></th></tr>${rows}</table>` +
-        `<div class="legend" style="padding:4px 0 0">worst first · tolerance 2.0 mm · standoff only — ` +
-        `connector/outline legality, mirror-twin validity, and the layering DAG still need the Python ` +
-        `shape_impact.py machinery, not ported here.</div>`;
+      sections += `<table><tr><th>panel</th><th>standoff</th><th>Δ</th><th></th></tr>${rows}</table>`;
     }
   }
-  return `Returning to Shape from your saved shell (${fmtSavedLabel(savedShell)}):<br><br>${body}<br><br>Continue?`;
+  return `Saving over "${shellName}" — ${layouts.length} layout(s) depend on this shell's (θ, s):` +
+    `${sections}<div class="legend" style="padding:6px 0 0">worst first · tolerance 2.0 mm.</div><br>Continue?`;
 }
 
-// Leaving Save Shell OR Panels for Upload/Shape is the consequential
-// move; moving between Save Shell and Panels themselves, or forward into
-// either, is free.
-function isConsequentialBackNav(from, to) {
-  return (from === "export" || from === "place") && to !== "export" && to !== "place";
+// ---------------------------------------------------------------- Save (creates or updates a library entry)
+async function saveCurrentShell() {
+  if (exportBlocked()) {
+    $("exportStatus").innerHTML = '<span class="err">save blocked — a named feature is lost at the ' +
+      "current density (see Shape); raise the density or check the override</span>";
+    return;
+  }
+  if (!currentShell) {
+    const defaultName = `Shell ${new Date().toLocaleString()}`;
+    const name = await promptModal("Name this shell", defaultName);
+    if (name == null) return;
+    const now = new Date().toISOString();
+    const shell = {
+      id: db.genId(), name, createdAt: now, updatedAt: now,
+      aPoints: paneA.points.map(p => [p.v, p.y]),
+      bFrontPoints: paneB.front.map(p => [p.v, p.y]),
+      bBackPoints: paneB.back.map(p => [p.v, p.y]),
+      neckline: { ...n },
+      backdropCalibration: currentCalibrationYaml(),
+      thumbnail: captureThumbnail(),
+    };
+    await db.putShell(shell);
+    currentShell = { id: shell.id, name: shell.name, dirty: false };
+    localStorage.setItem(CURRENT_SHELL_POINTER_KEY, shell.id);
+    shapeSource = "library";
+    $("exportStatus").innerHTML = `<span class="ok">✓ saved as "${shell.name}"</span>`;
+  } else if (!currentShell.dirty) {
+    $("exportStatus").innerHTML = '<span class="dim">no changes to save</span>';
+    return;
+  } else {
+    const owningLayouts = await db.listLayoutsForShell(currentShell.id);
+    const doOverwrite = async () => {
+      const shell = await db.getShell(currentShell.id);
+      shell.aPoints = paneA.points.map(p => [p.v, p.y]);
+      shell.bFrontPoints = paneB.front.map(p => [p.v, p.y]);
+      shell.bBackPoints = paneB.back.map(p => [p.v, p.y]);
+      shell.neckline = { ...n };
+      shell.backdropCalibration = currentCalibrationYaml();
+      shell.thumbnail = captureThumbnail();
+      shell.updatedAt = new Date().toISOString();
+      await db.putShell(shell);
+      currentShell.dirty = false;
+      $("exportStatus").innerHTML = `<span class="ok">✓ saved "${shell.name}"</span>` +
+        (owningLayouts.length ? ` — re-checked ${owningLayouts.length} layout(s) on this shell.` : "");
+      updateShellStatusPill();
+      await renderShellLibrary();
+      await updateStorageUsage();
+    };
+    if (owningLayouts.length === 0) {
+      await doOverwrite();
+    } else {
+      const oldShell = await db.getShell(currentShell.id);
+      const oldChart = buildSurfaceChart(
+        fitOfPoints(oldShell.aPoints), fitOfPoints(oldShell.bFrontPoints), fitOfPoints(oldShell.bBackPoints),
+        V_LO, V_HI, SPLIT, necklineHeightFn(oldShell.neckline));
+      const newChart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
+      const html = await buildShellOverwriteImpactHtml(oldChart, newChart, owningLayouts, oldShell.name);
+      confirmModal(html, doOverwrite);
+      return;
+    }
+  }
+  updateShellStatusPill();
+  await renderShellLibrary();
+  await updateStorageUsage();
 }
-function confirmModal(html, onConfirm) {
-  $("navModalText").innerHTML = html;
-  $("navModal").classList.add("open");
-  $("navModalConfirm").onclick = () => { $("navModal").classList.remove("open"); onConfirm(); };
-  $("navModalCancel").onclick = () => { $("navModal").classList.remove("open"); };
-}
+$("saveShellBtn").onclick = saveCurrentShell;
+$("saveShellBtnShape").onclick = saveCurrentShell;
+$("exportOverride").addEventListener("change", updateExportGuard);
 
+// ---------------------------------------------------------------- shell library UI
+async function renderShellLibrary() {
+  const shells = await db.listShells();
+  const el = $("shellLibraryList");
+  if (!shells.length) {
+    el.innerHTML = '<div class="legend">no saved shells yet — Save above to create the first one.</div>';
+    return;
+  }
+  el.innerHTML = shells.map((s) => {
+    const isCurrent = currentShell && currentShell.id === s.id;
+    return `<div class="libRow ${isCurrent ? "current" : ""}">
+      <img class="libThumb" src="${s.thumbnail || ""}" alt="">
+      <div class="libInfo">
+        <div class="libName">${s.name}${isCurrent ? ' <span class="ok">· current</span>' : ""}</div>
+        <div class="libMeta">saved ${new Date(s.updatedAt).toLocaleString()}</div>
+      </div>
+      <div class="libActions">
+        <button data-act="open" data-id="${s.id}">open</button>
+        <button data-act="dup" data-id="${s.id}">duplicate</button>
+        <button data-act="rename" data-id="${s.id}">rename</button>
+        <button data-act="del" data-id="${s.id}">delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function openShellById(id) {
+  const shell = await db.getShell(id);
+  if (!shell) return;
+  openShellIntoEditor(shell, "library");
+  currentShell = { id: shell.id, name: shell.name, dirty: false };
+  localStorage.setItem(CURRENT_SHELL_POINTER_KEY, shell.id);
+  updateShellStatusPill();
+  await renderShellLibrary();
+  goToTab("shape");
+}
+async function duplicateShell(id) {
+  const src = await db.getShell(id);
+  if (!src) return;
+  const name = await promptModal("Duplicate shell", `${src.name} copy`);
+  if (name == null) return;
+  const now = new Date().toISOString();
+  const copy = { ...src, id: db.genId(), name, createdAt: now, updatedAt: now };
+  await db.putShell(copy);
+  openShellIntoEditor(copy, "library");
+  currentShell = { id: copy.id, name: copy.name, dirty: false };
+  localStorage.setItem(CURRENT_SHELL_POINTER_KEY, copy.id);
+  updateShellStatusPill();
+  await renderShellLibrary();
+  await updateStorageUsage();
+  goToTab("shape");
+}
+async function renameShell(id) {
+  const shell = await db.getShell(id);
+  if (!shell) return;
+  const name = await promptModal("Rename shell", shell.name);
+  if (name == null) return;
+  shell.name = name; shell.updatedAt = new Date().toISOString();
+  await db.putShell(shell);
+  if (currentShell && currentShell.id === id) { currentShell.name = name; updateShellStatusPill(); }
+  await renderShellLibrary();
+}
+async function deleteShellWithConfirm(id) {
+  const shell = await db.getShell(id);
+  if (!shell) return;
+  const layouts = await db.listLayoutsForShell(id);
+  const msg = `Delete shell "${shell.name}"${layouts.length ? ` and its ${layouts.length} layout(s)` : ""}? This cannot be undone.`;
+  confirmModal(msg, async () => {
+    await db.deleteShell(id);
+    if (currentShell && currentShell.id === id) {
+      currentShell = null;
+      localStorage.removeItem(CURRENT_SHELL_POINTER_KEY);
+      updateShellStatusPill();
+    }
+    await renderShellLibrary();
+    await updateStorageUsage();
+    await renderShellLayoutList();
+  });
+}
+$("shellLibraryList").addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.dataset.act === "open") await openShellById(id);
+  else if (btn.dataset.act === "dup") await duplicateShell(id);
+  else if (btn.dataset.act === "rename") await renameShell(id);
+  else if (btn.dataset.act === "del") await deleteShellWithConfirm(id);
+});
+
+async function updateStorageUsage() {
+  const est = await db.estimateUsage();
+  const fmtMB = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
+  $("storageUsage").textContent = est
+    ? `library using ~${fmtMB(est.usage)} MB of ~${fmtMB(est.quota)} MB available (browser estimate, includes other site data)`
+    : "storage estimate not available in this browser";
+}
+$("exportLibraryBtn").onclick = async () => {
+  const data = await db.exportLibrary();
+  const text = JSON.stringify(data, null, 2);
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `dress-shell-library-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  $("libraryIOStatus").innerHTML = `<span class="ok">✓ exported ${data.shells.length} shell(s), ${data.layouts.length} layout(s).</span>`;
+};
+$("importLibraryInput").addEventListener("change", async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const result = await db.importLibrary(data);
+    $("libraryIOStatus").innerHTML = `<span class="ok">✓ imported ${result.shells} shell(s), ${result.layouts} layout(s).</span>`;
+    await renderShellLibrary();
+    await updateStorageUsage();
+    await renderShellLayoutList();
+  } catch (e) {
+    $("libraryIOStatus").innerHTML = `<span class="err">import failed: ${e.message}</span>`;
+  }
+  ev.target.value = "";
+});
+
+// -- quiet secondary: getting a shell into the repo. Separate concern. ----
+$("exportBtn").onclick = () => {
+  if (exportBlocked()) {
+    $("exportStatus").innerHTML = '<span class="err">blocked — a named feature is lost at the ' +
+      "current density (see Shape); raise the density or check the override</span>";
+    return;
+  }
+  const overridden = lostFeatures.a.length || lostFeatures.bf.length || lostFeatures.bb.length;
+  const text = dumpShapeYaml();
+  const blob = new Blob([text], { type: "text/yaml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "shape.yaml";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  $("exportArea").value = text;
+  $("exportArea").style.display = "block";
+  $("exportStatus").innerHTML = (overridden
+    ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used).</span> '
+    : '<span class="ok">downloaded shape.yaml.</span> ') +
+    "This does not save the shell to the library — use “Save” above for that.";
+};
+$("copyBtn").onclick = async () => {
+  if (exportBlocked()) {
+    $("exportStatus").innerHTML = '<span class="err">blocked — a named feature is lost at the ' +
+      "current density (see Shape); raise the density or check the override</span>";
+    return;
+  }
+  const text = dumpShapeYaml();
+  try {
+    await navigator.clipboard.writeText(text);
+    $("exportStatus").innerHTML = '<span class="ok">✓ copied shape.yaml to clipboard.</span> Paste it into your ' +
+      "Claude Code conversation and ask it to commit as tools/dress-shell/shape.yaml. This does not save the " +
+      "shell to the library — use “Save” above for that.";
+  } catch {
+    $("exportArea").value = text;
+    $("exportArea").style.display = "block";
+    $("exportStatus").innerHTML = '<span class="warn">clipboard blocked — select the text below and copy it. ' +
+      "This does not save the shell to the library — use “Save” above for that.</span>";
+  }
+};
+
+// ---------------------------------------------------------------- Panels tab
+function summarizeLayoutYaml(text) {
+  const panels = [];
+  let cur = null;
+  for (const line of text.split("\n")) {
+    const idMatch = line.match(/^\s*-\s*id:\s*(.+)$/);
+    if (idMatch) { if (cur) panels.push(cur); cur = { id: idMatch[1].trim() }; continue; }
+    if (!cur) continue;
+    const kv = line.match(/^\s*([a-z_]+):\s*(.+)$/);
+    if (kv) cur[kv[1]] = kv[2].trim();
+  }
+  if (cur) panels.push(cur);
+  return panels;
+}
+let layoutYamlText = null;
+let displayPanels = [];
+let committedShapeChart = null;
+async function ensureCommittedShapeChart() {
+  if (committedShapeChart) return committedShapeChart;
+  try {
+    const resp = await fetch("./tools/dress-shell/shape.yaml");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const parsed = shapeYamlToInitialCurves(parseShapeYaml(await resp.text()));
+    committedShapeChart = buildSurfaceChart(
+      fitOfPoints(parsed.aPoints), fitOfPoints(parsed.bFrontPoints), fitOfPoints(parsed.bBackPoints),
+      V_LO, V_HI, SPLIT, necklineHeightFn(parsed.neckline || state.neckline));
+  } catch (e) {
+    console.warn("could not build a chart for the committed shape.yaml:", e);
+    committedShapeChart = null;
+  }
+  return committedShapeChart;
+}
+(async () => {
+  try {
+    const resp = await fetch("./tools/dress-shell/layout.yaml");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    layoutYamlText = await resp.text();
+    displayPanels = summarizeLayoutYaml(layoutYamlText);
+    $("layoutStatus").innerHTML = `<span class="ok">loaded tools/dress-shell/layout.yaml</span> — ${displayPanels.length} committed panels.`;
+    $("layoutArea").value = layoutYamlText;
+    $("layoutPanelList").innerHTML = displayPanels.map(p =>
+      `${p.id} — class ${p.class ?? "?"} · θ ${p.theta ?? "?"}° · s ${p.s ?? "?"}mm · ` +
+      `layer ${p.layer ?? "?"} · mirrored ${p.mirrored ?? "?"}`).join("<br>");
+  } catch (e) {
+    $("layoutStatus").innerHTML = `<span class="err">could not load tools/dress-shell/layout.yaml (${e.message})</span>`;
+  }
+})();
+$("copyLayoutBtn").onclick = async () => {
+  if (!layoutYamlText) { $("layoutCopyStatus").innerHTML = '<span class="err">layout.yaml has not loaded yet</span>'; return; }
+  try {
+    await navigator.clipboard.writeText(layoutYamlText);
+    $("layoutCopyStatus").innerHTML = '<span class="ok">✓ copied to clipboard</span> — the committed file verbatim.';
+  } catch {
+    $("layoutArea").style.display = "block";
+    $("layoutCopyStatus").innerHTML = '<span class="warn">clipboard blocked — select the text above and copy it</span>';
+  }
+};
+$("importCommittedLayoutBtn").onclick = async () => {
+  if (!currentShell) { $("layoutCopyStatus").innerHTML = '<span class="err">open or save a shell first (Shells tab)</span>'; return; }
+  await ensureImpactData();
+  if (!impactClasses || !impactPanels || !impactPanels.length) {
+    $("layoutCopyStatus").innerHTML = '<span class="err">could not load panels.yaml/layout.yaml</span>'; return;
+  }
+  const oldChart = await ensureCommittedShapeChart();
+  const newChart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
+  const html = oldChart
+    ? buildStandoffImpactHtml(oldChart, newChart, impactPanels, `Duplicating the committed layout.yaml onto "${currentShell.name}"`)
+    : `Duplicating the committed layout.yaml onto "${currentShell.name}" — could not build a chart for the ` +
+      "committed shape.yaml to compare against. Continue?";
+  confirmModal(html, async () => {
+    const name = await promptModal("Name this layout", "from committed layout.yaml");
+    if (name == null) return;
+    const now = new Date().toISOString();
+    await db.putLayout({ id: db.genId(), shellId: currentShell.id, name, panels: impactPanels, createdAt: now, updatedAt: now });
+    await renderShellLayoutList(); updateTabProgress();
+    $("layoutCopyStatus").innerHTML = `<span class="ok">✓ added layout "${name}"</span>`;
+  });
+};
+
+async function renderShellLayoutList() {
+  const el = $("shellLayoutList");
+  if (!currentShell) {
+    el.innerHTML = '<div class="legend">no shell open — open or save one on the Shells tab first.</div>';
+    return;
+  }
+  const layouts = await db.listLayoutsForShell(currentShell.id);
+  if (!layouts.length) {
+    el.innerHTML = '<div class="legend">no layouts on this shell yet — duplicate the committed layout.yaml below onto it to start one.</div>';
+    return;
+  }
+  await ensureImpactData();
+  const shells = await db.listShells();
+  const otherShells = shells.filter(s => s.id !== currentShell.id);
+  const chart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
+  el.innerHTML = layouts.map((l) => {
+    let standoffHtml = "";
+    if (impactClasses) {
+      const results = computeStandoffs(chart, impactClasses, l.panels);
+      const worst = results[0];
+      if (worst) {
+        const so = Number.isFinite(worst.standoffMm) ? `${worst.standoffMm.toFixed(2)} mm` : "off-shell";
+        standoffHtml = ` · worst standoff <b>${so}</b> (${worst.id})`;
+      }
+    }
+    const otherOptions = otherShells.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+    return `<div class="layoutRow">
+      <div class="name">${l.name}</div>
+      <div class="meta">${l.panels.length} panels · updated ${new Date(l.updatedAt).toLocaleString()}${standoffHtml}</div>
+      <div class="row" style="padding:4px 0 0">
+        <button class="miniBtn" data-act="viewLayout" data-id="${l.id}">view standoff table</button>
+        <button class="miniBtn" data-act="dupLayout" data-id="${l.id}">duplicate here</button>
+        <button class="miniBtn" data-act="renameLayout" data-id="${l.id}">rename</button>
+        <button class="miniBtn" data-act="delLayout" data-id="${l.id}">delete</button>
+        ${otherShells.length ? `<select class="miniSelect" data-dup-target="${l.id}"><option value="">duplicate to shell…</option>${otherOptions}</select>` : ""}
+      </div>
+      <div id="layoutTable-${l.id}"></div>
+    </div>`;
+  }).join("");
+}
+$("shellLayoutList").addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.dataset.act === "viewLayout") {
+    const layout = await db.getLayout(id);
+    await ensureImpactData();
+    const chart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
+    const results = impactClasses ? computeStandoffs(chart, impactClasses, layout.panels) : [];
+    const rows = results.map(r => r.error
+      ? `<tr><td>${r.id}</td><td colspan=2 class="err">${r.error}</td></tr>`
+      : `<tr><td>${r.id}</td><td>${Number.isFinite(r.standoffMm) ? r.standoffMm.toFixed(2) + " mm" : "off-shell"}</td>` +
+        `<td>${r.withinTolerance ? '<span class="ok">fits</span>' : '<span class="warn">exceeds</span>'}</td></tr>`
+    ).join("");
+    $(`layoutTable-${id}`).innerHTML = rows ? `<table><tr><th>panel</th><th>standoff</th><th></th></tr>${rows}</table>` : "";
+  } else if (btn.dataset.act === "dupLayout") {
+    const layout = await db.getLayout(id);
+    const name = await promptModal("Duplicate layout (same shell)", `${layout.name} copy`);
+    if (name == null) return;
+    const now = new Date().toISOString();
+    await db.putLayout({ ...layout, id: db.genId(), name, createdAt: now, updatedAt: now });
+    await renderShellLayoutList(); updateTabProgress();
+  } else if (btn.dataset.act === "renameLayout") {
+    const layout = await db.getLayout(id);
+    const name = await promptModal("Rename layout", layout.name);
+    if (name == null) return;
+    layout.name = name; layout.updatedAt = new Date().toISOString();
+    await db.putLayout(layout);
+    await renderShellLayoutList();
+  } else if (btn.dataset.act === "delLayout") {
+    const layout = await db.getLayout(id);
+    confirmModal(`Delete layout "${layout.name}"? This cannot be undone.`, async () => {
+      await db.deleteLayout(id);
+      await renderShellLayoutList(); updateTabProgress();
+    });
+  }
+});
+$("shellLayoutList").addEventListener("change", async (ev) => {
+  const sel = ev.target.closest("select[data-dup-target]");
+  if (!sel || !sel.value) return;
+  const layoutId = sel.dataset.dupTarget;
+  const targetShellId = sel.value;
+  sel.value = "";
+  const layout = await db.getLayout(layoutId);
+  const sourceShell = await db.getShell(layout.shellId);
+  const targetShell = await db.getShell(targetShellId);
+  await ensureImpactData();
+  const sourceChart = buildSurfaceChart(
+    fitOfPoints(sourceShell.aPoints), fitOfPoints(sourceShell.bFrontPoints), fitOfPoints(sourceShell.bBackPoints),
+    V_LO, V_HI, SPLIT, necklineHeightFn(sourceShell.neckline));
+  const targetChart = buildSurfaceChart(
+    fitOfPoints(targetShell.aPoints), fitOfPoints(targetShell.bFrontPoints), fitOfPoints(targetShell.bBackPoints),
+    V_LO, V_HI, SPLIT, necklineHeightFn(targetShell.neckline));
+  const html = impactClasses
+    ? buildStandoffImpactHtml(sourceChart, targetChart, layout.panels, `Duplicating "${layout.name}" from "${sourceShell.name}" onto "${targetShell.name}"`)
+    : `Duplicating "${layout.name}" onto "${targetShell.name}" — could not load panels.yaml. Continue?`;
+  confirmModal(html, async () => {
+    const name = await promptModal("Name this layout on the target shell", `${layout.name} (on ${targetShell.name})`);
+    if (name == null) return;
+    const now = new Date().toISOString();
+    await db.putLayout({ id: db.genId(), shellId: targetShellId, name, panels: layout.panels, createdAt: now, updatedAt: now });
+    if (currentShell && currentShell.id === targetShellId) await renderShellLayoutList();
+  });
+});
+
+// ---------------------------------------------------------------- tab navigation (free — no gate)
 const TAB_NAMES = ["upload", "shape", "export", "place"];
 let currentTab = "shape";
 function setTabVisible(tab) {
@@ -1642,22 +1901,17 @@ function setTabVisible(tab) {
 }
 async function goToTab(tab) {
   if (tab === currentTab) return;
-  const commit = () => {
-    currentTab = tab;
-    setTabVisible(tab);
-    if (tab === "export") updateExportSummary();
-    if (tab === "place") enterPlaceTab();
-  };
-  if (!isConsequentialBackNav(currentTab, tab) || !savedShell) { commit(); return; }
-  $("navModalText").innerHTML = "computing panel standoff impact against the saved shell…";
-  $("navModal").classList.add("open");
-  const html = await buildImpactModalHtml();
-  confirmModal(html, commit);
+  currentTab = tab;
+  setTabVisible(tab);
+  if (tab === "export") { updateExportSummary(); await renderShellLibrary(); await updateStorageUsage(); }
+  if (tab === "place") { await renderShellLayoutList(); }
+  updateShellStatusPill();
 }
 for (const btn of document.querySelectorAll(".tabBtn")) {
   btn.addEventListener("click", () => { goToTab(btn.dataset.tab); });
 }
 setTabVisible(currentTab);
+updateShellStatusPill();
 
 paneA.draw();
 paneB.draw();
