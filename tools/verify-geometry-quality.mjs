@@ -42,9 +42,9 @@
    Browser-based (like verify-flower-export): serves flower.js with an appended hook that
    calls the real resolveParams + exported geometry fns (reaching the two exports flower.js
    does not import — buildRibGraph, getCleftContour — via a dynamic import), so it measures
-   exactly what the renderer uses. Cleft-on-continuous-margin configs are a KNOWN, tracked
-   failure (#64): they are marked xfail so the table shows their real numbers without
-   breaking the build; the gate is hard for every shipping (non-cleft) config. Usage:
+   exactly what the renderer uses. Cleft-on-continuous-margin configs were a tracked
+   failure — the unsealed sinus, fixed in PR #50 — and are now gated like everything else;
+   the xfail machinery below stays for the next tracked debt. Usage:
      node tools/verify-geometry-quality.mjs               # 5 shapes x 5 patterns gate
      node tools/verify-geometry-quality.mjs --report-only # never exit non-zero (just report)
      node tools/verify-geometry-quality.mjs --sweep       # cleftDepth sweep (Lobed), report-only
@@ -132,7 +132,7 @@ const PATTERNS = ['veins', 'voronoi', 'strands', 'bone', 'spacecol'];
 // Config list. Cleft petals (Lobed) used to render their sinus correctly ONLY when the rim
 // was cleft-aware — i.e. continuous margin OFF. With it ON (the Standard default) the two
 // un-clefted marginal strands skipped the sinus entirely, so the shape was manifold-but-
-// wrong, and these configs were quarantined xfail under #64. Fixed: ribPath(P) is now the
+// wrong, and these configs were quarantined xfail. Fixed in PR #50: ribPath(P) is now the
 // single producer of the boundary and the continuous-margin strands are the two halves of
 // the real material contour, so the sinus seals with the margin ON. The marker is gone and
 // the gate is HARD here — a Lobed regression breaks the build like anything else.
@@ -390,7 +390,7 @@ window.__gq = async function() {
 
   // (5) RIB-PATH SPLIT INTEGRITY — ribPath cuts the boundary into its two halves at
   //     the contour's own y = 0 crossings. If that split is degenerate it falls back
-  //     to the analytic envelope, which IS the #64 defect: a rim that skips every
+  //     to the analytic envelope, which IS the pre-#50 defect: a rim that skips every
   //     sinus. The fallback is a real code path, so it is gated here rather than left
   //     to a console warning nobody reads — false on every shipped config today, and
   //     the thing that catches a future outline change that makes it trip.
@@ -461,7 +461,7 @@ for (const cfg of CONFIGS) {
   // undershoot is reported per-config but not gated.
   const badOvershoot = q.regOvershootMaxMM > T.regOvershootMM;
   const badUndershoot = q.infill === 'voronoi' && q.regUndershootMaxMM > T.regUndershootVoronoiMM;
-  // The rib-path split either held or the rim silently reverted to the pre-#64
+  // The rib-path split either held or the rim silently reverted to the pre-#50
   // envelope. There is no tolerance to set here: it is a boolean, and it is hard.
   const badSplit = !q.ribSplit || q.ribSplit.fallback || !q.ribSplit.coverage || !q.ribSplit.sidePure;
   const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit;

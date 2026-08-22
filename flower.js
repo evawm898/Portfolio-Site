@@ -3453,7 +3453,7 @@ const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ct
 //   - Edge TOOTHED / SCALLOPED: the teeth/scallops reshape the silhouette rim, but the
 //     Standard-default continuous margin replaces the rim with smooth marginal strands,
 //     so they render identically to CLEAN. They render correctly in Advanced (continuous
-//     margin OFF). Return to Standard once the margin is edge-profile-aware (#67).
+//     margin OFF). Return to Standard once the margin is edge-profile-aware (issue #53).
 //   - Arrangement FAN (bilateral): renders as scattered debris. Advanced-only until the
 //     bilateral layout is rebuilt.
 // (The FRACTAL edge was DELETED outright — no live geometry ever existed — so it is gone
