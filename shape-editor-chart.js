@@ -196,6 +196,22 @@ export function parseLayoutPanels(text) {
   return panels;
 }
 
+// Per-panel standoff against a SINGLE shell (no comparison) — worst
+// first. Used to make a read-only panel view "work against" whichever
+// shell is currently saved, rather than just listing (theta, s) text.
+export function computeStandoffs(chart, classes, authoredPanels, toleranceMm = 2.0, samples = 9) {
+  const results = authoredPanels.map((p) => {
+    const cls = classes[p.classId];
+    if (!cls || cls.outlineW == null) {
+      return { id: p.id, classId: p.classId, error: "unknown class or missing outline in panels.yaml" };
+    }
+    const standoffMm = seatStandoff(chart, cls.outlineW, cls.outlineH, p.theta, p.s, p.rotation, samples);
+    return { id: p.id, classId: p.classId, standoffMm, withinTolerance: standoffMm <= toleranceMm };
+  });
+  results.sort((a, b) => (b.standoffMm ?? -Infinity) - (a.standoffMm ?? -Infinity));
+  return results;
+}
+
 // The scoped report itself: per-authored-panel standoff old vs new, worst
 // first. `classes`/`authoredPanels` come from the two parsers above.
 // toleranceMm matches curvature.STANDOFF_TOLERANCE_MM's default (2.0).

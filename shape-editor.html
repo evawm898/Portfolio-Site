@@ -119,8 +119,8 @@
     <div id="tabBar">
       <button class="tabBtn" data-tab="upload">1 · Upload</button>
       <button class="tabBtn" data-tab="shape">2 · Shape</button>
-      <button class="tabBtn" data-tab="export">3 · Export Shell</button>
-      <button class="tabBtn" data-tab="place">Panels (read-only)</button>
+      <button class="tabBtn" data-tab="export">3 · Save Shell</button>
+      <button class="tabBtn" data-tab="place">4 · Panels</button>
     </div>
 
     <!-- ============================================================ -->
@@ -314,15 +314,16 @@
     </section>
 
     <!-- ============================================================ -->
-    <!-- STAGE 3 — EXPORT SHELL                                        -->
+    <!-- STAGE 3 — SAVE SHELL                                          -->
     <!-- ============================================================ -->
     <section id="tab-export" class="tabSection">
-      <h1>Stage 3 · Export Shell</h1>
-      <div class="banner commit">The commitment point, not just a button. This produces the shell
-        panels get placed on. Review what's below, then export — that moment becomes the "old" shell
-        the next backward trip to Shape gets compared against, panel by panel.</div>
+      <h1>Stage 3 · Save Shell</h1>
+      <div class="banner commit">Not an export — a save. Nothing leaves the app. Saving snapshots the
+        current shell <b>in this browser</b> (it survives a reload) and switches straight to Panels,
+        which then works against it. Review what's below, then save — that moment becomes the shell
+        the next backward trip from Panels gets compared against, panel by panel.</div>
 
-      <h2>What's being exported</h2>
+      <h2>What's being saved</h2>
       <div id="exportSummary" class="kv">…</div>
 
       <h2>Final numbers</h2>
@@ -331,34 +332,38 @@
       <div id="exportShellReadout" class="kv" style="margin-top:6px">…</div>
 
       <hr>
-      <h2>Name this export</h2>
+      <h2>Name this save</h2>
       <div class="row">
         <label>label <input type="text" class="labelInput" id="exportLabel" placeholder="e.g. bodice-v2, pre-fitting-check"></label>
       </div>
       <div class="legend" id="exportGuard"></div>
       <label class="row" id="exportOverrideRow">
         <input type="checkbox" id="exportOverride">
-        I understand — a named feature is not represented at this density; allow export anyway
+        I understand — a named feature is not represented at this density; allow saving anyway
       </label>
-      <button class="primaryBtn" id="copyBtn">copy shape.yaml to clipboard (exports)</button>
-      <button class="miniBtn" id="exportBtn">or download the file instead</button>
+      <button class="primaryBtn" id="saveShellBtn">Save shell → Panels</button>
       <div class="kv" id="exportStatus"></div>
+
+      <hr>
+      <h3>Commit to the repo — a separate concern</h3>
+      <div class="legend">Getting a shell into <code>tools/dress-shell/shape.yaml</code> isn't part of
+        saving; use this only when you actually want that. Copies the same YAML a save would snapshot.</div>
+      <button class="miniBtn" id="copyBtn">copy shape.yaml to clipboard</button>
+      <button class="miniBtn" id="exportBtn">or download the file</button>
       <textarea id="exportArea" readonly></textarea>
-      <div class="legend">This page has no backend — it cannot write to the repo itself. The one
-        obvious path: <b>copy to clipboard</b>, paste the YAML into your Claude Code conversation,
-        and ask it to commit as <code>tools/dress-shell/shape.yaml</code>.</div>
     </section>
 
     <!-- ============================================================ -->
-    <!-- PANELS — read-only (unchanged; interactive placement not built yet) -->
+    <!-- PANELS — read-only placement editor is out of scope; this now works -->
+    <!-- against the saved shell (live per-panel standoff), not just text.   -->
     <!-- ============================================================ -->
     <section id="tab-place" class="tabSection">
-      <h1>Panels (read-only)</h1>
+      <h1>Stage 4 · Panels</h1>
       <div class="banner">Panel placement comes after the shell pipeline is finished, and what it
-        needs hasn't been worked out yet. This stays a read-only view of the committed
-        <code>layout.yaml</code> — not the interactive placement editor, which still lives in
-        <code>tools/dress-shell/editor_server.py</code> and is out of scope this round.</div>
-      <div class="stageWarnBanner" id="placeImpactBanner"></div>
+        needs hasn't been worked out yet. This stays a read-only view — not the interactive placement
+        editor, which still lives in <code>tools/dress-shell/editor_server.py</code> and is out of
+        scope this round. It DOES work against the saved shell below: standoff per panel, live.</div>
+      <div class="banner" id="savedShellBanner">…</div>
       <div class="legend" id="layoutStatus">loading tools/dress-shell/layout.yaml…</div>
       <div class="row">
         <button class="primaryBtn" id="copyLayoutBtn">copy layout.yaml to clipboard</button>

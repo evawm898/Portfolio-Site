@@ -43,7 +43,7 @@ import { pchipFit, CompoundCoarseShell, monotonicityReport,
         coarseCircumferenceReport, compoundPerimeter, buildAdaptiveOrder,
         checkNamedFeatures, smoothPoints, necklineHeightFn } from "./shape-editor-geom.js";
 import { parseShapeYaml, shapeYamlToInitialCurves } from "./shape-editor-yaml.js";
-import { buildSurfaceChart, computeStandoffImpact, parsePanelClasses, parseLayoutPanels } from "./shape-editor-chart.js";
+import { buildSurfaceChart, computeStandoffImpact, computeStandoffs, parsePanelClasses, parseLayoutPanels } from "./shape-editor-chart.js";
 
 // -- adaptive point density ---------------------------------------------
 // "Too many control points" — the flat ~31-point seed is replaced ONCE,
@@ -679,11 +679,45 @@ const seedBfPoints = initBf.points.map(p => [p.v, p.y]);
 const seedBbPoints = initBb.points.map(p => [p.v, p.y]);
 const bakedSeedCount = state.seed_a_points.length;
 
+// -- saved shell: localStorage, not a file -------------------------------
+// "Save shell -> Panels" (Stage 3) persists the shell HERE, in this
+// browser, so closing the tab and coming back lands you on your saved
+// shell rather than back at the committed shape.yaml. This is entirely
+// separate from getting a shell into the repo (the quiet clipboard/
+// download action on Stage 3) — nothing here ever leaves the app.
+const SAVED_SHELL_KEY = "dress-shell:shape-editor:saved-shell:v1";
+function loadSavedShellFromStorage() {
+  try {
+    const raw = localStorage.getItem(SAVED_SHELL_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!Array.isArray(obj.aPoints) || !Array.isArray(obj.bFrontPoints) || !Array.isArray(obj.bBackPoints)) return null;
+    return { ...obj, savedAt: new Date(obj.savedAt) };
+  } catch (e) {
+    console.warn("could not read the saved shell from localStorage:", e);
+    return null;
+  }
+}
+function persistSavedShellToStorage(saved) {
+  try {
+    localStorage.setItem(SAVED_SHELL_KEY, JSON.stringify({ ...saved, savedAt: saved.savedAt.toISOString() }));
+  } catch (e) {
+    console.warn("could not persist the saved shell to localStorage (private browsing / quota?):", e);
+  }
+}
+const storedSavedShell = loadSavedShellFromStorage();
+
 // ---------------------------------------------------------------- Stage 2's initial source
-// Priority: the committed tools/dress-shell/shape.yaml (fetchable
-// directly — Netlify serves the whole repo as static files) > the
-// generator seed. "Reset to generator seed" is an explicit action.
+// Priority: a shell saved in THIS browser (Stage 3's "Save shell") > the
+// committed tools/dress-shell/shape.yaml (fetchable directly — Netlify
+// serves the whole repo as static files) > the generator seed. "Reset to
+// generator seed" is an explicit action regardless of source.
 async function resolveInitialShapePoints() {
+  if (storedSavedShell) {
+    return { source: "saved", aPoints: storedSavedShell.aPoints, bFrontPoints: storedSavedShell.bFrontPoints,
+              bBackPoints: storedSavedShell.bBackPoints, neckline: storedSavedShell.neckline,
+              generator: null, backdropCalibration: storedSavedShell.backdropCalibration };
+  }
   try {
     const resp = await fetch("./tools/dress-shell/shape.yaml");
     if (resp.ok) {
@@ -743,16 +777,26 @@ if (initialShape.backdropCalibration) {
   calibTrace.hydrateFromYaml(initialShape.backdropCalibration.trace);
 }
 
-// -- shape-change / export tracking --------------------------------------
+// -- shape-change / saved-shell tracking ----------------------------------
 let shapeHandEdited = false;
-let shapeChangedSincePlace = true;   // drives the (unchanged) Panels-tab banner
-function markShapeChanged() { shapeHandEdited = true; shapeChangedSincePlace = true; }
-let lastExport = null;         // { aPoints, bFrontPoints, bBackPoints, neckline, label, exportedAt }
-let lastExportChart = null;    // pre-built buildSurfaceChart() for lastExport
+function markShapeChanged() { shapeHandEdited = true; }
 
 function fitOfPoints(pts) {
   const s = [...pts].sort((a, b) => a[0] - b[0]);
   return pchipFit(s.map(p => p[0]), s.map(p => p[1]));
+}
+
+// savedShell / savedShellChart: the shell "Save shell -> Panels" last
+// snapshotted — Panels works against this, and it's what the Export(Save)
+// -> Shape backward warning compares the current shell against. Hydrated
+// from localStorage at load if one exists (see storedSavedShell above),
+// so a reload keeps the same baseline a fresh save would have used.
+let savedShell = null, savedShellChart = null;
+if (storedSavedShell) {
+  savedShell = storedSavedShell;
+  savedShellChart = buildSurfaceChart(
+    fitOfPoints(savedShell.aPoints), fitOfPoints(savedShell.bFrontPoints), fitOfPoints(savedShell.bBackPoints),
+    V_LO, V_HI, SPLIT, necklineHeightFn(savedShell.neckline));
 }
 
 const noop = () => {};
@@ -803,6 +847,7 @@ wireFileInput("fileTop", topImg, calibTop);
 
 function updateShapeSourceReadout() {
   const labels = {
+    "saved": '<span class="ok">your saved shell (from this browser)</span>',
     "shape.yaml": '<span class="ok">committed tools/dress-shell/shape.yaml</span>',
     "seed": '<span class="warn">generator seed (fallback)</span>',
   };
@@ -818,7 +863,7 @@ $("resetToSeedBtn").onclick = () => {
   cacheA = cacheBf = cacheBb = null;
   lostFeatures.a = lostFeatures.bf = lostFeatures.bb = [];
   shapeSource = "seed"; updateShapeSourceReadout();
-  shapeHandEdited = false; shapeChangedSincePlace = true;
+  shapeHandEdited = false;
   paneA.draw(); paneB.draw(); updateExportGuard(); liveUpdate();
   status("reset to generator seed", "warn");
 };
@@ -1280,28 +1325,31 @@ $("exportMonoReadout").innerHTML = $("monoReadout").innerHTML;
 $("exportCircTable").innerHTML = $("circTable").innerHTML;
 $("exportShellReadout").innerHTML = $("shellReadout").innerHTML;
 
-// ---------------------------------------------------------------- Stage 3: Export Shell
+// ---------------------------------------------------------------- Stage 3: Save Shell
+function fmtSavedLabel(saved) {
+  return `${saved.label ? `"${saved.label}"` : "(unlabeled)"} at ${saved.savedAt.toLocaleString()}`;
+}
 function updateExportSummary() {
   const calibSummary = (label, calib) => `${label}: ${calib.calibrated
     ? `<span class="ok">calibrated</span> (${calib.imageLabel || "default asset"})`
     : '<span class="warn">not calibrated</span>'}`;
   $("exportSummary").innerHTML =
-    `source: ${shapeSource === "shape.yaml" ? "committed shape.yaml" : shapeSource === "seed" ? "generator seed" : "hand-edited this session"}<br>` +
+    `source: ${shapeSource === "saved" ? "your saved shell" : shapeSource === "shape.yaml" ? "committed shape.yaml" : shapeSource === "seed" ? "generator seed" : "hand-edited this session"}<br>` +
     `points: a(v) <b>${paneA.points.length}</b> · b_front <b>${paneB.front.length}</b> · b_back <b>${paneB.back.length}</b><br>` +
     `${calibSummary("front backdrop", calibFront)} · ${calibSummary("side backdrop", calibTrace)}<br>` +
     `neckline: CF ${n.cf_height} · peak ${n.peak_height} · CB ${n.cb_height}<br>` +
-    (lastExport
-      ? `last export: ${lastExport.label ? `"${lastExport.label}"` : "(unlabeled)"} at ${lastExport.exportedAt.toLocaleString()}` +
-        (shapeHandEditedSinceExport() ? ' — <span class="warn">shape has changed since</span>' : ' — <span class="ok">matches the current shell</span>')
-      : '<span class="dim">nothing exported yet this session</span>');
+    (savedShell
+      ? `last saved: ${fmtSavedLabel(savedShell)}` +
+        (shapeHandEditedSinceSave() ? ' — <span class="warn">shape has changed since</span>' : ' — <span class="ok">matches the current shell</span>')
+      : '<span class="dim">nothing saved yet — Panels has no shell to work against until you save</span>');
 }
-function shapeHandEditedSinceExport() {
-  if (!lastExport) return false;
+function shapeHandEditedSinceSave() {
+  if (!savedShell) return false;
   const same = (a, b) => a.length === b.length && a.every((p, i) => p[0] === b[i][0] && p[1] === b[i][1]);
   const curA = paneA.points.map(p => [p.v, p.y]);
   const curBf = paneB.front.map(p => [p.v, p.y]);
   const curBb = paneB.back.map(p => [p.v, p.y]);
-  return !(same(curA, lastExport.aPoints) && same(curBf, lastExport.bFrontPoints) && same(curBb, lastExport.bBackPoints));
+  return !(same(curA, savedShell.aPoints) && same(curBf, savedShell.bFrontPoints) && same(curBb, savedShell.bBackPoints));
 }
 
 // ---------------------------------------------------------------- export (no server to save to)
@@ -1358,27 +1406,50 @@ function dumpShapeYaml() {
   return lines.join("\n") + "\n";
 }
 
-function recordExport() {
-  lastExport = {
+// The ONE action on Stage 3: snapshot the current shell as the saved
+// shell (persisted to localStorage — survives a reload), and switch to
+// Panels. Nothing leaves the app. This is what the Save<->Shape backward
+// warning compares against, and what Panels works against — not a file,
+// not the clipboard.
+function saveShell() {
+  savedShell = {
     aPoints: paneA.points.map(p => [p.v, p.y]),
     bFrontPoints: paneB.front.map(p => [p.v, p.y]),
     bBackPoints: paneB.back.map(p => [p.v, p.y]),
     neckline: { ...n },
+    backdropCalibration: {
+      front: calibFront.toShapeYaml(calibFront.imageLabel || "assets/shape-editor/silhouette-front.png"),
+      trace: calibTrace.toShapeYaml(calibTrace.imageLabel || "assets/shape-editor/silhouette-trace.png"),
+    },
     label: $("exportLabel").value.trim(),
-    exportedAt: new Date(),
+    savedAt: new Date(),
   };
-  lastExportChart = buildSurfaceChart(
-    fitOfPoints(lastExport.aPoints), fitOfPoints(lastExport.bFrontPoints), fitOfPoints(lastExport.bBackPoints),
-    V_LO, V_HI, SPLIT, necklineHeightFn(lastExport.neckline));
-  shapeChangedSincePlace = false;
+  savedShellChart = buildSurfaceChart(
+    fitOfPoints(savedShell.aPoints), fitOfPoints(savedShell.bFrontPoints), fitOfPoints(savedShell.bBackPoints),
+    V_LO, V_HI, SPLIT, necklineHeightFn(savedShell.neckline));
+  persistSavedShellToStorage(savedShell);
+  shapeSource = "saved"; updateShapeSourceReadout();
   updateExportSummary();
 }
 
 $("exportOverride").addEventListener("change", updateExportGuard);
 
+$("saveShellBtn").onclick = () => {
+  if (exportBlocked()) {
+    $("exportStatus").innerHTML = '<span class="err">save blocked — a named feature is lost at the ' +
+      "current density (see Stage 2); raise the density or check the override</span>";
+    return;
+  }
+  saveShell();
+  $("exportStatus").innerHTML = '<span class="ok">✓ shell saved</span> — switching to Panels.';
+  goToTab("place");
+};
+
+// -- quiet secondary: getting a shell into the repo. Separate concern,
+// separate action — does NOT save the shell for Panels. -----------------
 $("exportBtn").onclick = () => {
   if (exportBlocked()) {
-    $("exportStatus").innerHTML = '<span class="err">export blocked — a named feature is lost at the ' +
+    $("exportStatus").innerHTML = '<span class="err">blocked — a named feature is lost at the ' +
       "current density (see Stage 2); raise the density or check the override</span>";
     return;
   }
@@ -1392,36 +1463,36 @@ $("exportBtn").onclick = () => {
   URL.revokeObjectURL(url);
   $("exportArea").value = text;
   $("exportArea").style.display = "block";
-  recordExport();
-  $("exportStatus").innerHTML = overridden
-    ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used).</span> ' +
-      "This file has to reach Claude Code some other way — the button above (copy to clipboard) " +
-      "is the more direct path."
-    : '<span class="ok">downloaded shape.yaml.</span> This file has to reach Claude Code some ' +
-      "other way — the button above (copy to clipboard) is the more direct path.";
+  $("exportStatus").innerHTML = (overridden
+    ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used).</span> '
+    : '<span class="ok">downloaded shape.yaml.</span> ') +
+    "This does not save the shell for Panels — use “Save shell → Panels” above for that.";
 };
 $("copyBtn").onclick = async () => {
   if (exportBlocked()) {
-    $("exportStatus").innerHTML = '<span class="err">copy blocked — a named feature is lost at the ' +
+    $("exportStatus").innerHTML = '<span class="err">blocked — a named feature is lost at the ' +
       "current density (see Stage 2); raise the density or check the override</span>";
     return;
   }
   const text = dumpShapeYaml();
   try {
     await navigator.clipboard.writeText(text);
-    recordExport();
-    $("exportStatus").innerHTML = '<span class="ok">✓ copied to clipboard — exported.</span> Paste it into your ' +
-      "Claude Code conversation and ask it to commit as tools/dress-shell/shape.yaml.";
+    $("exportStatus").innerHTML = '<span class="ok">✓ copied shape.yaml to clipboard.</span> Paste it into your ' +
+      "Claude Code conversation and ask it to commit as tools/dress-shell/shape.yaml. This does not save the " +
+      "shell for Panels — use “Save shell → Panels” above for that.";
   } catch {
     $("exportArea").value = text;
     $("exportArea").style.display = "block";
-    recordExport();
-    $("exportStatus").innerHTML = '<span class="warn">clipboard blocked — select the text below, copy it, ' +
-      "and paste it into your Claude Code conversation to have it committed (exported)</span>";
+    $("exportStatus").innerHTML = '<span class="warn">clipboard blocked — select the text below and copy it. ' +
+      "This does not save the shell for Panels — use “Save shell → Panels” above for that.</span>";
   }
 };
 
-// ---------------------------------------------------------------- Panels tab — UNCHANGED
+// ---------------------------------------------------------------- Panels tab
+// Read-only for EDITING (no interactive placement — out of scope, see the
+// tab's own banner), but no longer inert: once a shell is saved, this
+// renders each committed panel's real standoff against THAT shell —
+// shape-editor-chart.js's seatStandoff, single-shell (no comparison).
 function summarizeLayoutYaml(text) {
   const panels = [];
   let cur = null;
@@ -1436,18 +1507,37 @@ function summarizeLayoutYaml(text) {
   return panels;
 }
 let layoutYamlText = null;
+let displayPanels = [];
+async function renderPanelList() {
+  if (savedShellChart) {
+    await ensureImpactData();
+    if (impactClasses && impactPanels && impactPanels.length) {
+      const results = computeStandoffs(savedShellChart, impactClasses, impactPanels);
+      $("layoutPanelList").innerHTML = results.map((r) => {
+        if (r.error) return `${r.id} — <span class="err">${r.error}</span>`;
+        const tag = r.withinTolerance ? '<span class="ok">fits</span>' : '<span class="warn">exceeds tolerance</span>';
+        const so = Number.isFinite(r.standoffMm) ? `${r.standoffMm.toFixed(2)} mm` : "off-shell";
+        return `${r.id} — class ${r.classId} · standoff <b>${so}</b> · ${tag}`;
+      }).join("<br>") + '<div class="legend" style="padding:4px 0 0">worst first · tolerance 2.0 mm · ' +
+        "standoff only — connector/outline legality, mirror-twin validity, and the layering DAG still " +
+        "need the Python shape_impact.py machinery, not ported here.</div>";
+      return;
+    }
+  }
+  $("layoutPanelList").innerHTML = displayPanels.map(p =>
+    `${p.id} — class ${p.class ?? "?"} · θ ${p.theta ?? "?"}° · s ${p.s ?? "?"}mm · ` +
+    `layer ${p.layer ?? "?"} · mirrored ${p.mirrored ?? "?"}`).join("<br>");
+}
 (async () => {
   try {
     const resp = await fetch("./tools/dress-shell/layout.yaml");
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     layoutYamlText = await resp.text();
-    const panels = summarizeLayoutYaml(layoutYamlText);
+    displayPanels = summarizeLayoutYaml(layoutYamlText);
     $("layoutStatus").innerHTML = `<span class="ok">loaded tools/dress-shell/layout.yaml</span> — ` +
-      `${panels.length} committed panels. Read-only: this page cannot edit or re-place them yet.`;
-    $("layoutPanelList").innerHTML = panels.map(p =>
-      `${p.id} — class ${p.class ?? "?"} · θ ${p.theta ?? "?"}° · s ${p.s ?? "?"}mm · ` +
-      `layer ${p.layer ?? "?"} · mirrored ${p.mirrored ?? "?"}`).join("<br>");
+      `${displayPanels.length} committed panels. Read-only: this page cannot edit or re-place them yet.`;
     $("layoutArea").value = layoutYamlText;
+    await renderPanelList();
   } catch (e) {
     $("layoutStatus").innerHTML = `<span class="err">could not load tools/dress-shell/layout.yaml (${e.message})</span>`;
   }
@@ -1463,26 +1553,27 @@ $("copyLayoutBtn").onclick = async () => {
     $("layoutCopyStatus").innerHTML = '<span class="warn">clipboard blocked — select the text above and copy it</span>';
   }
 };
-function enterPlaceTab() {
-  const banner = $("placeImpactBanner");
-  if (shapeChangedSincePlace) {
-    banner.style.display = "block";
-    banner.innerHTML = `⚠ <b>the shell has changed since this tab was last opened</b> — panel placements ` +
-      `here are not re-validated against it. See Stage 3 (Export Shell) for the real, per-panel standoff ` +
-      `impact report when returning from an export.`;
+async function enterPlaceTab() {
+  const banner = $("savedShellBanner");
+  if (savedShell) {
+    banner.className = "banner commit";
+    banner.innerHTML = `Shell saved: <b>${fmtSavedLabel(savedShell)}</b> — panel standoff below is computed ` +
+      `against this shell, live.`;
   } else {
-    banner.style.display = "none";
+    banner.className = "banner";
+    banner.innerHTML = `No shell saved yet — save one from Stage 3 to see live per-panel standoff here. The ` +
+      `list below is layout.yaml as committed, not yet validated against any particular shell.`;
   }
-  shapeChangedSincePlace = false;
+  await renderPanelList();
 }
 
-// ---------------------------------------------------------------- Stage 3 <-> Stage 2 impact
-// The consequential backward move: leaving Export Shell for anywhere
-// except Panels re-validates every authored layout.yaml panel's standoff
+// ---------------------------------------------------------------- Save/Panels <-> Shape impact
+// The consequential backward move: leaving Save Shell or Panels for
+// Upload/Shape re-validates every authored layout.yaml panel's standoff
 // against the CURRENT shell, using shape-editor-chart.js's scoped port of
-// shape_impact.py's seat_standoff. Only meaningful once something has
-// actually been exported this session — before that there is nothing to
-// invalidate.
+// shape_impact.py's seat_standoff. Only meaningful once a shell has
+// actually been saved (in this browser) — before that there is nothing
+// to invalidate.
 let impactClasses = null, impactPanels = null;
 async function ensureImpactData() {
   if (impactClasses && impactPanels) return;
@@ -1498,9 +1589,6 @@ async function ensureImpactData() {
     impactClasses = null; impactPanels = null;
   }
 }
-function fmtExportLabel(exp) {
-  return `${exp.label ? `"${exp.label}"` : "(unlabeled)"} at ${exp.exportedAt.toLocaleString()}`;
-}
 async function buildImpactModalHtml() {
   await ensureImpactData();
   const newChart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
@@ -1511,10 +1599,10 @@ async function buildImpactModalHtml() {
   } else if (impactPanels.length === 0) {
     body = "no authored panels in layout.yaml — nothing to re-validate.";
   } else {
-    const results = computeStandoffImpact(lastExportChart, newChart, impactClasses, impactPanels);
+    const results = computeStandoffImpact(savedShellChart, newChart, impactClasses, impactPanels);
     const flagged = results.filter(r => r.error || r.regressed || !r.nowWithinTolerance);
     if (flagged.length === 0) {
-      body = '<span class="ok">no panels affected — every panel that fit at export still fits, standoff essentially unchanged.</span>';
+      body = '<span class="ok">no panels affected — every panel that fit at save still fits, standoff essentially unchanged.</span>';
     } else {
       let rows = "";
       for (const r of flagged) {
@@ -1530,11 +1618,14 @@ async function buildImpactModalHtml() {
         `shape_impact.py machinery, not ported here.</div>`;
     }
   }
-  return `Returning to Shape from an exported shell (${fmtExportLabel(lastExport)}):<br><br>${body}<br><br>Continue?`;
+  return `Returning to Shape from your saved shell (${fmtSavedLabel(savedShell)}):<br><br>${body}<br><br>Continue?`;
 }
 
+// Leaving Save Shell OR Panels for Upload/Shape is the consequential
+// move; moving between Save Shell and Panels themselves, or forward into
+// either, is free.
 function isConsequentialBackNav(from, to) {
-  return from === "export" && to !== "export" && to !== "place";
+  return (from === "export" || from === "place") && to !== "export" && to !== "place";
 }
 function confirmModal(html, onConfirm) {
   $("navModalText").innerHTML = html;
@@ -1557,8 +1648,8 @@ async function goToTab(tab) {
     if (tab === "export") updateExportSummary();
     if (tab === "place") enterPlaceTab();
   };
-  if (!isConsequentialBackNav(currentTab, tab) || !lastExport) { commit(); return; }
-  $("navModalText").innerHTML = "computing panel standoff impact against the last export…";
+  if (!isConsequentialBackNav(currentTab, tab) || !savedShell) { commit(); return; }
+  $("navModalText").innerHTML = "computing panel standoff impact against the saved shell…";
   $("navModal").classList.add("open");
   const html = await buildImpactModalHtml();
   confirmModal(html, commit);
