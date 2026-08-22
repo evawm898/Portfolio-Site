@@ -1435,8 +1435,27 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   }
   // Welded caps seal the open tube ends (free vein tips, and the T-junctions
   // where a secondary meets the midrib) so nothing reads as a hollow ring.
+  // ONE CAP PER OPENING. The node list can carry the same position more than
+  // once — several veins cut at the SAME point on a cleft wall, several strands
+  // converging on one hub — and beading a position twice emits byte-identical
+  // triangles twice. A duplicated triangle is a NON-MANIFOLD EDGE (4, 6, 18
+  // faces on one edge) inside an otherwise watertight export, and it is pure
+  // waste: the second bead covers exactly the surface the first one already
+  // covers. Capping once at the widest radius requested for that position
+  // covers the same opening with the same surface. Keyed at the STL weld
+  // precision (1e-4), so a node merely NEAR another still gets its own bead.
+  const capRadius = new Map();
   for (const node of ven.nodes) {
-    acc.addBead(toWorld(node), P.tubeRadius * node.width * 1.15 * gThick, 4, 7);
+    const k = node.x.toFixed(4) + ',' + node.y.toFixed(4);
+    const prev = capRadius.get(k);
+    if (prev === undefined || node.width > prev) capRadius.set(k, node.width);
+  }
+  const capped = new Set();
+  for (const node of ven.nodes) {
+    const k = node.x.toFixed(4) + ',' + node.y.toFixed(4);
+    if (capped.has(k)) continue;
+    capped.add(k);
+    acc.addBead(toWorld(node), P.tubeRadius * capRadius.get(k) * 1.15 * gThick, 4, 7);
   }
 
   // VORONOI infill is a solid perforated SHEET, not tubes: each cell is a sealed
