@@ -10,14 +10,13 @@
 
    PICKER_SHAPE_NAMES is the subset flower.js's Standard picker offers.
    LOBED is a real, testable shape — the geometry-quality gate exercises it
-   to catch the #64 cleft regression — but it is NOT in the picker: the
-   cleft renders correctly only when the rim is cleft-aware (continuous
-   margin OFF), so with the Standard default (margin ON) the two un-clefted
-   marginal strands skip the sinus and a one-click Lobed would ship a
-   manifold-but-wrong petal (tools/verify-geometry-quality.mjs measures an
-   ~8-19 mm unsealed gap across the whole cleftDepth range). Cleft params
-   stay reachable in Advanced (a hand-dialled cleft shows as CUSTOM); Lobed
-   joins PICKER_SHAPE_NAMES once #64 makes marginStrands cleft-aware.
+   across every infill pattern — but it is NOT in the picker. The reason it
+   was held out is gone: the sinus used to be unsealed under the Standard
+   default (continuous margin ON), an ~8-19 mm gap across the whole
+   cleftDepth range, and PR #50 closed it to 0.089 mm by making ribPath the
+   one producer of the boundary. Whether Lobed now joins the picker is a
+   taste call about the shop window, not a correctness one. Cleft params are
+   reachable in Advanced either way (a hand-dialled cleft shows as CUSTOM).
    =================================================================== */
 
 export const SHAPE_PARAMS = ['width', 'taper', 'clawLength', 'clawWidth', 'shoulder', 'cleftDepth', 'cleftLobes', 'cleftWidth', 'tip', 'curlAmount', 'edgeCurve', 'edgeProfile', 'petalCup'];

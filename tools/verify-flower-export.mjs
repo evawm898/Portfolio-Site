@@ -98,7 +98,8 @@ function analyzeStl(buf) {
 //     #44 first.
 //   - continuous margin ON (the SDF receptacle is a separate polygonised solid
 //     overlapping the feet/stem — its own registration surface)
-//   - the cleft/Lobed configs — the project's known-fragile margin area (#64)
+//   - the cleft/Lobed configs — the project's historically fragile margin area
+//     (the unsealed sinus, fixed in PR #50)
 //   - all 7 shipped presets — what a visitor actually clicks; a preset break is
 //     user-facing and gets caught on every PR, not just on dispatch/schedule
 // Full 142-config matrix still runs on workflow_dispatch and a schedule.
@@ -203,7 +204,7 @@ const CONFIGS = [
   { label: 'LOBED bifid spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
   { label: 'LOBED bifid bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '3' }] },
   // CLEFT DEPTH 0.5 x LOBE COUNT 2..7 — the full lobe-count range at a deep cleft, the
-  // configuration #64's rim fix has to hold across: each strand is now a half of the real
+  // configuration PR #50's rim fix has to hold across: each strand is now a half of the real
   // material contour, so the number of sinuses it weaves through is the thing that varies.
   // Every one must still export with 0 boundary edges and 0 non-manifold edges.
   { label: 'LOBED depth 0.5 x 2 lobes (rim contour split)', smoke: true, set: [{ id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftWidth', value: '0.3' }, { id: 'clawLength', value: '0' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
