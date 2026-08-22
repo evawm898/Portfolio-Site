@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E-Ink Skirt Panelizer — Eva Maskalenko</title>
+<meta name="description" content="Design tool for placing rigid e-ink panels on a bell-shaped skirt: the cone unrolled to its exact flat annulus, one course of panels placed symmetrically, chord-gap checked.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .skirt-figure {
+    background: #ffffff;
+    border: 1px solid var(--line-strong);
+    padding: 1.25rem;
+    margin: 0 0 0.75rem;
+  }
+  .skirt-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .skirt-figure__caption {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-dim);
+    margin: 0 0 2rem;
+    line-height: 1.6;
+  }
+  .skirt-report {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--ink);
+    background: var(--black-raised);
+    border: 1px solid var(--line);
+    padding: 1.25rem;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0;
+  }
+</style>
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="index.html" class="project-header__back">&larr; Index</a>
+  <div class="project-header__index">Experimental &middot; V1</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag">
+      <span class="project__year">2026</span>
+      <span class="project__affiliation">Lab &mdash; Work in Progress</span>
+    </div>
+    <h1 class="project__title">E-Ink Skirt Panelizer</h1>
+    <p class="project__lede">A design tool for placing rigid e-ink panels on a bell-shaped skirt &mdash; solving the placement in the garment's exact flat development, where a curved problem becomes a drawable one.</p>
+  </div>
+
+  <div class="project__body">
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>01</span>Premise</h2>
+      <div class="project__section-body">
+        <p>Rigid display panels and fabric disagree about geometry: the panel is a flat plane, the garment is curved. A short, stiff bell skirt is the friendliest possible battleground, because a truncated cone is <em>developable</em> &mdash; it unrolls exactly, with zero distortion, onto a flat annular sector. Three tape-measure numbers (waist circumference, hem circumference, slant height) fully determine that sector, and every placement decision can then be made in flat 2D with ordinary rulers and angles, knowing it will wrap back onto the body without stretching or creasing.</p>
+        <p>This first version handles the skirt only: one panel size, one concentric course of panels, no GUI &mdash; a Python tool that emits a 1:1-scale SVG pattern and a placement report.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>02</span>Method</h2>
+      <div class="project__section-body">
+        <p>The skirt (waist 660&thinsp;mm, hem 1100&thinsp;mm, slant 300&thinsp;mm) unrolls to an annulus with inner radius 450&thinsp;mm, outer radius 750&thinsp;mm, and an 84&deg; sweep. Panels are defined in a separate YAML library &mdash; outline, active display area with its offset, flex-cable exit point and direction, minimum bend radius &mdash; validated hard on load so a typo fails the run rather than silently shifting a display.</p>
+        <p>Placement puts nine panels in one course, long axes along the cone's ruling lines, cable tails toward the waist. The symmetry constraint deliberately applies to the <em>active areas</em>, not the outlines: e-ink modules carry their glass off-center, so centering outlines would visibly de-center the images. The active-area centers sit at uniform angular pitch, mirror-symmetric about center front, with the odd middle panel's display dead on the centerline &mdash; outline and tail positions are then derived per panel, never mirrored. Allowed per-panel transforms are identity and 180&deg; rotation only, and any transform that would point a cable tail toward the hem is rejected.</p>
+        <p>Rigidity gets its own check: a flat panel of width <em>w</em> bridging a surface of local radius <em>R</em> lifts off by roughly <em>w</em>&sup2;/8<em>R</em> at the chord center. The tool computes that gap for every panel &mdash; using the cone's transverse curvature radius at the panel's waist-side edge, the worst case &mdash; and warns when it exceeds tolerance (2&thinsp;mm by default). Here: 1.73&thinsp;mm, passing, but with little to spare &mdash; a wider module or a higher course would tip it over.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>03</span>The Developed Layout</h2>
+      <div class="project__section-body">
+        <p>The pattern below is the actual tool output, committed as a static file &mdash; the generator runs offline and this page just shows its results. The SVG is drawn at true 1:1 scale (about a metre wide; the 100&thinsp;mm bar verifies a full-size print), so it can be plotted and wrapped around a toile directly. Solid rectangles are panel outlines, dashed ones the active display areas, and each dot-and-arrow marks where a flex cable exits and heads for the waistband.</p>
+        <figure class="skirt-figure" style="margin-left:0; margin-right:0;">
+          <img src="skirt/skirt-panel-layout.svg" alt="Developed flat pattern of the skirt: an annular sector with nine radially oriented panels fanned symmetrically about the center-front line, cable tails pointing toward the waist arc." loading="lazy">
+        </figure>
+        <p class="skirt-figure__caption">skirt/skirt-panel-layout.svg &mdash; open the <a href="skirt/skirt-panel-layout.svg" class="footer__link">raw file</a> for the print-scale original.</p>
+        <p>The placement report from the same run:</p>
+        <pre class="skirt-report" id="skirtReport">loading skirt/placement-report.txt &hellip;</pre>
+        <script>
+          fetch('skirt/placement-report.txt')
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+            .then(function (t) { document.getElementById('skirtReport').textContent = t.trimEnd(); })
+            .catch(function () {
+              document.getElementById('skirtReport').innerHTML =
+                'could not load the report inline — <a class="footer__link" href="skirt/placement-report.txt">open placement-report.txt</a>';
+            });
+        </script>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>04</span>Next</h2>
+      <div class="project__section-body">
+        <p>The YAML panel library already accepts multiple sizes; the placement engine doesn't use them yet. Planned from here: multiple courses at different radii, real tail routing that respects each cable's minimum bend radius instead of just reporting straight runs, and mixed panel sizes within a course. The generator lives in the repo at <span style="font-family:var(--mono); font-size:0.85em;">tools/skirt-panelizer/</span>, outside the site build &mdash; it runs by hand and only its committed outputs appear here.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="project__nav">
+    <a href="index.html" class="project__nav-link">&larr; Back to Index</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+</body>
+</html>

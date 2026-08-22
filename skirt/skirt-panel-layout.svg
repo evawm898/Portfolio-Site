@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1044.025mm" height="804mm" viewBox="0 0 1044.025 804" font-family="IBM Plex Mono, Menlo, Consolas, monospace">
+<defs><marker id="tailArrow" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#a3520f"/></marker></defs>
+<rect width="1044.025" height="804" fill="#ffffff"/>
+<g transform="translate(522.012 20)">
+<path d="M -301.207 334.326 A 450 450 0 0 0 301.207 334.326 L 502.012 557.211 A 750 750 0 0 1 -502.012 557.211 Z" fill="#f2f2ef" stroke="#141616" stroke-width="0.5"/>
+<path d="M -6 0 L 6 0 M 0 -6 L 0 6" stroke="#6b7474" stroke-width="0.4"/>
+<text x="9" y="1.8" font-size="4.2" fill="#6b7474">apex / annulus center</text>
+<line x1="0" y1="450" x2="0" y2="750" stroke="#6b7474" stroke-width="0.35" stroke-dasharray="8 3 1.5 3"/>
+<text x="0" y="759" font-size="5" fill="#141616" text-anchor="middle">CF</text>
+<text x="-508.037" y="563.897" font-size="5" fill="#6b7474" text-anchor="middle">CB</text>
+<text x="508.037" y="563.897" font-size="5" fill="#6b7474" text-anchor="middle">CB</text>
+<polygon points="-337.797,408.943 -304.382,434.387 -358.907,505.991 -392.322,480.546" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="-338.41,413.378 -309.45,435.43 -359.249,500.828 -388.209,478.776" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M -350.829 457.103 L -346.829 457.103 M -348.829 455.103 L -348.829 459.103" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="-321.09" y1="421.665" x2="-312.608" y2="410.527" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="-321.09" cy="421.665" r="1.4" fill="#a3520f"/>
+<text x="-348.352" y="459.467" font-size="6" fill="#6b7474" text-anchor="middle">1</text>
+<polygon points="-266.974,458.33 -229.873,478.016 -272.058,557.517 -309.159,537.831" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="-266.858,462.806 -234.705,479.867 -273.234,552.478 -305.388,535.417" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M -272.046 507.642 L -268.046 507.642 M -270.046 505.642 L -270.046 509.642" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="-248.424" y1="468.173" x2="-241.861" y2="455.806" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="-248.424" cy="468.173" r="1.4" fill="#a3520f"/>
+<text x="-269.516" y="509.923" font-size="6" fill="#6b7474" text-anchor="middle">2</text>
+<polygon points="-189.076,495.572 -149.273,508.978 -178.001,594.27 -217.804,580.864" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="-188.236,499.97 -153.74,511.589 -179.978,589.489 -214.474,577.87" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M -186.107 544.729 L -182.107 544.729 M -184.107 542.729 L -184.107 546.729" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="-169.175" y1="502.275" x2="-164.706" y2="489.007" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="-169.175" cy="502.275" r="1.4" fill="#a3520f"/>
+<text x="-183.538" y="546.921" font-size="6" fill="#6b7474" text-anchor="middle">3</text>
+<polygon points="-106.168,519.682 -64.718,526.453 -79.227,615.276 -120.677,608.505" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="-104.626,523.886 -68.702,529.754 -81.953,610.879 -117.877,605.01" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M -95.29 567.382 L -91.29 567.382 M -93.29 565.382 L -93.29 569.382" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="-85.443" y1="523.067" x2="-83.186" y2="509.251" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="-85.443" cy="523.067" r="1.4" fill="#a3520f"/>
+<text x="-92.697" y="569.479" font-size="6" fill="#6b7474" text-anchor="middle">4</text>
+<polygon points="-20.447,530.022 21.553,529.978 21.647,619.978 -20.353,620.022" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="-18.243,533.919 18.157,533.881 18.243,616.081 -18.157,616.119" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M -2 575 L 2 575 M 0 573 L 0 577" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="0.553" y1="530" x2="0.538" y2="516" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="0.553" cy="530" r="1.4" fill="#a3520f"/>
+<text x="0.6" y="577" font-size="6" fill="#6b7474" text-anchor="middle">5</text>
+<polygon points="65.816,526.317 107.252,519.459 121.947,608.252 80.511,615.109" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="68.623,529.805 104.535,523.862 117.956,604.959 82.044,610.902" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M 91.29 567.382 L 95.29 567.382 M 93.29 565.382 L 93.29 569.382" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="86.534" y1="522.888" x2="84.248" y2="509.076" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="86.534" cy="522.888" r="1.4" fill="#a3520f"/>
+<text x="93.882" y="569.284" font-size="6" fill="#6b7474" text-anchor="middle">6</text>
+<polygon points="150.335,508.665 190.11,495.176 219.016,580.408 179.241,593.897" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="153.671,511.652 188.143,499.961 214.543,577.806 180.072,589.497" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M 182.107 544.729 L 186.107 544.729 M 184.107 542.729 L 184.107 546.729" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="170.222" y1="501.921" x2="165.726" y2="488.662" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="170.222" cy="501.921" r="1.4" fill="#a3520f"/>
+<text x="184.675" y="546.537" font-size="6" fill="#6b7474" text-anchor="middle">7</text>
+<polygon points="230.87,477.535 267.93,457.771 310.281,537.184 273.221,556.948" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="234.647,479.941 266.765,462.813 305.445,535.343 273.327,552.472" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M 268.046 507.642 L 272.046 507.642 M 270.046 505.642 L 270.046 509.642" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="249.4" y1="467.653" x2="242.812" y2="455.3" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="249.4" cy="467.653" r="1.4" fill="#a3520f"/>
+<text x="270.576" y="509.36" font-size="6" fill="#6b7474" text-anchor="middle">8</text>
+<polygon points="305.288,433.751 338.65,408.237 393.324,479.726 359.962,505.241" fill="#e5eaea" stroke="#141616" stroke-width="0.45"/>
+<polygon points="309.405,435.513 338.318,413.4 388.254,478.694 359.34,500.806" fill="none" stroke="#1c6b6b" stroke-width="0.4" stroke-dasharray="3 2"/>
+<path d="M 346.829 457.103 L 350.829 457.103 M 348.829 455.103 L 348.829 459.103" stroke="#1c6b6b" stroke-width="0.4"/>
+<line x1="321.969" y1="420.994" x2="313.464" y2="409.873" stroke="#a3520f" stroke-width="0.5" marker-end="url(#tailArrow)"/>
+<circle cx="321.969" cy="420.994" r="1.4" fill="#a3520f"/>
+<text x="349.306" y="458.739" font-size="6" fill="#6b7474" text-anchor="middle">9</text>
+</g>
+<text x="14" y="24" font-size="6.5" fill="#141616" font-weight="500">SKIRT PANELIZER — developed layout</text>
+<text x="14" y="33" font-size="4.6" fill="#3a4040">waist 660  hem 1100  slant 300  (mm)</text>
+<text x="14" y="39.4" font-size="4.6" fill="#3a4040">annulus R 450.0-750.0  sweep 84.03 deg</text>
+<text x="14" y="45.8" font-size="4.6" fill="#3a4040">panel eink_42x90  x9  top edge 80 mm below waist</text>
+<text x="14" y="52.2" font-size="4.6" fill="#3a4040">max chord gap 1.73 mm  (tolerance 2 mm)</text>
+<text x="14" y="58.6" font-size="4.6" fill="#3a4040">outline solid - active area dashed - tail dot/arrow = cable exit</text>
+<path d="M 14 66.5 L 14 71.5 M 14 69 L 114 69 M 114 66.5 L 114 71.5" stroke="#141616" stroke-width="0.5"/>
+<text x="118" y="70.6" font-size="4.6" fill="#3a4040">100 mm — SCALE 1:1, print at 100%</text>
+</svg>

@@ -1,0 +1,125 @@
+# Panel class library — REAL HARDWARE (deliberate one-commit replacement of
+# the placeholder XS/S/M/L classes; this file is otherwise append-only for
+# concurrent sessions).
+#
+# Three Adafruit bare e-ink displays, all 24-pin FPC, driven from real
+# manufacturer (Zhongjingyuan) datasheets supplied 2026-08. Units: mm.
+#
+# Panel-local frame (unchanged): origin at the OUTLINE's top-left corner,
+# +x right (width), +y down (height), viewed face-on from outside the
+# shell; at rotation 0 local +y runs hemward. Any PROPER rotation about
+# the active center is allowed — connectors are never mirrored.
+#
+# provenance: per-field source notes. Any entry containing 'unverified'
+# is surfaced by the console report. Numeric fields may be null when no
+# trustworthy source exists — the analysis reports them as unknown rather
+# than inventing a value.
+
+units: mm
+
+classes:
+  p213:  # Adafruit 6373 — 2.13" 250x122 quad-color, JD79661
+    outline: {width: 29.2, height: 59.2}
+    thickness: 1.0
+    active_area: {width: 23.7046, height: 48.55, offset: [2.748, 7.95]}
+    connector:
+      # tail exits the top (short) edge, off-center: 4.30 from a corner +
+      # half the 12.5 FPC width. WHICH corner (viewed face-on) is not
+      # determinable from the drawing alone — see provenance.
+      origin: [10.55, 0.0]
+      exit_vector: [0.0, -1.0]
+      escape_mm: 6.0
+      min_bend_radius_mm: null
+    chipset: JD79661
+    palette: [black, white, red, yellow]
+    refresh_s: null
+    price_usd: 9.95
+    requires_facet: false
+    provenance:
+      min_bend_radius_mm: "unverified: null. FPC minimum bend radius is
+        absent from every datasheet consulted (mechanical drawings give tail
+        dimensions only); the waist-bus bend-radius check reports CANNOT
+        VERIFY for this class rather than assuming an industry-typical
+        value."
+      mechanical: "CROSS-VARIANT, unverified for the quad panel: dimensions
+        from ZJY122250-0213BAAMFGN datasheet p4-5, which is the MONOCHROME
+        SSD1680Z variant (Adafruit 6383). Same glass family; quad-color
+        6373 assumed identical. Mono-only values (3 s refresh, SSD1680Z)
+        deliberately NOT carried over."
+      connector_chirality: "unverified: tail center 10.55 mm from one top
+        corner; drawing does not fix which corner when viewed face-on
+        (10.55 vs 18.65 from the left)."
+      escape_mm: "unverified: read as ~6.0+-0.5 mm unfolded tail from the
+        mono-variant drawing side view."
+      refresh_s: "unverified: null. JD79661 quad-color update time absent
+        from every source consulted; the 3 s figure in the supplied PDF is
+        the monochrome variant's and does not apply."
+      chipset_palette_price: "Adafruit product 6373 listing."
+
+  p370:  # Adafruit 6394 — 3.7" 416x240 tri-color, UC8253
+    outline: {width: 53.0, height: 92.99}
+    thickness: 1.0
+    active_area: {width: 47.04, height: 81.54, offset: [2.98, 8.47]}
+    connector:
+      origin: [11.4, 0.0]
+      exit_vector: [0.0, -1.0]
+      escape_mm: 19.79
+      min_bend_radius_mm: null
+    chipset: UC8253
+    palette: [black, white, red]
+    refresh_s: 22.0
+    price_usd: 24.50
+    requires_facet: false
+    provenance:
+      min_bend_radius_mm: "unverified: null. FPC minimum bend radius is
+        absent from every datasheet consulted (mechanical drawings give tail
+        dimensions only); the waist-bus bend-radius check reports CANNOT
+        VERIFY for this class rather than assuming an industry-typical
+        value."
+      mechanical: "VERIFIED: ZJY240416-037BABMFGN-R datasheet v1.1 p4-5
+        (outline 53.00x92.99x1.0 +-0.20, AA 47.04x81.54, tail-side ledge
+        8.47, lateral margins 2.98, FPC 12.5 wide / 24 pins @ 0.5 mm,
+        unfolded tail 19.79)."
+      connector_chirality: "unverified: tail center 11.4 mm from one top
+        corner (4.50 + 13.8/2); which corner face-on is ambiguous
+        (11.4 vs 41.6 from the left)."
+      refresh_s: "VERIFIED: image update time 22 s typ @ 25 C, p8."
+      chipset_palette_price: "datasheet drawing table (UC8253) + Adafruit
+        product 6394 listing."
+
+  p750:  # Adafruit 6415 — 7.5" 800x480 tri-color, UC8179. NOT SEATABLE
+         # on this garment by conforming: requires a flat facet.
+    outline: {width: 111.2, height: 170.2}
+    thickness: 1.25
+    active_area: {width: 97.92, height: 163.2, offset: [9.79, 3.5]}
+    connector:
+      # tail exits a LONG edge (the left edge in panel frame, x = 0),
+      # centered 86.15 mm from one corner (79.90 + 12.5/2)
+      origin: [0.0, 86.15]
+      exit_vector: [-1.0, 0.0]
+      escape_mm: 24.0
+      min_bend_radius_mm: null
+    chipset: UC8179
+    palette: [black, white, red]
+    refresh_s: 29.0
+    price_usd: 64.95
+    requires_facet: true
+    provenance:
+      min_bend_radius_mm: "unverified: null. FPC minimum bend radius is
+        absent from every datasheet consulted (mechanical drawings give tail
+        dimensions only); the waist-bus bend-radius check reports CANNOT
+        VERIFY for this class rather than assuming an industry-typical
+        value."
+      mechanical: "VERIFIED: ZJY800480-075AABMFGN-R datasheet v1.3 p4-5
+        (outline 170.20x111.20x1.25, AA 163.20x97.92, tail-side margin
+        9.79, opposite 3.49, ends 3.50/3.50, FPC 12.5 connector / 24.0
+        shoulder, tail start 79.90 from a corner)."
+      connector_chirality: "unverified: which end of the long edge the
+        86.15 mm is measured from, viewed face-on (86.15 vs 84.05)."
+      escape_mm: "read as the 24.00+-0.30 unfolded tail dimension."
+      refresh_s: "VERIFIED: image update time 29 s typ @ 25 C, p8."
+      chipset_palette_price: "datasheet drawing table (UC8179) + Adafruit
+        product 6415 listing."
+      requires_facet: "design decision: 111.2 mm across needs ~773 mm local
+        radius at 2 mm standoff; nothing on this shell is that flat. Seated
+        only on an authored flat facet."

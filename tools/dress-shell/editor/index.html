@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dress Panel Editor — local dev</title>
+<style>
+  :root {
+    --bg: #0c0e0e; --panel: #141717; --line: #2a2f2f; --ink: #e9ecec;
+    --dim: #8b9494; --petrol: #2fa3a3; --amber: #d98a35; --red: #e05545;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--mono);
+         font-size: 12px; overflow: hidden; }
+  #view { position: fixed; inset: 0; }
+  .hud { position: fixed; background: color-mix(in srgb, var(--panel) 92%, transparent);
+         border: 1px solid var(--line); padding: 10px 12px; border-radius: 3px;
+         line-height: 1.7; }
+  #sidebar { top: 12px; left: 12px; width: 270px; max-height: calc(100vh - 24px);
+             overflow-y: auto; }
+  #hover { right: 12px; top: 12px; width: 240px; min-height: 90px; }
+  #status { left: 50%; transform: translateX(-50%); bottom: 12px;
+            max-width: 80vw; white-space: nowrap; overflow: hidden; }
+  h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.12em;
+       text-transform: uppercase; color: var(--petrol); margin-bottom: 6px; }
+  h2 { font-size: 11px; font-weight: 500; color: var(--dim); margin: 10px 0 4px;
+       text-transform: uppercase; letter-spacing: 0.08em; }
+  button { background: none; border: 1px solid var(--line); color: var(--ink);
+           font: inherit; padding: 3px 8px; cursor: pointer; border-radius: 2px; }
+  input, select { background: var(--bg); border: 1px solid var(--line);
+                  color: var(--ink); font: inherit; padding: 2px 5px;
+                  border-radius: 2px; width: 70px; }
+  select { width: auto; }
+  .params label { display: flex; align-items: center; gap: 5px;
+                  color: var(--dim); }
+  button:hover { border-color: var(--petrol); }
+  button.on { border-color: var(--petrol); color: var(--petrol); }
+  button.danger { border-color: #5a3030; color: var(--red); }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+  .kv { color: var(--dim); } .kv b { color: var(--ink); font-weight: 500; }
+  .err { color: var(--red); }
+  .warn { color: var(--amber); }
+  .ok { color: var(--petrol); }
+  #errors div { margin: 2px 0; }
+  .keys { color: var(--dim); font-size: 10px; margin-top: 10px; line-height: 1.9; }
+  kbd { border: 1px solid var(--line); padding: 0 4px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+
+<div id="sidebar" class="hud">
+  <h1>Dress Panel Editor</h1>
+  <div class="kv" id="fileState">layout.yaml — <b class="ok">saved</b></div>
+
+  <h2>Shading</h2>
+  <div class="row" id="modes">
+    <button data-mode="class" class="on">max class</button>
+    <button data-mode="gaussian">gaussian</button>
+    <button data-mode="plain">plain</button>
+  </div>
+  <div class="row">
+    <button id="gridBtn" class="on">grid</button>
+    <button id="snapBtn" class="on">snap</button>
+    <button id="heatBtn" class="on">heatmap under panels</button>
+  </div>
+
+  <h2>Shell parameters</h2>
+  <div class="kv" id="paramInfo">…</div>
+  <div class="row params" id="neckHeights">
+    <label>CF <input id="pCf" type="number" step="5"
+           title="cf_height — center-front height (mm)"></label>
+    <label>peak <input id="pPeak" type="number" step="5"
+           title="peak_height — the one-shoulder peak (mm)"></label>
+  </div>
+  <div class="row params" id="neckHeights2">
+    <label>side <input id="pSide" type="number" step="5"
+           title="side_height — height at theta 90 (mm)"></label>
+    <label>CB <input id="pCb" type="number" step="5"
+           title="cb_height — center-back height (mm)"></label>
+  </div>
+  <div class="row params" id="neckKnobs">
+    <label>peak θ <input id="pPeakTheta" type="number" step="1"
+           title="peak_theta — azimuth of the shoulder peak (deg)"></label>
+    <label>bow <input id="pBow" type="number" step="0.05" min="0" max="1"
+           title="rise_bow — CF-to-peak rise fullness"></label>
+  </div>
+  <div class="row params" id="neckKnobs2">
+    <label>decay <input id="pDecay" type="number" step="0.05" min="0.2" max="0.95"
+           title="decay_rate — fraction of the peak-to-CB drop in the first 30 deg"></label>
+    <label><input id="pCfCorner" type="checkbox"
+           title="cf_corner — corner (true) or smooth apex (false) at CF"> CF corner</label>
+  </div>
+  <div class="row params" id="filletRow">
+    <label>fillet R <input id="pFilletR" type="number" step="5" min="5"
+           title="fillet_radius — waist fillet radius (mm); rebuild re-solves the armhole split"> mm</label>
+    <label>type <select id="pFilletType">
+      <option value="conic">conic</option>
+      <option value="circular">circular</option>
+    </select></label>
+  </div>
+  <div class="row">
+    <button id="applyParams">apply — rebuilds analysis</button>
+  </div>
+
+  <h2>Place — class palette</h2>
+  <div class="row" id="palette"></div>
+
+  <h2>Selected</h2>
+  <div id="selected" class="kv">none — click a panel, or click the shell to place</div>
+  <div class="row" id="selActions" style="display:none">
+    <label>rot <input id="rotInput" type="number" step="5" style="width:4.5em"
+           title="rotation — degrees, free proper rotation about the active center">°</label>
+    <button id="rotBtn" title="quick flip: +180°">flip 180</button>
+    <button id="layerUp">layer +</button>
+    <button id="layerDown">layer −</button>
+    <button id="mirrorBtn">paired</button>
+    <button id="delBtn" class="danger">delete</button>
+  </div>
+
+  <h2>Design totals</h2>
+  <div id="totals" class="kv">…</div>
+
+  <h2>Validation</h2>
+  <div id="errors"><span class="ok">clean</span></div>
+
+  <div class="row" style="margin-top:12px">
+    <button id="saveBtn">save layout.yaml</button>
+    <button id="undoBtn">undo</button>
+    <button id="redoBtn">redo</button>
+  </div>
+  <div class="row">
+    <button id="publishBtn">publish → /dress glTF</button>
+  </div>
+
+  <div class="keys">
+    <kbd>click</kbd> place · <kbd>drag</kbd> move · <kbd>R</kbd> flip 180 ·
+    <kbd>[</kbd>/<kbd>]</kbd> layer · <kbd>M</kbd> paired · <kbd>Del</kbd> delete<br>
+    <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo · <kbd>Ctrl+S</kbd> save ·
+    <kbd>G</kbd> grid · <kbd>N</kbd> snap · <kbd>1/2/3</kbd> shading
+  </div>
+</div>
+
+<div id="hover" class="hud kv">hover the shell…</div>
+<div id="status" class="hud kv">loading state…</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "/vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "/vendor/controls/OrbitControls.js"
+} }
+</script>
+<script type="module" src="/editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dress Shape Editor — Eva Maskalenko</title>
+<meta name="description" content="Browser-only dress-shell workflow: upload calibrated photos, shape the shell live, and build a library of shells and the layouts placed on them — no server.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root {
+    --bg: #0c0e0e; --panel: #141717; --panel2: #191d1d; --line: #262b2b; --ink: #e9ecec;
+    --dim: #8b9494; --petrol: #2fa3a3; --amber: #d98a35; --red: #e05545;
+    --violet: #8a63d9; --sky: #4fb0e0;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --sp1: 4px; --sp2: 8px; --sp3: 12px; --sp4: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: var(--mono);
+               font-size: 12px; height: 100%; }
+  body { overflow: hidden; }
+  #layout { position: fixed; inset: 0; display: flex; }
+  #curvePane { width: 720px; flex: none; border-right: 1px solid var(--line);
+               overflow-y: auto; }
+  #view { flex: 1; position: relative; min-width: 0; }
+  h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.02em;
+       color: var(--ink); padding: var(--sp3) var(--sp3) 2px; }
+  h2 { font-size: 10.5px; font-weight: 600; color: var(--petrol); margin: var(--sp3) var(--sp3) var(--sp1);
+       text-transform: uppercase; letter-spacing: 0.09em; }
+  h3 { font-size: 10px; font-weight: 600; color: var(--dim); margin: var(--sp2) var(--sp3) 2px;
+       text-transform: uppercase; letter-spacing: 0.06em; }
+  .curveRow { display: flex; gap: 0; }
+  .curveBlock { flex: 1; min-width: 0; }
+  canvas.curve { display: block; margin: 0 auto; }
+  .kv { color: var(--dim); padding: 0 var(--sp3); line-height: 1.7; }
+  .kv b { color: var(--ink); font-weight: 600; }
+  .ok { color: var(--petrol); } .warn { color: var(--amber); } .err { color: var(--red); }
+  .stageIntro { padding: 2px var(--sp3) var(--sp2); color: var(--dim); font-size: 11px; }
+  details.explain { margin: 2px var(--sp3) var(--sp2); font-size: 10px; color: var(--dim); }
+  details.explain summary { cursor: pointer; color: var(--petrol); list-style: none; user-select: none; }
+  details.explain summary::-webkit-details-marker { display: none; }
+  details.explain summary::before { content: "▸ "; }
+  details.explain[open] summary::before { content: "▾ "; }
+  details.explain .body { padding: var(--sp2) 0 0 var(--sp3); line-height: 1.7; }
+  .legend { padding: 2px var(--sp3) var(--sp2); color: var(--dim); font-size: 10px; line-height: 1.7; }
+  table { border-collapse: collapse; width: calc(100% - 24px); margin: 2px var(--sp3); }
+  td, th { padding: 1px 6px 1px 0; text-align: left; font-size: 11px; }
+  th { color: var(--dim); font-weight: 500; }
+  .row { display: flex; gap: var(--sp2); flex-wrap: wrap; padding: 2px var(--sp3); align-items: center; }
+  button { background: none; border: 1px solid var(--line); color: var(--ink);
+           font: inherit; padding: 3px 8px; cursor: pointer; border-radius: 2px; }
+  button:hover { border-color: var(--petrol); }
+  button.active { border-color: var(--petrol); color: var(--petrol); }
+  .primaryBtn { background: var(--petrol); border-color: var(--petrol); color: #0c0e0e;
+                font-weight: 700; padding: 8px 16px; font-size: 12px; }
+  .primaryBtn:hover { background: color-mix(in srgb, var(--petrol) 85%, white); }
+  .primaryBtn:disabled { opacity: 0.4; cursor: default; background: var(--line); border-color: var(--line); color: var(--dim); }
+  .primaryBtn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .primaryBtn.pulsed { transform: scale(1.05);
+                        box-shadow: 0 0 0 3px color-mix(in srgb, var(--petrol) 45%, transparent); }
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(12px);
+           background: var(--panel); border: 1px solid var(--petrol); color: var(--ink);
+           padding: 8px 16px; border-radius: 4px; font-size: 12px; z-index: 60;
+           opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  textarea { width: calc(100% - 24px); margin: 4px var(--sp3); height: 140px;
+             background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+             font: inherit; font-size: 10px; display: none; }
+  .hud { position: absolute; background: color-mix(in srgb, var(--panel) 92%, transparent);
+         border: 1px solid var(--line); padding: 8px 10px; border-radius: 3px;
+         line-height: 1.7; max-width: 60vw; }
+  #status { left: 12px; bottom: 12px; }
+  #modeTag { top: 12px; left: 12px; }
+  #fullPageHud { top: 12px; right: 12px; display: none; border-color: var(--petrol); }
+  #fullPageHud.show { display: block; }
+  body.fullPageView #curvePane { display: none; }
+  hr { border: none; border-top: 1px solid var(--line); margin: var(--sp3); }
+  .banner { background: color-mix(in srgb, var(--amber) 14%, var(--bg)); border: 1px solid var(--amber);
+            color: var(--ink); padding: 8px 10px; margin: 8px var(--sp3); border-radius: 3px; line-height: 1.6;
+            display: none; }
+  .banner.show { display: block; }
+  .banner.commit { background: color-mix(in srgb, var(--petrol) 14%, var(--bg)); border-color: var(--petrol); }
+  .banner.info { background: color-mix(in srgb, var(--panel2) 100%, var(--bg)); border-color: var(--line); }
+  .featureWarn { background: color-mix(in srgb, var(--red) 20%, var(--bg)); border: 1px solid var(--red);
+                 color: var(--ink); padding: 6px 8px; margin: 2px 0 4px; border-radius: 3px; line-height: 1.6; }
+  #exportGuard { display: none; background: color-mix(in srgb, var(--red) 18%, var(--bg));
+                 border: 1px solid var(--red); }
+  #exportOverrideRow { display: none; color: var(--dim); gap: 6px; }
+  .calibBlock { padding: 2px var(--sp3) var(--sp2); }
+  .calibStatus { font-size: 10px; line-height: 1.6; }
+  .calibStatus.uncal { color: var(--red); }
+  .calibStatus.pending { color: var(--amber); }
+  .calibStatus.cal { color: var(--petrol); }
+  .calibDiag { font-size: 10px; color: var(--dim); line-height: 1.6; margin-top: 4px;
+               padding: 4px 6px; border: 1px solid var(--line); border-radius: 3px; }
+  .miniBtn { font-size: 10px; padding: 2px 6px; }
+  input[type="number"].mmInput { width: 4.5em; background: var(--bg); color: var(--ink);
+                                 border: 1px solid var(--line); font: inherit; padding: 1px 4px; }
+  input[type="text"].labelInput { background: var(--bg); color: var(--ink);
+                                  border: 1px solid var(--line); font: inherit; padding: 4px 6px; width: 100%; }
+  select.miniSelect { background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+                       font: inherit; font-size: 10px; padding: 2px 4px; }
+
+  /* -- tab shell + progress ---------------------------------------------- */
+  #tabBar { display: flex; border-bottom: 1px solid var(--line); }
+  .tabBtn { flex: 1; margin: 0; border: none; border-radius: 0; background: var(--panel);
+            color: var(--dim); padding: 9px 4px 8px; font-size: 10.5px; letter-spacing: 0.04em;
+            text-transform: uppercase; border-bottom: 2px solid transparent; }
+  .tabBtn .tabDot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+                     background: transparent; border: 1.5px solid var(--dim); margin-right: 5px;
+                     vertical-align: 1px; }
+  .tabBtn .tabDot.done { background: var(--petrol); border-color: var(--petrol); }
+  .tabBtn .tabDot.current { background: var(--amber); border-color: var(--amber); }
+  .tabBtn .tabDot.unreachable { border-color: var(--line); opacity: 0.5; }
+  .tabBtn.current { color: var(--petrol); border-bottom-color: var(--petrol); background: var(--bg); }
+  .tabBtn:hover { color: var(--ink); }
+  .tabSection { display: none; }
+  .tabSection.current { display: block; }
+  .viewGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .viewSlot { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .layerRow button { padding: 2px 8px; font-size: 10px; }
+  .layerRow button[data-layer="silhouette"].active { border-color: var(--petrol); color: var(--petrol); }
+  .layerRow button[data-layer="neckline"].active { border-color: var(--amber); color: var(--amber); }
+  .layerRow button[data-layer="hemline"].active { border-color: var(--red); color: var(--red); }
+  .layerRow button[data-layer="waist"].active { border-color: var(--violet); color: var(--violet); }
+  .layerRow button[data-layer="armhole"].active { border-color: var(--sky); color: var(--sky); }
+  .fileRow input[type="file"] { color: var(--dim); font: inherit; font-size: 10px; max-width: 190px; }
+  .checklist { padding: 2px var(--sp3) var(--sp2); line-height: 1.9; }
+  .checklist .done { color: var(--petrol); }
+  .checklist .todo { color: var(--dim); }
+
+  /* -- current-shell status pill ------------------------------------------ */
+  .shellStatus { display: flex; align-items: center; gap: var(--sp2); padding: var(--sp2) var(--sp3);
+                 margin: 0 var(--sp3) var(--sp2); border: 1px solid var(--line); border-radius: 3px;
+                 background: var(--panel2); }
+  .shellStatus .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
+  .shellStatus .dot.clean { background: var(--petrol); }
+  .shellStatus .dot.dirty { background: var(--amber); }
+  .shellStatus .name { font-weight: 600; color: var(--ink); }
+
+  /* -- library rows -------------------------------------------------------- */
+  .libRow { display: flex; align-items: center; gap: var(--sp3); padding: var(--sp2) var(--sp3);
+            border-bottom: 1px solid var(--line); }
+  .libRow.current { background: color-mix(in srgb, var(--petrol) 8%, var(--bg)); }
+  .libThumb { width: 56px; height: 42px; object-fit: cover; border-radius: 2px; background: var(--panel2);
+              border: 1px solid var(--line); flex: none; }
+  .libInfo { flex: 1; min-width: 0; }
+  .libName { color: var(--ink); font-weight: 600; }
+  .libMeta { color: var(--dim); font-size: 10px; }
+  .libActions { display: flex; gap: 4px; flex-wrap: wrap; }
+  .libActions button { padding: 2px 6px; font-size: 10px; }
+  .libWarn { color: var(--amber); font-size: 10px; margin-top: 2px; line-height: 1.5; }
+  .layoutRow { padding: var(--sp2) var(--sp3); border-bottom: 1px solid var(--line); }
+  .layoutRow .name { color: var(--ink); font-weight: 600; }
+  .layoutRow .meta { color: var(--dim); font-size: 10px; }
+
+  /* -- backward-navigation / prompt modal --------------------------------- */
+  #navModal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 50;
+              display: none; align-items: center; justify-content: center; }
+  #navModal.open { display: flex; }
+  .modalBox { background: var(--panel); border: 1px solid var(--red); border-radius: 4px;
+              max-width: 520px; max-height: 80vh; overflow-y: auto; padding: 16px; line-height: 1.6; }
+  .modalBox .row { padding: 10px 0 0; justify-content: flex-end; }
+  .modalBox table { margin: 6px 0; width: 100%; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <div id="curvePane">
+    <div id="tabBar">
+      <button class="tabBtn" data-tab="upload"><span class="tabDot" id="dotUpload"></span>1 · Upload</button>
+      <button class="tabBtn" data-tab="shape"><span class="tabDot" id="dotShape"></span>2 · Shape</button>
+      <button class="tabBtn" data-tab="export"><span class="tabDot" id="dotShells"></span>3 · Shells</button>
+      <button class="tabBtn" data-tab="place"><span class="tabDot" id="dotPanels"></span>4 · Panels</button>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- STAGE 1 — UPLOAD                                              -->
+    <!-- ============================================================ -->
+    <section id="tab-upload" class="tabSection">
+      <h1>Upload</h1>
+      <details class="explain"><summary>what this stage is</summary>
+        <div class="body">Pure input, nothing else. Load the front, side, and top-down photos and
+          calibrate each by clicking two landmarks — no curves, no tracing, no 3D here. Back is
+          optional: this shell family has no left/right asymmetry, so it adds no new curve data even
+          once shaping starts.</div>
+      </details>
+      <div class="checklist" id="uploadChecklist">…</div>
+
+      <div class="viewGrid">
+        <div class="viewSlot">
+          <h2>Front (required)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileFront" accept="image/*"></label></div>
+          <canvas id="canvasFrontRef" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusFront">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnFront">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearFront" style="display:none">clear calibration</button>
+            </div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="hrefBtnFront">add horizontal reference (breast tip distance)</button>
+              <button class="miniBtn" id="hrefClearFront" style="display:none">clear h-ref</button>
+              <label style="color:var(--dim)">real distance
+                <input type="number" class="mmInput" id="hrefMmFront" value="175" min="1" step="0.5"> mm</label>
+            </div>
+          </div>
+        </div>
+        <div class="viewSlot">
+          <h2>Side (required)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileSide" accept="image/*"></label></div>
+          <canvas id="canvasSideRef" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusSide">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnSide">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearSide" style="display:none">clear calibration</button>
+            </div>
+          </div>
+        </div>
+        <div class="viewSlot">
+          <h2>Top-down (required)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileTop" accept="image/*"></label></div>
+          <canvas id="canvasTopRef" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusTop">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnTop">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearTop" style="display:none">clear calibration</button>
+            </div>
+          </div>
+          <div class="legend">Reference only this round — a known, flagged gap, not a silent omission.</div>
+        </div>
+        <div class="viewSlot">
+          <h2>Back (optional)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileBack" accept="image/*"></label></div>
+          <canvas id="canvasBackRef" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusBack">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnBack">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearBack" style="display:none">clear calibration</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- STAGE 2 — SHAPE                                               -->
+    <!-- ============================================================ -->
+    <section id="tab-shape" class="tabSection current">
+      <h1>Shape</h1>
+      <details class="explain"><summary>what this stage is</summary>
+        <div class="body">Tracing and editing are the same action here: drag points against the
+          calibrated backdrop from Upload and watch the 3D shell update live — one set of curve
+          editors, not two. A miss-click on empty canvas adds a point to the active layer below;
+          drag an existing point to move it; right-click a point to delete it (silhouette layers keep
+          a minimum of 2). This page has no server. Curve editing, 3D regeneration, circumference, and
+          monotonicity are genuinely live; the full curvature/seatability sweep still needs Python and
+          shows a labeled, bake-time snapshot rather than a live number.</div>
+      </details>
+
+      <div class="shellStatus">
+        <span class="dot" id="shellStatusDot"></span>
+        <span id="shellStatusText">…</span>
+        <span style="flex:1"></span>
+        <button class="primaryBtn" id="saveShellBtnShape" style="padding:5px 12px;font-size:11px">Save</button>
+      </div>
+
+      <div class="legend" id="imageDimsReadout">…</div>
+
+      <div class="curveRow">
+        <div class="curveBlock">
+          <h2>a(v) — over the front backdrop</h2>
+          <canvas id="canvasA" class="curve" width="340" height="480"></canvas>
+        </div>
+        <div class="curveBlock">
+          <h2>b_front(v) / b_back(v) — over the side backdrop</h2>
+          <canvas id="canvasB" class="curve" width="340" height="480"></canvas>
+        </div>
+      </div>
+      <div class="legend">
+        a(v): committed (dashed) · edited (solid) · mirrored, ONE shared value both sides.<br>
+        b(v): <span style="color:#2fa3a3">front (right = CF)</span> ·
+        <span style="color:#d98a35">back (left = CB)</span> · each independently draggable.
+      </div>
+
+      <div class="row layerRow">
+        marking:
+        <button data-layer="silhouette" class="active">silhouette</button>
+        <button data-layer="neckline">neckline</button>
+        <button data-layer="hemline">hemline</button>
+        <button data-layer="waist">waist</button>
+        <button data-layer="armhole">armhole</button>
+      </div>
+      <details class="explain"><summary>what marking layers do</summary>
+        <div class="body">Only <b>silhouette</b> points become a(v)/b_front(v)/b_back(v) — the other
+          four are visual/reference markers this first pass records but does not yet feed into the
+          neckline model or any derived quantity.</div>
+      </details>
+
+      <div class="row"><button class="miniBtn" id="resetToSeedBtn">reset to generator seed</button></div>
+
+      <details class="explain"><summary>neckline / generator reference</summary>
+        <div class="body">
+          <div id="neckRef" class="kv" style="padding:0 0 6px">…</div>
+          These are the parameters the starting curves were generated from. Ask for a fresh
+          export_shape_editor_static.py run + republish to change them and reseed.
+          <div id="genRef" class="kv" style="padding:6px 0 0">…</div>
+          armhole split θ: <b id="armholeReadout">…</b>
+        </div>
+      </details>
+
+      <hr>
+      <h2>Tape measurements — live check, not a constraint</h2>
+      <table id="traceTapeTable"></table>
+      <div class="row">
+        <label>waist <input type="number" class="mmInput" id="tapeWaist" value="609.6"> mm</label>
+        <label>underbust <input type="number" class="mmInput" id="tapeUnderbust" value="711.2"> mm</label>
+        <label>bust <input type="number" class="mmInput" id="tapeBust" value="825.5"> mm</label>
+        <label>above-bust <input type="number" class="mmInput" id="tapeAboveBust" value="812.8"> mm</label>
+      </div>
+
+      <hr>
+      <h2>Point density (adaptive placement)</h2>
+      <div class="legend" id="densityReport">…</div>
+      <div class="row">a(v) <input type="range" id="densityA" style="flex:1"> <b id="densityAVal"></b> pts</div>
+      <div id="densityAReadout" class="kv">…</div>
+      <div class="row">b_front <input type="range" id="densityBf" style="flex:1"> <b id="densityBfVal"></b> pts</div>
+      <div id="densityBfReadout" class="kv">…</div>
+      <div class="row">b_back <input type="range" id="densityBb" style="flex:1"> <b id="densityBbVal"></b> pts</div>
+      <div id="densityBbReadout" class="kv">…</div>
+
+      <h3>Smoothing (control-point cleanup, not reshaping)</h3>
+      <div class="row">amount <input type="number" id="smoothAmount" value="0.5" min="0" max="1" step="0.1" style="width:4em">
+        passes <input type="number" id="smoothPasses" value="2" min="1" max="10" step="1" style="width:4em"></div>
+      <div class="row">
+        <button id="smoothA">smooth a(v)</button>
+        <button id="smoothBf">smooth b_front</button>
+        <button id="smoothBb">smooth b_back</button>
+      </div>
+
+      <hr>
+      <h2>Live readouts</h2>
+      <div id="monoReadout" class="kv">…</div>
+      <h3>Circumference vs tape</h3>
+      <table id="circTable"></table>
+      <div class="legend" id="circCalibCaveat">…</div>
+      <h3>Shell (snapshot)</h3>
+      <details class="explain"><summary>why this stays a snapshot, not live</summary>
+        <div class="body">Adaptive placement does NOT close this gap: min-radius/seatable-area are
+          curvature (2nd-derivative) readouts, and PCHIP through control points is only C1-continuous
+          — any numeric curvature estimate on it is unstable regardless of point count or placement.
+          This block stays a labeled Python snapshot rather than a live number.</div>
+      </details>
+      <div id="shellReadout" class="kv">…</div>
+      <div id="baselineReadout" class="kv" style="margin-top:8px">…</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- STAGE 3 — SHELLS (save + library)                             -->
+    <!-- ============================================================ -->
+    <section id="tab-export" class="tabSection">
+      <h1>Shells</h1>
+      <details class="explain"><summary>what this stage is</summary>
+        <div class="body">Not one saved shell — a library you build up over time. Saving creates a
+          named entry with a timestamp and a thumbnail; nothing leaves the app, it's stored in this
+          browser. Opening one loads it into Shape; duplicating forks it so you can explore a variant
+          without touching the original. Layouts (Panels tab) belong to a specific shell — saving over
+          a shell that owns layouts re-checks their panel standoff first and names what breaks.</div>
+      </details>
+
+      <div class="shellStatus">
+        <span class="dot" id="shellStatusDot2"></span>
+        <span id="shellStatusText2">…</span>
+      </div>
+
+      <details class="explain"><summary>what's being saved / final numbers</summary>
+        <div class="body">
+          <div id="exportSummary" class="kv" style="padding:0">…</div>
+          <div id="exportMonoReadout" class="kv" style="padding:6px 0 0">…</div>
+          <table id="exportCircTable"></table>
+          <div id="exportShellReadout" class="kv" style="margin-top:6px">…</div>
+        </div>
+      </details>
+
+      <div class="legend" id="exportGuard"></div>
+      <label class="row" id="exportOverrideRow">
+        <input type="checkbox" id="exportOverride">
+        I understand — a named feature is not represented at this density; allow saving anyway
+      </label>
+      <div class="row">
+        <button class="primaryBtn" id="saveShellBtn">Save</button>
+      </div>
+      <div class="kv" id="exportStatus"></div>
+
+      <hr>
+      <h2>Library</h2>
+      <div class="row">
+        <span class="kv" style="padding:0" id="storageUsage">…</span>
+      </div>
+      <div id="shellLibraryList">…</div>
+      <div class="row">
+        <button class="miniBtn" id="exportLibraryBtn">export library (.json)</button>
+        <label class="miniBtn" style="display:inline-block">import library (.json)
+          <input type="file" id="importLibraryInput" accept="application/json" style="display:none"></label>
+      </div>
+      <div class="kv" id="libraryIOStatus"></div>
+
+      <hr>
+      <h3>Commit to the repo — a separate concern</h3>
+      <div class="legend">Getting a shell into <code>tools/dress-shell/shape.yaml</code> isn't part of
+        saving to the library; use this only when you actually want that.</div>
+      <button class="miniBtn" id="copyBtn">copy shape.yaml to clipboard</button>
+      <button class="miniBtn" id="exportBtn">or download the file</button>
+      <textarea id="exportArea" readonly></textarea>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- STAGE 4 — PANELS (layouts belong to shells)                   -->
+    <!-- ============================================================ -->
+    <section id="tab-place" class="tabSection">
+      <h1>Panels</h1>
+      <details class="explain"><summary>what this stage is</summary>
+        <div class="body">Panel placement comes after the shell pipeline is finished, and what it
+          needs hasn't been worked out yet — no interactive placement editor this round (still
+          <code>tools/dress-shell/editor_server.py</code>, out of scope). What IS built: layouts as
+          named, owned-by-a-shell entries, each showing live per-panel standoff against its shell.
+          Duplicating a layout onto a different shell re-checks standoff first and names what breaks.</div>
+      </details>
+
+      <div class="shellStatus">
+        <span class="dot" id="shellStatusDot3"></span>
+        <span id="shellStatusText3">…</span>
+        <span style="flex:1"></span>
+        <button class="primaryBtn" id="viewFullPageBtn" style="padding:5px 12px;font-size:11px">View full page →</button>
+      </div>
+      <div class="legend">Reads straight from the library — always what you actually saved, never a
+        stale published file. <code>/dress</code> is a separate, deliberately-published page; see below.</div>
+
+      <h2>Layouts on this shell</h2>
+      <div id="shellLayoutList">…</div>
+
+      <hr>
+      <h2>Reference: committed layout.yaml</h2>
+      <div class="legend" id="layoutStatus">loading tools/dress-shell/layout.yaml…</div>
+      <div class="row">
+        <button class="miniBtn" id="importCommittedLayoutBtn">duplicate onto current shell as a new layout</button>
+        <button class="miniBtn" id="copyLayoutBtn">copy layout.yaml to clipboard</button>
+      </div>
+      <div class="kv" id="layoutCopyStatus"></div>
+      <details class="explain"><summary>committed panels (raw)</summary>
+        <div class="body" id="layoutPanelList">…</div>
+      </details>
+      <textarea id="layoutArea" readonly style="height:180px"></textarea>
+    </section>
+  </div>
+  <div id="view">
+    <div id="modeTag" class="hud kv">loading…</div>
+    <div id="status" class="hud kv">loading…</div>
+    <div id="fullPageHud" class="hud kv">
+      <div id="fullPageHudText">…</div>
+      <button class="miniBtn" id="backToEditorBtn" style="margin-top:6px">← back to editor</button>
+    </div>
+  </div>
+</div>
+
+<div id="navModal">
+  <div class="modalBox">
+    <div id="navModalText"></div>
+    <div class="row">
+      <button id="navModalCancel">cancel</button>
+      <button id="navModalConfirm" class="primaryBtn">continue</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "./dress/vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./dress/vendor/controls/OrbitControls.js"
+} }
+</script>
+<script type="module" src="./shape-editor-app.js"></script>
+</body>
+</html>

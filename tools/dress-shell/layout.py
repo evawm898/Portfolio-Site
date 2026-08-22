@@ -1,0 +1,596 @@
+"""layout.yaml — the committed source of truth — and mirroring logic.
+
+AUTHORING MODEL
+  Only one side is authored: entries must have theta >= 0 (theta == 0 is
+  a single, unpaired, center-front panel). An entry with mirrored: true
+  gets a DERIVED twin at -theta at load time; twins are never stored and
+  are not independently editable — re-deriving after any edit updates
+  them by construction.
+
+MIRRORING SEMANTICS
+  A twin cannot be a reflection: reflection is orientation-reversing and
+  no physical panel can undergo it. The panel decomposes into
+    - MIRRORABLE (software): rendered content. A 180-degree physical
+      rotation is compensated by rotating the framebuffer 180 degrees;
+      the per-panel `content_rotation` field tracks this and rides along
+      into the export. It equals the physical rotation by definition
+      today, but is carried explicitly because export consumers need it.
+    - NOT MIRRORABLE (physical): outline, bezel offsets, connector origin
+      and exit vector, driver footprint. Any proper rotation is allowed
+      (panels are rigid; rotation is FREE in authoring). A reflection is
+      never allowed.
+
+  The twin's ACTIVE AREA CENTER is constrained to (-theta, s) exactly.
+  Twin rotation candidates are the source's rotation and the source's
+  rotation + 180 (the only two proper rotations that map the source's
+  outline onto a laterally mirrored outline when the active center is
+  off-center). Priority:
+    1. Connector escape legality (routing usually forces this, so it
+       wins). Geometric legality here; occlusion/burial is layering-time.
+    2. If both rotations are legal: minimize OUTLINE ASYMMETRY — the
+       distance between the twin's outline and where a true reflection
+       would put it. With o = R(source_rotation) applied to the outline
+       center's offset from the active center, keeping the source's
+       rotation misses by 2|ox| (lateral), flipping by 2|oy| (vertical).
+       Ties keep the source's rotation.
+  If neither rotation is legal the twin is marked INVALID with reasons.
+  Every twin records its outline asymmetry in mm for the summary.
+
+CONNECTOR LEGALITY (geometric, this layer)
+  The connector origin and its exit path (a straight run of the class's
+  escape_mm in the tangent chart) must stay on the panel's own piece:
+  they may not cross the piece seams at theta = +-split_theta (the
+  armhole seam on the committed dress; FRONT and BACK are separate
+  pieces), must clear the armhole seam band (a keep-out of
+  armhole_band_halfwidth mm each side of the seam), and may not run off
+  the top edge or the hem edge. Occlusion by other panels is a separate,
+  layering-level check.
+
+CHART MATH
+  Panels are rigid and small relative to the shell, so layout works in
+  the (theta, s) chart with the local metric: lateral millimetres convert
+  to degrees through the local circumferential radius |P_theta| =
+  sqrt(a^2 cos^2 theta + b^2 sin^2 theta), evaluated at the point's own
+  height. Curvature/standoff fidelity comes from the seating analysis,
+  not from this chart.
+
+Uses only the stable public API of shell.py / coords.py.
+"""
+
+import math
+import re
+from dataclasses import dataclass
+
+import numpy as np
+import yaml
+
+from panels import PanelClass
+
+
+class LayoutError(ValueError):
+    """Raised when layout.yaml is structurally or semantically invalid."""
+
+
+_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+@dataclass(frozen=True)
+class AuthoredPanel:
+    panel_id: str
+    class_id: str
+    theta: float        # degrees, authored side: >= 0
+    s: float            # mm along the profile from the waist
+    rotation: float     # degrees, FREE (proper rotation about the active center)
+    layer: int          # stacking index, innermost = 0
+    mirrored: bool      # derive a twin at -theta
+
+
+@dataclass(frozen=True)
+class PlacedPanel:
+    panel_id: str
+    cls: PanelClass
+    theta: float
+    s: float
+    rotation: float         # physical: any proper rotation, never a reflection
+    content_rotation: float # framebuffer counter-rotation (== rotation)
+    layer: int
+    is_twin: bool
+    source_id: str
+    valid: bool
+    problems: tuple         # human-readable strings; non-empty iff not valid
+    asymmetry_mm: float = None  # twins only: outline distance from true reflection
+
+
+# ---------------------------------------------------------------------------
+# chart adapter over the stable milestone-1 API
+
+def wrap180(deg):
+    return (deg + 180.0) % 360.0 - 180.0
+
+
+class SurfaceChart:
+    """(theta, s) chart helpers built on ShellModel/ShellCoords."""
+
+    def __init__(self, model, coords):
+        self.model = model
+        self.coords = coords
+        self.s_min = coords.s_min
+        self.s_max = coords.s_max
+        # FRONT/BACK piece split (the armhole seam angle on the committed
+        # dress; 90 on plain shells) and the seam band keep-out around it
+        self.split_theta = float(getattr(model, "split_theta", 90.0))
+        self.armhole_band_halfwidth = float(getattr(
+            model.params, "armhole_band_halfwidth", 0.0))
+        # waist seam band: keep-out ring about s = 0, also the cable bus.
+        # DERIVED from the fillet zone when the depth model has one (the
+        # blended region [z1, z2] mapped through s(z) — note s runs
+        # hemward, so z_hi maps to the bodice-side edge); otherwise the
+        # authored symmetric half-width.
+        zone = getattr(getattr(model, "depth", None), "fillet_zone", None)
+        if zone is not None:
+            self.band_s_lo = float(coords.s_of_z(float(zone[1])))  # bodice side (< 0)
+            self.band_s_hi = float(coords.s_of_z(float(zone[0])))  # skirt side (> 0)
+            self.band_derived = True
+        else:
+            hw = float(getattr(model.params, "waist_band_halfwidth", 0.0))
+            self.band_s_lo, self.band_s_hi = -hw, hw
+            self.band_derived = False
+        if not (self.band_s_lo <= 0.0 <= self.band_s_hi):
+            raise LayoutError(
+                f"waist seam band [{self.band_s_lo:.2f}, {self.band_s_hi:.2f}] "
+                f"does not straddle the waist (s = 0)")
+        # neckline: the physical top edge of the bodice (None = skirt only)
+        self.neckline = getattr(model, "neckline", None)
+
+    @property
+    def band_halfwidth(self):
+        """Legacy symmetric view of the waist band (max extent side)."""
+        return max(-self.band_s_lo, self.band_s_hi)
+
+    def band_edge_toward_waist(self, s):
+        """The waist-band edge a point at s would hit moving waistward;
+        0.0 if s is already inside the band."""
+        if s > self.band_s_hi:
+            return self.band_s_hi
+        if s < self.band_s_lo:
+            return self.band_s_lo
+        return 0.0
+
+    def piece_halfwidth(self, piece):
+        """Angular half-extent of a piece: FRONT spans +-split_theta about
+        0, BACK spans +-(180 - split_theta) about 180."""
+        return self.split_theta if piece == "FRONT" else 180.0 - self.split_theta
+
+    def seam_problems(self, tag, theta, s, piece, center):
+        """Problem strings if (theta, s) crosses the anchor piece's seam
+        or lands inside the armhole seam band keep-out. The piece is
+        ANCHORED at the panel's own center — a point past the seam must
+        read as a crossing, not as legally belonging to the other piece.
+        The band half-width is mm, converted to degrees at the point's
+        own height."""
+        local = abs(_local_angle(theta, center))
+        half = self.piece_halfwidth(piece)
+        if local >= half - 1e-9:
+            return [f"{tag} crosses the {piece} piece seam "
+                    f"(theta {wrap180(theta):.1f}, seam at +-{self.split_theta:.1f})"]
+        band = self.armhole_band_halfwidth
+        if band > 0.0:
+            r = self.r_theta(theta, s)
+            gap_mm = math.radians(half - local) * r
+            if gap_mm < band - 1e-9:
+                return [f"{tag} enters the armhole seam band ({gap_mm:.1f} mm "
+                        f"from the seam; keep-out +-{band:g} mm)"]
+        return []
+
+    def height_of_s(self, s):
+        """z (mm above waist) for a chart s, clipped to the chart range."""
+        return float(self.coords.z_of_s(float(np_clip(s, self.s_min, self.s_max))))
+
+    def on_shell(self, theta, s, below_edge_mm=0.0):
+        """True when (theta, s) lies on the physical shell — at or below
+        the neckline edge (minus below_edge_mm) at that azimuth."""
+        if not (self.s_min - 1e-9 <= s <= self.s_max + 1e-9):
+            return False
+        if self.neckline is None:
+            return True
+        return (self.height_of_s(s)
+                <= float(self.neckline.height(theta)) - below_edge_mm + 1e-9)
+
+    def neckline_violation(self, tag, theta, s):
+        """Problem string if the point crosses the neckline KEEP-OUT band
+        (edge minus keepout_mm — room for the bound edge finish); None
+        when legal or when there is no bodice."""
+        if self.neckline is None:
+            return None
+        z = self.height_of_s(s)
+        if z <= 0.0:
+            return None
+        floor = float(self.neckline.keepout_floor(theta))
+        if z > floor + 1e-9:
+            return (f"{tag} crosses the neckline keep-out (height {z:.1f} > "
+                    f"floor {floor:.1f} at theta {wrap180(theta):.1f})")
+        return None
+
+    def r_theta(self, theta_deg, s):
+        """Chart metric: mm of section arc per radian of theta. theta is
+        EQUAL-ARC, so this is P(z)/2pi — uniform around each ring by
+        construction (trap #1 handled at the source)."""
+        z = float(self.coords.z_of_s(float(np_clip(s, self.s_min, self.s_max))))
+        return float(self.model.section_perimeter(z)) / math.tau
+
+    def offset_point(self, theta, s, dx_mm, dy_mm):
+        """Move from (theta, s) by panel-frame offsets: dx lateral mm
+        (+ = +e_theta), dy meridian mm (+ = hemward)."""
+        s2 = s + dy_mm
+        r = self.r_theta(theta, s2)
+        return theta + math.degrees(dx_mm / r), s2
+
+
+def np_clip(v, lo, hi):
+    return lo if v < lo else hi if v > hi else v
+
+
+def piece_of(theta, split=90.0):
+    """FRONT for |theta| < split (the armhole angle on the committed
+    dress; 90 historically), BACK otherwise; returns (name, center)."""
+    lam = wrap180(theta)
+    return ("FRONT", 0.0) if abs(lam) < split else ("BACK", 180.0)
+
+
+def _local_angle(theta, piece_center):
+    return wrap180(theta - piece_center)
+
+
+# ---------------------------------------------------------------------------
+# seating a class definition at a pose (chart level)
+
+def _rot_cs(rotation_deg):
+    r = math.radians(rotation_deg)
+    return math.cos(r), math.sin(r)
+
+
+def _frame_offset(cls, rotation, local_xy):
+    """Panel-local point -> (dx_mm, dy_mm) offsets from the ACTIVE CENTER
+    in the seated frame (rotation spins the rigid part about its active
+    center by any angle; the active rectangle's center is invariant,
+    everything else moves)."""
+    acx, acy = cls.active_center
+    dx, dy = local_xy[0] - acx, local_xy[1] - acy
+    c, sn = _rot_cs(rotation)
+    return (c * dx - sn * dy, sn * dx + c * dy)
+
+
+def connector_geometry(chart, cls, theta, s, rotation):
+    """Connector origin and exit-path end in (theta, s). The waist seam
+    band is the cable bus: an escape run heading into the band TERMINATES
+    at the band edge rather than running to (or past) the bare waistline."""
+    dx, dy = _frame_offset(cls, rotation, cls.connector_origin)
+    c_theta, c_s = chart.offset_point(theta, s, dx, dy)
+    ex, ey = cls.connector_exit
+    c, sn = _rot_cs(rotation)
+    ex, ey = c * ex - sn * ey, sn * ex + c * ey
+    e_theta, e_s = chart.offset_point(c_theta, c_s, ex * cls.escape_mm, ey * cls.escape_mm)
+    edge = chart.band_edge_toward_waist(c_s)
+    if edge != 0.0 and (c_s - edge) * (e_s - edge) < 0.0:  # run crosses the band edge
+        t = (c_s - edge) / (c_s - e_s)
+        e_theta = c_theta + t * (e_theta - c_theta)
+        e_s = edge
+    return (c_theta, c_s), (e_theta, e_s)
+
+
+def tail_run_mm(chart, cls, theta, s, rotation):
+    """Meridian distance from the connector origin to the waist seam band
+    edge (the cable bus) — the tail-length metric. Terminates AT the band,
+    not the bare waistline."""
+    (c_theta, c_s), _ = connector_geometry(chart, cls, theta, s, rotation)
+    if c_s > chart.band_s_hi:
+        return c_s - chart.band_s_hi
+    if c_s < chart.band_s_lo:
+        return chart.band_s_lo - c_s
+    return 0.0
+
+
+def connector_problems(chart, cls, theta, s, rotation):
+    """Geometric legality of the connector at this pose; [] if legal.
+    Both coordinates vary monotonically along the straight exit path, so
+    checking origin and end covers the whole run."""
+    piece, center = piece_of(theta, chart.split_theta)
+    (c_theta, c_s), (e_theta, e_s) = connector_geometry(chart, cls, theta, s, rotation)
+    problems = []
+    for tag, (t, sv) in (("connector origin", (c_theta, c_s)),
+                         ("connector escape end", (e_theta, e_s))):
+        if sv < chart.s_min - 1e-9:
+            problems.append(f"{tag} runs off the top edge (s {sv:.1f} < {chart.s_min:.1f})")
+        if sv > chart.s_max + 1e-9:
+            problems.append(f"{tag} runs off the hem edge (s {sv:.1f} > {chart.s_max:.1f})")
+        problems += chart.seam_problems(tag, t, sv, piece, center)
+        neck = chart.neckline_violation(tag, t, sv)
+        if neck:
+            problems.append(neck)
+    return problems
+
+
+def outline_problems(chart, cls, theta, s, rotation):
+    """The outline must sit inside its piece (clear of the armhole seam
+    band), on the shell, and clear of the waist seam band (the derived
+    fillet-zone keep-out ring about s = 0)."""
+    piece, center = piece_of(theta, chart.split_theta)
+    problems = []
+    s_vals = []
+    for corner in ((0.0, 0.0), (cls.outline_w, 0.0),
+                   (cls.outline_w, cls.outline_h), (0.0, cls.outline_h)):
+        dx, dy = _frame_offset(cls, rotation, corner)
+        t, sv = chart.offset_point(theta, s, dx, dy)
+        s_vals.append(sv)
+        if sv < chart.s_min - 1e-9 or sv > chart.s_max + 1e-9:
+            problems.append(f"outline corner off the shell (s {sv:.1f} outside "
+                            f"[{chart.s_min:.1f}, {chart.s_max:.1f}])")
+        problems += chart.seam_problems("outline corner", t, sv, piece, center)
+        neck = chart.neckline_violation("outline corner", t, sv)
+        if neck:
+            problems.append(neck)
+    if (min(s_vals) < chart.band_s_hi - 1e-9
+            and max(s_vals) > chart.band_s_lo + 1e-9):
+        problems.append(
+            f"footprint intersects the waist seam band (keep-out "
+            f"[{chart.band_s_lo:.1f}, {chart.band_s_hi:.1f}] mm about s = 0; "
+            f"the band is the cable bus)")
+    return problems
+
+
+# ---------------------------------------------------------------------------
+# twin derivation
+
+def outline_asymmetry_mm(cls: PanelClass, source_rotation: float, twin_rotation: float):
+    """Distance between the twin's outline and where a true reflection of
+    the source would put it. With the active center pinned to the mirrored
+    position and o = R(source_rotation) applied to the outline center's
+    offset from the active center IN THE SEATED FRAME, keeping the
+    source's rotation misses reflection by 2|ox| (the seated lateral
+    offset); flipping 180 misses it by 2|oy| (the seated vertical
+    offset). Reduces to the classic 2|ex|/2|ey| at rotation 0/180."""
+    ex = cls.outline_w / 2.0 - cls.active_center[0]
+    ey = cls.outline_h / 2.0 - cls.active_center[1]
+    c, sn = _rot_cs(source_rotation)
+    ox, oy = c * ex - sn * ey, sn * ex + c * ey
+    same = abs(wrap180(twin_rotation - source_rotation)) < 1e-9
+    return 2.0 * abs(ox) if same else 2.0 * abs(oy)
+
+
+def derive_twin(chart, cls, source: AuthoredPanel):
+    """Twin of a mirrored source: active center at (-theta, s) exactly.
+    Rotation priority: (1) connector escape legality; (2) among legal
+    rotations, minimize outline asymmetry, ties keeping the source's
+    rotation. Neither legal -> INVALID twin, reasons attached."""
+    twin_theta = -source.theta
+    other = (source.rotation + 180.0) % 360.0   # 0 -> 180, 180 -> 0, 90 -> 270
+    candidates, tried = [], []
+    for rotation in (source.rotation, other):  # tie-break order: source first
+        problems = (outline_problems(chart, cls, twin_theta, source.s, rotation)
+                    + connector_problems(chart, cls, twin_theta, source.s, rotation))
+        if problems:
+            tried.append((rotation, problems))
+        else:
+            candidates.append(rotation)
+
+    def _twin(rotation, valid, problems):
+        return PlacedPanel(
+            panel_id=f"{source.panel_id}~twin", cls=cls,
+            theta=twin_theta, s=source.s,
+            rotation=rotation, content_rotation=rotation,
+            layer=source.layer, is_twin=True, source_id=source.panel_id,
+            valid=valid, problems=problems,
+            asymmetry_mm=outline_asymmetry_mm(cls, source.rotation, rotation),
+        )
+
+    if candidates:
+        best = min(candidates,
+                   key=lambda r: outline_asymmetry_mm(cls, source.rotation, r))
+        return _twin(best, True, ())
+    reasons = tuple(f"rotation {rot}: {p}" for rot, probs in tried for p in probs)
+    return _twin(source.rotation, False,
+                 ("INVALID twin: no legal transform",) + reasons)
+
+
+def asymmetry_summary(placed):
+    """(per-pair list, worst, mean) of twin outline asymmetry in mm —
+    how far the authored design actually is from true symmetry."""
+    pairs = [(p.source_id, p.rotation, p.asymmetry_mm)
+             for p in placed if p.is_twin and p.valid]
+    if not pairs:
+        return [], 0.0, 0.0
+    values = [a for _, _, a in pairs]
+    return pairs, max(values), sum(values) / len(values)
+
+
+def assert_face_normals(chart, placed):
+    """ASSERTION: every panel's display face normal must align with the
+    shell's outward normal, twins included. Every allowed transform is a
+    proper rotation in the tangent plane, so this holds identically — a
+    failure means an orientation-reversing transform (a reflection)
+    crept in somewhere."""
+    for p in placed:
+        f = chart.coords.forward(p.theta, p.s)
+        c, sn = _rot_cs(p.rotation)
+        e1 = c * f["e_theta"] + sn * f["e_s"]
+        e2 = -sn * f["e_theta"] + c * f["e_s"]
+        face_normal = np.cross(e1, e2)
+        if float(face_normal @ f["normal"]) <= 0.0:
+            raise LayoutError(
+                f"{p.panel_id}: display face normal opposes the shell outward "
+                f"normal — an orientation-reversing transform crept in"
+            )
+
+
+def resolve_layout(chart, classes, authored):
+    """Authored entries -> full placed list (sources + derived twins).
+    Returns (placed, errors). Sources with geometric problems are placed
+    but carry them; unknown classes are errors and are skipped."""
+    placed, errors = [], []
+    for entry in authored:
+        cls = classes.get(entry.class_id)
+        if cls is None:
+            errors.append(f"{entry.panel_id}: unknown panel class '{entry.class_id}' "
+                          f"(library has {', '.join(sorted(classes))})")
+            continue
+        problems = tuple(outline_problems(chart, cls, entry.theta, entry.s, entry.rotation)
+                         + connector_problems(chart, cls, entry.theta, entry.s, entry.rotation))
+        placed.append(PlacedPanel(
+            panel_id=entry.panel_id, cls=cls, theta=entry.theta, s=entry.s,
+            rotation=entry.rotation, content_rotation=entry.rotation,
+            layer=entry.layer, is_twin=False,
+            source_id=entry.panel_id, valid=not problems, problems=problems,
+        ))
+        if entry.mirrored:
+            placed.append(derive_twin(chart, cls, entry))
+    assert_face_normals(chart, placed)
+    return placed, errors
+
+
+# ---------------------------------------------------------------------------
+# layout.yaml IO — canonical, lossless
+
+_HEADER = """\
+# Dress panel layout — SOURCE OF TRUTH. Committed to the repo; read and
+# written by the editor (and hand-editable).
+#
+# Authoring is one-sided: theta >= 0 only. Entries with mirrored: true get
+# a twin DERIVED at -theta on load; twins are never stored here. theta is
+# degrees (0 = center front, + = wearer's left); s is mm of meridian arc
+# from the waist (- = bodice, + = skirt); (theta, s) is the panel's ACTIVE
+# AREA CENTER. rotation is degrees, FREE (a proper rotation about the
+# active center; twins consider rotation and rotation + 180). layer counts
+# outward from the shell.
+"""
+
+_ENTRY_KEYS = {"id", "class", "theta", "s", "rotation", "layer", "mirrored"}
+
+
+def load_layout(path):
+    """Parse layout.yaml -> list[AuthoredPanel]. Fails loudly, listing
+    every problem."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+    except FileNotFoundError:
+        raise LayoutError(f"layout file not found: {path}") from None
+    except yaml.YAMLError as exc:
+        raise LayoutError(f"layout file is not valid YAML: {exc}") from None
+
+    errors = []
+    if not isinstance(data, dict) or set(data.keys()) != {"version", "panels"}:
+        raise LayoutError(f"invalid layout {path}: top level must have exactly "
+                          f"the keys 'version' and 'panels'")
+    if data["version"] != 1:
+        errors.append(f"version: expected 1, got {data['version']!r}")
+    entries = data["panels"]
+    if entries is None:
+        entries = []
+    if not isinstance(entries, list):
+        raise LayoutError(f"invalid layout {path}: 'panels' must be a list")
+
+    authored, seen = [], set()
+    for i, node in enumerate(entries):
+        where = f"panels[{i}]"
+        if not isinstance(node, dict):
+            errors.append(f"{where}: expected a mapping")
+            continue
+        missing = _ENTRY_KEYS - node.keys()
+        unknown = node.keys() - _ENTRY_KEYS
+        if missing:
+            errors.append(f"{where}: missing key(s): {', '.join(sorted(missing))}")
+        if unknown:
+            errors.append(f"{where}: unknown key(s): {', '.join(sorted(map(str, unknown)))}")
+        if missing or unknown:
+            continue
+
+        pid = node["id"]
+        if not isinstance(pid, str) or not _ID_RE.match(pid) or "~" in pid:
+            errors.append(f"{where}.id: must match [A-Za-z0-9][A-Za-z0-9_-]* "
+                          f"('~' is reserved for derived twins), got {pid!r}")
+            continue
+        if pid in seen:
+            errors.append(f"{where}.id: duplicate id '{pid}'")
+            continue
+        seen.add(pid)
+        where = f"panels[{i}] '{pid}'"
+
+        ok = True
+
+        def num(key, kind=float):
+            nonlocal ok
+            v = node[key]
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+                errors.append(f"{where}.{key}: expected a finite number, got {v!r}")
+                ok = False
+                return None
+            if kind is int and not isinstance(v, int):
+                errors.append(f"{where}.{key}: expected an integer, got {v!r}")
+                ok = False
+                return None
+            return kind(v)
+
+        theta, s = num("theta"), num("s")
+        rotation, layer = num("rotation"), num("layer", int)
+        cls_id, mirrored = node["class"], node["mirrored"]
+        if not isinstance(cls_id, str) or not cls_id:
+            errors.append(f"{where}.class: expected a class id string, got {cls_id!r}")
+            ok = False
+        if not isinstance(mirrored, bool):
+            errors.append(f"{where}.mirrored: expected true/false, got {mirrored!r}")
+            ok = False
+        if not ok:
+            continue
+
+        if theta < 0.0 or theta > 180.0:
+            errors.append(f"{where}.theta: authored side only — must be in [0, 180], "
+                          f"got {theta}")
+        if not (-360.0 <= rotation <= 360.0):
+            errors.append(f"{where}.rotation: degrees in [-360, 360], got {rotation}")
+        if layer < 0:
+            errors.append(f"{where}.layer: must be >= 0, got {layer}")
+        if mirrored and theta == 0.0:
+            errors.append(f"{where}: theta == 0 panels are single and unpaired — "
+                          f"mirrored must be false")
+        if mirrored and theta == 180.0:
+            errors.append(f"{where}: theta == 180 mirrors onto itself — "
+                          f"mirrored must be false")
+
+        authored.append(AuthoredPanel(pid, cls_id, theta, s, rotation, layer, mirrored))
+
+    if errors:
+        bullets = "\n".join(f"  - {e}" for e in errors)
+        raise LayoutError(f"invalid layout {path}:\n{bullets}")
+    return authored
+
+
+def _yaml_float(v):
+    """repr() of a float round-trips binary64 exactly; ints stay ints in
+    value but are stored as floats for theta/s uniformity."""
+    return repr(float(v))
+
+
+def dump_layout(authored):
+    """Canonical text for layout.yaml. Same input -> byte-identical output,
+    so save(load(x)) is a fixed point."""
+    lines = [_HEADER, "version: 1", "panels:"]
+    if not authored:
+        lines[-1] = "panels: []"
+    for p in authored:
+        lines += [
+            f"  - id: {p.panel_id}",
+            f"    class: {p.class_id}",
+            f"    theta: {_yaml_float(p.theta)}",
+            f"    s: {_yaml_float(p.s)}",
+            f"    rotation: {_yaml_float(p.rotation)}",
+            f"    layer: {int(p.layer)}",
+            f"    mirrored: {'true' if p.mirrored else 'false'}",
+        ]
+    return "\n".join(lines) + "\n"
+
+
+def save_layout(path, authored):
+    text = dump_layout(authored)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return text

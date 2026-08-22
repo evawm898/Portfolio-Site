@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E-Ink Dress Shell — Eva Maskalenko</title>
+<meta name="description" content="Design pipeline for placing rigid e-ink panels on a 3D dress shell: a bell skirt with elliptical cross-sections built from confirmed measurements, body-centered coordinates, per-cell curvature analysis, and a mirrored panel layout — explored in an interactive 3D viewer.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .dress-viewer-wrap {
+    border: 1px solid var(--line-strong);
+    background: #0c0e0e;
+    margin: 0 0 0.75rem;
+  }
+  #dressViewer { width: 100%; height: min(72vh, 640px); }
+  #dressViewer canvas { display: block; }
+  .dress-controls {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+    padding: 0.6rem 0.75rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 0.7rem;
+  }
+  .dress-controls span.lbl { color: var(--ink-faint); padding: 0.25rem 0.2rem 0 0; }
+  .dress-controls button {
+    background: none; border: 1px solid var(--line); color: var(--ink-dim);
+    font: inherit; padding: 0.25rem 0.6rem; cursor: pointer; border-radius: 2px;
+  }
+  .dress-controls button:hover { border-color: var(--petrol-bright); }
+  .dress-controls button.is-on { color: var(--petrol-bright); border-color: var(--petrol); }
+  .dress-caption {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--ink-dim);
+    margin: 0 0 2rem; line-height: 1.6;
+  }
+  .dress-stats {
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.8;
+    color: var(--ink); background: var(--black-raised);
+    border: 1px solid var(--line); padding: 1.1rem 1.25rem; margin: 1rem 0;
+    overflow-x: auto; white-space: pre;
+  }
+</style>
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="index.html" class="project-header__back">&larr; Index</a>
+  <div class="project-header__index">Experimental &middot; M2</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag">
+      <span class="project__year">2026</span>
+      <span class="project__affiliation">Lab &mdash; Work in Progress</span>
+    </div>
+    <h1 class="project__title">E-Ink Dress Shell</h1>
+    <p class="project__lede">Placing rigid display panels on a rigid 3D garment &mdash; a corseted bodice and bell skirt formed in three dimensions from the start and never flattened. The tool answers the governing question directly: <em>what fits where?</em></p>
+  </div>
+
+  <div class="project__body">
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>01</span>Premise</h2>
+      <div class="project__section-body">
+        <p>Unlike the <a href="skirt.html" class="footer__link">earlier flat-pattern skirt study</a>, this shell is doubly curved, so it has no flat development at all. Every question has to be answered on the surface itself. The current geometry is the confirmed <strong>skirt</strong>: waist 24&Prime;, hem 61&Prime;, 15&Prime; drop, with a superellipse profile setting the <em>perimeter</em> of every level and each level solved as an ellipse at a constant 1.5&nbsp;:&nbsp;1 ratio &mdash; the bodice&rsquo;s waist ratio carried all the way to the hem (586&thinsp;mm wide &times; 391&thinsp;mm deep), so the skirt meets the future bodice edge-to-edge at the waist seam. The elliptical hem is a deliberate trade: flattening center front is what makes room for the largest panel (below). The waist itself is no longer a crease but a solved <strong>fillet</strong>: a 25&thinsp;mm conic blend joins skirt and bodice tangentially, constructed against a slightly smaller <em>virtual</em> waist so the blend&rsquo;s closest approach still measures exactly the given 24&Prime; (the minimum ring migrates ~9&thinsp;mm up into the bodice). The fillet region doubles as the seam band and cable bus &mdash; the keep-out is <em>derived</em> from the blend&rsquo;s actual extent rather than authored &mdash; panel footprints must clear it, and connector tails terminate at its edge. A body-centered coordinate system covers the surface &mdash; azimuth &theta; from center front (equal-arc, so a degree of &theta; is the same number of millimeters anywhere on a ring), arc length <em>s</em> from the waist, negative upward into the bodice &mdash; and a snap grid ruled in those coordinates stays honest on the curved surface.</p>
+        <p>Above the fillet rises the <strong>bodice</strong>, and its depth is no longer guessed: the designer traced a reference garment in true side view, the trace was measured per-scanline and fitted (residuals under ~1&thinsp;mm), and away from the bust the bodice depth follows that traced shape exactly &mdash; normalized to the given waist so the pieces still meet edge-to-edge at the seam. Bust curvature is applied by <strong>two anatomical apex points</strong> (left and right, at &plusmn;35&deg; off center front, 181&thinsp;mm above the waist) rather than a single central bump: each radiates a raised-cosine bump outward in <em>every</em> direction across the surface (height and azimuth alike) and falls to exactly zero at a 70&thinsp;mm radius, C1-continuous so no new corner is introduced anywhere. Center front and center back sit far enough from both apexes (&gt;&nbsp;78&thinsp;mm laterally, outside the radius) that they read at the traced baseline depth, unmodified &mdash; the earlier design applied its bump uniformly across the whole front half and reached panels 30&ndash;55&deg; off center front that anatomically have nothing to do with either breast; this one doesn&rsquo;t. The circumference schedule is <strong>frozen</strong> through this change &mdash; the half-width is re-solved (numerically, level by level) so the bumped perimeter still matches the given waist/underbust/bust exactly &mdash; while the amplitude (35.4&thinsp;mm) was solved so the achieved depth at each apex (121&thinsp;mm) matches the earlier design&rsquo;s peak projection. The <strong>neckline is the physical top edge</strong>, the asymmetric-in-height one-shoulder line the design calls for: center front at 220&thinsp;mm rises to a genuine corner peak of 240&thinsp;mm at 82&deg;, then falls steeply &mdash; two-thirds of the 95&thinsp;mm total drop happens in the first 30&deg; past the peak &mdash; through the sides (190&thinsp;mm) to a low back (145&thinsp;mm), easing to a zero tangent only in the last 15&deg; before center back. The shell is cut at the curve, panels must stay 6&thinsp;mm below it for the edge finish, and each segment is asserted monotone so the curve cannot kink. The garment&rsquo;s <strong>front/back seam is not at the sides</strong>: it sits at the solved armhole angle, &plusmn;103&deg;, found by wrapping the 360&thinsp;mm across-back tape along the actual surface at 190&thinsp;mm height &mdash; a straight-chord estimate would miss by ~17&thinsp;mm &mdash; and an 8&thinsp;mm keep-out band flanks the seam.</p>
+        <p>For every grid cell the tool computes principal curvatures and, more usefully, the <strong>max seatable panel class</strong>: the largest rigid panel from the library that can sit tangent there without lifting more than 2&thinsp;mm off the surface. Panels are then authored on one side only, at any rotation &mdash; placement rotation is free; mirror twins are derived, never stored. A physical panel cannot be reflected, so each twin keeps the source&rsquo;s rotation or adds 180&deg;, chosen by connector legality, then by closeness to true reflection.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>02</span>The Shell, Live</h2>
+      <div class="project__section-body">
+        <p>This viewer is read-only: it loads the committed glTF export and analysis produced offline by the Python pipeline &mdash; nothing is computed at request time; the flat facet is already baked into the exported shell. Drag to orbit, scroll to zoom. The <em>max class</em> shading is the design guidance layer: each cell is tinted by the largest panel that conforms there (violet = 2.13&Prime;, charcoal = nothing fits); the large panel spanning center front on the skirt is the 7.5&Prime; on its flat facet.</p>
+        <figure class="dress-viewer-wrap" style="margin:0 0 0.75rem;">
+          <div id="dressViewer"></div>
+          <div class="dress-controls">
+            <span class="lbl">shell</span>
+            <button data-shade="class" class="is-on">max class</button>
+            <button data-shade="gaussian">gaussian K</button>
+            <button data-shade="plain">plain</button>
+            <span class="lbl">panels</span>
+            <button data-ptint="class" class="is-on">class</button>
+            <button data-ptint="layer">layer</button>
+            <button data-ptint="standoff">standoff</button>
+            <span class="lbl">overlay</span>
+            <button id="gridToggle" class="is-on">grid</button>
+          </div>
+        </figure>
+        <p class="dress-caption" id="viewerStatus">loading committed glTF&hellip;</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>03</span>What the Analysis Says</h2>
+      <div class="project__section-body">
+        <p>Numbers below are read from the committed analysis file (the same data driving the shading), not recomputed by this page.</p>
+        <div class="dress-stats" id="dressStats">loading dress/dress-analysis.json &hellip;</div>
+        <p>The panel library is real hardware &mdash; three Adafruit bare e-ink modules (2.13&Prime; quad-color, 3.7&Prime; and 7.5&Prime; tri-color), dimensioned from their manufacturer datasheets. Four findings shaped the layout. First, the 7.5&Prime; is not a placeable panel on this garment at all: at 111&thinsp;mm across it needs roughly a 770&thinsp;mm local radius to stay under the 2&thinsp;mm standoff tolerance, and no cell comes close. It is seated instead on a deliberate <strong>flat facet</strong> on the skirt &mdash; the shell is locally flattened across the panel footprint (with a smooth blend band), and the silhouette cost is reported as the shell&rsquo;s deviation, ochre-flagged in the viewer. Second, the 3.7&Prime; conforms <em>nowhere</em> on this dress at the 2&thinsp;mm tolerance &mdash; the traced bodice curves just past its limit (best seat ~2.3&thinsp;mm), and the sweep shows it returning across 13% of cells if the tolerance is relaxed to 2.5&thinsp;mm. Third, the <strong>two bust apexes cost curvature locally around themselves, not across center front</strong>: with the current apex-based bust curvature (two off-axis, C1-continuous radial bumps &mdash; see above), center front conforms nearly continuously across roughly 150&thinsp;mm of the bodice, with no hard corner splitting it into islands; an earlier design that smeared the same bust volume uniformly across the whole front half did cut that run to two ~90&thinsp;mm islands via its own authored corners, but that design has been superseded. The whole-shell seatable fraction is materially unchanged either way (63% p213 / 37% none) &mdash; the apex fix relocates where curvature costs seating, it doesn&rsquo;t reduce the total cost. Fourth, near &plusmn;90&deg;&ndash;110&deg; the section curves tightest and even the 2.13&Prime; cannot seat &mdash; but with the seam moved back to the solved armhole angle (&plusmn;103&deg;), that unseatable ring now falls partly <em>mid-front-piece</em> rather than along the physical seam, an honest cost of the one-shoulder construction the report calls out. The 2&thinsp;mm tolerance itself is an untested assumption; the committed analysis carries a sweep (1.5&ndash;3&thinsp;mm) showing how the map shifts if the real number differs.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>04</span>Pipeline</h2>
+      <div class="project__section-body">
+        <p>Everything lives in the repo at <span style="font-family:var(--mono); font-size:0.85em;">tools/dress-shell/</span>, outside the site build: the parametric shell and exact coordinate maps (round-tripping at machine precision), the panel library and layout source-of-truth in YAML with lossless canonical saves, the mirroring/derivation engine, per-cell curvature and seating analysis, a layering engine (mount-height stacking, occlusion, connector-escape checks), and a local three.js placement editor with a small dev server &mdash; click to place on the snapped grid, drag to re-seat, undo/redo, save, and an explicit publish step that writes the static files this page loads. The design itself is a committed YAML file; this page only ever changes when a new layout is deliberately published.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="project__nav">
+    <a href="index.html" class="project__nav-link">&larr; Back to Index</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script type="importmap">
+{ "imports": {
+    "three": "./dress/vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "./dress/vendor/controls/OrbitControls.js",
+    "three/addons/loaders/GLTFLoader.js": "./dress/vendor/loaders/GLTFLoader.js"
+} }
+</script>
+<script type="module" src="dress/viewer.js"></script>
+<script>
+  fetch('dress/dress-analysis.json').then(r => r.json()).then(a => {
+    const d = a.class_distribution, cov = a.coverage, lay = a.layering;
+    const total = Object.values(d).reduce((x, y) => x + y, 0);
+    const pct = k => (100 * (d[k] || 0) / total).toFixed(0) + '%';
+    const nk = a.meta.neckline;
+    document.getElementById('dressStats').textContent = [
+      `grid          ${a.meta.cell_count} cells (${a.meta.grid.dtheta}° × ${a.meta.grid.ds} mm), width ${a.meta.cell_width_mm[0]}–${a.meta.cell_width_mm[2]} mm`,
+      nk ? `neckline      CF ${nk.cf_height} / peak ${nk.peak_height} @ ${nk.peak_theta}° / side ${nk.side_height} / CB ${nk.cb_height} mm · keep-out ${nk.keepout_mm} mm — the shell's top edge` : '',
+      a.meta.shell_params.split_theta ? `pieces        split at the SOLVED armhole ±${a.meta.shell_params.split_theta}° · armhole band ±${a.meta.shell_params.armhole_band_halfwidth} mm · waist band s [${a.meta.waist_band_s.lo}, ${a.meta.waist_band_s.hi}] mm (derived from the fillet)` : '',
+      a.meta.apex_sections ? `bust apexes   ±${a.meta.apex_sections.apex_theta_deg}° @ v=${a.meta.apex_sections.apex_v} mm (true equal-arc ${a.meta.apex_sections.apex_true_equal_arc_theta_deg}°) · radial falloff, amplitude ${a.meta.apex_sections.amplitude_mm} mm, radius ${a.meta.apex_sections.radius_mm} mm · achieved depth ${a.meta.apex_sections.apex_depth_mm} mm · perimeter frozen (residual ${a.meta.apex_sections.perimeter_residual_mm.toExponential(1)} mm)` : '',
+      a.meta.compound_sections ? `bust cup      max projection v=${a.meta.compound_sections.bust_point_v} · corner radius ${a.meta.compound_sections.bust_point_radius_mm} mm · front/back join at v=${a.meta.compound_sections.join_v} (${a.meta.compound_sections.join_radius_mm} mm radius, ${a.meta.compound_sections.join_angle_deg.toFixed(1)}° tangent break) · perimeter frozen (residual ${a.meta.compound_sections.perimeter_residual_mm.toExponential(1)} mm)` : '',
+      `max class     p213 ${pct('p213')} · p370 ${pct('p370')} · none ${pct('None')}   (tolerance ${a.meta.tolerance_mm} mm; p750 = facet only)`,
+      `layout        ${a.panels.filter(p => !p.is_twin).length} authored → ${a.panels.length} placed (${a.panels.filter(p => p.is_twin).length} derived twins)`,
+      `mirroring     outline asymmetry worst ${a.asymmetry.worst_mm} mm · mean ${a.asymmetry.mean_mm} mm`,
+      `layering      max stack ${lay.max_stack_mm} mm · visible active ${(lay.total_visible_mm2 / 100).toFixed(1)} / ${(lay.total_active_mm2 / 100).toFixed(1)} cm²`,
+      `coverage      shell ${(cov.shell_area_mm2 / 100).toFixed(0)} cm² · uncovered ${cov.uncovered_pct}%`,
+      ...(a.facets || []).map(f => `facet         ${f.panel}: shell deviation max ${f.max_deviation_mm} mm, rms ${f.rms_deviation_mm} mm`),
+      a.electrical ? `electrical    ${a.electrical.total_panels} panels · $${a.electrical.cost_usd} · ${a.electrical.control_lines} control lines · ${a.electrical.sequential_refresh_s}s+ sequential refresh (${a.electrical.refresh_unknown_panels.length} unverified)` : '',
+      a.unverified ? `unverified    ${a.unverified.length} datasheet fields still open (see tools/dress-shell/panels.yaml)` : '',
+    ].filter(Boolean).join('\n');
+  }).catch(() => {
+    document.getElementById('dressStats').textContent = 'could not load dress/dress-analysis.json';
+  });
+</script>
+</body>
+</html>

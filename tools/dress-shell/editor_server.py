@@ -1,0 +1,470 @@
+#!/usr/bin/env python3
+"""Local dev server for the placement editor. NOT part of the deployed
+site — run it by hand:
+
+    python3 tools/dress-shell/editor_server.py [--port 8765]
+
+Serves the editor page, computes the full shell/analysis state, and owns
+the two write paths:
+  POST /api/layout        validate + save layout.yaml (canonical, lossless)
+  POST /api/publish       run the explicit publish step (committed glTF for
+                          /dress) — separate from save on purpose. Publishes
+                          "the shell the editor is actually showing"
+                          (STATE.model.params), which already has shape.yaml
+                          applied if it was present when STATE was built.
+  POST /api/resolve       authoritative re-resolve of an unsaved layout (the
+                          editor's client-side math is a port; the server is
+                          the source of truth)
+  POST /api/reload-shape  re-read shape.yaml, rebuild the shell, and
+                          RE-VALIDATE every placement in layout.yaml against
+                          it — reports named standoff/connector/twin/DAG
+                          regressions, never silently re-seats anything
+                          (shape_impact.report_shape_change_impact)
+  GET  /api/shape-status  which shape.yaml is loaded, when, and whether a
+                          newer one has been committed since (STATE stays
+                          on whatever it loaded until /api/reload-shape is
+                          called — it never silently picks up a change)
+"""
+
+import argparse
+import datetime
+import json
+import sys
+import tempfile
+import traceback
+from dataclasses import replace
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import numpy as np
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+from coords import ShellCoords
+from curvature import (STANDOFF_TOLERANCE_MM, analyze_cells, class_distribution)
+from facets import apply_facets
+from grid import GridSpec, ShellGrid
+from layering import LayeringError, analyze_layering, uncovered_shell_area
+from layout import (AuthoredPanel, LayoutError, SurfaceChart, asymmetry_summary,
+                    dump_layout, load_layout, resolve_layout, save_layout)
+from panels import load_panel_classes
+from neckline import NecklineParams
+from shell import ShellModel, ShellParams, build_meshes, dress_params
+
+VENDOR_DIR = HERE.parents[1] / "dress" / "vendor"
+LAYOUT_PATH = HERE / "layout.yaml"
+SHAPE_PATH = HERE / "shape.yaml"
+
+TOLERANCE_MM = STANDOFF_TOLERANCE_MM   # single named constant (curvature.py)
+GRID_SPEC = GridSpec(dtheta=10.0, ds=25.0)
+
+
+def _is_v3(model):
+    from neckline import NecklineV3
+    return isinstance(model.neckline, NecklineV3)
+
+
+def _apply_shape_if_present(params):
+    """Thin wrapper over shape_state.apply_shape_if_present (now shared
+    with export_gltf.py, so publish is never independent of shape.yaml —
+    see that function's docstring). Kept as a local name since State below
+    and the shape-status reporting need this exact SHAPE_PATH."""
+    from shape_state import apply_shape_if_present
+    return apply_shape_if_present(params, SHAPE_PATH)
+
+
+class State:
+    """Everything static about the shell, computed once per parameter set
+    (startup and every /api/params rebuild)."""
+
+    def __init__(self, params: ShellParams = None):
+        print("building shell + analysis state ...")
+        base = params if params is not None else dress_params()
+        # Shape status captured at THIS moment, independent of
+        # _apply_shape_if_present's own file read below — so /api/state can
+        # answer "which shape.yaml, loaded when" and, on every poll,
+        # whether a NEWER one has since been committed (see shape_status())
+        # rather than silently keeping whatever was true at startup.
+        self.shape_path = SHAPE_PATH
+        self.shape_loaded = SHAPE_PATH.exists()
+        self.shape_mtime_at_load = SHAPE_PATH.stat().st_mtime if self.shape_loaded else None
+        self.state_built_at = datetime.datetime.now(datetime.timezone.utc)
+        self.model = ShellModel(_apply_shape_if_present(base))
+        self.coords = ShellCoords(self.model)
+        self.chart = SurfaceChart(self.model, self.coords)
+        self.classes = load_panel_classes(HERE / "panels.yaml")
+        self.grid = ShellGrid(self.chart, GRID_SPEC)
+        self.analyses = analyze_cells(self.coords, self.chart, self.grid,
+                                      self.classes, TOLERANCE_MM, samples=7)
+        # pristine mesh cache for facet-deviation reporting
+        self._facet_mesh = []
+        for name in ("FRONT", "BACK"):
+            V, _ = build_meshes(self.model)[name]
+            th, s = self.coords.inverse(V, check_mm=None)
+            self._facet_mesh.append((V, np.stack([th, s], axis=-1)))
+        self.static_payload = self._build_static()
+        print(f"ready: {len(self.grid.cells)} cells analyzed")
+
+    def _iso(self, epoch):
+        return (datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).isoformat()
+                if epoch is not None else None)
+
+    def shape_status(self):
+        """"State, visibly, which shape.yaml it loaded and when. If a
+        newer one has been committed since it started, say so rather than
+        silently using a stale shell" — computed FRESH on every call
+        (never baked into static_payload, which is built once at startup/
+        rebuild), so a shape.yaml committed or edited after this server
+        started is caught the moment anyone asks, not silently missed."""
+        now_exists = self.shape_path.exists()
+        now_mtime = self.shape_path.stat().st_mtime if now_exists else None
+        stale = (now_exists != self.shape_loaded) or (
+            now_exists and self.shape_loaded and now_mtime != self.shape_mtime_at_load)
+        try:
+            rel_path = str(self.shape_path.relative_to(HERE.parents[1]))
+        except ValueError:
+            rel_path = str(self.shape_path)
+        return {
+            "path": rel_path,
+            "loaded": self.shape_loaded,
+            "state_built_at": self.state_built_at.isoformat(),
+            "mtime_at_load": self._iso(self.shape_mtime_at_load),
+            "current_mtime": self._iso(now_mtime),
+            "currently_exists": now_exists,
+            "stale": stale,
+        }
+
+    def _mesh(self, name):
+        V, F = build_meshes(self.model)[name]
+        theta, s = self.coords.inverse(V, check_mm=None)
+        fr = self.coords.forward(theta, s)
+        r2 = lambda a: np.round(a, 2).tolist()
+        return {"positions": r2(V.ravel()), "normals": np.round(fr["normal"], 4).ravel().tolist(),
+                "theta_s": np.round(np.stack([theta, s], axis=-1), 4).ravel().tolist(),
+                "indices": F.ravel().tolist()}
+
+    def _build_static(self):
+        m, c = self.model, self.coords
+        # dense table over BOTH segments; the crease at z = 0 is smoothed
+        # across at most one sample interval in the client (server stays
+        # authoritative on drag-end/save)
+        z = np.linspace(m.z_bottom, m.z_top, 1001)
+        prof = {"z": np.round(z, 3).tolist(),
+                "a": np.round(m.a(z), 4).tolist(), "b": np.round(m.b(z), 4).tolist(),
+                "da": np.round(m.da(z), 6).tolist(), "db": np.round(m.db(z), 6).tolist(),
+                # perimeter-equivalent radius r_eq = P/2pi and its slope:
+                # the equal-arc chart metric and the frame's dt/dz term
+                "req": np.round(m.mean_radius(z), 4).tolist(),
+                "dreq": np.round(m.mean_slope(z), 6).tolist(),
+                "s": np.round(c.s_of_z(z), 4).tolist()}
+        grid_lines = {
+            "rings": [np.round(pl, 2).ravel().tolist()
+                      for pl in self.grid.ring_polylines(c)],
+            "radials": [np.round(pl, 2).ravel().tolist()
+                        for pl in self.grid.radial_polylines(c)],
+        }
+        ch = self.chart
+        neck = m.neckline
+        if neck is None:
+            neck_payload = None
+        else:
+            # version-proof: the editor consumes a SAMPLED height table
+            # (0.25 deg pitch, linear interp client-side) instead of
+            # re-implementing whichever neckline version is live
+            th = np.linspace(0.0, 180.0, 721)
+            neck_payload = {
+                "version": type(neck).__name__,
+                "keepout_mm": neck.params.keepout_mm,
+                "v_max": float(neck.v_max),
+                "theta": np.round(th, 4).tolist(),
+                "height": np.round(np.atleast_1d(neck.height(th)), 4).tolist(),
+            }
+        fillet = getattr(m.params.depth_curve, "params", None)
+        return {
+            "tolerance_mm": TOLERANCE_MM,
+            "bounds": {"s_min": c.s_min, "s_max": c.s_max,
+                       "z_bottom": m.z_bottom, "z_top": m.z_top,
+                       "band_s_lo": ch.band_s_lo, "band_s_hi": ch.band_s_hi,
+                       "band_derived": ch.band_derived,
+                       "band_halfwidth": ch.band_halfwidth,
+                       "split_theta": ch.split_theta,
+                       "armhole_band_halfwidth": ch.armhole_band_halfwidth},
+            "params": {
+                "waist_circumference": m.params.waist_circumference,
+                "hem_circumference": m.params.hem_circumference,
+                "drop": m.params.drop, "dome_n": m.params.dome_n,
+                "split_theta": float(getattr(m, "split_theta", 90.0)),
+                "fillet_radius": (None if fillet is None
+                                  else fillet.fillet_radius),
+                "fillet_type": (None if fillet is None else fillet.fillet_type),
+                **({} if not _is_v3(m) else {
+                    "cf_height": m.neckline.params.cf_height,
+                    "peak_height": m.neckline.params.peak_height,
+                    "peak_theta": m.neckline.params.peak_theta,
+                    "side_height": m.neckline.params.side_height,
+                    "cb_height": m.neckline.params.cb_height,
+                    "cf_corner": m.neckline.params.cf_corner,
+                    "rise_bow": m.neckline.params.rise_bow,
+                    "decay_rate": m.neckline.params.decay_rate,
+                }),
+            },
+            "neckline": neck_payload,
+            "grid": {"dtheta": self.grid.spec.dtheta, "ds": self.grid.spec.ds,
+                     "rings": self.grid.rings.tolist(),
+                     "thetas": self.grid.thetas.tolist(),
+                     "stats": {k: v for k, v in self.grid.cell_stats().items()
+                               if not isinstance(v, np.ndarray)},
+                     "lines": grid_lines},
+            "profile": prof,
+            "classes": {cl.class_id: {
+                "outline": [cl.outline_w, cl.outline_h], "thickness": cl.thickness,
+                "active": [cl.active_w, cl.active_h],
+                "active_offset": list(cl.active_offset),
+                "connector": {"origin": list(cl.connector_origin),
+                              "exit": list(cl.connector_exit),
+                              "escape_mm": cl.escape_mm},
+                "chipset": cl.chipset, "palette": list(cl.palette),
+                "refresh_s": cl.refresh_s, "price_usd": cl.price_usd,
+                "requires_facet": cl.requires_facet,
+            } for cl in self.classes.values()},
+            "cells": [{"i": a.cell_index, "k1": a.k1, "k2": a.k2, "K": a.gaussian,
+                       "rmin": None if not np.isfinite(a.r_min) else round(a.r_min, 1),
+                       "max_class": a.max_class,
+                       "standoff": {k: (None if not np.isfinite(v) else round(v, 3))
+                                    for k, v in a.standoff_by_class.items()}}
+                      for a in self.analyses],
+            "class_distribution": {str(k): v for k, v in
+                                   class_distribution(self.analyses).items()},
+            "meshes": {"FRONT": self._mesh("FRONT"), "BACK": self._mesh("BACK")},
+        }
+
+    # -- layout handling -----------------------------------------------------
+
+    def parse_entries(self, raw_entries):
+        """Round the wire format through the real loader so validation is
+        identical to hand-edited files: dump canonical text, load it."""
+        entries = [AuthoredPanel(e["id"], e["class"], float(e["theta"]),
+                                 float(e["s"]), float(e["rotation"]),
+                                 int(e["layer"]), bool(e["mirrored"]))
+                   for e in raw_entries]
+        text = dump_layout(entries)
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
+            fh.write(text)
+            tmp = fh.name
+        return load_layout(tmp)  # raises LayoutError loudly
+
+    def resolve_payload(self, authored):
+        placed, errors = resolve_layout(self.chart, self.classes, authored)
+        try:
+            rep = analyze_layering(self.chart, placed)
+            layer_error = None
+        except LayeringError as exc:
+            rep, layer_error = None, str(exc)
+        uncovered, total = uncovered_shell_area(self.chart, placed,
+                                                n_theta=360, n_s=70)
+        pairs, worst, mean = asymmetry_summary(placed)
+        facet_reports = {}
+        for V, ts in self._facet_mesh:
+            _, reps = apply_facets(self.chart, self.coords, V, ts, placed)
+            for fr in reps:
+                cur = facet_reports.get(fr.panel_id)
+                if cur is None or fr.affected_vertices > cur["affected_vertices"]:
+                    facet_reports[fr.panel_id] = {
+                        "panel": fr.panel_id,
+                        "max_deviation_mm": round(fr.max_deviation_mm, 2),
+                        "rms_deviation_mm": round(fr.rms_deviation_mm, 2),
+                        "affected_vertices": fr.affected_vertices,
+                    }
+        return {
+            "authored": [{"id": a.panel_id, "class": a.class_id, "theta": a.theta,
+                          "s": a.s, "rotation": a.rotation, "layer": a.layer,
+                          "mirrored": a.mirrored} for a in authored],
+            "placed": [{
+                "id": p.panel_id, "class": p.cls.class_id, "theta": p.theta,
+                "s": p.s, "rotation": p.rotation,
+                "content_rotation": p.content_rotation, "layer": p.layer,
+                "is_twin": p.is_twin, "source_id": p.source_id,
+                "valid": p.valid, "problems": list(p.problems),
+                "facet": p.cls.requires_facet,
+                "mount_mm": (rep.mount_mm.get(p.panel_id, 0.0) if rep else 0.0),
+                "visible_pct": (rep.visible_pct.get(p.panel_id, 100.0) if rep else None),
+            } for p in placed],
+            "errors": errors + ([layer_error] if layer_error else []),
+            "layering": None if rep is None else {
+                "max_stack_mm": rep.max_stack_mm,
+                "total_active_mm2": rep.total_active,
+                "total_visible_mm2": rep.total_visible,
+                "buried_connectors": rep.buried_connectors,
+                "overlaps": rep.overlaps,
+            },
+            "coverage": {"uncovered_pct": 100.0 * uncovered / total},
+            "facets": sorted(facet_reports.values(), key=lambda d: d["panel"]),
+            "asymmetry": {"worst_mm": worst, "mean_mm": mean,
+                          "pairs": [[a, b, c] for a, b, c in pairs]},
+        }
+
+
+STATE = None
+
+
+class Handler(BaseHTTPRequestHandler):
+    def _send(self, code, body, ctype="application/json"):
+        data = body if isinstance(body, (bytes, bytearray)) else \
+            json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _file(self, path, ctype):
+        try:
+            self._send(200, path.read_bytes(), ctype)
+        except FileNotFoundError:
+            self._send(404, {"error": f"not found: {path.name}"})
+
+    def do_GET(self):
+        p = self.path.split("?")[0]
+        if p in ("/", "/index.html"):
+            self._file(HERE / "editor" / "index.html", "text/html; charset=utf-8")
+        elif p == "/editor.js":
+            self._file(HERE / "editor" / "editor.js", "text/javascript")
+        elif p == "/surface.js":
+            self._file(HERE / "editor" / "surface.js", "text/javascript")
+        elif p.startswith("/vendor/"):
+            rel = Path(p).relative_to("/vendor")
+            target = (VENDOR_DIR / rel).resolve()
+            if VENDOR_DIR.resolve() not in target.parents and target != VENDOR_DIR.resolve():
+                self._send(403, {"error": "outside vendor dir"})
+            else:
+                self._file(target, "text/javascript")
+        elif p == "/api/state":
+            payload = dict(STATE.static_payload)
+            payload["resolved"] = STATE.resolve_payload(load_layout(LAYOUT_PATH))
+            payload["shape_status"] = STATE.shape_status()   # live, not cached — see docstring
+            self._send(200, payload)
+        elif p == "/api/shape-status":
+            self._send(200, STATE.shape_status())
+        else:
+            self._send(404, {"error": "unknown route"})
+
+    def do_POST(self):
+        global STATE
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            return self._send(400, {"error": "invalid JSON body"})
+        try:
+            if self.path == "/api/params":
+                # live shell parameters (consolidated spec): the neckline
+                # v3 knobs + 4 heights, and the waist fillet. Fillet or
+                # peak-height changes rebuild the depth profiles and
+                # RE-SOLVE the armhole split via dress_params(). Body
+                # measurements (waist, drop, circumference anchors) stay
+                # fixed. Validators fire on rebuild; on failure the old
+                # STATE stays in place.
+                from fillet import FilletParams
+                from shell import dress_params as _dp
+                cur_bod = STATE.model.params.bodice
+                neck_float = ("cf_height", "peak_height", "peak_theta",
+                              "side_height", "cb_height", "rise_bow",
+                              "decay_rate")
+                neck_updates = {k: float(body[k])
+                                for k in neck_float if k in body}
+                if "cf_corner" in body:
+                    neck_updates["cf_corner"] = bool(body["cf_corner"])
+                bod = (replace(cur_bod, **neck_updates)
+                       if neck_updates and cur_bod is not None else cur_bod)
+                cur_f = getattr(STATE.model.params.depth_curve, "params", None)
+                if cur_f is not None:
+                    fp = FilletParams(
+                        fillet_radius=float(body.get("fillet_radius",
+                                                     cur_f.fillet_radius)),
+                        fillet_type=str(body.get("fillet_type",
+                                                 cur_f.fillet_type)))
+                    new_params = _dp(fillet_params=fp, bodice=bod)
+                else:
+                    new_params = replace(STATE.model.params, bodice=bod)
+                STATE = State(new_params)   # ShellError -> 422, STATE kept
+                self._send(200, {"rebuilt": True,
+                                 "params": STATE.static_payload["params"]})
+            elif self.path == "/api/resolve":
+                authored = STATE.parse_entries(body.get("panels", []))
+                self._send(200, STATE.resolve_payload(authored))
+            elif self.path == "/api/layout":
+                authored = STATE.parse_entries(body.get("panels", []))
+                save_layout(LAYOUT_PATH, authored)
+                self._send(200, {"saved": True,
+                                 "resolved": STATE.resolve_payload(authored)})
+            elif self.path == "/api/publish":
+                import export_gltf
+                # publish the shell the editor is actually showing
+                sidecar = export_gltf.main(params=STATE.model.params)
+                self._send(200, {"published": True,
+                                 "summary": {
+                                     "panels": len(sidecar["panels"]),
+                                     "uncovered_pct": sidecar["coverage"]["uncovered_pct"],
+                                     "max_stack_mm": sidecar["layering"]["max_stack_mm"],
+                                 }})
+            elif self.path == "/api/reload-shape":
+                # "When a new shape.yaml is applied, re-validate every
+                # existing placement against the new shell and report
+                # what broke. Do not silently re-seat them." This is that
+                # integration point: re-read shape.yaml, rebuild the
+                # shell, and diff EVERY layout.yaml placement between the
+                # shell this server was showing a moment ago and the one
+                # it's showing now — before the caller does anything else
+                # with the new STATE.
+                from shape_impact import report_shape_change_impact
+                old_params = STATE.model.params
+                new_state = State(old_params)   # re-reads SHAPE_PATH fresh; see docstring above
+                authored = load_layout(LAYOUT_PATH)
+                impact = report_shape_change_impact(
+                    old_params, new_state.model.params, STATE.classes, authored)
+                STATE = new_state
+                self._send(200, {
+                    "reloaded": True,
+                    "shape_status": STATE.shape_status(),
+                    "impact": {
+                        "clean": impact.clean,
+                        "standoff_regressions": impact.standoff_regressions,
+                        "now_exceeds_tolerance": impact.now_exceeds_tolerance,
+                        "new_connector_or_outline_problems": impact.new_connector_or_outline_problems,
+                        "twin_became_invalid": impact.twin_became_invalid,
+                        "dag_broke": impact.dag_broke,
+                        # None (not NaN) when the DAG is invalid — NaN isn't
+                        # valid JSON and would break the client's parse
+                        "old_max_stack_mm": (impact.old_max_stack_mm
+                                             if impact.old_dag_valid else None),
+                        "new_max_stack_mm": (impact.new_max_stack_mm
+                                             if impact.new_dag_valid else None),
+                        "summary_lines": impact.summary_lines(),
+                    },
+                })
+            else:
+                self._send(404, {"error": "unknown route"})
+        except (LayoutError, LayeringError, KeyError, TypeError, ValueError) as exc:
+            self._send(422, {"error": str(exc)})
+        except Exception:
+            self._send(500, {"error": traceback.format_exc()})
+
+    def log_message(self, fmt, *args):
+        pass  # quiet
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--port", type=int, default=8765)
+    args = ap.parse_args()
+    global STATE
+    STATE = State()
+    srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    print(f"editor: http://127.0.0.1:{args.port}/  (Ctrl-C to stop)")
+    srv.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

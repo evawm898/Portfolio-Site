@@ -1,0 +1,15 @@
+SKIRT PANELIZER — placement report (v1: one course, one panel size)
+
+skirt        waist 660 mm | hem 1100 mm | slant 300 mm
+development  annulus inner R 450.00 mm | outer R 750.00 mm | sweep 84.03 deg
+cone         half-angle 13.50 deg | 3D radius at waist 105.0 mm, at hem 175.1 mm
+
+panel        'eink_42x90'  outline 42 x 90 mm, active 36.4 x 82.2 mm
+course       9 panels | top edge 80 mm below waist (developed R 530.0 mm) | transform 0 deg on all panels
+symmetry     active-area centers at uniform pitch 9.337 deg, mirror-symmetric about CF
+
+coverage     12.9% of the fabric (9 x 3780 mm^2 of 264000 mm^2)
+chord gap    max 1.73 mm at the waist-side edge (local transverse R 127.2 mm) | tolerance 2 mm
+tail run     80.0 mm per panel x 9 = 720.0 mm total (straight run, exit point to waist arc)
+
+warnings     none
