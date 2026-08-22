@@ -244,6 +244,43 @@ const CONFIGS = [
     { id: 'crossSection', value: '1' }, { id: 'crossSectionTaper', value: '0' }, { id: 'petalCup', value: '0' },
     { id: 'variance', value: '0.6' },
   ] },
+  // ===== SPINE CURL: bends the spine along its LENGTH (as opposed to CROSS-SECTION,
+  // which bends it across its WIDTH) — flat -> gentle arc -> full circle -> a
+  // tight multi-turn fiddlehead/crozier. Two axes: curlAmount (strength/direction)
+  // and curlBias (0 uniform/circular -> 1 tip-loaded crozier). A tight, tip-loaded
+  // coil pushes spineSampleCount/outlineN well past their defaults (see
+  // flower-geometry.js), so this is the real stress case for that densification —
+  // and, combined with CROSS-SECTION, the spider-chrysanthemum case (quilled +
+  // fiddleheaded) the two axes have to compose for.
+  { label: 'reset to a clean strap petal (for SPINE CURL block)', smoke: true, set: [
+    { id: 'petalShape', value: 'strap', evt: 'change' },
+    { id: 'petalCount', value: '6' }, { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
+    { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' },
+    { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'edgeTermination', value: 'meet', evt: 'change' },
+    { id: 'petalCup', value: '0' }, { id: 'crossSection', value: '0' }, { id: 'crossSectionTaper', value: '0' },
+    { id: 'curlAmount', value: '0' }, { id: 'curlBias', value: '0' },
+    { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' },
+    { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' },
+    { id: 'stemBudMode', value: 'none', evt: 'change' },
+  ] },
+  { label: 'SPINE CURL gentle arc (0.3, uniform)', set: [{ id: 'curlAmount', value: '0.3' }] },
+  { label: 'SPINE CURL full circle (1, uniform)', set: [{ id: 'curlAmount', value: '1' }, { id: 'curlBias', value: '0' }] },
+  { label: 'SPINE CURL FIDDLEHEAD (1, tip-loaded crozier)', smoke: true, set: [{ id: 'curlAmount', value: '1' }, { id: 'curlBias', value: '1' }] },
+  { label: 'SPINE CURL reverse direction fiddlehead (-1, tip-loaded)', set: [{ id: 'curlAmount', value: '-1' }] },
+  { label: 'SPINE CURL fiddlehead + solid sepals (rim/solid-blade densification)', smoke: true, set: [{ id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalStyle', value: 'solid', evt: 'change' }] },
+  { label: 'SPINE CURL fiddlehead + PETALOID FILL centre (inherited curl on tiny blades)', smoke: true, set: [
+    { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'centerArch', value: 'petaloid', evt: 'change' },
+    { id: 'fillPetalCount', value: '60' }, { id: 'fillBloomAngle', value: '30' },
+    { id: 'fillOuterSize', value: '0.2' }, { id: 'fillInnerSize', value: '0.08' }, { id: 'fillDensity', value: '0.5' },
+  ] },
+  { label: 'SPINE CURL fiddlehead + max petal count (30, triangle-budget stress)', smoke: true, set: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'petalCount', value: '30' }] },
+  { label: 'SPINE CURL + CROSS-SECTION composed (quilled fiddlehead, spider-mum)', smoke: true, set: [
+    { id: 'petalCount', value: '10' }, { id: 'crossSection', value: '1' }, { id: 'crossSectionTaper', value: '0' },
+  ] },
+  { label: 'SPINE CURL mid bias (0.5) bilateral per-slot (Petal 1)', set: [
+    { id: 'crossSection', value: '0' }, { id: 'curlAmount', value: '0.4' }, { id: 'curlBias', value: '0.5' },
+    { id: 'bloomType', value: 'bilateral', evt: 'change' }, { id: 'bilCurlAmount1', value: '-1' }, { id: 'bilCurlAmount2', value: '1' }, { id: 'bilCurlAmount3', value: '0' },
+  ] },
 ];
 
 // ===== Receptacle JUNCTION axis matrix: PROFILE x CONSTRUCTION x COLLAR =====

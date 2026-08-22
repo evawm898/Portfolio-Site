@@ -22,7 +22,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import {
   lerp, clamp, smootherstep, mulberry32,
-  buildSpine, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone,
+  buildSpine, spineCurlPeakRate, spineSampleCount, buildSilhouette, buildBlade, buildVenation, buildVoronoi, buildStrands, buildBone,
   buildJaggedEdge, buildRuffledEdge, buildScallopEdge,
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
@@ -1046,7 +1046,8 @@ function resolveParams(ui) {
     tip: ui.tip,                                 // TIP SHAPE: sharpness of every tip (apex + teeth)
     tipFineness: ui.tipFineness,                 // TIP FINENESS: extends the outline's tip sharpness ceiling, relative to petal width
     bloom: ui.bloom * DEG,
-    curl: ui.centerCurve * CENTER_CURVE_SCALE,   // centre curve -> spine curvature
+    curlAmount: ui.curlAmount,                   // SPINE CURL: flat -> arc -> circle -> fiddlehead
+    curlBias: ui.curlBias,                       // SPINE CURL: uniform (hoop) -> tip-loaded (crozier)
     edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
     edgeProfile: ui.edgeProfile,                 // out-of-plane edge lift, parallel to the centre curve
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
@@ -1163,7 +1164,13 @@ function marginStrands(P) {
   // pattern's boundary derives from (via ribInnerEdge), so the rendered rib and
   // what infill clips to can never diverge. Reads P.bundleTightness/P.flareRate
   // internally (via marginFlareFactor) rather than taking them as params.
-  const nMar = 30;
+  // SPINE CURL needs this centerline as densely sampled as everything else that
+  // traces the length (outlineN in buildPetalInto) — computed internally, not
+  // via an extra parameter, so a caller reaching in from outside this module
+  // (tools/verify-geometry-quality.mjs's injected hook shares this module scope
+  // and calls marginStrands(P, ...) with two OTHER positional args already —
+  // adding a meaningful 2nd param here would silently break that call).
+  const nMar = spineCurlPeakRate(P) > 0 ? Math.max(30, spineSampleCount(P)) : 30;
   const strands = [];
   for (const side of [1, -1]) {
     const points = [];
@@ -1188,7 +1195,17 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   if (DEBUG_FIELDS && !acc.exportMode && !P.solidBlade) {
     debugPetals.push({ P, spine, az, baseHeight, radialOffset, tilt });
   }
-  const outline = buildSilhouette(P, P.outlineSteps || 56);   // leaves use a lighter margin
+  // SPINE CURL densifies the flattened outline/rib polyline the same way it
+  // densifies the spine itself (spineSampleCount, shared with buildSpine so
+  // the two can't drift apart) — a tip-loaded crozier needs far more of its
+  // u-samples right at the tip than a flat/gently-curved petal does. Only
+  // engaged when curl is actually turning the spine (spineCurlPeakRate > 0),
+  // so parts that don't use SPINE CURL (leaves, sepals, petaloid fill) keep
+  // their existing outlineSteps exactly — no regression for out-of-scope parts.
+  const outlineN = spineCurlPeakRate(P) > 0
+    ? Math.max(P.outlineSteps || 56, spineSampleCount(P))
+    : (P.outlineSteps || 56);
+  const outline = buildSilhouette(P, outlineN);   // leaves use a lighter margin
   // INFILL: leaf venation (default) or a bilaterally-symmetric Voronoi mesh.
   // Both return { veins, nodes } in flattened space, rendered identically below.
   // SOLID-BLADE petals (solid sepals, petaloid-fill centres) skip this entirely —
@@ -1252,7 +1269,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // rib tube actually sits. Off for FADE and for slab/blade infills.
   if (ven && ven.veins && (P.infillType === 'veins' || P.infillType === 'bone' || P.infillType === 'spacecol')
       && P.edgeTermination && P.edgeTermination !== 'fade') {
-    const term = terminateEdges(ven.veins, ribMarginPolyline(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist);
+    const term = terminateEdges(ven.veins, ribMarginPolyline(P, outlineN), P, P.edgeTermination, P.captureDist);
     for (const v of term.veins) ven.veins.push(v);
     for (const nd of term.nodes) ven.nodes.push(nd);
   }
@@ -1276,7 +1293,15 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     // a lighter grid than a sepal; defaults reproduce the original 26x12 exactly.
     // Tiny petaloid-fill petals pass a coarser grid and skip the rim (bladeNoRim) to
     // stay cheap at high counts. The blade itself is watertight without the rim.
-    const { rows } = buildBlade(P, { uSteps: P.bladeUSteps || 26, vSteps: P.bladeVSteps || 12 });
+    // SPINE CURL (inherited by petaloid-fill centres from the outer petal — see
+    // buildPetaloidFillInto) still needs enough u-resolution to trace a coiled
+    // centre without faceting, so raise the floor when curl is active — capped
+    // well below spineSampleCount's own ceiling so 100+ fill petals can't blow
+    // the triangle budget on their own.
+    const bladeU = spineCurlPeakRate(P) > 0
+      ? Math.max(P.bladeUSteps || 26, Math.min(outlineN, 40))
+      : (P.bladeUSteps || 26);
+    const { rows } = buildBlade(P, { uSteps: bladeU, vSteps: P.bladeVSteps || 12 });
     const grid = rows.map((row) => row.map((pt) => ({
       p: place(mapPointToSurface(pt, P, spine)),
       n: placeDir(surfaceNormalAt(pt, P, spine), az, tilt),
@@ -1292,7 +1317,7 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
       // Solid blades keep the single-valued grid (clefts here need the masked
       // triangulation, a clean follow-up on the SAME mask/contour machinery), so
       // the rim must trace the un-clefted outline to stay flush with the blade.
-      const rim = (cleftConfig(P) ? buildSilhouette({ ...P, cleftDepth: 0 }, P.outlineSteps || 56) : outline).map(toWorld);
+      const rim = (cleftConfig(P) ? buildSilhouette({ ...P, cleftDepth: 0 }, outlineN) : outline).map(toWorld);
       rim.push(rim[0]);                              // close the loop at the base
       acc.addTube(rim, ribRadius(0, P, false), 0, P.rimSegments || RADIAL_SEGMENTS);
     }
@@ -1372,7 +1397,18 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   const rollStep = rollMag > ROLL_DENSIFY_MAG
     ? clamp(ROLL_STEP_MAX * ROLL_DENSIFY_MAG / rollMag, ROLL_STEP_MIN, ROLL_STEP_MAX)
     : Infinity;
-  const veinStep = Math.min(ruffleStep, rollStep);
+  // SPINE CURL bends real curvature into the spine itself (not just the cross
+  // section), and a tip-loaded crozier turns fastest right at the tip — a
+  // straight vein-ribbon chord between two coarse stations would visibly cut
+  // the corner there. Same [ROLL_STEP_MIN, ROLL_STEP_MAX] range, sized from
+  // the worst-case turn rate (spineCurlPeakRate, owned by flower-geometry.js
+  // so this can't drift from what buildSpine itself resolves to smooth).
+  const CURL_DENSIFY_DEG = 8;   // matches SPINE_SAMPLE_DEG_PER_SEG in flower-geometry.js
+  const curlPeakRate = spineCurlPeakRate(P);
+  const curlStep = curlPeakRate > 1e-6
+    ? clamp((CURL_DENSIFY_DEG * Math.PI / 180 / curlPeakRate) * P.L, ROLL_STEP_MIN, ROLL_STEP_MAX)
+    : Infinity;
+  const veinStep = Math.min(ruffleStep, rollStep, curlStep);
   const densify = veinStep < Infinity;
   const lamHalf = P.tubeRadius * LAMINA_HALF;    // lamina half-thickness (flat sheet)
   for (const vein of ven.veins) {
@@ -1596,7 +1632,9 @@ function buildPetaloidFillInto(acc, P, centerHeight, rng) {
   const shapeBase = {
     ...P,
     bloom,
-    curl: P.curl,                                  // centre curve (scale-invariant angle)
+    // curlAmount/curlBias carry through from ...P unchanged (SPINE CURL is a
+    // scale-invariant angle, like the old centre curve it replaced), so a
+    // fiddleheaded outer petal packs a fiddleheaded centre too.
     edgeCurve: 0, edgeProfile: 0,                  // drop billow / profile lift
     tipStyle: 'clean', edgeNoise: 0, edgeNoiseScale: 0,
     tipLength: 0, tipRegion: 0, tipFrequency: 1, tipIrregularity: 0,
@@ -1784,11 +1822,11 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // venation density, a tighter opening angle, and no exposed stamens.
   const voronoi = ui.infillType === 'voronoi';
   // TIGHT: force a closed teardrop — near-vertical petals whose tips curl INWARD
-  // (negative centre curve) and cup around the axis, so they wrap shut with minimal
+  // (negative spine curl) and cup around the axis, so they wrap shut with minimal
   // separation. EARLY: a faithful, just smaller + simpler + slightly-more-closed
   // copy of the current bloom (its own petal shape / curve / cup carried through).
   const pose = tight
-    ? { bloom: 12, tightness: 0.88, elevation: 0.32, centerCurve: -0.5, petalCup: Math.max(ui.petalCup, 0.45) }
+    ? { bloom: 12, tightness: 0.88, elevation: 0.32, curlAmount: -0.5, petalCup: Math.max(ui.petalCup, 0.45) }
     : { bloom: 34, tightness: 0.66, elevation: 0.15 };
   const budUi = {
     ...ui,
@@ -2761,7 +2799,7 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     const over = (k) => ({
       edge: [ui.bilEdge1, ui.bilEdge2, ui.bilEdge3][k - 1],
       W: [ui.bilWidth1, ui.bilWidth2, ui.bilWidth3][k - 1],
-      curl: [ui.bilCenterCurve1, ui.bilCenterCurve2, ui.bilCenterCurve3][k - 1] * CENTER_CURVE_SCALE,
+      curlAmount: [ui.bilCurlAmount1, ui.bilCurlAmount2, ui.bilCurlAmount3][k - 1],
       edgeCurve: [ui.bilEdgeCurve1, ui.bilEdgeCurve2, ui.bilEdgeCurve3][k - 1],
       edgeProfile: [ui.bilEdgeProfile1, ui.bilEdgeProfile2, ui.bilEdgeProfile3][k - 1],
       scale: [ui.bilScale1, ui.bilScale2, ui.bilScale3][k - 1],
@@ -2823,9 +2861,11 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     let Pp = P;
     if (pl.over) {
       // Scale grows the whole petal (length + width proportionally) from its base;
-      // curl / edgeCurve are shape ratios, so they stay put under scale.
+      // curlAmount / edgeCurve are shape ratios, so they stay put under scale.
+      // curlBias has no per-slot control — all three fan petals share the main
+      // Curl bias slider (P.curlBias, already carried through by ...P).
       const s = pl.over.scale;
-      Pp = { ...P, L: P.L * s, W: pl.over.W * s, curl: pl.over.curl, edgeCurve: pl.over.edgeCurve, edgeProfile: pl.over.edgeProfile };
+      Pp = { ...P, L: P.L * s, W: pl.over.W * s, curlAmount: pl.over.curlAmount, edgeCurve: pl.over.edgeCurve, edgeProfile: pl.over.edgeProfile };
       if (pl.over.edge && pl.over.edge !== 'default') Pp.tipStyle = pl.over.edge;
     }
     // LAYER transforms — identity for layer 0 (scale 1, all deltas 0), so the outer
@@ -3757,7 +3797,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 17;
+const CURRENT_SCHEMA = 18;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3967,7 +4007,32 @@ function migrateV16toV17(p) {
   delete out.gatherRadius; delete out.mergeStart; delete out.mergeRate;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17];
+// v17 -> v18: SPINE CURL replaces Center curve. Center curve only ever eased
+// toward a fixed final angle (dPhi/du -> 0 at the tip, so curvature actually
+// fell to zero there) — it could never produce a fiddlehead. It's replaced by
+// CURL AMOUNT (same -1..1 slot, same slider position/default) + a new CURL
+// BIAS (uniform circular arc -> tip-loaded crozier; 0 is the closest reading
+// of the old shape, though not an exact match — the old curve eased at both
+// ends, the new one only at the base). A design's centerCurve value carries
+// over verbatim as curlAmount so it isn't reset to a flat petal; curlBias
+// defaults to 0. This is a deliberate, versioned visual change (per
+// CLAUDE.md, "never a silent shift"), not a byte-identical migration. Same
+// rename for the three bilateral per-petal slots (bilCenterCurve1..3 ->
+// bilCurlAmount1..3), which have no per-slot bias — they read the shared
+// curlBias, defaulted the same way.
+function migrateV17toV18(p) {
+  const out = { ...p };
+  if (out.curlAmount == null) out.curlAmount = out.centerCurve != null ? out.centerCurve : DEFAULTS.curlAmount;
+  delete out.centerCurve;
+  for (const k of [1, 2, 3]) {
+    const oldKey = `bilCenterCurve${k}`, newKey = `bilCurlAmount${k}`;
+    if (out[newKey] == null) out[newKey] = out[oldKey] != null ? out[oldKey] : DEFAULTS[newKey];
+    delete out[oldKey];
+  }
+  if (out.curlBias == null) out.curlBias = DEFAULTS.curlBias;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17, migrateV17toV18];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build

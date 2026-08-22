@@ -161,7 +161,7 @@ if (SWEEP) {
     width: 0.1, taper: 1, tip: 1, tipFineness: 1,
     clawLength: 0, clawWidth: 0.3, shoulder: 0.5,
     cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3,
-    centerCurve: 0.2, edgeCurve: 0, edgeProfile: 0, petalCup: 0,
+    curlAmount: 0.2, edgeCurve: 0, edgeProfile: 0, petalCup: 0,
     crossSection: 1, crossSectionTaper: 0,
   };
   for (const pat of PATTERNS) {
@@ -211,10 +211,16 @@ window.__gq = async function() {
   const P = resolveParams(ui);
   const cfg = cleftConfig(P);
   const seed = 12345;
+  // SPINE CURL densifies the outline/rib-margin sampling the same way flower.js's
+  // buildPetalInto does (outlineN there) — read via the same exported helpers so
+  // this diagnostic can't drift from what the real renderer resolves to.
+  const outlineN = G.spineCurlPeakRate(P) > 0
+    ? Math.max(P.outlineSteps || 56, G.spineSampleCount(P))
+    : (P.outlineSteps || 56);
 
   // MATERIAL BOUNDARY — the true cleft-aware outline of the printed material (closed
   // ring). buildSilhouette resolves clefts via the marching-squares contour.
-  const material = buildSilhouette(P, P.outlineSteps || 56);
+  const material = buildSilhouette(P, outlineN);
   if (!material || material.length < 3) return { error: 'empty-silhouette' };
   const n = material.length;
   const matRing = [{ points: material.concat([material[0]]) }];   // closed for seg distance
@@ -294,7 +300,7 @@ window.__gq = async function() {
       // onto ribMarginPolyline (the rib's actual inner edge), not 'material' (the true
       // outline) — using 'material' here was the gate's OWN stale copy of the bug this
       // metric exists to catch, pulling free tips out past where the rib really sits.
-      try { const term = terminateEdges(veins, G.ribMarginPolyline(P, P.outlineSteps || 56), P, P.edgeTermination, P.captureDist); for (const v of term.veins) veins.push(v); } catch (e) {}
+      try { const term = terminateEdges(veins, G.ribMarginPolyline(P, outlineN), P, P.edgeTermination, P.captureDist); for (const v of term.veins) veins.push(v); } catch (e) {}
     }
   }
   let degree1 = 0, onMargin = 0, atBase = 0, freeEnds = 0;

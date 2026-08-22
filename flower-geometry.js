@@ -208,17 +208,28 @@ export function petalHalfWidth(u, P) {
    from a small base radius r0 at height 0 and arcs outward + upward. Its
    tangent angle measured FROM THE VERTICAL AXIS is:
 
-       phi(u) = bloom + curl * smootherstep(u)
+       phi(u) = bloom + curl * smootherstep(u) + spineCurlAngle(u, P)
 
      - `bloom` (radians) is the launch angle: 0 = straight up (closed bud),
        ~pi/2 = straight out (fully open / flat flower). This is the "bloom
        angle" slider and is deliberately independent of petal shape.
-     - `curl` adds a gentle progressive outward bend toward the tip so even
-       a bud reads as an organic teardrop rather than a stiff spike.
+     - `curl` (legacy, radians) adds a gentle progressive outward bend toward
+       the tip so even a bud reads as an organic teardrop rather than a stiff
+       spike. Only leaves and sepals still set this directly (see
+       buildLeafInto / sepal construction in flower.js) — the outer petal's
+       "Center curve" slider was retired in favour of SPINE CURL below, so
+       P.curl is 0 (a no-op) for every petal built through resolveParams.
+     - `spineCurlAngle` is SPINE CURL: a from-scratch axis, independent of the
+       legacy `curl` term, that bends the spine along its LENGTH into a
+       fiddlehead/crozier (see below). Summing it with the legacy term is
+       safe because in practice exactly one of the two is ever non-zero for
+       a given part (petals set curlAmount/curlBias and leave P.curl at 0;
+       leaves/sepals set P.curl and leave curlAmount at 0).
 
    Because the curve is parameterised so that |dP/du| = L (constant speed),
    the arc length from the base is exactly L*u. That identity is what lets
-   the flattened lattice space use X = L*u with no arc-length inversion.
+   the flattened lattice space use X = L*u with no arc-length inversion. This
+   holds for ANY phi(u), so SPINE CURL doesn't disturb it.
 
    Each sample stores the spine position (s, y), the inward-pointing surface
    normal (nx, ny) used for cupping, and u. Normal = tangent rotated +90deg:
@@ -226,14 +237,92 @@ export function petalHalfWidth(u, P) {
    which points up-and-inward, so cupping opens toward the flower's centre.
    ------------------------------------------------------------------- */
 
-export function buildSpine(P, n = 64) {
+// SPINE CURL: bends the spine along its LENGTH (as opposed to CROSS-SECTION
+// ROLL, which bends it across its WIDTH into a tube) — flat -> gentle arc ->
+// full circle -> a tight multi-turn fiddlehead/crozier. Two controls:
+//   P.curlAmount (signed, -1..1): total curl strength; sign picks direction.
+//   P.curlBias    (0..1): where the curvature concentrates.
+//     0 = UNIFORM  — constant curvature along the whole length, i.e. a true
+//         circular arc (a real hoop at |curlAmount| = 1).
+//     1 = TIP-LOADED — curvature is near zero through the base and rises
+//         sharply toward the tip: a logarithmic-spiral-like crozier, tight at
+//         the tip and opening out toward the base, per the botanical
+//         fiddlehead this models (NOT a constant-curvature hoop).
+// Implementation: cumulative turning angle Phi(u) = total * u^(p+1), so
+// curvature kappa(u) = dPhi/du = total*(p+1)*u^p — constant at p=0 (bias=0)
+// and strictly increasing in u for p>0 (bias>0), which is exactly the
+// "increasing curvature toward the tip" a crozier needs. The exponent form
+// also gives an exact closed-form integral (no numerical integration needed)
+// and Phi(0)=0 always, so the spine still launches at exactly the bloom
+// angle regardless of curl.
+//   TOTAL_MAX interpolates 360 deg (bias=0, so |curlAmount|=1 closes a single
+// full circle) up to 720 deg (bias=1, so |curlAmount|=1 winds a ~2-turn
+// crozier) — the range this feature was asked to cover.
+const SPINE_CURL_TURNS_UNIFORM = 2 * Math.PI;   // 360 deg: |curlAmount|=1, curlBias=0 -> one closed circle
+const SPINE_CURL_TURNS_TIPLOAD = 4 * Math.PI;   // 720 deg: |curlAmount|=1, curlBias=1 -> ~2-turn crozier
+const SPINE_CURL_BIAS_POWER    = 4;              // exponent p at curlBias=1
+
+// Total signed cumulative turn (radians) SPINE CURL contributes by u=1 — the
+// magnitude other code (adaptive spine sampling, vein/blade densification)
+// needs to know how tightly this petal is going to coil.
+export function spineCurlTotal(P) {
+  const amount = clamp(P.curlAmount || 0, -1, 1);
+  if (!amount) return 0;
+  const bias = clamp(P.curlBias != null ? P.curlBias : 0, 0, 1);
+  const totalMax = lerp(SPINE_CURL_TURNS_UNIFORM, SPINE_CURL_TURNS_TIPLOAD, bias);
+  return amount * totalMax;
+}
+
+// Cumulative SPINE CURL turning angle at station u (radians, signed). 0 at
+// u=0 (base tangent stays exactly at the bloom angle) rising to
+// spineCurlTotal(P) at u=1.
+export function spineCurlAngle(u, P) {
+  const total = spineCurlTotal(P);
+  if (!total) return 0;
+  const bias = clamp(P.curlBias != null ? P.curlBias : 0, 0, 1);
+  const p = SPINE_CURL_BIAS_POWER * bias;
+  return total * Math.pow(clamp(u, 0, 1), p + 1);
+}
+
+// Worst-case local turn rate dPhi/du (radians per unit u), always at u=1 since
+// curvature is constant (bias=0) or strictly increasing toward the tip
+// (bias>0). Callers outside this module (vein/blade densification in
+// flower.js) read this instead of re-deriving SPINE_CURL_BIAS_POWER
+// themselves — one owner for the curve's shape, per the registration rule.
+export function spineCurlPeakRate(P) {
+  const total = Math.abs(spineCurlTotal(P));
+  if (!total) return 0;
+  const bias = clamp(P.curlBias != null ? P.curlBias : 0, 0, 1);
+  const p = SPINE_CURL_BIAS_POWER * bias;
+  return total * (p + 1);
+}
+
+// How many spine samples buildSpine needs to stay smooth: enough that no
+// segment turns through more than ~8 degrees, the same faceting bar the
+// tube cross-section (RADIAL_SEGMENTS) already ships at. A tight, tip-loaded
+// crozier turns fastest right at the tip (kappa(1) = total*(p+1)), so that's
+// the worst-case segment to protect. buildSpine's own cost is negligible
+// (a polyline, not triangles), so it's fine to size generously.
+const SPINE_SAMPLE_DEG_PER_SEG = 8;
+const SPINE_SAMPLES_MIN = 64;    // unchanged from the old fixed default
+const SPINE_SAMPLES_MAX = 480;   // generous cap; cost here is just polyline points
+export function spineSampleCount(P) {
+  const peakTurnRate = spineCurlPeakRate(P);       // dPhi/du at u=1, the steepest point
+  if (!peakTurnRate) return SPINE_SAMPLES_MIN;
+  const maxRad = SPINE_SAMPLE_DEG_PER_SEG * Math.PI / 180;
+  const needed = Math.ceil(peakTurnRate / maxRad) + 1;
+  return clamp(Math.max(SPINE_SAMPLES_MIN, needed), SPINE_SAMPLES_MIN, SPINE_SAMPLES_MAX);
+}
+
+export function buildSpine(P, n) {
+  if (!n) n = spineSampleCount(P);
   const samples = [];
   const du = 1 / (n - 1);
   let s = P.r0;
   let y = 0;
   for (let i = 0; i < n; i++) {
     const u = i * du;
-    const phi = P.bloom + P.curl * smootherstep(u);
+    const phi = P.bloom + (P.curl || 0) * smootherstep(u) + spineCurlAngle(u, P);
     samples.push({
       u, s, y,
       nx: -Math.cos(phi),

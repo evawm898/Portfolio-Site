@@ -45,7 +45,7 @@ fs.mkdirSync(OUT, { recursive: true });
 // ---- shared base config (Standard defaults, radial/8-petal bloom, no sepals/stem) ----
 const BASE = {
   bloomType: 'radial', petalCount: 8, bloom: 78, tightness: 0.3, elevation: 0.06,
-  width: 0.9, taper: 0.35, tip: 0.5, centerCurve: 0.4, petalCup: 0, shoulder: 0.5,
+  width: 0.9, taper: 0.35, tip: 0.5, curlAmount: 0.4, petalCup: 0, shoulder: 0.5,
   clawLength: 0, cleftDepth: 0, centerArch: 'disc',
   sepalsType: 'none', stemType: 'none',
 };
