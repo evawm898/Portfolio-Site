@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dress Shape Editor — Eva Maskalenko</title>
-<meta name="description" content="Browser-only dress-shell workflow: trace a garment from photos, edit the shell curves live, and place rigid panels — three stages, one page, no server.">
+<meta name="description" content="Browser-only dress-shell workflow: upload calibrated photos, shape the shell live, and export it as the artifact panels get placed on — no server.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
@@ -56,7 +56,8 @@
   hr { border: none; border-top: 1px solid var(--line); margin: 8px 12px; }
   .banner { background: color-mix(in srgb, var(--amber) 14%, var(--bg)); border: 1px solid var(--amber);
             color: var(--ink); padding: 8px 10px; margin: 10px 12px; border-radius: 3px; line-height: 1.6; }
-  /* A lost named feature is a different CATEGORY of event than a worse
+  .banner.commit { background: color-mix(in srgb, var(--petrol) 14%, var(--bg)); border-color: var(--petrol); }
+  /* A lost named feature is a different CATEGORY of event than a
      residual number — this must not read as just another stat. */
   .featureWarn { background: color-mix(in srgb, var(--red) 20%, var(--bg)); border: 1px solid var(--red);
                  color: var(--ink); padding: 6px 8px; margin: 2px 0 4px; border-radius: 3px; line-height: 1.6; }
@@ -74,11 +75,13 @@
   .miniBtn { font-size: 10px; padding: 2px 6px; margin: 2px 6px 2px 0; }
   input[type="number"].mmInput { width: 4.5em; background: var(--bg); color: var(--ink);
                                  border: 1px solid var(--line); font: inherit; padding: 1px 4px; }
+  input[type="text"].labelInput { background: var(--bg); color: var(--ink);
+                                  border: 1px solid var(--line); font: inherit; padding: 2px 6px; width: 16em; }
 
   /* -- tab shell ------------------------------------------------------- */
   #tabBar { display: flex; border-bottom: 1px solid var(--line); }
   .tabBtn { flex: 1; margin: 0; border: none; border-radius: 0; background: var(--panel);
-            color: var(--dim); padding: 10px 6px; font-size: 11px; letter-spacing: 0.06em;
+            color: var(--dim); padding: 10px 4px; font-size: 10.5px; letter-spacing: 0.05em;
             text-transform: uppercase; border-bottom: 2px solid transparent; }
   .tabBtn.current { color: var(--petrol); border-bottom-color: var(--petrol); background: var(--bg); }
   .tabBtn:hover { color: var(--ink); }
@@ -96,119 +99,100 @@
   .layerRow button[data-layer="waist"].active { border-color: var(--violet); color: var(--violet); }
   .layerRow button[data-layer="armhole"].active { border-color: var(--sky); color: var(--sky); }
   .fileRow input[type="file"] { color: var(--dim); font: inherit; font-size: 10px; max-width: 190px; }
+  .checklist { padding: 2px 12px 8px; line-height: 1.9; }
+  .checklist .done { color: var(--petrol); }
+  .checklist .todo { color: var(--dim); }
 
   /* -- backward-navigation confirm modal -------------------------------- */
   #navModal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 50;
               display: none; align-items: center; justify-content: center; }
   #navModal.open { display: flex; }
   .modalBox { background: var(--panel); border: 1px solid var(--red); border-radius: 4px;
-              max-width: 480px; padding: 16px; line-height: 1.6; }
+              max-width: 520px; max-height: 80vh; overflow-y: auto; padding: 16px; line-height: 1.6; }
   .modalBox .row { padding: 10px 0 0; justify-content: flex-end; }
+  .modalBox table { margin: 6px 0; width: 100%; }
 </style>
 </head>
 <body>
 <div id="layout">
   <div id="curvePane">
     <div id="tabBar">
-      <button class="tabBtn" data-tab="trace">1 · Trace</button>
+      <button class="tabBtn" data-tab="upload">1 · Upload</button>
       <button class="tabBtn" data-tab="shape">2 · Shape</button>
-      <button class="tabBtn" data-tab="place">3 · Place</button>
+      <button class="tabBtn" data-tab="export">3 · Export Shell</button>
+      <button class="tabBtn" data-tab="place">Panels (read-only)</button>
     </div>
 
     <!-- ============================================================ -->
-    <!-- STAGE 1 — TRACE                                               -->
+    <!-- STAGE 1 — UPLOAD                                              -->
     <!-- ============================================================ -->
-    <section id="tab-trace" class="tabSection">
-      <h1>Stage 1 · Trace</h1>
-      <div class="banner">Load photos, calibrate each one by clicking two landmarks, then trace the
-        silhouette edge. Front gives a(v). Side gives BOTH b_front(v) (right of centerline) and
-        b_back(v) (left of centerline) — one photo, two independent traces. Back and top-down are
-        load + calibrate only in this first cut: back doesn't add new curve data (this shell family
-        has no left/right asymmetry) and top-down's "sets the section shape between the extremes" is
-        not implemented yet — a known gap, not a silent omission.</div>
+    <section id="tab-upload" class="tabSection">
+      <h1>Stage 1 · Upload</h1>
+      <div class="banner">Pure input, nothing else. Load the front, side, and top-down photos and
+        calibrate each by clicking two landmarks — no curves, no tracing, no 3D here. Back is
+        optional: this shell family has no left/right asymmetry, so it adds no new curve data even
+        once shaping starts.</div>
+      <div class="checklist" id="uploadChecklist">…</div>
 
       <div class="viewGrid">
         <div class="viewSlot">
-          <h2>Front → a(v)</h2>
+          <h2>Front (required)</h2>
           <div class="row fileRow"><label>photo <input type="file" id="fileFront" accept="image/*"></label></div>
-          <canvas id="canvasTraceFront" class="curve" width="340" height="480"></canvas>
+          <canvas id="canvasFrontRef" class="curve" width="340" height="480"></canvas>
           <div class="calibBlock">
-            <div class="calibStatus uncal" id="calibStatusTF">uncalibrated — backdrop is a visual reference only</div>
+            <div class="calibStatus uncal" id="calibStatusFront">uncalibrated — backdrop is a visual reference only</div>
             <div class="row" style="padding:2px 0">
-              <button class="miniBtn" id="calibBtnTF">calibrate waist/hem</button>
-              <button class="miniBtn" id="calibClearTF" style="display:none">clear calibration</button>
+              <button class="miniBtn" id="calibBtnFront">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearFront" style="display:none">clear calibration</button>
             </div>
             <div class="row" style="padding:2px 0">
-              <button class="miniBtn" id="hrefBtnTF">add horizontal reference (breast tip distance)</button>
-              <button class="miniBtn" id="hrefClearTF" style="display:none">clear h-ref</button>
+              <button class="miniBtn" id="hrefBtnFront">add horizontal reference (breast tip distance)</button>
+              <button class="miniBtn" id="hrefClearFront" style="display:none">clear h-ref</button>
               <label style="color:var(--dim)">real distance
-                <input type="number" class="mmInput" id="hrefMmTF" value="175" min="1" step="0.5"> mm</label>
+                <input type="number" class="mmInput" id="hrefMmFront" value="175" min="1" step="0.5"> mm</label>
             </div>
           </div>
         </div>
         <div class="viewSlot">
-          <h2>Side → b_front(v) / b_back(v)</h2>
+          <h2>Side (required)</h2>
           <div class="row fileRow"><label>photo <input type="file" id="fileSide" accept="image/*"></label></div>
-          <canvas id="canvasTraceSide" class="curve" width="340" height="480"></canvas>
+          <canvas id="canvasSideRef" class="curve" width="340" height="480"></canvas>
           <div class="calibBlock">
-            <div class="calibStatus uncal" id="calibStatusTS">uncalibrated — backdrop is a visual reference only</div>
+            <div class="calibStatus uncal" id="calibStatusSide">uncalibrated — backdrop is a visual reference only</div>
             <div class="row" style="padding:2px 0">
-              <button class="miniBtn" id="calibBtnTS">calibrate waist/hem</button>
-              <button class="miniBtn" id="calibClearTS" style="display:none">clear calibration</button>
+              <button class="miniBtn" id="calibBtnSide">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearSide" style="display:none">clear calibration</button>
+            </div>
+          </div>
+        </div>
+        <div class="viewSlot">
+          <h2>Top-down (required)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileTop" accept="image/*"></label></div>
+          <canvas id="canvasTopRef" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusTop">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnTop">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearTop" style="display:none">clear calibration</button>
+            </div>
+          </div>
+          <div class="legend">Reference only this round — "the section shape between the extremes"
+            that a top-down view can give needs a new section-family model this round doesn't build.
+            A known, flagged gap, not a silent omission.</div>
+        </div>
+        <div class="viewSlot">
+          <h2>Back (optional)</h2>
+          <div class="row fileRow"><label>photo <input type="file" id="fileBack" accept="image/*"></label></div>
+          <canvas id="canvasBackRef" class="curve" width="340" height="480"></canvas>
+          <div class="calibBlock">
+            <div class="calibStatus uncal" id="calibStatusBack">uncalibrated — backdrop is a visual reference only</div>
+            <div class="row" style="padding:2px 0">
+              <button class="miniBtn" id="calibBtnBack">calibrate waist/hem</button>
+              <button class="miniBtn" id="calibClearBack" style="display:none">clear calibration</button>
             </div>
           </div>
         </div>
       </div>
-
-      <div class="row layerRow">
-        marking:
-        <button data-layer="silhouette" class="active">silhouette</button>
-        <button data-layer="neckline">neckline</button>
-        <button data-layer="hemline">hemline</button>
-        <button data-layer="waist">waist</button>
-        <button data-layer="armhole">armhole</button>
-      </div>
-      <div class="legend">Click an empty spot on either canvas above to add a point to the active
-        layer; drag an existing point to move it; right-click a point to delete it (silhouette layers
-        keep a minimum of 2). Only <b>silhouette</b> points become a(v)/b_front(v)/b_back(v) — the
-        other four are visual/reference markers this first pass records but does not yet feed into
-        the neckline model or any derived quantity.</div>
-      <div class="row">
-        <button class="miniBtn" id="clearLayerBtn">clear active layer (this canvas pair)</button>
-      </div>
-
-      <hr>
-      <h2>Back / top-down — reference only</h2>
-      <div class="viewGrid">
-        <div class="viewSlot">
-          <h3>Back</h3>
-          <div class="row fileRow"><label>photo <input type="file" id="fileBack" accept="image/*"></label></div>
-          <canvas id="canvasTraceBack" class="curve" width="340" height="480"></canvas>
-        </div>
-        <div class="viewSlot">
-          <h3>Top-down</h3>
-          <div class="row fileRow"><label>photo <input type="file" id="fileTop" accept="image/*"></label></div>
-          <canvas id="canvasTraceTop" class="curve" width="340" height="480"></canvas>
-        </div>
-      </div>
-
-      <hr>
-      <h2>Tape measurements — live check, not a constraint</h2>
-      <div class="legend">Enter the tape circumference at each anchor; the table compares it to what
-        the traced curves currently imply. A big Δ means the trace and the tape disagree — it does
-        not adjust the trace for you.</div>
-      <table id="traceTapeTable"></table>
-      <div class="row">
-        <label>waist <input type="number" class="mmInput" id="tapeWaist" value="609.6"> mm</label>
-        <label>underbust <input type="number" class="mmInput" id="tapeUnderbust" value="711.2"> mm</label>
-        <label>bust <input type="number" class="mmInput" id="tapeBust" value="825.5"> mm</label>
-        <label>above-bust <input type="number" class="mmInput" id="tapeAboveBust" value="812.8"> mm</label>
-      </div>
-
-      <hr>
-      <div class="legend" id="traceCounts">…</div>
-      <button class="primaryBtn" id="sendTraceBtn">use this trace for Stage 2 →</button>
-      <div class="kv" id="traceSendStatus"></div>
     </section>
 
     <!-- ============================================================ -->
@@ -216,12 +200,14 @@
     <!-- ============================================================ -->
     <section id="tab-shape" class="tabSection current">
       <h1>Stage 2 · Shape</h1>
-      <div class="banner">This page has no server — reachable from any browser via this deploy preview
-        (not the local dev tool). Curve editing, 3D regeneration, circumference, and monotonicity are
-        genuinely live here, and so is the neckline trim on the 3D view (heights themselves are still
-        reference-only, not draggable — see below). The full curvature/seatability sweep and the "seed
-        from parameters" generator still need Python — they show a labeled, bake-time snapshot rather
-        than a live number.</div>
+      <div class="banner">Tracing and editing are the same action here: drag points against the
+        calibrated backdrop from Stage 1 and watch the 3D shell update live — one set of curve
+        editors, not two. A miss-click on empty canvas adds a point to the active layer below;
+        drag an existing point to move it; right-click a point to delete it (silhouette layers keep
+        a minimum of 2). This page has no server — reachable from any browser via this deploy
+        preview. Curve editing, 3D regeneration, circumference, and monotonicity are genuinely live;
+        the full curvature/seatability sweep still needs Python and shows a labeled, bake-time
+        snapshot rather than a live number.</div>
       <div class="row">
         <span class="kv" style="padding:0" id="shapeSourceReadout">opened from: …</span>
       </div>
@@ -233,16 +219,12 @@
 
       <div class="curveRow">
         <div class="curveBlock">
-          <h2>a(v) — shared lateral half-width</h2>
+          <h2>a(v) — over the front backdrop</h2>
           <canvas id="canvasA" class="curve" width="340" height="480"></canvas>
-          <div class="calibCaveat">Backdrop and calibration for this curve are set on the Trace tab —
-            this view is read-only here (drag the a(v) points themselves, not the photo).</div>
         </div>
         <div class="curveBlock">
-          <h2>b(v) — front / back depth (independent)</h2>
+          <h2>b_front(v) / b_back(v) — over the side backdrop</h2>
           <canvas id="canvasB" class="curve" width="340" height="480"></canvas>
-          <div class="calibCaveat">Backdrop and calibration for this curve are set on the Trace tab —
-            this view is read-only here (drag the b(v) points themselves, not the photo).</div>
         </div>
       </div>
       <div class="legend">
@@ -250,6 +232,18 @@
         b(v): <span style="color:#2fa3a3">front (right = CF)</span> ·
         <span style="color:#d98a35">back (left = CB)</span> · each independently draggable.
       </div>
+
+      <div class="row layerRow">
+        marking:
+        <button data-layer="silhouette" class="active">silhouette</button>
+        <button data-layer="neckline">neckline</button>
+        <button data-layer="hemline">hemline</button>
+        <button data-layer="waist">waist</button>
+        <button data-layer="armhole">armhole</button>
+      </div>
+      <div class="legend">Only <b>silhouette</b> points become a(v)/b_front(v)/b_back(v) — the other
+        four are visual/reference markers this first pass records but does not yet feed into the
+        neckline model or any derived quantity.</div>
 
       <hr>
       <h2>Neckline height(θ) — heights reference only, trim is live below</h2>
@@ -264,20 +258,18 @@
       <div class="row"><span class="kv" style="padding:0">armhole split θ:
         <b id="armholeReadout">…</b></span></div>
 
-      <h3>Get this into the repo</h3>
-      <div class="legend">This page has no backend — it cannot write to the repo itself. The one
-        obvious path: <b>copy to clipboard</b>, paste the YAML into your Claude Code conversation,
-        and ask it to commit as <code>tools/dress-shell/shape.yaml</code>. No file to hand-place,
-        no guessing where it goes.</div>
-      <div class="legend" id="exportGuard"></div>
-      <label class="row" id="exportOverrideRow">
-        <input type="checkbox" id="exportOverride">
-        I understand — a named feature is not represented at this density; allow export anyway
-      </label>
-      <button id="copyBtn" class="primaryBtn">copy shape.yaml to clipboard</button>
-      <button id="exportBtn" class="miniBtn">or download the file instead</button>
-      <div class="kv" id="exportStatus"></div>
-      <textarea id="exportArea" readonly></textarea>
+      <hr>
+      <h2>Tape measurements — live check, not a constraint</h2>
+      <div class="legend">Enter the tape circumference at each anchor; the table compares it to what
+        the curves currently imply. A big Δ means the trace and the tape disagree — it does not
+        adjust the curves for you.</div>
+      <table id="traceTapeTable"></table>
+      <div class="row">
+        <label>waist <input type="number" class="mmInput" id="tapeWaist" value="609.6"> mm</label>
+        <label>underbust <input type="number" class="mmInput" id="tapeUnderbust" value="711.2"> mm</label>
+        <label>bust <input type="number" class="mmInput" id="tapeBust" value="825.5"> mm</label>
+        <label>above-bust <input type="number" class="mmInput" id="tapeAboveBust" value="812.8"> mm</label>
+      </div>
 
       <hr>
       <h2>Point density (adaptive placement)</h2>
@@ -322,16 +314,50 @@
     </section>
 
     <!-- ============================================================ -->
-    <!-- STAGE 3 — PLACE                                               -->
+    <!-- STAGE 3 — EXPORT SHELL                                        -->
+    <!-- ============================================================ -->
+    <section id="tab-export" class="tabSection">
+      <h1>Stage 3 · Export Shell</h1>
+      <div class="banner commit">The commitment point, not just a button. This produces the shell
+        panels get placed on. Review what's below, then export — that moment becomes the "old" shell
+        the next backward trip to Shape gets compared against, panel by panel.</div>
+
+      <h2>What's being exported</h2>
+      <div id="exportSummary" class="kv">…</div>
+
+      <h2>Final numbers</h2>
+      <div id="exportMonoReadout" class="kv">…</div>
+      <table id="exportCircTable"></table>
+      <div id="exportShellReadout" class="kv" style="margin-top:6px">…</div>
+
+      <hr>
+      <h2>Name this export</h2>
+      <div class="row">
+        <label>label <input type="text" class="labelInput" id="exportLabel" placeholder="e.g. bodice-v2, pre-fitting-check"></label>
+      </div>
+      <div class="legend" id="exportGuard"></div>
+      <label class="row" id="exportOverrideRow">
+        <input type="checkbox" id="exportOverride">
+        I understand — a named feature is not represented at this density; allow export anyway
+      </label>
+      <button class="primaryBtn" id="copyBtn">copy shape.yaml to clipboard (exports)</button>
+      <button class="miniBtn" id="exportBtn">or download the file instead</button>
+      <div class="kv" id="exportStatus"></div>
+      <textarea id="exportArea" readonly></textarea>
+      <div class="legend">This page has no backend — it cannot write to the repo itself. The one
+        obvious path: <b>copy to clipboard</b>, paste the YAML into your Claude Code conversation,
+        and ask it to commit as <code>tools/dress-shell/shape.yaml</code>.</div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PANELS — read-only (unchanged; interactive placement not built yet) -->
     <!-- ============================================================ -->
     <section id="tab-place" class="tabSection">
-      <h1>Stage 3 · Place</h1>
-      <div class="banner">Scoped down this round: this is a read-only view of the committed
-        <code>layout.yaml</code>, not yet the interactive placement editor. The full port —
-        dragging panels in (θ, s), connector/outline legality, mirror-twin derivation, layering/DAG
-        checks, seat-standoff footprint — lives in <code>tools/dress-shell/editor_server.py</code> and
-        has not been moved to client-side JS yet. Built this round: the tab itself, the shared-shell
-        wiring, and the forward-navigation shape-change flag below.</div>
+      <h1>Panels (read-only)</h1>
+      <div class="banner">Panel placement comes after the shell pipeline is finished, and what it
+        needs hasn't been worked out yet. This stays a read-only view of the committed
+        <code>layout.yaml</code> — not the interactive placement editor, which still lives in
+        <code>tools/dress-shell/editor_server.py</code> and is out of scope this round.</div>
       <div class="stageWarnBanner" id="placeImpactBanner"></div>
       <div class="legend" id="layoutStatus">loading tools/dress-shell/layout.yaml…</div>
       <div class="row">

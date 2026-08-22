@@ -1,21 +1,33 @@
-// Shape editor — STATIC PAGE, three stages, one page, three tabs, ONE
-// shell state shared in memory across them. There is no server: this
-// file, geom.js's math, shape-editor-yaml.js's tiny parser, and a baked
-// JSON snapshot are the whole application.
+// Shape editor — STATIC PAGE, three stages, one page, one shell state
+// shared in memory across them, plus a fourth read-only "Panels" tab left
+// as-is (see below). There is no server: this file, geom.js's math,
+// shape-editor-yaml.js's tiny parser, shape-editor-chart.js's (theta, s)
+// port, and a baked JSON snapshot are the whole application.
 //
-// STAGE 1 (Trace) -> STAGE 2 (Shape) -> STAGE 3 (Place). Moving forward
-// is free. Moving backward is consequential:
-//   - Shape -> Trace: retracing REPLACES the curves Shape's hand edits
-//     are built on. Warned every time, unconditionally.
-//   - Place -> Shape: panel placements live in (theta, s) on the CURRENT
-//     shell and will move (or become invalid) if the shape changes.
-//     Warned every time, unconditionally.
-//   - Shape -> Place (forward): free, but if the shape changed since
-//     Place was last opened, a banner says so before anything else. That
-//     banner is a FLAG, not the real shape_impact.py validation — porting
-//     connector/outline/mirror-twin/layering/seat-standoff checks to JS
-//     hasn't happened yet (see the Place tab's own banner for the honest
-//     version of that gap).
+// STAGE 1 (Upload) -> STAGE 2 (Shape) -> STAGE 3 (Export Shell).
+//
+// Upload is pure input: load photos, calibrate by clicking two landmarks,
+// nothing else — no curves, no tracing, no 3D. Shape is where tracing and
+// editing MERGE into one action: dragging a point against the calibrated
+// backdrop IS both, live, on the same two curve editors. There is no
+// separate "send trace to shape" handoff — Upload's calibration and
+// Shape's curves are the same in-memory state, always. Export Shell is
+// the commitment point: it shows what would be exported, and pressing
+// export/copy is the moment that becomes the "old" shell every later
+// backward trip from Export gets compared against.
+//
+// GOING BACK IS THE CONSEQUENTIAL MOVE, and only from Export: returning
+// to Shape after a shell has been exported re-validates every authored
+// layout.yaml panel's standoff against the shell as it stands now, using
+// a real (scoped) port of shape_impact.py's seat_standoff machinery —
+// see shape-editor-chart.js — and reports which panels are affected and
+// by how much, worst first. Upload<->Shape carries no such warning:
+// Upload no longer holds curve data, so revisiting it never overwrites a
+// hand edit.
+//
+// The Panels tab is UNCHANGED from the previous round on purpose — a
+// read-only view of the committed layout.yaml. The interactive placement
+// editor is out of scope until the shell pipeline above is finished.
 //
 // LIVE vs SNAPSHOT, the one thing this page cannot blur: curve editing,
 // 3D regeneration, circumference, and monotonicity are computed in this
@@ -24,15 +36,6 @@
 // export time (grid.py/curvature.py need Python) and goes stale the
 // instant you drag. This file never lets the two look the same: the
 // snapshot block gets a "may be stale" banner the moment any point moves.
-//
-// Persistence: there's no backend to save shape.yaml/layout.yaml to.
-// "Export" builds the identical canonical YAML text shape_state.
-// dump_shape() would (same repr()-float convention) and offers it as a
-// copy/download — send it back to have it committed. Stage 2 now OPENS
-// on that committed tools/dress-shell/shape.yaml when it's reachable
-// (Netlify serves the whole repo as static files, so a plain fetch()
-// works) — the generator seed is a fallback, and reset-to-seed is an
-// explicit action, never the silent default.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -40,6 +43,7 @@ import { pchipFit, CompoundCoarseShell, monotonicityReport,
         coarseCircumferenceReport, compoundPerimeter, buildAdaptiveOrder,
         checkNamedFeatures, smoothPoints, necklineHeightFn } from "./shape-editor-geom.js";
 import { parseShapeYaml, shapeYamlToInitialCurves } from "./shape-editor-yaml.js";
+import { buildSurfaceChart, computeStandoffImpact, parsePanelClasses, parseLayoutPanels } from "./shape-editor-chart.js";
 
 // -- adaptive point density ---------------------------------------------
 // "Too many control points" — the flat ~31-point seed is replaced ONCE,
@@ -55,14 +59,6 @@ import { parseShapeYaml, shapeYamlToInitialCurves } from "./shape-editor-yaml.js
 // is lossless; only a real hand edit on the canvas (or a smoothing pass)
 // invalidates the cache and forces the next slider move to rebuild from
 // the edited curve.
-//
-// A named feature going missing is a DIFFERENT CATEGORY of event than a
-// fit getting slightly worse — a residual number can't stand in for it.
-// Every cache also records its "floor": the smallest point count (over
-// the same adaptive order) at which no named feature reads lost, so the
-// UI can show where that line is instead of it being found by scrubbing
-// past it. Crossing it is flagged loudly (not styled the same as the
-// residual line) and blocks export until an explicit override is set.
 const MAX_POINTS = 40;
 const MIN_POINTS = 4;
 const DEFAULT_TARGET_RESIDUAL_MM = 0.7;
@@ -132,30 +128,17 @@ function axes(canvas) {
   const vOf = (y) => V_LO + (canvas.height - PAD - y) / pxPerMm;
   return { CX, pxPerMm, yOf, vOf };
 }
-function loadBackdrop(src, onload) {
-  const img = new Image();
-  img.onload = onload;
-  img.src = src;
-  return img;
-}
 
 // -- backdrop calibration -------------------------------------------------
 // Uncalibrated, a backdrop's px-to-mm scale is unknown — dragging a point
 // onto its silhouette edge is a visual match, not a measurement. Two
 // clicked landmarks (waist v=0, hem v=V_LO=-381 — the SAME waist->hem=
 // 381mm reference silhouette.py's own extract_from_image already uses to
-// fit these exact images server-side, see WAIST_TO_HEM_MM there) solve
-// the vertical mm/px scale directly. Horizontal defaults to the vertical
-// scale (assumes the image's aspect ratio survived whatever cropping it
-// went through — flagged as an ASSUMPTION, not silently trusted) and can
-// be overridden by an independent reference: breast tip distance
-// (175mm — the dress-shell reference body's own measured value, already
-// the basis of the committed plateau bust's 87.5mm half-width), which is
-// horizontal only in the FRONT view.
-//
-// Calibration now lives on Stage 1 (Trace) — these objects are created
-// ONCE and shared with Stage 2 (Shape), which reads them read-only to
-// register its own backdrop. One measurement, both stages, never two.
+// fit these exact images server-side) solve the vertical mm/px scale
+// directly. Horizontal defaults to the vertical scale (assumes the
+// image's aspect ratio survived whatever cropping it went through) and
+// can be overridden by an independent reference: breast tip distance
+// (175mm), horizontal only in the FRONT view.
 const BREAST_TIP_DEFAULT_MM = 175.0;
 
 function containFit(naturalW, naturalH, boxX, boxY, boxW, boxH) {
@@ -168,18 +151,18 @@ class BackdropCalibration {
   constructor() {
     this.calibrated = false;
     this.naturalWidth = null; this.naturalHeight = null;
-    this.uncalFitRect = null;      // stable click-capture frame, calibration-independent
-    this.waistPx = null; this.hemPx = null;     // natural image px
+    this.uncalFitRect = null;
+    this.waistPx = null; this.hemPx = null;
     this.mmPerPxV = null; this.mmPerPxH = null;
     this.xOriginPx = null;
-    this.hRefMethod = "aspect";    // "aspect" | "independent"
-    this.hRef = null;              // { leftPx, rightPx, mm }
-    this.imageLabel = null;        // repo-relative path OR "uploaded: <filename>" — export provenance
+    this.hRefMethod = "aspect";
+    this.hRef = null;
+    this.imageLabel = null;
   }
   setNaturalSize(w, h, boxX, boxY, boxW, boxH) {
     this.naturalWidth = w; this.naturalHeight = h;
     this.uncalFitRect = containFit(w, h, boxX, boxY, boxW, boxH);
-    if (this.xOriginPx == null) this.xOriginPx = w / 2;   // default until measured
+    if (this.xOriginPx == null) this.xOriginPx = w / 2;
   }
   canvasToImgPx(cx, cy) {
     const r = this.uncalFitRect;
@@ -187,9 +170,9 @@ class BackdropCalibration {
   }
   setVertical(waistPx, hemPx) {
     const dPx = hemPx.y - waistPx.y;
-    if (dPx <= 1e-6) return false;   // hem must click BELOW waist in the image
+    if (dPx <= 1e-6) return false;
     this.waistPx = waistPx; this.hemPx = hemPx;
-    this.mmPerPxV = (0.0 - V_LO) / dPx;   // waist v=0, hem v=V_LO(=-381)
+    this.mmPerPxV = (0.0 - V_LO) / dPx;
     if (this.hRefMethod === "aspect") this.mmPerPxH = this.mmPerPxV;
     this.calibrated = true;
     return true;
@@ -219,7 +202,6 @@ class BackdropCalibration {
     return (this.mmPerPxV != null && this.naturalHeight != null)
       ? this.mmPerPxV * this.naturalHeight : null;
   }
-  // natural image px -> real (v_mm, signed lateral mm from the v-axis)
   imgToReal(px, py) {
     return { vMm: 0.0 - (py - this.waistPx.y) * this.mmPerPxV,
             xMmSigned: (px - this.xOriginPx) * this.mmPerPxH };
@@ -279,15 +261,13 @@ function drawLandmarkDot(ctx, imgPx, calib, yOf, xOf, color, label) {
 }
 
 // Uncalibrated: contain-fit (preserves the image's own aspect ratio),
-// greyed out, low alpha — unmistakably "not a measurement". Calibrated:
-// re-registered through the SAME yOf/xOf the curve points use, so it
-// shares one real-world mm coordinate system with the curve. The fit
-// rect is recomputed whenever the image actually shown doesn't match
-// what's cached on the calibration object — needed because Stage 1 and
-// Stage 2 can pass DIFFERENT <img> elements through the SAME shared
-// BackdropCalibration (Stage 1's freshly-uploaded photo vs Stage 2's
-// fixed default asset); the measurement (mm/px, landmark px) is shared
-// and correct either way, only the display fit-rect needs refreshing.
+// greyed out, low alpha. Calibrated: re-registered through the SAME
+// yOf/xOf the curve points use. The fit rect self-heals whenever the
+// image actually shown doesn't match what's cached on the calibration
+// object — needed because Upload's reference pane and Shape's curve pane
+// pass the SAME <img> element (and the same BackdropCalibration) through
+// this function; only the fit-rect display needs refreshing per canvas
+// size, the measurement itself is shared and correct either way.
 function drawBackdrop(ctx, canvas, img, calib, yOf, xOf) {
   if (!(img.complete && img.naturalWidth)) return;
   if (!calib.uncalFitRect || calib.naturalWidth !== img.naturalWidth || calib.naturalHeight !== img.naturalHeight) {
@@ -336,15 +316,18 @@ function defFitOf(table) {
   };
 }
 
-// Feature-line marker layers Stage 1 (traceMode) draws on top of the
-// silhouette — visual/reference only in this first pass, they do not
-// feed a(v)/b(v), the neckline model, or any derived quantity.
+// Feature-line marker layers — visual/reference only in this first pass,
+// they do not feed a(v)/b(v), the neckline model, or any derived quantity.
 const MARK_LAYER_COLORS = { neckline: "#d98a35", hemline: "#e05545", waist: "#8a63d9", armhole: "#4fb0e0" };
 const MARK_LAYER_NAMES = Object.keys(MARK_LAYER_COLORS);
 
 // ---------------------------------------------------------------- a(v): mirrored single curve
+// traceMode merges tracing and editing into one action (Stage 2's own
+// framing): a miss-click on empty canvas ADDS a point instead of no-op;
+// a hit drags it; right-click deletes it. Always true for canvasA/canvasB
+// now — there's no longer a separate non-interactive display mode.
 class CurvePane {
-  constructor({ canvas, seed, defaultTable, backdropSrc, onLive, onDragEnd, calib, traceMode = false }) {
+  constructor({ canvas, seed, defaultTable, backdrop, onLive, onDragEnd, calib, traceMode = false }) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
     this.points = seed.map(([v, y]) => ({ v, y }));
     this.defaultTable = defaultTable;
@@ -356,11 +339,11 @@ class CurvePane {
     this.onLive = onLive;
     this.onDragEnd = onDragEnd;
     this.calib = calib;
-    this.calibClickHandler = null;   // set by setupCalibration() below
-    this.traceMode = traceMode;      // Stage 1 only: miss-click ADDS a point
+    this.calibClickHandler = null;
+    this.traceMode = traceMode;
     this.activeLayer = "silhouette";
     this.markLayers = { neckline: [], hemline: [], waist: [], armhole: [] };
-    this.backdrop = backdropSrc ? loadBackdrop(backdropSrc, () => this.draw()) : new Image();
+    this.backdrop = backdrop;
     this._wire();
   }
   xOf(val, side) { return this.CX + side * val / this.mmPerPxY; }
@@ -440,7 +423,7 @@ class CurvePane {
     const hit = this._pick(mx, my);
     if (!hit) return;
     if (this.points.includes(hit)) {
-      if (this.points.length <= 2) return;   // keep a minimum viable curve
+      if (this.points.length <= 2) return;
       this.points = this.points.filter(p => p !== hit);
     } else {
       for (const key of MARK_LAYER_NAMES) {
@@ -488,7 +471,7 @@ class CurvePane {
 
 // ---------------------------------------------------------------- b(v): front (right) / back (left)
 class DualCurvePane {
-  constructor({ canvas, seedFront, seedBack, defaultTable, backdropSrc, onLive, onDragEnd, calib, traceMode = false }) {
+  constructor({ canvas, seedFront, seedBack, defaultTable, backdrop, onLive, onDragEnd, calib, traceMode = false }) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
     this.front = seedFront.map(([v, y]) => ({ v, y }));
     this.back = seedBack.map(([v, y]) => ({ v, y }));
@@ -501,11 +484,11 @@ class DualCurvePane {
     this.onLive = onLive;
     this.onDragEnd = onDragEnd;
     this.calib = calib;
-    this.calibClickHandler = null;   // set by setupCalibration() below
+    this.calibClickHandler = null;
     this.traceMode = traceMode;
     this.activeLayer = "silhouette";
     this.markLayers = { neckline: [], hemline: [], waist: [], armhole: [] };
-    this.backdrop = backdropSrc ? loadBackdrop(backdropSrc, () => this.draw()) : new Image();
+    this.backdrop = backdrop;
     this._wire();
   }
   xOf(val, side) { return this.CX + side * val / this.mmPerPxY; }
@@ -639,20 +622,16 @@ class DualCurvePane {
   }
 }
 
-// ---------------------------------------------------------------- reference-only pane (back/top-down)
-// Load + calibrate, no tracing: this shell family has no left/right
-// asymmetry (so BACK adds no new curve data over FRONT/SIDE) and
-// top-down's "sets the section shape between the extremes" would need a
-// new section-family model this round doesn't build — a known,
-// deliberately-flagged gap, not a silent omission.
+// ---------------------------------------------------------------- Stage 1: reference-only pane
+// Load + calibrate, no curves, no tracing, no 3D — Upload is pure input.
 class ReferencePane {
-  constructor({ canvas, calib }) {
+  constructor({ canvas, calib, backdrop }) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
     Object.assign(this, axes(canvas));
     this.yMax = 340; this.mmPerPxY = this.yMax / (this.CX - PAD);
     this.calib = calib;
     this.calibClickHandler = null;
-    this.backdrop = new Image();
+    this.backdrop = backdrop;
     this._wire();
   }
   xOf(val, side) { return this.CX + side * val / this.mmPerPxY; }
@@ -681,14 +660,14 @@ class ReferencePane {
 // points that meet DEFAULT_TARGET_RESIDUAL_MM against the TRUE dense
 // generated curve (seed_a_dense/seed_b_dense, 1601 points) — a one-time
 // operation, done once here at load. This is the GENERATOR SEED fallback:
-// used only if neither Stage 1's trace nor the committed shape.yaml is
-// available (see resolveInitialShapePoints below), and always reachable
-// again afterward via the explicit "reset to generator seed" action.
+// used only if the committed shape.yaml isn't available, and always
+// reachable again afterward via the explicit "reset to generator seed"
+// action.
 const groundTruthA = defFitOf({ z: state.seed_a_dense.z, y: state.seed_a_dense.a });
 const groundTruthB = defFitOf({ z: state.seed_b_dense.z, y: state.seed_b_dense.b });
 let cacheA = buildDensityCacheFromFit(groundTruthA);
 let cacheBf = buildDensityCacheFromFit(groundTruthB);
-let cacheBb = buildDensityCacheFromFit(groundTruthB);   // separate object — front/back diverge on edits
+let cacheBb = buildDensityCacheFromFit(groundTruthB);
 const initACount = firstCountMeetingResidual(cacheA, DEFAULT_TARGET_RESIDUAL_MM);
 const initBfCount = firstCountMeetingResidual(cacheBf, DEFAULT_TARGET_RESIDUAL_MM);
 const initBbCount = firstCountMeetingResidual(cacheBb, DEFAULT_TARGET_RESIDUAL_MM);
@@ -702,10 +681,8 @@ const bakedSeedCount = state.seed_a_points.length;
 
 // ---------------------------------------------------------------- Stage 2's initial source
 // Priority: the committed tools/dress-shell/shape.yaml (fetchable
-// directly — Netlify serves the whole repo as static files, no build
-// step) > the generator seed. Stage 1's OWN trace output is applied
-// separately, explicitly, via the "use this trace for Stage 2" button —
-// never silently at load, since at cold load Stage 1 hasn't run yet.
+// directly — Netlify serves the whole repo as static files) > the
+// generator seed. "Reset to generator seed" is an explicit action.
 async function resolveInitialShapePoints() {
   try {
     const resp = await fetch("./tools/dress-shell/shape.yaml");
@@ -725,10 +702,8 @@ async function resolveInitialShapePoints() {
 const initialShape = await resolveInitialShapePoints();
 
 // Per-curve "named feature currently lost" state — set by a density
-// resample or a smoothing pass (the two actions that can silently erase
-// a feature), never by a hand-drag (an intentional edit is out of scope
-// for this guard). Drives both the loud on-page warning and the export
-// block below.
+// resample or a smoothing pass, never by a hand-drag. Drives both the
+// loud on-page warning and the export block on Stage 3.
 const lostFeatures = { a: [], bf: [], bb: [] };
 function exportBlocked() {
   return (lostFeatures.a.length || lostFeatures.bf.length || lostFeatures.bb.length) > 0
@@ -744,13 +719,21 @@ function updateExportGuard() {
   if (anyLost) {
     $("exportGuard").innerHTML = `<b class="err">⚠ named feature lost</b> at the current density — ` +
       `${parts.join(" · ")}. Export is blocked until the density is raised (see the floor under each ` +
-      `slider) or the override below is checked.`;
+      `slider on Stage 2) or the override below is checked.`;
   }
   $("exportOverrideRow").style.display = anyLost ? "flex" : "none";
   if (!anyLost) $("exportOverride").checked = false;
 }
 
-const noop = () => {};
+// -- shared images: ONE Image per photo slot, referenced by BOTH Upload's
+// reference pane and Shape's curve pane. A file picker swap on either
+// side is instantly visible on the other — genuinely one shell state, not
+// a handoff between two copies. -----------------------------------------
+const frontImg = new Image(); frontImg.src = "./assets/shape-editor/silhouette-front.png";
+const sideImg = new Image(); sideImg.src = "./assets/shape-editor/silhouette-trace.png";
+const backImg = new Image();
+const topImg = new Image();
+
 const calibFront = new BackdropCalibration();
 const calibTrace = new BackdropCalibration();
 const calibBack = new BackdropCalibration();
@@ -760,31 +743,67 @@ if (initialShape.backdropCalibration) {
   calibTrace.hydrateFromYaml(initialShape.backdropCalibration.trace);
 }
 
-// -- shape-change / hand-edit tracking (drives the reset button, the
-// Trace<->Shape retrace warning's honesty, and the Shape->Place banner) --
+// -- shape-change / export tracking --------------------------------------
 let shapeHandEdited = false;
-let shapeChangedSincePlace = true;   // never validated yet at cold load
+let shapeChangedSincePlace = true;   // drives the (unchanged) Panels-tab banner
 function markShapeChanged() { shapeHandEdited = true; shapeChangedSincePlace = true; }
+let lastExport = null;         // { aPoints, bFrontPoints, bBackPoints, neckline, label, exportedAt }
+let lastExportChart = null;    // pre-built buildSurfaceChart() for lastExport
+
+function fitOfPoints(pts) {
+  const s = [...pts].sort((a, b) => a[0] - b[0]);
+  return pchipFit(s.map(p => p[0]), s.map(p => p[1]));
+}
+
+const noop = () => {};
 
 // ---------------------------------------------------------------- Stage 2 (Shape) panes
 const paneA = new CurvePane({
   canvas: $("canvasA"), seed: initialShape.aPoints,
   defaultTable: { z: state.default_a_table.z, y: state.default_a_table.a },
-  backdropSrc: "./assets/shape-editor/silhouette-front.png", onLive: noop,
+  backdrop: frontImg, onLive: noop, traceMode: true,
   onDragEnd: () => { cacheA = null; markShapeChanged(); }, calib: calibFront,
 });
 const paneB = new DualCurvePane({
   canvas: $("canvasB"), seedFront: initialShape.bFrontPoints, seedBack: initialShape.bBackPoints,
   defaultTable: { z: state.default_b_table.z, y: state.default_b_table.b },
-  backdropSrc: "./assets/shape-editor/silhouette-trace.png", onLive: noop,
+  backdrop: sideImg, onLive: noop, traceMode: true,
   onDragEnd: (side) => { if (side === 1) cacheBf = null; else cacheBb = null; markShapeChanged(); }, calib: calibTrace,
 });
 paneA.onLive = paneB.onLive = () => liveUpdate();
 
+// -- Stage 1 (Upload) reference panes -------------------------------------
+const stage1FrontPane = new ReferencePane({ canvas: $("canvasFrontRef"), calib: calibFront, backdrop: frontImg });
+const stage1SidePane = new ReferencePane({ canvas: $("canvasSideRef"), calib: calibTrace, backdrop: sideImg });
+const stage1BackPane = new ReferencePane({ canvas: $("canvasBackRef"), calib: calibBack, backdrop: backImg });
+const stage1TopPane = new ReferencePane({ canvas: $("canvasTopRef"), calib: calibTop, backdrop: topImg });
+
+frontImg.onload = () => { stage1FrontPane.draw(); paneA.draw(); };
+sideImg.onload = () => { stage1SidePane.draw(); paneB.draw(); };
+backImg.onload = () => { stage1BackPane.draw(); };
+topImg.onload = () => { stage1TopPane.draw(); };
+
+function wireFileInput(inputId, img, calib) {
+  $(inputId).addEventListener("change", (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    calib.reset();
+    calib.uncalFitRect = null;
+    calib.naturalWidth = null; calib.naturalHeight = null;
+    calib.imageLabel = `uploaded: ${file.name}`;
+    img.src = URL.createObjectURL(file);   // reuses the onload already wired above
+    status(`loaded ${file.name}`, "ok");
+    updateUploadChecklist();
+  });
+}
+wireFileInput("fileFront", frontImg, calibFront);
+wireFileInput("fileSide", sideImg, calibTrace);
+wireFileInput("fileBack", backImg, calibBack);
+wireFileInput("fileTop", topImg, calibTop);
+
 function updateShapeSourceReadout() {
   const labels = {
     "shape.yaml": '<span class="ok">committed tools/dress-shell/shape.yaml</span>',
-    "trace": '<span class="ok">Stage 1 trace</span>',
     "seed": '<span class="warn">generator seed (fallback)</span>',
   };
   $("shapeSourceReadout").innerHTML = `opened from: ${labels[shapeSource] || shapeSource}`;
@@ -807,8 +826,7 @@ $("resetToSeedBtn").onclick = () => {
 // Derived circumference reflects whatever the curve control points
 // currently are — if they were dragged against an uncalibrated or
 // mis-scaled backdrop, part of the tape-anchor delta below can be a
-// calibration artifact, not a real shape disagreement. Flagged loudly
-// when either backdrop's own calibration is measurably off Python's fit.
+// calibration artifact, not a real shape disagreement.
 function updateCircCaveat() {
   const flags = [];
   for (const [label, calib, refKey] of [["a(v)/front", calibFront, "front"], ["b(v)/trace", calibTrace, "trace"]]) {
@@ -824,29 +842,13 @@ function updateCircCaveat() {
     ? `<span class="warn">⚠ backdrop calibration is off from Python's own fit on the same photo ` +
       `(${flags.join(", ")}) — if the curves were dragged against that mis-scaled backdrop, part of ` +
       `the delta below may be a calibration artifact, not a real shape disagreement. Recalibrate the ` +
-      `flagged backdrop(s) on the Trace tab before trusting this table.</span>`
+      `flagged backdrop(s) on Stage 1 before trusting this table.</span>`
     : "Reflects whatever the curve control points currently are — if they were dragged against an " +
       "uncalibrated or mis-scaled backdrop, part of the delta below can be that, not a real shape " +
-      "disagreement. Calibrate the backdrops on the Trace tab first.";
+      "disagreement. Calibrate the backdrops on Stage 1 first.";
 }
 
-// -- Stage 1 (Trace) panes --------------------------------------------
-const traceFrontPane = new CurvePane({
-  canvas: $("canvasTraceFront"), seed: initialShape.aPoints,
-  defaultTable: { z: state.default_a_table.z, y: state.default_a_table.a },
-  backdropSrc: "./assets/shape-editor/silhouette-front.png", onLive: () => updateTraceTape(),
-  onDragEnd: () => updateTraceCounts(), calib: calibFront, traceMode: true,
-});
-const traceSidePane = new DualCurvePane({
-  canvas: $("canvasTraceSide"), seedFront: initialShape.bFrontPoints, seedBack: initialShape.bBackPoints,
-  defaultTable: { z: state.default_b_table.z, y: state.default_b_table.b },
-  backdropSrc: "./assets/shape-editor/silhouette-trace.png", onLive: () => updateTraceTape(),
-  onDragEnd: () => updateTraceCounts(), calib: calibTrace, traceMode: true,
-});
-const traceBackPane = new ReferencePane({ canvas: $("canvasTraceBack"), calib: calibBack });
-const traceTopPane = new ReferencePane({ canvas: $("canvasTraceTop"), calib: calibTop });
-
-// -- calibration UI wiring (Stage 1 only) -------------------------------
+// -- calibration UI wiring (Stage 1) -------------------------------------
 function setupCalibration(pane, refKey, suffix, hasHRef) {
   const calib = pane.calib;
   const statusEl = $(`calibStatus${suffix}`);
@@ -857,7 +859,7 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
   const hrefMmInput = hasHRef ? $(`hrefMm${suffix}`) : null;
   const ref = state.backdrop_calibration_reference?.[refKey];
 
-  let step = null;   // null | "waist" | "hem" | "hrefLeft" | "hrefRight"
+  let step = null;
   let pendingWaist = null, pendingHrefLeft = null;
 
   function setStatus(cls, html) {
@@ -865,13 +867,13 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
     statusEl.innerHTML = html;
   }
   function refresh() {
-    if (step === "waist") { setStatus("pending", "click the WAIST line (v = 0) on the image"); return; }
-    if (step === "hem") { setStatus("pending", `click the HEM line (v = ${V_LO.toFixed(0)} mm) on the image`); return; }
-    if (step === "hrefLeft") { setStatus("pending", "click the LEFT bust point on the image"); return; }
-    if (step === "hrefRight") { setStatus("pending", "click the RIGHT bust point on the image"); return; }
+    if (step === "waist") { setStatus("pending", "click the WAIST line (v = 0) on the image"); updateUploadChecklist(); return; }
+    if (step === "hem") { setStatus("pending", `click the HEM line (v = ${V_LO.toFixed(0)} mm) on the image`); updateUploadChecklist(); return; }
+    if (step === "hrefLeft") { setStatus("pending", "click the LEFT bust point on the image"); updateUploadChecklist(); return; }
+    if (step === "hrefRight") { setStatus("pending", "click the RIGHT bust point on the image"); updateUploadChecklist(); return; }
     if (!calib.calibrated) {
       setStatus("uncal", "uncalibrated — backdrop is a visual reference only, not a measurement");
-      updateCircCaveat();
+      updateCircCaveat(); updateUploadChecklist();
       return;
     }
     let hrefLine;
@@ -915,9 +917,8 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
 
     setStatus("cal", `calibrated — vertical <b>${calib.mmPerPxV.toFixed(3)}</b> mm/px, ` +
       `implied FULL-FRAME height <b>${calib.impliedHeightMm().toFixed(0)}</b> mm (top-to-bottom of the ` +
-      `whole image, not just the garment — a badly cropped/stretched image shows up here as an ` +
-      `unreasonable number)${hrefLine}${refLine}${deltaFlag}${diag}`);
-    updateCircCaveat();
+      `whole image, not just the garment)${hrefLine}${refLine}${deltaFlag}${diag}`);
+    updateCircCaveat(); updateUploadChecklist();
   }
   refresh();
 
@@ -930,7 +931,7 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
       step = null; pendingWaist = null;
       if (!ok) {
         setStatus("uncal", "calibration failed — the hem click must be BELOW the waist click in the " +
-          "image (check the order/positions) — click “calibrate waist/hem” to try again");
+          "image — click “calibrate waist/hem” to try again");
       } else {
         calibBtn.textContent = "recalibrate waist/hem";
         calibClearBtn.style.display = "inline-block";
@@ -981,7 +982,6 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
       refresh(); pane.draw();
     };
   }
-  // already-hydrated from a fetched shape.yaml: reflect it immediately
   if (calib.calibrated) {
     calibBtn.textContent = "recalibrate waist/hem";
     calibClearBtn.style.display = "inline-block";
@@ -989,124 +989,33 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
     refresh();
   }
 }
-setupCalibration(traceFrontPane, "front", "TF", true);
-setupCalibration(traceSidePane, "trace", "TS", false);
+setupCalibration(stage1FrontPane, "front", "Front", true);
+setupCalibration(stage1SidePane, "trace", "Side", false);
+setupCalibration(stage1BackPane, null, "Back", false);
+setupCalibration(stage1TopPane, null, "Top", false);
 
-// back/top-down: load-only, reference display, deliberately NOT calibrated
-// or traced in this round (see the Trace-tab banner for why) — they still
-// go through drawBackdrop's normal contain-fit/greyscale path, just with
-// calib permanently uncalibrated, so a loaded photo is visible immediately.
-
-// -- file pickers (client-side, no backend — every new garment starts
-// here now instead of a Python run) -----------------------------------
-function wireFileInput(inputId, pane, calib) {
-  $(inputId).addEventListener("change", (ev) => {
-    const file = ev.target.files[0];
-    if (!file) return;
-    calib.reset();
-    calib.uncalFitRect = null;
-    calib.imageLabel = `uploaded: ${file.name}`;
-    const url = URL.createObjectURL(file);
-    pane.backdrop = loadBackdrop(url, () => pane.draw());
-    pane.draw();
-    status(`loaded ${file.name}`, "ok");
-  });
-}
-wireFileInput("fileFront", traceFrontPane, calibFront);
-wireFileInput("fileSide", traceSidePane, calibTrace);
-wireFileInput("fileBack", traceBackPane, calibBack);
-wireFileInput("fileTop", traceTopPane, calibTop);
-
-// -- feature-line layer selector ----------------------------------------
-for (const btn of document.querySelectorAll(".layerRow button[data-layer]")) {
-  btn.addEventListener("click", () => {
-    for (const b of document.querySelectorAll(".layerRow button[data-layer]")) b.classList.remove("active");
-    btn.classList.add("active");
-    traceFrontPane.activeLayer = traceSidePane.activeLayer = btn.dataset.layer;
-  });
-}
-$("clearLayerBtn").onclick = () => {
-  const layer = traceFrontPane.activeLayer;
-  if (layer === "silhouette") {
-    traceFrontPane.points = [{ v: V_LO, y: 100 }, { v: V_HI, y: 100 }];
-    traceSidePane.front = [{ v: V_LO, y: 80 }, { v: V_HI, y: 80 }];
-    traceSidePane.back = [{ v: V_LO, y: 80 }, { v: V_HI, y: 80 }];
-  } else {
-    traceFrontPane.markLayers[layer] = [];
-    traceSidePane.markLayers[layer] = [];
+function updateUploadChecklist() {
+  const rows = [
+    ["front", calibFront, true], ["side", calibTrace, true],
+    ["top-down", calibTop, true], ["back", calibBack, false],
+  ];
+  let html = "";
+  let requiredDone = 0, requiredTotal = 0;
+  for (const [label, calib, required] of rows) {
+    const done = calib.calibrated;
+    if (required) { requiredTotal++; if (done) requiredDone++; }
+    html += `<div class="${done ? "done" : "todo"}">${done ? "✓" : "○"} ${label}${required ? "" : " (optional)"}` +
+      `${done ? "" : " — not calibrated"}</div>`;
   }
-  traceFrontPane.draw(); traceSidePane.draw();
-  updateTraceCounts(); updateTraceTape();
-};
-
-// -- tape measurements: live check, not a constraint --------------------
-const TRACE_TAPE_ANCHORS = [
-  ["waist", 0.0, "tapeWaist"], ["underbust", 152.4, "tapeUnderbust"],
-  ["bust", 203.2, "tapeBust"], ["above-bust", 254.0, "tapeAboveBust"],
-];
-function updateTraceTape() {
-  if (traceFrontPane.points.length < 2 || traceSidePane.front.length < 2 || traceSidePane.back.length < 2) {
-    $("traceTapeTable").innerHTML = "<tr><td colspan=4>need at least 2 silhouette points on front and side to derive a circumference</td></tr>";
-    return;
-  }
-  const aFit = traceFrontPane.fit(), bfFit = traceSidePane.fitFront(), bbFit = traceSidePane.fitBack();
-  let html = "<tr><th>anchor</th><th>derived</th><th>tape</th><th>Δ</th></tr>";
-  for (const [label, v, inputId] of TRACE_TAPE_ANCHORS) {
-    const vv = Math.max(V_LO, Math.min(V_HI, v));
-    const derived = compoundPerimeter(aFit(vv), bfFit(vv), bbFit(vv));
-    const tape = parseFloat($(inputId).value) || 0;
-    const delta = derived - tape;
-    const cls = Math.abs(delta) > 15 ? "warn" : "";
-    html += `<tr><td>${label}</td><td>${derived.toFixed(1)}</td><td>${tape.toFixed(1)}</td>` +
-      `<td class="${cls}">${delta.toFixed(1)}</td></tr>`;
-  }
-  $("traceTapeTable").innerHTML = html;
+  const doneAll = requiredDone === requiredTotal;
+  html = `<div class="${doneAll ? "done" : "todo"}"><b>${doneAll ? "Stage 1 complete" : `Stage 1: ${requiredDone}/${requiredTotal} required images calibrated`}</b></div>` + html;
+  $("uploadChecklist").innerHTML = html;
 }
-for (const [, , inputId] of TRACE_TAPE_ANCHORS) $(inputId).addEventListener("input", updateTraceTape);
-
-function updateTraceCounts() {
-  $("traceCounts").innerHTML = `silhouette points — front (a): <b>${traceFrontPane.points.length}</b> · ` +
-    `side b_front: <b>${traceSidePane.front.length}</b> · side b_back: <b>${traceSidePane.back.length}</b>. ` +
-    `feature marks — neckline ${traceFrontPane.markLayers.neckline.length + traceSidePane.markLayers.neckline.length} · ` +
-    `hemline ${traceFrontPane.markLayers.hemline.length + traceSidePane.markLayers.hemline.length} · ` +
-    `waist ${traceFrontPane.markLayers.waist.length + traceSidePane.markLayers.waist.length} · ` +
-    `armhole ${traceFrontPane.markLayers.armhole.length + traceSidePane.markLayers.armhole.length}`;
-  updateTraceTape();
-}
-updateTraceCounts();
-
-// -- send trace to Stage 2 -----------------------------------------------
-function applyTraceToShape() {
-  paneA.points = traceFrontPane.points.map(p => ({ v: p.v, y: p.y }));
-  paneB.front = traceSidePane.front.map(p => ({ v: p.v, y: p.y }));
-  paneB.back = traceSidePane.back.map(p => ({ v: p.v, y: p.y }));
-  cacheA = cacheBf = cacheBb = null;
-  lostFeatures.a = lostFeatures.bf = lostFeatures.bb = [];
-  shapeSource = "trace"; updateShapeSourceReadout();
-  shapeHandEdited = false; shapeChangedSincePlace = true;
-  paneA.draw(); paneB.draw(); updateExportGuard(); liveUpdate();
-  $("traceSendStatus").innerHTML = '<span class="ok">✓ sent to Stage 2</span>';
-  goToTab("shape");
-}
-$("sendTraceBtn").onclick = () => {
-  if (traceFrontPane.points.length < 2 || traceSidePane.front.length < 2 || traceSidePane.back.length < 2) {
-    $("traceSendStatus").innerHTML = '<span class="err">trace at least 2 silhouette points on front and 2 on each side of the side view first</span>';
-    return;
-  }
-  if (shapeHandEdited) {
-    confirmModal("Sending this trace to Stage 2 REPLACES the current a(v)/b(v) curves — any hand " +
-      "edits made in Shape since it was opened will be lost. Continue?", applyTraceToShape);
-  } else {
-    applyTraceToShape();
-  }
-};
+updateUploadChecklist();
 
 // Raw pixel dimensions of both backdrop files, and whether they share an
 // aspect ratio — independent of any calibration, straight from what
-// export_shape_editor_static.py baked (PIL's own Image.size on each
-// original, plus the resize it actually served). A mismatch here would
-// mean the two photos were framed/cropped differently from each other,
-// not a click or scale problem.
+// export_shape_editor_static.py baked.
 {
   const refF = state.backdrop_calibration_reference?.front;
   const refT = state.backdrop_calibration_reference?.trace;
@@ -1125,6 +1034,38 @@ $("sendTraceBtn").onclick = () => {
           "the two photos were framed/cropped differently from each other</span>");
   }
 }
+
+// -- feature-line layer selector + tape measurements (Stage 2) -----------
+for (const btn of document.querySelectorAll(".layerRow button[data-layer]")) {
+  btn.addEventListener("click", () => {
+    for (const b of document.querySelectorAll(".layerRow button[data-layer]")) b.classList.remove("active");
+    btn.classList.add("active");
+    paneA.activeLayer = paneB.activeLayer = btn.dataset.layer;
+  });
+}
+const TRACE_TAPE_ANCHORS = [
+  ["waist", 0.0, "tapeWaist"], ["underbust", 152.4, "tapeUnderbust"],
+  ["bust", 203.2, "tapeBust"], ["above-bust", 254.0, "tapeAboveBust"],
+];
+function updateTraceTape() {
+  if (paneA.points.length < 2 || paneB.front.length < 2 || paneB.back.length < 2) {
+    $("traceTapeTable").innerHTML = "<tr><td colspan=4>need at least 2 silhouette points on a(v) and each side of b(v)</td></tr>";
+    return;
+  }
+  const aFit = paneA.fit(), bfFit = paneB.fitFront(), bbFit = paneB.fitBack();
+  let html = "<tr><th>anchor</th><th>derived</th><th>tape</th><th>Δ</th></tr>";
+  for (const [label, v, inputId] of TRACE_TAPE_ANCHORS) {
+    const vv = Math.max(V_LO, Math.min(V_HI, v));
+    const derived = compoundPerimeter(aFit(vv), bfFit(vv), bbFit(vv));
+    const tape = parseFloat($(inputId).value) || 0;
+    const delta = derived - tape;
+    const cls = Math.abs(delta) > 15 ? "warn" : "";
+    html += `<tr><td>${label}</td><td>${derived.toFixed(1)}</td><td>${tape.toFixed(1)}</td>` +
+      `<td class="${cls}">${delta.toFixed(1)}</td></tr>`;
+  }
+  $("traceTapeTable").innerHTML = html;
+}
+for (const [, , inputId] of TRACE_TAPE_ANCHORS) $(inputId).addEventListener("input", updateTraceTape);
 
 // ---------------------------------------------------------------- 3D pane
 const view = $("view");
@@ -1217,11 +1158,6 @@ $("baselineReadout").innerHTML = fmtShell(state.baseline_shell_analysis, "commit
 $("armholeReadout").textContent = `${SPLIT.toFixed(2)}° (frozen from the snapshot — armhole re-solve needs Python)`;
 $("modeTag").innerHTML = `<b class="ok">LIVE</b> — client-computed, cross-validated to ~1e-13mm`;
 
-// generator/neckline reference: prefer the committed shape.yaml's own
-// dicts when that's what Stage 2 opened on (more accurate to the CURRENT
-// design than the baked-at-export-time snapshot); otherwise fall back to
-// the baked JSON. Either way these stay REFERENCE ONLY — no Python here
-// to re-solve the fillet/bump-field construction or the neckline shape.
 const g = initialShape.generator || state.generator;
 $("genRef").innerHTML = `hem circ ${g.hem_circumference} · dome n ${g.dome_n} · ` +
   `fillet R ${g.fillet_radius} (${g.fillet_type}) · plateau θ ${g.plateau_theta_deg.toFixed(3)}° · ` +
@@ -1230,9 +1166,8 @@ $("genRef").innerHTML = `hem circ ${g.hem_circumference} · dome n ${g.dome_n} �
 // ---------------------------------------------------------------- adaptive density UI
 $("densityReport").innerHTML = `adaptive seed replaced the flat ${bakedSeedCount}-point baked seed: ` +
   `a(v) <b>${bakedSeedCount}→${initA.count}</b> pts · b_front <b>${bakedSeedCount}→${initBf.count}</b> pts · ` +
-  `b_back <b>${bakedSeedCount}→${initBb.count}</b> pts (≤${DEFAULT_TARGET_RESIDUAL_MM}mm target, sampled ` +
-  `between control points against the true generated curve, never just at knots — applies to the ` +
-  `generator seed only; a curve opened from shape.yaml or a trace keeps its own point count).`;
+  `b_back <b>${bakedSeedCount}→${initBb.count}</b> pts (≤${DEFAULT_TARGET_RESIDUAL_MM}mm target — applies to the ` +
+  `generator seed only; a curve opened from shape.yaml keeps its own point count).`;
 
 $("densityA").min = String(MIN_POINTS); $("densityA").max = String(MAX_POINTS); $("densityA").value = String(paneA.points.length);
 $("densityAVal").textContent = String(paneA.points.length);
@@ -1314,10 +1249,7 @@ $("smoothBb").onclick = () => {
 };
 
 // neckline: heights are still reference-only (not draggable in this
-// first cut — rebuilding the neckline SHAPE needs Python), but the trim
-// itself is applied to the 3D view: it's a known function of theta, so
-// clipping the mesh to it is a clip, not a solve. Faithful port of
-// neckline.NecklineV3.height (validated to ~1e-11mm, see geom.js).
+// first cut), but the trim itself is applied to the 3D view.
 const n = initialShape.neckline || state.neckline;
 $("neckRef").innerHTML = `CF ${n.cf_height} · peak ${n.peak_height} · side ${n.side_height} · ` +
   `CB ${n.cb_height} · peak θ ${n.peak_theta}° · bow ${n.rise_bow} · decay ${n.decay_rate} · ` +
@@ -1327,11 +1259,15 @@ const necklineFn = necklineHeightFn(n);
 function liveUpdate() {
   const aFit = paneA.fit(), bfFit = paneB.fitFront(), bbFit = paneB.fitBack();
   $("monoReadout").innerHTML = fmtMono(monotonicityReport(aFit, V_HI), "LIVE");
-  $("circTable").innerHTML = fmtCircTable(
-    coarseCircumferenceReport(aFit, bfFit, bbFit, V_LO, V_HI), "LIVE");
+  const circRows = coarseCircumferenceReport(aFit, bfFit, bbFit, V_LO, V_HI);
+  $("circTable").innerHTML = fmtCircTable(circRows, "LIVE");
   const shell = new CompoundCoarseShell(aFit, bfFit, bbFit, V_LO, V_HI, SPLIT);
   setMeshes(shell.buildMeshes(48, 64, necklineFn), 0xc9cfcc);
   $("shellReadout").innerHTML = fmtShell(state.initial_shell_analysis, "SNAPSHOT (baked at export)", true);
+  updateTraceTape();
+  $("exportMonoReadout").innerHTML = fmtMono(monotonicityReport(aFit, V_HI), "LIVE");
+  $("exportCircTable").innerHTML = fmtCircTable(circRows, "LIVE");
+  $("exportShellReadout").innerHTML = fmtShell(state.initial_shell_analysis, "SNAPSHOT (baked at export)", true);
   status("live", "ok");
 }
 
@@ -1340,11 +1276,36 @@ function liveUpdate() {
   const shell = new CompoundCoarseShell(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT);
   setMeshes(shell.buildMeshes(48, 64, necklineFn), 0xc9cfcc);
 }
+$("exportMonoReadout").innerHTML = $("monoReadout").innerHTML;
+$("exportCircTable").innerHTML = $("circTable").innerHTML;
+$("exportShellReadout").innerHTML = $("shellReadout").innerHTML;
+
+// ---------------------------------------------------------------- Stage 3: Export Shell
+function updateExportSummary() {
+  const calibSummary = (label, calib) => `${label}: ${calib.calibrated
+    ? `<span class="ok">calibrated</span> (${calib.imageLabel || "default asset"})`
+    : '<span class="warn">not calibrated</span>'}`;
+  $("exportSummary").innerHTML =
+    `source: ${shapeSource === "shape.yaml" ? "committed shape.yaml" : shapeSource === "seed" ? "generator seed" : "hand-edited this session"}<br>` +
+    `points: a(v) <b>${paneA.points.length}</b> · b_front <b>${paneB.front.length}</b> · b_back <b>${paneB.back.length}</b><br>` +
+    `${calibSummary("front backdrop", calibFront)} · ${calibSummary("side backdrop", calibTrace)}<br>` +
+    `neckline: CF ${n.cf_height} · peak ${n.peak_height} · CB ${n.cb_height}<br>` +
+    (lastExport
+      ? `last export: ${lastExport.label ? `"${lastExport.label}"` : "(unlabeled)"} at ${lastExport.exportedAt.toLocaleString()}` +
+        (shapeHandEditedSinceExport() ? ' — <span class="warn">shape has changed since</span>' : ' — <span class="ok">matches the current shell</span>')
+      : '<span class="dim">nothing exported yet this session</span>');
+}
+function shapeHandEditedSinceExport() {
+  if (!lastExport) return false;
+  const same = (a, b) => a.length === b.length && a.every((p, i) => p[0] === b[i][0] && p[1] === b[i][1]);
+  const curA = paneA.points.map(p => [p.v, p.y]);
+  const curBf = paneB.front.map(p => [p.v, p.y]);
+  const curBb = paneB.back.map(p => [p.v, p.y]);
+  return !(same(curA, lastExport.aPoints) && same(curBf, lastExport.bFrontPoints) && same(curBb, lastExport.bBackPoints));
+}
 
 // ---------------------------------------------------------------- export (no server to save to)
-function yamlFloat(x) {
-  return String(x);
-}
+function yamlFloat(x) { return String(x); }
 function yamlPx(px) { return `[${yamlFloat(px[0])}, ${yamlFloat(px[1])}]`; }
 function dumpCalibrationYaml(lines, calibration) {
   const names = Object.keys(calibration);
@@ -1397,12 +1358,28 @@ function dumpShapeYaml() {
   return lines.join("\n") + "\n";
 }
 
+function recordExport() {
+  lastExport = {
+    aPoints: paneA.points.map(p => [p.v, p.y]),
+    bFrontPoints: paneB.front.map(p => [p.v, p.y]),
+    bBackPoints: paneB.back.map(p => [p.v, p.y]),
+    neckline: { ...n },
+    label: $("exportLabel").value.trim(),
+    exportedAt: new Date(),
+  };
+  lastExportChart = buildSurfaceChart(
+    fitOfPoints(lastExport.aPoints), fitOfPoints(lastExport.bFrontPoints), fitOfPoints(lastExport.bBackPoints),
+    V_LO, V_HI, SPLIT, necklineHeightFn(lastExport.neckline));
+  shapeChangedSincePlace = false;
+  updateExportSummary();
+}
+
 $("exportOverride").addEventListener("change", updateExportGuard);
 
 $("exportBtn").onclick = () => {
   if (exportBlocked()) {
     $("exportStatus").innerHTML = '<span class="err">export blocked — a named feature is lost at the ' +
-      "current density (see the warning above); raise the density or check the override</span>";
+      "current density (see Stage 2); raise the density or check the override</span>";
     return;
   }
   const overridden = lostFeatures.a.length || lostFeatures.bf.length || lostFeatures.bb.length;
@@ -1415,35 +1392,36 @@ $("exportBtn").onclick = () => {
   URL.revokeObjectURL(url);
   $("exportArea").value = text;
   $("exportArea").style.display = "block";
+  recordExport();
   $("exportStatus").innerHTML = overridden
     ? '<span class="warn">downloaded shape.yaml WITH a named feature lost (override used).</span> ' +
-      "This file has to reach Claude Code some other way (paste its contents, attach it, etc.) — " +
-      "the button above (copy to clipboard) is the more direct path."
+      "This file has to reach Claude Code some other way — the button above (copy to clipboard) " +
+      "is the more direct path."
     : '<span class="ok">downloaded shape.yaml.</span> This file has to reach Claude Code some ' +
-      "other way (paste its contents, attach it, etc.) — the button above (copy to clipboard) " +
-      "is the more direct path.";
+      "other way — the button above (copy to clipboard) is the more direct path.";
 };
 $("copyBtn").onclick = async () => {
   if (exportBlocked()) {
     $("exportStatus").innerHTML = '<span class="err">copy blocked — a named feature is lost at the ' +
-      "current density (see the warning above); raise the density or check the override</span>";
+      "current density (see Stage 2); raise the density or check the override</span>";
     return;
   }
   const text = dumpShapeYaml();
   try {
     await navigator.clipboard.writeText(text);
-    $("exportStatus").innerHTML = '<span class="ok">✓ copied to clipboard</span> — paste it into your ' +
-      "Claude Code conversation and ask it to commit as tools/dress-shell/shape.yaml. That's the one " +
-      "path from this page into the repo — there's no direct write from a static site.";
+    recordExport();
+    $("exportStatus").innerHTML = '<span class="ok">✓ copied to clipboard — exported.</span> Paste it into your ' +
+      "Claude Code conversation and ask it to commit as tools/dress-shell/shape.yaml.";
   } catch {
     $("exportArea").value = text;
     $("exportArea").style.display = "block";
+    recordExport();
     $("exportStatus").innerHTML = '<span class="warn">clipboard blocked — select the text below, copy it, ' +
-      "and paste it into your Claude Code conversation to have it committed</span>";
+      "and paste it into your Claude Code conversation to have it committed (exported)</span>";
   }
 };
 
-// ---------------------------------------------------------------- Stage 3 (Place)
+// ---------------------------------------------------------------- Panels tab — UNCHANGED
 function summarizeLayoutYaml(text) {
   const panels = [];
   let cur = null;
@@ -1479,45 +1457,84 @@ $("copyLayoutBtn").onclick = async () => {
   try {
     await navigator.clipboard.writeText(layoutYamlText);
     $("layoutCopyStatus").innerHTML = '<span class="ok">✓ copied to clipboard</span> — this is the ' +
-      "committed file verbatim (read-only in this round); there is nothing to re-commit unless it's " +
-      "been edited by hand elsewhere.";
+      "committed file verbatim (read-only in this round).";
   } catch {
     $("layoutArea").style.display = "block";
     $("layoutCopyStatus").innerHTML = '<span class="warn">clipboard blocked — select the text above and copy it</span>';
   }
 };
-
-// ---------------------------------------------------------------- tab navigation
-// "The arrows are load-bearing": moving forward (1->2, 2->3) is free.
-// Moving backward is consequential and warned EVERY time, unconditionally
-// — never gated by a dirty-flag, because the risk (retracing / shape
-// drift under placements) is the same whether or not this particular
-// visit happens to change anything.
-const TAB_ORDER = { trace: 1, shape: 2, place: 3 };
-let currentTab = "shape";
-
-function setTabVisible(tab) {
-  for (const t of Object.keys(TAB_ORDER)) {
-    $(`tab-${t}`).classList.toggle("current", t === tab);
-  }
-  for (const btn of document.querySelectorAll(".tabBtn")) {
-    btn.classList.toggle("current", btn.dataset.tab === tab);
-  }
-}
 function enterPlaceTab() {
   const banner = $("placeImpactBanner");
   if (shapeChangedSincePlace) {
     banner.style.display = "block";
-    banner.innerHTML = `⚠ <b>shape changed since Place was last opened.</b> The real check here is ` +
-      `shape_impact.py's report_shape_change_impact — it re-validates every layout.yaml panel's fixed ` +
-      `(θ, s, rotation) against the old and new shell via seat-standoff footprint, connector/outline/` +
-      `mirror-twin legality, and layering. That validation stack has NOT been ported to client-side JS ` +
-      `yet — this banner is a flag, not a real check. Treat every panel below as UNVERIFIED against the ` +
-      `current shell until that port exists.`;
+    banner.innerHTML = `⚠ <b>the shell has changed since this tab was last opened</b> — panel placements ` +
+      `here are not re-validated against it. See Stage 3 (Export Shell) for the real, per-panel standoff ` +
+      `impact report when returning from an export.`;
   } else {
     banner.style.display = "none";
   }
   shapeChangedSincePlace = false;
+}
+
+// ---------------------------------------------------------------- Stage 3 <-> Stage 2 impact
+// The consequential backward move: leaving Export Shell for anywhere
+// except Panels re-validates every authored layout.yaml panel's standoff
+// against the CURRENT shell, using shape-editor-chart.js's scoped port of
+// shape_impact.py's seat_standoff. Only meaningful once something has
+// actually been exported this session — before that there is nothing to
+// invalidate.
+let impactClasses = null, impactPanels = null;
+async function ensureImpactData() {
+  if (impactClasses && impactPanels) return;
+  try {
+    const [classesText, layoutText] = await Promise.all([
+      fetch("./tools/dress-shell/panels.yaml").then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))),
+      fetch("./tools/dress-shell/layout.yaml").then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))),
+    ]);
+    impactClasses = parsePanelClasses(classesText);
+    impactPanels = parseLayoutPanels(layoutText);
+  } catch (e) {
+    console.warn("could not load panels.yaml/layout.yaml for the impact report:", e);
+    impactClasses = null; impactPanels = null;
+  }
+}
+function fmtExportLabel(exp) {
+  return `${exp.label ? `"${exp.label}"` : "(unlabeled)"} at ${exp.exportedAt.toLocaleString()}`;
+}
+async function buildImpactModalHtml() {
+  await ensureImpactData();
+  const newChart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
+  let body;
+  if (!impactClasses || !impactPanels) {
+    body = '<span class="warn">could not load panels.yaml/layout.yaml — showing the generic warning only. ' +
+      "Panel placements live in (θ, s) on the shell and will move if it changes.</span>";
+  } else if (impactPanels.length === 0) {
+    body = "no authored panels in layout.yaml — nothing to re-validate.";
+  } else {
+    const results = computeStandoffImpact(lastExportChart, newChart, impactClasses, impactPanels);
+    const flagged = results.filter(r => r.error || r.regressed || !r.nowWithinTolerance);
+    if (flagged.length === 0) {
+      body = '<span class="ok">no panels affected — every panel that fit at export still fits, standoff essentially unchanged.</span>';
+    } else {
+      let rows = "";
+      for (const r of flagged) {
+        if (r.error) { rows += `<tr><td>${r.id}</td><td colspan=3 class="err">${r.error}</td></tr>`; continue; }
+        const tag = r.regressed ? '<span class="err">REGRESSED</span>' : '<span class="warn">still exceeds</span>';
+        const delta = r.deltaMm != null ? `${r.deltaMm >= 0 ? "+" : ""}${r.deltaMm.toFixed(2)}` : "—";
+        rows += `<tr><td>${r.id}</td><td>${r.oldStandoffMm.toFixed(2)}→${r.newStandoffMm.toFixed(2)} mm</td>` +
+          `<td>Δ${delta} mm</td><td>${tag}</td></tr>`;
+      }
+      body = `<table><tr><th>panel</th><th>standoff</th><th>Δ</th><th></th></tr>${rows}</table>` +
+        `<div class="legend" style="padding:4px 0 0">worst first · tolerance 2.0 mm · standoff only — ` +
+        `connector/outline legality, mirror-twin validity, and the layering DAG still need the Python ` +
+        `shape_impact.py machinery, not ported here.</div>`;
+    }
+  }
+  return `Returning to Shape from an exported shell (${fmtExportLabel(lastExport)}):<br><br>${body}<br><br>Continue?`;
+}
+
+function isConsequentialBackNav(from, to) {
+  return from === "export" && to !== "export" && to !== "place";
 }
 function confirmModal(html, onConfirm) {
   $("navModalText").innerHTML = html;
@@ -1525,38 +1542,39 @@ function confirmModal(html, onConfirm) {
   $("navModalConfirm").onclick = () => { $("navModal").classList.remove("open"); onConfirm(); };
   $("navModalCancel").onclick = () => { $("navModal").classList.remove("open"); };
 }
-function goToTab(tab) {
+
+const TAB_NAMES = ["upload", "shape", "export", "place"];
+let currentTab = "shape";
+function setTabVisible(tab) {
+  for (const t of TAB_NAMES) $(`tab-${t}`).classList.toggle("current", t === tab);
+  for (const btn of document.querySelectorAll(".tabBtn")) btn.classList.toggle("current", btn.dataset.tab === tab);
+}
+async function goToTab(tab) {
   if (tab === currentTab) return;
-  function commit() {
+  const commit = () => {
     currentTab = tab;
     setTabVisible(tab);
+    if (tab === "export") updateExportSummary();
     if (tab === "place") enterPlaceTab();
-  }
-  if (TAB_ORDER[tab] >= TAB_ORDER[currentTab]) { commit(); return; }
-  if (currentTab === "shape" && tab === "trace") {
-    confirmModal("Returning to Trace: retracing and sending it forward again REPLACES the curves " +
-      "Shape's hand edits are built on. Nothing is lost just by looking here — only by using " +
-      "“use this trace for Stage 2” again. Continue?", commit);
-  } else if (currentTab === "place" && tab === "shape") {
-    confirmModal("Returning to Shape: panel placements in Stage 3 live in (θ, s) on the CURRENT " +
-      "shell and will move — or become invalid — if the shape changes here. Continue?", commit);
-  } else {
-    // place -> trace direct jump: both warnings apply
-    confirmModal("Returning to Trace from Place: panel placements will need re-validation against " +
-      "whatever shape comes out of Shape, and retracing replaces Shape's curves in turn. Continue?", commit);
-  }
+  };
+  if (!isConsequentialBackNav(currentTab, tab) || !lastExport) { commit(); return; }
+  $("navModalText").innerHTML = "computing panel standoff impact against the last export…";
+  $("navModal").classList.add("open");
+  const html = await buildImpactModalHtml();
+  confirmModal(html, commit);
 }
 for (const btn of document.querySelectorAll(".tabBtn")) {
-  btn.addEventListener("click", () => goToTab(btn.dataset.tab));
+  btn.addEventListener("click", () => { goToTab(btn.dataset.tab); });
 }
 setTabVisible(currentTab);
 
 paneA.draw();
 paneB.draw();
-traceFrontPane.draw();
-traceSidePane.draw();
-traceBackPane.draw();
-traceTopPane.draw();
+stage1FrontPane.draw();
+stage1SidePane.draw();
+stage1BackPane.draw();
+stage1TopPane.draw();
+updateTraceTape();
 status(`ready — v ∈ [${V_LO.toFixed(0)}, ${V_HI.toFixed(0)}] mm · ` +
        `${paneA.points.length} a(v) points, ${paneB.front.length} b_front / ` +
        `${paneB.back.length} b_back points (v fixed, drag value) · fully client-side, no server`);
