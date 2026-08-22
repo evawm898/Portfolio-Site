@@ -22,7 +22,7 @@ export const SECTIONS = [
 ];
 
 export const CONTROLS = [
-  {"id":"bloomType","section":"acc-form","kind":"select","options":[{"value":"coiled","text":"SPIRAL"},{"value":"radial","text":"ROSETTE"},{"value":"bilateral","text":"FAN"}],"default":"coiled","label":"Arrangement","tier":"standard"},
+  {"id":"bloomType","section":"acc-form","kind":"select","options":[{"value":"coiled","text":"SPIRAL"},{"value":"radial","text":"ROSETTE"},{"value":"bilateral","text":"FAN","advancedOnly":true}],"default":"coiled","standardFallback":"coiled","label":"Arrangement","tier":"standard"},
   {"id":"petalCount","section":"acc-form","kind":"slider","min":1,"max":40,"step":1,"default":4,"label":"Number of petals","fmt":"int","gating":{"data-bloom-styles":"coiled radial"},"tier":"standard"},
   {"id":"divergenceMode","section":"acc-form","kind":"select","options":[{"value":"golden","text":"GOLDEN"},{"value":"even","text":"EVEN"},{"value":"custom","text":"CUSTOM"}],"default":"golden","label":"Divergence angle","gating":{"data-bloom-styles":"coiled"}},
   {"id":"divergenceAngle","section":"acc-form","kind":"slider","min":0,"max":180,"step":0.1,"default":137.5,"label":"Custom angle","fmt":"f1deg","divId":"divergenceAngleCtrl","permanentHidden":true},

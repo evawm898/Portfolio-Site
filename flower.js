@@ -3461,23 +3461,28 @@ WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount' && c.id !== 'he
 let standardMode = true;
 const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
 const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
-// Option-level tier: a handful of select OPTIONS are Advanced-only even though the
-// control they live in (Arrangement / Edge) is a Standard picker. In Standard we hide
-// those options and, if a loaded design had one selected, fall back to a Standard-safe
-// value (and regenerate, since the geometry must follow the picker). Why each is here —
-// caught by the Standard-option sweep as broken-in-Standard:
-//   - Edge TOOTHED / SCALLOPED: the teeth/scallops reshape the silhouette rim, but the
-//     Standard-default continuous margin replaces the rim with smooth marginal strands,
-//     so they render identically to CLEAN. They render correctly in Advanced (continuous
-//     margin OFF). Return to Standard once the margin is edge-profile-aware (issue #53).
-//   - Arrangement FAN (bilateral): renders as scattered debris. Advanced-only until the
-//     bilateral layout is rebuilt.
-// (The FRACTAL edge was DELETED outright — no live geometry ever existed — so it is gone
-//  from the enum, not listed here; the v15->v16 migration maps any saved fractal to clean.)
-const ADV_OPTIONS = {
-  tipStyle:  { advanced: ['jagged', 'scallop'], fallback: 'clean' },
-  bloomType: { advanced: ['bilateral'], fallback: 'coiled' },
-};
+// Option-level tier: a select OPTION can be Advanced-only even though the control it
+// lives in is a Standard picker. In Standard those options are hidden and, if a loaded
+// design had one selected, the picker falls back to a Standard-safe value (and
+// regenerates, since the geometry must follow the picker).
+//
+// DECLARED IN THE REGISTRY, not here. This used to be a hand-written literal — a third
+// list beside the registry and the markup, with no gate tying it to either, holding
+// reasons that quietly stopped being true. An option now carries `advancedOnly: true`
+// and its control carries `standardFallback`, and verify-tier-visibility asserts both
+// directions at the option level: an advancedOnly option is hidden in Standard and
+// visible in Advanced, and every other option is visible in both.
+//
+// TOOTHED / SCALLOPED were quarantined here because the teeth reshape the rim polyline
+// and the Standard-default continuous margin discarded it, so they rendered identically
+// to CLEAN. PR #58 put the treatments on the marginal strands, so the condition that
+// quarantined them no longer holds and they are Standard again.
+// Arrangement FAN (bilateral) stays Advanced-only: it renders as scattered debris
+// (issue #54), which is a live defect, not a stale reason.
+const ADV_OPTIONS = Object.fromEntries(
+  PANEL.filter((c) => c.kind === 'select' && (c.options || []).some((o) => o.advancedOnly))
+       .map((c) => [c.id, { advanced: c.options.filter((o) => o.advancedOnly).map((o) => o.value),
+                            fallback: c.standardFallback }]));
 function applyTier() {
   let fellBack = false;
   for (const [id, spec] of Object.entries(ADV_OPTIONS)) {
