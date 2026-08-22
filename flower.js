@@ -3460,6 +3460,36 @@ function applyTier() {
   }
   if (standardMode) {
     for (const c of WIRED) if (!STANDARD_IDS.has(c.id)) { const w = ctrlWrap(c.id); if (w) w.hidden = true; }
+  } else {
+    // ADVANCED — the mirror image of the block above, and for a long time the missing
+    // half of it: entering Standard force-hides every non-standard control, but nothing
+    // ever force-SHOWED them back on leaving Standard. A control with a contextual
+    // data-* gating attribute got un-hidden anyway, as a side effect of that attribute's
+    // own sweep (e.g. data-hide-bilateral) recomputing its hidden state unconditionally
+    // every time it runs — but any Advanced control with NO gating attribute had nothing
+    // to reverse the Standard-mode hide, and stayed stuck hidden in Advanced forever
+    // (confirmed for curlBias, petalCup, crossSection, layerCount, continuousMargin, and
+    // ~20 others — see tools/verify-tier-visibility.mjs). Fix: on leaving Standard,
+    // un-hide every WIRED control that has no CONTEXTUAL reason to stay hidden —
+    // excluding the three carve-outs below, none of which a blind unhide can safely
+    // touch:
+    //   - c.gating: already owned by that attribute's own sweep, called in the same
+    //     chain (this function is itself called at the end of every updateXOptions()),
+    //     so it always ends up correct regardless of what order the calls run in — but
+    //     THIS loop must never touch it, or it could show a contextually-wrong control
+    //     for one frame, or (worse) permanently if that control's sweep already ran
+    //     earlier in the same chain.
+    //   - c.permanentHidden: migration-only / dev-only controls (divergenceAngle's
+    //     legacy slot, receptacleType, stemCurve, tube) that must never surface in any
+    //     tier.
+    //   - c.imperativeGate: a control shown/hidden by bespoke JS rather than a data-*
+    //     sweep (captureDist, via updateTerminationOptions()) — a blind unhide here
+    //     would fight that logic rather than reproduce it.
+    for (const c of WIRED) {
+      if (c.gating || c.permanentHidden || c.imperativeGate) continue;
+      const w = ctrlWrap(c.id);
+      if (w) w.hidden = false;
+    }
   }
   // Collapse an accordion section (Standard only) when none of its controls show.
   document.querySelectorAll('.fl-acc[data-acc]').forEach((sec) => {
