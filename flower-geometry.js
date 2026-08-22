@@ -688,33 +688,12 @@ export function placePoint(p, az, baseHeight, radialOffset = 0, tilt = 0) {
    ------------------------------------------------------------------- */
 
 export function buildSilhouette(P, n = 56) {
-  // LOBED / CLEFT: the outline is the marching-squares contour of the material
-  // mask (a single re-entrant loop weaving up each lobe and down each cleft).
-  // Off (cleftDepth <= 0) falls through to the exact analytic ±w(u) loop below.
-  const cc = getCleftContour(P);
-  if (cc && cc.loops.length) {
-    // Match the analytic outline's winding (clockwise / negative shoelace area) so
-    // every downstream orientation convention — rim tube, Voronoi cell rings, blade
-    // top/bottom faces — stays consistent (outward normals, positive solid volume).
-    let outer = cc.loops[0];
-    if (polyArea(outer) > 0) outer = outer.slice().reverse();
-    return outer;
-  }
-  const right = [];
-  const left = [];
-  for (let i = 0; i <= n; i++) {
-    const u = i / n;
-    const X = P.L * u;
-    const hw = petalHalfWidth(u, P);
-    right.push({ x: X, y: hw });
-    left.push({ x: X, y: -hw });
-  }
-  // outline: base(+Y) -> tip along +Y edge, then tip -> base along -Y edge
-  const outline = [];
-  for (let i = 0; i < right.length; i++) outline.push(right[i]);
-  for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
-  // drop duplicate/degenerate points at the tip (hw -> 0) and base
-  return dedupePolygon(outline);
+  // ONE PRODUCER: where the petal edge is, is decided by ribPath(P) (below) —
+  // the marching-squares contour of the material mask when the petal is clefted,
+  // the analytic +-w(u) loop when it is not. This wrapper only exists because
+  // much of the codebase asks for the outline by this name; it adds nothing of
+  // its own, so there is no second definition here to drift from that one.
+  return ribPath(P).loop(n);
 }
 
 /* -------------------------------------------------------------------
@@ -732,17 +711,18 @@ export function buildSilhouette(P, n = 56) {
    inset can't track that, which is exactly why the gap varied around the
    perimeter and the rib crossed over the infill near the base.
 
-   These functions are the single source of truth for the rib's geometry.
-   marginStrands() (flower.js) — what actually gets lofted into a tube —
-   calls ribCenterline() below rather than re-deriving the flare curve, so
-   the rendered rib and the boundary every infill clips to CANNOT diverge:
-   it's the same function, not a second copy that happens to agree today.
+   These functions are the single source of truth for the rib's WEIGHT and its
+   inner edge; ribPath(P) below owns the CURVE they sit on. marginStrands()
+   (flower.js) — what actually gets lofted into a tube — asks ribPath for that
+   curve rather than re-deriving it, so the rendered rib and the boundary every
+   infill clips to CANNOT diverge: it's the same producer, not a second copy
+   that happens to agree today.
    ------------------------------------------------------------------- */
 
 // The bundle/flare smoothstep: 0 (on-axis, bundled with the midrib) near
-// the foot, ramping to 1 (exactly on the true outline) by `flareEnd`. Used
-// by marginStrands (flower.js) to place the rib's own centerline, and by
-// ribCenterline below for the boundary — the identical curve both places.
+// the foot, ramping to 1 (exactly on the true outline) by `flareEnd`. Used by
+// ribPath to blend each marginal strand off the axis and onto the boundary,
+// and by ribCenterline for the scalar form — the identical curve both places.
 export function marginFlareFactor(u, bundleTight, flareRate) {
   const bt = clamp(bundleTight != null ? bundleTight : 0.5, 0, 1);
   const fr = clamp(flareRate != null ? flareRate : 0.5, 0, 1);
@@ -773,11 +753,15 @@ export function ribRadius(u, P, contMargin) {
 }
 
 // Where the rib's tube is CENTRED at u, before subtracting its own radius:
-// the true outline under a constant-radius hoop, or the bundled/flared
-// strand curve under continuous margin — the exact curve marginStrands
-// plots (flower.js calls this function directly for that purpose).
+// the boundary's outer envelope under a constant-radius hoop, or that envelope
+// bundled/flared under continuous margin. The pointwise scalar form of what
+// ribPath lofts — same producer, so the two cannot describe different edges.
 export function ribCenterline(u, P, contMargin) {
-  const hw = petalHalfWidth(clamp(u, 0, 1), P);
+  // outerAt is ribPath's own outer envelope — the analytic w(u) verbatim on a
+  // smooth petal, the contour's binned envelope on a clefted one. Reading it
+  // (rather than petalHalfWidth directly) is what keeps the scalar bound every
+  // infill clips to and the polyline the rim is lofted along the same curve.
+  const hw = ribPath(P).outerAt(clamp(u, 0, 1));
   if (!contMargin) return hw;
   return hw * marginFlareFactor(u, P.bundleTightness, P.flareRate);
 }
@@ -806,6 +790,250 @@ export function ribMarginPolyline(P, n = 56) {
   for (let i = 0; i < right.length; i++) outline.push(right[i]);
   for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
   return dedupePolygon(outline);
+}
+
+/* -------------------------------------------------------------------
+   4a-ii. ribPath(P) — THE SINGLE PRODUCER of the petal boundary.
+
+   ribInnerEdge() unified the CONSUMERS of the boundary. This unifies the
+   PRODUCERS, which is where #64 actually lived: there were two, and the
+   second one was private to continuous margin. The hoop rim traced
+   buildSilhouette (the real material outline, cleft-aware), while the
+   continuous-margin strands were sampled straight off the analytic envelope
+   +-petalHalfWidth(u) x flare. A cleft petal has no single w(u), so those
+   strands sailed over every sinus and the margin never sealed around a lobe:
+   watertight, and the wrong shape.
+
+   Everything that needs to know where the petal edge is now asks this:
+     .loop(n)     closed flattened boundary, base(+Y) -> tip -> base(-Y).
+                  buildSilhouette() is a thin alias for it.
+     .sides       the boundary split into a +Y half and a -Y half, base->tip
+                  (null when the split is degenerate; see .diag).
+     .strands(n)  what CONTINUOUS MARGIN lofts: each side rooted at the foot
+                  and blended onto the boundary by marginFlareFactor.
+     .outerAt(u)  the boundary's outer envelope at u — what ribCenterline, and
+                  therefore ribInnerEdge, derives from.
+     .diag        the split invariants, for the gates to assert on.
+
+   TWO EVALUATION STRATEGIES FOR ONE CURVE, not two curves. With no clefts the
+   analytic envelope IS the boundary, and is used verbatim (so smooth petals
+   stay byte-identical); with clefts the marching-squares contour is. Adding a
+   third strategy (a rim treatment) means adding it HERE, not beside this.
+   ------------------------------------------------------------------- */
+
+// Douglas-Peucker, on flattened points. A cleft contour is ~1k vertices of
+// which most lie on nearly straight runs; lofting all of them would multiply
+// the rim's triangle count for nothing. Corner-preserving, so sinus floors and
+// lobe tips survive at any tolerance coarse enough to flatten the straights.
+function simplifyPath(pts, tol) {
+  if (pts.length < 3) return pts.slice();
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  const t2 = tol * tol;
+  while (stack.length) {
+    const [i0, i1] = stack.pop();
+    if (i1 <= i0 + 1) continue;
+    const a = pts[i0], b = pts[i1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let best = -1, bestD = 0;
+    for (let k = i0 + 1; k < i1; k++) {
+      const p = pts[k];
+      let d2;
+      if (len2 < 1e-18) { const ex = p.x - a.x, ey = p.y - a.y; d2 = ex * ex + ey * ey; }
+      else {
+        const t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / len2, 0, 1);
+        const ex = p.x - (a.x + dx * t), ey = p.y - (a.y + dy * t);
+        d2 = ex * ex + ey * ey;
+      }
+      if (d2 > bestD) { bestD = d2; best = k; }
+    }
+    if (bestD > t2 && best > 0) { keep[best] = 1; stack.push([i0, best], [best, i1]); }
+  }
+  const out = [];
+  for (let i = 0; i < pts.length; i++) if (keep[i]) out.push(pts[i]);
+  return out;
+}
+
+// Split any segment longer than `step` — the rib is mapped onto a cupped,
+// rolled, possibly crozier-curled surface downstream, and a long chord across
+// real curvature facets visibly (the same reason veins are densified).
+function densifyFlat(pts, step) {
+  if (!(step > 0) || pts.length < 2) return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    const k = Math.ceil(d / step);
+    for (let j = 1; j < k; j++) out.push({ x: lerp(a.x, b.x, j / k), y: lerp(a.y, b.y, j / k) });
+    out.push(b);
+  }
+  return out;
+}
+
+// The boundary's own two y = 0 crossings. A bilaterally symmetric petal outline
+// meets its axis exactly twice: once on the base edge, once in the tip region
+// (a lobe tip when the lobe count is odd, a sinus floor when it is even).
+// Found by walking the loop's OWN edge sequence and interpolating the sign
+// change — NOT by a nearest-point search against the base and apex, which picks
+// the wrong vertex at high lobe counts where sinus floors come near the axis.
+function axisCrossings(loop) {
+  const out = [];
+  const n = loop.length;
+  for (let i = 0; i < n; i++) {
+    const a = loop[i], b = loop[(i + 1) % n];
+    const up = a.y <= 0 && b.y > 0, dn = a.y >= 0 && b.y < 0;
+    if (!up && !dn) continue;
+    const t = a.y / (a.y - b.y);
+    out.push({ i, x: a.x + (b.x - a.x) * t });
+  }
+  return out;
+}
+
+// Cut the closed boundary into a +Y half and a -Y half at those two crossings.
+// Returns { sides, diag }; sides is null when the loop is degenerate (crossing
+// count != 2), in which case the caller falls back to the analytic envelope and
+// diag says so rather than shipping a silently wrong rim.
+function splitLoopAtAxis(loop) {
+  const cr = axisCrossings(loop);
+  const diag = { crossings: cr.length, coverage: false, sidePure: false };
+  if (cr.length !== 2) return { sides: null, diag };
+  const n = loop.length;
+  const [c0, c1] = cr[0].x <= cr[1].x ? [cr[0], cr[1]] : [cr[1], cr[0]];   // base cut, apex cut
+  // vertices strictly after edge `from`, walked forward to and including the
+  // start vertex of edge `to` — the loop's own ordering, no geometry involved.
+  const arc = (from, to) => {
+    const out = [];
+    for (let k = (from.i + 1) % n; ; k = (k + 1) % n) { out.push(loop[k]); if (k === to.i) break; }
+    return out;
+  };
+  const pBase = { x: Math.max(0, c0.x), y: 0 };       // the foot, exactly on the axis
+  const pApex = { x: c1.x, y: 0 };
+  const A = [pBase, ...arc(c0, c1), pApex];
+  const B = [pBase, ...arc(c1, c0).reverse(), pApex];
+  // INVARIANT: the two halves cover the loop exactly once — every vertex in
+  // exactly one interior, nothing shared but the two cuts. A gap or an overlap
+  // here renders convincingly and prints as a seam, so it is asserted, not eyeballed.
+  diag.coverage = (A.length + B.length) === (n + 4);
+  const span = (arr) => { let lo = Infinity, hi = -Infinity; for (let i = 1; i < arr.length - 1; i++) { if (arr[i].y < lo) lo = arr[i].y; if (arr[i].y > hi) hi = arr[i].y; } return { lo, hi }; };
+  const sa = span(A), sb = span(B);
+  diag.sidePure = (sa.lo >= -1e-9 && sb.hi <= 1e-9) || (sb.lo >= -1e-9 && sa.hi <= 1e-9);
+  if (!diag.coverage || !diag.sidePure) return { sides: null, diag };
+  const plus = sa.hi >= sb.hi ? A : B;
+  const minus = plus === A ? B : A;
+  return { sides: [{ side: 1, points: plus }, { side: -1, points: minus }], diag };
+}
+
+const _ribPathCache = new WeakMap();   // keyed on the resolved P object (never mutated in place)
+
+export function ribPath(P) {
+  let v = _ribPathCache.get(P);
+  if (!v) { v = buildRibPath(P); _ribPathCache.set(P, v); }
+  return v;
+}
+
+function buildRibPath(P) {
+  const L = Math.max(P.L, 1e-4);
+  const flareAt = (x) => marginFlareFactor(clamp(x / L, 0, 1), P.bundleTightness, P.flareRate);
+
+  // The SMOOTH boundary: the analytic envelope, sampled the way it always was.
+  const analyticLoop = (n) => {
+    const right = [], left = [];
+    for (let i = 0; i <= n; i++) {
+      const u = i / n, X = P.L * u, hw = petalHalfWidth(u, P);
+      right.push({ x: X, y: hw });
+      left.push({ x: X, y: -hw });
+    }
+    const outline = [];
+    for (let i = 0; i < right.length; i++) outline.push(right[i]);
+    for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
+    return dedupePolygon(outline);
+  };
+  const analyticStrands = (n) => [1, -1].map((side) => {
+    const points = [];
+    for (let i = 0; i <= n; i++) {
+      const u = i / n;
+      points.push({ x: P.L * u, y: side * petalHalfWidth(clamp(u, 0, 1), P) * marginFlareFactor(u, P.bundleTightness, P.flareRate) });
+    }
+    return { points, side };
+  });
+
+  const cc = getCleftContour(P);
+  const raw = cc && cc.loops.length ? cc.loops[0] : null;
+  if (!raw) {
+    return {
+      clefted: false,
+      loop: analyticLoop,
+      sides: null,
+      strands: analyticStrands,
+      outerAt: (u) => petalHalfWidth(clamp(u, 0, 1), P),
+      diag: { clefted: false, crossings: 2, coverage: true, sidePure: true, fallback: false },
+    };
+  }
+
+  // CLEFT: the marching-squares contour of the material mask is the boundary.
+  // Match the analytic outline's winding (clockwise / negative shoelace area) so
+  // every downstream orientation convention — rim tube, Voronoi cell rings, blade
+  // top/bottom faces — stays consistent (outward normals, positive solid volume).
+  let loop = raw;
+  if (polyArea(loop) > 0) loop = loop.slice().reverse();
+  const { sides, diag } = splitLoopAtAxis(loop);
+  // A degenerate split falls back to the analytic envelope — which is the OLD
+  // #64 behaviour, so it must never be silent. Nothing in the shipped cleft
+  // range (depth <= 0.6, 2..7 lobes) hits this; if a future outline does, this
+  // is the line that says the rim stopped tracing the material.
+  if (!sides && typeof console !== 'undefined') {
+    console.warn('ribPath: cleft contour split degenerate (crossings=' + diag.crossings
+      + ', coverage=' + diag.coverage + ', sidePure=' + diag.sidePure + ') — margin fell back to the envelope');
+  }
+
+  // Outer envelope of the ACTUAL boundary, binned in u. For a clefted petal this
+  // is what ribCenterline/ribInnerEdge read, so the infill's cap comes from the
+  // same curve the rim is lofted along instead of a parallel analytic guess.
+  // Binned per EDGE, not per vertex: a marching-squares contour puts a vertex
+  // roughly every grid cell, which is coarser than a bin, so per-vertex binning
+  // leaves bins whose only vertex sits on a sinus WALL — reporting the envelope
+  // there as the sinus depth and clipping the whole lobe away. Spanning each
+  // edge across every bin it crosses is resolution-independent.
+  const NB = 256;
+  const tab = new Float64Array(NB + 1).fill(-1);
+  const binOf = (x) => Math.round(clamp(x / L, 0, 1) * NB);
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i], b = loop[(i + 1) % loop.length];
+    const ay = Math.max(Math.abs(a.y), Math.abs(b.y));
+    let b0 = binOf(a.x), b1 = binOf(b.x);
+    if (b0 > b1) { const t = b0; b0 = b1; b1 = t; }
+    for (let k = b0; k <= b1; k++) if (ay > tab[k]) tab[k] = ay;
+  }
+  for (let b = 0; b <= NB; b++) {                       // fill empty bins by linear interpolation
+    if (tab[b] >= 0) continue;
+    let lo = b - 1; while (lo >= 0 && tab[lo] < 0) lo--;
+    let hi = b + 1; while (hi <= NB && tab[hi] < 0) hi++;
+    if (lo < 0 && hi > NB) tab[b] = 0;
+    else if (lo < 0) tab[b] = tab[hi];
+    else if (hi > NB) tab[b] = 0;                       // past the last material: no boundary
+    else tab[b] = lerp(tab[lo], tab[hi], (b - lo) / (hi - lo));
+  }
+  const outerAt = (u) => {
+    const f = clamp(u, 0, 1) * NB, i0 = Math.min(NB - 1, Math.floor(f));
+    return lerp(tab[i0], tab[i0 + 1], f - i0);
+  };
+
+  const cleftStrands = (n) => sides.map(({ side, points }) => {
+    const flared = points.map((p) => ({ x: Math.max(0, p.x), y: p.y * flareAt(p.x) }));
+    const simp = simplifyPath(flared, L / 400);
+    return { points: densifyFlat(simp, L / Math.max(8, n)), side };
+  });
+
+  return {
+    clefted: true,
+    loop: () => loop,                    // the contour's own resolution; n is not a knob here
+    sides,
+    strands: sides ? cleftStrands : analyticStrands,
+    outerAt,
+    diag: { clefted: true, ...diag, fallback: !sides },
+  };
 }
 
 /* -------------------------------------------------------------------

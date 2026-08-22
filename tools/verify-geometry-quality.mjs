@@ -122,7 +122,6 @@ const ENDS_INFILLS = new Set(['veins', 'bone', 'strands']);
 const XFAIL_MAX_AGE_DAYS = 30;
 const XFAIL_MAX = 3;
 const XFAILS = {
-  '#64': { since: '2026-08-19', reason: 'continuous-margin rim not cleft-aware (Lobed sinus unsealed)' },
 };
 
 // The five silhouette bundles — imported from flower-shapes.js, the single source of
@@ -130,17 +129,17 @@ const XFAILS = {
 // apart the way they used to (each keeping its own hand-copied literal).
 const PATTERNS = ['veins', 'voronoi', 'strands', 'bone', 'spacecol'];
 
-// Config list. Cleft petals (Lobed) render their sinus correctly ONLY when the rim is
-// cleft-aware — i.e. continuous margin OFF. With it ON (the Standard default) the two
-// un-clefted marginal strands skip the sinus entirely, so the shape is manifold-but-wrong.
-// That is a KNOWN, tracked defect (#64), so cleft-on-continuous-margin configs are marked
-// xfail: they still appear in the table with their real numbers, but a known failure does
-// not break the build. When #64 makes the strands cleft-aware, drop the marker and the
-// gate goes hard. A cleft config that UNEXPECTEDLY passes (xpass) is surfaced too.
-// cfg.xfail holds the ISSUE REF for a known-failing config (or null). GQ_MARGIN_OFF routes
-// the cleft through the good (cleft-aware) rim, so it clears the quarantine — the configs
-// must then PASS on their own, which is the gate's credibility check.
-const CLEFT_XFAIL = process.env.GQ_MARGIN_OFF ? null : '#64';
+// Config list. Cleft petals (Lobed) used to render their sinus correctly ONLY when the rim
+// was cleft-aware — i.e. continuous margin OFF. With it ON (the Standard default) the two
+// un-clefted marginal strands skipped the sinus entirely, so the shape was manifold-but-
+// wrong, and these configs were quarantined xfail under #64. Fixed: ribPath(P) is now the
+// single producer of the boundary and the continuous-margin strands are the two halves of
+// the real material contour, so the sinus seals with the margin ON. The marker is gone and
+// the gate is HARD here — a Lobed regression breaks the build like anything else.
+// cfg.xfail holds the ISSUE REF for a known-failing config (or null); none are open on the
+// matrix today. GQ_MARGIN_OFF still routes the cleft through the margin-OFF rim, which must
+// pass too: both arms of the same boundary, one producer.
+const CLEFT_XFAIL = null;
 const CONFIGS = [];
 if (SWEEP) {
   for (const depth of [0.10, 0.15, 0.20, 0.25, 0.30, 0.35]) {
@@ -168,8 +167,8 @@ if (SWEEP) {
     CONFIGS.push({ name: `chrysanthemum__${pat}`, ui: { ...CHRYSANTHEMUM_UI, infillType: pat }, xfail: null });
   }
 }
-// Credibility check: GQ_MARGIN_OFF flips continuous margin off on every config, routing
-// the rim through the cleft-aware contour. The fidelity gap must then collapse to ~0 —
+// Cross-check: GQ_MARGIN_OFF flips continuous margin off on every config, routing the rim
+// through the hoop that traces the same contour. The fidelity gap stays ~0 there too —
 // proof the gate measures the RENDERED margin, not merely the presence of a cleft.
 if (process.env.GQ_MARGIN_OFF) for (const c of CONFIGS) c.ui.continuousMargin = 'off';
 
