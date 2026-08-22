@@ -71,6 +71,9 @@
          line-height: 1.7; max-width: 60vw; }
   #status { left: 12px; bottom: 12px; }
   #modeTag { top: 12px; left: 12px; }
+  #fullPageHud { top: 12px; right: 12px; display: none; border-color: var(--petrol); }
+  #fullPageHud.show { display: block; }
+  body.fullPageView #curvePane { display: none; }
   hr { border: none; border-top: 1px solid var(--line); margin: var(--sp3); }
   .banner { background: color-mix(in srgb, var(--amber) 14%, var(--bg)); border: 1px solid var(--amber);
             color: var(--ink); padding: 8px 10px; margin: 8px var(--sp3); border-radius: 3px; line-height: 1.6;
@@ -430,7 +433,11 @@
       <div class="shellStatus">
         <span class="dot" id="shellStatusDot3"></span>
         <span id="shellStatusText3">…</span>
+        <span style="flex:1"></span>
+        <button class="primaryBtn" id="viewFullPageBtn" style="padding:5px 12px;font-size:11px">View full page →</button>
       </div>
+      <div class="legend">Reads straight from the library — always what you actually saved, never a
+        stale published file. <code>/dress</code> is a separate, deliberately-published page; see below.</div>
 
       <h2>Layouts on this shell</h2>
       <div id="shellLayoutList">…</div>
@@ -452,6 +459,10 @@
   <div id="view">
     <div id="modeTag" class="hud kv">loading…</div>
     <div id="status" class="hud kv">loading…</div>
+    <div id="fullPageHud" class="hud kv">
+      <div id="fullPageHudText">…</div>
+      <button class="miniBtn" id="backToEditorBtn" style="margin-top:6px">← back to editor</button>
+    </div>
   </div>
 </div>
 

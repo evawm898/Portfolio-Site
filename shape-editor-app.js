@@ -885,6 +885,8 @@ function updateShellStatusPill() {
     const btn = $(id);
     if (btn && !btn.classList.contains("pulsed")) { btn.disabled = !btnEnabled; btn.textContent = btnText; }
   }
+  const fullPageBtn = $("viewFullPageBtn");
+  if (fullPageBtn) fullPageBtn.disabled = !currentShell;
   updateTabProgress();
 }
 // Three states per tab, not one: complete (done), current (you're on
@@ -1179,11 +1181,12 @@ scene.add(new THREE.HemisphereLight(0xdfe8e8, 0x30383a, 1.1));
 const dir = new THREE.DirectionalLight(0xffffff, 1.4);
 dir.position.set(700, 900, 900);
 scene.add(dir);
-addEventListener("resize", () => {
+function applyViewportSize() {
   camera.aspect = view.clientWidth / view.clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(view.clientWidth, view.clientHeight);
-});
+}
+addEventListener("resize", applyViewportSize);
 
 let shellMeshes = [];
 function setMeshes(payload, color) {
@@ -1201,6 +1204,46 @@ function setMeshes(payload, color) {
     shellMeshes.push(mesh);
   }
 }
+// ---------------------------------------------------------------- full-page saved-shell view
+// Panels needs to show the shell that's actually saved, not a stale
+// published file — and it needs to do that WITHOUT teaching /dress to
+// read this browser's storage, which would blur two genuinely different
+// jobs (the editor shows work in progress; /dress shows the finished,
+// deliberately-published thing to visitors). So: reuse this same
+// renderer/scene/camera — the same viewer the right pane already is —
+// just expanded to the full page and re-pointed at whatever's in the
+// library right now, read fresh from IndexedDB every time (never the
+// possibly-dirty live edit in Shape).
+let inFullPageView = false;
+async function enterFullPageView() {
+  if (!currentShell) return;
+  const shell = await db.getShell(currentShell.id);
+  if (!shell) return;
+  const aFit = fitOfPoints(shell.aPoints), bfFit = fitOfPoints(shell.bFrontPoints), bbFit = fitOfPoints(shell.bBackPoints);
+  const savedNecklineFn = necklineHeightFn(shell.neckline || state.neckline);
+  const coarse = new CompoundCoarseShell(aFit, bfFit, bbFit, V_LO, V_HI, SPLIT);
+  setMeshes(coarse.buildMeshes(64, 96, savedNecklineFn), 0xc9cfcc);
+  inFullPageView = true;
+  document.body.classList.add("fullPageView");
+  $("fullPageHud").classList.add("show");
+  $("fullPageHudText").innerHTML = `<b>${shell.name}</b><br>saved ${new Date(shell.updatedAt).toLocaleString()}`;
+  applyViewportSize();
+  status("viewing the saved shell from the library — not live editing", "ok");
+  $("modeTag").innerHTML = `<b class="ok">SAVED SHELL</b> — from the library, read fresh just now`;
+}
+function exitFullPageView() {
+  if (!inFullPageView) return;
+  inFullPageView = false;
+  document.body.classList.remove("fullPageView");
+  $("fullPageHud").classList.remove("show");
+  applyViewportSize();
+  liveUpdate();
+  $("modeTag").innerHTML = `<b class="ok">LIVE</b> — client-computed, cross-validated to ~1e-13mm`;
+}
+$("viewFullPageBtn").onclick = enterFullPageView;
+$("backToEditorBtn").onclick = exitFullPageView;
+addEventListener("keydown", (ev) => { if (ev.key === "Escape" && inFullPageView) exitFullPageView(); });
+
 function captureThumbnail() {
   try {
     const tc = document.createElement("canvas");
