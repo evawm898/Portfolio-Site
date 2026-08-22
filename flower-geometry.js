@@ -64,11 +64,18 @@ export function mulberry32(seed) {
    station u, already scaled by P.W (the max half-width). The silhouette is
    symmetric about the mid-rib, so the full outline is +/- this value.
 
-   The profile is a single continuous curve with three intuitive knobs:
-     P.W     : overall max half-width (world units)
-     P.taper : 0 = broad/paddle-like, 1 = slender. Also moves the widest
-               point toward the base as it increases.
-     P.tip   : 0 = round/blunt tip, 1 = sharp point.
+   The profile is a single continuous curve with four intuitive knobs:
+     P.W           : overall max half-width (world units)
+     P.taper       : 0 = broad/paddle-like, 1 = slender. Also moves the
+                     widest point toward the base as it increases.
+     P.tip         : 0 = round/blunt tip, 1 = sharp point.
+     P.tipFineness : 0 (default, exact no-op) -> 1 extends how SHARP a sharp
+                     tip can get, RELATIVE to how narrow the petal already is
+                     (see tipNarrowness). It never rounds a tip off further —
+                     it only raises the ceiling at the P.tip = 1 end, and only
+                     in proportion to narrowness, so a broad petal stays put
+                     even at full fineness (no needle out of a paddle) while a
+                     quilled strap can close to a genuinely fine point.
 
    Construction: a rise segment (base -> widest point) and a fall segment
    (widest point -> tip), joined continuously at value 1.0 where they meet.
@@ -107,21 +114,43 @@ const RELIEF_RIBS_MAX = 22;     // crepe count at reliefFreq = 1
 const TWIST_MAX = 1.15;         // max cross-section rotation at |twist| = 1 (radians, tip)
 const SKEW_MAX  = 0.7;          // max lateral midrib swing at |skew| = 1 (fraction of W, tip)
 const RELIEF_SIDE_PHASE = 13.7; // edge-noise phase offset applied to the -v side when asymmetric
+// TIP FINENESS: how far the P.tip=1 exponent ceiling can be pushed past 1.0
+// (a genuinely fine needle point), and the P.W band over which "how narrow is
+// this petal already" ramps from 0 (broad paddle) to 1 (quilled strap). A
+// control whose visual effect depends on another control's value must be
+// expressed RELATIVE to it (see tipNarrowness) — this is that fix: tip
+// sharpness used to be an absolute exponent range regardless of width, so a
+// narrow petal's tip never refined past the same mild taper a broad one got.
+const TIP_FINE_EXP_MAX = 5;      // tipExp ceiling at P.tip=1, full narrowness, full fineness
+const TIP_FINE_W_NARROW = 0.18;  // P.W at/below which a petal counts as fully narrow (quill-thin)
+const TIP_FINE_W_BROAD  = 0.70;  // P.W at/above which fineness has no extra effect (~default width)
+
+// 0 (broad) .. 1 (already slender/quilled), purely a function of the petal's
+// own max half-width — the "local width it's tapering from" the fineness
+// ratio needs, independent of any other control.
+function tipNarrowness(W) {
+  const t = clamp((W - TIP_FINE_W_NARROW) / (TIP_FINE_W_BROAD - TIP_FINE_W_NARROW), 0, 1);
+  return 1 - smootherstep(t);
+}
 
 export function petalHalfWidth(u, P) {
   u = clamp(u, 0, 1);   // guard the tip boundary: a fractional tipExp turns a
                         // marginally-negative cos() (u just past 1) into NaN
   const T = clamp(P.taper, 0, 1);
   const tip = clamp(P.tip, 0, 1);
+  const fineness = clamp(P.tipFineness || 0, 0, 1);
 
   const peak    = lerp(0.48, 0.34, T);   // where the petal is widest
   const riseExp = lerp(1.0, 1.7, T);     // base sharpness
   // Fall-off exponent for the tip segment (cos^tipExp). Below 1 the outline
   // meets the apex with a vertical tangent -> a genuinely rounded/domed tip;
-  // at 1 it meets linearly -> a sharp leaf point. (Exponents above 1 draw the
-  // tip out into a thin needle, which reads as sharper, not rounder — the old
-  // 3.0->1.0 mapping had this backwards and never produced a round tip.)
-  const tipExp  = lerp(0.5, 1.0, tip);   // 0 = round dome -> 1 = sharp point
+  // at 1 it meets linearly -> a sharp leaf point. Exponents above 1 draw the
+  // tip out into a genuine needle — TIP FINENESS unlocks that range, but only
+  // in proportion to how narrow the petal already is (tipNarrowness), so a
+  // broad petal can't be driven into a needle and fineness=0 is an exact
+  // no-op (tipExpMax collapses to 1.0, reproducing the old lerp(0.5,1.0,tip)).
+  const tipExpMax = lerp(1.0, TIP_FINE_EXP_MAX, tipNarrowness(P.W) * fineness);
+  const tipExp  = lerp(0.5, tipExpMax, tip);   // 0 = round dome -> 1 = sharp point (or needle)
 
   let shape;
   if (u <= peak) {

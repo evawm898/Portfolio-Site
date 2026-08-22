@@ -287,6 +287,14 @@
           <span class="fl-ctrl__hint">sunken bowl &rarr; flat &rarr; raised cone</span>
         </div>
 
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="variance">Organic variance</label>
+            <span class="fl-ctrl__val" data-value="variance"></span>
+          </div>
+          <input type="range" id="variance" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">uniform florets &rarr; each varies in length, angle &amp; roll</span>
+        </div>
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
@@ -307,7 +315,7 @@
             <label for="width">Petal width</label>
             <span class="fl-ctrl__val" data-value="width"></span>
           </div>
-          <input type="range" id="width" min="0.45" max="1.5" step="0.01" value="0.9">
+          <input type="range" id="width" min="0.1" max="1.5" step="0.01" value="0.9">
           <span class="fl-ctrl__hint">bilateral sets width per petal (Bloom)</span>
         </div>
 
@@ -890,6 +898,15 @@
           <span class="fl-ctrl__hint" data-tip-styles="clean">round &rarr; pointed tip</span>
           <span class="fl-ctrl__hint" data-tip-styles="jagged">round &rarr; pointed &mdash; apex &amp; teeth</span>
           <span class="fl-ctrl__hint" data-tip-styles="ruffled">soft sine &rarr; tight gathered crest</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="tipFineness">Tip fineness</label>
+            <span class="fl-ctrl__val" data-value="tipFineness"></span>
+          </div>
+          <input type="range" id="tipFineness" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">sharpens a POINTED tip further, relative to how narrow the petal already is</span>
         </div>
 
         <div class="fl-ctrl" data-tip-styles="jagged ruffled">

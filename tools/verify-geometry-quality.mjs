@@ -153,6 +153,20 @@ if (SWEEP) {
     const cleft = (SHAPES[shape].cleftDepth || 0) > 0;
     CONFIGS.push({ name: `${shape}__${pat}`, ui: { ...SHAPES[shape], infillType: pat }, xfail: cleft ? CLEFT_XFAIL : null });
   }
+  // CHRYSANTHEMUM reachability: a quilled floret at the new width floor (0.1) +
+  // TIP FINENESS (relative tip sharpness) — not a named SHAPES entry (it's a
+  // cross-section/width extreme, not a silhouette bundle), but the margin still
+  // has to trace this narrow + this sharp across every infill pattern.
+  const CHRYSANTHEMUM_UI = {
+    width: 0.1, taper: 1, tip: 1, tipFineness: 1,
+    clawLength: 0, clawWidth: 0.3, shoulder: 0.5,
+    cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3,
+    centerCurve: 0.2, edgeCurve: 0, edgeProfile: 0, petalCup: 0,
+    crossSection: 1, crossSectionTaper: 0,
+  };
+  for (const pat of PATTERNS) {
+    CONFIGS.push({ name: `chrysanthemum__${pat}`, ui: { ...CHRYSANTHEMUM_UI, infillType: pat }, xfail: null });
+  }
 }
 // Credibility check: GQ_MARGIN_OFF flips continuous margin off on every config, routing
 // the rim through the cleft-aware contour. The fidelity gap must then collapse to ~0 —
