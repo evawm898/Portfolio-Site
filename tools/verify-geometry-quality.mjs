@@ -122,7 +122,6 @@ const ENDS_INFILLS = new Set(['veins', 'bone', 'strands']);
 const XFAIL_MAX_AGE_DAYS = 30;
 const XFAIL_MAX = 3;
 const XFAILS = {
-  '#64': { since: '2026-08-19', reason: 'continuous-margin rim not cleft-aware (Lobed sinus unsealed)' },
 };
 
 // The five silhouette bundles — imported from flower-shapes.js, the single source of
@@ -130,17 +129,17 @@ const XFAILS = {
 // apart the way they used to (each keeping its own hand-copied literal).
 const PATTERNS = ['veins', 'voronoi', 'strands', 'bone', 'spacecol'];
 
-// Config list. Cleft petals (Lobed) render their sinus correctly ONLY when the rim is
-// cleft-aware — i.e. continuous margin OFF. With it ON (the Standard default) the two
-// un-clefted marginal strands skip the sinus entirely, so the shape is manifold-but-wrong.
-// That is a KNOWN, tracked defect (#64), so cleft-on-continuous-margin configs are marked
-// xfail: they still appear in the table with their real numbers, but a known failure does
-// not break the build. When #64 makes the strands cleft-aware, drop the marker and the
-// gate goes hard. A cleft config that UNEXPECTEDLY passes (xpass) is surfaced too.
-// cfg.xfail holds the ISSUE REF for a known-failing config (or null). GQ_MARGIN_OFF routes
-// the cleft through the good (cleft-aware) rim, so it clears the quarantine — the configs
-// must then PASS on their own, which is the gate's credibility check.
-const CLEFT_XFAIL = process.env.GQ_MARGIN_OFF ? null : '#64';
+// Config list. Cleft petals (Lobed) used to render their sinus correctly ONLY when the rim
+// was cleft-aware — i.e. continuous margin OFF. With it ON (the Standard default) the two
+// un-clefted marginal strands skipped the sinus entirely, so the shape was manifold-but-
+// wrong, and these configs were quarantined xfail under #64. Fixed: ribPath(P) is now the
+// single producer of the boundary and the continuous-margin strands are the two halves of
+// the real material contour, so the sinus seals with the margin ON. The marker is gone and
+// the gate is HARD here — a Lobed regression breaks the build like anything else.
+// cfg.xfail holds the ISSUE REF for a known-failing config (or null); none are open on the
+// matrix today. GQ_MARGIN_OFF still routes the cleft through the margin-OFF rim, which must
+// pass too: both arms of the same boundary, one producer.
+const CLEFT_XFAIL = null;
 const CONFIGS = [];
 if (SWEEP) {
   for (const depth of [0.10, 0.15, 0.20, 0.25, 0.30, 0.35]) {
@@ -168,8 +167,8 @@ if (SWEEP) {
     CONFIGS.push({ name: `chrysanthemum__${pat}`, ui: { ...CHRYSANTHEMUM_UI, infillType: pat }, xfail: null });
   }
 }
-// Credibility check: GQ_MARGIN_OFF flips continuous margin off on every config, routing
-// the rim through the cleft-aware contour. The fidelity gap must then collapse to ~0 —
+// Cross-check: GQ_MARGIN_OFF flips continuous margin off on every config, routing the rim
+// through the hoop that traces the same contour. The fidelity gap stays ~0 there too —
 // proof the gate measures the RENDERED margin, not merely the presence of a cleft.
 if (process.env.GQ_MARGIN_OFF) for (const c of CONFIGS) c.ui.continuousMargin = 'off';
 
@@ -389,7 +388,17 @@ window.__gq = async function() {
   const regUndershootMeanMM = (regUnderCount ? regUnderSum / regUnderCount : 0) * MM;
   const regWorstU = regOverMax * MM >= regUndershootMaxMM ? regOverU : regUnderU;
 
-  return { infill: P.infillType, cleftDepth: +(P.cleftDepth || 0).toFixed(2), contMargin, numLoops, marginClosed,
+  // (5) RIB-PATH SPLIT INTEGRITY — ribPath cuts the boundary into its two halves at
+  //     the contour's own y = 0 crossings. If that split is degenerate it falls back
+  //     to the analytic envelope, which IS the #64 defect: a rim that skips every
+  //     sinus. The fallback is a real code path, so it is gated here rather than left
+  //     to a console warning nobody reads — false on every shipped config today, and
+  //     the thing that catches a future outline change that makes it trip.
+  const rp = G.ribPath(P);
+  const ribSplit = { fallback: !!rp.diag.fallback, crossings: rp.diag.crossings,
+                     coverage: !!rp.diag.coverage, sidePure: !!rp.diag.sidePure };
+
+  return { infill: P.infillType, cleftDepth: +(P.cleftDepth || 0).toFixed(2), contMargin, numLoops, marginClosed, ribSplit,
            marginGapMM: +marginGapMM.toFixed(3), worstU: +worstU.toFixed(2), neck: +neck.toFixed(2),
            maxTurnDeg: +maxTurn.toFixed(1), p95TurnDeg: +p95Turn.toFixed(1),
            maxCurvDegMM: +maxCurv.toFixed(1), p95CurvDegMM: +p95Curv.toFixed(1),
@@ -452,8 +461,11 @@ for (const cfg of CONFIGS) {
   // undershoot is reported per-config but not gated.
   const badOvershoot = q.regOvershootMaxMM > T.regOvershootMM;
   const badUndershoot = q.infill === 'voronoi' && q.regUndershootMaxMM > T.regUndershootVoronoiMM;
-  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot;
-  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : ''].filter(Boolean).join(',');
+  // The rib-path split either held or the rim silently reverted to the pre-#64
+  // envelope. There is no tolerance to set here: it is a boolean, and it is hard.
+  const badSplit = !q.ribSplit || q.ribSplit.fallback || !q.ribSplit.coverage || !q.ribSplit.sidePure;
+  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit;
+  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : ''].filter(Boolean).join(',');
   let verdict;
   if (cfg.xfail) {
     const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
@@ -488,6 +500,6 @@ if (openIssues.length) {
   if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
 }
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held`);
 await browser.close(); server.close();
 process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));

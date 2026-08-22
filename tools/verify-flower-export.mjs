@@ -202,6 +202,16 @@ const CONFIGS = [
   { label: 'LOBED fringed (7 lobes, cleft 0.6) veins', set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.6' }, { id: 'cleftLobes', value: '7' }, { id: 'cleftWidth', value: '0.4' }] },
   { label: 'LOBED bifid spacecol CLOSED', set: [{ id: 'infillType', value: 'spacecol', evt: 'change' }, { id: 'spaceMode', value: 'closed', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
   { label: 'LOBED bifid bone', set: [{ id: 'infillType', value: 'bone', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '3' }] },
+  // CLEFT DEPTH 0.5 x LOBE COUNT 2..7 — the full lobe-count range at a deep cleft, the
+  // configuration #64's rim fix has to hold across: each strand is now a half of the real
+  // material contour, so the number of sinuses it weaves through is the thing that varies.
+  // Every one must still export with 0 boundary edges and 0 non-manifold edges.
+  { label: 'LOBED depth 0.5 x 2 lobes (rim contour split)', smoke: true, set: [{ id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftWidth', value: '0.3' }, { id: 'clawLength', value: '0' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] },
+  { label: 'LOBED depth 0.5 x 3 lobes (rim contour split)', set: [{ id: 'cleftLobes', value: '3' }] },
+  { label: 'LOBED depth 0.5 x 4 lobes (rim contour split)', set: [{ id: 'cleftLobes', value: '4' }] },
+  { label: 'LOBED depth 0.5 x 5 lobes (rim contour split)', set: [{ id: 'cleftLobes', value: '5' }] },
+  { label: 'LOBED depth 0.5 x 6 lobes (rim contour split)', set: [{ id: 'cleftLobes', value: '6' }] },
+  { label: 'LOBED depth 0.5 x 7 lobes (rim contour split)', smoke: true, set: [{ id: 'cleftLobes', value: '7' }] },
   { label: 'LOBED + CLAW compose (Dianthus superbus)', smoke: true, set: [{ id: 'infillType', value: 'veins', evt: 'change' }, { id: 'cleftDepth', value: '0.55' }, { id: 'cleftLobes', value: '5' }, { id: 'clawLength', value: '0.3' }] },
   // ===== CROSS-SECTION: rolls the flat blade into a channel / quill (flat ->
   // channelled -> quilled), with a second axis (TAPER) that opens the roll into a

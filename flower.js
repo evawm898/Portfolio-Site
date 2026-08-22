@@ -27,7 +27,7 @@ import {
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
-  ribRadius, ribCenterline, ribMarginPolyline,
+  ribRadius, ribCenterline, ribMarginPolyline, ribPath,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
@@ -1161,10 +1161,15 @@ function resolveParams(ui) {
    a tulip-underside neck that flares, not a hoop bolted on. The render layer lofts each
    as a tapered ROUND strand so it is continuous with the receptacle rib it becomes. */
 function marginStrands(P) {
-  // Centerline curve: ribCenterline(u, P, true) — the SAME function every infill
-  // pattern's boundary derives from (via ribInnerEdge), so the rendered rib and
-  // what infill clips to can never diverge. Reads P.bundleTightness/P.flareRate
-  // internally (via marginFlareFactor) rather than taking them as params.
+  // ONE PRODUCER: ribPath(P).strands(n) — the same object buildSilhouette,
+  // ribCenterline and therefore ribInnerEdge all read. On a clefted petal it
+  // returns the two halves of the REAL material contour (up each lobe, down
+  // each sinus), which is what seals the margin around a lobe; on a smooth one
+  // it returns the analytic envelope samples verbatim, byte-identical to what
+  // this function used to compute inline. The rendered rib and the boundary
+  // infill clips to cannot diverge because there is no second curve left.
+  // Reads P.bundleTightness/P.flareRate internally (via marginFlareFactor)
+  // rather than taking them as params.
   // SPINE CURL needs this centerline as densely sampled as everything else that
   // traces the length (outlineN in buildPetalInto) — computed internally, not
   // via an extra parameter, so a caller reaching in from outside this module
@@ -1172,16 +1177,7 @@ function marginStrands(P) {
   // and calls marginStrands(P, ...) with two OTHER positional args already —
   // adding a meaningful 2nd param here would silently break that call).
   const nMar = spineCurlPeakRate(P) > 0 ? Math.max(30, spineSampleCount(P)) : 30;
-  const strands = [];
-  for (const side of [1, -1]) {
-    const points = [];
-    for (let i = 0; i <= nMar; i++) {
-      const u = i / nMar;
-      points.push({ x: P.L * u, y: side * ribCenterline(u, P, true) });
-    }
-    strands.push({ points, side });
-  }
-  return strands;
+  return ribPath(P).strands(nMar);
 }
 
 function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {

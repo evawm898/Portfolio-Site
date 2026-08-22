@@ -1,13 +1,14 @@
 # Correctness gate: watertight is necessary but not sufficient — a petal can export with
-# zero boundary edges and still be the WRONG SHAPE (e.g. the un-clefted continuous-margin
-# rim skipping a Lobed sinus, #64). tools/verify-geometry-quality.mjs measures margin
+# zero boundary edges and still be the WRONG SHAPE (as the un-clefted continuous-margin
+# rim did, skipping every Lobed sinus — #64, fixed by making ribPath the one producer of
+# the boundary; this gate is what holds it fixed). tools/verify-geometry-quality.mjs measures margin
 # fidelity, contour smoothness, and uncapped infill ends across the shape x pattern matrix
 # plus every shipped preset by name. See CLAUDE.md and the flower-project skill.
 #
 # Fast enough (32 configs, ~24s on a 4-core box) to run the full matrix on every PR — no
 # smoke/full split needed here, unlike the export-watertight gate. Known, tracked defects
-# (currently #64) are xfail — the gate still fails if a debt goes stale, its config count
-# exceeds the cap, or one unexpectedly starts passing (the ledger's own self-policing).
+# are xfail; none are open today, and the gate still fails if a debt goes stale, its config
+# count exceeds the cap, or one unexpectedly starts passing (the ledger's own self-policing).
 # Path-scoped generously (every geometry source AND tools/**) so a change to a dev tool or
 # a preset can't silently skip this.
 name: flower-geometry-quality
