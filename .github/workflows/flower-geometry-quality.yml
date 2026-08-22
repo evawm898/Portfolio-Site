@@ -1,6 +1,6 @@
 # Correctness gate: watertight is necessary but not sufficient — a petal can export with
 # zero boundary edges and still be the WRONG SHAPE (as the un-clefted continuous-margin
-# rim did, skipping every Lobed sinus — #64, fixed by making ribPath the one producer of
+# rim did, skipping every Lobed sinus — fixed in PR #50 by making ribPath the one producer of
 # the boundary; this gate is what holds it fixed). tools/verify-geometry-quality.mjs measures margin
 # fidelity, contour smoothness, and uncapped infill ends across the shape x pattern matrix
 # plus every shipped preset by name. See CLAUDE.md and the flower-project skill.

@@ -796,7 +796,8 @@ export function ribMarginPolyline(P, n = 56) {
    4a-ii. ribPath(P) — THE SINGLE PRODUCER of the petal boundary.
 
    ribInnerEdge() unified the CONSUMERS of the boundary. This unifies the
-   PRODUCERS, which is where #64 actually lived: there were two, and the
+   PRODUCERS, which is where the cleft-margin defect actually lived (PR #50):
+   there were two producers, and the
    second one was private to continuous margin. The hoop rim traced
    buildSilhouette (the real material outline, cleft-aware), while the
    continuous-margin strands were sampled straight off the analytic envelope
@@ -980,7 +981,8 @@ function buildRibPath(P) {
   if (polyArea(loop) > 0) loop = loop.slice().reverse();
   const { sides, diag } = splitLoopAtAxis(loop);
   // A degenerate split falls back to the analytic envelope — which is the OLD
-  // #64 behaviour, so it must never be silent. Nothing in the shipped cleft
+  // pre-#50 behaviour — a rim that skips every sinus — so it must never be
+  // silent. Nothing in the shipped cleft
   // range (depth <= 0.6, 2..7 lobes) hits this; if a future outline does, this
   // is the line that says the rim stopped tracing the material.
   if (!sides && typeof console !== 'undefined') {

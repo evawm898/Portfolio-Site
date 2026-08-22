@@ -25,9 +25,8 @@
    NOT EXERCISED — the cleanup backlog. No preset drives these ON PURPOSE: each is
    a known-weak or in-flux feature we keep out of the shop window until it is
    overhauled. This list IS the plan.
-     · bilateral (FAN) arrangement  — renders as scattered debris (#68)
-     · Lobed / cleft margin         — continuous-margin rim not cleft-aware (#64)
-     · Toothed / Scalloped edges    — inert under the continuous margin (#67)
+     · bilateral (FAN) arrangement  — renders as scattered debris (issue #54)
+     · Toothed / Scalloped edges    — inert under the continuous margin (issue #53)
      · receptacle / junction        — DERIVED from a stem or sepals; no preset
                                        carries either, so none builds a junction
      · sepals                       — Rose & Thistle carried sepalsType:'sepals'
