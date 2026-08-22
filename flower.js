@@ -3538,8 +3538,9 @@ if (advancedToggle) advancedToggle.addEventListener('change', () => {
 // truth. When the params match no named shape the picker shows CUSTOM (a display-only
 // state, never a pickable option), so it never lies about what the geometry is.
 // The bundles themselves live in flower-shapes.js (shared with the geometry-quality
-// gate's shape fixtures, so the two can't drift apart); PICKER_SHAPE_NAMES excludes
-// LOBED — see that module for why.
+// gate's shape fixtures, so the two can't drift apart). PICKER_SHAPE_NAMES is the
+// subset offered here; registry-sync asserts it matches the petalShape option list,
+// so a shape can never be listed-but-inert or implemented-but-unreachable.
 const SHAPES = Object.fromEntries(PICKER_SHAPE_NAMES.map((name) => [name, SHAPE_BUNDLES[name]]));
 // Write a named bundle to every silhouette param, re-detect (lands on the picked
 // shape), and rebuild. CUSTOM is never applicable — it is only ever a detected state.

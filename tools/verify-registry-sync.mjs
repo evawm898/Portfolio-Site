@@ -160,6 +160,30 @@ if (imperative.length !== 1) {
       `Either restore the single allowed exception or extend the declarative gating vocabulary instead of adding another hand-gated control.`);
 }
 
+// ---- THIRD list: the petal-shape picker ------------------------------------------
+// The registry and the markup are checked against each other above, but the shape
+// picker has a third list that neither of them sees: PICKER_SHAPE_NAMES in
+// flower-shapes.js, which is what applyShape() actually resolves a pick against.
+// If they disagree the failure is silent in the worst way — an option listed in the
+// markup whose applyShape(name) finds no bundle and returns without doing anything
+// (listed-but-inert), or a bundle that exists with no way to pick it
+// (implemented-but-unreachable). Both are the "shipped means reachable" failure.
+{
+  const { PICKER_SHAPE_NAMES, SHAPES } = await import(REPO + 'flower-shapes.js');
+  const picker = CONTROLS.find((c) => c.id === 'petalShape');
+  if (!picker) err('petalShape missing from the registry');
+  else {
+    const listed = picker.options.filter((o) => o.value !== '__custom').map((o) => o.value);
+    const named = [...PICKER_SHAPE_NAMES];
+    if (listed.join(',') !== named.join(',')) {
+      err(`petalShape options [${listed.join(', ')}] do not match PICKER_SHAPE_NAMES [${named.join(', ')}] `
+        + `(order included) — a listed option with no bundle silently does nothing when picked, and a bundle `
+        + `with no option cannot be reached.`);
+    }
+    for (const n of named) if (!SHAPES[n]) err(`PICKER_SHAPE_NAMES lists "${n}" but flower-shapes.js has no such bundle`);
+  }
+}
+
 // ---- report ----------------------------------------------------------------------
 if (fail.length) {
   console.error(`registry-sync: FAIL — ${fail.length} disagreement(s) between flower-registry.js and flower.html:\n`);
