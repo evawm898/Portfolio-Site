@@ -186,8 +186,8 @@
           <input type="range" id="bilWidth1" min="0.45" max="1.5" step="0.01" value="0.9">
         </div>
         <div class="fl-ctrl" data-bil-petal="1">
-          <div class="fl-ctrl__row"><label for="bilCenterCurve1">Center curve</label><span class="fl-ctrl__val" data-value="bilCenterCurve1"></span></div>
-          <input type="range" id="bilCenterCurve1" min="-1" max="1" step="0.01" value="0.4">
+          <div class="fl-ctrl__row"><label for="bilCurlAmount1">Spine curl</label><span class="fl-ctrl__val" data-value="bilCurlAmount1"></span></div>
+          <input type="range" id="bilCurlAmount1" min="-1" max="1" step="0.01" value="0.4">
         </div>
         <div class="fl-ctrl" data-bil-petal="1">
           <div class="fl-ctrl__row"><label for="bilEdgeCurve1">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve1"></span></div>
@@ -217,8 +217,8 @@
           <input type="range" id="bilWidth2" min="0.45" max="1.5" step="0.01" value="0.9">
         </div>
         <div class="fl-ctrl" data-bil-petal="2">
-          <div class="fl-ctrl__row"><label for="bilCenterCurve2">Center curve</label><span class="fl-ctrl__val" data-value="bilCenterCurve2"></span></div>
-          <input type="range" id="bilCenterCurve2" min="-1" max="1" step="0.01" value="0.4">
+          <div class="fl-ctrl__row"><label for="bilCurlAmount2">Spine curl</label><span class="fl-ctrl__val" data-value="bilCurlAmount2"></span></div>
+          <input type="range" id="bilCurlAmount2" min="-1" max="1" step="0.01" value="0.4">
         </div>
         <div class="fl-ctrl" data-bil-petal="2">
           <div class="fl-ctrl__row"><label for="bilEdgeCurve2">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve2"></span></div>
@@ -248,8 +248,8 @@
           <input type="range" id="bilWidth3" min="0.45" max="1.5" step="0.01" value="0.9">
         </div>
         <div class="fl-ctrl" data-bil-petal="3">
-          <div class="fl-ctrl__row"><label for="bilCenterCurve3">Center curve</label><span class="fl-ctrl__val" data-value="bilCenterCurve3"></span></div>
-          <input type="range" id="bilCenterCurve3" min="-1" max="1" step="0.01" value="0.4">
+          <div class="fl-ctrl__row"><label for="bilCurlAmount3">Spine curl</label><span class="fl-ctrl__val" data-value="bilCurlAmount3"></span></div>
+          <input type="range" id="bilCurlAmount3" min="-1" max="1" step="0.01" value="0.4">
         </div>
         <div class="fl-ctrl" data-bil-petal="3">
           <div class="fl-ctrl__row"><label for="bilEdgeCurve3">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve3"></span></div>
@@ -384,11 +384,20 @@
 
         <div class="fl-ctrl" data-hide-bilateral>
           <div class="fl-ctrl__row">
-            <label for="centerCurve">Center curve</label>
-            <span class="fl-ctrl__val" data-value="centerCurve"></span>
+            <label for="curlAmount">Spine curl</label>
+            <span class="fl-ctrl__val" data-value="curlAmount"></span>
           </div>
-          <input type="range" id="centerCurve" min="-1" max="1" step="0.01" value="0.4">
-          <span class="fl-ctrl__hint">concave &rarr; convex</span>
+          <input type="range" id="curlAmount" min="-1" max="1" step="0.01" value="0.4">
+          <span class="fl-ctrl__hint">flat &rarr; arc &rarr; full circle &rarr; fiddlehead crozier</span>
+        </div>
+
+        <div class="fl-ctrl">
+          <div class="fl-ctrl__row">
+            <label for="curlBias">Curl bias</label>
+            <span class="fl-ctrl__val" data-value="curlBias"></span>
+          </div>
+          <input type="range" id="curlBias" min="0" max="1" step="0.01" value="0">
+          <span class="fl-ctrl__hint">uniform (hoop) &rarr; tip-loaded (crozier)</span>
         </div>
 
         <div class="fl-ctrl" data-hide-bilateral>
