@@ -1048,6 +1048,7 @@ function resolveParams(ui) {
     bloom: ui.bloom * DEG,
     curlAmount: ui.curlAmount,                   // SPINE CURL: flat -> arc -> circle -> fiddlehead
     curlBias: ui.curlBias,                       // SPINE CURL: uniform (hoop) -> tip-loaded (crozier)
+    curlStart: ui.curlStart,                     // SPINE CURL: 0 = whole petal curls, higher = only the outer portion
     edgeCurve: ui.edgeCurve,                     // top-down side billow (+) / pinch (-)
     edgeProfile: ui.edgeProfile,                 // out-of-plane edge lift, parallel to the centre curve
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
@@ -2643,6 +2644,8 @@ function buildBloomInto(petalAcc, coreAcc, ui, P) {
   for (let li = 0; li < layerCount; li++) {
     const layer = {
       index: li,
+      total: layerCount,          // BLOOM GRADIENTS: total whorl count, so buildLayerInto can place this
+                                   // layer's band in the shared 0(centre)..1(edge) POSITION axis
       scale: Math.pow(falloff, li),
       dHeight: heightStep * li,
       dRot: rotStep * li,
@@ -2765,6 +2768,12 @@ function buildInto(petalAcc, coreAcc, ui, P) {
 // count; `layer` carries its transforms (scale / dHeight / dRot / dBloom — all
 // zero-effect for layer 0). Returns the placements plus the derived sizing the
 // caller needs for the core / base. Reuses buildPetalInto — no petal logic here.
+//
+// BLOOM GRADIENTS — shared POSITION axis (see below, where placements get
+// `pl.position`) plus the two signed gradients that read it: CURL GRADIENT
+// (ui.curlGradient) and SIZE GRADIENT (ui.sizeGradient). Both default to 0,
+// an exact no-op, and both are ONE-LINERS against `pl.position` — that's the
+// point of computing it once here instead of per-consumer.
 function buildLayerInto(petalAcc, ui, P, count, layer) {
   const bloomType = ui.bloomType;
 
@@ -2845,7 +2854,29 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     }
   }
 
+  // BLOOM GRADIENTS — shared POSITION axis (0 at the flower's centre, 1 at its
+  // outer edge), defined identically for every arrangement so any future
+  // position-based control is a one-liner against `pl.position`.
+  //   - Only the coiled GOLDEN/CUSTOM spiral spaces petals in one ring at
+  //     genuinely different radii (pl.r grows with i on the Vogel spiral) — that
+  //     ratio (clamped 0..1) IS a real within-ring gradient. RADIAL, BILATERAL,
+  //     and coiled EVEN divergence put every petal in a ring at the SAME radius
+  //     (an actinomorphic ring has no inner/outer petals of its own), so within
+  //     such a ring "ringPos" is canonically 1 — the ring IS the outer edge of
+  //     itself. Reusing the incidental ratio of two unrelated radii there (as
+  //     the existing `rho` below does, for the elevation profile only) would
+  //     bake an arbitrary, un-intuitive uniform gradient offset into a plain
+  //     rosette/fan that never varies petal-to-petal — see flower-project
+  //     discovery notes.
+  //   - A solitary centred petal (r=0, the count===1 case) is canonically 0.
+  //   - Across LAYERS, layer 0 is outermost and layer (layerCount-1) is
+  //     innermost: the layer band dominates position, ringPos only refines
+  //     WITHIN that band. layerCount=1 collapses the formula to ringPos exactly.
+  const trueSpiral = bloomType === 'coiled' && ui.divergenceMode !== 'even';
+  const totalLayers = layer.total;
   for (const pl of placements) {
+    const ringPos = pl.r <= 1e-4 ? 0 : (trueSpiral ? clamp(pl.r / rMax, 0, 1) : 1);
+    pl.position = ((totalLayers - 1 - layer.index) + ringPos) / totalLayers;
     const rho = rMax > 1e-6 ? clamp(pl.r / rMax, 0, 1) : 0;
     // raised-cosine receptacle profile: 1 at the centre, 0 at the rim
     const profile = 0.5 * (1 + Math.cos(Math.PI * rho));
@@ -2875,6 +2906,26 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     // offset varies the venation between whorls.
     if (layer.scale !== 1 || layer.dBloom !== 0) {
       Pp = { ...Pp, L: Pp.L * layer.scale, W: Pp.W * layer.scale, bloom: Math.max(0, Pp.bloom - layer.dBloom) };
+    }
+    // BLOOM GRADIENTS: both read pl.position (0 centre .. 1 edge) computed
+    // above; both default to 0, an exact no-op.
+    const curlGrad = clamp(ui.curlGradient || 0, -1, 1);
+    if (curlGrad) {
+      // + -> outer curls LESS / inner curls MORE; sign reverses it.
+      const mult = 1 - curlGrad * (2 * pl.position - 1);
+      Pp = { ...Pp, curlAmount: clamp((Pp.curlAmount || 0) * mult, -1, 1) };
+    }
+    const sizeGrad = clamp(ui.sizeGradient || 0, -1, 1);
+    // GATED to a single whorl: layerSizeFalloff already grades size BY LAYER
+    // for layered blooms — a second control reading the same layer signal
+    // (position bakes in layer depth once layerCount > 1) would fight it, so
+    // SIZE GRADIENT only acts with exactly one whorl, where position is the
+    // pure within-ring term. Floored well above 0 so the extreme (a golden-
+    // spiral's very first petal sits at position 0) never shrinks a petal to
+    // nothing.
+    if (sizeGrad && totalLayers === 1) {
+      const mult = Math.max(0.2, 1 + sizeGrad * (2 * pl.position - 1));   // + -> inner smaller / outer bigger
+      Pp = { ...Pp, L: Pp.L * mult, W: Pp.W * mult };
     }
     const petalSeed = SEED_BASE + pl.seedIdx * 131 + layer.index * LAYER_SEED_STRIDE;
     // ORGANIC VARIANCE (see constants above): length, opening angle, roll only —

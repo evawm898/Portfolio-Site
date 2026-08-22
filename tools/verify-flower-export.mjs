@@ -281,6 +281,48 @@ const CONFIGS = [
     { id: 'crossSection', value: '0' }, { id: 'curlAmount', value: '0.4' }, { id: 'curlBias', value: '0.5' },
     { id: 'bloomType', value: 'bilateral', evt: 'change' }, { id: 'bilCurlAmount1', value: '-1' }, { id: 'bilCurlAmount2', value: '1' }, { id: 'bilCurlAmount3', value: '0' },
   ] },
+  // ===== BLOOM GRADIENTS: a shared per-petal POSITION value (0 centre .. 1 edge,
+  // defined for coiled/radial/layered alike) feeding two signed gradients —
+  // CURL GRADIENT (grades curlAmount by position) and SIZE GRADIENT (grades L/W by
+  // position, single-whorl only — layerSizeFalloff already owns size-by-LAYER) —
+  // plus the independent CURL START axis (where along u curl begins). All three
+  // default to 0, an exact no-op; this block exercises both signs / extremes and
+  // the interaction with layering.
+  { label: 'reset to a clean coiled golden-spiral bloom (for BLOOM GRADIENTS block)', smoke: true, set: [
+    { id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'divergenceMode', value: 'golden', evt: 'change' },
+    { id: 'petalShape', value: 'rounded', evt: 'change' }, { id: 'petalCount', value: '12' },
+    { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
+    { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' },
+    { id: 'crossSection', value: '0' }, { id: 'crossSectionTaper', value: '0' }, { id: 'petalCup', value: '0' },
+    { id: 'curlAmount', value: '0.4' }, { id: 'curlBias', value: '0' }, { id: 'curlStart', value: '0' },
+    { id: 'curlGradient', value: '0' }, { id: 'sizeGradient', value: '0' }, { id: 'variance', value: '0' },
+    { id: 'leafType', value: 'none', evt: 'change' }, { id: 'stemType', value: 'none', evt: 'change' },
+    { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' },
+    { id: 'stemBudMode', value: 'none', evt: 'change' },
+  ] },
+  { label: 'CURL GRADIENT +1 (outer curls off, inner doubles, golden spiral incl. i=0 at position 0)', set: [{ id: 'curlGradient', value: '1' }] },
+  { label: 'CURL GRADIENT -1 (reversed: inner curls off, outer doubles)', set: [{ id: 'curlGradient', value: '-1' }] },
+  { label: 'CURL GRADIENT +1 on RADIAL rosette (single ring, canonical position=1)', set: [
+    { id: 'curlGradient', value: '1' }, { id: 'bloomType', value: 'radial', evt: 'change' },
+  ] },
+  { label: 'SIZE GRADIENT +1, single whorl (inner shrinks to the 0.2 floor at position 0)', set: [
+    { id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'curlGradient', value: '0' }, { id: 'sizeGradient', value: '1' },
+  ] },
+  { label: 'SIZE GRADIENT -1, single whorl (reversed: outer shrinks)', set: [{ id: 'sizeGradient', value: '-1' }] },
+  { label: 'SIZE GRADIENT +1 GATED OFF under 3 layers (must no-op; layerSizeFalloff owns size-by-layer)', set: [
+    { id: 'layerCount', value: '3' }, { id: 'layerSizeFalloff', value: '0.7' },
+  ] },
+  { label: 'CURL START 0.7 (only the outer 30% curls) at max curl — the tightest compressed-curvature case', set: [
+    { id: 'layerCount', value: '1' }, { id: 'sizeGradient', value: '0' },
+    { id: 'curlAmount', value: '1' }, { id: 'curlBias', value: '0' }, { id: 'curlStart', value: '0.7' },
+  ] },
+  { label: 'BLOOM GRADIENTS + CURL START + CROSS-SECTION combined (spider-chrysanthemum attempt)', smoke: true, set: [
+    { id: 'petalCount', value: '24' }, { id: 'petalShape', value: 'strap', evt: 'change' },
+    { id: 'curlAmount', value: '0.7' }, { id: 'curlBias', value: '0.3' }, { id: 'curlStart', value: '0.4' },
+    { id: 'curlGradient', value: '0.6' }, { id: 'sizeGradient', value: '-0.5' },
+    { id: 'crossSection', value: '0.8' }, { id: 'crossSectionTaper', value: '0.4' },
+    { id: 'centerArch', value: 'dense', evt: 'change' },
+  ] },
 ];
 
 // ===== Receptacle JUNCTION axis matrix: PROFILE x CONSTRUCTION x COLLAR =====

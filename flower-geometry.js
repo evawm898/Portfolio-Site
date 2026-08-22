@@ -239,7 +239,7 @@ export function petalHalfWidth(u, P) {
 
 // SPINE CURL: bends the spine along its LENGTH (as opposed to CROSS-SECTION
 // ROLL, which bends it across its WIDTH into a tube) — flat -> gentle arc ->
-// full circle -> a tight multi-turn fiddlehead/crozier. Two controls:
+// full circle -> a tight multi-turn fiddlehead/crozier. Three controls:
 //   P.curlAmount (signed, -1..1): total curl strength; sign picks direction.
 //   P.curlBias    (0..1): where the curvature concentrates.
 //     0 = UNIFORM  — constant curvature along the whole length, i.e. a true
@@ -248,13 +248,32 @@ export function petalHalfWidth(u, P) {
 //         sharply toward the tip: a logarithmic-spiral-like crozier, tight at
 //         the tip and opening out toward the base, per the botanical
 //         fiddlehead this models (NOT a constant-curvature hoop).
+//   P.curlStart   (0..1, default 0): where along u the curl BEGINS. 0 = the
+//     whole petal is eligible to curl (today's behaviour, unchanged). Above
+//     0, u < curlStart is held dead straight (Phi stays 0) and the SAME total
+//     turn (spineCurlTotal, unaffected by curlStart) is squeezed into the
+//     u >= curlStart remainder — so higher curlStart reads as "only the outer
+//     portion curls," not as a weaker curl.
+//     NOT redundant with curlBias: curlBias reshapes how curvature is
+//     DISTRIBUTED but never zeroes it before u=1 (kappa(u)>0 for any u>0 once
+//     bias<1, and even at bias=1 kappa is merely SMALL near the base, not
+//     exactly 0) — it can taper but can't produce a genuinely straight base
+//     segment. curlStart imposes a hard threshold: an actual straight run
+//     from u=0 to curlStart, then curl turns on. start=0.5/bias=0 gives a
+//     straight base half then a true circular arc through the tip half (one
+//     visible kink at the threshold); start=0/bias=1 curves smoothly
+//     everywhere with no straight segment, just concentrated near the tip.
+//     Different shapes, kept as two honest, non-cancelling controls.
 // Implementation: cumulative turning angle Phi(u) = total * u^(p+1), so
 // curvature kappa(u) = dPhi/du = total*(p+1)*u^p — constant at p=0 (bias=0)
 // and strictly increasing in u for p>0 (bias>0), which is exactly the
 // "increasing curvature toward the tip" a crozier needs. The exponent form
 // also gives an exact closed-form integral (no numerical integration needed)
 // and Phi(0)=0 always, so the spine still launches at exactly the bloom
-// angle regardless of curl.
+// angle regardless of curl. curlStart remaps u onto [0,1] over [curlStart,1]
+// before this formula runs, so Phi(curlStart)=0 and Phi(1) is still exactly
+// spineCurlTotal(P) — curlStart changes WHERE the turn happens, never how
+// much total turn there is.
 //   TOTAL_MAX interpolates 360 deg (bias=0, so |curlAmount|=1 closes a single
 // full circle) up to 720 deg (bias=1, so |curlAmount|=1 winds a ~2-turn
 // crozier) — the range this feature was asked to cover.
@@ -273,6 +292,19 @@ export function spineCurlTotal(P) {
   return amount * totalMax;
 }
 
+// CURL START: where along u the curl begins (0..1, default 0 = whole petal,
+// unchanged behaviour). u below curlStart maps to uu=0 (dead straight); u in
+// [curlStart, 1] remaps linearly onto [0, 1] so the existing bias formula
+// still runs Phi(1)=total exactly — curlStart only relocates the turn, one
+// owner (this function) for both curlAmount/curlBias and curlStart together
+// so no consumer can compute Phi with the axes half-applied. Capped at 0.95,
+// short of 1, so the remapped domain never divides by zero.
+function curlStartRemap(u, P) {
+  const start = clamp(P.curlStart || 0, 0, 0.95);
+  if (!start) return clamp(u, 0, 1);
+  return clamp((u - start) / (1 - start), 0, 1);
+}
+
 // Cumulative SPINE CURL turning angle at station u (radians, signed). 0 at
 // u=0 (base tangent stays exactly at the bloom angle) rising to
 // spineCurlTotal(P) at u=1.
@@ -281,7 +313,7 @@ export function spineCurlAngle(u, P) {
   if (!total) return 0;
   const bias = clamp(P.curlBias != null ? P.curlBias : 0, 0, 1);
   const p = SPINE_CURL_BIAS_POWER * bias;
-  return total * Math.pow(clamp(u, 0, 1), p + 1);
+  return total * Math.pow(curlStartRemap(u, P), p + 1);
 }
 
 // Worst-case local turn rate dPhi/du (radians per unit u), always at u=1 since
@@ -289,12 +321,18 @@ export function spineCurlAngle(u, P) {
 // (bias>0). Callers outside this module (vein/blade densification in
 // flower.js) read this instead of re-deriving SPINE_CURL_BIAS_POWER
 // themselves — one owner for the curve's shape, per the registration rule.
+// curlStart compresses the active turn into a shorter u-range, which raises
+// this peak rate by 1/(1-curlStart) — accounted for here so adaptive spine
+// sampling stays smooth for a late, tight curl start same as it does for a
+// tip-loaded bias.
 export function spineCurlPeakRate(P) {
   const total = Math.abs(spineCurlTotal(P));
   if (!total) return 0;
   const bias = clamp(P.curlBias != null ? P.curlBias : 0, 0, 1);
   const p = SPINE_CURL_BIAS_POWER * bias;
-  return total * (p + 1);
+  const start = clamp(P.curlStart || 0, 0, 0.95);
+  const compress = start ? 1 / (1 - start) : 1;
+  return total * (p + 1) * compress;
 }
 
 // How many spine samples buildSpine needs to stay smooth: enough that no
