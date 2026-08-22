@@ -55,6 +55,14 @@
                 font-weight: 700; padding: 8px 16px; font-size: 12px; }
   .primaryBtn:hover { background: color-mix(in srgb, var(--petrol) 85%, white); }
   .primaryBtn:disabled { opacity: 0.4; cursor: default; background: var(--line); border-color: var(--line); color: var(--dim); }
+  .primaryBtn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .primaryBtn.pulsed { transform: scale(1.05);
+                        box-shadow: 0 0 0 3px color-mix(in srgb, var(--petrol) 45%, transparent); }
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(12px);
+           background: var(--panel); border: 1px solid var(--petrol); color: var(--ink);
+           padding: 8px 16px; border-radius: 4px; font-size: 12px; z-index: 60;
+           opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   textarea { width: calc(100% - 24px); margin: 4px var(--sp3); height: 140px;
              background: var(--bg); color: var(--ink); border: 1px solid var(--line);
              font: inherit; font-size: 10px; display: none; }
@@ -96,8 +104,11 @@
             color: var(--dim); padding: 9px 4px 8px; font-size: 10.5px; letter-spacing: 0.04em;
             text-transform: uppercase; border-bottom: 2px solid transparent; }
   .tabBtn .tabDot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-                     background: var(--line); margin-right: 5px; vertical-align: 1px; }
-  .tabBtn .tabDot.done { background: var(--petrol); }
+                     background: transparent; border: 1.5px solid var(--dim); margin-right: 5px;
+                     vertical-align: 1px; }
+  .tabBtn .tabDot.done { background: var(--petrol); border-color: var(--petrol); }
+  .tabBtn .tabDot.current { background: var(--amber); border-color: var(--amber); }
+  .tabBtn .tabDot.unreachable { border-color: var(--line); opacity: 0.5; }
   .tabBtn.current { color: var(--petrol); border-bottom-color: var(--petrol); background: var(--bg); }
   .tabBtn:hover { color: var(--ink); }
   .tabSection { display: none; }
@@ -135,6 +146,7 @@
   .libMeta { color: var(--dim); font-size: 10px; }
   .libActions { display: flex; gap: 4px; flex-wrap: wrap; }
   .libActions button { padding: 2px 6px; font-size: 10px; }
+  .libWarn { color: var(--amber); font-size: 10px; margin-top: 2px; line-height: 1.5; }
   .layoutRow { padding: var(--sp2) var(--sp3); border-bottom: 1px solid var(--line); }
   .layoutRow .name { color: var(--ink); font-weight: 600; }
   .layoutRow .meta { color: var(--dim); font-size: 10px; }
@@ -452,6 +464,7 @@
     </div>
   </div>
 </div>
+<div id="toast"></div>
 
 <script type="importmap">
 { "imports": {

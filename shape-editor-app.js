@@ -704,6 +704,10 @@ let shapeSource = initialShape.source;
 let currentShell = initialShape.source === "library"
   ? { id: initialShape.shell.id, name: initialShape.shell.name, dirty: false }
   : null;
+// Declared here (not down by goToTab, where it conceptually lives) —
+// updateTabProgress() reads it and is reachable from code that runs
+// before the tab-navigation section below.
+let currentTab = "shape";
 
 // Per-curve "named feature currently lost" state.
 const lostFeatures = { a: [], bf: [], bb: [] };
@@ -830,15 +834,46 @@ function promptModal(title, defaultValue) {
   });
 }
 
+// ---------------------------------------------------------------- toast + button pulse
+// Saving used to be silent — the pill read "saved" before and after, so
+// nothing confirmed the press worked. Two independent signals now mark
+// the moment: a toast that appears and fades, and the button itself
+// flashing "Saved ✓" before settling into its new (disabled, "no
+// changes") resting state.
+let toastTimer = null;
+function showToast(msg) {
+  const el = $("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2400);
+}
+function pulseSaved(btn) {
+  if (!btn) return Promise.resolve();
+  btn.textContent = "Saved ✓";
+  btn.classList.add("pulsed");
+  return new Promise((resolve) => setTimeout(() => { btn.classList.remove("pulsed"); resolve(); }, 650));
+}
+
 // ---------------------------------------------------------------- current-shell status + tab progress
+// Saved vs unsaved has to be readable without reading text: the dot
+// color carries it, and the Save button's own enabled/disabled state
+// carries it a second way — prominent and armed when there's something
+// to save, quiet and inert ("No changes") when there isn't.
+let librarySize = 0;
+let currentShellLayoutCount = 0;
 function updateShellStatusPill() {
-  let text, dotClass;
+  let text, dotClass, btnEnabled, btnText;
   if (!currentShell) {
     text = `working from ${shapeSource === "shape.yaml" ? "committed shape.yaml" : "the generator seed"} — not saved to the library yet`;
-    dotClass = "";
+    dotClass = ""; btnEnabled = true; btnText = "Save";
+  } else if (currentShell.dirty) {
+    text = `<b>${currentShell.name}</b> — <span class="warn">unsaved changes</span>`;
+    dotClass = "dirty"; btnEnabled = true; btnText = "Save";
   } else {
-    text = `<b>${currentShell.name}</b>${currentShell.dirty ? " — unsaved edits" : " — saved"}`;
-    dotClass = currentShell.dirty ? "dirty" : "clean";
+    text = `<b>${currentShell.name}</b> — <span class="ok">saved</span>`;
+    dotClass = "clean"; btnEnabled = false; btnText = "No changes";
   }
   for (const id of ["shellStatusDot", "shellStatusDot2", "shellStatusDot3"]) {
     const el = $(id); if (el) el.className = `dot ${dotClass}`;
@@ -846,20 +881,29 @@ function updateShellStatusPill() {
   for (const id of ["shellStatusText", "shellStatusText2", "shellStatusText3"]) {
     const el = $(id); if (el) el.innerHTML = text;
   }
+  for (const id of ["saveShellBtn", "saveShellBtnShape"]) {
+    const btn = $(id);
+    if (btn && !btn.classList.contains("pulsed")) { btn.disabled = !btnEnabled; btn.textContent = btnText; }
+  }
   updateTabProgress();
+}
+// Three states per tab, not one: complete (done), current (you're on
+// it), or not yet reachable (its prerequisite doesn't exist yet) — a
+// plain "todo" (the CSS default: a hollow ring) covers everything else.
+function setTabDotState(tab, id, state) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.remove("done", "current", "unreachable");
+  const finalState = tab === currentTab ? "current" : state;
+  if (finalState !== "todo") el.classList.add(finalState);
 }
 function updateTabProgress() {
   const uploadDone = calibFront.calibrated && calibTrace.calibrated && calibTop.calibrated;
-  $("dotUpload")?.classList.toggle("done", uploadDone);
-  $("dotShape")?.classList.toggle("done", !!currentShell || shapeHandEdited);
-  $("dotShells")?.classList.toggle("done", !!currentShell);
-  if (currentShell) {
-    db.listLayoutsForShell(currentShell.id).then((layouts) => {
-      $("dotPanels")?.classList.toggle("done", layouts.length > 0);
-    }).catch(() => {});
-  } else {
-    $("dotPanels")?.classList.toggle("done", false);
-  }
+  setTabDotState("upload", "dotUpload", uploadDone ? "done" : "todo");
+  setTabDotState("shape", "dotShape", currentShell ? "done" : "todo");
+  setTabDotState("export", "dotShells", librarySize > 0 ? "done" : "todo");
+  setTabDotState("place", "dotPanels",
+    !currentShell ? "unreachable" : (currentShellLayoutCount > 0 ? "done" : "todo"));
 }
 
 // ---------------------------------------------------------------- open a shell into the editor
@@ -1475,12 +1519,32 @@ async function buildShellOverwriteImpactHtml(oldChart, newChart, layouts, shellN
 }
 
 // ---------------------------------------------------------------- Save (creates or updates a library entry)
-async function saveCurrentShell() {
+// Every successful save ends the same way: library/storage UI refreshed,
+// a toast that appears and fades, the triggering button flashing
+// "Saved ✓" before settling back to its resting state, then moving
+// forward — Shape's save offers Shells, Shells' save offers Panels. That
+// forward step is the point: without it every stage was a dead end.
+async function finishSave(triggerBtn, forwardTab, name) {
+  await renderShellLibrary();
+  await updateStorageUsage();
+  showToast(`Saved "${name}"`);
+  await pulseSaved(triggerBtn);
+  updateShellStatusPill();
+  if (forwardTab) goToTab(forwardTab);
+}
+async function saveCurrentShell(triggerBtn, forwardTab) {
   if (exportBlocked()) {
     $("exportStatus").innerHTML = '<span class="err">save blocked — a named feature is lost at the ' +
       "current density (see Shape); raise the density or check the override</span>";
     return;
   }
+  // Snapshot NOW, at the moment of saving — not read back out of live
+  // state later, since density/smoothing can change before the next
+  // save. A shell saved with a named feature below its floor should say
+  // so on its own library entry, not just in the export guard at the
+  // instant it happened.
+  const lostFeaturesSnapshot = { a: [...lostFeatures.a], bf: [...lostFeatures.bf], bb: [...lostFeatures.bb] };
+
   if (!currentShell) {
     const defaultName = `Shell ${new Date().toLocaleString()}`;
     const name = await promptModal("Name this shell", defaultName);
@@ -1494,61 +1558,71 @@ async function saveCurrentShell() {
       neckline: { ...n },
       backdropCalibration: currentCalibrationYaml(),
       thumbnail: captureThumbnail(),
+      lostFeatures: lostFeaturesSnapshot,
     };
     await db.putShell(shell);
     currentShell = { id: shell.id, name: shell.name, dirty: false };
     localStorage.setItem(CURRENT_SHELL_POINTER_KEY, shell.id);
     shapeSource = "library";
     $("exportStatus").innerHTML = `<span class="ok">✓ saved as "${shell.name}"</span>`;
-  } else if (!currentShell.dirty) {
+    await finishSave(triggerBtn, forwardTab, shell.name);
+    return;
+  }
+  if (!currentShell.dirty) {
     $("exportStatus").innerHTML = '<span class="dim">no changes to save</span>';
     return;
-  } else {
-    const owningLayouts = await db.listLayoutsForShell(currentShell.id);
-    const doOverwrite = async () => {
-      const shell = await db.getShell(currentShell.id);
-      shell.aPoints = paneA.points.map(p => [p.v, p.y]);
-      shell.bFrontPoints = paneB.front.map(p => [p.v, p.y]);
-      shell.bBackPoints = paneB.back.map(p => [p.v, p.y]);
-      shell.neckline = { ...n };
-      shell.backdropCalibration = currentCalibrationYaml();
-      shell.thumbnail = captureThumbnail();
-      shell.updatedAt = new Date().toISOString();
-      await db.putShell(shell);
-      currentShell.dirty = false;
-      $("exportStatus").innerHTML = `<span class="ok">✓ saved "${shell.name}"</span>` +
-        (owningLayouts.length ? ` — re-checked ${owningLayouts.length} layout(s) on this shell.` : "");
-      updateShellStatusPill();
-      await renderShellLibrary();
-      await updateStorageUsage();
-    };
-    if (owningLayouts.length === 0) {
-      await doOverwrite();
-    } else {
-      const oldShell = await db.getShell(currentShell.id);
-      const oldChart = buildSurfaceChart(
-        fitOfPoints(oldShell.aPoints), fitOfPoints(oldShell.bFrontPoints), fitOfPoints(oldShell.bBackPoints),
-        V_LO, V_HI, SPLIT, necklineHeightFn(oldShell.neckline));
-      const newChart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
-      const html = await buildShellOverwriteImpactHtml(oldChart, newChart, owningLayouts, oldShell.name);
-      confirmModal(html, doOverwrite);
-      return;
-    }
   }
-  updateShellStatusPill();
-  await renderShellLibrary();
-  await updateStorageUsage();
+  const owningLayouts = await db.listLayoutsForShell(currentShell.id);
+  const doOverwrite = async () => {
+    const shell = await db.getShell(currentShell.id);
+    shell.aPoints = paneA.points.map(p => [p.v, p.y]);
+    shell.bFrontPoints = paneB.front.map(p => [p.v, p.y]);
+    shell.bBackPoints = paneB.back.map(p => [p.v, p.y]);
+    shell.neckline = { ...n };
+    shell.backdropCalibration = currentCalibrationYaml();
+    shell.thumbnail = captureThumbnail();
+    shell.lostFeatures = lostFeaturesSnapshot;
+    shell.updatedAt = new Date().toISOString();
+    await db.putShell(shell);
+    currentShell.dirty = false;
+    $("exportStatus").innerHTML = `<span class="ok">✓ saved "${shell.name}"</span>` +
+      (owningLayouts.length ? ` — re-checked ${owningLayouts.length} layout(s) on this shell.` : "");
+    await finishSave(triggerBtn, forwardTab, shell.name);
+  };
+  if (owningLayouts.length === 0) {
+    await doOverwrite();
+  } else {
+    const oldShell = await db.getShell(currentShell.id);
+    const oldChart = buildSurfaceChart(
+      fitOfPoints(oldShell.aPoints), fitOfPoints(oldShell.bFrontPoints), fitOfPoints(oldShell.bBackPoints),
+      V_LO, V_HI, SPLIT, necklineHeightFn(oldShell.neckline));
+    const newChart = buildSurfaceChart(paneA.fit(), paneB.fitFront(), paneB.fitBack(), V_LO, V_HI, SPLIT, necklineFn);
+    const html = await buildShellOverwriteImpactHtml(oldChart, newChart, owningLayouts, oldShell.name);
+    confirmModal(html, doOverwrite);
+  }
 }
-$("saveShellBtn").onclick = saveCurrentShell;
-$("saveShellBtnShape").onclick = saveCurrentShell;
+$("saveShellBtn").onclick = () => saveCurrentShell($("saveShellBtn"), "place");
+$("saveShellBtnShape").onclick = () => saveCurrentShell($("saveShellBtnShape"), "export");
 $("exportOverride").addEventListener("change", updateExportGuard);
 
 // ---------------------------------------------------------------- shell library UI
+function fmtLostFeaturesWarning(shell) {
+  const lf = shell.lostFeatures;
+  if (!lf) return "";
+  const parts = [];
+  if (lf.a?.length) parts.push(`a(v): ${lf.a.join(", ")}`);
+  if (lf.bf?.length) parts.push(`b_front: ${lf.bf.join(", ")}`);
+  if (lf.bb?.length) parts.push(`b_back: ${lf.bb.join(", ")}`);
+  if (!parts.length) return "";
+  return `<div class="libWarn">⚠ saved with a named feature below its floor — ${parts.join(" · ")}</div>`;
+}
 async function renderShellLibrary() {
   const shells = await db.listShells();
+  librarySize = shells.length;
   const el = $("shellLibraryList");
   if (!shells.length) {
     el.innerHTML = '<div class="legend">no saved shells yet — Save above to create the first one.</div>';
+    updateTabProgress();
     return;
   }
   el.innerHTML = shells.map((s) => {
@@ -1558,6 +1632,7 @@ async function renderShellLibrary() {
       <div class="libInfo">
         <div class="libName">${s.name}${isCurrent ? ' <span class="ok">· current</span>' : ""}</div>
         <div class="libMeta">saved ${new Date(s.updatedAt).toLocaleString()}</div>
+        ${fmtLostFeaturesWarning(s)}
       </div>
       <div class="libActions">
         <button data-act="open" data-id="${s.id}">open</button>
@@ -1567,6 +1642,7 @@ async function renderShellLibrary() {
       </div>
     </div>`;
   }).join("");
+  updateTabProgress();
 }
 async function openShellById(id) {
   const shell = await db.getShell(id);
@@ -1791,9 +1867,11 @@ async function renderShellLayoutList() {
   const el = $("shellLayoutList");
   if (!currentShell) {
     el.innerHTML = '<div class="legend">no shell open — open or save one on the Shells tab first.</div>';
+    currentShellLayoutCount = 0; updateTabProgress();
     return;
   }
   const layouts = await db.listLayoutsForShell(currentShell.id);
+  currentShellLayoutCount = layouts.length; updateTabProgress();
   if (!layouts.length) {
     el.innerHTML = '<div class="legend">no layouts on this shell yet — duplicate the committed layout.yaml below onto it to start one.</div>';
     return;
@@ -1894,7 +1972,6 @@ $("shellLayoutList").addEventListener("change", async (ev) => {
 
 // ---------------------------------------------------------------- tab navigation (free — no gate)
 const TAB_NAMES = ["upload", "shape", "export", "place"];
-let currentTab = "shape";
 function setTabVisible(tab) {
   for (const t of TAB_NAMES) $(`tab-${t}`).classList.toggle("current", t === tab);
   for (const btn of document.querySelectorAll(".tabBtn")) btn.classList.toggle("current", btn.dataset.tab === tab);
@@ -1912,6 +1989,10 @@ for (const btn of document.querySelectorAll(".tabBtn")) {
 }
 setTabVisible(currentTab);
 updateShellStatusPill();
+// Populate library/layout counts up front so the tab dots are accurate
+// before Shells/Panels has ever been visited, not just after.
+renderShellLibrary();
+renderShellLayoutList();
 
 paneA.draw();
 paneB.draw();
