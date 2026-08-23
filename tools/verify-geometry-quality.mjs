@@ -107,7 +107,7 @@ const REPORT_ONLY = argv.includes('--report-only') || SWEEP;
 //                         the margin at every u), so their undershoot (measured worst ~27mm,
 //                         clawed__strands) reflects the pattern's own open structure, not a
 //                         registration bug — reported per-config, not gated.
-const T = { marginGapMM: 1.5, p95CurvDegMM: 40, freeEnds: 6, regOvershootMM: 3.0, regUndershootVoronoiMM: 2 };
+const T = { marginGapMM: 1.5, p95CurvDegMM: 40, freeEnds: 6, regOvershootMM: 3.0, regUndershootVoronoiMM: 2, treatmentAmpMM: 1.5 };
 // The connectivity check applies only to the STRUCTURED infills that are meant to cap
 // onto the margin. Space-colonization's free tips are its growth frontier (bead-capped
 // and watertight per the export gate), and Voronoi is closed slab rings — neither is a
@@ -167,6 +167,26 @@ if (SWEEP) {
     CONFIGS.push({ name: `chrysanthemum__${pat}`, ui: { ...CHRYSANTHEMUM_UI, infillType: pat }, xfail: null });
   }
 }
+// RIM TREATMENTS (issue #53). TOOTHED and SCALLOPED reshape the rim polyline and nothing
+// else; under CONTINUOUS MARGIN — the Standard default and the mode most designs use —
+// that polyline is discarded and they render identically to CLEAN. These configs are the
+// gate that was missing: each is run in both margin modes, so the pair states the defect
+// exactly (OFF carries the treatment, ON does not) and, once #53 is fixed, states the fix.
+// They are NOT xfail: the ON rows are expected to FAIL until the margin is edge-profile
+// aware. A gate landing red is the point — it is the positive control for the fix.
+if (!SWEEP && !process.env.GQ_MARGIN_OFF) {
+  for (const [style, extra] of [['jagged', { tipLength: 0.5, tipFrequency: 9, tipRegion: 0.35 }],
+                                ['scallop', { scallopCount: 9, scallopHeight: 0.8 }]]) {
+    for (const cm of ['on', 'off']) {
+      CONFIGS.push({
+        name: `${style === 'jagged' ? 'toothed' : 'scalloped'}__margin-${cm}`,
+        ui: { ...SHAPES.rounded, infillType: 'veins', tipStyle: style, continuousMargin: cm, ...extra },
+        xfail: null,
+      });
+    }
+  }
+}
+
 // Cross-check: GQ_MARGIN_OFF flips continuous margin off on every config, routing the rim
 // through the hoop that traces the same contour. The fidelity gap stays ~0 there too —
 // proof the gate measures the RENDERED margin, not merely the presence of a cleft.
@@ -188,10 +208,43 @@ if (!SWEEP && !process.env.GQ_MARGIN_OFF) {
 //      dynamic import of the geometry module (same relative specifier flower.js uses). --
 const GQ_HOOK = `
 const MM = 26;   // MM_PER_UNIT — report gaps in mm, the unit that matters for print.
+// SET, THEN READ BACK. A control can refuse the value it was handed — the Standard
+// tier rewrites tipStyle 'jagged'/'scallop' back to 'clean' (ADV_OPTIONS), a select
+// silently keeps its old value when handed an option it does not have, and a slider
+// clamps out of range. Every one of those makes the harness measure a DIFFERENT
+// design from the one the config names, while reporting the config's name — the
+// exact failure family this project keeps hitting. So the setter returns what did
+// not take, and the runner fails the config rather than measuring the wrong petal.
 window.__gqSet = function(obj) {
-  for (const k in obj) { const el = inputs[k]; if (!el) continue; if (el.type === 'checkbox') el.checked = !!obj[k]; else el.value = obj[k]; }
+  const rejected = [];
+  for (const k in obj) {
+    const el = inputs[k];
+    if (!el) { rejected.push(k + ': no such control'); continue; }
+    if (el.type === 'checkbox') { el.checked = !!obj[k]; if (el.checked !== !!obj[k]) rejected.push(k + ': refused ' + obj[k]); continue; }
+    el.value = obj[k];
+    // compare numerically for sliders (el.value normalises '0.50' -> '0.5'), by string for selects
+    const want = obj[k], got = el.value;
+    const bothNum = want !== '' && got !== '' && isFinite(Number(want)) && isFinite(Number(got));
+    const ok = bothNum ? Math.abs(Number(want) - Number(got)) < 1e-9 : String(want) === String(got);
+    if (!ok) rejected.push(k + ': set ' + JSON.stringify(want) + ' but reads back ' + JSON.stringify(got));
+  }
+  return rejected;
 };
 window.__gqGeom = null;
+// point -> distance to the nearest segment of a 3D polyline
+function __gqDist3(p, pts) {
+  let best = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L2 = dx*dx + dy*dy + dz*dz;
+    let t = L2 ? ((p.x - a.x) * dx + (p.y - a.y) * dy + (p.z - a.z) * dz) / L2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const qx = a.x + t*dx, qy = a.y + t*dy, qz = a.z + t*dz;
+    const d = Math.hypot(p.x - qx, p.y - qy, p.z - qz);
+    if (d < best) best = d;
+  }
+  return best;
+}
 // point -> distance to the nearest segment across a set of polylines [{points:[...]}...]
 function __gqDistToSegs(p, polys) {
   let best = Infinity;
@@ -388,6 +441,52 @@ window.__gq = async function() {
   const regUndershootMeanMM = (regUnderCount ? regUnderSum / regUnderCount : 0) * MM;
   const regWorstU = regOverMax * MM >= regUndershootMaxMM ? regOverU : regUnderU;
 
+  // (6) RIM TREATMENT AMPLITUDE — is the tooth/scallop displacement present in the
+  //     edge the renderer ACTUALLY lofts? Every other metric here is blind to this:
+  //     margin fidelity compares the rim against the SMOOTH material boundary, which
+  //     a discarded treatment matches perfectly. TOOTHED and SCALLOPED shipped inert
+  //     under continuous margin for weeks because nothing measured the one thing that
+  //     distinguishes them from CLEAN (issue #53).
+  //     Method: build the rim the render path builds (buildJaggedEdge / buildScallopEdge
+  //     when the hoop is drawn, the marginal strands when continuous margin is on), map
+  //     both it and the untreated outline onto the surface, and take the largest
+  //     excursion of the lofted rim away from the untreated one over the tip region.
+  //     The floor is deliberately far below the real reach (teeth at TIP LENGTH 0.4
+  //     travel ~5 mm, scallops at HEIGHT 0.8 ~7 mm) and far above zero: this asks "is
+  //     the treatment there at all", not "is it exactly this tall", so it does not
+  //     re-implement the amplitude constants as a second definition of them.
+  let treatmentAmpMM = null;
+  if (P.tipStyle === 'jagged' || P.tipStyle === 'scallop') {
+    try {
+      const spine3 = G.buildSpine(P);
+      const jag = G.buildJaggedEdge(P, spine3, mulberry32((seed ^ 0x9e3779b9) >>> 0)) || G.buildScallopEdge(P, spine3);
+      const smooth3 = material.map((p) => G.mapPointToSurface(p, P, spine3));
+      const drawRim3 = !(P.infillType === 'bone' && P.boneOutline === false) && !contMargin;
+      // Under continuous margin the strands legitimately leave the outline near the
+      // foot (the bundle/flare), which would read as a huge "treatment" — so there the
+      // measurement is restricted to the same tip region marginGap uses, using the
+      // flattened points where u is known. The hoop rim has no flare, so it is measured
+      // whole.
+      let lofted = [];
+      if (contMargin) {
+        // Assembled by the SAME function the renderer uses (treatedStrandPoints), not by
+        // this hook's own idea of what a strand is — a gate modelling the rendered margin
+        // itself is how a fixed renderer still reads as broken, and vice versa.
+        for (const st of marginStrands(P)) {
+          const pts = G.treatedStrandPoints(st.points, st.side, jag, P, (p) => G.mapPointToSurface(p, P, spine3));
+          const uS = G.rimSpliceU(P, jag);
+          const flatCount = st.points.filter((p) => (p.x / P.L) < uS).length;
+          pts.forEach((q, i) => { if (i >= flatCount || (st.points[i] && st.points[i].x / P.L >= neck)) lofted.push(q); });
+        }
+      } else {
+        lofted = (jag && drawRim3) ? jag.rim : smooth3;
+      }
+      let amp = 0;
+      for (const q of lofted) { const d = __gqDist3(q, smooth3); if (d > amp) amp = d; }
+      treatmentAmpMM = +(amp * MM).toFixed(3);
+    } catch (e) { treatmentAmpMM = -1; }
+  }
+
   // (5) RIB-PATH SPLIT INTEGRITY — ribPath cuts the boundary into its two halves at
   //     the contour's own y = 0 crossings. If that split is degenerate it falls back
   //     to the analytic envelope, which IS the pre-#50 defect: a rim that skips every
@@ -399,6 +498,7 @@ window.__gq = async function() {
                      coverage: !!rp.diag.coverage, sidePure: !!rp.diag.sidePure };
 
   return { infill: P.infillType, cleftDepth: +(P.cleftDepth || 0).toFixed(2), contMargin, numLoops, marginClosed, ribSplit,
+           tipStyle: P.tipStyle, treatmentAmpMM, boneOutline: P.boneOutline !== false,
            marginGapMM: +marginGapMM.toFixed(3), worstU: +worstU.toFixed(2), neck: +neck.toFixed(2),
            maxTurnDeg: +maxTurn.toFixed(1), p95TurnDeg: +p95Turn.toFixed(1),
            maxCurvDegMM: +maxCurv.toFixed(1), p95CurvDegMM: +p95Curv.toFixed(1),
@@ -437,15 +537,28 @@ await page.route('**/cdn.jsdelivr.net/**', (route) => {
 });
 await page.goto(`http://127.0.0.1:${port}/flower.html`, { waitUntil: 'load', timeout: 30000 });
 await page.waitForFunction('window.__gqReady === true', { timeout: 30000 });
+// ADVANCED. In Standard the tier rewrites tipStyle 'jagged'/'scallop' back to 'clean'
+// (ADV_OPTIONS in flower.js), so a tooth config set in Standard would silently measure a
+// CLEAN petal. __gqSet's read-back would now catch that as a hard failure rather than a
+// green row — this switch is what lets the tooth configs mean what they say.
+await page.evaluate(() => { const t = document.getElementById('advancedToggle'); if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); } });
 await page.waitForTimeout(300);
 
 const rows = [];
 let fails = 0, xfails = 0, xpasses = 0;
 const ledger = {};   // issue ref -> { total, failing }
-console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), '  verdict');
+console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), 'rimAmp'.padStart(7), '  verdict');
 for (const cfg of CONFIGS) {
+  let rejected = [];
   if (cfg.preset) await page.evaluate((d) => window.__gqApply(d), cfg.ui);
-  else await page.evaluate((ui) => window.__gqSet(ui), cfg.ui);
+  else rejected = await page.evaluate((ui) => window.__gqSet(ui), cfg.ui);
+  if (rejected && rejected.length) {
+    // Not a geometry failure — a harness failure. Reported loudly and counted as a
+    // FAIL, because the alternative is a green row measuring a petal nobody asked for.
+    console.log(cfg.name.padEnd(20), 'CONFIG DID NOT TAKE — ' + rejected.join('; '));
+    rows.push({ name: cfg.name, error: 'config-rejected: ' + rejected.join('; ') });
+    fails++; continue;
+  }
   const q = await page.evaluate(() => window.__gq());
   if (q.error) { console.log(cfg.name.padEnd(20), 'ERROR', q.error); rows.push({ name: cfg.name, error: q.error }); fails++; continue; }
   const badFidelity = q.marginGapMM > T.marginGapMM || !q.marginClosed;
@@ -464,8 +577,14 @@ for (const cfg of CONFIGS) {
   // The rib-path split either held or the rim silently reverted to the pre-#50
   // envelope. There is no tolerance to set here: it is a boolean, and it is hard.
   const badSplit = !q.ribSplit || q.ribSplit.fallback || !q.ribSplit.coverage || !q.ribSplit.sidePure;
-  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit;
-  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : ''].filter(Boolean).join(',');
+  // A selected rim treatment must be present in the geometry that actually gets lofted.
+  // Applies wherever a rim is drawn at all — BONE with the outline off has no rim to
+  // carry it, and is exempt for that reason and no other.
+  const rimBearing = !(q.infill === 'bone' && q.boneOutline === false);
+  const badTreat = (q.tipStyle === 'jagged' || q.tipStyle === 'scallop') && rimBearing
+                   && !(q.treatmentAmpMM >= T.treatmentAmpMM);
+  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat;
+  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : ''].filter(Boolean).join(',');
   let verdict;
   if (cfg.xfail) {
     const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
@@ -475,7 +594,7 @@ for (const cfg of CONFIGS) {
   } else if (bad) { verdict = `FAIL(${reasons})`; fails++; }                               // real regression — breaks the build
   else verdict = 'ok';
   rows.push({ name: cfg.name, xfail: cfg.xfail || null, ...q, verdict });
-  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), '  ' + verdict);
+  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), String(q.treatmentAmpMM == null ? '-' : q.treatmentAmpMM).padStart(7), '  ' + verdict);
 }
 if (process.env.GQ_JSON) fs.writeFileSync(process.env.GQ_JSON, JSON.stringify(rows, null, 1));
 
@@ -500,6 +619,6 @@ if (openIssues.length) {
   if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
 }
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm`);
 await browser.close(); server.close();
 process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));

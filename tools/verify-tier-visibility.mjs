@@ -132,6 +132,63 @@ for (const c of WIRED) {
   if (r.hidden !== false) failures.push(`${c.id} ("${c.label}"): still hidden in Advanced (no gating/permanentHidden/imperativeGate to explain it)`);
 }
 
+// ---- OPTION-LEVEL TIER, BOTH DIRECTIONS ------------------------------------------
+// The control-level check above says a control is reachable. It says nothing about the
+// OPTIONS inside a select, and a select can be fully visible while one of its options is
+// hidden — which is how TOOTHED and SCALLOPED sat unreachable in Standard for weeks
+// after the reason for hiding them stopped being true.
+//
+// The registry declares option-level tier (`advancedOnly` on the option, plus
+// `standardFallback` on the control) and flower.js derives ADV_OPTIONS from it, so there
+// is one declaration. This asserts BOTH directions against that declaration, because
+// "doesn't leak into Standard" and "does still show in Advanced" are different claims:
+//   Standard  — exactly the advancedOnly options are hidden; every other option visible.
+//   Advanced  — no option is hidden at all (except registry-`hidden` ones like CUSTOM).
+const optionState = async (advanced) => {
+  await page.evaluate((adv) => {
+    const t = document.getElementById('advancedToggle');
+    if (t && t.checked !== adv) { t.checked = adv; t.dispatchEvent(new Event('change', { bubbles: true })); }
+  }, advanced);
+  await page.waitForTimeout(150);
+  return page.evaluate(() => {
+    const out = {};
+    for (const sel of document.querySelectorAll('select')) {
+      out[sel.id] = [...sel.options].map((o) => ({ value: o.value, hidden: !!o.hidden, disabled: !!o.disabled }));
+    }
+    return out;
+  });
+};
+const declaredHidden = (c) => new Set((c.options || []).filter((o) => o.advancedOnly).map((o) => o.value));
+const registryHidden = (c) => new Set((c.options || []).filter((o) => o.hidden).map((o) => o.value));
+
+const inStandard = await optionState(false);
+const inAdvanced = await optionState(true);
+let optFail = 0;
+for (const c of PANEL.filter((x) => x.kind === 'select')) {
+  const adv = declaredHidden(c), always = registryHidden(c);
+  const st = inStandard[c.id] || [], ad = inAdvanced[c.id] || [];
+  for (const o of st) {
+    if (always.has(o.value)) continue;
+    const shouldHide = adv.has(o.value);
+    if (o.hidden !== shouldHide) {
+      console.error(`  FAIL ${c.id}/${o.value}: Standard mode hidden=${o.hidden}, registry says advancedOnly=${shouldHide}`);
+      optFail++;
+    }
+  }
+  for (const o of ad) {
+    if (always.has(o.value)) continue;
+    if (o.hidden || o.disabled) {
+      console.error(`  FAIL ${c.id}/${o.value}: hidden/disabled in ADVANCED mode — unreachable in the mode that is supposed to show everything`);
+      optFail++;
+    }
+  }
+}
+const optTotal = PANEL.filter((x) => x.kind === 'select').reduce((n, c) => n + (c.options || []).length, 0);
+const advOnly = PANEL.filter((x) => x.kind === 'select').flatMap((c) => (c.options || []).filter((o) => o.advancedOnly).map((o) => `${c.id}/${o.value}`));
+if (optFail) failures.push(`${optFail} option-level tier disagreement(s) — see above`);
+console.log(`tier-visibility: options OK — ${optTotal} select options agree with the registry in BOTH modes `
+  + `(advanced-only: ${advOnly.length ? advOnly.join(', ') : 'none'}).`);
+
 console.log(`tier-visibility: ${visibleCount}/${WIRED.length} WIRED controls visible in Advanced mode (default config).`);
 console.log(`  ${WIRED.filter(shouldBeVisibleInAdvanced).length} ungated Advanced-or-Standard controls checked for the "must be visible" assertion.`);
 
@@ -141,6 +198,7 @@ server.close();
 if (failures.length) {
   console.error(`\ntier-visibility: FAIL — ${failures.length} control(s) stuck hidden in Advanced:`);
   for (const f of failures) console.error('  -', f);
+
   process.exit(1);
 }
 console.log('\ntier-visibility: PASS — every ungated WIRED control is reachable in Advanced mode.');

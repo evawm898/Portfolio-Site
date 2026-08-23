@@ -404,6 +404,26 @@ CONFIGS.push({ label: 'cont-margin no stem (SDF seals on its own)', cm: true, sm
 // crash (issue #44 — ~27M live tris, browser dies on export), not a fixed-and-guarded case
 // to regression-test. See the comment on isSmoke() above before adding one back.
 
+// ===== RIM TREATMENTS UNDER CONTINUOUS MARGIN (issue #53) =====
+// The teeth/scallops now ride the two marginal strands instead of a closed hoop, which
+// means an OPEN tapered tube whose path detours out to a peak and back. That is exactly
+// the shape most likely to self-intersect or leave a boundary edge at the splice, so it
+// is gated at both ends of the range: a long/frequent tooth set and a tall scallop set,
+// each with the receptacle on so the strand feet are also being consumed by the junction.
+CONFIGS.push({ label: 'cont-margin reset for rim treatments', cm: true, set: [
+  { id: 'continuousMargin', value: 'on', evt: 'change' }, { id: 'bloomType', value: 'radial', evt: 'change' },
+  { id: 'petalCount', value: '9' }, { id: 'layerCount', value: '1' }, { id: 'infillType', value: 'veins', evt: 'change' },
+  { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' }, { id: 'crossSection', value: '0' }, { id: 'curlAmount', value: '0.3' },
+  { id: 'petalCup', value: '0' }, { id: 'receptacleType', value: 'on', evt: 'change' }, { id: 'stemType', value: 'stem', evt: 'change' },
+  { id: 'tipStyle', value: 'clean', evt: 'change' },
+] });
+CONFIGS.push({ label: 'cont-margin TOOTHED (teeth on the strands)', cm: true, smoke: true, set: [{ id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.5' }, { id: 'tipFrequency', value: '9' }, { id: 'tipRegion', value: '0.35' }] });
+CONFIGS.push({ label: 'cont-margin TOOTHED long + irregular + max cup', cm: true, set: [{ id: 'tipLength', value: '1' }, { id: 'tipIrregularity', value: '0.8' }, { id: 'tipFrequency', value: '15' }, { id: 'petalCup', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin SCALLOPED tall', cm: true, smoke: true, set: [{ id: 'petalCup', value: '0' }, { id: 'tipIrregularity', value: '0' }, { id: 'tipStyle', value: 'scallop', evt: 'change' }, { id: 'scallopCount', value: '9' }, { id: 'scallopHeight', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin SCALLOPED max count + quilled cross-section', cm: true, set: [{ id: 'scallopCount', value: '30' }, { id: 'crossSection', value: '1' }] });
+CONFIGS.push({ label: 'cont-margin TOOTHED + cleft (treatment on a clefted strand)', cm: true, set: [{ id: 'crossSection', value: '0' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.5' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] });
+CONFIGS.push({ label: 'cont-margin reset after rim treatments', cm: true, set: [{ id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'cleftDepth', value: '0' }, { id: 'tipLength', value: '0.3' }, { id: 'tipFrequency', value: '14' }, { id: 'tipRegion', value: '0.25' }, { id: 'scallopCount', value: '9' }, { id: 'scallopHeight', value: '0.4' }] });
+
 // ===== SHIPPED PRESETS: every curated preset (flower-presets.js) is a permanent
 // regression fixture — named, so a failure reads "Thistle broke", not "config N". Each
 // is loaded the way a visitor loads it: by clicking its gallery cell (the real
@@ -446,6 +466,16 @@ await page.route('**cdn.jsdelivr.net/**', (route) => {
 await page.goto(`http://localhost:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
 await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
 
+// ADVANCED. In Standard the tier rewrites tipStyle 'jagged'/'scallop' -> 'clean' and
+// bloomType 'bilateral' -> 'coiled' (ADV_OPTIONS in flower.js), so a config naming one of
+// those would export a DIFFERENT design from the one its label claims — silently, and
+// with a plausible-looking triangle count. That is how three different TOOTHED configs
+// first came back with byte-identical counts here.
+await page.evaluate(() => {
+  const t = document.getElementById('advancedToggle');
+  if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await page.waitForTimeout(200);
 // Export STL now lives inside the collapsed "Make" accordion — open it so the click lands.
 await page.evaluate(() => {
   const head = document.querySelector('.fl-acc__head[aria-controls="acc-make"]');
@@ -454,6 +484,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(120);
 
 const results = [];
+const setFailures = [];   // configs whose control values did not take (see below)
 for (const cfg of CONFIGS) {
   if (cfg.presetSlug) {
     // Load the preset by clicking its gallery cell — the real applyDesign path.
@@ -463,8 +494,21 @@ for (const cfg of CONFIGS) {
     }, cfg.presetSlug);
     if (!clicked) { if (isSmoke(cfg)) results.push({ label: cfg.label, ok: false, preset: true, note: 'gallery cell not found' }); continue; }
   } else {
+    // SET, THEN READ BACK. A control can refuse what it is handed (a tier fallback, an
+    // option a select does not have, a slider clamp), and a config that did not take
+    // exports a design nobody asked for under a label that says otherwise.
     for (const s of cfg.set) {
-      await page.evaluate(({ id, value, evt }) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event(evt || 'input', { bubbles: true })); }, s);
+      const got = await page.evaluate(({ id, value, evt }) => {
+        const el = document.getElementById(id);
+        if (!el) return { missing: true };
+        el.value = value;
+        el.dispatchEvent(new Event(evt || 'input', { bubbles: true }));
+        return { value: el.value };
+      }, s);
+      if (got.missing) { setFailures.push(`${cfg.label}: no control #${s.id}`); continue; }
+      const bothNum = s.value !== '' && got.value !== '' && isFinite(Number(s.value)) && isFinite(Number(got.value));
+      const ok = bothNum ? Math.abs(Number(s.value) - Number(got.value)) < 1e-9 : String(s.value) === String(got.value);
+      if (!ok) setFailures.push(`${cfg.label}: ${s.id} set "${s.value}" but reads back "${got.value}"`);
     }
   }
   await page.waitForTimeout(160); // let the double-rAF rebuild settle
@@ -501,6 +545,11 @@ if (cm.length) console.log(`Continuous-margin SDF receptacle (absorption × gath
 const pre = results.filter((r) => r.preset);
 const prePass = pre.filter((r) => r.ok).length;
 if (pre.length) console.log(`Shipped presets (flower-presets.js): ${prePass}/${pre.length} export watertight.`);
+if (setFailures.length) {
+  console.log('\nCONFIG VALUES THAT DID NOT TAKE (the harness would have measured a different design):');
+  for (const f of setFailures) console.log('  ! ' + f);
+  failed += setFailures.length;
+}
 if (pageErrors.length) {
   const real = pageErrors.filter((e) => !/fonts\.googleapis/.test(e));
   if (real.length) { console.log('\nPage errors:'); real.forEach((e) => console.log('  ! ' + e)); failed += real.length; }

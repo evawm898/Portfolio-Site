@@ -27,7 +27,7 @@ import {
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
-  ribRadius, ribCenterline, ribMarginPolyline, ribPath,
+  ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS } from './flower-registry.js';
@@ -1336,11 +1336,25 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // foot bundle (both strands + the foot-rooted midrib) into one node.
   let strandRoots = null;
   const contMargin = !!P.continuousMargin && !P.solidBlade;
+  // RIM TREATMENT ON THE STRANDS (issue #53). TOOTHED and SCALLOPED live entirely in the
+  // rim polyline, so under continuous margin — where the hoop is replaced by two strands —
+  // they used to be generated and then dropped, rendering identically to CLEAN. The teeth
+  // are not rebuilt here: buildJaggedEdge / buildScallopEdge hand back the SAME walk they
+  // build the hoop from, split into a +Y and a -Y half with each point tagged by its u,
+  // and the strand splices onto that half. One producer for the boundary (ribPath), one
+  // for the treatment.
+  //
+  // Where to splice: above the flare the strand IS the outline (marginFlareFactor reaches
+  // 1, so v = side and the strand point equals surfacePoint(u, side)), which makes the
+  // seam exact. Below it the strand is bundled toward the axis for the receptacle
+  // junction and must stay there — a tooth down in the bundle would be a spike off the
+  // neck. The flare end is FOUND by scanning marginFlareFactor rather than re-deriving
+  // its formula, so it cannot drift from the curve ribPath actually uses.
   if (contMargin) {
     strandRoots = [];
     const r0 = ribRadius(0, P, true), r1 = ribRadius(1, P, true);
     for (const s of marginStrands(P)) {
-      const wp = s.points.map(toWorld);
+      const wp = treatedStrandPoints(s.points, s.side, jag, P, (pt) => mapPointToSurface(pt, P, spine)).map(place);
       acc.addTube(wp, [r0, r1], 0, P.rimSegments || RADIAL_SEGMENTS);
       const a = wp[0], b = wp[1];
       strandRoots.push({ pos: a, tan: { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, r: r0, side: s.side });
@@ -1428,7 +1442,9 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // A fine mid-vein reaching from inside the petal into each jagged tooth, so
   // the veins extend into the jagged edge along with the outline (skipped when
   // the outline is turned off).
-  if (jag && drawRim) {
+  // The tooth mid-veins follow the teeth, so they are drawn whenever the teeth are —
+  // under continuous margin too. Only BONE-with-the-outline-off has no rim to carry them.
+  if (jag && (drawRim || (contMargin && jag.half))) {
     for (const v of jag.teethVeins) {
       acc.addTube(v.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
     }
@@ -3445,23 +3461,28 @@ WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount' && c.id !== 'he
 let standardMode = true;
 const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
 const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
-// Option-level tier: a handful of select OPTIONS are Advanced-only even though the
-// control they live in (Arrangement / Edge) is a Standard picker. In Standard we hide
-// those options and, if a loaded design had one selected, fall back to a Standard-safe
-// value (and regenerate, since the geometry must follow the picker). Why each is here —
-// caught by the Standard-option sweep as broken-in-Standard:
-//   - Edge TOOTHED / SCALLOPED: the teeth/scallops reshape the silhouette rim, but the
-//     Standard-default continuous margin replaces the rim with smooth marginal strands,
-//     so they render identically to CLEAN. They render correctly in Advanced (continuous
-//     margin OFF). Return to Standard once the margin is edge-profile-aware (issue #53).
-//   - Arrangement FAN (bilateral): renders as scattered debris. Advanced-only until the
-//     bilateral layout is rebuilt.
-// (The FRACTAL edge was DELETED outright — no live geometry ever existed — so it is gone
-//  from the enum, not listed here; the v15->v16 migration maps any saved fractal to clean.)
-const ADV_OPTIONS = {
-  tipStyle:  { advanced: ['jagged', 'scallop'], fallback: 'clean' },
-  bloomType: { advanced: ['bilateral'], fallback: 'coiled' },
-};
+// Option-level tier: a select OPTION can be Advanced-only even though the control it
+// lives in is a Standard picker. In Standard those options are hidden and, if a loaded
+// design had one selected, the picker falls back to a Standard-safe value (and
+// regenerates, since the geometry must follow the picker).
+//
+// DECLARED IN THE REGISTRY, not here. This used to be a hand-written literal — a third
+// list beside the registry and the markup, with no gate tying it to either, holding
+// reasons that quietly stopped being true. An option now carries `advancedOnly: true`
+// and its control carries `standardFallback`, and verify-tier-visibility asserts both
+// directions at the option level: an advancedOnly option is hidden in Standard and
+// visible in Advanced, and every other option is visible in both.
+//
+// TOOTHED / SCALLOPED were quarantined here because the teeth reshape the rim polyline
+// and the Standard-default continuous margin discarded it, so they rendered identically
+// to CLEAN. PR #58 put the treatments on the marginal strands, so the condition that
+// quarantined them no longer holds and they are Standard again.
+// Arrangement FAN (bilateral) stays Advanced-only: it renders as scattered debris
+// (issue #54), which is a live defect, not a stale reason.
+const ADV_OPTIONS = Object.fromEntries(
+  PANEL.filter((c) => c.kind === 'select' && (c.options || []).some((o) => o.advancedOnly))
+       .map((c) => [c.id, { advanced: c.options.filter((o) => o.advancedOnly).map((o) => o.value),
+                            fallback: c.standardFallback }]));
 function applyTier() {
   let fellBack = false;
   for (const [id, spec] of Object.entries(ADV_OPTIONS)) {
