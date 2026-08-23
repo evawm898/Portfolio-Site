@@ -202,6 +202,31 @@ if (!SWEEP && !process.env.GQ_MARGIN_OFF) {
   for (const p of PRESETS) CONFIGS.push({ name: `preset:${p.slug}`, preset: true, ui: { ...p.ui, schemaVersion: PRESET_SCHEMA }, xfail: null });
 }
 
+// ARRANGEMENT (issue #54). Every check above runs on a single flattened petal via
+// resolveParams(ui) — bloomType is never read, so this matrix never sampled it: every
+// config ran under whichever bloomType happened to be selected, unvaried and unasserted.
+// That is the coverage gap that let a placement claim go unverified for 18 days. These
+// configs are measured by window.__gqArrangement (a whorl built with the real
+// buildLayerInto) instead of window.__gq, and are run through __gqSet first like every
+// other config — so a value that does not take fails loud, same as the rest of the file.
+// All three bloom types are sampled; BILATERAL additionally gets a mirror-symmetry check
+// (see __gqArrangement) at every petals-per-side count the control allows (1..3) plus a
+// claw + cleft + cross-section-roll + spine-curl stress config, mirroring the manual
+// #54 investigation. NOTE: the requested contact-sheet counts were 3/5/9 petals; 9 is not
+// reachable — bilPerSide is capped at 3 (registry), so bilCenterPetal on tops out at
+// 2*3+1=7. Sampled at 3/5/7 instead and reported as such, not padded to fit.
+const ARRANGEMENT_CONFIGS = [
+  { name: 'arrange:coiled@4', arrangement: true, ui: { bloomType: 'coiled', petalCount: 4 } },
+  { name: 'arrange:radial@6', arrangement: true, ui: { bloomType: 'radial', petalCount: 6 } },
+  { name: 'arrange:bilateral@3', arrangement: true, ui: { bloomType: 'bilateral', bilPerSide: 1, bilCenterPetal: true, bilSpacing: 45 } },
+  { name: 'arrange:bilateral@5', arrangement: true, ui: { bloomType: 'bilateral', bilPerSide: 2, bilCenterPetal: true, bilSpacing: 45 } },
+  { name: 'arrange:bilateral@7', arrangement: true, ui: { bloomType: 'bilateral', bilPerSide: 3, bilCenterPetal: true, bilSpacing: 45 } },
+  { name: 'arrange:bilateral@6-noCenter', arrangement: true, ui: { bloomType: 'bilateral', bilPerSide: 3, bilCenterPetal: false, bilSpacing: 45 } },
+  { name: 'arrange:bilateral-stress', arrangement: true, ui: { bloomType: 'bilateral', bilPerSide: 3, bilCenterPetal: true, bilSpacing: 60,
+      clawLength: 0.3, cleftDepth: 0.4, cleftLobes: 3, cleftWidth: 0.3, crossSection: 0.6, curlAmount: 0.6 } },
+];
+if (!SWEEP && !process.env.GQ_MARGIN_OFF) CONFIGS.push(...ARRANGEMENT_CONFIGS);
+
 // ---- the geometry-quality hook, appended to the served flower.js (module scope, so it
 //      shares resolveParams / readUI / inputs / the imported geometry fns). Exports
 //      flower.js does NOT import (buildRibGraph, getCleftContour) are reached through a
@@ -509,6 +534,83 @@ window.__gq = async function() {
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
 window.__gqApply = function(d) { applyDesign(d); };
+
+// ARRANGEMENT — issue #54 found the per-petal checks above measure the flattened petal
+// only: resolveParams(ui) never reads bloomType, so every config in the shape x pattern
+// matrix has always run under whatever bloomType happened to be selected, unvaried and
+// unasserted. That is why a real placement defect (or, as #54 turned out, a claim of one)
+// could sit unchecked for 18 days: nothing here ever built a whorl. This calls
+// buildLayerInto directly — the exact function flower.js's generate() calls, not a
+// reimplementation of it — and checks the ARRANGEMENT invariants placement math must
+// hold, per bloom type:
+//   COILED / RADIAL — placements.length must equal the petal count actually requested.
+//   BILATERAL       — every non-centre seedIdx must appear in exactly one mirror pair
+//                      (az and -az, equal r/height/tilt — the fields buildPetalInto's
+//                      transform consumes), and a centre petal (when on) must sit at
+//                      az=0 exactly. expectedCount is recomputed here independently
+//                      (2*bilPerSide + center), deliberately not read off the code under
+//                      test — a census gate that trusted the formula it is checking
+//                      would not have caught the formula being wrong.
+window.__gqArrangement = function() {
+  const ui = readUI();
+  const P = resolveParams(ui);
+  const acc = new MeshAccumulator();
+  const layer = { index: 0, total: 1, scale: 1, dHeight: 0, dRot: 0, dBloom: 0 };
+  const count = Math.max(1, Math.min(40, Math.round(ui.petalCount) || 1));
+  let built;
+  try { built = buildLayerInto(acc, ui, P, count, layer); }
+  catch (e) { return { error: 'buildLayerInto:' + e.message }; }
+  const placements = built.placements;
+  const bloomType = ui.bloomType;
+  const out = { bloomType, count: placements.length, mirrorFailures: [], centerFailures: [] };
+  if (bloomType === 'bilateral') {
+    const bilPerSide = Math.max(1, Math.min(3, Math.round(ui.bilPerSide)));
+    const bilCenter = !!ui.bilCenterPetal;
+    out.expectedCount = 2 * bilPerSide + (bilCenter ? 1 : 0);
+    const bySeed = new Map();
+    for (const pl of placements) { const arr = bySeed.get(pl.seedIdx) || []; arr.push(pl); bySeed.set(pl.seedIdx, arr); }
+    for (const [seedIdx, arr] of bySeed) {
+      if (seedIdx === 0 && bilCenter) {
+        if (arr.length !== 1) out.centerFailures.push('seedIdx 0: expected 1 centre placement, got ' + arr.length);
+        else if (Math.abs(arr[0].az) > 1e-9) out.centerFailures.push('centre petal az=' + arr[0].az + ', expected 0');
+        continue;
+      }
+      if (arr.length !== 2) { out.mirrorFailures.push('seedIdx ' + seedIdx + ': expected a mirror pair (2), got ' + arr.length); continue; }
+      const [a, b] = arr;
+      const azSum = a.az + b.az;               // should cancel exactly: az and -az
+      const azOk = Math.abs(azSum) < 1e-9 && Math.abs(a.az) > 1e-9;
+      const rOk = Math.abs(a.r - b.r) < 1e-9;
+      const heightOk = Math.abs((a.footHeight ?? 0) - (b.footHeight ?? 0)) < 1e-9;
+      if (!azOk) out.mirrorFailures.push('seedIdx ' + seedIdx + ': az ' + a.az + ' / ' + b.az + ' do not mirror (sum=' + azSum + ')');
+      if (!rOk) out.mirrorFailures.push('seedIdx ' + seedIdx + ': r mismatch ' + a.r + ' vs ' + b.r);
+      if (!heightOk) out.mirrorFailures.push('seedIdx ' + seedIdx + ': footHeight mismatch ' + a.footHeight + ' vs ' + b.footHeight);
+      // WORLD-SPACE footprint check — the actual transform outcome buildPetalInto/
+      // placePoint produced, not just the placement inputs above. A foot sample is
+      // {az, r, y} in world cylindrical coords; a mirror pair's feet must overlay
+      // exactly (r, y equal; az negated), or the placed petal itself — not merely its
+      // inputs — is not a mirror image of its partner. petalBaseFootprint samples each
+      // spine step at [+margin, -margin] (indices 2k, 2k+1); mirroring an azimuth flips
+      // the surface frame's handedness, so petal A's +margin at step k lines up with
+      // petal B's -margin at the SAME step (index 2k+1), not its own index — confirmed
+      // by direct inspection (r/y matched exactly pairwise; az only matched cross-margin).
+      // Pairing index-for-index here would flag the correct geometry as broken.
+      if (a.foot && b.foot && a.foot.length === b.foot.length) {
+        let footBad = 0;
+        for (let i = 0; i < a.foot.length; i++) {
+          const fa = a.foot[i], fb = b.foot[i % 2 === 0 ? i + 1 : i - 1];
+          const ok = Math.abs(fa.r - fb.r) < 1e-6 && Math.abs(fa.y - fb.y) < 1e-6 && Math.abs(fa.az + fb.az) < 1e-6;
+          if (!ok) footBad++;
+        }
+        if (footBad) out.mirrorFailures.push('seedIdx ' + seedIdx + ': ' + footBad + '/' + a.foot.length + ' world-space foot samples do not mirror');
+      } else if (a.foot || b.foot) {
+        out.mirrorFailures.push('seedIdx ' + seedIdx + ': foot sample count mismatch');
+      }
+    }
+  } else {
+    out.expectedCount = count === 1 ? 1 : count;
+  }
+  return out;
+};
 window.__gqReady = true;
 `;
 
@@ -558,6 +660,19 @@ for (const cfg of CONFIGS) {
     console.log(cfg.name.padEnd(20), 'CONFIG DID NOT TAKE — ' + rejected.join('; '));
     rows.push({ name: cfg.name, error: 'config-rejected: ' + rejected.join('; ') });
     fails++; continue;
+  }
+  if (cfg.arrangement) {
+    const a = await page.evaluate(() => window.__gqArrangement());
+    if (a.error) { console.log(cfg.name.padEnd(20), 'ERROR', a.error); rows.push({ name: cfg.name, error: a.error }); fails++; continue; }
+    const countOk = a.count === a.expectedCount;
+    const mirrorOk = a.mirrorFailures.length === 0 && a.centerFailures.length === 0;
+    const bad = !countOk || !mirrorOk;
+    const reasons = [!countOk ? `count(${a.count}!=${a.expectedCount})` : '', ...a.mirrorFailures, ...a.centerFailures].filter(Boolean).join(' | ');
+    const verdict = bad ? `FAIL(${reasons})` : 'ok';
+    if (bad) fails++;
+    rows.push({ name: cfg.name, ...a, verdict });
+    console.log(cfg.name.padEnd(20), String(a.count).padStart(7), a.bloomType.padStart(8), ('exp ' + a.expectedCount).padStart(8), '', '', '', '', '', '  ' + verdict);
+    continue;
   }
   const q = await page.evaluate(() => window.__gq());
   if (q.error) { console.log(cfg.name.padEnd(20), 'ERROR', q.error); rows.push({ name: cfg.name, error: q.error }); fails++; continue; }

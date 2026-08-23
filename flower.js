@@ -3464,7 +3464,14 @@ const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ct
 // Option-level tier: a select OPTION can be Advanced-only even though the control it
 // lives in is a Standard picker. In Standard those options are hidden and, if a loaded
 // design had one selected, the picker falls back to a Standard-safe value (and
-// regenerates, since the geometry must follow the picker).
+// regenerates, since the geometry must follow the picker). NOTE the fallback rewrites
+// the CONTROL's live value, not just its display — a design saved with an advancedOnly
+// value, reopened in Standard, has that value silently replaced rather than kept and
+// shown as CUSTOM (the convention every other Standard control follows). Confirmed live
+// for bloomType/bilateral while FAN was quarantined (#54 investigation); lifting that
+// quarantine below removes today's only instance, but the MECHANISM still does this to
+// any future advancedOnly option — no option in the registry carries `advancedOnly` as
+// of this comment. Tracked on its own, not fixed here.
 //
 // DECLARED IN THE REGISTRY, not here. This used to be a hand-written literal — a third
 // list beside the registry and the markup, with no gate tying it to either, holding
@@ -3477,8 +3484,19 @@ const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ct
 // and the Standard-default continuous margin discarded it, so they rendered identically
 // to CLEAN. PR #58 put the treatments on the marginal strands, so the condition that
 // quarantined them no longer holds and they are Standard again.
-// Arrangement FAN (bilateral) stays Advanced-only: it renders as scattered debris
-// (issue #54), which is a live defect, not a stale reason.
+//
+// Arrangement FAN (bilateral) was quarantined here (#54) on the claim that it "renders
+// as scattered debris in both tiers" — never re-rendered to check. Investigation (#54,
+// closed) found bilateral placement geometry sound at every config tried, including
+// claw + cleft + cross-section roll + spine curl together: 0 boundary edges, exact
+// mirror symmetry, no stray geometry. The claim traces to this exact fallback: FAN
+// selected in Standard silently reverts to COILED (the bug this comment now documents
+// above), and COILED at the ambient default petal count (4) is a genuinely irregular,
+// asymmetric golden-angle pinwheel that reads as broken to the eye — see
+// tools/verify-geometry-quality.mjs's ARRANGEMENT configs, which now cover all three
+// bloom types including a bilateral mirror-symmetry check with a proven positive
+// control. FAN is Standard again; the quarantine's own citation (#68) never resolved to
+// a real tracker issue.
 const ADV_OPTIONS = Object.fromEntries(
   PANEL.filter((c) => c.kind === 'select' && (c.options || []).some((o) => o.advancedOnly))
        .map((c) => [c.id, { advanced: c.options.filter((o) => o.advancedOnly).map((o) => o.value),
