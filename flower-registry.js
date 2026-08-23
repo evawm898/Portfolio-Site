@@ -53,7 +53,7 @@ export const CONTROLS = [
   {"id":"variance","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Organic variance","fmt":"f2","tier":"standard"},
   {"id":"curlGradient","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Curl gradient (edge → centre)","fmt":"signed2"},
   {"id":"sizeGradient","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Size gradient (centre → edge, single whorl only)","fmt":"signed2"},
-  {"id":"petalShape","section":"acc-form","kind":"select","options":[{"value":"rounded","text":"ROUNDED"},{"value":"pointed","text":"POINTED"},{"value":"strap","text":"STRAP"},{"value":"clawed","text":"CLAWED"},{"value":"__custom","text":"CUSTOM","hidden":true,"disabled":true}],"default":"rounded","label":"Petal shape","tier":"standard","uiOnly":true},
+  {"id":"petalShape","section":"acc-form","kind":"select","options":[{"value":"rounded","text":"ROUNDED"},{"value":"pointed","text":"POINTED"},{"value":"strap","text":"STRAP"},{"value":"clawed","text":"CLAWED"},{"value":"lobed","text":"LOBED"},{"value":"__custom","text":"CUSTOM","hidden":true,"disabled":true}],"default":"rounded","label":"Petal shape","tier":"standard","uiOnly":true},
   {"id":"width","section":"acc-form","kind":"slider","min":0.1,"max":1.5,"step":0.01,"default":0.9,"label":"Petal width","fmt":"f2","gating":{"data-hide-bilateral":true}},
   {"id":"taper","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.35,"label":"Taper","fmt":"f2"},
   {"id":"clawLength","section":"acc-form","kind":"slider","min":0,"max":0.5,"step":0.01,"default":0,"label":"Claw length","fmt":"f2"},
