@@ -6,7 +6,7 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
   const MM = 26;
   const out = { lobes: cfg ? cfg.count : 0, depth: P.cleftDepth, density: P.density, L: P.L };
 
-  let __drawClipOnly = [], __drawPartition = [], __drawRegions = [];
+  let __drawClipOnly = [], __drawPartition = [], __drawRegions = [], __drawWatershed = [], __drawWsRegions = [];
   const area = (poly) => { let a=0; for (let i=0;i<poly.length;i++){const p=poly[i],q=poly[(i+1)%poly.length]; a+=p.x*q.y-q.x*p.y;} return Math.abs(a*0.5); };
   const inPoly = (x,y,poly) => { let s=false; for (let i=0,j=poly.length-1;i<poly.length;j=i++){
     const xi=poly[i].x,yi=poly[i].y,xj=poly[j].x,yj=poly[j].y;
@@ -288,6 +288,53 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
     out.optPartition = summarise(cells, 'per-lobe partition + cleft-aware clip'); out.optPartition.gate = reg(cells);
     out.partitionRegions = [...R.entries()].map(([k,v])=>({region:k===-1?'base':'lobe'+k, seeds:v.length})); }
 
+
+  // ---------- OPTION 4: WATERSHED partition + cleft-aware clip ----------
+  // The straight cut fails because it runs ACROSS a radial structure. This divides on
+  // curves that run WITH it: each divider follows the cleft slot down to its own sinus
+  // floor, then continues as a ray from the petal foot through that floor point. The two
+  // pieces meet exactly at the floor, so the divider is continuous, and every divider is
+  // radial. Consequence worth confirming rather than assuming: there is no separate basal
+  // region at all — each lobe owns its wedge of the base, so the basal-region rule the
+  // straight cut needed does not have to be invented.
+  //
+  //   y_div_k(x) = centers[k]                 for x >= xFloor   (along the cleft slot)
+  //              = centers[k] * x / xFloor    for x <  xFloor   (ray from the foot)
+  const dividerY = (k, x) => (x >= xFloor ? cfg.centers[k] : cfg.centers[k] * x / Math.max(xFloor, 1e-9));
+  // Sutherland-Hodgman generalised to a monotone piecewise-linear divider instead of a
+  // line. `below` selects which side to keep; crossings are found by bisection on the
+  // edge, which is exact enough for a contact sheet and has no orientation traps.
+  const clipByDivider = (poly, k, below) => {
+    const side = (p) => (below ? p.y - dividerY(k, p.x) : dividerY(k, p.x) - p.y);   // <= 0 keeps
+    const cross = (a, b) => { let lo = 0, hi = 1;
+      for (let i = 0; i < 28; i++) { const m = (lo + hi) / 2;
+        const q = { x: a.x + (b.x - a.x) * m, y: a.y + (b.y - a.y) * m };
+        if ((side(a) <= 0) === (side(q) <= 0)) lo = m; else hi = m; }
+      const t = (lo + hi) / 2; return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; };
+    const out = [];
+    for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length];
+      const sa = side(a), sb = side(b);
+      if (sa <= 0) out.push(a);
+      if ((sa < 0) !== (sb < 0)) out.push(cross(a, b)); }
+    return out; };
+  const wsRegionOf = (p) => { if (!cfg) return 0;
+    let k = 0; for (let j = 0; j < cfg.centers.length; j++) if (p.y > dividerY(j, p.x)) k++; return k; };
+  const wsRegionPoly = (r) => { if (!cfg) return bound;
+    let q = bound;
+    if (r > 0)                  q = clipByDivider(q, r - 1, false);   // keep y >= divider r-1
+    if (r < cfg.centers.length) q = clipByDivider(q, r, true);        // keep y <= divider r
+    return q; };
+  { const cells = []; const R = new Map();
+    for (const s2 of seedsAll) { const r = wsRegionOf(s2); if (!R.has(r)) R.set(r, []); R.get(r).push(s2); }
+    const RP = new Map(); for (const r of R.keys()) RP.set(r, wsRegionPoly(r));
+    for (const s2 of seedsAll) { const r = wsRegionOf(s2), rp = RP.get(r);
+      if (!rp || rp.length < 3) continue;
+      const c = cellOf(s2, R.get(r), rp, M0, null); if (c) cells.push(c); }
+    __drawWatershed = cells; __drawWsRegions = [...RP.values()];
+    out.optWatershed = summarise(cells, 'watershed partition + cleft-aware clip');
+    out.optWatershed.gate = reg(cells);
+    out.watershedRegions = [...R.entries()].map(([k, v]) => ({ region: 'lobe' + k, seeds: v.length })); }
+
   // ---------- COST: the same partition against a Douglas-Peucker-simplified bound ----------
   // The cleft-aware bound is a marching-squares polyline where today's is a 480-vertex
   // band, and cells inherit boundary vertices, which is where the triangle cost lands.
@@ -334,8 +381,8 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
                    centers: cfg ? cfg.centers.slice() : [],
                    material: G.buildSilhouette(P, 220),
                    bound, cellsToday: __drawToday, cellsClipOnly: __drawClipOnly,
-                   cellsPartition: __drawPartition,
-                   regionPolys: __drawRegions };
+                   cellsPartition: __drawPartition, cellsWatershed: __drawWatershed,
+                   regionPolys: __drawRegions, wsRegionPolys: __drawWsRegions };
   }
   out.gate = { thresholdUndershootVoronoiMM: 2, thresholdOvershootMM: 3, note: 'per-option figures are on each option object' };
   return out;

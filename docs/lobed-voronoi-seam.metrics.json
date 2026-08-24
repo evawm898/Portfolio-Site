@@ -5,21 +5,30 @@
    "widthAtCut": 1.956,
    "today": 0,
    "clipOnly": 0,
-   "partition": 1.979
+   "partition": 1.979,
+   "partitionSeamAngleDeg": 65.1,
+   "watershedSeamLen": 0.561,
+   "watershedSeamAngleDeg": 0
   },
   {
    "lobes": 4,
    "widthAtCut": 1.956,
    "today": 0,
    "clipOnly": 0,
-   "partition": 1.977
+   "partition": 1.977,
+   "partitionSeamAngleDeg": 65.2,
+   "watershedSeamLen": 1.895,
+   "watershedSeamAngleDeg": 16.8
   },
   {
    "lobes": 7,
    "widthAtCut": 1.956,
    "today": 0,
    "clipOnly": 0,
-   "partition": 1.98
+   "partition": 1.98,
+   "partitionSeamAngleDeg": 65.7,
+   "watershedSeamLen": 5.372,
+   "watershedSeamAngleDeg": 32
   }
  ],
  "slivers": [
@@ -27,19 +36,22 @@
    "lobes": 2,
    "today": 2,
    "clipOnly": 3,
-   "partition": 0
+   "partition": 0,
+   "watershed": 0
   },
   {
    "lobes": 4,
    "today": 1,
    "clipOnly": 3,
-   "partition": 0
+   "partition": 0,
+   "watershed": 0
   },
   {
    "lobes": 7,
    "today": 3,
    "clipOnly": 0,
-   "partition": 0
+   "partition": 0,
+   "watershed": 0
   }
  ]
 }

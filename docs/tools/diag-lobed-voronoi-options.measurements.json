@@ -108,6 +108,27 @@
     "seeds": 48
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 48,
+   "totalVerts": 1106,
+   "totalArea": 2.7463604393109198,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 0,
+   "starViolatingVerts": 0,
+   "cellsPerimCrossingVoid": 1,
+   "meanPerimInVoid": 0.004704824961806677,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe0",
+    "seeds": 48
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 48,
@@ -310,6 +331,31 @@
    {
     "region": "lobe1",
     "seeds": 9
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 44,
+   "totalVerts": 1234,
+   "totalArea": 2.1457864215014624,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 1,
+   "starViolatingVerts": 10,
+   "cellsPerimCrossingVoid": 4,
+   "meanPerimInVoid": 0.012023803490821562,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe0",
+    "seeds": 28
+   },
+   {
+    "region": "lobe1",
+    "seeds": 20
    }
   ],
   "optPartitionSimplified0p25": {
@@ -522,6 +568,39 @@
    {
     "region": "lobe0",
     "seeds": 3
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 45,
+   "totalVerts": 1570,
+   "totalArea": 2.0062528168831766,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 4,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 2,
+   "meanPerimInVoid": 0.0070413868325021325,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
    }
   ],
   "optPartitionSimplified0p25": {
@@ -748,6 +827,51 @@
     "seeds": 5
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 82,
+   "totalVerts": 2231,
+   "totalArea": 1.954370992585671,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 4,
+   "starViolatingVerts": 10,
+   "cellsPerimCrossingVoid": 2,
+   "meanPerimInVoid": 0.004647438277878995,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe3",
+    "seeds": 14
+   },
+   {
+    "region": "lobe5",
+    "seeds": 10
+   },
+   {
+    "region": "lobe1",
+    "seeds": 10
+   },
+   {
+    "region": "lobe6",
+    "seeds": 14
+   },
+   {
+    "region": "lobe0",
+    "seeds": 14
+   },
+   {
+    "region": "lobe4",
+    "seeds": 10
+   },
+   {
+    "region": "lobe2",
+    "seeds": 10
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 82,
@@ -960,6 +1084,39 @@
     "seeds": 3
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 44,
+   "totalVerts": 1577,
+   "totalArea": 2.0062528168831766,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 4,
+   "starViolatingVerts": 45,
+   "cellsPerimCrossingVoid": 2,
+   "meanPerimInVoid": 0.005488228792245041,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 45,
@@ -1151,6 +1308,27 @@
    }
   },
   "partitionRegions": [
+   {
+    "region": "lobe0",
+    "seeds": 48
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 43,
+   "totalVerts": 1023,
+   "totalArea": 2.1644707342292975,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 0,
+   "starViolatingVerts": 0,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0
+   }
+  },
+  "watershedRegions": [
    {
     "region": "lobe0",
     "seeds": 48
@@ -1368,6 +1546,39 @@
     "seeds": 3
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -1578,6 +1789,39 @@
    {
     "region": "lobe0",
     "seeds": 1
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 20,
+   "totalVerts": 1404,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 2,
+   "starViolatingVerts": 8,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 6
+   },
+   {
+    "region": "lobe0",
+    "seeds": 6
+   },
+   {
+    "region": "lobe2",
+    "seeds": 3
    }
   ],
   "optPartitionSimplified0p25": {
@@ -1792,6 +2036,39 @@
     "seeds": 2
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 24,
+   "totalVerts": 1423,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 3,
+   "starViolatingVerts": 15,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 8
+   },
+   {
+    "region": "lobe0",
+    "seeds": 8
+   },
+   {
+    "region": "lobe2",
+    "seeds": 4
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 26,
@@ -2002,6 +2279,39 @@
    {
     "region": "lobe0",
     "seeds": 2
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 29,
+   "totalVerts": 1452,
+   "totalArea": 1.42581127155277,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 4,
+   "starViolatingVerts": 19,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 13
+   },
+   {
+    "region": "lobe3",
+    "seeds": 8
+   },
+   {
+    "region": "lobe0",
+    "seeds": 8
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
    }
   ],
   "optPartitionSimplified0p25": {
@@ -2216,6 +2526,39 @@
     "seeds": 3
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 35,
+   "totalVerts": 1480,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 2,
+   "starViolatingVerts": 7,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 12
+   },
+   {
+    "region": "lobe3",
+    "seeds": 12
+   },
+   {
+    "region": "lobe0",
+    "seeds": 12
+   },
+   {
+    "region": "lobe2",
+    "seeds": 5
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 35,
@@ -2426,6 +2769,39 @@
    {
     "region": "lobe0",
     "seeds": 3
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
    }
   ],
   "optPartitionSimplified0p25": {
@@ -2640,6 +3016,39 @@
     "seeds": 7
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 45,
+   "totalVerts": 1531,
+   "totalArea": 1.425811271552771,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 31,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 19
+   },
+   {
+    "region": "lobe3",
+    "seeds": 13
+   },
+   {
+    "region": "lobe0",
+    "seeds": 13
+   },
+   {
+    "region": "lobe2",
+    "seeds": 10
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 45,
@@ -2850,6 +3259,39 @@
    {
     "region": "lobe2",
     "seeds": 7
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 49,
+   "totalVerts": 1545,
+   "totalArea": 1.4258112715527693,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 44,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 20
+   },
+   {
+    "region": "lobe3",
+    "seeds": 16
+   },
+   {
+    "region": "lobe0",
+    "seeds": 16
+   },
+   {
+    "region": "lobe2",
+    "seeds": 10
    }
   ],
   "optPartitionSimplified0p25": {
@@ -3064,6 +3506,39 @@
     "seeds": 7
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 53,
+   "totalVerts": 1573,
+   "totalArea": 1.425811271552771,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 2,
+   "starViolatingVerts": 13,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 23
+   },
+   {
+    "region": "lobe3",
+    "seeds": 16
+   },
+   {
+    "region": "lobe0",
+    "seeds": 16
+   },
+   {
+    "region": "lobe2",
+    "seeds": 12
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 52,
@@ -3274,6 +3749,39 @@
    {
     "region": "lobe2",
     "seeds": 10
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 59,
+   "totalVerts": 1599,
+   "totalArea": 1.4258112715527698,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 1,
+   "starViolatingVerts": 8,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 26
+   },
+   {
+    "region": "lobe3",
+    "seeds": 17
+   },
+   {
+    "region": "lobe0",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 14
    }
   ],
   "optPartitionSimplified0p25": {
@@ -3488,6 +3996,39 @@
     "seeds": 10
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 63,
+   "totalVerts": 1623,
+   "totalArea": 1.4258112715527695,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 3,
+   "starViolatingVerts": 12,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 32
+   },
+   {
+    "region": "lobe3",
+    "seeds": 16
+   },
+   {
+    "region": "lobe0",
+    "seeds": 16
+   },
+   {
+    "region": "lobe2",
+    "seeds": 18
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 61,
@@ -3698,6 +4239,39 @@
    {
     "region": "lobe0",
     "seeds": 3
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
    }
   ],
   "optPartitionSimplified0p25": {
@@ -3912,6 +4486,39 @@
     "seeds": 3
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -4122,6 +4729,39 @@
    {
     "region": "lobe0",
     "seeds": 3
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
    }
   ],
   "optPartitionSimplified0p25": {
@@ -4336,6 +4976,39 @@
     "seeds": 3
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -4546,6 +5219,39 @@
    {
     "region": "lobe0",
     "seeds": 3
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
    }
   ],
   "optPartitionSimplified0p25": {
@@ -4760,6 +5466,39 @@
     "seeds": 3
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -4972,6 +5711,39 @@
     "seeds": 3
    }
   ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
+   }
+  ],
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -5182,6 +5954,39 @@
    {
     "region": "lobe0",
     "seeds": 3
+   }
+  ],
+  "optWatershed": {
+   "label": "watershed partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1489,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 29,
+   "cellsPerimCrossingVoid": 0,
+   "meanPerimInVoid": 0,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "watershedRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 17
+   },
+   {
+    "region": "lobe2",
+    "seeds": 9
+   },
+   {
+    "region": "lobe3",
+    "seeds": 11
+   },
+   {
+    "region": "lobe0",
+    "seeds": 11
    }
   ],
   "optPartitionSimplified0p25": {
