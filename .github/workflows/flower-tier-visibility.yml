@@ -1,8 +1,12 @@
-# Build gate: every WIRED control the registry marks Advanced (or Standard) must
-# actually be reachable when the visitor switches to Advanced — see
-# tools/verify-tier-visibility.mjs for the failure this catches (applyTier() only ever
-# ADDED hidden=true on entering Standard; nothing cleared it on leaving Standard, so an
-# Advanced control with no contextual gating attribute stayed stuck hidden forever).
+# Build gate: every WIRED control must be exactly as visible as its registry declaration
+# says — visible <=> (Advanced OR tier:"standard") AND its predicate holds — in BOTH tiers,
+# at every config in tools/visibility-matrix.mjs. See tools/verify-tier-visibility.mjs for
+# what it measures and what it would miss.
+#
+# It grew from 25 assertions to ~11,000 when tier stopped being a FILTER on which controls
+# got examined and became an INPUT to the expectation: the old form could not check a
+# Standard-tier control in Standard mode at all, which is how a Standard control invisible
+# at the default state passed. Runs in about a minute; no reason to make it conditional.
 name: flower-tier-visibility
 
 on:
@@ -39,7 +43,7 @@ jobs:
         run: npm i --no-save three@0.161.0 playwright-core playwright
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
-      - name: Every ungated Advanced control must show in Advanced mode
+      - name: Every wired control matches its declared visibility, both tiers, whole matrix
         run: node tools/verify-tier-visibility.mjs
       # Records every control's visibility across the whole matrix in both tiers. Not an
       # assertion — it is the instrument a behaviour-preserving change is diffed against,
