@@ -221,6 +221,20 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
     a*=0.5; return {x:cx/(6*a),y:cy/(6*a)};};
   // cellAnnulus builds outer[k]/inner[k] on rays from the centroid: every boundary vertex
   // must be visible from the centroid INSIDE the cell, or the annulus is garbage.
+  // DOUBLED-BACK: the unified degeneracy criterion. Replaces the star-shape probe, which
+  // measured nothing real here — a centroid is outside a polygon with no area, so every
+  // entry in that column was a collapsed cell counted as concave. This one asks whether
+  // the ring lies on top of itself, which is what a collapsed ring and a spiked wedge
+  // both are, and which a legitimately thin cell is not.
+  const doubledBack=(poly)=>{ const n=poly.length; let hit=0;
+    const d2seg=(p,a,b)=>{ const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
+      let t=L2?((p.x-a.x)*dx+(p.y-a.y)*dy)/L2:0; t=t<0?0:t>1?1:t;
+      const qx=a.x+dx*t, qy=a.y+dy*t; return (p.x-qx)**2+(p.y-qy)**2; };
+    for(let i=0;i<n;i++){ for(let j=0;j<n;j++){
+      const gap=Math.min(Math.abs(i-j), n-Math.abs(i-j));
+      if(gap<=3) continue;
+      if(d2seg(poly[i],poly[j],poly[(j+1)%n])<1e-12){ hit++; break; } } }
+    return hit/n; };
   const starViolations=(poly)=>{ const c=centroid(poly); let bad=0;
     if(!inPoly(c.x,c.y,poly)) return poly.length;             // centroid outside: total failure
     for(const v of poly){ for(let k=1;k<10;k++){ const t=k/10;
@@ -228,14 +242,16 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
       if(!inPoly(x,y,poly)){ bad++; break; } } }
     return bad; };
   const summarise=(cells,label)=>{
-    let starBad=0, starBadCells=0, voidCells=0, voidPerim=0, verts=0, ar=0;
+    let starBad=0, starBadCells=0, voidCells=0, voidPerim=0, verts=0, ar=0, degenerateCells=0;
     for(const c of cells){ verts+=c.length; ar+=area(c);
       const sv=starViolations(c); if(sv>0){starBad+=sv;starBadCells++;}
+      if(doubledBack(c)>0) degenerateCells++;
       const pv=perimInVoid(c); voidPerim+=pv; if(pv>0.02)voidCells++; }
     // A diagram that tiles has total cell area ~= the bound's area. Much more means the
     // cells overlap — it is no longer a partition.
     return { label, cells:cells.length, totalVerts:verts, totalArea:ar,
              areaOverBound: +(ar / Math.max(area(bound), 1e-9)).toFixed(3),
+             degenerateCells,
              cellsNotStarShaped:starBadCells, starViolatingVerts:starBad,
              cellsPerimCrossingVoid:voidCells,
              meanPerimInVoid: cells.length? voidPerim/cells.length : 0 };
