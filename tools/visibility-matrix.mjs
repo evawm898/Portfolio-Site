@@ -127,11 +127,16 @@ export const MATRIX = [
  * driver to at least two distinct values (counting the RESET value as one of them). It is
  * a structural check, not a re-derivation of any predicate — it never evaluates one.
  */
-export function driverIds(pred, out = new Set()) {
+// `resolve` expands a named predicate ({ ref }) into the predicate it names. It is applied
+// at EVERY node, not just the root: named predicates are referenced from inside `all`/`any`
+// (all 18 uses of hasReceptacle are), so a root-only expansion would silently drop their
+// drivers and under-report the coverage gap. Default is identity, for a caller with no refs.
+export function driverIds(pred, out = new Set(), resolve = (p) => p) {
+  pred = resolve(pred);
   if (!pred || typeof pred !== 'object') return out;
   if (pred.id) out.add(pred.id);
-  for (const k of ['all', 'any']) if (Array.isArray(pred[k])) for (const p of pred[k]) driverIds(p, out);
-  if (pred.not) driverIds(pred.not, out);
+  for (const k of ['all', 'any']) if (Array.isArray(pred[k])) for (const p of pred[k]) driverIds(p, out, resolve);
+  if (pred.not) driverIds(pred.not, out, resolve);
   return out;
 }
 
@@ -144,7 +149,7 @@ export function uncoveredDrivers(controls, resolveRef = (r) => r) {
   for (const c of controls) {
     const pred = c.visibleWhen || c.standardVisibleWhen;
     if (!pred) continue;
-    for (const d of driverIds(resolveRef(pred))) {
+    for (const d of driverIds(pred, new Set(), resolveRef)) {
       const vals = seen.get(d);
       if (!vals || vals.size < 2) complaints.push(`${c.id}: driver "${d}" is never varied by the matrix (${vals ? [...vals].join('/') : 'never set'})`);
     }
