@@ -24,7 +24,10 @@ import { readFileSync } from 'node:fs';
 
 const REPO = new URL('..', import.meta.url).pathname;
 const H = readFileSync(REPO + 'flower.html', 'utf8');
-const { CONTROLS } = await import(REPO + 'flower-registry.js');
+const { CONTROLS, evalPredicate, predicateDrivers } = await import(REPO + 'flower-registry.js');
+
+// Gating attributes that must NO LONGER appear on any control wrapper.
+const GATES = ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral'];
 
 // Chrome controls live in the HTML but intentionally not in the registry (handled
 // directly in flower.js). They are exempt from the "HTML has, registry lacks" check.
@@ -75,10 +78,13 @@ function divInfo(idx) {
   const before = H.slice(0, idx);
   const divAt = before.lastIndexOf('<div class="fl-ctrl"');
   const divTag = H.slice(divAt, H.indexOf('>', divAt) + 1);
-  const gating = {};
-  const GATES = ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral'];
-  for (const g of GATES) { const v = attr(divTag, g); if (v !== null) gating[g] = v; }
-  return { gating, divId: attr(divTag, 'id') || null, permanentHidden: attr(divTag, 'hidden') === true };
+  // A control wrapper must carry NO gating attribute. Visibility conditions live in the
+  // registry as `visibleWhen` predicates now, and a data-* attribute on a wrapper would be
+  // a second, unevaluatable declaration of the same thing — the exact drift this change
+  // removed. (The attributes remain on HINT and NOTE elements, which have no registry row;
+  // those are swept by applyAnnotationVisibility in flower.js.)
+  const strays = GATES.filter((g) => attr(divTag, g) !== null);
+  return { strays, divId: attr(divTag, 'id') || null, staticHidden: attr(divTag, 'hidden') === true };
 }
 
 // ---- compare parsed HTML controls against the registry ---------------------------
@@ -90,12 +96,12 @@ for (const p of parsed) if (!regById.has(p.id) && !CHROME.has(p.id)) err(`HTML c
 for (const c of CONTROLS) if (!htmlById.has(c.id)) err(`registry control "${c.id}" is missing from flower.html`);
 
 const numEq = (a, b) => (a == null && b == null) || (+a === +b);
-const gatingEq = (a = {}, b = {}) => {
-  const ak = Object.keys(a).sort(), bk = Object.keys(b).sort();
-  if (ak.join(',') !== bk.join(',')) return false;
-  for (const k of ak) { const av = a[k] === true ? true : a[k]; const bv = b[k] === true ? true : b[k]; if (String(av) !== String(bv)) return false; }
-  return true;
-};
+// A control is statically `hidden` in the markup IFF its registry predicate can never be
+// satisfied. `{any: []}` is the honest expression of "never shown" — unlike the deleted
+// `permanentHidden` flag, it can be evaluated by the same evaluator as every other
+// predicate, and it sits beside a `hiddenReason` saying WHY. That flag was wrong on one of
+// its four users for as long as nothing could check it.
+const neverVisible = (c) => !!(c.visibleWhen && Array.isArray(c.visibleWhen.any) && c.visibleWhen.any.length === 0);
 
 for (const c of CONTROLS) {
   const p = htmlById.get(c.id);
@@ -120,9 +126,10 @@ for (const c of CONTROLS) {
   } else { // text
     if (String(p.default) !== String(c.default)) err(`${c.id}: default HTML=${JSON.stringify(p.default)} registry=${JSON.stringify(c.default)}`);
   }
-  if (!gatingEq(p.gating, c.gating)) err(`${c.id}: gating HTML=${JSON.stringify(p.gating)} registry=${JSON.stringify(c.gating || {})}`);
+  if (p.strays.length) err(`${c.id}: wrapper still carries gating attribute(s) ${p.strays.join(', ')} — visibility is declared in the registry (visibleWhen), not in the markup`);
   if ((p.divId || null) !== (c.divId || null)) err(`${c.id}: divId HTML=${p.divId} registry=${c.divId || null}`);
-  if (!!p.permanentHidden !== !!c.permanentHidden) err(`${c.id}: permanentHidden HTML=${!!p.permanentHidden} registry=${!!c.permanentHidden}`);
+  if (p.staticHidden !== neverVisible(c)) err(`${c.id}: static hidden HTML=${p.staticHidden} but registry visibleWhen is ${neverVisible(c) ? 'unsatisfiable ({any:[]})' : 'satisfiable'} — a wrapper is statically hidden iff its predicate can never be true`);
+  if (neverVisible(c) && !c.hiddenReason) err(`${c.id}: visibleWhen is unsatisfiable but no hiddenReason says why — "never shown" without a reason is the permanentHidden flag again`);
 }
 
 // DOM order within each section (registry order must equal HTML source order)
@@ -148,16 +155,35 @@ for (const c of CONTROLS) if (c.kind === 'slider' && c.fmt) {
   if (n !== 1) err(`${c.id}: declares fmt "${c.fmt}" but has ${n} data-value span(s) (expected exactly 1)`);
 }
 
-// ---- imperative-gate exception: capped + self-policing ---------------------------
-// captureDist's visibility is a compound AND across two selects (infill type AND
-// edge-termination != fade), which the single-attribute declarative gating cannot
-// express. It is gated imperatively (updateTerminationOptions) as a documented, single
-// exception. Assert EXACTLY ONE control carries the flag — a second one must not slip
-// in undocumented; it forces the conversation about extending the gating vocabulary.
-const imperative = CONTROLS.filter((c) => c.imperativeGate);
-if (imperative.length !== 1) {
-  err(`imperativeGate exception must be EXACTLY ONE control; found ${imperative.length} (${imperative.map((c) => c.id).join(', ') || 'none'}). ` +
-      `Either restore the single allowed exception or extend the declarative gating vocabulary instead of adding another hand-gated control.`);
+// ---- the retired flags must not come back ----------------------------------------
+// `permanentHidden` and `imperativeGate` were both flags that ASSERTED something about
+// visibility without stating the condition. captureDist carried `imperativeGate` because
+// its condition is a compound AND across two selects, which the old single-attribute
+// gating could not express — this file used to cap that exception at exactly one control
+// and tell whoever hit it to "extend the declarative gating vocabulary instead". That is
+// what happened: the vocabulary is `visibleWhen`, it expresses compound conditions, and
+// neither flag has an honest use left.
+for (const c of CONTROLS) {
+  if (c.permanentHidden) err(`${c.id}: carries the retired permanentHidden flag — use visibleWhen {any: []} plus a hiddenReason, which is checkable`);
+  if (c.imperativeGate) err(`${c.id}: carries the retired imperativeGate flag — state the condition as a visibleWhen predicate instead`);
+  if (c.gating) err(`${c.id}: carries the retired gating field (an attribute NAME, not a condition) — use visibleWhen`);
+}
+
+// ---- every predicate must be evaluable and reference real controls ----------------
+// A predicate naming a control that does not exist would silently... not silently do
+// anything: evalPredicate reads undefined and returns false, hiding the control forever.
+// That is the shipped-and-unreachable failure this project has produced four times.
+const allIds = new Set(CONTROLS.map((c) => c.id));
+for (const c of CONTROLS) {
+  for (const field of ['visibleWhen', 'standardVisibleWhen']) {
+    if (!c[field]) continue;
+    let drivers;
+    try { drivers = predicateDrivers(c[field]); }
+    catch (e) { err(`${c.id}: ${field} is not a valid predicate — ${e.message}`); continue; }
+    for (const d of drivers) if (!allIds.has(d)) err(`${c.id}: ${field} reads control "${d}", which is not in the registry`);
+    try { evalPredicate(c[field], Object.fromEntries([...allIds].map((k) => [k, '']))); }
+    catch (e) { err(`${c.id}: ${field} does not evaluate — ${e.message}`); }
+  }
 }
 
 // ---- THIRD list: the petal-shape picker ------------------------------------------

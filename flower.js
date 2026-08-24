@@ -30,7 +30,7 @@ import {
   ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
-import { CONTROLS } from './flower-registry.js';
+import { CONTROLS, PREDICATES, evalPredicate, predicateDrivers } from './flower-registry.js';
 import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
 import { VIEW_PRESETS } from './flower-view-presets.js';
 import { SHAPES as SHAPE_BUNDLES, SHAPE_PARAMS, PICKER_SHAPE_NAMES } from './flower-shapes.js';
@@ -1839,7 +1839,7 @@ function buildBudBranchInto(acc, P, ui, cl, stemOpts) {
 // decoration riding on top of it. flower-registry.js's acc-base entries carry a
 // role:"junction" / role:"ornament" tag marking which is which.
 function hasReceptacle(ui) {
-  return ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
+  return evalPredicate(PREDICATES.hasReceptacle, ui);
 }
 
 // Grow the simplified bud bloom into its own accumulator and merge it onto the
@@ -3452,12 +3452,29 @@ function setBuilding(on) {
 WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount' && c.id !== 'heightMM').forEach((c) => {
   inputs[c.id].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
-// ---- Standard / Advanced tier filter -------------------------------------------
-// The registry marks a curated set of controls tier:'standard'; everything else is
-// Advanced. Standard mode (the default) force-hides Advanced controls on top of the
-// contextual gating, and collapses any accordion section left with nothing visible.
-// Each gating sweep (updateXOptions) calls applyTier() at its end, so a contextual
-// change never reveals an Advanced control while Standard is active.
+// ---- VISIBILITY: one registry-driven pass ---------------------------------------
+// Every reason a control can be hidden is a declaration in flower-registry.js, and this
+// function is the only place that acts on them. It replaced eight bespoke `updateXOptions`
+// sweeps plus two flags (`permanentHidden`, `imperativeGate`) and one hardcoded id list
+// (`LEGACY_RECEPT`), which between them could hide a control four different ways — three
+// of which left a partial trace in the registry and one of which left none.
+//
+// The rule, whole:
+//
+//     visible  <=>  (Advanced OR tier:"standard")  AND  predicate holds
+//
+// where `predicate` is the control's `standardVisibleWhen` while Standard is active and
+// its `visibleWhen` otherwise, and an absent predicate is TRUE (no condition). Tier is an
+// INPUT to that expression, never a filter on which controls the expression is computed
+// for — the distinction that let the old gate report PASS while edgeNoise was invisible at
+// the default state.
+//
+// WHY ONE PASS RATHER THAN PER-ATTRIBUTE SWEEPS: the old sweeps each owned a subset of
+// wrappers and ran in a chain, so a control's final state depended on which sweeps had run
+// and in what order — which is how `updateEdgeAmount()` could set a wrapper visible and
+// `applyTier()` could hide it again two lines later, giving Standard an "Amount" slot that
+// works for one of its three edge styles. Recomputing every control from its declaration,
+// from scratch, on every change removes ordering from the problem entirely.
 let standardMode = true;
 const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
 const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
@@ -3469,39 +3486,29 @@ const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ct
 // value, reopened in Standard, has that value silently replaced rather than kept and
 // shown as CUSTOM (the convention every other Standard control follows). Confirmed live
 // for bloomType/bilateral while FAN was quarantined (#54 investigation); lifting that
-// quarantine below removes today's only instance, but the MECHANISM still does this to
-// any future advancedOnly option — no option in the registry carries `advancedOnly` as
-// of this comment. Tracked on its own, not fixed here.
+// quarantine removed today's only instance, but the MECHANISM still does this to any
+// future advancedOnly option — no option in the registry carries `advancedOnly` as of
+// this comment. Tracked on its own, not fixed here.
 //
 // DECLARED IN THE REGISTRY, not here. This used to be a hand-written literal — a third
 // list beside the registry and the markup, with no gate tying it to either, holding
 // reasons that quietly stopped being true. An option now carries `advancedOnly: true`
 // and its control carries `standardFallback`, and verify-tier-visibility asserts both
-// directions at the option level: an advancedOnly option is hidden in Standard and
-// visible in Advanced, and every other option is visible in both.
-//
-// TOOTHED / SCALLOPED were quarantined here because the teeth reshape the rim polyline
-// and the Standard-default continuous margin discarded it, so they rendered identically
-// to CLEAN. PR #58 put the treatments on the marginal strands, so the condition that
-// quarantined them no longer holds and they are Standard again.
-//
-// Arrangement FAN (bilateral) was quarantined here (#54) on the claim that it "renders
-// as scattered debris in both tiers" — never re-rendered to check. Investigation (#54,
-// closed) found bilateral placement geometry sound at every config tried, including
-// claw + cleft + cross-section roll + spine curl together: 0 boundary edges, exact
-// mirror symmetry, no stray geometry. The claim traces to this exact fallback: FAN
-// selected in Standard silently reverts to COILED (the bug this comment now documents
-// above), and COILED at the ambient default petal count (4) is a genuinely irregular,
-// asymmetric golden-angle pinwheel that reads as broken to the eye — see
-// tools/verify-geometry-quality.mjs's ARRANGEMENT configs, which now cover all three
-// bloom types including a bilateral mirror-symmetry check with a proven positive
-// control. FAN is Standard again; the quarantine's own citation (#68) never resolved to
-// a real tracker issue.
+// directions at the option level.
 const ADV_OPTIONS = Object.fromEntries(
   PANEL.filter((c) => c.kind === 'select' && (c.options || []).some((o) => o.advancedOnly))
        .map((c) => [c.id, { advanced: c.options.filter((o) => o.advancedOnly).map((o) => o.value),
                             fallback: c.standardFallback }]));
-function applyTier() {
+
+// The predicate that decides `id` right now — the single expression every consumer reads,
+// so the gate never re-derives it. Exported onto window for the headless gates below.
+function controlPredicate(c) { return (standardMode && c.standardVisibleWhen) ? c.standardVisibleWhen : c.visibleWhen; }
+function controlVisible(c, ui) {
+  if (standardMode && !STANDARD_IDS.has(c.id)) return false;
+  return evalPredicate(controlPredicate(c), ui);
+}
+
+function applyVisibility() {
   let fellBack = false;
   for (const [id, spec] of Object.entries(ADV_OPTIONS)) {
     const sel = inputs[id];
@@ -3512,50 +3519,47 @@ function applyTier() {
     }
     if (standardMode && spec.advanced.includes(sel.value)) { sel.value = spec.fallback; fellBack = true; }
   }
-  if (standardMode) {
-    for (const c of WIRED) if (!STANDARD_IDS.has(c.id)) { const w = ctrlWrap(c.id); if (w) w.hidden = true; }
-  } else {
-    // ADVANCED — the mirror image of the block above, and for a long time the missing
-    // half of it: entering Standard force-hides every non-standard control, but nothing
-    // ever force-SHOWED them back on leaving Standard. A control with a contextual
-    // data-* gating attribute got un-hidden anyway, as a side effect of that attribute's
-    // own sweep (e.g. data-hide-bilateral) recomputing its hidden state unconditionally
-    // every time it runs — but any Advanced control with NO gating attribute had nothing
-    // to reverse the Standard-mode hide, and stayed stuck hidden in Advanced forever
-    // (confirmed for curlBias, petalCup, crossSection, layerCount, continuousMargin, and
-    // ~20 others — see tools/verify-tier-visibility.mjs). Fix: on leaving Standard,
-    // un-hide every WIRED control that has no CONTEXTUAL reason to stay hidden —
-    // excluding the three carve-outs below, none of which a blind unhide can safely
-    // touch:
-    //   - c.gating: already owned by that attribute's own sweep, called in the same
-    //     chain (this function is itself called at the end of every updateXOptions()),
-    //     so it always ends up correct regardless of what order the calls run in — but
-    //     THIS loop must never touch it, or it could show a contextually-wrong control
-    //     for one frame, or (worse) permanently if that control's sweep already ran
-    //     earlier in the same chain.
-    //   - c.permanentHidden: migration-only / dev-only controls (divergenceAngle's
-    //     legacy slot, receptacleType, stemCurve, tube) that must never surface in any
-    //     tier.
-    //   - c.imperativeGate: a control shown/hidden by bespoke JS rather than a data-*
-    //     sweep (captureDist, via updateTerminationOptions()) — a blind unhide here
-    //     would fight that logic rather than reproduce it.
-    for (const c of WIRED) {
-      if (c.gating || c.permanentHidden || c.imperativeGate) continue;
-      const w = ctrlWrap(c.id);
-      if (w) w.hidden = false;
-    }
+  // ONE state read, so every control is decided against the same snapshot. readUI() is the
+  // same shape the geometry consumes, so a predicate cannot disagree with what gets built.
+  const ui = readUI();
+  for (const c of WIRED) {
+    const w = ctrlWrap(c.id);
+    if (w) w.hidden = !controlVisible(c, ui);
   }
+  // ANNOTATION elements — hints and section notes — are not controls and have no registry
+  // row, so they keep the data-* attribute sweep. Their attributes are the ONLY ones left
+  // in flower.html; verify-registry-sync asserts no .fl-ctrl wrapper ever carries one again.
+  applyAnnotationVisibility(ui);
   // Collapse an accordion section (Standard only) when none of its controls show.
   document.querySelectorAll('.fl-acc[data-acc]').forEach((sec) => {
     const anyVisible = [...sec.querySelectorAll('.fl-ctrl')].some((d) => !d.hidden);
     sec.hidden = standardMode && !anyVisible;
   });
-  // A fallback rewrote a picker value (e.g. a shared design's FAN arrangement in
-  // Standard); the geometry must follow, so rebuild. Debounced + deferred, so this is
-  // a no-op duplicate when a build is already pending. Only fires when an advanced
-  // value was actually selected — never on a default-value boot.
+  // A fallback rewrote a picker value; the geometry must follow, so rebuild. Debounced +
+  // deferred, so this is a no-op duplicate when a build is already pending.
   if (fellBack) scheduleRegen();
 }
+
+// Hints / notes / per-petal headings: non-control elements whose visibility follows the
+// same conditions. Each attribute's predicate is written once, here, in terms of the SAME
+// registry vocabulary — an element's attribute value is the `oneOf` list.
+const ANNOTATION_GATES = {
+  'data-bloom-styles': (v, ui) => v.split(/\s+/).includes(ui.bloomType),
+  'data-tip-styles': (v, ui) => v.split(/\s+/).includes(ui.tipStyle),
+  'data-infill-styles': (v, ui) => v.split(/\s+/).includes(ui.infillType),
+  'data-center-arch': (v, ui) => v.split(/\s+/).includes(ui.centerArch),
+  'data-bil-petal': (v, ui) => ui.bloomType === 'bilateral' && Number(v) <= clamp(ui.bilPerSide, 1, 3),
+};
+function applyAnnotationVisibility(ui) {
+  for (const [attr, test] of Object.entries(ANNOTATION_GATES)) {
+    document.querySelectorAll(`[${attr}]:not(.fl-ctrl)`).forEach((el) => { el.hidden = !test(el.getAttribute(attr), ui); });
+  }
+  // The low-petal-count divergence hint: coiled blooms under 8 petals, where the golden
+  // spiral reads as irregular rather than phyllotactic.
+  const hint = document.getElementById('divLowCountHint');
+  if (hint) hint.hidden = !(ui.bloomType === 'coiled' && (ui.petalCount || 0) < 8);
+}
+
 // Standard-tier controls currently visible — used by the headless tier probe.
 function standardVisibleCount() {
   return WIRED.filter((c) => STANDARD_IDS.has(c.id)).filter((c) => { const w = ctrlWrap(c.id); return w && !w.hidden; }).length;
@@ -3564,10 +3568,10 @@ const advancedToggle = document.getElementById('advancedToggle');
 if (advancedToggle) advancedToggle.addEventListener('change', () => {
   standardMode = !advancedToggle.checked;
   document.body.classList.toggle('fl-advanced', !standardMode);
-  // Re-run every gating sweep so wrappers reflect the contextual state, then the
-  // sweeps' own applyTier() re-imposes the filter (a no-op in Advanced mode).
-  updateTipOptions(); updateInfillOptions(); updateBloomOptions();
-  updateLayerOptions(); updateCenterOptions(); updateBaseOptions();
+  // One pass recomputes every control from its declaration; the Edge picker's Standard
+  // relabel ("Amount") is presentation, not visibility, so it is refreshed alongside.
+  updateEdgeAmount();
+  applyVisibility();
 });
 
 // ---- Petal shape picker (Standard) ---------------------------------------------
@@ -3606,12 +3610,8 @@ SHAPE_PARAMS.forEach((id) => inputs[id].addEventListener('input', detectShape));
 // Tip: like Infill, only the selected style's options are shown. Each option's
 // data-tip-styles lists the styles it belongs to; hide the rest.
 function updateTipOptions() {
-  const style = inputs.tipStyle.value;
-  document.querySelectorAll('[data-tip-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-tip-styles').split(/\s+/).includes(style);
-  });
-  updateEdgeAmount();
-  applyTier();
+  updateEdgeAmount();       // relabel only — the three sliders' visibility is declared
+  applyVisibility();
 }
 // The EDGE picker's contextual "Amount": in STANDARD each edge exposes exactly one
 // amount control (1:1, a pure relabel — no proxy state): Toothed -> tipLength,
@@ -3622,17 +3622,8 @@ const EDGE_AMOUNT = { jagged: 'tipLength', scallop: 'scallopHeight', ruffled: 'e
 const EDGE_NATIVE = { tipLength: 'Tip length', scallopHeight: 'Scallop height', edgeNoise: 'Edge noise' };
 function setCtrlLabel(id, text) { const l = document.querySelector(`label[for="${id}"]`); if (l) l.textContent = text; }
 function updateEdgeAmount() {
-  if (standardMode) {
-    const amt = EDGE_AMOUNT[inputs.tipStyle.value];       // undefined for CLEAN
-    for (const id of Object.keys(EDGE_NATIVE)) {
-      const w = ctrlWrap(id);
-      if (w) w.hidden = (id !== amt);
-      setCtrlLabel(id, id === amt ? 'Amount' : EDGE_NATIVE[id]);
-    }
-  } else {
-    for (const id of Object.keys(EDGE_NATIVE)) setCtrlLabel(id, EDGE_NATIVE[id]);
-    const en = ctrlWrap('edgeNoise'); if (en) en.hidden = false;   // edgeNoise: any style in Advanced
-  }
+  const amt = standardMode ? EDGE_AMOUNT[inputs.tipStyle.value] : undefined;   // undefined for CLEAN
+  for (const id of Object.keys(EDGE_NATIVE)) setCtrlLabel(id, id === amt ? 'Amount' : EDGE_NATIVE[id]);
 }
 // tip style is a <select>; swap the visible options and regenerate on change
 inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
@@ -3642,9 +3633,6 @@ inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleR
 // spread across the whole track.
 function updateInfillOptions() {
   const type = inputs.infillType.value;
-  document.querySelectorAll('[data-infill-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-infill-styles').split(/\s+/).includes(type);
-  });
   inputs.softness.max = type === 'voronoi' ? '5' : '1';
   inputs.softness.step = type === 'voronoi' ? '0.05' : '0.01';
   if (+inputs.softness.value > +inputs.softness.max) inputs.softness.value = inputs.softness.max;
@@ -3655,21 +3643,17 @@ function updateInfillOptions() {
   if (softLabel) softLabel.textContent = type === 'veins' ? 'Detail' : 'Roundness';
   // The junction-cluster controls (data-cont-margin) are gated in updateBaseOptions — they
   // shape the SDF receptacle, so they need BOTH continuous margin ON and the Receptacle on.
-  updateTerminationOptions();   // capture-distance visibility depends on infill type too
-  applyTier();
+  applyVisibility();            // capture-distance visibility depends on infill type too
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
 // Continuous margin drives both the infill edge AND the junction gating (updateBaseOptions).
 inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); updateBaseOptions(); scheduleRegen(); });
-// EDGE TERMINATION: the capture-distance slider only applies to a tube infill
-// (veins / bone) with an active mode, so hide it for FADE and for slab infills.
-function updateTerminationOptions() {
-  const el = document.getElementById('captureDistCtrl');
-  if (!el) return;
-  const tubeInfill = inputs.infillType.value === 'veins' || inputs.infillType.value === 'bone' || inputs.infillType.value === 'spacecol';
-  el.hidden = !(tubeInfill && inputs.edgeTermination.value !== 'fade');
-}
-inputs.edgeTermination.addEventListener('change', () => { updateTerminationOptions(); scheduleRegen(); });
+// EDGE TERMINATION: captureDist only applies to a tube infill (veins / bone / spacecol)
+// with an active mode. That was the ONE control the old single-attribute `gating` could not
+// express (a compound AND across two selects), so it was hand-gated here and flagged
+// `imperativeGate` — a flag that said "bespoke JS decides this" without saying what the
+// condition was. It is now `visibleWhen` like everything else, and the flag is gone.
+inputs.edgeTermination.addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
 // SPACE COLONIZATION: the two selects regenerate; the re-roll button draws a fresh
 // integer seed (stored in the design so the new network is saved and reproducible).
 inputs.spaceMode.addEventListener('change', scheduleRegen);
@@ -3682,52 +3666,22 @@ if (spaceReroll) spaceReroll.addEventListener('click', () => {
 });
 // Bloom type is a <select>; like Tip/Infill, only the chosen arrangement's hints
 // are shown (data-bloom-styles), and changing it re-lays out the whole bloom.
-function updateBloomOptions() {
-  const type = inputs.bloomType.value;
-  document.querySelectorAll('[data-bloom-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-bloom-styles').split(/\s+/).includes(type);
-  });
-  updateBilateralPetals();
-  updateDivergenceOptions();
-  applyTier();
-}
-// COILED divergence: the CUSTOM angle slider shows only for CUSTOM, and the
-// low-petal-count hint shows only when a coiled bloom has fewer than 8 petals
-// (where the golden spiral reads as irregular rather than phyllotactic).
-function updateDivergenceOptions() {
-  const coiled = inputs.bloomType.value === 'coiled';
-  const custom = inputs.divergenceMode.value === 'custom';
-  const angleCtrl = document.getElementById('divergenceAngleCtrl');
-  if (angleCtrl) angleCtrl.hidden = !(coiled && custom);
-  const hint = document.getElementById('divLowCountHint');
-  if (hint) hint.hidden = !(coiled && (parseInt(inputs.petalCount.value, 10) || 0) < 8);
-  applyTier();
-}
-inputs.divergenceMode.addEventListener('change', () => { updateDivergenceOptions(); scheduleRegen(); });
+function updateBloomOptions() { applyVisibility(); }
+// COILED divergence: divergenceAngle showed only for coiled + CUSTOM — and carried
+// `permanentHidden: true`, a flag asserting it is shown in no tier ever, while this
+// function showed it. Three of that flag's four users were honest and the fourth was not,
+// for as long as nothing could check it. The condition is now declared (`visibleWhen`) and
+// the flag is deleted. The low-count hint moved to applyAnnotationVisibility().
+inputs.divergenceMode.addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
 // keep the low-petal-count hint in sync as the petal slider moves
-inputs.petalCount.addEventListener('input', updateDivergenceOptions);
+inputs.petalCount.addEventListener('input', applyVisibility);
 // The per-petal edge dropdowns (bilateral only) show one per petal position, up to
 // the current PETALS PER SIDE — so they appear/disappear as that slider moves.
-function updateBilateralPetals() {
-  const on = inputs.bloomType.value === 'bilateral';
-  const perSide = clamp(parseInt(inputs.bilPerSide.value, 10) || 1, 1, 3);
-  document.querySelectorAll('[data-bil-petal]').forEach((el) => {
-    const k = parseInt(el.getAttribute('data-bil-petal'), 10);
-    el.hidden = !(on && k <= perSide);
-  });
-  // Global width / centre curve / edge curve are replaced by the per-petal
-  // versions when bilateral, so hide them there.
-  document.querySelectorAll('[data-hide-bilateral]').forEach((el) => { el.hidden = on; });
-  applyTier();
-}
+function updateBilateralPetals() { applyVisibility(); }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
 // LAYERS: the per-layer controls only matter with more than one whorl, so hide
 // them (data-layers-multi) when Layer count is 1.
-function updateLayerOptions() {
-  const multi = (parseInt(inputs.layerCount.value, 10) || 1) > 1;
-  document.querySelectorAll('[data-layers-multi]').forEach((el) => { el.hidden = !multi; });
-  applyTier();
-}
+function updateLayerOptions() { applyVisibility(); }
 inputs.layerCount.addEventListener('input', () => { refreshLabels(); updateLayerOptions(); scheduleRegen(); });
 // per-layer petal count is a free-text list; rebuild on edit (parsing is tolerant)
 inputs.petalsPerLayer.addEventListener('input', () => { scheduleRegen(); });
@@ -3740,66 +3694,36 @@ inputs.bilCenterPetal.addEventListener('change', () => { scheduleRegen(); });
 // CENTER visibility: the architecture selector (data-center-arch) shows one type's
 // controls; within CLASSIC, the stamens/pistil/none sub-select (data-center-styles)
 // further hides the amount/length/tip sliders when NONE is chosen.
-function updateCenterOptions() {
-  const arch = inputs.centerArch.value;
-  const style = inputs.centerType.value;
-  document.querySelectorAll('#acc-base [data-center-arch]').forEach((el) => {
-    let show = el.getAttribute('data-center-arch').split(/\s+/).includes(arch);
-    if (show && arch === 'classic' && el.hasAttribute('data-center-styles')) {
-      show = el.getAttribute('data-center-styles').split(/\s+/).includes(style);
-    }
-    el.hidden = !show;
-  });
-  applyTier();
-}
+function updateCenterOptions() { applyVisibility(); }
 inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
-// Base parts are independent: each part's sliders show only when it's not NONE.
-function updateBaseOptions() {
-  // The junction is DERIVED (stem or sepals present), not a control — so the Advanced
-  // sculpting controls (data-recept + the junction cluster) appear exactly when the
-  // derived receptacle is active. receptacleType is a hidden migration override only.
-  const on = hasReceptacle({
-    stemType: inputs.stemType.value, sepalsType: inputs.sepalsType.value, receptacleType: inputs.receptacleType.value,
-  });
-  const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
-  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
-  // JUNCTION cluster (absorption / neck swell / gather height / bundle tightness / flare
-  // rate): these shape the SDF receptacle, which only exists when continuous margin is ON
-  // AND the Receptacle is on. Gating on continuous margin alone left them inert in the
-  // default config (Receptacle off) — so require both, or they do nothing when shown.
-  const contMarginOnJ = inputs.continuousMargin.value === 'on';
-  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !(contMarginOnJ && on); });
-  // Per-axis sub-controls: only shown when the receptacle is on AND that axis is selected.
-  document.querySelectorAll('[data-recept-dome]').forEach((el) => { el.hidden = !on || prof !== 'dome'; });
-  document.querySelectorAll('[data-recept-open]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'gathered' && con !== 'cored'); });
-  document.querySelectorAll('[data-recept-ribbed]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'cored'); });
-  // The SDF junction (continuous margin ON) supersedes the legacy lathe receptacle's
-  // construction controls, so hide them there. The legacy path still runs when
-  // continuous margin is OFF, so these stay wired — hidden, not deleted.
-  // BACKLOG (trigger): retire the legacy receptacle entirely — delete these controls
-  // and the continuous-margin-OFF receptacle path, making continuous margin implicit —
-  // once the SDF junction is signed off. Until then the working fallback stays.
-  const contMarginOn = inputs.continuousMargin.value === 'on';
-  const LEGACY_RECEPT = ['receptConstruction', 'receptCollar', 'receptReach', 'receptSolidity', 'ribMultiplier', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight'];
-  if (on && contMarginOn) for (const id of LEGACY_RECEPT) { const w = ctrlWrap(id); if (w) w.hidden = true; }
-  // Sepal controls hide when sepals are off; the serration sub-controls
-  // (data-sepal-tip) hide further unless SEPAL TIP STYLE matches, mirroring the
-  // petal tip panel's data-tip-styles gating.
-  const sepalsOff = inputs.sepalsType.value === 'none';
-  const sepalTip = inputs.sepalTipStyle.value;
-  document.querySelectorAll('[data-sepal]').forEach((el) => {
-    let show = !sepalsOff;
-    if (show && el.hasAttribute('data-sepal-tip')) {
-      show = el.getAttribute('data-sepal-tip').split(/\s+/).includes(sepalTip);
-    }
-    el.hidden = !show;
-  });
-  document.querySelectorAll('[data-stem]').forEach((el) => { el.hidden = inputs.stemType.value === 'none'; });
-  // leaf sub-controls (arrangement / size) show only when a stem AND a leaf type are on
-  document.querySelectorAll('[data-leaf]').forEach((el) => { el.hidden = inputs.stemType.value === 'none' || inputs.leafType.value === 'none'; });
-  applyTier();
-}
+// Base parts are independent: each part's sliders show only when it's not NONE. Every
+// condition this function used to enforce imperatively is now a `visibleWhen` declaration:
+//
+//   data-recept          -> { ref: 'hasReceptacle' }
+//   data-cont-margin     -> all[ hasReceptacle, continuousMargin = on ]   <- SEE BELOW
+//   data-recept-dome     -> all[ hasReceptacle, receptProfile = dome ]
+//   data-recept-open  }  -> all[ hasReceptacle, receptConstruction in {ribbed, cored} ]
+//   data-recept-ribbed}     (two attributes for one set: the `open` sweep also listed the
+//                            retired 'gathered' construction, which is no longer an option
+//                            value and so could never match)
+//   LEGACY_RECEPT        -> ...plus continuousMargin = off, on the nine controls the SDF
+//                            junction supersedes. This was a hardcoded id list living in
+//                            this file, invisible to the registry: the nine were correctly
+//                            gated for "receptacle on" and then silently force-hidden again
+//                            by an undeclared second condition.
+//
+// The `data-cont-margin` five are the sharpest case in the whole change and worth naming.
+// The registry declared ONE condition; the code required that condition AND hasReceptacle().
+// A wholly undeclared condition is at least honestly absent — a reader checks the registry,
+// finds nothing, and knows to look further. A HALF-declared one reads as complete: the
+// reader finds a condition, believes it, and is wrong. That is the argument for predicates
+// over labels in one example.
+//
+// BACKLOG (trigger): retire the legacy receptacle entirely — delete those nine controls and
+// the continuous-margin-OFF receptacle path, making continuous margin implicit — once the
+// SDF junction is signed off. Until then the working fallback stays, now declared.
+function updateBaseOptions() { applyVisibility(); }
 inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptProfile.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptConstruction.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
@@ -4408,7 +4332,7 @@ updateLayerOptions();
 updateCenterOptions();
 updateBaseOptions();
 refreshLabels();
-applyTier();
+applyVisibility();
 detectShape();   // seed the petal-shape picker from the initial params (default = Rounded)
 
 // MAKE wiring: Size + Process feed the printability badge only (export-only, no rebuild);

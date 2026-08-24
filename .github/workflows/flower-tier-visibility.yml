@@ -12,6 +12,8 @@ on:
       - flower-registry.js
       - flower.html
       - tools/verify-tier-visibility.mjs
+      - tools/dump-visibility.mjs
+      - tools/visibility-matrix.mjs
       - tools/chromium-harness.mjs
       - .github/workflows/flower-tier-visibility.yml
   push:
@@ -21,6 +23,8 @@ on:
       - flower-registry.js
       - flower.html
       - tools/verify-tier-visibility.mjs
+      - tools/dump-visibility.mjs
+      - tools/visibility-matrix.mjs
       - tools/chromium-harness.mjs
 
 jobs:
@@ -37,3 +41,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Every ungated Advanced control must show in Advanced mode
         run: node tools/verify-tier-visibility.mjs
+      # Records every control's visibility across the whole matrix in both tiers. Not an
+      # assertion — it is the instrument a behaviour-preserving change is diffed against,
+      # and running it in CI proves the harness itself still works and every config in the
+      # matrix still takes (read-back). It fails on a config the UI silently rewrites.
+      - name: Visibility dump must run clean (read-back + predicate coverage)
+        run: node tools/dump-visibility.mjs > /dev/null

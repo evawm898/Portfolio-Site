@@ -50,6 +50,22 @@ them as optional or experimental.
   rendered rim trace the material boundary?), contour smoothness, and uncapped infill
   ends — across the shape × pattern matrix. Known, tracked defects are marked xfail so
   the gate is hard for everything that ships. Add new shape/pattern configs to it.
+- **Watertight is not connected either — also run the connectedness gate:**
+  `node tools/verify-connectedness.mjs` (issue #43). Two entirely separate closed solids
+  also have zero boundary edges, so the export gate would pass a bloom that prints
+  detached from its stem. This one voxelises the export below the minimum feature (0.6 mm)
+  and flood-fills; more than one region is a FAIL. Read its header before quoting a pass:
+  it is a surface-occupancy test over hand-picked junction corners, not the export matrix.
+- **Control visibility is declared in the registry, and only there.** Every reason a
+  control can be hidden is a `visibleWhen` predicate in `flower-registry.js`;
+  `applyVisibility()` in `flower.js` evaluates it and is the only thing that sets a
+  control wrapper's `hidden`. There are no gating data-attributes on control wrappers, no
+  `permanentHidden`/`imperativeGate` flags, and no hardcoded id lists —
+  `verify-registry-sync.mjs` fails the build if any of them come back. To change when a
+  control shows, edit its predicate; never add imperative code.
+  `node tools/dump-visibility.mjs` records all 166 controls x the matrix x both tiers, so
+  a change that claims not to move visibility is diffed rather than asserted;
+  `node tools/shot-panel-matrix.mjs <dir>` is the contact-sheet companion.
 - **Presets are permanent, named fixtures in BOTH gates.** Every shipped preset in
   `flower-presets.js` is loaded by name in `verify-flower-export.mjs` (must export
   watertight) and `verify-geometry-quality.mjs` (its petal must trace, stay smooth, cap
@@ -103,3 +119,6 @@ don't wait to be asked, and don't surface them only after the fact.
 - Provide the Deploy Preview URL if one exists.
 - For geometry changes, report the triangle count (live + export) and export STL
   file size (watch for bloat), and confirm `tools/verify-flower-export.mjs` passes.
+- For control-panel changes, confirm `tools/verify-registry-sync.mjs` and
+  `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
+  the pre-change dump when the change is meant to be visibility-neutral.

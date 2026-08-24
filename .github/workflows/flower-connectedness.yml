@@ -1,0 +1,47 @@
+# Build gate: the exported model must be ONE printed piece (issue #43).
+#
+# The export gate next door measures MANIFOLDNESS — boundary edges = 0 — and two entirely
+# separate closed solids also have zero boundary edges. "Watertight" and "connected" are
+# different properties, and only one of them had a gate. This one voxelises the export below
+# the minimum printable feature and flood-fills; more than one region means the print
+# arrives in parts. See the header of tools/verify-connectedness.mjs for what it does NOT
+# yet prove — it is a surface-occupancy test over a hand-picked set of junction corners, not
+# the export matrix.
+name: flower-connectedness
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower.html
+      - tools/verify-connectedness.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/flower-connectedness.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower.html
+      - tools/verify-connectedness.mjs
+      - tools/chromium-harness.mjs
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every junction config must export as a single connected body
+        run: node tools/verify-connectedness.mjs
