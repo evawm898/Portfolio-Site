@@ -97,6 +97,27 @@ const CONFIGS = [
   { name:'LOBED 4 aniso 4, margin off',          ui:{ ...LOBED, cleftLobes:4, voronoiAniso:4, continuousMargin:'off', infillType:'voronoi' } },
   { name:'SMOOTH, margin ON — flare agreement',  ui:{ ...LOBED, cleftDepth:0, continuousMargin:'on', infillType:'voronoi' } },
   { name:'LOBED 4, margin ON (the real default)',ui:{ ...LOBED, cleftLobes:4, continuousMargin:'on', infillType:'voronoi' } },
+  // Density points for the COST fit: triangles are read from the real page at the same
+  // three densities, so cell-boundary vertices can be converted into a triangle number
+  // instead of a direction.
+  { name:'COST d3 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:3, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d4 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:4, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d5 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:5, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d6 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:6, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d7 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:7, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d8 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:8, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d9 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:9, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d10 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:10, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d11 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:11, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'COST d12 — LOBED 4, margin ON', ui:{ ...LOBED, cleftLobes:4, density:12, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l0 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:0, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l2 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:2, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l4 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:4, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l6 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:6, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l8 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:8, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l12 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:12, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l16 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:16, continuousMargin:'on', infillType:'voronoi' } },
+  { name:'LLOYD l20 — LOBED 4, margin ON, d7', ui:{ ...LOBED, cleftLobes:4, density:7, voronoiLloyd:20, continuousMargin:'on', infillType:'voronoi' } },
 ];
 const RESET = { cleftDepth:0, cleftLobes:2, cleftWidth:0.3, voronoiDensityLaw:0, voronoiAniso:1, voronoiLloyd:0, density:7, continuousMargin:'on' };
 
@@ -104,8 +125,9 @@ const results = [];
 for (const c of CONFIGS) {
   const bad = await page.evaluate((u) => window.__diagSet2(u), { ...RESET, ...c.ui });
   if (bad.length) { console.error('CONFIG DID NOT TAKE:', c.name, bad.join('; ')); process.exitCode = 1; continue; }
-  const r = await page.evaluate(() => window.__diag2());
-  results.push({ name: c.name, ...r });
+  const r  = await page.evaluate(() => window.__diag2(false));
+  const rs = await page.evaluate(() => window.__diag2(true));
+  results.push({ name: c.name, ...r, simplified: { optClipOnly: rs.optClipOnly, optPartition: rs.optPartition, optAdjacency: rs.optAdjacency, insetBound: rs.insetBound } });
   console.error('measured', c.name);
 }
 await browser.close(); server.close();

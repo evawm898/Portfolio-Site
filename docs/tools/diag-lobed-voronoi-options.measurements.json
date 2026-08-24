@@ -5,6 +5,11 @@
   "depth": 0,
   "density": 7,
   "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 848,
+   "simplifiedVerts": 31,
+   "tolMM": 0.2
+  },
   "insetBound": {
    "loops": 1,
    "verts": 848,
@@ -133,6 +138,61 @@
    "thresholdUndershootVoronoiMM": 2,
    "thresholdOvershootMM": 3,
    "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 48,
+    "totalVerts": 289,
+    "totalArea": 2.738169793013062,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 0,
+    "starViolatingVerts": 0,
+    "cellsPerimCrossingVoid": 3,
+    "meanPerimInVoid": 0.009007746436288355,
+    "gate": {
+     "overshootMM": 0.17,
+     "undershootMM": 15.1
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 48,
+    "totalVerts": 289,
+    "totalArea": 2.738169793013062,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 0,
+    "starViolatingVerts": 0,
+    "cellsPerimCrossingVoid": 3,
+    "meanPerimInVoid": 0.009007746436288355,
+    "gate": {
+     "overshootMM": 0.17,
+     "undershootMM": 15.1
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 48,
+    "totalVerts": 289,
+    "totalArea": 2.738169793013062,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 0,
+    "starViolatingVerts": 0,
+    "cellsPerimCrossingVoid": 3,
+    "meanPerimInVoid": 0.009007746436288355,
+    "gate": {
+     "overshootMM": 0.17,
+     "undershootMM": 15.1
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 31,
+    "area": 2.738169793013061,
+    "maxCrossings": 2,
+    "areaInVoid": 0.0008965463475481407,
+    "perimInVoid": 0.06480483321175344
+   }
   }
  },
  {
@@ -141,6 +201,11 @@
   "depth": 0.55,
   "density": 7,
   "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1006,
+   "simplifiedVerts": 35,
+   "tolMM": 0.2
+  },
   "insetBound": {
    "loops": 1,
    "verts": 1006,
@@ -277,6 +342,61 @@
    "thresholdUndershootVoronoiMM": 2,
    "thresholdOvershootMM": 3,
    "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 47,
+    "totalVerts": 285,
+    "totalArea": 2.128533325598688,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 4,
+    "starViolatingVerts": 22,
+    "cellsPerimCrossingVoid": 7,
+    "meanPerimInVoid": 0.0797958966913564,
+    "gate": {
+     "overshootMM": 0,
+     "undershootMM": 21.83
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 44,
+    "totalVerts": 259,
+    "totalArea": 2.128533325598687,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 3,
+    "starViolatingVerts": 7,
+    "cellsPerimCrossingVoid": 5,
+    "meanPerimInVoid": 0.020804055031696238,
+    "gate": {
+     "overshootMM": 0,
+     "undershootMM": 22.87
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 48,
+    "totalVerts": 454,
+    "totalArea": 13.419725506360644,
+    "areaOverBound": 6.305,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 197,
+    "cellsPerimCrossingVoid": 13,
+    "meanPerimInVoid": 0.034396368905948355,
+    "gate": {
+     "overshootMM": 0,
+     "undershootMM": 21.83
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 35,
+    "area": 2.1285333255986876,
+    "maxCrossings": 4,
+    "areaInVoid": 0.0009143553794574825,
+    "perimInVoid": 0.05292808159725871
+   }
   }
  },
  {
@@ -285,6 +405,11 @@
   "depth": 0.55,
   "density": 7,
   "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1373,
+   "simplifiedVerts": 46,
+   "tolMM": 0.2
+  },
   "insetBound": {
    "loops": 1,
    "verts": 1373,
@@ -429,6 +554,61 @@
    "thresholdUndershootVoronoiMM": 2,
    "thresholdOvershootMM": 3,
    "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 48,
+    "totalVerts": 296,
+    "totalArea": 2.0037294157223715,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 11,
+    "starViolatingVerts": 40,
+    "cellsPerimCrossingVoid": 13,
+    "meanPerimInVoid": 0.0981325040457584,
+    "gate": {
+     "overshootMM": 0.01,
+     "undershootMM": 22.87
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 45,
+    "totalVerts": 264,
+    "totalArea": 2.003729415722371,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 9,
+    "starViolatingVerts": 22,
+    "cellsPerimCrossingVoid": 9,
+    "meanPerimInVoid": 0.03242449801877074,
+    "gate": {
+     "overshootMM": 0.01,
+     "undershootMM": 22.87
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 48,
+    "totalVerts": 662,
+    "totalArea": 13.892252410937807,
+    "areaOverBound": 6.933,
+    "cellsNotStarShaped": 27,
+    "starViolatingVerts": 314,
+    "cellsPerimCrossingVoid": 30,
+    "meanPerimInVoid": 0.12766534583410502,
+    "gate": {
+     "overshootMM": 0.01,
+     "undershootMM": 19.26
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 46,
+    "area": 2.0037294157223706,
+    "maxCrossings": 8,
+    "areaInVoid": 0.0010901342847232545,
+    "perimInVoid": 0.0465322028946046
+   }
   }
  },
  {
@@ -437,6 +617,11 @@
   "depth": 0.55,
   "density": 12,
   "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1891,
+   "simplifiedVerts": 59,
+   "tolMM": 0.2
+  },
   "insetBound": {
    "loops": 1,
    "verts": 1891,
@@ -593,6 +778,61 @@
    "thresholdUndershootVoronoiMM": 2,
    "thresholdOvershootMM": 3,
    "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 82,
+    "totalVerts": 548,
+    "totalArea": 1.9485293465017477,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 24,
+    "starViolatingVerts": 83,
+    "cellsPerimCrossingVoid": 29,
+    "meanPerimInVoid": 0.0811438295544325,
+    "gate": {
+     "overshootMM": 0.05,
+     "undershootMM": 13.46
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 82,
+    "totalVerts": 487,
+    "totalArea": 1.948529346501748,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 34,
+    "cellsPerimCrossingVoid": 17,
+    "meanPerimInVoid": 0.021447219507291594,
+    "gate": {
+     "overshootMM": 0.05,
+     "undershootMM": 13.67
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 82,
+    "totalVerts": 977,
+    "totalArea": 5.092258124223493,
+    "areaOverBound": 2.613,
+    "cellsNotStarShaped": 34,
+    "starViolatingVerts": 568,
+    "cellsPerimCrossingVoid": 39,
+    "meanPerimInVoid": 0.10687841488652138,
+    "gate": {
+     "overshootMM": 0.05,
+     "undershootMM": 14.54
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 59,
+    "area": 1.9485293465017475,
+    "maxCrossings": 14,
+    "areaInVoid": 0.0013149243918474688,
+    "perimInVoid": 0.033000926456983305
+   }
   }
  },
  {
@@ -601,6 +841,11 @@
   "depth": 0.55,
   "density": 7,
   "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1373,
+   "simplifiedVerts": 46,
+   "tolMM": 0.2
+  },
   "insetBound": {
    "loops": 1,
    "verts": 1373,
@@ -745,6 +990,61 @@
    "thresholdUndershootVoronoiMM": 2,
    "thresholdOvershootMM": 3,
    "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 48,
+    "totalVerts": 284,
+    "totalArea": 2.003729415722372,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 7,
+    "starViolatingVerts": 20,
+    "cellsPerimCrossingVoid": 9,
+    "meanPerimInVoid": 0.09457020785314879,
+    "gate": {
+     "overshootMM": 0,
+     "undershootMM": 18.23
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 45,
+    "totalVerts": 266,
+    "totalArea": 2.0037294157223715,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 24,
+    "cellsPerimCrossingVoid": 10,
+    "meanPerimInVoid": 0.050851909142976735,
+    "gate": {
+     "overshootMM": 0,
+     "undershootMM": 18.35
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 48,
+    "totalVerts": 508,
+    "totalArea": 12.35050521438469,
+    "areaOverBound": 6.164,
+    "cellsNotStarShaped": 11,
+    "starViolatingVerts": 127,
+    "cellsPerimCrossingVoid": 10,
+    "meanPerimInVoid": 0.01655457902648007,
+    "gate": {
+     "overshootMM": 0,
+     "undershootMM": 23.11
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 46,
+    "area": 2.0037294157223706,
+    "maxCrossings": 8,
+    "areaInVoid": 0.0010901342847232545,
+    "perimInVoid": 0.0465322028946046
+   }
   }
  },
  {
@@ -753,6 +1053,11 @@
   "depth": 0,
   "density": 7,
   "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 795,
+   "simplifiedVerts": 29,
+   "tolMM": 0.2
+  },
   "insetBound": {
    "loops": 1,
    "verts": 795,
@@ -881,6 +1186,61 @@
    "thresholdUndershootVoronoiMM": 2,
    "thresholdOvershootMM": 3,
    "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 43,
+    "totalVerts": 259,
+    "totalArea": 2.1564909511568735,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 0,
+    "starViolatingVerts": 0,
+    "cellsPerimCrossingVoid": 0,
+    "meanPerimInVoid": 0,
+    "gate": {
+     "overshootMM": 0.14,
+     "undershootMM": 17.53
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 43,
+    "totalVerts": 259,
+    "totalArea": 2.1564909511568735,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 0,
+    "starViolatingVerts": 0,
+    "cellsPerimCrossingVoid": 0,
+    "meanPerimInVoid": 0,
+    "gate": {
+     "overshootMM": 0.14,
+     "undershootMM": 17.53
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 43,
+    "totalVerts": 259,
+    "totalArea": 2.1564909511568735,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 0,
+    "starViolatingVerts": 0,
+    "cellsPerimCrossingVoid": 0,
+    "meanPerimInVoid": 0,
+    "gate": {
+     "overshootMM": 0.14,
+     "undershootMM": 17.53
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 29,
+    "area": 2.156490951156873,
+    "maxCrossings": 2,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
   }
  },
  {
@@ -889,6 +1249,11 @@
   "depth": 0.55,
   "density": 7,
   "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
   "insetBound": {
    "loops": 1,
    "verts": 1322,
@@ -1033,6 +1398,3877 @@
    "thresholdUndershootVoronoiMM": 2,
    "thresholdOvershootMM": 3,
    "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d3 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 3,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 20,
+   "realSlabs": 22,
+   "replicaArea": 2.0464483004409972,
+   "realOuterArea": 2.041996180338945
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 20,
+   "totalVerts": 582,
+   "totalArea": 2.0464483004409972,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 4,
+   "starViolatingVerts": 96,
+   "cellsPerimCrossingVoid": 12,
+   "meanPerimInVoid": 0.22550544245039186,
+   "gate": {
+    "overshootMM": 0.47,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 20,
+   "totalVerts": 1440,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 8,
+   "starViolatingVerts": 254,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.05205627185015458,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 20,
+   "totalVerts": 5967,
+   "totalArea": 5.666372930113425,
+   "areaOverBound": 3.974,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 4618,
+   "cellsPerimCrossingVoid": 4,
+   "meanPerimInVoid": 0.04229124269758691,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 20,
+   "totalVerts": 1423,
+   "totalArea": 1.42581127155277,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 38,
+   "cellsPerimCrossingVoid": 5,
+   "meanPerimInVoid": 0.029894890532718533,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 4
+   },
+   {
+    "region": "base",
+    "seeds": 14
+   },
+   {
+    "region": "lobe2",
+    "seeds": 2
+   },
+   {
+    "region": "lobe3",
+    "seeds": 1
+   },
+   {
+    "region": "lobe0",
+    "seeds": 1
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 20,
+   "totalVerts": 140,
+   "totalArea": 1.4228679241063293,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 20,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.05569063260527061,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 20,
+   "totalVerts": 129,
+   "totalArea": 1.4329939199853017,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 8,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 10,
+   "meanPerimInVoid": 0.08823635127443799,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 20,
+    "totalVerts": 161,
+    "totalArea": 1.4133854061807807,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 8,
+    "starViolatingVerts": 32,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.05190766620115946,
+    "gate": {
+     "overshootMM": 0.17,
+     "undershootMM": 25
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 20,
+    "totalVerts": 144,
+    "totalArea": 1.4133854061807807,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 7,
+    "starViolatingVerts": 22,
+    "cellsPerimCrossingVoid": 5,
+    "meanPerimInVoid": 0.030301108322476906,
+    "gate": {
+     "overshootMM": 0.17,
+     "undershootMM": 22.84
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 20,
+    "totalVerts": 288,
+    "totalArea": 5.601126155502933,
+    "areaOverBound": 3.963,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 176,
+    "cellsPerimCrossingVoid": 4,
+    "meanPerimInVoid": 0.04246161532684513,
+    "gate": {
+     "overshootMM": 0.17,
+     "undershootMM": 23.35
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d4 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 4,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 27,
+   "realSlabs": 25,
+   "replicaArea": 2.046448300440997,
+   "realOuterArea": 2.041996180338944
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 27,
+   "totalVerts": 610,
+   "totalArea": 2.046448300440997,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 6,
+   "starViolatingVerts": 99,
+   "cellsPerimCrossingVoid": 15,
+   "meanPerimInVoid": 0.22753686046814764,
+   "gate": {
+    "overshootMM": 0.54,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 27,
+   "totalVerts": 1476,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 13,
+   "starViolatingVerts": 330,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.09223576837774854,
+   "gate": {
+    "overshootMM": 0.54,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 27,
+   "totalVerts": 7295,
+   "totalArea": 6.958207089852395,
+   "areaOverBound": 4.88,
+   "cellsNotStarShaped": 17,
+   "starViolatingVerts": 6564,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.07961511915997753,
+   "gate": {
+    "overshootMM": 0.54,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 26,
+   "totalVerts": 1450,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 68,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.02280941619897348,
+   "gate": {
+    "overshootMM": 0.54,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 4
+   },
+   {
+    "region": "base",
+    "seeds": 17
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   },
+   {
+    "region": "lobe2",
+    "seeds": 2
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 26,
+   "totalVerts": 168,
+   "totalArea": 1.4228679241063298,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 37,
+   "cellsPerimCrossingVoid": 7,
+   "meanPerimInVoid": 0.03879481725345364,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 26,
+   "totalVerts": 159,
+   "totalArea": 1.4329939199853021,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 32,
+   "cellsPerimCrossingVoid": 10,
+   "meanPerimInVoid": 0.06044486493916853,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 27,
+    "totalVerts": 198,
+    "totalArea": 1.4133854061807807,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 13,
+    "starViolatingVerts": 66,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09253467147113999,
+    "gate": {
+     "overshootMM": 0.54,
+     "undershootMM": 18.83
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 26,
+    "totalVerts": 172,
+    "totalArea": 1.4133854061807807,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 11,
+    "starViolatingVerts": 40,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.022805921528448982,
+    "gate": {
+     "overshootMM": 0.54,
+     "undershootMM": 15.52
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 27,
+    "totalVerts": 363,
+    "totalArea": 6.8820466639635685,
+    "areaOverBound": 4.869,
+    "cellsNotStarShaped": 17,
+    "starViolatingVerts": 266,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.0793504416125476,
+    "gate": {
+     "overshootMM": 0.54,
+     "undershootMM": 22.79
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d5 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 5,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 32,
+   "realSlabs": 32,
+   "replicaArea": 2.0464483004409977,
+   "realOuterArea": 2.0419961803389457
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 32,
+   "totalVerts": 657,
+   "totalArea": 2.0464483004409977,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 4,
+   "starViolatingVerts": 112,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.27505899012408297,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 31,
+   "totalVerts": 1480,
+   "totalArea": 1.4258112715527698,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 8,
+   "starViolatingVerts": 186,
+   "cellsPerimCrossingVoid": 5,
+   "meanPerimInVoid": 0.08602519542619722,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 31,
+   "totalVerts": 8577,
+   "totalArea": 8.48899874016037,
+   "areaOverBound": 5.954,
+   "cellsNotStarShaped": 20,
+   "starViolatingVerts": 6935,
+   "cellsPerimCrossingVoid": 10,
+   "meanPerimInVoid": 0.08155739644763145,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 29,
+   "totalVerts": 1468,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 80,
+   "cellsPerimCrossingVoid": 5,
+   "meanPerimInVoid": 0.025692123073856977,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 7
+   },
+   {
+    "region": "base",
+    "seeds": 21
+   },
+   {
+    "region": "lobe2",
+    "seeds": 4
+   },
+   {
+    "region": "lobe3",
+    "seeds": 2
+   },
+   {
+    "region": "lobe0",
+    "seeds": 2
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 29,
+   "totalVerts": 186,
+   "totalArea": 1.4228679241063293,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 8,
+   "starViolatingVerts": 28,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0484624151639987,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 30,
+   "totalVerts": 179,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 8,
+   "starViolatingVerts": 25,
+   "cellsPerimCrossingVoid": 12,
+   "meanPerimInVoid": 0.10543506820443581,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 31,
+    "totalVerts": 202,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 8,
+    "starViolatingVerts": 37,
+    "cellsPerimCrossingVoid": 5,
+    "meanPerimInVoid": 0.08611596098552661,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 20.12
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 29,
+    "totalVerts": 190,
+    "totalArea": 1.413385406180781,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 8,
+    "starViolatingVerts": 35,
+    "cellsPerimCrossingVoid": 5,
+    "meanPerimInVoid": 0.02607640879925909,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 22.84
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 31,
+    "totalVerts": 450,
+    "totalArea": 8.401905920044058,
+    "areaOverBound": 5.945,
+    "cellsNotStarShaped": 18,
+    "starViolatingVerts": 286,
+    "cellsPerimCrossingVoid": 10,
+    "meanPerimInVoid": 0.08131509174973274,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 18.61
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d6 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 6,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 37,
+   "realSlabs": 37,
+   "replicaArea": 2.0464483004409977,
+   "realOuterArea": 2.0419961803389444
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 37,
+   "totalVerts": 674,
+   "totalArea": 2.0464483004409977,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 3,
+   "starViolatingVerts": 94,
+   "cellsPerimCrossingVoid": 20,
+   "meanPerimInVoid": 0.2564386708387883,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 36,
+   "totalVerts": 1522,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 189,
+   "cellsPerimCrossingVoid": 7,
+   "meanPerimInVoid": 0.08544485586668735,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 36,
+   "totalVerts": 8994,
+   "totalArea": 8.733852682444097,
+   "areaOverBound": 6.126,
+   "cellsNotStarShaped": 18,
+   "starViolatingVerts": 8097,
+   "cellsPerimCrossingVoid": 12,
+   "meanPerimInVoid": 0.08288070283789571,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 35,
+   "totalVerts": 1496,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 44,
+   "cellsPerimCrossingVoid": 4,
+   "meanPerimInVoid": 0.014857331185513157,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 6
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe3",
+    "seeds": 4
+   },
+   {
+    "region": "lobe0",
+    "seeds": 4
+   },
+   {
+    "region": "lobe2",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 35,
+   "totalVerts": 214,
+   "totalArea": 1.4228679241063296,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 18,
+   "cellsPerimCrossingVoid": 7,
+   "meanPerimInVoid": 0.03055859365250067,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 35,
+   "totalVerts": 202,
+   "totalArea": 1.4329939199853021,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 8,
+   "starViolatingVerts": 19,
+   "cellsPerimCrossingVoid": 12,
+   "meanPerimInVoid": 0.06481802730268334,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 36,
+    "totalVerts": 244,
+    "totalArea": 1.4133854061807807,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 47,
+    "cellsPerimCrossingVoid": 7,
+    "meanPerimInVoid": 0.08600317105404674,
+    "gate": {
+     "overshootMM": 0.12,
+     "undershootMM": 23.69
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 35,
+    "totalVerts": 218,
+    "totalArea": 1.4133854061807807,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 7,
+    "starViolatingVerts": 20,
+    "cellsPerimCrossingVoid": 4,
+    "meanPerimInVoid": 0.015133293219108881,
+    "gate": {
+     "overshootMM": 0.12,
+     "undershootMM": 19.28
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 36,
+    "totalVerts": 492,
+    "totalArea": 8.643666331174183,
+    "areaOverBound": 6.116,
+    "cellsNotStarShaped": 18,
+    "starViolatingVerts": 337,
+    "cellsPerimCrossingVoid": 12,
+    "meanPerimInVoid": 0.08304702731588516,
+    "gate": {
+     "overshootMM": 0.12,
+     "undershootMM": 18.65
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d7 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 42,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389453
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d8 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 8,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 49,
+   "realSlabs": 49,
+   "replicaArea": 2.0464483004409986,
+   "realOuterArea": 2.0419961803389435
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 49,
+   "totalVerts": 740,
+   "totalArea": 2.0464483004409986,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 3,
+   "starViolatingVerts": 96,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.27093581578137466,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 48,
+   "totalVerts": 1568,
+   "totalArea": 1.425811271552771,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 89,
+   "cellsPerimCrossingVoid": 4,
+   "meanPerimInVoid": 0.08000791484003737,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 48,
+   "totalVerts": 10000,
+   "totalArea": 9.784693406965344,
+   "areaOverBound": 6.863,
+   "cellsNotStarShaped": 25,
+   "starViolatingVerts": 8465,
+   "cellsPerimCrossingVoid": 20,
+   "meanPerimInVoid": 0.1014870178096939,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 45,
+   "totalVerts": 1543,
+   "totalArea": 1.425811271552771,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 51,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.016658614680777374,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 31
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 45,
+   "totalVerts": 261,
+   "totalArea": 1.4228679241063293,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.037248454968684876,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 45,
+   "totalVerts": 249,
+   "totalArea": 1.4329939199853028,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 21,
+   "cellsPerimCrossingVoid": 16,
+   "meanPerimInVoid": 0.07444193393448588,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 48,
+    "totalVerts": 286,
+    "totalArea": 1.4133854061807798,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 5,
+    "starViolatingVerts": 34,
+    "cellsPerimCrossingVoid": 4,
+    "meanPerimInVoid": 0.08074234701140139,
+    "gate": {
+     "overshootMM": 0.01,
+     "undershootMM": 21.26
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 45,
+    "totalVerts": 265,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 9,
+    "starViolatingVerts": 26,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.016902816951980853,
+    "gate": {
+     "overshootMM": 0.01,
+     "undershootMM": 13.57
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 48,
+    "totalVerts": 590,
+    "totalArea": 9.685313568006327,
+    "areaOverBound": 6.853,
+    "cellsNotStarShaped": 25,
+    "starViolatingVerts": 382,
+    "cellsPerimCrossingVoid": 20,
+    "meanPerimInVoid": 0.10148061337254494,
+    "gate": {
+     "overshootMM": 0.01,
+     "undershootMM": 17.66
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d9 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 9,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 54,
+   "realSlabs": 54,
+   "replicaArea": 2.0464483004409972,
+   "realOuterArea": 2.0419961803389457
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 54,
+   "totalVerts": 785,
+   "totalArea": 2.0464483004409972,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 6,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 30,
+   "meanPerimInVoid": 0.26968753396708395,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 53,
+   "totalVerts": 1594,
+   "totalArea": 1.4258112715527695,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 14,
+   "starViolatingVerts": 165,
+   "cellsPerimCrossingVoid": 9,
+   "meanPerimInVoid": 0.08937012244757227,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 53,
+   "totalVerts": 11733,
+   "totalArea": 11.664998660176112,
+   "areaOverBound": 8.181,
+   "cellsNotStarShaped": 29,
+   "starViolatingVerts": 10341,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.09473172754758939,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 49,
+   "totalVerts": 1557,
+   "totalArea": 1.42581127155277,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 45,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.019115656888409823,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 12
+   },
+   {
+    "region": "base",
+    "seeds": 31
+   },
+   {
+    "region": "lobe3",
+    "seeds": 6
+   },
+   {
+    "region": "lobe0",
+    "seeds": 6
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 49,
+   "totalVerts": 275,
+   "totalArea": 1.4228679241063291,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.03821517247423643,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 49,
+   "totalVerts": 265,
+   "totalArea": 1.4329939199853017,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 8,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.0632236881657359,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 53,
+    "totalVerts": 316,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 14,
+    "starViolatingVerts": 54,
+    "cellsPerimCrossingVoid": 9,
+    "meanPerimInVoid": 0.08951336211142616,
+    "gate": {
+     "overshootMM": 0.12,
+     "undershootMM": 18.4
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 49,
+    "totalVerts": 279,
+    "totalArea": 1.4133854061807802,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 7,
+    "starViolatingVerts": 24,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.019108601180472178,
+    "gate": {
+     "overshootMM": 0.12,
+     "undershootMM": 19.42
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 53,
+    "totalVerts": 697,
+    "totalArea": 11.549382834378179,
+    "areaOverBound": 8.171,
+    "cellsNotStarShaped": 29,
+    "starViolatingVerts": 482,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.09489838742517644,
+    "gate": {
+     "overshootMM": 0.12,
+     "undershootMM": 19.31
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d10 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 10,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 59,
+   "realSlabs": 61,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389457
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 59,
+   "totalVerts": 790,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 5,
+   "starViolatingVerts": 106,
+   "cellsPerimCrossingVoid": 32,
+   "meanPerimInVoid": 0.25723246400674243,
+   "gate": {
+    "overshootMM": 0.46,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 56,
+   "totalVerts": 1620,
+   "totalArea": 1.4258112715527707,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 16,
+   "starViolatingVerts": 145,
+   "cellsPerimCrossingVoid": 13,
+   "meanPerimInVoid": 0.10466354384462549,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 56,
+   "totalVerts": 11633,
+   "totalArea": 11.490699478355905,
+   "areaOverBound": 8.059,
+   "cellsNotStarShaped": 28,
+   "starViolatingVerts": 10332,
+   "cellsPerimCrossingVoid": 20,
+   "meanPerimInVoid": 0.10063326608461172,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 52,
+   "totalVerts": 1578,
+   "totalArea": 1.4258112715527709,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 61,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.014267954134640597,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 12
+   },
+   {
+    "region": "base",
+    "seeds": 36
+   },
+   {
+    "region": "lobe3",
+    "seeds": 6
+   },
+   {
+    "region": "lobe0",
+    "seeds": 6
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 52,
+   "totalVerts": 296,
+   "totalArea": 1.4228679241063291,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 28,
+   "cellsPerimCrossingVoid": 9,
+   "meanPerimInVoid": 0.027630257607698994,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 55,
+   "totalVerts": 299,
+   "totalArea": 1.4329939199853015,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 25,
+   "cellsPerimCrossingVoid": 13,
+   "meanPerimInVoid": 0.047943671612237296,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 56,
+    "totalVerts": 342,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 16,
+    "starViolatingVerts": 64,
+    "cellsPerimCrossingVoid": 13,
+    "meanPerimInVoid": 0.1048363471449674,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 19.63
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 52,
+    "totalVerts": 300,
+    "totalArea": 1.4133854061807802,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 9,
+    "starViolatingVerts": 30,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.014274316112403852,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 19.63
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 56,
+    "totalVerts": 688,
+    "totalArea": 11.375313068370861,
+    "areaOverBound": 8.048,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 451,
+    "cellsPerimCrossingVoid": 20,
+    "meanPerimInVoid": 0.10048379130891145,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 10.08
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d11 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 11,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 64,
+   "realSlabs": 64,
+   "replicaArea": 2.046448300440996,
+   "realOuterArea": 2.0419961803389453
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 64,
+   "totalVerts": 826,
+   "totalArea": 2.046448300440996,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 3,
+   "starViolatingVerts": 98,
+   "cellsPerimCrossingVoid": 39,
+   "meanPerimInVoid": 0.27175626482516296,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 63,
+   "totalVerts": 1658,
+   "totalArea": 1.42581127155277,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 17,
+   "starViolatingVerts": 153,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.10646536939172345,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 63,
+   "totalVerts": 13001,
+   "totalArea": 12.895140310495464,
+   "areaOverBound": 9.044,
+   "cellsNotStarShaped": 34,
+   "starViolatingVerts": 11852,
+   "cellsPerimCrossingVoid": 24,
+   "meanPerimInVoid": 0.09551050064892722,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 58,
+   "totalVerts": 1619,
+   "totalArea": 1.42581127155277,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 73,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.021644841187004736,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 16
+   },
+   {
+    "region": "base",
+    "seeds": 38
+   },
+   {
+    "region": "lobe3",
+    "seeds": 5
+   },
+   {
+    "region": "lobe0",
+    "seeds": 5
+   },
+   {
+    "region": "lobe2",
+    "seeds": 10
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 58,
+   "totalVerts": 337,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 34,
+   "cellsPerimCrossingVoid": 13,
+   "meanPerimInVoid": 0.04072127433418983,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 59,
+   "totalVerts": 329,
+   "totalArea": 1.4329939199853008,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 12,
+   "starViolatingVerts": 37,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.06274693125536644,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 63,
+    "totalVerts": 380,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 15,
+    "starViolatingVerts": 66,
+    "cellsPerimCrossingVoid": 14,
+    "meanPerimInVoid": 0.10669814915742387,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 18.53
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 58,
+    "totalVerts": 341,
+    "totalArea": 1.4133854061807802,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 11,
+    "starViolatingVerts": 38,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.021618733344549616,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 18.53
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 63,
+    "totalVerts": 790,
+    "totalArea": 12.767546881542774,
+    "areaOverBound": 9.033,
+    "cellsNotStarShaped": 32,
+    "starViolatingVerts": 536,
+    "cellsPerimCrossingVoid": 24,
+    "meanPerimInVoid": 0.09563170485920595,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 9.91
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "COST d12 — LOBED 4, margin ON",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 12,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 68,
+   "realSlabs": 68,
+   "replicaArea": 2.0464483004409986,
+   "realOuterArea": 2.041996180338945
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 68,
+   "totalVerts": 850,
+   "totalArea": 2.0464483004409986,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 3,
+   "starViolatingVerts": 98,
+   "cellsPerimCrossingVoid": 39,
+   "meanPerimInVoid": 0.28800403126667673,
+   "gate": {
+    "overshootMM": 0.02,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 67,
+   "totalVerts": 1674,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 13,
+   "starViolatingVerts": 163,
+   "cellsPerimCrossingVoid": 12,
+   "meanPerimInVoid": 0.114606149056984,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 67,
+   "totalVerts": 15980,
+   "totalArea": 16.168093792591314,
+   "areaOverBound": 11.34,
+   "cellsNotStarShaped": 36,
+   "starViolatingVerts": 14552,
+   "cellsPerimCrossingVoid": 26,
+   "meanPerimInVoid": 0.09506877702859408,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 61,
+   "totalVerts": 1628,
+   "totalArea": 1.42581127155277,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 47,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.017329220555808288,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 18
+   },
+   {
+    "region": "base",
+    "seeds": 44
+   },
+   {
+    "region": "lobe3",
+    "seeds": 5
+   },
+   {
+    "region": "lobe0",
+    "seeds": 5
+   },
+   {
+    "region": "lobe2",
+    "seeds": 10
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 61,
+   "totalVerts": 346,
+   "totalArea": 1.4228679241063293,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 24,
+   "cellsPerimCrossingVoid": 13,
+   "meanPerimInVoid": 0.03720812927283139,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 61,
+   "totalVerts": 335,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.06373877134511931,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 67,
+    "totalVerts": 396,
+    "totalArea": 1.4133854061807811,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 13,
+    "starViolatingVerts": 68,
+    "cellsPerimCrossingVoid": 12,
+    "meanPerimInVoid": 0.11506722911681827,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 17.62
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 61,
+    "totalVerts": 350,
+    "totalArea": 1.4133854061807807,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 7,
+    "starViolatingVerts": 26,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.01734401848986742,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 13.66
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 67,
+    "totalVerts": 917,
+    "totalArea": 16.01333737160758,
+    "areaOverBound": 11.33,
+    "cellsNotStarShaped": 36,
+    "starViolatingVerts": 639,
+    "cellsPerimCrossingVoid": 26,
+    "meanPerimInVoid": 0.09577187895655428,
+    "gate": {
+     "overshootMM": 0.15,
+     "undershootMM": 17.62
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l0 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 42,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389453
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l2 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 44,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.041996180338945
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l4 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 44,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389444
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l6 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 44,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389453
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l8 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 46,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.041996180338945
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l12 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 46,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389457
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l16 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 46,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389453
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
+  }
+ },
+ {
+  "name": "LLOYD l20 — LOBED 4, margin ON, d7",
+  "lobes": 4,
+  "depth": 0.55,
+  "density": 7,
+  "L": 2.2,
+  "boundSimplify": {
+   "rawVerts": 1322,
+   "simplifiedVerts": 44,
+   "tolMM": 0.2
+  },
+  "insetBound": {
+   "loops": 1,
+   "verts": 1322,
+   "area": 1.4258112715527678,
+   "maxCrossings": 8,
+   "areaInVoid": 0,
+   "perimInVoid": 0
+  },
+  "boundAgreementMM": {
+   "bins": 48,
+   "meanMM": 0.136,
+   "maxMM": 0.388,
+   "atU": 0.91
+  },
+  "envBound": {
+   "verts": 480,
+   "area": 2.0464483004409986,
+   "maxCrossings": 2,
+   "areaInVoid": 0.2848643006263048
+  },
+  "maskGradient": {
+   "samples": 716,
+   "mean": 1.1376658318627704,
+   "min": 0.7251395722551592,
+   "max": 1.6378773758441836
+  },
+  "replica": {
+   "replicaCells": 42,
+   "realSlabs": 46,
+   "replicaArea": 2.0464483004409963,
+   "realOuterArea": 2.0419961803389444
+  },
+  "today": {
+   "label": "today (envelope clip, all-pairs adjacency)",
+   "cells": 42,
+   "totalVerts": 714,
+   "totalArea": 2.0464483004409963,
+   "areaOverBound": 1.435,
+   "cellsNotStarShaped": 7,
+   "starViolatingVerts": 108,
+   "cellsPerimCrossingVoid": 27,
+   "meanPerimInVoid": 0.3252529739391946,
+   "gate": {
+    "overshootMM": 0.01,
+    "undershootMM": 0
+   }
+  },
+  "optClipOnly": {
+   "label": "cleft-aware clip only",
+   "cells": 41,
+   "totalVerts": 1538,
+   "totalArea": 1.4258112715527704,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 11,
+   "starViolatingVerts": 116,
+   "cellsPerimCrossingVoid": 8,
+   "meanPerimInVoid": 0.0983164679574561,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optAdjacency": {
+   "label": "material-aware adjacency + cleft-aware clip",
+   "cells": 41,
+   "totalVerts": 10518,
+   "totalArea": 10.395412794055126,
+   "areaOverBound": 7.291,
+   "cellsNotStarShaped": 27,
+   "starViolatingVerts": 8673,
+   "cellsPerimCrossingVoid": 18,
+   "meanPerimInVoid": 0.12618370271869364,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "optPartition": {
+   "label": "per-lobe partition + cleft-aware clip",
+   "cells": 38,
+   "totalVerts": 1502,
+   "totalArea": 1.4258112715527702,
+   "areaOverBound": 1,
+   "cellsNotStarShaped": 9,
+   "starViolatingVerts": 56,
+   "cellsPerimCrossingVoid": 6,
+   "meanPerimInVoid": 0.021159768103299306,
+   "gate": {
+    "overshootMM": 0,
+    "undershootMM": 0.01
+   }
+  },
+  "partitionRegions": [
+   {
+    "region": "lobe1",
+    "seeds": 11
+   },
+   {
+    "region": "base",
+    "seeds": 24
+   },
+   {
+    "region": "lobe2",
+    "seeds": 7
+   },
+   {
+    "region": "lobe3",
+    "seeds": 3
+   },
+   {
+    "region": "lobe0",
+    "seeds": 3
+   }
+  ],
+  "optPartitionSimplified0p25": {
+   "label": "per-lobe partition, bound simplified to 0.25 mm",
+   "cells": 38,
+   "totalVerts": 220,
+   "totalArea": 1.422867924106329,
+   "areaOverBound": 0.998,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 23,
+   "cellsPerimCrossingVoid": 11,
+   "meanPerimInVoid": 0.04551437407488733,
+   "boundVerts": 40,
+   "boundVoid": 0.0005561219760867551
+  },
+  "optPartitionSimplified0p5": {
+   "label": "per-lobe partition, bound simplified to 0.5 mm",
+   "cells": 38,
+   "totalVerts": 208,
+   "totalArea": 1.432993919985302,
+   "areaOverBound": 1.005,
+   "cellsNotStarShaped": 10,
+   "starViolatingVerts": 22,
+   "cellsPerimCrossingVoid": 14,
+   "meanPerimInVoid": 0.07636344165013201,
+   "boundVerts": 28,
+   "boundVoid": 0.004237678489175495
+  },
+  "gate": {
+   "thresholdUndershootVoronoiMM": 2,
+   "thresholdOvershootMM": 3,
+   "note": "per-option figures are on each option object"
+  },
+  "simplified": {
+   "optClipOnly": {
+    "label": "cleft-aware clip only",
+    "cells": 41,
+    "totalVerts": 256,
+    "totalArea": 1.4133854061807805,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 12,
+    "starViolatingVerts": 41,
+    "cellsPerimCrossingVoid": 8,
+    "meanPerimInVoid": 0.09849373690724349,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optPartition": {
+    "label": "per-lobe partition + cleft-aware clip",
+    "cells": 38,
+    "totalVerts": 224,
+    "totalArea": 1.41338540618078,
+    "areaOverBound": 1,
+    "cellsNotStarShaped": 10,
+    "starViolatingVerts": 25,
+    "cellsPerimCrossingVoid": 6,
+    "meanPerimInVoid": 0.021439700856353133,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.6
+    }
+   },
+   "optAdjacency": {
+    "label": "material-aware adjacency + cleft-aware clip",
+    "cells": 41,
+    "totalVerts": 611,
+    "totalArea": 10.290555511921669,
+    "areaOverBound": 7.281,
+    "cellsNotStarShaped": 28,
+    "starViolatingVerts": 428,
+    "cellsPerimCrossingVoid": 18,
+    "meanPerimInVoid": 0.1270256111463943,
+    "gate": {
+     "overshootMM": 0.02,
+     "undershootMM": 19.27
+    }
+   },
+   "insetBound": {
+    "loops": 1,
+    "verts": 44,
+    "area": 1.4133854061807805,
+    "maxCrossings": 8,
+    "areaInVoid": 0,
+    "perimInVoid": 0
+   }
   }
  }
 ]

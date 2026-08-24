@@ -1,10 +1,12 @@
 // ---- ROUND 2: viability of a cleft-aware clip bound, and the two candidate fixes ----
-window.__diag2 = async function () {
+window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
+  SIMPLIFY_BOUND = !!SIMPLIFY_BOUND;
   const G = window.__diag2Geom || (window.__diag2Geom = await import('./flower-geometry.js'));
   const ui = readUI(); const P = resolveParams(ui); const cfg = G.cleftConfig(P);
   const MM = 26;
   const out = { lobes: cfg ? cfg.count : 0, depth: P.cleftDepth, density: P.density, L: P.L };
 
+  let __drawClipOnly = [], __drawPartition = [], __drawRegions = [];
   const area = (poly) => { let a=0; for (let i=0;i<poly.length;i++){const p=poly[i],q=poly[(i+1)%poly.length]; a+=p.x*q.y-q.x*p.y;} return Math.abs(a*0.5); };
   const inPoly = (x,y,poly) => { let s=false; for (let i=0,j=poly.length-1;i<poly.length;j=i++){
     const xi=poly[i].x,yi=poly[i].y,xj=poly[j].x,yj=poly[j].y;
@@ -76,7 +78,37 @@ window.__diag2 = async function () {
     return loops;
   };
   const loops = levelContour(240);
-  const bound = loops[0] || [];
+  let bound = loops[0] || [];
+  // COST CONTROL. cellAnnulus emits SUB(=5) ring points PER CELL EDGE, so slab triangles
+  // scale with cell VERTEX count, not cell count. A raw marching-squares contour carries
+  // ~1.3-1.9k vertices where the envelope carries 480, and every cell clipped against it
+  // inherits a slice of that. flower-geometry.js already solves exactly this for the rim
+  // with Douglas-Peucker ("most lie on nearly straight runs; lofting all of them would
+  // multiply the rim's triangle count for nothing"), so measure the bound both raw and
+  // simplified rather than assuming the fix must be expensive.
+  const simplify = (pts, tol) => {
+    if (pts.length < 3) return pts.slice();
+    const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length-1] = 1;
+    const st = [[0, pts.length-1]], t2 = tol*tol;
+    while (st.length) { const [i0,i1] = st.pop(); if (i1 <= i0+1) continue;
+      const a = pts[i0], b = pts[i1], dx = b.x-a.x, dy = b.y-a.y, l2 = dx*dx+dy*dy;
+      let best = -1, bd = 0;
+      for (let k = i0+1; k < i1; k++) { const q = pts[k]; let d2;
+        if (l2 < 1e-18) { const ex=q.x-a.x, ey=q.y-a.y; d2 = ex*ex+ey*ey; }
+        else { const t = Math.max(0, Math.min(1, ((q.x-a.x)*dx + (q.y-a.y)*dy)/l2));
+               const ex = q.x-(a.x+dx*t), ey = q.y-(a.y+dy*t); d2 = ex*ex+ey*ey; }
+        if (d2 > bd) { bd = d2; best = k; } }
+      if (bd > t2 && best > 0) { keep[best] = 1; st.push([i0,best],[best,i1]); } }
+    const o = []; for (let i = 0; i < pts.length; i++) if (keep[i]) o.push(pts[i]);
+    return o; };
+  // Tolerance at a quarter of the printable minimum feature (0.8 mm / 26 mm-per-unit),
+  // so simplification cannot move the boundary by a printable amount.
+  const SIMP_TOL = (0.8 / 26) * 0.25;
+  const boundRaw = bound;
+  const boundSimplified = simplify(bound, SIMP_TOL);
+  out.boundSimplify = { rawVerts: boundRaw.length, simplifiedVerts: boundSimplified.length,
+                        tolMM: +(SIMP_TOL * 26).toFixed(3) };
+  if (SIMPLIFY_BOUND) bound = boundSimplified;
   out.insetBound = { loops: loops.length, verts: bound.length, area: area(bound),
                      maxCrossings: crossings(bound), areaInVoid: areaInVoid(bound, 200),
                      perimInVoid: perimInVoid(bound) };
@@ -220,11 +252,13 @@ window.__diag2 = async function () {
       const u=(bi+0.5)/NBIN, rib=G.ribInnerEdge(u,P); if(rib<1e-4)continue;
       const d=rib-outerY[bi]; if(d>under)under=d; }
     return { overshootMM:+(over*MM).toFixed(2), undershootMM:+(under*MM).toFixed(2) }; };
+  const __drawToday = replica;
   out.today = summarise(replica, 'today (envelope clip, all-pairs adjacency)');
   out.today.gate = reg(replica);
 
   // ---------- OPTION 1: cleft-aware clip only (no partition, no adjacency filter) ----------
   { const cells=[]; for(const s of seedsAll){ const c=cellOf(s,seedsAll,bound,M0,null); if(c)cells.push(c); }
+    __drawClipOnly = cells;
     out.optClipOnly = summarise(cells, 'cleft-aware clip only'); out.optClipOnly.gate = reg(cells); }
 
   // ---------- OPTION 2: material-aware adjacency + cleft-aware clip ----------
@@ -250,6 +284,7 @@ window.__diag2 = async function () {
     for(const s of seedsAll){ const r=regionOf(s); const rp=RP.get(r);
       if(!rp || rp.length<3) continue;
       const c=cellOf(s, R.get(r), rp, M0, null); if(c)cells.push(c); }
+    __drawPartition = cells; __drawRegions = [...RP.values()];
     out.optPartition = summarise(cells, 'per-lobe partition + cleft-aware clip'); out.optPartition.gate = reg(cells);
     out.partitionRegions = [...R.entries()].map(([k,v])=>({region:k===-1?'base':'lobe'+k, seeds:v.length})); }
 
@@ -293,8 +328,25 @@ window.__diag2 = async function () {
   // ---------- (3) WHAT THE QUALITY GATE WOULD SAY ----------
   // verify-geometry-quality's registration metric compares the outermost infill |y| per
   // u-bin against ribInnerEdge(u) — the SCALAR ENVELOPE. Compute it for each option.
+  if (WANT_DRAW) {
+    out.__draw = { L: P.L, W: P.W, lobes: cfg ? cfg.count : 0,
+                   xFloor: cfg ? cfg.uFloor * P.L : null,
+                   centers: cfg ? cfg.centers.slice() : [],
+                   material: G.buildSilhouette(P, 220),
+                   bound, cellsToday: __drawToday, cellsClipOnly: __drawClipOnly,
+                   cellsPartition: __drawPartition,
+                   regionPolys: __drawRegions };
+  }
   out.gate = { thresholdUndershootVoronoiMM: 2, thresholdOvershootMM: 3, note: 'per-option figures are on each option object' };
   return out;
 };
 window.__diag2Geom = null;
+
+// ---- geometry dump for the seam contact sheet ----
+// Returns the drawable polygons for one config: the true material contour, the
+// cleft-aware bound, and the cells under each candidate. The seam is a LOOK question.
+window.__diagCells = async function (SIMPLIFY_BOUND) {
+  const r = await window.__diag2(SIMPLIFY_BOUND, true);
+  return r.__draw;
+};
 window.__diag2Ready = true;

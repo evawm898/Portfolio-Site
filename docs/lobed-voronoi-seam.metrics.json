@@ -1,0 +1,45 @@
+{
+ "seam": [
+  {
+   "lobes": 2,
+   "widthAtCut": 1.956,
+   "today": 0,
+   "clipOnly": 0,
+   "partition": 1.979
+  },
+  {
+   "lobes": 4,
+   "widthAtCut": 1.956,
+   "today": 0,
+   "clipOnly": 0,
+   "partition": 1.977
+  },
+  {
+   "lobes": 7,
+   "widthAtCut": 1.956,
+   "today": 0,
+   "clipOnly": 0,
+   "partition": 1.98
+  }
+ ],
+ "slivers": [
+  {
+   "lobes": 2,
+   "today": 2,
+   "clipOnly": 3,
+   "partition": 0
+  },
+  {
+   "lobes": 4,
+   "today": 1,
+   "clipOnly": 3,
+   "partition": 0
+  },
+  {
+   "lobes": 7,
+   "today": 3,
+   "clipOnly": 0,
+   "partition": 0
+  }
+ ]
+}
