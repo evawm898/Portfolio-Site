@@ -3376,6 +3376,15 @@ function readUI() {
   ui.spaceSeed = parseInt(inputs.spaceSeed.value, 10) || 0;
   return ui;
 }
+// Test hook for the headless gates. verify-tier-visibility derives its EXPECTED visibility
+// by evaluating each control's registry predicate itself — but it must evaluate it against
+// the SAME state snapshot applyVisibility() decided from, or the two disagree about the
+// design rather than about the rule. Reading the DOM independently in the gate would be a
+// second copy of readUI() with its own coercion rules, i.e. exactly the drift this project
+// keeps paying for. State only: the gate never borrows controlVisible(), because a gate
+// that calls the function under test asserts nothing.
+window.__flowerUIState = () => readUI();
+window.__flowerStandardMode = () => standardMode;
 
 // live numeric read-outs next to each slider — one per slider, formatted by the
 // registry `fmt` token. LABEL_FMT reproduces the former hand-written formatting.
@@ -3501,7 +3510,11 @@ const ADV_OPTIONS = Object.fromEntries(
                             fallback: c.standardFallback }]));
 
 // The predicate that decides `id` right now — the single expression every consumer reads,
-// so the gate never re-derives it. Exported onto window for the headless gates below.
+// so the gate never re-derives it. NOTE this pair is deliberately NOT exposed to the gates:
+// verify-tier-visibility evaluates the registry declaration itself (via the registry's own
+// evalPredicate) and compares against the DOM, because a gate that called controlVisible()
+// would be asserting that a function agrees with itself. What the gates DO borrow is the
+// state snapshot (window.__flowerUIState, beside readUI above).
 function controlPredicate(c) { return (standardMode && c.standardVisibleWhen) ? c.standardVisibleWhen : c.visibleWhen; }
 function controlVisible(c, ui) {
   if (standardMode && !STANDARD_IDS.has(c.id)) return false;
