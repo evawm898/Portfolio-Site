@@ -434,7 +434,7 @@ window.__gq = async function() {
   // a 72-segment clip polygon against an 80-bin curve evaluation at a different
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
-  let voronoiCells = 0;
+  let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
   let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
@@ -458,6 +458,32 @@ window.__gq = async function() {
         slabTaper: P.voronoiSlabTaper, minCellSize: 3 * P.tubeRadius * SLAB_THICK,
       });
       for (const slab of (vor.slabs || [])) for (const pt of slab.outer) recordPt(pt.x, pt.y);
+      // (7) THE HOLE IS INSIDE ITS OWN CELL — #74.
+      //     addSlab pairs outer[k] with inner[k] and lofts the ring between them, so every
+      //     inner[k] must lie inside its own outer ring. When it does not, the strut crosses
+      //     its own hole. No other metric here can see it: boundary edges stay 0, the model
+      //     stays connected, and the registration metric only ever looks at the OUTER ring.
+      //
+      //     ASSERTED ON THE OUTCOME, NOT ON STAR-SHAPEDNESS. Star-shapedness is a property
+      //     cellAnnulus's centroid-ray construction happens to need, not the property that
+      //     matters; a hole built along the boundary normal would be correct without it, and
+      //     a gate written against the means would fail its own repair.
+      //
+      //     SPLIT BY CAUSE, because there are two and they need different fixes: a cell with
+      //     ZERO AREA cannot contain anything (the ring is a collapsed sliver, and it lofts
+      //     into zero-area triangles), while a cell WITH area whose hole still escapes is a
+      //     containment failure of the offset itself.
+      let escCells = 0, escPts = 0, escZeroArea = 0, escWithArea = 0;
+      for (const slab of (vor.slabs || [])) {
+        if (!slab.inner || slab.inner.length !== slab.outer.length) { escCells++; continue; }
+        let bad = 0;
+        for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+        if (!bad) continue;
+        escCells++; escPts += bad;
+        if (Math.abs(__gqPolyArea(slab.outer)) < 1e-9) escZeroArea++; else escWithArea++;
+      }
+      holeEscapeCells = escCells; holeEscapePoints = escPts;
+      holeZeroArea = escZeroArea; holeWithArea = escWithArea;
       voronoiCells = (vor.slabs || []).length;
       voronoiCulled = vor.culled || 0;
       voronoiCulledDegenerate = vor.culledDegenerate || 0;
@@ -499,10 +525,11 @@ window.__gq = async function() {
       tileRatio = boundA > 1e-12 ? +(sumA / boundA).toFixed(3) : null;
       // SELF-CHECK. A measurement tool that does not assert its own validity reports
       // whatever it happens to compute — this gate spent three rounds reporting zeros from
-      // a shadowed declaration before that was noticed. If a Voronoi config reaches here
-      // with no cells at all, the metrics below are vacuously fine and would read as a
-      // pass; that is a failure to be measuring anything, not a clean run.
-      if (!(vor.slabs || []).length) selfCheck = 'voronoi config produced 0 cells';
+      // a shadowed declaration before that was noticed. If the classification does not
+      // account for every escaping cell, the split is lying and the run is void, not odd.
+      if (escZeroArea + escWithArea !== escCells) {
+        selfCheck = 'hole classification lost cells: ' + escZeroArea + ' + ' + escWithArea + ' != ' + escCells;
+      }
     } catch (e) {}
   } else {
     for (const v of veins) for (const pt of v.points) recordPt(pt.x, pt.y);
@@ -587,7 +614,7 @@ window.__gq = async function() {
            degree1, onMargin, atBase, freeEnds, marginPts: n, L: +P.L.toFixed(3),
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
-           voronoiCells,
+           holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
            voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
@@ -708,7 +735,7 @@ await page.waitForTimeout(300);
 const rows = [];
 let fails = 0, xfails = 0, xpasses = 0;
 const ledger = {};   // issue ref -> { total, failing }
-console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), 'rimAmp'.padStart(7), 'cullDgn'.padStart(8), 'cullMin'.padStart(8), 'minAmm2'.padStart(8), 'tile'.padStart(6), '  verdict');
+console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), 'rimAmp'.padStart(7), 'holeEsc'.padStart(8), 'cullDgn'.padStart(8), 'cullMin'.padStart(8), 'minAmm2'.padStart(8), 'tile'.padStart(6), '  verdict');
 for (const cfg of CONFIGS) {
   let rejected = [];
   if (cfg.preset) await page.evaluate((d) => window.__gqApply(d), cfg.ui);
@@ -750,6 +777,8 @@ for (const cfg of CONFIGS) {
   const badUndershoot = q.infill === 'voronoi' && q.regUndershootMaxMM > T.regUndershootVoronoiMM;
   // The rib-path split either held or the rim silently reverted to the pre-#50
   // envelope. There is no tolerance to set here: it is a boolean, and it is hard.
+  // #74: hard and zero-tolerance. A hole outside its own cell is not a matter of degree.
+  const badHole = (q.holeEscapeCells || 0) > 0;
   // The second assertion: no emitted cell is degenerate. Independent of the first — a
   // collapsed cell adds nothing to a tiling sum, so a partition check is blind to it.
   // The threshold catches COLLAPSE, not smallness: the smallest legitimate cell in this
@@ -766,8 +795,8 @@ for (const cfg of CONFIGS) {
   const rimBearing = !(q.infill === 'bone' && q.boneOutline === false);
   const badTreat = (q.tipStyle === 'jagged' || q.tipStyle === 'scallop') && rimBearing
                    && !(q.treatmentAmpMM >= T.treatmentAmpMM);
-  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat || badDegenerate || badSelf;
-  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : ''].filter(Boolean).join(',');
+  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat || badHole || badDegenerate || badSelf;
+  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badHole ? `hole(${q.holeEscapeCells}/${q.voronoiCells}: ${q.holeZeroArea} zero-area + ${q.holeWithArea} with-area)` : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : ''].filter(Boolean).join(',');
   let verdict;
   if (cfg.xfail) {
     const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
@@ -777,7 +806,7 @@ for (const cfg of CONFIGS) {
   } else if (bad) { verdict = `FAIL(${reasons})`; fails++; }                               // real regression — breaks the build
   else verdict = 'ok';
   rows.push({ name: cfg.name, xfail: cfg.xfail || null, ...q, verdict });
-  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), String(q.treatmentAmpMM == null ? '-' : q.treatmentAmpMM).padStart(7), String(q.infill === 'voronoi' ? q.voronoiCulledDegenerate : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulled : '-').padStart(8), String(q.minCellAreaMM2 == null ? '-' : q.minCellAreaMM2.toFixed(3)).padStart(8), String(q.tileRatio == null ? '-' : q.tileRatio).padStart(6), '  ' + verdict);
+  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), String(q.treatmentAmpMM == null ? '-' : q.treatmentAmpMM).padStart(7), String(q.infill === 'voronoi' ? `${q.holeEscapeCells}/${q.voronoiCells}` : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulledDegenerate : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulled : '-').padStart(8), String(q.minCellAreaMM2 == null ? '-' : q.minCellAreaMM2.toFixed(3)).padStart(8), String(q.tileRatio == null ? '-' : q.tileRatio).padStart(6), '  ' + verdict);
 }
 if (process.env.GQ_JSON) fs.writeFileSync(process.env.GQ_JSON, JSON.stringify(rows, null, 1));
 
@@ -802,6 +831,6 @@ if (openIssues.length) {
   if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
 }
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm  minCellArea>${T.minCellAreaMM2}mm2 (#74)`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm holeEscapes=0 minCellArea>${T.minCellAreaMM2}mm2 (#74)`);
 await browser.close(); server.close();
 process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));
