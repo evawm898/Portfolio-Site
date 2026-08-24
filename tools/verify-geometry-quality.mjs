@@ -436,7 +436,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -556,6 +556,43 @@ window.__gq = async function() {
         const u = ((c.x-a.x)*r2 - (c.y-a.y)*r1) / den;
         return t > 1e-9 && t < 1-1e-9 && u > 1e-9 && u < 1-1e-9;
       };
+      // ISOPERIMETRIC CENSUS — one measure for both symptoms. Q = 4*pi*A / P^2: 1 for a
+      // circle, ~0.78 for a square, and it collapses toward 0 as a cell grows a spike,
+      // because the spike adds perimeter and no area. Measured here for every cell, split
+      // by whether the cell's hole escapes, so the threshold is chosen from the gap
+      // between the two populations rather than picked.
+      //
+      // MEASURED, and the gap is real but THIN at the extremes:
+      //   config          escapes   Q max ESCAPING   Q min LEGITIMATE
+      //   rounded            1          0.129            0.702
+      //   pointed            1          0.116            0.638
+      //   strap              2          0.007            0.616
+      //   clawed             1          0.083            0.356
+      //   lobed              3          0.327            0.603
+      //   chrysanthemum      4          0.015            0.612
+      //   preset:poppy       1          0.178            0.744
+      //
+      // Within any one config the two populations are separated by at least 1.8x. ACROSS
+      // configs the window is narrow: the worst escaping cell (lobed, 0.327) and the worst
+      // legitimate cell (clawed, 0.356) are 9% apart, so a single global threshold has to
+      // land in that 0.327-0.356 band. That is enough to separate everything measured and
+      // not enough to be comfortable, so the census ships REPORTED and the threshold is
+      // not yet chosen. Recorded here rather than resolved by picking a round number.
+      const isoQ = (poly) => { const A = Math.abs(__gqPolyArea(poly));
+        let per = 0; for (let i = 0; i < poly.length; i++) { const u = poly[i], v = poly[(i+1)%poly.length];
+          per += Math.hypot(v.x-u.x, v.y-u.y); }
+        return per > 1e-12 ? (4 * Math.PI * A) / (per * per) : 0; };
+      const qEsc = [], qOk = [];
+      for (const slab of (vor.slabs || [])) {
+        let bad = 0;
+        if (slab.inner && slab.inner.length === slab.outer.length)
+          for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+        (bad ? qEsc : qOk).push(isoQ(slab.outer));
+      }
+      qEsc.sort((a,b)=>a-b); qOk.sort((a,b)=>a-b);
+      isoEscMax = qEsc.length ? +qEsc[qEsc.length-1].toFixed(5) : null;
+      isoOkMin  = qOk.length  ? +qOk[0].toFixed(5) : null;
+      isoOkP05  = qOk.length  ? +qOk[Math.floor(qOk.length*0.05)].toFixed(5) : null;
       let siCells = 0, siPairs = 0;
       for (const slab of (vor.slabs || [])) {
         const R = slab.outer, n = R.length; let hit = 0;
@@ -658,7 +695,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05 };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
