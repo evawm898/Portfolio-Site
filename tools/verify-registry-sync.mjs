@@ -186,6 +186,33 @@ for (const c of CONTROLS) {
   }
 }
 
+// ---- the declarations must actually be WIRED -------------------------------------
+// A predicate is two properties, and until this check only one of them was gated: the
+// declaration can be correct AND the app can fail to react to it. `predicateDrivers` was
+// imported into flower.js and never called for the whole life of the predicates — every
+// one of them worked by coincidence, because each happened to name a driver that was
+// already hand-wired for some other reason. The first predicate to name an unwired driver
+// (clawLength) silently did nothing, and every gate stayed green: verify-tier-visibility
+// snapshots a config and evaluates predicates, so it never goes through the UI and never
+// exercises a listener.
+//
+// SCOPE, STATED PLAINLY: this is a TRIPWIRE for that exact regression — the import going
+// unused again — not proof of the general property. Listeners are derived from
+// predicateDrivers(), so "every driver is wired" holds BY CONSTRUCTION while that call is
+// there, and this asserts the call is there. It would not catch someone replacing the
+// derived loop with a hand-written list that calls predicateDrivers elsewhere. The real
+// property — every driver, driven through the UI, updates the DOM without a reload —
+// needs a runtime gate: issue #70.
+{
+  const JS = readFileSync(REPO + 'flower.js', 'utf8');
+  const uses = (JS.match(/predicateDrivers\s*\(/g) || []).length;
+  if (uses < 1) {
+    err('flower.js imports predicateDrivers but never CALLS it — the driver listeners are not derived from '
+      + 'the declarations, so a predicate naming a driver nothing listens to will silently never fire. '
+      + 'This is the failure that made every predicate work by coincidence until one did not.');
+  }
+}
+
 // ---- THIRD list: the petal-shape picker ------------------------------------------
 // The registry and the markup are checked against each other above, but the shape
 // picker has a third list that neither of them sees: PICKER_SHAPE_NAMES in

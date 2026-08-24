@@ -3553,6 +3553,31 @@ function applyVisibility() {
   if (fellBack) scheduleRegen();
 }
 
+// EVERY control a predicate reads gets a listener that re-runs the pass — DERIVED from the
+// declarations, not hand-written. The registry has claimed this since the predicates landed
+// ("Derived, so adding a predicate never means remembering to add a listener"), and
+// `predicateDrivers` was imported here to do it and then never called: the drivers were
+// wired one at a time (petalCount, bilPerSide, layerCount, and each select's own handler).
+// That is fine until a predicate names a driver nobody remembered, which is exactly what
+// happened the first time one did — clawLength moved and the controls it gates did not
+// re-evaluate. Caught by the two matrix rows added for these predicates, which is what a
+// both-polarities row is for.
+//
+// Both events: `input` for a slider dragging, `change` for a select or checkbox. Selects that
+// already call applyVisibility() from their own handler now call it twice per change, which
+// is a no-op — the pass recomputes every control from scratch and holds no state.
+const PREDICATE_DRIVERS = new Set();
+for (const c of WIRED) {
+  predicateDrivers(c.visibleWhen, PREDICATE_DRIVERS);
+  predicateDrivers(c.standardVisibleWhen, PREDICATE_DRIVERS);
+}
+for (const id of PREDICATE_DRIVERS) {
+  const el = inputs[id];
+  if (!el) continue;      // a predicate naming a control that is not in the panel is a bug, but not this line's to report
+  el.addEventListener('input', applyVisibility);
+  el.addEventListener('change', applyVisibility);
+}
+
 // Hints / notes / per-petal headings: non-control elements whose visibility follows the
 // same conditions. Each attribute's predicate is written once, here, in terms of the SAME
 // registry vocabulary — an element's attribute value is the `oneOf` list.
@@ -3606,6 +3631,12 @@ function applyShape(name) {
   for (const id of SHAPE_PARAMS) inputs[id].value = b[id];
   refreshLabels();
   detectShape();
+  // The bundle is written by assigning .value, which fires no events — so the derived
+  // driver listeners never see it. Two of these params (clawLength, cleftDepth) gate the
+  // rest of the shape family, so without this line picking CLAWED sets a claw the visitor
+  // cannot then adjust: exactly the "choose the shape, cannot tune it" failure the gating
+  // exists to remove, reintroduced at the macro. A silent write needs an explicit pass.
+  applyVisibility();
   scheduleRegen();
 }
 // Show the shape whose bundle the params exactly match, else CUSTOM.
@@ -3686,8 +3717,9 @@ function updateBloomOptions() { applyVisibility(); }
 // for as long as nothing could check it. The condition is now declared (`visibleWhen`) and
 // the flag is deleted. The low-count hint moved to applyAnnotationVisibility().
 inputs.divergenceMode.addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
-// keep the low-petal-count hint in sync as the petal slider moves
-inputs.petalCount.addEventListener('input', applyVisibility);
+// (petalCount's own applyVisibility listener used to live here; it is now covered by the
+// derived PREDICATE_DRIVERS wiring above, which reaches every driver rather than the three
+// somebody remembered.)
 // The per-petal edge dropdowns (bilateral only) show one per petal position, up to
 // the current PETALS PER SIDE — so they appear/disappear as that slider moves.
 function updateBilateralPetals() { applyVisibility(); }

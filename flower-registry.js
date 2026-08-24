@@ -62,6 +62,44 @@
    predicate holds.
    =================================================================== */
 
+/* THE SHAPE FAMILY — an effect-precondition, gated on the enabling PARAMETER, never on the
+   petal-shape picker.
+
+   `clawWidth` and `shoulder` do nothing at all while `clawLength` is 0: flower-geometry.js
+   guards the whole claw block with `if (clawLen > 0)`, and both measure a delta of exactly
+   0.000e+0 across their full ranges with the claw off. Same for `cleftLobes` / `cleftWidth`
+   while `cleftDepth` is 0 — `cleftConfig()` returns null at depth <= 1e-4, so neither is
+   read. They are hidden exactly when the geometry proves them inert.
+
+   WHY NOT GATE ON `petalShape`, which is the obvious reading of "you have to pick CLAWED
+   first": two reasons, and the second is the one that matters. (1) `petalShape` is `uiOnly`,
+   so it is absent from readUI() and a predicate cannot even read it. (2) Fixing that creates
+   a control that disappears while you use it: `petalShape` is a MACRO over SHAPE_PARAMS, and
+   detectShape() drops the picker to CUSTOM on the first `input` of any of them. Drag the very
+   slider the shape revealed and the picker leaves that shape, the predicate goes false, and
+   the slider vanishes under the cursor. A visibility condition that holds only until you use
+   the thing it reveals is not a condition. Gating on the parameter gives the same visitor
+   experience — the picker WRITES cleftDepth 0.55 for LOBED, so choosing LOBED still reveals
+   the lobe sliders — without the trap, and it keeps a clawed POINTED petal reachable in
+   Advanced instead of making the picker a mode.
+
+   `min: 0.01` is the SLIDER STEP, deliberately not the geometry's own epsilon (1e-4 for the
+   cleft, > 0 for the claw). Duplicating 1e-4 into this file would re-introduce exactly the
+   two-copies-of-one-boundary drift this registry exists to remove.
+
+   The divergence that trade was expected to buy turns out not to exist, which is worth
+   recording because the reasoning is not obvious: a design carrying a SUB-STEP value was
+   supposed to be able to reach "geometry active, dependents hidden". It cannot. These are
+   `<input type="range" step="0.01">`, so a loaded value snaps to the nearest step before
+   anything reads it — measured through the real ?d= load route, cleftDepth 0.005 arrives as
+   0.01 and clawLength 0.004 arrives as 0. Geometry reads the same snapped input (readUI ->
+   parseFloat(el.value)), so the predicate and the geometry cannot disagree about a value
+   neither of them can see. The 1e-4 boundary is unreachable from the UI in either direction.
+
+   (Aside, pre-existing and not this change's to fix: that snap silently rewrites a sub-step
+   saved value on load, for every slider, not just these.)
+*/
+
 // Named predicates: a condition used by more than one control is defined ONCE here and
 // referenced, never restated. `hasReceptacle` had four hand-written copies across flower.js
 // before the drift-collapse pass and is the reason this indirection exists.
@@ -155,11 +193,11 @@ export const CONTROLS = [
   {"id":"width","section":"acc-form","kind":"slider","min":0.1,"max":1.5,"step":0.01,"default":0.9,"label":"Petal width","fmt":"f2","visibleWhen":{"not":{"id":"bloomType","oneOf":["bilateral"]}}},
   {"id":"taper","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.35,"label":"Taper","fmt":"f2"},
   {"id":"clawLength","section":"acc-form","kind":"slider","min":0,"max":0.5,"step":0.01,"default":0,"label":"Claw length","fmt":"f2"},
-  {"id":"clawWidth","section":"acc-form","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.3,"label":"Claw width","fmt":"f2"},
-  {"id":"shoulder","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Shoulder","fmt":"f2"},
+  {"id":"clawWidth","section":"acc-form","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.3,"label":"Claw width","fmt":"f2","visibleWhen":{"id":"clawLength","min":0.01}},
+  {"id":"shoulder","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Shoulder","fmt":"f2","visibleWhen":{"id":"clawLength","min":0.01}},
   {"id":"cleftDepth","section":"acc-form","kind":"slider","min":0,"max":0.6,"step":0.01,"default":0,"label":"Cleft depth","fmt":"f2"},
-  {"id":"cleftLobes","section":"acc-form","kind":"slider","min":2,"max":7,"step":1,"default":2,"label":"Lobe count","fmt":"int"},
-  {"id":"cleftWidth","section":"acc-form","kind":"slider","min":0.05,"max":1,"step":0.01,"default":0.3,"label":"Cleft width","fmt":"f2"},
+  {"id":"cleftLobes","section":"acc-form","kind":"slider","min":2,"max":7,"step":1,"default":2,"label":"Lobe count","fmt":"int","visibleWhen":{"id":"cleftDepth","min":0.01}},
+  {"id":"cleftWidth","section":"acc-form","kind":"slider","min":0.05,"max":1,"step":0.01,"default":0.3,"label":"Cleft width","fmt":"f2","visibleWhen":{"id":"cleftDepth","min":0.01}},
   {"id":"curlAmount","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0.4,"label":"Spine curl","fmt":"signed2","visibleWhen":{"not":{"id":"bloomType","oneOf":["bilateral"]}}},
   {"id":"curlBias","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Curl bias","fmt":"f2"},
   {"id":"curlStart","section":"acc-form","kind":"slider","min":0,"max":0.95,"step":0.01,"default":0,"label":"Curl start","fmt":"f2"},
