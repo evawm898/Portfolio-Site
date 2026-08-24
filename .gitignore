@@ -21,6 +21,7 @@ audit-out/
 /sweep-standard-defaults.json
 /corrections.json
 /dual-regime.json
+/merged-primary.json
 
 # package.json is committed so Netlify installs the Function's @netlify/blobs
 # dependency at deploy time. Local dev deps (three, playwright-core) live in the
