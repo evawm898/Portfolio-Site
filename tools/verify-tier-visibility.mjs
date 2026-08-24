@@ -2,7 +2,8 @@
  * verify-tier-visibility.mjs — Standard/Advanced tier gate for the Flower Bloom
  * control panel.
  *
- * WHY: flower.js's applyTier() hides every non-`tier:"standard"` control while
+ * WHY (historical — applyTier() has since become applyVisibility(), one registry-driven
+ * pass): applyTier() hid every non-`tier:"standard"` control while
  * Standard mode is active. That direction was already covered by earlier ("P2 tier")
  * work — a Standard visitor never sees an Advanced-only control. Nobody checked the
  * OTHER direction: does switching TO Advanced actually reveal everything it should?
@@ -14,7 +15,9 @@
  * hide, and stayed stuck hidden in Advanced forever. Confirmed for 25 controls
  * (curlBias, petalCup, crossSection, layerCount, continuousMargin, curlGradient,
  * sizeGradient, curlStart, and 17 more) before the fix in this file's companion change
- * to applyTier().
+ * to applyTier(). That ordering hazard is gone — applyVisibility() recomputes every
+ * control from its declaration on every change, so no state depends on which sweep ran
+ * first — but the assertion is kept because the property it protects has not changed.
  *
  * WHAT IT MEASURES (and what it would miss): this is a DOM-visibility check, not a
  * geometry check — it proves a control is reachable in the UI, not that its value does
@@ -24,9 +27,18 @@
  * the slider isn't there" should fail CI, not just get reported by a confused user.
  *
  * ASSERTION: in Advanced mode, at the DEFAULT config, every WIRED control that carries
- * no contextual gating attribute (registry `gating`), is not `permanentHidden`
- * (migration-only/dev), and is not `imperativeGate` (shown/hidden by bespoke JS, not a
- * data-* sweep — e.g. captureDist) must be visible (`.fl-ctrl` wrapper `hidden===false`).
+ * no visibility predicate at all (registry `visibleWhen`) must be visible (`.fl-ctrl`
+ * wrapper `hidden===false`). The three separate carve-outs this used to name — `gating`,
+ * `permanentHidden`, `imperativeGate` — have collapsed into that one field, because all
+ * three were ways of saying "something conditions this control" and only one of them ever
+ * said what the condition was.
+ *
+ * SCOPE, STATED PLAINLY BECAUSE IT IS THE POINT: this checks 25 of 166 controls, in ONE of
+ * two modes. `c.tier !== 'standard'` makes tier a FILTER on what gets examined, so no
+ * Standard-tier control is ever checked in Standard mode — which is how edgeNoise can be
+ * invisible at the default state with this gate reporting PASS. PR 2 replaces this with an
+ * expectation derived from `visibleWhen` for every control in both modes; this revision only
+ * carries the existing assertion across the field rename.
  * Controls WITH a gating attribute are left to their own sweep — whether they're
  * currently shown or hidden at the default config is a contextual decision this gate
  * doesn't second-guess (that's the OTHER, already-covered direction: Standard doesn't
@@ -60,7 +72,7 @@ const WIRED = PANEL.filter((c) => !c.uiOnly);
 // The exact three carve-outs applyTier()'s Advanced-reveal loop excludes (see that
 // function's comment) — mirrored here as a STRUCTURAL fact read off the registry, not
 // a re-derivation of any gating predicate.
-const shouldBeVisibleInAdvanced = (c) => c.tier !== 'standard' && !c.gating && !c.permanentHidden && !c.imperativeGate;
+const shouldBeVisibleInAdvanced = (c) => c.tier !== 'standard' && !c.visibleWhen;
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
@@ -82,7 +94,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 
 // Serve the CDN three import from the local npm package (offline + pinned) — flower.js's
 // module-level `import * as THREE` must succeed or NONE of its boot code (including
-// applyTier()) ever runs, which would make this gate pass for the wrong reason.
+// applyVisibility()) ever runs, which would make this gate pass for the wrong reason.
 await page.route('**cdn.jsdelivr.net/**', (route) => {
   const rel = new URL(route.request().url()).pathname.replace(`/npm/three@${THREE_VERSION}/`, '');
   const fp = path.join(ROOT, 'node_modules/three', rel);
@@ -100,7 +112,7 @@ if (pageErrors.length) {
 }
 
 // Flip Advanced on, exactly the way a visitor does — the checkbox's own 'change'
-// listener drives every gating sweep, not an injected hook.
+// listener drives the visibility pass, not an injected hook.
 const hasToggle = await page.evaluate(() => !!document.getElementById('advancedToggle'));
 if (!hasToggle) {
   console.error('tier-visibility: FAIL — #advancedToggle not found in flower.html');
@@ -129,7 +141,7 @@ for (const c of WIRED) {
   if (!shouldBeVisibleInAdvanced(c)) continue;
   const r = byId.get(c.id);
   if (!r || !r.present) { failures.push(`${c.id}: missing from DOM`); continue; }
-  if (r.hidden !== false) failures.push(`${c.id} ("${c.label}"): still hidden in Advanced (no gating/permanentHidden/imperativeGate to explain it)`);
+  if (r.hidden !== false) failures.push(`${c.id} ("${c.label}"): still hidden in Advanced (no visibleWhen predicate to explain it)`);
 }
 
 // ---- OPTION-LEVEL TIER, BOTH DIRECTIONS ------------------------------------------

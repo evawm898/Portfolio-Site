@@ -105,12 +105,12 @@
           <span class="fl-ctrl__hint" data-bloom-styles="bilateral">symmetric fan across one axis</span>
         </div>
 
-        <div class="fl-ctrl" data-bloom-styles="bilateral">
+        <div class="fl-ctrl">
           <button id="bilTopView" class="fl-btn fl-btn--wide" type="button">Auto-center (top-down)</button>
           <span class="fl-ctrl__hint">frame the fan from straight above</span>
         </div>
 
-        <div class="fl-ctrl" data-bloom-styles="coiled radial">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="petalCount">Number of petals</label>
             <span class="fl-ctrl__val" data-value="petalCount"></span>
@@ -120,7 +120,7 @@
           <span class="fl-ctrl__hint" data-bloom-styles="radial">petals evenly spaced around the ring</span>
         </div>
 
-        <div class="fl-ctrl" data-bloom-styles="coiled">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="divergenceMode">Divergence angle</label>
           </div>
@@ -133,7 +133,7 @@
           <span class="fl-ctrl__hint" id="divLowCountHint" hidden>below 8 petals the spiral looks irregular &mdash; try even</span>
         </div>
 
-        <div class="fl-ctrl" id="divergenceAngleCtrl" hidden>
+        <div class="fl-ctrl" id="divergenceAngleCtrl">
           <div class="fl-ctrl__row">
             <label for="divergenceAngle">Custom angle</label>
             <span class="fl-ctrl__val" data-value="divergenceAngle"></span>
@@ -142,7 +142,7 @@
           <span class="fl-ctrl__hint">degrees between successive petals</span>
         </div>
 
-        <div class="fl-ctrl" data-bloom-styles="bilateral">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="bilPerSide">Petals per side</label>
             <span class="fl-ctrl__val" data-value="bilPerSide"></span>
@@ -151,7 +151,7 @@
           <span class="fl-ctrl__hint">petals on each side of the mirror line</span>
         </div>
 
-        <div class="fl-ctrl" data-bloom-styles="bilateral">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="bilSpacing">Petal spacing</label>
             <span class="fl-ctrl__val" data-value="bilSpacing"></span>
@@ -160,14 +160,14 @@
           <span class="fl-ctrl__hint">angle between neighbouring petals</span>
         </div>
 
-        <div class="fl-ctrl fl-ctrl--toggle" data-bloom-styles="bilateral">
+        <div class="fl-ctrl fl-ctrl--toggle">
           <label for="bilCenterPetal">Petal on mirror line</label>
           <input type="checkbox" id="bilCenterPetal">
         </div>
         <p class="fl-tip-note" data-bloom-styles="bilateral">On: a centre petal is bisected by the mirror line. Off: the mirror runs through the gap between the two inner petals.</p>
 
         <p class="fl-bil-head" data-bil-petal="1">Petal 1 &mdash; inner</p>
-        <div class="fl-ctrl" data-bil-petal="1">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdge1">Edge</label></div>
           <select class="fl-select" id="bilEdge1">
             <option value="default">DEFAULT (GLOBAL TIP)</option>
@@ -177,29 +177,29 @@
           </select>
           <span class="fl-ctrl__hint">applies to the centre petal too, if on</span>
         </div>
-        <div class="fl-ctrl" data-bil-petal="1">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilScale1">Scale</label><span class="fl-ctrl__val" data-value="bilScale1"></span></div>
           <input type="range" id="bilScale1" min="0.3" max="2" step="0.05" value="1">
         </div>
-        <div class="fl-ctrl" data-bil-petal="1">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilWidth1">Width</label><span class="fl-ctrl__val" data-value="bilWidth1"></span></div>
           <input type="range" id="bilWidth1" min="0.45" max="1.5" step="0.01" value="0.9">
         </div>
-        <div class="fl-ctrl" data-bil-petal="1">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilCurlAmount1">Spine curl</label><span class="fl-ctrl__val" data-value="bilCurlAmount1"></span></div>
           <input type="range" id="bilCurlAmount1" min="-1" max="1" step="0.01" value="0.4">
         </div>
-        <div class="fl-ctrl" data-bil-petal="1">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdgeCurve1">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve1"></span></div>
           <input type="range" id="bilEdgeCurve1" min="-1" max="1" step="0.01" value="0">
         </div>
-        <div class="fl-ctrl" data-bil-petal="1">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdgeProfile1">Edge curve &mdash; profile</label><span class="fl-ctrl__val" data-value="bilEdgeProfile1"></span></div>
           <input type="range" id="bilEdgeProfile1" min="-1" max="1" step="0.01" value="0">
         </div>
 
         <p class="fl-bil-head" data-bil-petal="2">Petal 2</p>
-        <div class="fl-ctrl" data-bil-petal="2">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdge2">Edge</label></div>
           <select class="fl-select" id="bilEdge2">
             <option value="default">DEFAULT (GLOBAL TIP)</option>
@@ -208,29 +208,29 @@
             <option value="ruffled">RUFFLED</option>
           </select>
         </div>
-        <div class="fl-ctrl" data-bil-petal="2">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilScale2">Scale</label><span class="fl-ctrl__val" data-value="bilScale2"></span></div>
           <input type="range" id="bilScale2" min="0.3" max="2" step="0.05" value="1">
         </div>
-        <div class="fl-ctrl" data-bil-petal="2">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilWidth2">Width</label><span class="fl-ctrl__val" data-value="bilWidth2"></span></div>
           <input type="range" id="bilWidth2" min="0.45" max="1.5" step="0.01" value="0.9">
         </div>
-        <div class="fl-ctrl" data-bil-petal="2">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilCurlAmount2">Spine curl</label><span class="fl-ctrl__val" data-value="bilCurlAmount2"></span></div>
           <input type="range" id="bilCurlAmount2" min="-1" max="1" step="0.01" value="0.4">
         </div>
-        <div class="fl-ctrl" data-bil-petal="2">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdgeCurve2">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve2"></span></div>
           <input type="range" id="bilEdgeCurve2" min="-1" max="1" step="0.01" value="0">
         </div>
-        <div class="fl-ctrl" data-bil-petal="2">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdgeProfile2">Edge curve &mdash; profile</label><span class="fl-ctrl__val" data-value="bilEdgeProfile2"></span></div>
           <input type="range" id="bilEdgeProfile2" min="-1" max="1" step="0.01" value="0">
         </div>
 
         <p class="fl-bil-head" data-bil-petal="3">Petal 3 &mdash; outer</p>
-        <div class="fl-ctrl" data-bil-petal="3">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdge3">Edge</label></div>
           <select class="fl-select" id="bilEdge3">
             <option value="default">DEFAULT (GLOBAL TIP)</option>
@@ -239,23 +239,23 @@
             <option value="ruffled">RUFFLED</option>
           </select>
         </div>
-        <div class="fl-ctrl" data-bil-petal="3">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilScale3">Scale</label><span class="fl-ctrl__val" data-value="bilScale3"></span></div>
           <input type="range" id="bilScale3" min="0.3" max="2" step="0.05" value="1">
         </div>
-        <div class="fl-ctrl" data-bil-petal="3">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilWidth3">Width</label><span class="fl-ctrl__val" data-value="bilWidth3"></span></div>
           <input type="range" id="bilWidth3" min="0.45" max="1.5" step="0.01" value="0.9">
         </div>
-        <div class="fl-ctrl" data-bil-petal="3">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilCurlAmount3">Spine curl</label><span class="fl-ctrl__val" data-value="bilCurlAmount3"></span></div>
           <input type="range" id="bilCurlAmount3" min="-1" max="1" step="0.01" value="0.4">
         </div>
-        <div class="fl-ctrl" data-bil-petal="3">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdgeCurve3">Edge curve &mdash; top-down</label><span class="fl-ctrl__val" data-value="bilEdgeCurve3"></span></div>
           <input type="range" id="bilEdgeCurve3" min="-1" max="1" step="0.01" value="0">
         </div>
-        <div class="fl-ctrl" data-bil-petal="3">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row"><label for="bilEdgeProfile3">Edge curve &mdash; profile</label><span class="fl-ctrl__val" data-value="bilEdgeProfile3"></span></div>
           <input type="range" id="bilEdgeProfile3" min="-1" max="1" step="0.01" value="0">
         </div>
@@ -269,7 +269,7 @@
           <span class="fl-ctrl__hint">closed bud &rarr; fully open</span>
         </div>
 
-        <div class="fl-ctrl" data-bloom-styles="coiled">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="tightness">Petal spacing</label>
             <span class="fl-ctrl__val" data-value="tightness"></span>
@@ -329,7 +329,7 @@
           <span class="fl-ctrl__hint">a named silhouette — the petal controls below fine-tune it (Advanced), which reads back as CUSTOM</span>
         </div>
 
-        <div class="fl-ctrl" data-hide-bilateral>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="width">Petal width</label>
             <span class="fl-ctrl__val" data-value="width"></span>
@@ -401,7 +401,7 @@
           <span class="fl-ctrl__hint">narrow slit &rarr; wide notch between lobes</span>
         </div>
 
-        <div class="fl-ctrl" data-hide-bilateral>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="curlAmount">Spine curl</label>
             <span class="fl-ctrl__val" data-value="curlAmount"></span>
@@ -428,7 +428,7 @@
           <span class="fl-ctrl__hint">0 = whole petal curls &rarr; higher = only the outer portion</span>
         </div>
 
-        <div class="fl-ctrl" data-hide-bilateral>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="edgeCurve">Edge curve &mdash; top-down</label>
             <span class="fl-ctrl__val" data-value="edgeCurve"></span>
@@ -437,7 +437,7 @@
           <span class="fl-ctrl__hint">pinched &rarr; billowed (plan view)</span>
         </div>
 
-        <div class="fl-ctrl" data-hide-bilateral>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="edgeProfile">Edge curve &mdash; profile</label>
             <span class="fl-ctrl__val" data-value="edgeProfile"></span>
@@ -563,7 +563,7 @@
           <span class="fl-ctrl__hint">concentric petal whorls (1 = single ring, unchanged)</span>
         </div>
 
-        <div class="fl-ctrl" data-layers-multi>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="petalsPerLayer">Petals per layer</label>
           </div>
@@ -571,7 +571,7 @@
           <span class="fl-ctrl__hint">comma list, outer&rarr;inner (e.g. 8,12,16); blank slots use the Bloom petal count</span>
         </div>
 
-        <div class="fl-ctrl" data-layers-multi>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="layerSizeFalloff">Layer size falloff</label>
             <span class="fl-ctrl__val" data-value="layerSizeFalloff"></span>
@@ -580,7 +580,7 @@
           <span class="fl-ctrl__hint">each inner layer's size, as a fraction of the one outside it (1 = uniform)</span>
         </div>
 
-        <div class="fl-ctrl" data-layers-multi>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="layerHeightOffset">Layer height offset</label>
             <span class="fl-ctrl__val" data-value="layerHeightOffset"></span>
@@ -589,7 +589,7 @@
           <span class="fl-ctrl__hint">vertical stacking distance between layers (+ raises the inner layers)</span>
         </div>
 
-        <div class="fl-ctrl" data-layers-multi>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="layerRotationOffset">Layer rotation offset</label>
             <span class="fl-ctrl__val" data-value="layerRotationOffset"></span>
@@ -598,7 +598,7 @@
           <span class="fl-ctrl__hint">angular stagger per layer, so inner petals fall in the outer gaps</span>
         </div>
 
-        <div class="fl-ctrl" data-layers-multi>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="layerBloomAngleDelta">Layer bloom angle delta</label>
             <span class="fl-ctrl__val" data-value="layerBloomAngleDelta"></span>
@@ -631,7 +631,7 @@
           </select>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spaceMode">Network</label>
           </div>
@@ -642,7 +642,7 @@
           <span class="fl-ctrl__hint">open grows a pure branching tree &rarr; closed lets veins fuse into loops and areoles</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spacePattern">Seed pattern</label>
           </div>
@@ -654,7 +654,7 @@
           <span class="fl-ctrl__hint">how the attraction sources are placed &mdash; phyllotactic (golden angle) is the crispest, matching the coiled bloom</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spaceDensity">Source density</label>
             <span class="fl-ctrl__val" data-value="spaceDensity"></span>
@@ -663,7 +663,7 @@
           <span class="fl-ctrl__hint">few sources, open network &rarr; many sources, fine dense venation</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spaceBirth">Birth distance</label>
             <span class="fl-ctrl__val" data-value="spaceBirth"></span>
@@ -672,7 +672,7 @@
           <span class="fl-ctrl__hint">minimum spacing between sources &mdash; larger spreads them out, capping how dense it can get</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spaceKill">Kill distance</label>
             <span class="fl-ctrl__val" data-value="spaceKill"></span>
@@ -681,7 +681,7 @@
           <span class="fl-ctrl__hint">how close a vein must reach a source before it is consumed &mdash; larger ends branches sooner</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spaceStep">Growth step</label>
             <span class="fl-ctrl__val" data-value="spaceStep"></span>
@@ -690,7 +690,7 @@
           <span class="fl-ctrl__hint">how far a vein advances each step &mdash; smaller is smoother and finer but heavier</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spaceVariants">Network variants</label>
             <span class="fl-ctrl__val" data-value="spaceVariants"></span>
@@ -699,7 +699,7 @@
           <span class="fl-ctrl__hint">distinct networks cycled across the petals &mdash; 1 repeats one, more break up the repetition</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label>Seed</label>
             <span class="fl-ctrl__val" data-value="spaceSeed"></span>
@@ -709,7 +709,7 @@
           <span class="fl-ctrl__hint">the random seed, stored with the design &mdash; re-roll for a new network, saved designs keep theirs</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="density">Density</label>
             <span class="fl-ctrl__val" data-value="density"></span>
@@ -719,7 +719,7 @@
           <span class="fl-ctrl__hint" data-infill-styles="voronoi">few, large cells &rarr; many, small</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="softness">Vein detail</label>
             <span class="fl-ctrl__val" data-value="softness"></span>
@@ -729,7 +729,7 @@
           <span class="fl-ctrl__hint" data-infill-styles="voronoi">angular cells &rarr; rounded, organic &mdash; up to 5&times;</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="veinBranchStart">First branch</label>
             <span class="fl-ctrl__val" data-value="veinBranchStart"></span>
@@ -738,7 +738,7 @@
           <span class="fl-ctrl__hint">where the first branch sits up the midrib &mdash; lower = closer to the base</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="veins bone spacecol">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="edgeTermination">Edge termination</label>
           </div>
@@ -759,7 +759,7 @@
           <span class="fl-ctrl__hint">how close a tip must reach the margin before it is captured &mdash; as a fraction of blade width</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="voronoiLloyd">Cell relaxation</label>
             <span class="fl-ctrl__val" data-value="voronoiLloyd"></span>
@@ -768,7 +768,7 @@
           <span class="fl-ctrl__hint">0 leaves cells sliced by the outline &rarr; more evens them and settles outer cells against the margin</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="voronoiDensityLaw">Cell density law</label>
             <span class="fl-ctrl__val" data-value="voronoiDensityLaw"></span>
@@ -777,7 +777,7 @@
           <span class="fl-ctrl__hint">0 keeps cells one size (crowds the tip) &rarr; 1 shrinks them with the blade so the count across stays even</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="voronoiAniso">Anisotropy</label>
             <span class="fl-ctrl__val" data-value="voronoiAniso"></span>
@@ -786,7 +786,7 @@
           <span class="fl-ctrl__hint">1 round cells &rarr; higher stretches them along the petal so they flow like veins</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="voronoiWeight">Weight hierarchy</label>
             <span class="fl-ctrl__val" data-value="voronoiWeight"></span>
@@ -795,7 +795,7 @@
           <span class="fl-ctrl__hint">0 one uniform wall weight &rarr; 1 thick at the base and along spines, fine toward the tip</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="voronoiWeightFalloff">Weight falloff</label>
             <span class="fl-ctrl__val" data-value="voronoiWeightFalloff"></span>
@@ -804,7 +804,7 @@
           <span class="fl-ctrl__hint">how fast wall weight drops from base to tip &mdash; low is gradual, high stays thick then thins late</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="voronoi">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="voronoiSlabTaper">Slab taper</label>
             <span class="fl-ctrl__val" data-value="voronoiSlabTaper"></span>
@@ -813,7 +813,7 @@
           <span class="fl-ctrl__hint">0 even sheet depth &rarr; 1 deeper at the base and shallower at the tip, for bending stiffness where it matters</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="strands">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="strandCount">Strand count</label>
             <span class="fl-ctrl__val" data-value="strandCount"></span>
@@ -822,7 +822,7 @@
           <span class="fl-ctrl__hint">wide gaps &rarr; densely packed</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="strands">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="strandWidth">Strand width</label>
             <span class="fl-ctrl__val" data-value="strandWidth"></span>
@@ -831,7 +831,7 @@
           <span class="fl-ctrl__hint">thin strands, open voids &rarr; thick strands, narrow slits</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="strands">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="strandTaper">Strand taper</label>
             <span class="fl-ctrl__val" data-value="strandTaper"></span>
@@ -840,7 +840,7 @@
           <span class="fl-ctrl__hint">uniform width &rarr; fine point at the tip</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="strands">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="strandCurvature">Strand curvature</label>
             <span class="fl-ctrl__val" data-value="strandCurvature"></span>
@@ -849,7 +849,7 @@
           <span class="fl-ctrl__hint">straight radial &rarr; organic bow</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="strands">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="strandIrregularity">Irregularity</label>
             <span class="fl-ctrl__val" data-value="strandIrregularity"></span>
@@ -858,7 +858,7 @@
           <span class="fl-ctrl__hint">uniform widths &rarr; naturally varied</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="bone">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="boneCount">Bone count</label>
             <span class="fl-ctrl__val" data-value="boneCount"></span>
@@ -867,7 +867,7 @@
           <span class="fl-ctrl__hint">few ribs &rarr; dense rib cage</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="bone">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="boneWidth">Bone width</label>
             <span class="fl-ctrl__val" data-value="boneWidth"></span>
@@ -876,7 +876,7 @@
           <span class="fl-ctrl__hint">fine bones &rarr; heavy bones (up to 3&times;)</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="bone">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="boneCurve">Bone curve</label>
             <span class="fl-ctrl__val" data-value="boneCurve"></span>
@@ -885,7 +885,7 @@
           <span class="fl-ctrl__hint">swept to the base &larr; straight out &rarr; swept to the tip</span>
         </div>
 
-        <div class="fl-ctrl" data-infill-styles="bone">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="boneSpread">Bone spread</label>
             <span class="fl-ctrl__val" data-value="boneSpread"></span>
@@ -894,7 +894,7 @@
           <span class="fl-ctrl__hint">short ribs &rarr; reach the margin</span>
         </div>
 
-        <div class="fl-ctrl fl-ctrl--toggle" data-infill-styles="bone">
+        <div class="fl-ctrl fl-ctrl--toggle">
           <label for="boneOutline">Petal outline</label>
           <input type="checkbox" id="boneOutline" checked>
         </div>
@@ -946,7 +946,7 @@
           <span class="fl-ctrl__hint">sharpens a POINTED tip further, relative to how narrow the petal already is</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="jagged ruffled">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="tipFrequency">Tip frequency</label>
             <span class="fl-ctrl__val" data-value="tipFrequency"></span>
@@ -956,7 +956,7 @@
           <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle waves &mdash; fine control low, caps at the densest</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="jagged">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="tipRegion">Tip region</label>
             <span class="fl-ctrl__val" data-value="tipRegion"></span>
@@ -965,7 +965,7 @@
           <span class="fl-ctrl__hint" data-tip-styles="jagged">how far teeth reach from the apex down</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="jagged ruffled">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="tipLength">Tip length</label>
             <span class="fl-ctrl__val" data-value="tipLength"></span>
@@ -975,7 +975,7 @@
           <span class="fl-ctrl__hint" data-tip-styles="ruffled">ruffle depth &mdash; how far the edge folds in/out</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="jagged">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="tipIrregularity">Tip irregularity</label>
             <span class="fl-ctrl__val" data-value="tipIrregularity"></span>
@@ -984,7 +984,7 @@
           <span class="fl-ctrl__hint">regular &rarr; organic, varied</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="scallop">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="scallopCount">Scallop count</label>
             <span class="fl-ctrl__val" data-value="scallopCount"></span>
@@ -993,7 +993,7 @@
           <span class="fl-ctrl__hint">few, wide scallops &rarr; many, narrow</span>
         </div>
 
-        <div class="fl-ctrl" data-tip-styles="scallop">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="scallopHeight">Scallop height</label>
             <span class="fl-ctrl__val" data-value="scallopHeight"></span>
@@ -1052,7 +1052,7 @@
         </div>
 
         <!-- CLASSIC -->
-        <div class="fl-ctrl" data-center-arch="classic">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="centerType">Classic style</label>
           </div>
@@ -1066,7 +1066,7 @@
           <span class="fl-ctrl__hint" data-center-styles="none">bare centre &mdash; no stamens or pistil</span>
         </div>
 
-        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="centerCount">Amount</label>
             <span class="fl-ctrl__val" data-value="centerCount"></span>
@@ -1075,7 +1075,7 @@
           <span class="fl-ctrl__hint">number of filaments</span>
         </div>
 
-        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="centerLength">Length</label>
             <span class="fl-ctrl__val" data-value="centerLength"></span>
@@ -1084,7 +1084,7 @@
           <span class="fl-ctrl__hint">short &rarr; long</span>
         </div>
 
-        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="centerFilThick">Filament thickness</label>
             <span class="fl-ctrl__val" data-value="centerFilThick"></span>
@@ -1093,7 +1093,7 @@
           <span class="fl-ctrl__hint">thin &rarr; thick filament</span>
         </div>
 
-        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="centerTipSize">Tip size</label>
             <span class="fl-ctrl__val" data-value="centerTipSize"></span>
@@ -1102,7 +1102,7 @@
           <span class="fl-ctrl__hint">small &rarr; large anther / stigma</span>
         </div>
 
-        <div class="fl-ctrl" data-center-arch="classic" data-center-styles="stamens pistil">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="centerTipShape">Tip shape</label>
             <span class="fl-ctrl__val" data-value="centerTipShape"></span>
@@ -1112,7 +1112,7 @@
         </div>
 
         <!-- DENSE CLUSTER -->
-        <div class="fl-ctrl" data-center-arch="dense">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="denseStamenCount">Stamen count</label>
             <span class="fl-ctrl__val" data-value="denseStamenCount"></span>
@@ -1120,7 +1120,7 @@
           <input type="range" id="denseStamenCount" min="10" max="200" step="1" value="80">
           <span class="fl-ctrl__hint">many fine filaments packed densely</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="dense">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="denseStamenLength">Stamen length</label>
             <span class="fl-ctrl__val" data-value="denseStamenLength"></span>
@@ -1128,7 +1128,7 @@
           <input type="range" id="denseStamenLength" min="0" max="1" step="0.01" value="0.4">
           <span class="fl-ctrl__hint">short &rarr; long filaments</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="dense">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="carpelCount">Carpel count</label>
             <span class="fl-ctrl__val" data-value="carpelCount"></span>
@@ -1136,7 +1136,7 @@
           <input type="range" id="carpelCount" min="1" max="10" step="1" value="5">
           <span class="fl-ctrl__hint">central rounded carpels (few)</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="dense">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="carpelSize">Carpel size</label>
             <span class="fl-ctrl__val" data-value="carpelSize"></span>
@@ -1146,7 +1146,7 @@
         </div>
 
         <!-- DISC -->
-        <div class="fl-ctrl" data-center-arch="disc">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="discSize">Disc size</label>
             <span class="fl-ctrl__val" data-value="discSize"></span>
@@ -1154,7 +1154,7 @@
           <input type="range" id="discSize" min="0" max="1" step="0.01" value="0.5">
           <span class="fl-ctrl__hint">radius of the central dome</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="disc">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="discHeight">Disc height</label>
             <span class="fl-ctrl__val" data-value="discHeight"></span>
@@ -1162,7 +1162,7 @@
           <input type="range" id="discHeight" min="0" max="1" step="0.01" value="0.5">
           <span class="fl-ctrl__hint">flat &rarr; domed</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="disc">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="ringStamenCount">Ring stamen count</label>
             <span class="fl-ctrl__val" data-value="ringStamenCount"></span>
@@ -1170,7 +1170,7 @@
           <input type="range" id="ringStamenCount" min="0" max="150" step="1" value="40">
           <span class="fl-ctrl__hint">short stamens ringing the dome edge</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="disc">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="ringStamenLength">Ring stamen length</label>
             <span class="fl-ctrl__val" data-value="ringStamenLength"></span>
@@ -1180,7 +1180,7 @@
         </div>
 
         <!-- PETALOID FILL -->
-        <div class="fl-ctrl" data-center-arch="petaloid">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="fillPetalCount">Fill petal count</label>
             <span class="fl-ctrl__val" data-value="fillPetalCount"></span>
@@ -1188,7 +1188,7 @@
           <input type="range" id="fillPetalCount" min="12" max="200" step="1" value="60">
           <span class="fl-ctrl__hint">tiny petals packed into the centre</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="petaloid">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="fillOuterSize">Outer fill size</label>
             <span class="fl-ctrl__val" data-value="fillOuterSize"></span>
@@ -1196,7 +1196,7 @@
           <input type="range" id="fillOuterSize" min="0.05" max="0.5" step="0.01" value="0.22">
           <span class="fl-ctrl__hint">size at the outer edge (near the real petals)</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="petaloid">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="fillInnerSize">Inner fill size</label>
             <span class="fl-ctrl__val" data-value="fillInnerSize"></span>
@@ -1204,7 +1204,7 @@
           <input type="range" id="fillInnerSize" min="0.03" max="0.5" step="0.01" value="0.10">
           <span class="fl-ctrl__hint">size at the very centre &mdash; petals taper outer &rarr; inner</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="petaloid">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="fillDensity">Fill density</label>
             <span class="fl-ctrl__val" data-value="fillDensity"></span>
@@ -1212,7 +1212,7 @@
           <input type="range" id="fillDensity" min="0" max="1" step="0.01" value="0.6">
           <span class="fl-ctrl__hint">loosely spaced &rarr; fully overlapping</span>
         </div>
-        <div class="fl-ctrl" data-center-arch="petaloid">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="fillBloomAngle">Fill bloom angle</label>
             <span class="fl-ctrl__val" data-value="fillBloomAngle"></span>
@@ -1234,7 +1234,7 @@
           <span class="fl-ctrl__hint">the edge as two strands rooted at the foot, and the receptacle rebuilt as ONE implicit surface (SDF) those strands gather into &mdash; petal, receptacle and stem read as one continuous piece</span>
         </div>
 
-        <div class="fl-ctrl" data-cont-margin>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="bundleTightness">Bundle tightness</label>
             <span class="fl-ctrl__val" data-value="bundleTightness"></span>
@@ -1243,7 +1243,7 @@
           <span class="fl-ctrl__hint">how close the strands stay to the axis at the foot &mdash; a loose splay &rarr; a tight neck</span>
         </div>
 
-        <div class="fl-ctrl" data-cont-margin>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="flareRate">Flare rate</label>
             <span class="fl-ctrl__val" data-value="flareRate"></span>
@@ -1252,7 +1252,7 @@
           <span class="fl-ctrl__hint">how fast they open onto the edge as they rise &mdash; a slow spread &rarr; a quick flare</span>
         </div>
 
-        <div class="fl-ctrl" data-cont-margin>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="absorption">Absorption</label>
             <span class="fl-ctrl__val" data-value="absorption"></span>
@@ -1261,7 +1261,7 @@
           <span class="fl-ctrl__hint">how much the gathered strands melt into one mass &mdash; low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)</span>
         </div>
 
-        <div class="fl-ctrl" data-cont-margin>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="buttonSize">Neck swell</label>
             <span class="fl-ctrl__val" data-value="buttonSize"></span>
@@ -1271,7 +1271,7 @@
         </div>
 
 
-        <div class="fl-ctrl" data-cont-margin>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="gatherHeight">Gather height</label>
             <span class="fl-ctrl__val" data-value="gatherHeight"></span>
@@ -1295,7 +1295,7 @@
           <span class="fl-ctrl__hint">the junction node that joins the petal &amp; sepal feet, the center bundle and the stem into one printable body</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="receptProfile">Profile</label>
           </div>
@@ -1309,7 +1309,7 @@
           <span class="fl-ctrl__hint">the silhouette &mdash; flared trumpet, round dome, straight taper, waisted urn, or a subtle solid swell (with continuous margin on, this becomes a radius multiplier along the receptacle's height)</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="receptConstruction">Construction</label>
           </div>
@@ -1321,7 +1321,7 @@
           <span class="fl-ctrl__hint">how it is built &mdash; a continuous surface, open scrollwork ribs, or a solid core with ribs outside &mdash; for the legacy receptacle only; with continuous margin on this is superseded by ABSORPTION (solid&nbsp;&rarr;&nbsp;fused, cored&nbsp;&rarr;&nbsp;looser)</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="receptCollar">Collar</label>
           </div>
@@ -1333,7 +1333,7 @@
           <span class="fl-ctrl__hint">an optional ring where the node meets the stem &mdash; none, a raised band, or a stepped ferrule sleeve (with continuous margin on, added as a radius bump in the field)</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="receptReach">Reach</label>
             <span class="fl-ctrl__val" data-value="receptReach"></span>
@@ -1342,7 +1342,7 @@
           <span class="fl-ctrl__hint">feeds the junction the outer whorl only &rarr; the inner whorls' feet too (multi-layer blooms; no effect on a single layer)</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="blendSmoothness">Blend smoothness</label>
             <span class="fl-ctrl__val" data-value="blendSmoothness"></span>
@@ -1351,7 +1351,7 @@
           <span class="fl-ctrl__hint">hugs each base tightly &rarr; flows smoothly between them</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="receptacleDepth">Receptacle depth</label>
             <span class="fl-ctrl__val" data-value="receptacleDepth"></span>
@@ -1360,7 +1360,7 @@
           <span class="fl-ctrl__hint">how far the surface descends before the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-recept>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="convergenceTightness">Convergence tightness</label>
             <span class="fl-ctrl__val" data-value="convergenceTightness"></span>
@@ -1369,7 +1369,7 @@
           <span class="fl-ctrl__hint">how sharply it narrows into the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-open>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="receptSolidity">Solidity</label>
             <span class="fl-ctrl__val" data-value="receptSolidity"></span>
@@ -1378,7 +1378,7 @@
           <span class="fl-ctrl__hint">open and airy between the ribs &rarr; filled in toward a solid surface</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-ribbed>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="ribMultiplier">Rib multiplier</label>
             <span class="fl-ctrl__val" data-value="ribMultiplier"></span>
@@ -1387,7 +1387,7 @@
           <span class="fl-ctrl__hint">ribs per foot &mdash; one each &rarr; several bundled together</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-ribbed>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spiralTightness">Rib tightness</label>
             <span class="fl-ctrl__val" data-value="spiralTightness"></span>
@@ -1396,7 +1396,7 @@
           <span class="fl-ctrl__hint">diagonal scroll &rarr; tight coil (rotations down to the stem)</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-ribbed>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="spiralThickness">Rib thickness</label>
             <span class="fl-ctrl__val" data-value="spiralThickness"></span>
@@ -1405,7 +1405,7 @@
           <span class="fl-ctrl__hint">rib thickness of the scrollwork</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-dome>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="bulbSize">Bulb size</label>
             <span class="fl-ctrl__val" data-value="bulbSize"></span>
@@ -1414,7 +1414,7 @@
           <span class="fl-ctrl__hint">how far the bead swells beyond the stem</span>
         </div>
 
-        <div class="fl-ctrl" data-recept-dome>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="bulbHeight">Bulb height</label>
             <span class="fl-ctrl__val" data-value="bulbHeight"></span>
@@ -1434,7 +1434,7 @@
           <span class="fl-ctrl__hint">a ring of small leaves cupping the base, matching the petals</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalSize">Sepal size</label>
             <span class="fl-ctrl__val" data-value="sepalSize"></span>
@@ -1443,7 +1443,7 @@
           <span class="fl-ctrl__hint">small &rarr; large</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalCount">Sepal count</label>
             <span class="fl-ctrl__val" data-value="sepalCount"></span>
@@ -1452,7 +1452,7 @@
           <span class="fl-ctrl__hint">number of sepals in the whorl</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalStyle">Sepal style</label>
           </div>
@@ -1463,7 +1463,7 @@
           <span class="fl-ctrl__hint">narrow modified leaf &rarr; solid soft-edged leaves</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalCenterCurve">Sepal center curve</label>
             <span class="fl-ctrl__val" data-value="sepalCenterCurve"></span>
@@ -1472,7 +1472,7 @@
           <span class="fl-ctrl__hint">reflex down &rarr; arc up (spine)</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalEdgeCurve">Sepal edge curve &mdash; top-down</label>
             <span class="fl-ctrl__val" data-value="sepalEdgeCurve"></span>
@@ -1481,7 +1481,7 @@
           <span class="fl-ctrl__hint">pinched &rarr; billowed (plan view)</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalEdgeProfile">Sepal edge curve &mdash; profile</label>
             <span class="fl-ctrl__val" data-value="sepalEdgeProfile"></span>
@@ -1494,7 +1494,7 @@
              sepals can carry serrated edges on their own (only the serration sub-
              controls show once SERRATED is picked). Solid sepals use the blade path,
              which ignores the tip style, exactly like solid petals. -->
-        <div class="fl-ctrl" data-sepal>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalTipStyle">Sepal tip style</label>
           </div>
@@ -1505,7 +1505,7 @@
           <span class="fl-ctrl__hint">smooth edge &rarr; serrated teeth (modified-leaf sepals)</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalTipShape">Sepal tip shape</label>
             <span class="fl-ctrl__val" data-value="sepalTipShape"></span>
@@ -1514,7 +1514,7 @@
           <span class="fl-ctrl__hint">round &rarr; pointed &mdash; apex &amp; teeth</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalTipFreq">Sepal tip frequency</label>
             <span class="fl-ctrl__val" data-value="sepalTipFreq"></span>
@@ -1523,7 +1523,7 @@
           <span class="fl-ctrl__hint">total tips &mdash; 1 = apex only</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalTipRegion">Sepal tip region</label>
             <span class="fl-ctrl__val" data-value="sepalTipRegion"></span>
@@ -1532,7 +1532,7 @@
           <span class="fl-ctrl__hint">how far teeth reach from the apex down</span>
         </div>
 
-        <div class="fl-ctrl" data-sepal data-sepal-tip="jagged">
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="sepalTipLength">Sepal tip length</label>
             <span class="fl-ctrl__val" data-value="sepalTipLength"></span>
@@ -1552,7 +1552,7 @@
           <span class="fl-ctrl__hint">a slender stem descending from the base &mdash; the view zooms out to fit it</span>
         </div>
 
-        <div class="fl-ctrl" data-stem>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="stemLength">Stem length</label>
             <span class="fl-ctrl__val" data-value="stemLength"></span>
@@ -1561,11 +1561,10 @@
           <span class="fl-ctrl__hint">short &rarr; long</span>
         </div>
 
-        <!-- STEM CURVE — hidden for now (not a wanted feature at the moment), but kept
-             wired up so it can come back later. To restore: re-add the `data-stem`
-             attribute, remove `hidden`, and set the input + DEFAULTS.stemCurve back to
-             0.2. The input stays in the DOM (value pinned to 0 = straight) so readUI /
-             reset / the label keep working and the stem stays straight while hidden. -->
+        <!-- STEM CURVE — never shown. The static `hidden` here is the pre-boot state; the
+             REASON lives in flower-registry.js as `visibleWhen: {any: []}` (unsatisfiable)
+             plus a `hiddenReason`, and verify-registry-sync asserts the two agree. To
+             restore: drop `hidden` here and drop both fields there. -->
         <div class="fl-ctrl" hidden>
           <div class="fl-ctrl__row">
             <label for="stemCurve">Stem curve</label>
@@ -1575,7 +1574,7 @@
           <span class="fl-ctrl__hint">straight &rarr; gently bent</span>
         </div>
 
-        <div class="fl-ctrl" data-stem>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="stemThickness">Stem thickness</label>
             <span class="fl-ctrl__val" data-value="stemThickness"></span>
@@ -1584,7 +1583,7 @@
           <span class="fl-ctrl__hint">slender &rarr; thick</span>
         </div>
 
-        <div class="fl-ctrl" data-stem>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="stemNodeCount">Leaf nodes</label>
             <span class="fl-ctrl__val" data-value="stemNodeCount"></span>
@@ -1593,7 +1592,7 @@
           <span class="fl-ctrl__hint">junction points along the stem &mdash; leaves attach here in a later pass</span>
         </div>
 
-        <div class="fl-ctrl" data-stem>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="stemNodeProminence">Node prominence</label>
             <span class="fl-ctrl__val" data-value="stemNodeProminence"></span>
@@ -1602,7 +1601,7 @@
           <span class="fl-ctrl__hint">smooth &rarr; swollen, gently kinked nodes</span>
         </div>
 
-        <div class="fl-ctrl" data-stem>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="stemBudMode">Side bud</label>
           </div>
@@ -1614,7 +1613,7 @@
           <span class="fl-ctrl__hint">an offshoot stem carrying a smaller bud of the same bloom</span>
         </div>
 
-        <div class="fl-ctrl" data-stem>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="leafType">Leaves</label>
           </div>
@@ -1628,7 +1627,7 @@
           <span class="fl-ctrl__hint">a leaf at each stem node &mdash; solid blades reusing the petal shape</span>
         </div>
 
-        <div class="fl-ctrl" data-stem data-leaf>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="leafPhyllotaxy">Leaf arrangement</label>
           </div>
@@ -1640,7 +1639,7 @@
           <span class="fl-ctrl__hint">how leaves sit around the stem: 1 zigzag &middot; 2 across &middot; 3 whorled</span>
         </div>
 
-        <div class="fl-ctrl" data-stem data-leaf>
+        <div class="fl-ctrl">
           <div class="fl-ctrl__row">
             <label for="leafSize">Leaf size</label>
             <span class="fl-ctrl__val" data-value="leafSize"></span>
