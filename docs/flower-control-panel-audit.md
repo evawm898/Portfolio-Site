@@ -8,6 +8,46 @@ app code is touched, so its Deploy Preview *is* current `main` — every control
 be exercised at `/flower.html` on that preview URL. See the PR description for the link
 (Netlify posts it as a PR check once the build finishes).
 
+---
+
+## Two findings before the table
+
+**The control literally labeled "Receptacle" is shown in no tier, ever, to anyone.**
+`receptacleType` (`flower-registry.js`) carries `permanentHidden: true` and a static
+`hidden` attribute in `flower.html` with no code path anywhere that clears it. Its own
+helper text — *"the junction node that joins the petal & sepal feet, the center bundle
+and the stem into one printable body"* — is the single clearest sentence in the entire
+panel explaining what the receptacle/junction actually is, and it exists only in markup
+a browser never renders. The receptacle Eva spent several sessions designing is reachable
+today only *indirectly*, by turning on Stem or Sepals (which derive it via
+`hasReceptacle()`) — there is no control anywhere named "Receptacle," "Junction," or
+similar that a visitor, in any tier, ever sees. This is the fourth shipped-and-unreachable
+defect this project has produced (after the Standard/Advanced tier-reveal bug, the
+Toothed/Scalloped option-tier bug, and the BILATERAL quarantine). Not fixed here — flagged
+so it can't be missed as a table row among 167.
+
+**`permanentHidden` is not a trustworthy signal on its own — verify, don't trust the flag.**
+Four controls carry it: `receptacleType`, `stemCurve`, `tube`, `divergenceAngle`. Checked
+each individually against the actual DOM/JS, not just the registry field:
+
+| Control | Static `hidden` in markup | Any code path that clears it | Verdict |
+|---|---|---|---|
+| `receptacleType` | yes | none found | genuinely, permanently hidden — flag is honest |
+| `stemCurve` | yes | none found | genuinely, permanently hidden — flag is honest |
+| `tube` | yes | none found | genuinely, permanently hidden — flag is honest |
+| `divergenceAngle` | yes | **yes** — `updateDivergenceOptions()` sets `angleCtrl.hidden = !(coiled && custom)`, live-toggled whenever `bloomType` or `divergenceMode` changes | **shown whenever `bloomType=coiled` AND `divergenceMode=custom`** — flag is misleading |
+
+**Three of four are honest; one is lying.** Manually verified `divergenceAngle` is
+reachable and genuinely **LIVE** (re-tested with the real trigger: STL checksum changes
+across 0°/90°/180° at identical triangle count — not just visible, actually moves
+geometry). This is the same class of bug the flower-project skill already warns about
+under the registration rule: a single-source-of-truth field (`permanentHidden`) that
+disagrees with the imperative code it's supposed to summarize, and nothing checks the two
+against each other. `divergenceAngle` should either carry `imperativeGate: true` (like
+`captureDist`, which correctly declares "shown by bespoke JS, not `gating`") or have its
+`divId` visibility logic replaced with a declared `gating` condition — right now it has
+neither, which is why it read UNREACHABLE on the first pass of this very sweep.
+
 ## Sweep methodology and cost (read before the table)
 
 The "Live?" column comes from an automated sweep, not inspection. For each of the 166
@@ -62,8 +102,123 @@ control instead of one cumulative session.
   actually shown by bespoke JS (`updateDivergenceOptions()` in `flower.js`) whenever
   `bloomType=coiled` AND `divergenceMode=custom`, which has nothing to do with `gating`.
   Manually re-tested with that setup: **LIVE** (see row below) — but the registry
-  mislabels this control's visibility mechanism, and that's a real finding — see
-  Section 1's vocabulary note.
+  mislabels this control's visibility mechanism, and that's the finding above.
+
+### Two different questions, two verdicts
+
+The first pass of this sweep answered one question — *"can this control ever change the
+geometry, under some reachable configuration?"* — by satisfying each control's declared
+`gating` precondition before sweeping it. That's necessary, but it isn't the same question
+as *"does this control do anything to the flower a visitor already sees?"* — and the gap
+between them turned out to be a real product defect, not a measurement artifact.
+
+`gating` only declares **visibility** preconditions. Nothing in the registry declares
+**effect** preconditions — a control can be visible, enabled, wired all the way to
+`readUI()`, and still multiply out to zero because a *different* control (not named in
+its `gating`) is sitting at its own default. Confirmed directly by the sweep, in the
+Form section alone, before any correction: `clawWidth` and `shoulder` read DEAD because
+`clawLength` defaults to 0 (no claw exists to have a width or a shoulder transition);
+`cleftLobes` and `cleftWidth` read DEAD because `cleftDepth` defaults to 0 (no cleft
+exists to have a lobe count or a notch width). None of these four controls is `gating`-
+restricted — a visitor can drag any of them right now and watch nothing happen, with
+nothing in the UI to explain why.
+
+**So this document reports two verdicts, not one:**
+
+- **Live (any configuration)** — the original question: does the control ever move
+  geometry, once its own declared gate and any discovered sibling dependency are
+  satisfied? A DEAD verdict here means the code path is unreachable full stop — delete it.
+- **Live at defaults (Standard)** — a separate, narrower sweep: of the controls that are
+  `tier:"standard"` *and* actually visible with literally nothing else touched from
+  `DEFAULTS`, which ones change geometry when swept alone? An INERT-AT-DEFAULT verdict
+  here means: a first-time visitor sees this exact slider, can drag it, and nothing
+  happens — not a code problem, a first-impression problem. This sweep is deliberately
+  narrower (Standard-tier only, no gate-satisfaction mutations at all) because it is
+  answering "what does someone land on," not "what can the panel do."
+
+**Headline number:** <!-- INERT_HEADLINE --> — see the "Live at defaults" section below the
+table for the full list and what each one needs to stop being inert.
+
+### The `petalShape` picker is the enabler for some of these, but only in Advanced
+
+`petalShape` (`flower.js` `applyShape()`/`detectShape()`, bundles in `flower-shapes.js`)
+writes a full 13-parameter bundle (`SHAPE_PARAMS`) on selection — not a gate, a macro.
+Every option sets **all thirteen** params at once:
+
+| Option | width | taper | clawLength | clawWidth | shoulder | cleftDepth | cleftLobes | cleftWidth | tip | curlAmount | edgeCurve | edgeProfile | petalCup |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ROUNDED (default) | 0.9 | 0.35 | **0** | 0.3 | 0.5 | **0** | 2 | 0.3 | 0.5 | 0.4 | 0 | 0 | 0 |
+| POINTED | 0.7 | 0.5 | **0** | 0.3 | 0.4 | **0** | 2 | 0.3 | 0.15 | 0.3 | -0.1 | 0 | 0 |
+| STRAP | 0.45 | 0.5 | **0** | 0.3 | 0.3 | **0** | 2 | 0.3 | 0.3 | 0.15 | 0 | 0 | 0.05 |
+| CLAWED | 1.0 | 0.3 | **0.35** | 0.25 | 0.55 | **0** | 2 | 0.3 | 0.6 | 0.35 | 0.05 | 0 | 0.15 |
+| LOBED | 0.95 | 0.35 | **0** | 0.3 | 0.55 | **0.55** | 2 | 0.3 | 0.85 | 0.4 | 0.05 | 0 | 0.1 |
+
+Only **CLAWED** sets `clawLength` non-zero (0.35) — the enabler for `clawWidth`'s and
+(probably — pending the correction pass) `shoulder`'s effect. Only **LOBED** sets
+`cleftDepth` non-zero (0.55) — the enabler for `cleftLobes`'s and `cleftWidth`'s effect.
+The default on page load, ROUNDED, sets both enablers to 0 — so a fresh visitor's claw and
+cleft families are inert *by the shipped default*, and stay inert until they either pick
+CLAWED/LOBED from the shape picker or manually raise `clawLength`/`cleftDepth`.
+
+**Is there a discoverable path?** Two different answers depending on tier:
+- **In Standard**, the question is moot for the specific controls above: `clawWidth`,
+  `shoulder`, `cleftLobes`, `cleftWidth`, and their enablers `clawLength`/`cleftDepth` are
+  all Advanced-tier — a Standard visitor never sees any of them, inert or not. `petalShape`
+  itself (the macro) is Standard-tier and both CLAWED and LOBED are in
+  `PICKER_SHAPE_NAMES` (the Standard picker's option set) — so a Standard visitor who picks
+  CLAWED or LOBED gets a petal that's actually clawed/lobed; they just never encounter the
+  five Advanced sliders that would otherwise look broken.
+- **In Advanced**, the risk is real: picking CLAWED or LOBED from the shape picker sets
+  every constituent slider correctly (the macro overwrites `clawLength` alongside
+  `clawWidth`, `cleftDepth` alongside `cleftLobes`/`cleftWidth` — so *after* picking a
+  shape, the sliders work). But an Advanced visitor who instead works top-to-bottom through
+  the panel and drags `clawWidth` or `cleftLobes` *before* touching `clawLength`/
+  `cleftDepth` — plausible, since the panel visually orders them adjacently
+  (`clawLength → clawWidth → shoulder`, `cleftDepth → cleftLobes → cleftWidth`), but
+  nothing stops someone opening straight to "Cleft width" via keyboard search or simply
+  skipping the slider two rows up — gets a slider that does nothing, silently. The
+  panel's own ordering is a soft mitigation, not a fix: adjacency helps a visitor who reads
+  top-to-bottom, not one who doesn't.
+
+### Proposal: declare effect-preconditions in the registry (not built here)
+
+The registry already has one mechanism for "this control depends on another control's
+value" — `gating`, for visibility. It has no equivalent for "this control has zero effect
+below some other control's threshold." That's why the sweep's mechanical deriver had no
+signal for any of the sibling dependencies found above — the same class of problem the
+flower-project skill documents repeatedly (a real dependency that exists in the code and
+nowhere in the single source of truth).
+
+**Shape of the fix, not built:** a new optional registry field on the *dependent* control
+— something like `enabledWhen: { id: 'clawLength', min: 0.01 }` (or, for the multi-value
+case, `enabledWhen: { id: 'cleftDepth', min: 0.01 }`) naming the sibling and the threshold
+below which this control is known to have no effect. One declaration would feed three
+consumers at once, the same pattern the registry already uses for `gating`: (1) this
+sweep's `deriveSetup()` could satisfy it automatically instead of needing a hand-curated
+correction list; (2) the UI could visually dim or annotate the control ("has no effect
+while Claw length is 0") instead of leaving it silently inert; (3) a small CI gate could
+assert every `enabledWhen` declaration is still true by construction (the referenced
+sibling really does zero out this control's contribution) the same way
+`verify-tier-visibility.mjs` asserts `gating` today.
+
+**Full set of candidates found or suspected**, for whoever builds this — confirmed ones
+first, from the sweep's actual DEAD verdicts; suspected ones after, from reading the
+geometry code's parameter names and the hint text, not yet independently confirmed by a
+second export:
+
+**Confirmed** (measured DEAD at `DEFAULTS`, corrected verdict pending — see table):
+- `clawWidth`, `shoulder` — need `clawLength > 0`
+- `cleftLobes`, `cleftWidth` — need `cleftDepth > 0`
+
+**Suspected, same pattern** (not yet independently measured — flagged for the correction
+pass, listed so the candidate set is reported in full rather than only the ones already
+proven):
+- `crossSectionTaper` — needs `crossSection != 0` (taper of a roll that doesn't exist)
+- `curlBias`, `curlStart` — need `curlAmount != 0` (biasing/starting a curl that doesn't exist)
+- `edgeNoiseScale` — needs `edgeNoise > 0` (scaling a noise pattern that isn't there)
+- `reliefFreq`, `reliefMode` — need `reliefAmp > 0` (frequency/pattern of relief that has zero amplitude)
+- `voronoiWeightFalloff` — needs `voronoiWeight > 0` (falloff of a weighting that's off)
+- `tipFineness` — needs `tip` away from its midpoint (sharpening a tip shape that may already read as neutral)
 
 ## The inventory table
 
