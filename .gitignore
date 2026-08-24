@@ -11,6 +11,17 @@ tools/dress-shell/out/
 # tools/audit-hires.mjs output (screenshots + results.json) — regenerate, don't commit.
 audit-out/
 
+# Throwaway control-panel-audit sweep scripts/data (docs/flower-control-panel-audit.md
+# session) — one-off measurement harnesses, not part of any gate, deleted once the doc
+# is finished. Gitignored rather than deleted mid-run so the stop hook doesn't nag while
+# a background sweep still has these files open.
+/_sweep_*_tmp.mjs
+/_correction_pass_tmp.mjs
+/sweep-results*.json
+/sweep-standard-defaults.json
+/corrections.json
+/dual-regime.json
+
 # package.json is committed so Netlify installs the Function's @netlify/blobs
 # dependency at deploy time. Local dev deps (three, playwright-core) live in the
 # gitignored node_modules and are NOT listed here — the browser loads three from
