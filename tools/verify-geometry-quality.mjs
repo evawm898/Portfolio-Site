@@ -602,12 +602,20 @@ window.__gq = async function() {
       //   chrysanthemum       0.694              0.44              0.015 / 0.612
       //   preset:poppy        0.533              0.00              0.178 / 0.744
       //
-      // Six of seven configs put EVERY legitimate cell at exactly 0. The global window is
-      // 0.44 to 0.533 — 21%, against the isoperimetric ratio's 9% — and the one nonzero
-      // legitimate reading (chrysanthemum 0.44) is unexplained, so no threshold is chosen
-      // here either. It is a cell that doubles back and whose hole nonetheless lands
-      // inside, which is either a spike that has not yet caused an escape or a limit of
-      // the SKIP window below; that distinction has not been measured.
+      // Six of seven configs put EVERY legitimate cell at exactly 0, and the seventh is
+      // NOT an exception — measured, chrysanthemum's 0.44 cell has 22 of its 50 ring
+      // points EXACTLY coincident with a non-adjacent segment. It is a spiked cell whose
+      // hole has not escaped yet, not a healthy cell being maligned: Q 0.7628 and a mean
+      // width of 0.86 mm make it look entirely fine to both of the other measures.
+      //
+      // So the populations are 0 and >= 0.44, and THERE IS NO THRESHOLD TO PICK. Any
+      // doubling back at all is a collapsed section. The criterion is db > 0, with the
+      // only tolerance being the 1e-6 coincidence distance below — no magic number, and
+      // no gap for the next design to straddle.
+      //
+      // This is also strictly STRONGER than the escape test it replaces: it catches every
+      // cell that escapes, plus the latent ones like chrysanthemum's that will escape once
+      // the spike outgrows the strut.
       const doubledBack = (poly) => {
         const n = poly.length; let hit = 0;
         const d2seg = (p, a, b) => { const dx = b.x-a.x, dy = b.y-a.y, L2 = dx*dx+dy*dy;
@@ -645,7 +653,18 @@ window.__gq = async function() {
           if (bad) { if (!bestEsc || q > bestEsc.q) bestEsc = { q, outer: slab.outer, inner: slab.inner }; }
           else if (!worstOk || q < worstOk.q) worstOk = { q, outer: slab.outer, inner: slab.inner };
         }
-        qDump = { worstOk, bestEsc };
+        // also the worst DOUBLED-BACK legitimate cell — the one that decides whether the
+        // db window is 0.44-0.533 or 0-0.533.
+        let worstDbOk = null;
+        for (const slab of (vor.slabs || [])) {
+          let bad = 0;
+          if (slab.inner && slab.inner.length === slab.outer.length)
+            for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+          if (bad) continue;
+          const db = doubledBack(slab.outer);
+          if (!worstDbOk || db > worstDbOk.db) worstDbOk = { db, q: isoQ(slab.outer), outer: slab.outer, inner: slab.inner };
+        }
+        qDump = { worstOk, bestEsc, worstDbOk };
       }
       qEsc.sort((a,b)=>a-b); qOk.sort((a,b)=>a-b);
       dbEsc.sort((a,b)=>a-b); dbOk.sort((a,b)=>a-b);
@@ -918,8 +937,9 @@ for (const cfg of CONFIGS) {
   const badUndershoot = q.infill === 'voronoi' && q.regUndershootMaxMM > T.regUndershootVoronoiMM;
   // The rib-path split either held or the rim silently reverted to the pre-#50
   // envelope. There is no tolerance to set here: it is a boolean, and it is hard.
-  // #74: hard and zero-tolerance. A hole outside its own cell is not a matter of degree.
-  const badHole = (q.holeEscapeCells || 0) > 0;
+  // #74: hard and zero-tolerance, on the UNIFIED criterion. A cell that doubles back on
+  // itself has a collapsed section, whether or not its hole has escaped through it yet.
+  const badHole = (q.dbEscMin != null || (q.dbOkMax || 0) > 0);
   // The second assertion: no emitted cell is degenerate. Independent of the first — a
   // collapsed cell adds nothing to a tiling sum, so a partition check is blind to it.
   // The threshold catches COLLAPSE, not smallness: the smallest legitimate cell in this
@@ -937,7 +957,7 @@ for (const cfg of CONFIGS) {
   const badTreat = (q.tipStyle === 'jagged' || q.tipStyle === 'scallop') && rimBearing
                    && !(q.treatmentAmpMM >= T.treatmentAmpMM);
   const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat || badHole || badDegenerate || badSelf;
-  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badHole ? `hole(${q.holeEscapeCells}/${q.voronoiCells}: ${q.holeZeroArea} zero-area + ${q.holeWithArea} with-area)` : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : ''].filter(Boolean).join(',');
+  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badHole ? `doubledBack(escaping ${q.holeEscapeCells}/${q.voronoiCells}, worst latent ${q.dbOkMax})` : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : ''].filter(Boolean).join(',');
   let verdict;
   if (cfg.xfail) {
     const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
@@ -972,6 +992,6 @@ if (openIssues.length) {
   if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
 }
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm holeEscapes=0 minCellArea>${T.minCellAreaMM2}mm2 (#74)`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm noDoubledBackCells minCellArea>${T.minCellAreaMM2}mm2 (#74)`);
 await browser.close(); server.close();
 process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));
