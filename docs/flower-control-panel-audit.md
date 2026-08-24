@@ -48,6 +48,105 @@ against each other. `divergenceAngle` should either carry `imperativeGate: true`
 `divId` visibility logic replaced with a declared `gating` condition — right now it has
 neither, which is why it read UNREACHABLE on the first pass of this very sweep.
 
+### Five hiding mechanisms, not one — and a fifth that leaves no trace at all
+
+A control's visibility in this panel is decided by up to five independent mechanisms,
+only three of which the registry declares at all. Counted precisely against the 166 WIRED
+controls:
+
+1. **`gating`** — a declared visibility precondition tied to another control's live value
+   (`data-tip-styles`, `data-recept`, etc.). **122 of 166 controls.** The normal case,
+   and the one every other mechanism below is a variant or exception of.
+2. **`permanentHidden`** — a declared, static, "never show this in any tier" flag.
+   **4 controls** (`receptacleType`, `stemCurve`, `tube`, `divergenceAngle`) — **3 honest,
+   1 lying** (see above).
+3. **`imperativeGate`** — a declared "this is shown/hidden by bespoke JS, not a `gating`
+   sweep" flag, telling a reader *not to be surprised* it isn't in the other two buckets.
+   **1 control** (`captureDist`, via `updateTerminationOptions()`) — accurate.
+4. **Untiered/ungated by default** — the remaining 39 controls carry none of the above and
+   are simply always visible once their section and tier conditions are met. Not a hiding
+   mechanism; the baseline.
+5. **Undeclared bespoke JS** — a control is hidden by inline application logic that *no
+   registry field names at all* — not `gating` (which would at least tell the sweep and a
+   reader what condition to check), not `permanentHidden`, not `imperativeGate`. Found in
+   **at least 12 controls**, in two shapes:
+   - **Zero declared signal** — `edgeNoise`. Nothing in the registry suggests this
+     control is ever conditionally hidden; it just is, some of the time (see below).
+   - **Partially declared, undeclared layer on top** — `tipLength` and `scallopHeight`
+     carry real `gating` that correctly explains their *native/Advanced* visibility, but
+     Standard mode's contextual relabeling (`updateEdgeAmount()`, see below) hides them
+     under an *additional* condition the registry says nothing about. Same pattern for
+     the **9 legacy-receptacle controls** (`receptConstruction`, `receptCollar`,
+     `receptReach`, `receptSolidity`, `ribMultiplier`, `spiralTightness`,
+     `spiralThickness`, `bulbSize`, `bulbHeight`): their `gating` (`data-recept` /
+     `data-recept-open` / `data-recept-ribbed`) is real and correct for *when the
+     receptacle is on*, but `updateBaseOptions()` force-hides all nine again whenever
+     `continuousMargin=on` — a second, undeclared condition, enforced by a hardcoded id
+     list (`LEGACY_RECEPT`) inside `flower.js`, invisible to the registry entirely.
+
+This is the strongest argument for the registry proposal below, precisely because it
+isn't four separate oversights — it's one structural gap (no registry field for "this can
+also be hidden by X") expressing itself independently in four different corners of the
+panel. `divergenceAngle` (mechanism 2, wrongly) and `edgeNoise`/`tipLength`/
+`scallopHeight`/the 9 legacy-receptacle controls (mechanism 5) are the same underlying
+failure — a real visibility condition the single source of truth doesn't know about —
+just caught by two different code paths.
+
+### The `edgeNoise` finding, and why `verify-tier-visibility.mjs` didn't catch it
+
+`edgeNoise` is `tier:"standard"`, carries no `gating`. Nothing in the registry suggests
+it is ever hidden. It is hidden — genuinely, verifiably — at the exact default state a
+first-time Standard visitor lands on.
+
+**Cause:** `updateEdgeAmount()` in `flower.js` implements a *contextual single-slot
+control* for the Edge picker: in Standard mode, `tipLength`, `scallopHeight`, and
+`edgeNoise` collapse into one relabeled "Amount" slider, showing only the one matching
+the current `tipStyle` (`{jagged: tipLength, scallop: scallopHeight, ruffled:
+edgeNoise}`). The default `tipStyle` is `clean` — which maps to **none** of the three, so
+the "Amount" slot is empty and all three sliders are hidden, `edgeNoise` included.
+Verified directly against the running page (not inferred): `.fl-ctrl` wrapper
+`hidden === true` at the literal default state, section itself expanded and visible.
+
+**Why the tier gate passes anyway — traced to the actual assertion, not guessed:**
+`verify-tier-visibility.mjs`'s control-level check is
+
+```js
+const shouldBeVisibleInAdvanced = (c) => c.tier !== 'standard' && !c.gating && !c.permanentHidden && !c.imperativeGate;
+for (const c of WIRED) {
+  if (!shouldBeVisibleInAdvanced(c)) continue;
+  // ...assert visible in Advanced...
+}
+```
+
+`c.tier !== 'standard'` means this assertion **only ever runs against Advanced-tier
+controls, and only checks them in Advanced mode.** It has no equivalent assertion for
+Standard-tier controls in Standard mode — not a weaker, one-directional version of one,
+an *absent* one. `edgeNoise` is `tier:"standard"`, so it is categorically out of scope
+for this check in both directions, for both reasons the docstring would lead you to
+expect coverage: it isn't a select (so the other, genuinely bidirectional half of the
+gate — `PANEL.filter(x => x.kind === 'select')`, which checks `advancedOnly` options in
+both Standard and Advanced — doesn't apply to a slider), and it isn't Advanced-tier (so
+the control-level half never examines it either). Two independent scope boundaries, not
+one asymmetric check catching one direction and missing the other.
+
+**This is the exact defect the gate was built to catch, one level down.**
+`verify-tier-visibility.mjs` exists because Advanced silently stopped showing 25
+controls — a Standard→Advanced regression. It was never extended to check the mirror
+case: does Standard actually show every Standard-tier control that has no declared
+reason to hide? It would not have caught this. Not fixed here — reported, because the
+gate's own docstring claims a completeness ("in Standard mode... in Advanced mode...")
+that the code doesn't deliver for control-level (non-select) visibility.
+
+### `updateEdgeAmount()` is progressive disclosure, built once, for one section, invisibly
+
+Set aside the bug for a moment — the *mechanism* `updateEdgeAmount()` implements is
+exactly the feature shape of "let someone in Standard reach one Advanced-level control
+without switching the whole panel to Advanced": one visible slot, swapped to whichever
+control matches the current context. That is real, working, shipped progressive
+disclosure — for exactly one section, implemented as one-off imperative JS, declared
+nowhere the registry (or any gate) can see it. See Section 2 for what that means for the
+reorganisation Eva is about to do.
+
 ## Sweep methodology and cost (read before the table)
 
 The "Live?" column comes from an automated sweep, not inspection. For each of the 166
@@ -136,8 +235,26 @@ nothing in the UI to explain why.
   narrower (Standard-tier only, no gate-satisfaction mutations at all) because it is
   answering "what does someone land on," not "what can the panel do."
 
-**Headline number:** <!-- INERT_HEADLINE --> — see the "Live at defaults" section below the
-table for the full list and what each one needs to stop being inert.
+**The headline is three numbers, not one — collapsing them into a single count buries
+the finding that prompted this whole side-investigation:**
+
+1. **Visible at defaults and inert — the panel-feels-broken number.** Of the 17
+   Standard-tier controls actually visible with nothing else touched from `DEFAULTS`,
+   **1 does nothing when swept: `tipFineness`** (needs `tip` away from its 0.5 midpoint
+   to have anything to sharpen — confirmed by direct measurement, not inferred). This is
+   the number that answers "does this exact panel a visitor lands on already feel
+   broken" — and it's reassuringly low.
+2. **Standard tier but invisible at defaults — the discoverability number.** **2
+   controls**: `leafType` and `edgeNoise`. These are different findings wearing the same
+   number. `leafType` is the unremarkable case — correctly `gating`-restricted
+   (`data-stem`), hidden until `stemType` (itself Standard, one control away) is turned
+   on; a nested reveal, not a defect. `edgeNoise` is the pathological case — see above:
+   hidden by undeclared bespoke JS, with zero registry signal that it's conditional at
+   all, at the exact default a first-time visitor sees.
+3. **Dead under every configuration — the delete list.** <!-- DELETE_LIST_HEADLINE -->
+   (pending the full 166-control sweep + correction pass — see the inventory table).
+
+<!-- INERT_HEADLINE -->
 
 ### The `petalShape` picker is the enabler for some of these, but only in Advanced
 
@@ -189,36 +306,56 @@ signal for any of the sibling dependencies found above — the same class of pro
 flower-project skill documents repeatedly (a real dependency that exists in the code and
 nowhere in the single source of truth).
 
-**Shape of the fix, not built:** a new optional registry field on the *dependent* control
-— something like `enabledWhen: { id: 'clawLength', min: 0.01 }` (or, for the multi-value
-case, `enabledWhen: { id: 'cleftDepth', min: 0.01 }`) naming the sibling and the threshold
-below which this control is known to have no effect. One declaration would feed three
-consumers at once, the same pattern the registry already uses for `gating`: (1) this
-sweep's `deriveSetup()` could satisfy it automatically instead of needing a hand-curated
-correction list; (2) the UI could visually dim or annotate the control ("has no effect
-while Claw length is 0") instead of leaving it silently inert; (3) a small CI gate could
-assert every `enabledWhen` declaration is still true by construction (the referenced
-sibling really does zero out this control's contribution) the same way
+**Two different dependency classes turned up, and they need two different declarations —
+collapsing them into one field would produce a declaration that can't express half the
+cases:**
+
+**1. Value dependency — a sibling *slider* sitting at/below a threshold multiplies this
+control's effect to zero.** Shape: `enabledWhen: { id: 'clawLength', min: 0.01 }`. Fixable
+two ways once declared: give the enabler a non-zero default, or dim/annotate the dependent
+control until it's satisfied. One declaration feeds three consumers, the same pattern the
+registry already uses for `gating`: (1) this sweep's `deriveSetup()` satisfies it
+automatically instead of needing a hand-curated correction list; (2) the UI dims or
+annotates the control ("has no effect while Claw length is 0"); (3) a small CI gate
+asserts every `enabledWhen` declaration is still true by construction, the same way
 `verify-tier-visibility.mjs` asserts `gating` today.
 
-**Full set of candidates found or suspected**, for whoever builds this — confirmed ones
-first, from the sweep's actual DEAD verdicts; suspected ones after, from reading the
-geometry code's parameter names and the hint text, not yet independently confirmed by a
-second export:
-
-**Confirmed** (measured DEAD at `DEFAULTS`, corrected verdict pending — see table):
+*Confirmed by direct measurement* (DEAD at `DEFAULTS`; corrected-regime result in the table):
 - `clawWidth`, `shoulder` — need `clawLength > 0`
 - `cleftLobes`, `cleftWidth` — need `cleftDepth > 0`
+- `reliefFreq`, `reliefMode` — need `reliefAmp > 0`
+- `voronoiWeightFalloff` — needs `voronoiWeight > 0`
+- `crossSectionTaper` — needs `crossSection != 0`
+- `tipFineness` — needs `tip` away from its 0.5 midpoint (also the one "visible at
+  defaults and inert" control from the Standard-tier sweep above)
 
-**Suspected, same pattern** (not yet independently measured — flagged for the correction
-pass, listed so the candidate set is reported in full rather than only the ones already
-proven):
-- `crossSectionTaper` — needs `crossSection != 0` (taper of a roll that doesn't exist)
-- `curlBias`, `curlStart` — need `curlAmount != 0` (biasing/starting a curl that doesn't exist)
-- `edgeNoiseScale` — needs `edgeNoise > 0` (scaling a noise pattern that isn't there)
-- `reliefFreq`, `reliefMode` — need `reliefAmp > 0` (frequency/pattern of relief that has zero amplitude)
-- `voronoiWeightFalloff` — needs `voronoiWeight > 0` (falloff of a weighting that's off)
-- `tipFineness` — needs `tip` away from its midpoint (sharpening a tip shape that may already read as neutral)
+*Suspected, not yet independently confirmed*:
+- `edgeNoiseScale` — needs `edgeNoise > 0`
+
+**2. Mode dependency — the control belongs to a *different code branch* entirely, not a
+magnitude.** Shape: `activeUnder: { id: 'infillType', oneOf: ['voronoi'] }`. **Not**
+fixable by a non-zero default — there's no "amount of veins infill" that turns on a
+slab-thickness control. The only real fixes are grouping (put the control inside its
+mode's own section, so it's never visible outside that mode) or dimming with an explicit
+"only applies under X" label — an `enabledWhen`-shaped UI treatment would be actively
+misleading here, since no amount of dragging *anything* fixes it short of switching modes.
+
+*Confirmed by direct measurement*:
+- `thickTaper`, `thickEdge` — DEAD under the default `veins` (tube) infill. Their own hint
+  text ("floored at print min") describes a *slab* thickness concept; `veins` builds tube
+  geometry, not slabs. Re-testing under `infillType=voronoi` in the correction pass to
+  confirm the slab-infill hypothesis directly rather than leave it as a plausible reading
+  of the code.
+
+**3. A third declaration this registry proposal must also cover — mechanism, not
+threshold.** `enabledWhen`/`activeUnder` describe when a control does something. They say
+nothing about *how it's revealed* — the `edgeNoise` finding above is a case where the
+control's very presence in the DOM is contingent, and that contingency has no field to
+live in today (that's what `imperativeGate` gestures at but doesn't fully cover — it
+marks "shown by bespoke JS" without saying *which* condition). Whoever builds this should
+treat "declares an effect precondition" and "declares a visibility precondition beyond
+`gating`" as the same underlying gap, prompted by the same finding, rather than solve one
+and leave the other as before.
 
 ## The inventory table
 
@@ -353,6 +490,23 @@ Arrangement (bloomType + bilateral overrides) / Silhouette (shape + outline) / S
 (the receptacle, named as such, its own heading) / Sepals / Stem & Leaves. That turns 5
 sections into roughly 9, each single-purpose — closer to Lace's shape than Form/Base's
 current shape.
+
+**6. `updateEdgeAmount()` already answers a question about this reorganisation, and the
+answer changes what "split into more sections" has to mean.** The mechanism it
+implements — one visible slot in Standard mode, showing whichever control matches the
+current context (`tipStyle` → `tipLength`/`scallopHeight`/`edgeNoise`) — is exactly
+*contextual, per-section progressive disclosure*: reach one Advanced-shaped control from
+Standard, for one section, without switching the whole panel to Advanced. That's a real
+feature, shipped and working (when the slot is occupied), built as one-off imperative JS
+for the Edge section alone, declared nowhere the registry or any gate can see. **If the
+reorganisation above builds declared, registry-driven progressive disclosure — and a
+9-section panel with a real Junction/Ornament split is exactly the shape that would
+benefit from it — `updateEdgeAmount()` cannot be left standing next to it.** Two
+implementations of the same idea, one declared and one not, is the precise failure mode
+this project has already paid for once (the cleft-margin outline had two producers for
+months before anyone noticed only one of them saw the sinuses). Either the new mechanism
+absorbs `updateEdgeAmount()`'s Edge-section case on day one, or the reorg explicitly
+carries it as a documented, temporary exception — never as an oversight discovered later.
 
 ---
 
