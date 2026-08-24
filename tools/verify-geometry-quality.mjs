@@ -436,7 +436,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipFolds = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -542,6 +542,28 @@ window.__gq = async function() {
       // 0.564-0.948 rather than 1.000. There is no threshold that means the same thing in
       // both margin modes. Gating this needs a rib-aware denominator — the inset material
       // — which is the cleft-aware bound that does not exist yet.
+      // Does the CLIP POLYGON itself double back? ribInnerEdge is floored at 0, so under
+      // continuous margin the bound can pinch to zero width near the foot — and any cell
+      // covering that neck inherits a spike no matter which seed owns it. That would make
+      // the escapes a property of the BOUND, not of seed placement, and culling seeds
+      // could never converge.
+      {
+        const cp = G.ribMarginPolyline(P, 72), m = cp.length;
+        let minR = Infinity, zeroR = 0;
+        for (let i = 0; i <= 72; i++) { const r = G.ribInnerEdge(i / 72, P);
+          if (r < minR) minR = r; if (r < 1e-9) zeroR++; }
+        clipMinInnerEdge = +minR.toExponential(3);
+        clipZeroStations = zeroR;
+        let fold = 0;
+        for (let i = 0; i < m; i++) {
+          const a = cp[(i-1+m)%m], b = cp[i], c2 = cp[(i+1)%m];
+          const ux=b.x-a.x, uy=b.y-a.y, vx=c2.x-b.x, vy=c2.y-b.y;
+          const lu=Math.hypot(ux,uy), lv=Math.hypot(vx,vy);
+          if (lu<1e-12||lv<1e-12) continue;
+          if ((ux*vx+uy*vy)/(lu*lv) < -0.9999) fold++;
+        }
+        clipFolds = fold;
+      }
       const matA = Math.abs(__gqPolyArea(G.buildSilhouette(P, 200)));
       tileVsMaterial = matA > 1e-12 ? +(sumA / matA).toFixed(3) : null;
       // SELF-INTERSECTION CENSUS — the one test that separates 'genuine overlap' from
@@ -775,7 +797,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipFolds };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
