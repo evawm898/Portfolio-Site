@@ -573,6 +573,102 @@ UNREACHABLE verdict is expected, not a bug. `divergenceAngle` is different — s
 `captureDist` is `imperativeGate` (shown by bespoke JS, not a `gating` sweep) and the
 deriver's special-cased setup for it worked correctly.
 
+### Breaking down the 70 NARROW verdicts
+
+Query over the sweep's own data, no new measurements.
+
+**1. Tier split: 3 Standard, 67 Advanced.** The Standard three are `softness` ("Vein
+detail"), `sepalsType` ("Sepals"), `leafType` ("Leaves"). Everything else living at
+NARROW is Advanced-tier — a subtle Advanced control is doing its job (fine-tuning within
+a space someone chose to enter); these three are the ones that matter, because they're
+what a first-time Standard visitor actually drags.
+
+**2. The threshold: 0.5 mm of bounding-box-diagonal movement across the full sampled
+range. Chosen, not inherited.** I picked this number when writing the sweep harness — it
+does not come from CLAUDE.md, the flower-project skill, or any existing gate in this
+codebase. Nothing in this project defines a "this counts as visible" threshold; the
+closest existing guidance is the skill's "match measurement resolution to feature size"
+principle (a 0.8 mm rib on a 120 mm flower is one pixel at 240 px), which argues for a
+*context-dependent* threshold (tied to the model's own scale and print-feature floor,
+`MIN_FEATURE_MM`), not a flat constant applied identically to every control regardless of
+overall model size. 0.5 mm is defensible as a first pass but is exactly the kind of
+number a real gate would need to derive, not assume — flagged for whoever builds the
+`enabledWhen`/`activeUnder` gate machinery above.
+
+**3. The ten smallest deltas — and the real finding is that "ten smallest" isn't a
+clean ranking.** Of the 70, 8 have no recoverable numeric delta (see the gap noted
+below); of the remaining 62, **48 measured *exactly* 0.000 mm — a 48-way tie, not a
+gradient.** These are controls whose triangle count and geometry checksum both changed
+(so they're not DEAD) while the model's outer bounding box didn't move by a
+floating-point-detectable amount at all. 2 of the 48 are the Standard-tier `sepalsType`
+and `leafType` — see point 4, this is a metric blind spot, not a true near-invisible
+effect, for those two specifically. The other 46 are internal/structural Advanced
+parameters (lattice density, rib counts, cell relaxation, strand curvature) where an
+envelope-invariant effect is expected and correct — changing how many bones a lattice
+has shouldn't move the petal's silhouette.
+
+Representative names from the zero-delta 48 (not a top-10, since there's no ordering
+among ties): `spaceMode`, `spacePattern`, `spaceBirth`, `spaceKill`, `spaceStep`,
+`captureDist`, `voronoiLloyd`, `voronoiWeight`, `strandTaper`, `strandCurvature` — all
+Advanced.
+
+Real ranking begins above zero:
+
+| Label | Registry key | Delta | Tier |
+|---|---|---|---|
+| Layer rotation offset | `layerRotationOffset` | 0.002 mm | Advanced |
+| Cell density law | `voronoiDensityLaw` | 0.002 mm | Advanced |
+| Anisotropy | `voronoiAniso` | 0.002 mm | Advanced |
+| Edge termination | `edgeTermination` | 0.004 mm | Advanced |
+| Vein detail | `softness` | 0.036 mm | **Standard** |
+| First branch | `veinBranchStart` | 0.036 mm | Advanced |
+| Strand count | `strandCount` | 0.039 mm | Advanced |
+| Tip shape (center) | `centerTipShape` | 0.109 mm | Advanced |
+| Tip frequency | `tipFrequency` | 0.116 mm | Advanced |
+| Sepal center curve | `sepalCenterCurve` | 0.152 mm | Advanced |
+
+`softness` — one of only three Standard-tier NARROW controls — is the 5th-smallest
+measured delta of any control in the entire 166-control sweep. That is the sharpest
+single number in this breakdown: a first-time visitor's one Standard "Vein detail"
+slider moves geometry less than all but four Advanced fine-tuning knobs.
+
+**Data gap, disclosed rather than papered over:** 8 of the 70 final NARROW controls
+(`clawWidth`, `cleftLobes`, `reliefFreq`, `thickTaper`, `thickEdge`,
+`voronoiWeightFalloff`, `blendSmoothness`, `convergenceTightness`) reached their final
+NARROW status through the correction/isolation pass — measured under a different,
+corrected configuration than the plain-defaults sweep — and the numeric bbox-delta for
+that corrected measurement lived in `corrections.json`/`dual-regime.json`, which were
+deleted as scratch files during cleanup before this question was asked. All 8 are
+Advanced-tier, so this gap doesn't touch the tier split (point 1) or the widen-range
+question (point 4, Standard-only) — it only means they're excluded from the ranking in
+point 3 rather than silently assigned a guessed number. Noted rather than re-run, per
+the "report only" constraint on this session.
+
+**4. Of the 3 Standard-tier NARROW controls, zero would clear the LIVE threshold by
+widening range alone — and two of the three aren't a range question at all.**
+
+- **`softness`** is the only one of the three that's actually a slider with a range to
+  widen. Its own 3-point sweep (`v=0` → diag 167.02103 mm, `v=0.5` → 167.03769 mm, `v=1`
+  → 167.05707 mm) gives a measured rate of **0.036 mm per unit of slider travel** across
+  its full declared 0–1 span. Linear extrapolation (a real assumption — the actual
+  relationship may not stay linear far outside the tested range) says clearing 0.5 mm
+  would need roughly a **14× wider span** — the slider would need to run to about 14
+  instead of 1. Not a plausible range widening; this control is envelope-preserving by
+  design (it grades internal vein branching density, not the petal outline), so no
+  amount of range makes it move the bounding box the way `enabledWhen`/`activeUnder`
+  would fix a truly gated-off control.
+- **`sepalsType`** and **`leafType`** are `<select>` controls with 2 and 5 discrete
+  options — there is no numeric range to widen. Their 0.000 mm reading is the metric
+  blind spot from point 3: turning sepals on adds 42,480 real triangles
+  (71,500 → 113,980) entirely inside a bounding box already set by the petals and stem
+  already in frame; turning leaves on does the same. The fix these two need, if any, is
+  a better metric (e.g. measuring the *added sub-assembly's* own bbox rather than the
+  whole model's), not a wider range and not a behaviour change — a third category this
+  question's framing didn't anticipate.
+
+**So: 0 of 3, by two different mechanisms — one genuinely small effect that range can't
+fix, two real, large, correctly-working effects a bounding-box metric can't see at all.**
+
 ---
 
 ## Section 1 — labels and helper text, verbatim
@@ -1270,5 +1366,44 @@ cross-referencing the skill by section name wherever a rule's *rationale* curren
 leaks into CLAUDE.md's text (items 1 and 3 above both currently include a worked example
 in CLAUDE.md that duplicates skill content). Eva decides the actual split; this section
 only reports where today's text disagrees with the stated intent.
+
+---
+
+## Rulings
+
+This session reported; it did not fix, rename, delete, or reorganise. The following
+decisions were made by Eva on the findings above and are recorded here so none of them
+gets re-litigated by a future session starting cold. Not built here — this is the
+decision record, not the implementation.
+
+1. **Delete `boneOutline`.** The one control confirmed dead under every tested
+   configuration, including isolated under its own gating context.
+2. **Receptacle controls are not deleted.** `receptacleType`, `stemCurve`, and `tube` get
+   unhidden into Advanced — the decorative receptacle rework is separate future work,
+   not blocked on this audit.
+3. **Tier becomes an input to expected visibility, never a filter on what is checked.**
+   The gate-scope finding (`verify-tier-visibility.mjs` never asserting Standard-mode
+   control visibility because `shouldBeVisibleInAdvanced` excludes anything
+   `tier==='standard'` by construction) is the reason this ruling exists.
+4. **Every hiding condition becomes a registry declaration.** No more mechanism 4
+   (undeclared bespoke JS controlling visibility) — `updateEdgeAmount()`,
+   `updateDivergenceOptions()`, and the `LEGACY_RECEPT` force-hide all get expressed as
+   registry fields, not one-off imperative code.
+5. **Two effect-precondition declarations, not one:** `enabledWhen` for value dependency
+   (a sibling slider below a threshold), `activeUnder` for mode dependency (a different
+   code branch entirely). Collapsing them into one field would misrepresent the
+   mode-dependent cases (`thickTaper`/`thickEdge` under infill type).
+6. **Value-dependent controls get gated on the choice that enables them, not defaulted
+   on.** Claw and cleft sliders do not appear until a clawed or lobed petal shape is
+   chosen — Lace's pattern (one visible choice, sub-panels gated per choice), which is
+   why Lace is the section that already works.
+7. **Progressive disclosure absorbs `updateEdgeAmount()`** rather than landing beside it
+   as a fifth, parallel mechanism.
+8. **Form and Base restructure toward Lace's shape**, with empty slots designed in for
+   sepals and base ornament from the start — not reorganised twice.
+9. **Preset authoring comes after the restructure**, not before — a UI authoring flow
+   built against a control layout that's about to change would need redoing.
+
+Ten decisions; this document's job is done. Closing.
 
 
