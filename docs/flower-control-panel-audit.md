@@ -203,6 +203,35 @@ control instead of one cumulative session.
   Manually re-tested with that setup: **LIVE** (see row below) — but the registry
   mislabels this control's visibility mechanism, and that's the finding above.
 
+**The sweep process died silently partway through, and the check that should have caught
+it didn't — worth two lines here because it bears on how much to trust a long unattended
+sweep in future.** Around control 39/166 the background process was killed (a process-group
+cleanup issue, not a script bug — the first attempt piped a `nohup`ed child through a
+throwaway launcher command instead of using the harness's own tracked background-task
+mechanism). For close to an hour, progress checks that `tail`ed the log file and counted
+rows kept reporting "still running, on schedule" — because a row count and a stalled
+timestamp can't distinguish "slow" from "dead." The fix wasn't a better log check; it was
+switching to the harness's own process-status tracking (`TaskOutput`, which reflects
+whether the OS process is actually alive), which caught the same failure mode immediately
+on the second run — a genuine crash mid-sweep (an unguarded `page.click()` promise
+rejection) was caught, diagnosed, and resumed within one check cycle instead of an hour.
+**A progress check has to assert the process is alive, not just that its output looks
+recent — the same "measuring an adjacent property, not the one that can fail" defect this
+whole audit exists to find, showing up inside the tool built to run the audit.**
+
+**Correction pass, and single-variable isolation on top of it.** The DEAD/NARROW verdicts
+above (mostly `gating`-satisfied but not sibling/mode-satisfied — see the value- vs.
+mode-dependency findings earlier) were re-tested two ways: first, in bulk, against a
+"rich" patch that pushes seven plausible-enabler sliders non-zero at once (cheap, but a
+flip under seven simultaneous changes doesn't say *which one* caused it); then,
+individually, isolating **only** the one specific suspected sibling per flipped control —
+`clawLength=0.3` alone for `clawWidth`/`shoulder`, `cleftDepth=0.4` alone for
+`cleftLobes`/`cleftWidth`, `infillType=voronoi` alone for `thickTaper`/`thickEdge`, and so
+on. **Every isolation attempt confirmed the single-variable cause directly** — none of the
+ten needed the bundle, only the one sibling named in the registry proposal above. The
+table's "Live?" notes cite the exact isolated config, not the seven-variable bundle, for
+every corrected verdict.
+
 ### Two different questions, two verdicts
 
 The first pass of this sweep answered one question — *"can this control ever change the
@@ -251,10 +280,18 @@ the finding that prompted this whole side-investigation:**
    on; a nested reveal, not a defect. `edgeNoise` is the pathological case — see above:
    hidden by undeclared bespoke JS, with zero registry signal that it's conditional at
    all, at the exact default a first-time visitor sees.
-3. **Dead under every configuration — the delete list.** <!-- DELETE_LIST_HEADLINE -->
-   (pending the full 166-control sweep + correction pass — see the inventory table).
-
-<!-- INERT_HEADLINE -->
+3. **Dead under every configuration — the delete list.** After the full 166-control sweep,
+   a correction pass that satisfied every plausible sibling/mode dependency, and a final
+   single-variable isolation check on every flip (attribution, not correlation — see
+   methodology below): **exactly 1 control, `boneOutline`.** 15 of the 16 controls that
+   read DEAD on the first pass turned out to be value- or mode-dependent (see the table
+   and the registry proposal above) and are genuinely live under some reachable
+   configuration. `boneOutline` (a checkbox, "Petal outline," under the Lattice/bone
+   infill) stayed DEAD even isolated under its only gating context (`infillType=bone`,
+   toggled alone, nothing else touched) — no known configuration makes it do anything.
+   Carries no helper text either, so there's no in-panel clue it might be broken. This is
+   the one control this audit can actually recommend deleting, pending a source read to
+   confirm it isn't a genuinely-dead wiring rather than a genuinely-dead visual effect.
 
 ### The `petalShape` picker is the enabler for some of these, but only in Advanced
 
@@ -359,7 +396,175 @@ and leave the other as before.
 
 ## The inventory table
 
-<!-- TABLE_PLACEHOLDER -->
+| Section | Label as shown | Registry key | Tier | Type | Range / options | Gated by | Live? |
+|---|---|---|---|---|---|---|---|
+| Form | Arrangement | `bloomType` | Standard | select | SPIRAL / ROSETTE / FAN | — | **LIVE** — bbox-diagonal delta 10.172mm, tris 71500/106600 |
+| Form | Number of petals | `petalCount` | Standard | slider | 1..40 step 1 | data-bloom-styles=coiled radial | **LIVE** — bbox-diagonal delta 35.990mm, tris 20328/351588/666488 |
+| Form | Divergence angle | `divergenceMode` | Advanced | select | GOLDEN / EVEN / CUSTOM | data-bloom-styles=coiled | **LIVE** — bbox-diagonal delta 9.370mm, tris 71500 |
+| Form | Custom angle | `divergenceAngle` | Advanced | slider | 0..180 step 0.1 | permanentHidden (never shown) | **LIVE** — manually corrected — registry permanentHidden flag is wrong; shown via updateDivergenceOptions() when bloomType=coiled AND divergenceMode=custom; re-tested checksum changes 0/90/180deg at identical tris |
+| Form | Petals per side | `bilPerSide` | Advanced | slider | 1..3 step 1 | data-bloom-styles=bilateral | **LIVE** — bbox-diagonal delta 18.565mm, tris 37464/72560/106600 |
+| Form | Petal spacing | `bilSpacing` | Advanced | slider | 15..60 step 1 | data-bloom-styles=bilateral | **LIVE** — bbox-diagonal delta 20.183mm, tris 106600 |
+| Form | Petal on mirror line | `bilCenterPetal` | Advanced | checkbox | — | data-bloom-styles=bilateral | **LIVE** — bbox-diagonal delta 9.653mm, tris 106600/122672 |
+| Form | Edge | `bilEdge1` | Advanced | select | DEFAULT (GLOBAL TIP) / CLEAN / SERRATED / RUFFLED | data-bil-petal=1 | **LIVE** — bbox-diagonal delta 2.661mm, tris 106600/109336/124024 |
+| Form | Scale | `bilScale1` | Advanced | slider | 0.3..2 step 0.05 | data-bil-petal=1 | **LIVE** — bbox-diagonal delta 20.928mm, tris 104380/106688/115496 |
+| Form | Width | `bilWidth1` | Advanced | slider | 0.45..1.5 step 0.01 | data-bil-petal=1 | **LIVE** — bbox-diagonal delta 8.725mm, tris 104176/106992/107344 |
+| Form | Spine curl | `bilCurlAmount1` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=1 | **LIVE** — bbox-diagonal delta 19.810mm, tris 114824/100712 |
+| Form | Edge curve — top-down | `bilEdgeCurve1` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=1 | **LIVE** — bbox-diagonal delta 6.489mm, tris 103088/106600/107728 |
+| Form | Edge curve — profile | `bilEdgeProfile1` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=1 | **LIVE** — bbox-diagonal delta 13.781mm, tris 106600 |
+| Form | Edge | `bilEdge2` | Advanced | select | DEFAULT (GLOBAL TIP) / CLEAN / SERRATED / RUFFLED | data-bil-petal=2 | **LIVE** — bbox-diagonal delta 4.331mm, tris 106600/109336/125784 |
+| Form | Scale | `bilScale2` | Advanced | slider | 0.3..2 step 0.05 | data-bil-petal=2 | **LIVE** — bbox-diagonal delta 18.377mm, tris 102556/105160/112560 |
+| Form | Width | `bilWidth2` | Advanced | slider | 0.45..1.5 step 0.01 | data-bil-petal=2 | **LIVE** — bbox-diagonal delta 8.140mm, tris 103320/104712/105800 |
+| Form | Spine curl | `bilCurlAmount2` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=2 | **LIVE** — bbox-diagonal delta 7.031mm, tris 115496/100136 |
+| Form | Edge curve — top-down | `bilEdgeCurve2` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=2 | **LIVE** — bbox-diagonal delta 6.485mm, tris 103800/106600/106224 |
+| Form | Edge curve — profile | `bilEdgeProfile2` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=2 | **LIVE** — bbox-diagonal delta 9.474mm, tris 106600 |
+| Form | Edge | `bilEdge3` | Advanced | select | DEFAULT (GLOBAL TIP) / CLEAN / SERRATED / RUFFLED | data-bil-petal=3 | **LIVE** — bbox-diagonal delta 1.086mm, tris 106600/109336/125048 |
+| Form | Scale | `bilScale3` | Advanced | slider | 0.3..2 step 0.05 | data-bil-petal=3 | **LIVE** — bbox-diagonal delta 11.496mm, tris 102916/106008/113912 |
+| Form | Width | `bilWidth3` | Advanced | slider | 0.45..1.5 step 0.01 | data-bil-petal=3 | **LIVE** — bbox-diagonal delta 8.252mm, tris 103136/107912/105080 |
+| Form | Spine curl | `bilCurlAmount3` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=3 | **LIVE** — bbox-diagonal delta 11.424mm, tris 115176/100552 |
+| Form | Edge curve — top-down | `bilEdgeCurve3` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=3 | **LIVE** — bbox-diagonal delta 8.891mm, tris 103640/106600/107960 |
+| Form | Edge curve — profile | `bilEdgeProfile3` | Advanced | slider | -1..1 step 0.01 | data-bil-petal=3 | **LIVE** — bbox-diagonal delta 7.700mm, tris 106600 |
+| Form | Bloom angle | `bloom` | Standard | slider | 0..90 step 1 | — | **LIVE** — bbox-diagonal delta 20.840mm, tris 71500 |
+| Form | Petal spacing | `tightness` | Standard | slider | 0..1 step 0.01 | data-bloom-styles=coiled | **LIVE** — bbox-diagonal delta 7.892mm, tris 71500 |
+| Form | Center elevation | `elevation` | Standard | slider | -1..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 9.685mm, tris 71500 |
+| Form | Organic variance | `variance` | Standard | slider | 0..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 7.320mm, tris 71500/69588/70004 |
+| Form | Curl gradient (edge → centre) | `curlGradient` | Advanced | slider | -1..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 18.482mm, tris 73020/71500/70156 |
+| Form | Size gradient (centre → edge, single whorl only) | `sizeGradient` | Advanced | slider | -1..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 5.619mm, tris 71888/71500/73100 |
+| Form | Petal shape | `petalShape` | Standard | select | ROUNDED / POINTED / STRAP / CLAWED / LOBED / CUSTOM | — | **N/A (uiOnly)** — derived proxy over 13 already-tested params (SHAPE_PARAMS) — see methodology |
+| Form | Petal width | `width` | Advanced | slider | 0.1..1.5 step 0.01 | data-hide-bilateral | **LIVE** — bbox-diagonal delta 13.595mm, tris 58376/68492/72704 |
+| Form | Taper | `taper` | Advanced | slider | 0..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 1.095mm, tris 71132/69912/68432 |
+| Form | Claw length | `clawLength` | Advanced | slider | 0..0.5 step 0.01 | — | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus clawLength itself)) |
+| Form | Claw width | `clawWidth` | Advanced | slider | 0.05..0.6 step 0.01 | — | **NARROW** — DEAD at defaults; confirmed LIVE isolated on clawLength=0.3 ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Shoulder | `shoulder` | Advanced | slider | 0..1 step 0.01 | — | **LIVE** — DEAD at defaults; confirmed LIVE isolated on clawLength=0.3 ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Cleft depth | `cleftDepth` | Advanced | slider | 0..0.6 step 0.01 | — | **LIVE** — bbox-diagonal delta 1.524mm, tris 71500/67320/61916 |
+| Form | Lobe count | `cleftLobes` | Advanced | slider | 2..7 step 1 | — | **NARROW** — DEAD at defaults; confirmed LIVE isolated on cleftDepth=0.4 ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Cleft width | `cleftWidth` | Advanced | slider | 0.05..1 step 0.01 | — | **LIVE** — DEAD at defaults; confirmed LIVE isolated on cleftDepth=0.4 ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Spine curl | `curlAmount` | Advanced | slider | -1..1 step 0.01 | data-hide-bilateral | **LIVE** — bbox-diagonal delta 14.925mm, tris 88524/59404 |
+| Form | Curl bias | `curlBias` | Advanced | slider | 0..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 6.264mm, tris 71500/116604/148572 |
+| Form | Curl start | `curlStart` | Advanced | slider | 0..0.95 step 0.01 | — | **LIVE** — bbox-diagonal delta 6.316mm, tris 71500/82556/171612 |
+| Form | Edge curve — top-down | `edgeCurve` | Advanced | slider | -1..1 step 0.01 | data-hide-bilateral | **LIVE** — bbox-diagonal delta 12.454mm, tris 66320/71500/73264 |
+| Form | Edge curve — profile | `edgeProfile` | Advanced | slider | -1..1 step 0.01 | data-hide-bilateral | **LIVE** — bbox-diagonal delta 1.984mm, tris 71500 |
+| Form | Petal cup | `petalCup` | Advanced | slider | -1..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 0.651mm, tris 71500 |
+| Form | Cross-section roll | `crossSection` | Advanced | slider | -1..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 6.499mm, tris 133580/71500 |
+| Form | Cross-section taper | `crossSectionTaper` | Advanced | slider | -1..1 step 0.01 | — | **LIVE** — DEAD at defaults; confirmed LIVE isolated on crossSection=0.5 ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Surface relief | `reliefAmp` | Advanced | slider | 0..1 step 0.01 | — | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus reliefAmp itself)) |
+| Form | Relief frequency | `reliefFreq` | Advanced | slider | 0..1 step 0.01 | — | **NARROW** — DEAD at defaults; confirmed LIVE isolated on reliefAmp=0.5 ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Relief pattern | `reliefMode` | Advanced | select | Radial (ribs from base) / Transverse / Irregular (bullate) | — | **LIVE** — DEAD at defaults; confirmed LIVE isolated on reliefAmp=0.5 ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Twist | `petalTwist` | Advanced | slider | -1..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 5.033mm, tris 71500 |
+| Form | Skew | `petalSkew` | Advanced | slider | -1..1 step 0.01 | — | **LIVE** — bbox-diagonal delta 4.202mm, tris 71500 |
+| Form | Thickness taper | `thickTaper` | Advanced | slider | 0..1 step 0.01 | — | **NARROW** — DEAD at defaults; confirmed LIVE isolated on infillType=voronoi ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Edge knife | `thickEdge` | Advanced | slider | 0..1 step 0.01 | — | **NARROW** — DEAD at defaults; confirmed LIVE isolated on infillType=voronoi ONLY alone (single-variable attribution, not the bundled patch) |
+| Form | Thickness | `thickScale` | Advanced | slider | 0.5..2 step 0.01 | — | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (infillType=voronoi) |
+| Form | Layer count | `layerCount` | Advanced | slider | 1..6 step 1 | — | **LIVE** — bbox-diagonal delta 1.236mm, tris 71500/264918/388398 |
+| Form | Petals per layer | `petalsPerLayer` | Advanced | text | — | data-layers-multi | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus petalsPerLayer itself)) |
+| Form | Layer size falloff | `layerSizeFalloff` | Advanced | slider | 0.3..1 step 0.01 | data-layers-multi | **LIVE** — bbox-diagonal delta 4.636mm, tris 155786/199324/204004 |
+| Form | Layer height offset | `layerHeightOffset` | Advanced | slider | -0.3..0.3 step 0.01 | data-layers-multi | **LIVE** — bbox-diagonal delta 5.275mm, tris 199720 |
+| Form | Layer rotation offset | `layerRotationOffset` | Advanced | slider | 0..90 step 1 | data-layers-multi | **NARROW** — bbox-diagonal delta 0.002mm across sampled range (tris 199720) |
+| Form | Layer bloom angle delta | `layerBloomAngleDelta` | Advanced | slider | 0..40 step 1 | data-layers-multi | **LIVE** — bbox-diagonal delta 2.876mm, tris 199720 |
+| Lace | Pattern | `infillType` | Standard | select | VEINS / CELLS / STRANDS / LATTICE / GROWTH | — | **LIVE** — bbox-diagonal delta 0.650mm, tris 71500/172876/33712/46760/90570 |
+| Lace | Network | `spaceMode` | Advanced | select | OPEN / CLOSED | data-infill-styles=spacecol | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 70916/90570) |
+| Lace | Seed pattern | `spacePattern` | Advanced | select | PHYLLOTACTIC / JITTERED LATTICE / RANDOM | data-infill-styles=spacecol | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 90570/89274/106702) |
+| Lace | Source density | `spaceDensity` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=spacecol | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus spaceDensity itself)) |
+| Lace | Birth distance | `spaceBirth` | Advanced | slider | 0.03..0.2 step 0.005 | data-infill-styles=spacecol | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 112390/52482/25308) |
+| Lace | Kill distance | `spaceKill` | Advanced | slider | 0.02..0.15 step 0.005 | data-infill-styles=spacecol | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 126204/42954/43052) |
+| Lace | Growth step | `spaceStep` | Advanced | slider | 0.02..0.12 step 0.005 | data-infill-styles=spacecol | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 80516/60870/31816) |
+| Lace | Network variants | `spaceVariants` | Advanced | slider | 1..6 step 1 | data-infill-styles=spacecol | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus spaceVariants itself)) |
+| Lace | Density | `density` | Standard | slider | 3..12 step 1 | data-infill-styles=veins voronoi | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus density itself)) |
+| Lace | Vein detail | `softness` | Standard | slider | 0..1 step 0.01 | data-infill-styles=veins voronoi | **NARROW** — bbox-diagonal delta 0.036mm across sampled range (tris 20724/45440/111864) |
+| Lace | First branch | `veinBranchStart` | Advanced | slider | 0..0.6 step 0.01 | data-infill-styles=veins | **NARROW** — bbox-diagonal delta 0.036mm across sampled range (tris 69784/79540/69344) |
+| Lace | Edge termination | `edgeTermination` | Advanced | select | FADE / MEET / LOOP | data-infill-styles=veins bone spacecol | **NARROW** — bbox-diagonal delta 0.004mm across sampled range (tris 36688/62548/71500) |
+| Lace | Capture distance | `captureDist` | Advanced | slider | 0.02..0.4 step 0.01 | imperative JS (not a `gating` sweep) | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 67364/71500) |
+| Lace | Cell relaxation | `voronoiLloyd` | Advanced | slider | 0..20 step 1 | data-infill-styles=voronoi | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 162076/173576/175576) |
+| Lace | Cell density law | `voronoiDensityLaw` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=voronoi | **NARROW** — bbox-diagonal delta 0.002mm across sampled range (tris 172876/158776/152376) |
+| Lace | Anisotropy | `voronoiAniso` | Advanced | slider | 1..4 step 0.05 | data-infill-styles=voronoi | **NARROW** — bbox-diagonal delta 0.002mm across sampled range (tris 172876/164776/165376) |
+| Lace | Weight hierarchy | `voronoiWeight` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=voronoi | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 172876) |
+| Lace | Weight falloff | `voronoiWeightFalloff` | Advanced | slider | 0..4 step 0.1 | data-infill-styles=voronoi | **NARROW** — mode-dependent: DEAD under continuousMargin=on (default/SDF path), NARROW under continuousMargin=off (legacy path) |
+| Lace | Slab taper | `voronoiSlabTaper` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=voronoi | **NARROW** — bbox-diagonal delta 0.467mm across sampled range (tris 172876) |
+| Lace | Strand count | `strandCount` | Advanced | slider | 4..44 step 1 | data-infill-styles=strands | **NARROW** — bbox-diagonal delta 0.039mm across sampled range (tris 17072/37872/58672) |
+| Lace | Strand width | `strandWidth` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=strands | **NARROW** — bbox-diagonal delta 0.177mm across sampled range (tris 33712) |
+| Lace | Strand taper | `strandTaper` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=strands | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 33712) |
+| Lace | Strand curvature | `strandCurvature` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=strands | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 33712) |
+| Lace | Irregularity | `strandIrregularity` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=strands | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 33712) |
+| Lace | Bone count | `boneCount` | Advanced | slider | 4..40 step 1 | data-infill-styles=bone | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 21624/53832/86040) |
+| Lace | Bone width | `boneWidth` | Advanced | slider | 0..3 step 0.01 | data-infill-styles=bone | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 46760) |
+| Lace | Bone curve | `boneCurve` | Advanced | slider | -1..1 step 0.01 | data-infill-styles=bone | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 43336/45288/47912) |
+| Lace | Bone spread | `boneSpread` | Advanced | slider | 0..1 step 0.01 | data-infill-styles=bone | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 41368/46440/46824) |
+| Lace | Petal outline | `boneOutline` | Advanced | checkbox | — | data-infill-styles=bone | **DEAD** — confirmed DEAD even isolated under its only plausible enabler (boneOutline <- infillType=bone, toggled alone) — no known config makes this control do anything |
+| Edge | Edge | `tipStyle` | Standard | select | CLEAN / TOOTHED / SCALLOPED / RUFFLED | — | **LIVE** — bbox-diagonal delta 1.262mm, tris 71500/76972/75468/107852 |
+| Edge | Tip shape | `tip` | Standard | slider | 0..1 step 0.01 | — | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus tip itself)) |
+| Edge | Tip fineness | `tipFineness` | Standard | slider | 0..1 step 0.01 | — | **LIVE** — DEAD at defaults; confirmed LIVE isolated on tip=0.9 + width=0.2 (narrow) alone (single-variable attribution, not the bundled patch) |
+| Edge | Tip frequency | `tipFrequency` | Advanced | slider | 1..40 step 1 | data-tip-styles=jagged ruffled | **NARROW** — bbox-diagonal delta 0.116mm across sampled range (tris 71916/80236/91116) |
+| Edge | Tip region | `tipRegion` | Advanced | slider | 0..1 step 0.01 | data-tip-styles=jagged | **LIVE** — bbox-diagonal delta 0.640mm, tris 78636/75180/72492 |
+| Edge | Tip length | `tipLength` | Advanced | slider | 0..1 step 0.01 | data-tip-styles=jagged ruffled | **LIVE** — bbox-diagonal delta 4.764mm, tris 71500/76972 |
+| Edge | Tip irregularity | `tipIrregularity` | Advanced | slider | 0..1 step 0.01 | data-tip-styles=jagged | **LIVE** — bbox-diagonal delta 1.171mm, tris 76972 |
+| Edge | Scallop count | `scallopCount` | Advanced | slider | 2..30 step 1 | data-tip-styles=scallop | **LIVE** — bbox-diagonal delta 1.232mm, tris 75596/76236/79948 |
+| Edge | Scallop height | `scallopHeight` | Advanced | slider | 0..1 step 0.01 | data-tip-styles=scallop | **LIVE** — bbox-diagonal delta 5.627mm, tris 75468 |
+| Edge | Edge noise | `edgeNoise` | Standard | slider | 0..1 step 0.01 | — | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85 (all, minus edgeNoise itself)) |
+| Edge | Edge noise scale | `edgeNoiseScale` | Advanced | slider | 0..1 step 0.01 | — | **LIVE** — DEAD at defaults; confirmed LIVE isolated on edgeNoise=0.5 ONLY alone (single-variable attribution, not the bundled patch) |
+| Base | Center type | `centerArch` | Standard | select | CLASSIC / DENSE CLUSTER / DISC / PETALOID FILL | — | **LIVE** — bbox-diagonal delta 0.504mm, tris 71500/76044/116204 |
+| Base | Classic style | `centerType` | Advanced | select | STAMENS / PISTIL / NONE | data-center-arch=classic | **LIVE** — bbox-diagonal delta 2.448mm, tris 71500/67244 |
+| Base | Amount | `centerCount` | Advanced | slider | 1..60 step 1 | data-center-arch=classic; data-center-styles=stamens pistil | **LIVE** — bbox-diagonal delta 0.583mm, tris 67548/76668/85484 |
+| Base | Length | `centerLength` | Advanced | slider | 0..3 step 0.01 | data-center-arch=classic; data-center-styles=stamens pistil | **LIVE** — bbox-diagonal delta 11.851mm, tris 71500 |
+| Base | Filament thickness | `centerFilThick` | Advanced | slider | 0..1 step 0.01 | data-center-arch=classic; data-center-styles=stamens pistil | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 71500) |
+| Base | Tip size | `centerTipSize` | Advanced | slider | 0..1 step 0.01 | data-center-arch=classic; data-center-styles=stamens pistil | **NARROW** — bbox-diagonal delta 0.423mm across sampled range (tris 71500) |
+| Base | Tip shape | `centerTipShape` | Advanced | slider | 0..1 step 0.01 | data-center-arch=classic; data-center-styles=stamens pistil | **NARROW** — bbox-diagonal delta 0.109mm across sampled range (tris 71500) |
+| Base | Stamen count | `denseStamenCount` | Advanced | slider | 10..200 step 1 | data-center-arch=dense | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 69044/78544/88044) |
+| Base | Stamen length | `denseStamenLength` | Advanced | slider | 0..1 step 0.01 | data-center-arch=dense | **LIVE** — bbox-diagonal delta 0.782mm, tris 76044 |
+| Base | Carpel count | `carpelCount` | Advanced | slider | 1..10 step 1 | data-center-arch=dense | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 75404/76204/76844) |
+| Base | Carpel size | `carpelSize` | Advanced | slider | 0..1 step 0.01 | data-center-arch=dense | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 76044) |
+| Base | Disc size | `discSize` | Advanced | slider | 0..1 step 0.01 | data-center-arch=disc | **LIVE** — bbox-diagonal delta 0.701mm, tris 71500 |
+| Base | Disc height | `discHeight` | Advanced | slider | 0..1 step 0.01 | data-center-arch=disc | **LIVE** — bbox-diagonal delta 1.297mm, tris 71500 |
+| Base | Ring stamen count | `ringStamenCount` | Advanced | slider | 0..150 step 1 | data-center-arch=disc | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 67500/75000/82500) |
+| Base | Ring stamen length | `ringStamenLength` | Advanced | slider | 0..1 step 0.01 | data-center-arch=disc | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 71500) |
+| Base | Fill petal count | `fillPetalCount` | Advanced | slider | 12..200 step 1 | data-center-arch=petaloid | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 77036/153740/230444) |
+| Base | Outer fill size | `fillOuterSize` | Advanced | slider | 0.05..0.5 step 0.01 | data-center-arch=petaloid | **LIVE** — bbox-diagonal delta 0.893mm, tris 116204 |
+| Base | Inner fill size | `fillInnerSize` | Advanced | slider | 0.03..0.5 step 0.01 | data-center-arch=petaloid | **LIVE** — bbox-diagonal delta 3.132mm, tris 116204 |
+| Base | Fill density | `fillDensity` | Advanced | slider | 0..1 step 0.01 | data-center-arch=petaloid | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 116204) |
+| Base | Fill bloom angle | `fillBloomAngle` | Advanced | slider | 0..90 step 1 | data-center-arch=petaloid | **NARROW** — bbox-diagonal delta 0.231mm across sampled range (tris 116204) |
+| Base | Continuous margin | `continuousMargin` | Advanced | select | OFF / ON | — | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85) |
+| Base | Bundle tightness | `bundleTightness` | Advanced | slider | 0..1 step 0.01 | data-cont-margin | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85) |
+| Base | Flare rate | `flareRate` | Advanced | slider | 0..1 step 0.01 | data-cont-margin | **LIVE** — NARROW at defaults; corrected to LIVE under a richer config (clawLength=0.3, cleftDepth=0.4, crossSection=0.5, curlAmount=0.5, edgeNoise=0.5, reliefAmp=0.5, tip=0.85) |
+| Base | Absorption | `absorption` | Advanced | slider | 0..1 step 0.01 | data-cont-margin | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 87096/92336/98704) |
+| Base | Neck swell | `buttonSize` | Advanced | slider | 0..1 step 0.01 | data-cont-margin | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 93512/94004/94588) |
+| Base | Gather height | `gatherHeight` | Advanced | slider | 0.05..0.6 step 0.01 | data-cont-margin | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 93908/93024/92676) |
+| Base | Receptacle | `receptacleType` | Advanced | select | NONE / ON | permanentHidden (never shown) | **UNREACHABLE** — UNREACHABLE — permanentHidden by design (migration-only slot, no code path reveals it) |
+| Base | Profile | `receptProfile` | Advanced | select | FLARE / DOME / CONE / URN / GENTLE | data-recept | **LIVE** — bbox-diagonal delta 9.873mm, tris 93580/95020/92672/93784/90108 |
+| Base | Construction | `receptConstruction` | Advanced | select | SOLID / RIBBED / CORED | data-recept | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 88832/89660) |
+| Base | Collar | `receptCollar` | Advanced | select | NONE / BAND / FERRULE | data-recept | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 88832/89372/90452) |
+| Base | Reach | `receptReach` | Advanced | slider | 0..1 step 0.01 | data-recept | **LIVE** — DEAD at defaults; confirmed LIVE isolated on layerCount=3 + stem alone (single-variable attribution, not the bundled patch) |
+| Base | Blend smoothness | `blendSmoothness` | Advanced | slider | 0..1 step 0.01 | data-recept | **NARROW** — mode-dependent: DEAD under continuousMargin=on (default/SDF path), NARROW under continuousMargin=off (legacy path) |
+| Base | Receptacle depth | `receptacleDepth` | Advanced | slider | 0..1 step 0.01 | data-recept | **LIVE** — bbox-diagonal delta 18.576mm, tris 89188/93580/97628 |
+| Base | Convergence tightness | `convergenceTightness` | Advanced | slider | 0..1 step 0.01 | data-recept | **NARROW** — mode-dependent: DEAD under continuousMargin=on (default/SDF path), NARROW under continuousMargin=off (legacy path) |
+| Base | Solidity | `receptSolidity` | Advanced | slider | 0..1 step 0.01 | data-recept-open | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 89660) |
+| Base | Rib multiplier | `ribMultiplier` | Advanced | slider | 0.5..3 step 0.05 | data-recept-ribbed | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 89080/90820/93140) |
+| Base | Rib tightness | `spiralTightness` | Advanced | slider | 0..1 step 0.01 | data-recept-ribbed | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 89660/91040/93380) |
+| Base | Rib thickness | `spiralThickness` | Advanced | slider | 0..1 step 0.01 | data-recept-ribbed | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 89660) |
+| Base | Bulb size | `bulbSize` | Advanced | slider | 0..1 step 0.01 | data-recept-dome | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 89312) |
+| Base | Bulb height | `bulbHeight` | Advanced | slider | 0..1 step 0.01 | data-recept-dome | **LIVE** — bbox-diagonal delta 11.858mm, tris 89312 |
+| Base | Sepals | `sepalsType` | Standard | select | NONE / SEPALS | — | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 71500/113980) |
+| Base | Sepal size | `sepalSize` | Advanced | slider | 0.1..1.5 step 0.05 | data-sepal | **LIVE** — bbox-diagonal delta 7.962mm, tris 111496/113880/117128 |
+| Base | Sepal count | `sepalCount` | Advanced | slider | 3..24 step 1 | data-sepal | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 103824/156120/200408) |
+| Base | Sepal style | `sepalStyle` | Advanced | select | MODIFIED LEAF / SOLID | data-sepal | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 113980/114732) |
+| Base | Sepal center curve | `sepalCenterCurve` | Advanced | slider | -1..1 step 0.01 | data-sepal | **NARROW** — bbox-diagonal delta 0.152mm across sampled range (tris 113980) |
+| Base | Sepal edge curve — top-down | `sepalEdgeCurve` | Advanced | slider | -1..1 step 0.01 | data-sepal | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 114400/114572/114440) |
+| Base | Sepal edge curve — profile | `sepalEdgeProfile` | Advanced | slider | -1..1 step 0.01 | data-sepal | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 113980) |
+| Base | Sepal tip style | `sepalTipStyle` | Advanced | select | CLEAN / SERRATED | data-sepal | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 113980/119284) |
+| Base | Sepal tip shape | `sepalTipShape` | Advanced | slider | 0..1 step 0.01 | data-sepal; data-sepal-tip=jagged | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 119020/119568/118964) |
+| Base | Sepal tip frequency | `sepalTipFreq` | Advanced | slider | 1..40 step 1 | data-sepal; data-sepal-tip=jagged | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 114644/124724/138324) |
+| Base | Sepal tip region | `sepalTipRegion` | Advanced | slider | 0..1 step 0.01 | data-sepal; data-sepal-tip=jagged | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 121844/117524/114164) |
+| Base | Sepal tip length | `sepalTipLength` | Advanced | slider | 0..1 step 0.01 | data-sepal; data-sepal-tip=jagged | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 114284/119284) |
+| Base | Stem | `stemType` | Standard | select | NONE / STEM | — | **LIVE** — bbox-diagonal delta 10.354mm, tris 71500/93580 |
+| Base | Stem length | `stemLength` | Advanced | slider | 0..10 step 0.05 | data-stem | **LIVE** — bbox-diagonal delta 32.582mm, tris 89660/93580 |
+| Base | Stem curve | `stemCurve` | Advanced | slider | -1..1 step 0.01 | permanentHidden (never shown) | **UNREACHABLE** — UNREACHABLE — permanentHidden by design (dev-only slot) |
+| Base | Stem thickness | `stemThickness` | Advanced | slider | 0.5..3 step 0.05 | data-stem | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 90372/99444/111840) |
+| Base | Leaf nodes | `stemNodeCount` | Advanced | slider | 0..8 step 1 | data-stem | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 93580) |
+| Base | Node prominence | `stemNodeProminence` | Advanced | slider | 0..1 step 0.01 | data-stem | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 93580) |
+| Base | Side bud | `stemBudMode` | Advanced | select | NONE / TIGHT BUD / EARLY BLOOM | data-stem | **LIVE** — bbox-diagonal delta 7.180mm, tris 93580/147724/147212 |
+| Base | Leaves | `leafType` | Standard | select | NONE / COMPOUND (ROSE) / LOBED (POPPY) / OVAL ON PETIOLE / NARROW | data-stem | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 93580/132772/102460/101968) |
+| Base | Leaf arrangement | `leafPhyllotaxy` | Advanced | select | ALTERNATE / OPPOSITE / WHORLED | data-stem; data-leaf | **NARROW** — bbox-diagonal delta 0.000mm across sampled range (tris 132772/171964/211156) |
+| Base | Leaf size | `leafSize` | Advanced | slider | 0.2..3 step 0.05 | data-stem; data-leaf | **LIVE** — bbox-diagonal delta 43.888mm, tris 132772 |
+| Make | Size | `heightMM` | Standard | slider | 40..300 step 5 | — | **LIVE** — bbox-diagonal delta 358.784mm, tris 71500 |
+| Make | Process | `process` | Standard | select | SLS NYLON / RESIN SLA / FDM 0.4MM | — | **LIVE** — bbox-diagonal delta 0.795mm, tris 71500 |
+| Make | Tube thickness | `tube` | Advanced | slider | 0..1 step 0.01 | permanentHidden (never shown) | **UNREACHABLE** — UNREACHABLE — permanentHidden by design (dev-only slot) |
 
 **Notes on rows above `permanentHidden` / `imperativeGate`:** `receptacleType`,
 `stemCurve`, and `tube` are permanently hidden *by design* — migration-only or
@@ -432,7 +637,371 @@ alongside these:
   rendered UI that says "Receptacle" or "Junction" at all (confirmed against
   `flower.html` — no `<h3>`/`fl-legend`-type element for this cluster; see Section 2).
 
-<!-- SECTION1_PLACEHOLDER -->
+### Full listing, by section
+
+#### Form
+
+- **Arrangement** (`bloomType`)
+    - phyllotactic spiral (golden angle) [bloom-styles=coiled]
+    - evenly spread around one ring [bloom-styles=radial]
+    - symmetric fan across one axis [bloom-styles=bilateral]
+- **Number of petals** (`petalCount`)
+    - total petals in the bloom [bloom-styles=coiled]
+    - petals evenly spaced around the ring [bloom-styles=radial]
+- **Divergence angle** (`divergenceMode`)
+    - golden spiral → even ring → custom angle
+    - below 8 petals the spiral looks irregular — try even
+- **Custom angle** (`divergenceAngle`)
+    - degrees between successive petals
+- **Petals per side** (`bilPerSide`)
+    - petals on each side of the mirror line
+- **Petal spacing** (`bilSpacing`)
+    - angle between neighbouring petals
+- **Petal on mirror line** (`bilCenterPetal`)
+    - _(no helper text)_
+- **Edge** (`bilEdge1`)
+    - applies to the centre petal too, if on
+- **Scale** (`bilScale1`)
+    - _(no helper text)_
+- **Width** (`bilWidth1`)
+    - _(no helper text)_
+- **Spine curl** (`bilCurlAmount1`)
+    - _(no helper text)_
+- **Edge curve — top-down** (`bilEdgeCurve1`)
+    - _(no helper text)_
+- **Edge curve — profile** (`bilEdgeProfile1`)
+    - _(no helper text)_
+- **Edge** (`bilEdge2`)
+    - _(no helper text)_
+- **Scale** (`bilScale2`)
+    - _(no helper text)_
+- **Width** (`bilWidth2`)
+    - _(no helper text)_
+- **Spine curl** (`bilCurlAmount2`)
+    - _(no helper text)_
+- **Edge curve — top-down** (`bilEdgeCurve2`)
+    - _(no helper text)_
+- **Edge curve — profile** (`bilEdgeProfile2`)
+    - _(no helper text)_
+- **Edge** (`bilEdge3`)
+    - _(no helper text)_
+- **Scale** (`bilScale3`)
+    - _(no helper text)_
+- **Width** (`bilWidth3`)
+    - _(no helper text)_
+- **Spine curl** (`bilCurlAmount3`)
+    - _(no helper text)_
+- **Edge curve — top-down** (`bilEdgeCurve3`)
+    - _(no helper text)_
+- **Edge curve — profile** (`bilEdgeProfile3`)
+    - _(no helper text)_
+- **Bloom angle** (`bloom`)
+    - closed bud → fully open
+- **Petal spacing** (`tightness`)
+    - petals touching (packed) → petals spread (open spiral)
+- **Center elevation** (`elevation`)
+    - sunken bowl → flat → raised cone
+- **Organic variance** (`variance`)
+    - uniform florets → each varies in length, angle & roll
+- **Curl gradient (edge → centre)** (`curlGradient`)
+    - + outer curls less / inner curls more — sign reverses it
+- **Size gradient (centre → edge, single whorl only)** (`sizeGradient`)
+    - + inner petals smaller / outer bigger — sign reverses it
+- **Petal shape** (`petalShape`)
+    - a named silhouette — the petal controls below fine-tune it (Advanced), which reads back as CUSTOM
+- **Petal width** (`width`)
+    - bilateral sets width per petal (Bloom)
+- **Taper** (`taper`)
+    - broad → slender
+- **Claw length** (`clawLength`)
+    - basal stalk (0 = none → caryophyllaceous claw)
+- **Claw width** (`clawWidth`)
+    - stalk width as fraction of blade
+- **Shoulder** (`shoulder`)
+    - gentle dip → abrupt claw → blade
+- **Cleft depth** (`cleftDepth`)
+    - lobed margin: entire (0) → emarginate → bifid → fringed
+- **Lobe count** (`cleftLobes`)
+    - 2 = bifid → 4 = ragged robin → 7 = fringed
+- **Cleft width** (`cleftWidth`)
+    - narrow slit → wide notch between lobes
+- **Spine curl** (`curlAmount`)
+    - flat → arc → full circle → fiddlehead crozier
+- **Curl bias** (`curlBias`)
+    - uniform (hoop) → tip-loaded (crozier)
+- **Curl start** (`curlStart`)
+    - 0 = whole petal curls → higher = only the outer portion
+- **Edge curve — top-down** (`edgeCurve`)
+    - pinched → billowed (plan view)
+- **Edge curve — profile** (`edgeProfile`)
+    - edges dip → lift (parallel to centre curve)
+- **Petal cup** (`petalCup`)
+    - across-width bowl: cupped spoon (+) → flat (0) → reflexed (−)
+- **Cross-section roll** (`crossSection`)
+    - flat (0) → channelled → closed quill (±1); sign picks which way it rolls
+- **Cross-section taper** (`crossSectionTaper`)
+    - uniform (0) → opens to a spoon at the tip (+) or the base (−)
+- **Surface relief** (`reliefAmp`)
+    - out-of-plane corrugation: smooth → plicate/rugose
+- **Relief frequency** (`reliefFreq`)
+    - broad pleats → fine crepe
+- **Relief pattern** (`reliefMode`)
+    - rib direction (radial follows the vein flow)
+- **Twist** (`petalTwist`)
+    - contorted bud spiral about the midrib (chirality)
+- **Skew** (`petalSkew`)
+    - lateral midrib bend (asymmetric single petal)
+- **Thickness taper** (`thickTaper`)
+    - base-to-tip: uniform → thick base, thin tip
+- **Edge knife** (`thickEdge`)
+    - thin the margin to a knife edge (floored at print min)
+- **Thickness** (`thickScale`)
+    - global sheet/rib thickness (floored at print min)
+- **Layer count** (`layerCount`)
+    - concentric petal whorls (1 = single ring, unchanged)
+- **Petals per layer** (`petalsPerLayer`)
+    - comma list, outer→inner (e.g. 8,12,16); blank slots use the Bloom petal count
+- **Layer size falloff** (`layerSizeFalloff`)
+    - each inner layer's size, as a fraction of the one outside it (1 = uniform)
+- **Layer height offset** (`layerHeightOffset`)
+    - vertical stacking distance between layers (+ raises the inner layers)
+- **Layer rotation offset** (`layerRotationOffset`)
+    - angular stagger per layer, so inner petals fall in the outer gaps
+- **Layer bloom angle delta** (`layerBloomAngleDelta`)
+    - how much more closed/cupped each inner layer is (rose/peony centre)
+
+#### Lace
+
+- **Pattern** (`infillType`)
+    - _(no helper text)_
+- **Network** (`spaceMode`)
+    - open grows a pure branching tree → closed lets veins fuse into loops and areoles
+- **Seed pattern** (`spacePattern`)
+    - how the attraction sources are placed — phyllotactic (golden angle) is the crispest, matching the coiled bloom
+- **Source density** (`spaceDensity`)
+    - few sources, open network → many sources, fine dense venation
+- **Birth distance** (`spaceBirth`)
+    - minimum spacing between sources — larger spreads them out, capping how dense it can get
+- **Kill distance** (`spaceKill`)
+    - how close a vein must reach a source before it is consumed — larger ends branches sooner
+- **Growth step** (`spaceStep`)
+    - how far a vein advances each step — smaller is smoother and finer but heavier
+- **Network variants** (`spaceVariants`)
+    - distinct networks cycled across the petals — 1 repeats one, more break up the repetition
+- **Density** (`density`)
+    - few → many primary veins off the midrib [infill-styles=veins]
+    - few, large cells → many, small [infill-styles=voronoi]
+- **Vein detail** (`softness`)
+    - midrib + primaries only → dense fine capillary network [infill-styles=veins]
+    - angular cells → rounded, organic — up to 5× [infill-styles=voronoi]
+- **First branch** (`veinBranchStart`)
+    - where the first branch sits up the midrib — lower = closer to the base
+- **Edge termination** (`edgeTermination`)
+    - how the infill meets the rim — fade stops short of it, meet runs veins into the margin, loop fuses neighbouring tips into arches
+- **Capture distance** (`captureDist`)
+    - how close a tip must reach the margin before it is captured — as a fraction of blade width
+- **Cell relaxation** (`voronoiLloyd`)
+    - 0 leaves cells sliced by the outline → more evens them and settles outer cells against the margin
+- **Cell density law** (`voronoiDensityLaw`)
+    - 0 keeps cells one size (crowds the tip) → 1 shrinks them with the blade so the count across stays even
+- **Anisotropy** (`voronoiAniso`)
+    - 1 round cells → higher stretches them along the petal so they flow like veins
+- **Weight hierarchy** (`voronoiWeight`)
+    - 0 one uniform wall weight → 1 thick at the base and along spines, fine toward the tip
+- **Weight falloff** (`voronoiWeightFalloff`)
+    - how fast wall weight drops from base to tip — low is gradual, high stays thick then thins late
+- **Slab taper** (`voronoiSlabTaper`)
+    - 0 even sheet depth → 1 deeper at the base and shallower at the tip, for bending stiffness where it matters
+- **Strand count** (`strandCount`)
+    - wide gaps → densely packed
+- **Strand width** (`strandWidth`)
+    - thin strands, open voids → thick strands, narrow slits
+- **Strand taper** (`strandTaper`)
+    - uniform width → fine point at the tip
+- **Strand curvature** (`strandCurvature`)
+    - straight radial → organic bow
+- **Irregularity** (`strandIrregularity`)
+    - uniform widths → naturally varied
+- **Bone count** (`boneCount`)
+    - few ribs → dense rib cage
+- **Bone width** (`boneWidth`)
+    - fine bones → heavy bones (up to 3×)
+- **Bone curve** (`boneCurve`)
+    - swept to the base ← straight out → swept to the tip
+- **Bone spread** (`boneSpread`)
+    - short ribs → reach the margin
+- **Petal outline** (`boneOutline`)
+    - _(no helper text)_
+
+#### Edge
+
+- **Edge** (`tipStyle`)
+    - _(no helper text)_
+- **Tip shape** (`tip`)
+    - round → pointed tip [tip-styles=clean]
+    - round → pointed — apex & teeth [tip-styles=jagged]
+    - soft sine → tight gathered crest [tip-styles=ruffled]
+- **Tip fineness** (`tipFineness`)
+    - sharpens a POINTED tip further, relative to how narrow the petal already is
+- **Tip frequency** (`tipFrequency`)
+    - total tips — 1 = apex only [tip-styles=jagged]
+    - ruffle waves — fine control low, caps at the densest [tip-styles=ruffled]
+- **Tip region** (`tipRegion`)
+    - how far teeth reach from the apex down [tip-styles=jagged]
+- **Tip length** (`tipLength`)
+    - how far all tips extend outward [tip-styles=jagged]
+    - ruffle depth — how far the edge folds in/out [tip-styles=ruffled]
+- **Tip irregularity** (`tipIrregularity`)
+    - regular → organic, varied
+- **Scallop count** (`scallopCount`)
+    - few, wide scallops → many, narrow
+- **Scallop height** (`scallopHeight`)
+    - shallow → deep bulge
+- **Edge noise** (`edgeNoise`)
+    - organic micro-crinkle (crepe paper), layered on top of any tip style
+- **Edge noise scale** (`edgeNoiseScale`)
+    - a few broad crinkles → dense fine crinkling
+
+#### Base
+
+- **Center type** (`centerArch`)
+    - stamens & pistil (the original centre) [center-arch=classic]
+    - peony: dense fine stamens around central carpels [center-arch=dense]
+    - anemone: a domed disc ringed with short stamens [center-arch=disc]
+    - ranunculus / mum: centre filled with tiny petals [center-arch=petaloid]
+- **Classic style** (`centerType`)
+    - spreading filaments tipped with anthers [center-styles=stamens]
+    - upright bundle tipped with stigmas [center-styles=pistil]
+    - bare centre — no stamens or pistil [center-styles=none]
+- **Amount** (`centerCount`)
+    - number of filaments
+- **Length** (`centerLength`)
+    - short → long
+- **Filament thickness** (`centerFilThick`)
+    - thin → thick filament
+- **Tip size** (`centerTipSize`)
+    - small → large anther / stigma
+- **Tip shape** (`centerTipShape`)
+    - round bead → oblong (lily) tip
+- **Stamen count** (`denseStamenCount`)
+    - many fine filaments packed densely
+- **Stamen length** (`denseStamenLength`)
+    - short → long filaments
+- **Carpel count** (`carpelCount`)
+    - central rounded carpels (few)
+- **Carpel size** (`carpelSize`)
+    - small → large carpels
+- **Disc size** (`discSize`)
+    - radius of the central dome
+- **Disc height** (`discHeight`)
+    - flat → domed
+- **Ring stamen count** (`ringStamenCount`)
+    - short stamens ringing the dome edge
+- **Ring stamen length** (`ringStamenLength`)
+    - short → long
+- **Fill petal count** (`fillPetalCount`)
+    - tiny petals packed into the centre
+- **Outer fill size** (`fillOuterSize`)
+    - size at the outer edge (near the real petals)
+- **Inner fill size** (`fillInnerSize`)
+    - size at the very centre — petals taper outer → inner
+- **Fill density** (`fillDensity`)
+    - loosely spaced → fully overlapping
+- **Fill bloom angle** (`fillBloomAngle`)
+    - closed bud (ranunculus) → fully open (mum)
+- **Continuous margin** (`continuousMargin`)
+    - the edge as two strands rooted at the foot, and the receptacle rebuilt as ONE implicit surface (SDF) those strands gather into — petal, receptacle and stem read as one continuous piece
+- **Bundle tightness** (`bundleTightness`)
+    - how close the strands stay to the axis at the foot — a loose splay → a tight neck
+- **Flare rate** (`flareRate`)
+    - how fast they open onto the edge as they rise — a slow spread → a quick flare
+- **Absorption** (`absorption`)
+    - how much the gathered strands melt into one mass — low keeps them as distinct traces, high fuses them into a solid receptacle (the blend radius of the field)
+- **Neck swell** (`buttonSize`)
+    - how much the neck widens at the arrival zone to receive the strands — zero is a straight taper (~4× a strand), higher swells the shoulder the strands emerge from
+- **Gather height** (`gatherHeight`)
+    - how far below the feet the button forms before the trunk descends — small keeps it up under the bloom, large drops it toward the stem
+- **Receptacle** (`receptacleType`)
+    - the junction node that joins the petal & sepal feet, the center bundle and the stem into one printable body
+- **Profile** (`receptProfile`)
+    - the silhouette — flared trumpet, round dome, straight taper, waisted urn, or a subtle solid swell (with continuous margin on, this becomes a radius multiplier along the receptacle's height)
+- **Construction** (`receptConstruction`)
+    - how it is built — a continuous surface, open scrollwork ribs, or a solid core with ribs outside — for the legacy receptacle only; with continuous margin on this is superseded by ABSORPTION (solid → fused, cored → looser)
+- **Collar** (`receptCollar`)
+    - an optional ring where the node meets the stem — none, a raised band, or a stepped ferrule sleeve (with continuous margin on, added as a radius bump in the field)
+- **Reach** (`receptReach`)
+    - feeds the junction the outer whorl only → the inner whorls' feet too (multi-layer blooms; no effect on a single layer)
+- **Blend smoothness** (`blendSmoothness`)
+    - hugs each base tightly → flows smoothly between them
+- **Receptacle depth** (`receptacleDepth`)
+    - how far the surface descends before the stem
+- **Convergence tightness** (`convergenceTightness`)
+    - how sharply it narrows into the stem
+- **Solidity** (`receptSolidity`)
+    - open and airy between the ribs → filled in toward a solid surface
+- **Rib multiplier** (`ribMultiplier`)
+    - ribs per foot — one each → several bundled together
+- **Rib tightness** (`spiralTightness`)
+    - diagonal scroll → tight coil (rotations down to the stem)
+- **Rib thickness** (`spiralThickness`)
+    - rib thickness of the scrollwork
+- **Bulb size** (`bulbSize`)
+    - how far the bead swells beyond the stem
+- **Bulb height** (`bulbHeight`)
+    - flattened disc → tall round knob
+- **Sepals** (`sepalsType`)
+    - a ring of small leaves cupping the base, matching the petals
+- **Sepal size** (`sepalSize`)
+    - small → large
+- **Sepal count** (`sepalCount`)
+    - number of sepals in the whorl
+- **Sepal style** (`sepalStyle`)
+    - narrow modified leaf → solid soft-edged leaves
+- **Sepal center curve** (`sepalCenterCurve`)
+    - reflex down → arc up (spine)
+- **Sepal edge curve — top-down** (`sepalEdgeCurve`)
+    - pinched → billowed (plan view)
+- **Sepal edge curve — profile** (`sepalEdgeProfile`)
+    - edges dip → lift (parallel to centre curve)
+- **Sepal tip style** (`sepalTipStyle`)
+    - smooth edge → serrated teeth (modified-leaf sepals)
+- **Sepal tip shape** (`sepalTipShape`)
+    - round → pointed — apex & teeth
+- **Sepal tip frequency** (`sepalTipFreq`)
+    - total tips — 1 = apex only
+- **Sepal tip region** (`sepalTipRegion`)
+    - how far teeth reach from the apex down
+- **Sepal tip length** (`sepalTipLength`)
+    - how far all teeth extend outward
+- **Stem** (`stemType`)
+    - a slender stem descending from the base — the view zooms out to fit it
+- **Stem length** (`stemLength`)
+    - short → long
+- **Stem curve** (`stemCurve`)
+    - straight → gently bent
+- **Stem thickness** (`stemThickness`)
+    - slender → thick
+- **Leaf nodes** (`stemNodeCount`)
+    - junction points along the stem — leaves attach here in a later pass
+- **Node prominence** (`stemNodeProminence`)
+    - smooth → swollen, gently kinked nodes
+- **Side bud** (`stemBudMode`)
+    - an offshoot stem carrying a smaller bud of the same bloom
+- **Leaves** (`leafType`)
+    - a leaf at each stem node — solid blades reusing the petal shape
+- **Leaf arrangement** (`leafPhyllotaxy`)
+    - how leaves sit around the stem: 1 zigzag · 2 across · 3 whorled
+- **Leaf size** (`leafSize`)
+    - small → large
+
+#### Make
+
+- **Size** (`heightMM`)
+    - largest dimension of the print
+- **Process** (`process`)
+    - sets the smallest printable feature (SLS 1.0 · SLA 0.4 · FDM 0.8 mm)
+- **Tube thickness** (`tube`)
+    - _(no helper text)_
 
 ---
 
