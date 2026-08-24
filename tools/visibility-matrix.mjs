@@ -35,6 +35,12 @@ export const RESET = [
   { id: 'bilPerSide', value: '3' },
   { id: 'layerCount', value: '1' },
   { id: 'petalShape', value: 'rounded', evt: 'change' },
+  // The shape family's two ENABLERS. Both default to 0 and both are now predicate drivers,
+  // so a row that turns one on must not leak into the next row. Set AFTER petalShape: the
+  // shape picker is a macro that writes these, so resetting it first and them second means
+  // the reset lands wherever the macro left them.
+  { id: 'clawLength', value: '0' },
+  { id: 'cleftDepth', value: '0' },
   { id: 'infillType', value: 'veins', evt: 'change' },
   { id: 'edgeTermination', value: 'loop', evt: 'change' },
   { id: 'tipStyle', value: 'clean', evt: 'change' },
@@ -60,6 +66,16 @@ export const MATRIX = [
   { label: 'bloom BILATERAL, 1 per side (bil-petal 2 and 3 false)', set: [{ id: 'bloomType', value: 'bilateral', evt: 'change' }, { id: 'bilPerSide', value: '1' }] },
   { label: 'coiled + CUSTOM divergence (divergenceAngle true)', set: [{ id: 'divergenceMode', value: 'custom', evt: 'change' }] },
   { label: 'RADIAL + custom divergence (divergenceAngle false via bloomType)', set: [{ id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'divergenceMode', value: 'custom', evt: 'change' }] },
+
+  // ---- shape family: the claw and cleft enablers --------------------------------
+  // Both new predicates need BOTH polarities or the dump only ever shows these four controls
+  // disappearing, which is not evidence that the reveal works. RESET holds the enablers at 0
+  // (false side); these two rows are the true side. They set the SLIDER, not the shape
+  // picker: the predicate's driver is the parameter, and a row that set `petalShape` instead
+  // would leave uncoveredDrivers() correctly complaining that clawLength/cleftDepth are never
+  // varied. (The picker route is covered by tools/shot-shape-picker.mjs.)
+  { label: 'claw ON (clawWidth + shoulder revealed)', set: [{ id: 'clawLength', value: '0.35' }] },
+  { label: 'cleft ON (cleftLobes + cleftWidth revealed)', set: [{ id: 'cleftDepth', value: '0.55' }] },
 
   // ---- layers: data-layers-multi ------------------------------------------------
   { label: 'layerCount 3 (layers-multi true)', set: [{ id: 'layerCount', value: '3' }] },
