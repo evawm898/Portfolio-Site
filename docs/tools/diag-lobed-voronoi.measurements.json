@@ -1,0 +1,587 @@
+[
+ {
+  "name": "ROUNDED + voronoi (control)",
+  "infill": "voronoi",
+  "cleftDepth": 0,
+  "cleftLobes": 2,
+  "L": 2.2,
+  "W": 0.9,
+  "density": 7,
+  "cellLaw": 0,
+  "aniso": 1,
+  "lobes": 0,
+  "uFloor": null,
+  "Wpeak": null,
+  "clipVertices": 144,
+  "clipArea": 2.087999648542457,
+  "materialArea": 2.6542480865752562,
+  "clipVoid": {
+   "frac": 0,
+   "inside": 25706
+  },
+  "clipMaxCrossings": 2,
+  "materialMaxCrossings": 2,
+  "cellCount": 44,
+  "cellsWithVoid": 0,
+  "cellsMostlyVoid": 0,
+  "meanCellVoidFrac": 0,
+  "worstCellVoidFrac": 0,
+  "cellsStraddlingASinus": 0,
+  "cellsPerimCrossingVoid": 0,
+  "meanCellPerimeterInVoid": 0,
+  "areaPerCell": 0.06032382014943764,
+  "areaPerCellMM2": 40.77890242101985
+ },
+ {
+  "name": "LOBED + voronoi (shipped)",
+  "infill": "voronoi",
+  "cleftDepth": 0.55,
+  "cleftLobes": 2,
+  "L": 2.2,
+  "W": 0.95,
+  "density": 7,
+  "cellLaw": 0,
+  "aniso": 1,
+  "lobes": 2,
+  "uFloor": 0.44999999999999996,
+  "Wpeak": 0.977806746635499,
+  "clipVertices": 144,
+  "clipArea": 2.067005668963359,
+  "materialArea": 2.181121709532968,
+  "clipVoid": {
+   "frac": 0.23311993171148102,
+   "inside": 23430
+  },
+  "clipMaxCrossings": 2,
+  "materialMaxCrossings": 4,
+  "widthRatios": [
+   {
+    "u": 0.55,
+    "envelopeHalfWidth": 0.9296645189584659,
+    "envelopeFullWidth": 1.8593290379169318,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.7428484338737622,
+    "ratio": 2.5029722795820035
+   },
+   {
+    "u": 0.65,
+    "envelopeHalfWidth": 0.8143274801698392,
+    "envelopeFullWidth": 1.6286549603396785,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.572879382299482,
+    "ratio": 2.842928216062544
+   },
+   {
+    "u": 0.75,
+    "envelopeHalfWidth": 0.63892989848862,
+    "envelopeFullWidth": 1.27785979697724,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.3434887134274822,
+    "ratio": 3.7202380952380945
+   },
+   {
+    "u": 0.85,
+    "envelopeHalfWidth": 0.41482789526025526,
+    "envelopeFullWidth": 0.8296557905205105,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.06577096279351347,
+    "ratio": 12.614317250078841
+   },
+   {
+    "u": 0.95,
+    "envelopeHalfWidth": 0.15239118056756779,
+    "envelopeFullWidth": 0.30478236113513557,
+    "lobeIntervals": 0,
+    "widestLobeWidth": 0,
+    "ratio": null
+   }
+  ],
+  "cellCount": 42,
+  "cellsWithVoid": 12,
+  "cellsMostlyVoid": 10,
+  "meanCellVoidFrac": 0.17114965078567496,
+  "worstCellVoidFrac": 1,
+  "cellsStraddlingASinus": 1,
+  "cellsPerimCrossingVoid": 20,
+  "meanCellPerimeterInVoid": 0.21410972956680277,
+  "areaPerCell": 0.05193146927459448,
+  "areaPerCellMM2": 35.10567322962587,
+  "shConcave": {
+   "subjectVerts": 832,
+   "resultVerts": 746,
+   "resultArea": 2.147432598698758,
+   "resultVoid": 0.0008062565508344756,
+   "resultPerimeterInVoid": 0.21084825389573475
+  },
+  "shDisconnected": {
+   "resultVerts": 106,
+   "resultArea": 0.07485092885162792,
+   "resultVoid": 0,
+   "resultPerimeterInVoid": 0.396765767248581
+  },
+  "shConvexControl": {
+   "resultVerts": 259,
+   "resultArea": 1.9300946288006764
+  }
+ },
+ {
+  "name": "LOBED lobes=4 + voronoi",
+  "infill": "voronoi",
+  "cleftDepth": 0.55,
+  "cleftLobes": 4,
+  "L": 2.2,
+  "W": 0.95,
+  "density": 7,
+  "cellLaw": 0,
+  "aniso": 1,
+  "lobes": 4,
+  "uFloor": 0.44999999999999996,
+  "Wpeak": 0.977806746635499,
+  "clipVertices": 144,
+  "clipArea": 2.0419961803389435,
+  "materialArea": 2.060886599158809,
+  "clipVoid": {
+   "frac": 0.28351629354308927,
+   "inside": 23138
+  },
+  "clipMaxCrossings": 2,
+  "materialMaxCrossings": 8,
+  "widthRatios": [
+   {
+    "u": 0.55,
+    "envelopeHalfWidth": 0.9296645189584659,
+    "envelopeFullWidth": 1.8593290379169318,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.3465324494417683,
+    "ratio": 5.365526492287054
+   },
+   {
+    "u": 0.65,
+    "envelopeHalfWidth": 0.8143274801698392,
+    "envelopeFullWidth": 1.6286549603396785,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.24796271771171619,
+    "ratio": 6.568144499178978
+   },
+   {
+    "u": 0.75,
+    "envelopeHalfWidth": 0.63892989848862,
+    "envelopeFullWidth": 1.27785979697724,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.19388327769637181,
+    "ratio": 6.590871642774755
+   },
+   {
+    "u": 0.85,
+    "envelopeHalfWidth": 0.41482789526025526,
+    "envelopeFullWidth": 0.8296557905205105,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.139817742097469,
+    "ratio": 5.933837709538646
+   },
+   {
+    "u": 0.95,
+    "envelopeHalfWidth": 0.15239118056756779,
+    "envelopeFullWidth": 0.30478236113513557,
+    "lobeIntervals": 0,
+    "widestLobeWidth": 0,
+    "ratio": null
+   }
+  ],
+  "cellCount": 42,
+  "cellsWithVoid": 27,
+  "cellsMostlyVoid": 15,
+  "meanCellVoidFrac": 0.25386143974298686,
+  "worstCellVoidFrac": 1,
+  "cellsStraddlingASinus": 2,
+  "cellsPerimCrossingVoid": 27,
+  "meanCellPerimeterInVoid": 0.31114423620961673,
+  "areaPerCell": 0.04906872855140021,
+  "areaPerCellMM2": 33.17046050074654,
+  "shConcave": {
+   "subjectVerts": 1128,
+   "resultVerts": 1000,
+   "resultArea": 1.9919443096433946,
+   "resultVoid": 0.0008683570684265369,
+   "resultPerimeterInVoid": 0.17477209687174544
+  },
+  "shDisconnected": {
+   "resultVerts": 212,
+   "resultArea": 0.13543838444175527,
+   "resultVoid": 0,
+   "resultPerimeterInVoid": 0.2710283419400675
+  },
+  "shConvexControl": {
+   "resultVerts": 259,
+   "resultArea": 1.8690685449848363
+  }
+ },
+ {
+  "name": "LOBED lobes=4, law=1",
+  "infill": "voronoi",
+  "cleftDepth": 0.55,
+  "cleftLobes": 4,
+  "L": 2.2,
+  "W": 0.95,
+  "density": 7,
+  "cellLaw": 1,
+  "aniso": 1,
+  "lobes": 4,
+  "uFloor": 0.44999999999999996,
+  "Wpeak": 0.977806746635499,
+  "clipVertices": 144,
+  "clipArea": 2.0419961803389435,
+  "materialArea": 2.060886599158809,
+  "clipVoid": {
+   "frac": 0.28351629354308927,
+   "inside": 23138
+  },
+  "clipMaxCrossings": 2,
+  "materialMaxCrossings": 8,
+  "widthRatios": [
+   {
+    "u": 0.55,
+    "envelopeHalfWidth": 0.9296645189584659,
+    "envelopeFullWidth": 1.8593290379169318,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.3465324494417683,
+    "ratio": 5.365526492287054
+   },
+   {
+    "u": 0.65,
+    "envelopeHalfWidth": 0.8143274801698392,
+    "envelopeFullWidth": 1.6286549603396785,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.24796271771171619,
+    "ratio": 6.568144499178978
+   },
+   {
+    "u": 0.75,
+    "envelopeHalfWidth": 0.63892989848862,
+    "envelopeFullWidth": 1.27785979697724,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.19388327769637181,
+    "ratio": 6.590871642774755
+   },
+   {
+    "u": 0.85,
+    "envelopeHalfWidth": 0.41482789526025526,
+    "envelopeFullWidth": 0.8296557905205105,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.139817742097469,
+    "ratio": 5.933837709538646
+   },
+   {
+    "u": 0.95,
+    "envelopeHalfWidth": 0.15239118056756779,
+    "envelopeFullWidth": 0.30478236113513557,
+    "lobeIntervals": 0,
+    "widestLobeWidth": 0,
+    "ratio": null
+   }
+  ],
+  "cellCount": 38,
+  "cellsWithVoid": 23,
+  "cellsMostlyVoid": 15,
+  "meanCellVoidFrac": 0.24918379590374656,
+  "worstCellVoidFrac": 1,
+  "cellsStraddlingASinus": 2,
+  "cellsPerimCrossingVoid": 25,
+  "meanCellPerimeterInVoid": 0.2966354982209945,
+  "areaPerCell": 0.05423385787260023,
+  "areaPerCellMM2": 36.662087921877756,
+  "shConcave": {
+   "subjectVerts": 1128,
+   "resultVerts": 1000,
+   "resultArea": 1.9919443096433946,
+   "resultVoid": 0.0008683570684265369,
+   "resultPerimeterInVoid": 0.17477209687174544
+  },
+  "shDisconnected": {
+   "resultVerts": 212,
+   "resultArea": 0.13543838444175527,
+   "resultVoid": 0,
+   "resultPerimeterInVoid": 0.2710283419400675
+  },
+  "shConvexControl": {
+   "resultVerts": 259,
+   "resultArea": 1.8690685449848363
+  }
+ },
+ {
+  "name": "LOBED lobes=4, aniso=4",
+  "infill": "voronoi",
+  "cleftDepth": 0.55,
+  "cleftLobes": 4,
+  "L": 2.2,
+  "W": 0.95,
+  "density": 7,
+  "cellLaw": 0,
+  "aniso": 4,
+  "lobes": 4,
+  "uFloor": 0.44999999999999996,
+  "Wpeak": 0.977806746635499,
+  "clipVertices": 144,
+  "clipArea": 2.0419961803389435,
+  "materialArea": 2.060886599158809,
+  "clipVoid": {
+   "frac": 0.28351629354308927,
+   "inside": 23138
+  },
+  "clipMaxCrossings": 2,
+  "materialMaxCrossings": 8,
+  "widthRatios": [
+   {
+    "u": 0.55,
+    "envelopeHalfWidth": 0.9296645189584659,
+    "envelopeFullWidth": 1.8593290379169318,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.3465324494417683,
+    "ratio": 5.365526492287054
+   },
+   {
+    "u": 0.65,
+    "envelopeHalfWidth": 0.8143274801698392,
+    "envelopeFullWidth": 1.6286549603396785,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.24796271771171619,
+    "ratio": 6.568144499178978
+   },
+   {
+    "u": 0.75,
+    "envelopeHalfWidth": 0.63892989848862,
+    "envelopeFullWidth": 1.27785979697724,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.19388327769637181,
+    "ratio": 6.590871642774755
+   },
+   {
+    "u": 0.85,
+    "envelopeHalfWidth": 0.41482789526025526,
+    "envelopeFullWidth": 0.8296557905205105,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.139817742097469,
+    "ratio": 5.933837709538646
+   },
+   {
+    "u": 0.95,
+    "envelopeHalfWidth": 0.15239118056756779,
+    "envelopeFullWidth": 0.30478236113513557,
+    "lobeIntervals": 0,
+    "widestLobeWidth": 0,
+    "ratio": null
+   }
+  ],
+  "cellCount": 44,
+  "cellsWithVoid": 21,
+  "cellsMostlyVoid": 17,
+  "meanCellVoidFrac": 0.15694197957554226,
+  "worstCellVoidFrac": 0.5929203539823009,
+  "cellsStraddlingASinus": 7,
+  "cellsPerimCrossingVoid": 25,
+  "meanCellPerimeterInVoid": 0.2005563244593687,
+  "areaPerCell": 0.04683833179906383,
+  "areaPerCellMM2": 31.66271229616715,
+  "shConcave": {
+   "subjectVerts": 1128,
+   "resultVerts": 1000,
+   "resultArea": 1.9919443096433946,
+   "resultVoid": 0.0008683570684265369,
+   "resultPerimeterInVoid": 0.17477209687174544
+  },
+  "shDisconnected": {
+   "resultVerts": 212,
+   "resultArea": 0.13543838444175527,
+   "resultVoid": 0,
+   "resultPerimeterInVoid": 0.2710283419400675
+  },
+  "shConvexControl": {
+   "resultVerts": 259,
+   "resultArea": 1.8690685449848363
+  }
+ },
+ {
+  "name": "LOBED l=4, law=1 aniso=4 lloyd=8",
+  "infill": "voronoi",
+  "cleftDepth": 0.55,
+  "cleftLobes": 4,
+  "L": 2.2,
+  "W": 0.95,
+  "density": 7,
+  "cellLaw": 1,
+  "aniso": 4,
+  "lobes": 4,
+  "uFloor": 0.44999999999999996,
+  "Wpeak": 0.977806746635499,
+  "clipVertices": 144,
+  "clipArea": 2.0419961803389435,
+  "materialArea": 2.060886599158809,
+  "clipVoid": {
+   "frac": 0.28351629354308927,
+   "inside": 23138
+  },
+  "clipMaxCrossings": 2,
+  "materialMaxCrossings": 8,
+  "widthRatios": [
+   {
+    "u": 0.55,
+    "envelopeHalfWidth": 0.9296645189584659,
+    "envelopeFullWidth": 1.8593290379169318,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.3465324494417683,
+    "ratio": 5.365526492287054
+   },
+   {
+    "u": 0.65,
+    "envelopeHalfWidth": 0.8143274801698392,
+    "envelopeFullWidth": 1.6286549603396785,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.24796271771171619,
+    "ratio": 6.568144499178978
+   },
+   {
+    "u": 0.75,
+    "envelopeHalfWidth": 0.63892989848862,
+    "envelopeFullWidth": 1.27785979697724,
+    "lobeIntervals": 4,
+    "widestLobeWidth": 0.19388327769637181,
+    "ratio": 6.590871642774755
+   },
+   {
+    "u": 0.85,
+    "envelopeHalfWidth": 0.41482789526025526,
+    "envelopeFullWidth": 0.8296557905205105,
+    "lobeIntervals": 2,
+    "widestLobeWidth": 0.139817742097469,
+    "ratio": 5.933837709538646
+   },
+   {
+    "u": 0.95,
+    "envelopeHalfWidth": 0.15239118056756779,
+    "envelopeFullWidth": 0.30478236113513557,
+    "lobeIntervals": 0,
+    "widestLobeWidth": 0,
+    "ratio": null
+   }
+  ],
+  "cellCount": 48,
+  "cellsWithVoid": 32,
+  "cellsMostlyVoid": 26,
+  "meanCellVoidFrac": 0.17745450980848157,
+  "worstCellVoidFrac": 0.5380116959064327,
+  "cellsStraddlingASinus": 19,
+  "cellsPerimCrossingVoid": 36,
+  "meanCellPerimeterInVoid": 0.24590143568794495,
+  "areaPerCell": 0.04293513748247518,
+  "areaPerCellMM2": 29.02415293815322,
+  "shConcave": {
+   "subjectVerts": 1128,
+   "resultVerts": 1000,
+   "resultArea": 1.9919443096433946,
+   "resultVoid": 0.0008683570684265369,
+   "resultPerimeterInVoid": 0.17477209687174544
+  },
+  "shDisconnected": {
+   "resultVerts": 212,
+   "resultArea": 0.13543838444175527,
+   "resultVoid": 0,
+   "resultPerimeterInVoid": 0.2710283419400675
+  },
+  "shConvexControl": {
+   "resultVerts": 259,
+   "resultArea": 1.8690685449848363
+  }
+ },
+ {
+  "name": "LOBED lobes=7, density=12",
+  "infill": "voronoi",
+  "cleftDepth": 0.55,
+  "cleftLobes": 7,
+  "L": 2.2,
+  "W": 0.95,
+  "density": 12,
+  "cellLaw": 0,
+  "aniso": 1,
+  "lobes": 7,
+  "uFloor": 0.44999999999999996,
+  "Wpeak": 0.977806746635499,
+  "clipVertices": 145,
+  "clipArea": 2.0646851538573388,
+  "materialArea": 2.03654185587999,
+  "clipVoid": {
+   "frac": 0.3048123771262501,
+   "inside": 23398
+  },
+  "clipMaxCrossings": 2,
+  "materialMaxCrossings": 14,
+  "widthRatios": [
+   {
+    "u": 0.55,
+    "envelopeHalfWidth": 0.9296645189584659,
+    "envelopeFullWidth": 1.8593290379169318,
+    "lobeIntervals": 7,
+    "widestLobeWidth": 0.17765888957296294,
+    "ratio": 10.465724751439032
+   },
+   {
+    "u": 0.65,
+    "envelopeHalfWidth": 0.8143274801698392,
+    "envelopeFullWidth": 1.6286549603396785,
+    "lobeIntervals": 7,
+    "widestLobeWidth": 0.14193727979360293,
+    "ratio": 11.47446930579461
+   },
+   {
+    "u": 0.75,
+    "envelopeHalfWidth": 0.63892989848862,
+    "envelopeFullWidth": 1.27785979697724,
+    "lobeIntervals": 5,
+    "widestLobeWidth": 0.11069460491315353,
+    "ratio": 11.544011544011532
+   },
+   {
+    "u": 0.85,
+    "envelopeHalfWidth": 0.41482789526025526,
+    "envelopeFullWidth": 0.8296557905205105,
+    "lobeIntervals": 3,
+    "widestLobeWidth": 0.07970918007425809,
+    "ratio": 10.408534998698928
+   },
+   {
+    "u": 0.95,
+    "envelopeHalfWidth": 0.15239118056756779,
+    "envelopeFullWidth": 0.30478236113513557,
+    "lobeIntervals": 1,
+    "widestLobeWidth": 0.048963286316359544,
+    "ratio": 6.224712107065046
+   }
+  ],
+  "cellCount": 66,
+  "cellsWithVoid": 38,
+  "cellsMostlyVoid": 28,
+  "meanCellVoidFrac": 0.230437097319462,
+  "worstCellVoidFrac": 0.6926406926406926,
+  "cellsStraddlingASinus": 2,
+  "cellsPerimCrossingVoid": 39,
+  "meanCellPerimeterInVoid": 0.30115720378594635,
+  "areaPerCell": 0.030856694786060457,
+  "areaPerCellMM2": 20.85912567537687,
+  "shConcave": {
+   "subjectVerts": 1561,
+   "resultVerts": 1371,
+   "resultArea": 1.9720945862432946,
+   "resultVoid": 0.0008777319406653208,
+   "resultPerimeterInVoid": 0.12989019655169262
+  },
+  "shDisconnected": {
+   "resultVerts": 304,
+   "resultArea": 0.12117173241640722,
+   "resultVoid": 0,
+   "resultPerimeterInVoid": 0.2377069689675045
+  },
+  "shConvexControl": {
+   "resultVerts": 259,
+   "resultArea": 1.8959883836410891
+  }
+ }
+]
