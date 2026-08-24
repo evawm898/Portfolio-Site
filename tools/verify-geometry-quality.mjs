@@ -191,6 +191,7 @@ if (!SWEEP && !process.env.GQ_MARGIN_OFF) {
 // through the hoop that traces the same contour. The fidelity gap stays ~0 there too —
 // proof the gate measures the RENDERED margin, not merely the presence of a cleft.
 if (process.env.GQ_MARGIN_OFF) for (const c of CONFIGS) c.ui.continuousMargin = 'off';
+if (process.env.GQ_ANISO) for (const c of CONFIGS) c.ui.voronoiAniso = Number(process.env.GQ_ANISO);
 
 // SHIPPED PRESETS as named correctness fixtures. Each preset's PETAL (its shape + infill +
 // edge, measured with the shipping continuous-margin ON) must trace its rim, stay smooth,
@@ -435,7 +436,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -523,6 +524,48 @@ window.__gq = async function() {
       for (const slab of (vor.slabs || [])) sumA += Math.abs(__gqPolyArea(slab.outer));
       const boundA = Math.abs(__gqPolyArea(G.ribMarginPolyline(P, 72)));
       tileRatio = boundA > 1e-12 ? +(sumA / boundA).toFixed(3) : null;
+      // TILING AGAINST THE MATERIAL — the denominator that can actually see the defect.
+      // Cells tiling the CLIP POLYGON faithfully give 1.000 even when the clip polygon is
+      // the wrong region, which is why tileRatio above is 1.000 everywhere and useless
+      // as an assertion. Against the MATERIAL the same sum is > 1 on overlap and < 1 on
+      // void, and it catches both:
+      //
+      //   margin OFF, anisotropy 1:  smooth 0.981-0.990   lobed 1.220
+      //   margin OFF, anisotropy 4:  smooth 0.981-0.990   lobed 16.966
+      //
+      // The lobed elevation at anisotropy 1 is cells spanning the sinuses; the 16.966 at
+      // anisotropy 4 is genuine overlap from per-seed metrics (#73), and it is genuine
+      // rather than a shoelace artifact because selfIntersectCells is 0 in every config.
+      //
+      // REPORTED, NOT GATED, and for a stated reason: with continuous margin ON the clip
+      // is inset from the material by the rib radius, so a correct diagram lands at
+      // 0.564-0.948 rather than 1.000. There is no threshold that means the same thing in
+      // both margin modes. Gating this needs a rib-aware denominator — the inset material
+      // — which is the cleft-aware bound that does not exist yet.
+      const matA = Math.abs(__gqPolyArea(G.buildSilhouette(P, 200)));
+      tileVsMaterial = matA > 1e-12 ? +(sumA / matA).toFixed(3) : null;
+      // SELF-INTERSECTION CENSUS — the one test that separates 'genuine overlap' from
+      // 'meaningless number'. A shoelace sum over a figure-eight returns nonsense with no
+      // overlapping area behind it. Measured 0 cells and 0 crossing pairs in every config,
+      // including lobed at anisotropy 4 where the tiling sum reaches 16.966x the material,
+      // so that sum is real area and not an artifact of the measure.
+      const segX = (a, b, c, d) => {
+        const r1 = (b.x-a.x), r2 = (b.y-a.y), s1 = (d.x-c.x), s2 = (d.y-c.y);
+        const den = r1*s2 - r2*s1; if (Math.abs(den) < 1e-14) return false;
+        const t = ((c.x-a.x)*s2 - (c.y-a.y)*s1) / den;
+        const u = ((c.x-a.x)*r2 - (c.y-a.y)*r1) / den;
+        return t > 1e-9 && t < 1-1e-9 && u > 1e-9 && u < 1-1e-9;
+      };
+      let siCells = 0, siPairs = 0;
+      for (const slab of (vor.slabs || [])) {
+        const R = slab.outer, n = R.length; let hit = 0;
+        for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+          if (i === 0 && j === n - 1) continue;
+          if (segX(R[i], R[(i+1)%n], R[j], R[(j+1)%n])) hit++;
+        }
+        if (hit) { siCells++; siPairs += hit; }
+      }
+      selfIntersectCells = siCells; selfIntersectPairs = siPairs;
       // SELF-CHECK. A measurement tool that does not assert its own validity reports
       // whatever it happens to compute — this gate spent three rounds reporting zeros from
       // a shadowed declaration before that was noticed. If the classification does not
@@ -615,7 +658,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
@@ -735,7 +778,7 @@ await page.waitForTimeout(300);
 const rows = [];
 let fails = 0, xfails = 0, xpasses = 0;
 const ledger = {};   // issue ref -> { total, failing }
-console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), 'rimAmp'.padStart(7), 'holeEsc'.padStart(8), 'cullDgn'.padStart(8), 'cullMin'.padStart(8), 'minAmm2'.padStart(8), 'tile'.padStart(6), '  verdict');
+console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), 'rimAmp'.padStart(7), 'holeEsc'.padStart(8), 'cullDgn'.padStart(8), 'cullMin'.padStart(8), 'minAmm2'.padStart(8), 'tile'.padStart(6), 'tileMat'.padStart(8), 'selfX'.padStart(6), '  verdict');
 for (const cfg of CONFIGS) {
   let rejected = [];
   if (cfg.preset) await page.evaluate((d) => window.__gqApply(d), cfg.ui);
@@ -806,7 +849,7 @@ for (const cfg of CONFIGS) {
   } else if (bad) { verdict = `FAIL(${reasons})`; fails++; }                               // real regression — breaks the build
   else verdict = 'ok';
   rows.push({ name: cfg.name, xfail: cfg.xfail || null, ...q, verdict });
-  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), String(q.treatmentAmpMM == null ? '-' : q.treatmentAmpMM).padStart(7), String(q.infill === 'voronoi' ? `${q.holeEscapeCells}/${q.voronoiCells}` : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulledDegenerate : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulled : '-').padStart(8), String(q.minCellAreaMM2 == null ? '-' : q.minCellAreaMM2.toFixed(3)).padStart(8), String(q.tileRatio == null ? '-' : q.tileRatio).padStart(6), '  ' + verdict);
+  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), String(q.treatmentAmpMM == null ? '-' : q.treatmentAmpMM).padStart(7), String(q.infill === 'voronoi' ? `${q.holeEscapeCells}/${q.voronoiCells}` : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulledDegenerate : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulled : '-').padStart(8), String(q.minCellAreaMM2 == null ? '-' : q.minCellAreaMM2.toFixed(3)).padStart(8), String(q.tileRatio == null ? '-' : q.tileRatio).padStart(6), String(q.tileVsMaterial == null ? '-' : q.tileVsMaterial).padStart(8), String(q.infill === 'voronoi' ? q.selfIntersectCells : '-').padStart(6), '  ' + verdict);
 }
 if (process.env.GQ_JSON) fs.writeFileSync(process.env.GQ_JSON, JSON.stringify(rows, null, 1));
 
