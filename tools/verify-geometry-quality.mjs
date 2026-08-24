@@ -436,7 +436,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -582,14 +582,75 @@ window.__gq = async function() {
         let per = 0; for (let i = 0; i < poly.length; i++) { const u = poly[i], v = poly[(i+1)%poly.length];
           per += Math.hypot(v.x-u.x, v.y-u.y); }
         return per > 1e-12 ? (4 * Math.PI * A) / (per * per) : 0; };
+      // DOUBLED-BACK CENSUS. The picture of the two threshold-deciding cells says Q is the
+      // wrong measure: clawed's worst LEGITIMATE cell is a long thin TRIANGLE (low Q from
+      // honest elongation, hole correctly inside), while lobed's best ESCAPING cell is a
+      // compact quadrilateral WITH a zero-width spike. Q punishes both and cannot tell
+      // them apart, which is what makes the global window only 9% wide.
+      // What actually distinguishes them is whether the ring DOUBLES BACK on itself — a
+      // spike is two ring sections lying on top of each other. That is one concept
+      // covering a fully collapsed ring (doubled back everywhere) and a spiked wedge
+      // (doubled back along the spike), and it does not penalise a thin cell at all.
+      //
+      // MEASURED, against the isoperimetric window it replaces:
+      //   config          DB min ESCAPING   DB max LEGITIMATE     (Q window, for contrast)
+      //   rounded             0.560              0.00              0.129 / 0.702
+      //   pointed             0.632              0.00              0.116 / 0.638
+      //   strap               0.792              0.00              0.007 / 0.616
+      //   clawed              0.594              0.00              0.083 / 0.356
+      //   lobed               0.765              0.00              0.327 / 0.603
+      //   chrysanthemum       0.694              0.44              0.015 / 0.612
+      //   preset:poppy        0.533              0.00              0.178 / 0.744
+      //
+      // Six of seven configs put EVERY legitimate cell at exactly 0. The global window is
+      // 0.44 to 0.533 — 21%, against the isoperimetric ratio's 9% — and the one nonzero
+      // legitimate reading (chrysanthemum 0.44) is unexplained, so no threshold is chosen
+      // here either. It is a cell that doubles back and whose hole nonetheless lands
+      // inside, which is either a spike that has not yet caused an escape or a limit of
+      // the SKIP window below; that distinction has not been measured.
+      const doubledBack = (poly) => {
+        const n = poly.length; let hit = 0;
+        const d2seg = (p, a, b) => { const dx = b.x-a.x, dy = b.y-a.y, L2 = dx*dx+dy*dy;
+          let t = L2 ? ((p.x-a.x)*dx + (p.y-a.y)*dy) / L2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const qx = a.x+dx*t, qy = a.y+dy*t; return (p.x-qx)**2 + (p.y-qy)**2; };
+        const SKIP = 3;
+        for (let i = 0; i < n; i++) {
+          for (let j = 0; j < n; j++) {
+            const gap = Math.min(Math.abs(i-j), n - Math.abs(i-j));
+            if (gap <= SKIP) continue;
+            if (d2seg(poly[i], poly[j], poly[(j+1)%n]) < 1e-12) { hit++; break; }
+          }
+        }
+        return hit / n;
+      };
+      const dbEsc = [], dbOk = [];
       const qEsc = [], qOk = [];
       for (const slab of (vor.slabs || [])) {
         let bad = 0;
         if (slab.inner && slab.inner.length === slab.outer.length)
           for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
         (bad ? qEsc : qOk).push(isoQ(slab.outer));
+        (bad ? dbEsc : dbOk).push(doubledBack(slab.outer));
+      }
+      // capture the two cells that decide the global threshold: the worst-Q legitimate
+      // cell and the best-Q escaping one. Whether the window is really 9% wide depends on
+      // what those two actually are.
+      if (window.__qDump !== false) {
+        let worstOk = null, bestEsc = null;
+        for (const slab of (vor.slabs || [])) {
+          let bad = 0;
+          if (slab.inner && slab.inner.length === slab.outer.length)
+            for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+          const q = isoQ(slab.outer);
+          if (bad) { if (!bestEsc || q > bestEsc.q) bestEsc = { q, outer: slab.outer, inner: slab.inner }; }
+          else if (!worstOk || q < worstOk.q) worstOk = { q, outer: slab.outer, inner: slab.inner };
+        }
+        qDump = { worstOk, bestEsc };
       }
       qEsc.sort((a,b)=>a-b); qOk.sort((a,b)=>a-b);
+      dbEsc.sort((a,b)=>a-b); dbOk.sort((a,b)=>a-b);
+      dbEscMin = dbEsc.length ? +dbEsc[0].toFixed(4) : null;
+      dbOkMax  = dbOk.length  ? +dbOk[dbOk.length-1].toFixed(4) : null;
       isoEscMax = qEsc.length ? +qEsc[qEsc.length-1].toFixed(5) : null;
       isoOkMin  = qOk.length  ? +qOk[0].toFixed(5) : null;
       isoOkP05  = qOk.length  ? +qOk[Math.floor(qOk.length*0.05)].toFixed(5) : null;
@@ -695,7 +756,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05 };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
