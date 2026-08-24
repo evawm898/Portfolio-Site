@@ -736,6 +736,17 @@ export function marginFlareFactor(u, bundleTight, flareRate) {
 // strand's base/tip radii. Canonical here; flower.js imports these instead
 // of keeping its own copies, so the render and the boundary check can never
 // drift apart by editing one and forgetting the other.
+// A Voronoi cell below this area (world units squared) is geometrically DEGENERATE, not
+// merely small: a ring with perimeter and no interior. The smallest LEGITIMATE cell the
+// geometry-quality matrix produces is 0.069 mm^2 (chrysanthemum, dense by design) — about
+// 1.0e-4 u^2 at 26 mm/unit — so this sits five orders of magnitude below it and can only
+// ever catch a collapse, never a real cell.
+// (An earlier draft of this comment cited 14.9 mm^2, taken from a run where the minCellSize
+// floor was temporarily un-gated and had already removed every small cell. Measuring the
+// wrong configuration and quoting it as the shipping one is the mistake this file keeps
+// finding elsewhere; recorded here rather than silently corrected.)
+export const DEGENERATE_CELL_AREA = 1e-9;
+
 export const RIM_WIDTH = 0.34;      // constant hoop radius, relative to tubeRadius
 export const MARGIN_W_BASE = 0.62;  // continuous-margin strand radius at the foot
 export const MARGIN_W_TIP = 0.12;   // continuous-margin strand radius at the tip
@@ -2597,13 +2608,35 @@ export function buildVoronoi(P, rng, opts = {}) {
     }
   }
 
-  // --- MINIMUM CELL SIZE floor: cull seeds whose cell is thinner than a few rib
-  //     widths (equivalent-circle diameter < minCellSize), so the density law /
-  //     anisotropy can't emit fragile slivers — the region is absorbed by neighbours
-  //     when the final cells re-solve. Off unless one of those features is on, so the
-  //     default look is untouched. Mirrored seeds are culled with their +Y twin. ---
-  let culled = 0;
+  // --- TWO CULLS, DELIBERATELY SEPARATE. Conflating them destroys designs.
+  //
+  //     (a) DEGENERATE CELLS — unconditional, and the actual defect. buildVoronoi emits
+  //     cells whose ring has signedArea EXACTLY 0: on a plain ROUNDED petal at defaults, a
+  //     21-edge polyline collapsed onto y = 0. cellAnnulus lofts each into zero-area
+  //     triangles and its hole cannot be inside a cell with no inside. Whatever produces
+  //     one (an axis-seed artifact, here) is a separate question from whether zero-area
+  //     geometry should reach the exporter. It should not, under any cause, so this floor
+  //     is not conditional on anything. The threshold is geometric degeneracy, not a
+  //     printability judgement: the smallest legitimate cell in the matrix is 0.069 mm^2
+  //     and these are exactly 0, so there is no boundary to tune.
+  //
+  //     (b) THE MINIMUM CELL SIZE floor — a printability feature for the density law and
+  //     anisotropy, which can drive cells thin enough to be fragile. It stays gated on
+  //     those two, and here is why, measured rather than assumed: un-gating it takes
+  //     `chrysanthemum__voronoi` from 42 cells to 4, culling 24. That is not a floor
+  //     catching noise (every other config culls 1-5), it is the floor eating the design —
+  //     a dense bloom's cells are legitimately small, and `minCellSize` is sized for
+  //     struts, not for them. Un-gating this was the obvious reading of "the guard is off
+  //     where it is needed" and it is the wrong one; only (a) was ever the defect.
+  //
+  //     `culled` is returned and reported per config by the gate, so both stay visible as
+  //     numbers rather than as a claim in a comment.
+  //     Mirrored seeds are culled with their +Y twin. ---
+  let culled = 0, culledDegenerate = 0;
   const minCell = opts.minCellSize || 0;
+  const cellAreaOf = (s) => { const cell = voronoiCell(s, fullSeeds(), clipPoly, metricFor(s)); return cell ? Math.abs(polyArea(cell)) : 0; };
+  for (let i = half.length - 1; i >= 0; i--) if (cellAreaOf(half[i]) < DEGENERATE_CELL_AREA) { half.splice(i, 1); culledDegenerate++; }
+  for (let i = axis.length - 1; i >= 0; i--) if (axis.length > 1 && cellAreaOf(axis[i]) < DEGENERATE_CELL_AREA) { axis.splice(i, 1); culledDegenerate++; }
   if (minCell > 0 && (cellLaw > 0 || aniso > 1)) {
     const tooSmall = (s, seeds) => {
       const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
@@ -2640,7 +2673,7 @@ export function buildVoronoi(P, rng, opts = {}) {
   };
   for (const s of axis) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, false); }
   for (const s of half) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, true); }
-  return { veins: [], nodes: [], slabs, culled };
+  return { veins: [], nodes: [], slabs, culled, culledDegenerate };
 }
 
 // Build one cell's ANNULUS for the perforated sheet. The OUTER loop walks the cell
