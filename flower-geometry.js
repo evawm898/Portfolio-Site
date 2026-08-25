@@ -2561,6 +2561,19 @@ export function buildVoronoi(P, rng, opts = {}) {
   const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // off-axis seeds in the +Y half
   const sil = buildSilhouette(P, 72);
   const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+  // ONE definition of "is this point in the material", read by BOTH seed samplers.
+  //
+  // They used to disagree. The off-axis sampler tested this silhouette, which is
+  // cleft-aware; the axis sampler tested `margin(x/P.L)` — petalHalfWidth, the ENVELOPE,
+  // which has no cleft term and spans every sinus. For an EVEN lobe count cleftConfig
+  // places a cleft centre at exactly y = 0, a slot down the midline, and the axis seeds
+  // are pinned to y = 0 — straight down the middle of it. Measured before this fix:
+  // 5 of 8 axis seeds inside removed material on both LOBED 2 and LOBED 4 (the shipped
+  // default), masks reaching -0.398; LOBED 7, odd, had none.
+  //
+  // `margin(...) < minHW` stays in both samplers, but it is a WIDTH FLOOR, not a material
+  // test, and it was never able to answer the question the axis sampler was asking it.
+  const inMaterial = (x, y) => pointInPoly(x, y, sil);
   const xLo = P.L * 0.05, xHi = P.L * 0.96;
   const minHW = 0.06;
   const axisGap = 0.05 * P.W;                       // min |y| for an off-axis seed
@@ -2599,6 +2612,7 @@ export function buildVoronoi(P, rng, opts = {}) {
         guard++;
         const x = lerp(xLo, xHi, rng());
         if (margin(x / P.L) < minHW) continue;
+        if (!inMaterial(x, 0)) continue;                 // the cleft slot, on an even lobe count
         let d = 1e9;
         for (const s of axis) d = Math.min(d, (s.x - x) ** 2);
         const score = d / (spaceW(x) ** 2);          // width-scaled spacing (law=0: constant -> same pick)
@@ -2619,7 +2633,7 @@ export function buildVoronoi(P, rng, opts = {}) {
         const hw = margin(x / P.L);
         if (hw < minHW) continue;
         const y = lerp(Math.max(axisGap, 0.02 * hw + 0.015), hw * 0.95, rng());
-        if (!pointInPoly(x, y, sil)) continue;
+        if (!inMaterial(x, y)) continue;
         let d = 1e9;
         for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
         for (const s of axis) d = Math.min(d, (s.x - x) ** 2 + y * y);
@@ -2657,15 +2671,27 @@ export function buildVoronoi(P, rng, opts = {}) {
   // no interior either way and every cell is culled as zero-area regardless.
   const clipPoly = ribClipPolygon(P, 72) || ribMarginPolyline(P, 72);
   const passes = lloyd === 0 ? 1 : lloyd;
+  //     CONSTRAINED TO THE MATERIAL, not merely to the bound. The clip polygon is the
+  //     rib's inner edge, an envelope band that spans every sinus, so a cell's centroid can
+  //     sit in REMOVED material and relaxation would move the seed there. That is a second,
+  //     independent route to the same defect as the axis sampler's envelope test, and it
+  //     reaches configs the sampler fix cannot: LOBED 7 is odd, has no slot on the axis, and
+  //     placed no seed in the void — yet ended with 6 there, all of them relaxed in. It
+  //     applies at lloyd = 0 too, because that is still one relaxation pass. A move that
+  //     leaves the material is refused and the seed stays where it was. ---
   for (let iter = 0; iter < passes; iter++) {
     const seeds = fullSeeds();
     for (const s of axis) {
       const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
-      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = 0; }
+      if (!cell) continue;
+      const c = polyCentroid(cell), nx = clamp(c.x, xLo, xHi);
+      if (inMaterial(nx, 0)) { s.x = nx; s.y = 0; }
     }
     for (const s of half) {
       const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
-      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = Math.max(axisGap, c.y); }
+      if (!cell) continue;
+      const c = polyCentroid(cell), nx = clamp(c.x, xLo, xHi), ny = Math.max(axisGap, c.y);
+      if (inMaterial(nx, ny)) { s.x = nx; s.y = ny; }
     }
   }
 
@@ -2734,7 +2760,14 @@ export function buildVoronoi(P, rng, opts = {}) {
   };
   for (const s of axis) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, false); }
   for (const s of half) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, true); }
-  return { veins: [], nodes: [], slabs, culled, culledDegenerate };
+  // SEEDS ARE RETURNED, so a diagnostic never has to reimplement the sampler. The
+  // measurement harness used to carry its own copy of this placement logic, and when the
+  // axis sampler's material test was fixed here the copy silently kept the old behaviour —
+  // it went on reporting 5 seeds in the cleft void that the shipped builder no longer
+  // places. Its replica-vs-real assertion caught the divergence, but the right repair is
+  // to remove the second derivation rather than to keep two in step. The post-cull set, in
+  // the same order cells were emitted.
+  return { veins: [], nodes: [], slabs, culled, culledDegenerate, seeds: fullSeeds() };
 }
 
 // Build one cell's ANNULUS for the perforated sheet. The OUTER loop walks the cell
