@@ -447,7 +447,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null, voidCrossing = null, voidPerimMean = null, floorSpanning = null, floorX = null;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null, voidCrossing = null, voidPerimMean = null, floorSpanning = null, floorX = null, rejoinFallbacks = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -623,8 +623,23 @@ window.__gq = async function() {
       //     behind an xfail or invite someone to "fix" an artifact.
       let sumA = 0;
       for (const slab of (vor.slabs || [])) sumA += Math.abs(__gqPolyArea(slab.outer));
-      const boundA = Math.abs(__gqPolyArea(G.ribMarginPolyline(P, 72)));
+      // THE DENOMINATOR IS WHATEVER THE DIAGRAM IS SUPPOSED TO COVER, AND THAT CHANGES WHEN
+      // THE DESIGN CHANGES. Before the per-lobe partition that was the whole clip bound. With
+      // it, the diagram is a partition of the REGIONS and deliberately does not cover the
+      // cleft slots: measured against the raw bound a correct partition reads 0.721 (#73).
+      // buildVoronoi returns its regions when it partitions, so this reads the right region
+      // either way instead of assuming one is a fixed property of the codebase.
+      let boundA;
+      if (vor.regions && vor.regions.length) {
+        // Regions are the +Y half; the diagram is mirrored, so the covered area is doubled.
+        let rA = 0;
+        for (const rp of vor.regions) rA += Math.abs(__gqPolyArea(rp));
+        boundA = 2 * rA;
+      } else {
+        boundA = Math.abs(__gqPolyArea(G.ribMarginPolyline(P, 72)));
+      }
       tileRatio = boundA > 1e-12 ? +(sumA / boundA).toFixed(3) : null;
+      rejoinFallbacks = vor.rejoinFallbacks || 0;
       // TILING AGAINST THE MATERIAL — the denominator that can actually see the defect.
       // Cells tiling the CLIP POLYGON faithfully give 1.000 even when the clip polygon is
       // the wrong region, which is why tileRatio above is 1.000 everywhere and useless
@@ -920,7 +935,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds, symAbove, symBelow, symStraddle, symAreaSkew, symCountSkew, voidCrossing, voidPerimMean, floorSpanning, floorX };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds, symAbove, symBelow, symStraddle, symAreaSkew, symCountSkew, voidCrossing, voidPerimMean, floorSpanning, floorX, rejoinFallbacks };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
