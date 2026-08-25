@@ -55,7 +55,16 @@ them as optional or experimental.
   also have zero boundary edges, so the export gate would pass a bloom that prints
   detached from its stem. This one voxelises the export below the minimum feature (0.6 mm)
   and flood-fills; more than one region is a FAIL. Read its header before quoting a pass:
-  it is a surface-occupancy test over hand-picked junction corners, not the export matrix.
+  it is a surface-occupancy test over hand-picked configs, not the export matrix. It covers
+  the junction corners, the Voronoi region seams, the BARE BLOOM (no stem, no sepals, no
+  receptacle override — the shipped defaults, and what every preset is) and every preset by
+  name. A row with a known, tracked defect carries `xfail: <issue>`: the gate stays green
+  for it, FAILS on any unmarked row, and FAILS HARD when an xfail row starts passing —
+  that is the fix landing and the marker must come off in the same commit. Its three
+  validity assertions (fresh page per row + whole-state read-back, the tail probe, the
+  pairwise sepal comparison) are never covered by an xfail and abort the run.
+  `node tools/verify-connectedness.mjs --negative-control` mislabels one row on purpose and
+  requires the run to fail — use it before quoting a pass from a changed harness.
 - **Control visibility is declared in the registry, and only there.** Every reason a
   control can be hidden is a `visibleWhen` predicate in `flower-registry.js`;
   `applyVisibility()` in `flower.js` evaluates it and is the only thing that sets a
@@ -66,13 +75,14 @@ them as optional or experimental.
   `node tools/dump-visibility.mjs` records all 166 controls x the matrix x both tiers, so
   a change that claims not to move visibility is diffed rather than asserted;
   `node tools/shot-panel-matrix.mjs <dir>` is the contact-sheet companion.
-- **Presets are permanent, named fixtures in BOTH gates.** Every shipped preset in
-  `flower-presets.js` is loaded by name in `verify-flower-export.mjs` (must export
-  watertight) and `verify-geometry-quality.mjs` (its petal must trace, stay smooth, cap
-  its ends) — so a preset regression reads "preset: thistle", not "config N". A preset is
+- **Presets are permanent, named fixtures in ALL THREE geometry gates.** Every shipped
+  preset in `flower-presets.js` is loaded by name in `verify-flower-export.mjs` (must export
+  watertight), `verify-geometry-quality.mjs` (its petal must trace, stay smooth, cap
+  its ends) and `verify-connectedness.mjs` (must export as one piece) — so a preset
+  regression reads "preset: thistle", not "config N". A preset is
   authored data (taste), so it is a readable DELTA over DEFAULTS and loads through the
   normal `applyDesign` path; it can never desync from the control set. When you add or
-  change a preset, both gates cover it automatically — just re-run them.
+  change a preset, all three gates cover it automatically — just re-run them.
 - **Preset thumbnails are a build-time artifact, never rendered at runtime.** Regenerate
   them (and the drift manifest) with `node tools/gen-preset-thumbs.mjs` and commit
   `assets/presets/`; the `preset-thumbs` CI job runs `--check` (a deterministic tris + bbox

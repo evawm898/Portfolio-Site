@@ -1778,21 +1778,6 @@ function stemRadiusFn(P, opts) {
   };
 }
 
-// Build the main stem into `acc` and return its centreline (so a side bud can
-// branch off it). Returns null for a degenerate length. The node markers are the
-// tube's own local swellings (stemRadiusFn) plus the kinks in the centreline, so
-// the stem stays one continuous watertight solid — no separate beads to read as a
-// string of balls. cl.nodes carries each junction's world position + direction for
-// the leaf geometry that attaches there in a later pass.
-function buildStemInto(acc, P, cx, cy, cz, opts) {
-  const length = clamp(opts.length, 0, 10);
-  if (length < 0.2) return null;                 // slider at/near its 0 minimum => no stem
-  const o = { ...opts, length };
-  const cl = stemCenterline(cx, cy, cz, o);
-  acc.addTube(cl.pts, stemRadiusFn(P, o), 0, CENTER_TUBE_SEGS);   // thick at the flower, slender below
-  return cl;
-}
-
 /* SIDE BUD — an optional secondary offshoot that branches partway down the main
    stem and ends in a smaller bud of the SAME bloom. Kept isolated from the petal
    builders: it reuses buildBloomInto to grow a simplified, more-closed bloom into
@@ -1911,7 +1896,8 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
 }
 
 /* ===================================================================
-   LEAVES — a leaf at each stem node, built on buildStemInto's node structure.
+   LEAVES — a leaf at each stem node, built on the node structure buildTrunkInto
+   returns (its `cl`, from stemCenterline).
    Reuses the petal machinery wholesale: every leaf blade is a watertight SOLID
    blade grown through buildPetalInto (the same primitive the SOLID sepals use), so
    none of the curve / taper / jag / edge math is re-implemented here. The current
@@ -2107,11 +2093,10 @@ function petalBaseFootprint(Pp, az, baseHeight, radialOffset, tilt) {
    the caps / neighbouring rings, so there are ZERO boundary edges. Every emitted
    radius honours the export feature-floor exactly like addTube.
 
-   LEAVES + SIDE BUD are unaffected: the stem zone's centreline is built by the
-   SAME stemCenterline() as before, and this returns `cl` in the identical shape
-   buildStemInto returned ({ pts, nodes, N, length }), so buildLeafInto /
-   buildBudBranchInto consume it unchanged. Returns { depth, cl } (cl is null when
-   no stem zone is built). */
+   LEAVES + SIDE BUD read the stem zone's centreline from here: this is the only
+   producer, and it returns stemCenterline()'s own object ({ pts, nodes, N, length })
+   unchanged, so buildLeafInto / buildBudBranchInto consume it directly. Returns
+   { depth, cl } (cl is null when no stem zone is built). */
 function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
   const wantRecept = !!opts.receptacle;
   const wantStem   = !!opts.stem;
@@ -2700,10 +2685,13 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // BASE — the RECEPTACLE and STEM grow as ONE continuous, watertight lofted TRUNK
   // (buildTrunkInto): the receptacle owns it, and when a stem is present the body
   // flows straight from the petal/sepal attachment ring down through the neck into
-  // the stem and its tip — no seam. SEPALS remain an independent whorl. A stem
-  // WITHOUT a receptacle has no junction to seam, so it keeps the standalone stem
-  // tube (buildStemInto). Everything builds into the petal mesh, same teal tubes.
-  // DERIVED junction — see hasReceptacle() for the rule.
+  // the stem and its tip — no seam. SEPALS remain an independent whorl. Everything
+  // builds into the petal mesh, same teal tubes.
+  // DERIVED junction — see hasReceptacle() for the rule. `stemType != none` is that
+  // predicate's own first clause, so a stem always brings a junction with it and
+  // buildTrunkInto is the only producer of a stem (and of the `cl` the leaves and the
+  // side bud read). If that clause is ever removed the stem disappears with it, and
+  // the tail probe in tools/verify-connectedness.mjs fails every stemmed row.
   const hasRecept = hasReceptacle(ui);
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
@@ -2714,7 +2702,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     nodeProminence: clamp(ui.stemNodeProminence, 0, 1),
   } : null;
 
-  let cl = null;   // stem centreline for the leaves + side bud (same shape either path)
+  let cl = null;   // stem centreline for the leaves + side bud, from the trunk
   if (hasRecept) {
     // The trunk's receptacle flutes are grown from the OUTER whorl's REAL petal
     // outlines: each layer-0 placement carries `foot`, world-polar samples of that
@@ -2747,24 +2735,14 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
-  } else if (hasStem) {
-    cl = buildStemInto(petalAcc, P, 0, centerHeight, 0, stemOpts);
   }
-  checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + receptacle/trunk or stem
+  checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + the trunk
 
   if (ui.sepalsType !== 'none') {
-    // Sepal base attachment radius. WITH a receptacle, the fluted funnel fills the
-    // space between the axis and ringR, so the old ring (ringR*0.85) embeds in it —
-    // no gap. WITHOUT a receptacle the sepals otherwise float in a wide ring around
-    // the thin stem, leaving a visible gap; anchor their bases at the stem-top
-    // surface (neckR = tubeRadius*4*thickness) instead so they emerge flush from the
-    // stem, matching how petals attach to the receptacle. Slightly inset (*0.9) so
-    // the blade base overlaps the stem wall for a watertight union.
-    const stemThick = hasStem ? clamp(ui.stemThickness, 0.3, 4) : 1;
-    const stemTopR = P.tubeRadius * 4.0 * stemThick;
-    const sepalAttachR = hasRecept ? Math.max(ringR * 0.85, 0.16)
-                       : hasStem   ? stemTopR * 0.9
-                       :             Math.max(ringR * 0.85, 0.16);
+    // Sepal base attachment radius. Sepals bring a junction with them — `sepalsType
+    // != none` is hasReceptacle()'s second clause — so the fluted funnel always fills
+    // the space between the axis and ringR, and this ring embeds in it with no gap.
+    const sepalAttachR = Math.max(ringR * 0.85, 0.16);
     buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
       count: ui.sepalCount,
       size: ui.sepalSize,
@@ -3427,7 +3405,11 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : 'leaf venation';
   // SDF receptacle telemetry (continuous margin on): report the field's own triangle
   // count so its contribution to the budget stays visible on every geometry change.
-  const recept = (ui.continuousMargin === 'on' && ui.receptacleType === 'on' && RECEPT_FIELD_STATS)
+  // hasReceptacle(ui), not the raw `receptacleType` toggle: the junction is DERIVED,
+  // and reading the migration-override control instead meant this clause was suppressed
+  // on every design that grew a junction from a stem or sepals — which is all of them
+  // except a migrated save. The field was being built and measured, and not reported.
+  const recept = (ui.continuousMargin === 'on' && hasReceptacle(ui) && RECEPT_FIELD_STATS)
     ? ` · sdf receptacle ~${RECEPT_FIELD_STATS.tris.toLocaleString()} tris (abs ${(+ui.absorption).toFixed(2)})`
     : '';
   el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris${recept}`;
@@ -3768,8 +3750,15 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 // BACKLOG (trigger): retire the legacy receptacle entirely — delete those nine controls and
 // the continuous-margin-OFF receptacle path, making continuous margin implicit — once the
 // SDF junction is signed off. Until then the working fallback stays, now declared.
+//
+// NO LISTENER ON `receptacleType`. It is permanently hidden (registry `visibleWhen:
+// {any: []}`) — a migration override for designs saved before the junction became
+// derived — so nothing can emit a `change` on it from the panel. The one that used to
+// be here did two things and needed neither: `applyVisibility()` is already wired for
+// it by PREDICATE_DRIVERS (it drives hasReceptacle), and the rebuild it also asked for
+// is the caller's job — applyDesign() schedules its own, and exportSTL() rebuilds from
+// readUI() regardless of what the live scene holds.
 function updateBaseOptions() { applyVisibility(); }
-inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptProfile.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptConstruction.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptCollar.addEventListener('change', scheduleRegen);

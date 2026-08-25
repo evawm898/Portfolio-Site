@@ -7,6 +7,12 @@
 # arrives in parts. See the header of tools/verify-connectedness.mjs for what it does NOT
 # yet prove — it is a surface-occupancy test over a hand-picked set of junction corners, not
 # the export matrix.
+#
+# It now also covers the BARE BLOOM — no stem, no sepals, no receptacle override, which is
+# what the shipped defaults and all seven presets are — and every preset by name. Rows with
+# a KNOWN, TRACKED defect carry an `xfail` issue number: the gate stays green for those and
+# fails hard if one starts passing, because that means the fix landed and the marker is now
+# a hole. See the tool's header.
 name: flower-connectedness
 
 on:
@@ -16,6 +22,7 @@ on:
       - flower-geometry.js
       - flower-sdf.js
       - flower-registry.js
+      - flower-presets.js
       - flower.html
       - tools/verify-connectedness.mjs
       - tools/chromium-harness.mjs
@@ -27,6 +34,7 @@ on:
       - flower-geometry.js
       - flower-sdf.js
       - flower-registry.js
+      - flower-presets.js
       - flower.html
       - tools/verify-connectedness.mjs
       - tools/chromium-harness.mjs
