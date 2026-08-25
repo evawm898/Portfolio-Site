@@ -137,6 +137,23 @@
     "seeds": 48
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe0",
+     "verts": 848,
+     "area": 2.74636,
+     "folds": 0,
+     "minWidthMM": 3.9136,
+     "minAtT": 0.988,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [],
+   "centers": [],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 48,
@@ -379,6 +396,210 @@
     "seeds": 20
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe0",
+     "verts": 502,
+     "area": 1.07289,
+     "folds": 0,
+     "minWidthMM": 0.6011,
+     "minAtT": 0.412,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe1",
+     "verts": 510,
+     "area": 1.07289,
+     "folds": 0,
+     "minWidthMM": 0.6011,
+     "minAtT": 0.412,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [
+    {
+     "region": "lobe0",
+     "doubledBackFrac": 0.0769,
+     "areaMM2": 2.159,
+     "verts": 26,
+     "seed": {
+      "x": 0.981,
+      "y": 0
+     },
+     "poly": [
+      [
+       0.80153,
+       0
+      ],
+      [
+       0.85228,
+       0
+      ],
+      [
+       0.8526,
+       -0.00926
+      ],
+      [
+       0.8526,
+       -0.00926
+      ],
+      [
+       0.85354,
+       -0.01853
+      ],
+      [
+       0.85512,
+       -0.02779
+      ],
+      [
+       0.85737,
+       -0.03705
+      ],
+      [
+       0.85968,
+       -0.04438
+      ],
+      [
+       0.86031,
+       -0.04631
+      ],
+      [
+       0.86401,
+       -0.05558
+      ],
+      [
+       0.86892,
+       -0.06559
+      ],
+      [
+       0.86892,
+       -0.06559
+      ],
+      [
+       0.87395,
+       -0.0741
+      ],
+      [
+       0.87817,
+       -0.08029
+      ],
+      [
+       0.88041,
+       -0.08336
+      ],
+      [
+       0.8881,
+       -0.09263
+      ],
+      [
+       0.8938,
+       -0.09832
+      ],
+      [
+       0.98641,
+       -0.13761
+      ],
+      [
+       0.98908,
+       -0.13771
+      ],
+      [
+       0.9946,
+       -0.13894
+      ],
+      [
+       0.99833,
+       -0.13977
+      ],
+      [
+       1.00757,
+       -0.14204
+      ],
+      [
+       1.01681,
+       -0.14432
+      ],
+      [
+       1.02221,
+       -0.14565
+      ],
+      [
+       1.01613,
+       -0.15021
+      ],
+      [
+       0.84804,
+       -0.07891
+      ]
+     ],
+     "regionVerts": 502,
+     "nSeedsInRegion": 28
+    }
+   ],
+   "seedsOnDivider": [
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe0"
+    },
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe0"
+    },
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe0"
+    },
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe0"
+    },
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe0"
+    },
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe0"
+    },
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe0"
+    },
+    {
+     "divider": 0,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe0"
+    }
+   ],
+   "centers": [
+    0
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 44,
@@ -637,6 +858,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 288,
+     "area": 0.45932,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 24
+    },
+    {
+     "region": "lobe2",
+     "verts": 290,
+     "area": 0.45932,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 24
+    },
+    {
+     "region": "lobe3",
+     "verts": 407,
+     "area": 0.54381,
+     "folds": 0,
+     "minWidthMM": 0.1666,
+     "minAtT": 0.537,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 400,
+     "area": 0.54381,
+     "folds": 0,
+     "minWidthMM": 0.1666,
+     "minAtT": 0.537,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 45,
@@ -919,6 +1245,113 @@
     "seeds": 10
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe3",
+     "verts": 298,
+     "area": 0.26535,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 24
+    },
+    {
+     "region": "lobe5",
+     "verts": 205,
+     "area": 0.23911,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 20
+    },
+    {
+     "region": "lobe1",
+     "verts": 204,
+     "area": 0.23912,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 20
+    },
+    {
+     "region": "lobe6",
+     "verts": 351,
+     "area": 0.34812,
+     "folds": 0,
+     "minWidthMM": 0.1074,
+     "minAtT": 0.613,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 343,
+     "area": 0.34812,
+     "folds": 0,
+     "minWidthMM": 0.1074,
+     "minAtT": 0.613,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe4",
+     "verts": 257,
+     "area": 0.25728,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 23
+    },
+    {
+     "region": "lobe2",
+     "verts": 253,
+     "area": 0.25728,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 23
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 5,
+     "distMM": 0.004551,
+     "x": 0.4114,
+     "y": 0.2901,
+     "region": "lobe5"
+    },
+    {
+     "divider": 0,
+     "distMM": 0.004551,
+     "x": 0.4114,
+     "y": -0.2901,
+     "region": "lobe1"
+    },
+    {
+     "divider": 5,
+     "distMM": 0.018361,
+     "x": 0.137,
+     "y": 0.0974,
+     "region": "lobe6"
+    },
+    {
+     "divider": 0,
+     "distMM": 0.018361,
+     "x": 0.137,
+     "y": -0.0974,
+     "region": "lobe0"
+    }
+   ],
+   "centers": [
+    -0.69843,
+    -0.41906,
+    -0.13969,
+    0.13969,
+    0.41906,
+    0.69843
+   ],
+   "axisSeeds": 14
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 82,
@@ -1177,6 +1610,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 288,
+     "area": 0.45932,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 24
+    },
+    {
+     "region": "lobe2",
+     "verts": 290,
+     "area": 0.45932,
+     "folds": 0,
+     "minWidthMM": 0,
+     "minAtT": 0.013,
+     "binsFilled": 24
+    },
+    {
+     "region": "lobe3",
+     "verts": 407,
+     "area": 0.54381,
+     "folds": 0,
+     "minWidthMM": 0.1666,
+     "minAtT": 0.537,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 400,
+     "area": 0.54381,
+     "folds": 0,
+     "minWidthMM": 0.1666,
+     "minAtT": 0.537,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 45,
@@ -1407,6 +1945,23 @@
     "seeds": 48
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe0",
+     "verts": 795,
+     "area": 2.16447,
+     "folds": 0,
+     "minWidthMM": 1.1308,
+     "minAtT": 0.013,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [],
+   "centers": [],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 43,
@@ -1665,6 +2220,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -1923,6 +2583,83 @@
     "seeds": 3
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 4
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 20,
@@ -2181,6 +2918,90 @@
     "seeds": 4
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 5
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 26,
@@ -2439,6 +3260,97 @@
     "seeds": 7
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 6
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 29,
@@ -2697,6 +3609,104 @@
     "seeds": 5
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 7
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 35,
@@ -2955,6 +3965,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -3213,6 +4328,118 @@
     "seeds": 10
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.8178,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 9
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 45,
@@ -3471,6 +4698,125 @@
     "seeds": 10
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.8178,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.7447,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 10
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 49,
@@ -3729,6 +5075,132 @@
     "seeds": 12
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.8178,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.7447,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.2521,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 11
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 52,
@@ -3987,6 +5459,139 @@
     "seeds": 14
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.8178,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.7447,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.2521,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0017,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 12
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 58,
@@ -4245,6 +5850,153 @@
     "seeds": 18
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.8178,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.7447,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.2521,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0017,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.158,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.2775,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 14
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 61,
@@ -4503,6 +6255,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -4761,6 +6618,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -5019,6 +6981,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -5277,6 +7344,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -5535,6 +7707,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -5793,6 +8070,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -6051,6 +8433,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,
@@ -6309,6 +8796,111 @@
     "seeds": 11
    }
   ],
+  "wsDiag": {
+   "regions": [
+    {
+     "region": "lobe1",
+     "verts": 344,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe2",
+     "verts": 349,
+     "area": 0.41237,
+     "folds": 0,
+     "minWidthMM": 0.4817,
+     "minAtT": 0.013,
+     "binsFilled": 32
+    },
+    {
+     "region": "lobe3",
+     "verts": 326,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    },
+    {
+     "region": "lobe0",
+     "verts": 317,
+     "area": 0.30053,
+     "folds": 0,
+     "minWidthMM": 0.577,
+     "minAtT": 0.313,
+     "binsFilled": 40
+    }
+   ],
+   "degenerate": [],
+   "seedsOnDivider": [
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 2.0714,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.6081,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.3696,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.1135,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.981,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.647,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 0.4207,
+     "y": 0,
+     "region": "lobe1"
+    },
+    {
+     "divider": 1,
+     "distMM": 0,
+     "x": 1.8488,
+     "y": 0,
+     "region": "lobe1"
+    }
+   ],
+   "centers": [
+    -0.4889,
+    0,
+    0.4889
+   ],
+   "axisSeeds": 8
+  },
   "optPartitionSimplified0p25": {
    "label": "per-lobe partition, bound simplified to 0.25 mm",
    "cells": 38,

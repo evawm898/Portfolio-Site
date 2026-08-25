@@ -364,7 +364,61 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
     __drawWatershed = cells; __drawWsRegions = [...RP.values()];
     out.optWatershed = summarise(cells, 'watershed partition + cleft-aware clip');
     out.optWatershed.gate = reg(cells);
-    out.watershedRegions = [...R.entries()].map(([k, v]) => ({ region: 'lobe' + k, seeds: v.length })); }
+    out.watershedRegions = [...R.entries()].map(([k, v]) => ({ region: 'lobe' + k, seeds: v.length })); 
+    // WHY a watershed region ever yields a degenerate cell. The hypothesis under test is
+    // that it is the #77 defect one level down: a REGION bound can pinch to zero width
+    // exactly as the petal bound did, and a cell covering that pinch inherits the spike no
+    // matter which seed owns it. So measure the region polygons themselves — folds
+    // (antiparallel consecutive edges) and the narrowest station across the region — and
+    // attribute every degenerate cell to the region that produced it.
+    const wsDiag = { regions: [], degenerate: [] };
+    for (const [r, rp] of RP.entries()) {
+      let fold = 0; const m = rp.length;
+      for (let i = 0; i < m; i++) { const a = rp[(i-1+m)%m], b = rp[i], c2 = rp[(i+1)%m];
+        const ux=b.x-a.x, uy=b.y-a.y, vx=c2.x-b.x, vy=c2.y-b.y;
+        const lu=Math.hypot(ux,uy), lv=Math.hypot(vx,vy);
+        if (lu<1e-12||lv<1e-12) continue;
+        if ((ux*vx+uy*vy)/(lu*lv) < -0.9999) fold++; }
+      // narrowest station: bin by x, width = max y - min y in the bin, over bins that have
+      // any vertices. A pinch shows up as a bin whose width collapses.
+      const NB = 40; let xmin = Infinity, xmax = -Infinity;
+      for (const q of rp) { if (q.x < xmin) xmin = q.x; if (q.x > xmax) xmax = q.x; }
+      const lo = new Array(NB).fill(Infinity), hi = new Array(NB).fill(-Infinity);
+      for (const q of rp) { const t = (q.x - xmin) / Math.max(xmax - xmin, 1e-12);
+        const bi = Math.min(NB-1, Math.max(0, Math.floor(t * NB)));
+        if (q.y < lo[bi]) lo[bi] = q.y; if (q.y > hi[bi]) hi[bi] = q.y; }
+      let minW = Infinity, minAtT = null, filled = 0;
+      for (let i = 0; i < NB; i++) { if (hi[i] < lo[i]) continue; filled++;
+        const w = hi[i] - lo[i]; if (w < minW) { minW = w; minAtT = +((i+0.5)/NB).toFixed(3); } }
+      wsDiag.regions.push({ region: 'lobe' + r, verts: rp.length, area: +area(rp).toFixed(5),
+                            folds: fold, minWidthMM: +(minW * 26).toFixed(4), minAtT, binsFilled: filled });
+    }
+    for (const s2 of seedsAll) { const r = wsRegionOf(s2), rp = RP.get(r);
+      if (!rp || rp.length < 3) continue;
+      const c = cellOf(s2, R.get(r), rp, M0, null); if (!c) continue;
+      const db = doubledBack(c);
+      if (db > 0) wsDiag.degenerate.push({ region: 'lobe' + r, doubledBackFrac: +db.toFixed(4),
+                                           areaMM2: +(area(c) * 26 * 26).toFixed(4), verts: c.length,
+                                           seed: { x: +s2.x.toFixed(4), y: +s2.y.toFixed(4) },
+                                           poly: c.map((q) => [+q.x.toFixed(5), +q.y.toFixed(5)]),
+                                           regionVerts: rp.length,
+                                           nSeedsInRegion: R.get(r).length }); }
+    // The pinch hypothesis is refuted by the two rows above, so measure the other
+    // candidate: a SEED LYING EXACTLY ON A DIVIDER. Such a seed sits on its own region's
+    // clip edge, so the clip passes through the site and the cell is severed at the seed.
+    // For an even lobe count one divider coincides with the axis, where the axis seeds are.
+    wsDiag.seedsOnDivider = [];
+    for (const s2 of (cfg ? seedsAll : [])) {
+      let best = Infinity, bestK = -1;
+      for (let j = 0; j < cfg.centers.length; j++) {
+        const d = Math.abs(s2.y - dividerY(j, s2.x));
+        if (d < best) { best = d; bestK = j; } }
+      if (best * 26 < 0.05) wsDiag.seedsOnDivider.push({ divider: bestK, distMM: +(best*26).toFixed(6),
+                                                         x: +s2.x.toFixed(4), y: +s2.y.toFixed(4),
+                                                         region: 'lobe' + wsRegionOf(s2) }); }
+    wsDiag.centers = cfg ? cfg.centers.map((c) => +c.toFixed(5)) : [];
+    wsDiag.axisSeeds = seedsAll.filter((q) => Math.abs(q.y) < 1e-9).length;
+    out.wsDiag = wsDiag; }
 
   // ---------- COST: the same partition against a Douglas-Peucker-simplified bound ----------
   // The cleft-aware bound is a marching-squares polyline where today's is a 480-vertex
