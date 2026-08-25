@@ -450,6 +450,7 @@ window.__gq = async function() {
   let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null, voidCrossing = null, voidPerimMean = null, floorSpanning = null, floorX = null, rejoinFallbacks = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
+  let cellPolys = null;
   let regOverMax = 0, regOverU = 0;
   const recordPt = (x, y) => {
     const u = Math.max(0, Math.min(1, x / P.L));
@@ -470,6 +471,7 @@ window.__gq = async function() {
         slabTaper: P.voronoiSlabTaper, minCellSize: 3 * P.tubeRadius * SLAB_THICK,
       });
       for (const slab of (vor.slabs || [])) for (const pt of slab.outer) recordPt(pt.x, pt.y);
+      cellPolys = (vor.slabs || []).map((sl) => sl.outer);
       // (7) THE HOLE IS INSIDE ITS OWN CELL — #74.
       //     addSlab pairs outer[k] with inner[k] and lofts the ring between them, so every
       //     inner[k] must lie inside its own outer ring. When it does not, the strut crosses
@@ -854,13 +856,81 @@ window.__gq = async function() {
   } else {
     for (const v of veins) for (const pt of v.points) recordPt(pt.x, pt.y);
   }
+  // UNDERSHOOT'S REFERENCE IS THE MATERIAL INSIDE THE RIB, not the scalar envelope.
+  // ribInnerEdge(u) is a single half-width per u and has no cleft term, so on a clefted
+  // petal it reports the envelope across every sinus. That was harmless while the cells
+  // spanned the sinuses too — both sides of the comparison were wrong the same way — and
+  // it stops being harmless the moment they correctly stop at the lobe: the gap the
+  // partition is FOR then reads as a 6.859 mm registration failure on lobed__voronoi.
+  //
+  // This gate's own header said so before it mattered — "gating this needs a rib-aware
+  // denominator, the inset material, which is the cleft-aware bound that does not exist
+  // yet". It exists now (ribInsetBound), so this reads it: the outer envelope of the same
+  // bound the cells are actually clipped against, per u bin, taken across islands. Where
+  // there are no clefts the producer returns ribClipPolygon verbatim and this is the same
+  // number it always was.
+  const insetOuter = (() => {
+    if (!cfg) return null;
+    const pieces = G.ribInsetBound(P);
+    if (!pieces || !pieces.length) return null;
+    // Where the bound reaches at this u, by INTERSECTING a vertical line with it — not by
+    // stamping each edge's y-range across the bins it spans. The spanning form is what
+    // ribPath's own envelope binner uses and it is right there, because the analytic
+    // outline has no long near-vertical edges. This contour does: it closes to a point at
+    // the foot and at the tip, so one nearly-vertical edge stamped its full y-range into a
+    // single bin and the reference read 22.274 mm where the bound actually reaches 5.430.
+    // Intersecting is exact and needs no resolution argument.
+    const tab = new Array(NBIN).fill(null);
+    for (let bi = 0; bi < NBIN; bi++) {
+      const x = P.L * (bi + 0.5) / NBIN;
+      let m = null;
+      for (const poly of pieces) {
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i], b = poly[(i + 1) % poly.length];
+          if ((a.x <= x && b.x > x) || (a.x >= x && b.x < x)) {
+            const t = (x - a.x) / (b.x - a.x);
+            const ay = Math.abs(a.y + (b.y - a.y) * t);
+            if (m == null || ay > m) m = ay;
+          }
+        }
+      }
+      tab[bi] = m;
+    }
+    return tab;
+  })();
+  // BOTH SIDES BY THE SAME ESTIMATOR, for voronoi. outerY is the max |y| of the infill's
+  // VERTICES in each bin, which is the right measure for a sparse polyline pattern and the
+  // wrong one against a continuous reference curve: a cell's outer edge lies exactly on the
+  // bound, but its vertices are at the cell's corners, so between them the per-bin vertex
+  // maximum falls short of a curve it is actually flush with. Measured on lobed__voronoi,
+  // that mismatch alone read as 6.721 mm of undershoot; intersecting the cells with the
+  // same vertical line the reference is sampled on gives 0.128 mm.
+  //
+  // Voronoi is the only pattern whose cells are closed polygons, so it is the only one this
+  // applies to; the sparse patterns keep the vertex measure, which is correct for them and
+  // ungated anyway.
+  const cellsAtX = (x) => {
+    let m = null;
+    for (const poly of cellPolys) {
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        if ((a.x <= x && b.x > x) || (a.x >= x && b.x < x)) {
+          const t = (x - a.x) / (b.x - a.x);
+          const ay = Math.abs(a.y + (b.y - a.y) * t);
+          if (m == null || ay > m) m = ay;
+        }
+      }
+    }
+    return m;
+  };
   let regUnderSum = 0, regUnderCount = 0, regUnderMax = 0, regUnderU = 0;
   for (let bi = 0; bi < NBIN; bi++) {
-    if (outerY[bi] == null) continue;
     const u = (bi + 0.5) / NBIN;
-    const rib = G.ribInnerEdge(u, P);
-    if (rib < 1e-4) continue;
-    const under = rib - outerY[bi];       // > 0 means this u-band's outermost point falls short
+    const reach = cellPolys ? cellsAtX(P.L * u) : outerY[bi];
+    if (reach == null) continue;
+    const rib = insetOuter ? insetOuter[bi] : G.ribInnerEdge(u, P);
+    if (rib == null || rib < 1e-4) continue;
+    const under = rib - reach;            // > 0 means this u-band's outermost point falls short
     if (under <= 0) continue;             // this band already meets/exceeds the rib (no gap here)
     regUnderSum += under; regUnderCount++;
     if (under > regUnderMax) { regUnderMax = under; regUnderU = u; }
