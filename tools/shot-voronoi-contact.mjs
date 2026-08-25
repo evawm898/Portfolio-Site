@@ -52,6 +52,16 @@ const CHRYSANTHEMUM_UI = {
 // ISOLATE THE PETAL: one petal, no receptacle, no stem, no sepals, no centre. The
 // subject is the cell tiling, and a bloom of nine overlapping petals hides it.
 const ISOLATE = { petalCount: '1', receptacleType: 'none', stemType: 'none', sepalsType: 'none', centerType: 'none' };
+// RESET, applied before every config. Controls persist across configs in one page session,
+// so anything one row sets and the next does not clear silently leaks forward — the first
+// version of this sheet let `lobed-aniso` set voronoiAniso: 4 and every lobe-count row
+// after it was measured at anisotropy 4 while claiming to be the default. Every key any
+// config sets must appear here with its default.
+const RESET = {
+  cleftDepth: 0, cleftLobes: 2, cleftWidth: 0.3,
+  voronoiAniso: 1, voronoiLloyd: 0, voronoiDensityLaw: 0, density: 7,
+  clawLength: 0, crossSection: 0, curlAmount: 0, continuousMargin: 'on',
+};
 
 const CONFIGS = [];
 for (const shape of Object.keys(SHAPES)) CONFIGS.push({ name: shape, ui: { ...SHAPES[shape], infillType: 'voronoi' } });
@@ -59,6 +69,15 @@ CONFIGS.push({ name: 'chrysanthemum', ui: { ...CHRYSANTHEMUM_UI, infillType: 'vo
 // Anisotropy on a cleft is the config with the largest triangle move (-12.6%), and the
 // one place the per-seed metric engages (#73). It has to be on the sheet.
 CONFIGS.push({ name: 'lobed-aniso', ui: { ...SHAPES.lobed, infillType: 'voronoi', cleftLobes: 4, voronoiAniso: 4 } });
+// LOBE PARITY. cleftConfig places n-1 cleft centres symmetrically, so an EVEN lobe count
+// puts one at exactly y = 0 — a slot down the midline, where the axis seeds are pinned.
+// Odd counts have no centre on the axis. Both are on the sheet deliberately: the even rows
+// are where a seed-placement fix must show, and the odd rows are the control that says a
+// change is confined to the case it was aimed at. (Relaxation can push a seed into a sinus
+// on any parity, so the odd rows are a control, not a guarantee of no movement.)
+for (const n of [2, 3, 4, 5, 7]) {
+  CONFIGS.push({ name: `lobes-${n}`, ui: { ...SHAPES.lobed, infillType: 'voronoi', cleftLobes: n } });
+}
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
@@ -137,7 +156,7 @@ const setAll = async (ui) => {
 
 const rows = [];
 for (const cfg of CONFIGS) {
-  const bad = await setAll({ ...ISOLATE, ...cfg.ui });
+  const bad = await setAll({ ...RESET, ...ISOLATE, ...cfg.ui });
   // Top-down frames the blade flat-on, which is the view the cell tiling reads in.
   // Re-applied per config because the camera refits to each new plant.
   await page.evaluate(() => {

@@ -148,38 +148,17 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
       n++; sum+=m; if(m<mn)mn=m; if(m>mx)mx=m; }
     out.maskGradient = { samples:n, mean:n?sum/n:0, min:mn===1e9?null:mn, max:mx }; }
 
-  // ---------- (2) SEED SAMPLER REPLICA, verified against the real buildVoronoi ----------
+  // ---------- (2) SEEDS — READ FROM THE REAL BUILDER, NOT RESAMPLED ----------
+  // This used to carry a copy of buildVoronoi's seed sampler. When the axis sampler's
+  // material test was fixed in the real one, the copy kept the old behaviour and went on
+  // reporting 5 seeds in the cleft void that no longer exist. The replica-vs-real assertion
+  // caught it — 10 configs drifted and the run refused to report — but keeping two
+  // derivations in step is not the repair. buildVoronoi now returns its seed set and this
+  // reads it. One sampler.
   const mkRng=(s)=>{let t=s>>>0;return()=>{t=(t+0x6D2B79F5)>>>0;let x=Math.imul(t^(t>>>15),1|t);
     x=(x+Math.imul(x^(x>>>7),61|x))^x;return((x^(x>>>14))>>>0)/4294967296;};};
   const clamp=(v,a,b)=>v<a?a:v>b?b:v;
   const lerp=(a,b,t)=>a+(b-a)*t;
-  function sampleSeeds(rng) {
-    const density = clamp(Math.round(P.density||7),3,12);
-    const perHalf = Math.round(lerp(9,34,(density-3)/9));
-    const sil = G.buildSilhouette(P, 72);
-    const margin=(u)=>G.petalHalfWidth(clamp(u,0,1),P);
-    const xLo=P.L*0.05, xHi=P.L*0.96, minHW=0.06, axisGap=0.05*P.W;
-    const cellLaw = clamp(P.voronoiDensityLaw!=null?P.voronoiDensityLaw:0,0,1);
-    let Wmax=minHW; for(let i=0;i<=100;i++) Wmax=Math.max(Wmax,margin(i/100));
-    const spaceW=(x)=>{const w=lerp(Wmax,margin(x/P.L),cellLaw);return w>1e-3?w:1e-3;};
-    const nAxis=clamp(Math.round(perHalf*0.4),2,14); const axis=[];
-    { let guard=0; while(axis.length<nAxis && guard<nAxis*400){ let best=null,bestD=-1;
-        for(let c=0;c<12;c++){ guard++; const x=lerp(xLo,xHi,rng()); if(margin(x/P.L)<minHW)continue;
-          let d=1e9; for(const s of axis) d=Math.min(d,(s.x-x)**2);
-          const sc=d/(spaceW(x)**2); if(sc>bestD){bestD=sc;best={x,y:0};} }
-        if(best)axis.push(best); } }
-    const half=[];
-    { let guard=0; while(half.length<perHalf && guard<perHalf*800){ let best=null,bestD=-1;
-        for(let c=0;c<10;c++){ guard++; const x=lerp(xLo,xHi,rng()); const hw=margin(x/P.L);
-          if(hw<minHW)continue;
-          const y=lerp(Math.max(axisGap,0.02*hw+0.015),hw*0.95,rng());
-          if(!inPoly(x,y,sil))continue;
-          let d=1e9; for(const s of half) d=Math.min(d,(s.x-x)**2+(s.y-y)**2);
-          for(const s of axis) d=Math.min(d,(s.x-x)**2+y*y);
-          const sc=d/(spaceW(x)**2); if(sc>bestD){bestD=sc;best={x,y};} }
-        if(best)half.push(best); } }
-    return { axis, half };
-  }
   const SH=(poly,a,b,c)=>{const o=[];const n=poly.length;
     for(let i=0;i<n;i++){const p=poly[i],q=poly[(i+1)%n];
       const dp=a*p.x+b*p.y+c, dq=a*q.x+b*q.y+c;
@@ -196,22 +175,19 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
       cell=SH(cell,2*(m00*dxs+m01*dys),2*(m01*dxs+m11*dys),sMs-tMt);
       if(cell.length<3)return null; }
     return cell; };
-  const fullSeeds=(sd)=>{const arr=[]; for(const s of sd.axis)arr.push(s);
-    for(const s of sd.half){arr.push(s);arr.push({x:s.x,y:-s.y});} return arr;};
 
-  // REPLICA CHECK: same seeds + the ENVELOPE clip must reproduce the real builder's cells.
-  const sd = sampleSeeds(mkRng(12345));
+  // REPLICA CHECK: the REAL builder's seeds + the ENVELOPE clip must reproduce its cells.
   const a2 = Math.pow(clamp(P.voronoiAniso!=null?P.voronoiAniso:1,1,4),2);
   const M0 = anisoMetric(1,0,a2);
-  const seedsAll = fullSeeds(sd);
-  // Every seed in the full set, mirrors included — the real builder emits an outer polygon
-  // per +Y cell AND its -Y mirror, so a replica over axis+half only is half a petal.
-  const replica = [];
-  for (const s of seedsAll) { const c=cellOf(s,seedsAll,envBound,M0,null); if(c) replica.push(c); }
   const real = G.buildVoronoi(P, mkRng(12345), { density:P.density, softness:P.softness,
     lloyd:P.voronoiLloyd, anisotropy:P.voronoiAniso, cellDensityLaw:P.voronoiDensityLaw,
     weightHierarchy:P.voronoiWeight, weightFalloff:P.voronoiWeightFalloff,
     slabTaper:P.voronoiSlabTaper, minCellSize:0 });
+  // The set the shipped builder actually used, mirrors included — it emits an outer polygon
+  // per +Y cell AND its -Y mirror, so a set over axis+half only is half a petal.
+  const seedsAll = real.seeds || [];
+  const replica = [];
+  for (const s of seedsAll) { const c=cellOf(s,seedsAll,envBound,M0,null); if(c) replica.push(c); }
   // real emits +Y cells and their -Y mirrors; replica builds +Y and -Y explicitly for half
   // seeds only through the mirror seeds, so compare TOTAL AREA and count of unmirrored cells.
   const replicaArea = replica.reduce((a,c)=>a+area(c),0);
@@ -420,11 +396,27 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
     // Are any seeds sitting in REMOVED MATERIAL? For an even lobe count a cleft slot runs
     // down the axis, and the axis seeds are pinned to y = 0 — straight down the middle of
     // it. petalMask < 0 is outside the material.
+    // TWO PREDICATES, MEASURED SEPARATELY, because they are not the same function and the
+    // whole defect is one of them being used where the other was meant:
+    //   petalMask(x, y, P, cfg)          the ANALYTIC signed field
+    //   pointInPoly(x, y, buildSilhouette(P, 72))   its 72-sample marching-squares polygon
+    // The off-axis sampler has always used the polygon. If they disagree the "one owner"
+    // has to be chosen deliberately, not inherited from whichever branch was edited last.
     wsDiag.seedsInVoid = [];
-    for (const s2 of (cfg ? seedsAll : [])) {
-      const mk = G.petalMask(s2.x, s2.y, P, cfg);
-      if (mk < 0) wsDiag.seedsInVoid.push({ x: +s2.x.toFixed(4), y: +s2.y.toFixed(4),
-                                            mask: +mk.toFixed(5), onAxis: Math.abs(s2.y) < 1e-9 }); }
+    wsDiag.predicateSplit = { maskOnly: 0, polyOnly: 0, both: 0, neither: 0 };
+    {
+      const silD = G.buildSilhouette(P, 72);
+      for (const s2 of (cfg ? seedsAll : [])) {
+        const mk = G.petalMask(s2.x, s2.y, P, cfg);
+        const outMask = mk < 0, outPoly = !inPoly(s2.x, s2.y, silD);
+        if (outMask && outPoly) wsDiag.predicateSplit.both++;
+        else if (outMask) wsDiag.predicateSplit.maskOnly++;
+        else if (outPoly) wsDiag.predicateSplit.polyOnly++;
+        else wsDiag.predicateSplit.neither++;
+        if (outMask) wsDiag.seedsInVoid.push({ x: +s2.x.toFixed(4), y: +s2.y.toFixed(4),
+                                               mask: +mk.toFixed(5), onAxis: Math.abs(s2.y) < 1e-9,
+                                               outPoly }); }
+    }
     wsDiag.axisSeeds = seedsAll.filter((q) => Math.abs(q.y) < 1e-9).length;
     out.wsDiag = wsDiag; }
 
