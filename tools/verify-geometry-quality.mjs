@@ -450,6 +450,7 @@ window.__gq = async function() {
   let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null, voidCrossing = null, voidPerimMean = null, floorSpanning = null, floorX = null, rejoinFallbacks = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
+  let cellPolys = null;
   let regOverMax = 0, regOverU = 0;
   const recordPt = (x, y) => {
     const u = Math.max(0, Math.min(1, x / P.L));
@@ -470,6 +471,7 @@ window.__gq = async function() {
         slabTaper: P.voronoiSlabTaper, minCellSize: 3 * P.tubeRadius * SLAB_THICK,
       });
       for (const slab of (vor.slabs || [])) for (const pt of slab.outer) recordPt(pt.x, pt.y);
+      cellPolys = (vor.slabs || []).map((sl) => sl.outer);
       // (7) THE HOLE IS INSIDE ITS OWN CELL — #74.
       //     addSlab pairs outer[k] with inner[k] and lofts the ring between them, so every
       //     inner[k] must lie inside its own outer ring. When it does not, the strut crosses
@@ -854,13 +856,81 @@ window.__gq = async function() {
   } else {
     for (const v of veins) for (const pt of v.points) recordPt(pt.x, pt.y);
   }
+  // UNDERSHOOT'S REFERENCE IS THE MATERIAL INSIDE THE RIB, not the scalar envelope.
+  // ribInnerEdge(u) is a single half-width per u and has no cleft term, so on a clefted
+  // petal it reports the envelope across every sinus. That was harmless while the cells
+  // spanned the sinuses too — both sides of the comparison were wrong the same way — and
+  // it stops being harmless the moment they correctly stop at the lobe: the gap the
+  // partition is FOR then reads as a 6.859 mm registration failure on lobed__voronoi.
+  //
+  // This gate's own header said so before it mattered — "gating this needs a rib-aware
+  // denominator, the inset material, which is the cleft-aware bound that does not exist
+  // yet". It exists now (ribInsetBound), so this reads it: the outer envelope of the same
+  // bound the cells are actually clipped against, per u bin, taken across islands. Where
+  // there are no clefts the producer returns ribClipPolygon verbatim and this is the same
+  // number it always was.
+  const insetOuter = (() => {
+    if (!cfg) return null;
+    const pieces = G.ribInsetBound(P);
+    if (!pieces || !pieces.length) return null;
+    // Where the bound reaches at this u, by INTERSECTING a vertical line with it — not by
+    // stamping each edge's y-range across the bins it spans. The spanning form is what
+    // ribPath's own envelope binner uses and it is right there, because the analytic
+    // outline has no long near-vertical edges. This contour does: it closes to a point at
+    // the foot and at the tip, so one nearly-vertical edge stamped its full y-range into a
+    // single bin and the reference read 22.274 mm where the bound actually reaches 5.430.
+    // Intersecting is exact and needs no resolution argument.
+    const tab = new Array(NBIN).fill(null);
+    for (let bi = 0; bi < NBIN; bi++) {
+      const x = P.L * (bi + 0.5) / NBIN;
+      let m = null;
+      for (const poly of pieces) {
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i], b = poly[(i + 1) % poly.length];
+          if ((a.x <= x && b.x > x) || (a.x >= x && b.x < x)) {
+            const t = (x - a.x) / (b.x - a.x);
+            const ay = Math.abs(a.y + (b.y - a.y) * t);
+            if (m == null || ay > m) m = ay;
+          }
+        }
+      }
+      tab[bi] = m;
+    }
+    return tab;
+  })();
+  // BOTH SIDES BY THE SAME ESTIMATOR, for voronoi. outerY is the max |y| of the infill's
+  // VERTICES in each bin, which is the right measure for a sparse polyline pattern and the
+  // wrong one against a continuous reference curve: a cell's outer edge lies exactly on the
+  // bound, but its vertices are at the cell's corners, so between them the per-bin vertex
+  // maximum falls short of a curve it is actually flush with. Measured on lobed__voronoi,
+  // that mismatch alone read as 6.721 mm of undershoot; intersecting the cells with the
+  // same vertical line the reference is sampled on gives 0.128 mm.
+  //
+  // Voronoi is the only pattern whose cells are closed polygons, so it is the only one this
+  // applies to; the sparse patterns keep the vertex measure, which is correct for them and
+  // ungated anyway.
+  const cellsAtX = (x) => {
+    let m = null;
+    for (const poly of cellPolys) {
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        if ((a.x <= x && b.x > x) || (a.x >= x && b.x < x)) {
+          const t = (x - a.x) / (b.x - a.x);
+          const ay = Math.abs(a.y + (b.y - a.y) * t);
+          if (m == null || ay > m) m = ay;
+        }
+      }
+    }
+    return m;
+  };
   let regUnderSum = 0, regUnderCount = 0, regUnderMax = 0, regUnderU = 0;
   for (let bi = 0; bi < NBIN; bi++) {
-    if (outerY[bi] == null) continue;
     const u = (bi + 0.5) / NBIN;
-    const rib = G.ribInnerEdge(u, P);
-    if (rib < 1e-4) continue;
-    const under = rib - outerY[bi];       // > 0 means this u-band's outermost point falls short
+    const reach = cellPolys ? cellsAtX(P.L * u) : outerY[bi];
+    if (reach == null) continue;
+    const rib = insetOuter ? insetOuter[bi] : G.ribInnerEdge(u, P);
+    if (rib == null || rib < 1e-4) continue;
+    const under = rib - reach;            // > 0 means this u-band's outermost point falls short
     if (under <= 0) continue;             // this band already meets/exceeds the rib (no gap here)
     regUnderSum += under; regUnderCount++;
     if (under > regUnderMax) { regUnderMax = under; regUnderU = u; }
@@ -1017,7 +1087,67 @@ window.__gqArrangement = function() {
   }
   return out;
 };
+// ---- THE PRODUCER'S POSITIVE CONTROL ---------------------------------------------
+// ribInsetBound traces the petal's material boundary inset by the rib as a LEVEL SET of
+// petalMask, and petalMask is not a signed distance field (|grad| runs 0.04 to 1.68), so
+// the trace is not an exact offset. On a CLEFTED petal there is nothing to compare it to
+// — that is the whole reason it exists. On a SMOOTH one ribClipPolygon is exact and the
+// two must describe the same curve, so that is where the approximation is measurable.
+//
+// A producer that disagrees with the existing one where no cleft exists is wrong whatever
+// it does on clefted petals. Hence: positive control, asserted, not eyeballed.
+//
+// Measured as a symmetric point-to-polyline distance in BOTH directions, not as a per-u
+// bin maximum. The bin metric was tried first and reported 4.899 mm — an artifact of
+// comparing a 29-vertex polyline against a 481-vertex one bin by bin, not a real
+// disagreement. The distance below is what the shapes actually differ by.
+//
+// Two tolerances because there are two error sources and they must stay attributable:
+//   TRACE  the level set alone (simplifyTol 0). Measured mean 0.001 / max 0.159 mm.
+//   SHIP   with Douglas-Peucker on top. Measured mean 0.065 / max 0.202 mm, where 0.202
+//          IS the DP tolerance (0.8mm/26 * 0.25) and therefore a ceiling by construction.
+// Both sit under the prototype's 0.105 / 0.298 mm, which is the number this route was
+// approved on.
+window.__gqProducerControl = async function() {
+  const G = window.__gqGeom || (window.__gqGeom = await import('./flower-geometry.js'));
+  const MM = 26;
+  const segD = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 < 1e-18 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+    return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t)); };
+  const toPoly = (p, Q) => { let m = Infinity;
+    for (let i = 0; i < Q.length; i++) { const d = segD(p, Q[i], Q[(i + 1) % Q.length]); if (d < m) m = d; }
+    return m; };
+  const sym = (A, B) => { let s = 0, w = 0, n = 0;
+    for (const p of A) { const d = toPoly(p, B); s += d; n++; if (d > w) w = d; }
+    for (const p of B) { const d = toPoly(p, A); s += d; n++; if (d > w) w = d; }
+    return { mean: s / n, max: w }; };
+  const base = { L: 1.6, W: 0.95, taper: 0.35, tip: 0.85, edgeCurve: 0.05, shoulder: 0.55,
+    clawLength: 0, clawWidth: 0.3, tubeRadius: 0.035, thickScale: 1,
+    bundleTightness: 0.5, flareRate: 0.5, cleftDepth: 0 };
+  let n = 0, sTrace = 0, mTrace = 0, sShip = 0, mShip = 0, islandsNot1 = 0, crossingsNot2 = 0;
+  for (const cm of [false, true]) for (const taper of [0.15, 0.35, 0.6]) for (const tip of [0.2, 0.5, 0.85])
+  for (const W of [0.6, 0.95, 1.3]) for (const tubeRadius of [0.02, 0.035, 0.06]) {
+    const P = { ...base, taper, tip, W, tubeRadius, continuousMargin: cm };
+    const exact = G.ribClipPolygon(P, 240);
+    const rawL = G.ribInsetBound(P, { trace: true, simplifyTol: 0 });
+    const shipL = G.ribInsetBound(P, { trace: true });
+    if (!exact || rawL.length !== 1 || shipL.length !== 1) { islandsNot1++; continue; }
+    // one closed loop: a bilaterally symmetric bound meets its axis exactly twice
+    let cr = 0; const b = shipL[0];
+    for (let i = 0; i < b.length; i++) { const p = b[i], q = b[(i + 1) % b.length];
+      if ((p.y <= 0 && q.y > 0) || (p.y >= 0 && q.y < 0)) cr++; }
+    if (cr !== 2) crossingsNot2++;
+    const a = sym(rawL[0], exact), c = sym(shipL[0], exact);
+    n++; sTrace += a.mean * MM; sShip += c.mean * MM;
+    if (a.max * MM > mTrace) mTrace = a.max * MM;
+    if (c.max * MM > mShip) mShip = c.max * MM;
+  }
+  return { configs: n, islandsNot1, crossingsNot2,
+    traceMeanMM: +(sTrace / Math.max(n, 1)).toFixed(4), traceMaxMM: +mTrace.toFixed(3),
+    shipMeanMM: +(sShip / Math.max(n, 1)).toFixed(4), shipMaxMM: +mShip.toFixed(3) };
+};
 window.__gqReady = true;
+
 `;
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
@@ -1122,8 +1252,22 @@ for (const cfg of CONFIGS) {
   const rimBearing = !(q.infill === 'bone' && q.boneOutline === false);
   const badTreat = (q.tipStyle === 'jagged' || q.tipStyle === 'scallop') && rimBearing
                    && !(q.treatmentAmpMM >= T.treatmentAmpMM);
-  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat || badHole || badDegenerate || badSym || badSelf;
-  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badHole ? `doubledBack(escaping ${q.holeEscapeCells}/${q.voronoiCells}, worst latent ${q.dbOkMax})` : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSym ? `asymmetric(${q.symAbove} above vs ${q.symBelow} below, areaSkew ${q.symAreaSkew})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : ''].filter(Boolean).join(',');
+  // (8d) CELLS CROSSING THE VOID — now GATED, where it used to be reported. It was
+  // reported because 17 was the shipped state on `lobed`; the per-lobe partition takes it
+  // to 0, and 0 is the only defensible threshold for "a strut printed across a hole in the
+  // blade". Exactly 0, no tolerance: the metric already carries its own (a cell counts only
+  // when more than 2% of its perimeter is in removed material), so a tolerance here would
+  // be a second one stacked on the first.
+  const badVoid = q.infill === 'voronoi' && (q.voidCrossing || 0) > 0;
+  // (8e) REJOIN FALLBACKS. A cell that spans the sinus floor is clipped into two convex
+  // pieces and spliced; a fallback means the splice was refused and the cell shipped as two
+  // annuli with a seam at the floor. It is not a print-safety failure — both pieces are
+  // sealed solids — but it is a visible seam that nothing else here would report, and it
+  // measured 0 across the matrix, so any nonzero value is a regression rather than a
+  // tolerance to spend.
+  const badRejoin = q.infill === 'voronoi' && (q.rejoinFallbacks || 0) > 0;
+  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat || badHole || badDegenerate || badSym || badSelf || badVoid || badRejoin;
+  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badHole ? `doubledBack(escaping ${q.holeEscapeCells}/${q.voronoiCells}, worst latent ${q.dbOkMax})` : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSym ? `asymmetric(${q.symAbove} above vs ${q.symBelow} below, areaSkew ${q.symAreaSkew})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : '', badVoid ? `voidCrossing(${q.voidCrossing} cells reach into removed material)` : '', badRejoin ? `rejoinFallbacks(${q.rejoinFallbacks})` : ''].filter(Boolean).join(',');
   let verdict;
   if (cfg.xfail) {
     const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
@@ -1157,7 +1301,23 @@ if (openIssues.length) {
   }
   if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
 }
+// ---- the producer's positive control, run once (not per config) ----
+const PC_TRACE_MAX_MM = 0.20;   // level set alone; measured 0.159
+const PC_SHIP_MAX_MM = 0.25;    // + Douglas-Peucker; measured 0.202, and 0.202 IS the DP tolerance
+const pc = await page.evaluate(() => window.__gqProducerControl());
+console.log(`\nribInsetBound positive control (smooth petals, vs ribClipPolygon), ${pc.configs} configs:`);
+console.log(`  level set alone   mean ${pc.traceMeanMM} mm   max ${pc.traceMaxMM} mm   (limit ${PC_TRACE_MAX_MM})`);
+console.log(`  as shipped (+DP)  mean ${pc.shipMeanMM} mm   max ${pc.shipMaxMM} mm   (limit ${PC_SHIP_MAX_MM})`);
+console.log(`  one island: ${pc.configs - pc.islandsNot1}/${pc.configs}   two axis crossings: ${pc.configs - pc.crossingsNot2}/${pc.configs}`);
+let pcFail = '';
+if (pc.configs === 0) pcFail = 'measured nothing';
+else if (pc.traceMaxMM > PC_TRACE_MAX_MM) pcFail = `level set max ${pc.traceMaxMM} > ${PC_TRACE_MAX_MM} mm`;
+else if (pc.shipMaxMM > PC_SHIP_MAX_MM) pcFail = `shipped max ${pc.shipMaxMM} > ${PC_SHIP_MAX_MM} mm`;
+else if (pc.islandsNot1) pcFail = `${pc.islandsNot1} smooth config(s) did not trace one island`;
+else if (pc.crossingsNot2) pcFail = `${pc.crossingsNot2} smooth config(s) did not close with two axis crossings`;
+if (pcFail) { console.log(`  POSITIVE CONTROL FAILED: ${pcFail}`); fails++; }
+
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm noDoubledBackCells minCellArea>${T.minCellAreaMM2}mm2 (#74) symmetric(count=exact, area<=${T.symAreaSkew})`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm noDoubledBackCells minCellArea>${T.minCellAreaMM2}mm2 (#74) symmetric(count=exact, area<=${T.symAreaSkew}) voidCrossing=0 rejoinFallbacks=0`);
 await browser.close(); server.close();
 process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));

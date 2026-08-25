@@ -20,6 +20,19 @@
  * say the slivers that lived in the collapsed neck stopped being produced; only
  * eyes confirm nothing else went with them.
  *
+ * A THIRD THING, found the hard way in the partition change: A ROW CAN MOVE BECAUSE THE
+ * ROW BEFORE IT CHANGED. Every config renders in one page session and the camera is not
+ * reset between them, so a config whose geometry changed re-frames the view and the NEXT
+ * config is then shot from a slightly different camera. In that change `chrysanthemum`
+ * — a smooth petal, byte-identical STL, identical triangle count, identical Voronoi
+ * output — came back 0.258% changed purely because `lobed` runs before it. Rendered on
+ * its own it was byte-identical between the two trees.
+ *
+ * So a small delta on a config the change should not touch is NOT automatically evidence
+ * of a regression: check whether a changed config precedes it, and re-render the suspect
+ * one in isolation before believing the number. The rows that read exactly 0.000 are
+ * trustworthy in either direction; a small nonzero on an untouched config is not.
+ *
  * RUN:  node tools/shot-voronoi-contact.mjs <outDir>
  * THEN: node tools/diff-contact.mjs <beforeDir> <afterDir>
  */
