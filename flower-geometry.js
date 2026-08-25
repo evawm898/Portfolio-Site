@@ -3210,8 +3210,11 @@ export function buildVoronoi(P, rng, opts = {}) {
   if (part.clefted) {
     for (let r = 0; r < part.regionCount; r++) {
       for (const [A, B] of part.pieces(r)) {
-        if (A && A.length >= 3) { regions.push(A); regions.push(A.map(mirrorY).reverse()); }
-        if (B && B.length >= 3) { regions.push(B); regions.push(B.map(mirrorY).reverse()); }
+        // The +Y HALF ONLY. The diagram is mirrored, so a consumer measuring coverage
+        // doubles this rather than being handed the mirrors — the convention tile's
+        // denominator already landed on (#80).
+        if (A && A.length >= 3) regions.push(A);
+        if (B && B.length >= 3) regions.push(B);
       }
     }
   }

@@ -35,9 +35,11 @@
  *   - Cell size is a floor, not a proof: at 0.6 mm a genuine 0.2 mm gap reads as joined.
  *     Lower CELL_MM to tighten it, at cubic cost in memory.
  *   - The config list below is small and hand-picked (it began as the junction-risk probe
- *     for the receptacle controls). It is NOT the export gate's matrix. Every config here
- *     has come back as one component; that is evidence the junction holds at these corners,
- *     not evidence it holds everywhere. Widen it before treating a PASS as general.
+ *     for the receptacle controls, and now carries one Voronoi PARTITION row for the region
+ *     seams, which are a different failure shape from a junction). It is NOT the export
+ *     gate's matrix. Every config here has come back as one component; that is evidence the
+ *     junction and those seams hold at these corners, not evidence they hold everywhere.
+ *     Widen it before treating a PASS as general.
  *
  * A grid larger than MAX_VOXELS is SKIPPED and reported as skipped, never silently passed.
  *
@@ -85,6 +87,18 @@ const CONFIGS = [
   { label: 'stemCurve +1, max length, thinnest stem', set: [{ id: 'stemCurve', value: '1' }, { id: 'stemLength', value: '10' }, { id: 'stemThickness', value: '0.5' }] },
   { label: 'stemCurve +1 + tube 0 (thinnest curved stem)', set: [{ id: 'stemCurve', value: '1' }, { id: 'stemLength', value: '10' }, { id: 'stemThickness', value: '0.5' }, { id: 'tube', value: '0' }] },
   { label: 'receptacleType ON alone (junction forced, no stem, no sepals)', set: [{ id: 'stemType', value: 'none', evt: 'change' }, { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'on', evt: 'change' }] },
+  // REGION SEAMS, not a junction corner. Every config above probes the junction — where
+  // the petal feet, the centre and the stem meet — so a green result from them says
+  // nothing about the seams the Voronoi PARTITION introduces: the divider that runs down
+  // each cleft slot to its sinus floor, and the midline where the +Y half meets its own
+  // mirror. Those are places where two independently-clipped cells are expected to touch,
+  // which is exactly the shape of thing that prints in two pieces if they do not.
+  // 4 lobes puts a divider on the midline (an even lobe count places a cleft centre at
+  // y = 0, so the divider seam and the mirror seam coincide there — the worst case);
+  // voronoi because the partition only exists for it.
+  { label: 'LOBED 4 + voronoi (partition region seams + mirror midline)', set: [
+    { id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.55' },
+    { id: 'cleftLobes', value: '4' }, { id: 'cleftWidth', value: '0.3' }] },
 ];
 
 function boundaryEdges(buf) {
