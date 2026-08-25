@@ -2899,9 +2899,10 @@ function buildPartition(P, cfg) {
   //   piece A (x <= xFloor): between two rays through the foot — both linear
   //   piece B (x >= xFloor): between two horizontals            — both linear
   //
-  // CLIP ORDER IS LOad-BEARING, and it is the one thing about this route that reading
-  // could not settle. "Sutherland-Hodgman constrains the CLIP, not the SUBJECT" is true
-  // of the clip's convexity and NOT of the result: SH returns a single vertex ring, so
+  // CLIP ORDER IS LOAD-BEARING, and it is the one thing about this route that reading
+  // could not settle. THE WHOLE SENTENCE, because the half of it that circulates is the
+  // half that misleads: "Sutherland-Hodgman constrains the CLIP, not the SUBJECT" is true
+  // of the clip's convexity — a concave subject really is fine — and NOT of the result: SH returns a single vertex ring, so
   // when the intersection is genuinely DISCONNECTED it comes back with the components
   // joined by degenerate bridge edges running along the clip line. `bound ∩ {x >= xFloor}`
   // is exactly that case — it is the n lobes, n separate pieces — and clipping in that
