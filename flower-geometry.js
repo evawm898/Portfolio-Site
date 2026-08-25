@@ -3106,8 +3106,15 @@ export function buildVoronoi(P, rng, opts = {}) {
   //     applies at lloyd = 0 too, because that is still one relaxation pass. A move that
   //     leaves the material is refused and the seed stays where it was. ---
   for (let iter = 0; iter < passes; iter++) {
+    // ONE snapshot per pass, not one per seed. fullSeeds() rebuilds each -Y twin as a
+    // fresh object from its +Y seed's CURRENT position, so calling it per seed would let a
+    // twin see moves made earlier in the same pass while the +Y seeds (live references)
+    // always did — turning a Jacobi pass into a half-Gauss-Seidel one. Measured as a
+    // 1.1e-14 vertex drift on 10 of 96 smooth configs, which is small and is still a
+    // change to relaxation that nothing asked for.
     const G = groupSeeds();
-    const peers = (s) => (part.clefted ? (G.get(part.regionOf(s)) || [s]) : fullSeeds());
+    const snapshot = fullSeeds();
+    const peers = (s) => (part.clefted ? (G.get(part.regionOf(s)) || [s]) : snapshot);
     for (const s of axis) {
       const cell = cellOf(s, peers(s));
       if (!cell) continue;
