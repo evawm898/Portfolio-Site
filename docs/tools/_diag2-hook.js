@@ -240,7 +240,32 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
       const pv=perimInVoid(c); voidPerim+=pv; if(pv>0.02)voidCells++; }
     // A diagram that tiles has total cell area ~= the bound's area. Much more means the
     // cells overlap — it is no longer a partition.
+    // BILATERAL SYMMETRY, the property void content and tiling are both blind to. Same
+    // centroid method as the gate's: above / below / straddling y = 0, and the two off-axis
+    // populations must match. An asymmetric partition scores perfectly on every other
+    // column here, which is exactly why this column has to exist.
+    //
+    // NOISE FLOOR IN THIS HARNESS, which the gate does not have. These options clip against
+    // the marching-squares level-set bound, and that polygon is not exactly mirror-symmetric,
+    // so a cell genuinely straddling y = 0 can have a centroid at +-1e-7 and be classified to
+    // one side. That shows up as a skew of 1-2. It is NOT the partition: on SMOOTH, which has
+    // no dividers, optWatershed is byte-identical to optClipOnly (20/18/5, skew 2) — the
+    // watershed contributes nothing to it. Read a skew of 1-2 as noise here; the signal this
+    // column exists for is the even-lobe skew of 6-8, which equals the axis-seed count exactly.
+    // In the shipped builder the same metric reads exactly 0, because that construction
+    // mirrors rather than classifying.
+    let symA=0, symB=0, symS=0, arA=0, arB=0;
+    for(const c of cells){
+      let cy=0,n=0,minY=Infinity,maxY=-Infinity;
+      for(const q of c){ cy+=q.y; n++; if(q.y<minY)minY=q.y; if(q.y>maxY)maxY=q.y; }
+      if(!n) continue; cy/=n; const a=Math.abs(area(c));
+      if(minY<-1e-6 && maxY>1e-6 && Math.abs(cy)<1e-6){ symS++; continue; }
+      if(cy>0){ symA++; arA+=a; } else { symB++; arB+=a; }
+    }
+    const symDen=Math.max(arA+arB,1e-12);
     return { label, cells:cells.length, totalVerts:verts, totalArea:ar,
+             symAbove:symA, symBelow:symB, symStraddle:symS,
+             symCountSkew:Math.abs(symA-symB), symAreaSkew:+(Math.abs(arA-arB)/symDen).toFixed(5),
              areaOverBound: +(ar / Math.max(area(bound), 1e-9)).toFixed(3),
              degenerateCells,
              cellsNotStarShaped:starBadCells, starViolatingVerts:starBad,
@@ -366,8 +391,21 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
       let minW = Infinity, minAtT = null, filled = 0;
       for (let i = 0; i < NB; i++) { if (hi[i] < lo[i]) continue; filled++;
         const w = hi[i] - lo[i]; if (w < minW) { minW = w; minAtT = +((i+0.5)/NB).toFixed(3); } }
+      // CONVEXITY of the wedge — the property that decides whether Sutherland-Hodgman can
+      // clip against it directly. SH requires a convex CLIP; it tolerates a concave SUBJECT,
+      // and voronoiCell already relies on that (cell starts as the passed-in polygon and only
+      // ever takes half-plane clips). So the material may be as concave as it likes; the
+      // question is only about the region wedge.
+      let turnPos = 0, turnNeg = 0;
+      for (let i = 0; i < m; i++) {
+        const a = rp[(i-1+m)%m], b = rp[i], c2 = rp[(i+1)%m];
+        const cr = (b.x-a.x)*(c2.y-b.y) - (b.y-a.y)*(c2.x-b.x);
+        if (cr > 1e-12) turnPos++; else if (cr < -1e-12) turnNeg++;
+      }
+      const convex = (turnPos === 0 || turnNeg === 0);
       wsDiag.regions.push({ region: 'lobe' + r, verts: rp.length, area: +area(rp).toFixed(5),
-                            folds: fold, minWidthMM: +(minW * 26).toFixed(4), minAtT, binsFilled: filled });
+                            folds: fold, minWidthMM: +(minW * 26).toFixed(4), minAtT, binsFilled: filled,
+                            convex, reflexVerts: Math.min(turnPos, turnNeg) });
     }
     for (const s2 of seedsAll) { const r = wsRegionOf(s2), rp = RP.get(r);
       if (!rp || rp.length < 3) continue;
