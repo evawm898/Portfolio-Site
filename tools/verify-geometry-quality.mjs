@@ -228,6 +228,17 @@ const ARRANGEMENT_CONFIGS = [
 ];
 if (!SWEEP && !process.env.GQ_MARGIN_OFF) CONFIGS.push(...ARRANGEMENT_CONFIGS);
 
+// GQ_ONLY=<substring> — run only the configs whose name contains it. A diagnostic
+// convenience for iterating on one family (the three voronoi rows take ~40s against the
+// full matrix's several minutes); it narrows what runs, never what is asserted, and CI
+// never sets it.
+if (process.env.GQ_ONLY) {
+  const needle = process.env.GQ_ONLY;
+  const kept = CONFIGS.filter((c) => c.name.includes(needle));
+  if (!kept.length) { console.error(`GQ_ONLY=${needle} matched no config`); process.exit(2); }
+  CONFIGS.length = 0; CONFIGS.push(...kept);
+}
+
 // ---- the geometry-quality hook, appended to the served flower.js (module scope, so it
 //      shares resolveParams / readUI / inputs / the imported geometry fns). Exports
 //      flower.js does NOT import (buildRibGraph, getCleftContour) are reached through a
@@ -436,7 +447,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipFolds = null;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -548,12 +559,28 @@ window.__gq = async function() {
       // the escapes a property of the BOUND, not of seed placement, and culling seeds
       // could never converge.
       {
-        const cp = G.ribMarginPolyline(P, 72), m = cp.length;
+        // Folds are measured on the bound Voronoi ACTUALLY clips against (ribClipPolygon),
+        // while minR / zero stations / spans stay on the untrimmed ribMarginPolyline — the
+        // untrimmed profile is what motivates the trim, so losing sight of it would hide a
+        // regression that widens the neck.
+        const cp = G.ribClipPolygon(P, 72) || G.ribMarginPolyline(P, 72), m = cp.length;
         let minR = Infinity, zeroR = 0;
         for (let i = 0; i <= 72; i++) { const r = G.ribInnerEdge(i / 72, P);
           if (r < minR) minR = r; if (r < 1e-9) zeroR++; }
         clipMinInnerEdge = +minR.toExponential(3);
         clipZeroStations = zeroR;
+        // WHERE the neck is, not just how much of it there is: a run of zero-width
+        // stations at the foot is a different fix from one straddling the middle.
+        clipZeroSpans = (function () {
+          const runs = []; let start = -1;
+          for (let i = 0; i <= 72; i++) {
+            const z = G.ribInnerEdge(i / 72, P) < 1e-9;
+            if (z && start < 0) start = i;
+            if (!z && start >= 0) { runs.push([+(start / 72).toFixed(3), +((i - 1) / 72).toFixed(3)]); start = -1; }
+          }
+          if (start >= 0) runs.push([+(start / 72).toFixed(3), 1]);
+          return runs;
+        })();
         let fold = 0;
         for (let i = 0; i < m; i++) {
           const a = cp[(i-1+m)%m], b = cp[i], c2 = cp[(i+1)%m];
@@ -797,7 +824,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipFolds };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.

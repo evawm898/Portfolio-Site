@@ -803,6 +803,64 @@ export function ribMarginPolyline(P, n = 56) {
   return dedupePolygon(outline);
 }
 
+// The same curve as ribMarginPolyline, TRIMMED to where it actually has width.
+//
+// ribInnerEdge is floored at 0 (see above), and under continuous margin that floor
+// engages over a run at the foot and, on clefted petals, a second run at the tip: the
+// bundled strand is wider there than the petal, so the rib owns the full width and the
+// "inner edge" is the axis on both sides. ribMarginPolyline emits those runs faithfully
+// — as a zero-width neck where the +Y and -Y walls lie on top of each other.
+//
+// That is correct as a TERMINATION TARGET (an infill strand at u = 0.05 should stop at
+// y = 0; there is no room), and wrong as a CLIP POLYGON. Sutherland-Hodgman clipping a
+// cell against a polygon that doubles back on itself yields a cell that doubles back on
+// itself, and no amount of seed culling fixes it: remove the seed owning the neck and its
+// region passes to a neighbour, which inherits the same spike. Measured over the six
+// voronoi configs: the neck spans 12.5-18.1% of the petal at the foot and up to 22.2% at
+// the tip, 1-2 folds in the bound, 1-4 escaping cells (#74, #77).
+//
+// So Voronoi clips against the positive-width span only. Nothing is lost: the trimmed
+// runs have zero material width by construction, so no cell belongs there. The endpoints
+// are placed at the true crossings by bisection rather than snapped to a station, so the
+// bound closes to a point at each end instead of a short zero-width stub.
+export function ribClipPolygon(P, n = 72) {
+  const positive = (u) => ribInnerEdge(clamp(u, 0, 1), P) > 1e-9;
+  // The LONGEST run of positive-width stations, not merely the first-to-last: measured,
+  // the zero runs are always one at the foot and one at the tip, but taking the outermost
+  // pair would silently span an interior neck if one ever appeared, which is the exact
+  // defect this function exists to remove. (The gate's clipFolds census is the backstop
+  // for a neck narrower than one station.)
+  let bestA = -1, bestB = -1, runA = -1;
+  for (let i = 0; i <= n; i++) {
+    const p = positive(i / n);
+    if (p && runA < 0) runA = i;
+    if ((!p || i === n) && runA >= 0) {
+      const end = p ? i : i - 1;
+      if (end - runA > bestB - bestA) { bestA = runA; bestB = end; }
+      runA = -1;
+    }
+  }
+  if (bestA < 0) return null;
+  const crossing = (uIn, uOut) => {          // uIn has width, uOut does not
+    let a = uIn, b = uOut;
+    for (let k = 0; k < 40; k++) { const m = (a + b) / 2; if (positive(m)) a = m; else b = m; }
+    return b;                                 // the zero side, so the bound closes to a point
+  };
+  const u0 = bestA === 0 ? 0 : crossing(bestA / n, (bestA - 1) / n);
+  const u1 = bestB === n ? 1 : crossing(bestB / n, (bestB + 1) / n);
+  if (!(u1 > u0)) return null;
+  const right = [], left = [];
+  for (let i = 0; i <= n; i++) {
+    const u = u0 + (u1 - u0) * (i / n), X = P.L * u, r = ribInnerEdge(u, P);
+    right.push({ x: X, y: r });
+    left.push({ x: X, y: -r });
+  }
+  const outline = [];
+  for (let i = 0; i < right.length; i++) outline.push(right[i]);
+  for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
+  return dedupePolygon(outline);
+}
+
 /* -------------------------------------------------------------------
    4a-ii. ribPath(P) — THE SINGLE PRODUCER of the petal boundary.
 
@@ -2594,7 +2652,10 @@ export function buildVoronoi(P, rng, opts = {}) {
   //     pinned to y = 0, +Y seeds stay off-axis, -Y twins rebuilt from the +Y set each
   //     pass. ---
   const lloyd = clamp(Math.round(opts.lloyd != null ? opts.lloyd : 0), 0, 20);
-  const clipPoly = ribMarginPolyline(P, 72);
+  // The rib's inner edge, trimmed to where it has width — see ribClipPolygon. Falls back
+  // to the untrimmed polyline only when the rib covers the entire petal, where there is
+  // no interior either way and every cell is culled as zero-area regardless.
+  const clipPoly = ribClipPolygon(P, 72) || ribMarginPolyline(P, 72);
   const passes = lloyd === 0 ? 1 : lloyd;
   for (let iter = 0; iter < passes; iter++) {
     const seeds = fullSeeds();
@@ -2686,6 +2747,15 @@ export function buildVoronoi(P, rng, opts = {}) {
 // pairs outer[k] with inner[k] on the same ray from the centroid, so both are
 // built radially from it.
 function cellAnnulus(poly, softness, wallMul = 1) {
+  // A clipped cell can carry COINCIDENT vertices — Sutherland-Hodgman emits one wherever
+  // the clip boundary passes exactly through a vertex of the cell. Each zero-length edge
+  // between them would then be subdivided into SUB coincident ring samples below, and a
+  // ring with a dozen identical points doubles back on itself by construction: the
+  // duplicates lie on their own non-adjacent edges. Measured on chrysanthemum__voronoi,
+  // where two such corners on the axis put 22 of 55 ring points on top of each other
+  // (#74). Zero-length edges carry no shape, so dropping them changes nothing else.
+  poly = dedupePolygon(poly);
+  if (poly.length < 3) return null;
   const c = polyCentroid(poly);
   const cx = c.x, cy = c.y;
   const SUB = 5;                                    // samples per cell edge
