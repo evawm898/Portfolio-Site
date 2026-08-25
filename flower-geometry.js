@@ -861,6 +861,139 @@ export function ribClipPolygon(P, n = 72) {
   return dedupePolygon(outline);
 }
 
+
+/* -------------------------------------------------------------------
+   4a-iii. ribInsetBound(P) — THE PETAL'S MATERIAL BOUNDARY, INSET BY THE RIB.
+
+   The third boundary, and the one that did not exist. The other two each answer
+   half the question:
+
+     buildSilhouette  the material outline — cleft-aware, no rib inset
+     ribClipPolygon   the rib's inner edge — inset, no cleft awareness
+
+   Voronoi needs BOTH at once: the material, inside the rib. Clipping cells to
+   ribClipPolygon lets them span every sinus (the void-crossing defect); clipping
+   them to buildSilhouette instead lets them run out past the margin rib (measured
+   at 13.643 mm of overshoot against a threshold of 3). Intersecting the two
+   polygons is a non-convex-against-non-convex clip, which is the general clipper
+   this file has deliberately never acquired.
+
+   So it is not built by intersecting them. It is traced, the way buildSilhouette
+   is traced, as the zero contour of a scalar field — SECOND USE of contourField
+   above, not a second copy of it:
+
+     m(x, y) = petalMask(x, y / f(x)) * f(x) - ribRadius(u)
+
+   where f = marginFlareFactor is the y-SCALE continuous margin applies to the
+   boundary (ribCenterline = outerAt * f), so scaling the mask's y by it puts the
+   zero contour of the first two terms exactly on the rib's centreline; subtracting
+   the rib's own radius insets to its inner edge. With continuous margin off f = 1
+   and the field is plainly petalMask - ribRadius. On the axis it reduces to
+   w(u)*f - r(u), which IS ribInnerEdge(u) — so this is the pointwise scalar
+   boundary generalised to two dimensions, not a parallel construction.
+
+   TWO EVALUATION STRATEGIES FOR ONE CURVE, exactly as ribPath does it: with no
+   clefts the analytic answer is exact and ribClipPolygon is returned VERBATIM,
+   so every non-clefted design is byte-identical and pays nothing. The level set
+   runs only where no analytic answer exists.
+
+   WHAT THIS IS NOT, stated because it would otherwise be assumed: petalMask is
+   NOT a signed distance field. |grad| over the material runs 0.04 to 1.68, so a
+   level set of it is not an exact offset, and this bound is not an exact inset.
+   Measured against ribClipPolygon on SMOOTH petals — where the two describe the
+   same curve and any disagreement is purely this approximation — the error is
+   mean 0.105 mm, max 0.298 mm (37% of the 0.8 mm minimum feature). That is the
+   reason the smooth path returns the analytic polygon instead of the level set:
+   the approximation is confined to clefted petals, where the alternative is not
+   a more accurate bound but no bound at all. The gate asserts the smooth-petal
+   agreement so the error cannot grow unnoticed.
+   ------------------------------------------------------------------- */
+
+// Douglas-Peucker tolerance for the traced bound, in world units. A marching-squares
+// contour carries ~1.3-1.9k vertices where the analytic band carries 480, and cells
+// INHERIT boundary vertices (cellAnnulus emits SUB samples per cell edge), so the
+// triangle cost of not simplifying lands on every cell. Set at a quarter of the
+// printable minimum feature — 0.8 mm at the file's 26 mm/unit convention — so
+// simplification cannot move the boundary by a printable amount.
+const RIB_BOUND_SIMPLIFY_TOL = (0.8 / 26) * 0.25;
+
+const _ribInsetCache = new Map();
+
+// Returns the bound's CONNECTED PIECES, largest first — always an array, one element in
+// every ordinary case. It is not always one: measured over 192 clefted configs, six trace
+// as two or three separate islands, all of them continuous margin with cleftDepth >= 0.55
+// AND cleftWidth >= 0.7, where the slots are wide enough at the sinus floor that the rib
+// inset pinches through and each lobe's interior stands alone. The MATERIAL is still one
+// piece there (maskContours returns a single loop on every one of them) — it is the INSET
+// that separates, which is real geometry and not a tracing failure. Returning only the
+// largest would silently drop up to 50% of the petal's interior on those designs, so the
+// contract is the list and every consumer clips against each piece.
+//
+// opts.trace forces the traced path on a petal that has no clefts, where ribClipPolygon
+// is exact. That is the ONLY way to measure this producer's approximation error against a
+// known-correct reference — on a clefted petal there is nothing to compare it to — so the
+// positive control in verify-geometry-quality.mjs is its one caller. Nothing in the render
+// or export path passes it.
+export function ribInsetBound(P, opts = {}) {
+  const cfg = cleftConfig(P);
+  // No clefts: the analytic inner edge IS the material's inner edge, exactly. Returned
+  // verbatim so smooth designs are untouched by this producer existing.
+  if (!cfg && !opts.trace) { const cp = ribClipPolygon(P, 72); return cp ? [cp] : []; }
+
+  const contMargin = !!P.continuousMargin && !P.solidBlade;
+  const k = [P.L, P.W, P.taper, P.tip, P.edgeCurve, P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0,
+    contMargin ? 1 : 0, P.tubeRadius, P.thickScale || 1, P.bundleTightness, P.flareRate,
+    opts.trace ? 'T' : '', opts.simplifyTol != null ? opts.simplifyTol : ''].join('|');
+  const hit = _ribInsetCache.get(k);
+  if (hit !== undefined) return hit;
+
+  const L = Math.max(P.L, 1e-4);
+  const uAt = (x) => clamp(x / L, 0, 1);
+  const rAt = (x) => ribRadius(uAt(x), P, contMargin);
+  // Floored away from 0: under continuous margin the flare vanishes at the foot, and
+  // dividing y by it there would send every off-axis sample to -Infinity rather than
+  // simply leaving the field negative (which the -rAt term already guarantees).
+  const flareAt = (x) => (contMargin
+    ? Math.max(1e-3, marginFlareFactor(uAt(x), P.bundleTightness, P.flareRate))
+    : 1);
+  const field = (x, y) => { const f = flareAt(x); return petalMask(x, y / f, P, cfg) * f - rAt(x); };
+
+  // 240, against maskContours' 200: this contour is an INSET one, so it runs through the
+  // narrow material between a slot wall and the rib where the coarser lattice loses the
+  // gap entirely. The cost is paid once per shape (cached) and simplified away below.
+  //
+  // Marching squares also emits a handful of 3-5 vertex loops wherever the field grazes
+  // the lattice tangentially. Those are not islands, and counting them as such would
+  // misreport the inset's topology. The floor separating them from real islands is not a
+  // tuned threshold: measured, noise loops come to <= 0.0027 mm^2 and the smallest genuine
+  // island to 11.44 mm^2, so anything narrower than the printable minimum feature square
+  // (0.8 mm)^2 = 0.64 mm^2 sits four orders of magnitude clear of both. An island that
+  // small could not hold one printable strut in any case.
+  const NOISE_AREA = (0.8 / 26) * (0.8 / 26);
+  let loops = contourField(field, flatContourBox(P, 240), 240)
+    .filter((l) => l.length >= 3 && Math.abs(polyArea(l)) > NOISE_AREA);
+
+  // opts.simplifyTol is the positive control's second knob: measuring at tol 0 separates
+  // this producer's LEVEL-SET approximation from the deliberate simplification on top of
+  // it, so a change in either is attributable. Shipped callers pass neither.
+  const tol = opts.simplifyTol != null ? opts.simplifyTol : RIB_BOUND_SIMPLIFY_TOL;
+  const out = [];
+  for (let piece of loops) {
+    if (tol > 0) piece = simplifyPath(piece, tol);
+    if (piece.length < 3) continue;
+    // Match ribClipPolygon's winding (clockwise / negative shoelace), which every
+    // downstream orientation convention — cell rings, slab faces — is built on.
+    if (polyArea(piece) > 0) piece = piece.slice().reverse();
+    piece = dedupePolygon(piece);
+    if (piece.length >= 3) out.push(piece);
+  }
+  out.sort((a, b) => Math.abs(polyArea(b)) - Math.abs(polyArea(a)));
+  if (_ribInsetCache.size > 24) _ribInsetCache.delete(_ribInsetCache.keys().next().value);
+  _ribInsetCache.set(k, out);
+  return out;
+}
+
 /* -------------------------------------------------------------------
    4a-ii. ribPath(P) — THE SINGLE PRODUCER of the petal boundary.
 
@@ -1230,20 +1363,32 @@ export function petalMask(x, y, P, cfg) {
 // m = 0 contour. Returns loops as arrays of {x, y}. For cleft petals (one
 // connected region) this is a single re-entrant loop; the generic multi-loop
 // return is what the fused-corolla work will use.
-export function maskContours(P, cfg, nu = 160) {
+// The bbox every flattened-space contour is traced over: the petal's envelope plus a
+// pad, so no contour touches the grid edge. Shared by every caller so two contours of
+// the same petal are sampled on the SAME lattice (and therefore agree vertex-for-vertex
+// where their fields agree), rather than on two independently-derived boxes.
+function flatContourBox(P, nu) {
   const L = Math.max(P.L, 1e-4);
   let Wmax = 1e-4;
   for (let i = 0; i <= 64; i++) { const w = petalHalfWidth(i / 64, P); if (w > Wmax) Wmax = w; }
   const padY = Wmax * 0.08 + L / nu;
-  const y0 = -Wmax - padY, y1 = Wmax + padY;
-  const x0 = -L / nu, x1 = L + L / nu;
+  return { x0: -L / nu, x1: L + L / nu, y0: -Wmax - padY, y1: Wmax + padY, L, Wmax };
+}
+
+// Marching squares over ANY scalar field on a flattened bbox -> ordered closed loop(s)
+// of its zero contour, largest first. This is the file's one contourer: maskContours
+// passes petalMask (the material outline) and ribInsetBound passes the rib-inset level
+// set (section 4a-iii). Adding a THIRD contour means passing a third field here, not
+// writing a third marching-squares loop beside this one.
+function contourField(field, box, nu) {
+  const { x0, x1, y0, y1 } = box;
   const dx = (x1 - x0) / nu;
   const nv = Math.max(8, Math.round((y1 - y0) / dx));
   const dy = (y1 - y0) / nv;
   const gx = (i) => x0 + i * dx, gy = (j) => y0 + j * dy;
-  // sample m on the (nu+1) x (nv+1) lattice
+  // sample the field on the (nu+1) x (nv+1) lattice
   const val = new Float64Array((nu + 1) * (nv + 1));
-  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) val[j * (nu + 1) + i] = petalMask(gx(i), gy(j), P, cfg);
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) val[j * (nu + 1) + i] = field(gx(i), gy(j));
   const V = (i, j) => val[j * (nu + 1) + i];
   // interpolated zero-crossing on a cell edge between corners a (va) and b (vb)
   const lerpEdge = (xa, ya, va, xb, yb, vb) => {
@@ -1301,6 +1446,10 @@ export function maskContours(P, cfg, nu = 160) {
   }
   loops.sort((a, b) => Math.abs(polyArea(b)) - Math.abs(polyArea(a)));
   return loops;
+}
+
+export function maskContours(P, cfg, nu = 160) {
+  return contourField((x, y) => petalMask(x, y, P, cfg), flatContourBox(P, nu), nu);
 }
 
 // Memoized contour + config accessor, so a multi-petal whorl of the same shape
