@@ -447,7 +447,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null, voidCrossing = null, voidPerimMean = null;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null, voidCrossing = null, voidPerimMean = null, floorSpanning = null, floorX = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -536,6 +536,25 @@ window.__gq = async function() {
         voidCrossing = voidCells;
         voidPerimMean = n ? +(voidPerimSum / n).toFixed(4) : 0;
       } else { voidCrossing = 0; voidPerimMean = 0; }
+      // (8c) HOW MANY CELLS SPAN THE SINUS FLOOR. Costing measurement for the per-lobe
+      //     partition (#80). A watershed divider is min(ray, constant) — concave — so the
+      //     wedge's UPPER bound is two half-planes (convex, exact in Sutherland-Hodgman) and
+      //     its LOWER bound is a union, giving exactly one reflex corner at x = xFloor.
+      //     Splitting there yields two convex pieces, both pure half-plane intersections.
+      //     The only cost is a cell that spans the split: it clips into two disjoint
+      //     polygons, hence two annuli and a seam, unless the pieces are rejoined along
+      //     their shared vertical edge. This counts how many cells that would be.
+      if (cfg) {
+        const xFloor = cfg.uFloor * cfg.L;
+        let spanning = 0;
+        for (const slab of (vor.slabs || [])) {
+          let lo = Infinity, hi = -Infinity;
+          for (const q of slab.outer) { if (q.x < lo) lo = q.x; if (q.x > hi) hi = q.x; }
+          if (lo < xFloor - 1e-9 && hi > xFloor + 1e-9) spanning++;
+        }
+        floorSpanning = spanning;
+        floorX = +xFloor.toFixed(4);
+      } else { floorSpanning = 0; floorX = null; }
       // (8a) BILATERAL SYMMETRY OF THE CELL SET — the property the option table cannot see.
       //     Every design this generator builds is symmetric about y = 0: axis seeds are
       //     pinned there, +Y seeds stay off-axis, -Y twins are rebuilt from the +Y set each
@@ -901,7 +920,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds, symAbove, symBelow, symStraddle, symAreaSkew, symCountSkew, voidCrossing, voidPerimMean };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds, symAbove, symBelow, symStraddle, symAreaSkew, symCountSkew, voidCrossing, voidPerimMean, floorSpanning, floorX };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.

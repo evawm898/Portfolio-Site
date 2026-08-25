@@ -391,8 +391,21 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
       let minW = Infinity, minAtT = null, filled = 0;
       for (let i = 0; i < NB; i++) { if (hi[i] < lo[i]) continue; filled++;
         const w = hi[i] - lo[i]; if (w < minW) { minW = w; minAtT = +((i+0.5)/NB).toFixed(3); } }
+      // CONVEXITY of the wedge — the property that decides whether Sutherland-Hodgman can
+      // clip against it directly. SH requires a convex CLIP; it tolerates a concave SUBJECT,
+      // and voronoiCell already relies on that (cell starts as the passed-in polygon and only
+      // ever takes half-plane clips). So the material may be as concave as it likes; the
+      // question is only about the region wedge.
+      let turnPos = 0, turnNeg = 0;
+      for (let i = 0; i < m; i++) {
+        const a = rp[(i-1+m)%m], b = rp[i], c2 = rp[(i+1)%m];
+        const cr = (b.x-a.x)*(c2.y-b.y) - (b.y-a.y)*(c2.x-b.x);
+        if (cr > 1e-12) turnPos++; else if (cr < -1e-12) turnNeg++;
+      }
+      const convex = (turnPos === 0 || turnNeg === 0);
       wsDiag.regions.push({ region: 'lobe' + r, verts: rp.length, area: +area(rp).toFixed(5),
-                            folds: fold, minWidthMM: +(minW * 26).toFixed(4), minAtT, binsFilled: filled });
+                            folds: fold, minWidthMM: +(minW * 26).toFixed(4), minAtT, binsFilled: filled,
+                            convex, reflexVerts: Math.min(turnPos, turnNeg) });
     }
     for (const s2 of seedsAll) { const r = wsRegionOf(s2), rp = RP.get(r);
       if (!rp || rp.length < 3) continue;
