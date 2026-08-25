@@ -191,6 +191,7 @@ if (!SWEEP && !process.env.GQ_MARGIN_OFF) {
 // through the hoop that traces the same contour. The fidelity gap stays ~0 there too —
 // proof the gate measures the RENDERED margin, not merely the presence of a cleft.
 if (process.env.GQ_MARGIN_OFF) for (const c of CONFIGS) c.ui.continuousMargin = 'off';
+if (process.env.GQ_ANISO) for (const c of CONFIGS) c.ui.voronoiAniso = Number(process.env.GQ_ANISO);
 
 // SHIPPED PRESETS as named correctness fixtures. Each preset's PETAL (its shape + infill +
 // edge, measured with the shipping continuous-margin ON) must trace its rim, stay smooth,
@@ -226,6 +227,17 @@ const ARRANGEMENT_CONFIGS = [
       clawLength: 0.3, cleftDepth: 0.4, cleftLobes: 3, cleftWidth: 0.3, crossSection: 0.6, curlAmount: 0.6 } },
 ];
 if (!SWEEP && !process.env.GQ_MARGIN_OFF) CONFIGS.push(...ARRANGEMENT_CONFIGS);
+
+// GQ_ONLY=<substring> — run only the configs whose name contains it. A diagnostic
+// convenience for iterating on one family (the three voronoi rows take ~40s against the
+// full matrix's several minutes); it narrows what runs, never what is asserted, and CI
+// never sets it.
+if (process.env.GQ_ONLY) {
+  const needle = process.env.GQ_ONLY;
+  const kept = CONFIGS.filter((c) => c.name.includes(needle));
+  if (!kept.length) { console.error(`GQ_ONLY=${needle} matched no config`); process.exit(2); }
+  CONFIGS.length = 0; CONFIGS.push(...kept);
+}
 
 // ---- the geometry-quality hook, appended to the served flower.js (module scope, so it
 //      shares resolveParams / readUI / inputs / the imported geometry fns). Exports
@@ -434,8 +446,8 @@ window.__gq = async function() {
   // a 72-segment clip polygon against an 80-bin curve evaluation at a different
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
-  let voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null;
+  let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -458,6 +470,32 @@ window.__gq = async function() {
         slabTaper: P.voronoiSlabTaper, minCellSize: 3 * P.tubeRadius * SLAB_THICK,
       });
       for (const slab of (vor.slabs || [])) for (const pt of slab.outer) recordPt(pt.x, pt.y);
+      // (7) THE HOLE IS INSIDE ITS OWN CELL — #74.
+      //     addSlab pairs outer[k] with inner[k] and lofts the ring between them, so every
+      //     inner[k] must lie inside its own outer ring. When it does not, the strut crosses
+      //     its own hole. No other metric here can see it: boundary edges stay 0, the model
+      //     stays connected, and the registration metric only ever looks at the OUTER ring.
+      //
+      //     ASSERTED ON THE OUTCOME, NOT ON STAR-SHAPEDNESS. Star-shapedness is a property
+      //     cellAnnulus's centroid-ray construction happens to need, not the property that
+      //     matters; a hole built along the boundary normal would be correct without it, and
+      //     a gate written against the means would fail its own repair.
+      //
+      //     SPLIT BY CAUSE, because there are two and they need different fixes: a cell with
+      //     ZERO AREA cannot contain anything (the ring is a collapsed sliver, and it lofts
+      //     into zero-area triangles), while a cell WITH area whose hole still escapes is a
+      //     containment failure of the offset itself.
+      let escCells = 0, escPts = 0, escZeroArea = 0, escWithArea = 0;
+      for (const slab of (vor.slabs || [])) {
+        if (!slab.inner || slab.inner.length !== slab.outer.length) { escCells++; continue; }
+        let bad = 0;
+        for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+        if (!bad) continue;
+        escCells++; escPts += bad;
+        if (Math.abs(__gqPolyArea(slab.outer)) < 1e-9) escZeroArea++; else escWithArea++;
+      }
+      holeEscapeCells = escCells; holeEscapePoints = escPts;
+      holeZeroArea = escZeroArea; holeWithArea = escWithArea;
       voronoiCells = (vor.slabs || []).length;
       voronoiCulled = vor.culled || 0;
       voronoiCulledDegenerate = vor.culledDegenerate || 0;
@@ -497,11 +535,215 @@ window.__gq = async function() {
       for (const slab of (vor.slabs || [])) sumA += Math.abs(__gqPolyArea(slab.outer));
       const boundA = Math.abs(__gqPolyArea(G.ribMarginPolyline(P, 72)));
       tileRatio = boundA > 1e-12 ? +(sumA / boundA).toFixed(3) : null;
+      // TILING AGAINST THE MATERIAL — the denominator that can actually see the defect.
+      // Cells tiling the CLIP POLYGON faithfully give 1.000 even when the clip polygon is
+      // the wrong region, which is why tileRatio above is 1.000 everywhere and useless
+      // as an assertion. Against the MATERIAL the same sum is > 1 on overlap and < 1 on
+      // void, and it catches both:
+      //
+      //   margin OFF, anisotropy 1:  smooth 0.981-0.990   lobed 1.220
+      //   margin OFF, anisotropy 4:  smooth 0.981-0.990   lobed 16.966
+      //
+      // The lobed elevation at anisotropy 1 is cells spanning the sinuses; the 16.966 at
+      // anisotropy 4 is genuine overlap from per-seed metrics (#73), and it is genuine
+      // rather than a shoelace artifact because selfIntersectCells is 0 in every config.
+      //
+      // REPORTED, NOT GATED, and for a stated reason: with continuous margin ON the clip
+      // is inset from the material by the rib radius, so a correct diagram lands at
+      // 0.564-0.948 rather than 1.000. There is no threshold that means the same thing in
+      // both margin modes. Gating this needs a rib-aware denominator — the inset material
+      // — which is the cleft-aware bound that does not exist yet.
+      // Does the CLIP POLYGON itself double back? ribInnerEdge is floored at 0, so under
+      // continuous margin the bound can pinch to zero width near the foot — and any cell
+      // covering that neck inherits a spike no matter which seed owns it. That would make
+      // the escapes a property of the BOUND, not of seed placement, and culling seeds
+      // could never converge.
+      {
+        // Folds are measured on the bound Voronoi ACTUALLY clips against (ribClipPolygon),
+        // while minR / zero stations / spans stay on the untrimmed ribMarginPolyline — the
+        // untrimmed profile is what motivates the trim, so losing sight of it would hide a
+        // regression that widens the neck.
+        const cp = G.ribClipPolygon(P, 72) || G.ribMarginPolyline(P, 72), m = cp.length;
+        let minR = Infinity, zeroR = 0;
+        for (let i = 0; i <= 72; i++) { const r = G.ribInnerEdge(i / 72, P);
+          if (r < minR) minR = r; if (r < 1e-9) zeroR++; }
+        clipMinInnerEdge = +minR.toExponential(3);
+        clipZeroStations = zeroR;
+        // WHERE the neck is, not just how much of it there is: a run of zero-width
+        // stations at the foot is a different fix from one straddling the middle.
+        clipZeroSpans = (function () {
+          const runs = []; let start = -1;
+          for (let i = 0; i <= 72; i++) {
+            const z = G.ribInnerEdge(i / 72, P) < 1e-9;
+            if (z && start < 0) start = i;
+            if (!z && start >= 0) { runs.push([+(start / 72).toFixed(3), +((i - 1) / 72).toFixed(3)]); start = -1; }
+          }
+          if (start >= 0) runs.push([+(start / 72).toFixed(3), 1]);
+          return runs;
+        })();
+        let fold = 0;
+        for (let i = 0; i < m; i++) {
+          const a = cp[(i-1+m)%m], b = cp[i], c2 = cp[(i+1)%m];
+          const ux=b.x-a.x, uy=b.y-a.y, vx=c2.x-b.x, vy=c2.y-b.y;
+          const lu=Math.hypot(ux,uy), lv=Math.hypot(vx,vy);
+          if (lu<1e-12||lv<1e-12) continue;
+          if ((ux*vx+uy*vy)/(lu*lv) < -0.9999) fold++;
+        }
+        clipFolds = fold;
+      }
+      const matA = Math.abs(__gqPolyArea(G.buildSilhouette(P, 200)));
+      tileVsMaterial = matA > 1e-12 ? +(sumA / matA).toFixed(3) : null;
+      // SELF-INTERSECTION CENSUS — the one test that separates 'genuine overlap' from
+      // 'meaningless number'. A shoelace sum over a figure-eight returns nonsense with no
+      // overlapping area behind it. Measured 0 cells and 0 crossing pairs in every config,
+      // including lobed at anisotropy 4 where the tiling sum reaches 16.966x the material,
+      // so that sum is real area and not an artifact of the measure.
+      const segX = (a, b, c, d) => {
+        const r1 = (b.x-a.x), r2 = (b.y-a.y), s1 = (d.x-c.x), s2 = (d.y-c.y);
+        const den = r1*s2 - r2*s1; if (Math.abs(den) < 1e-14) return false;
+        const t = ((c.x-a.x)*s2 - (c.y-a.y)*s1) / den;
+        const u = ((c.x-a.x)*r2 - (c.y-a.y)*r1) / den;
+        return t > 1e-9 && t < 1-1e-9 && u > 1e-9 && u < 1-1e-9;
+      };
+      // ISOPERIMETRIC CENSUS — one measure for both symptoms. Q = 4*pi*A / P^2: 1 for a
+      // circle, ~0.78 for a square, and it collapses toward 0 as a cell grows a spike,
+      // because the spike adds perimeter and no area. Measured here for every cell, split
+      // by whether the cell's hole escapes, so the threshold is chosen from the gap
+      // between the two populations rather than picked.
+      //
+      // MEASURED, and the gap is real but THIN at the extremes:
+      //   config          escapes   Q max ESCAPING   Q min LEGITIMATE
+      //   rounded            1          0.129            0.702
+      //   pointed            1          0.116            0.638
+      //   strap              2          0.007            0.616
+      //   clawed             1          0.083            0.356
+      //   lobed              3          0.327            0.603
+      //   chrysanthemum      4          0.015            0.612
+      //   preset:poppy       1          0.178            0.744
+      //
+      // Within any one config the two populations are separated by at least 1.8x. ACROSS
+      // configs the window is narrow: the worst escaping cell (lobed, 0.327) and the worst
+      // legitimate cell (clawed, 0.356) are 9% apart, so a single global threshold has to
+      // land in that 0.327-0.356 band. That is enough to separate everything measured and
+      // not enough to be comfortable, so the census ships REPORTED and the threshold is
+      // not yet chosen. Recorded here rather than resolved by picking a round number.
+      const isoQ = (poly) => { const A = Math.abs(__gqPolyArea(poly));
+        let per = 0; for (let i = 0; i < poly.length; i++) { const u = poly[i], v = poly[(i+1)%poly.length];
+          per += Math.hypot(v.x-u.x, v.y-u.y); }
+        return per > 1e-12 ? (4 * Math.PI * A) / (per * per) : 0; };
+      // DOUBLED-BACK CENSUS. The picture of the two threshold-deciding cells says Q is the
+      // wrong measure: clawed's worst LEGITIMATE cell is a long thin TRIANGLE (low Q from
+      // honest elongation, hole correctly inside), while lobed's best ESCAPING cell is a
+      // compact quadrilateral WITH a zero-width spike. Q punishes both and cannot tell
+      // them apart, which is what makes the global window only 9% wide.
+      // What actually distinguishes them is whether the ring DOUBLES BACK on itself — a
+      // spike is two ring sections lying on top of each other. That is one concept
+      // covering a fully collapsed ring (doubled back everywhere) and a spiked wedge
+      // (doubled back along the spike), and it does not penalise a thin cell at all.
+      //
+      // MEASURED, against the isoperimetric window it replaces:
+      //   config          DB min ESCAPING   DB max LEGITIMATE     (Q window, for contrast)
+      //   rounded             0.560              0.00              0.129 / 0.702
+      //   pointed             0.632              0.00              0.116 / 0.638
+      //   strap               0.792              0.00              0.007 / 0.616
+      //   clawed              0.594              0.00              0.083 / 0.356
+      //   lobed               0.765              0.00              0.327 / 0.603
+      //   chrysanthemum       0.694              0.44              0.015 / 0.612
+      //   preset:poppy        0.533              0.00              0.178 / 0.744
+      //
+      // Six of seven configs put EVERY legitimate cell at exactly 0, and the seventh is
+      // NOT an exception — measured, chrysanthemum's 0.44 cell has 22 of its 50 ring
+      // points EXACTLY coincident with a non-adjacent segment. It is a spiked cell whose
+      // hole has not escaped yet, not a healthy cell being maligned: Q 0.7628 and a mean
+      // width of 0.86 mm make it look entirely fine to both of the other measures.
+      //
+      // So the populations are 0 and >= 0.44, and THERE IS NO THRESHOLD TO PICK. Any
+      // doubling back at all is a collapsed section. The criterion is db > 0, with the
+      // only tolerance being the 1e-6 coincidence distance below — no magic number, and
+      // no gap for the next design to straddle.
+      //
+      // This is also strictly STRONGER than the escape test it replaces: it catches every
+      // cell that escapes, plus the latent ones like chrysanthemum's that will escape once
+      // the spike outgrows the strut.
+      const doubledBack = (poly) => {
+        const n = poly.length; let hit = 0;
+        const d2seg = (p, a, b) => { const dx = b.x-a.x, dy = b.y-a.y, L2 = dx*dx+dy*dy;
+          let t = L2 ? ((p.x-a.x)*dx + (p.y-a.y)*dy) / L2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const qx = a.x+dx*t, qy = a.y+dy*t; return (p.x-qx)**2 + (p.y-qy)**2; };
+        const SKIP = 3;
+        for (let i = 0; i < n; i++) {
+          for (let j = 0; j < n; j++) {
+            const gap = Math.min(Math.abs(i-j), n - Math.abs(i-j));
+            if (gap <= SKIP) continue;
+            if (d2seg(poly[i], poly[j], poly[(j+1)%n]) < 1e-12) { hit++; break; }
+          }
+        }
+        return hit / n;
+      };
+      const dbEsc = [], dbOk = [];
+      const qEsc = [], qOk = [];
+      for (const slab of (vor.slabs || [])) {
+        let bad = 0;
+        if (slab.inner && slab.inner.length === slab.outer.length)
+          for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+        (bad ? qEsc : qOk).push(isoQ(slab.outer));
+        (bad ? dbEsc : dbOk).push(doubledBack(slab.outer));
+      }
+      // capture the two cells that decide the global threshold: the worst-Q legitimate
+      // cell and the best-Q escaping one. Whether the window is really 9% wide depends on
+      // what those two actually are.
+      if (window.__qDump !== false) {
+        let worstOk = null, bestEsc = null;
+        for (const slab of (vor.slabs || [])) {
+          let bad = 0;
+          if (slab.inner && slab.inner.length === slab.outer.length)
+            for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+          const q = isoQ(slab.outer);
+          if (bad) { if (!bestEsc || q > bestEsc.q) bestEsc = { q, outer: slab.outer, inner: slab.inner }; }
+          else if (!worstOk || q < worstOk.q) worstOk = { q, outer: slab.outer, inner: slab.inner };
+        }
+        // also the worst DOUBLED-BACK legitimate cell — the one that decides whether the
+        // db window is 0.44-0.533 or 0-0.533.
+        let worstDbOk = null;
+        for (const slab of (vor.slabs || [])) {
+          let bad = 0;
+          if (slab.inner && slab.inner.length === slab.outer.length)
+            for (const q of slab.inner) if (!__gqPointInPoly(q.x, q.y, slab.outer)) bad++;
+          if (bad) continue;
+          const db = doubledBack(slab.outer);
+          if (!worstDbOk || db > worstDbOk.db) worstDbOk = { db, q: isoQ(slab.outer), outer: slab.outer, inner: slab.inner };
+        }
+        qDump = { worstOk, bestEsc, worstDbOk };
+      }
+      qEsc.sort((a,b)=>a-b); qOk.sort((a,b)=>a-b);
+      dbEsc.sort((a,b)=>a-b); dbOk.sort((a,b)=>a-b);
+      dbEscMin = dbEsc.length ? +dbEsc[0].toFixed(4) : null;
+      dbOkMax  = dbOk.length  ? +dbOk[dbOk.length-1].toFixed(4) : null;
+      isoEscMax = qEsc.length ? +qEsc[qEsc.length-1].toFixed(5) : null;
+      isoOkMin  = qOk.length  ? +qOk[0].toFixed(5) : null;
+      isoOkP05  = qOk.length  ? +qOk[Math.floor(qOk.length*0.05)].toFixed(5) : null;
+      let siCells = 0, siPairs = 0;
+      for (const slab of (vor.slabs || [])) {
+        const R = slab.outer, n = R.length; let hit = 0;
+        for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+          if (i === 0 && j === n - 1) continue;
+          if (segX(R[i], R[(i+1)%n], R[j], R[(j+1)%n])) hit++;
+        }
+        if (hit) { siCells++; siPairs += hit; }
+      }
+      selfIntersectCells = siCells; selfIntersectPairs = siPairs;
       // SELF-CHECK. A measurement tool that does not assert its own validity reports
       // whatever it happens to compute — this gate spent three rounds reporting zeros from
-      // a shadowed declaration before that was noticed. If a Voronoi config reaches here
-      // with no cells at all, the metrics below are vacuously fine and would read as a
-      // pass; that is a failure to be measuring anything, not a clean run.
+      // a shadowed declaration before that was noticed. If the classification does not
+      // account for every escaping cell, the split is lying and the run is void, not odd.
+      if (escZeroArea + escWithArea !== escCells) {
+        selfCheck = 'hole classification lost cells: ' + escZeroArea + ' + ' + escWithArea + ' != ' + escCells;
+      }
+      // And the check that arrived with the degeneracy cull (#76), kept because it asserts a
+      // DIFFERENT thing: the one above says the classification accounts for every escaping
+      // cell; this one says there were cells to classify at all. A voronoi config reaching
+      // here with zero cells makes every metric below vacuously fine and reads as a pass —
+      // that is a failure to be measuring anything, not a clean run.
       if (!(vor.slabs || []).length) selfCheck = 'voronoi config produced 0 cells';
     } catch (e) {}
   } else {
@@ -587,8 +829,8 @@ window.__gq = async function() {
            degree1, onMargin, atBase, freeEnds, marginPts: n, L: +P.L.toFixed(3),
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
-           voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio };
+           holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
@@ -708,7 +950,7 @@ await page.waitForTimeout(300);
 const rows = [];
 let fails = 0, xfails = 0, xpasses = 0;
 const ledger = {};   // issue ref -> { total, failing }
-console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), 'rimAmp'.padStart(7), 'cullDgn'.padStart(8), 'cullMin'.padStart(8), 'minAmm2'.padStart(8), 'tile'.padStart(6), '  verdict');
+console.log(`config`.padEnd(20), 'gapMM'.padStart(7), 'p95Curv'.padStart(8), 'maxTurn'.padStart(8), 'loops'.padStart(6), 'free'.padStart(5), 'overMM'.padStart(7), 'underMM'.padStart(8), 'rimAmp'.padStart(7), 'holeEsc'.padStart(8), 'cullDgn'.padStart(8), 'cullMin'.padStart(8), 'minAmm2'.padStart(8), 'tile'.padStart(6), 'tileMat'.padStart(8), 'selfX'.padStart(6), '  verdict');
 for (const cfg of CONFIGS) {
   let rejected = [];
   if (cfg.preset) await page.evaluate((d) => window.__gqApply(d), cfg.ui);
@@ -750,6 +992,9 @@ for (const cfg of CONFIGS) {
   const badUndershoot = q.infill === 'voronoi' && q.regUndershootMaxMM > T.regUndershootVoronoiMM;
   // The rib-path split either held or the rim silently reverted to the pre-#50
   // envelope. There is no tolerance to set here: it is a boolean, and it is hard.
+  // #74: hard and zero-tolerance, on the UNIFIED criterion. A cell that doubles back on
+  // itself has a collapsed section, whether or not its hole has escaped through it yet.
+  const badHole = (q.dbEscMin != null || (q.dbOkMax || 0) > 0);
   // The second assertion: no emitted cell is degenerate. Independent of the first — a
   // collapsed cell adds nothing to a tiling sum, so a partition check is blind to it.
   // The threshold catches COLLAPSE, not smallness: the smallest legitimate cell in this
@@ -766,8 +1011,8 @@ for (const cfg of CONFIGS) {
   const rimBearing = !(q.infill === 'bone' && q.boneOutline === false);
   const badTreat = (q.tipStyle === 'jagged' || q.tipStyle === 'scallop') && rimBearing
                    && !(q.treatmentAmpMM >= T.treatmentAmpMM);
-  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat || badDegenerate || badSelf;
-  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : ''].filter(Boolean).join(',');
+  const bad = badFidelity || badSmooth || badEnds || badOvershoot || badUndershoot || badSplit || badTreat || badHole || badDegenerate || badSelf;
+  const reasons = [badFidelity ? 'fidelity' : '', badSmooth ? 'smooth' : '', badEnds ? 'ends' : '', badOvershoot ? 'overshoot' : '', badUndershoot ? 'undershoot' : '', badSplit ? 'ribsplit' : '', badTreat ? 'rimtreat' : '', badHole ? `doubledBack(escaping ${q.holeEscapeCells}/${q.voronoiCells}, worst latent ${q.dbOkMax})` : '', badDegenerate ? `degenerate(min ${q.minCellAreaMM2}mm2 < ${T.minCellAreaMM2})` : '', badSelf ? `SELFCHECK(${q.selfCheck})` : ''].filter(Boolean).join(',');
   let verdict;
   if (cfg.xfail) {
     const s = ledger[cfg.xfail] || (ledger[cfg.xfail] = { total: 0, failing: 0 });
@@ -777,7 +1022,7 @@ for (const cfg of CONFIGS) {
   } else if (bad) { verdict = `FAIL(${reasons})`; fails++; }                               // real regression — breaks the build
   else verdict = 'ok';
   rows.push({ name: cfg.name, xfail: cfg.xfail || null, ...q, verdict });
-  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), String(q.treatmentAmpMM == null ? '-' : q.treatmentAmpMM).padStart(7), String(q.infill === 'voronoi' ? q.voronoiCulledDegenerate : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulled : '-').padStart(8), String(q.minCellAreaMM2 == null ? '-' : q.minCellAreaMM2.toFixed(3)).padStart(8), String(q.tileRatio == null ? '-' : q.tileRatio).padStart(6), '  ' + verdict);
+  console.log(cfg.name.padEnd(20), String(q.marginGapMM).padStart(7), String(q.p95CurvDegMM).padStart(8), String(q.maxTurnDeg).padStart(8), String(q.numLoops).padStart(6), String(q.freeEnds).padStart(5), String(q.regOvershootMaxMM).padStart(7), String(q.regUndershootMaxMM).padStart(8), String(q.treatmentAmpMM == null ? '-' : q.treatmentAmpMM).padStart(7), String(q.infill === 'voronoi' ? `${q.holeEscapeCells}/${q.voronoiCells}` : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulledDegenerate : '-').padStart(8), String(q.infill === 'voronoi' ? q.voronoiCulled : '-').padStart(8), String(q.minCellAreaMM2 == null ? '-' : q.minCellAreaMM2.toFixed(3)).padStart(8), String(q.tileRatio == null ? '-' : q.tileRatio).padStart(6), String(q.tileVsMaterial == null ? '-' : q.tileVsMaterial).padStart(8), String(q.infill === 'voronoi' ? q.selfIntersectCells : '-').padStart(6), '  ' + verdict);
 }
 if (process.env.GQ_JSON) fs.writeFileSync(process.env.GQ_JSON, JSON.stringify(rows, null, 1));
 
@@ -802,6 +1047,6 @@ if (openIssues.length) {
   if (openIssues.length > XFAIL_MAX) { console.log(`  ${openIssues.length} distinct debts > cap ${XFAIL_MAX}: burn some down before quarantining more`); debtBreaks = true; }
 }
 const okCount = CONFIGS.length - fails - xfails - xpasses;
-console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm  minCellArea>${T.minCellAreaMM2}mm2 (#74)`);
+console.log(`\n${okCount} ok, ${xfails} xfail, ${xpasses} xpass, ${fails} FAIL / ${CONFIGS.length}. thresholds: marginGap<=${T.marginGapMM}mm p95Curv<=${T.p95CurvDegMM}deg/mm freeEnds<=${T.freeEnds} marginClosed=true regOvershoot<=${T.regOvershootMM}mm regUndershoot(voronoi)<=${T.regUndershootVoronoiMM}mm ribSplit=held rimTreatment>=${T.treatmentAmpMM}mm noDoubledBackCells minCellArea>${T.minCellAreaMM2}mm2 (#74)`);
 await browser.close(); server.close();
 process.exit(REPORT_ONLY ? 0 : ((fails || debtBreaks) ? 1 : 0));
