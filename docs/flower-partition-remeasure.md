@@ -117,3 +117,76 @@ applies.
 The remaining honest measurement is to build the watershed and put it through
 `verify-geometry-quality`, which asserts on the object that actually gets exported. That is
 the only degeneracy number that counts.
+
+---
+
+# FINAL — re-measured against corrected seeds (post-#81)
+
+Third and last time this baseline moves. Everything above was measured before #81
+removed the seeds sitting in the cleft void; this section is the comparison the partition
+should actually be judged against. Harness re-run on `main` at `1e5050e`.
+
+**Two configs excluded, and the harness excluded them itself.** `COST d4` and `LLOYD l6`
+tripped the replica-vs-real assertion (cellGap 2, areaGap 0.0023) and the run exited
+non-zero rather than reporting them. Both are the pre-existing class where the real
+builder's culls and the replica's plain clip disagree by a cell or two — not caused by
+#81, which in fact removed the third member of that list (the anisotropy row, whose
+replica had disagreed by 87% of area).
+
+**Seeds in the void: 0 in all 23 clefted configs.** That is #81's control, still holding.
+
+## The comparison
+
+| config | today: cells crossing void / mean perim in void | **watershed** | today's `area/bound` |
+|---|---|---|---|
+| **LOBED 4, margin ON** *(the real default)* | 21 / 0.2521 | **0 / 0.0000** | 1.435 |
+| LOBED 4, margin off | 31 / 0.2500 | **2 / 0.0067** | 1.316 |
+| LOBED 7 d12, margin off | 53 / 0.2822 | **2 / 0.0053** | 1.359 |
+| LOBED 2, margin off | 27 / 0.1917 | **3 / 0.0084** | 1.244 |
+| SMOOTH, margin ON | 0 / 0.0000 | 0 / 0.0000 | 1.000 |
+
+`area / bound` is **1.000 for the watershed on every row**, against today's 1.244–1.435.
+
+## What #81 moved, and one row it moved the wrong way
+
+Today's numbers improved on three of four clefted rows — the seed fix delivering part of
+the defect, as predicted:
+
+| config | today, before #81 | today, after #81 |
+|---|---|---|
+| LOBED 2 | 32 / 0.2347 | 27 / 0.1917 |
+| LOBED 4, margin off | 37 / 0.3303 | 31 / 0.2500 |
+| LOBED 4, margin ON | 27 / 0.3323 | 21 / 0.2521 |
+| **LOBED 7 d12** | 51 / 0.2799 | **53 / 0.2822** |
+
+**LOBED 7 got slightly worse.** Recorded rather than smoothed over: removing void seeds
+redistributes the rest, and on seven lobes two more cells end up crossing a sinus. It is
+small and it is in the opposite direction to the other three, which is exactly the kind of
+row that gets quietly dropped from a summary.
+
+## The row that said the partition was worse has disappeared
+
+Before #81 the watershed showed **1 degenerate cell on LOBED 2** where today showed none —
+the one row where the partition looked worse, and the row that stopped the partition being
+built until it was explained.
+
+It is now **0 degenerate cells for the watershed on every row.**
+
+The cell belonged to the seed at **(0.981, 0), mask −0.123 — in the void**, and #81 removed
+that seed. The attribution recorded in `docs/flower-axis-seeds-in-void.md` is confirmed by
+its own fix: it was seed placement, not the partition, and not either of the two hypotheses
+tested before it.
+
+## The case, stated against a baseline that will not move again
+
+- **Void content.** On the real default the watershed is **0 cells crossing the void
+  against today's 21**, and mean perimeter in void **0.0000 against 0.2521**. On the other
+  clefted rows, 2–3 cells against 27–53.
+- **Tiling.** `area / bound` exactly **1.000**, against today's 1.244–1.435 — today's cells
+  overhang the material by a quarter to nearly half again its area.
+- **Degeneracy.** No longer an argument in either direction: **0 for both**, everywhere.
+- **Seam direction.** Unchanged and unmeasured here; it is why the watershed was chosen
+  over the straight cut, and the seam renders were approved at every lobe count.
+
+Nothing above is contaminated by seeds in removed material, by a replica of a builder that
+no longer ships, or by the wrong option column.
