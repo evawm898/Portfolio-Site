@@ -417,6 +417,14 @@ window.__diag2 = async function (SIMPLIFY_BOUND, WANT_DRAW) {
                                                          x: +s2.x.toFixed(4), y: +s2.y.toFixed(4),
                                                          region: 'lobe' + wsRegionOf(s2) }); }
     wsDiag.centers = cfg ? cfg.centers.map((c) => +c.toFixed(5)) : [];
+    // Are any seeds sitting in REMOVED MATERIAL? For an even lobe count a cleft slot runs
+    // down the axis, and the axis seeds are pinned to y = 0 — straight down the middle of
+    // it. petalMask < 0 is outside the material.
+    wsDiag.seedsInVoid = [];
+    for (const s2 of (cfg ? seedsAll : [])) {
+      const mk = G.petalMask(s2.x, s2.y, P, cfg);
+      if (mk < 0) wsDiag.seedsInVoid.push({ x: +s2.x.toFixed(4), y: +s2.y.toFixed(4),
+                                            mask: +mk.toFixed(5), onAxis: Math.abs(s2.y) < 1e-9 }); }
     wsDiag.axisSeeds = seedsAll.filter((q) => Math.abs(q.y) < 1e-9).length;
     out.wsDiag = wsDiag; }
 
