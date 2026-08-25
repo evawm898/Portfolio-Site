@@ -447,7 +447,7 @@ window.__gq = async function() {
   // phase, the same class of sampling residual marginGapMM's own header notes
   // already document for this gate. The per-point test below has no such residual.)
   let holeEscapeCells = 0, holeEscapePoints = 0, holeZeroArea = 0, holeWithArea = 0, voronoiCells = 0;
-  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null;
+  let voronoiCulled = 0, voronoiCulledDegenerate = 0, minCellAreaMM2 = null, selfCheck = null, tileRatio = null, tileVsMaterial = null, selfIntersectCells = 0, selfIntersectPairs = 0, isoEscMax = null, isoOkMin = null, isoOkP05 = null, qDump = null, dbEscMin = null, dbOkMax = null, clipMinInnerEdge = null, clipZeroStations = null, clipZeroSpans = null, clipFolds = null, symAbove = null, symBelow = null, symStraddle = null, symAreaSkew = null, symCountSkew = null, voidCrossing = null, voidPerimMean = null;
   const NBIN = 80;
   const outerY = new Array(NBIN).fill(null);
   let regOverMax = 0, regOverU = 0;
@@ -499,6 +499,43 @@ window.__gq = async function() {
       voronoiCells = (vor.slabs || []).length;
       voronoiCulled = vor.culled || 0;
       voronoiCulledDegenerate = vor.culledDegenerate || 0;
+      // (8b) CELLS CROSSING THE VOID — the property the per-lobe partition exists for, and
+      //     the one NO other column here can see. tile and tileMat are both blind to it: the
+      //     partition changes WHICH cell covers each piece of the bound, not how much bound
+      //     is covered, so both read identically with and without it. Measured post-#81 on
+      //     the shipped LOBED 4 default: 21 cells crossing the void before the partition, 0
+      //     after, with tile 1.002 and tileMat 0.949 either way.
+      //
+      //     A cell crosses the void when part of its perimeter lies in removed material —
+      //     it has reached across a cleft slot. Sampled along each edge against petalMask,
+      //     as a fraction of that cell's perimeter; a cell counts when more than 2% of its
+      //     perimeter is outside. Reported for every voronoi config; only meaningful where
+      //     there is a cleft, and exactly 0 where there is not.
+      if (cfg) {
+        let voidCells = 0, voidPerimSum = 0, n = 0;
+        for (const slab of (vor.slabs || [])) {
+          const poly = slab.outer; let outLen = 0, totLen = 0;
+          for (let i = 0; i < poly.length; i++) {
+            const a = poly[i], b = poly[(i + 1) % poly.length];
+            const L = Math.hypot(b.x - a.x, b.y - a.y);
+            if (L < 1e-12) continue;
+            totLen += L;
+            const S = 4;
+            for (let k = 0; k < S; k++) {
+              const t = (k + 0.5) / S;
+              const px = a.x + (b.x - a.x) * t, py = a.y + (b.y - a.y) * t;
+              if (G.petalMask(px, py, P, cfg) < 0) outLen += L / S;
+            }
+          }
+          if (totLen < 1e-12) continue;
+          n++;
+          const frac = outLen / totLen;
+          voidPerimSum += frac;
+          if (frac > 0.02) voidCells++;
+        }
+        voidCrossing = voidCells;
+        voidPerimMean = n ? +(voidPerimSum / n).toFixed(4) : 0;
+      } else { voidCrossing = 0; voidPerimMean = 0; }
       // (8a) BILATERAL SYMMETRY OF THE CELL SET — the property the option table cannot see.
       //     Every design this generator builds is symmetric about y = 0: axis seeds are
       //     pinned there, +Y seeds stay off-axis, -Y twins are rebuilt from the +Y set each
@@ -864,7 +901,7 @@ window.__gq = async function() {
            regOvershootMaxMM: +regOvershootMaxMM.toFixed(3), regUndershootMaxMM: +regUndershootMaxMM.toFixed(3),
            regUndershootMeanMM: +regUndershootMeanMM.toFixed(3), regWorstU: +regWorstU.toFixed(2),
            holeEscapeCells, holeEscapePoints, holeZeroArea, holeWithArea, voronoiCells,
-           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds, symAbove, symBelow, symStraddle, symAreaSkew, symCountSkew };
+           voronoiCulled, voronoiCulledDegenerate, minCellAreaMM2, selfCheck, tileRatio, tileVsMaterial, selfIntersectCells, selfIntersectPairs, isoEscMax, isoOkMin, isoOkP05, qDump, dbEscMin, dbOkMax, clipMinInnerEdge, clipZeroStations, clipZeroSpans, clipFolds, symAbove, symBelow, symStraddle, symAreaSkew, symCountSkew, voidCrossing, voidPerimMean };
 };
 // A preset is a full design; load it through applyDesign (merge over DEFAULTS) so its
 // petal params are set cleanly, not layered on the previous config's partial state.
