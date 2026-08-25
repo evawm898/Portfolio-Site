@@ -739,6 +739,12 @@ window.__gq = async function() {
       if (escZeroArea + escWithArea !== escCells) {
         selfCheck = 'hole classification lost cells: ' + escZeroArea + ' + ' + escWithArea + ' != ' + escCells;
       }
+      // And the check that arrived with the degeneracy cull (#76), kept because it asserts a
+      // DIFFERENT thing: the one above says the classification accounts for every escaping
+      // cell; this one says there were cells to classify at all. A voronoi config reaching
+      // here with zero cells makes every metric below vacuously fine and reads as a pass —
+      // that is a failure to be measuring anything, not a clean run.
+      if (!(vor.slabs || []).length) selfCheck = 'voronoi config produced 0 cells';
     } catch (e) {}
   } else {
     for (const v of veins) for (const pt of v.points) recordPt(pt.x, pt.y);
