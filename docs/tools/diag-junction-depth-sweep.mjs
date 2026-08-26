@@ -59,6 +59,10 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 
 const OUT = process.argv[2];
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
+// --no-shots: measure only, skip the renders. The canvas animates, so an element screenshot
+// waits for it to be "stable" and can time out under CPU contention — which is a reason to
+// not take one when the numbers are all that is wanted, not a reason to loosen the wait.
+const NO_SHOTS = process.argv.includes('--no-shots');
 if (!OUT) { console.error('usage: node docs/tools/diag-junction-depth-sweep.mjs <outDir> [--negative-control]'); process.exit(2); }
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -112,6 +116,32 @@ function analyse(buf, cell) {
   }
   const tailXZ = (isFinite(thi[0]) && whole > 0) ? +(Math.max(thi[0] - tlo[0], thi[1] - tlo[1]) / whole).toFixed(4) : NaN;
 
+  // spikeMM — HOW FAR the narrow tail hangs, in millimetres. `tailXZ` answers "is anything
+  // hanging below the bloom" and is correctly FLAT on a design where the answer is yes at
+  // every depth — but a longer spike of the same width barely moves a width ratio, so on its
+  // own it reads as "depth does not affect this design", which the renders refute. This is
+  // the companion with the right unit: scan up from the model's lowest point and find where
+  // the cross-section first reaches half the model's full width; the distance climbed is the
+  // length of the tail. Zero (or near it) means the lowest thing in the model is already
+  // full-width, i.e. no spike at all.
+  const SLABS = 200;
+  const height = hi[1] - lo[1];
+  const slo = Array.from({ length: SLABS }, () => [Infinity, Infinity]);
+  const shi = Array.from({ length: SLABS }, () => [-Infinity, -Infinity]);
+  if (height > 0) for (const t of tri) for (const v of t) {
+    const k = Math.min(SLABS - 1, Math.max(0, Math.floor(((v[1] - lo[1]) / height) * SLABS)));
+    if (v[0] < slo[k][0]) slo[k][0] = v[0];
+    if (v[0] > shi[k][0]) shi[k][0] = v[0];
+    if (v[2] < slo[k][1]) slo[k][1] = v[2];
+    if (v[2] > shi[k][1]) shi[k][1] = v[2];
+  }
+  let kFull = 0;
+  for (; kFull < SLABS; kFull++) {
+    const w = Math.max(shi[kFull][0] - slo[kFull][0], shi[kFull][1] - slo[kFull][1]);
+    if (isFinite(w) && w >= 0.5 * whole) break;
+  }
+  const spikeMM = height > 0 ? +((kFull / SLABS) * height).toFixed(2) : NaN;
+
   const dim = hi.map((h, k) => Math.max(1, Math.ceil((h - lo[k]) / cell) + 1));
   if (dim[0] * dim[1] * dim[2] > MAX_VOXELS) return { tris: n, tailXZ, comps: null, dim };
   const occ = new Uint8Array(dim[0] * dim[1] * dim[2]);
@@ -145,7 +175,7 @@ function analyse(buf, cell) {
     }
     if (sz > biggest) biggest = sz;
   }
-  return { tris: n, tailXZ, comps, strayFraction: total ? +(1 - biggest / total).toFixed(5) : 0 };
+  return { tris: n, tailXZ, spikeMM, comps, strayFraction: total ? +(1 - biggest / total).toFixed(5) : 0 };
 }
 
 const server = http.createServer((req, res) => {
@@ -193,6 +223,7 @@ async function freshPage() {
 }
 
 const shot = async (view, file) => {
+  if (NO_SHOTS) return;
   await page.evaluate((v) => {
     const el = document.getElementById('viewPreset');
     el.value = v; el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -273,15 +304,17 @@ let lastKey = null, baseTris = 0;
 for (const r of rows) {
   if (r.key !== lastKey) {
     console.log(`\n${r.design}`);
-    console.log('  depth   comps      tris      delta   tailXZ   sha');
+    console.log('  depth   comps      tris      delta   tailXZ  spikeMM   sha');
     lastKey = r.key; baseTris = r.tris;
   }
   const delta = r.tris - baseTris;
   console.log(`  ${String(r.depth).padEnd(5)}  ${String(r.comps).padStart(5)}  ${String(r.tris).padStart(9)}  ${(delta >= 0 ? '+' : '') + delta}`.padEnd(48)
-    + `  ${String(r.tailXZ).padEnd(7)}  ${r.sha}`);
+    + `  ${String(r.tailXZ).padEnd(7)} ${String(r.spikeMM).padStart(6)}   ${r.sha}`);
 }
-console.log(`\ntailXZ: ~1 = the lowest slice of the model is petal underside (junction tucked up inside the bloom).`);
-console.log(`        small = a narrow spike is the lowest thing in the model (junction hangs below).`);
+console.log(`\ntailXZ:  ~1 = the lowest slice of the model is petal underside (junction tucked up inside the bloom).`);
+console.log(`         small = a narrow spike is the lowest thing in the model (junction hangs below).`);
+console.log(`spikeMM: HOW FAR that tail hangs, in mm — the climb from the model's lowest point to where`);
+console.log(`         it first reaches half its full width. tailXZ says whether; spikeMM says how far.`);
 console.log(`\nPNGs in ${OUT} — <design>__depth<N>__34.png and __side.png.`);
 
 if (NEGATIVE_CONTROL) {

@@ -30,7 +30,7 @@ import {
   ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
-import { CONTROLS, PREDICATES, evalPredicate, predicateDrivers } from './flower-registry.js';
+import { CONTROLS, evalPredicate, predicateDrivers } from './flower-registry.js';
 import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
 import { VIEW_PRESETS } from './flower-view-presets.js';
 import { SHAPES as SHAPE_BUNDLES, SHAPE_PARAMS, PICKER_SHAPE_NAMES } from './flower-shapes.js';
@@ -1841,15 +1841,10 @@ function buildBudBranchInto(acc, P, ui, cl, stemOpts) {
 // is no visitor control; it appears because of course it does. `receptacleType
 // === 'on'` survives only as a migration override, so an old design that set it
 // explicitly keeps its receptacle even with no stem/sepals.
-// The single source of truth for "does this design need a junction below the
-// bloom" — every call site reads this, none re-derives it.
-// JUNCTION vs ORNAMENT: everything under this presence check is one flat
-// "Receptacle" control block, but only some of it IS the junction — the rest is
-// decoration riding on top of it. flower-registry.js's acc-base entries carry a
-// role:"junction" / role:"ornament" tag marking which is which.
-function hasReceptacle(ui) {
-  return evalPredicate(PREDICATES.hasReceptacle, ui);
-}
+// JUNCTION vs ORNAMENT: the "Receptacle" control block is one flat list, but only some of
+// it IS the junction — the rest is decoration riding on top of it. flower-registry.js's
+// acc-base entries carry a role:"junction" / role:"ornament" tag marking which is which.
+// There is no longer a presence check to sit under: every design builds a junction (#84).
 
 // Grow the simplified bud bloom into its own accumulator and merge it onto the
 // offshoot tip (position `tipPos`, axis `tipDir`). `rTip` is the offshoot's tip
@@ -1891,10 +1886,11 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // feet and merged into budAcc; the single appendTransformed below then scales + seats
   // it with the bloom, so it's automatically sized to the bud. It reads the MAIN ui's
   // receptacle sliders (blend / depth / tightness) so its flutes match the big one.
-  // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
-  // the bud's receptacle follows the same derived rule as the main bloom's (stem/sepals
-  // present, or the migration override), so a budded plant with a stem grows a bud base too.
-  if (hasReceptacle(ui)) {
+  // Unconditional, like the main bloom's (#84): the bud is a bloom, so its petal feet and
+  // its core need joining for exactly the same reason. It was gated on hasReceptacle(ui)
+  // until that predicate was retired; since a side bud only exists on a stemmed plant, that
+  // gate was already true at every call, so this is not a behaviour change.
+  {
     const attach = [];
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
@@ -2787,9 +2783,10 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + the trunk
 
   if (ui.sepalsType !== 'none') {
-    // Sepal base attachment radius. Sepals bring a junction with them — `sepalsType
-    // != none` is hasReceptacle()'s second clause — so the fluted funnel always fills
-    // the space between the axis and ringR, and this ring embeds in it with no gap.
+    // Sepal base attachment radius. The fluted funnel is always built now (#84), so it
+    // always fills the space between the axis and ringR and this ring embeds in it with
+    // no gap. It used to depend on sepals implying a junction; it no longer depends on
+    // anything.
     const sepalAttachR = Math.max(ringR * 0.85, 0.16);
     buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
       count: ui.sepalCount,
@@ -3453,11 +3450,11 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : 'leaf venation';
   // SDF receptacle telemetry (continuous margin on): report the field's own triangle
   // count so its contribution to the budget stays visible on every geometry change.
-  // hasReceptacle(ui), not the raw `receptacleType` toggle: the junction is DERIVED,
-  // and reading the migration-override control instead meant this clause was suppressed
-  // on every design that grew a junction from a stem or sepals — which is all of them
-  // except a migrated save. The field was being built and measured, and not reported.
-  const recept = (ui.continuousMargin === 'on' && hasReceptacle(ui) && RECEPT_FIELD_STATS)
+  // Every design has a junction now (#84), so the only condition left is whether the SDF
+  // field is the one building it. This read the raw `receptacleType` toggle once, which
+  // suppressed the clause on every design that grew a junction from a stem or sepals — the
+  // field was being built and measured, and not reported.
+  const recept = (ui.continuousMargin === 'on' && RECEPT_FIELD_STATS)
     ? ` · sdf receptacle ~${RECEPT_FIELD_STATS.tris.toLocaleString()} tris (abs ${(+ui.absorption).toFixed(2)})`
     : '';
   el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris${recept}`;
@@ -3775,10 +3772,10 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 // Base parts are independent: each part's sliders show only when it's not NONE. Every
 // condition this function used to enforce imperatively is now a `visibleWhen` declaration:
 //
-//   data-recept          -> { ref: 'hasReceptacle' }
-//   data-cont-margin     -> all[ hasReceptacle, continuousMargin = on ]   <- SEE BELOW
-//   data-recept-dome     -> all[ hasReceptacle, receptProfile = dome ]
-//   data-recept-open  }  -> all[ hasReceptacle, receptConstruction in {ribbed, cored} ]
+//   data-recept          -> (no gate at all now — see #84 below)
+//   data-cont-margin     -> continuousMargin = on                          <- SEE BELOW
+//   data-recept-dome     -> receptProfile = dome
+//   data-recept-open  }  -> receptConstruction in {ribbed, cored}
 //   data-recept-ribbed}     (two attributes for one set: the `open` sweep also listed the
 //                            retired 'gathered' construction, which is no longer an option
 //                            value and so could never match)
@@ -3789,11 +3786,13 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 //                            by an undeclared second condition.
 //
 // The `data-cont-margin` five are the sharpest case in the whole change and worth naming.
-// The registry declared ONE condition; the code required that condition AND hasReceptacle().
-// A wholly undeclared condition is at least honestly absent — a reader checks the registry,
-// finds nothing, and knows to look further. A HALF-declared one reads as complete: the
-// reader finds a condition, believes it, and is wrong. That is the argument for predicates
-// over labels in one example.
+// The registry declared ONE condition; the code required that condition AND a second,
+// undeclared one. A wholly undeclared condition is at least honestly absent — a reader
+// checks the registry, finds nothing, and knows to look further. A HALF-declared one reads
+// as complete: the reader finds a condition, believes it, and is wrong. That is the argument
+// for predicates over labels in one example. (The undeclared half was `hasReceptacle`, now
+// retired: since #84 every design builds a junction, so the condition became vacuous and was
+// deleted rather than left evaluating to true — see flower-registry.js's PREDICATES.)
 //
 // BACKLOG (trigger): retire the legacy receptacle entirely — delete those nine controls and
 // the continuous-margin-OFF receptacle path, making continuous margin implicit — once the
@@ -3803,7 +3802,7 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 // {any: []}`) — a migration override for designs saved before the junction became
 // derived — so nothing can emit a `change` on it from the panel. The one that used to
 // be here did two things and needed neither: `applyVisibility()` is already wired for
-// it by PREDICATE_DRIVERS (it drives hasReceptacle), and the rebuild it also asked for
+// it by PREDICATE_DRIVERS if any predicate still named it, and the rebuild it also asked for
 // is the caller's job — applyDesign() schedules its own, and exportSTL() rebuilds from
 // readUI() regardless of what the live scene holds.
 function updateBaseOptions() { applyVisibility(); }

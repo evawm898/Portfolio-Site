@@ -8,6 +8,13 @@
  * Two sheets, because the underside is what is in question and a head-on view would beg it:
  * one for the three-quarter view and one for the side view.
  *
+ * FRAME THE SUBJECT. The renders are whole-model shots, so the junction — the entire reason
+ * the sheet exists — lands at a couple of percent of each frame, and the first version of
+ * this sheet had to be cropped and enlarged by hand before the finding was visible at all.
+ * Each cell now carries a ZOOM STRIP under the full view: the same PNG scaled up and
+ * anchored on the lower-centre, where the junction is. Composition is part of whether the
+ * evidence lands, especially when it is being read on a phone.
+ *
  * RUN:  node docs/tools/make-depth-sheet.mjs <sweepDir> <out-prefix>
  *   writes <out-prefix>-34.png and <out-prefix>-side.png
  */
@@ -42,7 +49,9 @@ for (const view of ['34', 'side']) {
   const rows = designs.map((d) => {
     const cells = depths.map((dep) => {
       const hit = have.find((p) => p.design === d && p.depth === dep);
-      return `<td>${hit ? `<img src="${b64(hit.file)}">` : '<div class="miss">—</div>'}</td>`;
+      if (!hit) return '<td><div class="miss">—</div></td>';
+      const src = b64(hit.file);
+      return `<td><img src="${src}"><div class="zoom"><img src="${src}"></div></td>`;
     }).join('');
     return `<tr><th class="rowlab">${d}</th>${cells}</tr>`;
   }).join('');
@@ -55,15 +64,21 @@ for (const view of ['34', 'side']) {
     th.collab { font-weight: 600; color: #9fe0d2; padding-bottom: 8px; }
     th.rowlab { text-align: right; padding-right: 10px; color: #9fe0d2; white-space: nowrap; }
     img { display: block; width: 250px; height: 250px; object-fit: contain; background: #0a100f; border: 1px solid #1e2f2b; }
-    .miss { width: 250px; height: 250px; display: grid; place-items: center; color: #44605a; border: 1px dashed #1e2f2b; }
+    /* ZOOM STRIP — the same render at 3.2x, anchored on the lower-centre of the model, which
+       is where the junction is. The full view above gives the context; this gives the
+       subject at a size a person can actually judge. */
+    .zoom { width: 250px; height: 108px; overflow: hidden; margin-top: 3px; border: 1px solid #2a4a43; background: #0a100f; position: relative; }
+    .zoom img { position: absolute; width: 800px; height: 800px; border: 0; left: 50%; top: 50%; transform: translate(-50%, -62%); }
+    .miss { width: 250px; height: 361px; display: grid; place-items: center; color: #44605a; border: 1px dashed #1e2f2b; }
   </style>
   <h1>Junction depth sweep — ${view === '34' ? 'three-quarter' : 'side'} view</h1>
   <p class="note">receptacleDepth left to right: ${depths.join(' &nbsp; ')} &nbsp;&middot;&nbsp; every cell exports as ONE connected piece<br>
   depthW = lerp(0.18, top, depth) &mdash; top is 1.15 when something below the bloom receives the descent (a stem, or a side bud's branch),
-  and the 0.3-equivalent when nothing does. Every design here is stemless, so every cell is on the capped range.</p>
+  and the 0.3-equivalent when nothing does. Every design here is stemless, so every cell is on the capped range.<br>
+  <b>Each cell: full view above, and below it the same render at 3.2&times; on the lower-centre — the junction, which is the subject.</b></p>
   <table><tr><th></th>${depths.map((d) => `<th class="collab">depth ${d}</th>`).join('')}</tr>${rows}</table>`;
 
-  const page = await browser.newPage({ viewport: { width: 260 * depths.length + 220, height: 300 * designs.length + 120 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width: 260 * depths.length + 220, height: 400 * designs.length + 140 }, deviceScaleFactor: 1 });
   await page.setContent(html, { waitUntil: 'load' });
   const out = `${outPrefix}-${view}.png`;
   await page.screenshot({ path: out, fullPage: true });
