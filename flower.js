@@ -278,6 +278,18 @@ const MM_PER_UNIT = 26;   // millimetres per Three.js world unit (single scale k
 // MIN_RADIUS_UNITS are read at BUILD time (new accumulator per build), so updating the
 // floor before an export build is enough — no accumulator caches a stale value.
 const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no process set
+
+// TRUNK DESCENT RANGE (#84). `receptacleDepth` maps onto depthW, the trunk's descent below
+// the petal attachment ring. The TOP of that map is derived from what is underneath the
+// bloom, so the junction's size follows from what is present exactly as its existence does.
+//   DEPTH_TOP_SUPPORTED     something below receives the descent (a stem, or a side bud's
+//                           offshoot branch) — the full range, unchanged from before.
+//   DEPTH_CAP_UNSUPPORTED   nothing below: the descent is an underside, so the ceiling is
+//                           the old slider's 0.3, written as the fraction it is rather than
+//                           as 0.471, so the two cannot drift apart.
+const DEPTH_BOTTOM          = 0.18;
+const DEPTH_TOP_SUPPORTED   = 1.15;
+const DEPTH_CAP_UNSUPPORTED = 0.3;
 const PROCESS_FLOOR_MM  = { sls: 1.0, sla: 0.4, fdm: 0.8 };
 const PROCESS_LABEL     = { sls: 'SLS nylon', sla: 'resin SLA', fdm: 'FDM 0.4 mm' };
 let   activeFloorMM     = MIN_FEATURE_MM;
@@ -1875,6 +1887,13 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
       receptacle: true, stem: false,               // the offshoot branch is the bud's stem
+      below: 'branch',                             // ...and it receives the descent, so the
+                                                   // full depth range applies here exactly as
+                                                   // it does under a stem. `stem: false` says
+                                                   // "build no stem ZONE", which is a
+                                                   // different question — keying the range off
+                                                   // that would silently shallow every side
+                                                   // bud on a stemmed plant.
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
       profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
       reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,
@@ -2138,7 +2157,19 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
 
   // ---------- RECEPTACLE ZONE ----------
   if (wantRecept) {
-    const depthW = lerp(0.18, 1.15, clamp(opts.depth, 0, 1));  // descent below the ring
+    // DESCENT BELOW THE RING — the range is DERIVED from what is underneath, the same way
+    // the junction's existence is (#84). With something below to receive it — a stem, or the
+    // offshoot branch under a side bud — the descent is part of the silhouette and keeps its
+    // full range; that look ships today and does not move. With nothing below, the descent
+    // is an UNDERSIDE, and its ceiling is capped so a stemless bloom cannot grow a spike at
+    // ANY slider position, not merely at the default: a safe default is one drag away from
+    // the thing being avoided.
+    // The cap is today's 0.3 written as what it is, so the relationship cannot drift. The
+    // sweep in docs/tools/diag-junction-depth-sweep.mjs measured tailXZ as IDENTICAL at
+    // 0, 0.1, 0.2 and 0.3 on every design, so nothing expressive lives in the range this
+    // removes — the cliff is at 0.5.
+    const depthTop = opts.below ? DEPTH_TOP_SUPPORTED : lerp(DEPTH_BOTTOM, DEPTH_TOP_SUPPORTED, DEPTH_CAP_UNSUPPORTED);
+    const depthW = lerp(DEPTH_BOTTOM, depthTop, clamp(opts.depth, 0, 1));
     const tight  = clamp(opts.tightness, 0, 1);
     const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // relief pokes up among the petals
     const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dip between bases (fades as it smooths)
@@ -2729,7 +2760,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     // t=0), so the trunk flows straight into the stem at any thickness. No stem -> 4x.
     const stemThick = hasStem ? clamp(ui.stemThickness, 0.3, 4) : 1;
     const trunk = buildTrunkInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
-      receptacle: true, stem: hasStem,
+      receptacle: true, stem: hasStem, below: hasStem ? 'stem' : null,
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
       profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
       reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,

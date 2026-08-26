@@ -64,9 +64,14 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const { PRESETS } = await import(pathToFileURL(path.join(ROOT, 'flower-presets.js')).href);
 
-// depthW = lerp(0.18, 1.15, depth), so 0 is not "no junction" — it is the shallowest the
-// control can express. The sweep brackets the shipped default (0.5) from below.
-const DEPTHS = NEGATIVE_CONTROL ? [0.5, 0.5, 0.5] : [0, 0.1, 0.2, 0.3, 0.5];
+// The WHOLE slider, end to end. `receptacleDepth` runs 0..1, and the guarantee being
+// checked is that a stemless bloom cannot protrude at ANY position — not that it does not
+// at the default. A safe default is one drag away from the thing being avoided, so a sweep
+// that stops at the default proves the weaker claim.
+// depth 0 is not "no junction": depthW = lerp(0.18, <top>, depth), so 0 is the shallowest
+// the control can express, and <top> is 1.15 when something below the bloom receives the
+// descent and a shallow ceiling when nothing does.
+const DEPTHS = NEGATIVE_CONTROL ? [0.5, 0.5, 0.5] : [0, 0.25, 0.5, 0.75, 1];
 
 // The four presets #84 broke, plus the shipped DEFAULTS — the state a cold visitor lands on
 // before touching anything — plus DAHLIA. Dahlia was never broken (it exported as one piece
