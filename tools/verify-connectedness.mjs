@@ -70,13 +70,13 @@
  *    MIGRATES a preset before applying it, so the post-migration state is not predictable
  *    here without a second copy of every migration. They get a read-back of the ids the
  *    preset names instead; their isolation comes from the reload, not from an assertion.
- * 2. TAIL PROBE. `tailXZ` is the XZ extent of the lowest 8% of the model as a fraction of
- *    the whole model's XZ extent — one estimator on both sides, same vertex set. A stem or
- *    a receptacle neck tapers, so a based design reads small; a bare bloom's lowest slice is
- *    petal underside, so it reads near 1. Each row declares `stem: true | false` and a row
- *    whose probe lands on the wrong side of the band fails. This is what stops a "bare
- *    bloom" row silently growing a base (or a preset silently carrying one) and being
- *    reported under a label that says otherwise.
+ * 2. TAIL PROBE. Each row declares `stem: true | false`, and the geometry has to agree —
+ *    this is what stops a row silently becoming a different design and being reported under
+ *    a label that says otherwise. The asserted measure is `aspect` (model height over its
+ *    width): a stem makes the model taller than it is wide, a bare bloom wider than tall.
+ *    `narrowFrac` (how much of the height is a narrow shaft) and `tailXZ` (how wide the
+ *    lowest 8% is) are reported alongside it. `tailXZ` used to be the asserted one and no
+ *    longer separates anything — see the band below for why, and for what this one assumes.
  * 3. PAIRWISE TRIANGLE COMPARISON. Sepal absence is checked against the SAME design with
  *    sepals on (`moreTrisThan`), never against a global reference — triangle counts differ
  *    across configs for a dozen reasons, so only a matched pair carries information.
@@ -100,16 +100,32 @@ const THREE_VERSION = '0.161.0';
 const CELL_MM = 0.6;          // < MIN_FEATURE_MM (0.8): a real gap cannot hide inside a cell
 const MAX_VOXELS = 90e6;
 const TAIL_FRAC = 0.08;       // "the lowest 8%" of the model's height, for the tail probe
-// Tail-probe band, from the measured spread across every row in this file. Stemmed rows
-// land in 0.0106-0.1093: the stem tapers to a point, so the lowest slice of the model is
-// nearly nothing. Stemless rows land in 0.5114-1.0000: the lowest slice is petal underside,
-// most of the footprint. The two thresholds sit in the empty gap between 0.11 and 0.51 —
-// 2.3x above the widest stemmed row, 1.5x below the narrowest stemless one (Thistle, a
-// domed tuft, is the narrowest and is why this is not set at 0.5).
-// It is the STEM that separates them, not the junction: a stemless design with sepals or a
-// forced receptacle still reads ~0.95, because a receptacle is a bowl and not a taper.
-const STEMMED_MAX = 0.25;
-const STEMLESS_MIN = 0.35;
+// Tail-probe band — see validity check 2. ONE threshold on `aspect`, from the measured
+// spread across every row in this file:
+//
+//   stemmed  (10 rows)  aspect 0.964 - 1.569      narrowFrac 0.72 - 0.87
+//   stemless (21 rows)  aspect 0.200 - 0.414      narrowFrac 0.00 - 0.37
+//
+// 0.65 sits in the empty gap: 1.48x below the shortest stemmed row, 1.57x above the tallest
+// stemless one. `narrowFrac` separates too (1.95x) and is reported, but `aspect` has the
+// wider gap so it is the one asserted — one measure, not a conjunction that would fail
+// twice for the same reason.
+//
+// WHY NOT tailXZ, which this used to assert. It asked "is the lowest 8% of the model
+// narrow?" and inferred a stem. That inference held only while stemless meant NO JUNCTION.
+// Since the junction became unconditional (#84) every design has one and it tapers, so the
+// ranges now OVERLAP COMPLETELY — stemless spans 0.0259-1.0000 against stemmed's
+// 0.0106-0.1093 — and the measure has no separating power left. It is still reported,
+// because "does the junction hang below the bloom" is a real thing to watch; it is just not
+// evidence about a stem. Dahlia proves no depth setting rescues it: its underside reads
+// ~0.033 at every depth from 0 to 0.5, because its bloom already tapers to a small footprint.
+//
+// WHAT THIS BAND ASSUMES, so the next person knows when to re-measure it: that a stem makes
+// the model TALLER THAN IT IS WIDE (heightMM normalises the largest dimension, so a stemmed
+// plant fills the box vertically and a bare bloom fills it horizontally). A row with a very
+// SHORT stem, or a stemless bloom closed up into a tall bud, would sit nearer the middle.
+// No row here is either. Adding one means re-measuring the band, not widening it.
+const STEM_ASPECT_MIN = 0.65;
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
@@ -514,8 +530,9 @@ for (const r of results) {
   const want = r.cfg.stem;
   if (typeof want !== 'boolean') { validity.push(`${r.label}: row declares no \`stem\` — the tail probe has nothing to check`); continue; }
   if (!isFinite(r.tailXZ)) { validity.push(`${r.label}: tail probe returned NaN (${r.tailVerts} vertices in the lowest ${TAIL_FRAC * 100}%)`); continue; }
-  if (want && r.tailXZ > STEMMED_MAX) validity.push(`${r.label}: declared stem:true but tailXZ=${r.tailXZ} > ${STEMMED_MAX} — this design has NO stem`);
-  if (!want && r.tailXZ < STEMLESS_MIN) validity.push(`${r.label}: declared stem:false but tailXZ=${r.tailXZ} < ${STEMLESS_MIN} — this design HAS a stem it should not have`);
+  if (!isFinite(r.aspect)) { validity.push(`${r.label}: aspect is not finite`); continue; }
+  if (want && r.aspect < STEM_ASPECT_MIN) validity.push(`${r.label}: declared stem:true but aspect=${r.aspect} < ${STEM_ASPECT_MIN} — this model is not tall enough to have a stem`);
+  if (!want && r.aspect >= STEM_ASPECT_MIN) validity.push(`${r.label}: declared stem:false but aspect=${r.aspect} >= ${STEM_ASPECT_MIN} — this model is tall like a stemmed one`);
 }
 // ---- VALIDITY 3: pairwise triangle comparison, never a global reference. ----
 for (const r of results) {
