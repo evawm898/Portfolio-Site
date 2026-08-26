@@ -160,9 +160,9 @@ async function freshPage() {
   await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
   await page.evaluate(() => {
     const t = document.getElementById('advancedToggle'); t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true }));
-    const h = document.querySelector('.fl-acc__head[aria-controls="acc-make"]');
-    if (h && h.getAttribute('aria-expanded') !== 'true') h.click();
-    // Hide the panels: a render of the control panel is not a render of the flower.
+    // Hide the panels: a render of the control panel is not a render of the flower. The
+    // export button is inside one of them, so it is clicked in-page below rather than
+    // through Playwright's visibility-aware click.
     for (const sel of ['.fl-panel', '.fl-presets', '.fl-view', '#readout']) {
       for (const el of document.querySelectorAll(sel)) el.style.visibility = 'hidden';
     }
@@ -213,7 +213,13 @@ for (const d of DESIGNS) {
     await shot('default', path.join(OUT, `${tag}__34.png`));
     await shot('side', path.join(OUT, `${tag}__side.png`));
 
-    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 180000 }).catch(() => null), page.click('#exportStl')]);
+    // Dispatch the click in-page rather than through Playwright: the panels are hidden for
+    // the renders above, and Playwright's click waits for visibility. The button is real and
+    // wired either way — this is the same handler a visitor's click runs.
+    const [dl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 180000 }).catch(() => null),
+      page.evaluate(() => document.getElementById('exportStl').click()),
+    ]);
     if (!dl) { bad.push(`${d.label} @${depth}: no STL download`); continue; }
     const fp = path.join(tmp, 'x.stl');
     await dl.saveAs(fp);
