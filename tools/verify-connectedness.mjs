@@ -267,11 +267,23 @@ function tailProbe(buf, frac = TAIL_FRAC) {
     }
   }
   const whole = Math.max(hi[0] - lo[0], hi[2] - lo[2]);
-  const cut = lo[1] + (hi[1] - lo[1]) * frac;
+  const height = hi[1] - lo[1];
+  const cut = lo[1] + height * frac;
   const tlo = [Infinity, Infinity], thi = [-Infinity, -Infinity];
   let count = 0;
+  // SLAB PROFILE, for narrowFrac below: the XZ extent at each of SLABS heights.
+  const SLABS = 100;
+  const slo = Array.from({ length: SLABS }, () => [Infinity, Infinity]);
+  const shi = Array.from({ length: SLABS }, () => [-Infinity, -Infinity]);
   for (let i = 0; i < n * 3; i++) {
     const x = pts[i * 3], y = pts[i * 3 + 1], z = pts[i * 3 + 2];
+    if (height > 0) {
+      const k = Math.min(SLABS - 1, Math.max(0, Math.floor(((y - lo[1]) / height) * SLABS)));
+      if (x < slo[k][0]) slo[k][0] = x;
+      if (x > shi[k][0]) shi[k][0] = x;
+      if (z < slo[k][1]) slo[k][1] = z;
+      if (z > shi[k][1]) shi[k][1] = z;
+    }
     if (y > cut) continue;
     count++;
     if (x < tlo[0]) tlo[0] = x;
@@ -279,8 +291,24 @@ function tailProbe(buf, frac = TAIL_FRAC) {
     if (z < tlo[1]) tlo[1] = z;
     if (z > thi[1]) thi[1] = z;
   }
-  if (!count || !isFinite(whole) || whole <= 0) return { tailXZ: NaN, tailVerts: count };
-  return { tailXZ: +(Math.max(thi[0] - tlo[0], thi[1] - tlo[1]) / whole).toFixed(4), tailVerts: count };
+  if (!count || !isFinite(whole) || whole <= 0) return { tailXZ: NaN, narrowFrac: NaN, aspect: NaN, tailVerts: count };
+  // narrowFrac — how much of the model's HEIGHT, measured up from the bottom, is narrower
+  // than half the model's full width. A stem is long, so most of the model is narrow; a
+  // junction taper is short, so only a sliver is. This is the property that still separates
+  // them now that EVERY design has a junction and "narrow at the very bottom" no longer does.
+  let k = 0;
+  for (; k < SLABS; k++) {
+    const w = Math.max(shi[k][0] - slo[k][0], shi[k][1] - slo[k][1]);
+    if (isFinite(w) && w >= 0.5 * whole) break;
+  }
+  return {
+    tailXZ: +(Math.max(thi[0] - tlo[0], thi[1] - tlo[1]) / whole).toFixed(4),
+    narrowFrac: +(k / SLABS).toFixed(3),
+    // aspect — does the model stand taller than it is wide? heightMM normalises the LARGEST
+    // dimension, so a stemmed plant is tall-and-thin and a bare bloom is wide-and-flat.
+    aspect: +(height / whole).toFixed(3),
+    tailVerts: count,
+  };
 }
 
 function voxelComponents(buf, cell) {
@@ -508,7 +536,7 @@ for (const r of results) {
   else if (marked) { verdict = 'xfail'; xfails.push(r); }
   else { verdict = 'FAIL'; regressions.push(r); }
   const detail = r.comps !== undefined
-    ? `components=${r.comps} stray=${r.strayFraction} tris=${r.tris} boundary=${r.boundary} tailXZ=${r.tailXZ}`
+    ? `components=${r.comps} stray=${r.strayFraction} tris=${r.tris} boundary=${r.boundary} tailXZ=${r.tailXZ} narrowFrac=${r.narrowFrac} aspect=${r.aspect}`
     : (r.note || '');
   console.log(`  ${verdict.padEnd(5)} ${r.label.padEnd(62)} ${detail}${marked && !r.ok ? ` (#${r.cfg.xfail})` : ''}`);
 }

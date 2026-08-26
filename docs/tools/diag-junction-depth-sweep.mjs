@@ -37,7 +37,9 @@
  *   Sweeps the SAME depth several times, so distinctness must fail. If the run still passes,
  *   the check is not measuring anything and no result from this tool is worth quoting.
  *
- * RUN:  node docs/tools/diag-junction-depth-sweep.mjs <outDir>
+ * RUN:  node docs/tools/diag-junction-depth-sweep.mjs <outDir> [design ...]
+ *   e.g. node docs/tools/diag-junction-depth-sweep.mjs /tmp/sheet dahlia
+ *   Designs: defaults, daisy, lily, poppy, thistle, dahlia. All of them if none is named.
  */
 import { chromium } from 'playwright-core';
 import http from 'node:http';
@@ -67,15 +69,20 @@ const { PRESETS } = await import(pathToFileURL(path.join(ROOT, 'flower-presets.j
 const DEPTHS = NEGATIVE_CONTROL ? [0.5, 0.5, 0.5] : [0, 0.1, 0.2, 0.3, 0.5];
 
 // The four presets #84 broke, plus the shipped DEFAULTS — the state a cold visitor lands on
-// before touching anything. Rose / Dahlia / Carnation were already one piece and are not
-// the question being asked here.
-const DESIGNS = [
+// before touching anything — plus DAHLIA. Dahlia was never broken (it exported as one piece
+// all along), but its underside is one of the three the tail probe now flags, so leaving it
+// out would show the silhouette question with a third of its evidence missing. It is also
+// the design closest to the LIVE triangle budget, which depth pushes on.
+const ALL_DESIGNS = [
   { key: 'defaults', label: 'shipped DEFAULTS (bare bloom)', presetSlug: null },
-  ...['daisy', 'lily', 'poppy', 'thistle'].map((slug) => {
+  ...['daisy', 'lily', 'poppy', 'thistle', 'dahlia'].map((slug) => {
     const p = PRESETS.find((x) => x.slug === slug);
     return { key: slug, label: `preset: ${p.name}`, presetSlug: slug };
   }),
 ];
+const wanted = process.argv.slice(3).filter((a) => !a.startsWith('--')).map((x) => x.toLowerCase());
+const DESIGNS = wanted.length ? ALL_DESIGNS.filter((d) => wanted.includes(d.key)) : ALL_DESIGNS;
+if (!DESIGNS.length) { console.error(`no design matched ${wanted.join(', ')}; known: ${ALL_DESIGNS.map((d) => d.key).join(', ')}`); process.exit(2); }
 
 function analyse(buf, cell) {
   const n = buf.readUInt32LE(80);
