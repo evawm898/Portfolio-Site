@@ -58,7 +58,9 @@ for (const view of ['34', 'side']) {
     .miss { width: 250px; height: 250px; display: grid; place-items: center; color: #44605a; border: 1px dashed #1e2f2b; }
   </style>
   <h1>Junction depth sweep — ${view === '34' ? 'three-quarter' : 'side'} view</h1>
-  <p class="note">receptacleDepth left to right: ${depths.join(' &nbsp; ')} &nbsp;&middot;&nbsp; depthW = lerp(0.18, 1.15, depth) &nbsp;&middot;&nbsp; every cell exports as ONE connected piece</p>
+  <p class="note">receptacleDepth left to right: ${depths.join(' &nbsp; ')} &nbsp;&middot;&nbsp; every cell exports as ONE connected piece<br>
+  depthW = lerp(0.18, top, depth) &mdash; top is 1.15 when something below the bloom receives the descent (a stem, or a side bud's branch),
+  and the 0.3-equivalent when nothing does. Every design here is stemless, so every cell is on the capped range.</p>
   <table><tr><th></th>${depths.map((d) => `<th class="collab">depth ${d}</th>`).join('')}</tr>${rows}</table>`;
 
   const page = await browser.newPage({ viewport: { width: 260 * depths.length + 220, height: 300 * designs.length + 120 }, deviceScaleFactor: 1 });

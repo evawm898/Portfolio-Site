@@ -180,7 +180,10 @@ async function freshPage() {
     // through Playwright's visibility-aware click.
     // Every chrome container by its real class — `.fl-view` was a guess and matched
     // nothing, so the View panel stayed in the corner of all 60 renders of the first sweep.
-    for (const sel of ['.fl-panel', '.fl-presets', '.fl-viewpanel', '#readout', '.fl-hud']) {
+    // Element screenshots capture whatever is painted OVER the canvas, so every chrome
+    // container has to go, not just the ones beside it. `.fl-header` survived the first
+    // pass because only the side panels were listed.
+    for (const sel of ['.fl-panel', '.fl-presets', '.fl-viewpanel', '.fl-header', '#readout']) {
       for (const el of document.querySelectorAll(sel)) el.style.visibility = 'hidden';
     }
     const a = document.getElementById('autoRotate');
@@ -262,7 +265,10 @@ await browser.close();
 server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
 
-console.log(`junction depth sweep — depthW = lerp(0.18, 1.15, depth); components at ${CELL_MM} mm\n`);
+console.log(`junction depth sweep — components at ${CELL_MM} mm`);
+console.log('depthW = lerp(0.18, top, depth), where top is 1.15 when something below the bloom receives');
+console.log('the descent (a stem, or a side bud\'s branch) and the 0.3-equivalent when nothing does.');
+console.log('Every design below is STEMLESS, so every row here is on the capped range.\n');
 let lastKey = null, baseTris = 0;
 for (const r of rows) {
   if (r.key !== lastKey) {
