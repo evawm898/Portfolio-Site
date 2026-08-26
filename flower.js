@@ -121,12 +121,24 @@ const VARIANCE_ROLL_MAX   = 0.15;   // +/- 15% of the cross-section roll amount 
    readout (tools/probe-presets, see PR for #44):
      Daisy 103,656   Rose 286,378   Lily 68,352   Poppy 234,480
      Dahlia 330,500 (heaviest)   Thistle 257,280   Carnation 154,650
-   500,000 clears Dahlia by 1.51x, Thistle by 1.94x. Measured warm full-rebuild
-   time at that scale (pure slider drag, JIT already hot, no preset-switch
-   overhead): 505,596 tris -> 2.7s. Chromium's own "Page Unresponsive" hang
-   detector fires at roughly 5s of continuously blocked main thread, so that's
-   ~1.85x headroom before a maxed-out (500k) custom design risks the hang
-   dialog; a Dahlia-weight design keeps ~2.8x. gen-preset-thumbs.mjs asserts
+   500,000 cleared Dahlia by 1.51x, Thistle by 1.94x AT THAT TIME. Measured warm
+   full-rebuild time at that scale (pure slider drag, JIT already hot, no
+   preset-switch overhead): 505,596 tris -> 2.7s. Chromium's own "Page
+   Unresponsive" hang detector fires at roughly 5s of continuously blocked main
+   thread, so that's ~1.85x headroom before a maxed-out (500k) custom design
+   risks the hang dialog.
+
+   THOSE PER-PRESET FIGURES ARE HISTORY, NOT THE CURRENT STATE (#89). Preset
+   geometry has grown since, and the margins with it. Re-measured the same way:
+     Daisy 162,340   Rose 418,810   Lily 79,392   Poppy 237,488
+     Dahlia 437,828 (heaviest)   Thistle 364,592   Carnation 211,282
+   Dahlia now clears by 1.14x, not 1.51x — and it had already fallen to 1.23x
+   before the unconditional junction (#84) took the rest. The "a Dahlia-weight
+   design keeps ~2.8x" reasoning that used to sit here was measured against a
+   Dahlia that no longer exists, so it has been removed rather than left to be
+   believed. What refusal actually costs a visitor is measured in
+   docs/tools/diag-preset-headroom.mjs: Rose refuses on the SECOND notch of lace
+   density, Dahlia on the fifth of petal count. gen-preset-thumbs.mjs asserts
    every preset stays under this budget, in CI, with a stated margin — a
    preset drifting over it (e.g. once petal cross-sections roll a sheet into a
    tube and add geometry) fails the build instead of surfacing on a visitor's
