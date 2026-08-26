@@ -2687,12 +2687,17 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // flows straight from the petal/sepal attachment ring down through the neck into
   // the stem and its tip — no seam. SEPALS remain an independent whorl. Everything
   // builds into the petal mesh, same teal tubes.
-  // DERIVED junction — see hasReceptacle() for the rule. `stemType != none` is that
-  // predicate's own first clause, so a stem always brings a junction with it and
-  // buildTrunkInto is the only producer of a stem (and of the `cl` the leaves and the
-  // side bud read). If that clause is ever removed the stem disappears with it, and
-  // the tail probe in tools/verify-connectedness.mjs fails every stemmed row.
-  const hasRecept = hasReceptacle(ui);
+  //
+  // THE JUNCTION IS UNCONDITIONAL (#84). It used to be built only when something below
+  // the bloom needed joining — a stem, sepals, or the migration override. That read as a
+  // saving and was a defect: a bare bloom's petal feet start at a radius (measured: 20.7 mm
+  // on Daisy, 23.6 on Poppy) and its centre only reaches ~10 mm, so the annulus between
+  // them held nothing and the model exported in pieces — the centre always, plus every
+  // petal not touching a neighbour. 8 of 9 bare configurations and 4 of 7 shipped presets.
+  // The trunk already gathers its attachment ring from every layer-0 foot and fills the
+  // space between the axis and ringR, which is exactly that annulus, so the fix is to stop
+  // making it conditional rather than to build anything new.
+  // The stem zone is still conditional: `stem: hasStem` below.
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
     length: clamp(ui.stemLength, 0, 10),
@@ -2703,7 +2708,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   } : null;
 
   let cl = null;   // stem centreline for the leaves + side bud, from the trunk
-  if (hasRecept) {
+  {
     // The trunk's receptacle flutes are grown from the OUTER whorl's REAL petal
     // outlines: each layer-0 placement carries `foot`, world-polar samples of that
     // petal's actual visible edge (see petalBaseFootprint). Sepal bases are added

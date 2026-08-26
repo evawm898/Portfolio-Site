@@ -52,10 +52,10 @@
  *     that says so, never a warning: a stale xfail is a hole in the gate.
  * Validity assertions (below) are NEVER covered by an xfail. A harness measuring the wrong
  * design fails the run outright, whatever the row expected.
- * The open marker today is #84: the BARE BLOOM — no stem, no sepals, no override, which is
- * the shipped DEFAULTS and every preset — exports in more than one piece. Eight bare rows
- * and four presets carry it. Do not weaken an assertion to clear one of those; the numbers
- * in #84 are what the fix has to move.
+ * There is no open marker today. #84 — the BARE BLOOM exporting in more than one piece —
+ * was the last one, and it closed when the junction became unconditional. Every row in this
+ * file is hard. If you add a marker, cite the issue and delete it in the commit that fixes
+ * the row, never by weakening an assertion.
  *
  * ============================================================================
  * THE HARNESS ASSERTS ITS OWN VALIDITY — three checks, all hard failures.
@@ -182,18 +182,18 @@ const CONFIGS = [
   // a green `classic` says nothing about `dense`, `disc` or `petaloid`. Within `classic`,
   // `centerType` chooses stamens / pistil / none; it is INERT for the other three, so
   // `centerType: 'none'` there does not mean "no centre".
-  // Eight of these nine currently export in pieces and carry `xfail: 84`. The ninth,
-  // `classic + none`, is the only one with no centre geometry to detach — which is what
-  // localises the defect — so it is UNMARKED and a break there is a hard failure.
-  { label: 'BARE bloom, classic + stamens (SHIPPED DEFAULT centre)', stem: false, xfail: 84, set: BARE },
-  { label: 'BARE bloom, classic + pistil', stem: false, xfail: 84, set: [...BARE, { id: 'centerType', value: 'pistil', evt: 'change' }] },
+  // Eight of these nine exported in pieces until the junction became unconditional (#84);
+  // the ninth, `classic + none`, was the only one with no centre geometry to detach, which
+  // is what localised the defect. All nine are now unmarked and hard.
+  { label: 'BARE bloom, classic + stamens (SHIPPED DEFAULT centre)', stem: false, set: BARE },
+  { label: 'BARE bloom, classic + pistil', stem: false, set: [...BARE, { id: 'centerType', value: 'pistil', evt: 'change' }] },
   { label: 'BARE bloom, classic + none', stem: false, set: [...BARE, { id: 'centerType', value: 'none', evt: 'change' }] },
-  { label: 'BARE bloom, DENSE CLUSTER centre', stem: false, xfail: 84, set: [...BARE, { id: 'centerArch', value: 'dense', evt: 'change' }] },
-  { label: 'BARE bloom, DISC centre', stem: false, xfail: 84, set: [...BARE, { id: 'centerArch', value: 'disc', evt: 'change' }] },
-  { label: 'BARE bloom, PETALOID FILL centre', stem: false, xfail: 84, set: [...BARE, { id: 'centerArch', value: 'petaloid', evt: 'change' }] },
-  { label: 'BARE bloom, tube 0 (thinnest primitives)', stem: false, xfail: 84, set: [...BARE, { id: 'tube', value: '0' }] },
-  { label: 'BARE bloom, tube 1 (thickest primitives)', stem: false, xfail: 84, set: [...BARE, { id: 'tube', value: '1' }] },
-  { label: 'BARE bloom, layerCount 3', stem: false, xfail: 84, set: [...BARE, { id: 'layerCount', value: '3' }] },
+  { label: 'BARE bloom, DENSE CLUSTER centre', stem: false, set: [...BARE, { id: 'centerArch', value: 'dense', evt: 'change' }] },
+  { label: 'BARE bloom, DISC centre', stem: false, set: [...BARE, { id: 'centerArch', value: 'disc', evt: 'change' }] },
+  { label: 'BARE bloom, PETALOID FILL centre', stem: false, set: [...BARE, { id: 'centerArch', value: 'petaloid', evt: 'change' }] },
+  { label: 'BARE bloom, tube 0 (thinnest primitives)', stem: false, set: [...BARE, { id: 'tube', value: '0' }] },
+  { label: 'BARE bloom, tube 1 (thickest primitives)', stem: false, set: [...BARE, { id: 'tube', value: '1' }] },
+  { label: 'BARE bloom, layerCount 3', stem: false, set: [...BARE, { id: 'layerCount', value: '3' }] },
   // VALIDITY PAIR, and a gate row in its own right. The bare rows above claim "no sepals";
   // this is the same design with sepals ON, so the claim is checked against its own match
   // rather than against a global triangle reference that means nothing.
@@ -207,10 +207,8 @@ const CONFIGS = [
 // and quality gates load them, so a failure reads "preset: Thistle" rather than "config N".
 // All seven are bare blooms (each sets stemType/sepalsType none), so each declares
 // stem: true and the tail probe checks that claim rather than trusting it.
-// Four of the seven currently export in pieces (#84) and are marked; the other three are
-// unmarked, so a regression in Rose / Dahlia / Carnation is a hard failure.
-const PRESET_XFAIL = { daisy: 84, lily: 84, poppy: 84, thistle: 84 };
-for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, presetSlug: p.slug, stem: false, xfail: PRESET_XFAIL[p.slug] ?? null });
+// All seven are unmarked: #84 is fixed, so a regression in any of them is a hard failure.
+for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, presetSlug: p.slug, stem: false });
 
 if (NEGATIVE_CONTROL) {
   // Claim a stem on a row that has none. The tail probe must reject it; if the run still
