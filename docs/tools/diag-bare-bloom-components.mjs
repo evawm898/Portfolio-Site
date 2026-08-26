@@ -21,6 +21,12 @@
  *                  millimetres. A petal sits OUT at radius; the core sits ON the axis. This
  *                  is the column that separates "the petals came loose" from "the centre
  *                  came loose", and it is why a bare count could not.
+ *   azDeg          world azimuth of the component's centroid, degrees in [0, 360). On a
+ *                  coiled spiral the petals sit at i * 137.5 deg mod 360, so this says WHICH
+ *                  petal a loose component is, not merely that one came loose.
+ *   rSpan          min..max radius of the component's own vertices. A petal reaches from its
+ *                  foot (small r) out to its tip; a component whose rMin is far from 0 never
+ *                  had a foot near the axis at all.
  *   bbox           x/y/z extent in millimetres
  *   yMid           the component's mid-height, so a core reading low or high is visible
  *
@@ -31,6 +37,8 @@
  * RUN:  node docs/tools/diag-bare-bloom-components.mjs                 (all seven presets)
  *       node docs/tools/diag-bare-bloom-components.mjs lily poppy      (named presets)
  *       node docs/tools/diag-bare-bloom-components.mjs --bare          (+ the 9-petal BARE row)
+ *       node docs/tools/diag-bare-bloom-components.mjs --probes         (+ the centre-removal
+ *                                                                        arithmetic probes)
  */
 import { chromium } from 'playwright-core';
 import http from 'node:http';
@@ -50,12 +58,29 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 const { PRESETS } = await import(pathToFileURL(path.join(ROOT, 'flower-presets.js')).href);
 const argv = process.argv.slice(2);
 const WANT_BARE = argv.includes('--bare');
+const WANT_PROBES = argv.includes('--probes');
 const named = argv.filter((a) => !a.startsWith('--')).map((s) => s.toLowerCase());
 
 const CONFIGS = [];
 for (const p of PRESETS) {
   if (named.length && !named.includes(p.slug)) continue;
   CONFIGS.push({ label: `preset: ${p.name}`, presetSlug: p.slug, meta: `${p.ui.bloomType} / ${p.ui.petalCount} petals / centre ${p.ui.centerArch}` });
+}
+if (WANT_PROBES) {
+  // CENTRE-REMOVAL ARITHMETIC. `centerType: 'none'` is only honoured under
+  // `centerArch: 'classic'`, so removing a dense/disc/petaloid centre means switching the
+  // arch as well. The difference between a preset and its centre-less twin IS the centre's
+  // triangle count, which is what identifies an on-axis component by arithmetic rather than
+  // by eye. Same method that proved 149,448 + 4,256 = 153,704 on the 9-petal BARE row.
+  for (const slug of ['thistle', 'poppy', 'lily', 'daisy']) {
+    const p = PRESETS.find((x) => x.slug === slug);
+    if (named.length && !named.includes(slug)) continue;
+    CONFIGS.push({
+      label: `probe: ${p.name} with NO centre`, presetSlug: slug,
+      meta: `${p.ui.bloomType} / ${p.ui.petalCount} petals / centre REMOVED`,
+      after: [{ id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'centerType', value: 'none', evt: 'change' }],
+    });
+  }
 }
 if (WANT_BARE) {
   // The gate's BARE row, so the "the detached piece is the centre" reading of a 9-petal
@@ -131,7 +156,11 @@ function decompose(buf, cell) {
 
   const parts = Array.from({ length: comps }, () => ({
     tris: 0, lo: [Infinity, Infinity, Infinity], hi: [-Infinity, -Infinity, -Infinity], cx: 0, cy: 0, cz: 0,
+    rMin: Infinity, rMax: -Infinity,
   }));
+  // Model axis: the centre of the whole model's XZ footprint. A petal's centroid sits out
+  // from it; a core's sits on it.
+  const ax = (lo[0] + hi[0]) / 2, az = (lo[2] + hi[2]) / 2;
   let straddlers = 0, unlabelled = 0;
   for (const t of tri) {
     const ids = new Set();
@@ -146,14 +175,25 @@ function decompose(buf, cell) {
       p.cx += v[0]; p.cy += v[1]; p.cz += v[2];
     }
   }
-  // Model axis: the centre of the whole model's XZ footprint. A petal's centroid sits out
-  // from it; a core's sits on it.
-  const ax = (lo[0] + hi[0]) / 2, az = (lo[2] + hi[2]) / 2;
+  // Vertex radial span needs the model axis, which is only known after the whole-model
+  // bounds above, so it is a second pass rather than folded into the first.
+  for (const t of tri) {
+    const ids = new Set();
+    for (const i of samplesOf(t)) ids.add(label[i]);
+    if (!ids.size) continue;
+    const p = parts[ids.values().next().value];
+    for (const v of t) {
+      const r = Math.hypot(v[0] - ax, v[2] - az);
+      if (r < p.rMin) p.rMin = r;
+      if (r > p.rMax) p.rMax = r;
+    }
+  }
   for (const p of parts) {
     const nv = p.tris * 3;
     if (!nv) continue;
     p.cx /= nv; p.cy /= nv; p.cz /= nv;
     p.axisR = Math.hypot(p.cx - ax, p.cz - az);
+    p.azDeg = (Math.atan2(p.cz - az, p.cx - ax) * 180 / Math.PI + 360) % 360;
     p.bbox = [p.hi[0] - p.lo[0], p.hi[1] - p.lo[1], p.hi[2] - p.lo[2]];
     p.yMid = (p.lo[1] + p.hi[1]) / 2;
   }
@@ -204,6 +244,21 @@ for (const cfg of CONFIGS) {
       return true;
     }, cfg.presetSlug);
     if (!clicked) { bad.push(`${cfg.label}: gallery cell not found`); continue; }
+    if (cfg.after) {
+      const miss = await page.evaluate((ss) => {
+        const out = [];
+        for (const s of ss) {
+          const el = document.getElementById(s.id);
+          if (!el) { out.push(`${s.id}: not in the DOM`); continue; }
+          el.value = s.value;
+          el.dispatchEvent(new Event(s.evt || 'input', { bubbles: true }));
+          if ((s.evt || 'input') !== 'change') el.dispatchEvent(new Event('change', { bubbles: true }));
+          if (String(el.value) !== String(s.value)) out.push(`${s.id}: set "${s.value}", reads back "${el.value}"`);
+        }
+        return out;
+      }, cfg.after);
+      if (miss.length) { bad.push(`${cfg.label}: override did not take: ${miss.join('; ')}`); continue; }
+    }
   } else {
     const miss = await page.evaluate((ss) => {
       const out = [];
@@ -237,9 +292,10 @@ for (const cfg of CONFIGS) {
   d.parts.sort((a, b) => b.tris - a.tris);
   console.log(`\n${cfg.label}  (${cfg.meta})`);
   console.log(`  ${d.comps} component(s), ${d.total.toLocaleString()} tris total, model height ${(d.modelY[1] - d.modelY[0]).toFixed(1)} mm`);
-  console.log('   #      tris   share   axisR      bbox x*y*z (mm)      yMid');
+  console.log('   #      tris   share   axisR   azDeg       rSpan        bbox x*y*z (mm)      yMid');
   d.parts.slice(0, TOP_N).forEach((p, i) => {
     console.log(`  ${String(i).padStart(2)}  ${String(p.tris).padStart(8)}  ${(100 * p.tris / d.total).toFixed(2).padStart(5)}%  ${p.axisR.toFixed(2).padStart(6)}  `
+      + `${p.azDeg.toFixed(1).padStart(6)}  ${p.rMin.toFixed(1).padStart(5)}..${p.rMax.toFixed(1).padEnd(6)}  `
       + `${p.bbox.map((v) => v.toFixed(1).padStart(6)).join(' x ')}  ${p.yMid.toFixed(1).padStart(6)}`);
   });
   if (d.parts.length > TOP_N) console.log(`  ... and ${d.parts.length - TOP_N} more`);

@@ -30,7 +30,7 @@ import {
   ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
-import { CONTROLS, PREDICATES, evalPredicate, predicateDrivers } from './flower-registry.js';
+import { CONTROLS, evalPredicate, predicateDrivers } from './flower-registry.js';
 import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
 import { VIEW_PRESETS } from './flower-view-presets.js';
 import { SHAPES as SHAPE_BUNDLES, SHAPE_PARAMS, PICKER_SHAPE_NAMES } from './flower-shapes.js';
@@ -121,12 +121,24 @@ const VARIANCE_ROLL_MAX   = 0.15;   // +/- 15% of the cross-section roll amount 
    readout (tools/probe-presets, see PR for #44):
      Daisy 103,656   Rose 286,378   Lily 68,352   Poppy 234,480
      Dahlia 330,500 (heaviest)   Thistle 257,280   Carnation 154,650
-   500,000 clears Dahlia by 1.51x, Thistle by 1.94x. Measured warm full-rebuild
-   time at that scale (pure slider drag, JIT already hot, no preset-switch
-   overhead): 505,596 tris -> 2.7s. Chromium's own "Page Unresponsive" hang
-   detector fires at roughly 5s of continuously blocked main thread, so that's
-   ~1.85x headroom before a maxed-out (500k) custom design risks the hang
-   dialog; a Dahlia-weight design keeps ~2.8x. gen-preset-thumbs.mjs asserts
+   500,000 cleared Dahlia by 1.51x, Thistle by 1.94x AT THAT TIME. Measured warm
+   full-rebuild time at that scale (pure slider drag, JIT already hot, no
+   preset-switch overhead): 505,596 tris -> 2.7s. Chromium's own "Page
+   Unresponsive" hang detector fires at roughly 5s of continuously blocked main
+   thread, so that's ~1.85x headroom before a maxed-out (500k) custom design
+   risks the hang dialog.
+
+   THOSE PER-PRESET FIGURES ARE HISTORY, NOT THE CURRENT STATE (#89). Preset
+   geometry has grown since, and the margins with it. Re-measured the same way:
+     Daisy 162,340   Rose 418,810   Lily 79,392   Poppy 237,488
+     Dahlia 437,828 (heaviest)   Thistle 364,592   Carnation 211,282
+   Dahlia now clears by 1.14x, not 1.51x — and it had already fallen to 1.23x
+   before the unconditional junction (#84) took the rest. The "a Dahlia-weight
+   design keeps ~2.8x" reasoning that used to sit here was measured against a
+   Dahlia that no longer exists, so it has been removed rather than left to be
+   believed. What refusal actually costs a visitor is measured in
+   docs/tools/diag-preset-headroom.mjs: Rose refuses on the SECOND notch of lace
+   density, Dahlia on the fifth of petal count. gen-preset-thumbs.mjs asserts
    every preset stays under this budget, in CI, with a stated margin — a
    preset drifting over it (e.g. once petal cross-sections roll a sheet into a
    tube and add geometry) fails the build instead of surfacing on a visitor's
@@ -278,6 +290,18 @@ const MM_PER_UNIT = 26;   // millimetres per Three.js world unit (single scale k
 // MIN_RADIUS_UNITS are read at BUILD time (new accumulator per build), so updating the
 // floor before an export build is enough — no accumulator caches a stale value.
 const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no process set
+
+// TRUNK DESCENT RANGE (#84). `receptacleDepth` maps onto depthW, the trunk's descent below
+// the petal attachment ring. The TOP of that map is derived from what is underneath the
+// bloom, so the junction's size follows from what is present exactly as its existence does.
+//   DEPTH_TOP_SUPPORTED     something below receives the descent (a stem, or a side bud's
+//                           offshoot branch) — the full range, unchanged from before.
+//   DEPTH_CAP_UNSUPPORTED   nothing below: the descent is an underside, so the ceiling is
+//                           the old slider's 0.3, written as the fraction it is rather than
+//                           as 0.471, so the two cannot drift apart.
+const DEPTH_BOTTOM          = 0.18;
+const DEPTH_TOP_SUPPORTED   = 1.15;
+const DEPTH_CAP_UNSUPPORTED = 0.3;
 const PROCESS_FLOOR_MM  = { sls: 1.0, sla: 0.4, fdm: 0.8 };
 const PROCESS_LABEL     = { sls: 'SLS nylon', sla: 'resin SLA', fdm: 'FDM 0.4 mm' };
 let   activeFloorMM     = MIN_FEATURE_MM;
@@ -1817,15 +1841,10 @@ function buildBudBranchInto(acc, P, ui, cl, stemOpts) {
 // is no visitor control; it appears because of course it does. `receptacleType
 // === 'on'` survives only as a migration override, so an old design that set it
 // explicitly keeps its receptacle even with no stem/sepals.
-// The single source of truth for "does this design need a junction below the
-// bloom" — every call site reads this, none re-derives it.
-// JUNCTION vs ORNAMENT: everything under this presence check is one flat
-// "Receptacle" control block, but only some of it IS the junction — the rest is
-// decoration riding on top of it. flower-registry.js's acc-base entries carry a
-// role:"junction" / role:"ornament" tag marking which is which.
-function hasReceptacle(ui) {
-  return evalPredicate(PREDICATES.hasReceptacle, ui);
-}
+// JUNCTION vs ORNAMENT: the "Receptacle" control block is one flat list, but only some of
+// it IS the junction — the rest is decoration riding on top of it. flower-registry.js's
+// acc-base entries carry a role:"junction" / role:"ornament" tag marking which is which.
+// There is no longer a presence check to sit under: every design builds a junction (#84).
 
 // Grow the simplified bud bloom into its own accumulator and merge it onto the
 // offshoot tip (position `tipPos`, axis `tipDir`). `rTip` is the offshoot's tip
@@ -1867,14 +1886,22 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // feet and merged into budAcc; the single appendTransformed below then scales + seats
   // it with the bloom, so it's automatically sized to the bud. It reads the MAIN ui's
   // receptacle sliders (blend / depth / tightness) so its flutes match the big one.
-  // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
-  // the bud's receptacle follows the same derived rule as the main bloom's (stem/sepals
-  // present, or the migration override), so a budded plant with a stem grows a bud base too.
-  if (hasReceptacle(ui)) {
+  // Unconditional, like the main bloom's (#84): the bud is a bloom, so its petal feet and
+  // its core need joining for exactly the same reason. It was gated on hasReceptacle(ui)
+  // until that predicate was retired; since a side bud only exists on a stemmed plant, that
+  // gate was already true at every call, so this is not a behaviour change.
+  {
     const attach = [];
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
       receptacle: true, stem: false,               // the offshoot branch is the bud's stem
+      below: 'branch',                             // ...and it receives the descent, so the
+                                                   // full depth range applies here exactly as
+                                                   // it does under a stem. `stem: false` says
+                                                   // "build no stem ZONE", which is a
+                                                   // different question — keying the range off
+                                                   // that would silently shallow every side
+                                                   // bud on a stemmed plant.
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
       profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
       reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,
@@ -2138,7 +2165,19 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
 
   // ---------- RECEPTACLE ZONE ----------
   if (wantRecept) {
-    const depthW = lerp(0.18, 1.15, clamp(opts.depth, 0, 1));  // descent below the ring
+    // DESCENT BELOW THE RING — the range is DERIVED from what is underneath, the same way
+    // the junction's existence is (#84). With something below to receive it — a stem, or the
+    // offshoot branch under a side bud — the descent is part of the silhouette and keeps its
+    // full range; that look ships today and does not move. With nothing below, the descent
+    // is an UNDERSIDE, and its ceiling is capped so a stemless bloom cannot grow a spike at
+    // ANY slider position, not merely at the default: a safe default is one drag away from
+    // the thing being avoided.
+    // The cap is today's 0.3 written as what it is, so the relationship cannot drift. The
+    // sweep in docs/tools/diag-junction-depth-sweep.mjs measured tailXZ as IDENTICAL at
+    // 0, 0.1, 0.2 and 0.3 on every design, so nothing expressive lives in the range this
+    // removes — the cliff is at 0.5.
+    const depthTop = opts.below ? DEPTH_TOP_SUPPORTED : lerp(DEPTH_BOTTOM, DEPTH_TOP_SUPPORTED, DEPTH_CAP_UNSUPPORTED);
+    const depthW = lerp(DEPTH_BOTTOM, depthTop, clamp(opts.depth, 0, 1));
     const tight  = clamp(opts.tightness, 0, 1);
     const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // relief pokes up among the petals
     const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dip between bases (fades as it smooths)
@@ -2687,12 +2726,17 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // flows straight from the petal/sepal attachment ring down through the neck into
   // the stem and its tip — no seam. SEPALS remain an independent whorl. Everything
   // builds into the petal mesh, same teal tubes.
-  // DERIVED junction — see hasReceptacle() for the rule. `stemType != none` is that
-  // predicate's own first clause, so a stem always brings a junction with it and
-  // buildTrunkInto is the only producer of a stem (and of the `cl` the leaves and the
-  // side bud read). If that clause is ever removed the stem disappears with it, and
-  // the tail probe in tools/verify-connectedness.mjs fails every stemmed row.
-  const hasRecept = hasReceptacle(ui);
+  //
+  // THE JUNCTION IS UNCONDITIONAL (#84). It used to be built only when something below
+  // the bloom needed joining — a stem, sepals, or the migration override. That read as a
+  // saving and was a defect: a bare bloom's petal feet start at a radius (measured: 20.7 mm
+  // on Daisy, 23.6 on Poppy) and its centre only reaches ~10 mm, so the annulus between
+  // them held nothing and the model exported in pieces — the centre always, plus every
+  // petal not touching a neighbour. 8 of 9 bare configurations and 4 of 7 shipped presets.
+  // The trunk already gathers its attachment ring from every layer-0 foot and fills the
+  // space between the axis and ringR, which is exactly that annulus, so the fix is to stop
+  // making it conditional rather than to build anything new.
+  // The stem zone is still conditional: `stem: hasStem` below.
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
     length: clamp(ui.stemLength, 0, 10),
@@ -2703,7 +2747,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   } : null;
 
   let cl = null;   // stem centreline for the leaves + side bud, from the trunk
-  if (hasRecept) {
+  {
     // The trunk's receptacle flutes are grown from the OUTER whorl's REAL petal
     // outlines: each layer-0 placement carries `foot`, world-polar samples of that
     // petal's actual visible edge (see petalBaseFootprint). Sepal bases are added
@@ -2724,7 +2768,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     // t=0), so the trunk flows straight into the stem at any thickness. No stem -> 4x.
     const stemThick = hasStem ? clamp(ui.stemThickness, 0.3, 4) : 1;
     const trunk = buildTrunkInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
-      receptacle: true, stem: hasStem,
+      receptacle: true, stem: hasStem, below: hasStem ? 'stem' : null,
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
       profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
       reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,
@@ -2739,9 +2783,10 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + the trunk
 
   if (ui.sepalsType !== 'none') {
-    // Sepal base attachment radius. Sepals bring a junction with them — `sepalsType
-    // != none` is hasReceptacle()'s second clause — so the fluted funnel always fills
-    // the space between the axis and ringR, and this ring embeds in it with no gap.
+    // Sepal base attachment radius. The fluted funnel is always built now (#84), so it
+    // always fills the space between the axis and ringR and this ring embeds in it with
+    // no gap. It used to depend on sepals implying a junction; it no longer depends on
+    // anything.
     const sepalAttachR = Math.max(ringR * 0.85, 0.16);
     buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
       count: ui.sepalCount,
@@ -3405,11 +3450,11 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : 'leaf venation';
   // SDF receptacle telemetry (continuous margin on): report the field's own triangle
   // count so its contribution to the budget stays visible on every geometry change.
-  // hasReceptacle(ui), not the raw `receptacleType` toggle: the junction is DERIVED,
-  // and reading the migration-override control instead meant this clause was suppressed
-  // on every design that grew a junction from a stem or sepals — which is all of them
-  // except a migrated save. The field was being built and measured, and not reported.
-  const recept = (ui.continuousMargin === 'on' && hasReceptacle(ui) && RECEPT_FIELD_STATS)
+  // Every design has a junction now (#84), so the only condition left is whether the SDF
+  // field is the one building it. This read the raw `receptacleType` toggle once, which
+  // suppressed the clause on every design that grew a junction from a stem or sepals — the
+  // field was being built and measured, and not reported.
+  const recept = (ui.continuousMargin === 'on' && RECEPT_FIELD_STATS)
     ? ` · sdf receptacle ~${RECEPT_FIELD_STATS.tris.toLocaleString()} tris (abs ${(+ui.absorption).toFixed(2)})`
     : '';
   el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris${recept}`;
@@ -3727,10 +3772,10 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 // Base parts are independent: each part's sliders show only when it's not NONE. Every
 // condition this function used to enforce imperatively is now a `visibleWhen` declaration:
 //
-//   data-recept          -> { ref: 'hasReceptacle' }
-//   data-cont-margin     -> all[ hasReceptacle, continuousMargin = on ]   <- SEE BELOW
-//   data-recept-dome     -> all[ hasReceptacle, receptProfile = dome ]
-//   data-recept-open  }  -> all[ hasReceptacle, receptConstruction in {ribbed, cored} ]
+//   data-recept          -> (no gate at all now — see #84 below)
+//   data-cont-margin     -> continuousMargin = on                          <- SEE BELOW
+//   data-recept-dome     -> receptProfile = dome
+//   data-recept-open  }  -> receptConstruction in {ribbed, cored}
 //   data-recept-ribbed}     (two attributes for one set: the `open` sweep also listed the
 //                            retired 'gathered' construction, which is no longer an option
 //                            value and so could never match)
@@ -3741,11 +3786,13 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 //                            by an undeclared second condition.
 //
 // The `data-cont-margin` five are the sharpest case in the whole change and worth naming.
-// The registry declared ONE condition; the code required that condition AND hasReceptacle().
-// A wholly undeclared condition is at least honestly absent — a reader checks the registry,
-// finds nothing, and knows to look further. A HALF-declared one reads as complete: the
-// reader finds a condition, believes it, and is wrong. That is the argument for predicates
-// over labels in one example.
+// The registry declared ONE condition; the code required that condition AND a second,
+// undeclared one. A wholly undeclared condition is at least honestly absent — a reader
+// checks the registry, finds nothing, and knows to look further. A HALF-declared one reads
+// as complete: the reader finds a condition, believes it, and is wrong. That is the argument
+// for predicates over labels in one example. (The undeclared half was `hasReceptacle`, now
+// retired: since #84 every design builds a junction, so the condition became vacuous and was
+// deleted rather than left evaluating to true — see flower-registry.js's PREDICATES.)
 //
 // BACKLOG (trigger): retire the legacy receptacle entirely — delete those nine controls and
 // the continuous-margin-OFF receptacle path, making continuous margin implicit — once the
@@ -3755,7 +3802,7 @@ inputs.centerType.addEventListener('change', () => { updateCenterOptions(); sche
 // {any: []}`) — a migration override for designs saved before the junction became
 // derived — so nothing can emit a `change` on it from the panel. The one that used to
 // be here did two things and needed neither: `applyVisibility()` is already wired for
-// it by PREDICATE_DRIVERS (it drives hasReceptacle), and the rebuild it also asked for
+// it by PREDICATE_DRIVERS if any predicate still named it, and the rebuild it also asked for
 // is the caller's job — applyDesign() schedules its own, and exportSTL() rebuilds from
 // readUI() regardless of what the live scene holds.
 function updateBaseOptions() { applyVisibility(); }

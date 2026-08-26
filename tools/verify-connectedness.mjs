@@ -52,10 +52,10 @@
  *     that says so, never a warning: a stale xfail is a hole in the gate.
  * Validity assertions (below) are NEVER covered by an xfail. A harness measuring the wrong
  * design fails the run outright, whatever the row expected.
- * The open marker today is #84: the BARE BLOOM — no stem, no sepals, no override, which is
- * the shipped DEFAULTS and every preset — exports in more than one piece. Eight bare rows
- * and four presets carry it. Do not weaken an assertion to clear one of those; the numbers
- * in #84 are what the fix has to move.
+ * There is no open marker today. #84 — the BARE BLOOM exporting in more than one piece —
+ * was the last one, and it closed when the junction became unconditional. Every row in this
+ * file is hard. If you add a marker, cite the issue and delete it in the commit that fixes
+ * the row, never by weakening an assertion.
  *
  * ============================================================================
  * THE HARNESS ASSERTS ITS OWN VALIDITY — three checks, all hard failures.
@@ -70,13 +70,13 @@
  *    MIGRATES a preset before applying it, so the post-migration state is not predictable
  *    here without a second copy of every migration. They get a read-back of the ids the
  *    preset names instead; their isolation comes from the reload, not from an assertion.
- * 2. TAIL PROBE. `tailXZ` is the XZ extent of the lowest 8% of the model as a fraction of
- *    the whole model's XZ extent — one estimator on both sides, same vertex set. A stem or
- *    a receptacle neck tapers, so a based design reads small; a bare bloom's lowest slice is
- *    petal underside, so it reads near 1. Each row declares `stem: true | false` and a row
- *    whose probe lands on the wrong side of the band fails. This is what stops a "bare
- *    bloom" row silently growing a base (or a preset silently carrying one) and being
- *    reported under a label that says otherwise.
+ * 2. TAIL PROBE. Each row declares `stem: true | false`, and the geometry has to agree —
+ *    this is what stops a row silently becoming a different design and being reported under
+ *    a label that says otherwise. The asserted measure is `aspect` (model height over its
+ *    width): a stem makes the model taller than it is wide, a bare bloom wider than tall.
+ *    `narrowFrac` (how much of the height is a narrow shaft) and `tailXZ` (how wide the
+ *    lowest 8% is) are reported alongside it. `tailXZ` used to be the asserted one and no
+ *    longer separates anything — see the band below for why, and for what this one assumes.
  * 3. PAIRWISE TRIANGLE COMPARISON. Sepal absence is checked against the SAME design with
  *    sepals on (`moreTrisThan`), never against a global reference — triangle counts differ
  *    across configs for a dozen reasons, so only a matched pair carries information.
@@ -100,16 +100,32 @@ const THREE_VERSION = '0.161.0';
 const CELL_MM = 0.6;          // < MIN_FEATURE_MM (0.8): a real gap cannot hide inside a cell
 const MAX_VOXELS = 90e6;
 const TAIL_FRAC = 0.08;       // "the lowest 8%" of the model's height, for the tail probe
-// Tail-probe band, from the measured spread across every row in this file. Stemmed rows
-// land in 0.0106-0.1093: the stem tapers to a point, so the lowest slice of the model is
-// nearly nothing. Stemless rows land in 0.5114-1.0000: the lowest slice is petal underside,
-// most of the footprint. The two thresholds sit in the empty gap between 0.11 and 0.51 —
-// 2.3x above the widest stemmed row, 1.5x below the narrowest stemless one (Thistle, a
-// domed tuft, is the narrowest and is why this is not set at 0.5).
-// It is the STEM that separates them, not the junction: a stemless design with sepals or a
-// forced receptacle still reads ~0.95, because a receptacle is a bowl and not a taper.
-const STEMMED_MAX = 0.25;
-const STEMLESS_MIN = 0.35;
+// Tail-probe band — see validity check 2. ONE threshold on `aspect`, from the measured
+// spread across every row in this file:
+//
+//   stemmed  (10 rows)  aspect 0.964 - 1.569      narrowFrac 0.72 - 0.87
+//   stemless (21 rows)  aspect 0.200 - 0.414      narrowFrac 0.00 - 0.37
+//
+// 0.65 sits in the empty gap: 1.48x below the shortest stemmed row, 1.57x above the tallest
+// stemless one. `narrowFrac` separates too (1.95x) and is reported, but `aspect` has the
+// wider gap so it is the one asserted — one measure, not a conjunction that would fail
+// twice for the same reason.
+//
+// WHY NOT tailXZ, which this used to assert. It asked "is the lowest 8% of the model
+// narrow?" and inferred a stem. That inference held only while stemless meant NO JUNCTION.
+// Since the junction became unconditional (#84) every design has one and it tapers, so the
+// ranges now OVERLAP COMPLETELY — stemless spans 0.0259-1.0000 against stemmed's
+// 0.0106-0.1093 — and the measure has no separating power left. It is still reported,
+// because "does the junction hang below the bloom" is a real thing to watch; it is just not
+// evidence about a stem. Dahlia proves no depth setting rescues it: its underside reads
+// ~0.033 at every depth from 0 to 0.5, because its bloom already tapers to a small footprint.
+//
+// WHAT THIS BAND ASSUMES, so the next person knows when to re-measure it: that a stem makes
+// the model TALLER THAN IT IS WIDE (heightMM normalises the largest dimension, so a stemmed
+// plant fills the box vertically and a bare bloom fills it horizontally). A row with a very
+// SHORT stem, or a stemless bloom closed up into a tall bud, would sit nearer the middle.
+// No row here is either. Adding one means re-measuring the band, not widening it.
+const STEM_ASPECT_MIN = 0.65;
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
@@ -182,18 +198,33 @@ const CONFIGS = [
   // a green `classic` says nothing about `dense`, `disc` or `petaloid`. Within `classic`,
   // `centerType` chooses stamens / pistil / none; it is INERT for the other three, so
   // `centerType: 'none'` there does not mean "no centre".
-  // Eight of these nine currently export in pieces and carry `xfail: 84`. The ninth,
-  // `classic + none`, is the only one with no centre geometry to detach — which is what
-  // localises the defect — so it is UNMARKED and a break there is a hard failure.
-  { label: 'BARE bloom, classic + stamens (SHIPPED DEFAULT centre)', stem: false, xfail: 84, set: BARE },
-  { label: 'BARE bloom, classic + pistil', stem: false, xfail: 84, set: [...BARE, { id: 'centerType', value: 'pistil', evt: 'change' }] },
+  // Eight of these nine exported in pieces until the junction became unconditional (#84);
+  // the ninth, `classic + none`, was the only one with no centre geometry to detach, which
+  // is what localised the defect. All nine are now unmarked and hard.
+  { label: 'BARE bloom, classic + stamens (SHIPPED DEFAULT centre)', stem: false, set: BARE },
+  { label: 'BARE bloom, classic + pistil', stem: false, set: [...BARE, { id: 'centerType', value: 'pistil', evt: 'change' }] },
   { label: 'BARE bloom, classic + none', stem: false, set: [...BARE, { id: 'centerType', value: 'none', evt: 'change' }] },
-  { label: 'BARE bloom, DENSE CLUSTER centre', stem: false, xfail: 84, set: [...BARE, { id: 'centerArch', value: 'dense', evt: 'change' }] },
-  { label: 'BARE bloom, DISC centre', stem: false, xfail: 84, set: [...BARE, { id: 'centerArch', value: 'disc', evt: 'change' }] },
-  { label: 'BARE bloom, PETALOID FILL centre', stem: false, xfail: 84, set: [...BARE, { id: 'centerArch', value: 'petaloid', evt: 'change' }] },
-  { label: 'BARE bloom, tube 0 (thinnest primitives)', stem: false, xfail: 84, set: [...BARE, { id: 'tube', value: '0' }] },
-  { label: 'BARE bloom, tube 1 (thickest primitives)', stem: false, xfail: 84, set: [...BARE, { id: 'tube', value: '1' }] },
-  { label: 'BARE bloom, layerCount 3', stem: false, xfail: 84, set: [...BARE, { id: 'layerCount', value: '3' }] },
+  { label: 'BARE bloom, DENSE CLUSTER centre', stem: false, set: [...BARE, { id: 'centerArch', value: 'dense', evt: 'change' }] },
+  { label: 'BARE bloom, DISC centre', stem: false, set: [...BARE, { id: 'centerArch', value: 'disc', evt: 'change' }] },
+  { label: 'BARE bloom, PETALOID FILL centre', stem: false, set: [...BARE, { id: 'centerArch', value: 'petaloid', evt: 'change' }] },
+  { label: 'BARE bloom, tube 0 (thinnest primitives)', stem: false, set: [...BARE, { id: 'tube', value: '0' }] },
+  { label: 'BARE bloom, tube 1 (thickest primitives)', stem: false, set: [...BARE, { id: 'tube', value: '1' }] },
+  { label: 'BARE bloom, layerCount 3', stem: false, set: [...BARE, { id: 'layerCount', value: '3' }] },
+  // TIGHTNESS 0 — every petal foot ON THE AXIS, so NO footprint is captured at all.
+  // `R = PETAL_LENGTH * 0.5 * lerp(0, 1.85, tightness)` for a radial bloom, so at the
+  // slider's minimum every placement has r = 0, and `pl.foot` is only captured when
+  // `pl.r > 1e-4`. The trunk therefore gets an EMPTY attachment ring: no samples, so no
+  // flutes, and it builds a plain round column at the valley radius. That configuration is
+  // reachable from the panel and had never been exported by any gate — "unknown, not
+  // passing" is the shape the last two defects here took, so it is a row now. The guard
+  // itself, and the second site that re-derives the same condition, are #87. Both
+  // polarities: without a stem (the trunk is the only thing below the bloom) and with one
+  // (the neck has to meet a stem it has no flutes to blend from).
+  { label: 'BARE bloom, radial tightness 0 (NO foot captured — empty attach ring)', stem: false,
+    set: [...BARE, { id: 'tightness', value: '0' }] },
+  { label: 'radial tightness 0 + stem + sepals (empty attach ring, real neck)', stem: true,
+    set: [{ id: 'tightness', value: '0' }] },
+
   // VALIDITY PAIR, and a gate row in its own right. The bare rows above claim "no sepals";
   // this is the same design with sepals ON, so the claim is checked against its own match
   // rather than against a global triangle reference that means nothing.
@@ -207,10 +238,8 @@ const CONFIGS = [
 // and quality gates load them, so a failure reads "preset: Thistle" rather than "config N".
 // All seven are bare blooms (each sets stemType/sepalsType none), so each declares
 // stem: true and the tail probe checks that claim rather than trusting it.
-// Four of the seven currently export in pieces (#84) and are marked; the other three are
-// unmarked, so a regression in Rose / Dahlia / Carnation is a hard failure.
-const PRESET_XFAIL = { daisy: 84, lily: 84, poppy: 84, thistle: 84 };
-for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, presetSlug: p.slug, stem: false, xfail: PRESET_XFAIL[p.slug] ?? null });
+// All seven are unmarked: #84 is fixed, so a regression in any of them is a hard failure.
+for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, presetSlug: p.slug, stem: false });
 
 if (NEGATIVE_CONTROL) {
   // Claim a stem on a row that has none. The tail probe must reject it; if the run still
@@ -254,11 +283,23 @@ function tailProbe(buf, frac = TAIL_FRAC) {
     }
   }
   const whole = Math.max(hi[0] - lo[0], hi[2] - lo[2]);
-  const cut = lo[1] + (hi[1] - lo[1]) * frac;
+  const height = hi[1] - lo[1];
+  const cut = lo[1] + height * frac;
   const tlo = [Infinity, Infinity], thi = [-Infinity, -Infinity];
   let count = 0;
+  // SLAB PROFILE, for narrowFrac below: the XZ extent at each of SLABS heights.
+  const SLABS = 100;
+  const slo = Array.from({ length: SLABS }, () => [Infinity, Infinity]);
+  const shi = Array.from({ length: SLABS }, () => [-Infinity, -Infinity]);
   for (let i = 0; i < n * 3; i++) {
     const x = pts[i * 3], y = pts[i * 3 + 1], z = pts[i * 3 + 2];
+    if (height > 0) {
+      const k = Math.min(SLABS - 1, Math.max(0, Math.floor(((y - lo[1]) / height) * SLABS)));
+      if (x < slo[k][0]) slo[k][0] = x;
+      if (x > shi[k][0]) shi[k][0] = x;
+      if (z < slo[k][1]) slo[k][1] = z;
+      if (z > shi[k][1]) shi[k][1] = z;
+    }
     if (y > cut) continue;
     count++;
     if (x < tlo[0]) tlo[0] = x;
@@ -266,8 +307,24 @@ function tailProbe(buf, frac = TAIL_FRAC) {
     if (z < tlo[1]) tlo[1] = z;
     if (z > thi[1]) thi[1] = z;
   }
-  if (!count || !isFinite(whole) || whole <= 0) return { tailXZ: NaN, tailVerts: count };
-  return { tailXZ: +(Math.max(thi[0] - tlo[0], thi[1] - tlo[1]) / whole).toFixed(4), tailVerts: count };
+  if (!count || !isFinite(whole) || whole <= 0) return { tailXZ: NaN, narrowFrac: NaN, aspect: NaN, tailVerts: count };
+  // narrowFrac — how much of the model's HEIGHT, measured up from the bottom, is narrower
+  // than half the model's full width. A stem is long, so most of the model is narrow; a
+  // junction taper is short, so only a sliver is. This is the property that still separates
+  // them now that EVERY design has a junction and "narrow at the very bottom" no longer does.
+  let k = 0;
+  for (; k < SLABS; k++) {
+    const w = Math.max(shi[k][0] - slo[k][0], shi[k][1] - slo[k][1]);
+    if (isFinite(w) && w >= 0.5 * whole) break;
+  }
+  return {
+    tailXZ: +(Math.max(thi[0] - tlo[0], thi[1] - tlo[1]) / whole).toFixed(4),
+    narrowFrac: +(k / SLABS).toFixed(3),
+    // aspect — does the model stand taller than it is wide? heightMM normalises the LARGEST
+    // dimension, so a stemmed plant is tall-and-thin and a bare bloom is wide-and-flat.
+    aspect: +(height / whole).toFixed(3),
+    tailVerts: count,
+  };
 }
 
 function voxelComponents(buf, cell) {
@@ -473,8 +530,9 @@ for (const r of results) {
   const want = r.cfg.stem;
   if (typeof want !== 'boolean') { validity.push(`${r.label}: row declares no \`stem\` — the tail probe has nothing to check`); continue; }
   if (!isFinite(r.tailXZ)) { validity.push(`${r.label}: tail probe returned NaN (${r.tailVerts} vertices in the lowest ${TAIL_FRAC * 100}%)`); continue; }
-  if (want && r.tailXZ > STEMMED_MAX) validity.push(`${r.label}: declared stem:true but tailXZ=${r.tailXZ} > ${STEMMED_MAX} — this design has NO stem`);
-  if (!want && r.tailXZ < STEMLESS_MIN) validity.push(`${r.label}: declared stem:false but tailXZ=${r.tailXZ} < ${STEMLESS_MIN} — this design HAS a stem it should not have`);
+  if (!isFinite(r.aspect)) { validity.push(`${r.label}: aspect is not finite`); continue; }
+  if (want && r.aspect < STEM_ASPECT_MIN) validity.push(`${r.label}: declared stem:true but aspect=${r.aspect} < ${STEM_ASPECT_MIN} — this model is not tall enough to have a stem`);
+  if (!want && r.aspect >= STEM_ASPECT_MIN) validity.push(`${r.label}: declared stem:false but aspect=${r.aspect} >= ${STEM_ASPECT_MIN} — this model is tall like a stemmed one`);
 }
 // ---- VALIDITY 3: pairwise triangle comparison, never a global reference. ----
 for (const r of results) {
@@ -495,7 +553,7 @@ for (const r of results) {
   else if (marked) { verdict = 'xfail'; xfails.push(r); }
   else { verdict = 'FAIL'; regressions.push(r); }
   const detail = r.comps !== undefined
-    ? `components=${r.comps} stray=${r.strayFraction} tris=${r.tris} boundary=${r.boundary} tailXZ=${r.tailXZ}`
+    ? `components=${r.comps} stray=${r.strayFraction} tris=${r.tris} boundary=${r.boundary} tailXZ=${r.tailXZ} narrowFrac=${r.narrowFrac} aspect=${r.aspect}`
     : (r.note || '');
   console.log(`  ${verdict.padEnd(5)} ${r.label.padEnd(62)} ${detail}${marked && !r.ok ? ` (#${r.cfg.xfail})` : ''}`);
 }

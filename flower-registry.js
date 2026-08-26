@@ -101,17 +101,19 @@
 */
 
 // Named predicates: a condition used by more than one control is defined ONCE here and
-// referenced, never restated. `hasReceptacle` had four hand-written copies across flower.js
-// before the drift-collapse pass and is the reason this indirection exists.
-export const PREDICATES = {
-  // The junction is DERIVED, never a control: it exists because something below the bloom
-  // needs joining. flower.js's hasReceptacle() evaluates THIS — it is not a second copy.
-  hasReceptacle: { any: [
-    { not: { id: "stemType", oneOf: ["none"] } },
-    { not: { id: "sepalsType", oneOf: ["none"] } },
-    { id: "receptacleType", oneOf: ["on"] },
-  ] },
-};
+// referenced, never restated. This indirection exists because `hasReceptacle` once had four
+// hand-written copies across flower.js — that predicate is gone now (see below), but the
+// mechanism it motivated stays, for the next condition two controls need to share.
+//
+// RETIRED — `hasReceptacle` (#84). It asked "does this design need a junction below the
+// bloom", and eighteen controls were gated on it. The junction is now built for EVERY
+// design, so the predicate was true for every design that can exist: a condition that
+// cannot be false is not a condition, and leaving it in place would have hidden the
+// junction's own shaping controls from exactly the designs that had just gained a junction.
+// It was deleted rather than left evaluating to true, because a vacuous gate reads like a
+// real one to whoever checks next. The eighteen controls now carry either no gate or the
+// remaining half of what used to be an `all[...]` beside it.
+export const PREDICATES = {};
 
 /* Evaluate a predicate against a state object keyed by control id (the same shape readUI()
    produces, so geometry code and panel code evaluate against the same values). An absent
@@ -285,10 +287,11 @@ export const CONTROLS = [
   // The controls below (through bulbHeight) all sit under one flat "Receptacle"
   // block, but they are two different things wearing one name:
   //   role:"junction"  — shapes the minimal connective geometry that makes the
-  //     model one watertight solid. Its PRESENCE is never a control (see
-  //     hasReceptacle() in flower.js — stem/sepals present, or the receptacleType
-  //     migration override, decides that); these tags only shape how that
-  //     necessarily-existing connective mass blends and tapers.
+  //     model one watertight solid. Its PRESENCE is not a control and no longer a
+  //     condition either: since #84 every design builds one, so these tags only
+  //     shape how that always-present connective mass blends and tapers. Its SIZE
+  //     is derived too — the descent range depends on whether a stem or a side
+  //     bud's branch is underneath to receive it (DEPTH_* in flower.js).
   //   role:"ornament"  — decorative choices about what the base LOOKS like
   //     (profile silhouette, wall construction, collar, rib styling). Optional in
   //     spirit even though today's gating ties their visibility to the derived
@@ -296,25 +299,25 @@ export const CONTROLS = [
   //     "decorative structure below the bloom" family as sepals.
   // No ids, defaults, gating, or behaviour change here — annotation only, so the
   // future base-ornament work extends this block instead of untangling it first.
-  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bundle tightness","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"flareRate","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Flare rate","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"absorption","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Absorption","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"buttonSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.05,"label":"Neck swell","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"gatherHeight","section":"acc-base","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.15,"label":"Gather height","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"receptacleType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"on","text":"ON"}],"default":"none","label":"Receptacle","divId":"receptacleTypeCtrl","role":"junction","visibleWhen":{"any":[]},"hiddenReason":"Migration override only: forces hasReceptacle() true for designs saved before the junction became derived. PR 3 unhides it into Advanced."},
-  {"id":"receptProfile","section":"acc-base","kind":"select","options":[{"value":"flare","text":"FLARE"},{"value":"dome","text":"DOME"},{"value":"cone","text":"CONE"},{"value":"urn","text":"URN"},{"value":"gentle","text":"GENTLE"}],"default":"flare","label":"Profile","visibleWhen":{"ref":"hasReceptacle"},"role":"ornament"},
-  {"id":"receptConstruction","section":"acc-base","kind":"select","options":[{"value":"solid","text":"SOLID"},{"value":"ribbed","text":"RIBBED"},{"value":"cored","text":"CORED"}],"default":"solid","label":"Construction","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"receptCollar","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"band","text":"BAND"},{"value":"ferrule","text":"FERRULE"}],"default":"none","label":"Collar","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"receptReach","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Reach","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"blendSmoothness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Blend smoothness","fmt":"f2","visibleWhen":{"ref":"hasReceptacle"},"role":"junction"},
-  {"id":"receptacleDepth","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Receptacle depth","fmt":"f2","visibleWhen":{"ref":"hasReceptacle"},"role":"junction"},
-  {"id":"convergenceTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Convergence tightness","fmt":"f2","visibleWhen":{"ref":"hasReceptacle"},"role":"junction"},
-  {"id":"receptSolidity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":1,"label":"Solidity","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"ribMultiplier","section":"acc-base","kind":"slider","min":0.5,"max":3,"step":0.05,"default":1,"label":"Rib multiplier","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"spiralTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.12,"label":"Rib tightness","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"spiralThickness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Rib thickness","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"bulbSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb size","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"bulbHeight","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb height","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bundle tightness","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"flareRate","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Flare rate","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"absorption","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Absorption","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"buttonSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.05,"label":"Neck swell","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"gatherHeight","section":"acc-base","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.15,"label":"Gather height","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"receptacleType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"on","text":"ON"}],"default":"none","label":"Receptacle","divId":"receptacleTypeCtrl","role":"junction","visibleWhen":{"any":[]},"hiddenReason":"INERT since #84. It used to force the junction on for designs saved before the junction became derived; the junction is now built for every design, so this control changes nothing whatever its value. The id stays because it is persisted in saved designs and in every preset — removing it is a migration, and that belongs with the base-ornament work that will replace this block. Do not unhide it: it would be a control that does nothing."},
+  {"id":"receptProfile","section":"acc-base","kind":"select","options":[{"value":"flare","text":"FLARE"},{"value":"dome","text":"DOME"},{"value":"cone","text":"CONE"},{"value":"urn","text":"URN"},{"value":"gentle","text":"GENTLE"}],"default":"flare","label":"Profile","role":"ornament"},
+  {"id":"receptConstruction","section":"acc-base","kind":"select","options":[{"value":"solid","text":"SOLID"},{"value":"ribbed","text":"RIBBED"},{"value":"cored","text":"CORED"}],"default":"solid","label":"Construction","visibleWhen":{"id":"continuousMargin","oneOf":["off"]},"role":"ornament"},
+  {"id":"receptCollar","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"band","text":"BAND"},{"value":"ferrule","text":"FERRULE"}],"default":"none","label":"Collar","visibleWhen":{"id":"continuousMargin","oneOf":["off"]},"role":"ornament"},
+  {"id":"receptReach","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Reach","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["off"]},"role":"ornament"},
+  {"id":"blendSmoothness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Blend smoothness","fmt":"f2","role":"junction"},
+  {"id":"receptacleDepth","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Receptacle depth","fmt":"f2","role":"junction"},
+  {"id":"convergenceTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Convergence tightness","fmt":"f2","role":"junction"},
+  {"id":"receptSolidity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":1,"label":"Solidity","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"ribMultiplier","section":"acc-base","kind":"slider","min":0.5,"max":3,"step":0.05,"default":1,"label":"Rib multiplier","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"spiralTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.12,"label":"Rib tightness","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"spiralThickness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Rib thickness","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"bulbSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb size","fmt":"f2","visibleWhen":{"all":[{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"bulbHeight","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb height","fmt":"f2","visibleWhen":{"all":[{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
   {"id":"sepalsType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"sepals","text":"SEPALS"}],"default":"none","label":"Sepals","tier":"standard"},
   {"id":"sepalSize","section":"acc-base","kind":"slider","min":0.1,"max":1.5,"step":0.05,"default":0.6,"label":"Sepal size","fmt":"f2","visibleWhen":{"not":{"id":"sepalsType","oneOf":["none"]}}},
   {"id":"sepalCount","section":"acc-base","kind":"slider","min":3,"max":24,"step":1,"default":5,"label":"Sepal count","fmt":"int","visibleWhen":{"not":{"id":"sepalsType","oneOf":["none"]}}},
