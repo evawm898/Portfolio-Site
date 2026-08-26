@@ -28,7 +28,10 @@
  *   2. DISTINCTNESS — for one design, the STLs at different depths must have different
  *      SHA-256s. If the control were silently ignored (the failure mode that would make
  *      every number here a lie while still looking plausible), the hashes would collide.
- *      This is the assertion the negative control exercises.
+ *      This is the assertion the negative control exercises. The per-design record is an
+ *      ARRAY and not a Map keyed by depth: a Map deduplicates a repeated depth, which left
+ *      the check with nothing to compare and let the negative control pass on a harness
+ *      that could not fail. That is what running the control caught.
  *
  * NEGATIVE CONTROL:  node docs/tools/diag-junction-depth-sweep.mjs <dir> --negative-control
  *   Sweeps the SAME depth several times, so distinctness must fail. If the run still passes,
@@ -185,7 +188,11 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'flower-depth-'));
 const bad = [];
 const rows = [];
 for (const d of DESIGNS) {
-  const hashes = new Map();
+  // An ARRAY, not a Map keyed by depth. A Map silently deduplicates repeated depths, which
+  // is precisely the shape the negative control sweeps — so the distinctness check below had
+  // nothing to compare and the control ran green on a harness that could not fail. Found by
+  // running the control; a self-check nobody has watched fail is a hope, not a check.
+  const hashes = [];
   for (const depth of DEPTHS) {
     await freshPage();
     if (d.presetSlug) {
@@ -225,12 +232,14 @@ for (const d of DESIGNS) {
     await dl.saveAs(fp);
     const buf = fs.readFileSync(fp);
     const sha = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 12);
-    hashes.set(depth, sha);
+    hashes.push({ depth, sha });
     rows.push({ design: d.label, key: d.key, depth, sha, ...analyse(buf, CELL_MM) });
   }
-  // SELF-CHECK 2: distinctness. A silently-ignored control collides here.
+  // SELF-CHECK 2: distinctness. A silently-ignored control collides here. Every pair is
+  // compared, so a repeat of the same depth collides with itself — which is what makes the
+  // negative control able to exercise this at all.
   const seen = new Map();
-  for (const [depth, sha] of hashes) {
+  for (const { depth, sha } of hashes) {
     if (seen.has(sha)) bad.push(`${d.label}: depth ${depth} and depth ${seen.get(sha)} exported the SAME STL (${sha}) — receptacleDepth is not taking`);
     else seen.set(sha, depth);
   }
