@@ -173,7 +173,9 @@ async function freshPage() {
     // Hide the panels: a render of the control panel is not a render of the flower. The
     // export button is inside one of them, so it is clicked in-page below rather than
     // through Playwright's visibility-aware click.
-    for (const sel of ['.fl-panel', '.fl-presets', '.fl-view', '#readout']) {
+    // Every chrome container by its real class — `.fl-view` was a guess and matched
+    // nothing, so the View panel stayed in the corner of all 60 renders of the first sweep.
+    for (const sel of ['.fl-panel', '.fl-presets', '.fl-viewpanel', '#readout', '.fl-hud']) {
       for (const el of document.querySelectorAll(sel)) el.style.visibility = 'hidden';
     }
     const a = document.getElementById('autoRotate');
