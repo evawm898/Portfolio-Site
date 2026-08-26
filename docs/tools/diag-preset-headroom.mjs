@@ -43,11 +43,21 @@ const NEGATIVE_CONTROL = argv.includes('--negative-control');
 const named = argv.filter((a) => !a.startsWith('--')).map((s) => s.toLowerCase());
 const targets = PRESETS.filter((p) => !named.length || named.includes(p.slug));
 
-// Levers a visitor would actually reach for first. `heightMM` is the negative control: it
-// rescales the model in millimetres and cannot change how many triangles it is made of.
-const LEVERS = NEGATIVE_CONTROL
+// Levers a visitor would actually reach for first. The lace lever is DERIVED from the
+// design's own infill, because `density` only drives veins and voronoi — bone counts ribs
+// with `boneCount`, strands with `strandCount`, growth with `spaceDensity`. Pointing the
+// probe at `density` on a bone preset measures nothing, which is exactly what the
+// self-check caught the first time this ran.
+const LACE_LEVER = {
+  veins:    { id: 'density',      step: 1, label: 'lace density +1' },
+  voronoi:  { id: 'density',      step: 1, label: 'lace density +1' },
+  bone:     { id: 'boneCount',    step: 1, label: 'bone count +1' },
+  strands:  { id: 'strandCount',  step: 1, label: 'strand count +1' },
+  spacecol: { id: 'spaceDensity', step: 0.05, label: 'source density +0.05' },
+};
+const leversFor = (ui) => NEGATIVE_CONTROL
   ? [{ id: 'heightMM', step: 5, label: 'heightMM (negative control — must NOT change tris)' }]
-  : [{ id: 'petalCount', step: 1, label: 'petal count +1' }, { id: 'density', step: 1, label: 'lace density +1' }];
+  : [{ id: 'petalCount', step: 1, label: 'petal count +1' }, LACE_LEVER[ui.infillType] || LACE_LEVER.veins];
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
@@ -90,12 +100,12 @@ async function load(slug) {
 const bad = [];
 const rows = [];
 for (const p of targets) {
-  for (const lever of LEVERS) {
+  for (const lever of leversFor(p.ui)) {
     if (!await load(p.slug)) { bad.push(`${p.name}: gallery cell not found`); continue; }
     const base = await readout();
     const baseTris = trisOf(base);
     if (baseTris == null) { bad.push(`${p.name}/${lever.id}: could not read a triangle count from the readout`); continue; }
-    let steps = 0, lastTris = baseTris, hitMax = false, moved = false;
+    let steps = 0, lastTris = baseTris, hitMax = false, moved = false, atMaxFromStart = false;
     for (let i = 0; i < MAX_STEPS; i++) {
       const res = await page.evaluate(({ id, step }) => {
         const el = document.getElementById(id);
@@ -108,7 +118,7 @@ for (const p of targets) {
         return { value: Number(el.value) };
       }, lever);
       if (res.missing) { bad.push(`${p.name}: no control #${lever.id}`); break; }
-      if (res.atMax) { hitMax = true; break; }
+      if (res.atMax) { hitMax = true; if (i === 0) atMaxFromStart = true; break; }
       await page.waitForTimeout(900);
       const t = await readout();
       if (refused(t)) break;
@@ -117,8 +127,10 @@ for (const p of targets) {
       steps++;
     }
     // SELF-CHECK: a lever that does not move the triangle count cannot measure headroom.
-    if (!moved) bad.push(`${p.name}/${lever.id}: stepping it never changed the triangle count (${baseTris} throughout) — this lever measures no headroom`);
-    rows.push({ preset: p.name, lever: lever.label, baseTris, steps, lastTris, hitMax });
+    // A control that was ALREADY at its maximum has no room to give; that is a real answer
+    // ("this design cannot go further on this axis"), not a lever that fails to move.
+    if (!moved && !atMaxFromStart) bad.push(`${p.name}/${lever.id}: stepping it never changed the triangle count (${baseTris} throughout) — this lever measures no headroom`);
+    rows.push({ preset: p.name, lever: lever.label, baseTris, steps, lastTris, hitMax, atMaxFromStart });
   }
 }
 await browser.close();
@@ -127,7 +139,7 @@ server.close();
 console.log(`preset headroom — steps of one control before LIVE_TRI_BUDGET refuses the rebuild\n`);
 console.log('preset        lever                base tris    steps   tris at last accepted');
 for (const r of rows) {
-  console.log(`${r.preset.padEnd(13)} ${r.lever.padEnd(20)} ${String(r.baseTris).padStart(9)}   ${(r.hitMax ? `${r.steps}+` : String(r.steps)).padStart(5)}   ${String(r.lastTris).padStart(9)}${r.hitMax ? '   (slider maxed, never refused)' : ''}`);
+  console.log(`${r.preset.padEnd(13)} ${r.lever.padEnd(20)} ${String(r.baseTris).padStart(9)}   ${(r.hitMax ? `${r.steps}+` : String(r.steps)).padStart(5)}   ${String(r.lastTris).padStart(9)}${r.atMaxFromStart ? '   (control ALREADY at max — no room on this axis)' : r.hitMax ? '   (slider maxed, never refused)' : ''}`);
 }
 console.log('\n"steps" is how many notches were ACCEPTED. A trailing + means the slider ran out before the budget did.');
 
