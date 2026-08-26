@@ -194,6 +194,21 @@ const CONFIGS = [
   { label: 'BARE bloom, tube 0 (thinnest primitives)', stem: false, set: [...BARE, { id: 'tube', value: '0' }] },
   { label: 'BARE bloom, tube 1 (thickest primitives)', stem: false, set: [...BARE, { id: 'tube', value: '1' }] },
   { label: 'BARE bloom, layerCount 3', stem: false, set: [...BARE, { id: 'layerCount', value: '3' }] },
+  // TIGHTNESS 0 — every petal foot ON THE AXIS, so NO footprint is captured at all.
+  // `R = PETAL_LENGTH * 0.5 * lerp(0, 1.85, tightness)` for a radial bloom, so at the
+  // slider's minimum every placement has r = 0, and `pl.foot` is only captured when
+  // `pl.r > 1e-4`. The trunk therefore gets an EMPTY attachment ring: no samples, so no
+  // flutes, and it builds a plain round column at the valley radius. That configuration is
+  // reachable from the panel and had never been exported by any gate — "unknown, not
+  // passing" is the shape the last two defects here took, so it is a row now. The guard
+  // itself, and the second site that re-derives the same condition, are #87. Both
+  // polarities: without a stem (the trunk is the only thing below the bloom) and with one
+  // (the neck has to meet a stem it has no flutes to blend from).
+  { label: 'BARE bloom, radial tightness 0 (NO foot captured — empty attach ring)', stem: false,
+    set: [...BARE, { id: 'tightness', value: '0' }] },
+  { label: 'radial tightness 0 + stem + sepals (empty attach ring, real neck)', stem: true,
+    set: [{ id: 'tightness', value: '0' }] },
+
   // VALIDITY PAIR, and a gate row in its own right. The bare rows above claim "no sepals";
   // this is the same design with sepals ON, so the claim is checked against its own match
   // rather than against a global triangle reference that means nothing.
