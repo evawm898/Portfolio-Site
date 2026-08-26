@@ -80,6 +80,22 @@ await page.route('**cdn.jsdelivr.net/**', (route) => {
   catch { route.abort(); }
 });
 
+// WAIT FOR THE REBUILD, do not sleep at it. scheduleRegen turns #building on, and the
+// double-rAF rebuild turns it off when the mesh and the readout are done. A fixed sleep
+// races that: a heavy design can still be building when the timer fires, so the readout
+// read back belongs to the PREVIOUS step. Measured: the same Dahlia row came back as
+// "6 accepted, slider maxed" and "5 accepted, then refused" on two runs of identical code,
+// which is a number not fit to report. (This repo's backlog already records the same race
+// in the thumbnail and audit tools.)
+async function settle() {
+  await page.waitForTimeout(120);   // let scheduleRegen flip #building on
+  await page.waitForFunction(() => {
+    const el = document.getElementById('building');
+    return el && !el.classList.contains('is-on');
+  }, { timeout: 120000 });
+  await page.waitForTimeout(80);    // let updateReadout paint the new text
+}
+
 const readout = () => page.evaluate(() => document.getElementById('readout').textContent);
 // The refusal text is triBudgetMessage's: "~N triangles — over the M budget. Lower ...".
 const refused = (t) => /over the [\d,]+ budget/.test(t);
@@ -93,7 +109,7 @@ async function load(slug) {
     const cell = document.querySelector(`#presetRow .fl-preset[data-slug="${s}"]`);
     if (!cell) return false; cell.click(); return true;
   }, slug);
-  await page.waitForTimeout(1200);
+  await settle();
   return ok;
 }
 
@@ -119,7 +135,7 @@ for (const p of targets) {
       }, lever);
       if (res.missing) { bad.push(`${p.name}: no control #${lever.id}`); break; }
       if (res.atMax) { hitMax = true; if (i === 0) atMaxFromStart = true; break; }
-      await page.waitForTimeout(900);
+      await settle();
       const t = await readout();
       if (refused(t)) break;
       const n = trisOf(t);
