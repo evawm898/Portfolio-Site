@@ -134,13 +134,47 @@ is the gate's own stated false-pass direction, so 19 is a floor.
 **Two honest caveats about these rows.**
 
 *The 0.57 row does not detect the defect.* It is the measured threshold — the first TIP
-REGION at which a tooth falls below the splice — but at 2 free struts per petal the inner
-ends land on veins and the 0.6 mm voxel test reads them as attached. It is a threshold
-*marker*, kept because a future change that moves the threshold should be visible; it is
-not evidence of detection at that setting.
+REGION at which a tooth falls below the splice — but its 18 free struts all stay attached at
+their inner ends, and the voxel test reads them as one piece. It is a threshold *marker*,
+kept because a future change that moves the threshold should be visible; it is not evidence
+of detection at that setting. This is not a quirk of one row — see "the gate that caught
+this cannot see the hazard it caught" below, and #97.
 
 *The SCALLOPED / continuous-margin-OFF failure was not a geometry defect at all* — see
 below.
+
+### The gate that caught this cannot see the hazard it caught
+
+Connectedness counts **detached bodies**. It does not see **free ends**. A strut attached at
+its base and dangling at its tip is one connected piece and a 16 mm cantilever at the same
+time, and only the first of those is a component.
+
+The two counters in this PR measure the same rows, so the gap is exact. The triangle deltas
+give the true number of free struts (24 tris each, 9 petals); the gate gives components:
+
+| row (9 petals) | free struts removed | components the gate saw | struts it saw |
+|---|---|---|---|
+| TOOTHED tipRegion 0.57 | 432 ÷ 24 = **18** | 1 | **0** |
+| TOOTHED tipRegion 1.00 | 1,296 ÷ 24 = **54** | 19 | 18 (33%) |
+| TOOTHED tipRegion 1.00 + bundle 1 / flare 0 | 2,160 ÷ 24 = **90** | 37 | 36 (40%) |
+| TOOTHED tipRegion 1.00 + tipFrequency 40 | 3,456 ÷ 24 = **144** | 47 | 46 (32%) |
+
+A free end becomes a component only when it detaches at **both** ends, so roughly a third of
+these registered. **The 0.57 row is the one that matters: eighteen free-ended struts, and the
+gate is entirely clean.** At `process: sla` each of those is Ø 0.40 mm with 12.78 mm free —
+a 32:1 unsupported cantilever, and no gate in this repository can see it.
+
+So connectedness caught this defect by luck, not by design: it caught the configurations
+where enough struts happened to detach at both ends. A design with one or two free struts
+per petal — a real print hazard — passes every gate the project owns.
+
+That is a fifth instance of a gate measuring the property *adjacent* to the one that
+matters, after the four the working agreements already record, and it is the one with a
+physical consequence. The project states a 1.0 mm minimum for unsupported wire in its
+printing constraints and has **no gate that measures it**: `boundary === 0` cannot (a free
+strut is a capped closed solid), `shells` cannot, and connectedness only in the extreme.
+Filed as **#97**, with a pointer to the instrumentation this diagnosis already built — the
+per-strut free-length and diameter measurement is most of that gate.
 
 ### The row that failed for a reason nobody predicted
 
@@ -292,8 +326,18 @@ It was two clicks from the default landing state.
 - **#96** — the connectedness gate's false-alarm mode, above. The sampler is fixed here;
   the issue stays open for conservative voxelisation, which would be a proof rather than a
   sample-step margin.
+- **#97** — no gate measures the minimum-wire rule. Connectedness counts detached bodies,
+  not free ends, and misses roughly two thirds of the free struts it is looking straight at.
+- **#98** — `verify-registry-sync.mjs` tokenises options with a regex over raw markup and
+  does not skip comments, so prose containing a tag is read as live markup.
 
-## Four comments that asserted a fact with no gate behind it
+## Eight claims with nothing enforcing them, found in one PR
+
+This is the defect this repository repeats most, so they are counted rather than listed
+loosely. Instances 1-4 are the same sentence in four files; 5-8 were each found by *using*
+the thing that carried them, which is the only way any of them surface.
+
+### 1-4. The tier-rewrite claim
 
 The claim *"in Standard the tier rewrites `tipStyle` 'jagged'/'scallop' → 'clean' and
 `bloomType` 'bilateral' → 'coiled' (ADV_OPTIONS)"* was live in four files and false in all
@@ -303,14 +347,36 @@ four — `ADV_OPTIONS` has been `{}` since the FAN quarantine was lifted:
 - `tools/verify-geometry-quality.mjs` (twice)
 - `docs/tools/diff-export-bytes.mjs`
 
-And `flower-presets.js` carried *"scallop is inert under the Standard continuous margin;
-that edge lives in Advanced"* on a shipped preset's rationale — both halves false (#53 made
-the scallop live; it was never in Advanced). All corrected. The Advanced toggle those
-comments justified is still needed, for a different and true reason: Advanced-tier
-*controls* are hidden in Standard.
+### 5. A shipped preset's rationale
 
-Also found: `verify-connectedness.mjs` said its preset rows "declare `stem: true`" three
-lines above code declaring `stem: false`.
+`flower-presets.js` carried *"scallop is inert under the Standard continuous margin; that
+edge lives in Advanced"* on Poppy — both halves false (#53 made the scallop live, measured
+excursion 6.63 mm on / 7.13 mm off; it was never in Advanced). Load-bearing: it is the
+stated reason a shipped preset ships smooth.
+
+### 6. A comment contradicting the code three lines below it
+
+`verify-connectedness.mjs` said its preset rows "declare `stem: true`" directly above code
+declaring `stem: false`.
+
+### 7. The caption on the evidence itself
+
+`tools/make-contact-sheet.mjs` hardcoded the right-hand caption as `after (#77)` and kept
+saying so long after #77 merged — so every contact sheet produced since has been labelled
+with the wrong PR. Found by reading a sheet made *for this PR*, whose entire subject is
+claims with nothing enforcing them. A caption is a claim about which tree produced the
+frame; a hardcoded one is a claim nothing checks. Both captions are arguments now,
+defaulting to the directory basename, which cannot go stale.
+
+### 8. A gate's own header, falsified by one of its own new rows
+
+`verify-connectedness.mjs` claimed it "cannot produce a false ALARM, only a false pass on a
+hairline touch". It can, and one of the rows added here produced one. Corrected in place;
+**#96**. This is the worst of the eight, because it is the claim a reader would most
+reasonably trust without checking — a gate's account of its own failure modes.
+
+The Advanced toggle that instances 1-4 justified is still needed, for a different and true
+reason: Advanced-tier *controls* are hidden in Standard.
 
 ## Gate coverage
 
