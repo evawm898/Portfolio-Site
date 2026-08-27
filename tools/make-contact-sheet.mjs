@@ -11,8 +11,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { findChromium } from './chromium-harness.mjs';
 
-const [beforeDir, afterDir, out] = process.argv.slice(2);
-if (!beforeDir || !afterDir || !out) { console.error('usage: node tools/make-contact-sheet.mjs <beforeDir> <afterDir> <out.png>'); process.exit(2); }
+const [beforeDir, afterDir, out, beforeLabel, afterLabel] = process.argv.slice(2);
+if (!beforeDir || !afterDir || !out) { console.error('usage: node tools/make-contact-sheet.mjs <beforeDir> <afterDir> <out.png> [beforeLabel] [afterLabel]'); process.exit(2); }
+// The right-hand caption was the hardcoded string "after (#77)" and stayed that way after
+// #77 merged, so every sheet made since has been labelled with the wrong PR. A caption is a
+// claim about which tree produced the frame; a hardcoded one is a claim nothing checks.
+// Both captions are arguments now, defaulting to something that cannot be wrong.
+const capBefore = beforeLabel || `before (${path.basename(beforeDir)})`;
+const capAfter = afterLabel || `after (${path.basename(afterDir)})`;
 
 const names = fs.readdirSync(beforeDir).filter((f) => f.endsWith('.png')).sort();
 const b64 = (p) => 'data:image/png;base64,' + fs.readFileSync(p).toString('base64');
@@ -21,8 +27,8 @@ const CELL = 380;
 const rows = names.map((n) => `
   <div class="row">
     <div class="lab">${n.replace(/\.png$/, '')}</div>
-    <figure><img src="${b64(path.join(beforeDir, n))}"><figcaption>before (main)</figcaption></figure>
-    <figure><img src="${b64(path.join(afterDir, n))}"><figcaption>after (#77)</figcaption></figure>
+    <figure><img src="${b64(path.join(beforeDir, n))}"><figcaption>${capBefore}</figcaption></figure>
+    <figure><img src="${b64(path.join(afterDir, n))}"><figcaption>${capAfter}</figcaption></figure>
   </div>`).join('');
 
 const html = `<!doctype html><meta charset="utf-8"><style>

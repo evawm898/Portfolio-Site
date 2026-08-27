@@ -197,6 +197,45 @@ splice the margin is deliberately the bundled strands — that is what continuou
 for. Wanting teeth further down is a margin-design change with a contact sheet, not a
 repair.
 
+## Verification — the fix removes exactly the predicted geometry, and nothing else
+
+The two commits differ only by the fix, so CI's own per-row triangle counts are a matched
+change report. Every delta is **24 triangles × (predicted free struts per petal) × 9
+petals** — 24 being one strut's export cost (2 rings × 6 segments = 12 wall + 12 cap).
+
+| connectedness row (9 petals, radial) | before `3b18786` | after `3ecacc9` | Δ | predicted |
+|---|---|---|---|---|
+| TOOTHED tipRegion 0.25 (control) | 223,332 | 223,332 | **0** | 0 free → 0 |
+| TOOTHED tipRegion 0.57 | 217,284 | 216,852 | **−432** | 2 × 9 × 24 = 432 |
+| TOOTHED tipRegion 1.00 | 213,252 | 211,956 | **−1,296** | 6 × 9 × 24 = 1,296 |
+| TOOTHED tipRegion 1.00 + bundle 1 / flare 0 | 202,122 | 199,962 | **−2,160** | 10 × 9 × 24 = 2,160 |
+| TOOTHED tipRegion 1.00 + tipFrequency 40 | 234,420 | 230,964 | **−3,456** | 16 × 9 × 24 = 3,456 |
+| TOOTHED tipRegion 1.00, continuous margin OFF | 188,386 | 188,386 | **0** | hoop keeps every tooth |
+| SCALLOPED default height | 219,948 | 219,948 | **0** | no mid-veins to filter |
+| SCALLOPED height 1.0 | 219,948 | 219,948 | **0** | — |
+| SCALLOPED height 1.0, continuous margin OFF | 203,290 | 203,290 | **0** | — |
+| RUFFLED | 292,148 | 292,148 | **0** | — |
+| every other row, and **all seven presets** | — | — | **0** | — |
+
+The live view agrees, on a different arrangement (5 petals, radial) and a different cost per
+strut (12 tris — the live build emits no caps):
+
+| frame | before | after | Δ | free struts × 5 petals × 12 |
+|---|---|---|---|---|
+| tipRegion 0.25 (control) | 103,384 | 103,384 | 0 | 0 |
+| tipRegion 0.57 | 100,024 | 99,904 | **−120** | 2 × 5 × 12 |
+| tipRegion 1.00 | 97,784 | 97,424 | **−360** | 6 × 5 × 12 |
+| tipRegion 1.00 + bundle 1 / flare 0 | 91,926 | 91,326 | **−600** | 10 × 5 × 12 |
+| SCALLOPED height 1.0 | 102,404 | 102,404 | 0 | — |
+
+**The per-petal free-strut counts — 2, 6, 10, 16 — were derived on a 4-petal COILED bloom
+and reproduce exactly on a 5-petal ROSETTE and a 9-petal ROSETTE.** That is the diagnosis's
+central claim, that the condition is `uc < rimSpliceU` and nothing about petal shape or
+arrangement enters it, confirmed on three arrangements by two independent counters.
+
+`connectedness: PASS — 41/41 configs are ONE connected piece` on `3ecacc9`, with
+`boundary === 0` throughout and all six CI gates green.
+
 ## E2 — SCALLOPED, and why it is a different defect
 
 `buildScallopEdge` returns `teethVeins: []`. There are no struts on any scalloped row
