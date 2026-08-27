@@ -317,14 +317,32 @@ function buildGatherSkeleton(feet, neck, opts) {
       const u = d > 1e-9 ? _clamp((t - a.az) / d, 0, 1) : 0;
       return { R: _lerp(a.R, b.R, u), y: _lerp(a.y, b.y, u) };
     };
-    const SEG = Math.min(220, Math.max(64, Math.round(nFeet * 3)));
-    const ST = 9;
-    // Wall floor. At tube*0.75 = 0.0126 the wall is THINNER THAN THE LIVE GRID CELL (0.02),
-    // so the preview under-resolves the skirt into blobs while the export (cell 0.011,
-    // two smoothing passes) resolves it cleanly — measured as A_k 0.8440 live against
-    // 0.0052 exported on Daisy. Overridable so that diagnosis can be tested rather than
-    // asserted.
+    // Wall floor. With SEG capped, tube*0.75 = 0.0126 left the wall thinner than the live
+    // grid cell (0.02) and the preview under-resolved the skirt into blobs while the export
+    // (cell 0.011, two smoothing passes) resolved it — measured as A_k 0.8440 live, 0.0052
+    // exported on Daisy while SEG was capped. Kept overridable so the interaction between
+    // wall thickness and ring resolution stays testable rather than asserted.
+    // Wall thickness. 0.75 * tube = 0.0126, about 1.26 mm diameter on a 120 mm bloom, over
+    // the 1.0 mm SLS unsupported minimum. This was briefly raised to 1.2 on the theory that
+    // the wall being thinner than the live grid cell (0.02) was what made the preview
+    // disagree with the export by 162x. That theory was wrong, or at least not the binding
+    // constraint: once SEG is derived from the overlap condition below, wall 0.75 reads
+    // A_k 0.0024 live / 0.0066 exported, and wall 1.2 reads 0.0123 / 0.0056 — no better,
+    // and 3,600 more live triangles. Circumferential resolution was doing the work.
     const tMin = tube * (opts.loftWall != null ? opts.loftWall : 0.75);
+    // CIRCUMFERENTIAL RESOLUTION IS NOT A TASTE NUMBER — it is the condition that makes this
+    // one surface rather than a necklace of beads. Adjacent ring capsules must overlap, so
+    // the arc step at the WIDEST ring must stay under the wall thickness there. A hardcoded
+    // cap of 220 was tried first and it failed exactly where it bound: at 34 petals (102
+    // feet, widest rim 1.11) the arc step is 0.0317 against a 0.0126 wall, the ring stops
+    // being continuous, and A_k came back 1.0207 live / 1.0292 exported — WORSE than the
+    // law it replaces. Derived from the overlap requirement instead, with the cap only as a
+    // runaway backstop, and logged if it ever binds.
+    let Rmax = 0; for (const f of sorted) if (f.R > Rmax) Rmax = f.R;
+    const tAtMax = Math.max(tMin, (Rtrunk * Rtrunk) / (4 * Math.max(Rmax, 1e-4)));
+    const SEG_NEED = Math.ceil((2 * Math.PI * Rmax) / (0.75 * tAtMax));
+    const SEG = Math.min(1024, Math.max(64, SEG_NEED));
+    const ST = 9;
     for (let j = 0; j <= ST; j++) {
       const s = j / ST, w = s * s * (3 - 2 * s);                  // smootherstep: rim -> circle
       const ring = [];
