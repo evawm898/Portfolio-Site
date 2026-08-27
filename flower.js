@@ -299,7 +299,7 @@ const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no 
 //   DEPTH_CAP_UNSUPPORTED   nothing below: the descent is an underside, so the ceiling is
 //                           the old slider's 0.3, written as the fraction it is rather than
 //                           as 0.471, so the two cannot drift apart.
-// TEMPORARY EXPERIMENT SWITCH (#100 phase 1) — three candidate APPROACH LAWS for the
+// TEMPORARY EXPERIMENT SWITCH (approach-law phase 1) — three candidate APPROACH LAWS for the
 // junction, measured against the shipped one before Eva rules on the silhouette. Reads
 // ?junctionLaw= / ?spacingBeta= once at load and stays overridable from the console via
 // window.__junctionLaw. Deliberately NOT a registry control: exactly one law survives and
@@ -307,9 +307,14 @@ const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no 
 const _JQ = new URLSearchParams(location.search);
 let JUNCTION_LAW = _JQ.get('junctionLaw') || 'current';
 let JUNCTION_SPACING_BETA = _JQ.has('spacingBeta') ? +_JQ.get('spacingBeta') : 1.0;
+let JUNCTION_MERGE_ORDER = _JQ.get('mergeOrder') || 'gap';
 Object.defineProperty(window, '__junctionLaw', {
   get: () => JUNCTION_LAW,
   set: (v) => { JUNCTION_LAW = v || 'current'; if (typeof scheduleRegen === 'function') scheduleRegen(); },
+});
+Object.defineProperty(window, '__junctionMergeOrder', {
+  get: () => JUNCTION_MERGE_ORDER,
+  set: (v) => { JUNCTION_MERGE_ORDER = v || 'gap'; if (typeof scheduleRegen === 'function') scheduleRegen(); },
 });
 Object.defineProperty(window, '__junctionSpacingBeta', {
   get: () => JUNCTION_SPACING_BETA,
@@ -2398,11 +2403,11 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
             // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
             // so the preview reads as the same solid mass it prints as (export floors anyway).
             profile, collar, exportMode, floorR: acc.floorR,
-            // TEMPORARY (#100 phase 1): which APPROACH LAW governs the run from each foot
+            // TEMPORARY (approach-law phase 1): which APPROACH LAW governs the run from each foot
             // to the neck — 'current' | 'arearun' | 'spacing' | 'loft'. Set from the console
             // or ?junctionLaw=... so all four build from one tree and can be measured side by
             // side. NOT a control, NOT in the registry, and it comes out when one law wins.
-            approachLaw: JUNCTION_LAW, spacingBeta: JUNCTION_SPACING_BETA,
+            approachLaw: JUNCTION_LAW, spacingBeta: JUNCTION_SPACING_BETA, mergeOrder: JUNCTION_MERGE_ORDER,
             cell: exportMode ? (opts.sdfCell || 0.011) : (opts.sdfCellLive || 0.02),
             smoothIters: exportMode ? 2 : 0 });
         acc.addMesh(field.positions, field.normals, field.indices);

@@ -145,7 +145,7 @@ function buildGatherSkeleton(feet, neck, opts) {
   }
 
   // ===================== THE APPROACH (TEMPORARY: three candidate laws) =====================
-  // #100 diagnosis: the area rule sizes the HUB and nothing governs the JOURNEY. On an
+  // The junction diagnosis: the area rule sizes the HUB and nothing governs the JOURNEY. On an
   // 18-petal Daisy the 54 feet run inward from radius 1.017 to 0.098 while descending
   // 0.024 — a 38:1 run — as 54 parallel capsules that never merge. Measured petal-harmonic
   // rim amplitude A_k peaks at 0.8525 (live) / 0.8714 (export), and no shipped control gets
@@ -214,19 +214,62 @@ function buildGatherSkeleton(feet, neck, opts) {
     for (let L = 1; L <= levels && nodes.length > 1; L++) {
       const Rl = Math.max(rA, R0 * Math.pow(ratio, L));
       const yl = _lerp(yFeet, yArrival, L / levels);
+      // WHICH branches merge, at each level, is a SECOND design decision inside this law
+      // and it measurably changes the result — so it is a sub-switch, not a silent choice.
+      // Measured peak A_k at the petal harmonic (live), Daisy 18 / Lily 6, and the worst
+      // amplitude over ALL k, all four numbers produced by THIS code:
+      //   'gap'      nearest angular gap on the circle   0.3119 / 0.1703   worst 0.578 / 0.661
+      //   'pairs'    contiguous pairs, odd one carried   0.1735 / 0.1578   worst 0.351 / 0.635
+      //   'balanced' contiguous groups of 2 and 3        0.1518 / 0.2443   worst 0.359 / 0.630
+      // 'gap' is the principled one — phase-independent and wrap-safe — and it is the one
+      // that measures WORST at k = petalCount, because it merges each petal's own three
+      // strands first (those are the smallest gaps) and so preserves the petal phase a
+      // level longer. 'pairs' scores better by straddling petal boundaries at an arbitrary
+      // start index and leaving a seam at the azimuth wrap; that is an accident of phase,
+      // not a design, so it is not the default. Default stays 'gap' and the comparison is
+      // reported rather than tuned away.
+      // None of the three removes the LOW-K floor (0.35-0.66): once the tree is down to a
+      // handful of thick branches a rim slice is a handful of blobs. That is a property of
+      // gathering, not of the matching, and it is the thing to look at from the sheet.
+      const order = opts.mergeOrder || 'gap';
+      const m = nodes.length;
+      const groups = [];
+      if (order === 'gap') {
+        const gaps = [];
+        for (let i2 = 0; i2 < m; i2++) { let d = nodes[(i2 + 1) % m].az - nodes[i2].az;
+          while (d <= 0) d += Math.PI * 2; gaps.push({ i: i2, j: (i2 + 1) % m, d }); }
+        gaps.sort((p1, p2) => p1.d - p2.d);
+        const groupOf = new Array(m).fill(-1);
+        for (const g of gaps) { if (groupOf[g.i] >= 0 || groupOf[g.j] >= 0) continue;
+          groupOf[g.i] = groupOf[g.j] = groups.length; groups.push([g.i, g.j]); }
+        for (let i2 = 0; i2 < m; i2++) {              // odd one out joins its nearer group
+          if (groupOf[i2] >= 0) continue;
+          const gL = groupOf[(i2 - 1 + m) % m], gR = groupOf[(i2 + 1) % m];
+          let dL = nodes[i2].az - nodes[(i2 - 1 + m) % m].az; while (dL <= 0) dL += Math.PI * 2;
+          let dR = nodes[(i2 + 1) % m].az - nodes[i2].az;     while (dR <= 0) dR += Math.PI * 2;
+          const pick = (gL >= 0 && (gR < 0 || dL <= dR)) ? gL : gR;
+          if (pick >= 0) { groups[pick].push(i2); groupOf[i2] = pick; }
+          else { groupOf[i2] = groups.length; groups.push([i2]); } }
+      } else if (order === 'balanced') {
+        const g = Math.max(1, Math.floor(m / 2)), triples = m - 2 * g;
+        const sizes = new Array(g).fill(2);
+        for (let t = 0; t < triples; t++) sizes[(t + L) % g] = 3;
+        let i2 = 0; for (let gi = 0; gi < g; gi++) { const grp = [];
+          for (let q = 0; q < sizes[gi] && i2 < m; q++) grp.push(i2++); if (grp.length) groups.push(grp); }
+      } else {                                        // 'pairs' — contiguous, odd one carried
+        for (let i2 = 0; i2 < m; i2 += 2) groups.push(i2 + 1 < m ? [i2, i2 + 1] : [i2]);
+      }
       const next = [];
-      for (let i = 0; i < nodes.length; i += 2) {
-        const a = nodes[i], b = nodes[i + 1];
-        if (!b) { next.push(a); continue; }                       // odd one out rides to the next level
-        // circular mean azimuth of the pair (a and b are adjacent, so a plain mean is safe
-        // except across the wrap; take the vector mean so the wrap is handled either way)
-        const az = Math.atan2(Math.sin(a.az) + Math.sin(b.az), Math.cos(a.az) + Math.cos(b.az));
-        const r = Math.sqrt(a.r * a.r + b.r * b.r);               // ← the area rule, at this station
+      for (const gi of groups) {
+        let sx = 0, sy = 0, r2 = 0;
+        for (const ix of gi) { const n = nodes[ix]; sx += Math.cos(n.az); sy += Math.sin(n.az); r2 += n.r * n.r; }
+        const az = Math.atan2(sy, sx);
+        const r = Math.sqrt(r2);                      // <- the area rule, at THIS station
         const p = [cx + Rl * Math.cos(az), yl, cz + Rl * Math.sin(az)];
-        caps.push({ a: a.p, b: p, ra: a.r, rb: r });
-        caps.push({ a: b.p, b: p, ra: b.r, rb: r });
+        for (const ix of gi) caps.push({ a: nodes[ix].p, b: p, ra: nodes[ix].r, rb: r });
         next.push({ az, R: Rl, y: yl, r, p });
       }
+      next.sort((a, b) => a.az - b.az);
       nodes = next;
     }
     // whatever survives joins the neck at the arrival ring
