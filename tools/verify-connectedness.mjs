@@ -282,6 +282,29 @@ const CONFIGS = [
   // TOOTHED rows above are about teeth and not about "any tip style".
   { label: 'RUFFLED (surface treatment — contrast row)', stem: false,
     set: [...BARE, { id: 'tipStyle', value: 'ruffled', evt: 'change' }] },
+  // SERRATED SEPALS — a state every row above is structurally blind to, because they all
+  // use BARE and BARE sets sepalsType none. Sepals are built through the SAME
+  // buildPetalInto, so sepalTipStyle SERRATED runs the same buildJaggedEdge, emits the same
+  // tooth mid-veins, and obeys the same `uc < rimSpliceU`; sepalTipRegion is what tipRegion
+  // is for petals. So a design with CLEAN petals and SERRATED sepals carried the E3 defect,
+  // and nothing here could have seen it. The byte report is what found it: 27 of 188 export
+  // configs moved, 10 struts each at default bundle/flare and 50 at bundle 1 / flare 0 —
+  // all sepals. sepalTipRegion 0.6 is past the threshold (default 0.3 is not).
+  //
+  // READ THIS BEFORE QUOTING A PASS: per #97 this gate sees a free end only once it detaches
+  // at BOTH ends, so green here is COVERAGE of the state, not evidence the struts are gone.
+  // The evidence for that is the triangle delta in docs/flower-rim-treatment-registration.md.
+  { label: 'SERRATED SEPALS past the splice (petals CLEAN — sepals carry the treatment)', stem: true,
+    set: [{ id: 'tipStyle', value: 'clean', evt: 'change' },
+          { id: 'sepalStyle', value: 'strap', evt: 'change' },
+          { id: 'sepalTipStyle', value: 'jagged', evt: 'change' },
+          { id: 'sepalTipRegion', value: '1' }, { id: 'sepalTipLength', value: '0.7' }] },
+  { label: 'SERRATED SEPALS + bundle 1 / flare 0 (latest splice, most discarded)', stem: true,
+    set: [{ id: 'tipStyle', value: 'clean', evt: 'change' },
+          { id: 'sepalStyle', value: 'strap', evt: 'change' },
+          { id: 'sepalTipStyle', value: 'jagged', evt: 'change' },
+          { id: 'sepalTipRegion', value: '1' }, { id: 'sepalTipLength', value: '0.7' },
+          { id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }] },
 
   // VALIDITY PAIR, and a gate row in its own right. The bare rows above claim "no sepals";
   // this is the same design with sepals ON, so the claim is checked against its own match

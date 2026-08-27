@@ -270,6 +270,54 @@ arrangement enters it, confirmed on three arrangements by two independent counte
 `connectedness: PASS — 41/41 configs are ONE connected piece` on `3ecacc9`, with
 `boundary === 0` throughout and all six CI gates green.
 
+### The byte report, and the claim it refuted
+
+`docs/tools/diff-export-bytes.mjs` over all 188 configs, pre-fix tree against fixed tree.
+The pre-fix side was built in a **git worktree** with only `flower.js` and
+`flower-geometry.js` reverted, so the sole difference is the E3 fix and the config matrix is
+identical on both sides. Reproducibility control first: two full runs of the fixed tree gave
+**188/188 identical hashes** (the only diff in the whole file was a node PID in a warning
+line), so a hash difference between trees means a real change.
+
+**161 / 188 byte-identical. 27 changed.** I had predicted a much smaller set, on the
+argument that the guard sits inside `if (jag && …)` and so cannot reach a design without a
+toothed edge. **That argument was wrong**, and the byte report is what caught it — the
+triangle counts in CI did not, because every connectedness row is `BARE` and `BARE` turns
+sepals off.
+
+**Sepals are built through the same `buildPetalInto`.** `sepalTipStyle: SERRATED` runs the
+same `buildJaggedEdge`, emits the same tooth mid-veins, and is governed by the same
+`uc < rimSpliceU` inequality, with `sepalTipRegion` playing the part `tipRegion` plays for
+petals. A design can have CLEAN petals and SERRATED sepals — and then it is a "non-TOOTHED
+design" that the fix changes.
+
+The arithmetic closes exactly, at 24 triangles per strut:
+
+| config | Δ tris | struts | petal | sepal |
+|---|---|---|---|---|
+| cont-margin BUNDLE tight 1 / flare 0 | −1,200 | 50 | 0 | **50** |
+| cont-margin SCALLOPED tall, voronoi, PROFILE …, and 20 more | −240 | 10 | 0 | **10** |
+| cont-margin TOOTHED tipRegion 0.57 | −672 | 28 | 18 = 2 × 9 | **10** |
+| cont-margin TOOTHED tipRegion 1.0 + bundle 1 / flare 0 | −3,360 | 140 | 90 = 10 × 9 | **50** |
+
+The sepal contribution is 10 at default bundle/flare and 50 at bundle 1 / flare 0, and those
+two numbers are consistent across all four rows — two independent equations agreeing, not
+one fitted constant. The `SCALLOPED` rows change for the same reason: scalloped *petals*
+have no mid-veins, but their *sepals* are still serrated.
+
+Why so many rows: `diff-export-bytes` applies configs cumulatively on one page, and
+`sepalTipStyle: 'jagged'` is set once (with `sepalTipRegion: 0.6`, past the threshold) and
+**never reset**, so every later config inherits serrated sepals.
+
+At shipped defaults `sepalTipRegion` is 0.3, below the threshold, so a default serrated sepal
+is clean — exactly as `tipRegion` 0.25 is for petals. The slider reaches 1.0 either way.
+
+**Coverage consequence.** Every rim-treatment row added here uses `BARE`, which sets
+`sepalsType: none`, so none of them can see a serrated sepal. A row with serrated sepals is
+added for that state. Its value is coverage, not detection: per #97 the connectedness gate
+sees free ends only once they detach at both ends, so a green result there is not evidence
+the struts are gone — the byte delta is.
+
 ## E2 — SCALLOPED, and why it is a different defect
 
 `buildScallopEdge` returns `teethVeins: []`. There are no struts on any scalloped row
