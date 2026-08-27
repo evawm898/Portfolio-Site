@@ -72,9 +72,21 @@ them as optional or experimental.
   `permanentHidden`/`imperativeGate` flags, and no hardcoded id lists —
   `verify-registry-sync.mjs` fails the build if any of them come back. To change when a
   control shows, edit its predicate; never add imperative code.
-  `node tools/dump-visibility.mjs` records all 166 controls x the matrix x both tiers, so
+  `node tools/dump-visibility.mjs` records every control x the matrix x both tiers, so
   a change that claims not to move visibility is diffed rather than asserted;
   `node tools/shot-panel-matrix.mjs <dir>` is the contact-sheet companion.
+- **A deleted control's id is retired forever, and the reservation is enforced.** When a
+  control goes, its value stops mattering and its NAME starts: saved designs and shared
+  links carry the old key indefinitely, so reclaiming the name later feeds a stale number
+  into a control that means something else — silently. Retiring an id is therefore four
+  things, not one: delete the registry row and the markup, add an entry to `RETIRED_IDS`
+  in `flower-registry.js` (id + the schema version + why), bump `CURRENT_SCHEMA`, and add
+  a migration that **deletes the key**. That last step is not optional —
+  `migrateDesign()` sweeps keys with no control into `extras` and preserves them verbatim
+  on re-save, so a retired id with no delete is carried forward forever by the mechanism
+  meant to protect forward compatibility. `verify-registry-sync.mjs` fails the build if a
+  retired id collides with a live control id, a live option value or a DEFAULTS key, or if
+  no migration deletes it. Never remove an entry from `RETIRED_IDS`.
 - **Presets are permanent, named fixtures in ALL THREE geometry gates.** Every shipped
   preset in `flower-presets.js` is loaded by name in `verify-flower-export.mjs` (must export
   watertight), `verify-geometry-quality.mjs` (its petal must trace, stay smooth, cap

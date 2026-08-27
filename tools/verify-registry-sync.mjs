@@ -237,6 +237,60 @@ for (const c of CONTROLS) {
   }
 }
 
+// ---- RETIRED_IDS: a reservation with a gate behind it -----------------------------
+// Deleting a control makes its VALUE irrelevant and its NAME dangerous. Saved designs and
+// shared links carry the old key forever, so reclaiming the name later feeds a stale number
+// into a control that means something else — no error, no warning, the design just quietly
+// is not what it was. "Reserved permanently" in a comment cannot stop that; this can.
+//
+// Three collisions are checked, and each is a route by which a retired name could come back:
+//   1. a live control id           — the direct reuse
+//   2. a live select option value  — a retired id reappearing as a VALUE is the same
+//                                    corruption wearing a different hat
+//   3. a DEFAULTS key              — DEFAULTS is derived from the registry, but flower.js
+//                                    also assigns a few keys directly (autoRotate,
+//                                    spaceSeed); those are parsed out rather than assumed
+// Plus two structural checks, because a malformed reservation is not a reservation: every
+// entry needs an id, a retiredAt version and a why; and the retirement must be BACKED BY A
+// MIGRATION THAT DELETES THE KEY. That last one is not pedantry — migrateDesign() sweeps
+// keys with no control into `extras` and preserves them verbatim on re-save, so a retired
+// id with no delete is carried forward indefinitely by the mechanism meant to protect
+// forward compatibility. The reservation would be documented and simultaneously defeated.
+{
+  const { RETIRED_IDS } = await import(REPO + 'flower-registry.js');
+  if (!Array.isArray(RETIRED_IDS)) {
+    err('flower-registry.js does not export RETIRED_IDS — the permanent-reservation list is how a '
+      + 'deleted control\'s name is kept out of circulation; without it this gate checks nothing');
+  } else {
+    const JS = readFileSync(REPO + 'flower.js', 'utf8');
+    const seen = new Set();
+    for (const r of RETIRED_IDS) {
+      if (!r || typeof r.id !== 'string' || !r.id) { err(`RETIRED_IDS entry ${JSON.stringify(r)} has no id`); continue; }
+      if (seen.has(r.id)) err(`RETIRED_IDS lists "${r.id}" more than once`);
+      seen.add(r.id);
+      if (!Number.isInteger(r.retiredAt)) err(`RETIRED_IDS "${r.id}": retiredAt must be the integer schema version it was retired at (it names the migration that deletes the key)`);
+      if (!r.why || String(r.why).trim().length < 20) err(`RETIRED_IDS "${r.id}": needs a why. A reservation nobody can evaluate is the permanentHidden flag again — a claim with no grounds.`);
+
+      // 1. live control id
+      if (regById.has(r.id)) err(`RETIRED_IDS "${r.id}" is ALSO a live control in the registry — a retired id may never be reused. Every design saved before it was retired still carries a value under this name, and that value would now be fed to this control.`);
+      // 1b. live markup id (clearer message than the generic existence check)
+      if (htmlById.has(r.id)) err(`RETIRED_IDS "${r.id}" still exists as a control in flower.html — retiring an id means deleting the markup too`);
+      // 2. live select option value
+      for (const c of CONTROLS) for (const o of (c.options || [])) {
+        if (String(o.value) === r.id) err(`RETIRED_IDS "${r.id}" collides with option value "${o.value}" on live control "${c.id}" — a retired name reused as a value is the same silent corruption`);
+      }
+      // 3. DEFAULTS key assigned directly in flower.js (outside the registry-derived loop)
+      if (new RegExp('DEFAULTS\\.' + r.id + '\\s*=').test(JS)) {
+        err(`RETIRED_IDS "${r.id}" is assigned directly as a DEFAULTS key in flower.js — a retired id must have no DEFAULTS entry`);
+      }
+      // 4. a migration must DELETE the key, or the value rides along forever in `extras`
+      if (!new RegExp('delete\\s+\\w+\\.' + r.id + '\\b').test(JS)) {
+        err(`RETIRED_IDS "${r.id}": no migration in flower.js deletes this key. migrateDesign() preserves keys with no control verbatim in \`extras\` on re-save, so without a \`delete out.${r.id}\` the retired value is carried forward indefinitely — reserved on paper and alive in every saved design.`);
+      }
+    }
+  }
+}
+
 // ---- report ----------------------------------------------------------------------
 if (fail.length) {
   console.error(`registry-sync: FAIL — ${fail.length} disagreement(s) between flower-registry.js and flower.html:\n`);
@@ -244,4 +298,6 @@ if (fail.length) {
   console.error('\nThe registry is the single source of truth; reconcile it with the markup (or vice versa) before merging.');
   process.exit(1);
 }
-console.log(`registry-sync: OK — ${CONTROLS.length} controls agree with flower.html (fields, options, gating, order, no duplicate/orphan spans).`);
+const { RETIRED_IDS: RET } = await import(REPO + 'flower-registry.js');
+console.log(`registry-sync: OK — ${CONTROLS.length} controls agree with flower.html (fields, options, gating, order, no duplicate/orphan spans); `
+  + `${(RET || []).length} retired id(s) reserved and uncollided: ${(RET || []).map((r) => r.id).join(', ') || '(none)'}.`);

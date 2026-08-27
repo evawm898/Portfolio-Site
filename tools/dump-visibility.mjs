@@ -6,8 +6,11 @@
  * is not "the default screen looks the same" — the subject is conditional visibility, and
  * at defaults most conditions never flip. The claim is "for every control, under every
  * config in tools/visibility-matrix.mjs, in both tiers, hidden is what it was before." A
- * byte-identical dump before and after is that claim, checked, at
- * 166 controls x 34 configs x 2 tiers.
+ * byte-identical dump before and after is that claim, checked, at EVERY control x every
+ * config in tools/visibility-matrix.mjs x both tiers. (The control count is deliberately
+ * not written down here: it was already stale by one before the relief deletion, and five
+ * more deletions are queued behind it. A number in a comment that nothing recomputes is
+ * the same failure as a reservation in a comment that nothing checks.)
  *
  * It asserts NOTHING about whether a state is CORRECT — that is verify-tier-visibility's
  * job, which derives the expected state from the registry. This tool only records what the
