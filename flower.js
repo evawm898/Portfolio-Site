@@ -308,9 +308,14 @@ const _JQ = new URLSearchParams(location.search);
 let JUNCTION_LAW = _JQ.get('junctionLaw') || 'current';
 let JUNCTION_SPACING_BETA = _JQ.has('spacingBeta') ? +_JQ.get('spacingBeta') : 1.0;
 let JUNCTION_MERGE_ORDER = _JQ.get('mergeOrder') || 'gap';
+let JUNCTION_LOFT_WALL = _JQ.has('loftWall') ? +_JQ.get('loftWall') : 0.75;
 Object.defineProperty(window, '__junctionLaw', {
   get: () => JUNCTION_LAW,
   set: (v) => { JUNCTION_LAW = v || 'current'; if (typeof scheduleRegen === 'function') scheduleRegen(); },
+});
+Object.defineProperty(window, '__junctionLoftWall', {
+  get: () => JUNCTION_LOFT_WALL,
+  set: (v) => { JUNCTION_LOFT_WALL = +v; if (typeof scheduleRegen === 'function') scheduleRegen(); },
 });
 Object.defineProperty(window, '__junctionMergeOrder', {
   get: () => JUNCTION_MERGE_ORDER,
@@ -2407,7 +2412,8 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
             // to the neck — 'current' | 'arearun' | 'spacing' | 'loft'. Set from the console
             // or ?junctionLaw=... so all four build from one tree and can be measured side by
             // side. NOT a control, NOT in the registry, and it comes out when one law wins.
-            approachLaw: JUNCTION_LAW, spacingBeta: JUNCTION_SPACING_BETA, mergeOrder: JUNCTION_MERGE_ORDER,
+            approachLaw: JUNCTION_LAW, spacingBeta: JUNCTION_SPACING_BETA,
+            mergeOrder: JUNCTION_MERGE_ORDER, loftWall: JUNCTION_LOFT_WALL,
             cell: exportMode ? (opts.sdfCell || 0.011) : (opts.sdfCellLive || 0.02),
             smoothIters: exportMode ? 2 : 0 });
         acc.addMesh(field.positions, field.normals, field.indices);

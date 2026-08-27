@@ -160,12 +160,17 @@ function buildGatherSkeleton(feet, neck, opts) {
 
   // Shared: the UP-STUB into the petal, so the junction overlaps the petal strand tube.
   // Every law emits these — they are what makes the model one piece at each foot.
-  const emitUpStubs = () => {
-    for (const f of feet) caps.push({ a: f.p.slice(), b: _add(f.p, _mul(_norm(f.up), tube * 4)), ra: f.r, rb: f.r });
-  };
+  const upStub = (f) => caps.push({ a: f.p.slice(), b: _add(f.p, _mul(_norm(f.up), tube * 4)), ra: f.r, rb: f.r });
+  const emitUpStubs = () => { for (const f of feet) upStub(f); };
 
   // Shared: the CURRENT per-foot bezier, foot -> neck surface, arriving tangentially.
   // `kOf` (optional) returns a per-capsule smooth-union blend radius for the SPACING law.
+  // ORDER MATTERS AND IS NOT COSMETIC. fieldMesh folds smin over the capsule list per grid
+  // corner, and polynomial smin is commutative but NOT associative, so reordering the list
+  // moves the surface. Emitting all the beziers and then all the up-stubs — instead of each
+  // foot's bezier followed by its own stub, as the original did — changed six of seven
+  // export configs by 24 to 160 triangles with no intended behaviour change. So this keeps
+  // the original interleaving, and 'current' exports byte-identically to main.
   const emitBezierSpokes = (kOf) => {
     for (const f of feet) {
       const az = Math.atan2(f.p[2] - cz, f.p[0] - cx), c = Math.cos(az), s = Math.sin(az);
@@ -187,6 +192,7 @@ function buildGatherSkeleton(feet, neck, opts) {
           caps.push(seg); }
         pr = pt;
       }
+      upStub(f);                                                       // <- interleaved, per foot
       const endDir = _norm([P3[0] - c2[0], P3[1] - c2[1], P3[2] - c2[2]]);
       const nrm = _norm([c, -dr, s]);
       const entry = 90 - Math.acos(Math.min(1, Math.abs(endDir[0]*nrm[0] + endDir[1]*nrm[1] + endDir[2]*nrm[2]))) * 180 / Math.PI;
@@ -313,7 +319,12 @@ function buildGatherSkeleton(feet, neck, opts) {
     };
     const SEG = Math.min(220, Math.max(64, Math.round(nFeet * 3)));
     const ST = 9;
-    const tMin = tube * 0.75;
+    // Wall floor. At tube*0.75 = 0.0126 the wall is THINNER THAN THE LIVE GRID CELL (0.02),
+    // so the preview under-resolves the skirt into blobs while the export (cell 0.011,
+    // two smoothing passes) resolves it cleanly — measured as A_k 0.8440 live against
+    // 0.0052 exported on Daisy. Overridable so that diagnosis can be tested rather than
+    // asserted.
+    const tMin = tube * (opts.loftWall != null ? opts.loftWall : 0.75);
     for (let j = 0; j <= ST; j++) {
       const s = j / ST, w = s * s * (3 - 2 * s);                  // smootherstep: rim -> circle
       const ring = [];
@@ -336,10 +347,10 @@ function buildGatherSkeleton(feet, neck, opts) {
 
   switch (law) {
     case 'arearun': emitAreaRunTree(); emitUpStubs(); break;
-    case 'spacing': emitSpacingUnion(); emitUpStubs(); break;
+    case 'spacing': emitSpacingUnion(); break;              // stubs interleaved by emitBezierSpokes
     case 'loft':    emitLoftSkirt();    emitUpStubs(); break;
     case 'current':
-    default:        emitBezierSpokes(); emitUpStubs(); break;
+    default:        emitBezierSpokes(); break;              // ditto — original order, byte-identical
   }
 
   // COLLAR: a radius bump near the stem (unions in via smin). True radii, no floor.
