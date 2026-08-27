@@ -933,10 +933,14 @@ try { if (localStorage.getItem('flowerPanelCollapsed') === '1') document.documen
             <option value="jagged">TOOTHED</option>
             <!-- UNLISTED BUT LIVE: the value is reserved and still builds, so a saved
                  design that chose it keeps rendering exactly as it did. Delisted, not
-                 deleted — deleting the <option> would make applyDesign's `el.value = v`
+                 deleted — removing the element would make applyDesign's `el.value = v`
                  silently fall back to CLEAN, i.e. a migration nobody asked for. It
                  returns by dropping hidden/disabled once the empty-lens defect is fixed.
-                 See docs/flower-rim-treatment-registration.md. -->
+                 See docs/flower-rim-treatment-registration.md.
+                 (Do not write a literal option tag in a comment inside a select here:
+                 verify-registry-sync.mjs tokenises options with a regex over the raw
+                 markup and matched the one in this comment as a real option. It failed
+                 loudly rather than silently, but it cost a CI cycle.) -->
             <option value="scallop" disabled hidden>SCALLOPED</option>
             <option value="ruffled">RUFFLED</option>
           </select>
