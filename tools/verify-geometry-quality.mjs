@@ -245,9 +245,9 @@ if (process.env.GQ_ONLY) {
 //      dynamic import of the geometry module (same relative specifier flower.js uses). --
 const GQ_HOOK = `
 const MM = 26;   // MM_PER_UNIT — report gaps in mm, the unit that matters for print.
-// SET, THEN READ BACK. A control can refuse the value it was handed — the Standard
-// tier rewrites tipStyle 'jagged'/'scallop' back to 'clean' (ADV_OPTIONS), a select
-// silently keeps its old value when handed an option it does not have, and a slider
+// SET, THEN READ BACK. A control can refuse the value it was handed — a select silently
+// keeps its old value when handed an option it does not have, an advancedOnly option is
+// rewritten to the control's standardFallback in the Standard tier, and a slider
 // clamps out of range. Every one of those makes the harness measure a DIFFERENT
 // design from the one the config names, while reporting the config's name — the
 // exact failure family this project keeps hitting. So the setter returns what did
@@ -1175,10 +1175,13 @@ await page.route('**/cdn.jsdelivr.net/**', (route) => {
 });
 await page.goto(`http://127.0.0.1:${port}/flower.html`, { waitUntil: 'load', timeout: 30000 });
 await page.waitForFunction('window.__gqReady === true', { timeout: 30000 });
-// ADVANCED. In Standard the tier rewrites tipStyle 'jagged'/'scallop' back to 'clean'
-// (ADV_OPTIONS in flower.js), so a tooth config set in Standard would silently measure a
-// CLEAN petal. __gqSet's read-back would now catch that as a hard failure rather than a
-// green row — this switch is what lets the tooth configs mean what they say.
+// ADVANCED. Advanced-tier CONTROLS (tipRegion, bundleTightness, flareRate, the cleft and
+// cross-section sets) are hidden in Standard, so a config naming one of them needs this
+// on. It is NOT about tipStyle: `advancedOnly` appears nowhere in flower-registry.js, so
+// ADV_OPTIONS is {} and no option is tier-rewritten. The claim that used to sit here —
+// that Standard rewrites 'jagged'/'scallop' to 'clean' — stopped being true and stayed
+// in four files for months. __gqSet's read-back is what actually catches a config that
+// did not take; a comment is not.
 await page.evaluate(() => { const t = document.getElementById('advancedToggle'); if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); } });
 await page.waitForTimeout(300);
 

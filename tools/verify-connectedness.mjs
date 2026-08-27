@@ -225,6 +225,55 @@ const CONFIGS = [
   { label: 'radial tightness 0 + stem + sepals (empty attach ring, real neck)', stem: true,
     set: [{ id: 'tightness', value: '0' }] },
 
+  // ===== RIM TREATMENTS — the state this gate had never exercised ==================
+  // Not one row above sets a tip style, so every row above is a CLEAN margin. That is the
+  // same blindness that let #84 ship: the gate never entered the state where the defect
+  // lives. TOOTHED emits one mid-vein per tooth (buildJaggedEdge's teethVeins); under
+  // continuous margin the rim consumer drops every tooth below rimSpliceU while the
+  // mid-vein consumer kept all of them, so a discarded tooth left its vein behind as a
+  // free-standing spike. Measured: free iff the tooth station uc < rimSpliceU, tooth by
+  // tooth, on every config tried. See docs/flower-rim-treatment-registration.md.
+  //
+  // BOTH POLARITIES OF `continuousMargin` ARE ROWS, deliberately. The defect exists only
+  // with it ON — with it OFF the closed hoop carries every tooth — and an asymmetry that
+  // lives only in a comment is one nobody can check. TIP REGION 0.25 / 0.57 / 1.00 are the
+  // shipped default, the measured threshold (0.56 clean, 0.57 broken at default
+  // bundle/flare) and the far end; the bundle/flare row moves rimSpliceU instead of uStart,
+  // which is the other half of the same inequality.
+  { label: 'TOOTHED tipRegion 0.25 (shipped default region — CONTROL, clean)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '0.25' }] },
+  { label: 'TOOTHED tipRegion 0.57 (measured threshold: 0.56 clean, 0.57 not)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '0.57' }] },
+  { label: 'TOOTHED tipRegion 1.00 (teeth run to the base)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' }] },
+  { label: 'TOOTHED tipRegion 1.00 + bundle 1 / flare 0 (latest splice)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' },
+          { id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }] },
+  { label: 'TOOTHED tipRegion 1.00 + tipFrequency 40 (most teeth)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' },
+          { id: 'tipFrequency', value: '40' }] },
+  { label: 'TOOTHED tipRegion 1.00, continuous margin OFF (hoop carries every tooth)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' },
+          { id: 'continuousMargin', value: 'off', evt: 'change' }] },
+  // SCALLOPED is UNLISTED but LIVE — the option is hidden+disabled in the picker, and the
+  // value still loads and still builds, so a saved design keeps rendering. That makes it a
+  // gate row, not a dead branch: its one-piece result is PINNED here rather than assumed.
+  // Its own defect (each scallop encloses an empty lens, ~6.7 mm deep at the default
+  // height) is a SHAPE defect, not a connectedness one — this gate cannot see it and must
+  // not be read as clearing it. Its discarded basal stretch is #94.
+  { label: 'SCALLOPED default height (unlisted but live)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'scallop', evt: 'change' }] },
+  { label: 'SCALLOPED height 1.0 (tallest scallop)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'scallop', evt: 'change' }, { id: 'scallopHeight', value: '1' }] },
+  { label: 'SCALLOPED height 1.0, continuous margin OFF', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'scallop', evt: 'change' }, { id: 'scallopHeight', value: '1' },
+          { id: 'continuousMargin', value: 'off', evt: 'change' }] },
+  // RUFFLED for contrast: its treatment lives in surfacePoint, so the material field moves
+  // with it and there is no appendage to leave behind. A green row here is what says the
+  // TOOTHED rows above are about teeth and not about "any tip style".
+  { label: 'RUFFLED (surface treatment — contrast row)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'ruffled', evt: 'change' }] },
+
   // VALIDITY PAIR, and a gate row in its own right. The bare rows above claim "no sepals";
   // this is the same design with sepals ON, so the claim is checked against its own match
   // rather than against a global triangle reference that means nothing.
@@ -237,7 +286,9 @@ const CONFIGS = [
 // Loaded by NAME through the real gallery-click path (applyDesign), exactly as the export
 // and quality gates load them, so a failure reads "preset: Thistle" rather than "config N".
 // All seven are bare blooms (each sets stemType/sepalsType none), so each declares
-// stem: true and the tail probe checks that claim rather than trusting it.
+// stem: false and the tail probe checks that claim rather than trusting it. (This line
+// said `stem: true` while the code below said false — a comment contradicting the code
+// three lines under it, found while adding the rim-treatment rows.)
 // All seven are unmarked: #84 is fixed, so a regression in any of them is a hard failure.
 for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, presetSlug: p.slug, stem: false });
 
