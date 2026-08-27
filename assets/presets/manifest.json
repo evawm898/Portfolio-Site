@@ -1,6 +1,7 @@
 {
   "daisy": {
     "name": "Daisy",
+    "mode": "live",
     "tris": 162340,
     "bbox": {
       "min": [
@@ -17,6 +18,7 @@
   },
   "rose": {
     "name": "Rose",
+    "mode": "live",
     "tris": 418810,
     "bbox": {
       "min": [
@@ -33,6 +35,7 @@
   },
   "lily": {
     "name": "Lily",
+    "mode": "live",
     "tris": 79392,
     "bbox": {
       "min": [
@@ -49,6 +52,7 @@
   },
   "poppy": {
     "name": "Poppy",
+    "mode": "live",
     "tris": 237488,
     "bbox": {
       "min": [
@@ -65,6 +69,7 @@
   },
   "dahlia": {
     "name": "Dahlia",
+    "mode": "live",
     "tris": 437828,
     "bbox": {
       "min": [
@@ -81,6 +86,7 @@
   },
   "thistle": {
     "name": "Thistle",
+    "mode": "live",
     "tris": 364592,
     "bbox": {
       "min": [
@@ -97,6 +103,7 @@
   },
   "carnation": {
     "name": "Carnation",
+    "mode": "live",
     "tris": 211282,
     "bbox": {
       "min": [

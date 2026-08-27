@@ -177,6 +177,11 @@ const VARIANCE_ROLL_MAX   = 0.15;   // +/- 15% of the cross-section roll amount 
    these sliders to clamp, the dangerous region is in the middle. This is the
    clearest evidence yet for capping the output.
    --------------------------------------------------------------------- */
+// LIVE and EXPORT triangle counts are DIFFERENT NUMBERS for the same design — export mode
+// floors feature sizes, which measured 1.09x to 1.44x more triangles across the 7 presets,
+// varying per design rather than by a fixed factor. A budget only ever applies to its own
+// mode: comparing an export count against LIVE_TRI_BUDGET reads as over budget when the
+// design is comfortably under it. Every tool that prints a count now names the mode.
 const LIVE_TRI_BUDGET   = 500000;    // refuse over this, live — keep the last-good mesh on screen
 const EXPORT_INFO_TRIS  = 1000000;   // plain on-screen line above this (never a modal)
 const EXPORT_TRI_BUDGET = 3000000;   // refuse over this, export — no override

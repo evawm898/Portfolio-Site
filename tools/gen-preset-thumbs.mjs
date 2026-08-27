@@ -117,13 +117,18 @@ for (const p of PRESETS) {
   await page.screenshot({ path: path.join(writeDir, `${p.slug}.png`) });
   const tris = await page.evaluate(() => window.__thumb.tris());
   const bbox = await page.evaluate(() => window.__thumb.bbox());
-  manifest[p.slug] = { name: p.name, tris, bbox };
+  // `tris` here is the LIVE three.js count (window.__thumb.tris() reads
+  // meshPetals/meshCore geometry), NOT the exported STL's. The two differ per design by
+  // 1.09x to 1.44x because export mode floors feature sizes, so they are never
+  // interchangeable — and both gates used to print the bare word "tris", which is how an
+  // export figure can be read against LIVE_TRI_BUDGET and look alarming for no reason.
+  manifest[p.slug] = { name: p.name, mode: 'live', tris, bbox };
   const margin = tris > 0 ? liveTriBudget / tris : Infinity;
   if (tris > liveTriBudget) {
-    console.log(`FAIL ${p.slug.padEnd(12)} ${tris.toLocaleString().padStart(9)} tris — OVER the live budget (${liveTriBudget.toLocaleString()}), #44`);
+    console.log(`FAIL ${p.slug.padEnd(12)} ${tris.toLocaleString().padStart(9)} live tris — OVER the live budget (${liveTriBudget.toLocaleString()}), #44`);
     budgetFail++;
   } else {
-    process.stdout.write(`${p.slug.padEnd(12)} ${tris.toLocaleString().padStart(9)} tris   (${margin.toFixed(2)}x under the ${liveTriBudget.toLocaleString()} live budget)\n`);
+    process.stdout.write(`${p.slug.padEnd(12)} ${tris.toLocaleString().padStart(9)} live tris   (${margin.toFixed(2)}x under the ${liveTriBudget.toLocaleString()} live budget)\n`);
   }
 }
 await browser.close(); server.close();
@@ -149,7 +154,7 @@ const bboxDrift = (a, b) => {
 for (const p of PRESETS) {
   const now = manifest[p.slug], was = committed[p.slug];
   if (!was) { console.log(`FAIL ${p.slug}: no committed manifest entry (run without --check and commit)`); fail++; continue; }
-  if (now.tris !== was.tris) { console.log(`FAIL ${p.slug}: tris ${was.tris} -> ${now.tris}`); fail++; continue; }
+  if (now.tris !== was.tris) { console.log(`FAIL ${p.slug}: live tris ${was.tris} -> ${now.tris}`); fail++; continue; }
   const drift = bboxDrift(now.bbox, was.bbox);
   if (drift > 1e-3) { console.log(`FAIL ${p.slug}: bbox drift ${drift.toFixed(4)} units`); fail++; continue; }
   console.log(`ok   ${p.slug}`);

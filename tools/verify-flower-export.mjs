@@ -582,7 +582,7 @@ let failed = 0;
 console.log('Flower STL export — watertightness gate\n');
 for (const r of results) {
   if (!r.ok) failed++;
-  const detail = r.note ? r.note : `${r.tris.toLocaleString()} tris, boundaryEdges=${r.boundary}, nonManifold(overlaps)=${r.nonManifold}, shells=${r.shells}`;
+  const detail = r.note ? r.note : `${r.tris.toLocaleString()} export tris, boundaryEdges=${r.boundary}, nonManifold(overlaps)=${r.nonManifold}, shells=${r.shells}`;
   console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.label.padEnd(46)} ${detail}`);
 }
 const mat = results.filter((r) => r.matrix);

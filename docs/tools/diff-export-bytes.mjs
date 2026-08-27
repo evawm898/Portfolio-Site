@@ -568,6 +568,6 @@ await browser.close();
 server.close();
 
 for (const r of results) {
-  console.log(`${r.sha || '-'.repeat(16)}  ${String(r.tris ?? 0).padStart(9)} tris  ${String(r.bytes ?? 0).padStart(10)} B  ${r.label}`);
+  console.log(`${r.sha || '-'.repeat(16)}  ${String(r.tris ?? 0).padStart(9)} export tris  ${String(r.bytes ?? 0).padStart(10)} B  ${r.label}`);
 }
 if (setFailures.length) { for (const f of setFailures) console.error('CONFIG DID NOT TAKE: ' + f); process.exit(1); }
