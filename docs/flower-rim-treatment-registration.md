@@ -106,20 +106,79 @@ cantilever. At SLA it is below the minimum outright.
 ### The export gate cannot see any of this
 
 `addTube` caps both ends in export mode, so a free-floating strut is a closed solid.
-`boundary === 0` on every one of these designs. The connectedness gate is the one that
-sees it:
+`boundary === 0` on every one of these designs. The connectedness gate is the one that sees
+it. The eleven new rows, run in CI on the gates-only commit (`3b18786`) **before** the fix —
+41 configs, 37 one piece, 4 failing:
 
 ```
-ok    TOOTHED tipRegion 0.25 (CONTROL)                components=1   stray=0
-FAIL  TOOTHED tipRegion 1.00                          components=19  stray=1.45%
-FAIL  TOOTHED tipRegion 1.00 + bundle 1 / flare 0     components=37  stray=7.86%
-ok    SCALLOPED height 1.0                            components=1   stray=0
+ok    TOOTHED tipRegion 0.25 (CONTROL)                    components=1   stray=0
+ok    TOOTHED tipRegion 0.57 (threshold marker)           components=1   stray=0
+FAIL  TOOTHED tipRegion 1.00                              components=19  stray=1.45%
+FAIL  TOOTHED tipRegion 1.00 + bundle 1 / flare 0         components=37  stray=7.86%
+FAIL  TOOTHED tipRegion 1.00 + tipFrequency 40            components=47  stray=3.97%
+ok    TOOTHED tipRegion 1.00, continuous margin OFF       components=1   stray=0
+ok    SCALLOPED default height                            components=1   stray=0
+ok    SCALLOPED height 1.0                                components=1   stray=0
+FAIL  SCALLOPED height 1.0, continuous margin OFF         components=2   stray=0.001%
+ok    RUFFLED (contrast row)                              components=1   stray=0
 ```
 
-Nineteen and thirty-seven detached pieces, watertight throughout. Not every free strut
-detaches — 6 free × 9 petals is 54 candidates against 19 components — because a strut whose
-inner end happens to land on a vein stays attached and merely cantilevers. That is the
-gate's own stated false-pass direction (surface occupancy, not solid), so 19 is a floor.
+Nineteen, thirty-seven and forty-seven detached pieces, watertight throughout. Not every
+free strut detaches — 6 free × 9 petals is 54 candidates against 19 components — because a
+strut whose inner end happens to land on a vein stays attached and merely cantilevers. That
+is the gate's own stated false-pass direction, so 19 is a floor.
+
+**The `continuous margin OFF` row is the point of the pair**: same design, same TIP REGION
+1.00, one piece. The asymmetry is now a gate row rather than a sentence in a comment.
+
+**Two honest caveats about these rows.**
+
+*The 0.57 row does not detect the defect.* It is the measured threshold — the first TIP
+REGION at which a tooth falls below the splice — but at 2 free struts per petal the inner
+ends land on veins and the 0.6 mm voxel test reads them as attached. It is a threshold
+*marker*, kept because a future change that moves the threshold should be visible; it is
+not evidence of detection at that setting.
+
+*The SCALLOPED / continuous-margin-OFF failure was not a geometry defect at all* — see
+below.
+
+### The row that failed for a reason nobody predicted
+
+`SCALLOPED height 1.0, continuous margin OFF` reported 2 components on a commit containing
+**no geometry change**, so it was pre-existing on `main`. The second component was a
+**single voxel with a 0×0×0 bounding box** at (33.842, 7.771, −14.240) mm.
+
+That is the gate, not the flower. Two independent signatures on the same STL buffer:
+
+| probe | result |
+|---|---|
+| 6-connected, cell 0.60 mm (shipped) | **2 components** |
+| 26-connected, cell 0.60 mm | 1 component |
+| 6-connected, cell 0.45 mm | 1 component |
+| 6-connected, cell 0.30 mm | 1 component |
+
+A real gap does not close when the cell *shrinks*. The rasteriser sampled each triangle at
+`cell × 0.5`, derived from the triangle's longest edge, and `Math.round` snaps each sample
+to the nearest cell centre — so a thin oblique feature can occupy a cell none of whose six
+face-neighbours were ever sampled. Sample-step sweep at the shipped cell, 6-connectivity
+throughout:
+
+| sample step | components | occupied voxels |
+|---|---|---|
+| `cell × 0.50` (shipped) | **2** | 124,634 |
+| `cell × 0.35` | 1 | 126,761 |
+| `cell × 0.25` | 1 | 128,267 |
+| `cell × 0.20` | 1 | 129,037 |
+
+The shipped step was missing ~1.7% of the cells the surface passes through. Fixed to
+`cell × 0.25` (+47% on the voxel pass: 1007 ms → 1482 ms on that row). **Not a loosening**,
+though it turns a red green: denser sampling can only add voxels the surface genuinely
+passes through, so it can never bridge a real gap — only stop splitting one surface from
+itself.
+
+The gate's header claimed it "cannot produce a false ALARM, only a false pass on a hairline
+touch". That was false, and this was the counterexample. Corrected in place and recorded as
+**#96**, which stays open for the residual risk: a quarter cell is a margin, not a proof.
 
 ### The fix
 
@@ -191,6 +250,9 @@ It was two clicks from the default landing state.
   every process floor, so `MARGIN_W_BASE` / `MARGIN_W_TIP` and their 5:1 taper have no
   effect on any exported model.
 - **#94** — `buildScallopEdge` and the discarded basal 44%, above.
+- **#96** — the connectedness gate's false-alarm mode, above. The sampler is fixed here;
+  the issue stays open for conservative voxelisation, which would be a proof rather than a
+  sample-step margin.
 
 ## Four comments that asserted a fact with no gate behind it
 

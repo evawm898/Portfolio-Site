@@ -251,7 +251,15 @@ export const CONTROLS = [
   {"id":"boneCurve","section":"acc-lace","kind":"slider","min":-1,"max":1,"step":0.01,"default":0.55,"label":"Bone curve","fmt":"signed2","visibleWhen":{"id":"infillType","oneOf":["bone"]}},
   {"id":"boneSpread","section":"acc-lace","kind":"slider","min":0,"max":1,"step":0.01,"default":0.85,"label":"Bone spread","fmt":"f2","visibleWhen":{"id":"infillType","oneOf":["bone"]}},
   {"id":"boneOutline","section":"acc-lace","kind":"checkbox","default":true,"label":"Petal outline","visibleWhen":{"id":"infillType","oneOf":["bone"]}},
-  {"id":"tipStyle","section":"acc-edge","kind":"select","options":[{"value":"clean","text":"CLEAN"},{"value":"jagged","text":"TOOTHED"},{"value":"scallop","text":"SCALLOPED"},{"value":"ruffled","text":"RUFFLED"}],"default":"clean","label":"Edge","tier":"standard"},
+  // SCALLOPED is UNLISTED BUT LIVE: hidden + disabled, so it cannot be picked, while the
+  // value stays reserved and still builds. Each scallop arc bulges off a treatment-blind
+  // material boundary with nothing filling it — an empty lens ~6.7 mm deep at the default
+  // height, ~11.0 mm at height 1.0 (measured). It was NOT hard to reach: `advancedOnly`
+  // appears nowhere in this file, so ADV_OPTIONS is {} and this control is tier "standard"
+  // — it was two clicks from the default landing state. Delisted rather than deleted so a
+  // saved design keeps rendering byte-identically (no migration, no geometry movement);
+  // it returns by removing these two flags. See docs/flower-rim-treatment-registration.md.
+  {"id":"tipStyle","section":"acc-edge","kind":"select","options":[{"value":"clean","text":"CLEAN"},{"value":"jagged","text":"TOOTHED"},{"value":"scallop","text":"SCALLOPED","hidden":true,"disabled":true},{"value":"ruffled","text":"RUFFLED"}],"default":"clean","label":"Edge","tier":"standard"},
   {"id":"tip","section":"acc-edge","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Tip shape","fmt":"f2","tier":"standard"},
   {"id":"tipFineness","section":"acc-edge","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Tip fineness","fmt":"f2","tier":"standard"},
   {"id":"tipFrequency","section":"acc-edge","kind":"slider","min":1,"max":40,"step":1,"default":14,"label":"Tip frequency","fmt":"int","visibleWhen":{"id":"tipStyle","oneOf":["jagged","ruffled"]}},

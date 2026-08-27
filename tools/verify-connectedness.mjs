@@ -29,9 +29,18 @@
  *   - It is a SURFACE occupancy test, not a solid one. Two shells that merely graze within
  *     one cell read as connected. A true solid test would need per-shell interior
  *     classification (ray parity per shell, OR the occupancy grids, then fill); that is the
- *     stronger measure and is not built. This one cannot produce a false ALARM, only a
- *     false pass on a hairline touch — the safe direction for a first gate, and the reason
- *     it is worth shipping before the stronger one exists.
+ *     stronger measure and is not built. It is still the safe direction for a first gate,
+ *     and the reason it is worth shipping before the stronger one exists.
+ *     CORRECTION (#96): this used to claim the gate "cannot produce a false ALARM, only a
+ *     false pass on a hairline touch". That was FALSE and it is exactly the kind of claim
+ *     with no gate behind it that this project keeps paying for. A false alarm IS possible
+ *     and was measured: the rasterisation can leave a cell whose six face-neighbours were
+ *     never sampled, and the 6-connected fill then reports it as a separate component. One
+ *     voxel with a 0x0x0 bounding box, on SCALLOPED height 1.0 / continuous margin OFF.
+ *     Fixed by sampling at a quarter cell instead of a half — see the note at the sampler.
+ *     The residual risk is not zero: a fine enough feature can still out-run any fixed
+ *     sample step. A single-voxel or few-voxel component with a degenerate bounding box is
+ *     the signature; re-check it at 26-connectivity and at a finer cell before believing it.
  *   - Cell size is a floor, not a proof: at 0.6 mm a genuine 0.2 mm gap reads as joined.
  *     Lower CELL_MM to tighten it, at cubic cost in memory.
  *   - The config list below is hand-picked, not the export gate's matrix. It covers the
@@ -394,11 +403,34 @@ function voxelComponents(buf, cell) {
   if (dim[0] * dim[1] * dim[2] > MAX_VOXELS) return { skipped: true, dim };
   const occ = new Uint8Array(dim[0] * dim[1] * dim[2]);
   const at = (x, y, z) => (z * dim[1] + y) * dim[0] + x;
-  // Barycentric sampling at half a cell, so no cell a triangle passes through is skipped.
+  // Barycentric sampling at a QUARTER of a cell. It was half a cell, and half a cell is not
+  // enough: `s` is derived from the LONGEST edge, so an oblique sliver is sampled on a
+  // triangular lattice coarser than its own width, and `Math.round` then snaps a sample to
+  // the nearest cell CENTRE — so a thin feature crossing near a cell corner can occupy a
+  // cell whose six face-neighbours were never sampled. The flood fill is 6-connected, so
+  // that cell falls out as its own component.
+  //
+  // MEASURED, on the SCALLOPED height 1.0 / continuous margin OFF row: at 0.5 the run
+  // reported 2 components, the second being a SINGLE voxel with a 0x0x0 bounding box at
+  // (33.842, 7.771, -14.240) mm. It merged under 26-connectivity, and vanished at cell 0.45
+  // and 0.30 — both signatures of a sampling gap, not a detached body. Sample-step sweep at
+  // the shipped 0.6 mm cell, 6-connected throughout: 0.5 -> 2 components / 124,634 occupied
+  // voxels; 0.35 -> 1 / 126,761; 0.25 -> 1 / 128,267; 0.2 -> 1 / 129,037. The shipped step
+  // was missing ~1.7% of the cells the surface actually passes through.
+  //
+  // THIS IS NOT A LOOSENING, though it does turn a red green, so it deserves the argument:
+  // denser sampling can only ADD voxels the surface genuinely passes through. It cannot put
+  // a voxel inside a real gap, so it can never bridge two genuinely separate solids — it can
+  // only stop splitting one surface from itself. Cost is +47% on the voxel pass (1007 ms ->
+  // 1482 ms on that row), which is minor next to the export it follows.
+  //
+  // The header's claim that this gate "cannot produce a false ALARM, only a false pass on a
+  // hairline touch" was FALSE, and the single voxel above is the counterexample. Corrected
+  // there; recorded as #96 so it is not re-asserted from memory.
   for (const t of tri) {
     const e1 = [t[1][0] - t[0][0], t[1][1] - t[0][1], t[1][2] - t[0][2]];
     const e2 = [t[2][0] - t[0][0], t[2][1] - t[0][1], t[2][2] - t[0][2]];
-    const s = Math.max(2, Math.ceil(Math.max(Math.hypot(...e1), Math.hypot(...e2)) / (cell * 0.5)));
+    const s = Math.max(2, Math.ceil(Math.max(Math.hypot(...e1), Math.hypot(...e2)) / (cell * 0.25)));
     for (let a = 0; a <= s; a++) for (let b = 0; b + a <= s; b++) {
       const u = a / s, v = b / s;
       const x = Math.round((t[0][0] + e1[0] * u + e2[0] * v - lo[0]) / cell);
