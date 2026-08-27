@@ -3992,14 +3992,18 @@ function migrateV3toV4(p) {
 // 0, thickScale 1, reliefMode 'radial' — all no-ops), so filling from DEFAULTS leaves
 // every prior design byte-identical.
 //
-// The three relief keys are retired at v19 and no longer have DEFAULTS entries, so this
-// loop now writes `undefined` for them. That is deliberate and harmless: migrations are
-// APPEND-ONLY (editing one changes what an already-saved design means), no migration
-// between v5 and v19 reads those keys, and v18 -> v19 deletes them outright. Left as-is
-// rather than quietly rewriting history.
+// The three RELIEF keys this migration introduced are dropped from the backfill list: they
+// are retired at v19 and no longer have DEFAULTS entries, so the loop would have written
+// `undefined` for them, leaving a live code reference to a retired id in the one file where
+// that matters most. Append-only protects a migration's SEMANTICS, and there are none to
+// protect here — proven, not assumed: (a) where a saved design already carries the key the
+// `!(k in out)` guard never touched it, (b) no migration from v5 to v18 reads any of the
+// three in executable code, and (c) v18 -> v19 deletes all three unconditionally. So the
+// end state is key-absent either way, for every design at every starting version.
+// verify-registry-sync.mjs check 6 now fails the build if one comes back.
 function migrateV4toV5(p) {
   const out = { ...p };
-  for (const k of ['reliefAmp', 'reliefFreq', 'reliefMode', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
+  for (const k of ['petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
     if (!(k in out)) out[k] = DEFAULTS[k];
   }
   return out;

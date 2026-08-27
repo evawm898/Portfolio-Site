@@ -250,6 +250,16 @@ for (const c of CONTROLS) {
 //   3. a DEFAULTS key              — DEFAULTS is derived from the registry, but flower.js
 //                                    also assigns a few keys directly (autoRotate,
 //                                    spaceSeed); those are parsed out rather than assumed
+//
+// SCOPE, STATED PLAINLY — because a check that reads broader than it is, is how this
+// codebase has been misled before. Checks 5 and 6 are TEXTUAL scans over a HARDCODED file
+// list (DRIVER_FILES, SOURCE_FILES). They are not a reference analysis: a retired id
+// reached by computed access (`p[k]`, `state['relief' + x]`), or living in a file absent
+// from both lists, is NOT caught. The lists are the coverage, so a new tool that sets
+// controls by id, or a new app source file, must be added to one of them or it is unchecked.
+// What the two scans DO cover is the split that actually bit: check 5 sees files that SET
+// controls by id and cannot see the app's own source; check 6 sees the app's own source and
+// is the one that caught migrateV4toV5 still carrying all three ids in a plain string list.
 // Plus two structural checks, because a malformed reservation is not a reservation: every
 // entry needs an id, a retiredAt version and a why; and the retirement must be BACKED BY A
 // MIGRATION THAT DELETES THE KEY. That last one is not pedantry — migrateDesign() sweeps
@@ -267,6 +277,8 @@ for (const c of CONTROLS) {
     'tools/gen-preset-thumbs.mjs', 'docs/tools/diff-export-bytes.mjs',
     'flower-presets.js', 'flower-view-presets.js', 'flower-shapes.js',
   ];
+  // The app's own source, scanned for surviving code references (check 6).
+  const SOURCE_FILES = ['flower.js', 'flower-geometry.js', 'flower-registry.js', 'flower-sdf.js', 'flower-shapes.js', 'flower-chrome.js', 'flower-saved.js'];
   const { RETIRED_IDS } = await import(REPO + 'flower-registry.js');
   if (!Array.isArray(RETIRED_IDS)) {
     err('flower-registry.js does not export RETIRED_IDS — the permanent-reservation list is how a '
@@ -297,6 +309,27 @@ for (const c of CONTROLS) {
       if (!new RegExp('delete\\s+\\w+\\.' + r.id + '\\b').test(JS)) {
         err(`RETIRED_IDS "${r.id}": no migration in flower.js deletes this key. migrateDesign() preserves keys with no control verbatim in \`extras\` on re-save, so without a \`delete out.${r.id}\` the retired value is carried forward indefinitely — reserved on paper and alive in every saved design.`);
       }
+      // 6. nothing may still REFERENCE the id in executable code. Check 5 covers files that
+      // SET controls by id; this covers the app's own source, where a retired id can survive
+      // as a plain string in a list — which is exactly what happened: migrateV4toV5's backfill
+      // array still carried all three ids after the controls were deleted, and check 5 could
+      // not see it because flower.js is not a driver file. Comments are stripped first (the
+      // migration notes name retired ids in prose, legitimately); string literals are NOT
+      // stripped, because the backfill names them as strings and that is the case worth
+      // catching. Two allowances: the `delete <obj>.<id>` that check 4 REQUIRES, and the
+      // RETIRED_IDS declaration itself, which has to name them.
+      for (const f of SOURCE_FILES) {
+        let src;
+        try { src = readFileSync(REPO + f, 'utf8'); } catch { continue; }
+        src = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+        src = src.replace(/export const RETIRED_IDS = \[[\s\S]*?\n\];/, ' ');
+        src = src.replace(new RegExp('delete\\s+\\w+\\.' + r.id + '\\b', 'g'), ' ');
+        if (new RegExp('\\b' + r.id + '\\b').test(src)) {
+          const line = (src.split('\n').findIndex((l) => new RegExp('\\b' + r.id + '\\b').test(l)) + 1);
+          err(`RETIRED_IDS "${r.id}" is still REFERENCED in executable code: ${f}:${line}. A retired id `
+            + `surviving in a list or an expression is the reservation defeated in the one file that matters most.`);
+        }
+      }
       // 5. nothing may still DRIVE the id — a gate matrix, a preset, a shot config.
       // Deleting reliefAmp's control while four export configs still said
       // `{ id: 'reliefAmp', value: '0.7' }` was caught only by the export gate's read-back
@@ -305,6 +338,11 @@ for (const c of CONTROLS) {
       // second instead. Two forms are searched: the `{ id: 'x' }` a config/matrix row uses,
       // and the `x:` an authored preset uses. Comments are free to name a retired id (the
       // migration notes do); only a driving reference fails.
+      //
+      // THIS CHECK COVERS DRIVER_FILES ONLY — files that set controls by id. It says nothing
+      // about the app's own source, where flower.js is deliberately absent from the list;
+      // code references are check 6's job, and the two are separate because the first
+      // version of this shipped with only check 5 and read as though it covered both.
       for (const f of DRIVER_FILES) {
         let src;
         try { src = readFileSync(REPO + f, 'utf8'); } catch { continue; }
