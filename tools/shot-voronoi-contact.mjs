@@ -129,7 +129,10 @@ await page.evaluate(() => {
     const out = [];
     const ar = document.getElementById('autoRotate');
     if (!ar || ar.checked) out.push('autoRotate still on');
-    for (const sel of ['.fl-panel', '.fl-viewpanel', '.fl-header', '.fl-hint']) {
+    // Every piece of chrome, or the audit measures a frame with the UI drawn over it.
+    // .fl-rail and .fl-panel__toggle joined the list when the tick rail and the collapse
+    // arrows landed; the panel is now flush right, so anything left here sits ON the bloom.
+    for (const sel of ['.fl-panel', '.fl-viewpanel', '.fl-header', '.fl-hint', '.fl-rail', '.fl-panel__toggle']) {
       const el = document.querySelector(sel);
       if (el && getComputedStyle(el).display !== 'none') out.push(sel + ' still visible');
     }
