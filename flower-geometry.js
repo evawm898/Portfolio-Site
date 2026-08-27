@@ -3588,7 +3588,11 @@ export function placeDir(d, az, tilt = 0) {
 
    buildJaggedEdge returns LOCAL-frame geometry (or null when not jagged):
      rim        : ordered [{x,y,z}] closed outline, weaving through the teeth
-     teethVeins : [ [{x,y,z}...] ]  one small mid-vein polyline per tooth
+     teethVeins : [ { points: [{x,y,z}...], u } ]  one mid-vein per tooth, TAGGED with
+                  the station its tooth sits at. The tag is not decoration: the mid-vein
+                  only belongs in the model where its TOOTH does, and under continuous
+                  margin that is decided by rimCoversStation(). A vein whose tooth the rim
+                  discarded is a free-standing spike — see rimCoversStation's own note.
    The render layer places these into the bloom exactly like every other point.
    ------------------------------------------------------------------- */
 
@@ -3768,9 +3772,17 @@ export function buildJaggedEdge(P, spine, rng) {
   half['-1'].reverse();                           // -Y was walked tip -> base; store base -> tip
 
   // ---- a fine mid-vein running from inside the petal into each tooth's peak --
+  // TAGGED with its tooth's station. The vein exists to fill a tooth, so it belongs in the
+  // model exactly where the tooth does and nowhere else; the consumer decides that by
+  // asking rimCoversStation(u), the same function the rim itself asks. The tag is taken
+  // from the tooth that was actually built (t.uc) rather than re-derived from
+  // tipRegionRange + TIP FREQUENCY, so it cannot drift from where the tooth is.
   const teethVeins = [];
-  for (const t of [...plus, ...minus]) teethVeins.push([t.footInner, t.peak]);
-  teethVeins.push([surfacePoint(0.9, 0, P, spine), apexPeak]);  // into the apex tooth
+  for (const t of [...plus, ...minus]) teethVeins.push({ points: [t.footInner, t.peak], u: t.uc });
+  // The apex tooth wraps the very tip at uEnd — always the tip-most station on the rim, so
+  // it survives any splice. Its vein is tagged uEnd for the same reason the others are:
+  // so the consumer never has to special-case it.
+  teethVeins.push({ points: [surfacePoint(0.9, 0, P, spine), apexPeak], u: uEnd });
 
   return { rim, teethVeins, half, uStart };
 }
@@ -3798,14 +3810,47 @@ export function rimSpliceU(P, treat) {
   return (treat && treat.half) ? Math.max(u, treat.uStart) : u;
 }
 
+/* IS THE TREATED RIM PRESENT AT STATION u? — ONE OWNER, every consumer reads it.
+
+   A rim treatment has more than one consumer: the margin itself (the hoop, or the two
+   strands under continuous margin) and the geometry that FILLS the treatment — today the
+   tooth mid-veins, tomorrow whatever a scallop or a fringe gets. Those consumers have to
+   agree about which stations carry the treatment, and for months they did not: the strand
+   applied `q.u >= rimSpliceU` and the mid-vein loop applied nothing, so every tooth the
+   splice discarded left its mid-vein behind — a Ø1.0 mm needle up to 16 mm long with a
+   free end, pointing at a tooth that was never built. Reachable from the panel, and the
+   export gate cannot see it: the tube is capped, so `boundary === 0` throughout. The
+   project's own connectedness gate reads 19 and 37 detached components on it.
+
+   That is the registration rule pointed at a FILTER rather than at a boundary. The answer
+   lives here once; `treatedStrandPoints` and the mid-vein consumer in flower.js both ask,
+   and neither re-derives it. Adding the same `>= rimSpliceU` test at the second call site
+   would have fixed today's symptom and left two consumers each deciding for themselves
+   what the splice means — which is the defect in miniature.
+
+   Under a closed hoop (continuous margin OFF, or no treatment at all) every station is on
+   the treated rim, so the answer is unconditionally true and every tooth keeps its vein.
+   That asymmetry is a gate row in verify-connectedness.mjs, not just this note.
+
+   NOTE this says where the rim IS, not where teeth SHOULD reach. Below the splice the
+   margin is deliberately the bundled strands — that is what continuous margin is for —
+   so teeth do not exist down there and their veins must not either. Wanting teeth all the
+   way to the base is a margin-design change with a contact sheet, not a change here.  */
+export function rimCoversStation(u, P, treat) {
+  const contMargin = !!P.continuousMargin && !P.solidBlade;
+  if (!contMargin || !treat || !treat.half) return true;
+  return u >= rimSpliceU(P, treat);
+}
+
 // Ordered LOCAL-frame points for one treated strand: the bundled stretch of the strand
-// (mapped through `mapFlat`), then the treatment's own half above the splice.
+// (the stations the treated rim does NOT cover, mapped through `mapFlat`), then the
+// treatment's own half over the stations it does. The two halves are complementary by
+// construction because they ask rimCoversStation the same question.
 export function treatedStrandPoints(strandPoints, side, treat, P, mapFlat) {
   if (!treat || !treat.half) return strandPoints.map(mapFlat);
-  const uS = rimSpliceU(P, treat);
   const out = [];
-  for (const p of strandPoints) if ((p.x / Math.max(P.L, 1e-6)) < uS) out.push(mapFlat(p));
-  for (const q of treat.half[String(side)]) if (q.u >= uS) out.push(q.p);
+  for (const p of strandPoints) if (!rimCoversStation(p.x / Math.max(P.L, 1e-6), P, treat)) out.push(mapFlat(p));
+  for (const q of treat.half[String(side)]) if (rimCoversStation(q.u, P, treat)) out.push(q.p);
   return out;
 }
 

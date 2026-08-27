@@ -410,6 +410,16 @@ CONFIGS.push({ label: 'cont-margin TOOTHED long + irregular + max cup', cm: true
 CONFIGS.push({ label: 'cont-margin SCALLOPED tall', cm: true, smoke: true, set: [{ id: 'petalCup', value: '0' }, { id: 'tipIrregularity', value: '0' }, { id: 'tipStyle', value: 'scallop', evt: 'change' }, { id: 'scallopCount', value: '9' }, { id: 'scallopHeight', value: '1' }] });
 CONFIGS.push({ label: 'cont-margin SCALLOPED max count + quilled cross-section', cm: true, set: [{ id: 'scallopCount', value: '30' }, { id: 'crossSection', value: '1' }] });
 CONFIGS.push({ label: 'cont-margin TOOTHED + cleft (treatment on a clefted strand)', cm: true, set: [{ id: 'crossSection', value: '0' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.5' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' }] });
+// TIP REGION PAST THE SPLICE. Every other TOOTHED config here sits at tipRegion 0.25-0.35,
+// i.e. entirely above the margin flare end, so none of them ever exercised a tooth the
+// continuous-margin rim discards. That is where the tooth mid-veins used to be emitted for
+// teeth that were never built (free-ended struts; connectedness gate read 19 and 37 pieces
+// at boundary === 0). 0.57 is the measured threshold at default bundle/flare — 0.56 is
+// clean — and the bundle/flare row moves the splice instead of the region, which is the
+// other side of the same inequality. See docs/flower-rim-treatment-registration.md.
+CONFIGS.push({ label: 'cont-margin TOOTHED tipRegion 0.57 (first station past the splice)', cm: true, smoke: true, set: [{ id: 'cleftDepth', value: '0' }, { id: 'cleftLobes', value: '2' }, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipLength', value: '0.5' }, { id: 'tipRegion', value: '0.57' }] });
+CONFIGS.push({ label: 'cont-margin TOOTHED tipRegion 1.0 + bundle 1 / flare 0 (deepest discard)', cm: true, smoke: true, set: [{ id: 'tipRegion', value: '1' }, { id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }] });
+CONFIGS.push({ label: 'cont-margin reset after the splice rows', cm: true, set: [{ id: 'tipRegion', value: '0.25' }, { id: 'bundleTightness', value: '0.5' }, { id: 'flareRate', value: '0.5' }] });
 CONFIGS.push({ label: 'cont-margin reset after rim treatments', cm: true, set: [{ id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'cleftDepth', value: '0' }, { id: 'tipLength', value: '0.3' }, { id: 'tipFrequency', value: '14' }, { id: 'tipRegion', value: '0.25' }, { id: 'scallopCount', value: '9' }, { id: 'scallopHeight', value: '0.4' }] });
 
 // ===== SHIPPED PRESETS: every curated preset (flower-presets.js) is a permanent
@@ -454,11 +464,15 @@ await page.route('**cdn.jsdelivr.net/**', (route) => {
 await page.goto(`http://localhost:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
 await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
 
-// ADVANCED. In Standard the tier rewrites tipStyle 'jagged'/'scallop' -> 'clean' and
-// bloomType 'bilateral' -> 'coiled' (ADV_OPTIONS in flower.js), so a config naming one of
-// those would export a DIFFERENT design from the one its label claims — silently, and
-// with a plausible-looking triangle count. That is how three different TOOTHED configs
-// first came back with byte-identical counts here.
+// ADVANCED. Advanced-tier CONTROLS (tipRegion, bundleTightness, flareRate, the cleft and
+// cross-section sets) are hidden in Standard, so a config naming one of them is only
+// meaningful with this on. It is NOT about tipStyle: `advancedOnly` appears nowhere in
+// flower-registry.js today, so ADV_OPTIONS is {} and no option is tier-rewritten by
+// anything — the older claim here, that Standard rewrites tipStyle 'jagged'/'scallop' to
+// 'clean' and bloomType 'bilateral' to 'coiled', stopped being true and stayed in four
+// files for months, which is the defect this codebase repeats most. The MECHANISM is
+// still live for any future advancedOnly option, and the read-back assertion below is
+// what actually catches it — not this comment.
 await page.evaluate(() => {
   const t = document.getElementById('advancedToggle');
   if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }

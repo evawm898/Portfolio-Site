@@ -27,7 +27,7 @@ import {
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
-  ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints,
+  ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints, rimCoversStation,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS, evalPredicate, predicateDrivers } from './flower-registry.js';
@@ -1468,9 +1468,14 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // the outline is turned off).
   // The tooth mid-veins follow the teeth, so they are drawn whenever the teeth are —
   // under continuous margin too. Only BONE-with-the-outline-off has no rim to carry them.
+  // PER TOOTH, not per petal: under continuous margin the rim keeps only the teeth above
+  // the splice, so a vein for a tooth below it would stand in open air with a free end.
+  // rimCoversStation is the SAME function treatedStrandPoints asks — one owner for "is the
+  // treated rim here", so this loop and the strand cannot disagree about which teeth exist.
   if (jag && (drawRim || (contMargin && jag.half))) {
     for (const v of jag.teethVeins) {
-      acc.addTube(v.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
+      if (!rimCoversStation(v.u, P, jag)) continue;
+      acc.addTube(v.points.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
     }
   }
   // Welded caps seal the open tube ends (free vein tips, and the T-junctions

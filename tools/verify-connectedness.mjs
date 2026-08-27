@@ -29,9 +29,18 @@
  *   - It is a SURFACE occupancy test, not a solid one. Two shells that merely graze within
  *     one cell read as connected. A true solid test would need per-shell interior
  *     classification (ray parity per shell, OR the occupancy grids, then fill); that is the
- *     stronger measure and is not built. This one cannot produce a false ALARM, only a
- *     false pass on a hairline touch — the safe direction for a first gate, and the reason
- *     it is worth shipping before the stronger one exists.
+ *     stronger measure and is not built. It is still the safe direction for a first gate,
+ *     and the reason it is worth shipping before the stronger one exists.
+ *     CORRECTION (#96): this used to claim the gate "cannot produce a false ALARM, only a
+ *     false pass on a hairline touch". That was FALSE and it is exactly the kind of claim
+ *     with no gate behind it that this project keeps paying for. A false alarm IS possible
+ *     and was measured: the rasterisation can leave a cell whose six face-neighbours were
+ *     never sampled, and the 6-connected fill then reports it as a separate component. One
+ *     voxel with a 0x0x0 bounding box, on SCALLOPED height 1.0 / continuous margin OFF.
+ *     Fixed by sampling at a quarter cell instead of a half — see the note at the sampler.
+ *     The residual risk is not zero: a fine enough feature can still out-run any fixed
+ *     sample step. A single-voxel or few-voxel component with a degenerate bounding box is
+ *     the signature; re-check it at 26-connectivity and at a finer cell before believing it.
  *   - Cell size is a floor, not a proof: at 0.6 mm a genuine 0.2 mm gap reads as joined.
  *     Lower CELL_MM to tighten it, at cubic cost in memory.
  *   - The config list below is hand-picked, not the export gate's matrix. It covers the
@@ -225,6 +234,78 @@ const CONFIGS = [
   { label: 'radial tightness 0 + stem + sepals (empty attach ring, real neck)', stem: true,
     set: [{ id: 'tightness', value: '0' }] },
 
+  // ===== RIM TREATMENTS — the state this gate had never exercised ==================
+  // Not one row above sets a tip style, so every row above is a CLEAN margin. That is the
+  // same blindness that let #84 ship: the gate never entered the state where the defect
+  // lives. TOOTHED emits one mid-vein per tooth (buildJaggedEdge's teethVeins); under
+  // continuous margin the rim consumer drops every tooth below rimSpliceU while the
+  // mid-vein consumer kept all of them, so a discarded tooth left its vein behind as a
+  // free-standing spike. Measured: free iff the tooth station uc < rimSpliceU, tooth by
+  // tooth, on every config tried. See docs/flower-rim-treatment-registration.md.
+  //
+  // BOTH POLARITIES OF `continuousMargin` ARE ROWS, deliberately. The defect exists only
+  // with it ON — with it OFF the closed hoop carries every tooth — and an asymmetry that
+  // lives only in a comment is one nobody can check. TIP REGION 0.25 / 0.57 / 1.00 are the
+  // shipped default, the measured threshold (0.56 clean, 0.57 broken at default
+  // bundle/flare) and the far end; the bundle/flare row moves rimSpliceU instead of uStart,
+  // which is the other half of the same inequality.
+  { label: 'TOOTHED tipRegion 0.25 (shipped default region — CONTROL, clean)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '0.25' }] },
+  { label: 'TOOTHED tipRegion 0.57 (measured threshold: 0.56 clean, 0.57 not)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '0.57' }] },
+  { label: 'TOOTHED tipRegion 1.00 (teeth run to the base)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' }] },
+  { label: 'TOOTHED tipRegion 1.00 + bundle 1 / flare 0 (latest splice)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' },
+          { id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }] },
+  { label: 'TOOTHED tipRegion 1.00 + tipFrequency 40 (most teeth)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' },
+          { id: 'tipFrequency', value: '40' }] },
+  { label: 'TOOTHED tipRegion 1.00, continuous margin OFF (hoop carries every tooth)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'jagged', evt: 'change' }, { id: 'tipRegion', value: '1' },
+          { id: 'continuousMargin', value: 'off', evt: 'change' }] },
+  // SCALLOPED is UNLISTED but LIVE — the option is hidden+disabled in the picker, and the
+  // value still loads and still builds, so a saved design keeps rendering. That makes it a
+  // gate row, not a dead branch: its one-piece result is PINNED here rather than assumed.
+  // Its own defect (each scallop encloses an empty lens, ~6.7 mm deep at the default
+  // height) is a SHAPE defect, not a connectedness one — this gate cannot see it and must
+  // not be read as clearing it. Its discarded basal stretch is #94.
+  { label: 'SCALLOPED default height (unlisted but live)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'scallop', evt: 'change' }] },
+  { label: 'SCALLOPED height 1.0 (tallest scallop)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'scallop', evt: 'change' }, { id: 'scallopHeight', value: '1' }] },
+  { label: 'SCALLOPED height 1.0, continuous margin OFF', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'scallop', evt: 'change' }, { id: 'scallopHeight', value: '1' },
+          { id: 'continuousMargin', value: 'off', evt: 'change' }] },
+  // RUFFLED for contrast: its treatment lives in surfacePoint, so the material field moves
+  // with it and there is no appendage to leave behind. A green row here is what says the
+  // TOOTHED rows above are about teeth and not about "any tip style".
+  { label: 'RUFFLED (surface treatment — contrast row)', stem: false,
+    set: [...BARE, { id: 'tipStyle', value: 'ruffled', evt: 'change' }] },
+  // SERRATED SEPALS — a state every row above is structurally blind to, because they all
+  // use BARE and BARE sets sepalsType none. Sepals are built through the SAME
+  // buildPetalInto, so sepalTipStyle SERRATED runs the same buildJaggedEdge, emits the same
+  // tooth mid-veins, and obeys the same `uc < rimSpliceU`; sepalTipRegion is what tipRegion
+  // is for petals. So a design with CLEAN petals and SERRATED sepals carried the E3 defect,
+  // and nothing here could have seen it. The byte report is what found it: 27 of 188 export
+  // configs moved, 10 struts each at default bundle/flare and 50 at bundle 1 / flare 0 —
+  // all sepals. sepalTipRegion 0.6 is past the threshold (default 0.3 is not).
+  //
+  // READ THIS BEFORE QUOTING A PASS: per #97 this gate sees a free end only once it detaches
+  // at BOTH ends, so green here is COVERAGE of the state, not evidence the struts are gone.
+  // The evidence for that is the triangle delta in docs/flower-rim-treatment-registration.md.
+  { label: 'SERRATED SEPALS past the splice (petals CLEAN — sepals carry the treatment)', stem: true,
+    set: [{ id: 'tipStyle', value: 'clean', evt: 'change' },
+          { id: 'sepalStyle', value: 'strap', evt: 'change' },
+          { id: 'sepalTipStyle', value: 'jagged', evt: 'change' },
+          { id: 'sepalTipRegion', value: '1' }, { id: 'sepalTipLength', value: '0.7' }] },
+  { label: 'SERRATED SEPALS + bundle 1 / flare 0 (latest splice, most discarded)', stem: true,
+    set: [{ id: 'tipStyle', value: 'clean', evt: 'change' },
+          { id: 'sepalStyle', value: 'strap', evt: 'change' },
+          { id: 'sepalTipStyle', value: 'jagged', evt: 'change' },
+          { id: 'sepalTipRegion', value: '1' }, { id: 'sepalTipLength', value: '0.7' },
+          { id: 'bundleTightness', value: '1' }, { id: 'flareRate', value: '0' }] },
+
   // VALIDITY PAIR, and a gate row in its own right. The bare rows above claim "no sepals";
   // this is the same design with sepals ON, so the claim is checked against its own match
   // rather than against a global triangle reference that means nothing.
@@ -237,7 +318,9 @@ const CONFIGS = [
 // Loaded by NAME through the real gallery-click path (applyDesign), exactly as the export
 // and quality gates load them, so a failure reads "preset: Thistle" rather than "config N".
 // All seven are bare blooms (each sets stemType/sepalsType none), so each declares
-// stem: true and the tail probe checks that claim rather than trusting it.
+// stem: false and the tail probe checks that claim rather than trusting it. (This line
+// said `stem: true` while the code below said false — a comment contradicting the code
+// three lines under it, found while adding the rim-treatment rows.)
 // All seven are unmarked: #84 is fixed, so a regression in any of them is a hard failure.
 for (const p of PRESETS) CONFIGS.push({ label: `preset: ${p.name}`, presetSlug: p.slug, stem: false });
 
@@ -343,11 +426,34 @@ function voxelComponents(buf, cell) {
   if (dim[0] * dim[1] * dim[2] > MAX_VOXELS) return { skipped: true, dim };
   const occ = new Uint8Array(dim[0] * dim[1] * dim[2]);
   const at = (x, y, z) => (z * dim[1] + y) * dim[0] + x;
-  // Barycentric sampling at half a cell, so no cell a triangle passes through is skipped.
+  // Barycentric sampling at a QUARTER of a cell. It was half a cell, and half a cell is not
+  // enough: `s` is derived from the LONGEST edge, so an oblique sliver is sampled on a
+  // triangular lattice coarser than its own width, and `Math.round` then snaps a sample to
+  // the nearest cell CENTRE — so a thin feature crossing near a cell corner can occupy a
+  // cell whose six face-neighbours were never sampled. The flood fill is 6-connected, so
+  // that cell falls out as its own component.
+  //
+  // MEASURED, on the SCALLOPED height 1.0 / continuous margin OFF row: at 0.5 the run
+  // reported 2 components, the second being a SINGLE voxel with a 0x0x0 bounding box at
+  // (33.842, 7.771, -14.240) mm. It merged under 26-connectivity, and vanished at cell 0.45
+  // and 0.30 — both signatures of a sampling gap, not a detached body. Sample-step sweep at
+  // the shipped 0.6 mm cell, 6-connected throughout: 0.5 -> 2 components / 124,634 occupied
+  // voxels; 0.35 -> 1 / 126,761; 0.25 -> 1 / 128,267; 0.2 -> 1 / 129,037. The shipped step
+  // was missing ~1.7% of the cells the surface actually passes through.
+  //
+  // THIS IS NOT A LOOSENING, though it does turn a red green, so it deserves the argument:
+  // denser sampling can only ADD voxels the surface genuinely passes through. It cannot put
+  // a voxel inside a real gap, so it can never bridge two genuinely separate solids — it can
+  // only stop splitting one surface from itself. Cost is +47% on the voxel pass (1007 ms ->
+  // 1482 ms on that row), which is minor next to the export it follows.
+  //
+  // The header's claim that this gate "cannot produce a false ALARM, only a false pass on a
+  // hairline touch" was FALSE, and the single voxel above is the counterexample. Corrected
+  // there; recorded as #96 so it is not re-asserted from memory.
   for (const t of tri) {
     const e1 = [t[1][0] - t[0][0], t[1][1] - t[0][1], t[1][2] - t[0][2]];
     const e2 = [t[2][0] - t[0][0], t[2][1] - t[0][1], t[2][2] - t[0][2]];
-    const s = Math.max(2, Math.ceil(Math.max(Math.hypot(...e1), Math.hypot(...e2)) / (cell * 0.5)));
+    const s = Math.max(2, Math.ceil(Math.max(Math.hypot(...e1), Math.hypot(...e2)) / (cell * 0.25)));
     for (let a = 0; a <= s; a++) for (let b = 0; b + a <= s; b++) {
       const u = a / s, v = b / s;
       const x = Math.round((t[0][0] + e1[0] * u + e2[0] * v - lo[0]) / cell);
