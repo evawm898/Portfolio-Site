@@ -144,36 +144,159 @@ function buildGatherSkeleton(feet, neck, opts) {
     prev = { p, r };
   }
 
-  // STRANDS: each foot -> a cubic bezier arriving TANGENTIALLY at the neck surface at the
-  // common arrival height. Radius = the true foot radius (grammar preserved), so a strand
-  // matches the local surface where it joins and blends in via the field's smooth union.
+  // ===================== THE APPROACH (TEMPORARY: three candidate laws) =====================
+  // #100 diagnosis: the area rule sizes the HUB and nothing governs the JOURNEY. On an
+  // 18-petal Daisy the 54 feet run inward from radius 1.017 to 0.098 while descending
+  // 0.024 — a 38:1 run — as 54 parallel capsules that never merge. Measured petal-harmonic
+  // rim amplitude A_k peaks at 0.8525 (live) / 0.8714 (export), and no shipped control gets
+  // it below 0.77. These three laws each govern the approach differently; they exist side by
+  // side ONLY so all three build from one tree and can be measured against each other.
+  // `approachLaw` is a temporary experiment switch, NOT a control and NOT in the registry.
+  // Exactly one of these survives; the other two come out with the switch.
+  const law = opts.approachLaw || 'current';
+  const nFeet = Math.max(1, feet.length);
+  const rA = neckR(yArrival);
   let maxEntryDeg = 0;
-  for (const f of feet) {
-    const az = Math.atan2(f.p[2] - cz, f.p[0] - cx), c = Math.cos(az), s = Math.sin(az);
-    const P0 = f.p.slice();
-    const rA = neckR(yArrival);
-    const P3 = [cx + rA * c, yArrival, cz + rA * s];                 // arrival ON the neck surface
-    const dr = dNeckR(yArrival);
-    const tanEnd = _norm([-c * dr, -1, -s * dr]);                    // down the meridian (tangent to the surface)
-    const tanStart = _norm([-c, -0.4, -s]);                         // leave the foot down-and-in
-    const d = Math.hypot(P3[0] - P0[0], P3[1] - P0[1], P3[2] - P0[2]) || 1e-3;
-    const c1 = [P0[0] + tanStart[0] * d * 0.45, P0[1] + tanStart[1] * d * 0.45, P0[2] + tanStart[2] * d * 0.45];
-    const c2 = [P3[0] - tanEnd[0] * d * 0.45, P3[1] - tanEnd[1] * d * 0.45, P3[2] - tanEnd[2] * d * 0.45];
-    const K = 9;
-    let pr = null;
-    for (let i = 0; i <= K; i++) {
-      const t = i / K, mt = 1 - t, w0 = mt*mt*mt, w1 = 3*mt*mt*t, w2 = 3*mt*t*t, w3 = t*t*t;
-      const pt = [w0*P0[0]+w1*c1[0]+w2*c2[0]+w3*P3[0], w0*P0[1]+w1*c1[1]+w2*c2[1]+w3*P3[1], w0*P0[2]+w1*c1[2]+w2*c2[2]+w3*P3[2]];
-      if (pr) caps.push({ a: pr, b: pt, ra: f.r, rb: f.r });
-      pr = pt;
+
+  // Shared: the UP-STUB into the petal, so the junction overlaps the petal strand tube.
+  // Every law emits these — they are what makes the model one piece at each foot.
+  const emitUpStubs = () => {
+    for (const f of feet) caps.push({ a: f.p.slice(), b: _add(f.p, _mul(_norm(f.up), tube * 4)), ra: f.r, rb: f.r });
+  };
+
+  // Shared: the CURRENT per-foot bezier, foot -> neck surface, arriving tangentially.
+  // `kOf` (optional) returns a per-capsule smooth-union blend radius for the SPACING law.
+  const emitBezierSpokes = (kOf) => {
+    for (const f of feet) {
+      const az = Math.atan2(f.p[2] - cz, f.p[0] - cx), c = Math.cos(az), s = Math.sin(az);
+      const P0 = f.p.slice();
+      const P3 = [cx + rA * c, yArrival, cz + rA * s];                 // arrival ON the neck surface
+      const dr = dNeckR(yArrival);
+      const tanEnd = _norm([-c * dr, -1, -s * dr]);                    // down the meridian (tangent to the surface)
+      const tanStart = _norm([-c, -0.4, -s]);                          // leave the foot down-and-in
+      const d = Math.hypot(P3[0] - P0[0], P3[1] - P0[1], P3[2] - P0[2]) || 1e-3;
+      const c1 = [P0[0] + tanStart[0] * d * 0.45, P0[1] + tanStart[1] * d * 0.45, P0[2] + tanStart[2] * d * 0.45];
+      const c2 = [P3[0] - tanEnd[0] * d * 0.45, P3[1] - tanEnd[1] * d * 0.45, P3[2] - tanEnd[2] * d * 0.45];
+      const K = 9;
+      let pr = null;
+      for (let i = 0; i <= K; i++) {
+        const t = i / K, mt = 1 - t, w0 = mt*mt*mt, w1 = 3*mt*mt*t, w2 = 3*mt*t*t, w3 = t*t*t;
+        const pt = [w0*P0[0]+w1*c1[0]+w2*c2[0]+w3*P3[0], w0*P0[1]+w1*c1[1]+w2*c2[1]+w3*P3[1], w0*P0[2]+w1*c1[2]+w2*c2[2]+w3*P3[2]];
+        if (pr) { const seg = { a: pr, b: pt, ra: f.r, rb: f.r };
+          if (kOf) { const mr = (Math.hypot(pr[0]-cx, pr[2]-cz) + Math.hypot(pt[0]-cx, pt[2]-cz)) * 0.5; seg.k = kOf(mr); }
+          caps.push(seg); }
+        pr = pt;
+      }
+      const endDir = _norm([P3[0] - c2[0], P3[1] - c2[1], P3[2] - c2[2]]);
+      const nrm = _norm([c, -dr, s]);
+      const entry = 90 - Math.acos(Math.min(1, Math.abs(endDir[0]*nrm[0] + endDir[1]*nrm[1] + endDir[2]*nrm[2]))) * 180 / Math.PI;
+      if (entry > maxEntryDeg) maxEntryDeg = entry;
     }
-    // up-stub into the petal so the receptacle overlaps the petal strand tube
-    caps.push({ a: P0, b: _add(P0, _mul(_norm(f.up), tube * 4)), ra: f.r, rb: f.r });
-    // entry angle: bezier end direction vs the neck-surface normal (0 = tangential, 90 = stab)
-    const endDir = _norm([P3[0] - c2[0], P3[1] - c2[1], P3[2] - c2[2]]);
-    const nrm = _norm([c, -dr, s]);
-    const entry = 90 - Math.acos(Math.min(1, Math.abs(endDir[0]*nrm[0] + endDir[1]*nrm[1] + endDir[2]*nrm[2]))) * 180 / Math.PI;
-    if (entry > maxEntryDeg) maxEntryDeg = entry;
+  };
+
+  // ---- LAW A — AREA RULE ALONG THE RUN ----------------------------------------------
+  // r(s)² = Σ r_child² at EVERY station, not only at the hub. Feet are paired with their
+  // azimuthal neighbours into a binary merge tree; each level halves the branch count and
+  // the surviving branch takes the area-rule radius of everything it has absorbed. The
+  // radial schedule is geometric from the foot ring to the neck (a converging tree spends
+  // its levels evenly in log-radius), so by the radius where the current law still shows
+  // `nFeet` spokes this law shows a handful of thick, merged branches. Monotone taper by
+  // construction: a parent is never thinner than either child.
+  const emitAreaRunTree = () => {
+    let nodes = feet.map((f) => ({
+      az: Math.atan2(f.p[2] - cz, f.p[0] - cx),
+      R: Math.hypot(f.p[0] - cx, f.p[2] - cz),
+      y: f.p[1], r: f.r, p: f.p.slice(),
+    })).sort((a, b) => a.az - b.az);
+    const R0 = nodes.reduce((s2, n) => s2 + n.R, 0) / nodes.length;
+    const levels = Math.max(1, Math.ceil(Math.log2(Math.max(2, nodes.length))));
+    const ratio = Math.pow(Math.max(1e-4, rA / Math.max(1e-4, R0)), 1 / levels);
+    for (let L = 1; L <= levels && nodes.length > 1; L++) {
+      const Rl = Math.max(rA, R0 * Math.pow(ratio, L));
+      const yl = _lerp(yFeet, yArrival, L / levels);
+      const next = [];
+      for (let i = 0; i < nodes.length; i += 2) {
+        const a = nodes[i], b = nodes[i + 1];
+        if (!b) { next.push(a); continue; }                       // odd one out rides to the next level
+        // circular mean azimuth of the pair (a and b are adjacent, so a plain mean is safe
+        // except across the wrap; take the vector mean so the wrap is handled either way)
+        const az = Math.atan2(Math.sin(a.az) + Math.sin(b.az), Math.cos(a.az) + Math.cos(b.az));
+        const r = Math.sqrt(a.r * a.r + b.r * b.r);               // ← the area rule, at this station
+        const p = [cx + Rl * Math.cos(az), yl, cz + Rl * Math.sin(az)];
+        caps.push({ a: a.p, b: p, ra: a.r, rb: r });
+        caps.push({ a: b.p, b: p, ra: b.r, rb: r });
+        next.push({ az, R: Rl, y: yl, r, p });
+      }
+      nodes = next;
+    }
+    // whatever survives joins the neck at the arrival ring
+    for (const n of nodes) {
+      const p = [cx + rA * Math.cos(n.az), yArrival, cz + rA * Math.sin(n.az)];
+      caps.push({ a: n.p, b: p, ra: n.r, rb: Math.max(n.r, Rtrunk * 0.5) });
+    }
+  };
+
+  // ---- LAW B — SPACING-SCALED UNION --------------------------------------------------
+  // Keep the spokes; widen the smooth union where they crowd. The neighbour arc spacing at
+  // radius R is 2πR/n, so a blend radius proportional to it fuses neighbours at the station
+  // where they are close and leaves them distinct where they are not. Cheapest possible
+  // change — it touches no topology. SPACING BETA scales it; at beta 0 this is `current`.
+  const emitSpacingUnion = () => {
+    const beta = opts.spacingBeta != null ? opts.spacingBeta : 1.0;
+    const kBase = opts.kBase != null ? opts.kBase : 0.039;
+    emitBezierSpokes((R) => Math.max(kBase, beta * (2 * Math.PI * Math.max(R, 1e-4)) / nFeet));
+  };
+
+  // ---- LAW C — ONE LOFTED SURFACE ----------------------------------------------------
+  // No spokes to merge: the approach is a single funnel whose top rim interpolates the feet
+  // and whose bottom rim is the neck circle. Realised as a stack of closed rings of short
+  // capsules (circumferentially overlapping, so each ring is one solid torus and the stack
+  // is one solid skirt). Wall thickness follows the area rule spread around the
+  // circumference — 2πR·2t = πRtrunk² — floored so it stays printable at the wide top.
+  const emitLoftSkirt = () => {
+    const sorted = feet.map((f) => ({
+      az: Math.atan2(f.p[2] - cz, f.p[0] - cx),
+      R: Math.hypot(f.p[0] - cx, f.p[2] - cz), y: f.p[1],
+    })).sort((a, b) => a.az - b.az);
+    // rim radius / height at azimuth th: linear interpolation between the two feet it lies
+    // between — literally "a rim that interpolates the feet".
+    const rimAt = (th) => {
+      let t = th; while (t < sorted[0].az) t += Math.PI * 2; while (t > sorted[0].az + Math.PI * 2) t -= Math.PI * 2;
+      let i = 0; while (i < sorted.length - 1 && sorted[i + 1].az < t) i++;
+      const a = sorted[i], b = sorted[(i + 1) % sorted.length];
+      let d = b.az - a.az; if (d <= 0) d += Math.PI * 2;
+      const u = d > 1e-9 ? _clamp((t - a.az) / d, 0, 1) : 0;
+      return { R: _lerp(a.R, b.R, u), y: _lerp(a.y, b.y, u) };
+    };
+    const SEG = Math.min(220, Math.max(64, Math.round(nFeet * 3)));
+    const ST = 9;
+    const tMin = tube * 0.75;
+    for (let j = 0; j <= ST; j++) {
+      const s = j / ST, w = s * s * (3 - 2 * s);                  // smootherstep: rim -> circle
+      const ring = [];
+      for (let q = 0; q < SEG; q++) {
+        const th = (q / SEG) * Math.PI * 2, rim = rimAt(th);
+        const y = _lerp(rim.y, yArrival, w);
+        const R = Math.max(rA, _lerp(rim.R, rA, w));
+        ring.push({ p: [cx + R * Math.cos(th), y, cz + R * Math.sin(th)], R });
+      }
+      for (let q = 0; q < SEG; q++) {
+        const a = ring[q], b = ring[(q + 1) % SEG];
+        const Rm = (a.R + b.R) * 0.5;
+        const t = Math.max(tMin, (Rtrunk * Rtrunk) / (4 * Math.max(Rm, 1e-4)));
+        caps.push({ a: a.p, b: b.p, ra: t, rb: t });
+      }
+      // one radial rib per foot per station keeps consecutive rings overlapping vertically
+      if (j > 0) { /* rings overlap via their own thickness; no extra ribs needed */ }
+    }
+  };
+
+  switch (law) {
+    case 'arearun': emitAreaRunTree(); emitUpStubs(); break;
+    case 'spacing': emitSpacingUnion(); emitUpStubs(); break;
+    case 'loft':    emitLoftSkirt();    emitUpStubs(); break;
+    case 'current':
+    default:        emitBezierSpokes(); emitUpStubs(); break;
   }
 
   // COLLAR: a radius bump near the stem (unions in via smin). True radii, no floor.
@@ -189,7 +312,7 @@ function buildGatherSkeleton(feet, neck, opts) {
   }
 
   const maxWidth = Math.max(swell, neckR(_lerp(yArrival, yStem, 0.5))) * 2;   // widest junction diameter
-  return { caps, buttons: [], meta: { Rring, yFeet, yStem, yArrival, Rtrunk, swell, stemR, maxEntryDeg, maxWidth, leafCount: feet.length, neckR } };
+  return { caps, buttons: [], meta: { Rring, yFeet, yStem, yArrival, Rtrunk, swell, stemR, maxEntryDeg, maxWidth, leafCount: feet.length, neckR, approachLaw: law, approachCaps: caps.length } };
 }
 
 /* Narrow-band surface nets over a capsule list. Rasterizes each capsule into
@@ -198,7 +321,7 @@ function buildGatherSkeleton(feet, neck, opts) {
    Laplacian reprojection) plus the raw { verts, faces }. */
 function fieldMesh(caps, buttons, k, cell) {
   let mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
-  for (const c of caps) { const m = Math.max(c.ra, c.rb) + k + 3 * cell;
+  for (const c of caps) { const m = Math.max(c.ra, c.rb) + (c.k != null ? c.k : k) + 3 * cell;
     for (const q of [c.a, c.b]) for (let d = 0; d < 3; d++) { mn[d] = Math.min(mn[d], q[d] - m); mx[d] = Math.max(mx[d], q[d] + m); } }
   for (const e of buttons) { const pad = k + 3 * cell;
     for (let d = 0; d < 3; d++) { mn[d] = Math.min(mn[d], e.c[d] - e.r[d] - pad); mx[d] = Math.max(mx[d], e.c[d] + e.r[d] + pad); } }
@@ -206,12 +329,12 @@ function fieldMesh(caps, buttons, k, cell) {
   const vidx = (i, j, kk) => i + nx * (j + ny * kk); const BIG = 1e9;
   const val = new Float32Array(nx * ny * nz).fill(BIG);
   const gx = (i) => mn[0] + i * cell, gy = (j) => mn[1] + j * cell, gz = (kk) => mn[2] + kk * cell;
-  for (const c of caps) { const m = Math.max(c.ra, c.rb) + k + 3 * cell;
+  for (const c of caps) { const kc = c.k != null ? c.k : k; const m = Math.max(c.ra, c.rb) + kc + 3 * cell;
     const i0 = Math.max(0, Math.floor((Math.min(c.a[0], c.b[0]) - m - mn[0]) / cell)), i1 = Math.min(nx - 1, Math.ceil((Math.max(c.a[0], c.b[0]) + m - mn[0]) / cell));
     const j0 = Math.max(0, Math.floor((Math.min(c.a[1], c.b[1]) - m - mn[1]) / cell)), j1 = Math.min(ny - 1, Math.ceil((Math.max(c.a[1], c.b[1]) + m - mn[1]) / cell));
     const k0 = Math.max(0, Math.floor((Math.min(c.a[2], c.b[2]) - m - mn[2]) / cell)), k1 = Math.min(nz - 1, Math.ceil((Math.max(c.a[2], c.b[2]) + m - mn[2]) / cell));
     for (let kk = k0; kk <= k1; kk++) for (let j = j0; j <= j1; j++) { const zz = gz(kk), yy = gy(j); let base = vidx(i0, j, kk);
-      for (let i = i0; i <= i1; i++, base++) { const d = sdRoundCone(gx(i), yy, zz, c.a, c.b, c.ra, c.rb); const cur = val[base]; val[base] = cur >= BIG ? d : smin(cur, d, k); } } }
+      for (let i = i0; i <= i1; i++, base++) { const d = sdRoundCone(gx(i), yy, zz, c.a, c.b, c.ra, c.rb); const cur = val[base]; val[base] = cur >= BIG ? d : smin(cur, d, kc); } } }
   for (const e of buttons) { const pad = k + 3 * cell;
     const i0 = Math.max(0, Math.floor((e.c[0] - e.r[0] - pad - mn[0]) / cell)), i1 = Math.min(nx - 1, Math.ceil((e.c[0] + e.r[0] + pad - mn[0]) / cell));
     const j0 = Math.max(0, Math.floor((e.c[1] - e.r[1] - pad - mn[1]) / cell)), j1 = Math.min(ny - 1, Math.ceil((e.c[1] + e.r[1] + pad - mn[1]) / cell));
@@ -331,7 +454,8 @@ export function buildReceptacleField(feet, neck, opts = {}) {
   const cell = opts.cell != null ? opts.cell : (opts.exportMode ? 0.011 : 0.02);
   const iters = opts.smoothIters != null ? opts.smoothIters : (opts.exportMode ? 2 : 0);
 
-  const { caps, buttons, meta } = buildGatherSkeleton(feet, neck, opts);
+  // the SPACING law needs the baseline blend radius to floor its per-capsule one against
+  const { caps, buttons, meta } = buildGatherSkeleton(feet, neck, { ...opts, kBase: k });
   const grid = fieldMesh(caps, buttons, k, cell);
   const { verts, faces } = grid;
   const sampler = makeGridSampler(grid);
