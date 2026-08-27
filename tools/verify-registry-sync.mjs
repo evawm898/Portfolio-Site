@@ -257,6 +257,16 @@ for (const c of CONTROLS) {
 // id with no delete is carried forward indefinitely by the mechanism meant to protect
 // forward compatibility. The reservation would be documented and simultaneously defeated.
 {
+  // Files that DRIVE the panel by control id: gate matrices, authored presets, shot
+  // helpers. flower.js is deliberately absent — its migration notes name retired ids in
+  // prose, and its two real risks (a DEFAULTS assignment, a missing delete) are checked
+  // directly above. Add a file here when a new tool starts setting controls by id.
+  const DRIVER_FILES = [
+    'tools/verify-flower-export.mjs', 'tools/verify-geometry-quality.mjs',
+    'tools/verify-connectedness.mjs', 'tools/visibility-matrix.mjs',
+    'tools/gen-preset-thumbs.mjs', 'docs/tools/diff-export-bytes.mjs',
+    'flower-presets.js', 'flower-view-presets.js', 'flower-shapes.js',
+  ];
   const { RETIRED_IDS } = await import(REPO + 'flower-registry.js');
   if (!Array.isArray(RETIRED_IDS)) {
     err('flower-registry.js does not export RETIRED_IDS — the permanent-reservation list is how a '
@@ -286,6 +296,24 @@ for (const c of CONTROLS) {
       // 4. a migration must DELETE the key, or the value rides along forever in `extras`
       if (!new RegExp('delete\\s+\\w+\\.' + r.id + '\\b').test(JS)) {
         err(`RETIRED_IDS "${r.id}": no migration in flower.js deletes this key. migrateDesign() preserves keys with no control verbatim in \`extras\` on re-save, so without a \`delete out.${r.id}\` the retired value is carried forward indefinitely — reserved on paper and alive in every saved design.`);
+      }
+      // 5. nothing may still DRIVE the id — a gate matrix, a preset, a shot config.
+      // Deleting reliefAmp's control while four export configs still said
+      // `{ id: 'reliefAmp', value: '0.7' }` was caught only by the export gate's read-back
+      // assertion, nine minutes into a full matrix run, as 26 failures. Every one of the
+      // six queued retirements can make the same mistake, so it is caught here in under a
+      // second instead. Two forms are searched: the `{ id: 'x' }` a config/matrix row uses,
+      // and the `x:` an authored preset uses. Comments are free to name a retired id (the
+      // migration notes do); only a driving reference fails.
+      for (const f of DRIVER_FILES) {
+        let src;
+        try { src = readFileSync(REPO + f, 'utf8'); } catch { continue; }
+        const asConfig = new RegExp(`\\bid:\\s*['"]${r.id}['"]`).test(src);
+        const asKey = new RegExp(`(^|[{,\\s])${r.id}\\s*:`, 'm').test(src);
+        if (asConfig || asKey) {
+          err(`RETIRED_IDS "${r.id}" is still DRIVEN by ${f} (${asConfig ? "a { id: '...' } config row" : 'an object key'}). `
+            + `The control is gone, so this sets nothing — a matrix row that silently no-ops measures a different design from the one it names.`);
+        }
       }
     }
   }
