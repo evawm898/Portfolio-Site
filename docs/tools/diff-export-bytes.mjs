@@ -322,6 +322,50 @@ const CONFIGS = [
     { id: 'crossSection', value: '0.8' }, { id: 'crossSectionTaper', value: '0.4' },
     { id: 'centerArch', value: 'dense', evt: 'change' },
   ] },
+  // ---- SURFACE RELIEF, off the claw ------------------------------------------------
+  // Every pre-existing relief config (RELIEF radial / transverse / irregular, and the
+  // SURFACE all combination) sits inside the CLAW block with clawLength carried in, so
+  // relief was exercised on exactly ONE petal-shape family. Infill coverage was fine
+  // (voronoi / veins / bone); shape coverage was not, and a change report drawn from that
+  // matrix could only ever speak for claw petals. These add the families that actually
+  // ship: the plain single-whorl spiral (the default silhouette), a LOBED petal (relief
+  // over a clefted margin), and a FAN arrangement.
+  //
+  // KEPT LAST and fully self-contained (clawLength/cleftDepth reset explicitly), so the
+  // cumulative state they set leaks into nothing above them and the export ORDER of every
+  // existing config is unchanged — which is what keeps a before/after byte comparison
+  // honest, and matters especially for GROWTH (#92: its triangle count depends on how many
+  // exports preceded it).
+  { label: 'RELIEF off-claw: default spiral + radial, veins', set: [
+    { id: 'clawLength', value: '0' }, { id: 'clawWidth', value: '0.15' }, { id: 'shoulder', value: '0.5' },
+    { id: 'cleftDepth', value: '0' }, { id: 'crossSection', value: '0' }, { id: 'crossSectionTaper', value: '0' },
+    { id: 'curlGradient', value: '0' }, { id: 'sizeGradient', value: '0' }, { id: 'curlStart', value: '0' },
+    { id: 'curlAmount', value: '0.35' }, { id: 'curlBias', value: '0' }, { id: 'layerCount', value: '1' },
+    { id: 'petalCount', value: '5' }, { id: 'petalShape', value: 'ovate', evt: 'change' },
+    { id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'centerArch', value: 'classic', evt: 'change' },
+    { id: 'infillType', value: 'veins', evt: 'change' }, { id: 'tipStyle', value: 'clean', evt: 'change' },
+    { id: 'reliefAmp', value: '0.7' }, { id: 'reliefFreq', value: '0.5' }, { id: 'reliefMode', value: 'radial', evt: 'change' },
+  ] },
+  { label: 'RELIEF off-claw: default spiral + transverse fine (freq 0.85), voronoi', set: [
+    { id: 'infillType', value: 'voronoi', evt: 'change' },
+    { id: 'reliefAmp', value: '0.8' }, { id: 'reliefFreq', value: '0.85' }, { id: 'reliefMode', value: 'transverse', evt: 'change' },
+  ] },
+  { label: 'RELIEF off-claw: default spiral + irregular (bullate), veins', set: [
+    { id: 'infillType', value: 'veins', evt: 'change' },
+    { id: 'reliefAmp', value: '0.7' }, { id: 'reliefFreq', value: '0.5' }, { id: 'reliefMode', value: 'irregular', evt: 'change' },
+  ] },
+  { label: 'RELIEF off-claw: LOBED bifid (cleft 0.5) + radial, voronoi', set: [
+    { id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.5' }, { id: 'cleftLobes', value: '2' },
+    { id: 'reliefAmp', value: '0.7' }, { id: 'reliefMode', value: 'radial', evt: 'change' },
+  ] },
+  { label: 'RELIEF off-claw: FAN (bilateral) + irregular, veins', set: [
+    { id: 'cleftDepth', value: '0' }, { id: 'infillType', value: 'veins', evt: 'change' },
+    { id: 'bloomType', value: 'bilateral', evt: 'change' },
+    { id: 'reliefAmp', value: '0.6' }, { id: 'reliefMode', value: 'irregular', evt: 'change' },
+  ] },
+  { label: 'RELIEF off-claw: FAN at MAX amplitude (1.0) + broad pleats (freq 0)', set: [
+    { id: 'reliefAmp', value: '1' }, { id: 'reliefFreq', value: '0' }, { id: 'reliefMode', value: 'radial', evt: 'change' },
+  ] },
 ];
 
 // ===== Receptacle JUNCTION axis matrix: PROFILE x CONSTRUCTION x COLLAR =====

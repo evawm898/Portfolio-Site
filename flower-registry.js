@@ -44,6 +44,9 @@
    rest. Do not remove an entry — that is the whole point.
    =================================================================== */
 export const RETIRED_IDS = [
+  { id: "reliefAmp",  retiredAt: 19, why: "SURFACE RELIEF, deleted whole. The case for it assumed a continuous sheet to corrugate — surface information at arm's length on a monochrome print, and bending stiffness rising as (depth/thickness)^2. These petals are lace: ribs and voids, almost no lamina, so there is no face to displace. The stiffness argument transfers to the infill work, not here." },
+  { id: "reliefFreq", retiredAt: 19, why: "SURFACE RELIEF rib count (broad pleats -> fine crepe). Inert once reliefAmp is gone; retired with it rather than left as a live value nobody can reach." },
+  { id: "reliefMode", retiredAt: 19, why: "SURFACE RELIEF pattern (radial / transverse / irregular). Retired with reliefAmp. Its three option values are not separately reserved: they were only ever meaningful as values OF this id, and reserving them would burn three common words on a control that no longer exists." },
 ];
 
 /* ===================================================================
@@ -241,9 +244,6 @@ export const CONTROLS = [
   {"id":"petalCup","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Petal cup","fmt":"signed2"},
   {"id":"crossSection","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section roll","fmt":"signed2"},
   {"id":"crossSectionTaper","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section taper","fmt":"signed2"},
-  {"id":"reliefAmp","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Surface relief","fmt":"f2"},
-  {"id":"reliefFreq","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Relief frequency","fmt":"f2"},
-  {"id":"reliefMode","section":"acc-form","kind":"select","options":[{"value":"radial","text":"Radial (ribs from base)"},{"value":"transverse","text":"Transverse"},{"value":"irregular","text":"Irregular (bullate)"}],"default":"radial","label":"Relief pattern"},
   {"id":"petalTwist","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Twist","fmt":"signed2"},
   {"id":"petalSkew","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Skew","fmt":"signed2"},
   {"id":"thickTaper","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Thickness taper","fmt":"f2"},

@@ -1078,9 +1078,6 @@ function resolveParams(ui) {
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
     crossSection: ui.crossSection,               // CROSS-SECTION: flat (0) -> channelled -> quilled (|1|); sign picks roll direction
     crossSectionTaper: ui.crossSectionTaper,     // CROSS-SECTION TAPER: 0 uniform -> +1 opens to a spoon at the tip, -1 opens at the base
-    reliefAmp: ui.reliefAmp,                      // SURFACE RELIEF amplitude (0 = smooth, exact no-op)
-    reliefFreq: ui.reliefFreq,                    // RELIEF rib count: broad pleats -> fine crepe
-    reliefMode: ui.reliefMode,                    // RELIEF pattern: radial (T-aligned) | transverse | irregular
     petalTwist: ui.petalTwist,                    // TWIST: cross-section rotation about the midrib (chirality)
     petalSkew: ui.petalSkew,                      // SKEW: lateral midrib bend
     thickTaper: ui.thickTaper,                    // THICKNESS (a): base-to-tip gradient (0 = uniform)
@@ -3734,7 +3731,6 @@ inputs.edgeTermination.addEventListener('change', () => { applyVisibility(); sch
 // integer seed (stored in the design so the new network is saved and reproducible).
 inputs.spaceMode.addEventListener('change', scheduleRegen);
 inputs.spacePattern.addEventListener('change', scheduleRegen);
-inputs.reliefMode.addEventListener('change', scheduleRegen);
 const spaceReroll = document.getElementById('spaceReroll');
 if (spaceReroll) spaceReroll.addEventListener('click', () => {
   inputs.spaceSeed.value = String((Math.floor(Math.random() * 0x7fffffff)) >>> 0);
@@ -3943,7 +3939,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 18;
+const CURRENT_SCHEMA = 19;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3995,6 +3991,12 @@ function migrateV3toV4(p) {
 // key's legacy value IS its DEFAULTS value (relief/twist/skew 0, thickTaper/thickEdge
 // 0, thickScale 1, reliefMode 'radial' — all no-ops), so filling from DEFAULTS leaves
 // every prior design byte-identical.
+//
+// The three relief keys are retired at v19 and no longer have DEFAULTS entries, so this
+// loop now writes `undefined` for them. That is deliberate and harmless: migrations are
+// APPEND-ONLY (editing one changes what an already-saved design means), no migration
+// between v5 and v19 reads those keys, and v18 -> v19 deletes them outright. Left as-is
+// rather than quietly rewriting history.
 function migrateV4toV5(p) {
   const out = { ...p };
   for (const k of ['reliefAmp', 'reliefFreq', 'reliefMode', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
@@ -4178,7 +4180,31 @@ function migrateV17toV18(p) {
   if (out.curlBias == null) out.curlBias = DEFAULTS.curlBias;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17, migrateV17toV18];
+// v18 -> v19: SURFACE RELIEF deleted whole — reliefAmp / reliefFreq / reliefMode, controls
+// and effect both. The case for relief assumed a continuous sheet to corrugate; these petals
+// are lace (ribs and voids, almost no lamina), so there was no face to displace. Its three
+// ids are RESERVED PERMANENTLY in RETIRED_IDS (flower-registry.js) and enforced by
+// verify-registry-sync.mjs, because the stored value stops mattering the moment the control
+// is gone and the NAME starts: a design saved today carries reliefAmp forever, and anything
+// that later reclaimed the name would silently inherit a stale number.
+//
+// The keys are DELETED, not left to fall through. migrateDesign() gathers keys with no
+// control into `extras` and preserves them verbatim on re-save, so without this delete a
+// retired id would be carried forward indefinitely by the very mechanism that exists to
+// protect forward compatibility — stale, invisible, and permanent.
+//
+// This is a deliberate, versioned VISUAL change, not a byte-identical migration (per
+// CLAUDE.md, "never a silent shift"). A design saved with reliefAmp > 0 loses its
+// corrugation and its exported mesh moves. It is not pinned: a migration pin protects an
+// aesthetic choice a visitor deliberately made and could perceive, and #86 established that
+// an export nobody can see is not such a choice. The accompanying PR carries the per-design
+// change report measuring exactly how far each one moved.
+function migrateV18toV19(p) {
+  const out = { ...p };
+  delete out.reliefAmp; delete out.reliefFreq; delete out.reliefMode;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17, migrateV17toV18, migrateV18toV19];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build
