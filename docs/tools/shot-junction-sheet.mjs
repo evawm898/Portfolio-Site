@@ -185,7 +185,7 @@ async function shoot(root, laws, outDir) {
         if (err > Math.max(1e-6, distC * 1e-4)) throw new Error(`camera did not take: off by ${err} (something moved it after the hook)`);
         await page.locator('#flower-canvas').screenshot({ path: path.join(outDir, `${D.name}--${V.name}--${law}.png`) });
       }
-      console.log(`  ok  ${tag}  junction tris(live)=${jf.stats.tris} caps=${jf.stats.caps}`);
+      console.log(`  ok  ${tag}` + (jf ? `  junction tris(live)=${jf.stats.tris} caps=${jf.stats.caps}` : '  (no junction probe on this tree — framing from saved run)'));
     } catch (e) {
       problems.push(`${tag}: ${e.message}`);
       console.log(`  FAIL ${tag}: ${e.message}`);
