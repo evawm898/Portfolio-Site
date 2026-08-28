@@ -303,18 +303,26 @@ const ROWS = [
   // touch. So bundle/stem is expected to fall as 1/thickness, and the step INVERTS
   // (bundle wider than stem) below some thickness. Measured here rather than derived.
   //
+  // SELF-CONTAINED ROWS. This probe uses a FRESH PAGE PER ROW (#92/#100), unlike the
+  // cumulative export matrices elsewhere in this repo — so every row carries its own
+  // stemType. Writing these in the cumulative style gave a constant bundle/stem of 0.576
+  // across 0.55-3.00: without a stem, flower.js:2799 takes stemThick = 1 regardless of
+  // the slider. The read-back assertion CANNOT catch that — stemThickness accepted and
+  // read back its value on every row; the design ignored it. Read-back proves a control
+  // took a value, not that the geometry consumes it.
+  //
   // REACHABLE RANGE ONLY. flower.js clamps stemThickness to [0.3, 4] in two places
   // (2774, 2799) while the registry slider and the markup are [0.5, 3] — the same
   // registry-vs-clamp split this file already records for thickScale, and the second
   // instance of that class. Rows at 0.3 or 4 would fail the read-back assertion, which
   // is the proof they are unreachable; they are therefore not rows.
   { label: 'stemThickness 0.50 (slider MIN)', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '0.5' }] },
-  { label: 'stemThickness 0.55', set: [{ id: 'stemThickness', value: '0.55' }] },
-  { label: 'stemThickness 0.60', set: [{ id: 'stemThickness', value: '0.6' }] },
-  { label: 'stemThickness 0.75', set: [{ id: 'stemThickness', value: '0.75' }] },
-  { label: 'stemThickness 1.00 (default)', set: [{ id: 'stemThickness', value: '1' }] },
-  { label: 'stemThickness 2.00', set: [{ id: 'stemThickness', value: '2' }] },
-  { label: 'stemThickness 3.00 (slider MAX)', set: [{ id: 'stemThickness', value: '3' }] },
+  { label: 'stemThickness 0.55', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '0.55' }] },
+  { label: 'stemThickness 0.60', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '0.6' }] },
+  { label: 'stemThickness 0.75', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '0.75' }] },
+  { label: 'stemThickness 1.00 (default)', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '1' }] },
+  { label: 'stemThickness 2.00', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '2' }] },
+  { label: 'stemThickness 3.00 (slider MAX)', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '3' }] },
   { label: 'process sla', set: [{ id: 'process', value: 'sla' }] },
 ];
 
@@ -438,7 +446,7 @@ console.log('  A_k is GONE (Eva, Phase 2 ruling): retired as an objective, and t
   + '  frequency. A column that reads n/a on every row describes nothing and invites re-adoption\n'
   + '  of a retired target. The surface-sampled estimator was ruled out rather than deferred.\n'
   + '  In its place: BUNDLE/STEM = Rtrunk/stemR, the step the join sliders have to resolve.\n');
-console.log('  ' + 'row'.padEnd(26) + 'feet caps  lathe  lathe%  run:rise(min/med/max)   A_k    freeEnds  minDia');
+console.log('  ' + 'row'.padEnd(34) + 'feet caps  lathe  lathe%  run:rise(min/med/max)  bnd/stm  freeEnds  minDia');
 for (const r of out) {
   const rs = r.ratios.slice().sort((a, b) => a - b);
   const med = rs.length ? rs[rs.length >> 1] : NaN;
