@@ -177,6 +177,11 @@ const VARIANCE_ROLL_MAX   = 0.15;   // +/- 15% of the cross-section roll amount 
    these sliders to clamp, the dangerous region is in the middle. This is the
    clearest evidence yet for capping the output.
    --------------------------------------------------------------------- */
+// LIVE and EXPORT triangle counts are DIFFERENT NUMBERS for the same design — export mode
+// floors feature sizes, which measured 1.09x to 1.44x more triangles across the 7 presets,
+// varying per design rather than by a fixed factor. A budget only ever applies to its own
+// mode: comparing an export count against LIVE_TRI_BUDGET reads as over budget when the
+// design is comfortably under it. Every tool that prints a count now names the mode.
 const LIVE_TRI_BUDGET   = 500000;    // refuse over this, live — keep the last-good mesh on screen
 const EXPORT_INFO_TRIS  = 1000000;   // plain on-screen line above this (never a modal)
 const EXPORT_TRI_BUDGET = 3000000;   // refuse over this, export — no override
@@ -1098,9 +1103,6 @@ function resolveParams(ui) {
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
     crossSection: ui.crossSection,               // CROSS-SECTION: flat (0) -> channelled -> quilled (|1|); sign picks roll direction
     crossSectionTaper: ui.crossSectionTaper,     // CROSS-SECTION TAPER: 0 uniform -> +1 opens to a spoon at the tip, -1 opens at the base
-    reliefAmp: ui.reliefAmp,                      // SURFACE RELIEF amplitude (0 = smooth, exact no-op)
-    reliefFreq: ui.reliefFreq,                    // RELIEF rib count: broad pleats -> fine crepe
-    reliefMode: ui.reliefMode,                    // RELIEF pattern: radial (T-aligned) | transverse | irregular
     petalTwist: ui.petalTwist,                    // TWIST: cross-section rotation about the midrib (chirality)
     petalSkew: ui.petalSkew,                      // SKEW: lateral midrib bend
     thickTaper: ui.thickTaper,                    // THICKNESS (a): base-to-tip gradient (0 = uniform)
@@ -3757,7 +3759,6 @@ inputs.edgeTermination.addEventListener('change', () => { applyVisibility(); sch
 // integer seed (stored in the design so the new network is saved and reproducible).
 inputs.spaceMode.addEventListener('change', scheduleRegen);
 inputs.spacePattern.addEventListener('change', scheduleRegen);
-inputs.reliefMode.addEventListener('change', scheduleRegen);
 const spaceReroll = document.getElementById('spaceReroll');
 if (spaceReroll) spaceReroll.addEventListener('click', () => {
   inputs.spaceSeed.value = String((Math.floor(Math.random() * 0x7fffffff)) >>> 0);
@@ -3966,7 +3967,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 18;
+const CURRENT_SCHEMA = 19;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -4018,9 +4019,19 @@ function migrateV3toV4(p) {
 // key's legacy value IS its DEFAULTS value (relief/twist/skew 0, thickTaper/thickEdge
 // 0, thickScale 1, reliefMode 'radial' — all no-ops), so filling from DEFAULTS leaves
 // every prior design byte-identical.
+//
+// The three RELIEF keys this migration introduced are dropped from the backfill list: they
+// are retired at v19 and no longer have DEFAULTS entries, so the loop would have written
+// `undefined` for them, leaving a live code reference to a retired id in the one file where
+// that matters most. Append-only protects a migration's SEMANTICS, and there are none to
+// protect here — proven, not assumed: (a) where a saved design already carries the key the
+// `!(k in out)` guard never touched it, (b) no migration from v5 to v18 reads any of the
+// three in executable code, and (c) v18 -> v19 deletes all three unconditionally. So the
+// end state is key-absent either way, for every design at every starting version.
+// verify-registry-sync.mjs check 6 now fails the build if one comes back.
 function migrateV4toV5(p) {
   const out = { ...p };
-  for (const k of ['reliefAmp', 'reliefFreq', 'reliefMode', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
+  for (const k of ['petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
     if (!(k in out)) out[k] = DEFAULTS[k];
   }
   return out;
@@ -4201,7 +4212,37 @@ function migrateV17toV18(p) {
   if (out.curlBias == null) out.curlBias = DEFAULTS.curlBias;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17, migrateV17toV18];
+// v18 -> v19: the control named SURFACE RELIEF deleted whole — reliefAmp / reliefFreq /
+// reliefMode, controls and effect both. What it actually did was RIB JITTER: it displaced the
+// rib network rather than texturing a face, destroying the flowing rib fan instead of
+// ornamenting it, and the wobble it produced is already reachable through edge noise (which
+// adds to the same normalLift accumulator, flower-geometry.js) and tip irregularity. It was
+// named and documented for something the geometry does not do. The earlier claim that it
+// "reads as doing so little" is FALSE and was struck rather than softened: measured at
+// 2.4-12.6% of canvas pixels, and plainly visible at amplitude 0.16. See
+// docs/img/relief-retirement-contact-sheet.png. Its three
+// ids are RESERVED PERMANENTLY in RETIRED_IDS (flower-registry.js) and enforced by
+// verify-registry-sync.mjs, because the stored value stops mattering the moment the control
+// is gone and the NAME starts: a design saved today carries reliefAmp forever, and anything
+// that later reclaimed the name would silently inherit a stale number.
+//
+// The keys are DELETED, not left to fall through. migrateDesign() gathers keys with no
+// control into `extras` and preserves them verbatim on re-save, so without this delete a
+// retired id would be carried forward indefinitely by the very mechanism that exists to
+// protect forward compatibility — stale, invisible, and permanent.
+//
+// This is a deliberate, versioned VISUAL change, not a byte-identical migration (per
+// CLAUDE.md, "never a silent shift"). A design saved with reliefAmp > 0 loses its rib
+// jitter and its exported mesh moves. It is not pinned: a migration pin protects an
+// aesthetic choice a visitor deliberately made and could perceive, and #86 established that
+// an export nobody can see is not such a choice. The accompanying PR carries the per-design
+// change report measuring exactly how far each one moved.
+function migrateV18toV19(p) {
+  const out = { ...p };
+  delete out.reliefAmp; delete out.reliefFreq; delete out.reliefMode;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17, migrateV17toV18, migrateV18toV19];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build
