@@ -722,6 +722,32 @@ export function ribRadius(u, P, contMargin) {
   return lerp(P.tubeRadius * MARGIN_W_BASE, P.tubeRadius * MARGIN_W_TIP, clamp(u, 0, 1)) * gThick;
 }
 
+/* CONTINUOUS SPINE (?junctionLaw=spine) — the ONE OWNER of the descending member's
+   cross-section at the foot. Below the foot the petal's three strands (midrib ribbon +
+   two marginal rods) continue as ONE round member; its radius is defined here, by AREA
+   EQUIVALENCE, so the member carries exactly the material that feeds it:
+
+     A_foot = midrib ribbon area + 2 x marginal rod area
+     r_foot = sqrt(A_foot / PI)
+
+   The midrib contributes its RIBBON area — width 2·tubeRadius·midribW (matches
+   addRibbon's halfWidth = tubeRadius·w0, w0 = VEIN_MIDRIB_BASE = 1), thickness
+   2·tubeRadius·laminaHalf·gThick (matches addRibbon's halfThick = lamHalf·thickMul at
+   the foot, where taper and edge-knife are both 1) — NOT the round-rod radius the
+   pre-spine hand-off used, which was sqrt(PI/2) = 1.2533x the equivalent-area radius at
+   thickScale 1 and drifted with thickScale (rod area ~ gThick^2, ribbon ~ gThick; see
+   docs/flower-continuous-spine-proposal.md §1). laminaHalf and midribW are passed in
+   because flower.js owns those rendering constants (LAMINA_HALF, MIDRIB_W_BASE); this
+   function owns the LAW, the caller supplies the same numbers it renders with — one
+   producer for each. */
+export function spineFootRadius(P, laminaHalf, midribW) {
+  const gThick = clamp(P.thickScale != null ? P.thickScale : 1, 0.4, 2.5);
+  const rMargin = ribRadius(0, P, true);                          // marginal strand rod, foot radius
+  const midribArea = (2 * P.tubeRadius * midribW) * (2 * P.tubeRadius * laminaHalf * gThick);
+  const area = midribArea + 2 * Math.PI * rMargin * rMargin;
+  return Math.sqrt(area / Math.PI);
+}
+
 // Where the rib's tube is CENTRED at u, before subtracting its own radius:
 // the boundary's outer envelope under a constant-radius hoop, or that envelope
 // bundled/flared under continuous margin. The pointwise scalar form of what

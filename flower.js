@@ -28,6 +28,7 @@ import {
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
   ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints, rimCoversStation,
+  spineFootRadius,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
 import { CONTROLS, evalPredicate, predicateDrivers } from './flower-registry.js';
@@ -1409,7 +1410,21 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
     // trunk land near the stem radius). It is rendered as a ribbon up the blade; here we only
     // hand its foot root (position + up-tangent along the midline + radius) to the receptacle.
     const m0 = toWorld({ x: 0, y: 0 }), m1 = toWorld({ x: P.L * 0.04, y: 0 });
-    strandRoots.push({ pos: m0, tan: { x: m1.x - m0.x, y: m1.y - m0.y, z: m1.z - m0.z }, r: P.tubeRadius * MIDRIB_W_BASE * gThick, side: 0, midrib: true });
+    if (JUNCTION_LAW === 'spine') {
+      // SPINE LAW: below the foot the three strands are ONE continuous member. All three
+      // roots coincide at u=0 (marginFlareFactor(0) = 0 at every slider value), so the
+      // hand-off is a single leaf at that point whose radius is the AREA SUM of what
+      // feeds it — spineFootRadius (flower-geometry.js) owns the law; the constants
+      // passed are the same ones the blade renders with. The pre-spine hand-off pushed
+      // three coincident leaves and the field kept only the fattest (smin of coincident
+      // capsules is their pointwise min), so the continuation carried 57% of the area
+      // feeding it — see docs/flower-continuous-spine-proposal.md §1.
+      strandRoots.length = 0;
+      strandRoots.push({ pos: m0, tan: { x: m1.x - m0.x, y: m1.y - m0.y, z: m1.z - m0.z },
+                         r: spineFootRadius(P, LAMINA_HALF, MIDRIB_W_BASE), side: 0, spine: true });
+    } else {
+      strandRoots.push({ pos: m0, tan: { x: m1.x - m0.x, y: m1.y - m0.y, z: m1.z - m0.z }, r: P.tubeRadius * MIDRIB_W_BASE * gThick, side: 0, midrib: true });
+    }
     // No foot bead here: the SDF receptacle field welds the foot bundle smoothly, and a
     // discrete low-poly bead only read as a faceted fin poking out of the implicit surface.
   }
@@ -2374,17 +2389,21 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
 
     if (opts.continuousMargin) {
       // ===== SDF RECEPTACLE — the lower flower as ONE implicit surface. =====
-      // The petal strand feet (midrib + two margins per petal; a connector per sepal)
-      // are the LEAVES of a GATHER tree: they run INWARD, merging pairwise as they
-      // converge into a compact button below the bloom centre (GATHER RADIUS/HEIGHT),
-      // and only THEN does a single trunk descend into the stem neck — the way a real
-      // daisy/anemone gathers, not the wide splay of feet-descend-straight-down. A
-      // smooth union (ABSORPTION = blend radius) fields the skeleton; a narrow-band
-      // surface-nets mesher (SDF-gradient normals + floor-aware constrained Laplacian)
-      // polygonises it into a closed solid that OVERLAPS the petal feet (up-stubs) and
-      // the stem (neck stub). The slicer unions the overlap, so it is watertight with
-      // no lathe and no stitching. PROFILE is a radius multiplier along the height;
-      // COLLAR a radius bump at the neck. (See flower-sdf.js.)
+      // Two approach laws live in flower-sdf.js behind ?junctionLaw= (see the switch
+      // above). CURRENT (the default): each foot's strands run inward as independent
+      // bezier chains to ONE common arrival height on a 30-segment coaxial LATHE that
+      // carries everything down to the stem — no strand ever merges with another, and
+      // nothing below the foot is floored to the print minimum (both measured;
+      // docs/flower-continuous-spine-proposal.md). SPINE: one continuous member per
+      // petal that merges pairwise down staggered Y-joins under the area rule, no
+      // lathe, floored at export. An earlier version of this comment described the
+      // pairwise merging and the absence of a lathe as properties of the shipped path;
+      // both were false of it (and are true only of the spine law).
+      // A smooth union (ABSORPTION = blend radius) fields the skeleton; a narrow-band
+      // surface-nets mesher (SDF-gradient normals + constrained Laplacian) polygonises
+      // it into a closed solid that OVERLAPS the petal feet (up-stubs) and the stem
+      // (neck stub); the slicer unions the overlap. PROFILE is a radius multiplier
+      // along the height; COLLAR a radius bump at the neck. (See flower-sdf.js.)
       const sdfFeet = [];
       for (const a of structFeet) {
         if (a.strandRoots && a.strandRoots.length) {
@@ -2400,8 +2419,11 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
           sdfFeet, { p: [neckPt.x, neckPt.y, neckPt.z], r: stemR },
           { cx, cz, tubeRadius: P.tubeRadius,
             absorption: opts.absorption, gatherHeight: opts.gatherHeight, buttonSize: opts.buttonSize,
-            // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
-            // so the preview reads as the same solid mass it prints as (export floors anyway).
+            // floorR: applied by the SPINE law at export (every member radius lifted to
+            // it, same rule as MeshAccumulator._floorRadius). The CURRENT law never
+            // reads it — a recorded defect, not a convention (proposal §2); an earlier
+            // comment here claimed radii were floored "even live", which was false of
+            // both modes.
             profile, collar, exportMode, floorR: acc.floorR,
             approachLaw: JUNCTION_LAW,   // see the switch above; not a control
             cell: exportMode ? (opts.sdfCell || 0.011) : (opts.sdfCellLive || 0.02),
@@ -2409,7 +2431,10 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
         acc.addMesh(field.positions, field.normals, field.indices);
         // ?junctionProbe=1 — the junction field ALONE, before it is fused with the petals.
         if (JUNCTION_PROBE) window.__junctionField = { positions: field.positions, indices: field.indices, meta: field.meta, stats: field.stats, exportMode, feet: sdfFeet.length };
-        if (exportMode && acc.floorR < acc.minRadius) acc.minRadius = acc.floorR;   // keep min-feature telemetry honest
+        // Min-feature telemetry: record what the skeleton ACTUALLY contains. The old line
+        // stamped acc.floorR here unconditionally — reporting a floor the field never
+        // applied (under the current law the thinnest member exports below it).
+        if (exportMode && isFinite(field.stats.minCapR) && field.stats.minCapR < acc.minRadius) acc.minRadius = field.stats.minCapR;
         RECEPT_FIELD_STATS = field.stats;
       }
       // The receptacle is its own closed shell; the stem lathe below caps its own top

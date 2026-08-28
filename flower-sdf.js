@@ -1,23 +1,29 @@
 /* ===================================================================
    flower-sdf.js — the receptacle as ONE implicit surface (SDF).
 
-   The lower flower is not a lathe and not a bundle of separate tubes: it
-   is a single smooth field. A SKELETON of round-cone capsules (the petal
-   strand feet running INWARD, merging pairwise as they converge into a
-   compact button below the bloom centre, then a single trunk descending
-   into the stem neck) is turned into a signed-distance field by smooth
-   union (polynomial smin, blend radius = ABSORPTION). It is polygonised
-   with a narrow-band surface-nets mesher, given SDF-gradient normals, and
-   relaxed by a floor-aware constrained Laplacian. The result is a closed,
-   watertight solid that OVERLAPS the petal feet (up-stubs) and the stem
-   (neck down-stub); the slicer unions the overlap. Print floor is honored
-   by flooring every capsule radius before the field is built.
+   A SKELETON of round-cone capsules is turned into a signed-distance
+   field by smooth union (polynomial smin, blend radius = ABSORPTION),
+   polygonised with a narrow-band surface-nets mesher, given SDF-gradient
+   normals, and relaxed by a constrained Laplacian. The result is a
+   closed, watertight solid that OVERLAPS the petal feet (up-stubs) and
+   the stem (neck down-stub); the slicer unions the overlap.
 
-   GATHER is the fix for flat blooms: real daisy/anemone feet don't splay —
-   their strands run inward to a compact receptacle button and only then
-   descend. GATHER RADIUS ~0 => tight button on the axis; wide => the
-   strands meet late and it degrades back to a splay. GATHER HEIGHT is how
-   far below the feet the button forms.
+   TWO APPROACH LAWS build that skeleton (?junctionLaw=, flower.js):
+
+   CURRENT (default) — each foot's strands run inward as independent
+   bezier chains to ONE common arrival height on a 30-segment coaxial
+   LATHE that carries everything to the stem. Strands never merge with
+   each other, and NO radius here is floored to the print minimum:
+   opts.floorR is ignored on this path (measured; see
+   docs/flower-continuous-spine-proposal.md §2 — an earlier version of
+   this header claimed pairwise merging and a honored print floor, and
+   both claims were false of this law).
+
+   SPINE — the petal spine as one continuous member (buildSpineSkeleton
+   below): one leaf per petal at the area-summed foot radius, staggered
+   pairwise Y-joins with SHARED ENDPOINTS under the area rule
+   r_p² = r_a² + r_b², no lathe, a stated coupling law into the stem, and
+   every member radius floored to opts.floorR at export.
 
    Pure math — no THREE, no DOM. Returns flat vertex / normal / index
    arrays plus stats, ready to drop into a MeshAccumulator.
@@ -98,6 +104,14 @@ function buildGatherSkeleton(feet, neck, opts) {
   // area-rule trunk radius from UNFLOORED leaves (√Σr²) — the natural ~4x-a-strand trunk.
   const Rtrunk = Math.sqrt(feet.reduce((s, f) => s + f.r * f.r, 0)) || stemR;
 
+  // ===== APPROACH LAW SWITCH — before the lathe, because one law builds no lathe. =====
+  // 'current' continues below, untouched. 'spine' is the continuous-spine construction
+  // (buildSpineSkeleton; Eva's four rulings on docs/flower-continuous-spine-proposal.md),
+  // reachable only via ?junctionLaw=spine — not a control and not in the registry.
+  const law = opts.approachLaw || 'current';
+  if (law === 'spine') return buildSpineSkeleton(feet, neck, opts, { cx, cz, tube, profile, Rring, yFeet, yStem, stemR });
+  if (law !== 'current') throw new Error(`unknown approachLaw "${law}" — 'current' and 'spine' are the laws; add yours here beside them`);
+
   // COMMON ARRIVAL height: one plane just below the feet where every strand meets the neck.
   // GATHER HEIGHT sets how far below the feet it sits.
   const gH = _clamp(opts.gatherHeight != null ? opts.gatherHeight : 0.25, 0.05, 0.9);
@@ -164,8 +178,8 @@ function buildGatherSkeleton(feet, neck, opts) {
   // A_k is the wrong objective — driving it to zero drives toward the smooth skin that is the
   // actual defect. `docs/tools/measure-junction-rim.mjs` still reports A_k because it is a real
   // description of the surface; it is a measurement, not a target.
-  const law = opts.approachLaw || 'current';
-  if (law !== 'current') throw new Error(`unknown approachLaw "${law}" — 'current' is the only law; add yours here beside it`);
+  // (The approach-law switch itself moved ABOVE the lathe emission — a law that builds
+  // no lathe has to branch before one is pushed into the capsule list.)
 
   // STRANDS: each foot -> a cubic bezier arriving TANGENTIALLY at the neck surface at the
   // common arrival height. Radius = the true foot radius (grammar preserved), so a strand
@@ -213,6 +227,199 @@ function buildGatherSkeleton(feet, neck, opts) {
 
   const maxWidth = Math.max(swell, neckR(_lerp(yArrival, yStem, 0.5))) * 2;   // widest junction diameter
   return { caps, buttons: [], meta: { Rring, yFeet, yStem, yArrival, Rtrunk, swell, stemR, maxEntryDeg, maxWidth, leafCount: feet.length, neckR, approachLaw: law } };
+}
+
+/* ============================================================================
+   SPINE LAW (?junctionLaw=spine) — the petal spine as ONE CONTINUOUS MEMBER.
+
+   Construction, per the four rulings on docs/flower-continuous-spine-proposal.md:
+
+   MEMBERS   one leaf per distinct foot, radius = the area-summed foot radius the
+             hand-off provides (spineFootRadius in flower-geometry.js owns that law —
+             coincident feet arriving here anyway are merged by the same area rule,
+             defensively). At export every member radius is floored to opts.floorR —
+             the SAME floor MeshAccumulator._floorRadius applies to the blade side of
+             the foot, so one member obeys one floor rule on both sides (Q4).
+   JOINS     staggered pairwise Y-joins (Q3): repeatedly merge the two members that are
+             AZIMUTHALLY ADJACENT with the smallest angular gap (ties by id), each join
+             at its own rung of a height ladder from just below the feet down the merge
+             span (gatherHeight stretches the ladder). Join position = area-weighted
+             mean of the children in x/z; parent azimuth = area-weighted circular mean.
+             Deterministic — sorted azimuths, no RNG, no clock. Children END EXACTLY at
+             the join node and the parent STARTS there (shared endpoints), so contact
+             is topology, not field bridging: the clearance margin of the old law's
+             arrival circle (sign-flipping across the shipped presets) ceases to exist
+             as a quantity. Parent radius r_p = sqrt(r_a² + r_b²), ASSERTED per join —
+             a violation throws, it does not warn.
+   TRUNK     the last surviving member IS the trunk; by induction its area at any
+             height equals the sum of the areas joined above it (the merge-region
+             invariant, Q1). No lathe is built anywhere on this path.
+   COUPLING  below the last join the trunk root meets the USER-SIZED stem (stemR is
+             never derived from the bundle — Q1): radius follows the stated law
+             r(t) = sqrt(lerp(r_root², stemR², smootherstep(t))) — a smooth taper in
+             AREA space — down a bezier from the root node to an on-axis anchor
+             tube*8 below the stem top (overlapping the stem; on a bare bloom the
+             field's round cap seals it as the model's underside). PROFILE is ornament
+             here (Q2): it may multiply the coupling radius UP, never below the law —
+             floored at max(1, profileMult) and ASSERTED.
+
+   What this deliberately does NOT read: buttonSize (there is no arrival circle to
+   swell — Phase B decides its retirement; unused here is not retired), absorption
+   (the field blend, applied downstream as always), convergenceTightness /
+   blendSmoothness (never reached the SDF on any law).
+
+   meta.spine carries the class counts {members, joins, chainSegs, joinSegs,
+   couplingSegs, stubs} so tools/verify-junction-continuity.mjs can reconcile the
+   capsule census against the construction.
+   ============================================================================ */
+function buildSpineSkeleton(feet, neck, opts, S) {
+  const { cx, cz, tube, profile, Rring, yFeet, yStem, stemR } = S;
+  const sstep = (t) => { t = _clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const fl = opts.exportMode && opts.floorR ? opts.floorR : 0;   // export floor; live matches _floorRadius's no-op
+  const caps = [];
+
+  // ---- members: one per distinct foot, floored, area-merged if coincident ----
+  const groups = [];
+  for (const f of feet) {
+    const g = groups.find((q) => Math.hypot(q.p[0] - f.p[0], q.p[1] - f.p[1], q.p[2] - f.p[2]) < 1e-9);
+    if (g) { g.r2 += f.r * f.r; }
+    else groups.push({ p: f.p.slice(), r2: f.r * f.r, up: f.up.slice() });
+  }
+  let nextId = 0;
+  let members = groups.map((g) => {
+    const r = Math.max(Math.sqrt(g.r2), fl);
+    return { id: nextId++, node: g.p, r, area: r * r,
+             az: Math.atan2(g.p[2] - cz, g.p[0] - cx), up: g.up, leaf: true };
+  });
+  const N0 = members.length;
+  // up-stubs into the blade, same overlap as the current law
+  for (const m of members) {
+    const u = _norm(m.up);
+    caps.push({ a: m.node, b: _add(m.node, _mul(u, tube * 4)), ra: m.r, rb: m.r });
+  }
+  const stubs = members.length;
+
+  // ---- the join ladder ----
+  // yAnchor is the coupling's on-axis end, overlapping the stem; the min() guarantees a
+  // real descent even when the stem top sits ABOVE the mean foot height (Thistle ships
+  // that way — yStem 0.206 vs yFeet 0.151, measured in the discovery).
+  const J = Math.max(0, N0 - 1);
+  const yAnchor = Math.min(yStem - tube * 8, yFeet - 0.12);
+  const gH = _clamp(opts.gatherHeight != null ? opts.gatherHeight : 0.25, 0.05, 0.9);
+  const drop = yFeet - yAnchor;
+  const yLadderTop = yFeet - 0.12 * drop;
+  const yLadderBot = yFeet - Math.min(0.85, 0.25 + gH) * drop;   // gatherHeight = the MERGE SPAN
+
+  const joins = [];
+  const edges = [];                          // { A: child member, B: parent member }
+  while (members.length > 1) {
+    members.sort((p, q) => p.az - q.az || p.id - q.id);
+    let bi = 0, bGap = Infinity;
+    for (let i = 0; i < members.length; i++) {
+      const p = members[i], q = members[(i + 1) % members.length];
+      let gap = q.az - p.az; if (i === members.length - 1) gap += Math.PI * 2;
+      if (gap < bGap - 1e-12) { bGap = gap; bi = i; }
+    }
+    const a = members[bi], b = members[(bi + 1) % members.length];
+    const j = joins.length;
+    const yj = _lerp(yLadderTop, yLadderBot, J === 1 ? 0.5 : j / (J - 1));
+    const w = a.area + b.area;
+    const node = [(a.node[0] * a.area + b.node[0] * b.area) / w, yj,
+                  (a.node[2] * a.area + b.node[2] * b.area) / w];
+    const az = Math.atan2(a.area * Math.sin(a.az) + b.area * Math.sin(b.az),
+                          a.area * Math.cos(a.az) + b.area * Math.cos(b.az));
+    const parent = { id: nextId++, node, r: Math.sqrt(w), area: w, az, leaf: false };
+    joins.push({ p: node, y: yj, rp: parent.r, ra: a.r, rb: b.r });
+    edges.push({ A: a, B: parent }, { A: b, B: parent });
+    members = members.filter((m) => m !== a && m !== b);
+    members.push(parent);
+  }
+  const root = members[0];
+  const anchor = [cx, yAnchor, cz];
+
+  // AREA RULE — asserted, never assumed. Exact by construction today; this throw is what
+  // makes a future edit that cuts a join below its feeds fail loudly (Q2's "assertion,
+  // not a convention" applies to the whole merge region).
+  for (const jn of joins) {
+    if (jn.rp * jn.rp + 1e-12 < jn.ra * jn.ra + jn.rb * jn.rb)
+      throw new Error(`SPINE AREA RULE violated at join y=${jn.y.toFixed(4)}: r_p=${jn.rp.toFixed(6)} < sqrt(${jn.ra.toFixed(6)}^2 + ${jn.rb.toFixed(6)}^2)`);
+  }
+
+  // ---- emit link chains: child node -> parent node, tangent-aimed into the parent's
+  // own departure so the member reads as one continuous run through each join ----
+  const targetOf = new Map();
+  for (const e of edges) targetOf.set(e.A.id, e.B.node);
+  targetOf.set(root.id, anchor);
+  const K = 7;
+  const emitLink = (P0, P3, r, tanStart, tanEnd) => {
+    const d = Math.max(1e-6, Math.hypot(P3[0] - P0[0], P3[1] - P0[1], P3[2] - P0[2]));
+    const c1 = _add(P0, _mul(tanStart, d * 0.4));
+    const c2 = _sub(P3, _mul(tanEnd, d * 0.4));
+    let pr = null;
+    for (let i = 0; i <= K; i++) {
+      const t = i / K, mt = 1 - t, w0 = mt * mt * mt, w1 = 3 * mt * mt * t, w2 = 3 * mt * t * t, w3 = t * t * t;
+      const pt = i === 0 ? P0 : i === K ? P3 :                    // endpoints EXACT — shared-node contact is the construction
+        [w0 * P0[0] + w1 * c1[0] + w2 * c2[0] + w3 * P3[0],
+         w0 * P0[1] + w1 * c1[1] + w2 * c2[1] + w3 * P3[1],
+         w0 * P0[2] + w1 * c1[2] + w2 * c2[2] + w3 * P3[2]];
+      if (pr) caps.push({ a: pr, b: pt, ra: r, rb: r });
+      pr = pt;
+    }
+  };
+  for (const e of edges) {
+    const P0 = e.A.node, P3 = e.B.node;
+    const chordEnd = _norm(_sub(targetOf.get(e.B.id), e.B.node));   // the parent's own departure
+    let tanStart;
+    if (e.A.leaf) {
+      const c = Math.cos(e.A.az), s = Math.sin(e.A.az);
+      tanStart = _norm([-c, -0.4, -s]);                             // leave the foot down-and-in (as the current law does)
+    } else {
+      tanStart = _norm(_sub(P3, P0));                               // continue along the member's own chord
+    }
+    emitLink(P0, P3, e.A.r, tanStart, chordEnd);
+  }
+
+  // ---- the coupling: trunk root -> user-sized stem, the stated law ----
+  const M = 12;
+  const rRoot = root.r;
+  const rBase = (t) => Math.sqrt(_lerp(rRoot * rRoot, stemR * stemR, sstep(t)));
+  const rFinal = (t) => {
+    const base = rBase(t);
+    const rf = Math.max(base * Math.max(1, profileMult(profile, 1 - t)), fl);
+    if (rf + 1e-12 < base) throw new Error(`SPINE PROFILE FLOOR violated at t=${t.toFixed(3)}: r=${rf} < coupling law ${base}`);
+    return rf;
+  };
+  {
+    const P0 = root.node, P3 = anchor;
+    const d = Math.max(1e-6, Math.hypot(P3[0] - P0[0], P3[1] - P0[1], P3[2] - P0[2]));
+    const tanStart = N0 > 1 ? _norm(_sub(P3, P0)) : _norm([0, -1, 0]);
+    const c1 = _add(P0, _mul(tanStart, d * 0.4));
+    const c2 = _sub(P3, _mul([0, -1, 0], d * 0.4));
+    let pr = null, prR = rFinal(0);
+    for (let i = 0; i <= M; i++) {
+      const t = i / M, mt = 1 - t, w0 = mt * mt * mt, w1 = 3 * mt * mt * t, w2 = 3 * mt * t * t, w3 = t * t * t;
+      const pt = i === 0 ? P0 : i === M ? P3 :
+        [w0 * P0[0] + w1 * c1[0] + w2 * c2[0] + w3 * P3[0],
+         w0 * P0[1] + w1 * c1[1] + w2 * c2[1] + w3 * P3[1],
+         w0 * P0[2] + w1 * c1[2] + w2 * c2[2] + w3 * P3[2]];
+      const rr = rFinal(t);
+      if (pr) caps.push({ a: pr, b: pt, ra: prR, rb: rr });
+      pr = pt; prR = rr;
+    }
+  }
+
+  const chainSegs = edges.length * K;
+  const couplingSegs = M;
+  const yjs = joins.map((q) => q.y);
+  const maxWidth = 2 * Math.max(rRoot, stemR);
+  return { caps, buttons: [], meta: {
+    Rring, yFeet, yStem,
+    yArrival: yjs.length ? (Math.min(...yjs) + Math.max(...yjs)) / 2 : yLadderTop,   // mid-ladder; the SPREAD is the real number now
+    Rtrunk: rRoot, swell: rRoot, stemR, maxEntryDeg: 0, maxWidth,
+    leafCount: feet.length, approachLaw: 'spine',
+    joins: joins.map((q) => ({ y: q.y, rp: q.rp, ra: q.ra, rb: q.rb, p: q.p.slice() })),
+    spine: { members: N0, joins: J, chainSegs, joinSegs: 0, couplingSegs, stubs },
+  } };
 }
 
 /* Narrow-band surface nets over a capsule list. Rasterizes each capsule into
@@ -284,10 +491,14 @@ function makeGridSampler(grid) {
   return { f, grad };
 }
 
-/* Floor-aware constrained Laplacian: umbrella-smooth each vertex toward its
-   neighbour average, then reproject onto the isosurface (Newton step along the
-   field gradient) so tangential lumps go but the surface never shrinks below the
-   floored feature — the field already encodes the print floor. */
+/* Constrained Laplacian: umbrella-smooth each vertex toward its neighbour
+   average, then reproject onto the isosurface (Newton step along the field
+   gradient) so tangential lumps go without the surface drifting off the field.
+   An earlier version called this "floor-aware ... the field already encodes the
+   print floor" — false: under the CURRENT law nothing floors the capsule radii,
+   so there was no floor in the field to be aware of. Under the SPINE law the
+   radii are floored before the field is built, and this reprojection preserves
+   that as a side effect of preserving the field. */
 function smoothConstrained(verts, faces, sampler, iters) {
   if (iters <= 0) return verts;
   const n = verts.length;
@@ -372,7 +583,12 @@ export function buildReceptacleField(feet, neck, opts = {}) {
   const indices = new Array(faces.length * 3);
   for (let t = 0; t < faces.length; t++) { const f = faces[t]; indices[t * 3] = f[0]; indices[t * 3 + 1] = f[1]; indices[t * 3 + 2] = f[2]; }
 
-  return { positions, normals, indices, stats: { tris: faces.length, verts: sm.length, caps: caps.length, k, cell }, meta };
+  // minCapR: the thinnest capsule radius actually in the field, so the caller's
+  // min-feature telemetry can report what the skeleton CONTAINS rather than a floor
+  // that may not have been applied (the current law never floors; the spine law does).
+  let minCapR = Infinity;
+  for (const c of caps) { if (c.ra < minCapR) minCapR = c.ra; if (c.rb < minCapR) minCapR = c.rb; }
+  return { positions, normals, indices, stats: { tris: faces.length, verts: sm.length, caps: caps.length, k, cell, minCapR }, meta };
 }
 
 // Expose internals for the acceptance probe / tests.
