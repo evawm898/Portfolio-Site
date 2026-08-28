@@ -82,6 +82,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const THREE_VERSION = '0.161.0';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const NEGATIVE = process.argv.includes('--negative-control');
+// --law <name>: run every row under ?junctionLaw=<name>. Default 'current' (the shipped
+// law, and what every number in PR #102/#103 was measured against). Under 'spine' the
+// census reconciles against the builder's meta.spine counts instead of the 30-segment
+// lathe closed form, and the arrival section reports the JOIN ladder (min/max/spread) —
+// the staggered construction's real arrival property.
+const _lawIdx = process.argv.indexOf('--law');
+const LAW = _lawIdx >= 0 ? process.argv[_lawIdx + 1] : 'current';
 
 const PROCESS_FLOOR_MM = { sls: 1.0, sla: 0.4, fdm: 0.8 };
 
@@ -386,7 +393,7 @@ for (const row of ROWS) {
     try { route.fulfill({ status: 200, contentType: 'text/javascript', body: fs.readFileSync(path.join(ROOT, 'node_modules/three', rel)) }); }
     catch { route.abort(); }
   });
-  await page.goto(`http://localhost:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
+  await page.goto(`http://localhost:${port}/flower.html${LAW !== 'current' ? `?junctionLaw=${LAW}` : ''}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
   await page.evaluate(() => { const t = document.getElementById('advancedToggle'); if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); } });
   await page.waitForTimeout(120);
@@ -440,14 +447,25 @@ for (const row of ROWS) {
   const { cx, cz, tubeRadius, collar } = rec.opts;
   const cls = classifyCaps(rec.caps, cx, cz, rec.feet, tubeRadius);
   const groups = groupFeet(rec.feet);
-  // V2 CAP CENSUS — reconcile against the closed form in flower-sdf.js.
+  // V2 CAP CENSUS — reconcile against the law's closed form.
   const total = cls.lathe.length + cls.strand.length + cls.stub.length + cls.collar.length;
-  const expectCollar = collar === 'band' ? 1 : collar === 'ferrule' ? 3 : 0;
-  const expect = 30 + rec.feet.length * 9 + rec.feet.length + expectCollar;
   if (total !== rec.caps.length) failures.push(`V2 ${row.label}: census ${total} != ${rec.caps.length} caps`);
-  if (rec.caps.length !== expect) failures.push(`V2 ${row.label}: ${rec.caps.length} caps, closed form predicts ${expect} (30 lathe + ${rec.feet.length}x9 strand + ${rec.feet.length} stub + ${expectCollar} collar)`);
-  if (cls.lathe.length !== 30) failures.push(`V2 ${row.label}: ${cls.lathe.length} lathe segments, source builds 30`);
-  if (cls.stub.length !== rec.feet.length) failures.push(`V2 ${row.label}: ${cls.stub.length} stubs for ${rec.feet.length} feet`);
+  if (LAW === 'current') {
+    const expectCollar = collar === 'band' ? 1 : collar === 'ferrule' ? 3 : 0;
+    const expect = 30 + rec.feet.length * 9 + rec.feet.length + expectCollar;
+    if (rec.caps.length !== expect) failures.push(`V2 ${row.label}: ${rec.caps.length} caps, closed form predicts ${expect} (30 lathe + ${rec.feet.length}x9 strand + ${rec.feet.length} stub + ${expectCollar} collar)`);
+    if (cls.lathe.length !== 30) failures.push(`V2 ${row.label}: ${cls.lathe.length} lathe segments, source builds 30`);
+    if (cls.stub.length !== rec.feet.length) failures.push(`V2 ${row.label}: ${cls.stub.length} stubs for ${rec.feet.length} feet`);
+  } else if (rec.meta.spine) {
+    // spine: the builder's meta.spine counts, re-summed against the actual capsule list.
+    const sp = rec.meta.spine;
+    const expect = sp.chainSegs + sp.joinSegs + sp.couplingSegs + sp.stubs;
+    if (rec.caps.length !== expect) failures.push(`V2 ${row.label}: ${rec.caps.length} caps, meta.spine sums to ${expect}`);
+    if (cls.stub.length !== sp.stubs) failures.push(`V2 ${row.label}: ${cls.stub.length} stubs classified, builder says ${sp.stubs}`);
+    if (rec.meta.joins.length !== sp.joins) failures.push(`V2 ${row.label}: ${rec.meta.joins.length} joins in meta, spine counts say ${sp.joins}`);
+  } else {
+    failures.push(`V2 ${row.label}: law "${LAW}" has no census closed form here`);
+  }
 
   const lathe = latheMeasure(rec.caps, cls);
   const rr = runRise(rec.caps, cls, rec.feet, cx, cz);
@@ -477,7 +495,11 @@ await browser.close();
 server.close();
 
 // ---- V4 LATHE DETECTOR PAIR (known-good / known-bad) -----------------------
-if (out.length) {
+// Only under the current law: it validates the LATHE detector against a skeleton known
+// to contain one. The spine law builds no lathe, so there is no known-good input here —
+// its structural validity lives in tools/verify-junction-continuity.mjs's detector pair.
+if (LAW !== 'current' && NEGATIVE) { console.log('\n--negative-control is a current-law check (V4 lathe pair); run it without --law.'); process.exit(1); }
+if (out.length && LAW === 'current') {
   const s = out[0];
   const good = latheMeasure(s.caps_raw, s.cls);
   const stripped = s.caps_raw.filter((_, i) => !s.cls.lathe.includes(i));
@@ -581,6 +603,22 @@ if (out.length) {
  *     so mm printed with it are the mm a slicer would measure. Used for all Ø/height columns
  *     in the sections added below. */
 const mmTrue = (r) => (r.floorMM && r.floorRPassed) ? r.floorMM / (2 * r.floorRPassed) : r.mmPerUnit;
+if (out.some((r) => r.meta.joins)) {
+  console.log('\nJOIN LADDER (spine law — per row: join heights and radii; the staggered construction\'s arrival property):');
+  console.log('  ' + 'row'.padEnd(28) + 'members'.padStart(8) + 'joins'.padStart(6) + 'y min'.padStart(9) + 'y max'.padStart(9) + 'spread'.padStart(9) + 'spread mm'.padStart(10) + 'r_p min–max'.padStart(17));
+  for (const r of out) {
+    const js = r.meta.joins || [];
+    const mm = mmTrue(r);
+    if (!js.length) { console.log('  ' + r.label.padEnd(28) + String(r.meta.spine ? r.meta.spine.members : 0).padStart(8) + '     0   (single member — no joins)'); continue; }
+    const ys = js.map((q) => q.y), rps = js.map((q) => q.rp);
+    console.log('  ' + r.label.padEnd(28) + String(r.meta.spine.members).padStart(8) + String(js.length).padStart(6)
+      + Math.min(...ys).toFixed(4).padStart(9) + Math.max(...ys).toFixed(4).padStart(9)
+      + (Math.max(...ys) - Math.min(...ys)).toFixed(4).padStart(9)
+      + ((Math.max(...ys) - Math.min(...ys)) * mm).toFixed(2).padStart(10)
+      + `${Math.min(...rps).toFixed(4)}–${Math.max(...rps).toFixed(4)}`.padStart(17));
+  }
+}
+
 console.log('\nARRIVAL GEOMETRY (per row — TRUE chain ends (P3), spread, spans in mm at the floor-derived export scale):');
 console.log('  ' + 'row'.padEnd(28) + 'nEnds  yArr'.padEnd(16) + 'endY spread'.padStart(12) + 'arrR mean'.padStart(11) + 'feet→arr mm'.padStart(13) + 'arr→stem mm'.padStart(13) + 'mm/unit'.padStart(9));
 for (const r of out) {
