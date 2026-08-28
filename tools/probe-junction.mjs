@@ -263,29 +263,6 @@ function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet,
   return { freeEnds: free, blendK: k, mmPerUnit };
 }
 
-/* A_k — descriptive only. Azimuthal ripple of the strand-arrival radius at the petal
- * harmonic, as a fraction of the mean. Reported so changes stay legible; NOT a target.
- *
- * Indexed by TRUE AZIMUTH over DISTINCT feet. The first version indexed by array
- * position and averaged over all nine feet including the six coincident duplicates,
- * which put a repeating triple through a harmonic-3 kernel and resonated exactly: it
- * returned 2.000 on all 30 rows, unchanged by every control including ones that visibly
- * move the geometry. A number identical across every row is a coincidence, not a result.
- *
- * NOTE ON RESOLUTION: the shipped default has THREE distinct feet. A harmonic-3 estimate
- * from three samples sits exactly at the Nyquist limit and carries no information; it is
- * returned as null rather than as a number that looks like a measurement. Rows with
- * enough distinct feet (the presets, 6 to 39) get a real figure. */
-function azimuthalRipple(rows, feet, groups, nHarm, cx, cz) {
-  const pts = [];
-  for (const g of groups) { const r = rows[g.at]; if (r) pts.push({ az: Math.atan2(feet[g.at].p[2] - cz, feet[g.at].p[0] - cx), r1: r.r1 }); }
-  if (pts.length < 2 * nHarm + 1) return null;                 // below Nyquist for this harmonic
-  const mean = pts.reduce((s2, q) => s2 + q.r1, 0) / pts.length;
-  let re = 0, im = 0;
-  for (const q of pts) { re += q.r1 * Math.cos(nHarm * q.az); im += q.r1 * Math.sin(nHarm * q.az); }
-  return mean > EPS ? 2 * Math.hypot(re, im) / pts.length / mean : null;
-}
-
 // ---------------------------------------------------------------------------
 // Rows. The shipped defaults and every preset first (coverage against what actually
 // ships, per the skill), then the junction-control sweep.
@@ -319,6 +296,25 @@ const ROWS = [
   // 0.4/2.5 measures 0.5/2.0 under a label that says otherwise. V3 caught exactly that.
   { label: 'thickScale 0.50 (slider min)', set: [{ id: 'thickScale', value: '0.5' }] },
   { label: 'thickScale 2.00 (slider max)', set: [{ id: 'thickScale', value: '2' }] },
+  // ---- STEM-JOIN SWEEP (Phase 2). The step the join sliders must resolve is Rtrunk
+  // against stemR, and ONLY stemR moves with this slider: flower.js:2809 passes
+  // neckR = tubeRadius * 4.0 * stemThick, flower-sdf.js:95 takes stemR = neck.r, and
+  // :99 takes Rtrunk = sqrt(sum r_child^2) over the FEET, which stemThickness does not
+  // touch. So bundle/stem is expected to fall as 1/thickness, and the step INVERTS
+  // (bundle wider than stem) below some thickness. Measured here rather than derived.
+  //
+  // REACHABLE RANGE ONLY. flower.js clamps stemThickness to [0.3, 4] in two places
+  // (2774, 2799) while the registry slider and the markup are [0.5, 3] — the same
+  // registry-vs-clamp split this file already records for thickScale, and the second
+  // instance of that class. Rows at 0.3 or 4 would fail the read-back assertion, which
+  // is the proof they are unreachable; they are therefore not rows.
+  { label: 'stemThickness 0.50 (slider MIN)', set: [{ id: 'stemType', value: 'stem' }, { id: 'stemThickness', value: '0.5' }] },
+  { label: 'stemThickness 0.55', set: [{ id: 'stemThickness', value: '0.55' }] },
+  { label: 'stemThickness 0.60', set: [{ id: 'stemThickness', value: '0.6' }] },
+  { label: 'stemThickness 0.75', set: [{ id: 'stemThickness', value: '0.75' }] },
+  { label: 'stemThickness 1.00 (default)', set: [{ id: 'stemThickness', value: '1' }] },
+  { label: 'stemThickness 2.00', set: [{ id: 'stemThickness', value: '2' }] },
+  { label: 'stemThickness 3.00 (slider MAX)', set: [{ id: 'stemThickness', value: '3' }] },
   { label: 'process sla', set: [{ id: 'process', value: 'sla' }] },
 ];
 
@@ -412,7 +408,6 @@ for (const row of ROWS) {
     meta: rec.meta, k: rec.k, proc, floorMM, minDiaMM, exportMode: rec.opts.exportMode, floorRPassed: rec.opts.floorR,
     ratios: rr.filter(Boolean).map((r) => r.ratio), rr,
     orphans: orph.freeEnds, mmPerUnit: orph.mmPerUnit,
-    Ak: azimuthalRipple(rr, rec.feet, groups, Math.max(1, groups.length), cx, cz),
     readout: snap.readout.replace(/\s+/g, ' ').trim(),
     radii: [...new Set(radii.map((v) => +v.toFixed(6)))],
     caps_raw: rec.caps, cls, feetRaw: rec.feet, tubeRadius,
@@ -438,7 +433,11 @@ if (out.length) {
 const f2 = (x) => (x == null || !isFinite(x) ? '  n/a' : x.toFixed(2));
 const f3 = (x) => (x == null || !isFinite(x) ? '   n/a' : x.toFixed(3));
 console.log('Junction probe — is the junction a continuation of the petal, or a skin?\n');
-console.log('  A_k is DESCRIPTIVE ONLY. It is not a target and nothing is tuned to it.\n');
+console.log('  A_k is GONE (Eva, Phase 2 ruling): retired as an objective, and this probe could only\n'
+  + '  ever report n/a for it — one distinct foot per petal puts the harmonic at the sampling\n'
+  + '  frequency. A column that reads n/a on every row describes nothing and invites re-adoption\n'
+  + '  of a retired target. The surface-sampled estimator was ruled out rather than deferred.\n'
+  + '  In its place: BUNDLE/STEM = Rtrunk/stemR, the step the join sliders have to resolve.\n');
 console.log('  ' + 'row'.padEnd(26) + 'feet caps  lathe  lathe%  run:rise(min/med/max)   A_k    freeEnds  minDia');
 for (const r of out) {
   const rs = r.ratios.slice().sort((a, b) => a - b);
@@ -447,7 +446,8 @@ for (const r of out) {
     + `${r.feet}/${r.distinctFeet}`.padStart(9) + String(r.caps).padStart(5)
     + String(r.latheSegs).padStart(7) + (100 * r.latheFrac).toFixed(1).padStart(7) + '%'
     + `   ${f2(rs[0])}/${f2(med)}/${f2(rs[rs.length - 1])}`.padEnd(24)
-    + f3(r.Ak).padStart(7) + String(r.orphans.length).padStart(10)
+    + (r.meta && r.meta.stemR ? (r.meta.Rtrunk / r.meta.stemR).toFixed(3) : 'n/a').padStart(9)
+    + String(r.orphans.length).padStart(10)
     + (r.minDiaMM ? r.minDiaMM.toFixed(2) : 'n/a').padStart(8));
 }
 console.log('\nGEOMETRY OF THE APPROACH (default row):');
