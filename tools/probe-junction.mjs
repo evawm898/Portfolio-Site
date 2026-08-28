@@ -112,30 +112,55 @@ const EPS = 1e-9;
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const radial = (p, cx, cz) => Math.hypot(p[0] - cx, p[2] - cz);
 
-/* A cap is LATHE when both endpoints sit on the centre axis: it is one segment of a
- * surface of revolution. That is the geometric definition, not a positional one — a
- * classifier keyed off "the first 30 caps" would silently pass a lathe that moved. */
+/* A cap is LATHE when both endpoints sit on the centre axis AND it is part of a CHAIN
+ * of such caps: that is what a surface of revolution is — consecutive coaxial segments
+ * sharing endpoints. A COLLAR ring is also coaxial but stands alone, sharing an endpoint
+ * with nothing.
+ *
+ * An earlier version of this separated the two by ASPECT (wide-and-short = collar). That
+ * was wrong and V2 caught it: below yStem the neck chain runs at a constant stemR, so
+ * those segments are also wide-and-short, and 8 of the 30 lathe segments were filed as
+ * collar on the default row (all 30 but one on Thistle). They then leaked into the
+ * orphan test's kept set, where a stemR-radius cylinder sitting on the axis is closer to
+ * every strand's arrival point than the arrival point is to anything real — so every row
+ * reported "no free ends", which was an artifact of the misclassification, not a result.
+ * Endpoint-sharing is the definition that cannot make that mistake. */
 function classifyCaps(caps, cx, cz, feet, tube) {
   const AXIS_TOL = 1e-6;
   const stubLen = tube * 4;
   const out = { lathe: [], strand: [], stub: [], collar: [] };
+  const coax = [];
   for (let i = 0; i < caps.length; i++) {
     const c = caps[i];
-    const onAxisA = radial(c.a, cx, cz) < AXIS_TOL, onAxisB = radial(c.b, cx, cz) < AXIS_TOL;
-    if (onAxisA && onAxisB) {
-      // A collar is also coaxial but is a WIDE short disc (ra === rb, far above a lathe
-      // segment's local radius); separate them by aspect so the census reconciles.
-      const len = dist(c.a, c.b);
-      if (c.ra === c.rb && len > EPS && Math.max(c.ra, c.rb) / len > 1.5) out.collar.push(i);
-      else out.lathe.push(i);
-      continue;
-    }
-    // A stub is the short up-segment rooted exactly at a foot position.
-    const atFoot = feet.some((f) => dist(f.p, c.a) < 1e-9);
+    if (radial(c.a, cx, cz) < AXIS_TOL && radial(c.b, cx, cz) < AXIS_TOL) { coax.push(i); continue; }
+    const atFoot = feet.some((f) => dist(f.p, c.a) < 1e-9);   // a stub is the short up-segment at a foot
     if (atFoot && Math.abs(dist(c.a, c.b) - stubLen) < 1e-6) out.stub.push(i);
     else out.strand.push(i);
   }
+  for (const i of coax) {
+    const c = caps[i];
+    const shares = coax.some((j) => j !== i && (dist(caps[j].a, c.b) < 1e-9 || dist(caps[j].b, c.a) < 1e-9
+                                             || dist(caps[j].a, c.a) < 1e-9 || dist(caps[j].b, c.b) < 1e-9));
+    (shares ? out.lathe : out.collar).push(i);
+  }
   return out;
+}
+
+/* Feet at the SAME world position are one foot carrying several strands, not several
+ * feet. marginFlareFactor(0) === 0 collapses both margin strands onto the midrib line at
+ * u = 0, so the shipped default reports nine feet that are three. This matters twice:
+ * six of the nine bezier chains are then exact duplicates of the other three (wasted
+ * field work), and — the reason it is a validity concern rather than trivia — an orphan
+ * test that lets a chain count its own duplicate as a neighbour reports every rod as
+ * connected. Grouping is what stops that. */
+function groupFeet(feet) {
+  const groups = [];
+  for (let i = 0; i < feet.length; i++) {
+    let g = groups.find((q) => dist(feet[q.at].p, feet[i].p) < 1e-9);
+    if (!g) { g = { at: i, members: [] }; groups.push(g); }
+    g.members.push(i);
+  }
+  return groups;
 }
 
 /* AXISYMMETRY: total arc length of coaxial (lathe) segments, and their share of the
@@ -181,20 +206,34 @@ function runRise(caps, cls, feet, cx, cz) {
  * against every other non-lathe cap and against the stem top disc. Reports the free
  * length and diameter of anything that is not, per process, since the same strut is a
  * different diameter at each. */
-function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits) {
+function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet, groups, cx, cz) {
   const keep = [...cls.strand, ...cls.stub, ...cls.collar];
   const mmPerUnit = modelSpanUnits > EPS ? heightMM / modelSpanUnits : 0;
+  // Which foot GROUP each kept cap belongs to, by nearest foot azimuth — so a chain end
+  // is never scored as "connected" to its own coincident duplicate.
+  const azOf = (p) => Math.atan2(p[2] - cz, p[0] - cx);
+  const groupOf = (c) => {
+    let best = -1, bd = Infinity;
+    for (let g = 0; g < groups.length; g++) {
+      const d = Math.abs(Math.atan2(Math.sin(azOf(c.a) - azOf(feet[groups[g].at].p)), Math.cos(azOf(c.a) - azOf(feet[groups[g].at].p))));
+      if (d < bd) { bd = d; best = g; }
+    }
+    return best;
+  };
+  const gCache = new Map();
+  const grp = (i) => { if (!gCache.has(i)) gCache.set(i, groupOf(caps[i])); return gCache.get(i); };
   const free = [];
   for (const i of cls.strand) {
     const c = caps[i];
-    // the chain end: a strand cap whose b is not the a of any other kept cap
+    // the chain end: a strand cap whose b is not the a of any other kept cap IN ITS OWN GROUP
     let continues = false;
-    for (let j = 0; j < keep.length; j++) { if (keep[j] === i) continue; if (dist(caps[keep[j]].a, c.b) < 1e-9) { continues = true; break; } }
+    for (let j = 0; j < keep.length; j++) { if (keep[j] === i) continue; if (grp(keep[j]) !== grp(i)) continue; if (dist(caps[keep[j]].a, c.b) < 1e-9) { continues = true; break; } }
     if (continues) continue;
-    // free end: nearest surface among the other kept caps, and the stem top
+    // free end: nearest surface among kept caps of OTHER groups, and the stem top
     let gap = Infinity;
     for (let j = 0; j < keep.length; j++) {
       const o = caps[keep[j]]; if (keep[j] === i) continue;
+      if (grp(keep[j]) === grp(i)) continue;   // its own petal's material is not "reaching something"
       // segment-to-segment surface gap, sampled — enough resolution for a mm-scale answer
       let dmin = Infinity;
       for (let s = 0; s <= 8; s++) for (let t = 0; t <= 8; t++) {
@@ -251,8 +290,11 @@ const ROWS = [
   { label: 'flareRate 1.00', set: [{ id: 'flareRate', value: '1' }] },
   { label: 'receptProfile gentle', set: [{ id: 'receptProfile', value: 'gentle' }] },
   { label: 'receptProfile dome', set: [{ id: 'receptProfile', value: 'dome' }] },
-  { label: 'thickScale 0.40', set: [{ id: 'thickScale', value: '0.4' }] },
-  { label: 'thickScale 2.50', set: [{ id: 'thickScale', value: '2.5' }] },
+  // thickScale's REACHABLE range. flower.js clamps it to [0.4, 2.5] in two places but the
+  // registry slider is [0.5, 2] — the outer fifth at each end is unreachable, so a row at
+  // 0.4/2.5 measures 0.5/2.0 under a label that says otherwise. V3 caught exactly that.
+  { label: 'thickScale 0.50 (slider min)', set: [{ id: 'thickScale', value: '0.5' }] },
+  { label: 'thickScale 2.00 (slider max)', set: [{ id: 'thickScale', value: '2' }] },
   { label: 'process sla', set: [{ id: 'process', value: 'sla' }] },
 ];
 
@@ -320,6 +362,7 @@ for (const row of ROWS) {
   const rec = snap.rec, ui = snap.ui;
   const { cx, cz, tubeRadius, collar } = rec.opts;
   const cls = classifyCaps(rec.caps, cx, cz, rec.feet, tubeRadius);
+  const groups = groupFeet(rec.feet);
   // V2 CAP CENSUS — reconcile against the closed form in flower-sdf.js.
   const total = cls.lathe.length + cls.strand.length + cls.stub.length + cls.collar.length;
   const expectCollar = collar === 'band' ? 1 : collar === 'ferrule' ? 3 : 0;
@@ -333,14 +376,14 @@ for (const row of ROWS) {
   const rr = runRise(rec.caps, cls, rec.feet, cx, cz);
   const heightMM = Number(ui.heightMM) || 120;
   const span = Math.max(1e-6, (rec.meta.yFeet - rec.meta.yStem) + rec.meta.Rring * 2);   // rough model span in units
-  const orph = orphansWithoutLathe(rec.caps, cls, rec.k, rec.neck, heightMM, span);
+  const orph = orphansWithoutLathe(rec.caps, cls, rec.k, rec.neck, heightMM, span, rec.feet, groups, cx, cz);
   const proc = String(ui.process || 'sls');
   const floorMM = PROCESS_FLOOR_MM[proc] || 0.8;
   const radii = rec.feet.map((f) => f.r);
   const minDiaMM = 2 * Math.min(...radii) * orph.mmPerUnit;
 
   out.push({
-    label: row.label, feet: rec.feet.length, caps: rec.caps.length,
+    label: row.label, feet: rec.feet.length, distinctFeet: groups.length, caps: rec.caps.length,
     latheSegs: lathe.latheSegs, latheFrac: lathe.latheFrac,
     meta: rec.meta, k: rec.k, proc, floorMM, minDiaMM, exportMode: rec.opts.exportMode, floorRPassed: rec.opts.floorR,
     ratios: rr.filter(Boolean).map((r) => r.ratio), rr,
@@ -348,7 +391,7 @@ for (const row of ROWS) {
     Ak: azimuthalRipple(rr, Math.max(1, Math.round(rec.feet.length / 3))),
     readout: snap.readout.replace(/\s+/g, ' ').trim(),
     radii: [...new Set(radii.map((v) => +v.toFixed(6)))],
-    caps_raw: rec.caps, cls,
+    caps_raw: rec.caps, cls, feetRaw: rec.feet, tubeRadius,
   });
 }
 
@@ -360,7 +403,7 @@ if (out.length) {
   const s = out[0];
   const good = latheMeasure(s.caps_raw, s.cls);
   const stripped = s.caps_raw.filter((_, i) => !s.cls.lathe.includes(i));
-  const clsB = classifyCaps(stripped, s.meta ? 0 : 0, 0, [], 0);
+  const clsB = classifyCaps(stripped, 0, 0, s.feetRaw, s.tubeRadius);
   const bad = latheMeasure(stripped, clsB);
   const detectorLatheSegs = NEGATIVE ? good.latheSegs : bad.latheSegs;   // negative control: feed it the WRONG input
   if (!(good.latheSegs > 0)) failures.push('V4 known-good: detector found no lathe in the real skeleton — it cannot detect one');
@@ -376,8 +419,8 @@ console.log('  ' + 'row'.padEnd(26) + 'feet caps  lathe  lathe%  run:rise(min/me
 for (const r of out) {
   const rs = r.ratios.slice().sort((a, b) => a - b);
   const med = rs.length ? rs[rs.length >> 1] : NaN;
-  console.log('  ' + r.label.padEnd(26)
-    + String(r.feet).padStart(4) + String(r.caps).padStart(5)
+  console.log('  ' + r.label.padEnd(28)
+    + `${r.feet}/${r.distinctFeet}`.padStart(9) + String(r.caps).padStart(5)
     + String(r.latheSegs).padStart(7) + (100 * r.latheFrac).toFixed(1).padStart(7) + '%'
     + `   ${f2(rs[0])}/${f2(med)}/${f2(rs[rs.length - 1])}`.padEnd(24)
     + f3(r.Ak).padStart(7) + String(r.orphans.length).padStart(10)
@@ -394,9 +437,9 @@ if (out[0]) {
 }
 console.log('\nFREE ENDS IF THE LATHE WERE DELETED (per row, gap beyond the blend radius k):');
 for (const r of out) {
-  if (!r.orphans.length) { console.log(`  ${r.label.padEnd(26)} none`); continue; }
+  if (!r.orphans.length) { console.log(`  ${r.label.padEnd(28)} none`); continue; }
   const g = r.orphans.map((o) => o.gapMM);
-  console.log(`  ${r.label.padEnd(26)} ${r.orphans.length} free ends, gap ${Math.min(...g).toFixed(2)}–${Math.max(...g).toFixed(2)} mm, Ø ${r.orphans[0].diaMM.toFixed(2)} mm`);
+  console.log(`  ${r.label.padEnd(28)} ${r.orphans.length} free ends, gap ${Math.min(...g).toFixed(2)}–${Math.max(...g).toFixed(2)} mm, Ø ${r.orphans[0].diaMM.toFixed(2)} mm`);
 }
 
 if (failures.length) {
