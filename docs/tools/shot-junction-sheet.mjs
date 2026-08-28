@@ -57,7 +57,12 @@ const CAMERA_HOOK = `
   controls.autoRotate = false;
   controls.enableDamping = false;   // damping interpolates the camera AFTER a set — the read-back would then measure the damper, not the hook
   try { viewTween = null; } catch (e) {}   // the post-rebuild camera FLIGHT (applyViewPreset's 650 ms tween) would keep stepping after the hook
-  controls.minDistance = 0.01; controls.maxDistance = 1000;   // the app's dolly clamp (minDistance 1.5) sits ABOVE a junction-framing distance (~1.49) and update() pushed the camera out by exactly the read-back error
+  controls.minDistance = 0.01; controls.maxDistance = 1000;   // the app's dolly clamp (minDistance 1.5) can sit above a junction-framing distance
+  // FLUSH the residual autoRotate/damping spherical delta BEFORE positioning: update()
+  // applies whatever delta the auto-rotation accumulated on its last frame, so calling it
+  // after the set rotated the camera ~0.58 deg of azimuth — a deterministic, identical
+  // offset on every run (traced at t=0, not an animation). One update() here consumes it.
+  controls.update();
   if (target) controls.target.set(target[0], target[1], target[2]);
   const t = controls.target, az = azDeg * Math.PI / 180, el = elDeg * Math.PI / 180;
   camera.position.set(t.x + dist * Math.cos(el) * Math.cos(az), t.y + dist * Math.sin(el), t.z + dist * Math.cos(el) * Math.sin(az));
