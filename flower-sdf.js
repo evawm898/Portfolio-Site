@@ -286,24 +286,32 @@ function buildSpineSkeleton(feet, neck, opts, S) {
     else groups.push({ p: f.p.slice(), r2: f.r * f.r, up: f.up.slice() });
   }
   let nextId = 0;
-  let members = groups.map((g) => {
+  const allMembers = groups.map((g) => {
     const r = Math.max(Math.sqrt(g.r2), fl);
     return { id: nextId++, node: g.p, r, area: r * r,
-             az: Math.atan2(g.p[2] - cz, g.p[0] - cx), up: g.up, leaf: true };
+             az: Math.atan2(g.p[2] - cz, g.p[0] - cx),
+             axial: Math.hypot(g.p[0] - cx, g.p[2] - cz) < 1e-6,   // the centre connector — no azimuth to pair by
+             up: g.up, leaf: true };
   });
-  const N0 = members.length;
-  // up-stubs into the blade, same overlap as the current law
-  for (const m of members) {
+  // ON-AXIS members (the centre connector) have no azimuth, so they cannot enter the
+  // azimuthal pairing; they join the tree LAST, against the root — their descent is the
+  // axial riser that carries the centre down to the trunk.
+  let members = allMembers.filter((m) => !m.axial);
+  const axialMembers = allMembers.filter((m) => m.axial);
+  if (!members.length && axialMembers.length) { members = [axialMembers.shift()]; }   // degenerate: only axial feet
+  const N0 = allMembers.length;
+  // up-stubs into the blade (or the centre mass), same overlap as the current law
+  for (const m of allMembers) {
     const u = _norm(m.up);
     caps.push({ a: m.node, b: _add(m.node, _mul(u, tube * 4)), ra: m.r, rb: m.r });
   }
-  const stubs = members.length;
+  const stubs = allMembers.length;
 
-  // ---- the join ladder ----
+  // ---- the join ladder (azimuthal members) ----
   // yAnchor is the coupling's on-axis end, overlapping the stem; the min() guarantees a
   // real descent even when the stem top sits ABOVE the mean foot height (Thistle ships
   // that way — yStem 0.206 vs yFeet 0.151, measured in the discovery).
-  const J = Math.max(0, N0 - 1);
+  const J = Math.max(0, members.length - 1);
   const yAnchor = Math.min(yStem - tube * 8, yFeet - 0.12);
   const gH = _clamp(opts.gatherHeight != null ? opts.gatherHeight : 0.25, 0.05, 0.9);
   const drop = yFeet - yAnchor;
@@ -334,6 +342,19 @@ function buildSpineSkeleton(feet, neck, opts, S) {
     members = members.filter((m) => m !== a && m !== b);
     members.push(parent);
   }
+  // ---- axial members (the centre connector) join the tree last, against the root ----
+  for (let i = 0; i < axialMembers.length; i++) {
+    const ax = axialMembers[i], rt = members[0];
+    const yj = _lerp(yLadderBot, yAnchor, (i + 1) / (axialMembers.length + 2));
+    const w = ax.area + rt.area;
+    const node = [(ax.node[0] * ax.area + rt.node[0] * rt.area) / w, yj,
+                  (ax.node[2] * ax.area + rt.node[2] * rt.area) / w];
+    const parent = { id: nextId++, node, r: Math.sqrt(w), area: w, az: rt.az, leaf: false };
+    joins.push({ p: node, y: yj, rp: parent.r, ra: ax.r, rb: rt.r });
+    edges.push({ A: ax, B: parent }, { A: rt, B: parent });
+    members = [parent];
+  }
+
   const root = members[0];
   const anchor = [cx, yAnchor, cz];
 
@@ -418,7 +439,7 @@ function buildSpineSkeleton(feet, neck, opts, S) {
     Rtrunk: rRoot, swell: rRoot, stemR, maxEntryDeg: 0, maxWidth,
     leafCount: feet.length, approachLaw: 'spine',
     joins: joins.map((q) => ({ y: q.y, rp: q.rp, ra: q.ra, rb: q.rb, p: q.p.slice() })),
-    spine: { members: N0, joins: J, chainSegs, joinSegs: 0, couplingSegs, stubs },
+    spine: { members: N0, joins: joins.length, chainSegs, joinSegs: 0, couplingSegs, stubs },
   } };
 }
 

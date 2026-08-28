@@ -2414,6 +2414,18 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
           sdfFeet.push({ p: [cx + fp.r * c, fp.y, cz + fp.r * s], r: P.tubeRadius * 0.6, up: [u.x, u.y, u.z] });
         }
       }
+      // SPINE LAW: the CENTRE is a junction leaf too. Under the current law the centre
+      // cluster happened to rest on the lathe's top shoulder; the spine builds no lathe,
+      // and with a stem's deep descent nothing axial remained near the heart — the
+      // connectedness gate's SPINE rows caught the centre exporting as a detached body
+      // (voxel-measured: a ~15 mm blob at the bloom heart, stem on, sepals irrelevant).
+      // One connector leaf at the heart, the same derived tubeRadius*0.6 convention as
+      // the sepal connectors, pointing up into the centre mass; buildSpineSkeleton holds
+      // an on-axis member out of the azimuthal pairing and joins it with the trunk root,
+      // so its descent IS the axial riser and the area rule holds at that join too.
+      if (JUNCTION_LAW === 'spine') {
+        sdfFeet.push({ p: [cx, cy, cz], r: P.tubeRadius * 0.6, up: [0, 1, 0] });
+      }
       if (sdfFeet.length) {
         const field = buildReceptacleField(
           sdfFeet, { p: [neckPt.x, neckPt.y, neckPt.z], r: stemR },
