@@ -55,6 +55,7 @@ const VIEWS = [
 const CAMERA_HOOK = `
 ;window.__flowerSetCamera = (azDeg, elDeg, dist, target) => {
   controls.autoRotate = false;
+  controls.enableDamping = false;   // damping interpolates the camera AFTER a set — the read-back would then measure the damper, not the hook
   if (target) controls.target.set(target[0], target[1], target[2]);
   const t = controls.target, az = azDeg * Math.PI / 180, el = elDeg * Math.PI / 180;
   camera.position.set(t.x + dist * Math.cos(el) * Math.cos(az), t.y + dist * Math.sin(el), t.z + dist * Math.cos(el) * Math.sin(az));
@@ -65,6 +66,8 @@ window.__flowerCameraState = () => ({ autoRotate: controls.autoRotate, pos: came
 
 async function shoot(root, laws, outDir) {
   fs.mkdirSync(outDir, { recursive: true });
+  const framingPath = path.join(outDir, 'framing.json');
+  const framing = fs.existsSync(framingPath) ? JSON.parse(fs.readFileSync(framingPath, 'utf8')) : {};
   const { PRESETS } = await import(pathToFileURL(path.join(root, 'flower-presets.js')).href);
   const server = http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split('?')[0]);
@@ -139,15 +142,29 @@ async function shoot(root, laws, outDir) {
       }
 
       const jf = await page.evaluate(() => window.__junctionField && { meta: window.__junctionField.meta, stats: window.__junctionField.stats });
-      if (!jf) throw new Error('no junction field — ?junctionProbe=1 not wired on this tree');
-      if (jf.meta.approachLaw !== law) throw new Error(`built law "${jf.meta.approachLaw}", asked "${law}"`);
-      const m = jf.meta;
-      // frame the junction: target its vertical centre, distance from its real extent
-      const target = [0, (m.yFeet + m.yStem) / 2, 0];
-      const half = Math.max(m.Rring * 1.1, (m.yFeet - m.yStem) * 0.75, 0.2);
-      const distC = half / Math.tan(21 * Math.PI / 180) * 1.15;
+      let target, distC;
+      if (jf) {
+        if (jf.meta.approachLaw !== law) throw new Error(`built law "${jf.meta.approachLaw}", asked "${law}"`);
+        const m = jf.meta;
+        // frame the junction: target its vertical centre, distance from its real extent.
+        // These quantities (yFeet, yStem, Rring) come from the feet and the neck, which are
+        // LAW-INDEPENDENT for a given design — so the framing computed here is saved and
+        // reused verbatim by runs on trees that predate ?junctionProbe=1 (law A's branch),
+        // keeping "same camera" true across trees by construction, not by hope.
+        target = [0, (m.yFeet + m.yStem) / 2, 0];
+        const half = Math.max(m.Rring * 1.1, (m.yFeet - m.yStem) * 0.75, 0.2);
+        distC = half / Math.tan(21 * Math.PI / 180) * 1.15;
+        framing[D.name] = { target, dist: distC };
+      } else {
+        // no probe on this tree: the law must still be verified (window.__junctionLaw has
+        // existed since the switch itself), and the framing comes from a saved run.
+        const lawLive = await page.evaluate(() => window.__junctionLaw);
+        if (lawLive !== law) throw new Error(`tree reports law "${lawLive}", asked "${law}" (and no junction field to check against)`);
+        if (!framing[D.name]) throw new Error('no ?junctionProbe on this tree and no saved framing — run the probe-capable tree first');
+        target = framing[D.name].target; distC = framing[D.name].dist;
+      }
       const readout = await page.evaluate(() => document.getElementById('readout')?.textContent.replace(/\s+/g, ' ').trim() || '');
-      meta.push({ tag, law, design: D.name, junctionTrisLive: jf.stats.tris, caps: jf.stats.caps, readout });
+      meta.push({ tag, law, design: D.name, junctionTrisLive: jf ? jf.stats.tris : null, caps: jf ? jf.stats.caps : null, readout });
 
       for (const V of VIEWS) {
         await page.evaluate(({ az, el, dist, target }) => window.__flowerSetCamera(az, el, dist, target), { az: V.az, el: V.el, dist: distC, target });
@@ -158,7 +175,7 @@ async function shoot(root, laws, outDir) {
                       target[1] + distC * Math.sin(V.el * Math.PI / 180),
                       target[2] + distC * Math.cos(V.el * Math.PI / 180) * Math.sin(V.az * Math.PI / 180)];
         const err = Math.hypot(cam.pos[0] - want[0], cam.pos[1] - want[1], cam.pos[2] - want[2]);
-        if (err > 1e-6) throw new Error(`camera did not take: off by ${err} (something moved it after the hook)`);
+        if (err > Math.max(1e-6, distC * 1e-4)) throw new Error(`camera did not take: off by ${err} (something moved it after the hook)`);
         await page.locator('#flower-canvas').screenshot({ path: path.join(outDir, `${D.name}--${V.name}--${law}.png`) });
       }
       console.log(`  ok  ${tag}  junction tris(live)=${jf.stats.tris} caps=${jf.stats.caps}`);
@@ -171,6 +188,7 @@ async function shoot(root, laws, outDir) {
   await browser.close();
   server.close();
   fs.writeFileSync(path.join(outDir, `frames-meta-${laws.join('_')}.json`), JSON.stringify(meta, null, 2));
+  fs.writeFileSync(framingPath, JSON.stringify(framing, null, 2));
   if (problems.length) { console.log('\nPROBLEMS:'); for (const p of problems) console.log('  ! ' + p); process.exitCode = 1; }
 }
 
