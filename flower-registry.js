@@ -14,6 +14,42 @@
    =================================================================== */
 
 /* ===================================================================
+   RETIRED_IDS — names that may never be used again.
+
+   When a control is deleted, its VALUE stops mattering and its NAME starts. Saved
+   designs and shared links carry `{"reliefAmp": 0.16, ...}` forever; nothing rewrites
+   a design already in someone's browser or in a URL. If `reliefAmp` were later
+   reclaimed for an unrelated parameter, every design saved before the deletion would
+   quietly feed a stale 0.16 into a control that means something different. No error,
+   no warning — the design simply is not what it was, and nobody can tell.
+
+   A comment saying "reserved, do not reuse" is a claim with nothing behind it, and
+   this repository has produced that failure repeatedly: `permanentHidden` was wrong
+   on one of its four users for as long as nothing could check it, `gating` named a
+   condition without stating one for three quarters of the panel, and the export gate's
+   own header claimed a non-manifold check that did not exist. So the reservation is
+   a structure with a gate, not a sentence: tools/verify-registry-sync.mjs FAILS THE
+   BUILD if any live control id, any select option value, or any DEFAULTS key collides
+   with a name listed here.
+
+   Each entry: the id, the schema version it was retired at, and one line on why. The
+   version matters because it names the migration that deletes the key — without that
+   deletion the value is not merely stale, it RIDES ALONG: migrateDesign() collects
+   keys with no control into `extras` and preserves them verbatim on re-save, so a
+   retired id with no migration is carried forward indefinitely by the very mechanism
+   meant to protect forward compatibility.
+
+   TO RETIRE A CONTROL: delete its registry row and its markup, add the entry here,
+   bump CURRENT_SCHEMA, and add a migration that DELETES the key. The gate does the
+   rest. Do not remove an entry — that is the whole point.
+   =================================================================== */
+export const RETIRED_IDS = [
+  { id: "reliefAmp",  retiredAt: 19, why: "Named SURFACE RELIEF; what it actually did was RIB JITTER. It displaced the rib network rather than texturing a face, so it destroyed the flowing rib fan instead of ornamenting it — and the wobble it produced is already reachable through edge noise (which adds to the same normalLift accumulator) and tip irregularity. A control named and documented for something the geometry does not do. NOTE: the original ruling argued it 'reads as doing so little'; that was measured and is FALSE (2.4-12.6% of pixels, visible at amplitude 0.16). It goes because it is misnamed and redundant, not because it is subtle." },
+  { id: "reliefFreq", retiredAt: 19, why: "Jitter frequency for reliefAmp (documented as broad pleats -> fine crepe; actually the wavelength of the rib disturbance). Inert once reliefAmp is gone; retired with it rather than left as a live value nobody can reach." },
+  { id: "reliefMode", retiredAt: 19, why: "Jitter pattern (radial / transverse / irregular). Retired with reliefAmp. Its three option values are not separately reserved: they were only ever meaningful as values OF this id, and reserving them would burn three common words on a control that no longer exists." },
+];
+
+/* ===================================================================
    VISIBILITY PREDICATES — the condition itself, not a name for it.
 
    Until this change the registry stored `gating: {"data-recept": true}` — the NAME of a
@@ -208,9 +244,6 @@ export const CONTROLS = [
   {"id":"petalCup","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Petal cup","fmt":"signed2"},
   {"id":"crossSection","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section roll","fmt":"signed2"},
   {"id":"crossSectionTaper","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section taper","fmt":"signed2"},
-  {"id":"reliefAmp","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Surface relief","fmt":"f2"},
-  {"id":"reliefFreq","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Relief frequency","fmt":"f2"},
-  {"id":"reliefMode","section":"acc-form","kind":"select","options":[{"value":"radial","text":"Radial (ribs from base)"},{"value":"transverse","text":"Transverse"},{"value":"irregular","text":"Irregular (bullate)"}],"default":"radial","label":"Relief pattern"},
   {"id":"petalTwist","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Twist","fmt":"signed2"},
   {"id":"petalSkew","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Skew","fmt":"signed2"},
   {"id":"thickTaper","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Thickness taper","fmt":"f2"},
