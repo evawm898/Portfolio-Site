@@ -223,6 +223,7 @@ function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet,
   const gCache = new Map();
   const grp = (i) => { if (!gCache.has(i)) gCache.set(i, groupOf(caps[i])); return gCache.get(i); };
   const free = [];
+  const seenEnd = new Set();   // one chain per DISTINCT foot: coincident duplicates share an end
   for (const i of cls.strand) {
     const c = caps[i];
     // the chain end: a strand cap whose b is not the a of any other kept cap IN ITS OWN GROUP
@@ -245,6 +246,9 @@ function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet,
       if (dmin < gap) gap = dmin;
     }
     const dStem = Math.max(0, dist(c.b, neck.p) - (c.rb + neck.r));
+    const key = `${c.b[0].toFixed(9)}|${c.b[1].toFixed(9)}|${c.b[2].toFixed(9)}`;
+    if (seenEnd.has(key)) continue;    // a coincident duplicate of a chain already counted
+    seenEnd.add(key);
     const g = Math.min(gap, dStem);
     if (g > k) free.push({ gapUnits: g, gapMM: g * mmPerUnit, diaMM: 2 * c.rb * mmPerUnit, endY: c.b[1], endR: radial(c.b, 0, 0) });
   }
@@ -252,13 +256,25 @@ function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet,
 }
 
 /* A_k — descriptive only. Azimuthal ripple of the strand-arrival radius at the petal
- * harmonic, as a fraction of the mean. Reported so changes stay legible; NOT a target. */
-function azimuthalRipple(rows, nPetalStrands) {
-  const pts = rows.filter(Boolean);
-  if (pts.length < 3) return null;
-  const mean = pts.reduce((s, r) => s + r.r1, 0) / pts.length;
+ * harmonic, as a fraction of the mean. Reported so changes stay legible; NOT a target.
+ *
+ * Indexed by TRUE AZIMUTH over DISTINCT feet. The first version indexed by array
+ * position and averaged over all nine feet including the six coincident duplicates,
+ * which put a repeating triple through a harmonic-3 kernel and resonated exactly: it
+ * returned 2.000 on all 30 rows, unchanged by every control including ones that visibly
+ * move the geometry. A number identical across every row is a coincidence, not a result.
+ *
+ * NOTE ON RESOLUTION: the shipped default has THREE distinct feet. A harmonic-3 estimate
+ * from three samples sits exactly at the Nyquist limit and carries no information; it is
+ * returned as null rather than as a number that looks like a measurement. Rows with
+ * enough distinct feet (the presets, 6 to 39) get a real figure. */
+function azimuthalRipple(rows, feet, groups, nHarm, cx, cz) {
+  const pts = [];
+  for (const g of groups) { const r = rows[g.at]; if (r) pts.push({ az: Math.atan2(feet[g.at].p[2] - cz, feet[g.at].p[0] - cx), r1: r.r1 }); }
+  if (pts.length < 2 * nHarm + 1) return null;                 // below Nyquist for this harmonic
+  const mean = pts.reduce((s2, q) => s2 + q.r1, 0) / pts.length;
   let re = 0, im = 0;
-  for (let i = 0; i < pts.length; i++) { const th = 2 * Math.PI * i / pts.length; re += pts[i].r1 * Math.cos(nPetalStrands * th); im += pts[i].r1 * Math.sin(nPetalStrands * th); }
+  for (const q of pts) { re += q.r1 * Math.cos(nHarm * q.az); im += q.r1 * Math.sin(nHarm * q.az); }
   return mean > EPS ? 2 * Math.hypot(re, im) / pts.length / mean : null;
 }
 
@@ -388,7 +404,7 @@ for (const row of ROWS) {
     meta: rec.meta, k: rec.k, proc, floorMM, minDiaMM, exportMode: rec.opts.exportMode, floorRPassed: rec.opts.floorR,
     ratios: rr.filter(Boolean).map((r) => r.ratio), rr,
     orphans: orph.freeEnds, mmPerUnit: orph.mmPerUnit,
-    Ak: azimuthalRipple(rr, Math.max(1, Math.round(rec.feet.length / 3))),
+    Ak: azimuthalRipple(rr, rec.feet, groups, Math.max(1, groups.length), cx, cz),
     readout: snap.readout.replace(/\s+/g, ' ').trim(),
     radii: [...new Set(radii.map((v) => +v.toFixed(6)))],
     caps_raw: rec.caps, cls, feetRaw: rec.feet, tubeRadius,
