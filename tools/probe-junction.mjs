@@ -147,10 +147,14 @@ function classifyCaps(caps, cx, cz, feet, tube) {
   const coax = [];
   for (let i = 0; i < caps.length; i++) {
     const c = caps[i];
-    if (radial(c.a, cx, cz) < AXIS_TOL && radial(c.b, cx, cz) < AXIS_TOL) { coax.push(i); continue; }
+    // Stub BEFORE coax: the spine law's CENTRE connector sits ON the axis, so its up-stub
+    // is coaxial and the old order filed it under lathe/collar — V2 then read one stub
+    // short on every spine row. No current-law foot is on-axis, so the reorder cannot
+    // change any current-law classification.
     const atFoot = feet.some((f) => dist(f.p, c.a) < 1e-9);   // a stub is the short up-segment at a foot
-    if (atFoot && Math.abs(dist(c.a, c.b) - stubLen) < 1e-6) out.stub.push(i);
-    else out.strand.push(i);
+    if (atFoot && Math.abs(dist(c.a, c.b) - stubLen) < 1e-6) { out.stub.push(i); continue; }
+    if (radial(c.a, cx, cz) < AXIS_TOL && radial(c.b, cx, cz) < AXIS_TOL) { coax.push(i); continue; }
+    out.strand.push(i);
   }
   for (const i of coax) {
     const c = caps[i];
