@@ -17,6 +17,14 @@
  *
  *   A_k   rim ripple AROUND the axis at the petal harmonic: the DFT amplitude of rim radius vs
  *         azimuth on a horizontal slice, normalised by mean rim radius, peaked over the run.
+ *   NOT THE SAME A_k AS tools/probe-junction.mjs. That probe reports A_feet — the same
+ *         idea applied to the strand ARRIVAL RADIUS at the SKELETON's distinct feet,
+ *         before the field is polygonised. On the shipped default it is n/a (three
+ *         distinct feet is below Nyquist for the petal harmonic) where this A_k reads
+ *         0.97. Different object, different number: never compare or plot them together.
+ *         The two tools are complementary — that one sees the skeleton and cannot see the
+ *         mesh, this one sees the mesh and cannot see the skeleton.
+ *
  *   M     meridional roughness: ripple ALONG the axis. RMS second difference of R(y) per
  *         azimuth, normalised by mean radius. A_k CANNOT SEE THIS — a stack of rings is
  *         perfectly axisymmetric (A_k ~ 0.002) and visibly terraced. That blindness is why this

@@ -6,10 +6,14 @@
  * smooth and tied to whatever thickness the petal / petal infill has. Then the sliders
  * are for the join to the stem." Nothing in this repository measures whether that is
  * true, and the metric that was previously used to judge the junction (A_k, azimuthal
- * ripple at the petal harmonic) was validated for the WRONG PROPERTY: under this
- * specification the junction SHOULD ripple at petal frequency, because it is made of
- * petal material at petal spacing. Driving A_k down drives toward a smooth skin, and the
- * skin is the defect. A_k is reported here as a descriptive column and is not a target.
+ * ripple at the petal harmonic, measured on the polygonised surface) was validated for
+ * the WRONG PROPERTY: under this specification the junction SHOULD ripple at petal
+ * frequency, because it is made of petal material at petal spacing. Driving A_k down
+ * drives toward a smooth skin, and the skin is the defect.
+ *
+ * THIS PROBE DOES NOT REPORT THAT A_k, and its ripple column is deliberately NOT called
+ * A_k. See A_feet below: they are different quantities on different objects, and naming
+ * both of them A_k would invite exactly the comparison that cannot be made.
  *
  * WHAT IT MEASURES. It serves the repo with an INSTRUMENTED copy of flower-sdf.js — the
  * source verbatim plus a recorder around buildReceptacleField — so it sees the actual
@@ -35,15 +39,37 @@
  *                boundary === 0 cannot see a free end.
  *   FLOOR        whether the skeleton radii honour the process floor. Reported per
  *                process because the same strut is a different diameter at each.
- *   A_k          descriptive only, see above — and CURRENTLY ALWAYS n/a. There is exactly
- *                ONE distinct foot per petal (marginFlareFactor(0) === 0 collapses each
- *                petal's three strand roots onto one point), so the petal harmonic sits
- *                exactly at the sampling frequency and is unresolvable from the skeleton
- *                at ANY petal count. The estimator returns null rather than a number that
- *                would look like a measurement. To carry A_k as a real descriptive column
- *                it has to be sampled on the POLYGONISED SURFACE — junction radius against
- *                azimuth at a few heights — not at the feet. Not built; flagged here so
- *                the empty column is a known limit rather than a silent one.
+ *   A_feet       descriptive only — azimuthal ripple of the strand ARRIVAL RADIUS at the
+ *                petal harmonic, over the DISTINCT FEET of the skeleton.
+ *
+ *                CURRENTLY ALWAYS n/a, ON EVERY ROW, BY CONSTRUCTION — not just on the
+ *                sparse ones. An earlier version of this header said rows with enough
+ *                distinct feet (the presets, 6 to 39) "get a real figure". Measured on
+ *                all 30 rows: none do. `nHarm` is passed as groups.length, the number of
+ *                distinct feet, and the Nyquist guard is `pts.length < 2*nHarm + 1` with
+ *                pts.length <= groups.length — so it reduces to n < 2n+1, which is true
+ *                for every n. The estimator cannot return a number.
+ *
+ *                That is not wrong so much as unresolvable as posed: you cannot recover
+ *                harmonic N from N samples at any N, and there is one distinct foot per
+ *                petal (marginFlareFactor(0) === 0 collapses each petal's three strand
+ *                roots onto one point), so the petal harmonic always sits exactly at the
+ *                sampling frequency. Deciding what this column should measure instead —
+ *                a lower harmonic, or nothing at all — is the probe author's call, so
+ *                only the false claim is corrected here, not the behaviour. Left as it
+ *                is, the column is a permanently empty one whose header now says so.
+ *
+ *                A_feet IS NOT A_k. A_k is sampled on the POLYGONISED SURFACE — junction
+ *                rim radius against azimuth, 1440 bins, at many heights — and reads 0.97
+ *                on the same default row where A_feet is n/a. Two different quantities on
+ *                two different objects (skeleton feet vs meshed surface), so they carry
+ *                two different names and must never be compared or plotted together.
+ *                An earlier version of this header said the surface figure was "not
+ *                built"; it is, in docs/tools/measure-junction-rim.mjs, which landed
+ *                within hours of this probe and could not be seen from here. That tool
+ *                exports sliceRim / harmonic / spectrum / meridionalRoughness, so if this
+ *                probe ever wants the surface figure it should IMPORT it rather than grow
+ *                a third estimator.
  *
  * VALIDITY ASSERTIONS — all hard, all abort the run. A harness that reports instead of
  * failing is a log line (see the flower-project skill).
@@ -263,8 +289,11 @@ function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet,
   return { freeEnds: free, blendK: k, mmPerUnit };
 }
 
-/* A_k — descriptive only. Azimuthal ripple of the strand-arrival radius at the petal
- * harmonic, as a fraction of the mean. Reported so changes stay legible; NOT a target.
+/* A_feet — descriptive only, and NOT A_k (see the header). Azimuthal ripple of the
+ * strand-ARRIVAL RADIUS at the petal harmonic, as a fraction of the mean, over the
+ * skeleton's distinct feet. A_k is the same idea on the polygonised surface and is a
+ * different number; docs/tools/measure-junction-rim.mjs carries it.
+ * Reported so changes stay legible; NOT a target.
  *
  * Indexed by TRUE AZIMUTH over DISTINCT feet. The first version indexed by array
  * position and averaged over all nine feet including the six coincident duplicates,
@@ -276,7 +305,7 @@ function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet,
  * from three samples sits exactly at the Nyquist limit and carries no information; it is
  * returned as null rather than as a number that looks like a measurement. Rows with
  * enough distinct feet (the presets, 6 to 39) get a real figure. */
-function azimuthalRipple(rows, feet, groups, nHarm, cx, cz) {
+function arrivalRipple(rows, feet, groups, nHarm, cx, cz) {
   const pts = [];
   for (const g of groups) { const r = rows[g.at]; if (r) pts.push({ az: Math.atan2(feet[g.at].p[2] - cz, feet[g.at].p[0] - cx), r1: r.r1 }); }
   if (pts.length < 2 * nHarm + 1) return null;                 // below Nyquist for this harmonic
@@ -412,7 +441,7 @@ for (const row of ROWS) {
     meta: rec.meta, k: rec.k, proc, floorMM, minDiaMM, exportMode: rec.opts.exportMode, floorRPassed: rec.opts.floorR,
     ratios: rr.filter(Boolean).map((r) => r.ratio), rr,
     orphans: orph.freeEnds, mmPerUnit: orph.mmPerUnit,
-    Ak: azimuthalRipple(rr, rec.feet, groups, Math.max(1, groups.length), cx, cz),
+    Afeet: arrivalRipple(rr, rec.feet, groups, Math.max(1, groups.length), cx, cz),
     readout: snap.readout.replace(/\s+/g, ' ').trim(),
     radii: [...new Set(radii.map((v) => +v.toFixed(6)))],
     caps_raw: rec.caps, cls, feetRaw: rec.feet, tubeRadius,
@@ -438,8 +467,9 @@ if (out.length) {
 const f2 = (x) => (x == null || !isFinite(x) ? '  n/a' : x.toFixed(2));
 const f3 = (x) => (x == null || !isFinite(x) ? '   n/a' : x.toFixed(3));
 console.log('Junction probe — is the junction a continuation of the petal, or a skin?\n');
-console.log('  A_k is DESCRIPTIVE ONLY. It is not a target and nothing is tuned to it.\n');
-console.log('  ' + 'row'.padEnd(26) + 'feet caps  lathe  lathe%  run:rise(min/med/max)   A_k    freeEnds  minDia');
+console.log('  A_feet is DESCRIPTIVE ONLY, is not a target, and is NOT the surface A_k');
+console.log('  reported by docs/tools/measure-junction-rim.mjs — different object, different number.\n');
+console.log('  ' + 'row'.padEnd(26) + 'feet caps  lathe  lathe%  run:rise(min/med/max)   A_feet freeEnds  minDia');
 for (const r of out) {
   const rs = r.ratios.slice().sort((a, b) => a - b);
   const med = rs.length ? rs[rs.length >> 1] : NaN;
@@ -447,7 +477,7 @@ for (const r of out) {
     + `${r.feet}/${r.distinctFeet}`.padStart(9) + String(r.caps).padStart(5)
     + String(r.latheSegs).padStart(7) + (100 * r.latheFrac).toFixed(1).padStart(7) + '%'
     + `   ${f2(rs[0])}/${f2(med)}/${f2(rs[rs.length - 1])}`.padEnd(24)
-    + f3(r.Ak).padStart(7) + String(r.orphans.length).padStart(10)
+    + f3(r.Afeet).padStart(7) + String(r.orphans.length).padStart(10)
     + (r.minDiaMM ? r.minDiaMM.toFixed(2) : 'n/a').padStart(8));
 }
 console.log('\nGEOMETRY OF THE APPROACH (default row):');
