@@ -4189,9 +4189,15 @@ function migrateV17toV18(p) {
   if (out.curlBias == null) out.curlBias = DEFAULTS.curlBias;
   return out;
 }
-// v18 -> v19: SURFACE RELIEF deleted whole — reliefAmp / reliefFreq / reliefMode, controls
-// and effect both. The case for relief assumed a continuous sheet to corrugate; these petals
-// are lace (ribs and voids, almost no lamina), so there was no face to displace. Its three
+// v18 -> v19: the control named SURFACE RELIEF deleted whole — reliefAmp / reliefFreq /
+// reliefMode, controls and effect both. What it actually did was RIB JITTER: it displaced the
+// rib network rather than texturing a face, destroying the flowing rib fan instead of
+// ornamenting it, and the wobble it produced is already reachable through edge noise (which
+// adds to the same normalLift accumulator, flower-geometry.js) and tip irregularity. It was
+// named and documented for something the geometry does not do. The earlier claim that it
+// "reads as doing so little" is FALSE and was struck rather than softened: measured at
+// 2.4-12.6% of canvas pixels, and plainly visible at amplitude 0.16. See
+// docs/img/relief-retirement-contact-sheet.png. Its three
 // ids are RESERVED PERMANENTLY in RETIRED_IDS (flower-registry.js) and enforced by
 // verify-registry-sync.mjs, because the stored value stops mattering the moment the control
 // is gone and the NAME starts: a design saved today carries reliefAmp forever, and anything
@@ -4203,8 +4209,8 @@ function migrateV17toV18(p) {
 // protect forward compatibility — stale, invisible, and permanent.
 //
 // This is a deliberate, versioned VISUAL change, not a byte-identical migration (per
-// CLAUDE.md, "never a silent shift"). A design saved with reliefAmp > 0 loses its
-// corrugation and its exported mesh moves. It is not pinned: a migration pin protects an
+// CLAUDE.md, "never a silent shift"). A design saved with reliefAmp > 0 loses its rib
+// jitter and its exported mesh moves. It is not pinned: a migration pin protects an
 // aesthetic choice a visitor deliberately made and could perceive, and #86 established that
 // an export nobody can see is not such a choice. The accompanying PR carries the per-design
 // change report measuring exactly how far each one moved.

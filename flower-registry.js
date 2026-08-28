@@ -44,9 +44,9 @@
    rest. Do not remove an entry — that is the whole point.
    =================================================================== */
 export const RETIRED_IDS = [
-  { id: "reliefAmp",  retiredAt: 19, why: "SURFACE RELIEF, deleted whole. The case for it assumed a continuous sheet to corrugate — surface information at arm's length on a monochrome print, and bending stiffness rising as (depth/thickness)^2. These petals are lace: ribs and voids, almost no lamina, so there is no face to displace. The stiffness argument transfers to the infill work, not here." },
-  { id: "reliefFreq", retiredAt: 19, why: "SURFACE RELIEF rib count (broad pleats -> fine crepe). Inert once reliefAmp is gone; retired with it rather than left as a live value nobody can reach." },
-  { id: "reliefMode", retiredAt: 19, why: "SURFACE RELIEF pattern (radial / transverse / irregular). Retired with reliefAmp. Its three option values are not separately reserved: they were only ever meaningful as values OF this id, and reserving them would burn three common words on a control that no longer exists." },
+  { id: "reliefAmp",  retiredAt: 19, why: "Named SURFACE RELIEF; what it actually did was RIB JITTER. It displaced the rib network rather than texturing a face, so it destroyed the flowing rib fan instead of ornamenting it — and the wobble it produced is already reachable through edge noise (which adds to the same normalLift accumulator) and tip irregularity. A control named and documented for something the geometry does not do. NOTE: the original ruling argued it 'reads as doing so little'; that was measured and is FALSE (2.4-12.6% of pixels, visible at amplitude 0.16). It goes because it is misnamed and redundant, not because it is subtle." },
+  { id: "reliefFreq", retiredAt: 19, why: "Jitter frequency for reliefAmp (documented as broad pleats -> fine crepe; actually the wavelength of the rib disturbance). Inert once reliefAmp is gone; retired with it rather than left as a live value nobody can reach." },
+  { id: "reliefMode", retiredAt: 19, why: "Jitter pattern (radial / transverse / irregular). Retired with reliefAmp. Its three option values are not separately reserved: they were only ever meaningful as values OF this id, and reserving them would burn three common words on a control that no longer exists." },
 ];
 
 /* ===================================================================
