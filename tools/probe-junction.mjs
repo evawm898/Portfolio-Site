@@ -6,10 +6,16 @@
  * smooth and tied to whatever thickness the petal / petal infill has. Then the sliders
  * are for the join to the stem." Nothing in this repository measures whether that is
  * true, and the metric that was previously used to judge the junction (A_k, azimuthal
- * ripple at the petal harmonic) was validated for the WRONG PROPERTY: under this
- * specification the junction SHOULD ripple at petal frequency, because it is made of
- * petal material at petal spacing. Driving A_k down drives toward a smooth skin, and the
- * skin is the defect. A_k is reported here as a descriptive column and is not a target.
+ * ripple at the petal harmonic, measured on the polygonised surface) was validated for
+ * the WRONG PROPERTY: under this specification the junction SHOULD ripple at petal
+ * frequency, because it is made of petal material at petal spacing. Driving A_k down
+ * drives toward a smooth skin, and the skin is the defect.
+ *
+ * A_k proper is RETIRED AS AN OBJECTIVE (#102): under this specification a LOW ripple
+ * score is evidence of the defect, not of its absence. It survives as a description of
+ * the surface in docs/tools/measure-junction-rim.mjs, which is the only place it lives.
+ *
+ * THIS PROBE REPORTS NO RIPPLE COLUMN AT ALL — see NO AZIMUTHAL RIPPLE below.
  *
  * WHAT IT MEASURES. It serves the repo with an INSTRUMENTED copy of flower-sdf.js — the
  * source verbatim plus a recorder around buildReceptacleField — so it sees the actual
@@ -35,15 +41,32 @@
  *                boundary === 0 cannot see a free end.
  *   FLOOR        whether the skeleton radii honour the process floor. Reported per
  *                process because the same strut is a different diameter at each.
- *   A_k          descriptive only, see above — and CURRENTLY ALWAYS n/a. There is exactly
- *                ONE distinct foot per petal (marginFlareFactor(0) === 0 collapses each
- *                petal's three strand roots onto one point), so the petal harmonic sits
- *                exactly at the sampling frequency and is unresolvable from the skeleton
- *                at ANY petal count. The estimator returns null rather than a number that
- *                would look like a measurement. To carry A_k as a real descriptive column
- *                it has to be sampled on the POLYGONISED SURFACE — junction radius against
- *                azimuth at a few heights — not at the feet. Not built; flagged here so
- *                the empty column is a known limit rather than a silent one.
+ *
+ * NO AZIMUTHAL RIPPLE COLUMN — and this is the record of why, so nobody rebuilds it.
+ * This probe carried one, called A_k and then A_feet: the ripple of the strand ARRIVAL
+ * RADIUS at the petal harmonic over the skeleton's distinct feet. It never returned a
+ * value on any row, at any petal count, and it never could:
+ *
+ *     nHarm     = groups.length                       (the number of distinct feet)
+ *     the guard = pts.length < 2 * nHarm + 1          with pts.length <= groups.length
+ *               => n < 2n + 1, which is true for every n >= 0
+ *
+ * so the estimator returned null unconditionally. Measured that way on all 30 rows before
+ * it was deleted, including the presets at 6 to 39 distinct feet, which an earlier version
+ * of this header claimed would "get a real figure". They did not.
+ *
+ * It is unresolvable as posed rather than merely miscoded. There is exactly ONE distinct
+ * foot per petal — marginFlareFactor(0) === 0 collapses each petal's three strand roots
+ * onto a single point — so the petal harmonic sits exactly at the sampling frequency, and
+ * harmonic N cannot be recovered from N samples at any N. Widening the guard would not
+ * fix it; it would only replace null with a number that means nothing.
+ *
+ * Deleted rather than documented-and-kept, because A_k is retired as an objective anyway
+ * (above): a second, permanently-null ripple metric sitting on top of a retired one is
+ * debris. If a ripple figure is ever wanted here it belongs on the POLYGONISED SURFACE,
+ * not at the feet, and docs/tools/measure-junction-rim.mjs already computes it and exports
+ * sliceRim / harmonic / spectrum / meridionalRoughness — import it rather than grow a
+ * third estimator.
  *
  * VALIDITY ASSERTIONS — all hard, all abort the run. A harness that reports instead of
  * failing is a log line (see the flower-project skill).
@@ -284,29 +307,6 @@ function orphansWithoutLathe(caps, cls, k, neck, heightMM, modelSpanUnits, feet,
   return { freeEnds: free, blendK: k, mmPerUnit };
 }
 
-/* A_k — descriptive only. Azimuthal ripple of the strand-arrival radius at the petal
- * harmonic, as a fraction of the mean. Reported so changes stay legible; NOT a target.
- *
- * Indexed by TRUE AZIMUTH over DISTINCT feet. The first version indexed by array
- * position and averaged over all nine feet including the six coincident duplicates,
- * which put a repeating triple through a harmonic-3 kernel and resonated exactly: it
- * returned 2.000 on all 30 rows, unchanged by every control including ones that visibly
- * move the geometry. A number identical across every row is a coincidence, not a result.
- *
- * NOTE ON RESOLUTION: the shipped default has THREE distinct feet. A harmonic-3 estimate
- * from three samples sits exactly at the Nyquist limit and carries no information; it is
- * returned as null rather than as a number that looks like a measurement. Rows with
- * enough distinct feet (the presets, 6 to 39) get a real figure. */
-function azimuthalRipple(rows, feet, groups, nHarm, cx, cz) {
-  const pts = [];
-  for (const g of groups) { const r = rows[g.at]; if (r) pts.push({ az: Math.atan2(feet[g.at].p[2] - cz, feet[g.at].p[0] - cx), r1: r.r1 }); }
-  if (pts.length < 2 * nHarm + 1) return null;                 // below Nyquist for this harmonic
-  const mean = pts.reduce((s2, q) => s2 + q.r1, 0) / pts.length;
-  let re = 0, im = 0;
-  for (const q of pts) { re += q.r1 * Math.cos(nHarm * q.az); im += q.r1 * Math.sin(nHarm * q.az); }
-  return mean > EPS ? 2 * Math.hypot(re, im) / pts.length / mean : null;
-}
-
 // ---------------------------------------------------------------------------
 // Rows. The shipped defaults and every preset first (coverage against what actually
 // ships, per the skill), then the junction-control sweep.
@@ -465,7 +465,6 @@ for (const row of ROWS) {
     meta: rec.meta, k: rec.k, proc, floorMM, minDiaMM, exportMode: rec.opts.exportMode, floorRPassed: rec.opts.floorR,
     ratios: rr.filter(Boolean).map((r) => r.ratio), rr,
     orphans: orph.freeEnds, mmPerUnit: orph.mmPerUnit,
-    Ak: azimuthalRipple(rr, rec.feet, groups, Math.max(1, groups.length), cx, cz),
     readout: snap.readout.replace(/\s+/g, ' ').trim(),
     radii: [...new Set(radii.map((v) => +v.toFixed(6)))],
     caps_raw: rec.caps, cls, feetRaw: rec.feet, tubeRadius,
@@ -492,8 +491,9 @@ if (out.length) {
 const f2 = (x) => (x == null || !isFinite(x) ? '  n/a' : x.toFixed(2));
 const f3 = (x) => (x == null || !isFinite(x) ? '   n/a' : x.toFixed(3));
 console.log('Junction probe — is the junction a continuation of the petal, or a skin?\n');
-console.log('  A_k is DESCRIPTIVE ONLY. It is not a target and nothing is tuned to it.\n');
-console.log('  ' + 'row'.padEnd(26) + 'feet caps  lathe  lathe%  run:rise(min/med/max)   A_k    freeEnds  minDia');
+console.log('  No azimuthal-ripple column: see the header. A_k lives in');
+console.log('  docs/tools/measure-junction-rim.mjs and is RETIRED as an objective.\n');
+console.log('  ' + 'row'.padEnd(26) + 'feet caps  lathe  lathe%  run:rise(min/med/max)  freeEnds  minDia');
 for (const r of out) {
   const rs = r.ratios.slice().sort((a, b) => a - b);
   const med = rs.length ? rs[rs.length >> 1] : NaN;
@@ -501,7 +501,7 @@ for (const r of out) {
     + `${r.feet}/${r.distinctFeet}`.padStart(9) + String(r.caps).padStart(5)
     + String(r.latheSegs).padStart(7) + (100 * r.latheFrac).toFixed(1).padStart(7) + '%'
     + `   ${f2(rs[0])}/${f2(med)}/${f2(rs[rs.length - 1])}`.padEnd(24)
-    + f3(r.Ak).padStart(7) + String(r.orphans.length).padStart(10)
+    + String(r.orphans.length).padStart(10)
     + (r.minDiaMM ? r.minDiaMM.toFixed(2) : 'n/a').padStart(8));
 }
 console.log('\nGEOMETRY OF THE APPROACH (default row):');
