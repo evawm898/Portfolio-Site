@@ -304,6 +304,26 @@ const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no 
 //   DEPTH_CAP_UNSUPPORTED   nothing below: the descent is an underside, so the ceiling is
 //                           the old slider's 0.3, written as the fraction it is rather than
 //                           as 0.471, so the two cannot drift apart.
+// APPROACH-LAW SWITCH + FIELD PROBE — the A/B rig the junction work runs on.
+// Three candidate approach laws were built behind this switch, measured, and rejected by eye;
+// the laws are gone and the rig is kept, because the next candidate needs exactly this: a law
+// reachable from the same tree as the shipped one, so both can be rendered, exported and
+// measured side by side without a second checkout.
+//   ?junctionLaw=<name>   pick an approach law   (see flower-sdf.js; 'current' is the only one)
+//   ?junctionProbe=1      publish the junction field mesh on window.__junctionField
+// Neither is a control and neither is in the registry. The probe is off unless asked for, and
+// publishes geometry the app already built — it changes nothing. It exists because the junction
+// is fused into one accumulator with the petals, so there is otherwise no way to measure the
+// junction ALONE, and every junction number this project has ever quoted needed that isolation.
+// Consumed by docs/tools/measure-junction-rim.mjs.
+const _JQ = new URLSearchParams(location.search);
+let JUNCTION_LAW = _JQ.get('junctionLaw') || 'current';
+const JUNCTION_PROBE = _JQ.has('junctionProbe');
+Object.defineProperty(window, '__junctionLaw', {
+  get: () => JUNCTION_LAW,
+  set: (v) => { JUNCTION_LAW = v || 'current'; if (typeof scheduleRegen === 'function') scheduleRegen(); },
+});
+
 const DEPTH_BOTTOM          = 0.18;
 const DEPTH_TOP_SUPPORTED   = 1.15;
 const DEPTH_CAP_UNSUPPORTED = 0.3;
@@ -2383,9 +2403,12 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
             // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
             // so the preview reads as the same solid mass it prints as (export floors anyway).
             profile, collar, exportMode, floorR: acc.floorR,
+            approachLaw: JUNCTION_LAW,   // see the switch above; not a control
             cell: exportMode ? (opts.sdfCell || 0.011) : (opts.sdfCellLive || 0.02),
             smoothIters: exportMode ? 2 : 0 });
         acc.addMesh(field.positions, field.normals, field.indices);
+        // ?junctionProbe=1 — the junction field ALONE, before it is fused with the petals.
+        if (JUNCTION_PROBE) window.__junctionField = { positions: field.positions, indices: field.indices, meta: field.meta, stats: field.stats, exportMode, feet: sdfFeet.length };
         if (exportMode && acc.floorR < acc.minRadius) acc.minRadius = acc.floorR;   // keep min-feature telemetry honest
         RECEPT_FIELD_STATS = field.stats;
       }
