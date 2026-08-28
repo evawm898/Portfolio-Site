@@ -275,6 +275,7 @@ for (const c of CONTROLS) {
     'tools/verify-flower-export.mjs', 'tools/verify-geometry-quality.mjs',
     'tools/verify-connectedness.mjs', 'tools/visibility-matrix.mjs',
     'tools/gen-preset-thumbs.mjs', 'docs/tools/diff-export-bytes.mjs',
+    'docs/tools/measure-junction-rim.mjs',
     'flower-presets.js', 'flower-view-presets.js', 'flower-shapes.js',
   ];
   // The app's own source, scanned for surviving code references (check 6).
