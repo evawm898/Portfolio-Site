@@ -171,6 +171,27 @@ function groupFeet(feet) {
   return groups;
 }
 
+/* TRUE CHAIN ENDS — the last bezier segment's far endpoint per distinct foot (P3 in the
+ * source: the point pinned to the neck surface at yArrival). runRise() above deliberately
+ * uses each chain's LOWEST sampled point instead, which on elevated coiled designs is a
+ * mid-bezier dip, not the arrival — fine for a run:rise ratio, wrong for arrival geometry.
+ * A strand cap is a chain end when no other strand cap starts where it ends; coincident
+ * duplicate chains (collapsed margin strands) share end positions and are deduped. */
+function chainEnds(caps, cls) {
+  const ends = [], seen = new Set();
+  for (const i of cls.strand) {
+    const c = caps[i];
+    let cont = false;
+    for (const j of cls.strand) { if (j === i) continue; if (dist(caps[j].a, c.b) < 1e-9) { cont = true; break; } }
+    if (cont) continue;
+    const key = c.b.map((v) => v.toFixed(9)).join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ends.push({ p: c.b.slice(), r: c.rb });
+  }
+  return ends;
+}
+
 /* AXISYMMETRY: total arc length of coaxial (lathe) segments, and their share of the
  * skeleton's total length. Under Eva's specification this must reach zero. */
 function latheMeasure(caps, cls) {
@@ -304,6 +325,12 @@ const ROWS = [
   { label: 'absorption 1.00', set: [{ id: 'absorption', value: '1' }] },
   { label: 'blendSmoothness 0.00', set: [{ id: 'blendSmoothness', value: '0' }] },
   { label: 'blendSmoothness 1.00', set: [{ id: 'blendSmoothness', value: '1' }] },
+  // blendSmoothness's one measured live path under cm=ON is the STEM lathe's sector count
+  // (PR #101: M = clamp(round(rimFeet·lerp(11,7,blend)), 40, 120), rimFeet = petals) — a
+  // bare-bloom sweep has no stem rings, so the two rows above CANNOT see it and would
+  // read "inert". These two put a stem under the same sweep so the tris column can.
+  { label: 'stem + blendSmoothness 0', set: [{ id: 'stemType', value: 'stem' }, { id: 'blendSmoothness', value: '0' }] },
+  { label: 'stem + blendSmoothness 1', set: [{ id: 'stemType', value: 'stem' }, { id: 'blendSmoothness', value: '1' }] },
   { label: 'convergenceTightness 0.00', set: [{ id: 'convergenceTightness', value: '0' }] },
   { label: 'convergenceTightness 1.00', set: [{ id: 'convergenceTightness', value: '1' }] },
   { label: 'receptacleDepth 0.00', set: [{ id: 'receptacleDepth', value: '0' }] },
@@ -340,6 +367,15 @@ const ctx = await browser.newContext({ viewport: { width: 1000, height: 800 } })
 const failures = [];
 const out = [];
 
+// Wait for the app's own "building" indicator to clear (same signal measure-junction-rim
+// waits on). The leading beat gives the rebuild time to be SCHEDULED — the indicator can
+// read idle in the gap between an input event and the debounced regen starting.
+async function settleBuild(page) {
+  await page.waitForTimeout(150);
+  await page.waitForFunction(() => { const b = document.getElementById('building'); return !b || !b.classList.contains('is-on'); }, { timeout: 120000 }).catch(() => {});
+  await page.waitForTimeout(150);
+}
+
 for (const row of ROWS) {
   const page = await ctx.newPage();                       // FRESH PAGE PER ROW (#92/#100)
   const pageErrors = [];
@@ -358,6 +394,21 @@ for (const row of ROWS) {
   if (row.presetSlug) {
     const ok = await page.evaluate((slug) => { const c = document.querySelector(`#presetRow .fl-preset[data-slug="${slug}"]`); if (!c) return false; c.click(); return true; }, row.presetSlug);
     if (!ok) { failures.push(`V3 ${row.label}: preset gallery cell not found`); await page.close(); continue; }
+    // V3 FOR PRESETS — read back the ids the preset names, from the app's own state.
+    // The first version had NO read-back here, and a same-tree second run caught the
+    // consequence: the fixed 220 ms wait raced the async preset rebuild, two preset rows
+    // silently measured the SHIPPED DEFAULT, and every validity assertion still passed —
+    // the census reconciles fine against the wrong design. "A harness that sets a config
+    // must read it back" (flower-project skill) has no preset exemption.
+    await settleBuild(page);
+    const pre = PRESETS.find((q) => q.slug === row.presetSlug);
+    const st = await page.evaluate(() => (window.__flowerUIState ? window.__flowerUIState() : {}));
+    for (const [id, v] of Object.entries(pre.ui || {})) {
+      if (!(id in st)) continue;                       // not a wired control on this tier — skip, don't guess
+      const a = st[id], num = isFinite(Number(v)) && isFinite(Number(a)) && String(v) !== '' && String(a) !== '';
+      if (!(num ? Math.abs(Number(v) - Number(a)) < 1e-9 : String(v) === String(a)))
+        failures.push(`V3 ${row.label}: preset sets ${id}="${v}", app state reads "${a}" — this row did NOT measure the preset`);
+    }
   } else {
     for (const s of row.set) {                            // V3 READ-BACK
       const got = await page.evaluate(({ id, value }) => {
@@ -371,7 +422,9 @@ for (const row of ROWS) {
       if (!ok) failures.push(`V3 ${row.label}: ${s.id} set "${s.value}" reads back "${got.value}"`);
     }
   }
-  await page.waitForTimeout(220);
+  // Wait on the real signal, not a fixed sleep — the skill records the race this replaces:
+  // a fixed wait let a stale build be read while the async rebuild was still running.
+  await settleBuild(page);
 
   const snap = await page.evaluate(() => {
     const recs = globalThis.__sdfProbe || [];
@@ -416,6 +469,7 @@ for (const row of ROWS) {
     readout: snap.readout.replace(/\s+/g, ' ').trim(),
     radii: [...new Set(radii.map((v) => +v.toFixed(6)))],
     caps_raw: rec.caps, cls, feetRaw: rec.feet, tubeRadius,
+    ends: chainEnds(rec.caps, cls),
   });
 }
 
@@ -459,6 +513,142 @@ if (out[0]) {
   console.log(`  strand foot radii present: ${out[0].radii.join(', ')}`);
   console.log(`  opts.floorR passed in = ${out[0].floorRPassed} — grep flower-sdf.js: it is never read.`);
 }
+/* ---- ARRIVAL GEOMETRY + AREA LAW (added for the continuous-spine discovery) ----------
+ * Everything printed here is read from data the probe already records (meta, the recorded
+ * caps, the per-foot run:rise rows); no new instrument, no new page work. Three additions:
+ *
+ *   ARRIVAL   per row: where each distinct foot's strand chain ENDS (height + radius), and
+ *             the SPREAD of those end heights. The source pins every strand's endpoint to
+ *             one COMMON ARRIVAL height (flower-sdf.js: yArrival, P3[1] = yArrival), so the
+ *             expected spread is 0 — this MEASURES it instead of asserting it, and any row
+ *             where it is nonzero is a finding, not noise. Also the descent spans in mm.
+ *   AREA LAW  trunk radius at stations down the descent (read from the recorded lathe caps
+ *             — they sample neckR(y) directly) against √Σr² of the strands joined above
+ *             that station. Under the shipped construction every strand joins at yArrival,
+ *             so the "running sum" is a step; the interesting numbers are min r/Rtrunk over
+ *             the descent and the stem-end ratio.
+ *   CLEARANCE the arrival circle: chord spacing between neighbouring distinct arrivals vs
+ *             strand diameter vs the blend radius k. surface gap = chord − 2·r̄; the field
+ *             bridges ~k, so margin = k − gap. Positive margin with the lathe deleted is
+ *             what would make spine contact a CONSTRUCTION; negative is a free end. This is
+ *             the same physics the orphan test measures — printed here as the design number
+ *             (contact margin) rather than the failure symptom (free ends).
+ */
+/* CONTROL CLASSIFICATION — which side of the foot a control acts on, by measured effect.
+ * Two instruments per row, each with a stated blind spot:
+ *   SKELETON  a rounded signature over the recorded caps (positions + radii). Sees ONLY
+ *             the SDF junction skeleton. It cannot see: the rendered blade, the stem
+ *             lathe's sector count (built in flower.js — the blendSmoothness trap), the
+ *             polygonised field resolution, or anything the petals do.
+ *   LIVE TRIS the page readout's whole-model triangle count. Sees everything and
+ *             attributes nothing; on a spacecol design it also carries rebuild drift
+ *             (#100) — the sweep rows here are the default design, fresh page per row,
+ *             so that drift does not apply, but preset rows' counts are not comparable
+ *             to each other for that reason.
+ * SKELETON same + TRIS same   => inert on this design (within what these two can see)
+ * SKELETON same + TRIS moved  => acts ABOVE the foot (blade/petal side) or in non-SDF
+ *                                geometry (stem sectors, centre) — NOT in the junction
+ * SKELETON moved              => acts BELOW the foot (junction skeleton)             */
+// The signature includes the blend radius k: absorption never moves a cap (k lives in the
+// field fold, not the skeleton), so a caps-only signature would file the junction's own
+// blend control under "not the junction" — the same instrument-blindness this table exists
+// to avoid.
+const skelSig = (r) => r.k.toFixed(6) + '#' + r.caps_raw.map((c) => [...c.a, ...c.b, c.ra, c.rb].map((v) => v.toFixed(6)).join(',')).join(';');
+const trisOf = (r) => { const mres = /([\d,]+)\s*tris/.exec(r.readout); return mres ? Number(mres[1].replace(/,/g, '')) : NaN; };
+if (out.length) {
+  const base = out[0], baseSig = skelSig(base), baseTris = trisOf(base);
+  console.log('\nCONTROL CLASSIFICATION vs DEFAULT row (skeleton+k signature, live tris):');
+  console.log('  ' + 'row'.padEnd(28) + 'skeleton'.padStart(10) + 'tris'.padStart(10) + 'Δtris'.padStart(9) + '  reading');
+  for (const r of out) {
+    if (r === base) continue;
+    if (r.label.startsWith('preset:')) continue;   // a different design, not a control delta
+    const sk = skelSig(r) === baseSig ? 'same' : 'MOVED';
+    const t = trisOf(r), dt = t - baseTris;
+    const reading = sk === 'MOVED' ? 'below the foot (junction skeleton or field blend)'
+      : dt !== 0 ? 'above the foot, or non-SDF geometry — not the junction skeleton'
+      : 'inert here (within what these instruments see)';
+    console.log('  ' + r.label.padEnd(28) + sk.padStart(10) + (isFinite(t) ? String(t) : 'n/a').padStart(10)
+      + (isFinite(dt) ? (dt > 0 ? '+' : '') + dt : 'n/a').padStart(9) + '  ' + reading);
+  }
+}
+
+/* SCALE NOTE. Two mm/unit conversions exist and they disagree by ~3x:
+ *   - r.mmPerUnit (the tool's original columns, and PR #102's gap quotes): heightMM over a
+ *     ROUGH span (junction height + ring diameter). Labeled rough; kept for continuity.
+ *   - mmT below: derived from the floor the app itself passed — floorRPassed is
+ *     activeFloorMM/activeMMPerUnit/2 in flower.js, so activeMMPerUnit = floorMM/(2·floorRPassed).
+ *     This is the export scale the STL is actually written at (mesh.scale.setScalar(mmPerUnit)),
+ *     so mm printed with it are the mm a slicer would measure. Used for all Ø/height columns
+ *     in the sections added below. */
+const mmTrue = (r) => (r.floorMM && r.floorRPassed) ? r.floorMM / (2 * r.floorRPassed) : r.mmPerUnit;
+console.log('\nARRIVAL GEOMETRY (per row — TRUE chain ends (P3), spread, spans in mm at the floor-derived export scale):');
+console.log('  ' + 'row'.padEnd(28) + 'nEnds  yArr'.padEnd(16) + 'endY spread'.padStart(12) + 'arrR mean'.padStart(11) + 'feet→arr mm'.padStart(13) + 'arr→stem mm'.padStart(13) + 'mm/unit'.padStart(9));
+for (const r of out) {
+  const m = r.meta, mm = mmTrue(r);
+  const spread = r.ends.length ? Math.max(...r.ends.map((q) => Math.abs(q.p[1] - m.yArrival))) : NaN;
+  const arrR = r.ends.length ? r.ends.reduce((s, q) => s + Math.hypot(q.p[0], q.p[2]), 0) / r.ends.length : NaN;
+  console.log('  ' + r.label.padEnd(28) + String(r.ends.length).padStart(5)
+    + m.yArrival.toFixed(4).padStart(9)
+    + (isFinite(spread) ? spread.toExponential(1) : 'n/a').padStart(12)
+    + (isFinite(arrR) ? arrR.toFixed(4) : 'n/a').padStart(11)
+    + ((m.yFeet - m.yArrival) * mm).toFixed(2).padStart(13)
+    + ((m.yArrival - m.yStem) * mm).toFixed(2).padStart(13)
+    + mm.toFixed(1).padStart(9));
+}
+console.log('\nAREA LAW DOWN THE DESCENT (trunk radius vs √Σr² of strands joined above it):');
+console.log('  ' + 'row'.padEnd(28) + 'Rtrunk'.padStart(8) + 'stemR'.padStart(8) + 'stem/trunk area'.padStart(16)
+  + 'swell/trunk area'.padStart(17) + 'min lathe r/Rtrunk (y)'.padStart(24) + 'Øtrunk mm'.padStart(10) + 'Østem mm'.padStart(10));
+for (const r of out) {
+  const m = r.meta, mm = mmTrue(r);
+  // trunk profile from the recorded lathe caps, restricted to the descent (below yArrival,
+  // above the stem top) — exactly the span the governing rule constrains.
+  let minR = Infinity, minY = NaN;
+  for (const i of r.cls.lathe) {
+    const c = r.caps_raw[i];
+    for (const [p, rad] of [[c.a, c.ra], [c.b, c.rb]]) {
+      if (p[1] <= m.yArrival && p[1] >= m.yStem && rad < minR) { minR = rad; minY = p[1]; }
+    }
+  }
+  console.log('  ' + r.label.padEnd(28) + m.Rtrunk.toFixed(4).padStart(8) + m.stemR.toFixed(4).padStart(8)
+    + ((m.stemR / m.Rtrunk) ** 2).toFixed(2).padStart(16)
+    + ((m.swell / m.Rtrunk) ** 2).toFixed(2).padStart(17)
+    + (isFinite(minR) ? `${(minR / m.Rtrunk).toFixed(3)} (y=${minY.toFixed(3)})` : 'n/a').padStart(24)
+    + (2 * m.Rtrunk * mm).toFixed(2).padStart(10) + (2 * m.stemR * mm).toFixed(2).padStart(10));
+}
+/* PRINT FLOOR ACROSS THE FOOT — the same strand's exported diameter on each side of the
+ * foot. Above it the strand is an addTube primitive: _floorRadius lifts it to floorR at
+ * export. Below it the same radius drives the SDF skeleton, where opts.floorR is never
+ * read. Both diameters computed from the recorded foot radii and the row's own floor. */
+console.log('\nPRINT FLOOR ACROSS THE FOOT (per row, mm at the floor-derived export scale):');
+console.log('  ' + 'row'.padEnd(28) + 'floor Ø'.padStart(9) + 'foot Ø raw (min–max)'.padStart(22) + 'petal side exports'.padStart(20) + 'continuation'.padStart(14));
+for (const r of out) {
+  const mm = mmTrue(r);
+  const ds = r.feetRaw.map((f) => 2 * f.r * mm);
+  const lo = Math.min(...ds), hi = Math.max(...ds);
+  const petal = `${Math.max(lo, r.floorMM).toFixed(2)}–${Math.max(hi, r.floorMM).toFixed(2)}`;
+  console.log('  ' + r.label.padEnd(28) + r.floorMM.toFixed(2).padStart(9)
+    + `${lo.toFixed(2)}–${hi.toFixed(2)}`.padStart(22) + petal.padStart(20)
+    + `${lo.toFixed(2)}–${hi.toFixed(2)}`.padStart(14) + (lo < r.floorMM ? '  BELOW FLOOR' : ''));
+}
+
+console.log('\nARRIVAL CLEARANCE (per row — each TRUE chain end against its nearest neighbouring end):');
+console.log('  worst = the end farthest from any neighbour. surface gap = centre dist − r_i − r_j; smin bridges ~k.');
+console.log('  ' + 'row'.padEnd(28) + 'nEnds'.padStart(6) + 'gap min'.padStart(10) + 'gap worst'.padStart(11) + 'k'.padStart(8) + 'margin k−worst'.padStart(15) + '  verdict');
+for (const r of out) {
+  if (r.ends.length < 2) { console.log('  ' + r.label.padEnd(28) + ' <2 distinct ends — no circle'); continue; }
+  const gaps = r.ends.map((e, i) => {
+    let g = Infinity;
+    for (let j = 0; j < r.ends.length; j++) { if (j === i) continue; const o = r.ends[j];
+      const d = dist(e.p, o.p) - e.r - o.r; if (d < g) g = d; }
+    return g;
+  });
+  const worst = Math.max(...gaps), best = Math.min(...gaps);
+  const margin = r.k - worst;
+  console.log('  ' + r.label.padEnd(28) + String(r.ends.length).padStart(6) + best.toFixed(4).padStart(10)
+    + worst.toFixed(4).padStart(11) + r.k.toFixed(4).padStart(8) + margin.toFixed(4).padStart(15)
+    + (margin > 0 ? '  all ends touch a neighbour (crowding)' : '  CLEAR — free ends without a trunk'));
+}
+
 console.log('\nFREE ENDS IF THE LATHE WERE DELETED (per row, gap beyond the blend radius k):');
 for (const r of out) {
   if (!r.orphans.length) { console.log(`  ${r.label.padEnd(28)} none`); continue; }
