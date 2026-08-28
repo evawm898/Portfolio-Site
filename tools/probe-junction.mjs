@@ -35,7 +35,15 @@
  *                boundary === 0 cannot see a free end.
  *   FLOOR        whether the skeleton radii honour the process floor. Reported per
  *                process because the same strut is a different diameter at each.
- *   A_k          descriptive only, see above.
+ *   A_k          descriptive only, see above — and CURRENTLY ALWAYS n/a. There is exactly
+ *                ONE distinct foot per petal (marginFlareFactor(0) === 0 collapses each
+ *                petal's three strand roots onto one point), so the petal harmonic sits
+ *                exactly at the sampling frequency and is unresolvable from the skeleton
+ *                at ANY petal count. The estimator returns null rather than a number that
+ *                would look like a measurement. To carry A_k as a real descriptive column
+ *                it has to be sampled on the POLYGONISED SURFACE — junction radius against
+ *                azimuth at a few heights — not at the feet. Not built; flagged here so
+ *                the empty column is a known limit rather than a silent one.
  *
  * VALIDITY ASSERTIONS — all hard, all abort the run. A harness that reports instead of
  * failing is a log line (see the flower-project skill).
