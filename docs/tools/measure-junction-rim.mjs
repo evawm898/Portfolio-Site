@@ -17,15 +17,24 @@
  *
  *   A_k   rim ripple AROUND the axis at the petal harmonic: the DFT amplitude of rim radius vs
  *         azimuth on a horizontal slice, normalised by mean rim radius, peaked over the run.
+ *         THIS IS THE ONLY A_k IN THE REPOSITORY. tools/probe-junction.mjs briefly
+ *         carried a second ripple figure under the same name, at the SKELETON's feet
+ *         rather than on the surface; it was provably always null (harmonic N from N
+ *         samples) and has been deleted, with the arithmetic recorded in that file's
+ *         header so nobody rebuilds it. The two tools stay complementary — that one sees
+ *         the skeleton and cannot see the mesh, this one sees the mesh and cannot see the
+ *         skeleton — but only one of them reports a ripple, and it is this one.
+ *
  *   M     meridional roughness: ripple ALONG the axis. RMS second difference of R(y) per
  *         azimuth, normalised by mean radius. A_k CANNOT SEE THIS — a stack of rings is
  *         perfectly axisymmetric (A_k ~ 0.002) and visibly terraced. That blindness is why this
  *         number exists; the first three candidate laws were measured on A_k alone and one of
  *         them scored beautifully while looking like a wedding cake.
  *
- * A_k IS NOT AN OBJECTIVE. Three approach laws were built to drive it down — an area rule
- * applied at every station (0.28 exported), a spacing-scaled union (never helped), and a single
- * lofted skirt (0.0056, holding across every petal count) — and ALL THREE WERE REJECTED BY EYE.
+ * A_k IS NOT AN OBJECTIVE, AND A LOW SCORE IS BAD NEWS. Three approach laws were built to
+ * drive it down — an area rule applied at every station (0.28 exported), a spacing-scaled
+ * union (never helped), and a single lofted skirt (0.0056, holding across every petal
+ * count) — and ALL THREE WERE REJECTED BY EYE.
  * The ruling: the junction is not a surface to shape. It is the petal's material continuing down
  * to the stem at the petal's own thickness, so variation at petal frequency is the POINT. A low
  * A_k means a smooth skin, and the smooth skin is the defect. Report these numbers as a
