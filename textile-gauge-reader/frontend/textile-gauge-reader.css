@@ -1109,6 +1109,61 @@
   color: #060707;
 }
 
+.tgr-gridbox-controls {
+  position: absolute;
+  left: 1rem;
+  bottom: 3.4rem; /* stacked above the ruler toggle */
+  z-index: 4;
+  display: flex;
+  gap: 0.35rem;
+}
+.tgr-gridbox-controls__btn,
+.tgr-gridbox-controls__unit {
+  height: 30px;
+  padding: 0 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(20, 20, 20, 0.72);
+  color: #f2f2f0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+.tgr-gridbox-controls__btn:hover,
+.tgr-gridbox-controls__unit:hover { background: rgba(255, 255, 255, 0.16); }
+.tgr-gridbox-controls__btn.is-active {
+  background: var(--tgr-course);
+  border-color: var(--tgr-course);
+  color: #060707;
+}
+
+.tgr-gridbox-panel {
+  position: fixed;
+  z-index: 6;
+  transform: translate(-50%, 12px);
+  background: rgba(15, 15, 15, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  min-width: 190px;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+.tgr-gridbox-panel__title {
+  margin: 0 0 0.4rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.tgr-gridbox-panel .tgr-cal-popup__row { margin-bottom: 0.35rem; }
+.tgr-gridbox-panel .tgr-cal-popup__row input[type="number"] { width: 4.5rem; }
+.tgr-gridbox-panel .tgr-button-row { margin: 0.3rem 0 0; }
+.tgr-gridbox-panel .tgr-status,
+.tgr-gridbox-panel .tgr-error { margin: 0.35rem 0 0; font-size: 11px; }
+
 /* Calibration popup -- position:fixed so it floats over the whole
    viewport regardless of #viewer's own overflow:hidden clipping (fixed
    descendants aren't clipped by an ancestor's overflow unless that

@@ -317,6 +317,34 @@
       <button type="button" id="rulerToggleBtn" class="tgr-ruler-controls__btn" aria-pressed="false">Ruler</button>
     </div>
 
+    <!-- Grid box: a draggable, to-scale (1in or 1cm square, from your
+         calibration) overlay for counting stitches by eye and checking the
+         tool's answer -- see #gridBoxPanel below for recording that count
+         as a ground-truth observation. Available anywhere calibration is
+         set, same as the ruler above, and deliberately BEFORE analysis too
+         (see #gridBoxPanel) so a count isn't anchored to a prediction
+         you've already seen. -->
+    <div class="tgr-gridbox-controls" id="gridBoxControls" hidden title="Show a to-scale square for counting stitches by eye -- drag it anywhere on the image">
+      <button type="button" id="gridBoxToggleBtn" class="tgr-gridbox-controls__btn" aria-pressed="false">Grid</button>
+      <button type="button" id="gridBoxUnitBtn" class="tgr-gridbox-controls__unit" hidden>1 in</button>
+    </div>
+    <div class="tgr-gridbox-panel" id="gridBoxPanel" hidden>
+      <p class="tgr-gridbox-panel__title">Count inside the box</p>
+      <div class="tgr-cal-popup__row">
+        <label for="gridWaleCount">Wales</label>
+        <input type="number" id="gridWaleCount" min="0" step="1" placeholder="e.g. 8">
+      </div>
+      <div class="tgr-cal-popup__row">
+        <label for="gridCourseCount">Rows</label>
+        <input type="number" id="gridCourseCount" min="0" step="1" placeholder="e.g. 10">
+      </div>
+      <div class="tgr-button-row">
+        <button type="button" id="gridBoxSaveBtn" class="tgr-btn" disabled>Record ground truth</button>
+      </div>
+      <p class="tgr-status" id="gridBoxStatus" hidden></p>
+      <p class="tgr-error" id="gridBoxError" hidden></p>
+    </div>
+
     <!-- Calibration popup: appears anchored near the two calibration points
          once both are placed (see positionCalPopup in the JS) -- distance/
          unit entry and the live px/inch readout live here, next to the

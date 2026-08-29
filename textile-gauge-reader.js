@@ -132,6 +132,16 @@
   const rulerControls = document.getElementById("rulerControls");
   const rulerToggleBtn = document.getElementById("rulerToggleBtn");
 
+  const gridBoxControls = document.getElementById("gridBoxControls");
+  const gridBoxToggleBtn = document.getElementById("gridBoxToggleBtn");
+  const gridBoxUnitBtn = document.getElementById("gridBoxUnitBtn");
+  const gridBoxPanel = document.getElementById("gridBoxPanel");
+  const gridWaleCountInput = document.getElementById("gridWaleCount");
+  const gridCourseCountInput = document.getElementById("gridCourseCount");
+  const gridBoxSaveBtn = document.getElementById("gridBoxSaveBtn");
+  const gridBoxStatus = document.getElementById("gridBoxStatus");
+  const gridBoxError = document.getElementById("gridBoxError");
+
   const panelEl = document.getElementById("panel");
   const panelToggle = document.getElementById("panelToggle");
   const appEl = document.querySelector(".tgr-app");
@@ -244,6 +254,20 @@
       y: null,
       dragging: false,
       dragOffset: null, // {dx, dy} from the pointer to state.ruler.{x,y} at drag start, in natural px
+    },
+    gridBox: {
+      visible: false, // the draggable to-scale (1in/1cm) counting box -- see gridBoxSpec/updateGridBoxUI.
+                       // Same availability rule as the ruler (only once currentPixelsPerMm() is
+                       // non-null), but deliberately usable on EVERY step from calibration onward,
+                       // including before analysis -- counting before seeing the tool's own answer
+                       // is the whole point (an uncontaminated ground-truth label).
+      unit: "in", // "in" | "cm" -- side length is DERIVED live from currentPixelsPerMm() + this,
+                  // never stored as a raw pixel value, so it stays exactly to scale across
+                  // recalibration too, not just pan/zoom (see gridBoxSpec).
+      x: null, // natural coords, top-left corner; null until first shown (see ensureGridBoxPosition)
+      y: null,
+      dragging: false,
+      dragOffset: null, // {dx, dy} from the pointer to state.gridBox.{x,y} at drag start, in natural px
     },
     roi: null, // {x, y, width, height} in natural coords -- the PRIMARY approved measurement
                // area, derived from rois[0] on approval. Multi-region independent analysis is
@@ -373,6 +397,7 @@
     updateZoomUI(); // pan-cursor affordance depends on the step (roi/calibrate reserve plain drag)
     updateRoiAddModeUI(); // add-mode crosshair cursor only applies while actually on the roi step
     updateRulerUI(); // ruler overlay only becomes available once calibration is confirmed
+    updateGridBoxUI(); // same availability rule as the ruler; see state.gridBox's comment for why it also spans steps
     render();
   }
 
@@ -585,6 +610,15 @@
       if (spec) {
         ensureRulerPosition(spec);
         if (pointInRulerDisplay(eventToDisplayPoint(evt), spec)) return false;
+      }
+    }
+    // Same reservation, same reason, for the grid box -- see its comment
+    // near state.gridBox for why it's draggable across the same set of steps.
+    if (state.gridBox.visible) {
+      const spec = gridBoxSpec();
+      if (spec) {
+        ensureGridBoxPosition(spec);
+        if (pointInGridBoxDisplay(eventToDisplayPoint(evt), spec)) return false;
       }
     }
     return true;
@@ -801,6 +835,14 @@
     if (!state.naturalWidth) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // The calibration popup lives outside the calibrate step's own
+    // <section data-panel="calibrate"> (it needs to float over the
+    // canvas, position: fixed, tracking the two points -- see
+    // positionCalPopup), so unlike that section it is NOT automatically
+    // hidden by goToStep()'s panel.hidden toggling and needs its own
+    // explicit visibility rule here, every render.
+    calPopup.hidden = state.currentStep !== "calibrate" || state.cal.points.length < 2;
+
     if (state.currentStep === "calibrate") {
       drawCalibration();
       positionCalPopup(); // keep the distance-entry popup pinned to the points under pan/zoom/resize
@@ -816,6 +858,8 @@
     // Drawn last (on top of everything else) on whichever step it's
     // available in -- see updateRulerUI / rulerControls.
     drawRuler();
+    drawGridBox();
+    positionGridBoxPanel();
   }
 
   function drawRepeatMarkBox() {
@@ -1221,6 +1265,7 @@
       state.calAutoDetectPending = false;
       state.calAutoDetected = false;
       state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
+      state.gridBox = { visible: false, unit: state.gridBox.unit, x: null, y: null, dragging: false, dragOffset: null };
       state.roi = null;
       state.result = null;
       state.showMeasurementAreas = false;
@@ -1572,6 +1617,73 @@
     );
   }
 
+  // --- Grid box: a draggable, to-scale counting square -----------------
+  //
+  // Same shape of machinery as the ruler above (spec/position/hit-test/
+  // draw/toggle), deliberately: both are "physically-scaled overlay you
+  // drag onto the fabric," and keeping the pattern identical means no new
+  // coordinate-transform bugs to introduce. The one real difference is
+  // purpose -- the ruler is a sanity-check against the calibration; the
+  // grid box is a counting aid whose count gets RECORDED as ground truth
+  // (see gridBoxSaveBtn's handler).
+  const GRID_BOX_UNIT_MM = { in: 25.4, cm: 10 };
+
+  function gridBoxSpec() {
+    const ppm = currentPixelsPerMm();
+    if (!ppm) return null;
+    return { ppm, sidePx: GRID_BOX_UNIT_MM[state.gridBox.unit] * ppm };
+  }
+
+  function ensureGridBoxPosition(spec) {
+    if (state.gridBox.x !== null && state.gridBox.y !== null) return;
+    // Offset from the ruler's own default center position (when both
+    // start out visible at once, they shouldn't land exactly on top of
+    // each other).
+    const cx = state.naturalWidth / 2 + spec.sidePx * 0.6;
+    const cy = state.naturalHeight / 2 + spec.sidePx * 0.6;
+    state.gridBox.x = clamp(cx - spec.sidePx / 2, 0, Math.max(0, state.naturalWidth - spec.sidePx));
+    state.gridBox.y = clamp(cy - spec.sidePx / 2, 0, Math.max(0, state.naturalHeight - spec.sidePx));
+  }
+
+  function pointInGridBoxDisplay(displayPt, spec) {
+    const origin = naturalToDisplay({ x: state.gridBox.x, y: state.gridBox.y });
+    const sideDisplay = spec.sidePx * getScale();
+    return (
+      displayPt.x >= origin.x && displayPt.x <= origin.x + sideDisplay &&
+      displayPt.y >= origin.y && displayPt.y <= origin.y + sideDisplay
+    );
+  }
+
+  const GRID_BOX_COLOR = "#c04fd6"; // violet -- distinct from every other overlay color in this file
+
+  function drawGridBox() {
+    if (!state.gridBox.visible) return;
+    const spec = gridBoxSpec();
+    if (!spec) return;
+    ensureGridBoxPosition(spec);
+
+    const s = getScale();
+    const origin = naturalToDisplay({ x: state.gridBox.x, y: state.gridBox.y });
+    const side = spec.sidePx * s;
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)"; // light outline pass first, same dark-fabric-contrast
+    ctx.lineWidth = 3.5;                       // treatment as the measurement boxes (see strokeRoiBox)
+    ctx.strokeRect(origin.x, origin.y, side, side);
+    ctx.strokeStyle = GRID_BOX_COLOR;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(origin.x, origin.y, side, side);
+    ctx.fillStyle = "rgba(192,79,214,0.08)";
+    ctx.fillRect(origin.x, origin.y, side, side);
+    ctx.restore();
+
+    ctx.font = "bold 11px monospace";
+    ctx.fillStyle = GRID_BOX_COLOR;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`1 ${state.gridBox.unit}`, origin.x + 3, origin.y - 3);
+  }
+
   function drawRulerArm(origin, armLenDisplay, mmToDisplayPx, axis) {
     const half = RULER_BAR_THICKNESS / 2;
     const horizontal = axis === "x";
@@ -1696,6 +1808,164 @@
     state.ruler.visible = !state.ruler.visible;
     updateRulerUI();
     render();
+  });
+
+  function updateGridBoxUI() {
+    const available = currentPixelsPerMm() !== null;
+    gridBoxControls.hidden = !available;
+    if (!available) state.gridBox.visible = false;
+    gridBoxToggleBtn.classList.toggle("is-active", state.gridBox.visible);
+    gridBoxToggleBtn.setAttribute("aria-pressed", String(state.gridBox.visible));
+    gridBoxUnitBtn.hidden = !state.gridBox.visible;
+    gridBoxUnitBtn.textContent = `1 ${state.gridBox.unit}`;
+    gridBoxPanel.hidden = !state.gridBox.visible;
+    if (state.gridBox.visible) {
+      positionGridBoxPanel();
+      updateGridBoxSaveButton();
+    }
+  }
+
+  gridBoxToggleBtn.addEventListener("click", () => {
+    state.gridBox.visible = !state.gridBox.visible;
+    if (!state.gridBox.visible) {
+      gridBoxStatus.hidden = true;
+      gridBoxError.hidden = true;
+    }
+    updateGridBoxUI();
+    render();
+  });
+
+  gridBoxUnitBtn.addEventListener("click", () => {
+    state.gridBox.unit = state.gridBox.unit === "in" ? "cm" : "in";
+    // Re-anchor at the same CENTER point under the new side length, rather
+    // than keeping the top-left corner fixed -- switching units shouldn't
+    // make the box visually jump off in one direction.
+    const spec = gridBoxSpec();
+    if (spec && state.gridBox.x !== null) {
+      const oldSide = GRID_BOX_UNIT_MM[state.gridBox.unit === "in" ? "cm" : "in"] * spec.ppm;
+      const cx = state.gridBox.x + oldSide / 2;
+      const cy = state.gridBox.y + oldSide / 2;
+      state.gridBox.x = clamp(cx - spec.sidePx / 2, 0, Math.max(0, state.naturalWidth - spec.sidePx));
+      state.gridBox.y = clamp(cy - spec.sidePx / 2, 0, Math.max(0, state.naturalHeight - spec.sidePx));
+    }
+    updateGridBoxUI();
+    render();
+  });
+
+  // Mirrors positionCalPopup() -- see its comment for why the canvas's own
+  // live bounding rect is enough to convert a natural-coordinate anchor
+  // into an on-screen position with no separate pan/zoom transform math.
+  function positionGridBoxPanel() {
+    if (!state.gridBox.visible || gridBoxPanel.hidden) return;
+    const spec = gridBoxSpec();
+    if (!spec) return;
+    const rect = canvas.getBoundingClientRect();
+    const zoom = state.view.zoom || 1;
+    const anchor = { x: state.gridBox.x + GRID_BOX_UNIT_MM[state.gridBox.unit] * spec.ppm / 2, y: state.gridBox.y + GRID_BOX_UNIT_MM[state.gridBox.unit] * spec.ppm };
+    const disp = naturalToDisplay(anchor);
+    gridBoxPanel.style.left = `${rect.left + disp.x * zoom}px`;
+    gridBoxPanel.style.top = `${rect.top + disp.y * zoom}px`;
+  }
+
+  function updateGridBoxSaveButton() {
+    const waleCount = parseInt(gridWaleCountInput.value, 10);
+    const courseCount = parseInt(gridCourseCountInput.value, 10);
+    gridBoxSaveBtn.disabled = !((waleCount > 0 || courseCount > 0) && currentPixelsPerMm() !== null);
+  }
+  gridWaleCountInput.addEventListener("input", updateGridBoxSaveButton);
+  gridCourseCountInput.addEventListener("input", updateGridBoxSaveButton);
+
+  gridBoxSaveBtn.addEventListener("click", async () => {
+    const spec = gridBoxSpec();
+    if (!spec || state.gridBox.x === null) return;
+    const waleCount = parseInt(gridWaleCountInput.value, 10);
+    const courseCount = parseInt(gridCourseCountInput.value, 10);
+    if (!(waleCount > 0) && !(courseCount > 0)) return;
+
+    gridBoxError.hidden = true;
+    gridBoxStatus.hidden = false;
+    gridBoxStatus.textContent = "Saving…";
+    gridBoxSaveBtn.disabled = true;
+
+    try {
+      if (!CONFIG.API_BASE_URL) {
+        throw new Error("Analysis service is not configured yet, so ground truth can't be saved.");
+      }
+      const sideMm = GRID_BOX_UNIT_MM[state.gridBox.unit];
+      const fd = new FormData();
+      fd.append("roi_x", state.gridBox.x);
+      fd.append("roi_y", state.gridBox.y);
+      fd.append("roi_width_px", spec.sidePx);
+      fd.append("roi_height_px", spec.sidePx);
+      fd.append("roi_width_mm", sideMm);
+      fd.append("roi_height_mm", sideMm);
+      fd.append("pixels_per_mm", spec.ppm);
+      fd.append("orientation", state.orientation);
+      // Deliberately NO predicted_* fields -- this is a standalone,
+      // human-counted ground-truth observation against the image and
+      // calibration, not a correction against any one analyzed ROI's
+      // prediction (the grid box is usually positioned somewhere the
+      // automatic detector never analyzed at all, and -- per the whole
+      // point of making the box available before Analyze -- may well be
+      // recorded before any prediction exists yet).
+      if (waleCount > 0) fd.append("actual_wale_count", waleCount);
+      if (courseCount > 0) fd.append("actual_course_count", courseCount);
+      fd.append("calibration_correct", true);
+      fd.append("orientation_correct", true);
+      fd.append("algorithm_version", "grid-box-manual-count");
+
+      if (state.file) {
+        fd.append("image_filename", state.file.name);
+        fd.append("image_size_bytes", state.file.size);
+      }
+      let hash = null;
+      try {
+        hash = state.imageHashPromise ? await state.imageHashPromise : null;
+      } catch {
+        hash = null;
+      }
+      if (hash) fd.append("image_sha256", hash);
+      fd.append("save_image", false); // no image-save consent checkbox on this compact panel -- never opt in implicitly
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+      let res;
+      try {
+        res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+      }
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || `Could not save ground truth (HTTP ${res.status}).`);
+      }
+
+      gridBoxStatus.textContent = `Saved (sample ${data.id.slice(0, 8)}…).`;
+      gridWaleCountInput.value = "";
+      gridCourseCountInput.value = "";
+    } catch (err) {
+      gridBoxStatus.hidden = true;
+      if (err && err.name === "AbortError") {
+        gridBoxError.textContent = "Saving timed out. Try again shortly.";
+      } else if (err instanceof TypeError) {
+        gridBoxError.textContent = "Could not reach the analysis service to save this.";
+      } else {
+        gridBoxError.textContent = (err && err.message) || "Could not save. Please try again.";
+      }
+      gridBoxError.hidden = false;
+    } finally {
+      updateGridBoxSaveButton();
+    }
   });
 
   function renderRoiList() {
@@ -1948,6 +2218,25 @@
       }
     }
 
+    // Same precedence as the ruler above, and for the same reason -- the
+    // grid box is a floating tool that sits on top of whatever the
+    // current step would otherwise do with this click.
+    if (state.gridBox.visible) {
+      const spec = gridBoxSpec();
+      if (spec) {
+        ensureGridBoxPosition(spec);
+        const dispPt = eventToDisplayPoint(evt);
+        if (pointInGridBoxDisplay(dispPt, spec)) {
+          const natPt = displayToNatural(dispPt);
+          state.gridBox.dragging = true;
+          state.gridBox.dragOffset = { dx: natPt.x - state.gridBox.x, dy: natPt.y - state.gridBox.y };
+          canvas.setPointerCapture(evt.pointerId);
+          render();
+          return;
+        }
+      }
+    }
+
     if (state.currentStep === "results" && state.repeatMark.active) {
       const pt = displayToNatural(eventToDisplayPoint(evt));
       state.repeatMark.dragging = true;
@@ -2191,6 +2480,27 @@
   }
   canvas.addEventListener("pointerup", endRulerDrag);
   canvas.addEventListener("pointercancel", endRulerDrag);
+
+  // Grid box drag -- mirrors the ruler drag immediately above.
+  canvas.addEventListener("pointermove", (evt) => {
+    if (!state.gridBox.dragging) return;
+    const spec = gridBoxSpec();
+    if (!spec) {
+      state.gridBox.dragging = false;
+      return;
+    }
+    const natPt = displayToNatural(eventToDisplayPoint(evt));
+    state.gridBox.x = clamp(natPt.x - state.gridBox.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.sidePx));
+    state.gridBox.y = clamp(natPt.y - state.gridBox.dragOffset.dy, 0, Math.max(0, state.naturalHeight - spec.sidePx));
+    render();
+  });
+  function endGridBoxDrag(evt) {
+    if (!state.gridBox.dragging) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.gridBox.dragging = false;
+  }
+  canvas.addEventListener("pointerup", endGridBoxDrag);
+  canvas.addEventListener("pointercancel", endGridBoxDrag);
 
   // Calibration point drag -- see the calibrate-step pointerdown branch
   // above for the hit-test that starts this.
@@ -3165,6 +3475,7 @@
     state.calAutoDetectPending = false;
     state.calAutoDetected = false;
     state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
+    state.gridBox = { visible: false, unit: "in", x: null, y: null, dragging: false, dragOffset: null };
     state.roi = null;
     state.roiDrag = null;
     state.orientation = "vertical";
