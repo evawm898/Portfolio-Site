@@ -73,7 +73,17 @@
 
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 8;
-  const WHEEL_ZOOM_SENSITIVITY = 0.01;
+  const WHEEL_ZOOM_SENSITIVITY = 0.01; // ctrl+wheel (trackpad pinch) -- deltaY there is already small/scaled
+  // A real mouse wheel's deltaY is much coarser per event (commonly ~100
+  // in Chrome's default delta mode) than a trackpad-pinch's ctrl+wheel
+  // deltaY, so it needs its own, much smaller sensitivity constant --
+  // reusing WHEEL_ZOOM_SENSITIVITY here would turn one wheel notch into
+  // a ~63% zoom jump. Tuned for roughly a 10-15% zoom change per notch.
+  const MOUSE_WHEEL_ZOOM_SENSITIVITY = 0.0016;
+  // Threshold for looksLikeMouseWheelDelta() below -- comfortably above
+  // ordinary trackpad micro-scroll deltas, comfortably below a typical
+  // wheel notch's magnitude (~100).
+  const MOUSE_WHEEL_MIN_DELTA = 20;
 
   // --- DOM refs -----------------------------------------------------
   const stepEls = Object.fromEntries(
@@ -459,18 +469,59 @@
     applyViewTransform();
   }
 
+  // Distinguishes a real mouse wheel from a trackpad's two-finger scroll,
+  // both of which arrive as plain "wheel" events with no other signal to
+  // tell them apart. A trackpad's scroll is continuous, sub-pixel-capable
+  // motion -- deltaX is usually nonzero even when scrolling "mostly
+  // vertically" (real fingers rarely move in a perfectly straight line),
+  // and deltaY arrives as many small, often-fractional values per
+  // gesture. A mouse wheel has no horizontal axis at all (deltaX === 0)
+  // and reports deltaY as one coarse, whole-number "notch" per click --
+  // commonly ~100 in Chrome's default delta mode, though the exact notch
+  // size varies by mouse/OS/browser, which is why this checks "large
+  // whole number" (MOUSE_WHEEL_MIN_DELTA) rather than hardcoding 100
+  // exactly. This is a heuristic, not a real device signal -- if it
+  // proves unreliable for some mouse/trackpad combination in practice,
+  // the fix is an explicit user-facing toggle, not a guess refinement.
+  function looksLikeMouseWheelDelta(evt) {
+    if (evt.deltaX !== 0) return false;
+    if (!Number.isInteger(evt.deltaY)) return false;
+    return Math.abs(evt.deltaY) >= MOUSE_WHEEL_MIN_DELTA;
+  }
+
   function onViewerWheel(evt) {
     if (!state.naturalWidth) return;
     evt.preventDefault();
+
+    if (evt.shiftKey) {
+      // Manual override: always pan, regardless of what device this
+      // looks like -- the escape hatch for whenever the heuristic below
+      // guesses wrong.
+      state.view.panX -= evt.deltaX;
+      state.view.panY -= evt.deltaY;
+      clampPan();
+      applyViewTransform();
+      return;
+    }
+
     if (evt.ctrlKey) {
       // Pinch-to-zoom on trackpads is synthesized by the browser as wheel
-      // events with ctrlKey set; a plain Ctrl+scroll does the same thing
-      // intentionally, matching the common zoom convention elsewhere.
+      // events with ctrlKey set -- always zoom, never guess here.
       const factor = Math.exp(-evt.deltaY * WHEEL_ZOOM_SENSITIVITY);
       zoomBy(factor, evt.clientX, evt.clientY);
+      return;
+    }
+
+    if (looksLikeMouseWheelDelta(evt)) {
+      // An un-modified real mouse wheel -- cursor-anchored zoom. A mouse
+      // has no equivalent to a trackpad's two-finger pan swipe, so its
+      // wheel notches are the zoom gesture instead (drag still pans).
+      const factor = Math.exp(-evt.deltaY * MOUSE_WHEEL_ZOOM_SENSITIVITY);
+      zoomBy(factor, evt.clientX, evt.clientY);
     } else {
-      // Plain two-finger scroll (or a mouse wheel) pans instead, matching
-      // how map/image viewers usually treat an un-modified scroll gesture.
+      // Trackpad two-finger scroll (or anything not confidently
+      // classified as a mouse wheel) -- pan, matching how a trackpad's
+      // plain scroll gesture is treated everywhere else on the page.
       state.view.panX -= evt.deltaX;
       state.view.panY -= evt.deltaY;
       clampPan();
