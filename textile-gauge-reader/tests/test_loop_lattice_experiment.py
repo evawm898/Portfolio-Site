@@ -162,6 +162,38 @@ def test_row_banded_lattice_column_count_vs_interval_math():
     assert result.wale_spacing_px == pytest.approx(40.0, abs=2.0)
 
 
+def test_row_banded_lattice_reports_columns_considered_vs_accepted():
+    # Same 5 well-supported columns as the test above, PLUS two more
+    # candidate x-positions that only ever get a single row's worth of
+    # evidence -- below MIN_ROW_SUPPORT_FOR_COLUMN (2), so they're
+    # rejected. columns_considered must count all 7 candidate groups;
+    # column_count only the 5 that were actually accepted -- a diagnostics
+    # view showing just column_count has no way to tell "5 accepted, none
+    # rejected" from "5 accepted, 2 rejected" without this field.
+    h, w = 60, 300
+    response = np.zeros((h, w))
+    rows_local = [10.0, 30.0, 50.0]
+    accepted_xs = [20.0, 60.0, 100.0, 140.0, 180.0]  # 5 columns, all 3 rows
+    rejected_xs = [220.0, 260.0]                      # 2 columns, only 1 row each -- far enough apart (> col_tolerance) to stay distinct groups, not merge with each other or the accepted columns
+    for ry in rows_local:
+        for x in accepted_xs:
+            response[int(ry), int(x)] = 5.0
+    response[int(rows_local[0]), int(rejected_xs[0])] = 5.0
+    response[int(rows_local[1]), int(rejected_xs[1])] = 5.0
+
+    import analysis.gauge_analysis as ga
+
+    original = ga._v_shape_response_map
+    ga._v_shape_response_map = lambda gx_, gy_, scale: response
+    try:
+        result = _build_row_banded_lattice(np.zeros((h, w)), np.zeros((h, w)), rows_local, scale_px=40.0, image_shape=(h, w))
+    finally:
+        ga._v_shape_response_map = original
+
+    assert result.column_count == 5
+    assert result.columns_considered == 7
+
+
 def test_row_banded_lattice_marks_inferred_positions_for_missing_rows():
     h, w = 100, 100
     response = np.zeros((h, w))

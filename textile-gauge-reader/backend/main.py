@@ -202,6 +202,7 @@ def _loop_lattice_to_out(lattice, pixels_per_mm: float) -> LoopLatticeDebugOut:
         direct_center_count=lattice.direct_center_count,
         row_count=lattice.row_count,
         column_count=lattice.column_count,
+        columns_considered=lattice.columns_considered,
         lattice_consistency=lattice.lattice_consistency,
         wale_spacing_px=lattice.wale_spacing_px,
         course_spacing_px=lattice.course_spacing_px,
@@ -230,6 +231,7 @@ def _axis_consensus_to_out(consensus, pixels_per_mm: float) -> AxisConsensusOut:
             )
             for o in consensus.outliers
         ],
+        no_measurement_labels=consensus.no_measurement_labels,
         regional_median_px=consensus.regional_median_px,
         regional_median_per_inch=(
             _period_px_to_per_inch(consensus.regional_median_px, pixels_per_mm)

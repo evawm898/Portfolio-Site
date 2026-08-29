@@ -133,6 +133,10 @@ class LoopLatticeDebugOut(BaseModel):
     direct_center_count: int = 0
     row_count: int = 0
     column_count: int = 0
+    # How many candidate column groups were considered before the
+    # row-support filter -- column_count is the accepted subset. Lets
+    # diagnostics show "accepted N of M candidates" instead of just N.
+    columns_considered: int = 0
     lattice_consistency: float = 0.0
     wale_spacing_px: Optional[float] = None
     course_spacing_px: Optional[float] = None
@@ -166,8 +170,19 @@ class AxisConsensusOut(BaseModel):
     """
 
     included_labels: List[str] = Field(default_factory=list)
+    # Every region NOT in included_labels, whatever the reason -- a
+    # statistical outlier (also itemized in `outliers` below) or a region
+    # with no usable measurement at all (also itemized in
+    # `no_measurement_labels`). included_labels + excluded_labels always
+    # accounts for every region considered for this axis, so "2 of 4
+    # contributed" is never indistinguishable from "2 of 2" the way it
+    # used to be when a no-measurement region silently vanished from both.
     excluded_labels: List[str] = Field(default_factory=list)
     outliers: List[OutlierOut] = Field(default_factory=list)
+    # Subset of excluded_labels dropped for having no usable measurement
+    # on this axis at all, as opposed to having one and losing the
+    # cross-region vote (see `outliers` for those).
+    no_measurement_labels: List[str] = Field(default_factory=list)
     regional_median_px: Optional[float] = None
     regional_median_per_inch: Optional[float] = None
     regional_spread_px: Optional[float] = None

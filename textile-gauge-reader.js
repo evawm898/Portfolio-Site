@@ -2591,9 +2591,18 @@
 
     const regionCount = mr.per_roi.length;
     const row = (label, value) => `<div class="tgr-consistency-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(value))}</span></div>`;
-    const agreedText = (consensus) =>
-      `${consensus.included_labels.length} of ${regionCount} agreed` +
-      (consensus.excluded_labels.length ? ` — ${consensus.excluded_labels.length} excluded as outlier${consensus.excluded_labels.length === 1 ? "" : "s"}` : "");
+    // included + excluded always accounts for every region considered on
+    // this axis (see AxisConsensusOut.excluded_labels) -- broken out by
+    // reason (outlier vs. no usable measurement at all) so "2 of 4
+    // contributed" is never silently indistinguishable from "2 of 2".
+    const agreedText = (consensus) => {
+      const nOutliers = consensus.outliers.length;
+      const nNoMeasurement = consensus.no_measurement_labels.length;
+      const parts = [];
+      if (nOutliers) parts.push(`${nOutliers} excluded as outlier${nOutliers === 1 ? "" : "s"}`);
+      if (nNoMeasurement) parts.push(`${nNoMeasurement} had no usable measurement`);
+      return `${consensus.included_labels.length} of ${regionCount} agreed` + (parts.length ? ` — ${parts.join(", ")}` : "");
+    };
 
     let html = "";
     html += row("Regions analyzed", regionCount);
@@ -2606,6 +2615,12 @@
     }
     for (const o of mr.course_consensus.outliers) {
       outlierLines.push(`Course ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
+    }
+    for (const label of mr.wale_consensus.no_measurement_labels) {
+      outlierLines.push(`Wale ${label}: no usable measurement for this region.`);
+    }
+    for (const label of mr.course_consensus.no_measurement_labels) {
+      outlierLines.push(`Course ${label}: no usable measurement for this region.`);
     }
     const outlierHtml = outlierLines.map((line) => `<div class="tgr-consistency-outlier">⚠ ${escapeHtml(line)}</div>`).join("");
 
@@ -2819,7 +2834,7 @@
         ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
         <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}%</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
-        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} columns</span></div>` : ""}
+        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered} candidate columns accepted</span></div>` : ""}
       </div>`;
     render(); // re-draw the results overlay so it reflects the newly selected region
   }
@@ -2954,7 +2969,7 @@
         </p>
         ${row("Direct loop detections", d.direct_center_count)}
         ${row("Course rows used as prior", d.row_count)}
-        ${row("Accepted wale columns", d.column_count)}
+        ${row("Accepted wale columns", `${d.column_count} of ${d.columns_considered} candidates`)}
         ${row("Column row-support (min..max)", d.column_support_counts && d.column_support_counts.length ? `${Math.min(...d.column_support_counts)}..${Math.max(...d.column_support_counts)} of ${d.row_count}` : "—")}
         ${row("Lattice consistency", fmt(d.lattice_consistency, 2))}
         ${row("Loop-lattice wale spacing", fmt(d.wale_spacing_px, 1, " px"))}

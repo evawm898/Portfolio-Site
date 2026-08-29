@@ -191,6 +191,72 @@ def test_empty_candidates_returns_no_measurement():
     assert result.confidence == 0.0
 
 
+# --- no_measurement_labels: a region dropped for lacking any usable ---------
+# --- measurement must never be indistinguishable from "there were only  ---
+# --- ever N regions" -- it must show up in both excluded_labels and its ---
+# --- own dedicated field, in every branch _consensus_for_axis can take. ---
+
+
+def test_no_measurement_region_is_folded_into_excluded_labels_with_inliers():
+    candidates = [
+        {"label": "A", "spacing_px": 4.9, "confidence": 0.7, "quality_score": 0.8},
+        {"label": "B", "spacing_px": 5.1, "confidence": 0.7, "quality_score": 0.8},
+        {"label": "C", "spacing_px": 5.0, "confidence": 0.7, "quality_score": 0.8},
+    ]
+    result = _consensus_for_axis(candidates, "wale", no_measurement_labels=["D"])
+    assert result.included_labels == ["A", "B", "C"]
+    assert result.no_measurement_labels == ["D"]
+    # D must be visible in excluded_labels too -- included + excluded must
+    # always account for every region considered, so "3 of 4 contributed"
+    # can never look identical to "3 of 3" the way it did before this fix.
+    assert "D" in result.excluded_labels
+    assert "D" in result.message
+
+
+def test_no_measurement_region_surfaces_with_empty_candidates():
+    result = _consensus_for_axis([], "wale", no_measurement_labels=["A", "B"])
+    assert result.spacing_px is None
+    assert result.no_measurement_labels == ["A", "B"]
+    assert result.excluded_labels == ["A", "B"]
+    assert "A" in result.message and "B" in result.message
+
+
+def test_no_measurement_region_surfaces_with_single_candidate():
+    candidates = [{"label": "A", "spacing_px": 5.0, "confidence": 0.7, "quality_score": 0.8}]
+    result = _consensus_for_axis(candidates, "wale", no_measurement_labels=["B"])
+    assert result.included_labels == ["A"]
+    assert result.no_measurement_labels == ["B"]
+    assert result.excluded_labels == ["B"]
+    assert "B" in result.message
+
+
+def test_no_measurement_region_surfaces_with_no_dominant_cluster():
+    # Every candidate disagrees (the "no inliers" branch) -- a no-
+    # measurement region must still show up, not just vanish because this
+    # branch never built an outliers list of its own.
+    candidates = [
+        {"label": "A", "spacing_px": 8.0, "confidence": 0.6, "quality_score": 0.8},
+        {"label": "B", "spacing_px": 16.0, "confidence": 0.6, "quality_score": 0.8},
+        {"label": "C", "spacing_px": 24.0, "confidence": 0.6, "quality_score": 0.8},
+    ]
+    result = _consensus_for_axis(candidates, "wale", no_measurement_labels=["D"])
+    assert result.no_measurement_labels == ["D"]
+    assert "D" in result.excluded_labels
+
+
+def test_no_measurement_region_does_not_get_mislabeled_an_outlier():
+    # A no-measurement region has no spacing_px at all -- it must never be
+    # reported via `outliers` (which asserts a real measured value that
+    # lost the vote); it's a distinct, separately-named failure mode.
+    candidates = [
+        {"label": "A", "spacing_px": 4.9, "confidence": 0.7, "quality_score": 0.8},
+        {"label": "B", "spacing_px": 5.1, "confidence": 0.7, "quality_score": 0.8},
+        {"label": "C", "spacing_px": 5.0, "confidence": 0.7, "quality_score": 0.8},
+    ]
+    result = _consensus_for_axis(candidates, "wale", no_measurement_labels=["D"])
+    assert [o.label for o in result.outliers] == []
+
+
 # --- analyze_multi_roi: independence + wiring --------------------------------
 
 
@@ -218,6 +284,46 @@ def test_regions_are_analyzed_independently_of_each_other():
     assert by_label["A"].course.spacing_px == standalone_a.course.spacing_px
     assert by_label["B"].wale.spacing_px == standalone_b.wale.spacing_px
     assert by_label["B"].course.spacing_px == standalone_b.course.spacing_px
+
+
+def test_region_with_no_usable_measurement_is_reported_not_silently_dropped():
+    # A real repro of the fix: one region is real, measurable synthetic
+    # knit; the other is flat/blank (no periodicity anywhere -- see
+    # test_gauge_analysis.py's own flat-image case, wale/course.spacing_px
+    # both None). Before this fix, the flat region's wale.spacing_px is
+    # None -> wale_candidates() dropped it with a bare `continue` and it
+    # never appeared in included_labels OR excluded_labels: "1 of 2
+    # contributed" was indistinguishable from "1 of 1", the exact class of
+    # invisibility that made the variegated-yarn failure hard to diagnose.
+    image = make_synthetic_knit(width=500, height=500, wale_period=12, course_period=16)
+    image[280:460, 280:460] = 128  # flat patch -- no periodicity to measure at all
+
+    rois = [
+        {"label": "REAL", "x": 20, "y": 20, "width": 180, "height": 180, "source": "auto"},
+        {"label": "FLAT", "x": 280, "y": 280, "width": 180, "height": 180, "source": "auto"},
+    ]
+    result = analyze_multi_roi(image, rois, orientation="vertical")
+
+    by_label = {m.label: m for m in result.per_roi}
+    assert by_label["FLAT"].wale.spacing_px is None
+    assert by_label["FLAT"].course.spacing_px is None
+
+    # The flat region must be visible on BOTH axes' consensus: named in
+    # no_measurement_labels, folded into excluded_labels, and never
+    # counted as an included region -- and must never disappear from the
+    # accounting entirely (included + excluded == every region considered).
+    for consensus in (result.wale_consensus, result.course_consensus):
+        assert "FLAT" not in consensus.included_labels
+        assert "FLAT" in consensus.no_measurement_labels
+        assert "FLAT" in consensus.excluded_labels
+        assert "FLAT" in consensus.message
+
+    # Its own per-region result must also say why, independent of the
+    # aggregate view (Developer Diagnostics' per-region selector reads this).
+    assert by_label["FLAT"].wale.status == "uncertain"
+    assert by_label["FLAT"].wale.uncertain_reason
+    assert by_label["FLAT"].course.status == "uncertain"
+    assert by_label["FLAT"].course.uncertain_reason
 
 
 def test_agreeing_regions_produce_a_confident_consensus_close_to_ground_truth(monkeypatch):

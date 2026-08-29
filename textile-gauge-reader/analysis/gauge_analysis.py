@@ -2528,6 +2528,14 @@ class LoopLatticeResult:
     direct_center_count: int = 0
     row_count: int = 0        # course rows used as the structural prior
     column_count: int = 0     # accepted (multi-row-supported) wale columns
+    # How many candidate x-position groups were CONSIDERED before the
+    # MIN_ROW_SUPPORT_FOR_COLUMN filter -- i.e. column_count plus every
+    # group that was tried and rejected for too little row support. Always
+    # >= column_count. Lets a diagnostics view show "accepted N of M
+    # candidates" instead of just the accepted count on its own, the same
+    # visibility principle behind AxisConsensusResult.no_measurement_labels
+    # (a candidate that's dropped shouldn't just disappear from the numbers).
+    columns_considered: int = 0
     lattice_consistency: float = 0.0   # 0..1, spacing-regularity of the accepted columns
     wale_spacing_px: Optional[float] = None
     course_spacing_px: Optional[float] = None   # echoed from the given course rows, not re-measured here
@@ -2728,6 +2736,7 @@ def _build_row_banded_lattice(
         direct_center_count=len(direct_centers),
         row_count=len(rows_sorted),
         column_count=len(wale_columns),
+        columns_considered=len(groups),
         lattice_consistency=round(lattice_consistency, 3),
         wale_spacing_px=wale_spacing,
         course_spacing_px=course_spacing,
@@ -4086,8 +4095,24 @@ class AxisConsensusResult:
     uncertain_reason: Optional[str] = None
     message: str = ""
     included_labels: List[str] = field(default_factory=list)
+    # Every region that didn't make it into included_labels, for WHATEVER
+    # reason -- a statistical outlier (see `outliers` for detail) or a
+    # region that never produced a usable measurement for this axis at all
+    # (see `no_measurement_labels`). Always included_labels + excluded_labels
+    # == every region considered for this axis, so "2 of 4 contributed" is
+    # never silently indistinguishable from "2 of 2" -- a region can never
+    # just vanish from both lists (issue: dense-grid-anchor-experiment
+    # follow-up found this gap via analyze_multi_roi's own candidate
+    # builders silently `continue`-ing past a None spacing_px).
     excluded_labels: List[str] = field(default_factory=list)
     outliers: List[OutlierInfo] = field(default_factory=list)
+    # Subset of excluded_labels that were dropped for having NO usable
+    # measurement at all (as opposed to `outliers`, which had a measurement
+    # but disagreed with the regional consensus) -- kept separate so a
+    # caller can tell "this region measured something and lost the vote"
+    # from "this region never measured anything on this axis" without
+    # having to diff excluded_labels against outliers' labels itself.
+    no_measurement_labels: List[str] = field(default_factory=list)
     regional_median_px: Optional[float] = None
     regional_spread_px: Optional[float] = None
 
@@ -4160,12 +4185,23 @@ def _weighted_median(values: List[float], weights: List[float]) -> float:
     return pairs[-1][0]
 
 
-def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensusResult:
+def _consensus_for_axis(
+    candidates: List[dict], axis_label: str, no_measurement_labels: Optional[List[str]] = None
+) -> AxisConsensusResult:
     """
     Robust cross-region consensus for one axis, from independently
     measured per-region candidates: [{"label","spacing_px","confidence",
-    "quality_score"}, ...] (regions with no usable measurement for this
-    axis are simply not included in `candidates`).
+    "quality_score"}, ...].
+
+    `no_measurement_labels` names every APPROVED region that never made it
+    into `candidates` at all because it had no usable measurement for this
+    axis (as opposed to having one and losing a statistical-outlier vote).
+    This function folds them into `excluded_labels` (and its own,
+    dedicated `no_measurement_labels` field) so the region count always
+    reconciles -- included + excluded == every region considered -- and
+    "2 of 4 contributed" can never look identical to "2 of 2" the way it
+    used to when such regions simply disappeared from both accounting
+    lists (see the field's docstring on AxisConsensusResult).
 
     Never a plain mean, per PART 9 of the request this implements: a
     coarse median first separates likely inliers from outliers (values
@@ -4176,10 +4212,20 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
     for a human reading the diagnostics, never the reason it was excluded
     in the first place (the tolerance check already excluded it).
     """
+    no_measurement_labels = list(no_measurement_labels or [])
+    total_regions = len(candidates) + len(no_measurement_labels)
+    no_measurement_note = (
+        f" {len(no_measurement_labels)} region(s) had no usable {axis_label} measurement "
+        f"({', '.join(no_measurement_labels)})."
+        if no_measurement_labels else ""
+    )
+
     if not candidates:
         return AxisConsensusResult(
             spacing_px=None, confidence=0.0,
-            message=f"No region produced a usable {axis_label} measurement.",
+            message=f"No region produced a usable {axis_label} measurement.{no_measurement_note}",
+            excluded_labels=list(no_measurement_labels),
+            no_measurement_labels=no_measurement_labels,
         )
 
     values = [c["spacing_px"] for c in candidates]
@@ -4192,9 +4238,11 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
             confidence=round(c["confidence"] * CONSENSUS_SINGLE_REGION_FACTOR, 4),
             message=(
                 f"Only region {c['label']} produced a usable {axis_label} measurement -- "
-                "cross-region validation unavailable."
+                f"cross-region validation unavailable.{no_measurement_note}"
             ),
             included_labels=[c["label"]],
+            excluded_labels=list(no_measurement_labels),
+            no_measurement_labels=no_measurement_labels,
             regional_median_px=c["spacing_px"],
             regional_spread_px=0.0,
         )
@@ -4246,9 +4294,11 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
             ),
             message=(
                 f"No dominant regional consensus for {axis_label}; used the confidence-weighted "
-                f"median of all {len(candidates)} regions."
+                f"median of all {len(candidates)} regions.{no_measurement_note}"
             ),
             included_labels=labels,
+            excluded_labels=list(no_measurement_labels),
+            no_measurement_labels=no_measurement_labels,
             regional_median_px=initial_median,
             regional_spread_px=(sorted_vals[-1] - sorted_vals[0]) / 2.0,
         )
@@ -4290,10 +4340,12 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
         uncertain_reason = f"Regions that agreed for {axis_label} still spread more than expected."
 
     included_labels = [c["label"] for c in inliers]
-    excluded_labels = [o.label for o in outliers]
+    outlier_labels = [o.label for o in outliers]
+    excluded_labels = outlier_labels + no_measurement_labels
     message = (
-        f"{axis_label.capitalize()} consensus from {len(inliers)} of {len(candidates)} region(s)"
-        + (f"; excluded {', '.join(excluded_labels)} as outlier(s)." if excluded_labels else ".")
+        f"{axis_label.capitalize()} consensus from {len(inliers)} of {total_regions} region(s)"
+        + (f"; excluded {', '.join(outlier_labels)} as outlier(s)." if outlier_labels else ".")
+        + no_measurement_note
     )
 
     return AxisConsensusResult(
@@ -4305,6 +4357,7 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
         included_labels=included_labels,
         excluded_labels=excluded_labels,
         outliers=outliers,
+        no_measurement_labels=no_measurement_labels,
         regional_median_px=initial_median,
         regional_spread_px=spread,
     )
@@ -4472,6 +4525,20 @@ def analyze_multi_roi(
         if reasons and m.wale.status != "uncertain":
             per_roi[idx] = replace(m, wale=replace(m.wale, status="uncertain", uncertain_reason=" ".join(reasons)))
 
+    # Regions dropped for having NO usable measurement on an axis at all --
+    # as opposed to ratio_excluded_labels/density_excluded_labels above,
+    # which have a measurement but fail a plausibility check. Populated by
+    # wale_candidates()/course_candidates() below and threaded into
+    # _consensus_for_axis so these regions can never simply vanish from
+    # both included_labels and excluded_labels (see AxisConsensusResult's
+    # no_measurement_labels docstring) -- this is exactly the gap the
+    # dense-grid-anchor-experiment follow-up found: a region silently
+    # dropped here was indistinguishable from a region that was never
+    # there, which is what let the median-of-anchors mitigation for that
+    # experiment fail silently.
+    wale_no_measurement_labels: List[str] = []
+    course_no_measurement_labels: List[str] = []
+
     def wale_candidates() -> List[dict]:
         # Prefer each region's COUNTED spacing (median interval between
         # real, position-verified loop columns) over its periodicity
@@ -4488,7 +4555,7 @@ def analyze_multi_roi(
         # agree with each other, per _single_region_agreement_confidence.
         single_region = len(per_roi) == 1
         out = []
-        for m in per_roi:
+        for idx, m in enumerate(per_roi):
             if m.label in ratio_excluded_labels or m.label in density_excluded_labels:
                 continue
             if m.wale_source == "loop_count":
@@ -4498,6 +4565,12 @@ def analyze_multi_roi(
                 spacing_px = m.wale.spacing_px
                 base_confidence = m.wale.confidence
             if spacing_px is None:
+                wale_no_measurement_labels.append(m.label)
+                if m.wale.status != "uncertain":
+                    per_roi[idx] = replace(m, wale=replace(
+                        m.wale, status="uncertain",
+                        uncertain_reason="No usable wale measurement for this region -- excluded from cross-region consensus.",
+                    ))
                 continue
             if single_region:
                 counted_px = m.loop_lattice.wale_spacing_px if m.loop_lattice else None
@@ -4512,13 +4585,19 @@ def analyze_multi_roi(
 
     def course_candidates() -> List[dict]:
         out = []
-        for m in per_roi:
+        for idx, m in enumerate(per_roi):
             # Ratio-implausible regions are excluded from BOTH axes (see
             # the module comment above the gating loop) -- density
             # exclusion is wale-only and doesn't apply here.
             if m.label in ratio_excluded_labels:
                 continue
             if m.course.spacing_px is None:
+                course_no_measurement_labels.append(m.label)
+                if m.course.status != "uncertain":
+                    per_roi[idx] = replace(m, course=replace(
+                        m.course, status="uncertain",
+                        uncertain_reason="No usable course measurement for this region -- excluded from cross-region consensus.",
+                    ))
                 continue
             # A floor on quality weight so a region with a near-zero
             # quality score can't be given literally zero say -- it was
@@ -4531,8 +4610,12 @@ def analyze_multi_roi(
             })
         return out
 
-    wale_consensus = _consensus_for_axis(wale_candidates(), "wale")
-    course_consensus = _consensus_for_axis(course_candidates(), "course")
+    wale_consensus = _consensus_for_axis(
+        wale_candidates(), "wale", no_measurement_labels=wale_no_measurement_labels
+    )
+    course_consensus = _consensus_for_axis(
+        course_candidates(), "course", no_measurement_labels=course_no_measurement_labels
+    )
 
     # Primary region for the overlay/analyzed-area: prefer whichever
     # (in approval order) region is accepted into the MOST axes' consensus
