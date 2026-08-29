@@ -129,9 +129,6 @@
   const zoomResetBtn = document.getElementById("zoomResetBtn");
   const zoomLevelEl = document.getElementById("zoomLevel");
 
-  const rulerControls = document.getElementById("rulerControls");
-  const rulerToggleBtn = document.getElementById("rulerToggleBtn");
-
   const gridBoxControls = document.getElementById("gridBoxControls");
   const gridBoxToggleBtn = document.getElementById("gridBoxToggleBtn");
   const gridBoxUnitBtn = document.getElementById("gridBoxUnitBtn");
@@ -244,21 +241,10 @@
                                   // guards against a late response overwriting points the user has since
                                   // started marking manually, or landing on a since-replaced image
     calAutoDetected: false, // true once auto-detected points are showing, still awaiting the user's own confirm
-    ruler: {
-      visible: false, // the on-image ruler overlay -- a movable, to-scale physical ruler drawn over
-                       // the photo so the user can sanity-check the calibration against real fabric
-                       // features, distinct from the (also draggable) calibration POINTS themselves.
-                       // Only ever available once currentPixelsPerMm() is non-null, i.e. AFTER
-                       // Confirm Calibration -- see updateRulerUI.
-      x: null, // natural coords, left end of the ruler bar; null until first shown (see ensureRulerPosition)
-      y: null,
-      dragging: false,
-      dragOffset: null, // {dx, dy} from the pointer to state.ruler.{x,y} at drag start, in natural px
-    },
     gridBox: {
       visible: false, // the draggable to-scale (1in/1cm) counting box -- see gridBoxSpec/updateGridBoxUI.
-                       // Same availability rule as the ruler (only once currentPixelsPerMm() is
-                       // non-null), but deliberately usable on EVERY step from calibration onward,
+                       // Available once currentPixelsPerMm() is non-null (i.e. after Confirm
+                       // Calibration), but deliberately usable on EVERY step from calibration onward,
                        // including before analysis -- counting before seeing the tool's own answer
                        // is the whole point (an uncontaminated ground-truth label).
       unit: "in", // "in" | "cm" -- side length is DERIVED live from currentPixelsPerMm() + this,
@@ -285,7 +271,7 @@
                          // see the "Touch: two-finger pinch" block below. Every other
                          // pointerdown handler on the canvas checks this and bails, so a
                          // second finger landing can never also start a new ROI/calibration/
-                         // ruler drag on top of the pinch.
+                         // grid-box drag on top of the pinch.
     orientation: "vertical",
     structure: "unknown",
     result: null,
@@ -396,8 +382,7 @@
     }
     updateZoomUI(); // pan-cursor affordance depends on the step (roi/calibrate reserve plain drag)
     updateRoiAddModeUI(); // add-mode crosshair cursor only applies while actually on the roi step
-    updateRulerUI(); // ruler overlay only becomes available once calibration is confirmed
-    updateGridBoxUI(); // same availability rule as the ruler; see state.gridBox's comment for why it also spans steps
+    updateGridBoxUI(); // grid box only becomes available once calibration is confirmed; see state.gridBox's comment for why it also spans steps
     render();
   }
 
@@ -600,20 +585,11 @@
     // step too -- same reservation roi/calibrate already get below.
     if (state.repeatMark.active) return false;
     if (state.currentStep === "roi" || state.currentStep === "calibrate") return false;
-    // The ruler overlay is draggable on every step it's available in,
-    // which includes the steps (orientation/analyze/results) where a
-    // plain drag otherwise pans -- reserve the gesture the same way
-    // roi/calibrate already do, but only when the click actually starts
-    // on the ruler itself, so panning elsewhere on those steps is unaffected.
-    if (state.ruler.visible) {
-      const spec = rulerSpec();
-      if (spec) {
-        ensureRulerPosition(spec);
-        if (pointInRulerDisplay(eventToDisplayPoint(evt), spec)) return false;
-      }
-    }
-    // Same reservation, same reason, for the grid box -- see its comment
-    // near state.gridBox for why it's draggable across the same set of steps.
+    // The grid box is draggable on every step it's available in, which
+    // includes the steps (orientation/analyze/results) where a plain drag
+    // otherwise pans -- reserve the gesture the same way roi/calibrate
+    // already do, but only when the click actually starts on the box
+    // itself, so panning elsewhere on those steps is unaffected.
     if (state.gridBox.visible) {
       const spec = gridBoxSpec();
       if (spec) {
@@ -657,7 +633,7 @@
   // A single touch already works today: PointerEvent.button is 0 for a
   // touch's primary contact exactly like a mouse left-click, so every
   // existing pointerdown/pointermove handler above and below (pan-drag,
-  // ROI create/move/resize, calibration point placement, ruler drag)
+  // ROI create/move/resize, calibration point placement, grid-box drag)
   // already treats one finger the same as a mouse. What's genuinely
   // missing is a SECOND simultaneous touch -- nothing turns that into a
   // pinch gesture -- and `.tgr-viewer__stage { touch-action: none }` (needed
@@ -708,9 +684,9 @@
       state.roiDrag = null;
       updateRoiUI();
     }
-    if (state.ruler.dragging) {
+    if (state.gridBox.dragging) {
       if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
-      state.ruler.dragging = false;
+      state.gridBox.dragging = false;
     }
     if (state.repeatMark.dragging) {
       if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
@@ -856,8 +832,7 @@
       drawRepeatMarkBox();
     }
     // Drawn last (on top of everything else) on whichever step it's
-    // available in -- see updateRulerUI / rulerControls.
-    drawRuler();
+    // available in -- see updateGridBoxUI / gridBoxControls.
     drawGridBox();
     positionGridBoxPanel();
   }
@@ -1264,7 +1239,6 @@
       state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null, draggingIndex: null };
       state.calAutoDetectPending = false;
       state.calAutoDetected = false;
-      state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
       state.gridBox = { visible: false, unit: state.gridBox.unit, x: null, y: null, dragging: false, dragOffset: null };
       state.roi = null;
       state.result = null;
@@ -1554,78 +1528,15 @@
     return mm > 0 ? pxDist / mm : null;
   }
 
-  // --- On-image ruler overlay ---------------------------------------------
-  //
-  // A movable, physically-proportioned ruler drawn over the photo once
-  // calibration is confirmed (currentPixelsPerMm() is only non-null AFTER
-  // that click -- see calConfirmBtn's handler -- which is what "available
-  // only after calibration" means here). It's drawn as a single rigid
-  // corner bracket -- one arm running along image x, one along image y,
-  // sharing a draggable origin corner -- so both the wale (x) and course
-  // (y) directions can be checked against the same reference point at
-  // once, rather than needing two separately-positioned rulers. Each arm
-  // shows BOTH a cm scale and an in scale simultaneously (like a real
-  // dual-marked ruler prints both scales on opposite edges), computed
-  // straight from currentPixelsPerMm() -- no dependence on state.cal.unit,
-  // since the calibration is exact in either system regardless of which
-  // unit the user happened to enter it in.
-  //
-  // Every length here is exact: computed from currentPixelsPerMm() so
-  // the tick spacing really does match the calibrated scale, same as
-  // every other overlay measurement in this file. Bar thickness/tick
-  // lengths are fixed DISPLAY pixels instead (like the calibration point
-  // markers and ROI resize handles already are) so ticks stay legible at
-  // any zoom level rather than shrinking to nothing when zoomed out --
-  // only the measurement axis itself needs to be "to scale."
-  const RULER_ARM_LENGTH_MM = 60; // per arm -- fits a full 5cm scale AND a full 2in scale (50.8mm) with a little headroom
-  const RULER_BAR_THICKNESS = 26; // display px, shared by both arms; each arm's thickness is split between its two unit scales
-  const RULER_TICK_MINOR = 5; // display px, tick length measured in from each edge toward the shared centerline
-  const RULER_TICK_MAJOR = 10;
-  const RULER_SCALES = [
-    { label: "cm", minorMm: 1, minorPerMajor: 10 }, // metric: major per cm, minor per mm
-    { label: "in", minorMm: 25.4 / 8, minorPerMajor: 8 }, // imperial: major per inch, minor per eighth-inch
-  ];
-
-  function rulerSpec() {
-    const ppm = currentPixelsPerMm();
-    if (!ppm) return null;
-    return { ppm, armLengthPx: RULER_ARM_LENGTH_MM * ppm };
-  }
-
-  function rulerTicksForScale(scale) {
-    const n = Math.floor(RULER_ARM_LENGTH_MM / scale.minorMm + 1e-6);
-    const ticks = [];
-    for (let i = 0; i <= n; i++) {
-      ticks.push({ mm: i * scale.minorMm, isMajor: i % scale.minorPerMajor === 0, majorNum: i / scale.minorPerMajor });
-    }
-    return ticks;
-  }
-
-  function ensureRulerPosition(spec) {
-    if (state.ruler.x !== null && state.ruler.y !== null) return;
-    state.ruler.x = clamp(state.naturalWidth / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
-    state.ruler.y = clamp(state.naturalHeight / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
-  }
-
-  function pointInRulerDisplay(displayPt, spec) {
-    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
-    const armLenDisplay = spec.armLengthPx * getScale();
-    const inRect = (x, y, w, h) => displayPt.x >= x && displayPt.x <= x + w && displayPt.y >= y && displayPt.y <= y + h;
-    return (
-      inRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS) || // horizontal (x) arm
-      inRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay) // vertical (y) arm
-    );
-  }
-
   // --- Grid box: a draggable, to-scale counting square -----------------
   //
-  // Same shape of machinery as the ruler above (spec/position/hit-test/
-  // draw/toggle), deliberately: both are "physically-scaled overlay you
-  // drag onto the fabric," and keeping the pattern identical means no new
-  // coordinate-transform bugs to introduce. The one real difference is
-  // purpose -- the ruler is a sanity-check against the calibration; the
-  // grid box is a counting aid whose count gets RECORDED as ground truth
-  // (see gridBoxSaveBtn's handler).
+  // A movable, physically-proportioned (1in or 1cm, toggleable) square
+  // drawn over the photo once calibration is confirmed
+  // (currentPixelsPerMm() is only non-null AFTER that click -- see
+  // calConfirmBtn's handler -- which is what "available only after
+  // calibration" means here). Every length here is exact: computed from
+  // currentPixelsPerMm() so the side really does match the calibrated
+  // scale, same as every other overlay measurement in this file.
   const GRID_BOX_UNIT_MM = { in: 25.4, cm: 10 };
 
   function gridBoxSpec() {
@@ -1636,9 +1547,6 @@
 
   function ensureGridBoxPosition(spec) {
     if (state.gridBox.x !== null && state.gridBox.y !== null) return;
-    // Offset from the ruler's own default center position (when both
-    // start out visible at once, they shouldn't land exactly on top of
-    // each other).
     const cx = state.naturalWidth / 2 + spec.sidePx * 0.6;
     const cy = state.naturalHeight / 2 + spec.sidePx * 0.6;
     state.gridBox.x = clamp(cx - spec.sidePx / 2, 0, Math.max(0, state.naturalWidth - spec.sidePx));
@@ -1683,132 +1591,6 @@
     ctx.textBaseline = "bottom";
     ctx.fillText(`1 ${state.gridBox.unit}`, origin.x + 3, origin.y - 3);
   }
-
-  function drawRulerArm(origin, armLenDisplay, mmToDisplayPx, axis) {
-    const half = RULER_BAR_THICKNESS / 2;
-    const horizontal = axis === "x";
-
-    ctx.fillStyle = "rgba(233, 236, 236, 0.92)";
-    ctx.strokeStyle = "rgba(6, 7, 7, 0.7)";
-    ctx.lineWidth = 1;
-    if (horizontal) {
-      ctx.fillRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
-      ctx.strokeRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
-      ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y + half);
-      ctx.lineTo(origin.x + armLenDisplay, origin.y + half);
-      ctx.stroke();
-    } else {
-      ctx.fillRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
-      ctx.strokeRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
-      ctx.beginPath();
-      ctx.moveTo(origin.x + half, origin.y);
-      ctx.lineTo(origin.x + half, origin.y + armLenDisplay);
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = "#060707";
-    ctx.font = "9px monospace";
-    RULER_SCALES.forEach((scale, idx) => {
-      // idx 0 (cm) draws in the "outer" half -- above the bar for the x
-      // arm, left of the bar for the y arm; idx 1 (in) draws in the
-      // "inner" half -- below/right -- mirroring how real dual-marked
-      // rulers print one scale per edge.
-      rulerTicksForScale(scale).forEach((t) => {
-        const pos = t.mm * mmToDisplayPx;
-        const tickLen = t.isMajor ? RULER_TICK_MAJOR : RULER_TICK_MINOR;
-        ctx.lineWidth = t.isMajor ? 1.6 : 1;
-        ctx.beginPath();
-        if (horizontal) {
-          const x = origin.x + pos;
-          if (idx === 0) {
-            ctx.moveTo(x, origin.y);
-            ctx.lineTo(x, origin.y + tickLen);
-          } else {
-            ctx.moveTo(x, origin.y + RULER_BAR_THICKNESS);
-            ctx.lineTo(x, origin.y + RULER_BAR_THICKNESS - tickLen);
-          }
-        } else {
-          const y = origin.y + pos;
-          if (idx === 0) {
-            ctx.moveTo(origin.x, y);
-            ctx.lineTo(origin.x + tickLen, y);
-          } else {
-            ctx.moveTo(origin.x + RULER_BAR_THICKNESS, y);
-            ctx.lineTo(origin.x + RULER_BAR_THICKNESS - tickLen, y);
-          }
-        }
-        ctx.stroke();
-
-        if (!t.isMajor || t.majorNum === 0) return;
-        const label = String(t.majorNum);
-        if (horizontal) {
-          const x = origin.x + pos;
-          ctx.textAlign = "center";
-          ctx.textBaseline = idx === 0 ? "bottom" : "top";
-          ctx.fillText(label, x, idx === 0 ? origin.y - 2 : origin.y + RULER_BAR_THICKNESS + 2);
-        } else {
-          const y = origin.y + pos;
-          ctx.textAlign = idx === 0 ? "right" : "left";
-          ctx.textBaseline = "middle";
-          ctx.fillText(label, idx === 0 ? origin.x - 3 : origin.x + RULER_BAR_THICKNESS + 3, y);
-        }
-      });
-    });
-
-    // Unit tag at the far end of each scale row -- past the last tick,
-    // so it never collides with a numbered label near the origin.
-    ctx.font = "8px monospace";
-    ctx.fillStyle = "#565e60";
-    if (horizontal) {
-      ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.fillText("cm", origin.x + armLenDisplay + 3, origin.y + half);
-      ctx.textBaseline = "top";
-      ctx.fillText("in", origin.x + armLenDisplay + 3, origin.y + half);
-    } else {
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText("cm", origin.x + half, origin.y + armLenDisplay + 3);
-      ctx.fillText("in", origin.x + half, origin.y + armLenDisplay + 12);
-    }
-  }
-
-  function drawRuler() {
-    if (!state.ruler.visible) return;
-    const spec = rulerSpec();
-    if (!spec) return;
-    ensureRulerPosition(spec);
-
-    const s = getScale();
-    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
-    const armLenDisplay = spec.armLengthPx * s;
-    const mmToDisplayPx = spec.ppm * s;
-
-    ctx.save();
-    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "x");
-    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "y");
-    // Corner drag handle, drawn last so it sits on top of both arms.
-    ctx.fillStyle = "rgba(6, 7, 7, 0.85)";
-    ctx.beginPath();
-    ctx.arc(origin.x, origin.y, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function updateRulerUI() {
-    const available = currentPixelsPerMm() !== null;
-    rulerControls.hidden = !available;
-    if (!available) state.ruler.visible = false;
-    rulerToggleBtn.classList.toggle("is-active", state.ruler.visible);
-    rulerToggleBtn.setAttribute("aria-pressed", String(state.ruler.visible));
-  }
-
-  rulerToggleBtn.addEventListener("click", () => {
-    state.ruler.visible = !state.ruler.visible;
-    updateRulerUI();
-    render();
-  });
 
   function updateGridBoxUI() {
     const available = currentPixelsPerMm() !== null;
@@ -2198,29 +1980,10 @@
     if (state.panDrag) return; // the viewer-pan listener above already claimed this gesture
     if (state.pinchActive) return; // a second touch just landed -- see the pinch block above
 
-    // The ruler overlay (if visible) sits on top of every other
-    // interaction on every step it's available in -- hit-test it first
-    // so dragging it never gets shadowed by whatever the current step
-    // would otherwise do with this same click.
-    if (state.ruler.visible) {
-      const spec = rulerSpec();
-      if (spec) {
-        ensureRulerPosition(spec);
-        const dispPt = eventToDisplayPoint(evt);
-        if (pointInRulerDisplay(dispPt, spec)) {
-          const natPt = displayToNatural(dispPt);
-          state.ruler.dragging = true;
-          state.ruler.dragOffset = { dx: natPt.x - state.ruler.x, dy: natPt.y - state.ruler.y };
-          canvas.setPointerCapture(evt.pointerId);
-          render();
-          return;
-        }
-      }
-    }
-
-    // Same precedence as the ruler above, and for the same reason -- the
-    // grid box is a floating tool that sits on top of whatever the
-    // current step would otherwise do with this click.
+    // The grid box (if visible) sits on top of every other interaction on
+    // every step it's available in -- hit-test it first so dragging it
+    // never gets shadowed by whatever the current step would otherwise
+    // do with this same click.
     if (state.gridBox.visible) {
       const spec = gridBoxSpec();
       if (spec) {
@@ -2457,31 +2220,10 @@
   canvas.addEventListener("pointerup", endRoiDrag);
   canvas.addEventListener("pointercancel", endRoiDrag);
 
-  // Ruler overlay drag -- unlike the roi/repeat-mark drags above, this
-  // isn't gated to one currentStep, since the ruler stays available (and
+  // Grid box drag -- unlike the roi/repeat-mark drags above, this isn't
+  // gated to one currentStep, since the box stays available (and
   // draggable) across roi/orientation/analyze/results once calibration
   // is confirmed.
-  canvas.addEventListener("pointermove", (evt) => {
-    if (!state.ruler.dragging) return;
-    const spec = rulerSpec();
-    if (!spec) {
-      state.ruler.dragging = false;
-      return;
-    }
-    const natPt = displayToNatural(eventToDisplayPoint(evt));
-    state.ruler.x = clamp(natPt.x - state.ruler.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
-    state.ruler.y = clamp(natPt.y - state.ruler.dragOffset.dy, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
-    render();
-  });
-  function endRulerDrag(evt) {
-    if (!state.ruler.dragging) return;
-    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
-    state.ruler.dragging = false;
-  }
-  canvas.addEventListener("pointerup", endRulerDrag);
-  canvas.addEventListener("pointercancel", endRulerDrag);
-
-  // Grid box drag -- mirrors the ruler drag immediately above.
   canvas.addEventListener("pointermove", (evt) => {
     if (!state.gridBox.dragging) return;
     const spec = gridBoxSpec();
@@ -3474,7 +3216,6 @@
     state.cal = { points: [], knownDistance: null, unit: loadDefaultCalUnit(), pixelsPerMm: null, draggingIndex: null };
     state.calAutoDetectPending = false;
     state.calAutoDetected = false;
-    state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
     state.gridBox = { visible: false, unit: "in", x: null, y: null, dragging: false, dragOffset: null };
     state.roi = null;
     state.roiDrag = null;

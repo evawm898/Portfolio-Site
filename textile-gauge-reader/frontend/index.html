@@ -311,17 +311,12 @@
       <button type="button" id="zoomInBtn" class="tgr-zoom-controls__btn" aria-label="Zoom in">+</button>
       <button type="button" id="zoomResetBtn" class="tgr-zoom-controls__reset" aria-label="Reset zoom and position">Reset</button>
     </div>
-    <div class="tgr-ruler-controls" id="rulerControls" hidden title="Show a ruler scaled to your calibration, to check against the fabric -- drag it anywhere on the image">
-      <button type="button" id="rulerToggleBtn" class="tgr-ruler-controls__btn" aria-pressed="false">Ruler</button>
-    </div>
-
     <!-- Grid box: a draggable, to-scale (1in or 1cm square, from your
          calibration) overlay for counting stitches by eye and checking the
          tool's answer -- see #gridBoxPanel below for recording that count
          as a ground-truth observation. Available anywhere calibration is
-         set, same as the ruler above, and deliberately BEFORE analysis too
-         (see #gridBoxPanel) so a count isn't anchored to a prediction
-         you've already seen. -->
+         set, and deliberately BEFORE analysis too (see #gridBoxPanel) so
+         a count isn't anchored to a prediction you've already seen. -->
     <div class="tgr-gridbox-controls" id="gridBoxControls" hidden title="Show a to-scale square for counting stitches by eye -- drag it anywhere on the image">
       <button type="button" id="gridBoxToggleBtn" class="tgr-gridbox-controls__btn" aria-pressed="false">Grid</button>
       <button type="button" id="gridBoxUnitBtn" class="tgr-gridbox-controls__unit" hidden>1 in</button>
