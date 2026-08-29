@@ -304,6 +304,20 @@ UNCERTAIN_CONFIDENCE_THRESHOLD = 0.35  # confidence below this -> "uncertain" re
 N_CONSENSUS_PATCHES = 4              # overlapping sub-region bands analyzed per axis
 PATCH_OVERLAP_FRACTION = 0.5
 
+# Aspect-ratio sanity check (see _apply_aspect_ratio_sanity_check): plain
+# stockinette/jersey's own geometry keeps wales/inch : courses/inch in a
+# fairly narrow band (a knit stitch is normally somewhat WIDER than tall,
+# so wale count usually runs a bit BELOW course count per inch -- a
+# typical real-world range is roughly 0.5-1.1). This is a coarse physical-
+# plausibility floor/ceiling, not a tight "is this exactly jersey" check
+# -- it exists to catch genuinely impossible results (a stitch several
+# times wider than tall, which no real knitting produces) rather than to
+# second-guess an unusual-but-real gauge from rib, garter, or another
+# structure this same code path also serves. Deliberately wider than the
+# "roughly 0.5-1.1" typical range for that reason.
+PLAUSIBLE_WALE_COURSE_RATIO_MIN = 0.35
+PLAUSIBLE_WALE_COURSE_RATIO_MAX = 1.6
+
 # --- Phase consistency (_phase_consistency_evidence) ----------------------
 # For a candidate period, does every repeat marker land on the SAME kind
 # of local visual feature, or does it alternate between two distinct ones
@@ -641,6 +655,15 @@ def analyze_gauge(
         course_signal=course_signal,
         roi_area=float(w * h),
     )
+
+    # Physical-plausibility floor: catches a confidently-wrong result
+    # neither per-axis confidence nor the density cross-check above would
+    # (both can be fooled together -- see _apply_aspect_ratio_sanity_
+    # check's docstring). Runs BEFORE the generic confidence floor below
+    # so its more specific reason, when it fires, is what a low-confidence
+    # flag ends up carrying (that floor's `or` never overwrites an
+    # existing uncertain_reason).
+    wale, course = _apply_aspect_ratio_sanity_check(wale, course)
 
     # Generic confidence-floor uncertainty: independent of which pipeline
     # produced the result (v0.3 scorer or the restored course pipeline
@@ -2227,6 +2250,61 @@ def _finalize_axis_v3(
         status="uncertain" if uncertain else "confident",
         uncertain_reason=uncertain_reason,
     )
+
+
+def _apply_aspect_ratio_sanity_check(wale: AxisResult, course: AxisResult) -> Tuple[AxisResult, AxisResult]:
+    """
+    Physical-plausibility floor: no real knitting produces a stitch
+    several times wider than it is tall (or vice versa), so a reported
+    wale:course ratio far outside PLAUSIBLE_WALE_COURSE_RATIO_MIN/MAX is
+    evidence the detector locked onto something that isn't the stitch
+    repeat on ONE of the two axes -- most often wale, since that's the
+    axis with a documented history of harmonic/texture lock-on in this
+    project (see the README) -- even when that axis's own confidence
+    looked fine in isolation. Confidence in isolation can't catch this:
+    a detector can be internally consistent (strong autocorrelation,
+    tight patch agreement, a clean counted-column tally) and still be
+    confidently measuring the wrong thing, if the periodic structure it
+    locked onto (e.g. a fine color-transition pattern in variegated yarn)
+    is real and regular -- just not the stitch grid.
+
+    Deliberately never rewrites spacing_px -- exactly like every other
+    "uncertain" flag in this file, this surfaces doubt rather than
+    fabricating a corrected number (a real fix needs to know which axis
+    is actually wrong and by what mechanism, which this coarse ratio
+    check alone can't determine).
+
+    Both axes are flagged together (not just the more-extreme-looking
+    one): the ratio only tells you the PAIR is inconsistent with each
+    other, not which one of the two is at fault, so calling out only one
+    would be a guess dressed up as a diagnosis.
+    """
+    if wale.spacing_px is None or course.spacing_px is None:
+        return wale, course
+    if wale.spacing_px <= 0 or course.spacing_px <= 0:
+        return wale, course
+
+    # wales_per_inch / courses_per_inch == course_spacing_px / wale_spacing_px
+    # -- the calibration (px-per-mm) is the same constant on both sides of
+    # that ratio and cancels out exactly, so this needs no calibration
+    # input at all, unlike the per-inch values themselves.
+    ratio = course.spacing_px / wale.spacing_px
+    if PLAUSIBLE_WALE_COURSE_RATIO_MIN <= ratio <= PLAUSIBLE_WALE_COURSE_RATIO_MAX:
+        return wale, course
+
+    reason = (
+        f"Wale:course ratio ({ratio:.2f}) is outside the physically plausible range for knitting "
+        f"({PLAUSIBLE_WALE_COURSE_RATIO_MIN:g}-{PLAUSIBLE_WALE_COURSE_RATIO_MAX:g}) -- "
+        "one of these two axes likely locked onto something other than the stitch repeat. "
+        "Verify manually (e.g. with the grid box)."
+    )
+
+    def _flag(axis: AxisResult) -> AxisResult:
+        if axis.status == "uncertain":
+            return axis  # already flagged; don't clobber a more specific existing reason
+        return replace(axis, status="uncertain", uncertain_reason=reason)
+
+    return _flag(wale), _flag(course)
 
 
 def _apply_confidence_floor_uncertainty(axis: AxisResult) -> AxisResult:
@@ -4391,6 +4469,14 @@ def analyze_multi_roi(
         status=course_consensus.status,
         uncertain_reason=course_consensus.uncertain_reason,
     )
+
+    # Same physical-plausibility floor as the single-ROI path (see
+    # _apply_aspect_ratio_sanity_check) -- applied to the FINAL consensus
+    # pair, not to each region individually: this deliberately doesn't
+    # touch which regions the consensus above included/excluded (that's
+    # the outlier-rejection mechanism itself, a separate question from
+    # sanity-checking its output).
+    final_wale, final_course = _apply_aspect_ratio_sanity_check(final_wale, final_course)
 
     any_axis_ok = wale_consensus.spacing_px is not None or course_consensus.spacing_px is not None
     message = (
