@@ -1109,6 +1109,51 @@
   color: #060707;
 }
 
+/* Calibration popup -- position:fixed so it floats over the whole
+   viewport regardless of #viewer's own overflow:hidden clipping (fixed
+   descendants aren't clipped by an ancestor's overflow unless that
+   ancestor also establishes a transform/filter containing block, which
+   #viewer doesn't); JS sets left/top per-frame in positionCalPopup() to
+   track the two calibration points under pan/zoom. */
+.tgr-cal-popup {
+  position: fixed;
+  z-index: 6;
+  transform: translate(-50%, 12px); /* horizontally centered under the anchor point, offset below it */
+  background: rgba(15, 15, 15, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  min-width: 190px;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+.tgr-cal-popup__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tgr-cal-popup__row label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.tgr-cal-popup__row input[type="number"] {
+  width: 5.5rem;
+}
+.tgr-cal-popup__ppm {
+  margin: 0.4rem 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--petrol-bright);
+}
+.tgr-cal-popup__spanhint {
+  margin: 0.35rem 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #e0b830; /* matches the warning tone used elsewhere (e.g. inferred-loop markers), not an error */
+}
+
 @media (max-width: 600px) {
   .tgr-topbar,
   .tgr-intro,

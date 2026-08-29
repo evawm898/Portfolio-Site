@@ -85,6 +85,33 @@
   // wheel notch's magnitude (~100).
   const MOUSE_WHEEL_MIN_DELTA = 20;
 
+  // Calibration: assumed click-placement error (screen/source-image px --
+  // treated as natural-image px here, same as every other stored
+  // coordinate) and the error-fraction threshold above which the short-
+  // span hint shows. Expressed as a ratio (error / span) rather than a
+  // fixed pixel span so it stays correct at any image resolution: a
+  // 300px span and a 3000px span at 10x the megapixel count carry the
+  // same relative click-error risk.
+  const CAL_ASSUMED_CLICK_ERROR_PX = 3;
+  const CAL_SHORT_SPAN_ERROR_THRESHOLD = 0.01; // ~1%
+  const CAL_UNIT_STORAGE_KEY = "tgr_calibration_unit";
+
+  function loadDefaultCalUnit() {
+    try {
+      const saved = localStorage.getItem(CAL_UNIT_STORAGE_KEY);
+      return saved === "in" || saved === "cm" ? saved : "cm";
+    } catch {
+      return "cm"; // localStorage can throw in private-browsing/sandboxed contexts -- never fatal here
+    }
+  }
+  function saveDefaultCalUnit(unit) {
+    try {
+      localStorage.setItem(CAL_UNIT_STORAGE_KEY, unit);
+    } catch {
+      // Purely a convenience (remembering the last-used unit for next time) -- never required.
+    }
+  }
+
   // --- DOM refs -----------------------------------------------------
   const stepEls = Object.fromEntries(
     [...document.querySelectorAll(".tgr-step")].map((el) => [el.dataset.step, el])
@@ -119,9 +146,11 @@
 
   const calStatus = document.getElementById("calStatus");
   const calAutoHint = document.getElementById("calAutoHint");
+  const calPopup = document.getElementById("calPopup");
   const knownDistanceInput = document.getElementById("knownDistance");
   const unitSelect = document.getElementById("unitSelect");
   const ppmPreview = document.getElementById("ppmPreview");
+  const calSpanHint = document.getElementById("calSpanHint");
   const calRedoBtn = document.getElementById("calRedo");
   const calConfirmBtn = document.getElementById("calConfirm");
   const calError = document.getElementById("calError");
@@ -203,6 +232,7 @@
       knownDistance: null,
       unit: "cm",
       pixelsPerMm: null,
+      draggingIndex: null, // 0 or 1 while a calibration point is being dragged, else null
     },
     calAutoDetectPending: false, // true while a /detect-ruler request for the CURRENT image is in flight --
                                   // guards against a late response overwriting points the user has since
@@ -777,6 +807,7 @@
 
     if (state.currentStep === "calibrate") {
       drawCalibration();
+      positionCalPopup(); // keep the distance-entry popup pinned to the points under pan/zoom/resize
     } else if (state.currentStep === "roi") {
       drawRoi(true);
     } else if (state.currentStep === "orientation" || state.currentStep === "analyze") {
@@ -837,9 +868,19 @@
       drawLabel(`${pxDist.toFixed(1)} px`, midX + 8, midY - 8);
     }
     pts.forEach((p, i) => {
+      const isDragging = state.cal.draggingIndex === i;
+      const r = isDragging ? 7 : 5;
+      // White ring first -- both a drag affordance (points are draggable
+      // once placed, unlike a plain click target) and contrast insurance
+      // against a busy/dark background near the point.
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 2, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.fillStyle = WALE_COLOR;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#060707";
       ctx.font = "bold 10px sans-serif";
@@ -1180,7 +1221,7 @@
       stage.hidden = false;
       zoomControls.hidden = false;
       // Reset any prior interaction state for a fresh image.
-      state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null };
+      state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null, draggingIndex: null };
       state.calAutoDetectPending = false;
       state.calAutoDetected = false;
       state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
@@ -1232,6 +1273,39 @@
     knownDistanceInput.value = "";
     calAutoHint.hidden = true;
     calAutoHint.textContent = "";
+    calPopup.hidden = true;
+    calSpanHint.hidden = true;
+  }
+
+  function calibrationSpanPx() {
+    if (state.cal.points.length !== 2) return null;
+    return Math.hypot(
+      state.cal.points[1].x - state.cal.points[0].x,
+      state.cal.points[1].y - state.cal.points[0].y
+    );
+  }
+
+  // Short-span hint: click-placement error is a roughly FIXED number of
+  // pixels regardless of how far apart the two points are, so its effect
+  // on the resulting px/inch is a ratio (error / span) -- a hint text
+  // threshold expressed that way stays equally valid on a 500px photo
+  // and a 5000px one, unlike a fixed "warn under 200px" rule would.
+  function updateSpanHint() {
+    const span = calibrationSpanPx();
+    if (span === null || span <= 0) {
+      calSpanHint.hidden = true;
+      return;
+    }
+    const errorFraction = CAL_ASSUMED_CLICK_ERROR_PX / span;
+    if (errorFraction <= CAL_SHORT_SPAN_ERROR_THRESHOLD) {
+      calSpanHint.hidden = true;
+      return;
+    }
+    calSpanHint.textContent =
+      `Short span (${span.toFixed(0)}px) -- a ${CAL_ASSUMED_CLICK_ERROR_PX}px click error here is ` +
+      `≈${(errorFraction * 100).toFixed(1)}% of the calibration. A longer span (e.g. spanning more of a ` +
+      `ruler) is more accurate.`;
+    calSpanHint.hidden = false;
   }
 
   function updateCalibrationUI() {
@@ -1239,24 +1313,25 @@
       calStatus.textContent =
         state.cal.points.length === 0 ? "Click the first point." : "Click the second point.";
       calConfirmBtn.disabled = true;
-      ppmPreview.textContent = "";
+      calPopup.hidden = true;
       return;
     }
-    calStatus.textContent = "Enter the known distance between the two points, then confirm.";
+    calStatus.textContent = "Enter the known distance in the popup, then confirm (you can still drag either point).";
+    calPopup.hidden = false;
+    positionCalPopup();
+    updateSpanHint();
     updatePpmPreview();
   }
 
   function updatePpmPreview() {
     const known = parseFloat(knownDistanceInput.value);
-    if (state.cal.points.length === 2 && known > 0) {
-      const pxDist = Math.hypot(
-        state.cal.points[1].x - state.cal.points[0].x,
-        state.cal.points[1].y - state.cal.points[0].y
-      );
-      const unitToMm = { mm: 1, cm: 10, in: 25.4 };
+    const span = calibrationSpanPx();
+    if (span !== null && known > 0) {
+      const unitToMm = { cm: 10, in: 25.4 };
       const mm = known * unitToMm[unitSelect.value];
-      const ppm = pxDist / mm;
-      ppmPreview.textContent = `≈ ${ppm.toFixed(3)} px/mm`;
+      const ppm = span / mm;
+      const perInch = ppm * 25.4;
+      ppmPreview.textContent = `≈ ${perInch.toFixed(1)} px/inch  (${ppm.toFixed(3)} px/mm)`;
       calConfirmBtn.disabled = false;
     } else {
       ppmPreview.textContent = "";
@@ -1265,7 +1340,30 @@
   }
 
   knownDistanceInput.addEventListener("input", updatePpmPreview);
-  unitSelect.addEventListener("change", updatePpmPreview);
+  unitSelect.addEventListener("change", () => {
+    saveDefaultCalUnit(unitSelect.value);
+    updatePpmPreview();
+  });
+
+  // Keeps the popup visually anchored to the calibration points' midpoint
+  // under pan/zoom/window-resize -- called from render() while on the
+  // calibrate step, same as every other overlay that tracks image
+  // coordinates. Uses the canvas's own live bounding rect (already
+  // reflecting the current pan/zoom CSS transform) the same way
+  // eventToDisplayPoint()'s inverse does, so this needs no separate
+  // transform math of its own.
+  function positionCalPopup() {
+    if (state.cal.points.length < 2 || calPopup.hidden) return;
+    const rect = canvas.getBoundingClientRect();
+    const zoom = state.view.zoom || 1;
+    const mid = {
+      x: (state.cal.points[0].x + state.cal.points[1].x) / 2,
+      y: (state.cal.points[0].y + state.cal.points[1].y) / 2,
+    };
+    const dispMid = naturalToDisplay(mid);
+    calPopup.style.left = `${rect.left + dispMid.x * zoom}px`;
+    calPopup.style.top = `${rect.top + dispMid.y * zoom}px`;
+  }
 
   // Automatic ruler calibration detection (see backend /detect-ruler,
   // which wraps analysis.gauge_analysis.detect_ruler_calibration). Runs
@@ -1339,6 +1437,7 @@
 
   calRedoBtn.addEventListener("click", () => {
     state.cal.points = [];
+    state.cal.draggingIndex = null;
     state.calAutoDetectPending = false; // user is taking over manually -- don't let a late auto-detect response overwrite this
     resetCalibrationUI();
     render();
@@ -1865,7 +1964,23 @@
     }
 
     if (state.currentStep === "calibrate") {
-      if (state.cal.points.length >= 2) return; // must Redo first
+      if (state.cal.points.length === 2) {
+        // Both points already placed -- hit-test for a drag instead of
+        // ignoring the click outright, so either point can be nudged
+        // (with the popup's px/inch updating live) without needing
+        // "Redo Points" to start over.
+        const dispPt = eventToDisplayPoint(evt);
+        for (let i = 0; i < 2; i++) {
+          const p = naturalToDisplay(state.cal.points[i]);
+          if (Math.hypot(dispPt.x - p.x, dispPt.y - p.y) <= HANDLE_HIT_RADIUS) {
+            state.cal.draggingIndex = i;
+            canvas.setPointerCapture(evt.pointerId);
+            render();
+            return;
+          }
+        }
+        return; // missed both points -- ignored, same as the old "must Redo first" behavior
+      }
       state.calAutoDetectPending = false; // user is marking manually -- don't let a late auto-detect response overwrite this
       const pt = displayToNatural(eventToDisplayPoint(evt));
       state.cal.points.push(pt);
@@ -2080,6 +2195,24 @@
   }
   canvas.addEventListener("pointerup", endRulerDrag);
   canvas.addEventListener("pointercancel", endRulerDrag);
+
+  // Calibration point drag -- see the calibrate-step pointerdown branch
+  // above for the hit-test that starts this.
+  canvas.addEventListener("pointermove", (evt) => {
+    if (state.cal.draggingIndex === null) return;
+    const pt = displayToNatural(eventToDisplayPoint(evt));
+    state.cal.points[state.cal.draggingIndex] = pt;
+    updateCalibrationUI(); // live px/inch + span hint as the point moves
+    render();
+  });
+  function endCalDrag(evt) {
+    if (state.cal.draggingIndex === null) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.cal.draggingIndex = null;
+    render();
+  }
+  canvas.addEventListener("pointerup", endCalDrag);
+  canvas.addEventListener("pointercancel", endCalDrag);
 
   // --- Step 4: Orientation -----------------------------------------------
 
@@ -3032,7 +3165,7 @@
     state.imageHashPromise = null;
     state.naturalWidth = 0;
     state.naturalHeight = 0;
-    state.cal = { points: [], knownDistance: null, unit: "cm", pixelsPerMm: null };
+    state.cal = { points: [], knownDistance: null, unit: loadDefaultCalUnit(), pixelsPerMm: null, draggingIndex: null };
     state.calAutoDetectPending = false;
     state.calAutoDetected = false;
     state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
@@ -3074,6 +3207,7 @@
   });
 
   // --- Init ---------------------------------------------------------
+  unitSelect.value = loadDefaultCalUnit();
   goToStep("upload");
   checkServiceHealth();
   setupExportLinks();

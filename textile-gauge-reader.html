@@ -69,19 +69,9 @@
     <!-- Step 2: Calibrate -->
     <section class="tgr-step-panel" data-panel="calibrate" hidden>
       <h2>Calibrate scale</h2>
-      <p class="tgr-hint">Click two points on the image that span a <strong>known physical distance</strong> (e.g. two marks on a ruler).</p>
+      <p class="tgr-hint">Click two points on the image that span a <strong>known physical distance</strong> (e.g. two marks on a ruler). Once placed, drag either point to adjust it -- a popup by the points is where you enter the distance.</p>
       <p class="tgr-status" id="calStatus">Click the first point.</p>
       <p class="tgr-hint" id="calAutoHint" hidden></p>
-      <div class="tgr-field-row">
-        <label for="knownDistance">Known distance</label>
-        <input type="number" id="knownDistance" min="0" step="any" placeholder="e.g. 50">
-        <select id="unitSelect">
-          <option value="mm">mm</option>
-          <option value="cm" selected>cm</option>
-          <option value="in">in</option>
-        </select>
-      </div>
-      <p class="tgr-hint" id="ppmPreview"></p>
       <div class="tgr-button-row">
         <button id="calRedo" class="tgr-btn tgr-btn--secondary" type="button">Redo Points</button>
         <button id="calConfirm" class="tgr-btn" type="button" disabled>Confirm Calibration</button>
@@ -327,6 +317,23 @@
     </div>
     <div class="tgr-ruler-controls" id="rulerControls" hidden title="Show a ruler scaled to your calibration, to check against the fabric -- drag it anywhere on the image">
       <button type="button" id="rulerToggleBtn" class="tgr-ruler-controls__btn" aria-pressed="false">Ruler</button>
+    </div>
+
+    <!-- Calibration popup: appears anchored near the two calibration points
+         once both are placed (see positionCalPopup in the JS) -- distance/
+         unit entry and the live px/inch readout live here, next to the
+         points themselves, rather than in the always-visible left panel. -->
+    <div class="tgr-cal-popup" id="calPopup" hidden>
+      <div class="tgr-cal-popup__row">
+        <label for="knownDistance">Distance</label>
+        <input type="number" id="knownDistance" min="0" step="any" placeholder="e.g. 10">
+        <select id="unitSelect">
+          <option value="cm" selected>cm</option>
+          <option value="in">in</option>
+        </select>
+      </div>
+      <p class="tgr-cal-popup__ppm" id="ppmPreview"></p>
+      <p class="tgr-cal-popup__spanhint" id="calSpanHint" hidden></p>
     </div>
   </section>
 
