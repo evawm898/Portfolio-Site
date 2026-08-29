@@ -1693,6 +1693,98 @@ Locally, you can also just open the SQLite file directly:
 sqlite3 textile-gauge-reader/data/corrections.db "select * from corrections;"
 ```
 
+## Investigated and rejected: user-anchored template matching
+
+Standalone scratch experiment, never wired into `analysis/gauge_analysis.py`
+or the app — recorded here so the negative result isn't relearned later.
+Motivation: this project's single best real-photo result ever
+(`count_repeats_by_template_match`, 5.04 WPI against a true 5.0) came from
+template matching, not the periodicity pipeline. The question was whether
+that generalizes into something worth shipping. Tested against the two real
+fixtures (`real_jersey_sample.jpg`, true 5.0 WPI/7.2 CPI; `sarahmaker-
+knitting-gauge.jpg`, true 4.0 WPI/5.0 CPI). It didn't clear the bar, on
+either axis, for reasons worth keeping on record.
+
+**Wale: the headline number was one lucky anchor, not a real effect.**
+Four hand-picked anchors on jersey looked good (0.8%–14.7% error). A dense
+grid of 72 anchors across the same photo told a different story: the
+**median** anchor gave 14.7% error — *worse* than the current pipeline's
+‑5.6%. The 5.04/0.8% result that motivated this whole investigation was the
+best of a small, eye-picked sample, not representative of a typical click.
+Refining the template by averaging the top-K matches (as originally
+specified) made things worse in most cases, not better — it blurs in
+false-positive phase/texture and broadens the match. On teal, anchor
+placement alone swung wale from ‑13% to +55–66% error (an ~80%-of-true
+spread across 4 anchors) purely by which stitch got clicked.
+
+**A real correlate of the wale drift exists, but it's weak and doesn't
+transfer.** An anchor's half-pitch self-similarity (normalized
+cross-correlation between its template and a copy of itself shifted by half
+a wale-pitch) predicts drift direction: an anchor that resembles its own
+half-pitch neighbor over-counts. At 4 anchors this looked like a clean
+monotonic ranking; at 72 anchors the real relationship is r=0.338 (p=0.004),
+r²≈0.11 — real and worth knowing, but explaining ~10% of the variance is not
+"reliable enough to threshold on." It filters out the *worst* overcounts
+(almost nothing scores >20% error at strongly negative NCC) without
+separating good from bad in the middle of the distribution. Tested against
+teal's failure specifically (the hypothesis being that a 2x sub-lattice
+lock-on looks like high self-similarity in general): r=0.065 (p=0.65),
+indistinguishable from no relationship. The two fabrics' overcounting
+mechanisms are not the same thing, and one diagnostic doesn't catch both.
+
+**Course looked robust to anchor placement — until the test stopped
+cheating.** A dense-grid course readout on jersey (72 anchors) gave a
+median 7.5% error against the current pipeline's ‑53.1% harmonic lock-on,
+with 99% of anchors under 20% error — a dramatic, reproducible-looking win.
+It did not survive an honest re-test. The good numbers depended on sizing
+the match template from the *true, known* gauge (`px_per_inch / true_wpi`)
+to decide how fine a feature to search for — information a deployed
+feature does not have; all it has is the *existing* (possibly already
+wrong) automatic estimate. Re-run using only that: reusing the shipped
+walking-match core (`_walk_template_matches`), seeded and step-sized from
+the existing course reading, just reproduces the same wrong answer, because
+the walk's own search window is derived from the number it's supposed to
+correct. Switching to a free, unseeded whole-ROI scan doesn't fix this
+either — the result becomes acutely sensitive to template size, and there
+is no single default size that works on both fixtures without peeking at
+ground truth: a small template (~13px) recovers jersey's true course
+period, but on teal it locks onto the same yarn ply-twist sub-texture
+described below (65–127% error on 3 of 4 anchors); a larger template
+(~27px) is fine on teal but reproduces jersey's original failure. A
+multi-scale, self-consistency-based scale picker was considered and
+explicitly not built, because validating a scale-selection heuristic
+against the same two photos used to discover the problem is the identical
+trap one level down.
+
+**Two independent, real mechanisms came out of this that are worth keeping
+regardless of the template-matching verdict:**
+- **Yarn ply-twist on the teal fixture.** A direct intensity-profile
+  measurement across the fabric shows a genuine, clean periodic feature at
+  roughly double the true stitch frequency (~7.2 peaks/inch vs. the
+  hand-counted 4 wales/inch) — this is *not* rib structure (there's no
+  visible knit/purl alternation in a gridded zoom of the photo; it's
+  continuous rope/braid-like texture), and it's the same trap that once
+  fooled a careful direct pixel measurement on this exact photo (see
+  "A real second photo..." above). It's what both the wale-axis anchor
+  sensitivity and the course-axis template-size sensitivity above are
+  actually running into on this fixture.
+- **Color pooling on variegated yarn** (see "the column count is
+  region-dependent by 5x" investigation elsewhere in this history):
+  variegated-yarn color transitions that are coherent across multiple
+  rows defeat multi-row consensus defenses, because the noise isn't
+  independent row-to-row the way the consensus math assumes.
+
+**Bar for revisiting.** Not "a better anchor" and not "a smarter refinement
+step" — both were tried and both are secondary to the real blocker, which
+is template *scale* selection. Worth reopening only with: (1) a
+ground-truth-free way to pick or validate template scale at runtime — some
+measurable self-consistency property of the matches themselves (never
+accuracy, which isn't available outside a test), and (2) validation against
+more than two photos, so a scale heuristic can't just be a threshold fitted
+to jersey and teal the way the wale/course numbers above almost were.
+Nothing from this investigation is in the codebase; it lives only in this
+writeup.
+
 ## Known V0 limitations
 
 - Orientation is user-specified, not auto-detected.
