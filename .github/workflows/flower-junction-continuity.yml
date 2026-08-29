@@ -1,0 +1,51 @@
+# Build gate: every junction member reaches the structure BY CONSTRUCTION (free-end gate).
+#
+# The connectedness gate counts detached bodies; a member attached to its petal above and
+# dangling below is ONE body and a print hazard at the same time. This gate reads the SDF
+# junction skeleton (instrumented flower-sdf.js) and asserts a single shared-endpoint
+# component, no disallowed terminals, and the area rule at every join. It runs against the
+# SPINE law only: against the shipped `current` law it is RED BY DESIGN (strand chains end
+# on the lathe's surface by proximity, not by constructed joins — the defect the spine law
+# exists to fix). This workflow merged AHEAD of the spine law: while ?junctionLaw=spine
+# throws "unknown approachLaw" the tool reports the tracked xfail (#106) and exits green;
+# it fails hard the moment the law lands with the marker still set. See the tool's header.
+name: flower-junction-continuity
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower-presets.js
+      - flower.html
+      - tools/verify-junction-continuity.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/flower-junction-continuity.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower-presets.js
+      - flower.html
+      - tools/verify-junction-continuity.mjs
+      - tools/chromium-harness.mjs
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every spine-law member must reach the structure by construction
+        run: node tools/verify-junction-continuity.mjs --law spine

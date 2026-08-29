@@ -136,6 +136,11 @@ const TAIL_FRAC = 0.08;       // "the lowest 8%" of the model's height, for the 
 // No row here is either. Adding one means re-measuring the band, not widening it.
 const STEM_ASPECT_MIN = 0.65;
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
+// --only <substr>: run only rows whose label contains the substring. A dev convenience for
+// iterating on one row family (e.g. --only "SPINE LAW"); CI runs without it, so the filter
+// can never narrow what the gate actually gates.
+const _onlyIdx = process.argv.indexOf('--only');
+const ONLY = _onlyIdx >= 0 ? process.argv[_onlyIdx + 1] : null;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
 // The registry is the source of truth for what a control is and what its default is, so
@@ -197,6 +202,33 @@ const CONFIGS = [
   { label: 'LOBED 4 + voronoi (partition region seams + mirror midline)', stem: true, set: [
     { id: 'infillType', value: 'voronoi', evt: 'change' }, { id: 'cleftDepth', value: '0.55' },
     { id: 'cleftLobes', value: '4' }, { id: 'cleftWidth', value: '0.3' }] },
+
+  // ===== SPINE LAW (?junctionLaw=spine) — the continuous-spine junction ==========
+  // The staggered-join construction (docs/flower-continuous-spine-proposal.md, Eva's Q3
+  // ruling) deletes the lathe as structure, so nothing axisymmetric carries a member
+  // that stops short. These rows exercise the states the discovery flagged as surviving
+  // ONLY by the lathe today: the low member counts, where the arrival circle is too
+  // sparse for field-blending to bridge (default 3 spines: worst end gap 0.0762 u vs
+  // blend k 0.0390 u — free ends without a trunk). The 2-petal row is the minimal merge
+  // tree (one Y-join); tube 0 is the thinnest members the law can be fed.
+  // These rows were written BEFORE the spine law existed and were recorded RED against
+  // ?junctionLaw=spine (builder throws "unknown approachLaw") — the gate has been seen
+  // to fail. They merged AHEAD of the law (gates-first), so each carries `xfail: 106`,
+  // the tracking issue for the pending law: while the law is absent the row cannot even
+  // build and the xfail keeps the gate green; the moment it exports ONE PIECE the xpass
+  // FAILS HARD, and the PR landing the law must delete these markers in the same commit
+  // (this gate's standard xfail lifecycle, stated in the header).
+  // NOTE the free-end property itself is NOT this gate's to see (a dangling member is
+  // one connected body) — that is tools/verify-junction-continuity.mjs. These rows prove
+  // the spine's voxel connectedness, the property this gate does measure.
+  { label: 'SPINE LAW: bare 3-petal (shipped default counts)', stem: false, law: 'spine', xfail: 106,
+    set: [...BARE, { id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '4' }] },
+  { label: 'SPINE LAW: radial 2 petals, bare (minimal merge tree)', stem: false, law: 'spine', xfail: 106,
+    set: [...BARE, { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '2' }] },
+  { label: 'SPINE LAW: radial 6 petals, bare (Lily/Poppy count)', stem: false, law: 'spine', xfail: 106,
+    set: [...BARE, { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '6' }] },
+  { label: 'SPINE LAW: base (9 + stem + sepals)', stem: true, law: 'spine', xfail: 106, set: [] },
+  { label: 'SPINE LAW: tube 0 + stem (thinnest members)', stem: true, law: 'spine', xfail: 106, set: [{ id: 'tube', value: '0' }] },
 
   // ===== BARE BLOOM — the state the product actually ships in =====================
   // Every row above sets a stem, sepals, or the migration override, so every row above
@@ -509,8 +541,8 @@ await page.route('**cdn.jsdelivr.net/**', (route) => {
 // inventory that every new row has to remember to extend — and did not: `cleftDepth` /
 // `cleftLobes` / `cleftWidth` from the LOBED row leaked into everything after it. A reload
 // costs a few seconds a row and cannot rot.
-async function freshPage() {
-  await page.goto(`http://127.0.0.1:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
+async function freshPage(law) {
+  await page.goto(`http://127.0.0.1:${port}/flower.html${law ? `?junctionLaw=${law}` : ''}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
   // Advanced, and open the Make accordion so the export button is clickable.
   await page.evaluate(() => {
@@ -572,7 +604,16 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'flower-conn-'));
 const results = [];
 const validity = [];   // harness-validity failures — never suppressed by an xfail
 for (const cfg of CONFIGS) {
-  await freshPage();
+  if (ONLY && !cfg.label.includes(ONLY)) continue;
+  try {
+    await freshPage(cfg.law);
+  } catch (e) {
+    // The page never became ready — under ?junctionLaw=<missing law> the build throws and
+    // the readout never appears. That is the ROW failing (xfail-able when marked, a hard
+    // FAIL when not), not the harness losing validity: the harness did its job.
+    results.push({ cfg, label: cfg.label, ok: false, note: `page never became ready: ${String(e && e.message || e).split('\n')[0]}` });
+    continue;
+  }
   if (cfg.presetSlug) {
     // Load the preset by clicking its gallery cell — the real applyDesign path.
     const clicked = await page.evaluate((slug) => {
@@ -633,6 +674,7 @@ fs.rmSync(tmp, { recursive: true, force: true });
 
 // ---- VALIDITY 2: tail probe. Every row declares the shape of its own underside. ----
 for (const r of results) {
+  if (r.tailXZ === undefined) continue;   // no export happened; the row already records its failure (never a silent pass — its ok is false)
   const want = r.cfg.stem;
   if (typeof want !== 'boolean') { validity.push(`${r.label}: row declares no \`stem\` — the tail probe has nothing to check`); continue; }
   if (!isFinite(r.tailXZ)) { validity.push(`${r.label}: tail probe returned NaN (${r.tailVerts} vertices in the lowest ${TAIL_FRAC * 100}%)`); continue; }
@@ -642,6 +684,7 @@ for (const r of results) {
 }
 // ---- VALIDITY 3: pairwise triangle comparison, never a global reference. ----
 for (const r of results) {
+  if (r.tailXZ === undefined) continue;   // no export — see the tail-probe guard above
   if (!r.cfg.moreTrisThan) continue;
   const other = results.find((x) => x.label === r.cfg.moreTrisThan);
   if (!other) { validity.push(`${r.label}: pair partner "${r.cfg.moreTrisThan}" produced no result`); continue; }
