@@ -628,6 +628,7 @@ async def analyze_multi(
             image_bgr=image, rois=rois,
             orientation=orientation,  # type: ignore[arg-type]
             structure=structure,  # type: ignore[arg-type]
+            pixels_per_mm=pixels_per_mm,
         )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Multi-ROI analysis raised an unexpected exception")

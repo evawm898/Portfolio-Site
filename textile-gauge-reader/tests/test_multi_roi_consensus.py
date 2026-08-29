@@ -324,6 +324,128 @@ def test_wale_consensus_prefers_counted_spacing_when_trustworthy(monkeypatch):
     assert by_label["B"].wale.spacing_px == 12.0
 
 
+def test_implausible_ratio_region_excluded_before_consensus_reproduces_the_variegated_yarn_report(monkeypatch):
+    # Regression test for the real bug report that motivated the gate:
+    # a variegated-rainbow-yarn photo where one region's wale detector
+    # locked onto color-transition periodicity (29.54 wales/in) while
+    # another region got it right (~6.24 wales/in) and a third agreed
+    # with the correct one -- but cross-region MEDIAN consensus excluded
+    # the correct region as the "outlier" because the two wrong regions
+    # happened to agree with each other. The per-region aspect-ratio gate
+    # is meant to catch region B on its own, before the vote, regardless
+    # of what the other regions say.
+    fake_wale = {"A": 6.3, "B": 0.86, "C": 6.24}   # B's wale badly wrong (matches the reported 0.86mm-scale spacing)
+    fake_course = {"A": 3.6, "B": 2.51, "C": 3.58}  # course reads roughly consistent across all three, per the report
+    labels_by_x = {0: "A", 100: "B", 200: "C"}
+
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+        label = labels_by_x[roi[0]]
+        axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.7)
+        return GaugeAnalysisResult(
+            success=True, message="", wale=axis(fake_wale[label]), course=axis(fake_course[label]),
+            roi_width_px=roi[2], roi_height_px=roi[3],
+        )
+
+    monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)
+    monkeypatch.setattr(gauge_analysis, "_wale_count_candidate", lambda lattice: (None, 0.0))
+
+    image = make_synthetic_knit(width=300, height=100)
+    rois = [
+        {"label": label, "x": i * 100, "y": 0, "width": 90, "height": 90, "source": "auto"}
+        for i, label in enumerate(["A", "B", "C"])
+    ]
+    result = analyze_multi_roi(image, rois, orientation="vertical")
+
+    # B is excluded from wale consensus on its own merits (implausible
+    # ratio: 2.51/0.86 = 2.92) -- A and C, which agree with each other
+    # and are individually plausible, form the consensus instead. Without
+    # the gate, the old median-based logic alone would have made B and
+    # one of {A, C} outvote the other (whichever pair happens to be
+    # numerically closer), exactly the reported failure.
+    assert "B" not in result.wale_consensus.included_labels
+    assert set(result.wale_consensus.included_labels) == {"A", "C"}
+
+    # The ratio gate is symmetric (excludes BOTH axes for that region --
+    # see the module comment above the gate): B is excluded from course
+    # consensus too, even though its course value alone looks plausible
+    # relative to A/C's course values.
+    assert "B" not in result.course_consensus.included_labels
+
+    # B's own numbers are never rewritten -- only whether it counts
+    # toward the vote -- and its per-region wale result is flagged so a
+    # human looking at Developer Diagnostics can see why.
+    by_label = {m.label: m for m in result.per_roi}
+    assert by_label["B"].wale.spacing_px == 0.86
+    assert by_label["B"].wale.status == "uncertain"
+    assert "physically plausible" in by_label["B"].wale.uncertain_reason
+
+
+def test_loop_lattice_absolute_density_implausible_region_excluded_from_wale_only(monkeypatch):
+    # The second, complementary gate: a region can have a wale:course
+    # RATIO that looks fine (both axes wrong in the same proportion, or
+    # just coincidentally balanced) while still being absurd in absolute
+    # terms -- e.g. 21 loop-lattice-counted columns packed into a ~1in
+    # region. This needs pixels_per_mm (an absolute per-inch value can't
+    # be derived from a pixel ratio alone), threaded through analyze_
+    # multi_roi's optional parameter.
+    class FakeLattice:
+        def __init__(self, wale_spacing_px, column_count):
+            self.wale_spacing_px = wale_spacing_px
+            self.column_count = column_count
+            self.column_support_counts = [column_count] * column_count
+            self.row_count = 6
+            self.lattice_consistency = 0.9
+
+    # At pixels_per_mm=4.0 (25.4 * 4.0 = 101.6 px/inch): a 2px spacing is
+    # 50.8 wales/in -- absurd -- while 15px is 6.77 wales/in, ordinary.
+    # Each region's course value is chosen to keep its own wale:course
+    # RATIO plausible (so the separate ratio gate does NOT fire here --
+    # this test isolates the absolute-density gate specifically): A's
+    # 2.0px wale pairs with a 3.0px course (ratio 1.5); B's 15.0px wale
+    # pairs with a 20.0px course (ratio 1.33).
+    absurd = FakeLattice(wale_spacing_px=2.0, column_count=21)
+    ordinary = FakeLattice(wale_spacing_px=15.0, column_count=6)
+    fake_course = {0: 3.0, 100: 20.0}
+
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+        axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.7)
+        wale_periodicity_px = 2.0 if roi[0] == 0 else 15.0
+        return GaugeAnalysisResult(
+            success=True, message="", wale=axis(wale_periodicity_px), course=axis(fake_course[roi[0]]),
+            roi_width_px=roi[2], roi_height_px=roi[3],
+        )
+
+    fake_lattices = {0: absurd, 100: ordinary}
+
+    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None):
+        return fake_lattices[roi[0]]
+
+    monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)
+    monkeypatch.setattr(gauge_analysis, "analyze_loop_lattice_experiment", fake_loop_lattice)
+
+    image = make_synthetic_knit(width=300, height=100)
+    rois = [
+        {"label": "A", "x": 0, "y": 0, "width": 90, "height": 90, "source": "auto"},
+        {"label": "B", "x": 100, "y": 0, "width": 90, "height": 90, "source": "auto"},
+    ]
+    result = analyze_multi_roi(image, rois, orientation="vertical", pixels_per_mm=4.0)
+
+    by_label = {m.label: m for m in result.per_roi}
+    assert by_label["A"].wale_source == "loop_count"  # both trustworthy enough to prefer counting
+    assert by_label["B"].wale_source == "loop_count"
+
+    assert "A" not in result.wale_consensus.included_labels  # the absurd-density region
+    assert by_label["A"].wale.status == "uncertain"
+    assert "physically plausible" in by_label["A"].wale.uncertain_reason
+
+    # Without pixels_per_mm, the density gate can't evaluate anything (an
+    # absolute per-inch value needs calibration) and is skipped entirely
+    # -- never fails permissively toward exclusion, genuinely inert.
+    result_no_calibration = analyze_multi_roi(image, rois, orientation="vertical")
+    by_label2 = {m.label: m for m in result_no_calibration.per_roi}
+    assert by_label2["A"].wale.status != "uncertain" or "physically plausible" not in (by_label2["A"].wale.uncertain_reason or "")
+
+
 def test_primary_region_is_never_an_outlier_on_every_axis_it_has(monkeypatch):
     # Regression test for a real bug: when wale's and course's inlier sets
     # don't overlap at all (a real, observed case -- e.g. the regions that
@@ -338,6 +460,22 @@ def test_primary_region_is_never_an_outlier_on_every_axis_it_has(monkeypatch):
     # unconditional "first region" fallback would have picked). B/C/D
     # cluster together on wale only; E/F/G cluster together on course
     # only -- the two inlier sets share no region at all.
+    #
+    # These per-region wale/course pairs are deliberately NOT physically
+    # plausible (e.g. B: wale=10.0, course=2.0 -- a 0.2 ratio, nowhere
+    # near real knitting) -- this dataset exists purely to force two
+    # disjoint median-based clusters for testing PRIMARY-region fallback
+    # selection, a different mechanism from the per-region aspect-ratio/
+    # density gates (see analyze_multi_roi's gating comment). Disable
+    # those gates for this test rather than contort the fixture to
+    # satisfy both a disjoint-clustering shape AND physical plausibility
+    # at once with only 7 hand-picked points -- reshaping this dataset to
+    # do both turned out to fight itself (a companion value plausible
+    # enough to pass the ratio gate kept landing close enough to the
+    # OTHER axis's cluster to also change which cluster the median picks).
+    monkeypatch.setattr(gauge_analysis, "PLAUSIBLE_WALE_COURSE_RATIO_MIN", 0.0)
+    monkeypatch.setattr(gauge_analysis, "PLAUSIBLE_WALE_COURSE_RATIO_MAX", float("inf"))
+
     fake_wale = {"A": 1.0, "B": 10.0, "C": 10.1, "D": 10.2, "E": 2.0, "F": 500.0, "G": 999.0}
     fake_course = {"A": 1.0, "B": 2.0, "C": 500.0, "D": 999.0, "E": 50.0, "F": 50.1, "G": 50.2}
     labels_by_x = {i * 60: label for i, label in enumerate("ABCDEFG")}

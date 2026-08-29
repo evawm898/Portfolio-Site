@@ -318,6 +318,23 @@ PATCH_OVERLAP_FRACTION = 0.5
 PLAUSIBLE_WALE_COURSE_RATIO_MIN = 0.35
 PLAUSIBLE_WALE_COURSE_RATIO_MAX = 1.6
 
+# Absolute per-inch plausibility bounds for the loop-lattice's own COUNTED
+# wale spacing specifically (see _region_wale_candidate_is_plausible in
+# analyze_multi_roi) -- a check the ratio guard above can't do, since a
+# region can have a wale:course RATIO that looks fine while both axes are
+# absolutely wrong together (or one axis alone is absurd regardless of
+# what the other reports). Real knitting -- from bulky hand-knit to fine
+# lace-weight machine knit -- doesn't go outside roughly 0.5-20 wales per
+# inch; this is generously wider than that on both ends, since the point
+# is to catch a "several times denser than physically possible" result
+# (the variegated-yarn case that motivated this: 29.54 WPI from a region
+# whose loop-lattice found 21 columns in a ~1in span), not to second-guess
+# an unusually fine or coarse but real gauge. Needs pixels_per_mm (an
+# absolute per-inch value, unlike the ratio check, doesn't have the
+# calibration cancel out) -- see analyze_multi_roi's pixels_per_mm param.
+PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MIN = 0.5
+PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX = 20.0
+
 # --- Phase consistency (_phase_consistency_evidence) ----------------------
 # For a candidate period, does every repeat marker land on the SAME kind
 # of local visual feature, or does it alternate between two distinct ones
@@ -2252,6 +2269,26 @@ def _finalize_axis_v3(
     )
 
 
+def _wale_course_ratio_plausible(wale_spacing_px: float, course_spacing_px: float) -> Tuple[bool, float]:
+    """
+    Shared core of the aspect-ratio check: is this (wale, course) spacing
+    PAIR physically plausible for knitting, and what's the ratio? Used
+    both by _apply_aspect_ratio_sanity_check (flags the FINAL result) and
+    by analyze_multi_roi's per-region candidate gating (excludes a single
+    region's candidate from consensus on its own merits -- see the module
+    comment above analyze_multi_roi's candidate-building closures).
+
+    wales_per_inch / courses_per_inch == course_spacing_px / wale_spacing_px
+    -- the calibration (px-per-mm) is the same constant on both sides of
+    that ratio and cancels out exactly, so this needs no calibration
+    input at all, unlike an absolute per-inch value would.
+    """
+    if wale_spacing_px <= 0 or course_spacing_px <= 0:
+        return True, 1.0  # can't evaluate a nonsensical spacing; don't claim implausibility either
+    ratio = course_spacing_px / wale_spacing_px
+    return PLAUSIBLE_WALE_COURSE_RATIO_MIN <= ratio <= PLAUSIBLE_WALE_COURSE_RATIO_MAX, ratio
+
+
 def _apply_aspect_ratio_sanity_check(wale: AxisResult, course: AxisResult) -> Tuple[AxisResult, AxisResult]:
     """
     Physical-plausibility floor: no real knitting produces a stitch
@@ -2281,15 +2318,8 @@ def _apply_aspect_ratio_sanity_check(wale: AxisResult, course: AxisResult) -> Tu
     """
     if wale.spacing_px is None or course.spacing_px is None:
         return wale, course
-    if wale.spacing_px <= 0 or course.spacing_px <= 0:
-        return wale, course
-
-    # wales_per_inch / courses_per_inch == course_spacing_px / wale_spacing_px
-    # -- the calibration (px-per-mm) is the same constant on both sides of
-    # that ratio and cancels out exactly, so this needs no calibration
-    # input at all, unlike the per-inch values themselves.
-    ratio = course.spacing_px / wale.spacing_px
-    if PLAUSIBLE_WALE_COURSE_RATIO_MIN <= ratio <= PLAUSIBLE_WALE_COURSE_RATIO_MAX:
+    plausible, ratio = _wale_course_ratio_plausible(wale.spacing_px, course.spacing_px)
+    if plausible:
         return wale, course
 
     reason = (
@@ -4285,6 +4315,7 @@ def analyze_multi_roi(
     rois: List[dict],
     orientation: Orientation,
     structure: Structure = "unknown",
+    pixels_per_mm: Optional[float] = None,
 ) -> MultiRoiAnalysisResult:
     """
     Analyze every approved measurement area COMPLETELY INDEPENDENTLY (each
@@ -4300,6 +4331,12 @@ def analyze_multi_roi(
     Measurement Areas" step (both auto-proposed and manually-added areas
     are treated identically here -- this function doesn't know or care
     which is which beyond echoing `source` back in diagnostics).
+
+    `pixels_per_mm`: optional calibration, used ONLY by the absolute
+    loop-lattice density plausibility gate (see the module comment above
+    the candidate-building closures below) -- every other computation in
+    this function works in raw pixels and needs no calibration at all.
+    Omit it (None) to skip that one gate; every other check still runs.
 
     Adapts to whatever the input supports: with a single region, this
     degenerates to that region's own result with a reduced confidence
@@ -4361,6 +4398,80 @@ def analyze_multi_roi(
             wale_source=wale_source, wale_count_confidence=count_confidence,
         ))
 
+    # --- Per-region plausibility gates, applied BEFORE cross-region
+    # consensus (see _consensus_for_axis) ---------------------------------
+    #
+    # The consensus mechanism above is majority/median agreement, which
+    # cannot by itself tell "the true value" apart from "a majority of
+    # regions sharing the same systematic error" -- a real, observed
+    # failure (a variegated-yarn photo where 2 of 3 regions' wale
+    # detectors independently locked onto the same color-transition
+    # pattern and outvoted the one region that got it right). No amount
+    # of cleverness in the VOTING rule fixes that; the fix is gating
+    # individual candidates on evidence that's independent of what other
+    # regions say, before they ever reach the vote.
+    #
+    # Two such gates, run once per region here (not per-axis inside the
+    # candidate-building closures below, so both closures see the same
+    # exclusion decision for a given region):
+    #
+    # 1. Aspect-ratio plausibility (_wale_course_ratio_plausible): a
+    #    region's own wale:course ratio must be physically possible for
+    #    knitting. Excludes the region from BOTH axes' consensus --
+    #    symmetric with _apply_aspect_ratio_sanity_check's own reasoning
+    #    (the final-result version of this same check): an implausible
+    #    ratio says the PAIR is inconsistent, not which one of the two is
+    #    at fault, so this region's course reading isn't trusted either,
+    #    even though course is usually the more reliable axis.
+    # 2. Absolute loop-lattice density plausibility: even a region whose
+    #    ratio happens to look fine (both axes wrong in proportion) can
+    #    still be absurd in absolute terms -- 21 counted columns in a
+    #    ~1in-wide region is not a real gauge no matter what course says.
+    #    Scoped to the loop-lattice COUNTED path specifically (wale_
+    #    source == "loop_count"), per the mechanism this was built for;
+    #    needs pixels_per_mm, so it's skipped (not "failed permissively,"
+    #    genuinely skipped) when that's not available. Wale-only: there's
+    #    no analogous "count" on the course axis to gate this way.
+    #
+    # Neither gate touches per_roi's own reported numbers (same principle
+    # as every other "uncertain" flag in this file) -- it only decides
+    # whether a region's candidate enters the vote. A region excluded by
+    # either gate DOES get its own wale AxisResult flagged uncertain with
+    # a specific reason (visible in Developer Diagnostics' per-region
+    # view), independent of and in addition to the exclusion itself.
+    ratio_excluded_labels = set()
+    density_excluded_labels = set()
+    for idx, m in enumerate(per_roi):
+        wale_px = m.loop_lattice.wale_spacing_px if (m.wale_source == "loop_count" and m.loop_lattice) else m.wale.spacing_px
+        course_px = m.course.spacing_px
+        reasons = []
+
+        if wale_px is not None and course_px is not None:
+            plausible, ratio = _wale_course_ratio_plausible(wale_px, course_px)
+            if not plausible:
+                ratio_excluded_labels.add(m.label)
+                reasons.append(
+                    f"This region's own wale:course ratio ({ratio:.2f}) is outside the physically "
+                    f"plausible range for knitting ({PLAUSIBLE_WALE_COURSE_RATIO_MIN:g}-"
+                    f"{PLAUSIBLE_WALE_COURSE_RATIO_MAX:g}) -- excluded from cross-region consensus "
+                    "on its own merits, regardless of how many other regions agree with it."
+                )
+
+        if m.wale_source == "loop_count" and pixels_per_mm and wale_px:
+            implied_wpi = 25.4 * pixels_per_mm / wale_px
+            if not (PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MIN <= implied_wpi <= PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX):
+                density_excluded_labels.add(m.label)
+                col_count = m.loop_lattice.column_count if m.loop_lattice else "?"
+                reasons.append(
+                    f"This region's loop-lattice counted density ({implied_wpi:.1f} wales/in from "
+                    f"{col_count} accepted columns) is outside the physically plausible range "
+                    f"({PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MIN:g}-{PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX:g}/in) "
+                    "-- excluded from cross-region consensus on its own merits."
+                )
+
+        if reasons and m.wale.status != "uncertain":
+            per_roi[idx] = replace(m, wale=replace(m.wale, status="uncertain", uncertain_reason=" ".join(reasons)))
+
     def wale_candidates() -> List[dict]:
         # Prefer each region's COUNTED spacing (median interval between
         # real, position-verified loop columns) over its periodicity
@@ -4378,6 +4489,8 @@ def analyze_multi_roi(
         single_region = len(per_roi) == 1
         out = []
         for m in per_roi:
+            if m.label in ratio_excluded_labels or m.label in density_excluded_labels:
+                continue
             if m.wale_source == "loop_count":
                 spacing_px = m.loop_lattice.wale_spacing_px
                 base_confidence = m.wale_count_confidence
@@ -4400,6 +4513,11 @@ def analyze_multi_roi(
     def course_candidates() -> List[dict]:
         out = []
         for m in per_roi:
+            # Ratio-implausible regions are excluded from BOTH axes (see
+            # the module comment above the gating loop) -- density
+            # exclusion is wale-only and doesn't apply here.
+            if m.label in ratio_excluded_labels:
+                continue
             if m.course.spacing_px is None:
                 continue
             # A floor on quality weight so a region with a near-zero
