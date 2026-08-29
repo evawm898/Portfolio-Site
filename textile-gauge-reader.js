@@ -200,6 +200,11 @@
     roiDrag: null, // active drag interaction descriptor: {mode: "create"|"move"|"resize", roiId, ...}
     view: { zoom: 1, panX: 0, panY: 0 }, // image viewer pan/zoom, in display (unscaled) px
     panDrag: null, // active viewer-pan drag descriptor
+    pinchActive: false, // true from the moment a second touch lands until either lifts --
+                         // see the "Touch: two-finger pinch" block below. Every other
+                         // pointerdown handler on the canvas checks this and bails, so a
+                         // second finger landing can never also start a new ROI/calibration/
+                         // ruler drag on top of the pinch.
     orientation: "vertical",
     structure: "unknown",
     result: null,
@@ -488,6 +493,7 @@
   }
 
   canvas.addEventListener("pointerdown", (evt) => {
+    if (state.pinchActive) return; // a second touch just landed -- see the pinch block below
     if (!isPanTrigger(evt)) return;
     evt.preventDefault();
     canvas.setPointerCapture(evt.pointerId);
@@ -513,6 +519,130 @@
   }
   canvas.addEventListener("pointerup", endPanDrag);
   canvas.addEventListener("pointercancel", endPanDrag);
+
+  // --- Touch: two-finger pinch-to-zoom + two-finger pan -------------------
+  //
+  // A single touch already works today: PointerEvent.button is 0 for a
+  // touch's primary contact exactly like a mouse left-click, so every
+  // existing pointerdown/pointermove handler above and below (pan-drag,
+  // ROI create/move/resize, calibration point placement, ruler drag)
+  // already treats one finger the same as a mouse. What's genuinely
+  // missing is a SECOND simultaneous touch -- nothing turns that into a
+  // pinch gesture -- and `.tgr-viewer__stage { touch-action: none }` (needed
+  // so the browser's own native pinch/scroll doesn't fight this custom
+  // viewer) means without handling it ourselves, touch users get no zoom
+  // gesture at all.
+  //
+  // Listens on #viewer (an ancestor of #canvas) in the CAPTURE phase
+  // specifically so this always runs before any of the canvas's own
+  // pointerdown listeners see the event -- capture vs. bubble only
+  // affects ordering between listeners on DIFFERENT elements in the
+  // event's path, not between multiple listeners on the same target, so
+  // putting this on canvas itself would not reliably run first. Running
+  // first is what lets cancelSinglePointerDrags() below undo whatever the
+  // FIRST finger's own (single-touch) pointerdown already started, in the
+  // same event where the second finger lands, before that second
+  // pointerdown's own bubble-phase handlers (gated on state.pinchActive)
+  // get a chance to react to it.
+  const activeTouches = new Map(); // pointerId -> {x, y} client coords, touch pointers only
+  let pinch = null; // {ids: [idA, idB], lastDist, lastMid: {x, y}} while exactly 2 touches are down
+
+  function touchDist(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+  function touchMid(a, b) {
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+
+  function cancelSinglePointerDrags(pointerId) {
+    if (state.panDrag && state.panDrag.pointerId === pointerId) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      state.panDrag = null;
+      canvas.classList.remove("is-panning");
+    }
+    if (state.roiDrag) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      // Drop a stray near-zero "create" box the first finger barely started
+      // -- same threshold endRoiDrag uses for a genuine pointerup, so a
+      // pinch that interrupts an about-to-be-drawn box doesn't leave a
+      // phantom sliver behind.
+      if (state.roiDrag.mode === "create") {
+        const roi = state.rois.find((r) => r.id === state.roiDrag.roiId);
+        if (roi && (roi.width < 4 || roi.height < 4)) {
+          state.rois = state.rois.filter((r) => r.id !== roi.id);
+          state.selectedRoiId = state.rois.length ? state.rois[state.rois.length - 1].id : null;
+        }
+      }
+      state.roiDrag = null;
+      updateRoiUI();
+    }
+    if (state.ruler.dragging) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      state.ruler.dragging = false;
+    }
+    if (state.repeatMark.dragging) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      state.repeatMark.dragging = false;
+      state.repeatMark.box = null;
+    }
+  }
+
+  viewer.addEventListener(
+    "pointerdown",
+    (evt) => {
+      if (evt.pointerType !== "touch") return;
+      activeTouches.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+      if (activeTouches.size === 2 && state.naturalWidth) {
+        const [idA, idB] = [...activeTouches.keys()];
+        state.pinchActive = true;
+        cancelSinglePointerDrags(idA);
+        cancelSinglePointerDrags(idB);
+        const a = activeTouches.get(idA);
+        const b = activeTouches.get(idB);
+        pinch = { ids: [idA, idB], lastDist: touchDist(a, b), lastMid: touchMid(a, b) };
+        render();
+      }
+    },
+    { capture: true }
+  );
+
+  viewer.addEventListener(
+    "pointermove",
+    (evt) => {
+      if (evt.pointerType !== "touch" || !activeTouches.has(evt.pointerId)) return;
+      activeTouches.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+      if (!pinch || !pinch.ids.includes(evt.pointerId)) return;
+      evt.preventDefault();
+      const a = activeTouches.get(pinch.ids[0]);
+      const b = activeTouches.get(pinch.ids[1]);
+      const dist = touchDist(a, b);
+      const mid = touchMid(a, b);
+      if (pinch.lastDist > 0 && dist > 0) {
+        zoomBy(dist / pinch.lastDist, mid.x, mid.y); // spreading/pinching the fingers apart -> zoom
+      }
+      // Fingers translating together (not just spreading) -> pan by the
+      // same amount their shared midpoint moved.
+      state.view.panX += mid.x - pinch.lastMid.x;
+      state.view.panY += mid.y - pinch.lastMid.y;
+      clampPan();
+      applyViewTransform();
+      pinch.lastDist = dist;
+      pinch.lastMid = mid;
+    },
+    { capture: true }
+  );
+
+  function endTouch(evt) {
+    if (evt.pointerType !== "touch") return;
+    activeTouches.delete(evt.pointerId);
+    if (pinch && pinch.ids.includes(evt.pointerId)) {
+      pinch = null;
+      state.pinchActive = false;
+    }
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+  }
+  viewer.addEventListener("pointerup", endTouch, { capture: true });
+  viewer.addEventListener("pointercancel", endTouch, { capture: true });
 
   // --- Collapsible results panel ------------------------------------------
 
@@ -1587,6 +1717,7 @@
 
   canvas.addEventListener("pointerdown", (evt) => {
     if (state.panDrag) return; // the viewer-pan listener above already claimed this gesture
+    if (state.pinchActive) return; // a second touch just landed -- see the pinch block above
 
     // The ruler overlay (if visible) sits on top of every other
     // interaction on every step it's available in -- hit-test it first
