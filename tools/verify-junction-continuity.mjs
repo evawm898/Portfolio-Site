@@ -40,18 +40,26 @@
  * (export + connectedness gates).
  *
  * ============================================================================
- * MERGED BEFORE THE LAW IT GATES — the XFAIL_LAW_MISSING marker (#106).
+ * MERGED BEFORE A LAW THAT CAN SATISFY IT — the XFAIL_LAW_MISSING marker (#106).
  * ============================================================================
- * This gate landed on main AHEAD of the spine law (gates-first). While
- * ?junctionLaw=spine throws the builder's "unknown approachLaw", every row fails with
- * that one uniform error; that state is EXPECTED, tracked as issue #106, and the run
- * reports it as an xfail and exits GREEN — by the marker below, never by a weakened
- * assertion. The lifecycle is the connectedness gate's xfail rule at tool granularity:
- * the moment ANY row BUILDS under the pending law while the marker is set, the run
- * FAILS HARD — that is the law landing, and the PR that lands it must delete the
- * marker in the same commit. A mix of unknown-law and other failures is a plain
- * failure, never an xfail. Runs against --law current are unaffected (red by design,
- * above).
+ * What #106 tracks is not "the spine is unfinished". It is a defect on main TODAY,
+ * independent of which construction eventually replaces the base: petal-to-base and
+ * CENTRE-to-base continuity have no gate coverage anywhere, and the bloom centre
+ * stays attached only because the current lathe's top shoulder happens to catch it
+ * (#108 records that accident — deleting the lathe detached the centre on every
+ * stemmed config, voxel-measured). This gate is the continuity coverage; it needs a
+ * junction law built on constructed contact to have anything to hold green, and no
+ * such law is on main yet. Whatever lands — a staggered merge tree, a plate, anything
+ * else — must satisfy these assertions or state why it cannot.
+ * While ?junctionLaw=spine throws the builder's "unknown approachLaw", every row
+ * fails with that one uniform error; that state is EXPECTED, tracked as #106, and the
+ * run reports it as an xfail and exits GREEN — by the marker below, never by a
+ * weakened assertion. The lifecycle is the connectedness gate's xfail rule at tool
+ * granularity: the moment ANY row BUILDS under the pending law while the marker is
+ * set, the run FAILS HARD — that is a law landing, and the PR that lands it must
+ * delete the marker in the same commit. A mix of unknown-law and other failures is a
+ * plain failure, never an xfail. Runs against --law current are unaffected (red by
+ * design, above).
  *
  * VALIDITY — all hard, all abort:
  *   V1 recorder fired; a recorded builder error fails the row with that error.
@@ -86,9 +94,12 @@ const NEGATIVE = process.argv.includes('--negative-control');
 const lawIdx = process.argv.indexOf('--law');
 const LAW = lawIdx >= 0 ? process.argv[lawIdx + 1] : 'spine';
 
-// XFAIL — LAW NOT YET IMPLEMENTED. See the header block above; delete this constant in
-// the same commit that lands PENDING_LAW (issue #106 tracks it). Never null it to clear
-// a red whose failures are not the uniform "unknown approachLaw" throw.
+// XFAIL — NO LAW ON MAIN CAN YET SATISFY THIS GATE. #106 tracks the real defect (base
+// continuity has no coverage and the centre's attachment is a lathe-shoulder accident,
+// #108) — not the spine's completeness; the reason survives whatever construction
+// replaces the base. Delete this constant in the same commit that lands PENDING_LAW.
+// Never null it to clear a red whose failures are not the uniform "unknown approachLaw"
+// throw.
 const PENDING_LAW = 'spine';
 const XFAIL_LAW_MISSING_ISSUE = 106;
 

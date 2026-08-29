@@ -211,12 +211,15 @@ const CONFIGS = [
   // sparse for field-blending to bridge (default 3 spines: worst end gap 0.0762 u vs
   // blend k 0.0390 u — free ends without a trunk). The 2-petal row is the minimal merge
   // tree (one Y-join); tube 0 is the thinnest members the law can be fed.
-  // These rows were written BEFORE the spine law existed and were recorded RED against
-  // ?junctionLaw=spine (builder throws "unknown approachLaw") — the gate has been seen
-  // to fail. They merged AHEAD of the law (gates-first), so each carries `xfail: 106`,
-  // the tracking issue for the pending law: while the law is absent the row cannot even
-  // build and the xfail keeps the gate green; the moment it exports ONE PIECE the xpass
-  // FAILS HARD, and the PR landing the law must delete these markers in the same commit
+  // These rows were written BEFORE any law existed that could pass them, and were
+  // recorded RED against ?junctionLaw=spine — the gate has been seen to fail. Each
+  // carries `xfail: 106`, and what #106 tracks is the defect that exists on main TODAY,
+  // independent of which construction replaces the base: petal-to-base continuity has
+  // no coverage here, and the bloom centre attaches only by the current lathe's
+  // top-shoulder accident (#108 — deleting the lathe detached the centre on every
+  // stemmed config). While no candidate law is on main these rows cannot even build and
+  // the xfail keeps the gate green; the moment one exports ONE PIECE the xpass FAILS
+  // HARD, and the PR landing that law must delete these markers in the same commit
   // (this gate's standard xfail lifecycle, stated in the header).
   // NOTE the free-end property itself is NOT this gate's to see (a dangling member is
   // one connected body) — that is tools/verify-junction-continuity.mjs. These rows prove
