@@ -1208,6 +1208,8 @@
   line-height: 1.4;
   color: #e0b830; /* matches the warning tone used elsewhere (e.g. inferred-loop markers), not an error */
 }
+.tgr-cal-popup .tgr-button-row { margin: 0.5rem 0 0; }
+.tgr-cal-popup .tgr-error { margin: 0.4rem 0 0; font-size: 11px; padding: 0.4rem 0.5rem; }
 
 @media (max-width: 600px) {
   .tgr-topbar,
