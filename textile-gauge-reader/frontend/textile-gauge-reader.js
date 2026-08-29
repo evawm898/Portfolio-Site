@@ -51,8 +51,25 @@
   const HEALTH_CHECK_RETRY_DELAYS_MS = [4000, 8000, 15000, 20000]; // backoff while the service cold-starts
   const ANALYZE_TIMEOUT_MS = 75000; // generous: free-tier hosts can cold-start slowly
 
-  const WALE_COLOR = "#0f7d7d";   // matches --petrol-bright
-  const COURSE_COLOR = "#a56b2e"; // matches --tgr-course
+  const WALE_COLOR = "#0f7d7d";   // matches --petrol-bright -- calibration points/line and the
+                                   // wale-axis result overlay/diagnostics only; NOT measurement boxes
+  const COURSE_COLOR = "#a56b2e"; // matches --tgr-course -- course-axis result overlay/diagnostics only
+
+  // Measurement-area (ROI) boxes specifically -- deliberately separate
+  // constants from WALE_COLOR/COURSE_COLOR above, which stay teal/rust for
+  // calibration points and the wale/course result lines. Black reads
+  // clearly against typical (light-to-mid) fabric; the light outline pass
+  // (see strokeRoiBox) is what keeps it visible against dark yarn, where a
+  // plain black stroke alone would disappear.
+  const ROI_BOX_COLOR = "#0a0a0a";
+  const ROI_BOX_OUTLINE = "rgba(255,255,255,0.9)";
+  // Auto-proposed vs. manually-added boxes used to be told apart by their
+  // own stroke color (teal vs. rust); now that both are black for
+  // contrast, that distinction moves to a small corner accent dot instead
+  // (see roiAccentColor/drawRoiAccentDot) -- reusing the same two hues so
+  // the meaning ("teal-ish = auto", "rust = manual") carries over.
+  const ROI_ACCENT_AUTO = WALE_COLOR;
+  const ROI_ACCENT_MANUAL = COURSE_COLOR;
 
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 8;
@@ -793,8 +810,41 @@
     ctx.fillText(text, x, y - 4);
   }
 
-  function roiSwatchColor(roi) {
-    return roi.source === "manual" ? COURSE_COLOR : WALE_COLOR;
+  // The only remaining visual difference between an auto-proposed and a
+  // manually-added measurement box, now that the box itself is always
+  // black -- see ROI_ACCENT_AUTO/ROI_ACCENT_MANUAL above.
+  function roiAccentColor(roi) {
+    return roi.source === "manual" ? ROI_ACCENT_MANUAL : ROI_ACCENT_AUTO;
+  }
+
+  // Stroke a measurement-area rect in near-black with a thin light outline
+  // underneath it, so the box stays visible against dark fabric -- a plain
+  // black stroke alone can disappear against dark yarn the way the old
+  // teal one didn't, but black alone is the ask, so the outline (not a
+  // different color) is what carries the dark-fabric case.
+  function strokeRoiBox(x, y, w, h, lineWidth, dashed) {
+    ctx.setLineDash(dashed ? [5, 4] : []);
+    ctx.strokeStyle = ROI_BOX_OUTLINE;
+    ctx.lineWidth = lineWidth + 1.5;
+    ctx.strokeRect(x, y, w, h);
+    ctx.strokeStyle = ROI_BOX_COLOR;
+    ctx.lineWidth = lineWidth;
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+  }
+
+  // Small filled+outlined dot at an explicit (cx, cy) display point,
+  // colored by source (auto vs. manual) -- see roiAccentColor. Callers
+  // place it on the box's right edge, clear of the top-left label chip
+  // and the four corner resize handles.
+  function drawRoiAccentDot(cx, cy, roi) {
+    ctx.fillStyle = roiAccentColor(roi);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
   function roiHandles(rect) {
@@ -823,19 +873,18 @@
     const w = state.roi.width * getScale();
     const h = state.roi.height * getScale();
 
-    ctx.strokeStyle = WALE_COLOR;
-    ctx.lineWidth = 2;
-    ctx.setLineDash(editable ? [] : [6, 4]);
-    ctx.strokeRect(tl.x, tl.y, w, h);
-    ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(15,125,125,0.1)";
+    strokeRoiBox(tl.x, tl.y, w, h, 2, !editable);
+    ctx.fillStyle = "rgba(10,10,10,0.12)";
     ctx.fillRect(tl.x, tl.y, w, h);
 
     if (editable) {
       const handles = roiHandles(state.roi);
-      ctx.fillStyle = WALE_COLOR;
+      ctx.fillStyle = ROI_BOX_COLOR;
       for (const key of ["tl", "tr", "bl", "br"]) {
         const p = handles[key];
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(p.x - 5, p.y - 5, 10, 10);
         ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
       }
     }
@@ -843,41 +892,41 @@
 
   // Draws every candidate measurement area on the review step: a subtle
   // dashed outline + label chip for each, a solid outline + resize
-  // handles for whichever one is currently selected. Manually-added areas
-  // get the course color instead of the wale color so they're visually
-  // distinguishable from auto-proposed ones at a glance (also reflected
-  // in the list below the image).
+  // handles for whichever one is currently selected. Every box is black
+  // (see strokeRoiBox) -- auto-proposed vs. manually-added is now told
+  // apart by a small corner accent dot instead (see roiAccentColor), not
+  // by the box's own stroke color.
   function drawAllRois() {
     for (const r of state.rois) {
       const isSelected = r.id === state.selectedRoiId;
-      const color = roiSwatchColor(r);
       const tl = naturalToDisplay({ x: r.x, y: r.y });
       const w = r.width * getScale();
       const h = r.height * getScale();
 
-      ctx.strokeStyle = color;
-      ctx.lineWidth = isSelected ? 2.5 : 1.5;
-      ctx.setLineDash(isSelected ? [] : [5, 4]);
-      ctx.strokeRect(tl.x, tl.y, w, h);
-      ctx.setLineDash([]);
-      ctx.fillStyle = isSelected ? "rgba(15,125,125,0.16)" : "rgba(15,125,125,0.06)";
+      strokeRoiBox(tl.x, tl.y, w, h, isSelected ? 2.5 : 1.5, !isSelected);
+      ctx.fillStyle = isSelected ? "rgba(10,10,10,0.18)" : "rgba(10,10,10,0.08)";
       ctx.fillRect(tl.x, tl.y, w, h);
 
       ctx.font = "bold 12px monospace";
       const padding = 4;
       const metrics = ctx.measureText(r.label);
-      ctx.fillStyle = color;
+      ctx.fillStyle = ROI_BOX_COLOR;
       ctx.fillRect(tl.x, tl.y, metrics.width + padding * 2, 16);
-      ctx.fillStyle = "#060707";
+      ctx.fillStyle = "#e9ecec";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(r.label, tl.x + padding, tl.y + 8);
 
+      drawRoiAccentDot(tl.x + w, tl.y + h / 2, r); // right-edge midpoint -- clear of the label chip and corner handles
+
       if (isSelected) {
         const handles = roiHandles(r);
-        ctx.fillStyle = color;
         for (const key of ["tl", "tr", "bl", "br"]) {
           const p = handles[key];
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(p.x - 5, p.y - 5, 10, 10);
+          ctx.fillStyle = ROI_BOX_COLOR;
           ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
         }
       }
@@ -968,17 +1017,27 @@
         roi.x === state.roi.x && roi.y === state.roi.y &&
         roi.width === state.roi.width && roi.height === state.roi.height;
       ctx.save();
-      ctx.strokeStyle = roiSwatchColor(roi);
-      ctx.lineWidth = isPrimary ? 1.5 : 1;
       ctx.globalAlpha = 0.55;
       ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = ROI_BOX_OUTLINE;
+      ctx.lineWidth = (isPrimary ? 1.5 : 1) + 1.5;
+      ctx.strokeRect(tl.x, tl.y, w, h);
+      ctx.strokeStyle = ROI_BOX_COLOR;
+      ctx.lineWidth = isPrimary ? 1.5 : 1;
       ctx.strokeRect(tl.x, tl.y, w, h);
       ctx.restore();
+      // Label as black text with a light outline (strokeText underneath,
+      // same treatment as the box itself) so it stays legible directly on
+      // dark fabric with no background chip behind it here.
       ctx.font = "10px monospace";
-      ctx.fillStyle = roiSwatchColor(roi);
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = ROI_BOX_OUTLINE;
+      ctx.strokeText(roi.label, tl.x + 3, tl.y + 2);
+      ctx.fillStyle = ROI_BOX_COLOR;
       ctx.fillText(roi.label, tl.x + 3, tl.y + 2);
+      drawRoiAccentDot(tl.x + w, tl.y + h / 2, roi);
     }
   }
 
