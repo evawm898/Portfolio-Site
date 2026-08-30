@@ -2370,7 +2370,19 @@ def _apply_aspect_ratio_sanity_check(wale: AxisResult, course: AxisResult) -> Tu
     def _flag(axis: AxisResult) -> AxisResult:
         if axis.status == "uncertain":
             return axis  # already flagged; don't clobber a more specific existing reason
-        return replace(axis, status="uncertain", uncertain_reason=reason)
+        # Cap confidence to the same "uncertain" ceiling _apply_confidence_
+        # floor_uncertainty already uses elsewhere in this file, rather than
+        # leaving a high confidence number sitting next to a status that
+        # says not to trust it. Found directly on knit_sample_02.jpg: course
+        # was correctly flagged uncertain by this exact check (ratio 0.01,
+        # miles outside plausible) while its confidence stayed at 0.823 --
+        # correct status, misleading number right next to it. A cap, not a
+        # zero-out: this check doesn't know the value is wrong, only that
+        # the pair is inconsistent, so some of the axis's own evidence may
+        # still be real -- same reasoning _apply_confidence_floor_uncertainty
+        # already uses for a low-confidence-driven uncertain flag.
+        capped_confidence = min(axis.confidence, UNCERTAIN_CONFIDENCE_THRESHOLD)
+        return replace(axis, status="uncertain", uncertain_reason=reason, confidence=capped_confidence)
 
     return _flag(wale), _flag(course)
 

@@ -16,6 +16,7 @@ in isolation from whatever produced the numbers.
 from analysis.gauge_analysis import (
     PLAUSIBLE_WALE_COURSE_RATIO_MAX,
     PLAUSIBLE_WALE_COURSE_RATIO_MIN,
+    UNCERTAIN_CONFIDENCE_THRESHOLD,
     AxisResult,
     _apply_aspect_ratio_sanity_check,
 )
@@ -41,6 +42,10 @@ def test_the_reported_real_photo_case_is_flagged():
     # Never rewrites the numbers themselves -- only the status/reason.
     assert wale2.spacing_px == 0.86
     assert course2.spacing_px == 2.51
+    # Confidence (default 0.7 from _axis()) is capped along with the flag --
+    # not left high next to a status that says not to trust it.
+    assert wale2.confidence <= UNCERTAIN_CONFIDENCE_THRESHOLD
+    assert course2.confidence <= UNCERTAIN_CONFIDENCE_THRESHOLD
 
 
 def test_typical_jersey_ratio_is_not_flagged():
@@ -91,6 +96,22 @@ def test_zero_or_negative_spacing_is_a_no_op():
     w, c = _apply_aspect_ratio_sanity_check(wale, course)
     assert w == wale
     assert c == course
+
+
+def test_flagging_caps_confidence_instead_of_leaving_it_high():
+    # Found directly on knit_sample_02.jpg: course was correctly flagged
+    # uncertain by this exact check (ratio 0.01, miles outside plausible)
+    # while its confidence stayed at 0.823 -- correct status, misleading
+    # number sitting right next to it. Confidence must not outrank the
+    # status it's paired with.
+    wale = _axis(spacing_px=293.455, confidence=0.324)
+    course = _axis(spacing_px=3.994, confidence=0.823)
+    w, c = _apply_aspect_ratio_sanity_check(wale, course)
+    assert c.status == "uncertain"
+    assert c.confidence <= UNCERTAIN_CONFIDENCE_THRESHOLD
+    assert c.confidence == UNCERTAIN_CONFIDENCE_THRESHOLD  # capped, not zeroed
+    # Wale's confidence was already below the cap -- must not be RAISED to it.
+    assert w.confidence == 0.324
 
 
 def test_does_not_clobber_an_existing_uncertain_reason():
