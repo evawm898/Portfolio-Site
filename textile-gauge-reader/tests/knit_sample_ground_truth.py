@@ -34,6 +34,32 @@ individual stitches are not reliably countable by eye at color transitions.
 
 No calibration constant is given for an axis with no ruler in that photo --
 `None` means "not measurable from this photo," not "not yet measured."
+
+SECOND PASS -- transposed calibration. For 02, 07, 08, and 09 (each of which
+only had a ruler along one axis), the same px/inch was reused for the other
+axis: image scale is a property of the photo, not of the ruler's orientation,
+so a ruler along one axis calibrates both -- PROVIDED the shot is square to
+the fabric (checked: each ruler's own tick spacing was consistent to within
+~2% across its full length, no sign of perspective tilt) and the fabric is
+flat (checked per-fixture below). A value derived this way is marked
+"transposed calibration" in its comment, on top of the existing "AI-estimated,
+human-verified" provenance note -- two independent reasons to keep these a
+step below the jersey/teal ground truth, not one.
+
+Two of the four candidates failed a check and were left blank rather than
+recorded:
+  - knit_sample_02's missing axis (courses) passed both checks (square ruler,
+    flat fabric) but turned out to be unmeasurable anyway: the fabric is
+    soft-focus at the pixel level (see the wale comment below), and that
+    blur turned out to affect row texture at least as badly as column
+    texture -- checked directly at native zoom in two different regions,
+    both showed smooth color gradient with no resolvable row structure at
+    all. Left blank for a different reason than "no ruler," so it's
+    recorded as its own comment rather than a bare None.
+  - knit_sample_07's missing axis (courses) failed the flatness check
+    outright: this fabric is still on the needles, pinned mid-row under
+    working tension, not blocked or relaxed -- row spacing there reflects
+    on-needle tension, not resting gauge. Left blank rather than transposed.
 """
 
 # knit_sample_01.jpg -- light blue stockinette in a 4in gauge-tool window.
@@ -49,7 +75,12 @@ TRUE_COURSES_PER_INCH_01 = 5.7  # AI-estimated, human-verified (not hand-counted
 # resolution, not a display artifact) -- lower confidence than the others.
 PX_PER_INCH_02 = 1187.0
 TRUE_WALES_PER_INCH_02 = 4.0   # AI-estimated, human-verified (not hand-counted)
-TRUE_COURSES_PER_INCH_02 = None  # no vertical ruler in this photo
+# Second pass: square/flatness checks both passed, so PX_PER_INCH_02 is valid
+# for courses too -- but the row direction turned out just as unresolvably
+# blurry as wale was (checked directly at native zoom, two regions, no row
+# texture visible at all). Left None because it's genuinely uncountable in
+# this photo, not because no ruler exists for it.
+TRUE_COURSES_PER_INCH_02 = None
 
 # knit_sample_05.jpg -- mint green stockinette, dual ruler (horizontal +
 # vertical, same Westcott ruler product, ~320 px/inch both axes).
@@ -71,17 +102,27 @@ TRUE_COURSES_PER_INCH_06 = 5.2  # AI-estimated, human-verified (not hand-counted
 # One horizontal tape measure only (confirmed inches, "60in" printed on tape).
 PX_PER_INCH_07 = 423.0
 TRUE_WALES_PER_INCH_07 = 5.0   # AI-estimated, human-verified (not hand-counted)
-TRUE_COURSES_PER_INCH_07 = None  # no vertical ruler in this photo
+# Second pass: FAILS the flatness check -- still on the needles, pinned
+# mid-row under working tension, not blocked/relaxed. Row spacing here would
+# reflect on-needle tension, not resting gauge, so left None rather than
+# transposing PX_PER_INCH_07 into a number that isn't representative.
+TRUE_COURSES_PER_INCH_07 = None
 
 # knit_sample_08.jpg -- gray/olive tweed-flecked stockinette. One horizontal
 # ruler only, unit printed directly on the ruler ("inch").
 PX_PER_INCH_08 = 346.0
 TRUE_WALES_PER_INCH_08 = 4.5   # AI-estimated, human-verified (not hand-counted)
-TRUE_COURSES_PER_INCH_08 = None  # no vertical ruler in this photo
+# Second pass: square/flatness checks passed; transposed PX_PER_INCH_08 to
+# the course direction (fabric is sharp here, unlike 02 -- confirmed at
+# native zoom). AI-estimated, human-verified, AND transposed calibration.
+TRUE_COURSES_PER_INCH_08 = 6.9
 
 # knit_sample_09.jpg -- light gray stockinette. One vertical tape measure
 # only (confirmed inches, "60in" printed on tape) -- measures courses, not
 # wales; the mirror-image situation to 02/07/08.
 PX_PER_INCH_09 = 187.0
-TRUE_WALES_PER_INCH_09 = None    # no horizontal ruler in this photo
+# Second pass: square/flatness checks passed; transposed PX_PER_INCH_09 to
+# the wale direction (fabric is sharp here, confirmed at native zoom).
+# AI-estimated, human-verified, AND transposed calibration.
+TRUE_WALES_PER_INCH_09 = 5.1
 TRUE_COURSES_PER_INCH_09 = 7.6   # AI-estimated, human-verified (not hand-counted)
