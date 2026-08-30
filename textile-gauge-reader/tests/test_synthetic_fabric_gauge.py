@@ -12,14 +12,21 @@ strict xfails so the suite AUTOMATICALLY flags when a future algorithm
 change fixes one (strict xfail turns an unexpected pass into a failure,
 forcing the mark — i.e. the documentation — to be updated):
 
-  * jersey, mildly degraded, 5x7 gauge, seed 7: BOTH axes flip to the
-    leg/half-period harmonic with confident scores (~0.67). Isolated to
+  * jersey, mildly degraded, 5x7 gauge, seed 7, COURSE axis: flips to the
+    leg/half-period harmonic with a confident score (~0.67). Isolated to
     a blur+perspective interaction with that seed's particular warp
     geometry — the identical degradation levels at seeds 8/9/10 stay
     correct, and no single degradation (nor blur+jpeg, lighting+warp,
     blur alone up to sigma 2.0) flips it. The structure="jersey" hint
     does NOT rescue it. This is the classic real-photo failure mode,
-    now reproducible on demand.
+    still reproducible on demand for course.
+    The WALE axis of this same case used to flip too and was xfailed
+    alongside it -- FIXED (mark removed, XPASSED the moment it shipped)
+    by DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN gating _cross_check_density:
+    traced directly, this was the identical bug found on knit_sample_01.jpg
+    (see knit_sample_ground_truth.py) -- wale's v0.3 evidence scorer had
+    already picked the correct period decisively, and the density
+    cross-check overrode it to the wrong 0.5x harmonic anyway.
   * jersey, mildly degraded, 8x10: course axis flips to half period
     (wale survives).
   * rib1x1: the wale axis consistently locks onto the knit-to-knit
@@ -90,8 +97,13 @@ GRID = [
     _case(clean, "jersey", 5, 7, "course"),
     _case(clean, "jersey", 8, 10, "wale"),
     _case(clean, "jersey", 8, 10, "course"),
-    _case(mildly_degraded, "jersey", 5, 7, "wale",
-          xfail_reason="blur+warp interaction (seed 7 geometry) flips to the leg half-harmonic at conf ~0.67; seeds 8-10 identical degradation are correct"),
+    # Was a strict xfail ("blur+warp interaction (seed 7 geometry) flips to
+    # the leg half-harmonic at conf ~0.67; seeds 8-10 identical degradation
+    # are correct") until the DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN gate on
+    # _cross_check_density landed -- XPASSED the moment that gate shipped,
+    # confirming this was the same override-a-decisive-pick bug traced
+    # directly on knit_sample_01.jpg, not a coincidentally-similar one.
+    _case(mildly_degraded, "jersey", 5, 7, "wale"),
     _case(mildly_degraded, "jersey", 5, 7, "course",
           xfail_reason="same seed-7 blur+warp interaction flips the course axis to half period"),
     _case(mildly_degraded, "jersey", 8, 10, "wale"),

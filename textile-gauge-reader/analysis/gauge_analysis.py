@@ -301,6 +301,24 @@ MIN_REPEATS_FOR_FULL_SCORE = 8.0     # visible repeats in the ROI at which repea
 MIN_REPEATS_FOR_ANY_SCORE = 2.0      # fewer than this and repeat_count score is 0
 UNCERTAIN_SCORE_MARGIN = 0.08        # top-2 final candidate scores within this margin -> "uncertain"
 UNCERTAIN_CONFIDENCE_THRESHOLD = 0.35  # confidence below this -> "uncertain" regardless of margin (any axis/pipeline)
+# Density cross-check (_cross_check_density, below) may only override wale's
+# v0.3 evidence-scorer pick when that pick was itself a near-tie -- i.e. the
+# SAME margin UNCERTAIN_SCORE_MARGIN already uses just above to call two top
+# candidates "too close to call." Deliberately the same constant, not a new
+# one: this is the identical question ("was the winner decisive?") asked at
+# a different point in the pipeline, and a second number here would just
+# invite the two thresholds to drift apart for no principled reason. Chosen
+# from the margin distribution across all 9 fixtures with recorded ground
+# truth (jersey, teal, knit_sample_01/02/05/06/07/08/09), not from the one
+# failing case alone: 8 of those 9 margins (0.097-0.324) sit comfortably
+# above 0.08; only one (0.063, knit_sample_02, whose v0.3 pick was already
+# correct and never reached the density check anyway) sits below it. The bug
+# this gates (knit_sample_01, margin 0.097): the evidence scorer picked
+# correctly and decisively, and the density check overrode it to the wrong
+# 0.5x harmonic regardless -- this constant stops that class of override
+# without touching any of the 8 already-healthy cases, none of which were
+# close enough to this margin for the gate to affect them either way.
+DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN = UNCERTAIN_SCORE_MARGIN
 N_CONSENSUS_PATCHES = 4              # overlapping sub-region bands analyzed per axis
 PATCH_OVERLAP_FRACTION = 0.5
 
@@ -1592,6 +1610,26 @@ def _cross_check_density(
     n = loop_centers.shape[0]
     if n < MIN_LOOP_CENTERS_FOR_EVIDENCE or wale.spacing_px is None or course.spacing_px is None or roi_area <= 0:
         return wale, course
+
+    # Gate: this override may only fire when wale's own v0.3 evidence-scorer
+    # pick was itself a near-tie -- never when it was decisive. Real bug this
+    # closes (knit_sample_01, traced directly): evidence scored the correct
+    # 85.0px candidate at 0.650 against the wrong 0.5x harmonic's 0.553 -- a
+    # 0.097 margin, comfortably decisive -- and this override still replaced
+    # it with the wrong one anyway. See DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN's
+    # own comment for where that threshold came from. Ranks by evidence_score
+    # exactly like _analyze_axis_v3's own uncertain-margin check does; if
+    # fewer than two candidates carry a score (e.g. hand-built CandidateInfo
+    # in older tests), there's nothing to gate on and the override proceeds
+    # exactly as it always has.
+    scored = sorted(
+        (d for d in wale.candidate_details if d.evidence_score is not None),
+        key=lambda d: d.evidence_score, reverse=True,
+    )
+    if len(scored) >= 2:
+        margin = scored[0].evidence_score - scored[1].evidence_score
+        if margin >= DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN:
+            return wale, course  # decisive pick -- density doesn't get a vote
 
     expected_cell_area = roi_area / n
     actual_cell_area = wale.spacing_px * course.spacing_px
