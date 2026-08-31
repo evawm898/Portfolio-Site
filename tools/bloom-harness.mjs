@@ -55,6 +55,16 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
    it rather than keeping a second copy. */
 export const { CONTROLS, DEFAULTS, valuesEqual } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
 
+/* The geometry module is read the same way, and for the same reason: the
+   roll curvature floor the form assertions check must be the number the
+   builder actually clamps to. A second copy here would let the gate endorse
+   a wall the geometry does not build. */
+export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+
+/* The four curves. Named once, read by formAssertions and by the matrix's
+   named-corner block; the ids themselves live in the registry. */
+const FORM_IDS = ['petalCup', 'petalSpineCurl', 'petalRoll', 'petalTwist'];
+
 export function serveRepo() {
   const server = http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split('?')[0]);
@@ -296,6 +306,104 @@ export async function applyCapability(page, row) {
 }
 
 /* ===================================================================
+   FORM ASSERTIONS — the instrument this session had to build, because
+   BOTH SHIPPED GATES ARE STRUCTURALLY BLIND to what form work can break.
+
+   That is a derivation, not a hedge. The export gate's criterion is
+   boundary edges on a mesh whose topology is FIXED (NU, NV and the panel
+   count depend on no form control), and pure vertex displacement cannot
+   change an edge census. The connectedness gate cannot fire either: the
+   foot rows are never written by the form layer and the hub disc spans
+   them, so no reachable curl / cup / roll / twist detaches a petal — a
+   blade bends TOWARD things, and interpenetrating closed solids read as
+   MORE connected, never less. Every failure this session can cause
+   therefore leaves both gates green.
+
+   What can actually go wrong, and what each assertion catches:
+     FOOT INVARIANCE   a deformation leaking onto the foot rows. The
+                       natural bug: the frame is built per row, and
+                       starting the rotation at row 0 rather than at u > 0
+                       is one index. It moves the junction and nothing else
+                       here would notice.
+     ROLL ISOMETRY     the roll ceasing to be an arc parameterised by ARC
+                       LENGTH — the property that makes it a bend rather
+                       than a stretch, and the premise this session was
+                       told to check rather than inherit.
+     CURVATURE FLOOR   a roll radius at or below t/2, where the sheet's
+                       inner offset surface INVERTS and the solid
+                       self-intersects while staying watertight and
+                       connected.
+     GUARD RESIDUAL    the all-zero short-circuit hiding a wrong form path.
+                       The guard is what makes the default byte-identical;
+                       this is what stops it being somewhere a bug can sit
+                       unexercised.
+
+   Like applyCapability, these read the APP'S OWN evaluation rather than the
+   STL, and like it that scope is printed beside every result rather than
+   only here. Returns failure strings; any is fatal for the RUN.
+   =================================================================== */
+export const FORM_SCOPE =
+  "form claims read from the builder's own frames/telemetry, NOT from the STL; watertight + connected are measured on the export";
+
+const ROLL_MIN_RADIUS_MM = ROLL_MIN_RADIUS_FACTOR * SHEET_THICKNESS_MM;
+
+export async function formAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const bad = [];
+  const wantsForm = (row.set || []).some((s) => FORM_IDS.includes(s.id) && Number(s.value) !== 0);
+
+  /* READ-BACK, both directions. A form row whose telemetry is null built a
+     flat petal under a label saying otherwise; a flat row WITH telemetry
+     took the form path where the guard should have short-circuited — and
+     that second one is the byte report's whole premise. */
+  if (wantsForm && !m.petalForm) bad.push('form row reports NO form telemetry — the guard short-circuited a row that sets a curve');
+  if (!wantsForm && m.petalForm) bad.push('flat row reports form telemetry — the guard did not short-circuit');
+
+  /* FOOT INVARIANCE, in EXACT arithmetic, and deliberately NOT by
+     re-deriving footRing()'s radius or overhang here — a gate keeping its
+     own copy of a boundary is this project's most repeated defect. These
+     are the three properties a form leak breaks: curl rotates the normal
+     and lifts the centre off the hub plane, twist rotates the width
+     direction. Slot 0 sits at azimuth 0, so its ring tangent is +y. */
+  const ff = m.petalFootFrames;
+  if (!Array.isArray(ff) || ff.length !== 3) bad.push(`foot frames: expected 3 rows, got ${JSON.stringify(ff && ff.length)}`);
+  else ff.forEach((f, i) => {
+    if (!(f.N[0] === 0 && f.N[1] === 0 && f.N[2] === 1)) bad.push(`foot row ${i}: normal ${JSON.stringify(f.N)} is not exactly the hub plane's [0,0,1] — a curve reached the foot`);
+    if (!(f.T[0] === 0 && f.T[1] === 1 && f.T[2] === 0)) bad.push(`foot row ${i}: width direction ${JSON.stringify(f.T)} is not exactly the ring tangent [0,1,0] — a twist reached the foot`);
+    if (f.C[2] !== 0) bad.push(`foot row ${i}: centre z = ${f.C[2]}, not exactly 0 — the foot left the hub plane`);
+  });
+
+  if (!m.petalForm) {
+    const g = m.petalGuardResidual;
+    if (typeof g !== 'number') bad.push(`flat row reports guard residual ${JSON.stringify(g)} — not measured`);
+    else if (!(g <= 1e-9)) bad.push(`guard residual ${g.toExponential(3)} exceeds 1e-9 — the zero-form law and the flat law have diverged`);
+    return bad;
+  }
+
+  const f = m.petalForm;
+  /* ROLL ISOMETRY, asserted only where it is a claim. Cup is the one curve
+     that legitimately moves the metric, so a cupped row is EXCLUDED rather
+     than given a loose tolerance — a tolerance wide enough for cup would be
+     wide enough to miss a broken roll. Curl and twist are rigid across the
+     width and must not move it either, so they are covered by the same
+     assertion rather than trusted. */
+  if (f.cup === 0) {
+    if (!(Math.abs(f.metricMin - 1) < 1e-12 && Math.abs(f.metricMax - 1) < 1e-12)) {
+      bad.push(`|dP/dv|/h is ${f.metricMin.toFixed(9)}..${f.metricMax.toFixed(9)}, not 1 — a cup-free deformation is stretching the width`);
+    }
+  } else if (!(f.metricMax >= 1)) {
+    bad.push(`cup ${f.cup} reports a max metric factor of ${f.metricMax} — cup can only lengthen the cross-section`);
+  }
+
+  /* THE CURVATURE FLOOR — the assertion whose failure is invisible to both
+     gates, which is exactly why it is here and not left to them. */
+  if (f.rollDeg !== 0 && !(f.rollRadiusMm >= ROLL_MIN_RADIUS_MM - 1e-9)) {
+    bad.push(`roll radius ${f.rollRadiusMm.toFixed(4)} mm is below the ${ROLL_MIN_RADIUS_MM} mm floor — the sheet's inner offset surface inverts`);
+  }
+  return bad;
+}
+
+/* ===================================================================
    THE MATRIX — the shared sweep both gates run. Order matters: the SHIPPING
    DEFAULT is row 1, then the arrangement sweep, then every slider at min and
    max, then the centre rig, then the corners. Anything added to the registry
@@ -420,12 +528,57 @@ export function buildMatrix() {
       });
     }
   }
-  /* 5. CAPABILITY — the two non-shipping rows. Registry state is DEFAULTS
+  /* 5. THE PETAL'S 3D FORM — four curves at min and max, then the named
+        corners. The four are swept SEPARATELY first and only then together,
+        deliberately: they are four different things that all sound like
+        "curve", and a matrix that only ever moved them as a block would
+        make a regression in one read as a regression in any of them.
+
+        The min/max rows themselves are NOT written here: block 1's sweep
+        over every non-centre slider already produces them from the
+        registry, and adding a second loop for the same eight rows is a
+        second source of truth for coverage — it produced eight duplicate
+        rows the first time this was written. This block adds only what
+        that sweep cannot know: the named corners.
+
+        Each named corner is ONE curve doing the thing it is for, so a red
+        row says which curve broke in the words the project uses for it.
+        ROLL CLAMP is the load-bearing one: it is the only row where the
+        curvature floor actually binds, and the floor guards a failure
+        (the sheet's inner offset surface inverting) that stays watertight
+        and connected and is therefore invisible to both gates. */
+  const ALL_FORM_MAX = { petalCup: 1.2, petalSpineCurl: 360, petalRoll: 330, petalTwist: 180 };
+  const ALL_FORM_MIN = { petalCup: -0.8, petalSpineCurl: -180, petalRoll: -330, petalTwist: -180 };
+  for (const [name, sets] of [
+    ['FORM: QUILL (roll alone, toward a tube)', { petalRoll: 330 }],
+    ['FORM: FIDDLEHEAD (spine curl alone)', { petalSpineCurl: 360 }],
+    ['FORM: CONTORTED (twist alone)', { petalTwist: 180 }],
+    ['FORM: REFLEXED (cup min x curl below the plane)', { petalCup: -0.8, petalSpineCurl: -180 }],
+    ['FORM: ROLL CLAMP (roll max x narrowest petal)', { petalRoll: 330, petalWidth: 8 }],
+    ['FORM: ALL MAX (all four curves together)', ALL_FORM_MAX],
+    ['FORM: ALL MIN (all four curves together)', ALL_FORM_MIN],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
+  /* 6. CAPABILITY — the two non-shipping rows. Registry state is DEFAULTS
         (they set no control), so fullStateDrift still applies unchanged and
         the capability carries its own read-back in applyCapability(). These
         are last so the matrix still opens on what ships. */
   rows.push({ label: 'CAPABILITY: claw (non-monotone width)', set: [], capability: CAPABILITY_CLAW });
   rows.push({ label: 'CAPABILITY: cleft (two-span domain)', set: [], capability: CAPABILITY_CLEFT });
+  /* CAPABILITY x FORM. The cleft row is the load-bearing one and it is not
+     decoration: a clefted petal is three panels, and each lobe evaluates
+     the row's cross-section over ITS OWN span of v. If the cross-section
+     were ever a function of a panel's LOCAL parameter rather than the
+     global v, the two lobes would sit on two different arcs and pull apart
+     under roll — watertight, and in pieces. This row is what says they do
+     not. The claw row does the same for a non-monotone width under a
+     deformation that scales with width. */
+  rows.push({ label: 'CAPABILITY: claw x form max', capability: CAPABILITY_CLAW,
+    set: Object.entries(ALL_FORM_MAX).map(([id, value]) => ({ id, value: String(value) })) });
+  rows.push({ label: 'CAPABILITY: cleft x roll max', capability: CAPABILITY_CLEFT,
+    set: [{ id: 'petalRoll', value: '330' }] });
 
   return rows;
 }
@@ -450,6 +603,100 @@ export function legacyMatrix() {
   }
   rows.push({ label: 'ALL MIN (fewest, smallest, flat)', set: ids.map((id) => ({ id, value: String(byId[id].min) })) });
   rows.push({ label: 'ALL MAX (most petals, largest, steepest tilt)', set: ids.map((id) => ({ id, value: String(byId[id].max) })) });
+  return rows;
+}
+
+/* ===================================================================
+   phase3Matrix() — THE 86 ROWS AS THEY STOOD AT 6626961, frozen.
+
+   The like-for-like baseline for the FORM layer, standing to it exactly as
+   phase2Matrix() stands to the silhouette engine. A NEW frozen matrix
+   beside the old one, never an edit to it: phase2Matrix()'s own header says
+   so, and the reason is that a frozen matrix is a record of one commit
+   rather than a view over anything. Both now run, and both must report zero.
+
+   FROZEN AGAINST: 6626961 ("Bloom: the petal silhouette model — width
+   profile over a trimmable domain", #114), the commit immediately before
+   the four form curves.
+
+   WHY BOTH MATRICES AND NOT JUST THIS ONE. phase2Matrix covers the centre
+   rig and the arrangement as they stood two commits back and pins the
+   controls that existed then; phase3Matrix adds the three silhouette
+   controls and the two named family corners. They overlap heavily and that
+   is the point — the 76 are the rows whose bytes have now been unmoved
+   across two consecutive feature layers, which is a stronger statement than
+   either matrix makes alone.
+
+   Row set and values are LITERALS here, deliberately, so a later range
+   change cannot silently rewrite what the baseline means. Transcribing 86
+   rows by hand is exactly the sort of thing that looks right and is not, so
+   it is not trusted either: `--verify-frozen` proves this function deep-
+   equal to the base commit's own buildMatrix() output rather than to a
+   reading of it.
+
+   These rows PIN only the controls that existed at 6626961, so they inherit
+   every later default. The four form controls default to exactly 0, which
+   is exactly flat, so the expected result here is 0 of 86 moved.
+   =================================================================== */
+export function phase3Matrix() {
+  const rows = [{ label: 'DEFAULT (the shipping configuration)', set: [] }];
+  for (let n = 3; n <= 40; n++) rows.push({ label: `petalCount ${n}`, set: [{ id: 'petalCount', value: String(n) }] });
+
+  /* Frozen ranges — the values these controls carried at 6626961. */
+  const RANGE = {
+    petalCount: [3, 40], petalLength: [20, 60], petalWidth: [8, 30], petalTilt: [0, 75],
+    petalBaseTaper: [0.3, 3], petalTipTaper: [0.6, 4], petalTipBreadth: [0, 0.6], spread: [0.6, 6],
+  };
+  const SPREAD_DEFAULT = 2;
+  const CENTER = {
+    DOME: [['centerSize', 0.25, 1], ['centerRise', 0.15, 1.2]],
+    DISC: [['centerSize', 0.25, 1], ['centerDish', 0, 0.9]],
+    RING: [['centerSize', 0.25, 1], ['centerBore', 0.2, 0.75]],
+  };
+  const STYLES_F = ['DOME', 'DISC', 'RING'];
+  /* Order matters: it is the order buildMatrix emitted at 6626961, which is
+     registry order for the sliders. */
+  const SWEPT = ['petalLength', 'petalWidth', 'petalTilt', 'petalBaseTaper', 'petalTipTaper', 'petalTipBreadth', 'spread'];
+
+  for (const id of SWEPT) {
+    rows.push({ label: `${id} min (${RANGE[id][0]})`, set: [{ id, value: String(RANGE[id][0]) }] });
+    rows.push({ label: `${id} max (${RANGE[id][1]})`, set: [{ id, value: String(RANGE[id][1]) }] });
+  }
+  for (const [name, sets] of [
+    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipBreadth: 0.3 }],
+    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipBreadth: 0.5 }],
+  ]) rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+
+  for (const style of STYLES_F) {
+    for (const [tag, v] of [['min', RANGE.spread[0]], ['default', SPREAD_DEFAULT], ['max', RANGE.spread[1]]]) {
+      rows.push({ label: `${style} × spread ${tag} (${v})`, set: [{ id: 'centerStyle', value: style }, { id: 'spread', value: String(v) }] });
+    }
+  }
+  for (const style of STYLES_F) {
+    for (const [id, lo, hi] of CENTER[style]) {
+      for (const [tag, v] of [['min', lo], ['max', hi]]) {
+        rows.push({ label: `${style} × ${id} ${tag} (${v})`, set: [{ id: 'centerStyle', value: style }, { id, value: String(v) }] });
+      }
+    }
+  }
+  const ALL = ['petalCount', 'petalLength', 'petalWidth', 'petalTilt', 'petalBaseTaper', 'petalTipTaper', 'petalTipBreadth', 'spread'];
+  for (const [tag, k] of [['MIN', 0], ['MAX', 1]]) {
+    rows.push({ label: `ALL ${tag} (centre off)`, set: ALL.map((id) => ({ id, value: String(RANGE[id][k]) })) });
+  }
+  for (const [tag, k] of [['MIN', 0], ['MAX', 1]]) {
+    for (const style of STYLES_F) {
+      rows.push({
+        label: `ALL ${tag} × ${style} ${k === 0 ? 'min' : 'max'}`,
+        set: [
+          ...ALL.map((id) => ({ id, value: String(RANGE[id][k]) })),
+          { id: 'centerStyle', value: style },
+          ...CENTER[style].map(([id, lo, hi]) => ({ id, value: String(k === 0 ? lo : hi) })),
+        ],
+      });
+    }
+  }
+  rows.push({ label: 'CAPABILITY: claw (non-monotone width)', set: [], capability: CAPABILITY_CLAW });
+  rows.push({ label: 'CAPABILITY: cleft (two-span domain)', set: [], capability: CAPABILITY_CLEFT });
   return rows;
 }
 

@@ -25,6 +25,12 @@
      --full     the live `buildMatrix()` — for comparing two trees that share a
                 matrix, where the question is not "did anything move" but
                 "did exactly the right things move".
+     --phase3   `phase3Matrix()` — the 86 rows frozen at 6626961, the commit
+                before the four form curves. The like-for-like baseline for
+                the FORM layer. Run BOTH this and --phase2 for a form
+                change: the 76 are then the rows whose bytes are unmoved
+                across two consecutive feature layers, which neither matrix
+                claims on its own.
      --phase2   `phase2Matrix()` — the 76 rows frozen at 21d4602, the commit
                 before the petal silhouette model. This is the like-for-like
                 baseline for the silhouette engine: `--full` cannot do that
@@ -94,7 +100,7 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2] --root <dir> --out <file.json>
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2|--phase3] --root <dir> --out <file.json>
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
@@ -105,7 +111,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -258,11 +264,12 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 
 const FULL = process.argv.includes('--full');
 const PHASE2 = process.argv.includes('--phase2');
+const PHASE3 = process.argv.includes('--phase3');
 if (FULL && PHASE2) { console.error('pick one matrix: --full or --phase2'); process.exit(2); }
 const MATRIX = FULL ? 'full' : PHASE2 ? 'phase2' : 'legacy';
 const rows = [];
 const validity = [];
-for (const row of (FULL ? buildMatrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {
+for (const row of (FULL ? buildMatrix() : PHASE3 ? phase3Matrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {
   await openBloom(page, port);
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }

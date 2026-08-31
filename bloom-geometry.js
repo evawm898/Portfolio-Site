@@ -210,9 +210,11 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
    — the picture exists (tools/shot-bloom-silhouette.mjs), and a fresh
    ruling needs a fresh picture.
 
-   NO FORM WORK LIVES HERE. Cup, spine curl, cross-section roll and twist
-   are the NEXT session (charter: the four curve terms). Sheets stay flat:
-   one normal per row, constant across the width, exactly as before.
+   NO FORM WORK LIVES HERE — the four curves are a separate layer with its
+   own owner (petalForm, below). This file's silhouette layer answers "how
+   WIDE is the blade at u" and nothing else; the form layer answers "where
+   in space does that width sit". Keeping them apart is what lets the byte
+   report attribute a moved export to one or the other.
    =================================================================== */
 
 /* The blunt-tip floor. A zero-width tip row would collapse the rim strip
@@ -360,6 +362,250 @@ export function trimPanels(rowCount, uAt, cap) {
 }
 
 /* ===================================================================
+   THE PETAL'S 3D FORM — the four curves, and they are not interchangeable.
+
+   The flower project lost a full session to conflating these, and its
+   working agreements carry a table for exactly that reason. Never accept
+   "curly" as a spec; ask which one.
+
+     PETAL CUP          parabolic lift ACROSS the width — cupped spoon
+                        through flat to reflexed.
+     SPINE CURL         bend ALONG the length — up to fiddlehead territory,
+                        and below the bloom plane in the reflex direction.
+     CROSS-SECTION ROLL curl ACROSS the width — flat sheet toward a quilled
+                        tube.
+     TWIST              rotation about the midrib ALONG the length —
+                        contorted aestivation, chirality.
+
+   No amount of range on one produces another. A fiddlehead is spine curl; a
+   quill is cross-section roll; a taco is cup. Cup and roll BOTH bend the
+   cross-section and are the pair most easily confused — what separates them
+   is the LAW, not the look: roll is a constant-curvature arc and is
+   isometric (it can close into a tube), cup is a parabolic lift and is not
+   (it can never wrap, and it is signed through flat into reflexed).
+
+   ORDER OF APPLICATION, and why it is not free:
+     1. SPINE CURL      builds the centreline and the row's base frame.
+     2. TWIST           rotates the width/normal pair about the CURLED
+                        length direction.
+     3. CROSS-SECTION   ROLL maps v to an arc in the row's (T, N) plane.
+     4. CUP             adds its lift along that row's N, after the roll.
+
+   1 before 2 because curl's bend axis IS the width direction: twisting
+   first would rotate the bend axis along the length and the spine would
+   WRITHE into a helix instead of curling in a plane — a fiddlehead would
+   stop being a fiddlehead. 2 before 3 and 4 because roll and cup are
+   cross-section shape IN THE ROW'S FRAME; expressed in an untwisted frame,
+   "across the width" stops meaning across the width. 3 before 4 because
+   roll decides where material sits along the arc and cup then lifts along
+   the rolled normal; reversing them rotates cup's lift into the width
+   direction and cup stops being a lift at all.
+
+   1 and 2 are FRAME operations — rigid per row, no metric change across the
+   width at all. 3 and 4 are CROSS-SECTION operations. That split is why
+   only roll and cup have a |dP/dv| story, and it is measured rather than
+   asserted (see `metricMin`/`metricMax` in the telemetry below).
+
+   PETAL TILT IS NOT SPINE CURL, and the code says so in one line:
+   `phi(u) = petalTilt + curl*u`. Tilt is the CONSTANT OF INTEGRATION — the
+   frame at u = 0, zero derivative, the whole blade rotating rigidly. Curl
+   is the RATE. They rotate about the same axis, which is exactly why they
+   get conflated, and being the two terms of one affine angle function is
+   what makes them unambiguous. `tilt 0 + curl 360` is a flat-emerging
+   fiddlehead; `tilt 75 + curl 0` is an upright straight petal; neither is
+   reachable from the other.
+
+   WHERE THE INFLUENCE BEGINS: strictly u > 0, and stronger than "we do not
+   write the foot rows". Curl and twist are EXACTLY zero at u = 0 by
+   construction (phi(0) = tilt, tau(0) = 0). Roll and cup are not naturally
+   zero there, so both ramp in over FORM_ONSET_END. All four therefore have
+   identically zero influence at the junction, which is what makes the foot
+   invariant structural rather than a matter of inspection.
+
+   BYTE-IDENTITY AT DEFAULTS is a GUARD, deliberately, and not the IEEE-754
+   argument the silhouette engine used. Cup would survive one (`+ N*(0*h*v*v)`
+   adds exactly +0) and twist very nearly would (`cos(0) === 1`,
+   `sin(0) === 0` — but `T = [-sinA, cosA, 0]` is `-0` in its first
+   component at azimuth 0, and `-0 + 0` is `+0`). Roll and curl cannot
+   survive one at all: both carry a `1/kappa` that is a genuine 0/0 limit at
+   zero. So rather than rest byte-identity on a case analysis about signed
+   zero, `petalFormIsFlat()` short-circuits to the pre-form expression
+   verbatim, and byte-identity becomes the statement that the shipped
+   default executes the same instructions as before. The guard is not
+   allowed to hide a wrong form path: `formGuardResidual` in the metrics
+   measures the zero-form law against the flat law at every emitted point,
+   and both gates assert it below 1e-9 on every row.
+   =================================================================== */
+
+/* Where the form curves have fully faded in, as a fraction of blade length.
+   Deliberately NOT sharing ROOT_BLEND_END's constant even though both are
+   0.30 today: the root blend answers "where does the foot stop flooring the
+   width", this answers "where has the form reached full strength". Two
+   different boundaries that happen to share a length scale — collapsing
+   them would mean a later change to one silently moved the other, which is
+   the registration rule misapplied rather than obeyed. */
+export const FORM_ONSET_END = 0.30;
+
+/* THE ROLL CURVATURE FLOOR — cap the OUTPUT, never an input proxy.
+   A rolled sheet's inner offset surface sits at `radius - t/2`. Let the
+   radius fall to t/2 and that surface inverts: the solid turns inside out
+   and self-intersects while staying watertight and connected, so NEITHER
+   GATE CAN SEE IT. Measured at the ranges that ship: petalWidth 8 asks for
+   a 0.637 mm radius at a full turn, leaving 0.037 mm of inner wall. The
+   floor is one full sheet thickness, so the inner surface keeps t/2 of
+   radius at the tightest reachable fold and the control saturates instead
+   of degenerating. Like every structural number in this project family this
+   is an ASSUMPTION with a number attached, not a printed result. */
+export const ROLL_MIN_RADIUS_FACTOR = 1.0;
+
+const D2R = Math.PI / 180;
+
+/* THE GUARD's predicate, exported so the app, the builder and the gates all
+   ask the same question. Exact zero comparisons: every one of the four
+   defaults IS exactly 0, and a range input at its default yields it. */
+export function petalFormIsFlat(state) {
+  return state.petalCup === 0 && state.petalSpineCurl === 0
+      && state.petalRoll === 0 && state.petalTwist === 0;
+}
+
+/* THE ONE OWNER of the four curves. Always returns the law (it is the
+   CALLER that decides whether to use it — see petalFormIsFlat), so the
+   zero-form law is constructible for the guard's residual check.
+
+   `halfW` and `t` are passed rather than recomputed: the roll clamp must be
+   expressed against the thickness the solids are ACTUALLY built at, or the
+   floor would protect a wall nothing has. */
+export function petalForm(state, halfW, t) {
+  const cup = state.petalCup;
+  const curlRad = state.petalSpineCurl * D2R;
+  const twistRad = state.petalTwist * D2R;
+
+  /* Roll: the control asks for a WRAP ANGLE at the nominal half-width, and
+     the geometry answers with a CURVATURE. One curvature for the whole
+     petal means the quill is a tube of one radius; the alternative (one
+     wrap angle per row, radius proportional to that row's half-width) puts
+     a 0.127 mm radius at the 0.8 mm tip row and inverts on every petal. */
+  const kReq = (state.petalRoll * D2R) / halfW;
+  const kMax = 1 / (ROLL_MIN_RADIUS_FACTOR * t);
+  const kappa = Math.sign(kReq) * Math.min(Math.abs(kReq), kMax);
+  const clamped = Math.abs(kReq) > kMax;
+
+  const ramp = (u) => (u >= FORM_ONSET_END ? 1 : u / FORM_ONSET_END);
+
+  /* The row's frame. ONE definition, read by the row loop and by the
+     contact sheet's framing alike — under twist the width direction is not
+     the ring tangent any more, so a consumer recomputing it would not
+     merely be a second owner, it would be wrong. */
+  const frameAt = (R, T, phi, u) => {
+    const N0 = [-R[0] * Math.sin(phi), -R[1] * Math.sin(phi), Math.cos(phi)];
+    const tau = twistRad * u;
+    const ct = Math.cos(tau), st = Math.sin(tau);
+    return {
+      D: [R[0] * Math.cos(phi), R[1] * Math.cos(phi), Math.sin(phi)],
+      T: [T[0] * ct + N0[0] * st, T[1] * ct + N0[1] * st, T[2] * ct + N0[2] * st],
+      N: [-T[0] * st + N0[0] * ct, -T[1] * st + N0[1] * ct, -T[2] * st + N0[2] * ct],
+    };
+  };
+
+  /* The cross-section, in the row's own (T, N) plane. `a = h*v` is
+     millimetres from the midrib, so the roll is an arc parameterised BY ARC
+     LENGTH — which is what makes it isometric: |d(aT, aN)/da| is
+     (cos, sin) and has magnitude exactly 1 at every sample.
+
+     The normal travels with the point. A rolled sheet offset by one
+     constant per-row normal is a wedge of varying thickness, not a sheet;
+     the unit normal here is dP/dv rotated a quarter turn in the same
+     plane, which keeps the offset a true constant-thickness shell. */
+  const sectAt = (C, T1, N1, h, u) => {
+    const r = ramp(u);
+    const k = kappa * r;
+    const c = cup * r;
+    return (v) => {
+      const a = h * v;
+      const aT = k === 0 ? a : Math.sin(k * a) / k;
+      const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k) + c * h * v * v;
+      const dT = k === 0 ? 1 : Math.cos(k * a);
+      const dN = (k === 0 ? 0 : Math.sin(k * a)) + 2 * c * v;
+      const L = Math.hypot(dT, dN);
+      const nT = -dN / L, nN = dT / L;
+      return {
+        P: [C[0] + T1[0] * aT + N1[0] * aN, C[1] + T1[1] * aT + N1[1] * aN, C[2] + T1[2] * aT + N1[2] * aN],
+        n: [T1[0] * nT + N1[0] * nN, T1[1] * nT + N1[1] * nN, T1[2] * nT + N1[2] * nN],
+      };
+    };
+  };
+
+  return {
+    curlRad, twistRad, kappa, frameAt, sectAt,
+    /* WHAT THE EXPORT CANNOT SHOW. Watertightness and connectedness are
+       measured on the STL; these are the properties a pure-displacement
+       change can break while leaving both of those green, so they are read
+       from the builder that made the geometry. Scope is printed beside
+       every gate result, never only in a header. */
+    telemetry(rows, footRows) {
+      let mMin = Infinity, mMax = -Infinity;
+      for (let i = footRows; i < rows.length; i++) {
+        const row = rows[i];
+        const rr = ramp(row.u);
+        const k = kappa * rr, c = cup * rr;
+        for (let j = 0; j < NV; j++) {
+          const v = -1 + (2 * j) / (NV - 1);
+          const a = row.h * v;
+          const dT = k === 0 ? 1 : Math.cos(k * a);
+          const dN = (k === 0 ? 0 : Math.sin(k * a)) + 2 * c * v;
+          const g = Math.hypot(dT, dN);              // |dP/dv| / h — the RATIO
+          if (g < mMin) mMin = g;
+          if (g > mMax) mMax = g;
+        }
+      }
+      /* THE EMITTED POLYLINE IS NOT THE CURVE, and that distinction is the
+         one thing the |dP/dv| ratio above cannot show. The roll is
+         isometric as a MAP — ratio exactly 1 at every sample — while the
+         panel emits NV columns, so the cross-section is an (NV-1)-segment
+         chord path inscribed in the arc and carries LESS material than the
+         flat row it came from. Measured here rather than reasoned about,
+         and printed on the contact sheet beside the picture of the
+         faceting it causes. Cup runs the other way (a parabola is longer
+         than its chord), which is why this is a range and not a deficit. */
+      let pMin = Infinity, pMax = -Infinity;
+      for (let i = footRows; i < rows.length; i++) {
+        const row = rows[i];
+        const rr = ramp(row.u);
+        const k = kappa * rr, c = cup * rr;
+        const pt = (v) => {
+          const a = row.h * v;
+          return [k === 0 ? a : Math.sin(k * a) / k,
+                  (k === 0 ? 0 : (1 - Math.cos(k * a)) / k) + c * row.h * v * v];
+        };
+        let chord = 0, prev = pt(-1);
+        for (let j = 1; j < NV; j++) {
+          const q = pt(-1 + (2 * j) / (NV - 1));
+          chord += Math.hypot(q[0] - prev[0], q[1] - prev[1]);
+          prev = q;
+        }
+        const ratio = chord / (2 * row.h);
+        if (ratio < pMin) pMin = ratio;
+        if (ratio > pMax) pMax = ratio;
+      }
+
+      return {
+        cup, curlDeg: state.petalSpineCurl, rollDeg: state.petalRoll, twistDeg: state.petalTwist,
+        polylineMin: pMin, polylineMax: pMax,
+        rollRadiusMm: kappa === 0 ? Infinity : 1 / Math.abs(kappa),
+        rollClamped: clamped,
+        /* The ratio |dP/dv| / |dP/dv|_flat. The flat sheet already has
+           |dP/dv| = h(u) (v is normalised, not arc length), so the raw
+           magnitude is not the comparable quantity — the RATIO is, and it
+           is what the flower's 1.09 / 1.75 cup numbers are. Roll holds it
+           at exactly 1; cup is the only one of the four that moves it. */
+        metricMin: mMin, metricMax: mMax,
+        onsetEnd: FORM_ONSET_END,
+      };
+    },
+  };
+}
+
+/* ===================================================================
    buildPetalInto — one petal: thin SOLID sheet panels, closed by
    construction.
 
@@ -370,7 +616,8 @@ export function trimPanels(rowCount, uAt, cap) {
                            rows. The silhouette layer never writes these.
      s in (0, length]      the BLADE — tilted by petalTilt about the ring
                            tangent, half-width from widthProfile(), domain
-                           from trimPanels(). 28 rows.
+                           from trimPanels(), and 3D FORM from petalForm().
+                           28 rows.
 
    Returns the petal's own measurements for the metrics hook, so the gates
    and the contact sheet ASK THE BUILDER rather than recomputing anything.
@@ -389,34 +636,116 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   const Z = [0, 0, 1];
 
   const profile = widthProfile(state, ring, halfW, cap);
+  /* THE GUARD. petalFormIsFlat() is the predicate; when it holds, `form`
+     stays null and every row below takes the pre-form expression verbatim.
+     That — not an IEEE-754 argument — is what makes the shipped default
+     byte-identical. */
+  const form = petalFormIsFlat(state) ? null : petalForm(state, halfW, t);
 
-  /* Row list: foot rows (flat), then blade rows. Each row: mid-surface
-     centre point C, per-row unit normal N (constant across the width — the
-     sheet is flat across its width; no cup, no roll, no twist in phase 3),
-     half-width h, and u (0 through the foot, i/NU on the blade). */
+  /* THE FLAT CROSS-SECTION, and the reason it is a closure.
+
+     Every row carries a `sect(v)` returning the mid-surface point and the
+     unit normal THERE. Flat rows return the row's own constant normal and
+     the expression `C + T*h*v` — operation for operation, in the same
+     order, as the pre-form code. Curving a sheet makes the normal vary
+     ACROSS the width (a rolled sheet offset by one constant normal is a
+     wedge, not a sheet of constant thickness), so the normal has to travel
+     with the point; making that one closure is what keeps emitPanel from
+     needing to know which law produced the row. */
+  const flatSect = (C, N, h) => (v) => ({
+    P: [C[0] + T[0] * h * v, C[1] + T[1] * h * v, C[2] + T[2] * h * v],
+    n: N,
+  });
+
   const rows = [];
+  /* THE FOOT — three flat rows in the hub plane. NOTHING in the form layer
+     reaches them: they are emitted here, from footRing()'s quantities only,
+     before any curve exists. That is the whole junction argument, and
+     `node tools/diff-bloom-bytes.mjs --region foot` is what measures it. */
   const footS = [-ring.overhang, -ring.overhang / 2, 0];
   for (const s of footS) {
-    rows.push({
-      C: [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z],
-      N: Z, h: footHalf, u: 0,
-    });
+    const C = [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z];
+    rows.push({ C, N: Z, T, h: footHalf, u: 0, sect: flatSect(C, Z, footHalf) });
   }
+
   const dir = [R[0] * Math.cos(tilt), R[1] * Math.cos(tilt), Math.sin(tilt)];       // blade direction
   const nrm = [-R[0] * Math.sin(tilt), -R[1] * Math.sin(tilt), Math.cos(tilt)];     // blade sheet normal
+  const base = [ring.radius * R[0], ring.radius * R[1], slot.z];
+
+  /* THE SPINE. Straight when there is no curl — the same expression as
+     before — and a constant-curvature arc when there is. The arc is the
+     integral of a direction whose angle is `tilt + kappa*s`, so at s = 0 it
+     leaves the foot at exactly the tilt angle and exactly the ring: curl
+     moves the TIP, never the attachment. That is why curl cannot disturb
+     the foot even though it acts on the frame the foot's neighbour uses. */
+  const kC = form ? form.curlRad / length : 0;
+  const spineAt = kC === 0
+    ? (s) => ({
+      C: [base[0] + dir[0] * s, base[1] + dir[1] * s, base[2] + dir[2] * s],
+      phi: tilt,
+    })
+    : (s) => {
+      const phi = tilt + kC * s;
+      const dR = (Math.sin(phi) - Math.sin(tilt)) / kC;
+      const dZ = (Math.cos(tilt) - Math.cos(phi)) / kC;
+      return { C: [base[0] + R[0] * dR, base[1] + R[1] * dR, base[2] + dZ], phi };
+    };
+
   for (let i = 1; i <= NU; i++) {
     const u = i / NU;
     const s = u * length;
-    rows.push({
-      C: [ring.radius * R[0] + dir[0] * s, ring.radius * R[1] + dir[1] * s, slot.z + dir[2] * s],
-      N: nrm, h: profile.halfWidthAt(u), u,
-    });
+    const h = profile.halfWidthAt(u);
+    const { C, phi } = spineAt(s);
+    if (!form) { rows.push({ C, N: nrm, T, h, u, sect: flatSect(C, nrm, h) }); continue; }
+    /* The row's own frame, READ from petalForm's frameAt rather than
+       recomputed here — the contact sheet's framing reads the same
+       function, and two copies of a frame is how this project's most
+       repeated defect starts. Twist follows the spine because frameAt
+       rotates about the CURRENT length direction; see the ordering
+       argument in petalForm's header. */
+    const f = form.frameAt(R, T, phi, u);
+    rows.push({ C, N: f.N, T: f.T, D: f.D, h, u, sect: form.sectAt(C, f.T, f.N, h, u) });
   }
 
   const panels = trimPanels(rows.length, (i) => rows[i].u, cap);
-  for (const panel of panels) emitPanel(acc, rows, panel, t, T);
+  for (const panel of panels) emitPanel(acc, rows, panel, t);
+
+  /* THE GUARD'S OWN CHECK — the thing that stops the short-circuit hiding
+     a wrong form path. On shipped (flat) builds only, and for slot 0 only,
+     the ZERO-form law is constructed and evaluated at every point the flat
+     law just emitted, frame included. The frame comparison is not padding:
+     it is precisely where the signed-zero case lives (`T = [-sinA, cosA, 0]`
+     is `-0` in its first component at azimuth 0, and `-0 + 0` is `+0`),
+     which is the case that made a pure IEEE-754 argument unattractive in
+     the first place. Both gates assert this below 1e-9 on every row. */
+  let guardResidual = null;
+  if (!form && slot.index === 0) {
+    const zero = petalForm({ petalCup: 0, petalSpineCurl: 0, petalRoll: 0, petalTwist: 0 }, halfW, t);
+    guardResidual = 0;
+    const dev = (a, b) => { for (let k = 0; k < 3; k++) guardResidual = Math.max(guardResidual, Math.abs(a[k] - b[k])); };
+    for (let i = footS.length; i < rows.length; i++) {
+      const row = rows[i];
+      const zf = zero.frameAt(R, T, tilt, row.u);
+      dev(zf.T, T); dev(zf.N, nrm);
+      const zs = zero.sectAt(row.C, row.T, row.N, row.h, row.u);
+      for (let j = 0; j < NV; j++) {
+        const v = -1 + (2 * j) / (NV - 1);
+        const A = row.sect(v), B = zs(v);
+        dev(A.P, B.P); dev(A.n, B.n);
+      }
+    }
+  }
 
   const midS = 0.5 * length;
+  const midRow = spineAt(midS);
+  /* The blade's own frame AT THE MIDPOINT, for the contact sheet's framing.
+     Reported rather than re-derived: face-on is down the normal, profile is
+     down the width direction, and a shot tool recomputing either from tilt
+     and azimuth would be a second owner of the petal frame — which under
+     curl and twist would also be WRONG, since neither is constant along the
+     blade any more. */
+  const midU = 0.5;
+  const midFrame = form ? form.frameAt(R, T, midRow.phi, midU) : { T, N: nrm };
   return {
     /* Row half-widths, FOOT ROWS INCLUDED — a claw is narrower than both
        its foot and its blade, so the foot rows are part of the evidence. */
@@ -424,21 +753,43 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     footRows: footS.length,
     panels: panels.map((p) => p.label),
     tipSpans: panels.filter((p) => p.rowTo === rows.length - 1).length,
-    mid: [ring.radius * R[0] + dir[0] * midS, ring.radius * R[1] + dir[1] * midS, slot.z + dir[2] * midS],
-    /* The blade's own sheet normal — what a face-on view of the SILHOUETTE
-       must look down. Reported rather than re-derived by the shot tool: a
-       consumer recomputing this from tilt and azimuth would be a second
-       owner of the petal frame. */
-    normal: nrm,
-    tip: [ring.radius * R[0] + dir[0] * length, ring.radius * R[1] + dir[1] * length, slot.z + dir[2] * length],
+    mid: midRow.C,
+    normal: midFrame.N,
+    /* The width direction — a PROFILE view looks down this. New in the form
+       session: with a flat sheet it was the ring tangent and a consumer
+       could get away with recomputing it; under twist it is not. */
+    tangent: midFrame.T,
+    /* The blade's LENGTH direction at the midpoint. An END-ON view looks
+       down this, and end-on is the only view a cross-section curve is
+       visible in at all — face-on shows the silhouette, profile shows the
+       spine. Three views because there are three planes and the four curves
+       do not all live in one. Derived here from the same frame the geometry
+       used; the flat case is the tilted blade direction exactly. */
+    axis: form ? midFrame.D : dir,
+    tip: spineAt(length).C,
+    /* FORM TELEMETRY — what the structural assertions read. The gates
+       measure watertightness and connectedness on the export; these are the
+       properties the export CANNOT show, read from the builder that made
+       the geometry. Scope is printed beside every result, never only here. */
+    form: form ? form.telemetry(rows, footS.length) : null,
+    guardResidual,
+    footFrames: rows.slice(0, footS.length).map((r) => ({ C: r.C, N: r.N, T: r.T, h: r.h })),
   };
 }
 
 /* One panel: a single-span quad grid, individually closed. Emission order
    is the placeholder's exactly — all face quads, then both side rims, then
    the two end caps — because at the default there is exactly ONE panel and
-   the byte report is a two-sided assertion that nothing moved. */
-function emitPanel(acc, rows, panel, t, T) {
+   the byte report is a two-sided assertion that nothing moved.
+
+   THE ROW OWNS ITS CROSS-SECTION. This asks each row for the mid-surface
+   point and the unit normal AT that point, rather than adding a per-row
+   constant normal itself: a curved cross-section has a normal that varies
+   across the width, and offsetting it by one constant would build a wedge
+   instead of a sheet. For a flat row the closure returns the row's own
+   constant normal and the same expression as before, so the shipped default
+   is unmoved — which the byte report measures rather than assumes. */
+function emitPanel(acc, rows, panel, t) {
   const top = [], bot = [];
   for (let i = panel.rowFrom; i <= panel.rowTo; i++) {
     const row = rows[i];
@@ -446,18 +797,18 @@ function emitPanel(acc, rows, panel, t, T) {
     const vLo = span[0], vHi = span[1];
     const ht = [], hb = [];
     for (let j = 0; j < NV; j++) {
+      /* The span-form column map. A trimmed panel evaluates the row's
+         cross-section at ITS OWN v values, and the cross-section is a
+         function of the GLOBAL v — so a cleft's two lobes stay on the one
+         arc their base panel is on instead of drifting onto two of their
+         own. That is what keeps a rolled cleft one connected body. */
       const v = vLo + ((vHi - vLo) * j) / (NV - 1);
-      const P = [
-        row.C[0] + T[0] * row.h * v,
-        row.C[1] + T[1] * row.h * v,
-        row.C[2] + T[2] * row.h * v,
-      ];
-      ht.push([P[0] + row.N[0] * t / 2, P[1] + row.N[1] * t / 2, P[2] + row.N[2] * t / 2]);
-      hb.push([P[0] - row.N[0] * t / 2, P[1] - row.N[1] * t / 2, P[2] - row.N[2] * t / 2]);
+      const { P, n } = row.sect(v);
+      ht.push([P[0] + n[0] * t / 2, P[1] + n[1] * t / 2, P[2] + n[2] * t / 2]);
+      hb.push([P[0] - n[0] * t / 2, P[1] - n[1] * t / 2, P[2] - n[2] * t / 2]);
     }
     top.push(ht); bot.push(hb);
   }
-
   const NR = top.length;
   /* Top face (outward = +N side) and bottom face (reversed winding). */
   for (let i = 0; i < NR - 1; i++) {
