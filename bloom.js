@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import { CONTROLS, DEFAULTS, evalPredicate } from './bloom-registry.js';
+import { CONTROLS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
@@ -26,8 +26,26 @@ const inputs = {};   // id -> input element
 const valSpans = {}; // id -> read-out span
 const wrappers = {}; // id -> control wrapper div
 
+function makeInput(c) {
+  if (c.kind === 'slider') {
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = c.min; input.max = c.max; input.step = c.step;
+    return input;
+  }
+  if (c.kind === 'choice') {
+    const sel = document.createElement('select');
+    for (const o of c.options) {
+      const opt = document.createElement('option');
+      opt.value = o.value; opt.textContent = o.label;
+      sel.append(opt);
+    }
+    return sel;
+  }
+  throw new Error(`unhandled control kind "${c.kind}" for ${c.id}`);
+}
+
 for (const c of CONTROLS) {
-  if (c.kind !== 'slider') throw new Error(`unhandled control kind "${c.kind}" for ${c.id}`);
   const wrap = document.createElement('div');
   wrap.className = 'bl-ctrl';
   const label = document.createElement('label');
@@ -36,24 +54,33 @@ for (const c of CONTROLS) {
   const val = document.createElement('span');
   val.className = 'bl-val';
   label.append(val);
-  const input = document.createElement('input');
-  input.type = 'range';
+  const input = makeInput(c);
   input.id = c.id;
-  input.min = c.min; input.max = c.max; input.step = c.step;
   input.value = c.default;
   wrap.append(label, input);
   panelRoot.append(wrap);
   inputs[c.id] = input; valSpans[c.id] = val; wrappers[c.id] = wrap;
 }
 
+/* Coercion is the REGISTRY's rule, imported — not re-decided here. A slider
+   is a number and a choice is a string; a local `Number(...)` would turn
+   centerStyle into NaN, which reads back as a legitimate-looking value and is
+   how a gate ends up measuring a design other than the one it names. */
 function readUI() {
   const out = {};
-  for (const c of CONTROLS) out[c.id] = Number(inputs[c.id].value);
+  for (const c of CONTROLS) out[c.id] = coerceValue(c, inputs[c.id].value);
   return out;
 }
 /* Harness hook: gates read the app's own state snapshot rather than keeping a
    second copy of readUI's coercion rules. */
 window.__bloomUIState = () => readUI();
+
+/* Harness hooks for the contact sheet, same doctrine as body.bl-preview: the
+   tool ASKS THE APP rather than recomputing. __bloomMetrics reports the live
+   build's own numbers so a caption can never disagree with the model in the
+   frame; __bloomFrame drives the app's own fitCamera so the centre zoom is
+   the real camera at a different radius, not a crop guessing at projection.
+   Assigned after the scene exists — see below. */
 
 function refreshLabels(ui) {
   for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id]);
@@ -100,11 +127,18 @@ scene.add(key);
 const material = new THREE.MeshStandardMaterial({ color: 0xc9dfd2, roughness: 0.62, metalness: 0.05 });
 let mesh = null;
 
-function fitCamera(radius) {
+/* THE ONE OWNER of "frame a sphere of this radius". The automatic fit and the
+   contact sheet's centre zoom are the same operation at two radii, so they are
+   the same function; a screenshot tool re-deriving the projection would be a
+   second copy of the camera rule, which is this project's most repeated
+   defect wearing a lens. `lift` raises the orbit target off the origin — the
+   whole-bloom view looks slightly up into the whorl, a centre crop looks
+   straight at the hub plane. */
+function fitCamera(radius, lift = 0.15) {
   const d = Math.max(40, radius * 2.6);
   camera.position.set(d * 0.75, -d * 0.75, d * 0.6);
   camera.up.set(0, 0, 1);
-  controls.target.set(0, 0, radius * 0.15);
+  controls.target.set(0, 0, radius * lift);
 }
 
 function resize() {
@@ -118,29 +152,51 @@ resize();
 
 /* ---------------- build ---------------- */
 const readout = document.getElementById('readout');
-let liveTris = 0;
+let liveSummary = '';
+
+let lastRing = { radius: 0, derivedRadius: 0 };
+let lastCenter = { style: 'NONE', tris: 0 };
+let lastTris = 0, lastMaxDim = 0;
 
 function buildGeometry({ exportMode }) {
   const acc = new MeshBuilder({ exportMode });
-  buildBloomInto(acc, readUI(), { below: null });   // 'stem' | 'branch' | null — null is phase 1's only state
+  const built = buildBloomInto(acc, readUI(), { below: null });   // 'stem' | 'branch' | null — null is phase 1's only state
+  if (!exportMode) { lastRing = built.ring; lastCenter = built.center; lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm; }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
   geo.computeVertexNormals();
   return { geo, acc };
 }
 
+/* The readout's one-line summary. Every number carries its MODE, because live
+   and export are different geometry and not convertible.
+
+   MAX DIM is reported, never enforced. Reachable states cross process caps —
+   dyed PA12 tops out near 180 mm on the shortest axis, standard white goes
+   much larger, and SLS nests in any orientation so the only question is
+   whether the box fits. Which cap applies is the user's call at order time,
+   so this is a number at the slider, not a clamp and not a refusal. (The one
+   thing this generator DOES refuse is triangle count, because that is a
+   property of the file rather than of somebody's process.) */
+function summarise(ui, acc, mode) {
+  const tris = acc.triangleCount.toLocaleString('en-US');
+  const dim = acc.maxDimensionMm.toFixed(1);
+  return `petals ${ui.petalCount} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}\n`
+       + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
+}
+
 function regenerate() {
   const ui = readUI();
   refreshLabels(ui);
-  const { geo } = buildGeometry({ exportMode: false });
+  const { geo, acc } = buildGeometry({ exportMode: false });
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
   else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
-  liveTris = geo.getAttribute('position').count / 3;
   if (!userMoved) {
     geo.computeBoundingSphere();
     fitCamera(geo.boundingSphere.radius);
   }
-  readout.textContent = `petals ${ui.petalCount} · tris (live) ${liveTris.toLocaleString('en-US')}`;
+  liveSummary = summarise(ui, acc, 'live');
+  readout.textContent = liveSummary;
 }
 
 /* rAF-coalesced rebuild: many input events per frame, one build. */
@@ -160,7 +216,7 @@ for (const c of CONTROLS) {
 document.getElementById('exportStl').addEventListener('click', () => {
   const ui = readUI();
   const { geo, acc } = buildGeometry({ exportMode: true });
-  const exportTris = geo.getAttribute('position').count / 3;
+  const exportTris = acc.triangleCount;   // the accumulator owns the count, in both modes
   if (exportTris > EXPORT_TRI_BUDGET) {
     geo.dispose();
     readout.innerHTML = `<span class="bl-err">export refused: ${exportTris.toLocaleString('en-US')} tris (export) exceeds the ${EXPORT_TRI_BUDGET.toLocaleString('en-US')} budget</span>`;
@@ -178,10 +234,24 @@ document.getElementById('exportStl').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   /* Both counts, both LABELLED — live and export modes are not convertible
      (the export floor changes geometry), so one word never covers both. */
-  readout.textContent =
-    `petals ${ui.petalCount} · tris (live) ${liveTris.toLocaleString('en-US')}\n` +
-    `exported bloom.stl · tris (export) ${exportTris.toLocaleString('en-US')} · min sheet ${acc.minThickness.toFixed(2)} mm`;
+  readout.textContent = `${liveSummary}\n`
+    + `exported bloom.stl · ${summarise(ui, acc, 'export').split('\n')[1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
+
+/* Contact-sheet hooks (see the note beside __bloomUIState). __bloomFrame sets
+   userMoved so the next rebuild's automatic refit does not silently undo the
+   framing the tool just asked for — a screenshot of a camera that moved back
+   is exactly the class of instrument error that padded the flower's pixel
+   diffs for months. */
+window.__bloomMetrics = () => ({
+  ringRadius: lastRing.radius,
+  derivedRadius: lastRing.derivedRadius,
+  centerStyle: lastCenter.style,
+  centerTris: lastCenter.tris,
+  liveTris: lastTris,
+  maxDimMm: lastMaxDim,
+});
+window.__bloomFrame = (radius, lift = 0.15) => { userMoved = true; fitCamera(radius, lift); };
 
 /* ---------------- go ---------------- */
 applyVisibility();
