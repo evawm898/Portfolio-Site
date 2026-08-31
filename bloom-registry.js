@@ -165,11 +165,19 @@ export function predicateDrivers(pred, out = new Set()) {
      no designs yet (see RETIRED_IDS above), so no saved value can be
      misread. The first feature that persists a design inherits that debt.
 
-   - `centerStyle` is an A/B RIG, not a shipped aesthetic. NONE is the default
-     and REMAINS the default — Eva's ruling, Aug 31, after seeing the contact
-     sheet: the archetype decision is DEFERRED until after the petal-shape
-     phase, because the placeholder ovate petals are stand-ins and a dome or a
-     ring should be judged against the real silhouettes it will sit among, not
+   - `centerStyle` WAS an A/B rig and is now a shipped aesthetic: **DISC is the
+     default** (Eva, Aug 31, ruled after the form phase against petals with
+     real cup, curl, roll and twist). The deferral it replaces was correct and
+     is recorded in docs/bloom-charter.md with both halves — the session-2 note
+     that the archetypes were "visually indistinguishable" was measuring them
+     against FLAT PLACEHOLDER blades, and that subject no longer exists.
+     The default moved as a SECOND EVENT under the spread precedent: the rig
+     landed byte-identical, and the default changed later, on evidence, with a
+     partition report. Sub-control defaults are unchanged. The superseded
+     reasoning ran: the archetype decision is DEFERRED until after the
+     petal-shape phase, because the placeholder ovate petals are stand-ins and
+     a dome or a ring should be judged against the real silhouettes it will
+     sit among, not
      against placeholders. Nothing is deleted and no style is promoted: the rig
      stays in the codebase as a built, gated capability and the question
      reopens when petals stop being placeholders.
@@ -358,7 +366,7 @@ export const CONTROLS = [
     visibleWhen: { all: [] } },
 
   /* CENTER — the A/B rig. */
-  { id: 'centerStyle', kind: 'choice', default: 'NONE',
+  { id: 'centerStyle', kind: 'choice', default: 'DISC',
     options: [
       { value: 'NONE', label: 'None' },
       { value: 'DOME', label: 'Dome' },

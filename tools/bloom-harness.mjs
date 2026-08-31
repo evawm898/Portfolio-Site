@@ -410,13 +410,15 @@ export async function formAssertions(page, row) {
    must be added here — a control with no min/default/max rows is unknown, not
    passing.
 
-   CENTRE COVERAGE STARTS FROM WHAT SHIPS. `centerStyle` defaults to NONE, so
-   the default row and the whole arrangement sweep exercise the bloom with NO
-   centre at all — which is the shipping configuration and stays the state
-   most rows measure. The centre is then exercised ON across every style. The
-   flower shipped a 7-piece bare bloom for months because every gate row
-   enabled the thing that hid the defect; the same mistake here would be a
-   matrix where every row turned the centre on.
+   CENTRE COVERAGE STARTS FROM WHAT SHIPS — AND WHAT SHIPS CHANGED. Until the
+   archetype ruling, `centerStyle` defaulted to NONE, so the default row and
+   the whole arrangement sweep exercised the bare bloom for free. DISC is the
+   default now, which silently DELETED that coverage: NONE went from "most
+   rows" to zero rows in one character. That is precisely the flower's defect
+   — it shipped a 7-piece bare bloom for months because every gate row enabled
+   the thing that hid it — so NONE is now covered EXPLICITLY, by its own named
+   row and by the same spread sweep the three styles get. A default is not
+   coverage; it is only coverage until someone changes it.
 
    A SUB-CONTROL ROW CARRIES THE STYLE THAT ENABLES IT. `centerRise` at its
    maximum with centerStyle NONE builds no dome and measures nothing, while
@@ -431,6 +433,10 @@ export async function formAssertions(page, row) {
    measuring a NaN.
    =================================================================== */
 const STYLES = ['DOME', 'DISC', 'RING'];
+/* Every centre state the model can be in, NONE included. STYLES drives the
+   sub-control blocks (NONE has no sub-controls to sweep); this drives the
+   coverage that must exist whatever the default happens to be. */
+const CENTRE_STATES = ['NONE', ...STYLES];
 /* The sub-control each style enables — read from the registry's own
    visibility predicates, never hand-listed, so a new gated control cannot be
    added without the matrix noticing. */
@@ -477,7 +483,7 @@ export function buildMatrix() {
         The spread-1.00 row of each style is also that style's plain
         defaults-elsewhere row. */
   const spread = CONTROLS.find((c) => c.id === 'spread');
-  for (const style of STYLES) {
+  for (const style of CENTRE_STATES) {
     /* The tag is 'default', never the default's current VALUE spelled out: an
        earlier version hardcoded '1.00' beside `spread.default`, so the moment
        Eva ruled the default to 2.00 every one of these rows printed
@@ -510,10 +516,17 @@ export function buildMatrix() {
         deliberately ugly state: the ring is tighter than the area rule's
         derived radius and the feet cross the axis. */
   const extremes = [['MIN', 'min'], ['MAX', 'max']];
+  /* PINNED to NONE, not inheriting it. These rows are named "(centre off)"
+     and under a DISC default an inherited value would have made that label a
+     lie — the exact defect shape this project keeps finding, arriving here as
+     a side effect of a one-character default change rather than as new code. */
   for (const [tag, k] of extremes) {
     rows.push({
       label: `ALL ${tag} (centre off)`,
-      set: SLIDERS().filter((c) => c.role !== 'center').map((c) => ({ id: c.id, value: String(c[k]) })),
+      set: [
+        ...SLIDERS().filter((c) => c.role !== 'center').map((c) => ({ id: c.id, value: String(c[k]) })),
+        { id: 'centerStyle', value: 'NONE' },
+      ],
     });
   }
   for (const [tag, k] of extremes) {

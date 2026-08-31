@@ -60,10 +60,14 @@ What changes from the flower project:
   Conflating them cost the flower project several cycles.
 - **`below: null` is the only state** for now — but keep the `below` parameter shape
   (`'stem' | 'branch' | null`, never a boolean) so a stem later is a value, not a rewrite.
-- **Gate coverage starts where the flower's gate was blind:** the bare bloom *is* the
-  shipping default here, so the connectedness gate's first rows are the default and every
-  preset, before any interesting cases. The flower shipped a 7-piece bare bloom for
-  months because every gate row enabled the thing that hid the defect.
+- **Gate coverage starts where the flower's gate was blind** — and a DEFAULT IS NOT
+  COVERAGE. The bare bloom was the shipping default for phases 1–3, so it was exercised
+  by the default row and the whole arrangement sweep for free. The archetype ruling made
+  DISC the default and deleted that coverage in one character: NONE went from "most rows"
+  to zero. It now has EXPLICIT rows — its own named spread sweep and the two pinned
+  "(centre off)" corners — because the flower shipped a 7-piece bare bloom for months
+  precisely because every gate row enabled the thing that hid the defect. Whenever a
+  default moves, check what it stopped covering.
 - Sheets change the failure modes: fewer free-wire hazards, more thin-wall ones. The
   connectedness gate still can't see a free end — carry that limitation forward in its
   header.
@@ -156,19 +160,35 @@ printer — and sheet petals add a min-wall coupon to that list.
   the ruling itself is still open.** Eva's ruling at phase-2 entry was that the question is
   not answered by argument: three archetypes ship behind one `centerStyle` choice —
   DOME (rounded boss), DISC (flat/dished button), RING (open torus collar) — plus NONE,
-  which is and remains the default until she rules from the contact sheet. Wiring the
-  winner as the default is a later session's job. The centre is DESIGNED and user-chosen;
+  which remained the default until she ruled from the contact sheet. **She has: DISC,
+  Aug 31, after the form phase — see the archetype entry below.** The centre is DESIGNED and user-chosen;
   the junction stays derived and control-free beneath it, and the registry's `role` field
   now carries that split (`center` vs. the deliberate absence of any `junction` row).
 
-- **The archetype ruling itself — DEFERRED until after the petal-shape phase (Eva,
-  Aug 31), from the contact sheet.** `centerStyle` stays NONE by default; nothing is
-  deleted and no style is promoted. The rig remains in the codebase as a built, gated
-  capability. The reason is a finding from the sheet rather than indecision: the petals
-  are still placeholder ovate sheets, and a dome or a ring should be ruled on against the
-  real silhouettes it will sit among, not against stand-ins. The question reopens at the
-  end of phase 3, when the ruling becomes "how does this sit against these petals" rather
-  than "which of these three is nicest against placeholders".
+- ~~The archetype ruling itself — DEFERRED until after the petal-shape phase~~
+  **SETTLED Aug 31, after the form phase: DISC is the shipping default.** The deferral
+  did exactly the job it was parked for, and BOTH halves are recorded here so the
+  reversal is legible rather than mysterious:
+
+    - **What session 2 said, and why it was right to wait.** `centerStyle` stayed NONE,
+      nothing was deleted, no style promoted — on a finding from the sheet rather than
+      indecision: the petals were still placeholder ovate sheets, and a dome or a ring
+      should be ruled on against the real silhouettes it will sit among, not against
+      stand-ins. That note also observed the four styles were **"visually
+      indistinguishable"** at the spreads then in use, and that observation was true of
+      what it was looking at.
+    - **What supersedes it.** Ruled against petals with REAL FORM — cup, spine curl,
+      cross-section roll and twist all reachable — the styles are no longer
+      undifferentiated, and DISC is the one that reads. The session-2 "least
+      differentiated" observation is therefore SUPERSEDED, not contradicted: it was a
+      measurement of the archetypes against flat placeholder blades, and the thing it
+      measured no longer exists. A reader who finds only the newer note and wonders why
+      an earlier session called these interchangeable has the answer here.
+
+  Sub-control defaults are UNCHANGED. This is the deliberate SECOND EVENT under the
+  spread precedent: the rig landed byte-identical in phase 2, and the default moves now,
+  as a design ruling, on evidence — which is expected to move exports and did, with the
+  partition asserted both ways below.
 
 - **Spread default 1.00 → 2.00 — settled Aug 31, on evidence from the same sheet.** At
   1.00 the foot ring is 4.42 mm against a 35 mm petal and eight 6.4 mm feet tile straight
@@ -336,6 +356,26 @@ printer — and sheet petals add a min-wall coupon to that list.
   never triangle count. Measured live-vs-export on six configs spanning both extremes,
   including one where the CENTRE's floor genuinely binds: **delta 0 on every row.** If live
   and export ever disagree on a bloom row, it is a bug, not the floor.
+
+- **The form sheet — RULED Aug 31, all three questions closed.** The teaching sheet
+  holds: swept alone, each in the view its own curve is visible in, the four read as
+  four different things and the controls ship as authored. Both extreme cells are
+  ACCEPTED as shipped extremes rather than tolerated defects, photographed and numbered:
+
+    - **Max-roll faceting stays, and `NV` stays 10.** The emitted cross-section is a
+      9-segment chord path inscribed in the arc and carries up to 7.9% less material
+      than the flat row (0.9207 at the widest row, 0.9992 at the tip). Constant topology
+      is what makes the whole form layer cost exactly zero triangles, and that is worth
+      more than the facets cost. **NO NV-under-roll work is queued and none should be
+      written.** Reopening needs FRESH EVIDENCE — a new picture, not a fresh reading of
+      this number.
+    - **The ROLL CLAMP look stays.** The only reachable state where the curvature floor
+      binds (roll max × petalWidth 8, radius held at 1.20 mm, printed "(clamped)").
+      Saturating is the intended behaviour, not a bug to design around.
+
+  Both cells are on `tools/shot-bloom-form.mjs`'s sheets with their measured numbers in
+  the caption. Same standing as the max-combinator kink: the ruling was made on a
+  picture, and a fresh ruling needs a fresh picture.
 
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).

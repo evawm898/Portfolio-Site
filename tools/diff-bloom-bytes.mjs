@@ -287,8 +287,17 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 const FULL = process.argv.includes('--full');
 const PHASE2 = process.argv.includes('--phase2');
 const PHASE3 = process.argv.includes('--phase3');
-if (FULL && PHASE2) { console.error('pick one matrix: --full or --phase2'); process.exit(2); }
-const MATRIX = FULL ? 'full' : PHASE2 ? 'phase2' : 'legacy';
+/* Exactly one matrix. The guard and the LABEL are derived from one list so a
+   new matrix cannot be added to the runner while the recorded label silently
+   keeps saying something else — which is what happened when --phase3 landed:
+   its runs recorded matrix:"legacy" while running phase3Matrix(), a label
+   naming a computation nobody performed, in this project's most repeated
+   defect shape. --compare does not read the field, so nothing drew a wrong
+   conclusion from it; it was wrong in the record, which is enough. */
+const MATRIX_FLAGS = [[FULL, 'full'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
+const chosen = MATRIX_FLAGS.filter(([on]) => on);
+if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
+const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
 const rows = [];
 const validity = [];
 for (const row of (FULL ? buildMatrix() : PHASE3 ? phase3Matrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {

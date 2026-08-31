@@ -858,9 +858,11 @@ export function buildHubInto(acc, state, ring) {
 
 /* ===================================================================
    buildCenterInto — THE DESIGNED CENTER. An A/B rig behind one choice
-   control: NONE / DOME / DISC / RING (Eva, Aug 31 — she rules on the
-   archetype by eye from a contact sheet; NONE is and stays the default until
-   she does).
+   control: NONE / DOME / DISC / RING. Eva ruled the archetype by eye from a
+   contact sheet, Aug 31, after the form phase: **DISC is the default.** NONE
+   remains a reachable state and keeps EXPLICIT gate coverage — it stopped
+   being the default, which is exactly when a state stops being exercised for
+   free (see the matrix header in tools/bloom-harness.mjs).
 
    THIS IS NOT THE JUNCTION, and the separation is structural, not a naming
    convention. buildHubInto above is derived plumbing that makes the model one
