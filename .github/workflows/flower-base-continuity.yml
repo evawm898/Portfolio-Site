@@ -1,0 +1,47 @@
+# Build gate: every petal placed by the bloom-base construction EMBEDS in the printed
+# base body, and the centre overlaps it (petal-to-base continuity — issue #106's first
+# defect, measurable for the first time because the base surface is the one owner of
+# "where petals begin"; the centre row is #108's deliberate-attachment row for the dome
+# construction). The voxel connectedness gate cannot see this class: a petal attached
+# above and grazing the body below is ONE component. See the tool's header for what it
+# does and does not cover.
+name: flower-base-continuity
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower-presets.js
+      - flower.html
+      - tools/verify-base-continuity.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/flower-base-continuity.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower-presets.js
+      - flower.html
+      - tools/verify-base-continuity.mjs
+      - tools/chromium-harness.mjs
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every dome petal must embed in the printed base body
+        run: node tools/verify-base-continuity.mjs

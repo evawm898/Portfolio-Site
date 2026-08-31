@@ -1900,6 +1900,13 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
     density: Math.min(ui.density, voronoi ? 3 : 4),
     centerType: 'none',                        // no exposed stamens in a bud
     receptacleType: 'none', sepalsType: 'none', stemType: 'none', stemBudMode: 'none',
+    // BLOOM BASE: the bud never grows its own base body. The construction is
+    // main-bloom-only in Phase A — a bud is a deliberately cheap, closed copy whose
+    // petals wrap the axis, and the body builder lives in buildInto, which the bud
+    // does not pass through (re-originating its petals with no body beneath them
+    // would detach exactly what the bud's own trunk exists to join). This override
+    // is also what keeps the bud's nested buildBloomInto out of BLOOMBASE_META.
+    bloomBase: 'none',
     ...pose,
   };
   const budP = resolveParams(budUi);
@@ -2706,6 +2713,111 @@ function resolveLayerCounts(ui, layerCount) {
   return counts;
 }
 
+// ===== BLOOM BASE — the petal-origin surface (Phase A) ============================
+// docs/flower-petal-origin-surface.md, built to Eva's eight rulings. A surface of
+// revolution sits beneath the bloom: petals ORIGINATE on it (buildLayerInto moves only
+// their origin), their DIRECTION stays with the existing elevation -> slope -> tilt
+// chain (no tilt coupling, no surface normal, no CAP — the surface is never truncated),
+// and the surface itself is PRINTED as a real closed body (buildBloomBaseInto below),
+// not a placement guide. `bloomBase: 'none'` (the default) takes the pre-existing code
+// path untouched — byte-identity at NONE is the construction's load-bearing claim,
+// verified by the full-matrix byte report.
+//
+// ONE OWNER OF THE CURVE (registration rule): the placement override and the printed
+// body both read THIS function; neither re-derives it. s runs 0 at the pole (top,
+// y = H), sEq at the equator (widest, r = R, y = 0), 1 at the end of the tuck-under
+// (y = -E; with E = 0 the curve ends AT the equator). Both branches are quarter-cosine.
+// sEq is height-weighted, not true arc length — a chosen simplicity, same as the
+// six scratch looks this ports.
+function bloomBaseProfile(R, H, E) {
+  const Ltot = H + E;
+  const sEq = Ltot > 1e-9 ? H / Ltot : 1;
+  const surfPoint = (s) => {
+    s = clamp(s, 0, 1);
+    if (s <= sEq) { const u = sEq > 1e-9 ? 1 - s / sEq : 0; return { r: R * Math.cos(Math.PI / 2 * u), y: H * u }; }
+    const v = (1 - sEq) > 1e-9 ? (s - sEq) / (1 - sEq) : 0;
+    return { r: R * Math.cos(Math.PI / 2 * v), y: -E * v };
+  };
+  // The solid's local radius at height y — the "is (rad, y) inside the body" question,
+  // owned here so the insertion seat, the petal embed scan, and the centre scan all ask
+  // it of ONE function instead of three inlined copies.
+  const localR = (y) => (y >= 0 ? R * Math.cos(Math.PI / 2 * clamp(y / H, 0, 1))
+                                : R * Math.cos(Math.PI / 2 * clamp(-y / Math.max(E, 1e-9), 0, 1)));
+  const insideSolid = (rad, y) => y >= -E - 1e-6 && y <= H + 1e-6 && rad < localR(y) - 1e-4;
+  return { sEq, surfPoint, localR, insideSolid };
+}
+
+// Telemetry for the base-continuity gate (tools/verify-base-continuity.mjs) and the
+// change-report probes. Reset by buildInto per build, appended to by buildLayerInto
+// (per overridden petal: az, s, origin, embedCount — built vertices strictly inside
+// the body's solid of revolution) and by buildBloomInto (centre overlap, #108's
+// deliberate-attachment measurement). Published as window.__bloomBaseMeta by
+// generate(), so it always describes the LIVE build. Empty/off at bloomBase none —
+// the none path must not even scan, or it would not be the pre-existing path.
+let BLOOMBASE_META = null;
+
+// The printed base body: the SAME profile the petal origins read, revolved into one
+// closed solid — rings of a lathe plus two caps, emitted exactly like buildTrunkInto's
+// solid path so the winding/normal conventions match. Watertight by construction
+// (every edge is shared by exactly two triangles: closed wall strips + caps that
+// reuse the rim vertices). It overlaps the trunk / centre / petal bases; overlapping
+// closed shells union at the slicer (the export contract). No feature floor applies:
+// this is solid mass, not wire — its thinnest place is the pole cap, which is part
+// of the body, and the petal bases embedding in it are what the base-continuity gate
+// asserts.
+function buildBloomBaseInto(acc, g) {
+  const { surfPoint, R, H, E } = g;
+  const M = 48;                       // sectors — fixed both modes, so live == export shape
+  const RINGS = 36;                   // profile samples pole -> end of curve
+  const cosH = new Array(M), sinH = new Array(M);
+  for (let j = 0; j < M; j++) { const a = (j / M) * Math.PI * 2; cosH[j] = Math.cos(a); sinH[j] = Math.sin(a); }
+  // s = 0 is the pole POINT (top cap apex, not a ring). With E = 0 the curve ends AT
+  // the equator with a real radius, so s = 1 is a ring and the bottom cap is a flat
+  // disc at y = 0; with E > 0 the curve closes toward the axis, so the last ring is
+  // s = (RINGS-1)/RINGS and the bottom cap fans to the end point (0, -E, 0).
+  const lastK = E > 0 ? RINGS - 1 : RINGS;
+  const rings = [];
+  for (let k = 1; k <= lastK; k++) {
+    const p = surfPoint(k / RINGS);
+    const ring = new Array(M);
+    for (let j = 0; j < M; j++) ring[j] = { x: p.r * cosH[j], y: p.y, z: p.r * sinH[j] };
+    rings.push(ring);
+  }
+  const Rn = rings.length;
+  if (Rn < 2) return;
+  const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+  const ringStart = new Array(Rn);
+  for (let i = 0; i < Rn; i++) {
+    ringStart[i] = acc.vcount;
+    const ri = rings[i], riUp = rings[Math.max(0, i - 1)], riDn = rings[Math.min(Rn - 1, i + 1)];
+    for (let j = 0; j < M; j++) {
+      const jP = (j + 1) % M, jM = (j + M - 1) % M;
+      const Rv = sub(ri[jP], ri[jM]);           // along-ring tangent
+      const Av = sub(riDn[j], riUp[j]);          // along-axis tangent (top -> bottom)
+      let nx = Rv.y * Av.z - Rv.z * Av.y, ny = Rv.z * Av.x - Rv.x * Av.z, nz = Rv.x * Av.y - Rv.y * Av.x;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+      if (nx * ri[j].x + nz * ri[j].z < 0) { nx = -nx; ny = -ny; nz = -nz; }   // outward
+      acc._vertex(ri[j].x, ri[j].y, ri[j].z, nx, ny, nz);
+    }
+  }
+  // wall quads — same winding as buildTrunkInto's lathe (rings run top -> bottom)
+  for (let i = 0; i < Rn - 1; i++) {
+    const a0 = ringStart[i], b0 = ringStart[i + 1];
+    for (let j = 0; j < M; j++) {
+      const jn = (j + 1) % M;
+      acc.idx.push(a0 + j, a0 + jn, b0 + j, a0 + jn, b0 + jn, b0 + j);
+    }
+  }
+  const s0 = ringStart[0];
+  const apexT = acc._vertex(0, H, 0, 0, 1, 0);                    // the pole itself
+  for (let j = 0; j < M; j++) acc.idx.push(apexT, s0 + (j + 1) % M, s0 + j);
+  const sl = ringStart[Rn - 1];
+  const endY = E > 0 ? -E : surfPoint(1).y;                       // tuck end point / disc centre
+  const apexB = acc._vertex(0, endY, 0, 0, -1, 0);
+  for (let j = 0; j < M; j++) acc.idx.push(apexB, sl + j, sl + (j + 1) % M);
+}
+
 // Build ONLY the bloom — the concentric petal whorls plus the central core — into
 // the given accumulators, returning the sizing the base parts (and the side bud)
 // depend on. Split out of buildInto so the side bud can grow a second, simplified
@@ -2742,14 +2854,50 @@ function buildBloomInto(petalAcc, coreAcc, ui, P) {
   }
 
   const centerHeight = ui.elevation * outer.elevAmp;         // core sits at the outer receptacle centre
+  const coreVBase = coreAcc.pos.length;
   buildCoreInto(coreAcc, P, centerHeight, mulberry32(SEED_BASE + 7));
+  // BLOOM BASE: centre-overlap telemetry — #108's deliberate-attachment measurement.
+  // Counts the centre's built vertices inside the body's solid of revolution, with the
+  // same estimator the petal embed check uses. Guarded on THIS call's ui (the side
+  // bud's buildBloomInto forces bloomBase 'none', so it never writes here) and on the
+  // outer layer actually having a body.
+  if (ui.bloomBase === 'dome' && outer.baseGeom && BLOOMBASE_META) {
+    let inside = 0, total = 0;
+    for (let v = coreVBase; v < coreAcc.pos.length; v += 3) {
+      const x = coreAcc.pos[v], y = coreAcc.pos[v + 1], z = coreAcc.pos[v + 2];
+      total++;
+      if (outer.baseGeom.insideSolid(Math.hypot(x, z), y)) inside++;
+    }
+    BLOOMBASE_META.centreVertsInside = inside;
+    BLOOMBASE_META.centreVerts = total;
+  }
   checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): the whole bloom (petals + core) so far
-  return { placements, centerHeight, ringR: outer.ringR };
+  return { placements, centerHeight, ringR: outer.ringR, baseGeom: outer.baseGeom };
 }
 
 function buildInto(petalAcc, coreAcc, ui, P) {
+  // BLOOM BASE telemetry — fresh per build (see BLOOMBASE_META's declaration). The side
+  // bud's nested buildBloomInto cannot clobber this: buildBudInto forces bloomBase
+  // 'none' on the bud, and only buildLayerInto/buildBloomInto guarded on 'dome' write.
+  BLOOMBASE_META = { on: ui.bloomBase === 'dome', bodyBuilt: false, R: 0, H: 0, E: 0, START: 0, sEq: 0,
+                     ringOwn: 0, noRadialOrder: false, petals: [], centreVertsInside: 0, centreVerts: 0,
+                     maxRadial: 0, bodyTris: 0 };
   // The bloom (petal whorls + central core).
-  const { placements, centerHeight, ringR } = buildBloomInto(petalAcc, coreAcc, ui, P);
+  const { placements, centerHeight, ringR, baseGeom } = buildBloomInto(petalAcc, coreAcc, ui, P);
+
+  // ===== BLOOM BASE BODY (Phase A) — the printed receptacle surface ================
+  // Real geometry in every mode (live AND export), never a placement guide: the same
+  // profile the petal origins just read (bloomBaseProfile — one owner), revolved into
+  // one closed solid, sized by LAYER 0's ring (the outer whorl owns the silhouette).
+  // Petal bases originating on it embed in it; its overlap with the trunk, centre and
+  // stem unions at the slicer. Skipped when the ring collapsed to the axis (baseGeom
+  // null at tightness 0 — nothing to print; the flat placement re-emerges untouched).
+  if (baseGeom) {
+    const bodyIdxBase = petalAcc.idx.length;
+    buildBloomBaseInto(petalAcc, baseGeom);
+    if (BLOOMBASE_META) { BLOOMBASE_META.bodyBuilt = true; BLOOMBASE_META.bodyTris = (petalAcc.idx.length - bodyIdxBase) / 3; }
+    checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + the base body
+  }
 
   // BASE — the RECEPTACLE and STEM grow as ONE continuous, watertight lofted TRUNK
   // (buildTrunkInto): the receptacle owns it, and when a stem is present the body
@@ -2958,6 +3106,41 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
   //     WITHIN that band. layerCount=1 collapses the formula to ringPos exactly.
   const trueSpiral = bloomType === 'coiled' && ui.divergenceMode !== 'even';
   const totalLayers = layer.total;
+
+  // ===== BLOOM BASE (Phase A): the surface sets petal ORIGIN, never direction ======
+  // Everything here is inert at bloomBase 'none' — no scan, no floats touched, the
+  // pre-existing path runs byte-identically. See bloomBaseProfile above for the curve.
+  //
+  // Q3 (arrangement-owned ring radius): the equator radius derives from the radius the
+  // ARRANGEMENT itself declares, with bloomBaseRadius as a multiplier — never from a
+  // second formula that happens to agree. For an ordered (golden/custom) spiral that
+  // radius is rMax, the outermost Vogel radius. For a no-radial-order ring (RADIAL,
+  // BILATERAL, coiled EVEN — every petal at ONE shared pl.r) it is that shared pl.r,
+  // read from the placements (one owner). At multiplier 1.0 the equator therefore
+  // coincides with the flat placement's own ring — the scratch look's rMax-for-everything
+  // formula shifted daisy's footprint +11% and lily's −9.5%; this removes both by
+  // construction. tightness 0 collapses a radial ring to the axis: the ring radius is
+  // ~0, so the body is deliberately skipped (nothing to print) and origins stay put.
+  let baseGeom = null;
+  if (ui.bloomBase === 'dome') {
+    let _rLo = Infinity, _rHi = -Infinity;
+    for (const pl of placements) { if (pl.r < _rLo) _rLo = pl.r; if (pl.r > _rHi) _rHi = pl.r; }
+    const noRadialOrder = (_rHi - _rLo) < 1e-6;
+    const ringOwn = noRadialOrder ? _rHi : rMax;
+    const R = ringOwn * clamp(ui.bloomBaseRadius, 0.6, 1.4);
+    if (R > 1e-3) {
+      const H = Math.max(1e-4, R * clamp(ui.bloomBaseHeight, 0.05, 1.2));
+      const E = Math.max(0, R * clamp(ui.bloomBaseExtent, 0, 1.2));
+      const START = clamp(ui.bloomBaseStart, 0, 0.5);          // Q2: hard cap 0.5, in code too
+      baseGeom = { ...bloomBaseProfile(R, H, E), R, H, E, START, ringOwn, noRadialOrder };
+    }
+    if (BLOOMBASE_META && layer.index === 0) {
+      BLOOMBASE_META.noRadialOrder = noRadialOrder;
+      BLOOMBASE_META.ringOwn = ringOwn;
+      if (baseGeom) Object.assign(BLOOMBASE_META, { R: baseGeom.R, H: baseGeom.H, E: baseGeom.E, START: baseGeom.START, sEq: baseGeom.sEq });
+    }
+  }
+
   for (const pl of placements) {
     const ringPos = pl.r <= 1e-4 ? 0 : (trueSpiral ? clamp(pl.r / rMax, 0, 1) : 1);
     pl.position = ((totalLayers - 1 - layer.index) + ringPos) / totalLayers;
@@ -3026,9 +3209,69 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
              crossSection: clamp((Pp.crossSection || 0) * jRoll, -1, 1) };
     }
     const az = pl.az + layer.dRot;
-    const height = baseHeight * layer.scale + layer.dHeight;
-    const radialOffset = (pl.r - P.r0) * layer.scale;
+    let height = baseHeight * layer.scale + layer.dHeight;
+    let radialOffset = (pl.r - P.r0) * layer.scale;
+    // BLOOM BASE origin override — the surface says where this petal STARTS; `tilt`,
+    // computed once above identically for every mode, is never touched (no surface
+    // normal, no tangent, no blend — the six looks measured direction-coupling at
+    // 12-79% base-in-surface intersections and origin-only at ~0.2%). Ordered
+    // arrangements map their radial order rho onto s in [START, 1]: the innermost
+    // petal moves down the curve, the outermost stays pinned at s = 1, the same
+    // petals pack into the remaining span — the surface itself is NEVER truncated.
+    // No-radial-order rings anchor every petal at the equator (one shared (r, y),
+    // only az differs — the rotational symmetry the flat ring already has; the
+    // index-fallback alternative measured corr(az, origin) = ±1.0 and a centroid
+    // offset of 19-27% of R, i.e. a lopsided spiral). START is a deliberate no-op
+    // for them: nothing distributes along the curve, so there is nothing to move.
+    let sEff = null, seated = null;
+    if (baseGeom) {
+      sEff = baseGeom.noRadialOrder ? baseGeom.sEq : (baseGeom.START + (1 - baseGeom.START) * rho);
+      const sp = baseGeom.surfPoint(sEff);
+      // INSERTION SEAT — the origin sinks ONE TUBE RADIUS along the profile's inward
+      // normal, so the petal INSERTS into the receptacle body (which is what petals do
+      // botanically) instead of grazing its boundary. Measured need, not taste: with
+      // origins exactly ON the surface, body overlap was only whatever sliver of the
+      // base cross-section happened to dip inside — 2-8 vertices on most petals and
+      // ZERO on every Lily petal and one mid-spiral petal each on Thistle/Dahlia
+      // (tangential contact is a zero-measure union, the exact hazard
+      // verify-base-continuity.mjs exists to catch). The seat is buried inside the
+      // body, so the visible flower is unchanged; direction is still never touched.
+      // The inward normal is derived from the same curve (one owner): rotate the
+      // tangent, keep whichever sign lands inside the solid.
+      const eps = 1e-3;
+      const pa = baseGeom.surfPoint(Math.max(0, sEff - eps));
+      const pb = baseGeom.surfPoint(Math.min(1, sEff + eps));
+      let tx = pb.r - pa.r, ty = pb.y - pa.y;
+      const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+      const seat = Pp.tubeRadius;
+      // Candidates are clamped into the body's height band before the inside test: at
+      // the E = 0 rim corner the tangent is within microns of straight-down, so the
+      // inward candidate lands a hair BELOW y = 0 and would be rejected on a 4e-5
+      // undershoot — the corner where the radial equator anchor lives. Clamping is the
+      // seat's own definition ("one tube radius inside, within the body"), not a fudge.
+      const cl = (p) => ({ r: Math.max(0, p.r), y: clamp(p.y, -baseGeom.E, baseGeom.H) });
+      const c1 = cl({ r: sp.r - ty * seat, y: sp.y + tx * seat });
+      const c2 = cl({ r: sp.r + ty * seat, y: sp.y - tx * seat });
+      seated = baseGeom.insideSolid(c1.r, c1.y) ? c1 : (baseGeom.insideSolid(c2.r, c2.y) ? c2 : sp);
+      radialOffset = (seated.r - P.r0) * layer.scale;
+      height = seated.y * layer.scale + layer.dHeight;
+    }
+    const vBase = petalAcc.pos.length;
     const petalOut = buildPetalInto(petalAcc, Pp, az, height, radialOffset, tilt, petalSeed);
+    // Base-continuity telemetry (see BLOOMBASE_META): count this petal's built vertices
+    // strictly INSIDE the body's solid of revolution — the property the gate asserts
+    // (>= 1 per petal), through the profile's own insideSolid (one owner). Runs ONLY
+    // when the construction is on, so the none path stays untouched.
+    if (baseGeom && BLOOMBASE_META) {
+      let embed = 0;
+      for (let v = vBase; v < petalAcc.pos.length; v += 3) {
+        const x = petalAcc.pos[v], y = petalAcc.pos[v + 1], z = petalAcc.pos[v + 2];
+        const rad = Math.hypot(x, z);
+        if (rad > BLOOMBASE_META.maxRadial) BLOOMBASE_META.maxRadial = rad;
+        if (baseGeom.insideSolid(rad, y)) embed++;
+      }
+      BLOOMBASE_META.petals.push({ az, s: sEff, r: seated.r, y: seated.y, layer: layer.index, embedCount: embed });
+    }
     // TRIANGLE BUDGET (#44): exact running-total check after EVERY petal — core
     // hasn't been built yet at this point (buildCoreInto runs once, after every
     // layer, in buildBloomInto), so petalAcc alone is the whole running mesh.
@@ -3050,7 +3293,7 @@ function buildLayerInto(petalAcc, ui, P, count, layer) {
     }
   }
 
-  return { placements, elevAmp, ringR };
+  return { placements, elevAmp, ringR, baseGeom };
 }
 
 function generate() {
@@ -3086,6 +3329,10 @@ function generate() {
 
   swapGeometry(meshPetals, petalAcc);
   swapGeometry(meshCore, coreAcc);
+  // BLOOM BASE: publish this LIVE build's telemetry for the base-continuity gate and
+  // probes. Assigned here (not in buildInto) so a later export build — which also runs
+  // buildInto and resets the module var — never replaces what the page reports.
+  window.__bloomBaseMeta = BLOOMBASE_META;
   if (DEBUG_FIELDS) renderFieldDebug();       // dev overlay only; not in the export path
 
   frameCameraOnce(petalAcc, coreAcc);
@@ -3758,6 +4005,11 @@ inputs.edgeTermination.addEventListener('change', () => { applyVisibility(); sch
 // SPACE COLONIZATION: the two selects regenerate; the re-roll button draws a fresh
 // integer seed (stored in the design so the new network is saved and reproducible).
 inputs.spaceMode.addEventListener('change', scheduleRegen);
+// BLOOM BASE: the select re-lays out the whole bloom (petal origins + the printed
+// body); its four sliders are ordinary registry sliders and are auto-wired above.
+// Visibility of the sliders is declared in the registry (visibleWhen on bloomBase)
+// and handled by the applyVisibility listeners every control already gets.
+inputs.bloomBase.addEventListener('change', scheduleRegen);
 inputs.spacePattern.addEventListener('change', scheduleRegen);
 const spaceReroll = document.getElementById('spaceReroll');
 if (spaceReroll) spaceReroll.addEventListener('click', () => {
