@@ -67,6 +67,28 @@
        (`below: null`); when a stem exists this criterion admits it and the
        region stops meaning "foot + hub". Re-derive the criterion then rather
        than trusting this sentence.
+     - **A FROZEN MATRIX CANNOT SEE A FORM LEAK, and this cost a wrong
+       prediction to find (Aug 31).** The region mode proves whatever the
+       MATRIX exercises, and a frozen matrix pins only the controls that
+       existed at its commit — so every one of its rows sits at the defaults
+       of every LATER control. The form curves default to exactly 0, where
+       the guard short-circuits to the flat path, so a deformation leaking
+       onto the foot is IDENTICALLY ABSENT from all 86 frozen rows. Measured,
+       not reasoned: a mutant that deforms the feet on purpose came back
+       `81/81 BIT-IDENTICAL` on `--phase3`, and `21 of 98 in-scope rows
+       MOVED` on `--full`, whose 103 rows include 25 that set a curve.
+       So the two claims are DIFFERENT and only one of them is this mode's:
+         `--phase3 --region foot`  the form layer does not move the foot AT
+                                   DEFAULTS. That is the byte-identity
+                                   question, and it is what the acceptance
+                                   bar needs.
+         `--full --region foot`    the foot is invariant UNDER FORM — but
+                                   only against a tree that shares the live
+                                   matrix.
+       Neither replaces `formAssertions()` in the two gates, which asserts
+       foot invariance per row in exact arithmetic on every row of the live
+       matrix. Do not quote a frozen-matrix foot pass as evidence that a
+       deformation stayed off the foot.
      - It is a HASH, not a geometric argument: it proves the bytes in that
        region did not move between two trees. It cannot tell you the region
        was correct in the first place.

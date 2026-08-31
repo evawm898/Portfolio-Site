@@ -288,7 +288,12 @@ printer — and sheet petals add a min-wall coupon to that list.
   is not a failure at all and only helps connectedness; a skewed sheet leaves topology
   untouched. So `formAssertions()` runs in BOTH gates on EVERY row and asserts what the STL
   cannot show: foot invariance in exact arithmetic, roll isometry, the curvature floor, and
-  the guard residual. **Do not read a green export or connectedness run as endorsing any
+  the guard residual. **And a frozen matrix cannot substitute for it:**
+  `--region foot` proves whatever its matrix exercises, and every row of a frozen matrix
+  sits at the defaults of every later control — which for the form layer is exactly flat.
+  A mutant that deforms the feet on purpose reads `81/81 BIT-IDENTICAL` on the frozen 86
+  and `21 of 98 moved` on the live 103. "The foot did not move at defaults" and "the foot
+  is invariant under form" are two claims, and only the second is the invariant. **Do not read a green export or connectedness run as endorsing any
   form property.**
 
 - **The roll curvature floor — cap the output, never the input.** A rolled sheet's inner
