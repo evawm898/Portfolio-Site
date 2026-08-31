@@ -62,6 +62,14 @@ body {
 .bl-ctrl input[type="range"] {
   width: 100%; accent-color: var(--bl-accent); height: 18px; margin: 0;
 }
+.bl-ctrl select {
+  width: 100%; font: inherit; font-size: 11px; letter-spacing: .04em;
+  color: var(--bl-ink); background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--bl-line); border-radius: 7px; padding: 5px 7px;
+  cursor: pointer; appearance: none;
+}
+.bl-ctrl select:hover, .bl-ctrl select:focus { border-color: var(--bl-accent); outline: none; }
+.bl-ctrl select option { background: #121614; color: var(--bl-ink); }
 
 .bl-actions { display: flex; gap: 8px; margin: 14px 0 10px; }
 .bl-btn {

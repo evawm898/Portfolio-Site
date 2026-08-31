@@ -53,7 +53,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 
 /* The registry is the source of truth for ids and defaults; the harness reads
    it rather than keeping a second copy. */
-export const { CONTROLS, DEFAULTS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
+export const { CONTROLS, DEFAULTS, valuesEqual } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
 
 export function serveRepo() {
   const server = http.createServer((req, res) => {
@@ -100,32 +100,50 @@ export async function openBloom(page, port) {
 /* READ-BACK: set each value through the real input, fire the real events,
    and compare what the element now holds. Returns failure strings; the
    caller must treat any as fatal for the row. */
-export const applyConfig = (page, sets) => page.evaluate((ss) => {
+export const applyConfig = (page, sets) => page.evaluate(({ ss, kinds }) => {
   const bad = [];
   for (const s of ss) {
     const el = document.getElementById(s.id);
     if (!el) { bad.push(`${s.id}: not in the DOM`); continue; }
+    const kind = kinds[s.id];
+    if (!kind) { bad.push(`${s.id}: not a registry control`); continue; }
     el.value = s.value;
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
     const got = el.value;
-    const num = isFinite(Number(s.value)) && isFinite(Number(got));
-    if (!(num ? Math.abs(Number(s.value) - Number(got)) < 1e-9 : String(s.value) === String(got))) {
-      bad.push(`${s.id}: set "${s.value}", reads back "${got}"`);
-    }
+    /* Compared IN THE CONTROL'S OWN KIND, from the registry — never sniffed
+       from the value. Sniffing happened to work for these option names, and
+       "happens to work" is how a <select> whose value the browser rejected
+       (an option that does not exist leaves a <select> reading "") would slip
+       through as a numeric-comparison edge case. A kind is declared; a sniff
+       is a guess that reads like a declaration. */
+    const ok = kind === 'slider'
+      ? (isFinite(Number(got)) && Math.abs(Number(s.value) - Number(got)) < 1e-9)
+      : String(s.value) === String(got);
+    if (!ok) bad.push(`${s.id}: set "${s.value}", reads back "${got}"`);
   }
   return bad;
-}, sets);
+}, { ss: sets, kinds: Object.fromEntries(CONTROLS.map((c) => [c.id, c.kind])) });
 
 /* FULL-STATE assertion: the app's own snapshot must equal DEFAULTS + set for
    EVERY registry control — not only the ids the row touched. */
 export async function fullStateDrift(page, sets) {
+  const byId = Object.fromEntries(CONTROLS.map((c) => [c.id, c]));
   const expected = { ...DEFAULTS };
-  for (const s of sets) expected[s.id] = Number(s.value);
+  for (const s of sets) {
+    if (!byId[s.id]) throw new Error(`fullStateDrift: "${s.id}" is not a registry control`);
+    expected[s.id] = s.value;
+  }
   const got = await page.evaluate(() => window.__bloomUIState());
   const bad = [];
   for (const c of CONTROLS) {
-    if (Math.abs(Number(expected[c.id]) - Number(got[c.id])) > 1e-9) {
+    /* valuesEqual comes from the REGISTRY — the same comparison the app uses
+       to decide what a control's value means. A local Number() here would
+       compare NaN with NaN for every choice control, which is false, so the
+       gate would have failed loudly; the worse version is a local `==` that
+       passes on a coerced value nobody checked. Neither is a risk when the
+       kind rule has one owner. */
+    if (!valuesEqual(c, expected[c.id], got[c.id])) {
       bad.push(`${c.id}: expected "${expected[c.id]}", live "${got[c.id]}"`);
     }
   }
@@ -174,29 +192,137 @@ export function analyzeStl(buf) {
 }
 
 /* ===================================================================
-   BLOOM_MATRIX — the shared sweep. Order matters: the SHIPPING DEFAULT is
-   row 1, then petal count 3–40, then every exposed slider at min and max
-   (defaults are covered by row 1), then the two corner combinations.
-   Anything added to the registry must be added here — a slider with no
-   min/default/max rows is unknown, not passing.
+   THE MATRIX — the shared sweep both gates run. Order matters: the SHIPPING
+   DEFAULT is row 1, then the arrangement sweep, then every slider at min and
+   max, then the centre rig, then the corners. Anything added to the registry
+   must be added here — a control with no min/default/max rows is unknown, not
+   passing.
+
+   CENTRE COVERAGE STARTS FROM WHAT SHIPS. `centerStyle` defaults to NONE, so
+   the default row and the whole arrangement sweep exercise the bloom with NO
+   centre at all — which is the shipping configuration and stays the state
+   most rows measure. The centre is then exercised ON across every style. The
+   flower shipped a 7-piece bare bloom for months because every gate row
+   enabled the thing that hid the defect; the same mistake here would be a
+   matrix where every row turned the centre on.
+
+   A SUB-CONTROL ROW CARRIES THE STYLE THAT ENABLES IT. `centerRise` at its
+   maximum with centerStyle NONE builds no dome and measures nothing, while
+   printing a label that says it did. Every sub-control row therefore sets its
+   style alongside it — that is the same registration discipline the registry
+   applies to visibility, applied to coverage.
+
+   A CHOICE ROW IS ALSO THE KIND TEST. `centerStyle DOME` exercises readUI's
+   coercion, applyConfig's read-back and fullStateDrift's comparison against a
+   <select> rather than a range input. If any of those three had kept its own
+   numeric rule, these rows fail the RUN on read-back rather than quietly
+   measuring a NaN.
    =================================================================== */
+const STYLES = ['DOME', 'DISC', 'RING'];
+/* The sub-control each style enables — read from the registry's own
+   visibility predicates, never hand-listed, so a new gated control cannot be
+   added without the matrix noticing. */
+function subControlsFor(style) {
+  return CONTROLS.filter((c) => {
+    const p = c.visibleWhen;
+    return p && p.id === 'centerStyle' && Array.isArray(p.oneOf)
+      && p.oneOf.length === 1 && p.oneOf[0] === style;
+  });
+}
+const SLIDERS = () => CONTROLS.filter((c) => c.kind === 'slider');
+const SHARED_CENTER = () => CONTROLS.filter((c) => c.id === 'centerSize');
+
 export function buildMatrix() {
   const rows = [{ label: 'DEFAULT (the shipping configuration)', set: [] }];
+
+  /* 1. Arrangement, centre OFF — the shipping state, swept. */
   for (let n = 3; n <= 40; n++) {
     rows.push({ label: `petalCount ${n}`, set: [{ id: 'petalCount', value: String(n) }] });
   }
-  for (const c of CONTROLS) {
-    if (c.id === 'petalCount') continue;   // swept exhaustively above
+  for (const c of SLIDERS()) {
+    if (c.id === 'petalCount') continue;                 // swept exhaustively above
+    if (c.role === 'center') continue;                   // needs a style; see block 3
     rows.push({ label: `${c.id} min (${c.min})`, set: [{ id: c.id, value: String(c.min) }] });
     rows.push({ label: `${c.id} max (${c.max})`, set: [{ id: c.id, value: String(c.max) }] });
   }
-  rows.push({
-    label: 'ALL MIN (fewest, smallest, flat)',
-    set: CONTROLS.map((c) => ({ id: c.id, value: String(c.min) })),
-  });
-  rows.push({
-    label: 'ALL MAX (most petals, largest, steepest tilt)',
-    set: CONTROLS.map((c) => ({ id: c.id, value: String(c.max) })),
-  });
+
+  /* 2. Every style x spread {min, default, max} — the ruling's explicit ask.
+        The spread-1.00 row of each style is also that style's plain
+        defaults-elsewhere row. */
+  const spread = CONTROLS.find((c) => c.id === 'spread');
+  for (const style of STYLES) {
+    /* The tag is 'default', never the default's current VALUE spelled out: an
+       earlier version hardcoded '1.00' beside `spread.default`, so the moment
+       Eva ruled the default to 2.00 every one of these rows printed
+       "spread 1.00 (2)" — a label naming a number it no longer held, in a
+       passing gate. The value still appears, from the variable. */
+    for (const [tag, v] of [['min', spread.min], ['default', spread.default], ['max', spread.max]]) {
+      rows.push({
+        label: `${style} × spread ${tag} (${v})`,
+        set: [{ id: 'centerStyle', value: style }, { id: 'spread', value: String(v) }],
+      });
+    }
+  }
+
+  /* 3. Centre sub-controls at min and max, each under a style that shows it:
+        the shared size under all three, each per-style control under its own. */
+  for (const style of STYLES) {
+    for (const c of [...SHARED_CENTER(), ...subControlsFor(style)]) {
+      for (const [tag, v] of [['min', c.min], ['max', c.max]]) {
+        rows.push({
+          label: `${style} × ${c.id} ${tag} (${v})`,
+          set: [{ id: 'centerStyle', value: style }, { id: c.id, value: String(v) }],
+        });
+      }
+    }
+  }
+
+  /* 4. Corners. The two centre-OFF corners are the pre-change rows, kept
+        byte-comparable; then the same extremes with each style turned on and
+        its own controls pushed to the same end. ALL MIN × spread 0.60 is the
+        deliberately ugly state: the ring is tighter than the area rule's
+        derived radius and the feet cross the axis. */
+  const extremes = [['MIN', 'min'], ['MAX', 'max']];
+  for (const [tag, k] of extremes) {
+    rows.push({
+      label: `ALL ${tag} (centre off)`,
+      set: SLIDERS().filter((c) => c.role !== 'center').map((c) => ({ id: c.id, value: String(c[k]) })),
+    });
+  }
+  for (const [tag, k] of extremes) {
+    for (const style of STYLES) {
+      rows.push({
+        label: `ALL ${tag} × ${style} ${k}`,
+        set: [
+          ...SLIDERS().filter((c) => c.role !== 'center').map((c) => ({ id: c.id, value: String(c[k]) })),
+          { id: 'centerStyle', value: style },
+          ...[...SHARED_CENTER(), ...subControlsFor(style)].map((c) => ({ id: c.id, value: String(c[k]) })),
+        ],
+      });
+    }
+  }
+  return rows;
+}
+
+/* The pre-spread, pre-centre matrix, frozen. tools/diff-bloom-bytes.mjs runs
+   exactly these rows on both trees so the byte comparison is like-for-like:
+   the new controls sit at their defaults and every one of these rows must
+   come back bit-identical. Frozen means frozen — it is a record of what the
+   scaffold's matrix was at 37e160d, not a view over the live registry, so it
+   must never be rewritten to track a registry change. Note that its rows PIN
+   only the four original sliders, so they inherit every later default — a
+   deliberate change to one (e.g. the spread default) moves them all, by
+   design. See diff-bloom-bytes.mjs's header on why that is not a regression. */
+export function legacyMatrix() {
+  const ids = ['petalCount', 'petalLength', 'petalWidth', 'petalTilt'];
+  const byId = Object.fromEntries(CONTROLS.map((c) => [c.id, c]));
+  const rows = [{ label: 'DEFAULT (the shipping configuration)', set: [] }];
+  for (let n = 3; n <= 40; n++) rows.push({ label: `petalCount ${n}`, set: [{ id: 'petalCount', value: String(n) }] });
+  for (const id of ids.slice(1)) {
+    rows.push({ label: `${id} min (${byId[id].min})`, set: [{ id, value: String(byId[id].min) }] });
+    rows.push({ label: `${id} max (${byId[id].max})`, set: [{ id, value: String(byId[id].max) }] });
+  }
+  rows.push({ label: 'ALL MIN (fewest, smallest, flat)', set: ids.map((id) => ({ id, value: String(byId[id].min) })) });
+  rows.push({ label: 'ALL MAX (most petals, largest, steepest tilt)', set: ids.map((id) => ({ id, value: String(byId[id].max) })) });
   return rows;
 }

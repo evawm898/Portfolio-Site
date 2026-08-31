@@ -126,8 +126,34 @@ printer — and sheet petals add a min-wall coupon to that list.
 
 ## Rulings to park for phase boundaries
 
-- Phase 2 entry: what *is* the bloom center, visually? (Disc, dome, boss, ring of mass —
-  the designed thing, distinct from the junction plumbing beneath it.)
+- ~~Phase 2 entry: what *is* the bloom center, visually?~~ **Built as an A/B rig, Aug 31;
+  the ruling itself is still open.** Eva's ruling at phase-2 entry was that the question is
+  not answered by argument: three archetypes ship behind one `centerStyle` choice —
+  DOME (rounded boss), DISC (flat/dished button), RING (open torus collar) — plus NONE,
+  which is and remains the default until she rules from the contact sheet. Wiring the
+  winner as the default is a later session's job. The centre is DESIGNED and user-chosen;
+  the junction stays derived and control-free beneath it, and the registry's `role` field
+  now carries that split (`center` vs. the deliberate absence of any `junction` row).
+
+- **The archetype ruling itself — DEFERRED until after the petal-shape phase (Eva,
+  Aug 31), from the contact sheet.** `centerStyle` stays NONE by default; nothing is
+  deleted and no style is promoted. The rig remains in the codebase as a built, gated
+  capability. The reason is a finding from the sheet rather than indecision: the petals
+  are still placeholder ovate sheets, and a dome or a ring should be ruled on against the
+  real silhouettes it will sit among, not against stand-ins. The question reopens at the
+  end of phase 3, when the ruling becomes "how does this sit against these petals" rather
+  than "which of these three is nicest against placeholders".
+
+- **Spread default 1.00 → 2.00 — settled Aug 31, on evidence from the same sheet.** At
+  1.00 the foot ring is 4.42 mm against a 35 mm petal and eight 6.4 mm feet tile straight
+  over it, so *any* centre is buried under the petal bases; below roughly 2× the four
+  styles are visually indistinguishable. A default that hides the thing the panel just
+  exposed is the wrong default. Recorded as two separate events, deliberately: the control
+  LANDED at 1.00 with every pre-existing export bit-identical (0 of 47 moved — the
+  new-control convention, satisfied), and the default THEN moved as a design ruling, which
+  is expected to move exports and did: exactly the 57 of 76 matrix rows that inherit the
+  default, with all 19 that pin `spread` bit-identical. No schema bump or migration: the
+  bloom persists no designs yet, so no saved value can be misread.
 - ~~Foot ownership~~ **Settled Aug 31:** the foot ring — where feet land, and the foot
   cross-section — gets one named owner function in **phase 1**; the petal builder and the
   phase-2 center builder both read it. No second definition, ever.
@@ -136,13 +162,26 @@ printer — and sheet petals add a min-wall coupon to that list.
   are the two that change what the silhouette can be.
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).
-- **Ring radius / spread exposure — re-decide at phase 2 entry (parked Aug 31, at
-  scaffold approval).** In phase 1 the foot-ring radius is *derived* (area rule over the
-  foot cross-sections), not a control. Note the reasoning so it doesn't harden into
-  doctrine: hiding a design control to keep the junction's size law simple is capping the
-  input to protect the plumbing, which this project family explicitly doesn't do. It's
-  acceptable now only because a spread-out ring has nothing in its middle yet except
-  plumbing, which would have to get big and loud to span it. Once the designed center
-  exists to occupy the middle, re-decide: if ring radius / spread is exposed then, the
-  junction reaches every foot by construction and the area rule governs its **mass**, not
-  its **extent**.
+- ~~Ring radius / spread exposure — re-decide at phase 2 entry~~ **Settled Aug 31, at
+  phase-2 entry: EXPOSED.** The phase-1 grounds for hiding it — that a spread-out ring
+  would have nothing in its middle but plumbing — expired the moment the designed centre
+  existed to occupy that middle, exactly as parked. `spread` is a Standard slider,
+  0.60–6.00, **default 2.00 (Eva, Aug 31)**, applied inside `footRing()` and nowhere else:
+  the area rule still *derives* the radius and spread only scales it. Eva's ruling on the
+  lower bound: **the area rule is a reference, not a cage** — below 1.00 the ring is
+  tighter than the derived radius, feet crowd and at the extreme cross the axis, and that
+  state is reachable on purpose. The
+  junction reaches every foot by construction at every spread, because `overhang` is
+  expressed in the same units as the radius (max(1.5, 0.4·r)), making the foot–hub overlap
+  a fixed *fraction* of the ring rather than a tuned length.
+
+- **The hub disc at high spread — a flagged candidate, NOT open work (Aug 31).** The
+  junction is a full disc of the foot-ring radius, so its extent tracks spread: at the
+  defaults × spread 6.00 with `centerStyle: NONE` it is a 53 mm plate 1.2 mm thick, and
+  the plumbing becomes the loudest thing in the frame. This is precisely the state this
+  charter predicted when it parked the spread question. Eva's ruling: ship the disc,
+  photograph the state honestly, and let the sheet decide — the alternative (rebuilding
+  the hub as an area-ruled annular band, extent = ring radius but mass = area rule) is a
+  separate piece of work needing its own before/after evidence, and it only becomes real
+  work if the plate turns out to be objectionable at spreads anyone would actually use.
+  Do not start it on the strength of this note alone.

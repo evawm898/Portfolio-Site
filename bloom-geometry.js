@@ -41,19 +41,42 @@ export class MeshBuilder {
     this.exportMode = !!exportMode;
     this.positions = [];          // 9 floats per triangle
     this.minThickness = Infinity; // telemetry: thinnest floored sheet emitted
+    /* Bounding box of everything emitted, accumulated as triangles arrive.
+       THE ONE OWNER of the model's extent: the readout reads this rather than
+       measuring the BufferGeometry separately, so live and export can each
+       report their own (the export floor changes geometry, so the two are
+       different numbers and each is labelled). The camera's bounding SPHERE
+       is a different quantity for a different job and stays where it is. */
+    this.lo = [Infinity, Infinity, Infinity];
+    this.hi = [-Infinity, -Infinity, -Infinity];
   }
+  /* Extent along each axis, and the max bounding dimension in mm — the number
+     that decides whether a design fits a given process. SLS nests in any
+     orientation, so the only question is whether the box fits. */
+  get boundingSize() {
+    if (!isFinite(this.lo[0])) return [0, 0, 0];
+    return [this.hi[0] - this.lo[0], this.hi[1] - this.lo[1], this.hi[2] - this.lo[2]];
+  }
+  get maxDimensionMm() { return Math.max(...this.boundingSize); }
   /* Every solid's thickness passes through here. Floored ONLY at export, so
      the live view shows the authored value and the print never goes below
      the printable minimum. */
   floorThickness(t) {
-    if (this.exportMode) {
-      const f = Math.max(t, MIN_FEATURE_MM);
-      if (f < this.minThickness) this.minThickness = f;
-      return f;
-    }
-    return t;
+    const f = this.floorFeature(t);
+    if (this.exportMode && f < this.minThickness) this.minThickness = f;
+    return f;
   }
-  tri(a, b, c) { this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]); }
+  /* The same floor, for a feature that is NOT a sheet thickness — a dome's
+     height, a torus tube's diameter, a dished button's residual wall. Same
+     rule, one definition; only floorThickness() feeds the `min sheet`
+     telemetry, so that readout keeps meaning what its label says. */
+  floorFeature(x) { return this.exportMode ? Math.max(x, MIN_FEATURE_MM) : x; }
+  tri(a, b, c) {
+    this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    for (const p of [a, b, c]) {
+      for (let k = 0; k < 3; k++) { if (p[k] < this.lo[k]) this.lo[k] = p[k]; if (p[k] > this.hi[k]) this.hi[k] = p[k]; }
+    }
+  }
   /* Quad a-b-c-d (counter-clockwise seen from outside) as two triangles. */
   quad(a, b, c, d) { this.tri(a, b, c); this.tri(a, c, d); }
   get triangleCount() { return this.positions.length / 9; }
@@ -71,12 +94,34 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
    registration rule from the flower project, and every registration bug there
    was a consumer inventing a private copy of a boundary.
 
-   RADIUS IS DERIVED, NOT A CONTROL (phase-1 ruling, parked for phase 2 —
-   docs/bloom-charter.md): the area rule r_ring² = Σ r_foot² sizes the circle
-   from what feeds it, where r_foot is the effective radius of one foot's
-   cross-section (width × thickness → the circle of equal area). Feet land ON
-   that circle and run inward past it (`overhang`), so the hub — a slab of
-   exactly this radius — always reaches every foot by construction.
+   RADIUS IS DERIVED AND THEN SCALED. The area rule r_ring² = Σ r_foot² sizes
+   the circle from what feeds it, where r_foot is the effective radius of one
+   foot's cross-section (width × thickness → the circle of equal area). That
+   derived value is then multiplied by `spread`, and THIS IS THE ONLY PLACE
+   `spread` EXISTS in the geometry — every consumer reads the scaled `radius`
+   and expresses its own dimensions as fractions of it, so nothing downstream
+   knows or needs to know that spread happened.
+
+   `derivedRadius` is returned for TELEMETRY ONLY. Nothing geometric may read
+   it: the moment something does, there are two radii and the one-owner rule
+   is gone (Eva's phase-2 note, and the flower's most repeated defect).
+
+   Byte-safety at the default: `x * 1.0 === x` exactly in IEEE-754, so at
+   spread 1.00 this function returns bit-identical values to the pre-spread
+   code. The default is byte-identical BY CONSTRUCTION; the byte-diff run
+   confirms it rather than establishing it.
+
+   BELOW 1.00 the ring is tighter than the area rule's derived radius (Eva,
+   Aug 31: the area rule is a reference, not a cage). Feet crowd, overlap each
+   other, and at the extreme cross the axis. That stays watertight — each foot
+   is its own closed solid — and stays connected, because the hub still spans
+   the ring. It is a design state, not a defect.
+
+   Feet land ON the circle and run inward past it (`overhang`), so the hub — a
+   slab of exactly this radius — always reaches every foot by construction.
+   `overhang` is expressed in the same units as `radius` (max(1.5, 0.4·r)), so
+   the foot–hub overlap is 40% of the ring radius at EVERY spread: the
+   guarantee is scale-free, not tuned to one radius.
 
    Takes the accumulator because the foot thickness is floored geometry: the
    ring's answer in export mode must match what the solids are actually built
@@ -87,11 +132,12 @@ export function footRing(state, acc) {
      floor so very narrow petals keep a printable root. */
   const width = clamp(state.petalWidth * 0.4, 3, 10);
   const rFoot = Math.sqrt((width * thickness) / Math.PI);
-  const radius = rFoot * Math.sqrt(state.petalCount);   // area rule
+  const derivedRadius = rFoot * Math.sqrt(state.petalCount);   // area rule
+  const radius = derivedRadius * state.spread;                 // the ONLY use of spread
   /* How far inside the ring each foot continues, so foot–hub overlap is a
      solid annulus, not a hairline touch. */
   const overhang = Math.max(1.5, radius * 0.4);
-  return { radius, width, thickness, overhang };
+  return { radius, derivedRadius, width, thickness, overhang };
 }
 
 /* ===================================================================
@@ -253,6 +299,178 @@ export function buildHubInto(acc, state, ring) {
 }
 
 /* ===================================================================
+   buildCenterInto — THE DESIGNED CENTER. An A/B rig behind one choice
+   control: NONE / DOME / DISC / RING (Eva, Aug 31 — she rules on the
+   archetype by eye from a contact sheet; NONE is and stays the default until
+   she does).
+
+   THIS IS NOT THE JUNCTION, and the separation is structural, not a naming
+   convention. buildHubInto above is derived plumbing that makes the model one
+   piece; this is user-chosen decoration that makes it look like something.
+   The proof they are separate: DELETE THIS FUNCTION AND THE BLOOM IS STILL
+   ONE CONNECTED SOLID. The centre contributes nothing to the invariant.
+
+   HOW IT READS THE FOOT RING. It never calls footRing() and never recomputes
+   a radius. It receives the same `ring` object footRing() produced once in
+   buildBloomInto — the object the petal builder and the hub builder are also
+   holding — and expresses every dimension as a FRACTION of `ring.radius`.
+   That is why the centre tracks `spread` with no code that mentions spread.
+   `ring.derivedRadius` is telemetry and is deliberately not read here.
+
+   CONNECTEDNESS BY CONSTRUCTION, not by measurement. The hub is a disc of
+   radius ring.radius spanning z ∈ [−t/2, +t/2], and it is already welded to
+   every foot. So a centre is joined to the whole model if two clauses hold:
+
+     (1) its radial footprint lies inside [0, ring.radius], and
+     (2) its z-span crosses [−t/2, +t/2].
+
+   Then centre ∩ hub is a solid region of the centre's FULL footprint — not a
+   band whose width has to be argued about, and not something the voxel gate
+   discovers. Each style satisfies both clauses by construction, and the
+   arithmetic is stated at each one. The `centerSize` ceiling of 1.00 is what
+   makes clause (1) unconditional; that is why it is 1.00 and not 1.25.
+
+   EXPORT CONTRACT. Every style is ONE individually closed solid — no bare
+   surface, no zero-thickness membrane, every perimeter edge shared by exactly
+   two triangles. Minimum dimensions go through the accumulator's floor in
+   export mode exactly as the sheets do.
+
+   TRIANGLE COST (fixed, independent of every slider): DOME 1,728 · DISC 1,056
+   · RING 2,304. Against the 10,080-tri default bloom that is +10% to +23%;
+   against the 49,632-tri petalCount-40 bloom, +2.1% to +4.6%.
+   =================================================================== */
+const CENTER_SEG = 48;   // segments around the axis — matches the hub's 48
+const DOME_RINGS = 18;
+const DISC_RINGS = 10;
+const RING_SEG_MINOR = 24;
+
+export function buildCenterInto(acc, state, ring) {
+  const style = state.centerStyle;
+  if (style === 'NONE') return { style, tris: 0 };
+
+  const t = acc.floorThickness(ring.thickness);   // the hub slab's thickness
+  /* The seated styles start an eighth of a slab BELOW the hub's underside,
+     not flush with it. Flush is exactly coincident: at centerSize 1.00 the
+     centre's outer radius equals ring.radius and its base fan shares the hub
+     bottom fan's centre vertex and all 48 rim vertices, so it emitted 48
+     triangles BIT-IDENTICAL to the hub's — measured, not guessed (DOME 48,
+     DISC 48, RING 0, and 0 at centerSize 0.99). That is duplicate geometry,
+     the known cause of non-manifold edges in this family, and it showed up as
+     nonManifold 96/192 on precisely the centerSize-max rows. The column is
+     unrated and the model was watertight and connected either way, but an
+     unexplained number in a gate's output is how a false belief starts here.
+     Dropping the base also strengthens clause (2): the centre now spans the
+     slab outright instead of sharing its boundary plane. */
+  const zBase = -t / 2 - t / 8;
+  /* Outer radius: a fraction of the foot ring, floored on its DIAMETER so a
+     tiny centre is printable rather than a sliver. The floor can never push
+     it past the ring: the smallest reachable ring radius is 1.149 mm
+     (ALL-MIN × spread 0.60) and the floor is 1.0 mm on the diameter, so
+     rC ≤ max(ring.radius, 0.5) = ring.radius. Clause (1) holds. */
+  const rC = acc.floorFeature(2 * ring.radius * state.centerSize) / 2;
+
+  const before = acc.triangleCount;
+  if (style === 'DOME') domeInto(acc, state, rC, zBase, t);
+  else if (style === 'DISC') discInto(acc, state, rC, zBase, t);
+  else if (style === 'RING') torusInto(acc, state, rC);
+  else throw new Error(`unknown centerStyle "${style}" — the registry and the builder have diverged`);
+  return { style, rC, tris: acc.triangleCount - before };
+}
+
+const ringPts = (n, r, z) => Array.from({ length: n }, (_, k) => [r * Math.cos((k * TAU) / n), r * Math.sin((k * TAU) / n), z]);
+
+/* DOME — a rounded boss: an ellipsoidal cap on a flat base disc.
+   Clause (2): the base sits at z = −t/2 and the height is floored to at least
+   t, so the cap spans the whole slab rather than sitting inside it as a
+   sliver. Closed: base fan + cap quads + apex fan. */
+function domeInto(acc, state, rC, zBase, t) {
+  const h = Math.max(acc.floorFeature(state.centerRise * rC), t);
+  const N = CENTER_SEG;
+  const rings = [];
+  for (let i = 0; i <= DOME_RINGS; i++) {
+    const a = (i / DOME_RINGS) * (Math.PI / 2);
+    rings.push({ r: rC * Math.cos(a), z: zBase + h * Math.sin(a) });
+  }
+  const base = ringPts(N, rC, zBase);
+  const cBase = [0, 0, zBase];
+  for (let k = 0; k < N; k++) acc.tri(cBase, base[(k + 1) % N], base[k]);   // faces down
+  /* The apex is emitted EXPLICITLY, never discovered by a radius reaching
+     zero. `rC * Math.cos(Math.PI/2)` is 6.1e-17, not 0, so a `r <= 0` test
+     never fires: the cap closed on a ring of 48 vertices 6e-17 apart, which
+     welds to a point in any quantised edge census — boundary edges 0, and 48
+     degenerate triangles plus 49 non-manifold edges on EVERY dome. It passed
+     the gated criterion while being wrong, which is the exact shape of defect
+     this project keeps finding. The loop now stops one ring short and the
+     apex fan is unconditional. */
+  let lower = base;
+  for (let i = 1; i < DOME_RINGS; i++) {
+    const upper = ringPts(N, rings[i].r, rings[i].z);
+    for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(lower[k], lower[k2], upper[k2], upper[k]); }
+    lower = upper;
+  }
+  const apex = [0, 0, zBase + h];
+  for (let k = 0; k < N; k++) acc.tri(lower[k], lower[(k + 1) % N], apex);
+}
+
+/* DISC — a flat or dished button. Thickness is DERIVED (0.22 × radius, never
+   below the slab), so the style costs one control, not two.
+   The dish is a paraboloid depression whose residual wall is floored, so the
+   button can never be pierced or reduced to a knife edge: at centerDish 0.90
+   in export mode the centre still carries a full 1.0 mm of material.
+   Clause (2): the body runs from z = −t/2 upward by at least t.
+   Closed: base fan + cylindrical wall + dished top + centre fan. */
+function discInto(acc, state, rC, zBase, t) {
+  const N = CENTER_SEG;
+  const h = Math.max(acc.floorFeature(0.22 * rC), t);
+  const residual = Math.min(h, acc.floorFeature(h * (1 - state.centerDish)));
+  const dish = h - residual;
+  const zTopAt = (r) => zBase + h - dish * (1 - (r / rC) ** 2);
+
+  const base = ringPts(N, rC, zBase);
+  const rim = ringPts(N, rC, zBase + h);            // zTopAt(rC) === zBase + h
+  const cBase = [0, 0, zBase];
+  for (let k = 0; k < N; k++) acc.tri(cBase, base[(k + 1) % N], base[k]);                    // faces down
+  for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(base[k], base[k2], rim[k2], rim[k]); }  // wall
+  let outer = rim;
+  for (let i = 1; i <= DISC_RINGS; i++) {
+    const r = rC * (1 - i / DISC_RINGS);
+    if (r <= 0) {
+      const c = [0, 0, zTopAt(0)];
+      for (let k = 0; k < N; k++) acc.tri(outer[k], outer[(k + 1) % N], c);
+      return;
+    }
+    const inner = ringPts(N, r, zTopAt(r));
+    for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(outer[k], outer[k2], inner[k2], inner[k]); }
+    outer = inner;
+  }
+}
+
+/* RING — an open collar: a torus on the hub's mid-plane, closed by
+   construction (a torus has no boundary at all).
+   Tube diameter is floored, and the major radius is then held at ≥ 1.2× the
+   tube radius so the hole never pinches shut into a degenerate axis.
+   Clause (1): outer edge R + r = max(rC, 2.2·r). In live mode the guard never
+   binds and that is exactly rC ≤ ring.radius. In export mode the guard can
+   only bind when the tube was floored to r = 0.5, giving 2.2·r = 1.1 mm —
+   below the smallest reachable ring radius of 1.149 mm. So the whole torus
+   sits over the hub disc at every setting.
+   Clause (2): the tube spans z ∈ [−r, +r] about z = 0, the slab's mid-plane,
+   so it crosses the slab for any r > 0. */
+function torusInto(acc, state, rC) {
+  const r = acc.floorFeature(rC * (1 - state.centerBore)) / 2;
+  const R = Math.max(rC - r, 1.2 * r);
+  const NS = CENTER_SEG, NM = RING_SEG_MINOR;
+  const P = (i, j) => {
+    const th = (i % NS) * TAU / NS, ph = (j % NM) * TAU / NM;
+    const rr = R + r * Math.cos(ph);
+    return [rr * Math.cos(th), rr * Math.sin(th), r * Math.sin(ph)];
+  };
+  for (let i = 0; i < NS; i++) {
+    for (let j = 0; j < NM; j++) acc.quad(P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1));
+  }
+}
+
+/* ===================================================================
    buildBloomInto — the whole model. `below` carries what sits beneath the
    bloom: 'stem' | 'branch' | null — a value, NEVER a boolean (flower lesson:
    buildBudInto keys off the thing itself, not a label correlating with it).
@@ -274,6 +492,7 @@ export function buildBloomInto(acc, state, { below = null } = {}) {
     phase: 0,
     blade: (slot) => buildPetalInto(acc, state, ring, slot),
   });
-  buildHubInto(acc, state, ring);   // unconditional — the invariant's plumbing
-  return { ring };
+  buildHubInto(acc, state, ring);          // unconditional — the invariant's plumbing
+  const center = buildCenterInto(acc, state, ring);   // optional — the designed mass
+  return { ring, center };
 }
