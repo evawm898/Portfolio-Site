@@ -2,7 +2,7 @@
 // palette, asks deck-builder.js / card-template.js to do the actual
 // layout and drawing, and hands the results to the export modules.
 import { PRINT_SPEC, SUITS, buildDeckList } from './cards/deck-builder.js';
-import { renderCardToCanvas } from './cards/card-template.js';
+import { renderCardToCanvas, CORNER_FONT_OPTIONS, DEFAULT_STYLE } from './cards/card-template.js';
 import { exportDeckPDF } from './cards/pdf-export.js';
 import { exportDeckZip } from './cards/png-export.js';
 
@@ -25,6 +25,49 @@ function getPalette() {
     primary: document.getElementById('colorPrimary').value,
     secondary: document.getElementById('colorSecondary').value,
   };
+}
+
+// ---------------------------------------------------------------------
+// Style panel (04) — deck-wide only, no per-suit variants in this pass.
+// ---------------------------------------------------------------------
+function getStyle() {
+  return {
+    cornerInsetPct: parseFloat(document.getElementById('styleCornerInset').value),
+    cornerFontId: document.getElementById('styleCornerFont').value,
+    glyphScale: parseFloat(document.getElementById('styleGlyphScale').value) / 100,
+  };
+}
+
+function buildStyleControls() {
+  const fontSelect = document.getElementById('styleCornerFont');
+  fontSelect.innerHTML = '';
+  for (const opt of CORNER_FONT_OPTIONS) {
+    const el = document.createElement('option');
+    el.value = opt.id;
+    el.textContent = opt.label;
+    fontSelect.appendChild(el);
+  }
+  fontSelect.value = DEFAULT_STYLE.cornerFontId;
+
+  const inset = document.getElementById('styleCornerInset');
+  const insetValue = document.getElementById('styleCornerInsetValue');
+  inset.value = DEFAULT_STYLE.cornerInsetPct;
+  insetValue.textContent = `${DEFAULT_STYLE.cornerInsetPct}%`;
+  inset.addEventListener('input', () => {
+    insetValue.textContent = `${inset.value}%`;
+    renderPreview();
+  });
+
+  const scale = document.getElementById('styleGlyphScale');
+  const scaleValue = document.getElementById('styleGlyphScaleValue');
+  scale.value = Math.round(DEFAULT_STYLE.glyphScale * 100);
+  scaleValue.textContent = `${scale.value}%`;
+  scale.addEventListener('input', () => {
+    scaleValue.textContent = `${scale.value}%`;
+    renderPreview();
+  });
+
+  fontSelect.addEventListener('change', renderPreview);
 }
 
 // ---------------------------------------------------------------------
@@ -102,6 +145,7 @@ function clearSuitFile(suit) {
 
 function renderSwatches() {
   const palette = getPalette();
+  const style = getStyle();
   for (const suit of SUITS) {
     const canvas = document.querySelector(`canvas[data-suit="${suit}"]`);
     if (!canvas) continue;
@@ -110,7 +154,7 @@ function renderSwatches() {
     // Reuse the real card-drawing path via a 1-card mini render, cropped —
     // simplest way to guarantee the swatch always matches the deck.
     const spec = { suit, rank: 'A' };
-    const full = renderCardToCanvas(spec, palette, suitImages);
+    const full = renderCardToCanvas(spec, palette, suitImages, style);
     const safeFrac = 0.5; // roughly the glyph-filled center of an Ace card
     const sx = full.width * (0.5 - safeFrac / 2);
     const sy = full.height * (0.5 - safeFrac / 2);
@@ -123,10 +167,11 @@ function renderSwatches() {
 // ---------------------------------------------------------------------
 function renderPreview() {
   const palette = getPalette();
+  const style = getStyle();
   const grid = document.getElementById('previewGrid');
   grid.innerHTML = '';
   for (const spec of PREVIEW_SPECS) {
-    const canvas = renderCardToCanvas(spec, palette, suitImages);
+    const canvas = renderCardToCanvas(spec, palette, suitImages, style);
     const cell = document.createElement('div');
     cell.className = 'cd-card';
     cell.appendChild(canvas);
@@ -140,10 +185,11 @@ function renderPreview() {
 // ---------------------------------------------------------------------
 async function renderFullDeck(onProgress) {
   const palette = getPalette();
+  const style = getStyle();
   const specs = buildDeckList();
   const cards = [];
   for (let i = 0; i < specs.length; i++) {
-    const canvas = renderCardToCanvas(specs[i], palette, suitImages);
+    const canvas = renderCardToCanvas(specs[i], palette, suitImages, style);
     cards.push({ ...specs[i], canvas });
     if (onProgress) onProgress(i + 1, specs.length);
     if (i % 8 === 7) await new Promise((r) => setTimeout(r, 0));
@@ -204,6 +250,7 @@ function renderSpecText() {
 
 function init() {
   buildSuitRows();
+  buildStyleControls();
   renderSpecText();
   renderPreview();
 
