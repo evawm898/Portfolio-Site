@@ -1907,13 +1907,100 @@ the duration of a single request.
   request after a period of idleness can take 30-60 seconds ("cold
   start"). The frontend's health check and Analyze error handling both
   account for this with a generous timeout and a clear retry message
-  rather than treating a slow cold start as a crash.
+  rather than treating a slow cold start as a crash — see "Why the
+  health banner can lie" below for what that actually took.
 - Nothing from `/analyze` is written to disk on the server — uploaded
   images exist only as in-memory arrays for the duration of the request.
   The one place anything touches disk is the opt-in ground-truth
   correction system — see
   [Ground Truth / Correction System](#ground-truth--correction-system),
   including the important caveat about Render's ephemeral disk.
+
+### Why the health banner can lie (and the cold-start-aware retry this led to)
+
+Reported symptom: the status banner said "Analysis service is online"
+while the Analyze step failed, repeatedly, with a generic "Could not
+reach the analysis service. It may be offline, waking up from a cold
+start, or blocking requests from this page (CORS)" — three
+undifferentiated causes, none actionable.
+
+**No Render dashboard/log access was available to diagnose this from
+live data** (this environment's outbound network access to `onrender.com`
+is blocked by policy) — the investigation instead profiled the exact
+production code locally and read the request/response handling directly.
+Three things came out of it:
+
+1. **`/health` proves liveness, not capacity.** It's a bare
+   `def health(): return {"status": "ok"}` — no image decode, no CV
+   work, no memory pressure, doesn't even touch the `analysis` package
+   at request time. "Online" was true and also **misleading**: it
+   proved the process could answer a GET, not that it could complete an
+   analysis. That gap, not a bug, is what let the banner and the Analyze
+   failure coexist.
+2. **Analyze had no retry; `/health` already did.** `/health` retries
+   with backoff (5 attempts, cumulative worst case ~90+s) specifically
+   because Render's free tier can take up to ~60s to wake a sleeping
+   instance. `/analyze-multi` was a single `fetch()` with one 75s
+   timeout and no retry at all. A user spending real time in
+   Upload → Calibrate → ROI → Orientation between the initial health
+   check and clicking Analyze can easily cross the free tier's 15-minute
+   idle window — the instance spins back down, and the one-shot Analyze
+   request had no mechanism to recover the way health did.
+3. **Every route ran its CV work directly on the event loop.** All
+   `/analyze*` routes are `async def`, but called `analyze_gauge` /
+   `analyze_multi_roi` / etc. synchronously, inline — with Render's
+   default single uvicorn worker (no `--workers` in render.yaml), that
+   blocks the ENTIRE process for the whole request, including its
+   ability to serve another `/health` check concurrently. Doesn't
+   directly cause a connection failure, but it's a real gap, fixed
+   alongside this (`backend/main.py` now runs all of it via
+   `run_in_threadpool`).
+4. **Memory is a real, checkable risk for large photos, not just a
+   theory.** Profiled the real `/analyze-multi` path locally: a
+   1508×1008 photo stays comfortably under the free tier's 512 MB
+   ceiling (~160-265 MB peak), but a 3925×2617 photo (a real phone-
+   camera-scale image already in this repo's fixtures) hit **368 MB from
+   region-proposal alone** — 72% of the ceiling, before uvicorn's own
+   overhead. There is no image downscaling anywhere in this codebase,
+   client or server — a full-resolution upload goes straight to
+   `cv2.imdecode`. Not fixed here (a real downscaling pass is its own,
+   separate piece of work); flagged as a live risk worth its own pass.
+   Side finding from that same profiling run, unrelated to this bug: on
+   that 3925×2617 image, `propose_measurement_rois` returned **zero**
+   candidate regions — its window-size heuristic is likely tuned for
+   smaller images. Also flagged, not fixed here.
+
+CORS was checked and ruled out directly: `CORSMiddleware` applies one
+identical wildcard policy (`allow_origins=["*"]`, `allow_methods=["*"]`,
+`allow_headers=["*"]`) to every route, and a GET to `/health` and a
+`multipart/form-data` POST with no custom headers are both CORS "simple
+requests" (the POST never triggers a preflight) — nothing in the code
+treats them differently.
+
+**What changed, given all of that:**
+
+- **Backend**: every CV-bound route now runs its work via
+  `run_in_threadpool` instead of blocking the event loop directly (see
+  the module comment at the top of `backend/main.py`).
+- **Frontend Analyze flow**: a transport-level failure (a bare
+  `TypeError` from `fetch()` — no HTTP response reached us at all — or
+  our own request timeout) is no longer immediately shown as a dead-end
+  error. It's treated as a possible cold start: the same retry/backoff
+  `/health` already used (now shared as `waitForServiceToWake`) runs
+  first, with the status line reading "Waking up the analysis service —
+  this can take about a minute…", and once `/health` confirms the
+  service is back, the ORIGINAL request is retried automatically, once.
+  Only a failure *after* that recovery attempt — or `/health` never
+  coming back — is shown as a real failure, with wording that says so
+  explicitly, distinct from the cold-start message.
+- **The banner no longer says "online".** It says "Analysis service is
+  reachable" — accurate to what a GET /health actually proves, no more.
+  A real (post-recovery) Analyze failure now also flips the banner to a
+  visibly degraded state itself (`markServiceDegradedAfterAnalyzeFailure`),
+  rather than leaving stale "reachable" text sitting next to a failure
+  the user can see happening.
+- An HTTP-level failure (the server DID answer, just with an error) is
+  never treated as a cold start — only genuine transport failures are.
 
 ## Ground Truth / Correction System
 

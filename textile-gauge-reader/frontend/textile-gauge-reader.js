@@ -319,6 +319,42 @@
   // instead of the two racing to update the status pill.
   let healthCheckGeneration = 0;
 
+  // Retry-with-backoff against /health, shared by the service-status
+  // banner AND (see waitForServiceToWake below) the Analyze cold-start
+  // recovery path -- Render's free tier can take up to ~60s to wake a
+  // sleeping instance, so a single quick timeout would be wrong almost
+  // every time the service has been idle. `onStatus(kind, text)` lets
+  // each caller drive its own UI element (the banner pill vs. the
+  // Analyze status line) without this function knowing about either.
+  // `shouldAbort()` lets a caller (the banner) bail out when superseded
+  // by a newer check; omit it for a plain one-shot wait. Resolves true
+  // once /health responds, false if every attempt is exhausted (or
+  // shouldAbort() fires) without one succeeding.
+  async function waitForServiceToWake(onStatus, shouldAbort = () => false) {
+    const totalAttempts = HEALTH_CHECK_RETRY_DELAYS_MS.length + 1;
+    for (let attempt = 0; attempt < totalAttempts; attempt++) {
+      if (shouldAbort()) return false;
+
+      try {
+        await pingHealthOnce();
+        return !shouldAbort();
+      } catch (err) {
+        const isLastAttempt = attempt === totalAttempts - 1;
+        if (shouldAbort()) return false;
+
+        if (isLastAttempt) {
+          onStatus("offline");
+          return false;
+        }
+
+        const delay = HEALTH_CHECK_RETRY_DELAYS_MS[attempt];
+        onStatus("waking", delay);
+        await sleep(delay);
+      }
+    }
+    return false; // unreachable, but keeps the return type honest
+  }
+
   async function checkServiceHealth() {
     if (!CONFIG.API_BASE_URL) {
       state.serviceOnline = false;
@@ -332,45 +368,51 @@
     const generation = ++healthCheckGeneration;
     setServiceStatus("checking", "Checking analysis service…");
 
-    // Render's free tier can take up to ~60s to wake a sleeping instance.
-    // Rather than declaring "unavailable" after one quick timeout (which
-    // would be wrong almost every time the service has been idle), retry
-    // with backoff and keep the status pill showing a clear "waking up"
-    // state — never a bare failure — until we've given it a fair chance.
-    const totalAttempts = HEALTH_CHECK_RETRY_DELAYS_MS.length + 1;
-    for (let attempt = 0; attempt < totalAttempts; attempt++) {
-      if (generation !== healthCheckGeneration) return; // superseded by a newer check
-
-      try {
-        await pingHealthOnce();
-        if (generation !== healthCheckGeneration) return;
-        state.serviceOnline = true;
-        setServiceStatus("online", "Analysis service is online.");
-        return;
-      } catch (err) {
-        const isLastAttempt = attempt === totalAttempts - 1;
-        if (generation !== healthCheckGeneration) return;
-
-        if (isLastAttempt) {
-          state.serviceOnline = false;
-          setServiceStatus(
-            "offline",
-            "Analysis service is still unavailable after waiting for a possible cold start — it may genuinely be down. Try Retry, or try again shortly."
-          );
-          return;
-        }
-
-        const delay = HEALTH_CHECK_RETRY_DELAYS_MS[attempt];
+    const reachable = await waitForServiceToWake((kind, delay) => {
+      if (kind === "waking") {
         setServiceStatus(
           "checking",
           `Waking up analysis service (Render free-tier cold start can take up to a minute)… retrying in ${Math.round(delay / 1000)}s.`
         );
-        await sleep(delay);
       }
+      // "offline" is handled below via the return value, not here, so it
+      // can't race a superseding check the way an inline set would.
+    }, () => generation !== healthCheckGeneration);
+
+    if (generation !== healthCheckGeneration) return; // superseded by a newer check
+
+    if (reachable) {
+      state.serviceOnline = true;
+      // "Reachable", not "online": this only proves the process can
+      // answer a plain GET -- no image decode, no CV work, no memory
+      // pressure. See README.md's "Why the health banner can lie" for
+      // why that distinction matters and isn't just wording.
+      setServiceStatus("online", "Analysis service is reachable.");
+    } else {
+      state.serviceOnline = false;
+      setServiceStatus(
+        "offline",
+        "Analysis service is still unavailable after waiting for a possible cold start — it may genuinely be down. Try Retry, or try again shortly."
+      );
     }
   }
 
   serviceStatusRetry.addEventListener("click", checkServiceHealth);
+
+  // A real (non-cold-start) Analyze failure means /health's last "it can
+  // answer a GET" check is stale information -- flip the banner to a
+  // visibly degraded state rather than leaving "reachable" displayed
+  // next to an error the user can see is happening right now. Does not
+  // re-probe the server; this is purely reflecting what Analyze itself
+  // just observed.
+  function markServiceDegradedAfterAnalyzeFailure() {
+    if (!CONFIG.API_BASE_URL) return;
+    state.serviceOnline = false;
+    setServiceStatus(
+      "offline",
+      "The last analysis request failed to reach the service, even after waiting for a possible cold start — it may be down. Try Retry above, or try again shortly."
+    );
+  }
 
   // --- Step navigation --------------------------------------------------
 
@@ -2338,36 +2380,43 @@
     analyzeStatus.textContent = "Analyzing…";
     analyzeBtn.disabled = true;
 
-    try {
-      const fd = new FormData();
-      fd.append("file", state.file);
-      // Every approved measurement area, in full-image pixel coordinates
-      // -- the backend analyzes each one COMPLETELY INDEPENDENTLY (see
-      // analyze_multi_roi) and returns a robust cross-region consensus
-      // as wale/course below; state.roi is updated afterward to whichever
-      // approved area the backend used as the primary/overlay region.
-      fd.append(
-        "rois_json",
-        JSON.stringify(
-          state.rois.map((r) => ({
-            label: r.label,
-            x: r.x,
-            y: r.y,
-            width: r.width,
-            height: r.height,
-            source: r.source,
-          }))
-        )
-      );
-      fd.append("cal_x1", state.cal.points[0].x);
-      fd.append("cal_y1", state.cal.points[0].y);
-      fd.append("cal_x2", state.cal.points[1].x);
-      fd.append("cal_y2", state.cal.points[1].y);
-      fd.append("known_distance", state.cal.knownDistance);
-      fd.append("unit", state.cal.unit);
-      fd.append("orientation", state.orientation);
-      fd.append("structure", state.structure);
+    const fd = new FormData();
+    fd.append("file", state.file);
+    // Every approved measurement area, in full-image pixel coordinates
+    // -- the backend analyzes each one COMPLETELY INDEPENDENTLY (see
+    // analyze_multi_roi) and returns a robust cross-region consensus
+    // as wale/course below; state.roi is updated afterward to whichever
+    // approved area the backend used as the primary/overlay region.
+    fd.append(
+      "rois_json",
+      JSON.stringify(
+        state.rois.map((r) => ({
+          label: r.label,
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+          source: r.source,
+        }))
+      )
+    );
+    fd.append("cal_x1", state.cal.points[0].x);
+    fd.append("cal_y1", state.cal.points[0].y);
+    fd.append("cal_x2", state.cal.points[1].x);
+    fd.append("cal_y2", state.cal.points[1].y);
+    fd.append("known_distance", state.cal.knownDistance);
+    fd.append("unit", state.cal.unit);
+    fd.append("orientation", state.orientation);
+    fd.append("structure", state.structure);
 
+    // One attempt at POST /analyze-multi -- FormData is safely reusable
+    // across calls (it isn't a stream), so the same `fd` above backs
+    // both the initial attempt and the cold-start retry below without
+    // rebuilding it. Throws on any failure: AbortError (local timeout),
+    // a bare TypeError (fetch never got an HTTP response at all -- no
+    // connection, connection reset, or a CORS rejection), or a regular
+    // Error for an HTTP-level/application failure.
+    async function attemptAnalyze() {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
       let res;
@@ -2392,6 +2441,61 @@
         throw new Error(data.message || `Analysis failed (HTTP ${res.status}).`);
       }
 
+      return data;
+    }
+
+    // AbortError (our own timeout) and a bare TypeError (no HTTP response
+    // reached us at all) are exactly what a cold, still-waking free-tier
+    // instance looks like from here -- indistinguishable, from a single
+    // failed fetch, from the service actually being down. See README.md's
+    // "Why the health banner can lie" for the investigation this is built
+    // from. An HTTP-level failure (thrown as a plain Error above) is NOT
+    // this -- the server answered, so it isn't a cold start.
+    function looksLikeColdStartOrUnreachable(err) {
+      return (err && err.name === "AbortError") || err instanceof TypeError;
+    }
+
+    try {
+      let data;
+      try {
+        data = await attemptAnalyze();
+      } catch (err) {
+        if (!looksLikeColdStartOrUnreachable(err)) throw err;
+
+        // Don't just fail -- wait for /health to confirm the service is
+        // actually back (reusing the exact same retry/backoff the status
+        // banner uses), then retry this SAME request once automatically.
+        // Only after that also fails do we call it a real failure.
+        analyzeStatus.textContent = "Waking up the analysis service — this can take about a minute…";
+        const reachable = await waitForServiceToWake((kind, delay) => {
+          if (kind === "waking") {
+            analyzeStatus.textContent =
+              `Waking up the analysis service (Render free-tier cold start can take up to a minute)… retrying in ${Math.round(delay / 1000)}s.`;
+          }
+        });
+
+        if (!reachable) {
+          markServiceDegradedAfterAnalyzeFailure();
+          throw new Error(
+            "The analysis service didn't wake up after waiting — it may genuinely be down. " +
+            "Try Retry on the status banner above, or try again shortly."
+          );
+        }
+
+        analyzeStatus.textContent = "Service is back — retrying analysis…";
+        try {
+          data = await attemptAnalyze();
+        } catch {
+          // Woke up (per /health) but the actual analysis request still
+          // failed -- this is a real failure now, not a cold start.
+          markServiceDegradedAfterAnalyzeFailure();
+          throw new Error(
+            "The analysis service woke up, but the request still failed. This looks like a real " +
+            "failure rather than a cold start — try again, or try a smaller photo."
+          );
+        }
+      }
+
       state.result = data;
       // The backend picks one approved area as the "primary" region (the
       // first one accepted into both axes' consensus) and echoes its
@@ -2407,20 +2511,12 @@
       renderResults();
       goToStep("results");
     } catch (err) {
+      // Any transport-shaped failure was already resolved (recovered, or
+      // turned into one of the specific messages above) inside the try
+      // block -- by the time we're here, err.message is always the
+      // right thing to show verbatim.
       analyzeStatus.hidden = true;
-      if (err && err.name === "AbortError") {
-        analyzeError.textContent =
-          "The analysis service took too long to respond and the request was cancelled. " +
-          "Free-tier hosts can be slow to wake up from a cold start — try again in ~30-60 seconds.";
-      } else if (err instanceof TypeError) {
-        // fetch() throws a bare TypeError for network failures / CORS rejections —
-        // this is the "service unavailable" case the task calls out explicitly.
-        analyzeError.textContent =
-          "Could not reach the analysis service. It may be offline, waking up from a cold start, " +
-          "or blocking requests from this page (CORS). Try the Retry button above, or try again shortly.";
-      } else {
-        analyzeError.textContent = (err && err.message) || "Analysis failed. Please try again.";
-      }
+      analyzeError.textContent = (err && err.message) || "Analysis failed. Please try again.";
       analyzeError.hidden = false;
     } finally {
       analyzeBtn.disabled = false;
