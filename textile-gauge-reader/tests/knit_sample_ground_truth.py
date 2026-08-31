@@ -74,7 +74,58 @@ tensioned photo, with no independent number to check it against. Excluded
 entirely rather than corrected: this photo has no stable resting gauge to
 serve as ground truth for either axis. See README.md's investigation
 writeup for the full crop-by-crop data.
+
+FOURTH PASS -- pinned ROIs. An accuracy pass earlier in this project's
+history hand-picked a "clean, representative" crop per fixture by eye
+(avoiding rulers/pins/markers) and reported per-fixture errors from that.
+A later pass, re-deriving those crops from scratch by eye again, produced
+DIFFERENT numbers for the same fixtures against the same, unchanged
+detector code -- by tens of percentage points, in both directions,
+including one case (jersey course) that looked "fixed" purely because the
+second crop happened to exclude a few rows of ruler ticks the first
+crop's approximate replica had included. A systematic grid sweep (see
+README.md's "How ROI-dependent is this, really?" section) confirmed why:
+this detector's reading for these real photos routinely swings across a
+range of several hundred percent depending on exactly where and how large
+the analysis crop is -- eyeballing "a clean crop" is not a repeatable
+methodology, and neither of those two hand-picked passes measured a
+stable property of the detector.
+
+ROI_01 / ROI_02 / ROI_05 / ROI_06 / ROI_08 / ROI_09 below fix that: one
+ROI per fixture, chosen by ONE stated rule applied uniformly and
+mechanically, with no per-fixture visual judgment and no re-picking after
+seeing a result:
+
+    side = int(min(image_width, image_height) * 0.5)
+    x = (image_width - side) // 2
+    y = (image_height - side) // 2
+    roi = (x, y, side, side)
+
+i.e. the central square crop, sized at 50% of the image's shorter
+dimension. This rule makes no attempt to avoid a ruler, pin, or marker
+that happens to fall inside it -- deliberately: the point is a number
+every future run can reproduce exactly, not the best number a person
+could find by looking. Where the rule lands on a ruler or produces a bad
+reading (it does, for at least one of these fixtures -- see the README
+section above), that is itself part of what got measured, not a flaw in
+the rule to be quietly corrected by picking a different crop. Any future
+accuracy claim against these fixtures MUST use these exact ROIs, passed
+to `analyze_gauge` verbatim, so it stays comparable to this one and to
+whatever comes after it.
 """
+
+
+def pinned_roi(image_width: int, image_height: int, frac: float = 0.5):
+    """The stated rule above, callable, so a ROI_XX constant below can be
+    verified (or a future fixture's ROI generated) instead of re-typing
+    the arithmetic by hand. Not used at import time -- these fixtures'
+    dimensions are fixed, so the ROI_XX constants below are the literal
+    result of this function, computed once and pinned as plain numbers
+    like every other constant in this file."""
+    side = int(min(image_width, image_height) * frac)
+    x = (image_width - side) // 2
+    y = (image_height - side) // 2
+    return (x, y, side, side)
 
 # knit_sample_01.jpg -- light blue stockinette in a 4in gauge-tool window.
 # Calibration: the tool's own printed ruler, both axes, 333 px/inch (the
@@ -83,6 +134,8 @@ writeup for the full crop-by-crop data.
 PX_PER_INCH_01 = 333.0
 TRUE_WALES_PER_INCH_01 = 3.8   # AI-estimated, human-verified (not hand-counted)
 TRUE_COURSES_PER_INCH_01 = 5.7  # AI-estimated, human-verified (not hand-counted)
+# Pinned ROI (see FOURTH PASS above) -- image is 1962x1725.
+ROI_01 = (550, 431, 862, 862)
 
 # knit_sample_02.jpg -- blue variegated/ombre stockinette, one horizontal tape
 # measure only. Fabric is soft-focus at the pixel level (confirmed at native
@@ -95,12 +148,18 @@ TRUE_WALES_PER_INCH_02 = 4.0   # AI-estimated, human-verified (not hand-counted)
 # texture visible at all). Left None because it's genuinely uncountable in
 # this photo, not because no ruler exists for it.
 TRUE_COURSES_PER_INCH_02 = None
+# Pinned ROI (see FOURTH PASS above) -- image is 3925x2617. Lands squarely
+# on the horizontal ruler crossing this photo's midsection (visually
+# confirmed) -- kept as-is per the rule, not nudged to avoid it.
+ROI_02 = (1308, 654, 1308, 1308)
 
 # knit_sample_05.jpg -- mint green stockinette, dual ruler (horizontal +
 # vertical, same Westcott ruler product, ~320 px/inch both axes).
 PX_PER_INCH_05 = 320.0
 TRUE_WALES_PER_INCH_05 = 4.7    # AI-estimated, human-verified (not hand-counted)
 TRUE_COURSES_PER_INCH_05 = 6.7  # AI-estimated, human-verified (not hand-counted)
+# Pinned ROI (see FOURTH PASS above) -- image is 1875x1946.
+ROI_05 = (469, 504, 937, 937)
 
 # knit_sample_06.jpg -- teal/blue textured knit. TWO rulers, different units
 # and different physical scales: the wale (horizontal) ruler is in cm, the
@@ -111,6 +170,8 @@ PX_PER_CM_06_WALE = 184.4       # horizontal ruler, cm
 PX_PER_INCH_06_COURSE = 433.5   # vertical ruler, inches
 TRUE_WALES_PER_INCH_06 = 3.8    # AI-estimated, human-verified (not hand-counted)
 TRUE_COURSES_PER_INCH_06 = 5.2  # AI-estimated, human-verified (not hand-counted)
+# Pinned ROI (see FOURTH PASS above) -- image is 1875x1312.
+ROI_06 = (609, 328, 656, 656)
 
 # knit_sample_07.jpg -- purple/lavender stockinette, still on the needles.
 # One horizontal tape measure only (confirmed inches, "60in" printed on tape).
@@ -144,6 +205,8 @@ TRUE_WALES_PER_INCH_08 = 4.5   # AI-estimated, human-verified (not hand-counted)
 # the course direction (fabric is sharp here, unlike 02 -- confirmed at
 # native zoom). AI-estimated, human-verified, AND transposed calibration.
 TRUE_COURSES_PER_INCH_08 = 6.9
+# Pinned ROI (see FOURTH PASS above) -- image is 1508x1008.
+ROI_08 = (502, 252, 504, 504)
 
 # knit_sample_09.jpg -- light gray stockinette. One vertical tape measure
 # only (confirmed inches, "60in" printed on tape) -- measures courses, not
@@ -154,3 +217,5 @@ PX_PER_INCH_09 = 187.0
 # AI-estimated, human-verified, AND transposed calibration.
 TRUE_WALES_PER_INCH_09 = 5.1
 TRUE_COURSES_PER_INCH_09 = 7.6   # AI-estimated, human-verified (not hand-counted)
+# Pinned ROI (see FOURTH PASS above) -- image is 1288x1079.
+ROI_09 = (374, 270, 539, 539)
