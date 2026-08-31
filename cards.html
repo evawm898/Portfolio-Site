@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cards — Eva Maskalenko</title>
+<meta name="description" content="Custom playing card deck builder — upload a suit glyph per suit, pick two colors, export a print-ready 52-card deck as PDF or PNG.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="cards.css">
+
+<!-- PDF + ZIP export, loaded globally via CDN (no bundler on this site).
+     Pinned versions so a CDN update never silently changes export output. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link">Field Notes</a>
+</nav>
+
+<header class="cd-header">
+  <div class="cd-header__index">Lab &middot; Deck Builder</div>
+  <h1 class="cd-header__title">Cards</h1>
+  <p class="cd-header__lede">Upload a glyph for each suit, choose two colors, and generate a complete 52-card deck — print-ready at 2.5&Prime; &times; 3.5&Prime;, 300&thinsp;DPI, with 0.125&Prime; bleed. No suit art yet? Every suit renders from a built-in placeholder glyph until you drop one in — the pipeline works the same either way.</p>
+</header>
+
+<main class="cd-body">
+
+  <section class="cd-panel" aria-labelledby="controls-heading">
+    <h2 id="controls-heading" class="sr-only" hidden>Deck controls</h2>
+
+    <div class="cd-panel__section">
+      <div class="cd-panel__label"><span>01</span>Suit Glyphs</div>
+      <div id="suitRows"></div>
+    </div>
+
+    <div class="cd-panel__section">
+      <div class="cd-panel__label"><span>02</span>Palette</div>
+      <div class="cd-color-row">
+        <input type="color" id="colorPrimary" value="#1c6b6b">
+        <div>
+          <div class="cd-color-row__label">Primary</div>
+          <span class="cd-color-row__sub">Spades &amp; Clubs</span>
+        </div>
+      </div>
+      <div class="cd-color-row">
+        <input type="color" id="colorSecondary" value="#b23b3b">
+        <div>
+          <div class="cd-color-row__label">Secondary</div>
+          <span class="cd-color-row__sub">Hearts &amp; Diamonds</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cd-panel__section">
+      <div class="cd-panel__label"><span>03</span>Export</div>
+      <button id="btnExportPdf" class="cd-export-btn">Download PDF (52 pages)</button>
+      <button id="btnExportZip" class="cd-export-btn cd-export-btn--secondary">Download PNGs (ZIP)</button>
+      <div id="exportStatus" class="cd-status" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="cd-panel__section">
+      <div class="cd-panel__label"><span>04</span>Print Spec</div>
+      <div class="cd-spec" id="specText"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="preview-heading">
+    <h2 id="preview-heading" class="cd-preview__label"><span>05</span>Preview</h2>
+    <div id="previewGrid" class="cd-preview-grid"></div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="cards.js"></script>
+</body>
+</html>
