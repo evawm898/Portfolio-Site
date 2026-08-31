@@ -60,6 +60,20 @@ recorded:
     outright: this fabric is still on the needles, pinned mid-row under
     working tension, not blocked or relaxed -- row spacing there reflects
     on-needle tension, not resting gauge. Left blank rather than transposed.
+
+THIRD PASS -- knit_sample_07's WALE axis excluded too. Diagnosing a large
+(+39.7%) detector error, six independent crops (varying distance from the
+needle, from the pin row, from the ruler) agreed with EACH OTHER to within
+~9% while disagreeing with the recorded 5.0 WPI estimate by +31% to +40% --
+not a harmonic split, not ROI noise, but the fabric and the eyeballed
+estimate disagreeing while the detector is internally consistent. This
+swatch is pinned flat into a blocking-style setup while still attached to
+the working needles (visible in the photo) -- genuinely under tension, not
+resting -- and the 5.0 WPI figure was itself eyeballed off that same
+tensioned photo, with no independent number to check it against. Excluded
+entirely rather than corrected: this photo has no stable resting gauge to
+serve as ground truth for either axis. See README.md's investigation
+writeup for the full crop-by-crop data.
 """
 
 # knit_sample_01.jpg -- light blue stockinette in a 4in gauge-tool window.
@@ -101,11 +115,25 @@ TRUE_COURSES_PER_INCH_06 = 5.2  # AI-estimated, human-verified (not hand-counted
 # knit_sample_07.jpg -- purple/lavender stockinette, still on the needles.
 # One horizontal tape measure only (confirmed inches, "60in" printed on tape).
 PX_PER_INCH_07 = 423.0
-TRUE_WALES_PER_INCH_07 = 5.0   # AI-estimated, human-verified (not hand-counted)
-# Second pass: FAILS the flatness check -- still on the needles, pinned
-# mid-row under working tension, not blocked/relaxed. Row spacing here would
-# reflect on-needle tension, not resting gauge, so left None rather than
-# transposing PX_PER_INCH_07 into a number that isn't representative.
+# THIRD PASS -- wale excluded too, not just course. Six independent,
+# non-overlapping crops (different distances from the needle, from the pin
+# row, from the ruler) agreed with EACH OTHER to within ~9% (60-64px) while
+# disagreeing with this eyeballed 5.0 WPI estimate by +31% to +40% -- not a
+# harmonic split (84.6px expected vs ~60-64px measured is ~28-33%, not a
+# clean 2x/0.5x), and not ROI noise either, since independent crops across
+# the width and at multiple distances from the needle land on the same
+# number. That combination reads as the fabric agreeing with itself, not
+# the detector disagreeing with itself: this swatch was photographed
+# pinned flat with multiple T-pins into a blocking-style setup while still
+# attached to the working needles, under real tension, not resting or
+# blocked. This 5.0 figure was itself eyeballed off that same tensioned
+# photo, so there's no independent number to trust it against. Excluded
+# rather than recorded: this photo does not have a stable resting gauge to
+# measure, the same disposition its course axis already got below.
+TRUE_WALES_PER_INCH_07 = None
+# Still on the needles, pinned mid-row under working tension, not blocked
+# or relaxed -- row spacing here would reflect on-needle tension, not
+# resting gauge.
 TRUE_COURSES_PER_INCH_07 = None
 
 # knit_sample_08.jpg -- gray/olive tweed-flecked stockinette. One horizontal
