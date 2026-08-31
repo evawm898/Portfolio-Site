@@ -736,6 +736,11 @@ generalize — and is real work still ahead.
 
 ### The density cross-check's blind spot: a real secondary peak, not just a bad override
 
+*(One instance of the broader period-selection ambiguity quantified in
+"How ROI-dependent is this, really?" below — see its "central finding"
+subsection for how this connects to ply-twist, color pooling, and the
+position-dependent coin-flips found by the mechanical ROI sweep.)*
+
 `_cross_check_density` (the wale-only loop-density override described
 above) was found overriding a wale pick the v0.3 evidence scorer had
 already gotten right, and decisively — on a real photo
@@ -928,6 +933,83 @@ these fixtures must use these exact ROIs (verbatim, not "close to") to
 be comparable to any other. This does not make the detector more
 accurate — it makes the next accuracy number about the detector, not
 about who picked the crop.
+
+#### The central finding: two layered problems, not one
+
+The sweep above shows a large spread but doesn't say what's driving it.
+A follow-up pass tagged all 210 axis-observations from the same 15-crop
+mechanical grid with three more facts per crop — does it overlap a ruler,
+pin, or foreign object (a fixed bounding box per fixture, defined once,
+not re-picked); how many true stitch/row repeats fit in it (crop size ÷
+ground-truth period); and the pipeline's own status/confidence — and
+separated their effects instead of reporting one blended spread.
+
+**Contamination is the dominant real-photo error source, by a wide
+margin:**
+
+| | median \|err\| | harmonic-lock rate |
+|---|---|---|
+| crop overlaps a ruler/pin/marker | 65.8% | 40% |
+| clean fabric only | 7.2% | 23% |
+
+**Crop size is a second-order effect, and naive analysis makes it look
+backwards.** Raw (uncontrolled) data shows error getting *worse* at
+larger crop sizes — but that's confounded: bigger crops mechanically
+overlap more of a fixture's (fixed-size) contamination zone, so larger
+crops are also *more likely to be contaminated* (51%→60%→73% of crops as
+size grows 30%→50%→70%). Controlling for that, within clean crops only,
+size shows the trend you'd actually expect, just a mild one: median
+\|err\| 8.2% → 7.2% → 5.6% as crops grow from ~6 to ~15 stitch repeats.
+No sharp "minimum viable ROI" threshold — just a gentle improvement with
+more fabric in frame.
+
+**Removing both confounds — clean fabric AND ≥6 repeats (n=69, 11
+fixture/axis pairs) — does not reveal a small, uniform residual. It
+reveals a bimodal split:**
+- **4 of 11 pairs are reliably accurate** regardless of exact position
+  (jersey course, knit_06 course, knit_08 course, knit_09 wale — every
+  clean/large crop on these reads within single-digit % error).
+- **1 of 11 is reliably, systematically wrong** (knit_06 wale: all 9
+  clean/large crops read -67% to -85% — not a coin flip, this scale is
+  simply wrong on this fixture no matter where the crop sits).
+- **6 of 11 are a genuine coin flip**, correct on some clean/adequately-
+  sized crops and badly wrong (a harmonic multiple) on others, with
+  nothing about cleanliness or size predicting which: jersey wale, teal
+  wale, knit_05 wale, knit_05 course, knit_08 wale, knit_09 course. The
+  starkest example — knit_05's course axis across its six clean, ≥6-
+  repeat crops reads **+1%, +87%, +1%, -52%, -1%, -75%** — alternating
+  between correct and badly wrong purely from where an otherwise-clean,
+  adequately-sized crop happens to land. "Use a bigger, cleaner crop"
+  has no answer for this class: bigger, cleaner crops disagree with each
+  other.
+
+**Confidence tracks part of this, imperfectly.** The coarse `status`
+flag (confident/uncertain) carries real signal — confident observations
+have median \|err\| 5.8% vs. uncertain's 67.0% — worth keeping. But it's
+a partial gate, not a solution: 29% of "confident" results are still
+wrong by >15% (one reads +100.6% error at confidence 0.83), and 39% of
+"uncertain" results are actually fine (≤15% error) — false confidence
+and over-caution both happen often enough to matter. The **numeric**
+confidence score, separately, carries essentially no information at all:
+Pearson correlation between confidence and absolute error across all 210
+observations is **-0.028** — indistinguishable from zero. Only the
+binary status split is informative; the number attached to it isn't.
+
+**This reframes several mechanism writeups already in this README as the
+same underlying problem, not separate bugs.** Yarn ply-twist on the teal
+fixture (see "Investigated and rejected" below), color pooling on
+variegated yarn (same section), and the density-cross-check override
+that fires on a decisive-but-wrong pick (see "The density cross-check's
+blind spot" above) are three different *mechanisms* for arriving at the
+same *symptom*: a genuinely periodic sub-feature — a half-stitch texture,
+a color-transition rhythm, a leg-crossing blob — sits close enough to the
+true stitch period that something in the pipeline locks onto it instead,
+and which one wins is sensitive to exactly where the analysis window
+sits. The coin-flip pairs found here (jersey wale, teal wale, knit_05,
+knit_08 wale, knit_09 course) are that same ambiguity showing up as
+*position*-dependence rather than a named texture cause — the common
+thread is one underlying period-selection ambiguity with several
+different triggers, not an unrelated bug per fixture.
 
 ### Verify by counting a repeat: user-anchored template matching
 
@@ -1968,6 +2050,11 @@ regardless of the template-matching verdict:**
   variegated-yarn color transitions that are coherent across multiple
   rows defeat multi-row consensus defenses, because the noise isn't
   independent row-to-row the way the consensus math assumes.
+
+*(Both of these, plus the density-cross-check override, are instances of
+the same underlying period-selection ambiguity — see "How ROI-dependent
+is this, really?"'s "central finding" subsection, earlier in this
+document, for the mechanical-sweep data tying them together.)*
 
 **Bar for revisiting.** Not "a better anchor" and not "a smarter refinement
 step" — both were tried and both are secondary to the real blocker, which
