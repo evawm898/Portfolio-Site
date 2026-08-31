@@ -47,7 +47,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
+         thicknessAssertions, THICKNESS_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -84,11 +85,32 @@ for (const row of rows) {
      everywhere because the junction is everywhere. */
   const frm = await formAssertions(page, row);
   if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
+  /* THE THICKNESS ASSERTIONS, on EVERY row for the same reason as the form
+     ones: the foot is everywhere, the guard's both-directions read-back is
+     what byte-identity rests on, and both of this gate's own measures are
+     structurally blind to a thickness bug (fixed topology, and a thinner
+     sheet is still spanned by a hub built at the same thickness). */
+  const thk = await thicknessAssertions(page, row);
+  if (thk.length) { validity.push(`${row.label}: ${thk.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
+  /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
+     live build never floors, so no live metric can answer this. */
+  const flr = await exportFloorAssertion(page);
+  if (flr.length) { validity.push(`${row.label}: ${flr.join('; ')}`); continue; }
   const fm = await page.evaluate(() => window.__bloomMetrics());
   results.push({
     label: row.label, capability: !!row.capability, bytes: buf.length,
+    /* THE THICKNESS NUMBERS TRAVEL WITH THE ROW, so a green run is a record
+       of where the clamps bound rather than only that nothing broke — and
+       every figure carries its mode, because live and export geometry are no
+       longer the same thing. */
+    thickness: fm.petalThickness
+      ? `sheet ${fm.petalThickness.authored.toFixed(2)} mm · tip ${fm.petalThickness.tipAuthored.toFixed(2)} mm (live)`
+        + `${fm.petalThickness.floorBinds ? ` → ${(1.0).toFixed(2)} mm (CLAMPED at export)` : ''}`
+        + ` · foot ${fm.ringWidth.toFixed(2)} mm${fm.ringWidthClamped ? ' (CLAMPED)' : ''}`
+        + ` · ring ${fm.ringRadius.toFixed(2)} mm (live)`
+      : null,
     /* The form numbers travel WITH the row's result, so a green run is a
        record of what was measured rather than only that it passed. */
     form: fm.petalForm
@@ -111,6 +133,7 @@ for (const r of results) {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${r.label.padEnd(46)} tris(export)=${String(r.tris).padStart(6)} boundary=${r.boundary} nonManifold=${r.nonManifold} (unrated) shells=${r.shells} (unrated) ${(r.bytes / 1024).toFixed(0)} KiB`);
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
+  if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 

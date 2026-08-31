@@ -338,7 +338,14 @@ export const CONTROLS = [
       if (d === 0) return 'flat';
       const halfW = (ui ? Number(ui.petalWidth) : 16) / 2;
       const kReq = Math.abs(d * Math.PI / 180) / halfW;
-      const kMax = 1 / 1.2;
+      /* Reads the SHEET THICKNESS CONTROL, not a hardcoded 1.2. It was
+         hardcoded until the thickness layer, correctly, because the sheet was
+         a constant; the moment thickness became a control this label would
+         have printed a radius the geometry does not build (too small a floor
+         on a thick sheet, too large on a thin one). The floor itself lives in
+         petalForm and is reported in its telemetry — this reads the same
+         arithmetic back, it does not set it. */
+      const kMax = 1 / (ui ? Number(ui.sheetThickness) : 1.2);
       const k = Math.min(kReq, kMax);
       return `${d > 0 ? '+' : ''}${d}° · roll radius ${(1 / k).toFixed(2)} mm${kReq > kMax ? ' (clamped)' : ''}`;
     },
@@ -349,6 +356,88 @@ export const CONTROLS = [
     fmt: (v) => {
       const d = Number(v);
       return d === 0 ? 'none' : `${d > 0 ? '+' : ''}${d}° (${d > 0 ? 'dextral' : 'sinistral'})`;
+    },
+    visibleWhen: { all: [] } },
+
+  /* MATERIAL — the thickness layer (Eva, Aug 31, ruled from the live page:
+     the petal-to-centre connection is too thick, and the petal tip is too
+     thick). Both were the same absence: thickness was ONE CONSTANT
+     everywhere — foot, blade and tip alike — so neither complaint had a
+     slider to answer it. All three are Standard and `role: 'petal'`.
+
+     WHY `role: 'petal'` FOR THE FOOT CONTROL, on precedent rather than
+     taste. `petalWidth` already feeds footRing() and already moves the ring
+     radius through the area rule, and it is role 'petal'. 'arrangement' is
+     where `spread` lives because spread moves WHERE PETALS SIT; delicacy
+     changes the petal's own root cross-section and the ring follows because
+     the area rule reads it. And there is deliberately no role 'junction' —
+     the hub stays derived plumbing, reading ring.thickness and ring.radius
+     exactly as before, so a thinner foot gives a thinner hub with no code
+     that mentions either control.
+
+     WHY `sheetThickness` CARRIES NO `petal` PREFIX. It governs the hub slab
+     and the centre's floors too (both read ring.thickness), so a petal
+     prefix would claim less than the control does. The role stays 'petal'
+     because the junction derives from the petal — there is no 'material'
+     role and inventing a fourth is a stop-and-raise, not a side effect of
+     naming a slider.
+
+     EVERY ONE OF THE THREE DEFAULTS REPRODUCES THE OLD CONSTANT EXACTLY:
+     1.20 is the double SHEET_THICKNESS_MM holds (bloom-harness asserts the
+     two are equal on every gate run), tip thinning 0 makes the profile law
+     `base * (1 - 0*u)` which is `base * 1` which is `base`, and delicacy
+     1.00 multiplies exactly (x * 1.0 === x, the spread precedent). The byte
+     report confirms a construction rather than establishing a result.
+
+     THE FLOORS ARE CLAMPS ON THE OUTPUT, NEVER LIMITS ON THE RANGE — the
+     roll-clamp pattern. All three ranges reach past where a floor starts
+     binding, on purpose, and every read-out says (CLAMPED) when it does, so
+     a slider that has stopped moving the print does not read as broken. */
+  { id: 'sheetThickness', kind: 'slider', min: 0.6, max: 2.4, step: 0.05, default: 1.2,
+    label: 'Sheet thickness', tier: 'standard', role: 'petal',
+    /* Prints the export floor's verdict, not only the authored value. Below
+       1.00 mm the exported sheet is floored and the live view is showing
+       material the print will not have — the same labelling discipline the
+       triangle counts use, because live and export are different geometry. */
+    fmt: (v) => {
+      const t = Number(v);
+      return `${t.toFixed(2)} mm${t < 1 ? ' · printed 1.00 mm (CLAMPED)' : ''}`;
+    },
+    visibleWhen: { all: [] } },
+
+  { id: 'tipThinning', kind: 'slider', min: 0, max: 0.8, step: 0.01, default: 0,
+    label: 'Tip thinning', tier: 'standard', role: 'petal',
+    /* Prints the DERIVED tip thickness in mm, live and printed, which is the
+       physical quantity — the fraction alone cannot say where the floor
+       takes over, and at the shipping 1.2 mm sheet it takes over from 0.17
+       upward. Same precedent as Tip taper printing the derived widest point
+       and Spine curl printing the derived radius: one expression here, one
+       in the geometry, and no control for the derived number. */
+    fmt: (v, ui) => {
+      const thin = Number(v);
+      if (thin === 0) return 'even';
+      const base = ui ? Number(ui.sheetThickness) : 1.2;
+      const tip = base * (1 - thin);
+      const printed = Math.max(tip, 1);
+      return `${(thin * 100).toFixed(0)}% · tip ${tip.toFixed(2)} mm`
+           + (printed > tip ? ` · printed ${printed.toFixed(2)} mm (CLAMPED)` : '');
+    },
+    visibleWhen: { all: [] } },
+
+  { id: 'footDelicacy', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 1,
+    label: 'Foot delicacy', tier: 'standard', role: 'petal',
+    /* Prints the DERIVED foot cross-section in mm — the answer to "how thin
+       can this connection get" is a pair of millimetres, not a multiplier.
+       The 1.6 mm floor is an ASSUMPTION (2x the assumed minimum feature;
+       nothing in this project family has ever been printed) and it says so
+       where it binds. */
+    fmt: (v, ui) => {
+      const d = Number(v);
+      const raw = (ui ? Number(ui.petalWidth) : 16) * 0.4 * d;
+      const w = Math.min(10, Math.max(1.6, raw));
+      const t = ui ? Number(ui.sheetThickness) : 1.2;
+      return `${d.toFixed(2)}x · foot ${w.toFixed(2)} x ${t.toFixed(2)} mm`
+           + (raw < 1.6 ? ' (CLAMPED — assumed floor)' : '');
     },
     visibleWhen: { all: [] } },
 

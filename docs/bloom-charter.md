@@ -154,6 +154,26 @@ slenderness argument is theory. The coupon plan (cantilevers at stepped diameter
 free lengths) still converts guesses into measurements the first time anything goes to a
 printer — and sheet petals add a min-wall coupon to that list.
 
+**Aug 31: a floor is now CAPPING something Eva asked for by eye, and that changes what the
+coupon is worth.** Until the thickness layer every floor was a guess that never bound —
+`SHEET_THICKNESS_MM` sat above `MIN_FEATURE_MM`, so nothing was ever clamped and the
+assumptions cost nothing. Eva ruled the petal tip too thick; **while the 1.0 mm
+minimum-feature assumption stands, the PRINTED tip can only thin from 1.20 mm to 1.00 mm —
+17% — however far the slider goes.** The live view shows the full authored thinning and the
+print will not have it. Real printed tip delicacy needs either a thicker base sheet
+(2.40 mm tapering to 1.00 mm is a genuine 2.4:1 wedge, and it ships) or a coupon showing
+1.0 mm is conservative.
+
+Four numbers in this family are now load-bearing guesses that a single coupon print would
+turn into measurements: `MIN_FEATURE_MM` 1.0 (which caps the tip and the foot),
+`FOOT_MIN_WIDTH_MM` 1.6 (the most delicate reachable connection), `TIP_HALF_MM` 0.8 (the
+tip's blunt WIDTH, which this session reports and does not touch), and
+`ROLL_MIN_RADIUS_FACTOR` 1.0 (one sheet thickness, and it now moves with the sheet). A
+coupon print is cheap, converts all four at once, and would retroactively improve every
+clamp the thickness layer ships. It is the strongest candidate for the next session — a
+better one than arrangement, which can be designed against assumptions but cannot resolve
+any of them.
+
 ## Rulings to park for phase boundaries
 
 - ~~Phase 2 entry: what *is* the bloom center, visually?~~ **Built as an A/B rig, Aug 31;
@@ -347,15 +367,43 @@ printer — and sheet petals add a min-wall coupon to that list.
   thing in this codebase to make triangle count depend on a slider. Do not start it on the
   strength of this note alone.
 
-- **The export feature-size floor cannot move triangle counts here, and the flower's
-  mechanism is structurally absent.** The flower measured a pure-displacement effect changing
-  export counts because its floor is evaluated per feature and displacement moved features
-  across it, adding or removing tube segments. Two reasons that cannot happen in the bloom:
-  `SHEET_THICKNESS_MM` (1.2) is above `MIN_FEATURE_MM` (1.0), so `floorThickness` never
-  binds; and every primitive is a fixed-topology grid, so the floor changes geometry but
-  never triangle count. Measured live-vs-export on six configs spanning both extremes,
-  including one where the CENTRE's floor genuinely binds: **delta 0 on every row.** If live
-  and export ever disagree on a bloom row, it is a bug, not the floor.
+- **The export feature-size floor cannot move TRIANGLE COUNTS here — but it now moves
+  GEOMETRY, and the half of this note that said otherwise has EXPIRED (rewritten Aug 31,
+  the thickness layer).** The flower measured a pure-displacement effect changing export
+  counts because its floor is evaluated per feature and displacement moved features across
+  it, adding or removing tube segments. **The surviving reason** that cannot happen in the
+  bloom: every primitive is a fixed-topology grid — `NU`, `NV`, the panel count and every
+  centre segment count depend on no control — so the floor changes geometry but never
+  triangle count. Re-measured across the thickness layer's own 120-row matrix, ALL-THIN
+  corners included: **delta 0 on every row, live against export.**
+
+  **The EXPIRED half, recorded rather than deleted.** This note also said
+  `SHEET_THICKNESS_MM` (1.2) is above `MIN_FEATURE_MM` (1.0) so `floorThickness` never
+  binds, and concluded "if live and export ever disagree on a bloom row, it is a bug, not
+  the floor". That was true of the CONSTANTS and is false of the CONTROLS: `sheetThickness`
+  reaches 0.60 mm, and the tip gradient crosses the floor from thinning 0.17 upward at the
+  shipping 1.20 mm sheet. Live and export geometry now legitimately differ. Session 4 called
+  this "a property of the constants, not a rule" and was exactly right; the claim expired
+  where it said it would.
+
+  **The divergence is not confined to a wall, which is the part to carry forward.**
+  `footRing()`'s area rule reads the thickness the solids are ACTUALLY built at, so flooring
+  the sheet moves the RING RADIUS: at a 0.60 mm sheet the ring is 6.25 mm live against
+  8.07 mm printed — a 29% difference in the whole arrangement, not a wall. **Eva's ruling
+  (Aug 31): no geometry change in either mode** — the one-owner rule is doing exactly what
+  footRing()'s header says it should, and live mode stays authoring-true — **but the
+  divergence must be TOLD.** The read-out prints both radii, labelled, whenever they differ,
+  on the same discipline the triangle counts have carried since the counts stopped being
+  convertible; and the state has its own cell on `tools/shot-bloom-thickness.mjs`'s
+  divergence sheet.
+
+- **PARKED, and deliberately not built: a "print preview" toggle** rendering the
+  export-floored geometry live. The reasoning that parks it is the same reasoning that
+  would eventually build it: a preview that silently shows an arrangement the print will not
+  produce is the same lie as an unlabelled triangle count — a labelled one is honest, and a
+  second, rendered one would be better still. It is a second rendering path with its own
+  camera, read-out and gate story, and the labelling is what makes today's state honest
+  without it. Do not start it on the strength of this note alone.
 
 - **The form sheet — RULED Aug 31, all three questions closed.** The teaching sheet
   holds: swept alone, each in the view its own curve is visible in, the four read as
@@ -376,6 +424,50 @@ printer — and sheet petals add a min-wall coupon to that list.
   Both cells are on `tools/shot-bloom-form.mjs`'s sheets with their measured numbers in
   the caption. Same standing as the max-combinator kink: the ruling was made on a
   picture, and a fresh ruling needs a fresh picture.
+
+- ~~The thickness layer — a single constant everywhere~~ **BUILT Aug 31, on Eva's ruling
+  from the live page: the petal-to-centre connection is too thick, and the petal tip is too
+  thick.** Both were one absence: `SHEET_THICKNESS_MM` was read at both call sites, so foot,
+  blade and tip were the same number by construction and neither complaint had a slider.
+
+  **Three Standard controls, all `role: 'petal'`, all byte-identical at their defaults:**
+  `sheetThickness` (0.60–2.40 mm, default 1.20 — the double the constant held, asserted
+  equal to it at harness load so the two cannot drift), `tipThinning` (0–0.80, default 0 —
+  the law `base * (1 - thin*u)` is `base * 1` is `base`), and `footDelicacy` (0.25–1.00,
+  default 1.00 — `x * 1.0 === x`, the spread precedent). Zero triangles at every setting:
+  the default bloom is 11,136 tris live and export alike, unchanged.
+
+  **Delicacy scales the foot's WIDTH, and the argument is a measurement.** A
+  thickness-scaling delicacy is INERT IN EXPORT below 0.833 at the default sheet — the
+  1.0 mm floor eats 83% of its range — so it would move the live page and nothing that
+  prints. Width survives the floor across its whole range, and because the area rule reads
+  it, the ring and the hub plate close with the foot. It is NOT the claw: the claw is a
+  silhouette term producing a strict interior local minimum; this scales the foot and
+  everything that reads it, monotonically, so Eva's rounded/ovate ruling stands untouched.
+
+  **`footRing()` remains the sole owner and gained no second copy.** The new controls FEED
+  it; `buildPetalInto` now READS `ring.thickness` instead of computing its own
+  `floorThickness()` of the same constant (a harmless second producer until thickness became
+  a control). The junction still derives everything from the petal's foot — the hub slab is
+  built at `ring.thickness`, so a delicate foot gives a thin hub with no code mentioning
+  either control.
+
+  **Foot invariance is STRUCTURAL, not guarded.** The profile is evaluated at the row's own
+  `u`, and the three foot rows carry `u = 0`, so `1 - thin*0` is exactly 1 at every thinning
+  value. Using the row INDEX instead is a one-character bug that moves the junction, and it
+  is this session's positive control — invisible to both STL gates and to every frozen
+  matrix, caught only by the reworked foot assertion.
+
+- **The foot–hub overlap at minimum foot dimensions — re-derived Aug 31, still holds by
+  construction.** The overlap is a solid box: radial depth `overhang = max(1.5, 0.4·r)`,
+  circumferential extent `ring.width`, vertical extent `min(footT, hubT)` — and those two
+  are EQUAL by construction, since the hub is built at `ring.thickness`. At the worst
+  reachable corner every dimension is bounded below independently of the new controls:
+  **≥ 1.5 mm × ≥ 1.6 mm × ≥ 1.0 mm** (the export floor), every edge above the 0.6 mm voxel.
+  Delicacy shrinks the radius, but `overhang` is a FRACTION of it with a 1.5 mm absolute
+  floor, so it cannot shrink proportionally away. The ALL-THIN corner rows were added
+  anyway, in both gates: a default is not coverage, by-construction is an argument rather
+  than a measurement, and the thin extreme is precisely the region this change affects.
 
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).

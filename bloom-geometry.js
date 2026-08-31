@@ -28,9 +28,34 @@
    in export mode, like the flower's floor. */
 export const MIN_FEATURE_MM = 1.0;
 
-/* Live sheet thickness. Above the export floor, so default exports are
-   byte-stable against the floor kicking in. */
+/* THE DEFAULT sheet thickness, in mm. Until the thickness layer this was the
+   thickness — one constant read at both call sites, so foot, blade and tip
+   were the same number by construction. It is now the DEFAULT of the
+   `sheetThickness` control and nothing reads it at build time; the geometry
+   reads `state.sheetThickness`. It is still exported, and it is still the one
+   owner of that number: the registry's default must BE this value, and
+   bloom-harness asserts `DEFAULTS.sheetThickness === SHEET_THICKNESS_MM` on
+   every gate run so the two cannot drift into two constants that agree today.
+
+   1.2 is above MIN_FEATURE_MM, which used to mean the export floor could
+   never bind. THAT IS NO LONGER TRUE and the charter's bullet saying so has
+   been rewritten: the control reaches 0.60 mm and the tip-thinning gradient
+   reaches below the floor from 0.17 upward at this default, so live and
+   export geometry now legitimately differ. Every count and every dimension
+   printed anywhere must carry its mode. */
 export const SHEET_THICKNESS_MM = 1.2;
+
+/* THE FOOT'S MINIMUM WIDTH — an ASSUMPTION with a number attached, like every
+   other floor in this project family, and nothing here has ever been printed.
+   1.6 mm is twice MIN_FEATURE_MM: at the export floor the most delicate
+   reachable foot is 1.6 mm wide by 1.0 mm thick, which is still a wall rather
+   than a wire. It replaces a hardcoded 3.0 that could never bind (the
+   smallest raw value reachable without a delicacy control was petalWidth 8 x
+   0.4 = 3.2 mm), so lowering it moved no byte anywhere; under `footDelicacy`
+   it becomes the clamp that answers "how thin can this connection get", and
+   it is printed with (CLAMPED) in the read-out when it takes over.
+   A printed coupon replaces this guess with a measurement. */
+export const FOOT_MIN_WIDTH_MM = 1.6;
 
 /* MeshBuilder — flat triangle-soup accumulator (positions only; the app wraps
    it in a three.js BufferGeometry, the exporter reads it directly). Rewritten
@@ -71,6 +96,16 @@ export class MeshBuilder {
      rule, one definition; only floorThickness() feeds the `min sheet`
      telemetry, so that readout keeps meaning what its label says. */
   floorFeature(x) { return this.exportMode ? Math.max(x, MIN_FEATURE_MM) : x; }
+  /* THE SHEET THICKNESS ACTUALLY EMITTED, recorded by emitPanel at the moment
+     it offsets a row. It is deliberately NOT the same thing as "every value
+     that was passed to floorThickness": a bug that routed a row's thickness
+     around the floor would also route it around that telemetry, so `min
+     sheet` in the read-out would keep reporting the floored number while the
+     geometry carried a thinner one — a label naming a computation nobody
+     performed, in the one figure a reader would use to check the floor. This
+     measures the emission. It is the channel the export-floor assertion
+     reads, and the reason that assertion can fail. */
+  noteSheet(t) { if (this.exportMode && t < this.minThickness) this.minThickness = t; }
   tri(a, b, c) {
     this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
     for (const p of [a, b, c]) {
@@ -127,17 +162,45 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
    ring's answer in export mode must match what the solids are actually built
    at, or the area rule would size the junction from a thickness nothing has. */
 export function footRing(state, acc) {
-  const thickness = acc.floorThickness(SHEET_THICKNESS_MM);
-  /* Foot width follows the petal it feeds — a fraction of blade width with a
-     floor so very narrow petals keep a printable root. */
-  const width = clamp(state.petalWidth * 0.4, 3, 10);
+  const thickness = acc.floorThickness(state.sheetThickness);
+  /* Foot width follows the petal it feeds — a fraction of blade width, scaled
+     by `footDelicacy`, with a floor so very narrow petals keep a printable
+     root. THIS IS THE ONLY PLACE `footDelicacy` EXISTS, exactly as spread is
+     applied here and nowhere else: every consumer reads `width` and knows
+     nothing about how it was sized. widthProfile's root blend reads it too,
+     so the blade's base slims with its foot instead of leaving a waist —
+     that is the registration rule, not a side effect.
+
+     WHY DELICACY IS THE WIDTH AND NOT THE THICKNESS (measured, Aug 31). A
+     thickness-scaling delicacy is INERT IN EXPORT below 0.833 at the default
+     1.2 mm sheet, because MIN_FEATURE_MM eats it — 83% of the range would
+     move the live view and nothing that prints. The width survives the floor
+     across its whole range. Sheet thickness is a control of its own; this is
+     the dimension that answers "how narrow is the connection".
+
+     IT IS NOT THE CLAW. The claw is a SILHOUETTE term producing a strict
+     interior local minimum, narrower than its own foot; this scales the foot
+     and everything that reads it, monotonically, so no profile is made
+     non-monotone. Eva's rounded/ovate ruling is untouched. */
+  const authoredWidth = state.petalWidth * 0.4 * state.footDelicacy;
+  const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
   const rFoot = Math.sqrt((width * thickness) / Math.PI);
   const derivedRadius = rFoot * Math.sqrt(state.petalCount);   // area rule
   const radius = derivedRadius * state.spread;                 // the ONLY use of spread
   /* How far inside the ring each foot continues, so foot–hub overlap is a
      solid annulus, not a hairline touch. */
   const overhang = Math.max(1.5, radius * 0.4);
-  return { radius, derivedRadius, width, thickness, overhang };
+  /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the read-out
+     and the gates can say WHERE a floor started binding instead of a slider
+     silently going quiet. Nothing geometric may read these. */
+  return {
+    radius, derivedRadius, width, thickness, overhang,
+    authoredWidth,
+    widthClamped: authoredWidth < FOOT_MIN_WIDTH_MM,
+    /* A statement about the EXPORT, true in either mode — the read-out has to
+       warn about a floor it is not currently applying. */
+    thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
+  };
 }
 
 /* ===================================================================
@@ -322,6 +385,73 @@ export function widthProfile(state, ring, halfW, cap) {
       }
       return Math.max(shape, rootBlend(u), TIP_HALF_MM);
     },
+  };
+}
+
+/* ===================================================================
+   thicknessProfile — THE ONE OWNER of "how thick is the sheet at u".
+
+   Until this layer there was no such question: SHEET_THICKNESS_MM was read
+   at both call sites and foot, blade and tip were the same number by
+   construction. Eva's ruling (Aug 31, from the live page) was that the
+   petal-to-centre connection is too thick AND the tip is too thick — one
+   absence, not two, and this function is it.
+
+   THE LAW: t(u) = base * (1 - tipThinning * u), linear in the blade's own
+   length coordinate.
+     base   is ring.thickness. footRing() OWNS it — this is a consumer, and
+            buildPetalInto no longer computes its own floorThickness() copy
+            of the same number (it did, harmlessly, until this layer; two
+            producers of one quantity is how every registration bug in this
+            project family started).
+     u      is the row's own length coordinate, and using it rather than the
+            row INDEX is what makes foot invariance STRUCTURAL: the three
+            foot rows carry u = 0, so 1 - thin*0 is exactly 1 and
+            base * 1 === base for every finite base, at every thinning
+            value. No guard, no ramp constant, no epsilon — the foot is the
+            profile evaluated where the profile is the identity. That is the
+            same shape as curl and twist being exactly zero at u = 0.
+
+   Linear, and deliberately not eased. It makes a wedge — thickest where the
+   petal meets the centre, thinnest at the tip — which is what a petal is,
+   and it needs no third onset constant beside ROOT_BLEND_END and
+   FORM_ONSET_END. Those two exist because they answer two different
+   questions that happen to share a length scale; a third that answered
+   nothing new would be the registration rule misapplied.
+
+   THE FLOOR IS APPLIED PER ROW, in export mode only, through the
+   accumulator — so `min sheet` in the read-out keeps meaning what its label
+   says, and so a thinned tip can never export below MIN_FEATURE_MM. THIS IS
+   WHERE THE EXPORT FLOOR STARTS BINDING FOR THE FIRST TIME IN THIS
+   CODEBASE. At the default 1.2 mm sheet it binds from tipThinning 0.17
+   upward: at 0.40 the tip is 0.720 mm live and 1.000 mm exported. Live and
+   export geometry legitimately differ from here on, which is why every
+   printed number carries its mode and why the read-out says (CLAMPED).
+
+   THE HEADLINE, because a slider that saturates must say so: while the
+   1.0 mm minimum-feature ASSUMPTION stands, the PRINTED tip can only thin
+   from 1.2 to 1.0 mm — 17% — however far the slider goes. A genuine printed
+   gradient needs a thicker base sheet (2.40 mm tapering to 1.00 mm is a
+   real 2.4:1 wedge) or a printed coupon showing 1.0 mm is conservative.
+   Nothing in this project family has ever been printed.
+   =================================================================== */
+
+/* THE GUARD's predicate, exported so the app, the builder and the gates all
+   ask the same question. Exact zero comparison: the default IS exactly 0 and
+   a range input at its default yields it. */
+export function thicknessIsUniform(state) {
+  return state.tipThinning === 0;
+}
+
+export function thicknessProfile(ring, state) {
+  const base = ring.thickness;          // footRing() is the owner; this reads it
+  const thin = state.tipThinning;
+  return {
+    base, thin,
+    /* Unfloored — the AUTHORED law. The caller applies the accumulator's
+       floor, so the floor is applied in exactly one place and the telemetry
+       can report both the authored and the emitted number. */
+    at(u) { return base * (1 - thin * u); },
   };
 }
 
@@ -593,6 +723,16 @@ export function petalForm(state, halfW, t) {
         polylineMin: pMin, polylineMax: pMax,
         rollRadiusMm: kappa === 0 ? Infinity : 1 / Math.abs(kappa),
         rollClamped: clamped,
+        /* THE FLOOR THIS BUILD ACTUALLY USED, reported rather than left for a
+           consumer to recompute. Until the thickness layer the harness held
+           `ROLL_MIN_RADIUS_FACTOR * SHEET_THICKNESS_MM` as a module constant
+           and compared every roll radius against 1.2 mm. With thickness a
+           control that constant is simply wrong in both directions: a 0.60 mm
+           sheet legitimately permits a 0.60 mm radius and would have read as
+           a FAIL, and a 2.40 mm sheet clamps at 2.40 so a genuinely inverting
+           radius would have read as a PASS. One owner, and it is here. */
+        rollMinRadiusMm: ROLL_MIN_RADIUS_FACTOR * t,
+        sheetThicknessMm: t,
         /* The ratio |dP/dv| / |dP/dv|_flat. The flat sheet already has
            |dP/dv| = h(u) (v is normalised, not arc length), so the raw
            magnitude is not the comparable quantity — the RATIO is, and it
@@ -623,7 +763,9 @@ export function petalForm(state, halfW, t) {
    and the contact sheet ASK THE BUILDER rather than recomputing anything.
    =================================================================== */
 export function buildPetalInto(acc, state, ring, slot, cap = null) {
-  const t = acc.floorThickness(SHEET_THICKNESS_MM);
+  /* READ from footRing(), never a second floorThickness() of the same
+     constant. Identical value, one producer. */
+  const t = ring.thickness;
   const length = state.petalLength * slot.scale;
   const tilt = ((state.petalTilt + slot.tiltExtra) * Math.PI) / 180;
   const halfW = (state.petalWidth * slot.scale) / 2;
@@ -641,6 +783,24 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      That — not an IEEE-754 argument — is what makes the shipped default
      byte-identical. */
   const form = petalFormIsFlat(state) ? null : petalForm(state, halfW, t);
+
+  /* THE THICKNESS GUARD, same doctrine as the form guard above. When the
+     profile is uniform, `tAt` is the pre-change scalar verbatim, so every
+     emitted coordinate is computed from the same doubles by the same
+     operations in the same order and the shipped default cannot move a byte.
+     The law is exact at the default anyway (`base * (1 - 0*u)` is
+     `base * 1` is `base`), so the guard is insurance rather than the
+     argument — and like the form guard it is not allowed to be somewhere a
+     bug sits unexercised: `thicknessGuardResidual` below evaluates the full
+     profile law against this scalar at every emitted row, and both gates
+     assert it below 1e-9.
+
+     The roll curvature floor is expressed against `t` — the THICKEST row,
+     since thinning only ever removes material — so the floor keeps
+     protecting the whole blade rather than only its tip. */
+  const uniformThickness = thicknessIsUniform(state);
+  const profileT = thicknessProfile(ring, state);
+  const tAt = uniformThickness ? () => t : (u) => acc.floorThickness(profileT.at(u));
 
   /* THE FLAT CROSS-SECTION, and the reason it is a closure.
 
@@ -708,7 +868,30 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   }
 
   const panels = trimPanels(rows.length, (i) => rows[i].u, cap);
-  for (const panel of panels) emitPanel(acc, rows, panel, t);
+  for (const panel of panels) emitPanel(acc, rows, panel, tAt);
+
+  /* THE THICKNESS GUARD'S OWN CHECK. On uniform (shipped-default) builds
+     only, and for slot 0 only, the full profile law is evaluated at every
+     row the scalar path just emitted and compared against it. This is what
+     stops the short-circuit hiding a wrong thick path — the same role
+     formGuardResidual plays for the four curves. */
+  let thicknessGuardResidual = null;
+  if (uniformThickness && slot.index === 0) {
+    thicknessGuardResidual = 0;
+    for (const row of rows) {
+      thicknessGuardResidual = Math.max(thicknessGuardResidual, Math.abs(acc.floorThickness(profileT.at(row.u)) - row.tUsed));
+    }
+  }
+  /* What the sheet ACTUALLY came out at, read from what emitPanel recorded on
+     each row — not from re-evaluating the profile, for the reason stated at
+     `row.tUsed`. A row no panel covered would be a hole in the mesh and shows
+     up here as an undefined rather than as a plausible number. */
+  let tMin = Infinity, tMax = -Infinity;
+  for (const row of rows) {
+    if (typeof row.tUsed !== 'number') throw new Error(`row u=${row.u} was never emitted by any panel — the trim domain does not cover the blade`);
+    if (row.tUsed < tMin) tMin = row.tUsed;
+    if (row.tUsed > tMax) tMax = row.tUsed;
+  }
 
   /* THE GUARD'S OWN CHECK — the thing that stops the short-circuit hiding
      a wrong form path. On shipped (flat) builds only, and for slot 0 only,
@@ -773,7 +956,39 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        the geometry. Scope is printed beside every result, never only here. */
     form: form ? form.telemetry(rows, footS.length) : null,
     guardResidual,
-    footFrames: rows.slice(0, footS.length).map((r) => ({ C: r.C, N: r.N, T: r.T, h: r.h })),
+    /* THE FOOT ROWS AS EMITTED, cross-section included. `h` and `t` are what
+       the reworked foot assertion compares against footRing()'s OWN answer
+       (ring.width / 2 and ring.thickness) — expected-from-state, read from
+       the owner, never a fixed number and never a second derivation. Adding
+       `t` is what makes a thickness leak onto the foot observable at all:
+       until this layer nothing read the foot's cross-section back. */
+    footFrames: rows.slice(0, footS.length).map((r) => ({ C: r.C, N: r.N, T: r.T, h: r.h, t: r.tUsed })),
+    /* THICKNESS TELEMETRY — the properties neither STL gate can show. Both
+       are structurally blind here for the same reason they are blind to the
+       form layer: thickness is pure vertex offset on a fixed-topology grid,
+       so no edge census can move, and a thinner sheet is still spanned by
+       the hub, so no flood fill can split. Scope is printed beside every
+       gate result, never only in a header. */
+    thickness: {
+      authored: state.sheetThickness,
+      thin: state.tipThinning,
+      base: rows[0].tUsed,
+      /* The tip BEFORE and AFTER the floor, so "(CLAMPED)" is a measurement
+         rather than a prediction from the slider value. */
+      tipAuthored: profileT.at(1),
+      tipEmitted: rows[rows.length - 1].tUsed,
+      minEmitted: tMin,
+      maxEmitted: tMax,
+      /* Would the EXPORT floor change this design's geometry? A statement
+         about the export, answered identically in either mode, because the
+         read-out has to warn about a floor it is not currently applying.
+         The tip is the thinnest authored row (thinning only removes), so one
+         comparison decides it. */
+      floorBinds: profileT.at(1) < MIN_FEATURE_MM,
+      exportMode: acc.exportMode,
+      uniform: uniformThickness,
+    },
+    thicknessGuardResidual,
   };
 }
 
@@ -789,10 +1004,24 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
    instead of a sheet. For a flat row the closure returns the row's own
    constant normal and the same expression as before, so the shipped default
    is unmoved — which the byte report measures rather than assumes. */
-function emitPanel(acc, rows, panel, t) {
+function emitPanel(acc, rows, panel, tAt) {
   const top = [], bot = [];
   for (let i = panel.rowFrom; i <= panel.rowTo; i++) {
     const row = rows[i];
+    /* THE ROW OWNS ITS THICKNESS as well as its cross-section, and it asks
+       thicknessProfile through the same closure the builder made. A panel
+       computing its own thickness would be a second owner of the quantity
+       whose single ownership this whole layer is about. At a uniform
+       profile this returns the identical scalar for every row. */
+    const t = tAt(row.u);
+    /* RECORDED ON THE ROW, so every consumer of "how thick was this row"
+       reads the number that was EMITTED rather than re-asking the profile.
+       The foot assertion compares this against footRing()'s own answer; if
+       it re-asked the profile it would agree with the profile by
+       construction and could never catch an emission that disagreed with
+       it — which is exactly the leak it exists to catch. */
+    row.tUsed = t;
+    acc.noteSheet(t);
     const span = panel.spanAt(i);
     const vLo = span[0], vHi = span[1];
     const ht = [], hb = [];

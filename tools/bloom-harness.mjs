@@ -59,17 +59,33 @@ export const { CONTROLS, DEFAULTS, valuesEqual } = await import(pathToFileURL(pa
    roll curvature floor the form assertions check must be the number the
    builder actually clamps to. A second copy here would let the gate endorse
    a wall the geometry does not build. */
-export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+
+/* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
+   name for the default sheet thickness and the registry carries a literal
+   1.2; two constants that agree today are two constants that drift. Asserted
+   at module load so every gate run and every shot tool checks it, and a
+   mismatch aborts before a single row is measured rather than producing 120
+   green results about a design nobody characterised. */
+if (DEFAULTS.sheetThickness !== SHEET_THICKNESS_MM) {
+  throw new Error(`registry default sheetThickness ${DEFAULTS.sheetThickness} !== SHEET_THICKNESS_MM ${SHEET_THICKNESS_MM} — the constant and the control have drifted`);
+}
 
 /* The four curves. Named once, read by formAssertions and by the matrix's
    named-corner block; the ids themselves live in the registry. */
 const FORM_IDS = ['petalCup', 'petalSpineCurl', 'petalRoll', 'petalTwist'];
 
-export function serveRepo() {
+/* Serves the repo root by default. `root` exists for ONE reason: a
+   before/after contact sheet needs the OLD tree rendered by the same browser,
+   the same camera and the same assertions as the new one, and the old tree
+   lives in a `git worktree` — never in a mutated working tree, which stages a
+   revert a stray commit can push. One server function, two roots; a private
+   copy in the shot tool would be the drift this file exists to prevent. */
+export function serveRepo(root = ROOT) {
   const server = http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split('?')[0]);
     if (p === '/') p = '/bloom.html';
-    fs.readFile(path.join(ROOT, p), (err, data) => {
+    fs.readFile(path.join(root, p), (err, data) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
       res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream' });
       res.end(data);
@@ -345,7 +361,17 @@ export async function applyCapability(page, row) {
 export const FORM_SCOPE =
   "form claims read from the builder's own frames/telemetry, NOT from the STL; watertight + connected are measured on the export";
 
-const ROLL_MIN_RADIUS_MM = ROLL_MIN_RADIUS_FACTOR * SHEET_THICKNESS_MM;
+/* NO MODULE-CONSTANT ROLL FLOOR ANY MORE. It was
+   `ROLL_MIN_RADIUS_FACTOR * SHEET_THICKNESS_MM` — 1.2 mm, computed once — and
+   the thickness layer made it wrong in BOTH directions: a 0.60 mm sheet
+   legitimately permits a 0.60 mm roll radius and would have failed a correct
+   build, and a 2.40 mm sheet clamps at 2.40 so a genuinely inverting radius
+   would have passed. The floor is now read from the builder's own telemetry
+   (`rollMinRadiusMm`), which is the same one-owner move the foot assertion
+   below makes: a fixed expectation becomes an expectation derived from the
+   state the row is actually in. The factor is still imported, and asserted
+   against the telemetry, so the floor cannot quietly stop being one sheet
+   thickness. */
 
 export async function formAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
@@ -371,6 +397,20 @@ export async function formAssertions(page, row) {
     if (!(f.N[0] === 0 && f.N[1] === 0 && f.N[2] === 1)) bad.push(`foot row ${i}: normal ${JSON.stringify(f.N)} is not exactly the hub plane's [0,0,1] — a curve reached the foot`);
     if (!(f.T[0] === 0 && f.T[1] === 1 && f.T[2] === 0)) bad.push(`foot row ${i}: width direction ${JSON.stringify(f.T)} is not exactly the ring tangent [0,1,0] — a twist reached the foot`);
     if (f.C[2] !== 0) bad.push(`foot row ${i}: centre z = ${f.C[2]}, not exactly 0 — the foot left the hub plane`);
+    /* THE CROSS-SECTION, AGAINST EXPECTED-FROM-STATE. Until the thickness
+       layer the foot's dimensions were fixed, so an assertion could have
+       carried a number; with `sheetThickness` and `footDelicacy` the expected
+       foot DERIVES FROM STATE, and a gate re-deriving it would be a second
+       copy of footRing() — this project's most repeated defect, arriving in
+       the instrument built to catch it. So the comparison is against
+       footRing()'s OWN answer, read back from the app: the emitted foot must
+       BE the ring's cross-section, whatever state produced it. Exact
+       arithmetic, because both sides are literally the same double: the
+       builder reads ring.width and ring.thickness rather than computing
+       anything. Weakening this to a tolerance would let exactly the leak it
+       exists to catch through. */
+    if (f.h !== m.ringWidth / 2) bad.push(`foot row ${i}: half-width ${f.h} is not footRing()'s ring.width/2 = ${m.ringWidth / 2} — something reached the foot by a second path`);
+    if (f.t !== m.ringThickness) bad.push(`foot row ${i}: thickness ${f.t} is not footRing()'s ring.thickness = ${m.ringThickness} — a thickness gradient reached the foot`);
   });
 
   if (!m.petalForm) {
@@ -397,10 +437,116 @@ export async function formAssertions(page, row) {
 
   /* THE CURVATURE FLOOR — the assertion whose failure is invisible to both
      gates, which is exactly why it is here and not left to them. */
-  if (f.rollDeg !== 0 && !(f.rollRadiusMm >= ROLL_MIN_RADIUS_MM - 1e-9)) {
-    bad.push(`roll radius ${f.rollRadiusMm.toFixed(4)} mm is below the ${ROLL_MIN_RADIUS_MM} mm floor — the sheet's inner offset surface inverts`);
+  if (f.rollDeg !== 0) {
+    const floor = f.rollMinRadiusMm;
+    if (!(floor > 0)) bad.push(`roll row reports no curvature floor (rollMinRadiusMm ${JSON.stringify(floor)}) — the assertion has nothing to compare against`);
+    else {
+      /* The floor must BE one sheet thickness of the sheet this row actually
+         built — checked against the geometry's own reported thickness, so a
+         floor computed from a thickness nothing has cannot pass. */
+      const want = ROLL_MIN_RADIUS_FACTOR * f.sheetThicknessMm;
+      if (Math.abs(floor - want) > 1e-12) bad.push(`roll floor ${floor} mm is not ${ROLL_MIN_RADIUS_FACTOR} x the emitted sheet thickness ${f.sheetThicknessMm} mm = ${want}`);
+      if (!(f.rollRadiusMm >= floor - 1e-9)) {
+        bad.push(`roll radius ${f.rollRadiusMm.toFixed(4)} mm is below the ${floor.toFixed(4)} mm floor (one sheet thickness at ${f.sheetThicknessMm.toFixed(2)} mm) — the sheet's inner offset surface inverts`);
+      }
+    }
   }
   return bad;
+}
+
+/* ===================================================================
+   THICKNESS ASSERTIONS — the instrument the thickness layer had to build,
+   for the same reason the form layer had to build one: BOTH SHIPPED GATES
+   ARE STRUCTURALLY BLIND TO IT, and that is a derivation rather than a
+   hedge.
+
+   The export gate's criterion is boundary edges on a mesh whose topology is
+   FIXED — NU, NV, the panel count and every centre segment count depend on
+   no thickness control — and thickness is pure vertex offset along the
+   surface normal, which cannot change an edge census. The connectedness gate
+   cannot fire either: the hub slab is built at ring.thickness, the same
+   number the feet are, so a thinner sheet thins BOTH and the foot stays
+   inside a hub that still spans the ring. No reachable thickness or
+   delicacy setting detaches anything.
+
+   What can actually go wrong, and what catches it:
+     FOOT INVARIANCE    a thickness gradient leaking onto the foot rows. The
+                        natural bug is one character: evaluate the ramp on
+                        the row INDEX instead of the row's u. Caught by the
+                        reworked foot assertion in formAssertions() above,
+                        which compares the emitted foot against footRing()'s
+                        own answer. It is the positive control for this
+                        session.
+     THE EXPORT FLOOR   a thinned tip exporting below MIN_FEATURE_MM. Read
+                        from the app's own export read-out (`min sheet`),
+                        i.e. through the real Get STL path, because the live
+                        build never floors anything and a live metric
+                        therefore cannot answer an export question.
+     THE GUARD          the uniform short-circuit hiding a wrong thick path.
+                        Same role formGuardResidual plays: measured, both
+                        directions, on every row.
+     DEGENERACY         a sheet thin enough for the two faces to weld. The
+                        thinnest reachable live sheet is 0.60 x (1 - 0.80) =
+                        0.12 mm at the tip, three orders above analyzeStl's
+                        1e-4 weld tolerance — asserted rather than argued.
+
+   Like the form assertions these read the APP'S OWN evaluation, not the STL,
+   and that scope is printed beside every result rather than only here.
+   =================================================================== */
+export const THICKNESS_SCOPE =
+  "thickness claims read from the builder's own per-row profile and the app's export read-out, NOT from the STL; watertight + connected are measured on the export";
+
+export async function thicknessAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const bad = [];
+  const th = m.petalThickness;
+  if (!th) { bad.push('no thickness telemetry reported'); return bad; }
+
+  const sets = Object.fromEntries((row.set || []).map((s) => [s.id, Number(s.value)]));
+  const wantsThinning = (sets.tipThinning ?? 0) !== 0;
+
+  /* READ-BACK, both directions — the guard's own premise. */
+  if (wantsThinning && th.uniform) bad.push('a row that sets tipThinning reports a UNIFORM profile — the guard short-circuited a graded row');
+  if (!wantsThinning && !th.uniform) bad.push('a row with no tipThinning reports a GRADED profile — the guard did not short-circuit, and byte-identity rests on it');
+
+  if (th.uniform) {
+    const g = m.petalThicknessGuardResidual;
+    if (typeof g !== 'number') bad.push(`uniform row reports guard residual ${JSON.stringify(g)} — not measured`);
+    else if (!(g <= 1e-9)) bad.push(`thickness guard residual ${g.toExponential(3)} exceeds 1e-9 — the profile law and the scalar path have diverged`);
+    if (th.minEmitted !== th.maxEmitted) bad.push(`uniform row emitted ${th.minEmitted}..${th.maxEmitted} mm — a uniform profile is one number`);
+  } else {
+    if (m.petalThicknessGuardResidual !== null) bad.push('graded row reports a guard residual — the guard is measuring a path it did not take');
+    /* The gradient goes the right way: thinning REMOVES material toward the
+       tip and never adds it. */
+    if (!(th.tipEmitted <= th.base + 1e-12)) bad.push(`tip ${th.tipEmitted} mm is thicker than the base ${th.base} mm — the gradient is inverted`);
+  }
+
+  /* DEGENERACY. A sheet whose two faces weld would close the rim into
+     nothing, and the edge census would read boundary edges with no cause a
+     reader could find. */
+  if (!(th.minEmitted > 1e-3)) bad.push(`minimum emitted sheet ${th.minEmitted} mm is at or below the 1e-3 mm degeneracy bound`);
+
+  /* THE FOOT IS THE PROFILE WHERE THE PROFILE IS THE IDENTITY. u = 0 gives
+     base * (1 - thin*0) = base * 1 = base, exactly, at every thinning value
+     — so this holds structurally rather than by a guard, and asserting it
+     here says the structure is still what the header claims. */
+  if (th.base !== m.ringThickness) bad.push(`profile at u=0 is ${th.base}, not footRing()'s ring.thickness ${m.ringThickness} — the gradient does not start at the foot's own thickness`);
+  return bad;
+}
+
+/* THE EXPORT FLOOR, asserted through the REAL export path. The live build
+   never floors — floorThickness() is a no-op outside export mode — so no
+   live metric can answer "did the print stay above the minimum feature". The
+   app prints `min sheet X mm` in the read-out after a real Get STL, from the
+   accumulator that built the exported geometry; this reads that. Call it
+   AFTER exportStl(). Returns failure strings. */
+export async function exportFloorAssertion(page) {
+  const txt = await page.evaluate(() => document.getElementById('readout')?.textContent || '');
+  const mm = /min sheet ([0-9.]+) mm/.exec(txt);
+  if (!mm) return [`export read-out carries no "min sheet" figure — the floor cannot be checked. Read-out was: ${txt.replace(/\s+/g, ' ').trim().slice(0, 200)}`];
+  const min = Number(mm[1]);
+  if (!(min >= MIN_FEATURE_MM - 1e-9)) return [`exported minimum sheet ${min} mm is below the ${MIN_FEATURE_MM} mm minimum feature — the export floor did not hold`];
+  return [];
 }
 
 /* ===================================================================
@@ -574,6 +720,57 @@ export function buildMatrix() {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 
+  /* 5b. THE THICKNESS LAYER'S NAMED CORNERS. Block 1 already sweeps each of
+        the three new sliders at min and max from the registry, and those six
+        rows are not repeated here — a second loop over the same rows is a
+        second source of truth for coverage, which is how eight duplicate
+        form rows appeared the first time that block was written.
+
+        WHAT BLOCK 1 CANNOT REACH, AND WHY THESE EXIST. `ALL MIN` IS NOT
+        ALL-THIN: tipThinning's minimum is 0, i.e. no thinning at all, so the
+        min/max sweep and both existing ALL corners leave the thin extreme —
+        exactly the region this layer affects — unvisited. A default is not
+        coverage and neither is an endpoint sweep. Each row below is one
+        question:
+          ALL THIN                the thinnest reachable sheet, tip and foot
+                                  at once, with the centre pinned OFF so the
+                                  label is not a lie under a DISC default.
+          x DISC                  the same against what actually ships.
+          x spread min            the tightest ring against the most delicate
+                                  foot — the junction's worst overlap case,
+                                  where the by-construction argument is
+                                  thinnest.
+          x petalCount 40         the most feet on the thinnest ring.
+          x form max              a thin sheet LOWERS the roll curvature
+                                  floor (the floor is one sheet thickness),
+                                  so this is the only place the two clamps
+                                  interact, and inverting the sheet stays
+                                  watertight and connected — invisible to
+                                  both gates by construction.
+          x ALL MIN               the thin extreme at the smallest geometry,
+                                  where the foot-width floor binds hardest.
+          THICK GRADIENT          the ONLY state where tip thinning has real
+                                  export headroom: 2.40 mm tapering to
+                                  1.00 mm is a genuine 2.4:1 printed wedge,
+                                  where at the 1.20 mm default the floor caps
+                                  the printed taper at 17%.
+          CLEFT x ALL THIN        three panels at minimum thickness: the lobe
+                                  panels' shared slab is where a thin sheet
+                                  could plausibly stop being a shared volume. */
+  const ALL_THIN = { sheetThickness: 0.6, tipThinning: 0.8, footDelicacy: 0.25 };
+  const thinRows = [
+    ['THIN: ALL THIN (centre off)', { ...ALL_THIN, centerStyle: 'NONE' }],
+    ['THIN: ALL THIN × DISC', { ...ALL_THIN, centerStyle: 'DISC' }],
+    ['THIN: ALL THIN × spread min', { ...ALL_THIN, spread: 0.6 }],
+    ['THIN: ALL THIN × petalCount 40', { ...ALL_THIN, petalCount: 40 }],
+    ['THIN: ALL THIN × form max', { ...ALL_THIN, ...ALL_FORM_MAX }],
+    ['THIN: ALL THIN × ALL MIN', { ...ALL_THIN, petalCount: 3, petalLength: 20, petalWidth: 8, petalTilt: 0 }],
+    ['THIN: THICK GRADIENT (sheet max × thinning max)', { sheetThickness: 2.4, tipThinning: 0.8 }],
+  ];
+  for (const [name, sets] of thinRows) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
   /* 6. CAPABILITY — the two non-shipping rows. Registry state is DEFAULTS
         (they set no control), so fullStateDrift still applies unchanged and
         the capability carries its own read-back in applyCapability(). These
@@ -592,6 +789,8 @@ export function buildMatrix() {
     set: Object.entries(ALL_FORM_MAX).map(([id, value]) => ({ id, value: String(value) })) });
   rows.push({ label: 'CAPABILITY: cleft x roll max', capability: CAPABILITY_CLEFT,
     set: [{ id: 'petalRoll', value: '330' }] });
+  rows.push({ label: 'CAPABILITY: cleft x all thin', capability: CAPABILITY_CLEFT,
+    set: Object.entries(ALL_THIN).map(([id, value]) => ({ id, value: String(value) })) });
 
   return rows;
 }
@@ -710,6 +909,124 @@ export function phase3Matrix() {
   }
   rows.push({ label: 'CAPABILITY: claw (non-monotone width)', set: [], capability: CAPABILITY_CLAW });
   rows.push({ label: 'CAPABILITY: cleft (two-span domain)', set: [], capability: CAPABILITY_CLEFT });
+  return rows;
+}
+
+/* ===================================================================
+   phase4Matrix() — THE 106 ROWS AS THEY STOOD AT 3c542fb, frozen.
+
+   The like-for-like baseline for the THICKNESS layer, standing to it exactly
+   as phase3Matrix() stands to the form layer and phase2Matrix() to the
+   silhouette engine. A NEW frozen matrix beside the older two, never an edit
+   to either — a frozen matrix is a record of one commit, not a view over
+   anything.
+
+   FROZEN AGAINST: 3c542fb ("Bloom: the petal's 3D form — four curves, and
+   DISC as the shipping centre", #115), the commit immediately before the
+   thickness profile and foot delicacy.
+
+   WHY IT IS THE STRONGEST OF THE THREE. phase2 (76) and phase3 (86) each
+   predate a feature layer, so neither exercises the FORM curves; this one
+   carries all seven named FORM corners and all four CAPABILITY rows, so a
+   thickness change that moved a curled, rolled or clefted petal's bytes at
+   the new defaults would show here and nowhere else. All three still run:
+   the 76 are the rows unmoved across THREE consecutive feature layers.
+
+   Row set and values are LITERALS, deliberately, so a later range change
+   cannot silently rewrite what the baseline means. Transcribing 106 rows by
+   hand is exactly the sort of thing that looks right and is not — and this
+   session found that the `--verify-frozen` the older headers cited as the
+   remedy DID NOT EXIST. It does now
+   (tools/diff-bloom-bytes.mjs --verify-frozen --phase4 --base <worktree>),
+   and this function is proved deep-equal to 3c542fb's own buildMatrix()
+   rather than to a careful reading of it.
+
+   These rows PIN only the controls that existed at 3c542fb, so they inherit
+   every later default. The three thickness controls default to values that
+   reproduce the constant exactly, so the expected result here is 0 of 106
+   moved. What that CANNOT show is a leak inside the new controls themselves
+   — every frozen row sits at their defaults, which is the same blindness
+   the form layer measured on --phase3. The live-matrix partition is the
+   instrument for those.
+   =================================================================== */
+export function phase4Matrix() {
+  const rows = [{ label: 'DEFAULT (the shipping configuration)', set: [] }];
+  for (let n = 3; n <= 40; n++) rows.push({ label: `petalCount ${n}`, set: [{ id: 'petalCount', value: String(n) }] });
+
+  /* Frozen ranges — the values these controls carried at 3c542fb. */
+  const RANGE = {
+    petalCount: [3, 40], petalLength: [20, 60], petalWidth: [8, 30], petalTilt: [0, 75],
+    petalBaseTaper: [0.3, 3], petalTipTaper: [0.6, 4], petalTipBreadth: [0, 0.6],
+    petalCup: [-0.8, 1.2], petalSpineCurl: [-180, 360], petalRoll: [-330, 330], petalTwist: [-180, 180],
+    spread: [0.6, 6],
+  };
+  const SPREAD_DEFAULT = 2;
+  const CENTER = {
+    DOME: [['centerSize', 0.25, 1], ['centerRise', 0.15, 1.2]],
+    DISC: [['centerSize', 0.25, 1], ['centerDish', 0, 0.9]],
+    RING: [['centerSize', 0.25, 1], ['centerBore', 0.2, 0.75]],
+  };
+  const STYLES_F = ['DOME', 'DISC', 'RING'];
+  const CENTRE_STATES_F = ['NONE', ...STYLES_F];
+  /* Registry order for the sliders, petalCount swept exhaustively above. */
+  const SWEPT = ['petalLength', 'petalWidth', 'petalTilt', 'petalBaseTaper', 'petalTipTaper', 'petalTipBreadth',
+    'petalCup', 'petalSpineCurl', 'petalRoll', 'petalTwist', 'spread'];
+  const ALL = ['petalCount', ...SWEPT];
+
+  for (const id of SWEPT) {
+    rows.push({ label: `${id} min (${RANGE[id][0]})`, set: [{ id, value: String(RANGE[id][0]) }] });
+    rows.push({ label: `${id} max (${RANGE[id][1]})`, set: [{ id, value: String(RANGE[id][1]) }] });
+  }
+  for (const [name, sets] of [
+    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipBreadth: 0.3 }],
+    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipBreadth: 0.5 }],
+  ]) rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+
+  for (const style of CENTRE_STATES_F) {
+    for (const [tag, v] of [['min', RANGE.spread[0]], ['default', SPREAD_DEFAULT], ['max', RANGE.spread[1]]]) {
+      rows.push({ label: `${style} \u00d7 spread ${tag} (${v})`, set: [{ id: 'centerStyle', value: style }, { id: 'spread', value: String(v) }] });
+    }
+  }
+  for (const style of STYLES_F) {
+    for (const [id, lo, hi] of CENTER[style]) {
+      for (const [tag, v] of [['min', lo], ['max', hi]]) {
+        rows.push({ label: `${style} \u00d7 ${id} ${tag} (${v})`, set: [{ id: 'centerStyle', value: style }, { id, value: String(v) }] });
+      }
+    }
+  }
+  for (const [tag, k] of [['MIN', 0], ['MAX', 1]]) {
+    rows.push({ label: `ALL ${tag} (centre off)`, set: [...ALL.map((id) => ({ id, value: String(RANGE[id][k]) })), { id: 'centerStyle', value: 'NONE' }] });
+  }
+  for (const [tag, k] of [['MIN', 0], ['MAX', 1]]) {
+    for (const style of STYLES_F) {
+      rows.push({
+        label: `ALL ${tag} \u00d7 ${style} ${k === 0 ? 'min' : 'max'}`,
+        set: [
+          ...ALL.map((id) => ({ id, value: String(RANGE[id][k]) })),
+          { id: 'centerStyle', value: style },
+          ...CENTER[style].map(([id, lo, hi]) => ({ id, value: String(k === 0 ? lo : hi) })),
+        ],
+      });
+    }
+  }
+  const ALL_FORM_MAX_F = { petalCup: 1.2, petalSpineCurl: 360, petalRoll: 330, petalTwist: 180 };
+  const ALL_FORM_MIN_F = { petalCup: -0.8, petalSpineCurl: -180, petalRoll: -330, petalTwist: -180 };
+  for (const [name, sets] of [
+    ['FORM: QUILL (roll alone, toward a tube)', { petalRoll: 330 }],
+    ['FORM: FIDDLEHEAD (spine curl alone)', { petalSpineCurl: 360 }],
+    ['FORM: CONTORTED (twist alone)', { petalTwist: 180 }],
+    ['FORM: REFLEXED (cup min x curl below the plane)', { petalCup: -0.8, petalSpineCurl: -180 }],
+    ['FORM: ROLL CLAMP (roll max x narrowest petal)', { petalRoll: 330, petalWidth: 8 }],
+    ['FORM: ALL MAX (all four curves together)', ALL_FORM_MAX_F],
+    ['FORM: ALL MIN (all four curves together)', ALL_FORM_MIN_F],
+  ]) rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+
+  rows.push({ label: 'CAPABILITY: claw (non-monotone width)', set: [], capability: CAPABILITY_CLAW });
+  rows.push({ label: 'CAPABILITY: cleft (two-span domain)', set: [], capability: CAPABILITY_CLEFT });
+  rows.push({ label: 'CAPABILITY: claw x form max', capability: CAPABILITY_CLAW,
+    set: Object.entries(ALL_FORM_MAX_F).map(([id, value]) => ({ id, value: String(value) })) });
+  rows.push({ label: 'CAPABILITY: cleft x roll max', capability: CAPABILITY_CLEFT,
+    set: [{ id: 'petalRoll', value: '330' }] });
   return rows;
 }
 
