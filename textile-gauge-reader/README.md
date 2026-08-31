@@ -784,6 +784,71 @@ bright") the way `_fold_consistency` checks structural resemblance
 between repeats, rather than a threshold tweak on the existing response
 map.
 
+### Course selection: why v0.3-authoritative was tested and rejected
+
+Jersey's course reading (`real_jersey_sample.jpg`, at the crop that
+reproduces its failure) can be off by as much as -53% — a doubled period,
+the largest error found in a 9-fixture accuracy pass. Since course
+selection deliberately uses the older `_analyze_direction` pipeline
+rather than the v0.3 evidence scorer (see "A real-photo regression, and
+phase consistency as its fix" above), the obvious question was whether
+that decision has simply gone stale: would making v0.3 authoritative for
+course fix this?
+
+**Tested directly against all 9 fixtures with recorded ground truth, and
+rejected — the answer is genuinely mixed, not a clean win:**
+
+- On the synthetic fabric grid (12 clean/degraded cases, exact known
+  ground truth), switching to v0.3's own top-evidence pick would **fix 3
+  cases that are currently strict-xfailed as broken** (jersey 5×7
+  degraded, jersey 8×10 degraded, rib1×1 8×10 clean — all currently flip
+  to a half-period harmonic under the old pipeline, and v0.3 gets all
+  three right) **and break 1 currently-good case** (rib1×1 8×10
+  degraded: old pipeline correct at 18.0px, v0.3 flips it to 36.0px).
+- On the real jersey photo itself, at a crop that reproduces the -53%
+  failure, v0.3's own top pick is the *same* wrong 49.0px candidate as
+  the old pipeline's, by a hair (evidence 0.424 vs. 0.418, margin
+  0.006). This is not an authority problem on this photo — both
+  mechanisms are wrong, in a near-tie.
+- On `knit_sample_08.jpg` (a real photo with recorded course ground
+  truth), the old pipeline is currently decent (-7.1%); v0.3's own pick
+  would badly regress it (-53.6%) — the identical doubled-period
+  failure, freshly introduced on a fixture that isn't currently broken.
+
+Net: switching course to v0.3-authoritative would trade one class of bug
+for another, and wouldn't even fix the case that prompted the question.
+**Rejected, not attempted.**
+
+**What actually distinguishes the two near-tied course candidates?**
+Dumped the full per-term evidence breakdown for jersey's 24.5px (correct)
+vs. 49.0px (wrong, selected) candidates: `patch_consensus` is the
+dominant term and it's badly wrong-direction (0.435 vs. 0.953 — 2.2x in
+favor of the wrong candidate) — the same failure mode already diagnosed
+and partially fixed for **wale** (see "A real second photo..." above:
+"patch_consensus favored the WRONG half-period candidate... phase_
+consistency favored the CORRECT candidate"). `phase_consistency` does
+lean correctly here (0.661 vs. 0.630), but far too weakly to overcome
+patch_consensus.
+
+That wale-side fix does **not** transfer to course. Checked on
+`knit_sample_08.jpg` (the same doubled-period failure shape):
+`phase_consistency` there favors the *wrong* candidate (0.588 vs.
+0.318) — backwards relative to jersey. `patch_consensus`, by contrast,
+favors the wrong (coarser) candidate on every real-photo case checked
+(jersey, knit_05, knit_08) — the one signal that's consistent, but it
+points the wrong way everywhere, so it's not a fix source either.
+`structural` (fold + loop-center-pitch agreement) is uninformative for
+course in these cases (~0): `fold_consistency` is deliberately never
+computed for course (rows don't have the V-leg bilateral-symmetry
+failure mode it targets), and loop-center pitch agreement isn't reliably
+trusted at these crop sizes.
+
+**No existing per-candidate signal in this codebase reliably separates
+the true course period from its harmonic.** This is parked, not
+in-progress: it needs its own investigation (a course-specific structural
+signal, most likely — not a reweighting of terms built for wale), rather
+than reuse of a fix that was checked here and does not generalize.
+
 ### Verify by counting a repeat: user-anchored template matching
 
 Every detection path above — raw autocorrelation, the v0.3 candidate
