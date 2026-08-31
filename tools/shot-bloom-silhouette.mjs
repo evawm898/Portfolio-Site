@@ -5,24 +5,24 @@
    The metric screens; eyes decide. A sheet is required before committing
    anything visual, and this one carries two live rulings:
 
-     1. THE CANDIDATE DEFAULTS. The silhouette engine lands byte-identical,
-        so the shipped default is still the placeholder's pointed ovate. The
-        sheet puts TODAY, ROSE-ish and POPPY-ish side by side with their
-        control values printed in the cell, so the default-silhouette
-        question can be ruled from evidence rather than argument. If Eva
-        picks one, applying it is a SEPARATE event with its own partition
-        report — the spread precedent exactly. If she does not, nothing
-        happens and the ovate stays.
+     1. THE CANDIDATE DEFAULTS — RULED, Aug 31: the pointed ovate stays.
+        The sheet puts TODAY, ROSE-ish and POPPY-ish side by side with their
+        control values printed in the cell, and Eva ruled against both
+        candidates from it. The cells STAY: they are the evidence the ruling
+        was made on, and ROSE-ish and POPPY-ish are also named rows in the
+        gate matrix covering the region the controls are for. Neither is an
+        unused preset to be tidied away. Reopening the default is a fresh
+        ruling needing a fresh sheet.
 
-     2. THE KINK. The width profile's terms are combined by plain Math.max
-        (Eva's ruling), which puts a C0 kink wherever two terms cross. The
-        placeholder already had two and they read fine. The worst reachable
-        case — maximum tip breadth against the steepest falling core — is
-        PHOTOGRAPHED here rather than pre-engineered away, at a crop tight
-        enough to actually see a corner at that scale. A whole-flower frame
-        cannot carry a kink ruling; the flower project made exactly that
-        mistake with `tailXZ`, answering "is anything there" for a question
-        that was "how much".
+     2. THE KINK — RULED, Aug 31: it reads fine, plain Math.max stays, no
+        p-norm blend. The worst reachable case — maximum tip breadth against
+        the steepest falling core — is PHOTOGRAPHED here rather than
+        pre-engineered away, at a crop tight enough to actually see a corner
+        at that scale. A whole-flower frame cannot carry a kink ruling; the
+        flower project made exactly that mistake with `tailXZ`, answering
+        "is anything there" for a question that was "how much". The crop
+        stays for the same reason the candidate cells do: it is what the
+        ruling was made on, and re-opening needs a fresh one.
 
    FRAMING IS THE APP'S OWN CAMERA, never a crop and never re-derived
    projection maths. fitCamera() in bloom.js was WIDENED with an optional

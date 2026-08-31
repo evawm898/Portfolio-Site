@@ -197,13 +197,18 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
    and no profile or trim setting can move either. Measured per row, before
    and after, by `node tools/diff-bloom-bytes.mjs --region foot`.
 
-   THE COMBINATOR IS PLAIN Math.max (Eva, Aug 31). One combinator for the
-   shape terms and the floors alike, trivially bit-exact. It puts a C0 kink
-   at each crossover; the placeholder already had two and they read fine.
-   The worst reachable case — max tip breadth against the steepest falling
-   core — is PHOTOGRAPHED on the silhouette contact sheet rather than
-   pre-engineered away. If it reads badly, a smooth p-norm blend is a
-   later, separately-evidenced change.
+   THE COMBINATOR IS PLAIN Math.max, AND THAT IS SETTLED (Eva, Aug 31). One
+   combinator for the shape terms and the floors alike, trivially bit-exact.
+   It puts a C0 kink at each crossover; the placeholder already had two and
+   they read fine. The worst reachable case — max tip breadth against the
+   steepest falling core — was PHOTOGRAPHED tip-cropped rather than
+   pre-engineered away, and Eva ruled from that picture that it reads fine.
+   NO p-norm blend is queued and none should be written: it would need
+   term-count switching to stay bit-exact plus an epsilon story about the
+   moment a term appears, bought against a corner nobody objected to on
+   sight. Do not reopen this from reading the code and imagining the corner
+   — the picture exists (tools/shot-bloom-silhouette.mjs), and a fresh
+   ruling needs a fresh picture.
 
    NO FORM WORK LIVES HERE. Cup, spine curl, cross-section roll and twist
    are the NEXT session (charter: the four curve terms). Sheets stay flat:

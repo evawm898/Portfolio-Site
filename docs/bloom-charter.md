@@ -208,21 +208,34 @@ printer — and sheet petals add a min-wall coupon to that list.
   petalTilt 0 are reported OUT OF SCOPE — with no tilt the blade lies in the same
   plane and the criterion cannot separate them — never as passes.
 
-- **The default silhouette — OPEN, and deliberately separated from the engine.**
-  Because the engine is byte-identical, the shipping default is still the placeholder's
-  pointed ovate. ROSE-ish and POPPY-ish ship as named matrix rows and as labelled
-  CANDIDATE DEFAULTS on `tools/shot-bloom-silhouette.mjs`'s ruling sheet, with their
-  control values printed in the cell. Moving the default is a SECOND event with its own
-  partition report — the spread precedent exactly (the control lands at current
-  behaviour; the default moves later, as a design ruling, on evidence). If no candidate
-  is chosen, the ovate stays and nothing further happens.
+- ~~The default silhouette — open, and deliberately separated from the engine~~
+  **Settled Aug 31 from the candidate sheet: the POINTED OVATE STAYS.** Eva ruled
+  against both candidates; no close-out commit was made and no default moved. So the
+  silhouette engine landed as ONE event, not two: the engine is byte-identical (0 of 76)
+  and the shipping default is the value the placeholder had.
 
-- **The max-combinator kink — a hypothesis on the sheet, not a defect.** Plain
-  `Math.max` leaves a C0 corner wherever two profile terms cross. The worst case the
-  shipped ranges reach (tip breadth 0.60 against the steepest falling core) is
-  photographed full-blade and tip-cropped. If it reads badly, a smooth p-norm blend is
-  a later, separately-evidenced change; if it reads fine, the complexity was never
-  needed. Do not build the blend on the strength of this note alone.
+  This is a decision, NOT an absence of one, and the difference matters to whoever picks
+  this up next. ROSE-ish and POPPY-ish were built, rendered face-on beside the ovate with
+  their control values in the cell, and rejected on sight. They remain as named rows in
+  the gate matrix and as cells on `tools/shot-bloom-silhouette.mjs`'s candidate sheet —
+  they are gate coverage of the region the controls are FOR, and they must not be deleted
+  as "unused presets". Reopening the default is a fresh ruling needing fresh evidence;
+  do not treat the ovate as a placeholder still awaiting replacement, because it is not
+  one any more. Were the default ever to move, it would still be its own event with a
+  partition report — the spread precedent — since every export inheriting it moves.
+
+- ~~The max-combinator kink — a hypothesis on the sheet~~ **Settled Aug 31: PLAIN
+  `Math.max` STAYS, and the kink reads fine.** Eva ruled from the tip-cropped sheet, at
+  the worst case the shipped ranges reach (tip breadth 0.60 against the steepest falling
+  core, 60 mm petals). No p-norm blend is queued and none should be written.
+
+  The saving is the point, and it is the reason this was photographed rather than
+  engineered around: a smooth blend would have needed term-count switching to stay
+  bit-exact, plus an epsilon story about the moment a term appears — complexity bought
+  against a corner nobody could object to once they saw it. ONE combinator now governs
+  the shape terms and the floors alike, which is also what makes the byte argument short
+  enough to check by eye. Do not reopen this on the strength of reading the code and
+  imagining the corner; the picture exists, and a fresh ruling needs a fresh picture.
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).
 - ~~Ring radius / spread exposure — re-decide at phase 2 entry~~ **Settled Aug 31, at
