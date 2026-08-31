@@ -314,6 +314,24 @@ window.__bloomMetrics = () => ({
   petalMid: lastPetal ? lastPetal.mid : null,
   petalTip: lastPetal ? lastPetal.tip : null,
   petalNormal: lastPetal ? lastPetal.normal : null,
+  /* The blade's WIDTH direction at the midpoint — a profile view looks down
+     this. It is reported rather than recomputed because under twist it is
+     no longer the ring tangent, so a shot tool deriving it from azimuth
+     would not merely be a second owner, it would be wrong. */
+  petalTangent: lastPetal ? lastPetal.tangent : null,
+  petalAxis: lastPetal ? lastPetal.axis : null,
+  /* FORM TELEMETRY, and the scope is the point. Both shipped gates are
+     structurally BLIND to this session's failure modes: the export gate
+     counts boundary edges on a fixed-topology grid, which pure displacement
+     cannot change, and connectedness cannot fire because the foot is never
+     written and the hub spans it. So the properties that CAN break — the
+     foot staying put, the roll staying isometric, the curvature floor
+     holding, and the all-zero guard not hiding a wrong form path — are
+     measured here, from the builder that made the geometry, and asserted by
+     both gates on every row. */
+  petalForm: lastPetal ? lastPetal.form : null,
+  petalFootFrames: lastPetal ? lastPetal.footFrames : null,
+  petalGuardResidual: lastPetal ? lastPetal.guardResidual : null,
 });
 window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null) => { userMoved = true; fitCamera(radius, lift, at, dir); };
 

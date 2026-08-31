@@ -60,13 +60,33 @@ What changes from the flower project:
   Conflating them cost the flower project several cycles.
 - **`below: null` is the only state** for now — but keep the `below` parameter shape
   (`'stem' | 'branch' | null`, never a boolean) so a stem later is a value, not a rewrite.
-- **Gate coverage starts where the flower's gate was blind:** the bare bloom *is* the
-  shipping default here, so the connectedness gate's first rows are the default and every
-  preset, before any interesting cases. The flower shipped a 7-piece bare bloom for
-  months because every gate row enabled the thing that hid the defect.
+- **Gate coverage starts where the flower's gate was blind** — and a DEFAULT IS NOT
+  COVERAGE. The bare bloom was the shipping default for phases 1–3, so it was exercised
+  by the default row and the whole arrangement sweep for free. The archetype ruling made
+  DISC the default and deleted that coverage in one character: NONE went from "most rows"
+  to zero. It now has EXPLICIT rows — its own named spread sweep and the two pinned
+  "(centre off)" corners — because the flower shipped a 7-piece bare bloom for months
+  precisely because every gate row enabled the thing that hid the defect. Whenever a
+  default moves, check what it stopped covering.
 - Sheets change the failure modes: fewer free-wire hazards, more thin-wall ones. The
   connectedness gate still can't see a free end — carry that limitation forward in its
   header.
+- **Overlapping closed solids are THE CONSTRUCTION, not an accident — and petals already
+  interpenetrate their neighbours at every setting that ships (measured Aug 31).** This is
+  recorded so a later session finds it here instead of discovering it and filing it as a
+  defect. Half the angular gap between adjacent petals at the foot ring is 4.69 mm at
+  petalCount 3 and 1.55 mm at petalCount 40, against a default petal half-width of
+  8.00 mm — so blades overlap at the ring in **every** reachable arrangement, flat, with no
+  form applied. That is fine and it is deliberate: every primitive is an individually
+  closed solid, the slicer unions them, and interpenetration adds no boundary edges and can
+  only ever read as MORE connected, never less. The consequence for form work is that
+  bending a blade toward a neighbour, toward the hub, or into the designed centre changes
+  nothing about either gate's verdict — spine curl at 180° or more sweeps the blade back
+  inside the hub rim and reaches r = 0.92 mm at 360°, and that is a shape decision, not a
+  hazard. What is NOT covered by this: a single petal self-intersecting, which is a
+  different property with its own guard (the roll curvature floor) and is invisible to both
+  gates.
+
 - **A coincident face reads as connected, and that bounds what this gate can endorse
   (measured Aug 31).** The cleft's panel overlap was expected to be the thing holding
   the lobes on; dropping it to zero left the panels sharing one cross-section exactly
@@ -140,19 +160,35 @@ printer — and sheet petals add a min-wall coupon to that list.
   the ruling itself is still open.** Eva's ruling at phase-2 entry was that the question is
   not answered by argument: three archetypes ship behind one `centerStyle` choice —
   DOME (rounded boss), DISC (flat/dished button), RING (open torus collar) — plus NONE,
-  which is and remains the default until she rules from the contact sheet. Wiring the
-  winner as the default is a later session's job. The centre is DESIGNED and user-chosen;
+  which remained the default until she ruled from the contact sheet. **She has: DISC,
+  Aug 31, after the form phase — see the archetype entry below.** The centre is DESIGNED and user-chosen;
   the junction stays derived and control-free beneath it, and the registry's `role` field
   now carries that split (`center` vs. the deliberate absence of any `junction` row).
 
-- **The archetype ruling itself — DEFERRED until after the petal-shape phase (Eva,
-  Aug 31), from the contact sheet.** `centerStyle` stays NONE by default; nothing is
-  deleted and no style is promoted. The rig remains in the codebase as a built, gated
-  capability. The reason is a finding from the sheet rather than indecision: the petals
-  are still placeholder ovate sheets, and a dome or a ring should be ruled on against the
-  real silhouettes it will sit among, not against stand-ins. The question reopens at the
-  end of phase 3, when the ruling becomes "how does this sit against these petals" rather
-  than "which of these three is nicest against placeholders".
+- ~~The archetype ruling itself — DEFERRED until after the petal-shape phase~~
+  **SETTLED Aug 31, after the form phase: DISC is the shipping default.** The deferral
+  did exactly the job it was parked for, and BOTH halves are recorded here so the
+  reversal is legible rather than mysterious:
+
+    - **What session 2 said, and why it was right to wait.** `centerStyle` stayed NONE,
+      nothing was deleted, no style promoted — on a finding from the sheet rather than
+      indecision: the petals were still placeholder ovate sheets, and a dome or a ring
+      should be ruled on against the real silhouettes it will sit among, not against
+      stand-ins. That note also observed the four styles were **"visually
+      indistinguishable"** at the spreads then in use, and that observation was true of
+      what it was looking at.
+    - **What supersedes it.** Ruled against petals with REAL FORM — cup, spine curl,
+      cross-section roll and twist all reachable — the styles are no longer
+      undifferentiated, and DISC is the one that reads. The session-2 "least
+      differentiated" observation is therefore SUPERSEDED, not contradicted: it was a
+      measurement of the archetypes against flat placeholder blades, and the thing it
+      measured no longer exists. A reader who finds only the newer note and wonders why
+      an earlier session called these interchangeable has the answer here.
+
+  Sub-control defaults are UNCHANGED. This is the deliberate SECOND EVENT under the
+  spread precedent: the rig landed byte-identical in phase 2, and the default moves now,
+  as a design ruling, on evidence — which is expected to move exports and did, with the
+  partition asserted both ways below.
 
 - **Spread default 1.00 → 2.00 — settled Aug 31, on evidence from the same sheet.** At
   1.00 the foot ring is 4.42 mm against a 35 mm petal and eight 6.4 mm feet tile straight
@@ -236,6 +272,111 @@ printer — and sheet petals add a min-wall coupon to that list.
   the shape terms and the floors alike, which is also what makes the byte argument short
   enough to check by eye. Do not reopen this on the strength of reading the code and
   imagining the corner; the picture exists, and a fresh ruling needs a fresh picture.
+- ~~Phase 3, the petal's 3D form: the four curves~~ **Built Aug 31, all four shipped, all
+  flat by default.** `petalCup`, `petalSpineCurl`, `petalRoll` and `petalTwist` — Standard,
+  `role: 'petal'`, signed, defaulting to exactly 0. Ordering is not free and the argument is
+  in `petalForm`'s header: curl builds the centreline and base frame, twist rotates that
+  frame about the curled length direction, roll maps the width to an arc in the resulting
+  plane, cup lifts along that plane's normal. Curl before twist because curl's bend axis IS
+  the width direction — twisting first would make the spine writhe into a helix instead of
+  curling in a plane.
+
+  **Petal tilt is not spine curl, and the code says so in one line:** `phi(u) = petalTilt +
+  curl*u`. Tilt is the CONSTANT OF INTEGRATION (the frame at u = 0, zero derivative, the
+  whole blade rotating rigidly); curl is the RATE. They rotate about the same axis, which is
+  exactly why they get conflated, and being the two terms of one affine angle function is
+  what makes them unambiguous. Curl's read-out prints the DERIVED spine radius; tilt has
+  none, because a rigid rotation has none.
+
+  **Byte-identity is a GUARD, not an IEEE-754 argument, and that was a deliberate
+  downgrade.** Cup would have survived one and twist very nearly would; roll and curl carry
+  a `1/kappa` that is a genuine 0/0 limit at zero and could not. Resting the whole layer on
+  a case analysis about signed zero (`T` is `-0` in its first component at azimuth 0, and
+  `-0 + 0` is `+0`) was the wrong trade, so `petalFormIsFlat()` short-circuits to the
+  pre-form expression verbatim. The guard is not allowed to be somewhere a bug sits
+  unexercised: `formGuardResidual` evaluates the ZERO-form law against the flat law at every
+  emitted point and frame, and both gates assert it. It measures **exactly 0**.
+
+- **BOTH SHIPPED GATES ARE STRUCTURALLY BLIND TO PURE DISPLACEMENT (derived and confirmed,
+  Aug 31), which is why the form layer had to ship its own instrument.** The export gate's
+  criterion is boundary edges on a mesh whose topology is fixed — `NU`, `NV` and the panel
+  count depend on no form control — and displacement cannot change an edge census. The
+  connectedness gate cannot fire either: the foot is never written by the form layer and the
+  hub disc spans it, so no reachable curl / cup / roll / twist detaches a petal. The
+  tempting positive controls were checked and rejected for exactly this reason — a roll
+  radius below t/2 self-intersects while staying watertight and one piece; interpenetration
+  is not a failure at all and only helps connectedness; a skewed sheet leaves topology
+  untouched. So `formAssertions()` runs in BOTH gates on EVERY row and asserts what the STL
+  cannot show: foot invariance in exact arithmetic, roll isometry, the curvature floor, and
+  the guard residual. **And a frozen matrix cannot substitute for it:**
+  `--region foot` proves whatever its matrix exercises, and every row of a frozen matrix
+  sits at the defaults of every later control — which for the form layer is exactly flat.
+  A mutant that deforms the feet on purpose reads `81/81 BIT-IDENTICAL` on the frozen 86
+  and `21 of 98 moved` on the live 103. "The foot did not move at defaults" and "the foot
+  is invariant under form" are two claims, and only the second is the invariant. **Do not read a green export or connectedness run as endorsing any
+  form property.**
+
+- **The roll curvature floor — cap the output, never the input.** A rolled sheet's inner
+  offset surface sits at `radius - t/2` and INVERTS below that. At `petalWidth` 8 a full turn
+  asks for a 0.637 mm radius against a 0.6 mm half-thickness. The floor is one full sheet
+  thickness, applied inside `petalForm` and nowhere else, and the control SATURATES rather
+  than degenerating; the read-out says "(clamped)" so a slider that has stopped moving does
+  not read as broken. Like every structural number in this project family this is an
+  assumption with a number attached, not a printed result.
+
+- **Roll is isometric here too — but the flower's premise needed restating before it could
+  be checked, and that restatement is the finding.** "|dP/dv| = 1" is a statement about a
+  UNIT-SPEED cross-width parameter. This model's `v` is normalised and scaled by the row
+  half-width, so the FLAT sheet already has `|dP/dv| = h(u)`, ranging 0.8–8.0 mm. The
+  comparable quantity is the RATIO to flat, which is what the flower's numbers actually are.
+  Measured on this model: roll holds the ratio at **1.000000 at every sample and every
+  value**; cup is the only one of the four that moves it, at **1.0925 at 0.22 and 1.7532 at
+  0.72** — reproducing the flower's 1.09 and 1.75 to three decimals, which is independent
+  confirmation that the same parabolic law transfers. At the shipped maximum of 1.20 it is
+  **2.600**: kept (Eva, Aug 31) and photographed, because the closed tulip is a real form and
+  the flower's 0.72 was a range choice rather than a safety rule.
+
+- **The emitted polyline is not the curve, and no other gate here can see the difference.**
+  Roll is isometric as a MAP and NOT as emitted geometry: the panel emits `NV = 10` columns,
+  so the cross-section is a 9-segment chord path inscribed in the arc and carries up to
+  **7.9% less material** than the flat row at maximum roll (0.9207 at the widest row, 0.9992
+  at the tip). `NV` stays 10 (Eva, Aug 31): constant topology is what makes the form layer
+  cost exactly zero triangles, and the faceting is photographed with the measured ratio
+  printed in the cell rather than bought with triangles. Raising `NV` under roll is later,
+  separately-evidenced work with its own triangle-count story — it would also be the first
+  thing in this codebase to make triangle count depend on a slider. Do not start it on the
+  strength of this note alone.
+
+- **The export feature-size floor cannot move triangle counts here, and the flower's
+  mechanism is structurally absent.** The flower measured a pure-displacement effect changing
+  export counts because its floor is evaluated per feature and displacement moved features
+  across it, adding or removing tube segments. Two reasons that cannot happen in the bloom:
+  `SHEET_THICKNESS_MM` (1.2) is above `MIN_FEATURE_MM` (1.0), so `floorThickness` never
+  binds; and every primitive is a fixed-topology grid, so the floor changes geometry but
+  never triangle count. Measured live-vs-export on six configs spanning both extremes,
+  including one where the CENTRE's floor genuinely binds: **delta 0 on every row.** If live
+  and export ever disagree on a bloom row, it is a bug, not the floor.
+
+- **The form sheet — RULED Aug 31, all three questions closed.** The teaching sheet
+  holds: swept alone, each in the view its own curve is visible in, the four read as
+  four different things and the controls ship as authored. Both extreme cells are
+  ACCEPTED as shipped extremes rather than tolerated defects, photographed and numbered:
+
+    - **Max-roll faceting stays, and `NV` stays 10.** The emitted cross-section is a
+      9-segment chord path inscribed in the arc and carries up to 7.9% less material
+      than the flat row (0.9207 at the widest row, 0.9992 at the tip). Constant topology
+      is what makes the whole form layer cost exactly zero triangles, and that is worth
+      more than the facets cost. **NO NV-under-roll work is queued and none should be
+      written.** Reopening needs FRESH EVIDENCE — a new picture, not a fresh reading of
+      this number.
+    - **The ROLL CLAMP look stays.** The only reachable state where the curvature floor
+      binds (roll max × petalWidth 8, radius held at 1.20 mm, printed "(clamped)").
+      Saturating is the intended behaviour, not a bug to design around.
+
+  Both cells are on `tools/shot-bloom-form.mjs`'s sheets with their measured numbers in
+  the caption. Same standing as the max-combinator kink: the ruling was made on a
+  picture, and a fresh ruling needs a fresh picture.
+
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).
 - ~~Ring radius / spread exposure — re-decide at phase 2 entry~~ **Settled Aug 31, at

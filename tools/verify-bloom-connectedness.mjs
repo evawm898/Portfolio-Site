@@ -85,7 +85,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 const MAX_VOXELS = 90e6;    // grids beyond this are SKIPPED and reported, never passed
@@ -162,6 +162,13 @@ for (const row of rows) {
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }
   const cap = await applyCapability(page, row);
   if (cap.length) { validity.push(`${row.label}: ${cap.join('; ')}`); continue; }
+  /* THE FORM ASSERTIONS, on EVERY row rather than only the form rows. Both
+     directions matter: a form row must report the form it names, and a flat
+     row must report none — the guard not short-circuiting is the failure
+     that would quietly cost byte-identity. Foot invariance is asserted
+     everywhere because the junction is everywhere. */
+  const frm = await formAssertions(page, row);
+  if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   const e = analyzeStl(buf);

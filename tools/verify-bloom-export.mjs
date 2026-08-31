@@ -47,7 +47,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -77,9 +77,27 @@ for (const row of rows) {
      be live on a row that did not ask for one. */
   const cap = await applyCapability(page, row);
   if (cap.length) { validity.push(`${row.label}: ${cap.join('; ')}`); continue; }
+  /* THE FORM ASSERTIONS, on EVERY row rather than only the form rows. Both
+     directions matter: a form row must report the form it names, and a flat
+     row must report none — the guard not short-circuiting is the failure
+     that would quietly cost byte-identity. Foot invariance is asserted
+     everywhere because the junction is everywhere. */
+  const frm = await formAssertions(page, row);
+  if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
-  results.push({ label: row.label, capability: !!row.capability, bytes: buf.length, ...analyzeStl(buf) });
+  const fm = await page.evaluate(() => window.__bloomMetrics());
+  results.push({
+    label: row.label, capability: !!row.capability, bytes: buf.length,
+    /* The form numbers travel WITH the row's result, so a green run is a
+       record of what was measured rather than only that it passed. */
+    form: fm.petalForm
+      ? `roll radius ${isFinite(fm.petalForm.rollRadiusMm) ? fm.petalForm.rollRadiusMm.toFixed(2) + ' mm' : 'flat'}`
+        + `${fm.petalForm.rollClamped ? ' (CLAMPED)' : ''}`
+        + ` · |dP/dv|/h ${fm.petalForm.metricMin.toFixed(4)}..${fm.petalForm.metricMax.toFixed(4)}`
+      : null,
+    ...analyzeStl(buf),
+  });
 }
 await browser.close();
 server.close();
@@ -92,6 +110,7 @@ for (const r of results) {
   if (!ok) failures.push(r);
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${r.label.padEnd(46)} tris(export)=${String(r.tris).padStart(6)} boundary=${r.boundary} nonManifold=${r.nonManifold} (unrated) shells=${r.shells} (unrated) ${(r.bytes / 1024).toFixed(0)} KiB`);
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
+  if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 

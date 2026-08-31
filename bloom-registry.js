@@ -165,11 +165,19 @@ export function predicateDrivers(pred, out = new Set()) {
      no designs yet (see RETIRED_IDS above), so no saved value can be
      misread. The first feature that persists a design inherits that debt.
 
-   - `centerStyle` is an A/B RIG, not a shipped aesthetic. NONE is the default
-     and REMAINS the default — Eva's ruling, Aug 31, after seeing the contact
-     sheet: the archetype decision is DEFERRED until after the petal-shape
-     phase, because the placeholder ovate petals are stand-ins and a dome or a
-     ring should be judged against the real silhouettes it will sit among, not
+   - `centerStyle` WAS an A/B rig and is now a shipped aesthetic: **DISC is the
+     default** (Eva, Aug 31, ruled after the form phase against petals with
+     real cup, curl, roll and twist). The deferral it replaces was correct and
+     is recorded in docs/bloom-charter.md with both halves — the session-2 note
+     that the archetypes were "visually indistinguishable" was measuring them
+     against FLAT PLACEHOLDER blades, and that subject no longer exists.
+     The default moved as a SECOND EVENT under the spread precedent: the rig
+     landed byte-identical, and the default changed later, on evidence, with a
+     partition report. Sub-control defaults are unchanged. The superseded
+     reasoning ran: the archetype decision is DEFERRED until after the
+     petal-shape phase, because the placeholder ovate petals are stand-ins and
+     a dome or a ring should be judged against the real silhouettes it will
+     sit among, not
      against placeholders. Nothing is deleted and no style is promoted: the rig
      stays in the codebase as a built, gated capability and the question
      reopens when petals stop being placeholders.
@@ -255,6 +263,95 @@ export const CONTROLS = [
     fmt: (v) => (Number(v) === 0 ? 'pointed' : `${(Number(v) * 100).toFixed(0)}% of width`),
     visibleWhen: { all: [] } },
 
+  /* THE PETAL'S 3D FORM — four curves, four controls, and they are NOT
+     interchangeable (bloom-geometry.js's petalForm header carries the full
+     ordering argument and the vocabulary table). All Standard: these change
+     what the bloom looks like from across a room, and geometry controls are
+     a DESIGN tier — the flower project demoted silhouette controls to
+     Advanced repeatedly and was wrong every time.
+
+     ALL FOUR DEFAULT TO EXACTLY 0, which is exactly flat, which is why the
+     whole layer lands byte-identical. That is a guard rather than an
+     IEEE-754 argument — see petalForm's header for why roll and curl cannot
+     have one.
+
+     ALL FOUR ARE SIGNED, and the sign is a different form rather than a
+     mirror in three of the four cases: cupped vs reflexed, incurved vs
+     recurved, dextral vs sinistral. Roll's sign is the one that is closer
+     to a mirror on its own (quilled vs revolute margin), and it earns its
+     range in combination with cup, where same-sign and opposite-sign are
+     genuinely different petals.
+
+     WHY ROLL STOPS AT 330 AND NOT 360. At exactly one turn the two rim
+     columns land coincident, and the export gate's edge census welds at
+     1e-4 — so a full turn would emit duplicate geometry and put a number in
+     the `nonManifold` column with no cause a reader could find. That column
+     is unrated and the model would be watertight and connected either way;
+     an unexplained number in a gate's output is how a false belief starts
+     here. 330 leaves 30 degrees of arc between the rims.
+
+     WHY CURL REACHES -180. Below-plane petals are wanted, not tolerated:
+     tips passing behind the bloom is martagon / cyclamen territory and the
+     flower's own gap analysis asked for reflex past 180. Nothing is below
+     the bloom today (`below: null`), so the state is geometrically free.
+     Reachable, never default. */
+  { id: 'petalCup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Petal cup', tier: 'standard', role: 'petal',
+    /* Prints the DERIVED edge lift in mm — the physical quantity — rather
+       than the dimensionless amount alone. Cup is the only one of the four
+       that stretches the material across the width: the metric factor at
+       the rim is sqrt(1 + 4*cup^2), measured 1.093 at 0.22 and 2.600 at the
+       maximum, and it is reported by the gates rather than by this label. */
+    fmt: (v, ui) => {
+      const c = Number(v);
+      if (c === 0) return 'flat';
+      const lift = Math.abs(c) * (ui ? Number(ui.petalWidth) : 16) / 2;
+      return `${c > 0 ? '+' : ''}${c.toFixed(2)} ${c > 0 ? 'cupped' : 'reflexed'} · edge ${lift.toFixed(1)} mm`;
+    },
+    visibleWhen: { all: [] } },
+
+  { id: 'petalSpineCurl', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+    label: 'Spine curl', tier: 'standard', role: 'petal',
+    /* Prints the DERIVED spine radius, which is the quantity that tells a
+       bend apart from a tilt — Petal tilt above prints an angle and has no
+       radius, because a rigid rotation has none. Same precedent as Tip
+       taper printing the derived widest point: one expression here, one in
+       the geometry, and no control for it. */
+    fmt: (v, ui) => {
+      const d = Number(v);
+      if (d === 0) return 'straight';
+      const L = ui ? Number(ui.petalLength) : 35;
+      return `${d > 0 ? '+' : ''}${d}° · spine radius ${(L / Math.abs(d * Math.PI / 180)).toFixed(1)} mm`;
+    },
+    visibleWhen: { all: [] } },
+
+  { id: 'petalRoll', kind: 'slider', min: -330, max: 330, step: 5, default: 0,
+    label: 'Cross-section roll', tier: 'standard', role: 'petal',
+    /* Prints the achieved roll radius AND says when the curvature floor
+       took over. Saturating silently would make a slider that stops doing
+       anything look broken; saying "clamped" makes it a stated cap on the
+       OUTPUT, which is the rule this project uses everywhere the parameter
+       space has a cliff. The floor itself lives in petalForm — this label
+       reads it back through the same arithmetic, it does not set it. */
+    fmt: (v, ui) => {
+      const d = Number(v);
+      if (d === 0) return 'flat';
+      const halfW = (ui ? Number(ui.petalWidth) : 16) / 2;
+      const kReq = Math.abs(d * Math.PI / 180) / halfW;
+      const kMax = 1 / 1.2;
+      const k = Math.min(kReq, kMax);
+      return `${d > 0 ? '+' : ''}${d}° · roll radius ${(1 / k).toFixed(2)} mm${kReq > kMax ? ' (clamped)' : ''}`;
+    },
+    visibleWhen: { all: [] } },
+
+  { id: 'petalTwist', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
+    label: 'Twist', tier: 'standard', role: 'petal',
+    fmt: (v) => {
+      const d = Number(v);
+      return d === 0 ? 'none' : `${d > 0 ? '+' : ''}${d}° (${d > 0 ? 'dextral' : 'sinistral'})`;
+    },
+    visibleWhen: { all: [] } },
+
   /* ARRANGEMENT. 0.60 – 6.00 (Eva, Aug 31). The upper bound: at the defaults
      6.00 puts the ring at 26.5 mm against a 35 mm petal — 0.76 x petal length,
      where the bloom stops reading as a flower and starts reading as a wreath,
@@ -269,7 +366,7 @@ export const CONTROLS = [
     visibleWhen: { all: [] } },
 
   /* CENTER — the A/B rig. */
-  { id: 'centerStyle', kind: 'choice', default: 'NONE',
+  { id: 'centerStyle', kind: 'choice', default: 'DISC',
     options: [
       { value: 'NONE', label: 'None' },
       { value: 'DOME', label: 'Dome' },

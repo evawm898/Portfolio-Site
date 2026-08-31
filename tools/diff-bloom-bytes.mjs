@@ -25,6 +25,12 @@
      --full     the live `buildMatrix()` — for comparing two trees that share a
                 matrix, where the question is not "did anything move" but
                 "did exactly the right things move".
+     --phase3   `phase3Matrix()` — the 86 rows frozen at 6626961, the commit
+                before the four form curves. The like-for-like baseline for
+                the FORM layer. Run BOTH this and --phase2 for a form
+                change: the 76 are then the rows whose bytes are unmoved
+                across two consecutive feature layers, which neither matrix
+                claims on its own.
      --phase2   `phase2Matrix()` — the 76 rows frozen at 21d4602, the commit
                 before the petal silhouette model. This is the like-for-like
                 baseline for the silhouette engine: `--full` cannot do that
@@ -61,6 +67,28 @@
        (`below: null`); when a stem exists this criterion admits it and the
        region stops meaning "foot + hub". Re-derive the criterion then rather
        than trusting this sentence.
+     - **A FROZEN MATRIX CANNOT SEE A FORM LEAK, and this cost a wrong
+       prediction to find (Aug 31).** The region mode proves whatever the
+       MATRIX exercises, and a frozen matrix pins only the controls that
+       existed at its commit — so every one of its rows sits at the defaults
+       of every LATER control. The form curves default to exactly 0, where
+       the guard short-circuits to the flat path, so a deformation leaking
+       onto the foot is IDENTICALLY ABSENT from all 86 frozen rows. Measured,
+       not reasoned: a mutant that deforms the feet on purpose came back
+       `81/81 BIT-IDENTICAL` on `--phase3`, and `21 of 98 in-scope rows
+       MOVED` on `--full`, whose 103 rows include 25 that set a curve.
+       So the two claims are DIFFERENT and only one of them is this mode's:
+         `--phase3 --region foot`  the form layer does not move the foot AT
+                                   DEFAULTS. That is the byte-identity
+                                   question, and it is what the acceptance
+                                   bar needs.
+         `--full --region foot`    the foot is invariant UNDER FORM — but
+                                   only against a tree that shares the live
+                                   matrix.
+       Neither replaces `formAssertions()` in the two gates, which asserts
+       foot invariance per row in exact arithmetic on every row of the live
+       matrix. Do not quote a frozen-matrix foot pass as evidence that a
+       deformation stayed off the foot.
      - It is a HASH, not a geometric argument: it proves the bytes in that
        region did not move between two trees. It cannot tell you the region
        was correct in the first place.
@@ -94,7 +122,7 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2] --root <dir> --out <file.json>
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2|--phase3] --root <dir> --out <file.json>
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
@@ -105,7 +133,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -258,11 +286,21 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 
 const FULL = process.argv.includes('--full');
 const PHASE2 = process.argv.includes('--phase2');
-if (FULL && PHASE2) { console.error('pick one matrix: --full or --phase2'); process.exit(2); }
-const MATRIX = FULL ? 'full' : PHASE2 ? 'phase2' : 'legacy';
+const PHASE3 = process.argv.includes('--phase3');
+/* Exactly one matrix. The guard and the LABEL are derived from one list so a
+   new matrix cannot be added to the runner while the recorded label silently
+   keeps saying something else — which is what happened when --phase3 landed:
+   its runs recorded matrix:"legacy" while running phase3Matrix(), a label
+   naming a computation nobody performed, in this project's most repeated
+   defect shape. --compare does not read the field, so nothing drew a wrong
+   conclusion from it; it was wrong in the record, which is enough. */
+const MATRIX_FLAGS = [[FULL, 'full'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
+const chosen = MATRIX_FLAGS.filter(([on]) => on);
+if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
+const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
 const rows = [];
 const validity = [];
-for (const row of (FULL ? buildMatrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {
+for (const row of (FULL ? buildMatrix() : PHASE3 ? phase3Matrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {
   await openBloom(page, port);
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
