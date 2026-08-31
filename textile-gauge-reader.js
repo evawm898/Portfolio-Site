@@ -47,12 +47,66 @@
   const HEALTH_CHECK_RETRY_DELAYS_MS = [4000, 8000, 15000, 20000]; // backoff while the service cold-starts
   const ANALYZE_TIMEOUT_MS = 75000; // generous: free-tier hosts can cold-start slowly
 
-  const WALE_COLOR = "#0f7d7d";   // matches --petrol-bright
-  const COURSE_COLOR = "#a56b2e"; // matches --tgr-course
+  const WALE_COLOR = "#0f7d7d";   // matches --petrol-bright -- calibration points/line and the
+                                   // wale-axis result overlay/diagnostics only; NOT measurement boxes
+  const COURSE_COLOR = "#a56b2e"; // matches --tgr-course -- course-axis result overlay/diagnostics only
+
+  // Measurement-area (ROI) boxes specifically -- deliberately separate
+  // constants from WALE_COLOR/COURSE_COLOR above, which stay teal/rust for
+  // calibration points and the wale/course result lines. Black reads
+  // clearly against typical (light-to-mid) fabric; the light outline pass
+  // (see strokeRoiBox) is what keeps it visible against dark yarn, where a
+  // plain black stroke alone would disappear.
+  const ROI_BOX_COLOR = "#0a0a0a";
+  const ROI_BOX_OUTLINE = "rgba(255,255,255,0.9)";
+  // Auto-proposed vs. manually-added boxes used to be told apart by their
+  // own stroke color (teal vs. rust); now that both are black for
+  // contrast, that distinction moves to a small corner accent dot instead
+  // (see roiAccentColor/drawRoiAccentDot) -- reusing the same two hues so
+  // the meaning ("teal-ish = auto", "rust = manual") carries over.
+  const ROI_ACCENT_AUTO = WALE_COLOR;
+  const ROI_ACCENT_MANUAL = COURSE_COLOR;
 
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 8;
-  const WHEEL_ZOOM_SENSITIVITY = 0.01;
+  const WHEEL_ZOOM_SENSITIVITY = 0.01; // ctrl+wheel (trackpad pinch) -- deltaY there is already small/scaled
+  // A real mouse wheel's deltaY is much coarser per event (commonly ~100
+  // in Chrome's default delta mode) than a trackpad-pinch's ctrl+wheel
+  // deltaY, so it needs its own, much smaller sensitivity constant --
+  // reusing WHEEL_ZOOM_SENSITIVITY here would turn one wheel notch into
+  // a ~63% zoom jump. Tuned for roughly a 10-15% zoom change per notch.
+  const MOUSE_WHEEL_ZOOM_SENSITIVITY = 0.0016;
+  // Threshold for looksLikeMouseWheelDelta() below -- comfortably above
+  // ordinary trackpad micro-scroll deltas, comfortably below a typical
+  // wheel notch's magnitude (~100).
+  const MOUSE_WHEEL_MIN_DELTA = 20;
+
+  // Calibration: assumed click-placement error (screen/source-image px --
+  // treated as natural-image px here, same as every other stored
+  // coordinate) and the error-fraction threshold above which the short-
+  // span hint shows. Expressed as a ratio (error / span) rather than a
+  // fixed pixel span so it stays correct at any image resolution: a
+  // 300px span and a 3000px span at 10x the megapixel count carry the
+  // same relative click-error risk.
+  const CAL_ASSUMED_CLICK_ERROR_PX = 3;
+  const CAL_SHORT_SPAN_ERROR_THRESHOLD = 0.01; // ~1%
+  const CAL_UNIT_STORAGE_KEY = "tgr_calibration_unit";
+
+  function loadDefaultCalUnit() {
+    try {
+      const saved = localStorage.getItem(CAL_UNIT_STORAGE_KEY);
+      return saved === "in" || saved === "cm" ? saved : "cm";
+    } catch {
+      return "cm"; // localStorage can throw in private-browsing/sandboxed contexts -- never fatal here
+    }
+  }
+  function saveDefaultCalUnit(unit) {
+    try {
+      localStorage.setItem(CAL_UNIT_STORAGE_KEY, unit);
+    } catch {
+      // Purely a convenience (remembering the last-used unit for next time) -- never required.
+    }
+  }
 
   // --- DOM refs -----------------------------------------------------
   const stepEls = Object.fromEntries(
@@ -75,8 +129,15 @@
   const zoomResetBtn = document.getElementById("zoomResetBtn");
   const zoomLevelEl = document.getElementById("zoomLevel");
 
-  const rulerControls = document.getElementById("rulerControls");
-  const rulerToggleBtn = document.getElementById("rulerToggleBtn");
+  const gridBoxControls = document.getElementById("gridBoxControls");
+  const gridBoxToggleBtn = document.getElementById("gridBoxToggleBtn");
+  const gridBoxUnitBtn = document.getElementById("gridBoxUnitBtn");
+  const gridBoxPanel = document.getElementById("gridBoxPanel");
+  const gridWaleCountInput = document.getElementById("gridWaleCount");
+  const gridCourseCountInput = document.getElementById("gridCourseCount");
+  const gridBoxSaveBtn = document.getElementById("gridBoxSaveBtn");
+  const gridBoxStatus = document.getElementById("gridBoxStatus");
+  const gridBoxError = document.getElementById("gridBoxError");
 
   const panelEl = document.getElementById("panel");
   const panelToggle = document.getElementById("panelToggle");
@@ -88,9 +149,11 @@
 
   const calStatus = document.getElementById("calStatus");
   const calAutoHint = document.getElementById("calAutoHint");
+  const calPopup = document.getElementById("calPopup");
   const knownDistanceInput = document.getElementById("knownDistance");
   const unitSelect = document.getElementById("unitSelect");
   const ppmPreview = document.getElementById("ppmPreview");
+  const calSpanHint = document.getElementById("calSpanHint");
   const calRedoBtn = document.getElementById("calRedo");
   const calConfirmBtn = document.getElementById("calConfirm");
   const calError = document.getElementById("calError");
@@ -172,21 +235,25 @@
       knownDistance: null,
       unit: "cm",
       pixelsPerMm: null,
+      draggingIndex: null, // 0 or 1 while a calibration point is being dragged, else null
     },
     calAutoDetectPending: false, // true while a /detect-ruler request for the CURRENT image is in flight --
                                   // guards against a late response overwriting points the user has since
                                   // started marking manually, or landing on a since-replaced image
     calAutoDetected: false, // true once auto-detected points are showing, still awaiting the user's own confirm
-    ruler: {
-      visible: false, // the on-image ruler overlay -- a movable, to-scale physical ruler drawn over
-                       // the photo so the user can sanity-check the calibration against real fabric
-                       // features, distinct from the (also draggable) calibration POINTS themselves.
-                       // Only ever available once currentPixelsPerMm() is non-null, i.e. AFTER
-                       // Confirm Calibration -- see updateRulerUI.
-      x: null, // natural coords, left end of the ruler bar; null until first shown (see ensureRulerPosition)
+    gridBox: {
+      visible: false, // the draggable to-scale (1in/1cm) counting box -- see gridBoxSpec/updateGridBoxUI.
+                       // Available once currentPixelsPerMm() is non-null (i.e. after Confirm
+                       // Calibration), but deliberately usable on EVERY step from calibration onward,
+                       // including before analysis -- counting before seeing the tool's own answer
+                       // is the whole point (an uncontaminated ground-truth label).
+      unit: "in", // "in" | "cm" -- side length is DERIVED live from currentPixelsPerMm() + this,
+                  // never stored as a raw pixel value, so it stays exactly to scale across
+                  // recalibration too, not just pan/zoom (see gridBoxSpec).
+      x: null, // natural coords, top-left corner; null until first shown (see ensureGridBoxPosition)
       y: null,
       dragging: false,
-      dragOffset: null, // {dx, dy} from the pointer to state.ruler.{x,y} at drag start, in natural px
+      dragOffset: null, // {dx, dy} from the pointer to state.gridBox.{x,y} at drag start, in natural px
     },
     roi: null, // {x, y, width, height} in natural coords -- the PRIMARY approved measurement
                // area, derived from rois[0] on approval. Multi-region independent analysis is
@@ -200,6 +267,11 @@
     roiDrag: null, // active drag interaction descriptor: {mode: "create"|"move"|"resize", roiId, ...}
     view: { zoom: 1, panX: 0, panY: 0 }, // image viewer pan/zoom, in display (unscaled) px
     panDrag: null, // active viewer-pan drag descriptor
+    pinchActive: false, // true from the moment a second touch lands until either lifts --
+                         // see the "Touch: two-finger pinch" block below. Every other
+                         // pointerdown handler on the canvas checks this and bails, so a
+                         // second finger landing can never also start a new ROI/calibration/
+                         // grid-box drag on top of the pinch.
     orientation: "vertical",
     structure: "unknown",
     result: null,
@@ -310,7 +382,7 @@
     }
     updateZoomUI(); // pan-cursor affordance depends on the step (roi/calibrate reserve plain drag)
     updateRoiAddModeUI(); // add-mode crosshair cursor only applies while actually on the roi step
-    updateRulerUI(); // ruler overlay only becomes available once calibration is confirmed
+    updateGridBoxUI(); // grid box only becomes available once calibration is confirmed; see state.gridBox's comment for why it also spans steps
     render();
   }
 
@@ -433,18 +505,59 @@
     applyViewTransform();
   }
 
+  // Distinguishes a real mouse wheel from a trackpad's two-finger scroll,
+  // both of which arrive as plain "wheel" events with no other signal to
+  // tell them apart. A trackpad's scroll is continuous, sub-pixel-capable
+  // motion -- deltaX is usually nonzero even when scrolling "mostly
+  // vertically" (real fingers rarely move in a perfectly straight line),
+  // and deltaY arrives as many small, often-fractional values per
+  // gesture. A mouse wheel has no horizontal axis at all (deltaX === 0)
+  // and reports deltaY as one coarse, whole-number "notch" per click --
+  // commonly ~100 in Chrome's default delta mode, though the exact notch
+  // size varies by mouse/OS/browser, which is why this checks "large
+  // whole number" (MOUSE_WHEEL_MIN_DELTA) rather than hardcoding 100
+  // exactly. This is a heuristic, not a real device signal -- if it
+  // proves unreliable for some mouse/trackpad combination in practice,
+  // the fix is an explicit user-facing toggle, not a guess refinement.
+  function looksLikeMouseWheelDelta(evt) {
+    if (evt.deltaX !== 0) return false;
+    if (!Number.isInteger(evt.deltaY)) return false;
+    return Math.abs(evt.deltaY) >= MOUSE_WHEEL_MIN_DELTA;
+  }
+
   function onViewerWheel(evt) {
     if (!state.naturalWidth) return;
     evt.preventDefault();
+
+    if (evt.shiftKey) {
+      // Manual override: always pan, regardless of what device this
+      // looks like -- the escape hatch for whenever the heuristic below
+      // guesses wrong.
+      state.view.panX -= evt.deltaX;
+      state.view.panY -= evt.deltaY;
+      clampPan();
+      applyViewTransform();
+      return;
+    }
+
     if (evt.ctrlKey) {
       // Pinch-to-zoom on trackpads is synthesized by the browser as wheel
-      // events with ctrlKey set; a plain Ctrl+scroll does the same thing
-      // intentionally, matching the common zoom convention elsewhere.
+      // events with ctrlKey set -- always zoom, never guess here.
       const factor = Math.exp(-evt.deltaY * WHEEL_ZOOM_SENSITIVITY);
       zoomBy(factor, evt.clientX, evt.clientY);
+      return;
+    }
+
+    if (looksLikeMouseWheelDelta(evt)) {
+      // An un-modified real mouse wheel -- cursor-anchored zoom. A mouse
+      // has no equivalent to a trackpad's two-finger pan swipe, so its
+      // wheel notches are the zoom gesture instead (drag still pans).
+      const factor = Math.exp(-evt.deltaY * MOUSE_WHEEL_ZOOM_SENSITIVITY);
+      zoomBy(factor, evt.clientX, evt.clientY);
     } else {
-      // Plain two-finger scroll (or a mouse wheel) pans instead, matching
-      // how map/image viewers usually treat an un-modified scroll gesture.
+      // Trackpad two-finger scroll (or anything not confidently
+      // classified as a mouse wheel) -- pan, matching how a trackpad's
+      // plain scroll gesture is treated everywhere else on the page.
       state.view.panX -= evt.deltaX;
       state.view.panY -= evt.deltaY;
       clampPan();
@@ -472,22 +585,23 @@
     // step too -- same reservation roi/calibrate already get below.
     if (state.repeatMark.active) return false;
     if (state.currentStep === "roi" || state.currentStep === "calibrate") return false;
-    // The ruler overlay is draggable on every step it's available in,
-    // which includes the steps (orientation/analyze/results) where a
-    // plain drag otherwise pans -- reserve the gesture the same way
-    // roi/calibrate already do, but only when the click actually starts
-    // on the ruler itself, so panning elsewhere on those steps is unaffected.
-    if (state.ruler.visible) {
-      const spec = rulerSpec();
+    // The grid box is draggable on every step it's available in, which
+    // includes the steps (orientation/analyze/results) where a plain drag
+    // otherwise pans -- reserve the gesture the same way roi/calibrate
+    // already do, but only when the click actually starts on the box
+    // itself, so panning elsewhere on those steps is unaffected.
+    if (state.gridBox.visible) {
+      const spec = gridBoxSpec();
       if (spec) {
-        ensureRulerPosition(spec);
-        if (pointInRulerDisplay(eventToDisplayPoint(evt), spec)) return false;
+        ensureGridBoxPosition(spec);
+        if (pointInGridBoxDisplay(eventToDisplayPoint(evt), spec)) return false;
       }
     }
     return true;
   }
 
   canvas.addEventListener("pointerdown", (evt) => {
+    if (state.pinchActive) return; // a second touch just landed -- see the pinch block below
     if (!isPanTrigger(evt)) return;
     evt.preventDefault();
     canvas.setPointerCapture(evt.pointerId);
@@ -513,6 +627,130 @@
   }
   canvas.addEventListener("pointerup", endPanDrag);
   canvas.addEventListener("pointercancel", endPanDrag);
+
+  // --- Touch: two-finger pinch-to-zoom + two-finger pan -------------------
+  //
+  // A single touch already works today: PointerEvent.button is 0 for a
+  // touch's primary contact exactly like a mouse left-click, so every
+  // existing pointerdown/pointermove handler above and below (pan-drag,
+  // ROI create/move/resize, calibration point placement, grid-box drag)
+  // already treats one finger the same as a mouse. What's genuinely
+  // missing is a SECOND simultaneous touch -- nothing turns that into a
+  // pinch gesture -- and `.tgr-viewer__stage { touch-action: none }` (needed
+  // so the browser's own native pinch/scroll doesn't fight this custom
+  // viewer) means without handling it ourselves, touch users get no zoom
+  // gesture at all.
+  //
+  // Listens on #viewer (an ancestor of #canvas) in the CAPTURE phase
+  // specifically so this always runs before any of the canvas's own
+  // pointerdown listeners see the event -- capture vs. bubble only
+  // affects ordering between listeners on DIFFERENT elements in the
+  // event's path, not between multiple listeners on the same target, so
+  // putting this on canvas itself would not reliably run first. Running
+  // first is what lets cancelSinglePointerDrags() below undo whatever the
+  // FIRST finger's own (single-touch) pointerdown already started, in the
+  // same event where the second finger lands, before that second
+  // pointerdown's own bubble-phase handlers (gated on state.pinchActive)
+  // get a chance to react to it.
+  const activeTouches = new Map(); // pointerId -> {x, y} client coords, touch pointers only
+  let pinch = null; // {ids: [idA, idB], lastDist, lastMid: {x, y}} while exactly 2 touches are down
+
+  function touchDist(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+  function touchMid(a, b) {
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+
+  function cancelSinglePointerDrags(pointerId) {
+    if (state.panDrag && state.panDrag.pointerId === pointerId) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      state.panDrag = null;
+      canvas.classList.remove("is-panning");
+    }
+    if (state.roiDrag) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      // Drop a stray near-zero "create" box the first finger barely started
+      // -- same threshold endRoiDrag uses for a genuine pointerup, so a
+      // pinch that interrupts an about-to-be-drawn box doesn't leave a
+      // phantom sliver behind.
+      if (state.roiDrag.mode === "create") {
+        const roi = state.rois.find((r) => r.id === state.roiDrag.roiId);
+        if (roi && (roi.width < 4 || roi.height < 4)) {
+          state.rois = state.rois.filter((r) => r.id !== roi.id);
+          state.selectedRoiId = state.rois.length ? state.rois[state.rois.length - 1].id : null;
+        }
+      }
+      state.roiDrag = null;
+      updateRoiUI();
+    }
+    if (state.gridBox.dragging) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      state.gridBox.dragging = false;
+    }
+    if (state.repeatMark.dragging) {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      state.repeatMark.dragging = false;
+      state.repeatMark.box = null;
+    }
+  }
+
+  viewer.addEventListener(
+    "pointerdown",
+    (evt) => {
+      if (evt.pointerType !== "touch") return;
+      activeTouches.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+      if (activeTouches.size === 2 && state.naturalWidth) {
+        const [idA, idB] = [...activeTouches.keys()];
+        state.pinchActive = true;
+        cancelSinglePointerDrags(idA);
+        cancelSinglePointerDrags(idB);
+        const a = activeTouches.get(idA);
+        const b = activeTouches.get(idB);
+        pinch = { ids: [idA, idB], lastDist: touchDist(a, b), lastMid: touchMid(a, b) };
+        render();
+      }
+    },
+    { capture: true }
+  );
+
+  viewer.addEventListener(
+    "pointermove",
+    (evt) => {
+      if (evt.pointerType !== "touch" || !activeTouches.has(evt.pointerId)) return;
+      activeTouches.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+      if (!pinch || !pinch.ids.includes(evt.pointerId)) return;
+      evt.preventDefault();
+      const a = activeTouches.get(pinch.ids[0]);
+      const b = activeTouches.get(pinch.ids[1]);
+      const dist = touchDist(a, b);
+      const mid = touchMid(a, b);
+      if (pinch.lastDist > 0 && dist > 0) {
+        zoomBy(dist / pinch.lastDist, mid.x, mid.y); // spreading/pinching the fingers apart -> zoom
+      }
+      // Fingers translating together (not just spreading) -> pan by the
+      // same amount their shared midpoint moved.
+      state.view.panX += mid.x - pinch.lastMid.x;
+      state.view.panY += mid.y - pinch.lastMid.y;
+      clampPan();
+      applyViewTransform();
+      pinch.lastDist = dist;
+      pinch.lastMid = mid;
+    },
+    { capture: true }
+  );
+
+  function endTouch(evt) {
+    if (evt.pointerType !== "touch") return;
+    activeTouches.delete(evt.pointerId);
+    if (pinch && pinch.ids.includes(evt.pointerId)) {
+      pinch = null;
+      state.pinchActive = false;
+    }
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+  }
+  viewer.addEventListener("pointerup", endTouch, { capture: true });
+  viewer.addEventListener("pointercancel", endTouch, { capture: true });
 
   // --- Collapsible results panel ------------------------------------------
 
@@ -573,8 +811,17 @@
     if (!state.naturalWidth) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // The calibration popup lives outside the calibrate step's own
+    // <section data-panel="calibrate"> (it needs to float over the
+    // canvas, position: fixed, tracking the two points -- see
+    // positionCalPopup), so unlike that section it is NOT automatically
+    // hidden by goToStep()'s panel.hidden toggling and needs its own
+    // explicit visibility rule here, every render.
+    calPopup.hidden = state.currentStep !== "calibrate" || state.cal.points.length < 2;
+
     if (state.currentStep === "calibrate") {
       drawCalibration();
+      positionCalPopup(); // keep the distance-entry popup pinned to the points under pan/zoom/resize
     } else if (state.currentStep === "roi") {
       drawRoi(true);
     } else if (state.currentStep === "orientation" || state.currentStep === "analyze") {
@@ -585,8 +832,9 @@
       drawRepeatMarkBox();
     }
     // Drawn last (on top of everything else) on whichever step it's
-    // available in -- see updateRulerUI / rulerControls.
-    drawRuler();
+    // available in -- see updateGridBoxUI / gridBoxControls.
+    drawGridBox();
+    positionGridBoxPanel();
   }
 
   function drawRepeatMarkBox() {
@@ -635,9 +883,19 @@
       drawLabel(`${pxDist.toFixed(1)} px`, midX + 8, midY - 8);
     }
     pts.forEach((p, i) => {
+      const isDragging = state.cal.draggingIndex === i;
+      const r = isDragging ? 7 : 5;
+      // White ring first -- both a drag affordance (points are draggable
+      // once placed, unlike a plain click target) and contrast insurance
+      // against a busy/dark background near the point.
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 2, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.fillStyle = WALE_COLOR;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#060707";
       ctx.font = "bold 10px sans-serif";
@@ -659,8 +917,41 @@
     ctx.fillText(text, x, y - 4);
   }
 
-  function roiSwatchColor(roi) {
-    return roi.source === "manual" ? COURSE_COLOR : WALE_COLOR;
+  // The only remaining visual difference between an auto-proposed and a
+  // manually-added measurement box, now that the box itself is always
+  // black -- see ROI_ACCENT_AUTO/ROI_ACCENT_MANUAL above.
+  function roiAccentColor(roi) {
+    return roi.source === "manual" ? ROI_ACCENT_MANUAL : ROI_ACCENT_AUTO;
+  }
+
+  // Stroke a measurement-area rect in near-black with a thin light outline
+  // underneath it, so the box stays visible against dark fabric -- a plain
+  // black stroke alone can disappear against dark yarn the way the old
+  // teal one didn't, but black alone is the ask, so the outline (not a
+  // different color) is what carries the dark-fabric case.
+  function strokeRoiBox(x, y, w, h, lineWidth, dashed) {
+    ctx.setLineDash(dashed ? [5, 4] : []);
+    ctx.strokeStyle = ROI_BOX_OUTLINE;
+    ctx.lineWidth = lineWidth + 1.5;
+    ctx.strokeRect(x, y, w, h);
+    ctx.strokeStyle = ROI_BOX_COLOR;
+    ctx.lineWidth = lineWidth;
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+  }
+
+  // Small filled+outlined dot at an explicit (cx, cy) display point,
+  // colored by source (auto vs. manual) -- see roiAccentColor. Callers
+  // place it on the box's right edge, clear of the top-left label chip
+  // and the four corner resize handles.
+  function drawRoiAccentDot(cx, cy, roi) {
+    ctx.fillStyle = roiAccentColor(roi);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
   function roiHandles(rect) {
@@ -689,19 +980,18 @@
     const w = state.roi.width * getScale();
     const h = state.roi.height * getScale();
 
-    ctx.strokeStyle = WALE_COLOR;
-    ctx.lineWidth = 2;
-    ctx.setLineDash(editable ? [] : [6, 4]);
-    ctx.strokeRect(tl.x, tl.y, w, h);
-    ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(15,125,125,0.1)";
+    strokeRoiBox(tl.x, tl.y, w, h, 2, !editable);
+    ctx.fillStyle = "rgba(10,10,10,0.12)";
     ctx.fillRect(tl.x, tl.y, w, h);
 
     if (editable) {
       const handles = roiHandles(state.roi);
-      ctx.fillStyle = WALE_COLOR;
+      ctx.fillStyle = ROI_BOX_COLOR;
       for (const key of ["tl", "tr", "bl", "br"]) {
         const p = handles[key];
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(p.x - 5, p.y - 5, 10, 10);
         ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
       }
     }
@@ -709,41 +999,41 @@
 
   // Draws every candidate measurement area on the review step: a subtle
   // dashed outline + label chip for each, a solid outline + resize
-  // handles for whichever one is currently selected. Manually-added areas
-  // get the course color instead of the wale color so they're visually
-  // distinguishable from auto-proposed ones at a glance (also reflected
-  // in the list below the image).
+  // handles for whichever one is currently selected. Every box is black
+  // (see strokeRoiBox) -- auto-proposed vs. manually-added is now told
+  // apart by a small corner accent dot instead (see roiAccentColor), not
+  // by the box's own stroke color.
   function drawAllRois() {
     for (const r of state.rois) {
       const isSelected = r.id === state.selectedRoiId;
-      const color = roiSwatchColor(r);
       const tl = naturalToDisplay({ x: r.x, y: r.y });
       const w = r.width * getScale();
       const h = r.height * getScale();
 
-      ctx.strokeStyle = color;
-      ctx.lineWidth = isSelected ? 2.5 : 1.5;
-      ctx.setLineDash(isSelected ? [] : [5, 4]);
-      ctx.strokeRect(tl.x, tl.y, w, h);
-      ctx.setLineDash([]);
-      ctx.fillStyle = isSelected ? "rgba(15,125,125,0.16)" : "rgba(15,125,125,0.06)";
+      strokeRoiBox(tl.x, tl.y, w, h, isSelected ? 2.5 : 1.5, !isSelected);
+      ctx.fillStyle = isSelected ? "rgba(10,10,10,0.18)" : "rgba(10,10,10,0.08)";
       ctx.fillRect(tl.x, tl.y, w, h);
 
       ctx.font = "bold 12px monospace";
       const padding = 4;
       const metrics = ctx.measureText(r.label);
-      ctx.fillStyle = color;
+      ctx.fillStyle = ROI_BOX_COLOR;
       ctx.fillRect(tl.x, tl.y, metrics.width + padding * 2, 16);
-      ctx.fillStyle = "#060707";
+      ctx.fillStyle = "#e9ecec";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(r.label, tl.x + padding, tl.y + 8);
 
+      drawRoiAccentDot(tl.x + w, tl.y + h / 2, r); // right-edge midpoint -- clear of the label chip and corner handles
+
       if (isSelected) {
         const handles = roiHandles(r);
-        ctx.fillStyle = color;
         for (const key of ["tl", "tr", "bl", "br"]) {
           const p = handles[key];
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(p.x - 5, p.y - 5, 10, 10);
+          ctx.fillStyle = ROI_BOX_COLOR;
           ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
         }
       }
@@ -834,17 +1124,27 @@
         roi.x === state.roi.x && roi.y === state.roi.y &&
         roi.width === state.roi.width && roi.height === state.roi.height;
       ctx.save();
-      ctx.strokeStyle = roiSwatchColor(roi);
-      ctx.lineWidth = isPrimary ? 1.5 : 1;
       ctx.globalAlpha = 0.55;
       ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = ROI_BOX_OUTLINE;
+      ctx.lineWidth = (isPrimary ? 1.5 : 1) + 1.5;
+      ctx.strokeRect(tl.x, tl.y, w, h);
+      ctx.strokeStyle = ROI_BOX_COLOR;
+      ctx.lineWidth = isPrimary ? 1.5 : 1;
       ctx.strokeRect(tl.x, tl.y, w, h);
       ctx.restore();
+      // Label as black text with a light outline (strokeText underneath,
+      // same treatment as the box itself) so it stays legible directly on
+      // dark fabric with no background chip behind it here.
       ctx.font = "10px monospace";
-      ctx.fillStyle = roiSwatchColor(roi);
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = ROI_BOX_OUTLINE;
+      ctx.strokeText(roi.label, tl.x + 3, tl.y + 2);
+      ctx.fillStyle = ROI_BOX_COLOR;
       ctx.fillText(roi.label, tl.x + 3, tl.y + 2);
+      drawRoiAccentDot(tl.x + w, tl.y + h / 2, roi);
     }
   }
 
@@ -936,10 +1236,10 @@
       stage.hidden = false;
       zoomControls.hidden = false;
       // Reset any prior interaction state for a fresh image.
-      state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null };
+      state.cal = { points: [], knownDistance: null, unit: unitSelect.value, pixelsPerMm: null, draggingIndex: null };
       state.calAutoDetectPending = false;
       state.calAutoDetected = false;
-      state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
+      state.gridBox = { visible: false, unit: state.gridBox.unit, x: null, y: null, dragging: false, dragOffset: null };
       state.roi = null;
       state.result = null;
       state.showMeasurementAreas = false;
@@ -988,6 +1288,39 @@
     knownDistanceInput.value = "";
     calAutoHint.hidden = true;
     calAutoHint.textContent = "";
+    calPopup.hidden = true;
+    calSpanHint.hidden = true;
+  }
+
+  function calibrationSpanPx() {
+    if (state.cal.points.length !== 2) return null;
+    return Math.hypot(
+      state.cal.points[1].x - state.cal.points[0].x,
+      state.cal.points[1].y - state.cal.points[0].y
+    );
+  }
+
+  // Short-span hint: click-placement error is a roughly FIXED number of
+  // pixels regardless of how far apart the two points are, so its effect
+  // on the resulting px/inch is a ratio (error / span) -- a hint text
+  // threshold expressed that way stays equally valid on a 500px photo
+  // and a 5000px one, unlike a fixed "warn under 200px" rule would.
+  function updateSpanHint() {
+    const span = calibrationSpanPx();
+    if (span === null || span <= 0) {
+      calSpanHint.hidden = true;
+      return;
+    }
+    const errorFraction = CAL_ASSUMED_CLICK_ERROR_PX / span;
+    if (errorFraction <= CAL_SHORT_SPAN_ERROR_THRESHOLD) {
+      calSpanHint.hidden = true;
+      return;
+    }
+    calSpanHint.textContent =
+      `Short span (${span.toFixed(0)}px) -- a ${CAL_ASSUMED_CLICK_ERROR_PX}px click error here is ` +
+      `≈${(errorFraction * 100).toFixed(1)}% of the calibration. A longer span (e.g. spanning more of a ` +
+      `ruler) is more accurate.`;
+    calSpanHint.hidden = false;
   }
 
   function updateCalibrationUI() {
@@ -995,24 +1328,25 @@
       calStatus.textContent =
         state.cal.points.length === 0 ? "Click the first point." : "Click the second point.";
       calConfirmBtn.disabled = true;
-      ppmPreview.textContent = "";
+      calPopup.hidden = true;
       return;
     }
-    calStatus.textContent = "Enter the known distance between the two points, then confirm.";
+    calStatus.textContent = "Enter the known distance in the popup, then confirm (you can still drag either point).";
+    calPopup.hidden = false;
+    positionCalPopup();
+    updateSpanHint();
     updatePpmPreview();
   }
 
   function updatePpmPreview() {
     const known = parseFloat(knownDistanceInput.value);
-    if (state.cal.points.length === 2 && known > 0) {
-      const pxDist = Math.hypot(
-        state.cal.points[1].x - state.cal.points[0].x,
-        state.cal.points[1].y - state.cal.points[0].y
-      );
-      const unitToMm = { mm: 1, cm: 10, in: 25.4 };
+    const span = calibrationSpanPx();
+    if (span !== null && known > 0) {
+      const unitToMm = { cm: 10, in: 25.4 };
       const mm = known * unitToMm[unitSelect.value];
-      const ppm = pxDist / mm;
-      ppmPreview.textContent = `≈ ${ppm.toFixed(3)} px/mm`;
+      const ppm = span / mm;
+      const perInch = ppm * 25.4;
+      ppmPreview.textContent = `≈ ${perInch.toFixed(1)} px/inch  (${ppm.toFixed(3)} px/mm)`;
       calConfirmBtn.disabled = false;
     } else {
       ppmPreview.textContent = "";
@@ -1021,7 +1355,30 @@
   }
 
   knownDistanceInput.addEventListener("input", updatePpmPreview);
-  unitSelect.addEventListener("change", updatePpmPreview);
+  unitSelect.addEventListener("change", () => {
+    saveDefaultCalUnit(unitSelect.value);
+    updatePpmPreview();
+  });
+
+  // Keeps the popup visually anchored to the calibration points' midpoint
+  // under pan/zoom/window-resize -- called from render() while on the
+  // calibrate step, same as every other overlay that tracks image
+  // coordinates. Uses the canvas's own live bounding rect (already
+  // reflecting the current pan/zoom CSS transform) the same way
+  // eventToDisplayPoint()'s inverse does, so this needs no separate
+  // transform math of its own.
+  function positionCalPopup() {
+    if (state.cal.points.length < 2 || calPopup.hidden) return;
+    const rect = canvas.getBoundingClientRect();
+    const zoom = state.view.zoom || 1;
+    const mid = {
+      x: (state.cal.points[0].x + state.cal.points[1].x) / 2,
+      y: (state.cal.points[0].y + state.cal.points[1].y) / 2,
+    };
+    const dispMid = naturalToDisplay(mid);
+    calPopup.style.left = `${rect.left + dispMid.x * zoom}px`;
+    calPopup.style.top = `${rect.top + dispMid.y * zoom}px`;
+  }
 
   // Automatic ruler calibration detection (see backend /detect-ruler,
   // which wraps analysis.gauge_analysis.detect_ruler_calibration). Runs
@@ -1095,6 +1452,7 @@
 
   calRedoBtn.addEventListener("click", () => {
     state.cal.points = [];
+    state.cal.draggingIndex = null;
     state.calAutoDetectPending = false; // user is taking over manually -- don't let a late auto-detect response overwrite this
     resetCalibrationUI();
     render();
@@ -1170,193 +1528,226 @@
     return mm > 0 ? pxDist / mm : null;
   }
 
-  // --- On-image ruler overlay ---------------------------------------------
+  // --- Grid box: a draggable, to-scale counting square -----------------
   //
-  // A movable, physically-proportioned ruler drawn over the photo once
-  // calibration is confirmed (currentPixelsPerMm() is only non-null AFTER
-  // that click -- see calConfirmBtn's handler -- which is what "available
-  // only after calibration" means here). It's drawn as a single rigid
-  // corner bracket -- one arm running along image x, one along image y,
-  // sharing a draggable origin corner -- so both the wale (x) and course
-  // (y) directions can be checked against the same reference point at
-  // once, rather than needing two separately-positioned rulers. Each arm
-  // shows BOTH a cm scale and an in scale simultaneously (like a real
-  // dual-marked ruler prints both scales on opposite edges), computed
-  // straight from currentPixelsPerMm() -- no dependence on state.cal.unit,
-  // since the calibration is exact in either system regardless of which
-  // unit the user happened to enter it in.
-  //
-  // Every length here is exact: computed from currentPixelsPerMm() so
-  // the tick spacing really does match the calibrated scale, same as
-  // every other overlay measurement in this file. Bar thickness/tick
-  // lengths are fixed DISPLAY pixels instead (like the calibration point
-  // markers and ROI resize handles already are) so ticks stay legible at
-  // any zoom level rather than shrinking to nothing when zoomed out --
-  // only the measurement axis itself needs to be "to scale."
-  const RULER_ARM_LENGTH_MM = 60; // per arm -- fits a full 5cm scale AND a full 2in scale (50.8mm) with a little headroom
-  const RULER_BAR_THICKNESS = 26; // display px, shared by both arms; each arm's thickness is split between its two unit scales
-  const RULER_TICK_MINOR = 5; // display px, tick length measured in from each edge toward the shared centerline
-  const RULER_TICK_MAJOR = 10;
-  const RULER_SCALES = [
-    { label: "cm", minorMm: 1, minorPerMajor: 10 }, // metric: major per cm, minor per mm
-    { label: "in", minorMm: 25.4 / 8, minorPerMajor: 8 }, // imperial: major per inch, minor per eighth-inch
-  ];
+  // A movable, physically-proportioned (1in or 1cm, toggleable) square
+  // drawn over the photo once calibration is confirmed
+  // (currentPixelsPerMm() is only non-null AFTER that click -- see
+  // calConfirmBtn's handler -- which is what "available only after
+  // calibration" means here). Every length here is exact: computed from
+  // currentPixelsPerMm() so the side really does match the calibrated
+  // scale, same as every other overlay measurement in this file.
+  const GRID_BOX_UNIT_MM = { in: 25.4, cm: 10 };
 
-  function rulerSpec() {
+  function gridBoxSpec() {
     const ppm = currentPixelsPerMm();
     if (!ppm) return null;
-    return { ppm, armLengthPx: RULER_ARM_LENGTH_MM * ppm };
+    return { ppm, sidePx: GRID_BOX_UNIT_MM[state.gridBox.unit] * ppm };
   }
 
-  function rulerTicksForScale(scale) {
-    const n = Math.floor(RULER_ARM_LENGTH_MM / scale.minorMm + 1e-6);
-    const ticks = [];
-    for (let i = 0; i <= n; i++) {
-      ticks.push({ mm: i * scale.minorMm, isMajor: i % scale.minorPerMajor === 0, majorNum: i / scale.minorPerMajor });
-    }
-    return ticks;
+  function ensureGridBoxPosition(spec) {
+    if (state.gridBox.x !== null && state.gridBox.y !== null) return;
+    const cx = state.naturalWidth / 2 + spec.sidePx * 0.6;
+    const cy = state.naturalHeight / 2 + spec.sidePx * 0.6;
+    state.gridBox.x = clamp(cx - spec.sidePx / 2, 0, Math.max(0, state.naturalWidth - spec.sidePx));
+    state.gridBox.y = clamp(cy - spec.sidePx / 2, 0, Math.max(0, state.naturalHeight - spec.sidePx));
   }
 
-  function ensureRulerPosition(spec) {
-    if (state.ruler.x !== null && state.ruler.y !== null) return;
-    state.ruler.x = clamp(state.naturalWidth / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
-    state.ruler.y = clamp(state.naturalHeight / 2 - spec.armLengthPx / 2, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
-  }
-
-  function pointInRulerDisplay(displayPt, spec) {
-    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
-    const armLenDisplay = spec.armLengthPx * getScale();
-    const inRect = (x, y, w, h) => displayPt.x >= x && displayPt.x <= x + w && displayPt.y >= y && displayPt.y <= y + h;
+  function pointInGridBoxDisplay(displayPt, spec) {
+    const origin = naturalToDisplay({ x: state.gridBox.x, y: state.gridBox.y });
+    const sideDisplay = spec.sidePx * getScale();
     return (
-      inRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS) || // horizontal (x) arm
-      inRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay) // vertical (y) arm
+      displayPt.x >= origin.x && displayPt.x <= origin.x + sideDisplay &&
+      displayPt.y >= origin.y && displayPt.y <= origin.y + sideDisplay
     );
   }
 
-  function drawRulerArm(origin, armLenDisplay, mmToDisplayPx, axis) {
-    const half = RULER_BAR_THICKNESS / 2;
-    const horizontal = axis === "x";
+  const GRID_BOX_COLOR = "#c04fd6"; // violet -- distinct from every other overlay color in this file
 
-    ctx.fillStyle = "rgba(233, 236, 236, 0.92)";
-    ctx.strokeStyle = "rgba(6, 7, 7, 0.7)";
-    ctx.lineWidth = 1;
-    if (horizontal) {
-      ctx.fillRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
-      ctx.strokeRect(origin.x, origin.y, armLenDisplay, RULER_BAR_THICKNESS);
-      ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y + half);
-      ctx.lineTo(origin.x + armLenDisplay, origin.y + half);
-      ctx.stroke();
-    } else {
-      ctx.fillRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
-      ctx.strokeRect(origin.x, origin.y, RULER_BAR_THICKNESS, armLenDisplay);
-      ctx.beginPath();
-      ctx.moveTo(origin.x + half, origin.y);
-      ctx.lineTo(origin.x + half, origin.y + armLenDisplay);
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = "#060707";
-    ctx.font = "9px monospace";
-    RULER_SCALES.forEach((scale, idx) => {
-      // idx 0 (cm) draws in the "outer" half -- above the bar for the x
-      // arm, left of the bar for the y arm; idx 1 (in) draws in the
-      // "inner" half -- below/right -- mirroring how real dual-marked
-      // rulers print one scale per edge.
-      rulerTicksForScale(scale).forEach((t) => {
-        const pos = t.mm * mmToDisplayPx;
-        const tickLen = t.isMajor ? RULER_TICK_MAJOR : RULER_TICK_MINOR;
-        ctx.lineWidth = t.isMajor ? 1.6 : 1;
-        ctx.beginPath();
-        if (horizontal) {
-          const x = origin.x + pos;
-          if (idx === 0) {
-            ctx.moveTo(x, origin.y);
-            ctx.lineTo(x, origin.y + tickLen);
-          } else {
-            ctx.moveTo(x, origin.y + RULER_BAR_THICKNESS);
-            ctx.lineTo(x, origin.y + RULER_BAR_THICKNESS - tickLen);
-          }
-        } else {
-          const y = origin.y + pos;
-          if (idx === 0) {
-            ctx.moveTo(origin.x, y);
-            ctx.lineTo(origin.x + tickLen, y);
-          } else {
-            ctx.moveTo(origin.x + RULER_BAR_THICKNESS, y);
-            ctx.lineTo(origin.x + RULER_BAR_THICKNESS - tickLen, y);
-          }
-        }
-        ctx.stroke();
-
-        if (!t.isMajor || t.majorNum === 0) return;
-        const label = String(t.majorNum);
-        if (horizontal) {
-          const x = origin.x + pos;
-          ctx.textAlign = "center";
-          ctx.textBaseline = idx === 0 ? "bottom" : "top";
-          ctx.fillText(label, x, idx === 0 ? origin.y - 2 : origin.y + RULER_BAR_THICKNESS + 2);
-        } else {
-          const y = origin.y + pos;
-          ctx.textAlign = idx === 0 ? "right" : "left";
-          ctx.textBaseline = "middle";
-          ctx.fillText(label, idx === 0 ? origin.x - 3 : origin.x + RULER_BAR_THICKNESS + 3, y);
-        }
-      });
-    });
-
-    // Unit tag at the far end of each scale row -- past the last tick,
-    // so it never collides with a numbered label near the origin.
-    ctx.font = "8px monospace";
-    ctx.fillStyle = "#565e60";
-    if (horizontal) {
-      ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.fillText("cm", origin.x + armLenDisplay + 3, origin.y + half);
-      ctx.textBaseline = "top";
-      ctx.fillText("in", origin.x + armLenDisplay + 3, origin.y + half);
-    } else {
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText("cm", origin.x + half, origin.y + armLenDisplay + 3);
-      ctx.fillText("in", origin.x + half, origin.y + armLenDisplay + 12);
-    }
-  }
-
-  function drawRuler() {
-    if (!state.ruler.visible) return;
-    const spec = rulerSpec();
+  function drawGridBox() {
+    if (!state.gridBox.visible) return;
+    const spec = gridBoxSpec();
     if (!spec) return;
-    ensureRulerPosition(spec);
+    ensureGridBoxPosition(spec);
 
     const s = getScale();
-    const origin = naturalToDisplay({ x: state.ruler.x, y: state.ruler.y });
-    const armLenDisplay = spec.armLengthPx * s;
-    const mmToDisplayPx = spec.ppm * s;
+    const origin = naturalToDisplay({ x: state.gridBox.x, y: state.gridBox.y });
+    const side = spec.sidePx * s;
 
     ctx.save();
-    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "x");
-    drawRulerArm(origin, armLenDisplay, mmToDisplayPx, "y");
-    // Corner drag handle, drawn last so it sits on top of both arms.
-    ctx.fillStyle = "rgba(6, 7, 7, 0.85)";
-    ctx.beginPath();
-    ctx.arc(origin.x, origin.y, 3.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)"; // light outline pass first, same dark-fabric-contrast
+    ctx.lineWidth = 3.5;                       // treatment as the measurement boxes (see strokeRoiBox)
+    ctx.strokeRect(origin.x, origin.y, side, side);
+    ctx.strokeStyle = GRID_BOX_COLOR;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(origin.x, origin.y, side, side);
+    ctx.fillStyle = "rgba(192,79,214,0.08)";
+    ctx.fillRect(origin.x, origin.y, side, side);
     ctx.restore();
+
+    ctx.font = "bold 11px monospace";
+    ctx.fillStyle = GRID_BOX_COLOR;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`1 ${state.gridBox.unit}`, origin.x + 3, origin.y - 3);
   }
 
-  function updateRulerUI() {
+  function updateGridBoxUI() {
     const available = currentPixelsPerMm() !== null;
-    rulerControls.hidden = !available;
-    if (!available) state.ruler.visible = false;
-    rulerToggleBtn.classList.toggle("is-active", state.ruler.visible);
-    rulerToggleBtn.setAttribute("aria-pressed", String(state.ruler.visible));
+    gridBoxControls.hidden = !available;
+    if (!available) state.gridBox.visible = false;
+    gridBoxToggleBtn.classList.toggle("is-active", state.gridBox.visible);
+    gridBoxToggleBtn.setAttribute("aria-pressed", String(state.gridBox.visible));
+    gridBoxUnitBtn.hidden = !state.gridBox.visible;
+    gridBoxUnitBtn.textContent = `1 ${state.gridBox.unit}`;
+    gridBoxPanel.hidden = !state.gridBox.visible;
+    if (state.gridBox.visible) {
+      positionGridBoxPanel();
+      updateGridBoxSaveButton();
+    }
   }
 
-  rulerToggleBtn.addEventListener("click", () => {
-    state.ruler.visible = !state.ruler.visible;
-    updateRulerUI();
+  gridBoxToggleBtn.addEventListener("click", () => {
+    state.gridBox.visible = !state.gridBox.visible;
+    if (!state.gridBox.visible) {
+      gridBoxStatus.hidden = true;
+      gridBoxError.hidden = true;
+    }
+    updateGridBoxUI();
     render();
+  });
+
+  gridBoxUnitBtn.addEventListener("click", () => {
+    state.gridBox.unit = state.gridBox.unit === "in" ? "cm" : "in";
+    // Re-anchor at the same CENTER point under the new side length, rather
+    // than keeping the top-left corner fixed -- switching units shouldn't
+    // make the box visually jump off in one direction.
+    const spec = gridBoxSpec();
+    if (spec && state.gridBox.x !== null) {
+      const oldSide = GRID_BOX_UNIT_MM[state.gridBox.unit === "in" ? "cm" : "in"] * spec.ppm;
+      const cx = state.gridBox.x + oldSide / 2;
+      const cy = state.gridBox.y + oldSide / 2;
+      state.gridBox.x = clamp(cx - spec.sidePx / 2, 0, Math.max(0, state.naturalWidth - spec.sidePx));
+      state.gridBox.y = clamp(cy - spec.sidePx / 2, 0, Math.max(0, state.naturalHeight - spec.sidePx));
+    }
+    updateGridBoxUI();
+    render();
+  });
+
+  // Mirrors positionCalPopup() -- see its comment for why the canvas's own
+  // live bounding rect is enough to convert a natural-coordinate anchor
+  // into an on-screen position with no separate pan/zoom transform math.
+  function positionGridBoxPanel() {
+    if (!state.gridBox.visible || gridBoxPanel.hidden) return;
+    const spec = gridBoxSpec();
+    if (!spec) return;
+    const rect = canvas.getBoundingClientRect();
+    const zoom = state.view.zoom || 1;
+    const anchor = { x: state.gridBox.x + GRID_BOX_UNIT_MM[state.gridBox.unit] * spec.ppm / 2, y: state.gridBox.y + GRID_BOX_UNIT_MM[state.gridBox.unit] * spec.ppm };
+    const disp = naturalToDisplay(anchor);
+    gridBoxPanel.style.left = `${rect.left + disp.x * zoom}px`;
+    gridBoxPanel.style.top = `${rect.top + disp.y * zoom}px`;
+  }
+
+  function updateGridBoxSaveButton() {
+    const waleCount = parseInt(gridWaleCountInput.value, 10);
+    const courseCount = parseInt(gridCourseCountInput.value, 10);
+    gridBoxSaveBtn.disabled = !((waleCount > 0 || courseCount > 0) && currentPixelsPerMm() !== null);
+  }
+  gridWaleCountInput.addEventListener("input", updateGridBoxSaveButton);
+  gridCourseCountInput.addEventListener("input", updateGridBoxSaveButton);
+
+  gridBoxSaveBtn.addEventListener("click", async () => {
+    const spec = gridBoxSpec();
+    if (!spec || state.gridBox.x === null) return;
+    const waleCount = parseInt(gridWaleCountInput.value, 10);
+    const courseCount = parseInt(gridCourseCountInput.value, 10);
+    if (!(waleCount > 0) && !(courseCount > 0)) return;
+
+    gridBoxError.hidden = true;
+    gridBoxStatus.hidden = false;
+    gridBoxStatus.textContent = "Saving…";
+    gridBoxSaveBtn.disabled = true;
+
+    try {
+      if (!CONFIG.API_BASE_URL) {
+        throw new Error("Analysis service is not configured yet, so ground truth can't be saved.");
+      }
+      const sideMm = GRID_BOX_UNIT_MM[state.gridBox.unit];
+      const fd = new FormData();
+      fd.append("roi_x", state.gridBox.x);
+      fd.append("roi_y", state.gridBox.y);
+      fd.append("roi_width_px", spec.sidePx);
+      fd.append("roi_height_px", spec.sidePx);
+      fd.append("roi_width_mm", sideMm);
+      fd.append("roi_height_mm", sideMm);
+      fd.append("pixels_per_mm", spec.ppm);
+      fd.append("orientation", state.orientation);
+      // Deliberately NO predicted_* fields -- this is a standalone,
+      // human-counted ground-truth observation against the image and
+      // calibration, not a correction against any one analyzed ROI's
+      // prediction (the grid box is usually positioned somewhere the
+      // automatic detector never analyzed at all, and -- per the whole
+      // point of making the box available before Analyze -- may well be
+      // recorded before any prediction exists yet).
+      if (waleCount > 0) fd.append("actual_wale_count", waleCount);
+      if (courseCount > 0) fd.append("actual_course_count", courseCount);
+      fd.append("calibration_correct", true);
+      fd.append("orientation_correct", true);
+      fd.append("algorithm_version", "grid-box-manual-count");
+
+      if (state.file) {
+        fd.append("image_filename", state.file.name);
+        fd.append("image_size_bytes", state.file.size);
+      }
+      let hash = null;
+      try {
+        hash = state.imageHashPromise ? await state.imageHashPromise : null;
+      } catch {
+        hash = null;
+      }
+      if (hash) fd.append("image_sha256", hash);
+      fd.append("save_image", false); // no image-save consent checkbox on this compact panel -- never opt in implicitly
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+      let res;
+      try {
+        res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
+          method: "POST",
+          body: fd,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+      }
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || `Could not save ground truth (HTTP ${res.status}).`);
+      }
+
+      gridBoxStatus.textContent = `Saved (sample ${data.id.slice(0, 8)}…).`;
+      gridWaleCountInput.value = "";
+      gridCourseCountInput.value = "";
+    } catch (err) {
+      gridBoxStatus.hidden = true;
+      if (err && err.name === "AbortError") {
+        gridBoxError.textContent = "Saving timed out. Try again shortly.";
+      } else if (err instanceof TypeError) {
+        gridBoxError.textContent = "Could not reach the analysis service to save this.";
+      } else {
+        gridBoxError.textContent = (err && err.message) || "Could not save. Please try again.";
+      }
+      gridBoxError.hidden = false;
+    } finally {
+      updateGridBoxSaveButton();
+    }
   });
 
   function renderRoiList() {
@@ -1587,20 +1978,21 @@
 
   canvas.addEventListener("pointerdown", (evt) => {
     if (state.panDrag) return; // the viewer-pan listener above already claimed this gesture
+    if (state.pinchActive) return; // a second touch just landed -- see the pinch block above
 
-    // The ruler overlay (if visible) sits on top of every other
-    // interaction on every step it's available in -- hit-test it first
-    // so dragging it never gets shadowed by whatever the current step
-    // would otherwise do with this same click.
-    if (state.ruler.visible) {
-      const spec = rulerSpec();
+    // The grid box (if visible) sits on top of every other interaction on
+    // every step it's available in -- hit-test it first so dragging it
+    // never gets shadowed by whatever the current step would otherwise
+    // do with this same click.
+    if (state.gridBox.visible) {
+      const spec = gridBoxSpec();
       if (spec) {
-        ensureRulerPosition(spec);
+        ensureGridBoxPosition(spec);
         const dispPt = eventToDisplayPoint(evt);
-        if (pointInRulerDisplay(dispPt, spec)) {
+        if (pointInGridBoxDisplay(dispPt, spec)) {
           const natPt = displayToNatural(dispPt);
-          state.ruler.dragging = true;
-          state.ruler.dragOffset = { dx: natPt.x - state.ruler.x, dy: natPt.y - state.ruler.y };
+          state.gridBox.dragging = true;
+          state.gridBox.dragOffset = { dx: natPt.x - state.gridBox.x, dy: natPt.y - state.gridBox.y };
           canvas.setPointerCapture(evt.pointerId);
           render();
           return;
@@ -1620,7 +2012,23 @@
     }
 
     if (state.currentStep === "calibrate") {
-      if (state.cal.points.length >= 2) return; // must Redo first
+      if (state.cal.points.length === 2) {
+        // Both points already placed -- hit-test for a drag instead of
+        // ignoring the click outright, so either point can be nudged
+        // (with the popup's px/inch updating live) without needing
+        // "Redo Points" to start over.
+        const dispPt = eventToDisplayPoint(evt);
+        for (let i = 0; i < 2; i++) {
+          const p = naturalToDisplay(state.cal.points[i]);
+          if (Math.hypot(dispPt.x - p.x, dispPt.y - p.y) <= HANDLE_HIT_RADIUS) {
+            state.cal.draggingIndex = i;
+            canvas.setPointerCapture(evt.pointerId);
+            render();
+            return;
+          }
+        }
+        return; // missed both points -- ignored, same as the old "must Redo first" behavior
+      }
       state.calAutoDetectPending = false; // user is marking manually -- don't let a late auto-detect response overwrite this
       const pt = displayToNatural(eventToDisplayPoint(evt));
       state.cal.points.push(pt);
@@ -1812,29 +2220,47 @@
   canvas.addEventListener("pointerup", endRoiDrag);
   canvas.addEventListener("pointercancel", endRoiDrag);
 
-  // Ruler overlay drag -- unlike the roi/repeat-mark drags above, this
-  // isn't gated to one currentStep, since the ruler stays available (and
+  // Grid box drag -- unlike the roi/repeat-mark drags above, this isn't
+  // gated to one currentStep, since the box stays available (and
   // draggable) across roi/orientation/analyze/results once calibration
   // is confirmed.
   canvas.addEventListener("pointermove", (evt) => {
-    if (!state.ruler.dragging) return;
-    const spec = rulerSpec();
+    if (!state.gridBox.dragging) return;
+    const spec = gridBoxSpec();
     if (!spec) {
-      state.ruler.dragging = false;
+      state.gridBox.dragging = false;
       return;
     }
     const natPt = displayToNatural(eventToDisplayPoint(evt));
-    state.ruler.x = clamp(natPt.x - state.ruler.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.armLengthPx));
-    state.ruler.y = clamp(natPt.y - state.ruler.dragOffset.dy, 0, Math.max(0, state.naturalHeight - spec.armLengthPx));
+    state.gridBox.x = clamp(natPt.x - state.gridBox.dragOffset.dx, 0, Math.max(0, state.naturalWidth - spec.sidePx));
+    state.gridBox.y = clamp(natPt.y - state.gridBox.dragOffset.dy, 0, Math.max(0, state.naturalHeight - spec.sidePx));
     render();
   });
-  function endRulerDrag(evt) {
-    if (!state.ruler.dragging) return;
+  function endGridBoxDrag(evt) {
+    if (!state.gridBox.dragging) return;
     if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
-    state.ruler.dragging = false;
+    state.gridBox.dragging = false;
   }
-  canvas.addEventListener("pointerup", endRulerDrag);
-  canvas.addEventListener("pointercancel", endRulerDrag);
+  canvas.addEventListener("pointerup", endGridBoxDrag);
+  canvas.addEventListener("pointercancel", endGridBoxDrag);
+
+  // Calibration point drag -- see the calibrate-step pointerdown branch
+  // above for the hit-test that starts this.
+  canvas.addEventListener("pointermove", (evt) => {
+    if (state.cal.draggingIndex === null) return;
+    const pt = displayToNatural(eventToDisplayPoint(evt));
+    state.cal.points[state.cal.draggingIndex] = pt;
+    updateCalibrationUI(); // live px/inch + span hint as the point moves
+    render();
+  });
+  function endCalDrag(evt) {
+    if (state.cal.draggingIndex === null) return;
+    if (canvas.hasPointerCapture(evt.pointerId)) canvas.releasePointerCapture(evt.pointerId);
+    state.cal.draggingIndex = null;
+    render();
+  }
+  canvas.addEventListener("pointerup", endCalDrag);
+  canvas.addEventListener("pointercancel", endCalDrag);
 
   // --- Step 4: Orientation -----------------------------------------------
 
@@ -1999,31 +2425,22 @@
 
   // --- Step 6: Results -------------------------------------------------
 
-  function confidenceClass(c) {
-    if (c < 0.4) return "is-low";
-    if (c < 0.7) return "is-mid";
-    return "";
-  }
-
-  // Single overall confidence word for the simplified results view --
-  // the weaker of the two axes decides it, and an axis explicitly
-  // flagged "uncertain" (see the backend's harmonic-ambiguity / low-
-  // confidence-floor logic) always forces "Low", even if the raw
-  // percentage alone would round up to "Medium". Detailed per-axis
-  // confidence/percentages/reasons remain available in Developer
-  // diagnostics -- this is deliberately the ONE number/word a normal
-  // user needs.
+  // Single overall confidence word for the simplified results view.
+  // Deliberately just the two states the backend's own data supports --
+  // see AxisOut's docstring (backend/schemas.py): a systematic accuracy
+  // sweep found the numeric confidence score has ~zero correlation with
+  // actual error (r = -0.028), while the confident/uncertain status
+  // itself is a real, meaningful signal (5.8% vs. 67.0% median error).
+  // The API no longer even sends the number for this reason -- do not
+  // reintroduce a Low/Medium/High-style split derived from it. Detailed
+  // per-axis status/reasons remain available in Developer diagnostics --
+  // this is deliberately the ONE word a normal user needs.
   function overallConfidence(r) {
     if (r.wale.spacing_px == null || r.course.spacing_px == null) {
-      return { level: "Low", value: 0 };
+      return { level: "Uncertain" };
     }
-    const value = Math.min(r.wale.confidence ?? 0, r.course.confidence ?? 0);
-    const forcedLow = r.wale.status === "uncertain" || r.course.status === "uncertain";
-    let level;
-    if (forcedLow || value < 0.4) level = "Low";
-    else if (value < 0.7) level = "Medium";
-    else level = "High";
-    return { level, value };
+    const uncertain = r.wale.status === "uncertain" || r.course.status === "uncertain";
+    return { level: uncertain ? "Uncertain" : "Confident" };
   }
 
   // Simplified primary number -- just the label and value. No per-axis
@@ -2058,10 +2475,13 @@
       </div>`;
   }
 
-  // Full per-axis technical detail (confidence %, spacing in px,
-  // detected-position count, uncertain reason) -- moved out of the
-  // normal Results view into Developer diagnostics. Same information
-  // as before, just no longer front-and-center for a normal user.
+  // Full per-axis technical detail (spacing in px, detected-position
+  // count, confident/uncertain status + reason) -- moved out of the
+  // normal Results view into Developer diagnostics. No numeric
+  // confidence here (nor anywhere a user reads): AxisOut no longer
+  // carries it -- see its docstring (backend/schemas.py) for why. The
+  // status/reason pair is the one part of the old confidence signal that
+  // held up under the accuracy sweep, so that's what's shown.
   function axisDiagnosticsCard(label, axis, color) {
     if (axis.spacing_px == null) {
       return `
@@ -2077,8 +2497,7 @@
         <div class="tgr-result-card__label">${label} spacing</div>
         <div class="tgr-result-card__value" style="color:${color}">${axis.spacing_mm.toFixed(2)} mm</div>
         <div class="tgr-result-card__sub">${axis.spacing_px.toFixed(1)} px &middot; ${axis.positions_px.length} detected</div>
-        <div class="tgr-confidence-bar"><div class="tgr-confidence-bar__fill ${confidenceClass(axis.confidence)}" style="width:${Math.round(axis.confidence * 100)}%"></div></div>
-        <div class="tgr-result-card__sub">Confidence: ${uncertain ? "Low — Uncertain" : `${Math.round(axis.confidence * 100)}%`}</div>
+        <div class="tgr-result-card__sub">${uncertain ? "Uncertain" : "Confident"}</div>
         ${uncertain ? `<div class="tgr-uncertain-badge">⚠ ${escapeHtml(axis.uncertain_reason || "Manual verification recommended.")}</div>` : ""}
       </div>`;
   }
@@ -2110,8 +2529,8 @@
     // failure in this OPTIONAL cross-check looked like the primary
     // detection itself was broken. Hidden entirely otherwise; still
     // collapsed by default even when shown, so using it is still opt-in.
-    if (level === "Low") {
-      resultsWarning.textContent = "Low confidence — try “Verify by counting a repeat” below to double-check.";
+    if (level === "Uncertain") {
+      resultsWarning.textContent = "Uncertain — try “Verify by counting a repeat” below to double-check.";
       resultsWarning.hidden = false;
       repeatCountPanel.hidden = false;
     } else {
@@ -2165,9 +2584,18 @@
 
     const regionCount = mr.per_roi.length;
     const row = (label, value) => `<div class="tgr-consistency-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(value))}</span></div>`;
-    const agreedText = (consensus) =>
-      `${consensus.included_labels.length} of ${regionCount} agreed` +
-      (consensus.excluded_labels.length ? ` — ${consensus.excluded_labels.length} excluded as outlier${consensus.excluded_labels.length === 1 ? "" : "s"}` : "");
+    // included + excluded always accounts for every region considered on
+    // this axis (see AxisConsensusOut.excluded_labels) -- broken out by
+    // reason (outlier vs. no usable measurement at all) so "2 of 4
+    // contributed" is never silently indistinguishable from "2 of 2".
+    const agreedText = (consensus) => {
+      const nOutliers = consensus.outliers.length;
+      const nNoMeasurement = consensus.no_measurement_labels.length;
+      const parts = [];
+      if (nOutliers) parts.push(`${nOutliers} excluded as outlier${nOutliers === 1 ? "" : "s"}`);
+      if (nNoMeasurement) parts.push(`${nNoMeasurement} had no usable measurement`);
+      return `${consensus.included_labels.length} of ${regionCount} agreed` + (parts.length ? ` — ${parts.join(", ")}` : "");
+    };
 
     let html = "";
     html += row("Regions analyzed", regionCount);
@@ -2180,6 +2608,12 @@
     }
     for (const o of mr.course_consensus.outliers) {
       outlierLines.push(`Course ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
+    }
+    for (const label of mr.wale_consensus.no_measurement_labels) {
+      outlierLines.push(`Wale ${label}: no usable measurement for this region.`);
+    }
+    for (const label of mr.course_consensus.no_measurement_labels) {
+      outlierLines.push(`Course ${label}: no usable measurement for this region.`);
     }
     const outlierHtml = outlierLines.map((line) => `<div class="tgr-consistency-outlier">⚠ ${escapeHtml(line)}</div>`).join("");
 
@@ -2388,12 +2822,12 @@
     roiDiagContent.innerHTML = `
       <div class="tgr-roi-diag-card">
         <div class="tgr-roi-diag-card__row"><span>Source</span><span>${m.source === "manual" ? "Manual" : "Auto-proposed"}</span></div>
-        <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleUsedWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleUsedWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>Wale evidence used</span><span>${isCounted ? `counted (${d ? d.column_count : "?"} columns)` : "periodicity"}</span></div>
         ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
-        <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
-        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} columns</span></div>` : ""}
+        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered} candidate columns accepted</span></div>` : ""}
       </div>`;
     render(); // re-draw the results overlay so it reflects the newly selected region
   }
@@ -2528,7 +2962,7 @@
         </p>
         ${row("Direct loop detections", d.direct_center_count)}
         ${row("Course rows used as prior", d.row_count)}
-        ${row("Accepted wale columns", d.column_count)}
+        ${row("Accepted wale columns", `${d.column_count} of ${d.columns_considered} candidates`)}
         ${row("Column row-support (min..max)", d.column_support_counts && d.column_support_counts.length ? `${Math.min(...d.column_support_counts)}..${Math.max(...d.column_support_counts)} of ${d.row_count}` : "—")}
         ${row("Lattice consistency", fmt(d.lattice_consistency, 2))}
         ${row("Loop-lattice wale spacing", fmt(d.wale_spacing_px, 1, " px"))}
@@ -2549,8 +2983,9 @@
       ["Predicted courses/in", result.course.per_inch != null ? result.course.per_inch.toFixed(2) : "—"],
       ["Wale spacing", result.wale.spacing_mm != null ? `${result.wale.spacing_mm.toFixed(2)} mm` : "—"],
       ["Course spacing", result.course.spacing_mm != null ? `${result.course.spacing_mm.toFixed(2)} mm` : "—"],
-      ["Wale confidence", `${Math.round(result.wale.confidence * 100)}%`],
-      ["Course confidence", `${Math.round(result.course.confidence * 100)}%`],
+      // No confidence row here (or anywhere a user reads) -- see AxisOut's
+      // docstring (backend/schemas.py): the numeric score doesn't track
+      // error and was removed from the API response entirely.
     ];
     verifyPredictedSummary.innerHTML = rows
       .map(
@@ -2688,8 +3123,9 @@
       if (r.course.spacing_mm != null) fd.append("predicted_course_spacing_mm", r.course.spacing_mm);
       if (r.wale.per_inch != null) fd.append("predicted_wales_per_inch", r.wale.per_inch);
       if (r.course.per_inch != null) fd.append("predicted_courses_per_inch", r.course.per_inch);
-      fd.append("predicted_wale_confidence", r.wale.confidence);
-      fd.append("predicted_course_confidence", r.course.confidence);
+      // No predicted_*_confidence anymore: r.wale/r.course no longer carry
+      // the numeric score (see AxisOut's docstring, backend/schemas.py).
+      // The backend form fields still default to 0.0 if omitted.
       fd.append("detected_wale_positions", JSON.stringify(r.wale.positions_px || []));
       fd.append("detected_course_positions", JSON.stringify(r.course.positions_px || []));
 
@@ -2787,10 +3223,10 @@
     state.imageHashPromise = null;
     state.naturalWidth = 0;
     state.naturalHeight = 0;
-    state.cal = { points: [], knownDistance: null, unit: "cm", pixelsPerMm: null };
+    state.cal = { points: [], knownDistance: null, unit: loadDefaultCalUnit(), pixelsPerMm: null, draggingIndex: null };
     state.calAutoDetectPending = false;
     state.calAutoDetected = false;
-    state.ruler = { visible: false, x: null, y: null, dragging: false, dragOffset: null };
+    state.gridBox = { visible: false, unit: "in", x: null, y: null, dragging: false, dragOffset: null };
     state.roi = null;
     state.roiDrag = null;
     state.orientation = "vertical";
@@ -2829,6 +3265,7 @@
   });
 
   // --- Init ---------------------------------------------------------
+  unitSelect.value = loadDefaultCalUnit();
   goToStep("upload");
   checkServiceHealth();
   setupExportLinks();

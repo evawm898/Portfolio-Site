@@ -301,8 +301,57 @@ MIN_REPEATS_FOR_FULL_SCORE = 8.0     # visible repeats in the ROI at which repea
 MIN_REPEATS_FOR_ANY_SCORE = 2.0      # fewer than this and repeat_count score is 0
 UNCERTAIN_SCORE_MARGIN = 0.08        # top-2 final candidate scores within this margin -> "uncertain"
 UNCERTAIN_CONFIDENCE_THRESHOLD = 0.35  # confidence below this -> "uncertain" regardless of margin (any axis/pipeline)
+# Density cross-check (_cross_check_density, below) may only override wale's
+# v0.3 evidence-scorer pick when that pick was itself a near-tie -- i.e. the
+# SAME margin UNCERTAIN_SCORE_MARGIN already uses just above to call two top
+# candidates "too close to call." Deliberately the same constant, not a new
+# one: this is the identical question ("was the winner decisive?") asked at
+# a different point in the pipeline, and a second number here would just
+# invite the two thresholds to drift apart for no principled reason. Chosen
+# from the margin distribution across all 9 fixtures with recorded ground
+# truth (jersey, teal, knit_sample_01/02/05/06/07/08/09), not from the one
+# failing case alone: 8 of those 9 margins (0.097-0.324) sit comfortably
+# above 0.08; only one (0.063, knit_sample_02, whose v0.3 pick was already
+# correct and never reached the density check anyway) sits below it. The bug
+# this gates (knit_sample_01, margin 0.097): the evidence scorer picked
+# correctly and decisively, and the density check overrode it to the wrong
+# 0.5x harmonic regardless -- this constant stops that class of override
+# without touching any of the 8 already-healthy cases, none of which were
+# close enough to this margin for the gate to affect them either way.
+DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN = UNCERTAIN_SCORE_MARGIN
 N_CONSENSUS_PATCHES = 4              # overlapping sub-region bands analyzed per axis
 PATCH_OVERLAP_FRACTION = 0.5
+
+# Aspect-ratio sanity check (see _apply_aspect_ratio_sanity_check): plain
+# stockinette/jersey's own geometry keeps wales/inch : courses/inch in a
+# fairly narrow band (a knit stitch is normally somewhat WIDER than tall,
+# so wale count usually runs a bit BELOW course count per inch -- a
+# typical real-world range is roughly 0.5-1.1). This is a coarse physical-
+# plausibility floor/ceiling, not a tight "is this exactly jersey" check
+# -- it exists to catch genuinely impossible results (a stitch several
+# times wider than tall, which no real knitting produces) rather than to
+# second-guess an unusual-but-real gauge from rib, garter, or another
+# structure this same code path also serves. Deliberately wider than the
+# "roughly 0.5-1.1" typical range for that reason.
+PLAUSIBLE_WALE_COURSE_RATIO_MIN = 0.35
+PLAUSIBLE_WALE_COURSE_RATIO_MAX = 1.6
+
+# Absolute per-inch plausibility bounds for the loop-lattice's own COUNTED
+# wale spacing specifically (see _region_wale_candidate_is_plausible in
+# analyze_multi_roi) -- a check the ratio guard above can't do, since a
+# region can have a wale:course RATIO that looks fine while both axes are
+# absolutely wrong together (or one axis alone is absurd regardless of
+# what the other reports). Real knitting -- from bulky hand-knit to fine
+# lace-weight machine knit -- doesn't go outside roughly 0.5-20 wales per
+# inch; this is generously wider than that on both ends, since the point
+# is to catch a "several times denser than physically possible" result
+# (the variegated-yarn case that motivated this: 29.54 WPI from a region
+# whose loop-lattice found 21 columns in a ~1in span), not to second-guess
+# an unusually fine or coarse but real gauge. Needs pixels_per_mm (an
+# absolute per-inch value, unlike the ratio check, doesn't have the
+# calibration cancel out) -- see analyze_multi_roi's pixels_per_mm param.
+PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MIN = 0.5
+PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX = 20.0
 
 # --- Phase consistency (_phase_consistency_evidence) ----------------------
 # For a candidate period, does every repeat marker land on the SAME kind
@@ -641,6 +690,15 @@ def analyze_gauge(
         course_signal=course_signal,
         roi_area=float(w * h),
     )
+
+    # Physical-plausibility floor: catches a confidently-wrong result
+    # neither per-axis confidence nor the density cross-check above would
+    # (both can be fooled together -- see _apply_aspect_ratio_sanity_
+    # check's docstring). Runs BEFORE the generic confidence floor below
+    # so its more specific reason, when it fires, is what a low-confidence
+    # flag ends up carrying (that floor's `or` never overwrites an
+    # existing uncertain_reason).
+    wale, course = _apply_aspect_ratio_sanity_check(wale, course)
 
     # Generic confidence-floor uncertainty: independent of which pipeline
     # produced the result (v0.3 scorer or the restored course pipeline
@@ -1553,6 +1611,26 @@ def _cross_check_density(
     if n < MIN_LOOP_CENTERS_FOR_EVIDENCE or wale.spacing_px is None or course.spacing_px is None or roi_area <= 0:
         return wale, course
 
+    # Gate: this override may only fire when wale's own v0.3 evidence-scorer
+    # pick was itself a near-tie -- never when it was decisive. Real bug this
+    # closes (knit_sample_01, traced directly): evidence scored the correct
+    # 85.0px candidate at 0.650 against the wrong 0.5x harmonic's 0.553 -- a
+    # 0.097 margin, comfortably decisive -- and this override still replaced
+    # it with the wrong one anyway. See DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN's
+    # own comment for where that threshold came from. Ranks by evidence_score
+    # exactly like _analyze_axis_v3's own uncertain-margin check does; if
+    # fewer than two candidates carry a score (e.g. hand-built CandidateInfo
+    # in older tests), there's nothing to gate on and the override proceeds
+    # exactly as it always has.
+    scored = sorted(
+        (d for d in wale.candidate_details if d.evidence_score is not None),
+        key=lambda d: d.evidence_score, reverse=True,
+    )
+    if len(scored) >= 2:
+        margin = scored[0].evidence_score - scored[1].evidence_score
+        if margin >= DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN:
+            return wale, course  # decisive pick -- density doesn't get a vote
+
     expected_cell_area = roi_area / n
     actual_cell_area = wale.spacing_px * course.spacing_px
     if expected_cell_area <= 0 or actual_cell_area <= 0:
@@ -2229,6 +2307,86 @@ def _finalize_axis_v3(
     )
 
 
+def _wale_course_ratio_plausible(wale_spacing_px: float, course_spacing_px: float) -> Tuple[bool, float]:
+    """
+    Shared core of the aspect-ratio check: is this (wale, course) spacing
+    PAIR physically plausible for knitting, and what's the ratio? Used
+    both by _apply_aspect_ratio_sanity_check (flags the FINAL result) and
+    by analyze_multi_roi's per-region candidate gating (excludes a single
+    region's candidate from consensus on its own merits -- see the module
+    comment above analyze_multi_roi's candidate-building closures).
+
+    wales_per_inch / courses_per_inch == course_spacing_px / wale_spacing_px
+    -- the calibration (px-per-mm) is the same constant on both sides of
+    that ratio and cancels out exactly, so this needs no calibration
+    input at all, unlike an absolute per-inch value would.
+    """
+    if wale_spacing_px <= 0 or course_spacing_px <= 0:
+        return True, 1.0  # can't evaluate a nonsensical spacing; don't claim implausibility either
+    ratio = course_spacing_px / wale_spacing_px
+    return PLAUSIBLE_WALE_COURSE_RATIO_MIN <= ratio <= PLAUSIBLE_WALE_COURSE_RATIO_MAX, ratio
+
+
+def _apply_aspect_ratio_sanity_check(wale: AxisResult, course: AxisResult) -> Tuple[AxisResult, AxisResult]:
+    """
+    Physical-plausibility floor: no real knitting produces a stitch
+    several times wider than it is tall (or vice versa), so a reported
+    wale:course ratio far outside PLAUSIBLE_WALE_COURSE_RATIO_MIN/MAX is
+    evidence the detector locked onto something that isn't the stitch
+    repeat on ONE of the two axes -- most often wale, since that's the
+    axis with a documented history of harmonic/texture lock-on in this
+    project (see the README) -- even when that axis's own confidence
+    looked fine in isolation. Confidence in isolation can't catch this:
+    a detector can be internally consistent (strong autocorrelation,
+    tight patch agreement, a clean counted-column tally) and still be
+    confidently measuring the wrong thing, if the periodic structure it
+    locked onto (e.g. a fine color-transition pattern in variegated yarn)
+    is real and regular -- just not the stitch grid.
+
+    Deliberately never rewrites spacing_px -- exactly like every other
+    "uncertain" flag in this file, this surfaces doubt rather than
+    fabricating a corrected number (a real fix needs to know which axis
+    is actually wrong and by what mechanism, which this coarse ratio
+    check alone can't determine).
+
+    Both axes are flagged together (not just the more-extreme-looking
+    one): the ratio only tells you the PAIR is inconsistent with each
+    other, not which one of the two is at fault, so calling out only one
+    would be a guess dressed up as a diagnosis.
+    """
+    if wale.spacing_px is None or course.spacing_px is None:
+        return wale, course
+    plausible, ratio = _wale_course_ratio_plausible(wale.spacing_px, course.spacing_px)
+    if plausible:
+        return wale, course
+
+    reason = (
+        f"Wale:course ratio ({ratio:.2f}) is outside the physically plausible range for knitting "
+        f"({PLAUSIBLE_WALE_COURSE_RATIO_MIN:g}-{PLAUSIBLE_WALE_COURSE_RATIO_MAX:g}) -- "
+        "one of these two axes likely locked onto something other than the stitch repeat. "
+        "Verify manually (e.g. with the grid box)."
+    )
+
+    def _flag(axis: AxisResult) -> AxisResult:
+        if axis.status == "uncertain":
+            return axis  # already flagged; don't clobber a more specific existing reason
+        # Cap confidence to the same "uncertain" ceiling _apply_confidence_
+        # floor_uncertainty already uses elsewhere in this file, rather than
+        # leaving a high confidence number sitting next to a status that
+        # says not to trust it. Found directly on knit_sample_02.jpg: course
+        # was correctly flagged uncertain by this exact check (ratio 0.01,
+        # miles outside plausible) while its confidence stayed at 0.823 --
+        # correct status, misleading number right next to it. A cap, not a
+        # zero-out: this check doesn't know the value is wrong, only that
+        # the pair is inconsistent, so some of the axis's own evidence may
+        # still be real -- same reasoning _apply_confidence_floor_uncertainty
+        # already uses for a low-confidence-driven uncertain flag.
+        capped_confidence = min(axis.confidence, UNCERTAIN_CONFIDENCE_THRESHOLD)
+        return replace(axis, status="uncertain", uncertain_reason=reason, confidence=capped_confidence)
+
+    return _flag(wale), _flag(course)
+
+
 def _apply_confidence_floor_uncertainty(axis: AxisResult) -> AxisResult:
     """
     Flag "uncertain" purely from low absolute confidence, independent of
@@ -2420,6 +2578,14 @@ class LoopLatticeResult:
     direct_center_count: int = 0
     row_count: int = 0        # course rows used as the structural prior
     column_count: int = 0     # accepted (multi-row-supported) wale columns
+    # How many candidate x-position groups were CONSIDERED before the
+    # MIN_ROW_SUPPORT_FOR_COLUMN filter -- i.e. column_count plus every
+    # group that was tried and rejected for too little row support. Always
+    # >= column_count. Lets a diagnostics view show "accepted N of M
+    # candidates" instead of just the accepted count on its own, the same
+    # visibility principle behind AxisConsensusResult.no_measurement_labels
+    # (a candidate that's dropped shouldn't just disappear from the numbers).
+    columns_considered: int = 0
     lattice_consistency: float = 0.0   # 0..1, spacing-regularity of the accepted columns
     wale_spacing_px: Optional[float] = None
     course_spacing_px: Optional[float] = None   # echoed from the given course rows, not re-measured here
@@ -2620,6 +2786,7 @@ def _build_row_banded_lattice(
         direct_center_count=len(direct_centers),
         row_count=len(rows_sorted),
         column_count=len(wale_columns),
+        columns_considered=len(groups),
         lattice_consistency=round(lattice_consistency, 3),
         wale_spacing_px=wale_spacing,
         course_spacing_px=course_spacing,
@@ -3978,8 +4145,24 @@ class AxisConsensusResult:
     uncertain_reason: Optional[str] = None
     message: str = ""
     included_labels: List[str] = field(default_factory=list)
+    # Every region that didn't make it into included_labels, for WHATEVER
+    # reason -- a statistical outlier (see `outliers` for detail) or a
+    # region that never produced a usable measurement for this axis at all
+    # (see `no_measurement_labels`). Always included_labels + excluded_labels
+    # == every region considered for this axis, so "2 of 4 contributed" is
+    # never silently indistinguishable from "2 of 2" -- a region can never
+    # just vanish from both lists (issue: dense-grid-anchor-experiment
+    # follow-up found this gap via analyze_multi_roi's own candidate
+    # builders silently `continue`-ing past a None spacing_px).
     excluded_labels: List[str] = field(default_factory=list)
     outliers: List[OutlierInfo] = field(default_factory=list)
+    # Subset of excluded_labels that were dropped for having NO usable
+    # measurement at all (as opposed to `outliers`, which had a measurement
+    # but disagreed with the regional consensus) -- kept separate so a
+    # caller can tell "this region measured something and lost the vote"
+    # from "this region never measured anything on this axis" without
+    # having to diff excluded_labels against outliers' labels itself.
+    no_measurement_labels: List[str] = field(default_factory=list)
     regional_median_px: Optional[float] = None
     regional_spread_px: Optional[float] = None
 
@@ -4052,12 +4235,23 @@ def _weighted_median(values: List[float], weights: List[float]) -> float:
     return pairs[-1][0]
 
 
-def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensusResult:
+def _consensus_for_axis(
+    candidates: List[dict], axis_label: str, no_measurement_labels: Optional[List[str]] = None
+) -> AxisConsensusResult:
     """
     Robust cross-region consensus for one axis, from independently
     measured per-region candidates: [{"label","spacing_px","confidence",
-    "quality_score"}, ...] (regions with no usable measurement for this
-    axis are simply not included in `candidates`).
+    "quality_score"}, ...].
+
+    `no_measurement_labels` names every APPROVED region that never made it
+    into `candidates` at all because it had no usable measurement for this
+    axis (as opposed to having one and losing a statistical-outlier vote).
+    This function folds them into `excluded_labels` (and its own,
+    dedicated `no_measurement_labels` field) so the region count always
+    reconciles -- included + excluded == every region considered -- and
+    "2 of 4 contributed" can never look identical to "2 of 2" the way it
+    used to when such regions simply disappeared from both accounting
+    lists (see the field's docstring on AxisConsensusResult).
 
     Never a plain mean, per PART 9 of the request this implements: a
     coarse median first separates likely inliers from outliers (values
@@ -4068,10 +4262,20 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
     for a human reading the diagnostics, never the reason it was excluded
     in the first place (the tolerance check already excluded it).
     """
+    no_measurement_labels = list(no_measurement_labels or [])
+    total_regions = len(candidates) + len(no_measurement_labels)
+    no_measurement_note = (
+        f" {len(no_measurement_labels)} region(s) had no usable {axis_label} measurement "
+        f"({', '.join(no_measurement_labels)})."
+        if no_measurement_labels else ""
+    )
+
     if not candidates:
         return AxisConsensusResult(
             spacing_px=None, confidence=0.0,
-            message=f"No region produced a usable {axis_label} measurement.",
+            message=f"No region produced a usable {axis_label} measurement.{no_measurement_note}",
+            excluded_labels=list(no_measurement_labels),
+            no_measurement_labels=no_measurement_labels,
         )
 
     values = [c["spacing_px"] for c in candidates]
@@ -4084,9 +4288,11 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
             confidence=round(c["confidence"] * CONSENSUS_SINGLE_REGION_FACTOR, 4),
             message=(
                 f"Only region {c['label']} produced a usable {axis_label} measurement -- "
-                "cross-region validation unavailable."
+                f"cross-region validation unavailable.{no_measurement_note}"
             ),
             included_labels=[c["label"]],
+            excluded_labels=list(no_measurement_labels),
+            no_measurement_labels=no_measurement_labels,
             regional_median_px=c["spacing_px"],
             regional_spread_px=0.0,
         )
@@ -4138,9 +4344,11 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
             ),
             message=(
                 f"No dominant regional consensus for {axis_label}; used the confidence-weighted "
-                f"median of all {len(candidates)} regions."
+                f"median of all {len(candidates)} regions.{no_measurement_note}"
             ),
             included_labels=labels,
+            excluded_labels=list(no_measurement_labels),
+            no_measurement_labels=no_measurement_labels,
             regional_median_px=initial_median,
             regional_spread_px=(sorted_vals[-1] - sorted_vals[0]) / 2.0,
         )
@@ -4182,10 +4390,12 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
         uncertain_reason = f"Regions that agreed for {axis_label} still spread more than expected."
 
     included_labels = [c["label"] for c in inliers]
-    excluded_labels = [o.label for o in outliers]
+    outlier_labels = [o.label for o in outliers]
+    excluded_labels = outlier_labels + no_measurement_labels
     message = (
-        f"{axis_label.capitalize()} consensus from {len(inliers)} of {len(candidates)} region(s)"
-        + (f"; excluded {', '.join(excluded_labels)} as outlier(s)." if excluded_labels else ".")
+        f"{axis_label.capitalize()} consensus from {len(inliers)} of {total_regions} region(s)"
+        + (f"; excluded {', '.join(outlier_labels)} as outlier(s)." if outlier_labels else ".")
+        + no_measurement_note
     )
 
     return AxisConsensusResult(
@@ -4197,6 +4407,7 @@ def _consensus_for_axis(candidates: List[dict], axis_label: str) -> AxisConsensu
         included_labels=included_labels,
         excluded_labels=excluded_labels,
         outliers=outliers,
+        no_measurement_labels=no_measurement_labels,
         regional_median_px=initial_median,
         regional_spread_px=spread,
     )
@@ -4207,6 +4418,7 @@ def analyze_multi_roi(
     rois: List[dict],
     orientation: Orientation,
     structure: Structure = "unknown",
+    pixels_per_mm: Optional[float] = None,
 ) -> MultiRoiAnalysisResult:
     """
     Analyze every approved measurement area COMPLETELY INDEPENDENTLY (each
@@ -4222,6 +4434,12 @@ def analyze_multi_roi(
     Measurement Areas" step (both auto-proposed and manually-added areas
     are treated identically here -- this function doesn't know or care
     which is which beyond echoing `source` back in diagnostics).
+
+    `pixels_per_mm`: optional calibration, used ONLY by the absolute
+    loop-lattice density plausibility gate (see the module comment above
+    the candidate-building closures below) -- every other computation in
+    this function works in raw pixels and needs no calibration at all.
+    Omit it (None) to skip that one gate; every other check still runs.
 
     Adapts to whatever the input supports: with a single region, this
     degenerates to that region's own result with a reduced confidence
@@ -4283,6 +4501,94 @@ def analyze_multi_roi(
             wale_source=wale_source, wale_count_confidence=count_confidence,
         ))
 
+    # --- Per-region plausibility gates, applied BEFORE cross-region
+    # consensus (see _consensus_for_axis) ---------------------------------
+    #
+    # The consensus mechanism above is majority/median agreement, which
+    # cannot by itself tell "the true value" apart from "a majority of
+    # regions sharing the same systematic error" -- a real, observed
+    # failure (a variegated-yarn photo where 2 of 3 regions' wale
+    # detectors independently locked onto the same color-transition
+    # pattern and outvoted the one region that got it right). No amount
+    # of cleverness in the VOTING rule fixes that; the fix is gating
+    # individual candidates on evidence that's independent of what other
+    # regions say, before they ever reach the vote.
+    #
+    # Two such gates, run once per region here (not per-axis inside the
+    # candidate-building closures below, so both closures see the same
+    # exclusion decision for a given region):
+    #
+    # 1. Aspect-ratio plausibility (_wale_course_ratio_plausible): a
+    #    region's own wale:course ratio must be physically possible for
+    #    knitting. Excludes the region from BOTH axes' consensus --
+    #    symmetric with _apply_aspect_ratio_sanity_check's own reasoning
+    #    (the final-result version of this same check): an implausible
+    #    ratio says the PAIR is inconsistent, not which one of the two is
+    #    at fault, so this region's course reading isn't trusted either,
+    #    even though course is usually the more reliable axis.
+    # 2. Absolute loop-lattice density plausibility: even a region whose
+    #    ratio happens to look fine (both axes wrong in proportion) can
+    #    still be absurd in absolute terms -- 21 counted columns in a
+    #    ~1in-wide region is not a real gauge no matter what course says.
+    #    Scoped to the loop-lattice COUNTED path specifically (wale_
+    #    source == "loop_count"), per the mechanism this was built for;
+    #    needs pixels_per_mm, so it's skipped (not "failed permissively,"
+    #    genuinely skipped) when that's not available. Wale-only: there's
+    #    no analogous "count" on the course axis to gate this way.
+    #
+    # Neither gate touches per_roi's own reported numbers (same principle
+    # as every other "uncertain" flag in this file) -- it only decides
+    # whether a region's candidate enters the vote. A region excluded by
+    # either gate DOES get its own wale AxisResult flagged uncertain with
+    # a specific reason (visible in Developer Diagnostics' per-region
+    # view), independent of and in addition to the exclusion itself.
+    ratio_excluded_labels = set()
+    density_excluded_labels = set()
+    for idx, m in enumerate(per_roi):
+        wale_px = m.loop_lattice.wale_spacing_px if (m.wale_source == "loop_count" and m.loop_lattice) else m.wale.spacing_px
+        course_px = m.course.spacing_px
+        reasons = []
+
+        if wale_px is not None and course_px is not None:
+            plausible, ratio = _wale_course_ratio_plausible(wale_px, course_px)
+            if not plausible:
+                ratio_excluded_labels.add(m.label)
+                reasons.append(
+                    f"This region's own wale:course ratio ({ratio:.2f}) is outside the physically "
+                    f"plausible range for knitting ({PLAUSIBLE_WALE_COURSE_RATIO_MIN:g}-"
+                    f"{PLAUSIBLE_WALE_COURSE_RATIO_MAX:g}) -- excluded from cross-region consensus "
+                    "on its own merits, regardless of how many other regions agree with it."
+                )
+
+        if m.wale_source == "loop_count" and pixels_per_mm and wale_px:
+            implied_wpi = 25.4 * pixels_per_mm / wale_px
+            if not (PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MIN <= implied_wpi <= PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX):
+                density_excluded_labels.add(m.label)
+                col_count = m.loop_lattice.column_count if m.loop_lattice else "?"
+                reasons.append(
+                    f"This region's loop-lattice counted density ({implied_wpi:.1f} wales/in from "
+                    f"{col_count} accepted columns) is outside the physically plausible range "
+                    f"({PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MIN:g}-{PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX:g}/in) "
+                    "-- excluded from cross-region consensus on its own merits."
+                )
+
+        if reasons and m.wale.status != "uncertain":
+            per_roi[idx] = replace(m, wale=replace(m.wale, status="uncertain", uncertain_reason=" ".join(reasons)))
+
+    # Regions dropped for having NO usable measurement on an axis at all --
+    # as opposed to ratio_excluded_labels/density_excluded_labels above,
+    # which have a measurement but fail a plausibility check. Populated by
+    # wale_candidates()/course_candidates() below and threaded into
+    # _consensus_for_axis so these regions can never simply vanish from
+    # both included_labels and excluded_labels (see AxisConsensusResult's
+    # no_measurement_labels docstring) -- this is exactly the gap the
+    # dense-grid-anchor-experiment follow-up found: a region silently
+    # dropped here was indistinguishable from a region that was never
+    # there, which is what let the median-of-anchors mitigation for that
+    # experiment fail silently.
+    wale_no_measurement_labels: List[str] = []
+    course_no_measurement_labels: List[str] = []
+
     def wale_candidates() -> List[dict]:
         # Prefer each region's COUNTED spacing (median interval between
         # real, position-verified loop columns) over its periodicity
@@ -4299,7 +4605,9 @@ def analyze_multi_roi(
         # agree with each other, per _single_region_agreement_confidence.
         single_region = len(per_roi) == 1
         out = []
-        for m in per_roi:
+        for idx, m in enumerate(per_roi):
+            if m.label in ratio_excluded_labels or m.label in density_excluded_labels:
+                continue
             if m.wale_source == "loop_count":
                 spacing_px = m.loop_lattice.wale_spacing_px
                 base_confidence = m.wale_count_confidence
@@ -4307,6 +4615,12 @@ def analyze_multi_roi(
                 spacing_px = m.wale.spacing_px
                 base_confidence = m.wale.confidence
             if spacing_px is None:
+                wale_no_measurement_labels.append(m.label)
+                if m.wale.status != "uncertain":
+                    per_roi[idx] = replace(m, wale=replace(
+                        m.wale, status="uncertain",
+                        uncertain_reason="No usable wale measurement for this region -- excluded from cross-region consensus.",
+                    ))
                 continue
             if single_region:
                 counted_px = m.loop_lattice.wale_spacing_px if m.loop_lattice else None
@@ -4321,8 +4635,19 @@ def analyze_multi_roi(
 
     def course_candidates() -> List[dict]:
         out = []
-        for m in per_roi:
+        for idx, m in enumerate(per_roi):
+            # Ratio-implausible regions are excluded from BOTH axes (see
+            # the module comment above the gating loop) -- density
+            # exclusion is wale-only and doesn't apply here.
+            if m.label in ratio_excluded_labels:
+                continue
             if m.course.spacing_px is None:
+                course_no_measurement_labels.append(m.label)
+                if m.course.status != "uncertain":
+                    per_roi[idx] = replace(m, course=replace(
+                        m.course, status="uncertain",
+                        uncertain_reason="No usable course measurement for this region -- excluded from cross-region consensus.",
+                    ))
                 continue
             # A floor on quality weight so a region with a near-zero
             # quality score can't be given literally zero say -- it was
@@ -4335,8 +4660,12 @@ def analyze_multi_roi(
             })
         return out
 
-    wale_consensus = _consensus_for_axis(wale_candidates(), "wale")
-    course_consensus = _consensus_for_axis(course_candidates(), "course")
+    wale_consensus = _consensus_for_axis(
+        wale_candidates(), "wale", no_measurement_labels=wale_no_measurement_labels
+    )
+    course_consensus = _consensus_for_axis(
+        course_candidates(), "course", no_measurement_labels=course_no_measurement_labels
+    )
 
     # Primary region for the overlay/analyzed-area: prefer whichever
     # (in approval order) region is accepted into the MOST axes' consensus
@@ -4391,6 +4720,14 @@ def analyze_multi_roi(
         status=course_consensus.status,
         uncertain_reason=course_consensus.uncertain_reason,
     )
+
+    # Same physical-plausibility floor as the single-ROI path (see
+    # _apply_aspect_ratio_sanity_check) -- applied to the FINAL consensus
+    # pair, not to each region individually: this deliberately doesn't
+    # touch which regions the consensus above included/excluded (that's
+    # the outlier-rejection mechanism itself, a separate question from
+    # sanity-checking its output).
+    final_wale, final_course = _apply_aspect_ratio_sanity_check(final_wale, final_course)
 
     any_axis_ok = wale_consensus.spacing_px is not None or course_consensus.spacing_px is not None
     message = (

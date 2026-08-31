@@ -44,6 +44,7 @@ from .schemas import (
     AnalyzeResponse,
     AreaMm,
     AxisConsensusOut,
+    AxisDebugOut,
     AxisOut,
     CandidateOut,
     LoopLatticeDebugOut,
@@ -152,6 +153,14 @@ def _period_px_to_per_inch(period_px: float, pixels_per_mm: float) -> Optional[f
 
 
 def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
+    """
+    Builds the user-facing AxisOut -- deliberately WITHOUT axis.confidence
+    (see AxisOut's own docstring for why: it doesn't track error). Used
+    for the primary AnalyzeResponse.wale/course on both /analyze and
+    /analyze-multi. For the per-region debug detail nested under
+    /analyze-multi's multi_roi (Developer diagnostics only), see
+    _axis_to_debug_out below instead.
+    """
     spacing_mm = None
     per_inch = None
     if axis.spacing_px is not None and pixels_per_mm > 0:
@@ -163,7 +172,6 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
         spacing_mm=round(spacing_mm, 4) if spacing_mm is not None else None,
         per_inch=round(per_inch, 3) if per_inch is not None else None,
         positions_px=axis.positions_px,
-        confidence=axis.confidence,
         message=axis.message,
         candidates_px=axis.candidates_px,
         selected_reason=axis.selected_reason,
@@ -192,6 +200,15 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
     )
 
 
+def _axis_to_debug_out(axis, pixels_per_mm: float) -> AxisDebugOut:
+    """
+    _axis_to_out plus the raw, uncalibrated confidence score -- for
+    RoiMeasurementOut (per-region detail nested under /analyze-multi's
+    multi_roi) only. See AxisDebugOut's docstring.
+    """
+    return AxisDebugOut(**_axis_to_out(axis, pixels_per_mm).model_dump(), confidence=axis.confidence)
+
+
 def _loop_lattice_to_out(lattice, pixels_per_mm: float) -> LoopLatticeDebugOut:
     """Shared by /analyze and /analyze-multi (once per region, in the latter)."""
     return LoopLatticeDebugOut(
@@ -202,6 +219,7 @@ def _loop_lattice_to_out(lattice, pixels_per_mm: float) -> LoopLatticeDebugOut:
         direct_center_count=lattice.direct_center_count,
         row_count=lattice.row_count,
         column_count=lattice.column_count,
+        columns_considered=lattice.columns_considered,
         lattice_consistency=lattice.lattice_consistency,
         wale_spacing_px=lattice.wale_spacing_px,
         course_spacing_px=lattice.course_spacing_px,
@@ -230,6 +248,7 @@ def _axis_consensus_to_out(consensus, pixels_per_mm: float) -> AxisConsensusOut:
             )
             for o in consensus.outliers
         ],
+        no_measurement_labels=consensus.no_measurement_labels,
         regional_median_px=consensus.regional_median_px,
         regional_median_per_inch=(
             _period_px_to_per_inch(consensus.regional_median_px, pixels_per_mm)
@@ -628,6 +647,7 @@ async def analyze_multi(
             image_bgr=image, rois=rois,
             orientation=orientation,  # type: ignore[arg-type]
             structure=structure,  # type: ignore[arg-type]
+            pixels_per_mm=pixels_per_mm,
         )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Multi-ROI analysis raised an unexpected exception")
@@ -653,8 +673,8 @@ async def analyze_multi(
         RoiMeasurementOut(
             label=m.label, x=m.x, y=m.y, width=m.width, height=m.height, source=m.source,
             success=m.success, message=m.message,
-            wale=_axis_to_out(m.wale, pixels_per_mm),
-            course=_axis_to_out(m.course, pixels_per_mm),
+            wale=_axis_to_debug_out(m.wale, pixels_per_mm),
+            course=_axis_to_debug_out(m.course, pixels_per_mm),
             quality_score=m.quality_score,
             sharpness=m.quality_parts.get("sharpness"),
             contrast=m.quality_parts.get("contrast"),

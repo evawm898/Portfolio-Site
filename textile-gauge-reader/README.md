@@ -734,6 +734,303 @@ Fixing the loop-lattice path safely needs its own targeted evidence — not
 a copy of finding 1's fix, which was checked here and shown not to
 generalize — and is real work still ahead.
 
+### The density cross-check's blind spot: a real secondary peak, not just a bad override
+
+*(One instance of the broader period-selection ambiguity quantified in
+"How ROI-dependent is this, really?" below — see its "central finding"
+subsection for how this connects to ply-twist, color pooling, and the
+position-dependent coin-flips found by the mechanical ROI sweep.)*
+
+`_cross_check_density` (the wale-only loop-density override described
+above) was found overriding a wale pick the v0.3 evidence scorer had
+already gotten right, and decisively — on a real photo
+(`tests/fixtures/knit_sample_01.jpg`, see `tests/knit_sample_ground_
+truth.py`), evidence scored the correct 85.0px candidate at 0.650
+against the wrong 0.5x-harmonic candidate's 0.553, a 0.097 margin, and
+the density check still substituted the wrong one. Fixed by
+`DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN`: the override may now only fire
+when wale's own top-2 evidence scores are within `UNCERTAIN_SCORE_MARGIN`
+(0.08) of each other — a genuine near-tie — never when the scorer has
+already separated them decisively. Chosen from the margin distribution
+across all 9 fixtures with recorded ground truth, not the one failing
+case: 8 of 9 margins (0.097–0.324) sit comfortably above the threshold;
+only one (0.063, a case whose pick was already correct and never reached
+the density check regardless) sits below it.
+
+That fix closes the override, but doesn't explain why the density check
+had anything to disagree with in the first place — on this photo, `_
+detect_loop_centers` (the DoG blob detector feeding both `_cross_check_
+density` and `_analyze_direction`'s center-pitch correction) really is
+finding roughly twice as many loop centers as there are loops. Measured
+directly: the median nearest-neighbor spacing among detected centers
+(34.5px) is almost exactly half the true loop pitch (70.2px, the
+geometric mean of the true 85×58px wale/course spacing) — not a
+harmonic-selection error downstream, a genuine secondary local maximum
+in the detector's own response map, most likely from adjacent stitches'
+diagonal legs crossing near the midpoint between true loop centers and
+producing a compact-enough blob to pass the DoG blob test.
+
+This is the same *shape* of problem `fold_consistency` already solves
+for the periodicity path — a real, periodic sub-feature (there, one leg
+of a V; here, a leg-crossing between two loops) that's genuinely regular
+enough to be mistaken for the thing actually being measured — but the
+spatial loop-center detector has no equivalent structural defense: DoG
+blob detection has no notion of "is this compact bright spot actually a
+complete loop head, or the crossing point between two legs of adjacent
+loops." `min_separation_px`'s non-max-suppression radius (`0.3 *
+min(p0_wale, p0_course)`) is the only thing currently keeping detections
+apart, and it isn't derived from anything that distinguishes a leg
+crossing from a loop head — simply raising that fraction would risk
+being a fix fitted to this one photo's geometry rather than a
+structurally-grounded one. Root-caused, not fixed here: a real defense
+would need something like a shape check on the blob's local gradient
+structure (does it look like two converging legs, not just "compact and
+bright") the way `_fold_consistency` checks structural resemblance
+between repeats, rather than a threshold tweak on the existing response
+map.
+
+### Course selection: why v0.3-authoritative was tested and rejected
+
+Jersey's course reading (`real_jersey_sample.jpg`, at the crop that
+reproduces its failure) can be off by as much as -53% — a doubled period,
+the largest error found in a 9-fixture accuracy pass. Since course
+selection deliberately uses the older `_analyze_direction` pipeline
+rather than the v0.3 evidence scorer (see "A real-photo regression, and
+phase consistency as its fix" above), the obvious question was whether
+that decision has simply gone stale: would making v0.3 authoritative for
+course fix this?
+
+**Tested directly against all 9 fixtures with recorded ground truth, and
+rejected — the answer is genuinely mixed, not a clean win:**
+
+- On the synthetic fabric grid (12 clean/degraded cases, exact known
+  ground truth), switching to v0.3's own top-evidence pick would **fix 3
+  cases that are currently strict-xfailed as broken** (jersey 5×7
+  degraded, jersey 8×10 degraded, rib1×1 8×10 clean — all currently flip
+  to a half-period harmonic under the old pipeline, and v0.3 gets all
+  three right) **and break 1 currently-good case** (rib1×1 8×10
+  degraded: old pipeline correct at 18.0px, v0.3 flips it to 36.0px).
+- On the real jersey photo itself, at a crop that reproduces the -53%
+  failure, v0.3's own top pick is the *same* wrong 49.0px candidate as
+  the old pipeline's, by a hair (evidence 0.424 vs. 0.418, margin
+  0.006). This is not an authority problem on this photo — both
+  mechanisms are wrong, in a near-tie.
+- On `knit_sample_08.jpg` (a real photo with recorded course ground
+  truth), the old pipeline is currently decent (-7.1%); v0.3's own pick
+  would badly regress it (-53.6%) — the identical doubled-period
+  failure, freshly introduced on a fixture that isn't currently broken.
+
+Net: switching course to v0.3-authoritative would trade one class of bug
+for another, and wouldn't even fix the case that prompted the question.
+**Rejected, not attempted.**
+
+**What actually distinguishes the two near-tied course candidates?**
+Dumped the full per-term evidence breakdown for jersey's 24.5px (correct)
+vs. 49.0px (wrong, selected) candidates: `patch_consensus` is the
+dominant term and it's badly wrong-direction (0.435 vs. 0.953 — 2.2x in
+favor of the wrong candidate) — the same failure mode already diagnosed
+and partially fixed for **wale** (see "A real second photo..." above:
+"patch_consensus favored the WRONG half-period candidate... phase_
+consistency favored the CORRECT candidate"). `phase_consistency` does
+lean correctly here (0.661 vs. 0.630), but far too weakly to overcome
+patch_consensus.
+
+That wale-side fix does **not** transfer to course. Checked on
+`knit_sample_08.jpg` (the same doubled-period failure shape):
+`phase_consistency` there favors the *wrong* candidate (0.588 vs.
+0.318) — backwards relative to jersey. `patch_consensus`, by contrast,
+favors the wrong (coarser) candidate on every real-photo case checked
+(jersey, knit_05, knit_08) — the one signal that's consistent, but it
+points the wrong way everywhere, so it's not a fix source either.
+`structural` (fold + loop-center-pitch agreement) is uninformative for
+course in these cases (~0): `fold_consistency` is deliberately never
+computed for course (rows don't have the V-leg bilateral-symmetry
+failure mode it targets), and loop-center pitch agreement isn't reliably
+trusted at these crop sizes.
+
+**No existing per-candidate signal in this codebase reliably separates
+the true course period from its harmonic.** This is parked, not
+in-progress: it needs its own investigation (a course-specific structural
+signal, most likely — not a reweighting of terms built for wale), rather
+than reuse of a fix that was checked here and does not generalize.
+
+### How ROI-dependent is this, really?
+
+Two accuracy passes over the same 8 fixtures (real_jersey_sample.jpg,
+sarahmaker-knitting-gauge.jpg, and the knit_sample fixtures — see
+`tests/knit_sample_ground_truth.py`), run in the same session against
+**unchanged detector code**, disagreed by tens of percentage points per
+fixture — including one fixture (jersey course) that looked "fixed"
+between the two passes purely because the second pass's hand-picked crop
+happened to exclude a few rows of ruler ticks the first pass's crop had
+included. That contradicted a finding from the same session (jersey's
+course near-tie has no available fix — see "Course selection" above),
+which is what caught the problem: the two "accuracy" numbers weren't
+measuring the same thing at all.
+
+**Confirmed directly, not assumed.** Re-deriving ROIs that approximate
+the first pass's crops (a natural, non-adversarial choice per fixture —
+e.g. knit_sample_01's whole gauge-tool window, real_jersey_sample's full
+frame minus its ruler strip) reproduced that pass's numbers almost
+exactly on every fixture checked (knit_01 wale +4.6% vs. reported +4.3%;
+knit_01 course +0.72% vs. reported +0.7%; jersey course -52.1% vs.
+reported -53.1%; knit_02 wale +0.6% vs. reported +1.1%; knit_06 wale
+-1.3% vs. reported -0.8%). The code did not move between passes; only
+the crop did. ROI choice is the entire explanation.
+
+**Quantified with a systematic grid, not more hand-picked crops.** For
+each of the 8 fixtures, 15 crops were generated mechanically — 3 sizes
+(30%/50%/70% of the image's shorter dimension, as a centered square) ×
+5 positions (the 4 corners + center) — with no visual inspection of any
+kind, and `analyze_gauge` run on each:
+
+| fixture | wale median err | wale err range | wale harmonic-lock rate | course median err | course err range | course harmonic-lock rate |
+|---|---|---|---|---|---|---|
+| real_jersey_sample | -7.2% | -54% to +90% | 6/15 | -6.9% | -70% to +65% | 7/15 |
+| sarahmaker (teal) | **+68.7%** | -14% to +89% | 5/15 | n/a | n/a | n/a |
+| knit_01 | +6.3% | +2.7% to +109% | 3/15 | **+367%** | -66% to +554% | 3/15 |
+| knit_02 | **+121%** | -5% to +7356% | 7/15 | n/a | n/a | n/a |
+| knit_05 | +5.2% | -33% to +109% | 6/15 | +0.7% | -88% to +402% | 4/15 |
+| knit_06 | **-69.1%** | -85% to -67% | 10/15 | -3.4% | -26% to +6% | 1/15 |
+| knit_08 | +5.5% | -52% to +105% | 6/15 | +1.0% | -69% to +414% | 3/15 |
+| knit_09 | -1.6% | -44% to +8% | 0/15 | **-67.2%** | -86% to +9% | 9/15 |
+
+("harmonic-lock rate" = crops landing within 12% of a 0.5×/1.5×/2×/3×
+multiple of the true value, out of 15.)
+
+**This is a large, plain finding, not a footnote: an error range spanning
+several hundred percentage points from crop choice alone, on more than
+half the fixtures checked, on either axis.** The median across most
+individual fixtures looks reasonable (many sit within ~10% of true) —
+but that's the sweep's *center*, not its *worst case*, and a mechanically
+generated grid hits genuinely bad crops (a harmonic lock, or a scale so
+small the ROI is mostly background/table) often enough that "roughly
+right on a typical crop" is not the same claim as "accurate." Two
+findings stand out:
+
+- **The teal fixture's wale median across the grid (+68.7%) is far worse
+  than the ~correct numbers reported elsewhere in this README** for the
+  same fixture (`test_wale_scoring_weights.py`'s 5 specifically-chosen
+  ~1in² windows). Those windows were chosen *because* earlier debugging
+  found they avoid this fixture's known half-period ambiguity — they are
+  not representative of what an unbiased crop gives on this photo, they
+  were selected against exactly the failure this table now shows is
+  common. Every accuracy figure anywhere in this README computed from a
+  hand-picked "clean" ROI should be read with that in mind.
+- **Harmonic lock is not rare** — it's the modal failure, not a tail
+  event, on several fixtures (knit_06 wale 10/15, knit_09 course 9/15,
+  knit_02 wale 7/15).
+
+**The fix for the harness, not (yet) the detector: pin one ROI per
+fixture, chosen by a stated rule, applied uniformly, with no visual
+judgment and no re-picking.** `tests/knit_sample_ground_truth.py`'s
+`pinned_roi()` and its `ROI_01`/`ROI_02`/`ROI_05`/`ROI_06`/`ROI_08`/
+`ROI_09` constants (see its "FOURTH PASS" docstring section) implement:
+the central square crop at 50% of the image's shorter dimension, computed
+mechanically from image dimensions — no attempt to dodge a ruler, pin, or
+marker that happens to land inside it. Any future accuracy claim against
+these fixtures must use these exact ROIs (verbatim, not "close to") to
+be comparable to any other. This does not make the detector more
+accurate — it makes the next accuracy number about the detector, not
+about who picked the crop.
+
+#### The central finding: two layered problems, not one
+
+The sweep above shows a large spread but doesn't say what's driving it.
+A follow-up pass tagged all 210 axis-observations from the same 15-crop
+mechanical grid with three more facts per crop — does it overlap a ruler,
+pin, or foreign object (a fixed bounding box per fixture, defined once,
+not re-picked); how many true stitch/row repeats fit in it (crop size ÷
+ground-truth period); and the pipeline's own status/confidence — and
+separated their effects instead of reporting one blended spread.
+
+**Contamination is the dominant real-photo error source, by a wide
+margin:**
+
+| | median \|err\| | harmonic-lock rate |
+|---|---|---|
+| crop overlaps a ruler/pin/marker | 65.8% | 40% |
+| clean fabric only | 7.2% | 23% |
+
+**Crop size is a second-order effect, and naive analysis makes it look
+backwards.** Raw (uncontrolled) data shows error getting *worse* at
+larger crop sizes — but that's confounded: bigger crops mechanically
+overlap more of a fixture's (fixed-size) contamination zone, so larger
+crops are also *more likely to be contaminated* (51%→60%→73% of crops as
+size grows 30%→50%→70%). Controlling for that, within clean crops only,
+size shows the trend you'd actually expect, just a mild one: median
+\|err\| 8.2% → 7.2% → 5.6% as crops grow from ~6 to ~15 stitch repeats.
+No sharp "minimum viable ROI" threshold — just a gentle improvement with
+more fabric in frame.
+
+**Removing both confounds — clean fabric AND ≥6 repeats (n=69, 11
+fixture/axis pairs) — does not reveal a small, uniform residual. It
+reveals a bimodal split:**
+- **4 of 11 pairs are reliably accurate** regardless of exact position
+  (jersey course, knit_06 course, knit_08 course, knit_09 wale — every
+  clean/large crop on these reads within single-digit % error).
+- **1 of 11 is reliably, systematically wrong** (knit_06 wale: all 9
+  clean/large crops read -67% to -85% — not a coin flip, this scale is
+  simply wrong on this fixture no matter where the crop sits).
+- **6 of 11 are a genuine coin flip**, correct on some clean/adequately-
+  sized crops and badly wrong (a harmonic multiple) on others, with
+  nothing about cleanliness or size predicting which: jersey wale, teal
+  wale, knit_05 wale, knit_05 course, knit_08 wale, knit_09 course. The
+  starkest example — knit_05's course axis across its six clean, ≥6-
+  repeat crops reads **+1%, +87%, +1%, -52%, -1%, -75%** — alternating
+  between correct and badly wrong purely from where an otherwise-clean,
+  adequately-sized crop happens to land. "Use a bigger, cleaner crop"
+  has no answer for this class: bigger, cleaner crops disagree with each
+  other.
+
+**Confidence tracks part of this, imperfectly.** The coarse `status`
+flag (confident/uncertain) carries real signal — confident observations
+have median \|err\| 5.8% vs. uncertain's 67.0% — worth keeping. But it's
+a partial gate, not a solution: 29% of "confident" results are still
+wrong by >15% (one reads +100.6% error at confidence 0.83), and 39% of
+"uncertain" results are actually fine (≤15% error) — false confidence
+and over-caution both happen often enough to matter. The **numeric**
+confidence score, separately, carries essentially no information at all:
+Pearson correlation between confidence and absolute error across all 210
+observations is **-0.028** — indistinguishable from zero. Only the
+binary status split is informative; the number attached to it isn't.
+
+**Acted on, not just noted: the numeric score is gone from the API and
+UI.** `AxisOut` (backend/schemas.py) no longer has a `confidence` field
+at all — `/analyze` and `/analyze-multi`'s primary `wale`/`course`
+responses don't send it, and the frontend shows only Confident/Uncertain
+(plus `uncertain_reason`) anywhere a user looks. A number that doesn't
+track error is worse than no number: it invites more trust in one wrong
+result over another equally wrong one just because it carries a higher
+digit. The raw score still exists internally (`AxisResult.confidence` in
+`analysis/gauge_analysis.py`, used computationally — e.g. the
+`UNCERTAIN_CONFIDENCE_THRESHOLD` floor) and is still surfaced in
+`AxisDebugOut`, used only by the per-region detail nested under
+`/analyze-multi`'s `multi_roi` (Developer diagnostics), explicitly
+labeled internal/uncalibrated there. Restoring a real, calibrated
+confidence number is future work that depends on first understanding the
+position-dependent coin-flip documented above — a score fit to today's
+8-9 fixtures without that would very likely just be fit to their
+particular coin-flips, the same "threshold fitted to two photos" trap
+already rejected once in this project (see "Investigated and rejected:
+user-anchored template matching").
+
+**This reframes several mechanism writeups already in this README as the
+same underlying problem, not separate bugs.** Yarn ply-twist on the teal
+fixture (see "Investigated and rejected" below), color pooling on
+variegated yarn (same section), and the density-cross-check override
+that fires on a decisive-but-wrong pick (see "The density cross-check's
+blind spot" above) are three different *mechanisms* for arriving at the
+same *symptom*: a genuinely periodic sub-feature — a half-stitch texture,
+a color-transition rhythm, a leg-crossing blob — sits close enough to the
+true stitch period that something in the pipeline locks onto it instead,
+and which one wins is sensitive to exactly where the analysis window
+sits. The coin-flip pairs found here (jersey wale, teal wale, knit_05,
+knit_08 wale, knit_09 course) are that same ambiguity showing up as
+*position*-dependence rather than a named texture cause — the common
+thread is one underlying period-selection ambiguity with several
+different triggers, not an unrelated bug per fixture.
+
 ### Verify by counting a repeat: user-anchored template matching
 
 Every detection path above — raw autocorrelation, the v0.3 candidate
@@ -1692,6 +1989,103 @@ Locally, you can also just open the SQLite file directly:
 ```bash
 sqlite3 textile-gauge-reader/data/corrections.db "select * from corrections;"
 ```
+
+## Investigated and rejected: user-anchored template matching
+
+Standalone scratch experiment, never wired into `analysis/gauge_analysis.py`
+or the app — recorded here so the negative result isn't relearned later.
+Motivation: this project's single best real-photo result ever
+(`count_repeats_by_template_match`, 5.04 WPI against a true 5.0) came from
+template matching, not the periodicity pipeline. The question was whether
+that generalizes into something worth shipping. Tested against the two real
+fixtures (`real_jersey_sample.jpg`, true 5.0 WPI/7.2 CPI; `sarahmaker-
+knitting-gauge.jpg`, true 4.0 WPI/5.0 CPI). It didn't clear the bar, on
+either axis, for reasons worth keeping on record.
+
+**Wale: the headline number was one lucky anchor, not a real effect.**
+Four hand-picked anchors on jersey looked good (0.8%–14.7% error). A dense
+grid of 72 anchors across the same photo told a different story: the
+**median** anchor gave 14.7% error — *worse* than the current pipeline's
+‑5.6%. The 5.04/0.8% result that motivated this whole investigation was the
+best of a small, eye-picked sample, not representative of a typical click.
+Refining the template by averaging the top-K matches (as originally
+specified) made things worse in most cases, not better — it blurs in
+false-positive phase/texture and broadens the match. On teal, anchor
+placement alone swung wale from ‑13% to +55–66% error (an ~80%-of-true
+spread across 4 anchors) purely by which stitch got clicked.
+
+**A real correlate of the wale drift exists, but it's weak and doesn't
+transfer.** An anchor's half-pitch self-similarity (normalized
+cross-correlation between its template and a copy of itself shifted by half
+a wale-pitch) predicts drift direction: an anchor that resembles its own
+half-pitch neighbor over-counts. At 4 anchors this looked like a clean
+monotonic ranking; at 72 anchors the real relationship is r=0.338 (p=0.004),
+r²≈0.11 — real and worth knowing, but explaining ~10% of the variance is not
+"reliable enough to threshold on." It filters out the *worst* overcounts
+(almost nothing scores >20% error at strongly negative NCC) without
+separating good from bad in the middle of the distribution. Tested against
+teal's failure specifically (the hypothesis being that a 2x sub-lattice
+lock-on looks like high self-similarity in general): r=0.065 (p=0.65),
+indistinguishable from no relationship. The two fabrics' overcounting
+mechanisms are not the same thing, and one diagnostic doesn't catch both.
+
+**Course looked robust to anchor placement — until the test stopped
+cheating.** A dense-grid course readout on jersey (72 anchors) gave a
+median 7.5% error against the current pipeline's ‑53.1% harmonic lock-on,
+with 99% of anchors under 20% error — a dramatic, reproducible-looking win.
+It did not survive an honest re-test. The good numbers depended on sizing
+the match template from the *true, known* gauge (`px_per_inch / true_wpi`)
+to decide how fine a feature to search for — information a deployed
+feature does not have; all it has is the *existing* (possibly already
+wrong) automatic estimate. Re-run using only that: reusing the shipped
+walking-match core (`_walk_template_matches`), seeded and step-sized from
+the existing course reading, just reproduces the same wrong answer, because
+the walk's own search window is derived from the number it's supposed to
+correct. Switching to a free, unseeded whole-ROI scan doesn't fix this
+either — the result becomes acutely sensitive to template size, and there
+is no single default size that works on both fixtures without peeking at
+ground truth: a small template (~13px) recovers jersey's true course
+period, but on teal it locks onto the same yarn ply-twist sub-texture
+described below (65–127% error on 3 of 4 anchors); a larger template
+(~27px) is fine on teal but reproduces jersey's original failure. A
+multi-scale, self-consistency-based scale picker was considered and
+explicitly not built, because validating a scale-selection heuristic
+against the same two photos used to discover the problem is the identical
+trap one level down.
+
+**Two independent, real mechanisms came out of this that are worth keeping
+regardless of the template-matching verdict:**
+- **Yarn ply-twist on the teal fixture.** A direct intensity-profile
+  measurement across the fabric shows a genuine, clean periodic feature at
+  roughly double the true stitch frequency (~7.2 peaks/inch vs. the
+  hand-counted 4 wales/inch) — this is *not* rib structure (there's no
+  visible knit/purl alternation in a gridded zoom of the photo; it's
+  continuous rope/braid-like texture), and it's the same trap that once
+  fooled a careful direct pixel measurement on this exact photo (see
+  "A real second photo..." above). It's what both the wale-axis anchor
+  sensitivity and the course-axis template-size sensitivity above are
+  actually running into on this fixture.
+- **Color pooling on variegated yarn** (see "the column count is
+  region-dependent by 5x" investigation elsewhere in this history):
+  variegated-yarn color transitions that are coherent across multiple
+  rows defeat multi-row consensus defenses, because the noise isn't
+  independent row-to-row the way the consensus math assumes.
+
+*(Both of these, plus the density-cross-check override, are instances of
+the same underlying period-selection ambiguity — see "How ROI-dependent
+is this, really?"'s "central finding" subsection, earlier in this
+document, for the mechanical-sweep data tying them together.)*
+
+**Bar for revisiting.** Not "a better anchor" and not "a smarter refinement
+step" — both were tried and both are secondary to the real blocker, which
+is template *scale* selection. Worth reopening only with: (1) a
+ground-truth-free way to pick or validate template scale at runtime — some
+measurable self-consistency property of the matches themselves (never
+accuracy, which isn't available outside a test), and (2) validation against
+more than two photos, so a scale heuristic can't just be a threshold fitted
+to jersey and teal the way the wale/course numbers above almost were.
+Nothing from this investigation is in the codebase; it lives only in this
+writeup.
 
 ## Known V0 limitations
 
