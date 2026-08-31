@@ -995,6 +995,26 @@ Pearson correlation between confidence and absolute error across all 210
 observations is **-0.028** — indistinguishable from zero. Only the
 binary status split is informative; the number attached to it isn't.
 
+**Acted on, not just noted: the numeric score is gone from the API and
+UI.** `AxisOut` (backend/schemas.py) no longer has a `confidence` field
+at all — `/analyze` and `/analyze-multi`'s primary `wale`/`course`
+responses don't send it, and the frontend shows only Confident/Uncertain
+(plus `uncertain_reason`) anywhere a user looks. A number that doesn't
+track error is worse than no number: it invites more trust in one wrong
+result over another equally wrong one just because it carries a higher
+digit. The raw score still exists internally (`AxisResult.confidence` in
+`analysis/gauge_analysis.py`, used computationally — e.g. the
+`UNCERTAIN_CONFIDENCE_THRESHOLD` floor) and is still surfaced in
+`AxisDebugOut`, used only by the per-region detail nested under
+`/analyze-multi`'s `multi_roi` (Developer diagnostics), explicitly
+labeled internal/uncalibrated there. Restoring a real, calibrated
+confidence number is future work that depends on first understanding the
+position-dependent coin-flip documented above — a score fit to today's
+8-9 fixtures without that would very likely just be fit to their
+particular coin-flips, the same "threshold fitted to two photos" trap
+already rejected once in this project (see "Investigated and rejected:
+user-anchored template matching").
+
 **This reframes several mechanism writeups already in this README as the
 same underlying problem, not separate bugs.** Yarn ply-twist on the teal
 fixture (see "Investigated and rejected" below), color pooling on

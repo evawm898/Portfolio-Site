@@ -2425,31 +2425,22 @@
 
   // --- Step 6: Results -------------------------------------------------
 
-  function confidenceClass(c) {
-    if (c < 0.4) return "is-low";
-    if (c < 0.7) return "is-mid";
-    return "";
-  }
-
-  // Single overall confidence word for the simplified results view --
-  // the weaker of the two axes decides it, and an axis explicitly
-  // flagged "uncertain" (see the backend's harmonic-ambiguity / low-
-  // confidence-floor logic) always forces "Low", even if the raw
-  // percentage alone would round up to "Medium". Detailed per-axis
-  // confidence/percentages/reasons remain available in Developer
-  // diagnostics -- this is deliberately the ONE number/word a normal
-  // user needs.
+  // Single overall confidence word for the simplified results view.
+  // Deliberately just the two states the backend's own data supports --
+  // see AxisOut's docstring (backend/schemas.py): a systematic accuracy
+  // sweep found the numeric confidence score has ~zero correlation with
+  // actual error (r = -0.028), while the confident/uncertain status
+  // itself is a real, meaningful signal (5.8% vs. 67.0% median error).
+  // The API no longer even sends the number for this reason -- do not
+  // reintroduce a Low/Medium/High-style split derived from it. Detailed
+  // per-axis status/reasons remain available in Developer diagnostics --
+  // this is deliberately the ONE word a normal user needs.
   function overallConfidence(r) {
     if (r.wale.spacing_px == null || r.course.spacing_px == null) {
-      return { level: "Low", value: 0 };
+      return { level: "Uncertain" };
     }
-    const value = Math.min(r.wale.confidence ?? 0, r.course.confidence ?? 0);
-    const forcedLow = r.wale.status === "uncertain" || r.course.status === "uncertain";
-    let level;
-    if (forcedLow || value < 0.4) level = "Low";
-    else if (value < 0.7) level = "Medium";
-    else level = "High";
-    return { level, value };
+    const uncertain = r.wale.status === "uncertain" || r.course.status === "uncertain";
+    return { level: uncertain ? "Uncertain" : "Confident" };
   }
 
   // Simplified primary number -- just the label and value. No per-axis
@@ -2484,10 +2475,13 @@
       </div>`;
   }
 
-  // Full per-axis technical detail (confidence %, spacing in px,
-  // detected-position count, uncertain reason) -- moved out of the
-  // normal Results view into Developer diagnostics. Same information
-  // as before, just no longer front-and-center for a normal user.
+  // Full per-axis technical detail (spacing in px, detected-position
+  // count, confident/uncertain status + reason) -- moved out of the
+  // normal Results view into Developer diagnostics. No numeric
+  // confidence here (nor anywhere a user reads): AxisOut no longer
+  // carries it -- see its docstring (backend/schemas.py) for why. The
+  // status/reason pair is the one part of the old confidence signal that
+  // held up under the accuracy sweep, so that's what's shown.
   function axisDiagnosticsCard(label, axis, color) {
     if (axis.spacing_px == null) {
       return `
@@ -2503,8 +2497,7 @@
         <div class="tgr-result-card__label">${label} spacing</div>
         <div class="tgr-result-card__value" style="color:${color}">${axis.spacing_mm.toFixed(2)} mm</div>
         <div class="tgr-result-card__sub">${axis.spacing_px.toFixed(1)} px &middot; ${axis.positions_px.length} detected</div>
-        <div class="tgr-confidence-bar"><div class="tgr-confidence-bar__fill ${confidenceClass(axis.confidence)}" style="width:${Math.round(axis.confidence * 100)}%"></div></div>
-        <div class="tgr-result-card__sub">Confidence: ${uncertain ? "Low — Uncertain" : `${Math.round(axis.confidence * 100)}%`}</div>
+        <div class="tgr-result-card__sub">${uncertain ? "Uncertain" : "Confident"}</div>
         ${uncertain ? `<div class="tgr-uncertain-badge">⚠ ${escapeHtml(axis.uncertain_reason || "Manual verification recommended.")}</div>` : ""}
       </div>`;
   }
@@ -2536,8 +2529,8 @@
     // failure in this OPTIONAL cross-check looked like the primary
     // detection itself was broken. Hidden entirely otherwise; still
     // collapsed by default even when shown, so using it is still opt-in.
-    if (level === "Low") {
-      resultsWarning.textContent = "Low confidence — try “Verify by counting a repeat” below to double-check.";
+    if (level === "Uncertain") {
+      resultsWarning.textContent = "Uncertain — try “Verify by counting a repeat” below to double-check.";
       resultsWarning.hidden = false;
       repeatCountPanel.hidden = false;
     } else {
@@ -2829,10 +2822,10 @@
     roiDiagContent.innerHTML = `
       <div class="tgr-roi-diag-card">
         <div class="tgr-roi-diag-card__row"><span>Source</span><span>${m.source === "manual" ? "Manual" : "Auto-proposed"}</span></div>
-        <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleUsedWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleUsedWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>Wale evidence used</span><span>${isCounted ? `counted (${d ? d.column_count : "?"} columns)` : "periodicity"}</span></div>
         ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
-        <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}%</span></div>
+        <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
         ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered} candidate columns accepted</span></div>` : ""}
       </div>`;
@@ -2990,8 +2983,9 @@
       ["Predicted courses/in", result.course.per_inch != null ? result.course.per_inch.toFixed(2) : "—"],
       ["Wale spacing", result.wale.spacing_mm != null ? `${result.wale.spacing_mm.toFixed(2)} mm` : "—"],
       ["Course spacing", result.course.spacing_mm != null ? `${result.course.spacing_mm.toFixed(2)} mm` : "—"],
-      ["Wale confidence", `${Math.round(result.wale.confidence * 100)}%`],
-      ["Course confidence", `${Math.round(result.course.confidence * 100)}%`],
+      // No confidence row here (or anywhere a user reads) -- see AxisOut's
+      // docstring (backend/schemas.py): the numeric score doesn't track
+      // error and was removed from the API response entirely.
     ];
     verifyPredictedSummary.innerHTML = rows
       .map(
@@ -3129,8 +3123,9 @@
       if (r.course.spacing_mm != null) fd.append("predicted_course_spacing_mm", r.course.spacing_mm);
       if (r.wale.per_inch != null) fd.append("predicted_wales_per_inch", r.wale.per_inch);
       if (r.course.per_inch != null) fd.append("predicted_courses_per_inch", r.course.per_inch);
-      fd.append("predicted_wale_confidence", r.wale.confidence);
-      fd.append("predicted_course_confidence", r.course.confidence);
+      // No predicted_*_confidence anymore: r.wale/r.course no longer carry
+      // the numeric score (see AxisOut's docstring, backend/schemas.py).
+      // The backend form fields still default to 0.0 if omitted.
       fd.append("detected_wale_positions", JSON.stringify(r.wale.positions_px || []));
       fd.append("detected_course_positions", JSON.stringify(r.course.positions_px || []));
 

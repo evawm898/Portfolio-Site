@@ -549,9 +549,13 @@
 }
 .tgr-result-card--primary .tgr-result-card__block { flex: 1; }
 
-/* Simplified Results: one Confidence word (High/Medium/Low) instead of
-   per-axis percentages/bars/uncertain-reason text -- those move to
-   Developer diagnostics (axisDiagnosticsCard). */
+/* Simplified Results: one Confident/Uncertain word instead of per-axis
+   percentages/uncertain-reason text -- those move to Developer
+   diagnostics (axisDiagnosticsCard). Deliberately two states, not three:
+   see AxisOut's docstring (backend/schemas.py) -- the numeric confidence
+   score behind an old three-way High/Medium/Low split didn't track
+   error at all (r = -0.028), so it was removed rather than kept as a
+   finer-grained word. */
 .tgr-confidence-card {
   display: flex;
   flex-direction: column;
@@ -564,9 +568,8 @@
   font-weight: 700;
   margin-top: 0.15rem;
 }
-.tgr-confidence-word--high { color: var(--tgr-ok-dot); }
-.tgr-confidence-word--medium { color: var(--tgr-course); }
-.tgr-confidence-word--low { color: var(--tgr-error); }
+.tgr-confidence-word--confident { color: var(--tgr-ok-dot); }
+.tgr-confidence-word--uncertain { color: var(--tgr-error); }
 
 .tgr-secondary-card {
   display: flex;
@@ -604,20 +607,6 @@
   color: var(--ink-faint);
   margin-top: 0.25rem;
 }
-.tgr-confidence-bar {
-  height: 4px;
-  background: var(--line);
-  border-radius: 2px;
-  margin-top: 0.45rem;
-  overflow: hidden;
-}
-.tgr-confidence-bar__fill {
-  height: 100%;
-  background: var(--tgr-ok-dot);
-}
-.tgr-confidence-bar__fill.is-low { background: var(--tgr-error); }
-.tgr-confidence-bar__fill.is-mid { background: var(--tgr-course); }
-
 .tgr-repeat-result-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
