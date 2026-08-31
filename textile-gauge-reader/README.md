@@ -849,6 +849,86 @@ in-progress: it needs its own investigation (a course-specific structural
 signal, most likely — not a reweighting of terms built for wale), rather
 than reuse of a fix that was checked here and does not generalize.
 
+### How ROI-dependent is this, really?
+
+Two accuracy passes over the same 8 fixtures (real_jersey_sample.jpg,
+sarahmaker-knitting-gauge.jpg, and the knit_sample fixtures — see
+`tests/knit_sample_ground_truth.py`), run in the same session against
+**unchanged detector code**, disagreed by tens of percentage points per
+fixture — including one fixture (jersey course) that looked "fixed"
+between the two passes purely because the second pass's hand-picked crop
+happened to exclude a few rows of ruler ticks the first pass's crop had
+included. That contradicted a finding from the same session (jersey's
+course near-tie has no available fix — see "Course selection" above),
+which is what caught the problem: the two "accuracy" numbers weren't
+measuring the same thing at all.
+
+**Confirmed directly, not assumed.** Re-deriving ROIs that approximate
+the first pass's crops (a natural, non-adversarial choice per fixture —
+e.g. knit_sample_01's whole gauge-tool window, real_jersey_sample's full
+frame minus its ruler strip) reproduced that pass's numbers almost
+exactly on every fixture checked (knit_01 wale +4.6% vs. reported +4.3%;
+knit_01 course +0.72% vs. reported +0.7%; jersey course -52.1% vs.
+reported -53.1%; knit_02 wale +0.6% vs. reported +1.1%; knit_06 wale
+-1.3% vs. reported -0.8%). The code did not move between passes; only
+the crop did. ROI choice is the entire explanation.
+
+**Quantified with a systematic grid, not more hand-picked crops.** For
+each of the 8 fixtures, 15 crops were generated mechanically — 3 sizes
+(30%/50%/70% of the image's shorter dimension, as a centered square) ×
+5 positions (the 4 corners + center) — with no visual inspection of any
+kind, and `analyze_gauge` run on each:
+
+| fixture | wale median err | wale err range | wale harmonic-lock rate | course median err | course err range | course harmonic-lock rate |
+|---|---|---|---|---|---|---|
+| real_jersey_sample | -7.2% | -54% to +90% | 6/15 | -6.9% | -70% to +65% | 7/15 |
+| sarahmaker (teal) | **+68.7%** | -14% to +89% | 5/15 | n/a | n/a | n/a |
+| knit_01 | +6.3% | +2.7% to +109% | 3/15 | **+367%** | -66% to +554% | 3/15 |
+| knit_02 | **+121%** | -5% to +7356% | 7/15 | n/a | n/a | n/a |
+| knit_05 | +5.2% | -33% to +109% | 6/15 | +0.7% | -88% to +402% | 4/15 |
+| knit_06 | **-69.1%** | -85% to -67% | 10/15 | -3.4% | -26% to +6% | 1/15 |
+| knit_08 | +5.5% | -52% to +105% | 6/15 | +1.0% | -69% to +414% | 3/15 |
+| knit_09 | -1.6% | -44% to +8% | 0/15 | **-67.2%** | -86% to +9% | 9/15 |
+
+("harmonic-lock rate" = crops landing within 12% of a 0.5×/1.5×/2×/3×
+multiple of the true value, out of 15.)
+
+**This is a large, plain finding, not a footnote: an error range spanning
+several hundred percentage points from crop choice alone, on more than
+half the fixtures checked, on either axis.** The median across most
+individual fixtures looks reasonable (many sit within ~10% of true) —
+but that's the sweep's *center*, not its *worst case*, and a mechanically
+generated grid hits genuinely bad crops (a harmonic lock, or a scale so
+small the ROI is mostly background/table) often enough that "roughly
+right on a typical crop" is not the same claim as "accurate." Two
+findings stand out:
+
+- **The teal fixture's wale median across the grid (+68.7%) is far worse
+  than the ~correct numbers reported elsewhere in this README** for the
+  same fixture (`test_wale_scoring_weights.py`'s 5 specifically-chosen
+  ~1in² windows). Those windows were chosen *because* earlier debugging
+  found they avoid this fixture's known half-period ambiguity — they are
+  not representative of what an unbiased crop gives on this photo, they
+  were selected against exactly the failure this table now shows is
+  common. Every accuracy figure anywhere in this README computed from a
+  hand-picked "clean" ROI should be read with that in mind.
+- **Harmonic lock is not rare** — it's the modal failure, not a tail
+  event, on several fixtures (knit_06 wale 10/15, knit_09 course 9/15,
+  knit_02 wale 7/15).
+
+**The fix for the harness, not (yet) the detector: pin one ROI per
+fixture, chosen by a stated rule, applied uniformly, with no visual
+judgment and no re-picking.** `tests/knit_sample_ground_truth.py`'s
+`pinned_roi()` and its `ROI_01`/`ROI_02`/`ROI_05`/`ROI_06`/`ROI_08`/
+`ROI_09` constants (see its "FOURTH PASS" docstring section) implement:
+the central square crop at 50% of the image's shorter dimension, computed
+mechanically from image dimensions — no attempt to dodge a ruler, pin, or
+marker that happens to land inside it. Any future accuracy claim against
+these fixtures must use these exact ROIs (verbatim, not "close to") to
+be comparable to any other. This does not make the detector more
+accurate — it makes the next accuracy number about the detector, not
+about who picked the crop.
+
 ### Verify by counting a repeat: user-anchored template matching
 
 Every detection path above — raw autocorrelation, the v0.3 candidate
