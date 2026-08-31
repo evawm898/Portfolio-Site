@@ -734,6 +734,56 @@ Fixing the loop-lattice path safely needs its own targeted evidence — not
 a copy of finding 1's fix, which was checked here and shown not to
 generalize — and is real work still ahead.
 
+### The density cross-check's blind spot: a real secondary peak, not just a bad override
+
+`_cross_check_density` (the wale-only loop-density override described
+above) was found overriding a wale pick the v0.3 evidence scorer had
+already gotten right, and decisively — on a real photo
+(`tests/fixtures/knit_sample_01.jpg`, see `tests/knit_sample_ground_
+truth.py`), evidence scored the correct 85.0px candidate at 0.650
+against the wrong 0.5x-harmonic candidate's 0.553, a 0.097 margin, and
+the density check still substituted the wrong one. Fixed by
+`DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN`: the override may now only fire
+when wale's own top-2 evidence scores are within `UNCERTAIN_SCORE_MARGIN`
+(0.08) of each other — a genuine near-tie — never when the scorer has
+already separated them decisively. Chosen from the margin distribution
+across all 9 fixtures with recorded ground truth, not the one failing
+case: 8 of 9 margins (0.097–0.324) sit comfortably above the threshold;
+only one (0.063, a case whose pick was already correct and never reached
+the density check regardless) sits below it.
+
+That fix closes the override, but doesn't explain why the density check
+had anything to disagree with in the first place — on this photo, `_
+detect_loop_centers` (the DoG blob detector feeding both `_cross_check_
+density` and `_analyze_direction`'s center-pitch correction) really is
+finding roughly twice as many loop centers as there are loops. Measured
+directly: the median nearest-neighbor spacing among detected centers
+(34.5px) is almost exactly half the true loop pitch (70.2px, the
+geometric mean of the true 85×58px wale/course spacing) — not a
+harmonic-selection error downstream, a genuine secondary local maximum
+in the detector's own response map, most likely from adjacent stitches'
+diagonal legs crossing near the midpoint between true loop centers and
+producing a compact-enough blob to pass the DoG blob test.
+
+This is the same *shape* of problem `fold_consistency` already solves
+for the periodicity path — a real, periodic sub-feature (there, one leg
+of a V; here, a leg-crossing between two loops) that's genuinely regular
+enough to be mistaken for the thing actually being measured — but the
+spatial loop-center detector has no equivalent structural defense: DoG
+blob detection has no notion of "is this compact bright spot actually a
+complete loop head, or the crossing point between two legs of adjacent
+loops." `min_separation_px`'s non-max-suppression radius (`0.3 *
+min(p0_wale, p0_course)`) is the only thing currently keeping detections
+apart, and it isn't derived from anything that distinguishes a leg
+crossing from a loop head — simply raising that fraction would risk
+being a fix fitted to this one photo's geometry rather than a
+structurally-grounded one. Root-caused, not fixed here: a real defense
+would need something like a shape check on the blob's local gradient
+structure (does it look like two converging legs, not just "compact and
+bright") the way `_fold_consistency` checks structural resemblance
+between repeats, rather than a threshold tweak on the existing response
+map.
+
 ### Verify by counting a repeat: user-anchored template matching
 
 Every detection path above — raw autocorrelation, the v0.3 candidate
