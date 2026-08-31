@@ -54,7 +54,7 @@
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, DEFAULTS } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, CONTROLS, DEFAULTS } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -71,31 +71,18 @@ const { browser, page } = await launchPage({ viewport: { width: 900, height: 900
 
 function die(msg) { console.error('HARNESS INVALID: ' + msg); return browser.close().then(() => { server.close(); process.exit(2); }); }
 
-/* Preview mode + still camera, then ASSERT both took. */
-async function stillFrame() {
-  await page.evaluate(() => {
-    document.body.classList.add('bl-preview');
-    const ar = document.getElementById('autoRotate');
-    if (ar && ar.checked) { ar.checked = false; ar.dispatchEvent(new Event('change', { bubbles: true })); }
-  });
-  await page.waitForTimeout(120);
-  const bad = await page.evaluate(() => {
-    const out = [];
-    const ar = document.getElementById('autoRotate');
-    if (!ar) out.push('#autoRotate missing'); else if (ar.checked) out.push('autoRotate still on');
-    for (const sel of ['.bl-panel', '.bl-viewpanel', '.bl-header']) {
-      const el = document.querySelector(sel);
-      if (el && getComputedStyle(el).display !== 'none') out.push(sel + ' still visible');
-    }
-    return out;
-  });
+/* Preview mode + still camera. The assertion itself lives in the harness —
+   there are two shot tools now, and the flower project's screenshot plumbing
+   drifted precisely because each tool kept its own copy. */
+async function preview() {
+  const bad = await stillFrame(page);
   if (bad.length) await die(bad.join('; '));
 }
 
 /* One cell: fresh page, real controls, every assertion, then the shots. */
 async function cell({ label, set, zoom }) {
   await openBloom(page, port);
-  await stillFrame();
+  await preview();
   const bad = await applyConfig(page, set);
   if (bad.length) await die(`${label}: ${bad.join('; ')}`);
   const drift = await fullStateDrift(page, set);

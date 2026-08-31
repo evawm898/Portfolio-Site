@@ -51,6 +51,11 @@
        count 3–40, and every exposed slider at min/default/max. A config not
        in the matrix — and every future control until its rows are added —
        is unknown, not passing.
+     - The CAPABILITY rows' structural claims. Non-monotone width and the
+       two-span domain are asserted from the APP'S OWN profile and trim
+       evaluation, not from the STL; what this gate measures on those rows is
+       the same thing it measures everywhere — one connected body. The scope
+       is printed beside each capability row, not only here.
    There are no presets yet; when presets exist they become named rows here
    FIRST (charter: coverage starts where the flower's gate was blind).
 
@@ -58,7 +63,11 @@
      1. FRESH PAGE per row + READ-BACK of every set value + FULL-STATE
         comparison of every registry control against DEFAULTS + set, via the
         app's own snapshot. A row measuring a design other than the one its
-        label names invalidates the run, passes included.
+        label names invalidates the run, passes included. A capability row
+        additionally reads its capability back and asserts the structure it
+        names (a claw with no interior local minimum, or a cleft with one
+        span at the tip, invalidates the run) — and every ORDINARY row
+        asserts no capability is live, so one cannot leak between rows.
      2. PAIRWISE TRIANGLE COMPARISON: the petalCount 40 row must export more
         triangles than the petalCount 3 row. Matched pair, never a global
         reference — it proves the slider actually drove geometry through the
@@ -76,7 +85,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, exportStl, analyzeStl, buildMatrix } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 const MAX_VOXELS = 90e6;    // grids beyond this are SKIPPED and reported, never passed
@@ -151,12 +160,14 @@ for (const row of rows) {
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   const drift = await fullStateDrift(page, row.set);
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }
+  const cap = await applyCapability(page, row);
+  if (cap.length) { validity.push(`${row.label}: ${cap.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   const e = analyzeStl(buf);
   const v = voxelComponents(buf, CELL_MM);
-  if (v.skipped) results.push({ label: row.label, ok: null, ...e, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
-  else results.push({ label: row.label, ok: v.comps === 1, ...e, ...v });
+  if (v.skipped) results.push({ label: row.label, capability: !!row.capability, ok: null, ...e, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
+  else results.push({ label: row.label, capability: !!row.capability, ok: v.comps === 1, ...e, ...v });
 }
 await browser.close();
 server.close();
@@ -180,6 +191,7 @@ for (const r of results) {
     ? `components=${r.comps} stray=${r.strayFraction} tris(export)=${r.tris} boundary=${r.boundary}`
     : (r.note || '');
   console.log(`  ${verdict} ${r.label.padEnd(46)} ${detail}`);
+  if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
 }
 console.log(`\n${results.length - failures.length - skipped.length}/${results.length} rows are ONE connected piece`
   + (skipped.length ? `; ${skipped.length} skipped (grid too large — NOT a pass)` : '')

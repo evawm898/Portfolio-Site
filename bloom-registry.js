@@ -200,6 +200,61 @@ export const CONTROLS = [
     label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 
+  /* SILHOUETTE (Eva, Aug 31 — phase 3). All Standard: geometry and
+     silhouette controls are a DESIGN tier, never calibration, and the flower
+     project got that wrong repeatedly.
+
+     THE TWO TAPERS ARE THE EXPONENTS of the width profile's CORE term,
+     u^a (1-u)^b, and their defaults are EXACTLY the placeholder's constants
+     — which is what makes the whole silhouette engine land byte-identical.
+     They are exposed as themselves rather than re-parameterised as
+     (shoulder, fullness) for one measurable reason: the widest point is
+     a/(a+b), which at the placeholder's values is 0.357142857…, a number no
+     clean slider default lands on. Exposing the shoulder AND the exponents
+     would be two owners of one quantity, so the shoulder is DERIVED and
+     printed in Tip taper's read-out instead. Derive, don't expose.
+
+     WHAT THE EXPONENT FAMILY CANNOT DO, and why the third control exists:
+     w(0) = w(1) = 0 for every a, b > 0, so every member of the family is
+     pinched to a point at both ends. The placeholder's tip is not a shape at
+     all — it is the TIP_HALF_MM constant, governing the last 4 of 28 blade
+     rows. Rose, ranunculus and poppy petals are broad or truncate at the
+     tip. `petalTipBreadth` is the only shipped term that reaches outside the
+     family, and it is EXACTLY 0 by default so it cannot move a byte.
+
+     DELIBERATELY NOT SHIPPED, with grounds rather than silence:
+       - shoulder position — derived from the two tapers (above);
+       - base breadth — the root blend already floors the base at the foot's
+         own half-width (40% of max width at the defaults), so a broadening
+         control would be dead over most of its range (DEAD != INVISIBLE:
+         zero geometry delta means delete it, not ship it). The useful
+         direction at the base is NARROWING, and that is the claw, which
+         does not ship;
+       - claw and cleft — architected, proven by non-shipping capability
+         rows in both gates, exposed nowhere. Eva's ruling: rounded/ovate
+         family only. */
+  { id: 'petalBaseTaper', kind: 'slider', min: 0.3, max: 3, step: 0.05, default: 1,
+    label: 'Base taper', tier: 'standard', role: 'petal',
+    fmt: (v) => `${Number(v).toFixed(2)}${Number(v) < 0.7 ? ' (broad base)' : Number(v) > 1.6 ? ' (narrow base)' : ''}`,
+    visibleWhen: { all: [] } },
+
+  { id: 'petalTipTaper', kind: 'slider', min: 0.6, max: 4, step: 0.05, default: 1.8,
+    label: 'Tip taper', tier: 'standard', role: 'petal',
+    /* Prints the DERIVED widest point. One owner: the geometry computes
+       a/(a+b) from the same two values, and this read-out is the only place
+       it is shown. A control for it would be a second definition. */
+    fmt: (v, ui) => {
+      const b = Number(v);
+      const a = ui ? Number(ui.petalBaseTaper) : 1;
+      return `${b.toFixed(2)} · widest at ${(a / (a + b)).toFixed(2)}`;
+    },
+    visibleWhen: { all: [] } },
+
+  { id: 'petalTipBreadth', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+    label: 'Tip breadth', tier: 'standard', role: 'petal',
+    fmt: (v) => (Number(v) === 0 ? 'pointed' : `${(Number(v) * 100).toFixed(0)}% of width`),
+    visibleWhen: { all: [] } },
+
   /* ARRANGEMENT. 0.60 – 6.00 (Eva, Aug 31). The upper bound: at the defaults
      6.00 puts the ring at 26.5 mm against a 35 mm petal — 0.76 x petal length,
      where the bloom stops reading as a flower and starts reading as a wreath,

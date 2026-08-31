@@ -191,6 +191,110 @@ export function analyzeStl(buf) {
   return { tris, boundary, nonManifold, shells: tris > 0 ? roots.size : 0 };
 }
 
+/* PREVIEW FRAME — chrome hidden and the camera still, ASSERTED.
+
+   Ported from the flower's two silent instrument defects: the control panel
+   composited into every frame for months, and autoRotate left on, which made
+   the camera angle a function of wall-clock time and every cross-run pixel
+   diff meaningless. Both were invisible because the numbers looked
+   plausible. This lives in the harness rather than in a shot tool because
+   there are now TWO shot tools, and a copy in each is a copy that drifts.
+
+   `body.bl-preview` in bloom.css stays THE ONE OWNER of which elements are
+   chrome; this only sets the class and reads the result back. Returns
+   failure strings — the caller must treat any as fatal. */
+export async function stillFrame(page) {
+  await page.evaluate(() => {
+    document.body.classList.add('bl-preview');
+    const ar = document.getElementById('autoRotate');
+    if (ar && ar.checked) { ar.checked = false; ar.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  await page.waitForTimeout(120);
+  return page.evaluate(() => {
+    const out = [];
+    const ar = document.getElementById('autoRotate');
+    if (!ar) out.push('#autoRotate missing'); else if (ar.checked) out.push('autoRotate still on');
+    for (const sel of ['.bl-panel', '.bl-viewpanel', '.bl-header']) {
+      const el = document.querySelector(sel);
+      if (el && getComputedStyle(el).display !== 'none') out.push(sel + ' still visible');
+    }
+    return out;
+  });
+}
+
+/* ===================================================================
+   CAPABILITY — the two NON-SHIPPING petal-model configurations.
+
+   Eva's ruling (Aug 31): the silhouette model is architected for claw and
+   cleft from day one, and capability is PROVEN, NOT CLAIMED. These two specs
+   are the proof. They are reachable only through window.__bloomCapability —
+   no registry row, no DOM input, nothing in the panel sets them — so they
+   can never leak into a shipped state, and "architected for cleft" can never
+   exist only as a sentence in a header.
+
+   ONE DEFINITION, three consumers: both gates and the silhouette contact
+   sheet import these rather than each spelling out its own numbers.
+
+   CLAW  exercises a NON-MONOTONE width profile: a narrow constant stalk
+         below u = 0.30 that also suppresses the foot-continuity floor, so
+         the blade leaves the foot NARROWER THAN THE FOOT and then widens
+         abruptly into the blade. Narrower than both its foot and its blade
+         is what a claw IS, and it is asserted as a strict interior local
+         minimum in the row half-widths rather than eyeballed.
+   CLEFT exercises a TWO-SPAN TRIMMED DOMAIN: above u = 0.55 the petal
+         carries two spans with a central gap, built as a base panel plus
+         two lobe panels that reach down into it. Asserted as two spans at
+         the tip row, plus watertight and connected from the export itself.
+   =================================================================== */
+export const CAPABILITY_CLAW = { label: 'CLAW', stalk: { until: 0.30, halfWidth: 1.4 } };
+export const CAPABILITY_CLEFT = { label: 'CLEFT', cleft: { from: 0.55, gap: 0.35 } };
+
+/* The scope of what the structural assertions below actually measure —
+   printed BESIDE every capability row's result, not only in a header, so a
+   future reader of a green run sees the limit next to the claim (Eva,
+   Aug 31). */
+export const CAPABILITY_SCOPE =
+  'structural claim read from the app\'s own profile/trim evaluation, NOT from the STL; watertight + connected are measured on the export';
+
+/* Sets the capability through the only hook that writes it, and READS BACK
+   what the app now holds — the same doctrine as applyConfig. A capability
+   is invisible to fullStateDrift (it is not a registry control), so this is
+   the assertion that a capability row measures the design its label names.
+   Also asserts the NEGATIVE for ordinary rows: no capability may be live on
+   a row that did not ask for one. Returns failure strings; any is fatal for
+   the RUN, never just the row. */
+export async function applyCapability(page, row) {
+  const spec = row.capability || null;
+  if (spec) await page.evaluate((s) => window.__bloomCapability(s), spec);
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const want = spec ? spec.label : null;
+  const bad = [];
+  if (m.capability !== want) bad.push(`capability: set ${JSON.stringify(want)}, reads back ${JSON.stringify(m.capability)}`);
+  if (!spec) return bad;
+
+  /* STRUCTURAL ASSERTIONS — what makes the row load-bearing rather than
+     decorative. A capability row that only proved "it still exports" would
+     prove nothing about the capability. */
+  const prof = m.petalProfile;
+  if (!Array.isArray(prof) || prof.length < 3) { bad.push(`capability ${want}: no petal profile reported`); return bad; }
+  if (spec.stalk) {
+    /* NON-MONOTONE: a strict interior local minimum, foot rows included. */
+    let found = -1;
+    for (let j = 1; j < prof.length - 1 && found < 0; j++) {
+      let hiBefore = false, hiAfter = false;
+      for (let i = 0; i < j; i++) if (prof[i] > prof[j]) hiBefore = true;
+      for (let k = j + 1; k < prof.length; k++) if (prof[k] > prof[j]) hiAfter = true;
+      if (hiBefore && hiAfter) found = j;
+    }
+    if (found < 0) bad.push(`capability ${want}: width profile has NO strict interior local minimum — [${prof.map((h) => h.toFixed(2)).join(', ')}]`);
+  }
+  if (spec.cleft) {
+    if (m.petalTipSpans !== 2) bad.push(`capability ${want}: tip carries ${m.petalTipSpans} span(s), expected 2 — the domain was not trimmed`);
+    if (!Array.isArray(m.petalPanels) || m.petalPanels.length !== 3) bad.push(`capability ${want}: panels ${JSON.stringify(m.petalPanels)}, expected base + two lobes`);
+  }
+  return bad;
+}
+
 /* ===================================================================
    THE MATRIX — the shared sweep both gates run. Order matters: the SHIPPING
    DEFAULT is row 1, then the arrangement sweep, then every slider at min and
@@ -244,6 +348,21 @@ export function buildMatrix() {
     if (c.role === 'center') continue;                   // needs a style; see block 3
     rows.push({ label: `${c.id} min (${c.min})`, set: [{ id: c.id, value: String(c.min) }] });
     rows.push({ label: `${c.id} max (${c.max})`, set: [{ id: c.id, value: String(c.max) }] });
+  }
+
+  /* 1b. NAMED SILHOUETTE FAMILY CORNERS. A change report is only as good as
+        where it sampled: the min/max rows above move one silhouette control
+        at a time, and the region this change is actually FOR is the combined
+        one — a broad tip against a shifted shoulder. These two are also the
+        candidate defaults on the contact sheet, so a regression reads
+        "ROSE-ish", not "config N". They are ROWS, not presets: the bloom
+        has no preset machinery yet, and inventing one here would be a
+        second source of truth for authored values. */
+  for (const [name, sets] of [
+    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipBreadth: 0.3 }],
+    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipBreadth: 0.5 }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 
   /* 2. Every style x spread {min, default, max} — the ruling's explicit ask.
@@ -301,6 +420,13 @@ export function buildMatrix() {
       });
     }
   }
+  /* 5. CAPABILITY — the two non-shipping rows. Registry state is DEFAULTS
+        (they set no control), so fullStateDrift still applies unchanged and
+        the capability carries its own read-back in applyCapability(). These
+        are last so the matrix still opens on what ships. */
+  rows.push({ label: 'CAPABILITY: claw (non-monotone width)', set: [], capability: CAPABILITY_CLAW });
+  rows.push({ label: 'CAPABILITY: cleft (two-span domain)', set: [], capability: CAPABILITY_CLEFT });
+
   return rows;
 }
 
@@ -324,5 +450,86 @@ export function legacyMatrix() {
   }
   rows.push({ label: 'ALL MIN (fewest, smallest, flat)', set: ids.map((id) => ({ id, value: String(byId[id].min) })) });
   rows.push({ label: 'ALL MAX (most petals, largest, steepest tilt)', set: ids.map((id) => ({ id, value: String(byId[id].max) })) });
+  return rows;
+}
+
+/* ===================================================================
+   phase2Matrix() — THE 76 ROWS AS THEY STOOD AT 21d4602, frozen.
+
+   WHAT IT IS FOR. tools/diff-bloom-bytes.mjs runs exactly these rows on two
+   trees so the silhouette engine's byte report is like-for-like. `--full`
+   cannot do that job: it builds its rows from the LIVE harness, and the live
+   matrix now sets control ids the pre-change tree's registry does not have,
+   so every row would fail read-back against the old tree. legacyMatrix()
+   can do it but covers only the four original sliders — it would leave the
+   entire centre rig unmeasured for byte drift.
+
+   FROZEN AGAINST: 21d4602 ("Bloom: the designed centre as an A/B rig,
+   spread exposed, spread default 2.00"), the commit immediately before the
+   petal silhouette model. Both the ROW SET and the VALUES are literals here,
+   deliberately — legacyMatrix() looks its min/max up in the live registry,
+   which means a later range change would silently rewrite what that
+   "frozen" matrix means. This one cannot drift that way.
+
+   FROZEN MEANS FROZEN. Do not update it to track the registry. It is not a
+   view over anything; it is a record of one commit. If a future change
+   needs a newer baseline, add a NEW frozen matrix beside this one and say
+   which commit it snapshots. Never edit this function to make a comparison
+   pass — a comparison that has to be edited to pass is the finding.
+
+   These rows PIN only the controls that existed at 21d4602, so they inherit
+   every later default. That is deliberate and is the same property
+   legacyMatrix() has: a deliberate change to a NEW control's default would
+   move them all, correctly. The silhouette engine's new controls default to
+   values that reproduce the placeholder exactly, so the expected result here
+   is 0 of 76 moved.
+   =================================================================== */
+export function phase2Matrix() {
+  const rows = [{ label: 'DEFAULT (the shipping configuration)', set: [] }];
+  for (let n = 3; n <= 40; n++) rows.push({ label: `petalCount ${n}`, set: [{ id: 'petalCount', value: String(n) }] });
+
+  /* Frozen ranges — the values these controls carried at 21d4602. */
+  const RANGE = { petalCount: [3, 40], petalLength: [20, 60], petalWidth: [8, 30], petalTilt: [0, 75], spread: [0.6, 6] };
+  const SPREAD_DEFAULT = 2;
+  const CENTER = {
+    DOME: [['centerSize', 0.25, 1], ['centerRise', 0.15, 1.2]],
+    DISC: [['centerSize', 0.25, 1], ['centerDish', 0, 0.9]],
+    RING: [['centerSize', 0.25, 1], ['centerBore', 0.2, 0.75]],
+  };
+  const STYLES_F = ['DOME', 'DISC', 'RING'];
+  const SWEPT = ['petalLength', 'petalWidth', 'petalTilt', 'spread'];   // petalCount swept exhaustively above
+
+  for (const id of SWEPT) {
+    rows.push({ label: `${id} min (${RANGE[id][0]})`, set: [{ id, value: String(RANGE[id][0]) }] });
+    rows.push({ label: `${id} max (${RANGE[id][1]})`, set: [{ id, value: String(RANGE[id][1]) }] });
+  }
+  for (const style of STYLES_F) {
+    for (const [tag, v] of [['min', RANGE.spread[0]], ['default', SPREAD_DEFAULT], ['max', RANGE.spread[1]]]) {
+      rows.push({ label: `${style} × spread ${tag} (${v})`, set: [{ id: 'centerStyle', value: style }, { id: 'spread', value: String(v) }] });
+    }
+  }
+  for (const style of STYLES_F) {
+    for (const [id, lo, hi] of CENTER[style]) {
+      for (const [tag, v] of [['min', lo], ['max', hi]]) {
+        rows.push({ label: `${style} × ${id} ${tag} (${v})`, set: [{ id: 'centerStyle', value: style }, { id, value: String(v) }] });
+      }
+    }
+  }
+  const ALL = ['petalCount', 'petalLength', 'petalWidth', 'petalTilt', 'spread'];
+  for (const [tag, k] of [['MIN', 0], ['MAX', 1]]) {
+    rows.push({ label: `ALL ${tag} (centre off)`, set: ALL.map((id) => ({ id, value: String(RANGE[id][k]) })) });
+  }
+  for (const [tag, k] of [['MIN', 0], ['MAX', 1]]) {
+    for (const style of STYLES_F) {
+      rows.push({
+        label: `ALL ${tag} × ${style} ${k === 0 ? 'min' : 'max'}`,
+        set: [
+          ...ALL.map((id) => ({ id, value: String(RANGE[id][k]) })),
+          { id: 'centerStyle', value: style },
+          ...CENTER[style].map(([id, lo, hi]) => ({ id, value: String(k === 0 ? lo : hi) })),
+        ],
+      });
+    }
+  }
   return rows;
 }

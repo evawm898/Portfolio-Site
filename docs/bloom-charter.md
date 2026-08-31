@@ -67,6 +67,16 @@ What changes from the flower project:
 - Sheets change the failure modes: fewer free-wire hazards, more thin-wall ones. The
   connectedness gate still can't see a free end — carry that limitation forward in its
   header.
+- **A coincident face reads as connected, and that bounds what this gate can endorse
+  (measured Aug 31).** The cleft's panel overlap was expected to be the thing holding
+  the lobes on; dropping it to zero left the panels sharing one cross-section exactly
+  and the gate still reported ONE piece — correctly, per its own "two solids that
+  merely graze within one cell read as connected" limit. Only a real gap (lobes
+  starting a row ABOVE the base) turned it red, at five components with boundary edges
+  still zero. So the gate distinguishes touching from separated, NOT overlapping from
+  touching; any preference for real shared volume over a coincident touch is a
+  slicer-robustness argument, and like every structural argument in this project family
+  it is untested until something prints.
 
 ## Carried over wholesale (see the flower-project skill for full text)
 
@@ -157,9 +167,75 @@ printer — and sheet petals add a min-wall coupon to that list.
 - ~~Foot ownership~~ **Settled Aug 31:** the foot ring — where feet land, and the foot
   cross-section — gets one named owner function in **phase 1**; the petal builder and the
   phase-2 center builder both read it. No second definition, ever.
-- Phase 3 entry: which of the flower's six absences (gap analysis) the bloom's petal
-  model should avoid inheriting — non-monotone width (claw) and domain trimming (cleft)
-  are the two that change what the silhouette can be.
+- ~~Phase 3 entry: which of the flower's six absences the petal model should avoid
+  inheriting~~ **Settled Aug 31: BOTH, architected from day one, neither shipped.**
+  The placeholder ovate is replaced by a width PROFILE over a trimmable DOMAIN.
+  Width is a term list with per-term domains combined by plain `Math.max` (Eva's
+  ruling: one combinator, trivially bit-exact; the worst reachable kink is
+  photographed rather than pre-engineered away). The boundary is a list of spans per
+  row, meshed as single-span PANELS, so a cleft is a base panel plus two lobe panels
+  rather than one grid with a hole — closed by construction instead of by argument
+  about the sinus.
+
+  **Neither claw nor cleft is a control, and both are PROVEN rather than claimed.**
+  Two non-shipping capability rows, reachable only through `window.__bloomCapability`
+  (no registry row, no DOM input), run in both gates: CLAW asserts a strict interior
+  local minimum in the row half-widths — narrower than both its foot and its blade —
+  and CLEFT asserts two spans at the tip. Both export watertight and as ONE connected
+  piece, so no xfail was needed. The structural assertions read the app's own
+  profile/trim evaluation, not the STL; that scope is printed beside each capability
+  row's result, not only in a header.
+
+  **Shipped: three Standard controls, all `role: 'petal'`** — Base taper and Tip taper
+  (the CORE term's exponents, defaults exactly the placeholder's 1.0 and 1.8) and Tip
+  breadth (default exactly 0). The widest point `a/(a+b)` is DERIVED and printed in
+  Tip taper's read-out; a control for it would be a second owner. Tip breadth exists
+  for a measured reason: `w(0) = w(1) = 0` for every `a,b > 0`, so the exponent family
+  is pinched to a point at BOTH ends and cannot reach a truncate or rounded tip — the
+  placeholder's tip was never a shape, it was the 0.8 mm blunt-tip floor governing the
+  last 4 of 28 blade rows.
+
+  **The engine landed BYTE-IDENTICAL: 0 of 76 configs moved** on `phase2Matrix()`, the
+  76 rows frozen at 21d4602 (proved deep-equal to that commit's own `buildMatrix()`
+  rather than transcribed and hoped for). The three controls add ZERO triangles at
+  every shipped setting — the grid stays 31x10 — so the default bloom is 10,080 tris
+  live and export alike, unchanged.
+
+  **The foot is untouched, and it is MEASURED, not asserted.**
+  `diff-bloom-bytes.mjs --region foot` hashes the export triangles all of whose
+  vertices lie in the hub slab (|z| <= t/2), which at any tilt > 0 is exactly the foot
+  rows plus the hub disc: bit-identical on all 71 in-scope rows. The 5 rows at
+  petalTilt 0 are reported OUT OF SCOPE — with no tilt the blade lies in the same
+  plane and the criterion cannot separate them — never as passes.
+
+- ~~The default silhouette — open, and deliberately separated from the engine~~
+  **Settled Aug 31 from the candidate sheet: the POINTED OVATE STAYS.** Eva ruled
+  against both candidates; no close-out commit was made and no default moved. So the
+  silhouette engine landed as ONE event, not two: the engine is byte-identical (0 of 76)
+  and the shipping default is the value the placeholder had.
+
+  This is a decision, NOT an absence of one, and the difference matters to whoever picks
+  this up next. ROSE-ish and POPPY-ish were built, rendered face-on beside the ovate with
+  their control values in the cell, and rejected on sight. They remain as named rows in
+  the gate matrix and as cells on `tools/shot-bloom-silhouette.mjs`'s candidate sheet —
+  they are gate coverage of the region the controls are FOR, and they must not be deleted
+  as "unused presets". Reopening the default is a fresh ruling needing fresh evidence;
+  do not treat the ovate as a placeholder still awaiting replacement, because it is not
+  one any more. Were the default ever to move, it would still be its own event with a
+  partition report — the spread precedent — since every export inheriting it moves.
+
+- ~~The max-combinator kink — a hypothesis on the sheet~~ **Settled Aug 31: PLAIN
+  `Math.max` STAYS, and the kink reads fine.** Eva ruled from the tip-cropped sheet, at
+  the worst case the shipped ranges reach (tip breadth 0.60 against the steepest falling
+  core, 60 mm petals). No p-norm blend is queued and none should be written.
+
+  The saving is the point, and it is the reason this was photographed rather than
+  engineered around: a smooth blend would have needed term-count switching to stay
+  bit-exact, plus an epsilon story about the moment a term appears — complexity bought
+  against a corner nobody could object to once they saw it. ONE combinator now governs
+  the shape terms and the floors alike, which is also what makes the byte argument short
+  enough to check by eye. Do not reopen this on the strength of reading the code and
+  imagining the corner; the picture exists, and a fresh ruling needs a fresh picture.
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).
 - ~~Ring radius / spread exposure — re-decide at phase 2 entry~~ **Settled Aug 31, at
