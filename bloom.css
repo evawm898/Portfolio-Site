@@ -1,0 +1,88 @@
+/* bloom.css — Parametric Bloom page. Standalone; shares nothing with
+   flower.css so neither page can restyle the other by accident. */
+
+:root {
+  --bl-bg: #0c0f0e;
+  --bl-ink: #e8ece9;
+  --bl-dim: #9aa8a0;
+  --bl-line: #24302b;
+  --bl-accent: #8fd6b8;
+  --bl-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --bl-serif: "Fraunces", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bl-bg);
+  color: var(--bl-ink);
+  font-family: var(--bl-mono);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+#bloom-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+.bl-header {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+  text-align: center; pointer-events: none; z-index: 4;
+}
+.bl-header h1 { font-family: var(--bl-serif); font-weight: 500; font-size: 26px; margin: 4px 0 2px; }
+.bl-sub { margin: 0; color: var(--bl-dim); font-size: 11px; letter-spacing: .04em; }
+.bl-back { pointer-events: auto; color: var(--bl-dim); text-decoration: none; font-size: 11px; }
+.bl-back:hover { color: var(--bl-accent); }
+
+.bl-eyebrow {
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--bl-dim); margin-bottom: 10px;
+}
+
+.bl-viewpanel {
+  position: fixed; top: 18px; left: 18px; z-index: 4;
+  background: rgba(12, 15, 14, .82); border: 1px solid var(--bl-line);
+  border-radius: 10px; padding: 12px 14px; backdrop-filter: blur(6px);
+}
+.bl-toggle { display: flex; align-items: center; gap: 8px; }
+.bl-toggle label { color: var(--bl-dim); font-size: 11px; }
+
+.bl-panel {
+  position: fixed; top: 18px; right: 18px; z-index: 4;
+  width: 250px; max-height: calc(100vh - 36px); overflow-y: auto;
+  background: rgba(12, 15, 14, .82); border: 1px solid var(--bl-line);
+  border-radius: 10px; padding: 14px 16px 12px; backdrop-filter: blur(6px);
+}
+
+.bl-ctrl { margin-bottom: 12px; }
+.bl-ctrl label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; color: var(--bl-dim); letter-spacing: .04em; margin-bottom: 4px;
+}
+.bl-val { color: var(--bl-ink); }
+.bl-ctrl input[type="range"] {
+  width: 100%; accent-color: var(--bl-accent); height: 18px; margin: 0;
+}
+
+.bl-actions { display: flex; gap: 8px; margin: 14px 0 10px; }
+.bl-btn {
+  flex: 1; font: inherit; font-size: 11px; letter-spacing: .06em;
+  color: var(--bl-ink); background: transparent;
+  border: 1px solid var(--bl-line); border-radius: 7px; padding: 7px 8px; cursor: pointer;
+}
+.bl-btn:hover { border-color: var(--bl-accent); color: var(--bl-accent); }
+.bl-btn--primary { border-color: var(--bl-accent); color: var(--bl-accent); }
+.bl-btn--primary:hover { background: rgba(143, 214, 184, .12); }
+
+.bl-readout {
+  font-size: 10.5px; color: var(--bl-dim); border-top: 1px solid var(--bl-line);
+  padding-top: 8px; white-space: pre-line; min-height: 1.2em;
+}
+.bl-readout .bl-err { color: #e8a1a1; }
+
+/* body.bl-preview — THE ONE OWNER of chrome-hiding for headless capture.
+   tools/shot-bloom.mjs adds this class (and asserts the result) instead of
+   keeping its own selector list; the flower's screenshot tool composited the
+   control panel into every frame for months because it had no such owner. */
+body.bl-preview .bl-panel,
+body.bl-preview .bl-viewpanel,
+body.bl-preview .bl-header { display: none; }

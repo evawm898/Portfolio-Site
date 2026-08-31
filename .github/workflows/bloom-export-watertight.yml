@@ -1,0 +1,46 @@
+# Print-safety gate for the Parametric Bloom (docs/bloom-charter.md): every
+# config in the matrix must export as a watertight STL — the pass criterion is
+# boundary edges === 0 and nothing else (nonManifold / shells are unrated
+# diagnostics; see the tool's header). tools/verify-bloom-export.mjs does the
+# actual check: headless Chromium, the real Get STL click, a real STL parse.
+name: bloom-export-watertight
+
+on:
+  pull_request:
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-geometry.js
+      - bloom-registry.js
+      - tools/verify-bloom-export.mjs
+      - tools/bloom-harness.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/bloom-export-watertight.yml
+  push:
+    branches: [main]
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-geometry.js
+      - bloom-registry.js
+      - tools/verify-bloom-export.mjs
+      - tools/bloom-harness.mjs
+      - tools/chromium-harness.mjs
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every config must export watertight (boundary edges = 0)
+        run: node tools/verify-bloom-export.mjs
