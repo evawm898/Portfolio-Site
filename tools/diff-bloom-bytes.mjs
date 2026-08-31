@@ -31,6 +31,12 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase4   `phase4Matrix()` — the 106 rows frozen at 3c542fb, the commit
+                before the thickness layer. The STRONGEST of the frozen
+                baselines: it is the only one that carries the seven named
+                FORM corners and all four CAPABILITY rows, so a change that
+                moved a curled, rolled or clefted petal's bytes at the new
+                defaults shows here and in neither of the others.
      --phase2   `phase2Matrix()` — the 76 rows frozen at 21d4602, the commit
                 before the petal silhouette model. This is the like-for-like
                 baseline for the silhouette engine: `--full` cannot do that
@@ -424,6 +430,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 const FULL = process.argv.includes('--full');
 const PHASE2 = process.argv.includes('--phase2');
 const PHASE3 = process.argv.includes('--phase3');
+const PHASE4 = process.argv.includes('--phase4');
 /* Exactly one matrix. The guard and the LABEL are derived from one list so a
    new matrix cannot be added to the runner while the recorded label silently
    keeps saying something else — which is what happened when --phase3 landed:
@@ -431,13 +438,22 @@ const PHASE3 = process.argv.includes('--phase3');
    naming a computation nobody performed, in this project's most repeated
    defect shape. --compare does not read the field, so nothing drew a wrong
    conclusion from it; it was wrong in the record, which is enough. */
-const MATRIX_FLAGS = [[FULL, 'full'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
+const MATRIX_FLAGS = [[FULL, 'full'], [PHASE4, 'phase4'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
 const chosen = MATRIX_FLAGS.filter(([on]) => on);
 if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
 const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
 const rows = [];
 const validity = [];
-for (const row of (FULL ? buildMatrix() : PHASE3 ? phase3Matrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {
+const MATRIX_FN = { full: buildMatrix, phase4: phase4Matrix, phase3: phase3Matrix, phase2: phase2Matrix, legacy: legacyMatrix };
+/* ONE list decides the flag, the recorded LABEL and the rows. It used to be
+   two — a flag list for the guard and a ternary chain for the rows — and the
+   chain silently fell through for any flag the chain did not know. That is
+   how `--phase3` once recorded matrix:"legacy" while running phase3Matrix();
+   it happened again in the other direction the moment `--phase4` was added
+   (the flag was accepted, legacyMatrix() ran, and the record said so while
+   nobody read it). The record was honest both times and the second copy was
+   the defect, so there is now only one. */
+for (const row of MATRIX_FN[MATRIX]()) {
   await openBloom(page, port);
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
