@@ -164,28 +164,213 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
 }
 
 /* ===================================================================
-   buildPetalInto — one placeholder petal: a thin SOLID sheet, simple ovate.
+   THE PETAL SILHOUETTE MODEL — a width PROFILE over a trimmable DOMAIN.
 
-   Closed by construction: a mid-surface grid, offset ±t/2 along the per-row
-   sheet normal into a top face and a bottom face, then a rim strip around the
-   whole perimeter (inner end cap, tip cap, both side edges). Zero boundary
-   edges per petal, independent of every other solid.
+   This replaces the placeholder ovate (37e160d..21d4602) with the real
+   model. It is architected for CLAW and CLEFT from day one even though
+   neither ships: those were the flower project's two hard absences, and
+   retrofitting them is the expensive path this project exists to avoid
+   (charter, "Phase 3 entry"). Neither is a control; both are proven by
+   non-shipping capability rows in the gates, never by this sentence.
 
-   Layout along the local length coordinate s:
-     s ∈ [-overhang, 0]   the FOOT — flat in the hub plane (z = ring plane),
-                          constant half-width ring.width/2. Staying flat until
-                          the ring is what guarantees the foot lies inside the
-                          hub slab whatever the tilt slider does.
-     s ∈ (0, length]      the BLADE — tilted up by petalTilt about the ring
-                          tangent; ovate half-width profile (widest below the
-                          middle), blended out of the foot width near the base.
+   BYTE-IDENTITY AT DEFAULTS IS A PROPERTY OF THE CODE, not a lucky result.
+   Three things make it hold, and each is load-bearing:
+     - the CORE term evaluates the SAME expression in the SAME order as the
+       placeholder's `halfW * (u^a (1-u)^b) / gPk`, with a and b now read
+       from controls whose defaults are exactly 1.0 and 1.8;
+     - the TIP_PLATEAU term evaluates to EXACTLY 0 at its default, and
+       `Math.max(x, 0) === x` for every x >= 0 (verified over the range);
+     - the default domain is the single span [-1, 1], and the span-form
+       column map `vLo + ((vHi - vLo) * j) / (NV - 1)` is bit-identical to
+       the placeholder's `-1 + (2 * j) / (NV - 1)` for every j (verified for
+       all ten columns; vHi - vLo is exactly 2).
+   Change any of those three and the byte report is the thing that tells
+   you — it is a two-sided measurement, not a hope.
 
-   The tip is blunted to TIP_HALF_MM rather than pinched to a point: a
-   zero-width tip row would collapse the rim strip into degenerate triangles.
-   Placeholder silhouette; phase 3 owns the real one. */
-const TIP_HALF_MM = 0.8;
+   WHERE THE PROFILE'S INFLUENCE BEGINS: strictly at s > 0, the blade rows.
+   THE FOOT IS NOT TOUCHED BY ANYTHING IN THIS FILE'S SILHOUETTE LAYER. The
+   three foot rows are flat in the hub plane at half-width ring.width / 2,
+   landing on ring.radius and running inward by ring.overhang — all four
+   quantities owned by footRing() and none of them a function of the
+   silhouette. That is why the junction argument is unchanged: the hub is a
+   disc of ring.radius, the feet overlap it by a fixed FRACTION of the ring,
+   and no profile or trim setting can move either. Measured per row, before
+   and after, by `node tools/diff-bloom-bytes.mjs --region foot`.
 
-export function buildPetalInto(acc, state, ring, slot) {
+   THE COMBINATOR IS PLAIN Math.max (Eva, Aug 31). One combinator for the
+   shape terms and the floors alike, trivially bit-exact. It puts a C0 kink
+   at each crossover; the placeholder already had two and they read fine.
+   The worst reachable case — max tip breadth against the steepest falling
+   core — is PHOTOGRAPHED on the silhouette contact sheet rather than
+   pre-engineered away. If it reads badly, a smooth p-norm blend is a
+   later, separately-evidenced change.
+
+   NO FORM WORK LIVES HERE. Cup, spine curl, cross-section roll and twist
+   are the NEXT session (charter: the four curve terms). Sheets stay flat:
+   one normal per row, constant across the width, exactly as before.
+   =================================================================== */
+
+/* The blunt-tip floor. A zero-width tip row would collapse the rim strip
+   into degenerate triangles, so the tip is blunted rather than pinched. */
+export const TIP_HALF_MM = 0.8;
+/* Where the foot's width stops floor-ing the blade. Frozen at the
+   placeholder's value — moving it moves every export. */
+const ROOT_BLEND_END = 0.30;
+const NU = 28;   // blade rows
+const NV = 10;   // columns across one span
+/* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
+   both panels occupy the slab between these rows, so the slicer unions
+   solid material rather than being asked to join two shells that merely
+   touch on a plane.
+
+   WHAT THE POSITIVE CONTROL ACTUALLY MEASURED (Aug 31), because the obvious
+   reading of this constant is wrong and cost a run to find out:
+     - overlap 1  -> 15,136 tris, ONE connected component. Ships.
+     - overlap 0  -> 14,496 tris, still ONE connected component. The lobe
+                    panels start on the base panel's LAST row, so the two
+                    share a cross-section exactly. That is a coincident face,
+                    not a gap, and the connectedness gate reads it as joined
+                    — correctly, and consistently with its own documented
+                    limit that two solids grazing within one cell read as
+                    connected. So overlap 0 is NOT the failure mode.
+     - overlap -1 -> 13,856 tris, FIVE components, 10.86% of the surface
+                    detached, gate exit 1. The lobes start one row ABOVE the
+                    base panel, leaving a genuine 1.25 mm gap at the defaults
+                    — wider than the 0.6 mm voxel. THIS is the failure this
+                    machinery can actually produce, and it is the one the
+                    gate can observe. Boundary edges stayed 0 throughout:
+                    watertight and in five pieces at the same time, which is
+                    exactly why connectedness is a separate gate.
+   The gate therefore cannot distinguish overlap 1 from overlap 0. One is
+   chosen over zero on slicer-robustness grounds — shared volume rather than
+   a zero-thickness coincident touch — and that is an ARGUMENT, not a
+   measurement, until something prints. Do not read the gate as endorsing it.
+   The mutation lives in a throwaway worktree, never as a switch that ships. */
+const PANEL_OVERLAP_ROWS = 1;
+
+/* ===================================================================
+   widthProfile — THE ONE OWNER of "how wide is the blade at u".
+
+   The profile is a TERM LIST combined by max, floored by the printability
+   and continuity clamps. Each term carries its own domain [from, to] and
+   contributes nothing outside it — which is what lets a term NARROW the
+   blade (by restricting the core's domain) rather than only widen it. A
+   pure max-envelope cannot express a claw; a domained one can.
+
+   SHIPPED TERMS
+     CORE          the power curve u^a (1-u)^b, a = petalBaseTaper,
+                   b = petalTipTaper. Every member of this family is pinched
+                   to a point at BOTH ends (w(0) = w(1) = 0 for all a,b > 0),
+                   which is exactly why TIP_PLATEAU has to exist.
+     TIP_PLATEAU   rises from 0 at the widest point to petalTipBreadth of
+                   the max half-width at the tip. The only shipped term that
+                   reaches outside the exponent family — truncate and
+                   rounded tips (rose, poppy) are unreachable without it.
+                   EXACTLY ZERO at its default, so it cannot move a byte.
+
+   CAPABILITY TERM — non-shipping, reachable only through the harness hook
+     STALK         a narrow constant below `until`, which also restricts
+                   CORE's domain to [until, 1] and suppresses the root
+                   blend. The result is narrower than BOTH its foot and its
+                   blade — a strict interior local minimum in the row
+                   half-widths, which is what a claw IS and what the gate
+                   asserts. Non-monotone, proven rather than claimed.
+
+   FLOORS (hard clamps, not shape — one owner, this list)
+     rootBlend     the foot's own half-width, decaying to zero by
+                   ROOT_BLEND_END, so blade and foot meet without a waist.
+                   Reads ring.width — footRing() is the owner, this is a
+                   consumer. Suppressed only by STALK, which is the claw's
+                   shoulder and is deliberate.
+     TIP_HALF_MM   the blunt-tip floor.
+   =================================================================== */
+export function widthProfile(state, ring, halfW, cap) {
+  const a = state.petalBaseTaper;
+  const b = state.petalTipTaper;
+  const uPk = a / (a + b);                                     // the derived widest point
+  const gPk = Math.pow(uPk, a) * Math.pow(1 - uPk, b);         // normalise the peak to 1
+  const core = (u) => (Math.pow(u, a) * Math.pow(1 - u, b)) / gPk;
+  const footHalf = ring.width / 2;
+  const stalk = (cap && cap.stalk) || null;
+
+  const terms = [
+    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * core(u) },
+    { name: 'TIP_PLATEAU', from: 0, to: 1,
+      at: (u) => state.petalTipBreadth * halfW * clamp((u - uPk) / (1 - uPk), 0, 1) },
+  ];
+  if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
+
+  /* The claw's shoulder: a stalk narrower than the foot is the whole point,
+     so the foot-continuity floor stands down for it — and ONLY for it. */
+  const rootBlend = stalk ? () => 0 : (u) => footHalf * Math.max(0, 1 - u / ROOT_BLEND_END);
+
+  return {
+    uPk, terms, footHalf,
+    halfWidthAt(u) {
+      let shape = 0;
+      for (const t of terms) {
+        if (u < t.from || u > t.to) continue;
+        const v = t.at(u);
+        if (v > shape) shape = v;
+      }
+      return Math.max(shape, rootBlend(u), TIP_HALF_MM);
+    },
+  };
+}
+
+/* ===================================================================
+   trimPanels — THE ONE OWNER of the petal's domain decomposition.
+
+   The petal's boundary is a TRIMMABLE DOMAIN: per row, which spans of the
+   cross-width coordinate v carry material. The default is one span over
+   every row. A CLEFT is two spans with a gap, and the machinery that makes
+   that watertight is the reason this abstraction exists at all.
+
+   A PANEL IS A SINGLE-SPAN QUAD GRID over a contiguous run of rows, closed
+   on its own (two faces + two side rims + two end caps). That is the whole
+   trick: a clefted petal is not one grid with a hole, it is a base panel
+   plus two lobe panels, each individually closed — so the export contract
+   (every primitive an individually closed solid, zero boundary edges) holds
+   by construction rather than by argument about the sinus.
+
+   The lobe panels start PANEL_OVERLAP_ROWS below the split and evaluate
+   their span there too, so they reach DOWN INTO the base panel's material.
+   The shared slab is a real overlapping volume, which is what makes the
+   three solids one connected body. See PANEL_OVERLAP_ROWS above for what
+   happens when that overlap is dropped, and why it is the positive control.
+   =================================================================== */
+export function trimPanels(rowCount, uAt, cap) {
+  const cleft = (cap && cap.cleft) || null;
+  if (!cleft) return [{ label: 'full', rowFrom: 0, rowTo: rowCount - 1, spanAt: () => [-1, 1] }];
+
+  let mSplit = rowCount - 1;
+  for (let i = 0; i < rowCount; i++) { if (uAt(i) > cleft.from) { mSplit = i; break; } }
+  const gHalf = cleft.gap / 2;
+  const lobeFrom = Math.max(0, mSplit - PANEL_OVERLAP_ROWS);
+  return [
+    { label: 'base', rowFrom: 0, rowTo: mSplit, spanAt: () => [-1, 1] },
+    { label: 'lobe-', rowFrom: lobeFrom, rowTo: rowCount - 1, spanAt: () => [-1, -gHalf] },
+    { label: 'lobe+', rowFrom: lobeFrom, rowTo: rowCount - 1, spanAt: () => [gHalf, 1] },
+  ];
+}
+
+/* ===================================================================
+   buildPetalInto — one petal: thin SOLID sheet panels, closed by
+   construction.
+
+   Layout along the local length coordinate s, unchanged from the
+   placeholder because the FOOT IS SETTLED AND OWNED:
+     s in [-overhang, 0]   the FOOT — flat in the hub plane (z = ring
+                           plane), constant half-width ring.width / 2. Three
+                           rows. The silhouette layer never writes these.
+     s in (0, length]      the BLADE — tilted by petalTilt about the ring
+                           tangent, half-width from widthProfile(), domain
+                           from trimPanels(). 28 rows.
+
+   Returns the petal's own measurements for the metrics hook, so the gates
+   and the contact sheet ASK THE BUILDER rather than recomputing anything.
+   =================================================================== */
+export function buildPetalInto(acc, state, ring, slot, cap = null) {
   const t = acc.floorThickness(SHEET_THICKNESS_MM);
   const length = state.petalLength * slot.scale;
   const tilt = ((state.petalTilt + slot.tiltExtra) * Math.PI) / 180;
@@ -198,25 +383,18 @@ export function buildPetalInto(acc, state, ring, slot) {
   const T = [-sinA, cosA, 0];
   const Z = [0, 0, 1];
 
-  /* Ovate half-width profile on u ∈ [0,1]: g(u) = u^a (1-u)^b, peak at
-     a/(a+b) ≈ 0.36 — broadest below the middle, which is what "ovate" means.
-     Normalised so the peak equals 1. */
-  const a = 1.0, b = 1.8;
-  const uPk = a / (a + b);
-  const gPk = Math.pow(uPk, a) * Math.pow(1 - uPk, b);
-  const ovate = (u) => (Math.pow(u, a) * Math.pow(1 - u, b)) / gPk;
+  const profile = widthProfile(state, ring, halfW, cap);
 
-  const NU = 28;   // blade rows
-  const NV = 10;   // columns across the width
-  /* Row list: foot rows (flat), then blade rows. Each row: mid-surface centre
-     point C, per-row unit normal N (constant across the width — the sheet is
-     flat across its width; no cup in phase 1), half-width h. */
+  /* Row list: foot rows (flat), then blade rows. Each row: mid-surface
+     centre point C, per-row unit normal N (constant across the width — the
+     sheet is flat across its width; no cup, no roll, no twist in phase 3),
+     half-width h, and u (0 through the foot, i/NU on the blade). */
   const rows = [];
   const footS = [-ring.overhang, -ring.overhang / 2, 0];
   for (const s of footS) {
     rows.push({
       C: [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z],
-      N: Z, h: footHalf,
+      N: Z, h: footHalf, u: 0,
     });
   }
   const dir = [R[0] * Math.cos(tilt), R[1] * Math.cos(tilt), Math.sin(tilt)];       // blade direction
@@ -224,22 +402,46 @@ export function buildPetalInto(acc, state, ring, slot) {
   for (let i = 1; i <= NU; i++) {
     const u = i / NU;
     const s = u * length;
-    /* Half-width: the ovate profile, never narrower than the foot taper near
-       the base (so blade and foot meet without a waist), never narrower than
-       the blunt tip. */
-    const h = Math.max(halfW * ovate(u), footHalf * Math.max(0, 1 - u / 0.3), TIP_HALF_MM);
     rows.push({
       C: [ring.radius * R[0] + dir[0] * s, ring.radius * R[1] + dir[1] * s, slot.z + dir[2] * s],
-      N: nrm, h,
+      N: nrm, h: profile.halfWidthAt(u), u,
     });
   }
 
-  /* Vertex grids: top[i][j], bot[i][j]; j spans v ∈ [-1, 1] across the width. */
+  const panels = trimPanels(rows.length, (i) => rows[i].u, cap);
+  for (const panel of panels) emitPanel(acc, rows, panel, t, T);
+
+  const midS = 0.5 * length;
+  return {
+    /* Row half-widths, FOOT ROWS INCLUDED — a claw is narrower than both
+       its foot and its blade, so the foot rows are part of the evidence. */
+    profile: rows.map((r) => r.h),
+    footRows: footS.length,
+    panels: panels.map((p) => p.label),
+    tipSpans: panels.filter((p) => p.rowTo === rows.length - 1).length,
+    mid: [ring.radius * R[0] + dir[0] * midS, ring.radius * R[1] + dir[1] * midS, slot.z + dir[2] * midS],
+    /* The blade's own sheet normal — what a face-on view of the SILHOUETTE
+       must look down. Reported rather than re-derived by the shot tool: a
+       consumer recomputing this from tilt and azimuth would be a second
+       owner of the petal frame. */
+    normal: nrm,
+    tip: [ring.radius * R[0] + dir[0] * length, ring.radius * R[1] + dir[1] * length, slot.z + dir[2] * length],
+  };
+}
+
+/* One panel: a single-span quad grid, individually closed. Emission order
+   is the placeholder's exactly — all face quads, then both side rims, then
+   the two end caps — because at the default there is exactly ONE panel and
+   the byte report is a two-sided assertion that nothing moved. */
+function emitPanel(acc, rows, panel, t, T) {
   const top = [], bot = [];
-  for (const row of rows) {
+  for (let i = panel.rowFrom; i <= panel.rowTo; i++) {
+    const row = rows[i];
+    const span = panel.spanAt(i);
+    const vLo = span[0], vHi = span[1];
     const ht = [], hb = [];
     for (let j = 0; j < NV; j++) {
-      const v = -1 + (2 * j) / (NV - 1);
+      const v = vLo + ((vHi - vLo) * j) / (NV - 1);
       const P = [
         row.C[0] + T[0] * row.h * v,
         row.C[1] + T[1] * row.h * v,
@@ -251,7 +453,7 @@ export function buildPetalInto(acc, state, ring, slot) {
     top.push(ht); bot.push(hb);
   }
 
-  const NR = rows.length;
+  const NR = top.length;
   /* Top face (outward = +N side) and bottom face (reversed winding). */
   for (let i = 0; i < NR - 1; i++) {
     for (let j = 0; j < NV - 1; j++) {
@@ -475,14 +677,28 @@ function torusInto(acc, state, rC) {
    bloom: 'stem' | 'branch' | null — a value, NEVER a boolean (flower lesson:
    buildBudInto keys off the thing itself, not a label correlating with it).
    Only null exists in phase 1; passing anything else is a loud error rather
-   than a silent ignore, so the first stem session cannot half-wire it. */
-export function buildBloomInto(acc, state, { below = null } = {}) {
+   than a silent ignore, so the first stem session cannot half-wire it.
+
+   `capability` is the NON-SHIPPING petal-model override: null in every
+   shipped state, and settable ONLY through window.__bloomCapability by the
+   gates and the contact sheet. It has NO REGISTRY ROW and no DOM input by
+   design — "architected for claw and cleft" has to be provable, and a
+   capability that is only asserted in a comment is exactly the label-naming-
+   a-computation-nobody-performed defect this project keeps finding. It is
+   an ARGUMENT here rather than a state key so it cannot be reached by
+   anything that reads the control set. */
+export function buildBloomInto(acc, state, { below = null, capability = null } = {}) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }
   if (below !== null) throw new Error(`below='${below}' is phase-2+ work; only null is built today`);
 
   const ring = footRing(state, acc);
+  /* Slot 0's own measurements, kept for the metrics hook. Every slot in a
+     phase-3 whorl is the same petal (sizeRamp and angleRamp are constants),
+     so slot 0 is the whorl — when per-slot overrides arrive that stops being
+     true and this must report per slot, not one of them. */
+  let petal = null;
   buildWhorlInto({
     count: state.petalCount,
     radius: ring.radius,
@@ -490,9 +706,12 @@ export function buildBloomInto(acc, state, { below = null } = {}) {
     sizeRamp: () => 1,
     angleRamp: () => 0,
     phase: 0,
-    blade: (slot) => buildPetalInto(acc, state, ring, slot),
+    blade: (slot) => {
+      const p = buildPetalInto(acc, state, ring, slot, capability);
+      if (slot.index === 0) petal = p;
+    },
   });
   buildHubInto(acc, state, ring);          // unconditional — the invariant's plumbing
   const center = buildCenterInto(acc, state, ring);   // optional — the designed mass
-  return { ring, center };
+  return { ring, center, petal };
 }

@@ -20,6 +20,12 @@
      - Anything outside the matrix: the sweep is every registry control at
        min/default/max plus the petal-count range — a config this file does
        not build is unknown, not passing.
+     - The CAPABILITY rows' structural claims. Those rows assert
+       non-monotone width and a two-span domain from the APP'S OWN profile
+       and trim evaluation, not from the STL; this gate only measures that
+       whatever was built exports watertight. The scope is printed beside
+       each capability row so a reader of a green run sees it next to the
+       claim, and connectedness is a separate gate again.
 
    VALIDITY. Every row runs on a FRESH PAGE; every set value is READ BACK
    through the real input and the whole registry state is compared against
@@ -41,7 +47,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, exportStl, analyzeStl, buildMatrix } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -65,9 +71,15 @@ for (const row of rows) {
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   const drift = await fullStateDrift(page, row.set);
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }
+  /* The capability is invisible to fullStateDrift (it is not a registry
+     control), so it carries its own read-back AND its structural assertion.
+     This also asserts the NEGATIVE on every ordinary row: no capability may
+     be live on a row that did not ask for one. */
+  const cap = await applyCapability(page, row);
+  if (cap.length) { validity.push(`${row.label}: ${cap.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
-  results.push({ label: row.label, bytes: buf.length, ...analyzeStl(buf) });
+  results.push({ label: row.label, capability: !!row.capability, bytes: buf.length, ...analyzeStl(buf) });
 }
 await browser.close();
 server.close();
@@ -79,6 +91,7 @@ for (const r of results) {
   const ok = r.boundary === 0;
   if (!ok) failures.push(r);
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${r.label.padEnd(46)} tris(export)=${String(r.tris).padStart(6)} boundary=${r.boundary} nonManifold=${r.nonManifold} (unrated) shells=${r.shells} (unrated) ${(r.bytes / 1024).toFixed(0)} KiB`);
+  if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 

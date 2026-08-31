@@ -25,6 +25,47 @@
      --full     the live `buildMatrix()` — for comparing two trees that share a
                 matrix, where the question is not "did anything move" but
                 "did exactly the right things move".
+     --phase2   `phase2Matrix()` — the 76 rows frozen at 21d4602, the commit
+                before the petal silhouette model. This is the like-for-like
+                baseline for the silhouette engine: `--full` cannot do that
+                job (the live matrix sets control ids the old tree has no
+                inputs for, so every row fails read-back against it), and the
+                47 legacy rows would leave the whole centre rig unmeasured.
+                Its whole-state check covers the ids the row PINS, which for
+                these rows is the set that existed at 21d4602.
+
+   THE REGION MODE — `--region foot`.
+
+   WHAT IT HASHES: the export triangles ALL THREE of whose vertices satisfy
+   |z| <= t/2 + 1e-3, with t the sheet thickness (1.2 mm live and export
+   alike, above the 1.0 mm floor, so t/2 = 0.6 mm). At any petalTilt > 0 that
+   set is exactly the three FOOT rows plus the hub disc plus whatever of the
+   centre lies in the slab — the first blade row already reaches z = 1.07 mm
+   at the default tilt, and a triangle spanning the last foot row and the
+   first blade row has vertices on both sides and is therefore excluded.
+
+   WHY: it turns "the silhouette does not touch the foot, so the junction
+   argument is unchanged" from a sentence into a per-row measurement. The
+   foot rows and the hub are the entire junction argument — flat in the hub
+   plane at ring.width/2, landing on ring.radius, overhanging inward by
+   ring.overhang, spanned by a disc of exactly ring.radius — and none of
+   those four quantities is a function of the silhouette. This mode is what
+   says so with a hash instead of a claim.
+
+   WHAT IT DOES NOT COVER, and this is not a detail:
+     - petalTilt === 0. With no tilt the blade lies IN the hub plane, so the
+       criterion cannot separate foot from blade and those rows are reported
+       as OUT OF SCOPE, never as passes and never as failures. In the frozen
+       76 that is 5 rows (petalTilt min, ALL MIN, and ALL MIN x each style).
+     - Anything below the slab. There is nothing below the bloom today
+       (`below: null`); when a stem exists this criterion admits it and the
+       region stops meaning "foot + hub". Re-derive the criterion then rather
+       than trusting this sentence.
+     - It is a HASH, not a geometric argument: it proves the bytes in that
+       region did not move between two trees. It cannot tell you the region
+       was correct in the first place.
+   The criterion is stated in ONE place — footRegionHash() below — and both
+   the header and the run output quote it from there.
 
    THE PARTITION MODE is for that second question. Changing a control's DEFAULT
    moves every row that INHERITS it and must leave every row that PINS it
@@ -53,17 +94,44 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full] --root <dir> --out <file.json>
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2] --root <dir> --out <file.json>
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
+         node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --region foot
    =================================================================== */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix } from './bloom-harness.mjs';
+
+/* THE ONE OWNER of the foot-region criterion. Both the header above and the
+   run output quote this string rather than restating the rule — a region
+   definition written twice is a region definition that drifts, and the
+   tilt-range caveat is the half that would be dropped. */
+const FOOT_T_HALF = 0.6;        // sheet thickness 1.2 mm / 2 — live and export alike
+const FOOT_EPS = 1e-3;
+export const FOOT_REGION_RULE =
+  `all three vertices with |z| <= ${FOOT_T_HALF} + ${FOOT_EPS} mm (= foot rows + hub disc at any petalTilt > 0; UNDEFINED at petalTilt 0, where the blade lies in the same plane)`;
+
+/* Hash of the foot region alone. Triangles are hashed in file order — the
+   builders are deterministic, so order is part of "did it move". */
+function footRegionHash(buf) {
+  const n = buf.readUInt32LE(80);
+  const h = crypto.createHash('sha256');
+  let kept = 0;
+  for (let i = 0; i < n; i++) {
+    const o = 84 + i * 50;
+    let inside = true;
+    for (let k = 0; k < 3 && inside; k++) if (Math.abs(buf.readFloatLE(o + 12 + k * 12 + 8)) > FOOT_T_HALF + FOOT_EPS) inside = false;
+    if (!inside) continue;
+    kept++;
+    h.update(buf.subarray(o + 12, o + 48));
+  }
+  return { hash: h.digest('hex'), tris: kept };
+}
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null; };
 const LEGACY_IDS = ['petalCount', 'petalLength', 'petalWidth', 'petalTilt'];
@@ -80,6 +148,8 @@ if (process.argv.includes('--compare')) {
   }
   const pi = process.argv.indexOf('--partition');
   const partition = pi > 0 ? process.argv[pi + 1] : null;
+  const ri = process.argv.indexOf('--region');
+  const region = ri > 0 ? process.argv[ri + 1] : null;
   const movedSet = new Set();
   for (let k = 0; k < labels.length; k++) {
     if (before.rows[k].sha256 !== after.rows[k].sha256) movedSet.add(labels[k]);
@@ -87,6 +157,36 @@ if (process.argv.includes('--compare')) {
   console.log(`byte diff: ${labels.length} configs compared`);
   console.log(`  before: ${before.root} @ ${before.head || 'unrecorded'}`);
   console.log(`  after:  ${after.root} @ ${after.head || 'unrecorded'}\n`);
+
+  if (region) {
+    if (region !== 'foot') { console.error(`byte diff: unknown region "${region}" — only "foot" exists.`); process.exit(2); }
+    if (before.rows.some((r) => !r.footHash) || after.rows.some((r) => !r.footHash)) {
+      console.error('byte diff: INVALID — one of the runs carries no foot-region hash. Re-run both captures with this version of the tool.');
+      process.exit(1);
+    }
+    console.log(`region "foot": ${FOOT_REGION_RULE}\n`);
+    const scoped = [], skipped = [], movedFoot = [];
+    for (let k = 0; k < labels.length; k++) {
+      const b = before.rows[k], a = after.rows[k];
+      /* petalTilt 0 is OUT OF SCOPE, never a pass and never a failure — with
+         no tilt the blade lies in the hub plane and the criterion cannot
+         separate it from the foot. Read from the row's own recorded tilt, so
+         a matrix change cannot silently move a row in or out of scope. */
+      if (Number(b.tilt) === 0 || Number(a.tilt) === 0) { skipped.push(labels[k]); continue; }
+      scoped.push(labels[k]);
+      if (b.footHash !== a.footHash || b.footTris !== a.footTris) movedFoot.push({ l: labels[k], b, a });
+    }
+    for (const m of movedFoot) console.log(`  MOVED ${m.l}: ${m.b.footTris} -> ${m.a.footTris} tris, ${m.b.footHash.slice(0, 12)} -> ${m.a.footHash.slice(0, 12)}`);
+    console.log(`  ${scoped.length - movedFoot.length}/${scoped.length} in-scope rows have a BIT-IDENTICAL foot region`);
+    console.log(`  ${skipped.length} row(s) OUT OF SCOPE (petalTilt 0 — not a pass): ${skipped.join(', ') || 'none'}`);
+    console.log(`  whole-export moves on the same rows: ${movedSet.size}/${labels.length} (that is the blade changing, which is the point)`);
+    if (movedFoot.length) {
+      console.error(`\nbyte diff: FAIL — ${movedFoot.length} row(s) moved bytes INSIDE the foot region. The silhouette reached the foot or the hub; the junction argument no longer holds by construction.`);
+      process.exit(1);
+    }
+    console.log('\nbyte diff: PASS — the foot region is bit-identical on every in-scope row.');
+    process.exit(0);
+  }
 
   if (!partition) {
     for (const l of labels) if (movedSet.has(l)) {
@@ -157,9 +257,12 @@ const { browser, page } = await launchPage();
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 
 const FULL = process.argv.includes('--full');
+const PHASE2 = process.argv.includes('--phase2');
+if (FULL && PHASE2) { console.error('pick one matrix: --full or --phase2'); process.exit(2); }
+const MATRIX = FULL ? 'full' : PHASE2 ? 'phase2' : 'legacy';
 const rows = [];
 const validity = [];
-for (const row of (FULL ? buildMatrix() : legacyMatrix())) {
+for (const row of (FULL ? buildMatrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {
   await openBloom(page, port);
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -174,7 +277,16 @@ for (const row of (FULL ? buildMatrix() : legacyMatrix())) {
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   /* `pins` records which controls the row set EXPLICITLY — the partition mode
      reads it rather than re-deriving the row's intent from its label. */
-  rows.push({ label: row.label, pins: row.set.map((s) => s.id), bytes: buf.length, tris: analyzeStl(buf).tris, sha256: crypto.createHash('sha256').update(buf).digest('hex') });
+  const foot = footRegionHash(buf);
+  /* `tilt` is recorded from the app's LIVE state, not from the row's label
+     or its set — the region mode uses it to decide scope, and a row that
+     inherits the default tilt must not be scoped by what its label omits. */
+  rows.push({
+    label: row.label, pins: row.set.map((s) => s.id), tilt: Number(got.petalTilt),
+    bytes: buf.length, tris: analyzeStl(buf).tris,
+    sha256: crypto.createHash('sha256').update(buf).digest('hex'),
+    footHash: foot.hash, footTris: foot.tris,
+  });
 }
 await browser.close(); server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
@@ -184,7 +296,17 @@ if (validity.length) {
   for (const v of validity) console.error(`  - ${v}`);
   process.exit(1);
 }
+/* The recorded head must distinguish the two trees, and a COMMIT SHA ALONE
+   DOES NOT when one of them is a dirty working tree: a before/after pair
+   both reading "21d4602" looks exactly like a comparison of one tree with
+   itself, which is the shape of a result that proves nothing. The dirty
+   marker is therefore part of the identity, not a nicety. */
 let head = null;
-try { head = (await import('node:child_process')).execSync('git rev-parse --short HEAD', { cwd: root }).toString().trim(); } catch { /* not a checkout */ }
-fs.writeFileSync(out, JSON.stringify({ root, head, matrix: FULL ? 'full' : 'legacy', rows }, null, 1));
+try {
+  const cp = await import('node:child_process');
+  const sha = cp.execSync('git rev-parse --short HEAD', { cwd: root }).toString().trim();
+  const dirty = cp.execSync('git status --porcelain', { cwd: root }).toString().trim().length > 0;
+  head = dirty ? `${sha}+dirty` : sha;
+} catch { /* not a checkout */ }
+fs.writeFileSync(out, JSON.stringify({ root, head, matrix: MATRIX, footRegionRule: FOOT_REGION_RULE, rows }, null, 1));
 console.log(`hashed ${rows.length} configs from ${root} -> ${out}`);

@@ -82,8 +82,12 @@ window.__bloomUIState = () => readUI();
    the real camera at a different radius, not a crop guessing at projection.
    Assigned after the scene exists — see below. */
 
+/* fmt receives the control's own value AND the whole state snapshot: Tip
+   taper prints the DERIVED widest point a/(a+b), which needs the other
+   taper. Every other fmt ignores the second argument. A control for the
+   widest point would be a second owner of a derived quantity. */
 function refreshLabels(ui) {
-  for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id]);
+  for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id], ui);
 }
 
 /* The ONLY setter of a control wrapper's hidden — evaluates the registry's
@@ -134,11 +138,31 @@ let mesh = null;
    defect wearing a lens. `lift` raises the orbit target off the origin — the
    whole-bloom view looks slightly up into the whorl, a centre crop looks
    straight at the hub plane. */
-function fitCamera(radius, lift = 0.15) {
-  const d = Math.max(40, radius * 2.6);
-  camera.position.set(d * 0.75, -d * 0.75, d * 0.6);
+function fitCamera(radius, lift = 0.15, at = null, dir = null) {
+  /* The axis-framing path is byte-for-byte the original: a single-petal crop
+     is a NEW capability, and widening a signature must never move the shot
+     every existing sheet was taken with. The 40 mm distance floor belongs to
+     that path only — it keeps a tiny bloom from being framed absurdly close,
+     and it would otherwise stop a petal crop ever getting close enough to
+     read an outline. */
+  if (!at) {
+    const d = Math.max(40, radius * 2.6);
+    camera.position.set(d * 0.75, -d * 0.75, d * 0.6);
+    camera.up.set(0, 0, 1);
+    controls.target.set(0, 0, radius * lift);
+    return;
+  }
+  /* Targeted framing, optionally along a given view direction. A SILHOUETTE
+     is an outline, and an outline seen at three-quarters is foreshortened —
+     so the silhouette sheet asks to look down the petal's own normal, which
+     the builder reports. The direction is normalised here so `radius` means
+     the same distance whichever way the camera is pointing. */
+  const d = radius * 2.6;
+  const v = dir || [0.75, -0.75, 0.6];
+  const n = Math.hypot(v[0], v[1], v[2]) || 1;
+  camera.position.set(at[0] + (v[0] / n) * d, at[1] + (v[1] / n) * d, at[2] + (v[2] / n) * d);
   camera.up.set(0, 0, 1);
-  controls.target.set(0, 0, radius * lift);
+  controls.target.set(at[0], at[1], at[2]);
 }
 
 function resize() {
@@ -156,12 +180,24 @@ let liveSummary = '';
 
 let lastRing = { radius: 0, derivedRadius: 0 };
 let lastCenter = { style: 'NONE', tris: 0 };
-let lastTris = 0, lastMaxDim = 0;
+let lastPetal = null;
+let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
+
+/* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
+   there is no registry row, no DOM input, and no listener that writes it —
+   window.__bloomCapability (below) is the only writer, and only the gates
+   and the contact sheet call it. It exists so "architected for claw and
+   cleft" is a thing the gates BUILD and MEASURE rather than a sentence in a
+   header. Because it is not a control, the gates' whole-state read-back is
+   unaffected: their fullStateDrift still compares every registry control
+   against DEFAULTS + set, and this is invisible to it — which is why the
+   capability rows carry their OWN read-back assertion. */
+let capability = null;
 
 function buildGeometry({ exportMode }) {
   const acc = new MeshBuilder({ exportMode });
-  const built = buildBloomInto(acc, readUI(), { below: null });   // 'stem' | 'branch' | null — null is phase 1's only state
-  if (!exportMode) { lastRing = built.ring; lastCenter = built.center; lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm; }
+  const built = buildBloomInto(acc, readUI(), { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
+  if (!exportMode) { lastRing = built.ring; lastCenter = built.center; lastPetal = built.petal; lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm; }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
   geo.computeVertexNormals();
@@ -181,7 +217,12 @@ function buildGeometry({ exportMode }) {
 function summarise(ui, acc, mode) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
-  return `petals ${ui.petalCount} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}\n`
+  /* The capability appears in the readout for the same reason every other
+     value does: the contact sheet and the gates assert the app REACTED
+     through the real UI route, and a state they cannot see in the readout is
+     a state they cannot confirm was built. */
+  return `petals ${ui.petalCount} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
+       + (capability ? ` · capability ${capability.label}` : '') + `\n`
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
 
@@ -191,10 +232,14 @@ function regenerate() {
   const { geo, acc } = buildGeometry({ exportMode: false });
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
   else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
-  if (!userMoved) {
-    geo.computeBoundingSphere();
-    fitCamera(geo.boundingSphere.radius);
-  }
+  /* The bounding SPHERE is the framing quantity (the accumulator's bounding
+     BOX is the print-size quantity — two different jobs, kept apart). It is
+     computed on every rebuild, not only when the camera is free, so a shot
+     tool can ASK the app for the radius its own automatic fit would use
+     instead of inventing a proxy from the bounding box. */
+  geo.computeBoundingSphere();
+  lastFitRadius = geo.boundingSphere.radius;
+  if (!userMoved) fitCamera(lastFitRadius);
   liveSummary = summarise(ui, acc, 'live');
   readout.textContent = liveSummary;
 }
@@ -250,8 +295,32 @@ window.__bloomMetrics = () => ({
   centerTris: lastCenter.tris,
   liveTris: lastTris,
   maxDimMm: lastMaxDim,
+  fitRadius: lastFitRadius,
+  capability: capability ? capability.label : null,
+  /* THE PETAL'S OWN MEASUREMENTS, from the builder that made it. The
+     capability assertions and the single-petal framing read these rather
+     than re-deriving a profile or a projection — a consumer inventing its
+     own copy of a boundary is this project's most repeated defect.
+
+     SCOPE, stated here and repeated in the gates' own output: `profile` and
+     `tipSpans` are the APP'S evaluation of the width profile and the trim
+     domain, not a measurement of the exported STL. Watertightness and
+     connectedness are measured on the export; the structural claims are
+     measured here. */
+  petalProfile: lastPetal ? lastPetal.profile : null,
+  petalFootRows: lastPetal ? lastPetal.footRows : null,
+  petalPanels: lastPetal ? lastPetal.panels : null,
+  petalTipSpans: lastPetal ? lastPetal.tipSpans : null,
+  petalMid: lastPetal ? lastPetal.mid : null,
+  petalTip: lastPetal ? lastPetal.tip : null,
+  petalNormal: lastPetal ? lastPetal.normal : null,
 });
-window.__bloomFrame = (radius, lift = 0.15) => { userMoved = true; fitCamera(radius, lift); };
+window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null) => { userMoved = true; fitCamera(radius, lift, at, dir); };
+
+/* THE ONLY WRITER of `capability`. Rebuilds synchronously rather than
+   through the rAF coalescer so a caller can read __bloomMetrics back on the
+   next line and get the design it just asked for. Pass null to clear. */
+window.__bloomCapability = (spec) => { capability = spec || null; regenerate(); return capability; };
 
 /* ---------------- go ---------------- */
 applyVisibility();
