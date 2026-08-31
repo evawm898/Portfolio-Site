@@ -139,18 +139,40 @@ export function predicateDrivers(pred, out = new Set()) {
      middle, so the reasoning expired and the control ships. spread is a SCALE
      FACTOR over the derived radius, applied inside footRing() and nowhere
      else — the area rule still sizes the circle, spread only opens or closes
-     it. At the 1.00 default the multiply is exact in IEEE-754 (x * 1.0 === x),
-     so every pre-change export is byte-identical by construction rather than
-     by measurement agreeing. Below 1.00 the ring is TIGHTER than the area
-     rule's derived radius — feet crowd and overlap, and at the extreme they
-     cross the axis. That is reachable on purpose (Eva's ruling: the area rule
-     is a reference, not a cage) and it stays watertight and connected, because
-     the feet are closed solids over a hub that still spans the ring.
+     it. Below 1.00 the ring is TIGHTER than the area rule's derived radius —
+     feet crowd and overlap, and at the extreme they cross the axis. That is
+     reachable on purpose (Eva's ruling: the area rule is a reference, not a
+     cage) and it stays watertight and connected, because the feet are closed
+     solids over a hub that still spans the ring.
+
+     THE DEFAULT IS 2.00, AND IT WAS 1.00 FOR ONE COMMIT. Two different things
+     happened, in order, and collapsing them would lose the evidence for both:
+       1. The control LANDED at 1.00, where the multiply is exact in IEEE-754
+          (x * 1.0 === x) and every pre-existing export was therefore
+          bit-identical by construction — the convention that a new control
+          defaults to current behaviour, measured at 0 of 47 configs moved.
+       2. Eva then RULED the default to 2.00 (Aug 31). That is a deliberate
+          change to the shipping design, not a new control, and it is expected
+          to move every export that inherits it. It moved exactly the 57 of 76
+          matrix rows that inherit the default and left all 19 that pin spread
+          explicitly bit-identical — a two-sided set equality, not a "mostly
+          as expected". Why: at 1.00 the foot ring is 4.42 mm against a 35 mm
+          petal, and eight 6.4 mm feet tile straight over it, so the centre —
+          any centre — is buried under the petal bases. The archetypes only
+          become legible above roughly 2x. A default that hides the thing the
+          panel just exposed is the wrong default.
+     There is no migration to write and no schema to bump: the bloom persists
+     no designs yet (see RETIRED_IDS above), so no saved value can be
+     misread. The first feature that persists a design inherits that debt.
 
    - `centerStyle` is an A/B RIG, not a shipped aesthetic. NONE is the default
-     and stays the default: a new control defaults to current behaviour. Eva
-     rules on the archetype by eye from a contact sheet; wiring the winner as
-     a default is a LATER session's job, not this one's.
+     and REMAINS the default — Eva's ruling, Aug 31, after seeing the contact
+     sheet: the archetype decision is DEFERRED until after the petal-shape
+     phase, because the placeholder ovate petals are stand-ins and a dome or a
+     ring should be judged against the real silhouettes it will sit among, not
+     against placeholders. Nothing is deleted and no style is promoted: the rig
+     stays in the codebase as a built, gated capability and the question
+     reopens when petals stop being placeholders.
 
    Everything else about the whorl (height, sizeRamp, angleRamp, phase) is
    still a derived value or a constant, per "derive, don't expose" — as are
@@ -187,7 +209,7 @@ export const CONTROLS = [
      180 mm dyed-PA12 cap, under standard white. The readout prints the max
      bounding dimension so that is visible at the slider, never a clamp: which
      process cap applies is the user's call at order time. */
-  { id: 'spread', kind: 'slider', min: 0.6, max: 6, step: 0.05, default: 1,
+  { id: 'spread', kind: 'slider', min: 0.6, max: 6, step: 0.05, default: 2,
     label: 'Spread', fmt: (v) => `${Number(v).toFixed(2)}x`, tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [] } },
 

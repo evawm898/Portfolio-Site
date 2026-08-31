@@ -134,6 +134,26 @@ printer — and sheet petals add a min-wall coupon to that list.
   winner as the default is a later session's job. The centre is DESIGNED and user-chosen;
   the junction stays derived and control-free beneath it, and the registry's `role` field
   now carries that split (`center` vs. the deliberate absence of any `junction` row).
+
+- **The archetype ruling itself — DEFERRED until after the petal-shape phase (Eva,
+  Aug 31), from the contact sheet.** `centerStyle` stays NONE by default; nothing is
+  deleted and no style is promoted. The rig remains in the codebase as a built, gated
+  capability. The reason is a finding from the sheet rather than indecision: the petals
+  are still placeholder ovate sheets, and a dome or a ring should be ruled on against the
+  real silhouettes it will sit among, not against stand-ins. The question reopens at the
+  end of phase 3, when the ruling becomes "how does this sit against these petals" rather
+  than "which of these three is nicest against placeholders".
+
+- **Spread default 1.00 → 2.00 — settled Aug 31, on evidence from the same sheet.** At
+  1.00 the foot ring is 4.42 mm against a 35 mm petal and eight 6.4 mm feet tile straight
+  over it, so *any* centre is buried under the petal bases; below roughly 2× the four
+  styles are visually indistinguishable. A default that hides the thing the panel just
+  exposed is the wrong default. Recorded as two separate events, deliberately: the control
+  LANDED at 1.00 with every pre-existing export bit-identical (0 of 47 moved — the
+  new-control convention, satisfied), and the default THEN moved as a design ruling, which
+  is expected to move exports and did: exactly the 57 of 76 matrix rows that inherit the
+  default, with all 19 that pin `spread` bit-identical. No schema bump or migration: the
+  bloom persists no designs yet, so no saved value can be misread.
 - ~~Foot ownership~~ **Settled Aug 31:** the foot ring — where feet land, and the foot
   cross-section — gets one named owner function in **phase 1**; the petal builder and the
   phase-2 center builder both read it. No second definition, ever.
@@ -146,12 +166,11 @@ printer — and sheet petals add a min-wall coupon to that list.
   phase-2 entry: EXPOSED.** The phase-1 grounds for hiding it — that a spread-out ring
   would have nothing in its middle but plumbing — expired the moment the designed centre
   existed to occupy that middle, exactly as parked. `spread` is a Standard slider,
-  0.60–6.00, default 1.00, applied inside `footRing()` and nowhere else: the area rule
-  still *derives* the radius and spread only scales it. At the 1.00 default the multiply
-  is exact in IEEE-754, so every pre-change export is bit-identical by construction
-  (confirmed: 0 of 47 configs moved). Eva's ruling on the lower bound: **the area rule is
-  a reference, not a cage** — below 1.00 the ring is tighter than the derived radius, feet
-  crowd and at the extreme cross the axis, and that state is reachable on purpose. The
+  0.60–6.00, **default 2.00 (Eva, Aug 31)**, applied inside `footRing()` and nowhere else:
+  the area rule still *derives* the radius and spread only scales it. Eva's ruling on the
+  lower bound: **the area rule is a reference, not a cage** — below 1.00 the ring is
+  tighter than the derived radius, feet crowd and at the extreme cross the axis, and that
+  state is reachable on purpose. The
   junction reaches every foot by construction at every spread, because `overhang` is
   expressed in the same units as the radius (max(1.5, 0.4·r)), making the foot–hub overlap
   a fixed *fraction* of the ring rather than a tuned length.

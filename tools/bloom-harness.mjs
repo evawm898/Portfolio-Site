@@ -251,7 +251,12 @@ export function buildMatrix() {
         defaults-elsewhere row. */
   const spread = CONTROLS.find((c) => c.id === 'spread');
   for (const style of STYLES) {
-    for (const [tag, v] of [['min', spread.min], ['1.00', spread.default], ['max', spread.max]]) {
+    /* The tag is 'default', never the default's current VALUE spelled out: an
+       earlier version hardcoded '1.00' beside `spread.default`, so the moment
+       Eva ruled the default to 2.00 every one of these rows printed
+       "spread 1.00 (2)" — a label naming a number it no longer held, in a
+       passing gate. The value still appears, from the variable. */
+    for (const [tag, v] of [['min', spread.min], ['default', spread.default], ['max', spread.max]]) {
       rows.push({
         label: `${style} × spread ${tag} (${v})`,
         set: [{ id: 'centerStyle', value: style }, { id: 'spread', value: String(v) }],
@@ -304,7 +309,10 @@ export function buildMatrix() {
    the new controls sit at their defaults and every one of these rows must
    come back bit-identical. Frozen means frozen — it is a record of what the
    scaffold's matrix was at 37e160d, not a view over the live registry, so it
-   must never be rewritten to track a registry change. */
+   must never be rewritten to track a registry change. Note that its rows PIN
+   only the four original sliders, so they inherit every later default — a
+   deliberate change to one (e.g. the spread default) moves them all, by
+   design. See diff-bloom-bytes.mjs's header on why that is not a regression. */
 export function legacyMatrix() {
   const ids = ['petalCount', 'petalLength', 'petalWidth', 'petalTilt'];
   const byId = Object.fromEntries(CONTROLS.map((c) => [c.id, c]));
