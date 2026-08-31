@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametric Bloom — Eva Maskalenko</title>
+<meta name="description" content="Parametric Bloom — a whorl of solid-sheet petals joined into one printable solid, rendered live in the browser.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="bloom.css">
+
+<!-- Three.js via ES-module import map, pinned to the same version as the
+     flower page so the headless gates' CDN intercept serves one local copy
+     for both (tools/verify-bloom-*.mjs fulfil this URL from node_modules). -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<canvas id="bloom-canvas"></canvas>
+
+<aside class="bl-viewpanel" aria-label="View controls">
+  <div class="bl-eyebrow">View</div>
+  <div class="bl-toggle">
+    <label for="autoRotate">Auto-rotate</label>
+    <input type="checkbox" id="autoRotate" checked>
+  </div>
+</aside>
+
+<header class="bl-header">
+  <a href="index.html" class="bl-back">&larr; Index</a>
+  <h1>Parametric Bloom</h1>
+  <p class="bl-sub">Phase 1 — the whorl. Placeholder petals; the designed center is phase&nbsp;2.</p>
+</header>
+
+<aside class="bl-panel" aria-label="Bloom controls">
+  <div class="bl-eyebrow">Bloom</div>
+  <!-- The panel is GENERATED from bloom-registry.js by bloom.js. No control
+       markup lives in this file, ever — the registry is the only list. -->
+  <div id="panelControls"></div>
+  <div class="bl-actions">
+    <button id="resetBtn" class="bl-btn" type="button">Reset</button>
+    <button id="exportStl" class="bl-btn bl-btn--primary" type="button"
+            title="Download a 3D-printable STL (millimetres)">Get STL &darr;</button>
+  </div>
+  <div id="readout" class="bl-readout" aria-live="polite"></div>
+</aside>
+
+<script type="module" src="bloom.js"></script>
+</body>
+</html>

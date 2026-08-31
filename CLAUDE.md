@@ -19,6 +19,17 @@ Guidance for Claude Code sessions working in this repository.
 - Never delete old branches without explicit approval.
 - Before making branch-history changes, rebases, force pushes, or destructive Git operations, stop and ask first.
 
+## Bloom generator — pointer only
+
+The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
+`bloom-registry.js`) is a separate generator from the flower. Its governing
+document is **`docs/bloom-charter.md`** — read it before touching any bloom
+file; rules are stated there (and in the flower-project skill it references),
+deliberately not repeated here. Its invariant is one connected watertight
+solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
+`node tools/verify-bloom-connectedness.mjs` (voxel flood-fill, one region) —
+both run in CI and both must pass before any bloom geometry change is done.
+
 ## Flower generator — print-safety is a hard invariant
 
 The Flower Bloom generator (`flower.html`, `flower.js`, `flower-geometry.js`) is a
