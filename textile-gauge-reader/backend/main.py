@@ -12,6 +12,21 @@ see the module-level comment below.
 
 Uploaded images are processed entirely in memory and are never written
 to disk.
+
+Every route below is `async def`, but the actual CV work (image decode,
+analyze_gauge, analyze_multi_roi, propose_measurement_rois,
+detect_ruler_calibration, count_repeats_by_template_match,
+analyze_loop_lattice_experiment) is synchronous and CPU-bound -- it is
+always run via `await run_in_threadpool(...)`, never called directly.
+Calling it directly would block this process's single asyncio event
+loop for the entire request: on Render's free tier (the default
+`uvicorn backend.main:app` in render.yaml runs one worker, no
+`--workers`), that means NOTHING else -- not even a `/health` check --
+can be served while one analysis is in flight, which is exactly the
+kind of thing that makes a slow request look like a dead service from
+the frontend's side. Diagnosed directly against a real "health check
+says online, analyze fails" report; see README.md's "Why the health
+banner can lie" section for the full investigation.
 """
 from __future__ import annotations
 
@@ -26,6 +41,7 @@ from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from analysis import ALGORITHM_VERSION, analyze_gauge, analyze_multi_roi, propose_measurement_rois
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
@@ -279,7 +295,10 @@ async def analyze(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        # decode_image (JPEG/PNG decode) and everything CPU-bound below is
+        # run off the event loop -- see the module comment above
+        # run_in_threadpool's other call sites for why.
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(
             status_code=400,
@@ -337,7 +356,8 @@ async def analyze(
 
     # --- Run analysis --------------------------------------------------
     try:
-        result = analyze_gauge(
+        result = await run_in_threadpool(
+            analyze_gauge,
             image_bgr=image,
             roi=roi,
             orientation=orientation,  # type: ignore[arg-type]  # Literal-compatible str
@@ -369,7 +389,8 @@ async def analyze(
         # EXISTING, frozen course detector's own row positions straight
         # through -- this experiment only ever reads them, never adjusts
         # course detection itself.
-        lattice = analyze_loop_lattice_experiment(
+        lattice = await run_in_threadpool(
+            analyze_loop_lattice_experiment,
             image, roi=roi, orientation=orientation,  # type: ignore[arg-type]
             course_rows_px=result.course.positions_px or None,
         )
@@ -422,7 +443,7 @@ async def propose_rois(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(
             status_code=400,
@@ -458,7 +479,9 @@ async def propose_rois(
         )
 
     try:
-        proposal = propose_measurement_rois(image_bgr=image, pixels_per_mm=pixels_per_mm)
+        proposal = await run_in_threadpool(
+            propose_measurement_rois, image_bgr=image, pixels_per_mm=pixels_per_mm
+        )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("ROI proposal raised an unexpected exception")
         return JSONResponse(
@@ -505,12 +528,12 @@ async def detect_ruler(file: UploadFile = File(...)) -> JSONResponse:
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(status_code=400, content=RulerCalibrationOut(success=False, message=str(exc)).model_dump())
 
     try:
-        result = detect_ruler_calibration(image)
+        result = await run_in_threadpool(detect_ruler_calibration, image)
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Ruler calibration detection raised an unexpected exception")
         return JSONResponse(
@@ -568,7 +591,7 @@ async def analyze_multi(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(
             status_code=400,
@@ -643,7 +666,8 @@ async def analyze_multi(
 
     # --- Run independent-per-region analysis + consensus -----------------
     try:
-        result = analyze_multi_roi(
+        result = await run_in_threadpool(
+            analyze_multi_roi,
             image_bgr=image, rois=rois,
             orientation=orientation,  # type: ignore[arg-type]
             structure=structure,  # type: ignore[arg-type]
@@ -751,7 +775,7 @@ async def count_repeats(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(status_code=400, content=RepeatMatchOut(success=False, message=str(exc)).model_dump())
 
@@ -767,7 +791,8 @@ async def count_repeats(
         )
 
     try:
-        result = count_repeats_by_template_match(
+        result = await run_in_threadpool(
+            count_repeats_by_template_match,
             image_bgr=image,
             roi=(roi_x, roi_y, roi_width, roi_height),
             anchor_start=(anchor_start_x, anchor_start_y),

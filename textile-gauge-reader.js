@@ -299,6 +299,30 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  // AbortError (our own timeout) and a bare TypeError (no HTTP response
+  // reached us at all) are exactly what a cold, still-waking free-tier
+  // instance looks like from here -- indistinguishable, from a single
+  // failed fetch, from the service actually being down. See README.md's
+  // "Why the health banner can lie" for the investigation this is built
+  // from. An HTTP-level failure (the server DID answer, just with an
+  // error) is NOT this.
+  //
+  // IMPORTANT, and the reason this exists as a NAMED, SHARED check rather
+  // than being inlined at each call site: `err instanceof TypeError` is
+  // also true for an ordinary JS bug with no connection to the network at
+  // all -- e.g. reading `.length` off a field the response didn't
+  // include. Every caller of this function MUST only apply it to errors
+  // thrown by the fetch+parse+HTTP-status step itself, never to errors
+  // from rendering/state code that runs after a response was already
+  // successfully received -- otherwise a real application crash gets
+  // mislabeled "could not reach the analysis service," which is exactly
+  // the bug this function's own history is named for (see the "reading
+  // 'length' of undefined" regression this was written to stop
+  // recurring, tests/test_frontend_response_contract.py).
+  function isTransportFailure(err) {
+    return (err && err.name === "AbortError") || err instanceof TypeError;
+  }
+
   async function pingHealthOnce() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
@@ -315,6 +339,42 @@
   // instead of the two racing to update the status pill.
   let healthCheckGeneration = 0;
 
+  // Retry-with-backoff against /health, shared by the service-status
+  // banner AND (see waitForServiceToWake below) the Analyze cold-start
+  // recovery path -- Render's free tier can take up to ~60s to wake a
+  // sleeping instance, so a single quick timeout would be wrong almost
+  // every time the service has been idle. `onStatus(kind, text)` lets
+  // each caller drive its own UI element (the banner pill vs. the
+  // Analyze status line) without this function knowing about either.
+  // `shouldAbort()` lets a caller (the banner) bail out when superseded
+  // by a newer check; omit it for a plain one-shot wait. Resolves true
+  // once /health responds, false if every attempt is exhausted (or
+  // shouldAbort() fires) without one succeeding.
+  async function waitForServiceToWake(onStatus, shouldAbort = () => false) {
+    const totalAttempts = HEALTH_CHECK_RETRY_DELAYS_MS.length + 1;
+    for (let attempt = 0; attempt < totalAttempts; attempt++) {
+      if (shouldAbort()) return false;
+
+      try {
+        await pingHealthOnce();
+        return !shouldAbort();
+      } catch (err) {
+        const isLastAttempt = attempt === totalAttempts - 1;
+        if (shouldAbort()) return false;
+
+        if (isLastAttempt) {
+          onStatus("offline");
+          return false;
+        }
+
+        const delay = HEALTH_CHECK_RETRY_DELAYS_MS[attempt];
+        onStatus("waking", delay);
+        await sleep(delay);
+      }
+    }
+    return false; // unreachable, but keeps the return type honest
+  }
+
   async function checkServiceHealth() {
     if (!CONFIG.API_BASE_URL) {
       state.serviceOnline = false;
@@ -328,45 +388,51 @@
     const generation = ++healthCheckGeneration;
     setServiceStatus("checking", "Checking analysis service…");
 
-    // Render's free tier can take up to ~60s to wake a sleeping instance.
-    // Rather than declaring "unavailable" after one quick timeout (which
-    // would be wrong almost every time the service has been idle), retry
-    // with backoff and keep the status pill showing a clear "waking up"
-    // state — never a bare failure — until we've given it a fair chance.
-    const totalAttempts = HEALTH_CHECK_RETRY_DELAYS_MS.length + 1;
-    for (let attempt = 0; attempt < totalAttempts; attempt++) {
-      if (generation !== healthCheckGeneration) return; // superseded by a newer check
-
-      try {
-        await pingHealthOnce();
-        if (generation !== healthCheckGeneration) return;
-        state.serviceOnline = true;
-        setServiceStatus("online", "Analysis service is online.");
-        return;
-      } catch (err) {
-        const isLastAttempt = attempt === totalAttempts - 1;
-        if (generation !== healthCheckGeneration) return;
-
-        if (isLastAttempt) {
-          state.serviceOnline = false;
-          setServiceStatus(
-            "offline",
-            "Analysis service is still unavailable after waiting for a possible cold start — it may genuinely be down. Try Retry, or try again shortly."
-          );
-          return;
-        }
-
-        const delay = HEALTH_CHECK_RETRY_DELAYS_MS[attempt];
+    const reachable = await waitForServiceToWake((kind, delay) => {
+      if (kind === "waking") {
         setServiceStatus(
           "checking",
           `Waking up analysis service (Render free-tier cold start can take up to a minute)… retrying in ${Math.round(delay / 1000)}s.`
         );
-        await sleep(delay);
       }
+      // "offline" is handled below via the return value, not here, so it
+      // can't race a superseding check the way an inline set would.
+    }, () => generation !== healthCheckGeneration);
+
+    if (generation !== healthCheckGeneration) return; // superseded by a newer check
+
+    if (reachable) {
+      state.serviceOnline = true;
+      // "Reachable", not "online": this only proves the process can
+      // answer a plain GET -- no image decode, no CV work, no memory
+      // pressure. See README.md's "Why the health banner can lie" for
+      // why that distinction matters and isn't just wording.
+      setServiceStatus("online", "Analysis service is reachable.");
+    } else {
+      state.serviceOnline = false;
+      setServiceStatus(
+        "offline",
+        "Analysis service is still unavailable after waiting for a possible cold start — it may genuinely be down. Try Retry, or try again shortly."
+      );
     }
   }
 
   serviceStatusRetry.addEventListener("click", checkServiceHealth);
+
+  // A real (non-cold-start) Analyze failure means /health's last "it can
+  // answer a GET" check is stale information -- flip the banner to a
+  // visibly degraded state rather than leaving "reachable" displayed
+  // next to an error the user can see is happening right now. Does not
+  // re-probe the server; this is purely reflecting what Analyze itself
+  // just observed.
+  function markServiceDegradedAfterAnalyzeFailure() {
+    if (!CONFIG.API_BASE_URL) return;
+    state.serviceOnline = false;
+    setServiceStatus(
+      "offline",
+      "The last analysis request failed to reach the service, even after waiting for a possible cold start — it may be down. Try Retry above, or try again shortly."
+    );
+  }
 
   // --- Step navigation --------------------------------------------------
 
@@ -1709,27 +1775,41 @@
       if (hash) fd.append("image_sha256", hash);
       fd.append("save_image", false); // no image-save consent checkbox on this compact panel -- never opt in implicitly
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
       let data;
       try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || `Could not save ground truth (HTTP ${res.status}).`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
+            method: "POST",
+            body: fd,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        try {
+          data = await res.json();
+        } catch {
+          throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+        }
+        if (!res.ok || data.success === false) {
+          throw new Error(data.message || `Could not save ground truth (HTTP ${res.status}).`);
+        }
+      } catch (err) {
+        // isTransportFailure is only applied here, to the fetch+parse+
+        // status-check above -- never to the rendering code below, so a
+        // real JS bug there can't get mislabeled as a connectivity issue.
+        if (isTransportFailure(err)) {
+          throw new Error(
+            err.name === "AbortError"
+              ? "Saving timed out. Try again shortly."
+              : "Could not reach the analysis service to save this."
+          );
+        }
+        throw err;
       }
 
       gridBoxStatus.textContent = `Saved (sample ${data.id.slice(0, 8)}…).`;
@@ -1737,13 +1817,7 @@
       gridCourseCountInput.value = "";
     } catch (err) {
       gridBoxStatus.hidden = true;
-      if (err && err.name === "AbortError") {
-        gridBoxError.textContent = "Saving timed out. Try again shortly.";
-      } else if (err instanceof TypeError) {
-        gridBoxError.textContent = "Could not reach the analysis service to save this.";
-      } else {
-        gridBoxError.textContent = (err && err.message) || "Could not save. Please try again.";
-      }
+      gridBoxError.textContent = (err && err.message) || "Could not save. Please try again.";
       gridBoxError.hidden = false;
     } finally {
       updateGridBoxSaveButton();
@@ -1852,27 +1926,41 @@
       fd.append("known_distance", state.cal.knownDistance);
       fd.append("unit", state.cal.unit);
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/propose-rois`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
       let data;
       try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok) {
-        throw new Error(data.message || `Proposing measurement areas failed (HTTP ${res.status}).`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(`${CONFIG.API_BASE_URL}/propose-rois`, {
+            method: "POST",
+            body: fd,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        try {
+          data = await res.json();
+        } catch {
+          throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+        }
+        if (!res.ok) {
+          throw new Error(data.message || `Proposing measurement areas failed (HTTP ${res.status}).`);
+        }
+      } catch (err) {
+        // isTransportFailure is only applied here, to the fetch+parse+
+        // status-check above -- never to the rendering code below, so a
+        // real JS bug there can't get mislabeled as a connectivity issue.
+        if (isTransportFailure(err)) {
+          throw new Error(
+            err.name === "AbortError"
+              ? "Proposing measurement areas timed out."
+              : "Could not reach the analysis service to propose measurement areas."
+          );
+        }
+        throw err;
       }
 
       const proposed = (data.rois || []).map((r) => ({
@@ -1901,13 +1989,7 @@
       updateRoiUI();
       render();
     } catch (err) {
-      if (err && err.name === "AbortError") {
-        roiStatus.textContent = "Proposing measurement areas timed out.";
-      } else if (err instanceof TypeError) {
-        roiStatus.textContent = "Could not reach the analysis service to propose measurement areas.";
-      } else {
-        roiStatus.textContent = (err && err.message) || "Could not propose measurement areas.";
-      }
+      roiStatus.textContent = (err && err.message) || "Could not propose measurement areas.";
       roiError.textContent = "You can still add a measurement area manually below.";
       roiError.hidden = false;
       state.roiAddMode = true;
@@ -2334,36 +2416,43 @@
     analyzeStatus.textContent = "Analyzing…";
     analyzeBtn.disabled = true;
 
-    try {
-      const fd = new FormData();
-      fd.append("file", state.file);
-      // Every approved measurement area, in full-image pixel coordinates
-      // -- the backend analyzes each one COMPLETELY INDEPENDENTLY (see
-      // analyze_multi_roi) and returns a robust cross-region consensus
-      // as wale/course below; state.roi is updated afterward to whichever
-      // approved area the backend used as the primary/overlay region.
-      fd.append(
-        "rois_json",
-        JSON.stringify(
-          state.rois.map((r) => ({
-            label: r.label,
-            x: r.x,
-            y: r.y,
-            width: r.width,
-            height: r.height,
-            source: r.source,
-          }))
-        )
-      );
-      fd.append("cal_x1", state.cal.points[0].x);
-      fd.append("cal_y1", state.cal.points[0].y);
-      fd.append("cal_x2", state.cal.points[1].x);
-      fd.append("cal_y2", state.cal.points[1].y);
-      fd.append("known_distance", state.cal.knownDistance);
-      fd.append("unit", state.cal.unit);
-      fd.append("orientation", state.orientation);
-      fd.append("structure", state.structure);
+    const fd = new FormData();
+    fd.append("file", state.file);
+    // Every approved measurement area, in full-image pixel coordinates
+    // -- the backend analyzes each one COMPLETELY INDEPENDENTLY (see
+    // analyze_multi_roi) and returns a robust cross-region consensus
+    // as wale/course below; state.roi is updated afterward to whichever
+    // approved area the backend used as the primary/overlay region.
+    fd.append(
+      "rois_json",
+      JSON.stringify(
+        state.rois.map((r) => ({
+          label: r.label,
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+          source: r.source,
+        }))
+      )
+    );
+    fd.append("cal_x1", state.cal.points[0].x);
+    fd.append("cal_y1", state.cal.points[0].y);
+    fd.append("cal_x2", state.cal.points[1].x);
+    fd.append("cal_y2", state.cal.points[1].y);
+    fd.append("known_distance", state.cal.knownDistance);
+    fd.append("unit", state.cal.unit);
+    fd.append("orientation", state.orientation);
+    fd.append("structure", state.structure);
 
+    // One attempt at POST /analyze-multi -- FormData is safely reusable
+    // across calls (it isn't a stream), so the same `fd` above backs
+    // both the initial attempt and the cold-start retry below without
+    // rebuilding it. Throws on any failure: AbortError (local timeout),
+    // a bare TypeError (fetch never got an HTTP response at all -- no
+    // connection, connection reset, or a CORS rejection), or a regular
+    // Error for an HTTP-level/application failure.
+    async function attemptAnalyze() {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
       let res;
@@ -2388,6 +2477,50 @@
         throw new Error(data.message || `Analysis failed (HTTP ${res.status}).`);
       }
 
+      return data;
+    }
+
+    try {
+      let data;
+      try {
+        data = await attemptAnalyze();
+      } catch (err) {
+        if (!isTransportFailure(err)) throw err;
+
+        // Don't just fail -- wait for /health to confirm the service is
+        // actually back (reusing the exact same retry/backoff the status
+        // banner uses), then retry this SAME request once automatically.
+        // Only after that also fails do we call it a real failure.
+        analyzeStatus.textContent = "Waking up the analysis service — this can take about a minute…";
+        const reachable = await waitForServiceToWake((kind, delay) => {
+          if (kind === "waking") {
+            analyzeStatus.textContent =
+              `Waking up the analysis service (Render free-tier cold start can take up to a minute)… retrying in ${Math.round(delay / 1000)}s.`;
+          }
+        });
+
+        if (!reachable) {
+          markServiceDegradedAfterAnalyzeFailure();
+          throw new Error(
+            "The analysis service didn't wake up after waiting — it may genuinely be down. " +
+            "Try Retry on the status banner above, or try again shortly."
+          );
+        }
+
+        analyzeStatus.textContent = "Service is back — retrying analysis…";
+        try {
+          data = await attemptAnalyze();
+        } catch {
+          // Woke up (per /health) but the actual analysis request still
+          // failed -- this is a real failure now, not a cold start.
+          markServiceDegradedAfterAnalyzeFailure();
+          throw new Error(
+            "The analysis service woke up, but the request still failed. This looks like a real " +
+            "failure rather than a cold start — try again, or try a smaller photo."
+          );
+        }
+      }
+
       state.result = data;
       // The backend picks one approved area as the "primary" region (the
       // first one accepted into both axes' consensus) and echoes its
@@ -2403,20 +2536,12 @@
       renderResults();
       goToStep("results");
     } catch (err) {
+      // Any transport-shaped failure was already resolved (recovered, or
+      // turned into one of the specific messages above) inside the try
+      // block -- by the time we're here, err.message is always the
+      // right thing to show verbatim.
       analyzeStatus.hidden = true;
-      if (err && err.name === "AbortError") {
-        analyzeError.textContent =
-          "The analysis service took too long to respond and the request was cancelled. " +
-          "Free-tier hosts can be slow to wake up from a cold start — try again in ~30-60 seconds.";
-      } else if (err instanceof TypeError) {
-        // fetch() throws a bare TypeError for network failures / CORS rejections —
-        // this is the "service unavailable" case the task calls out explicitly.
-        analyzeError.textContent =
-          "Could not reach the analysis service. It may be offline, waking up from a cold start, " +
-          "or blocking requests from this page (CORS). Try the Retry button above, or try again shortly.";
-      } else {
-        analyzeError.textContent = (err && err.message) || "Analysis failed. Please try again.";
-      }
+      analyzeError.textContent = (err && err.message) || "Analysis failed. Please try again.";
       analyzeError.hidden = false;
     } finally {
       analyzeBtn.disabled = false;
@@ -2584,17 +2709,29 @@
 
     const regionCount = mr.per_roi.length;
     const row = (label, value) => `<div class="tgr-consistency-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(value))}</span></div>`;
+    // arr() defaults a possibly-missing array field to [] rather than
+    // letting `.length`/`for...of` crash on it -- defends this whole
+    // panel against exactly the class of bug found via a live-site
+    // report: a frontend/backend schema mismatch (e.g. an older backend
+    // deploy predating a field this code expects) throwing "Cannot read
+    // properties of undefined (reading 'length')" instead of just
+    // degrading. See tests/test_frontend_response_contract.py, which
+    // pins the CURRENT contract so drift is caught before it ships --
+    // this guard is the belt to that test's suspenders, for whatever
+    // drift reaches production anyway (a stale deploy, a hand-rolled
+    // response in a future refactor, etc).
+    const arr = (x) => x || [];
     // included + excluded always accounts for every region considered on
     // this axis (see AxisConsensusOut.excluded_labels) -- broken out by
     // reason (outlier vs. no usable measurement at all) so "2 of 4
     // contributed" is never silently indistinguishable from "2 of 2".
     const agreedText = (consensus) => {
-      const nOutliers = consensus.outliers.length;
-      const nNoMeasurement = consensus.no_measurement_labels.length;
+      const nOutliers = arr(consensus.outliers).length;
+      const nNoMeasurement = arr(consensus.no_measurement_labels).length;
       const parts = [];
       if (nOutliers) parts.push(`${nOutliers} excluded as outlier${nOutliers === 1 ? "" : "s"}`);
       if (nNoMeasurement) parts.push(`${nNoMeasurement} had no usable measurement`);
-      return `${consensus.included_labels.length} of ${regionCount} agreed` + (parts.length ? ` — ${parts.join(", ")}` : "");
+      return `${arr(consensus.included_labels).length} of ${regionCount} agreed` + (parts.length ? ` — ${parts.join(", ")}` : "");
     };
 
     let html = "";
@@ -2603,16 +2740,16 @@
     html += row("Course agreement", agreedText(mr.course_consensus));
 
     const outlierLines = [];
-    for (const o of mr.wale_consensus.outliers) {
+    for (const o of arr(mr.wale_consensus.outliers)) {
       outlierLines.push(`Wale ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
     }
-    for (const o of mr.course_consensus.outliers) {
+    for (const o of arr(mr.course_consensus.outliers)) {
       outlierLines.push(`Course ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
     }
-    for (const label of mr.wale_consensus.no_measurement_labels) {
+    for (const label of arr(mr.wale_consensus.no_measurement_labels)) {
       outlierLines.push(`Wale ${label}: no usable measurement for this region.`);
     }
-    for (const label of mr.course_consensus.no_measurement_labels) {
+    for (const label of arr(mr.course_consensus.no_measurement_labels)) {
       outlierLines.push(`Course ${label}: no usable measurement for this region.`);
     }
     const outlierHtml = outlierLines.map((line) => `<div class="tgr-consistency-outlier">⚠ ${escapeHtml(line)}</div>`).join("");
@@ -2827,7 +2964,7 @@
         ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
         <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
-        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered} candidate columns accepted</span></div>` : ""}
+        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered != null ? d.columns_considered : "?"} candidate columns accepted</span></div>` : ""}
       </div>`;
     render(); // re-draw the results overlay so it reflects the newly selected region
   }
@@ -2962,7 +3099,7 @@
         </p>
         ${row("Direct loop detections", d.direct_center_count)}
         ${row("Course rows used as prior", d.row_count)}
-        ${row("Accepted wale columns", `${d.column_count} of ${d.columns_considered} candidates`)}
+        ${row("Accepted wale columns", `${d.column_count} of ${d.columns_considered != null ? d.columns_considered : "?"} candidates`)}
         ${row("Column row-support (min..max)", d.column_support_counts && d.column_support_counts.length ? `${Math.min(...d.column_support_counts)}..${Math.max(...d.column_support_counts)} of ${d.row_count}` : "—")}
         ${row("Lattice consistency", fmt(d.lattice_consistency, 2))}
         ${row("Loop-lattice wale spacing", fmt(d.wale_spacing_px, 1, " px"))}
@@ -3164,42 +3301,50 @@
         fd.append("file", state.file);
       }
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
       let data;
       try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || `Could not save correction (HTTP ${res.status}).`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
+            method: "POST",
+            body: fd,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        try {
+          data = await res.json();
+        } catch {
+          throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+        }
+        if (!res.ok || data.success === false) {
+          throw new Error(data.message || `Could not save correction (HTTP ${res.status}).`);
+        }
+      } catch (err) {
+        // isTransportFailure is only applied here, to the fetch+parse+
+        // status-check above -- never to the rendering code below, so a
+        // real JS bug there (e.g. renderCorrectionComparison reading a
+        // field the response didn't include) can't get mislabeled as a
+        // connectivity issue.
+        if (isTransportFailure(err)) {
+          throw new Error(
+            err.name === "AbortError"
+              ? "Saving timed out. The analysis service may be waking up from a cold start — try again shortly."
+              : "Could not reach the analysis service to save this correction. Try again shortly."
+          );
+        }
+        throw err;
       }
 
       correctionStatus.hidden = true;
       renderCorrectionComparison(data);
     } catch (err) {
       correctionStatus.hidden = true;
-      if (err && err.name === "AbortError") {
-        correctionError.textContent =
-          "Saving timed out. The analysis service may be waking up from a cold start — try again shortly.";
-      } else if (err instanceof TypeError) {
-        correctionError.textContent =
-          "Could not reach the analysis service to save this correction. Try again shortly.";
-      } else {
-        correctionError.textContent = (err && err.message) || "Could not save correction. Please try again.";
-      }
+      correctionError.textContent = (err && err.message) || "Could not save correction. Please try again.";
       correctionError.hidden = false;
     } finally {
       updateSaveCorrectionButton();
