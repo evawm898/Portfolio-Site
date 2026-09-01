@@ -1116,3 +1116,43 @@ any of them.
       corners and the SPIRAL count sweep, which is the region a placement change is most
       likely to disturb. `--full` could not do the job at all here, since all 22 new rows
       select an option value the old registry does not have.
+
+    - **THE POSITIVE CONTROL, RED THEN GREEN, in throwaway worktrees** (`git worktree add`,
+      never mutate-and-restore). Three mutations, the shipped instrument run against each,
+      with what the STL gates saw recorded beside what the assertions saw:
+
+      | mutation | fired | boundary edges | export tris | seen by |
+      |---|---|---|---|---|
+      | shipped tree | **0 of 7 rows** | 0 | unchanged | — (green) |
+      | M1 quantizer (`lambda = floor(k/n)`) | 8 across 5 rows | **0** | **identical** | **J5 only** |
+      | M2 wrong exponent (`k/(K-1) · L`) | 23 across 5 rows | **0** | **identical** | **J6 only** |
+      | M3 floor once per sequence | 67 on the one row where it binds | **0** | **identical** | **J4b only** |
+
+      Every mutation leaves both ringed control rows clean, so all three are scoped to the
+      continuous arm. **M1 was then run through the connectedness gate with J5 silenced, to
+      measure what the flood fill actually says: 22 of 22 continuous rows report ONE
+      CONNECTED PIECE.** (That run self-reports HARNESS INVALID, because scoping its matrix
+      to continuous rows removes the rows its own pairwise and response assertions need —
+      so it is a measurement of the voxel verdict, never a gate pass. A failing validity
+      assertion is not a known-red.)
+
+    - **M2 EXPOSED A BLIND SPOT IN J6 ITSELF, AT THE SHIPPING DEPTH, and closing it is the
+      most useful thing the control did.** In its first run M2 fired on every three-turn
+      row and NOT on the one-turn row: `quantizerResiduals` carried entries only for
+      `m < layerCount`, so at layerCount 1 the single entry was `m = 0`, where every law
+      agrees trivially — the sequence stops at `k = n-1`, before its first multiple. The
+      law is defined for every k, so the check now also evaluates it ONE TURN PAST THE END
+      ("one more turn would land exactly on the next ringed layer"), and the law became a
+      closure both the ring loop and the cross-validation call so the two cannot drift into
+      two copies. M2 then fired on 5 of 7 rows instead of 4. **The gate that has never
+      caught anything is a hope; this one caught a hole in itself before shipping.**
+
+    - **AN UNEXPLAINED INSTRUMENT ANOMALY, recorded rather than smoothed over.** M3 reported
+      67 failures on its first batch run, **0 on the second batch run**, and 67 on three
+      subsequent runs (two isolated, one batch). The mutation was present in the worktree
+      throughout, verified after the fact. No cause was found — Chromium's HTTP cache was
+      ruled out (a fresh browser and ephemeral context per process, random port per run),
+      and so was a write race (the mutation was applied minutes before that loop iteration).
+      It is reported because "run the same tree twice" cuts both ways: a control that
+      reports NOT FIRED once in five runs would, on a single run, have read as a passing
+      instrument. Anyone extending these mutations should run each more than once.

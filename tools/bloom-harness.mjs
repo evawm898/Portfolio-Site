@@ -1490,6 +1490,7 @@ export const FROZEN_BASE_COMMITS = {
   phase3: '6626961',   // the silhouette model — before the four form curves
   phase4: '3c542fb',   // the form curves and the DISC default — before the thickness layer
   phase5: 'deacded',   // the thickness layer, tip cap and sectioned panel — before layers and spiral
+  phase6: 'c1886d0',   // layers and spiral placement — before the continuous spiral
 };
 
 /* ===================================================================
