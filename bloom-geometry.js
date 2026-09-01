@@ -254,13 +254,107 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
    inner ring). It is a second junction primitive with its own watertightness
    argument and gate rows. It is NOT built and there is no stub for it. The
    evidence that would reopen it is Eva finding the tilt-driven layering flat
-   on the arrangement sheet — nothing else. */
+   on the arrangement sheet — nothing else.
+
+   ===================================================================
+   CONTINUOUS: ONE LAW, TWO QUANTIZERS (Sep 1, Eva's ruling from the brief
+   "the spiral is still very distinct layers, and I don't know if it should
+   be"). The layered spiral placed three rings and wrote spiral azimuths on
+   them; what a sunflower or a succulent rosette actually is has no rings at
+   all — one sequence winding inward, every element at its own radius, size
+   and tilt.
+
+   THE WHOLE PROPOSAL IS THAT THE LAYER INDEX STOPS BEING AN INTEGER. Every
+   per-layer quantity in this function is already a function of a layer index
+   L; continuous mode evaluates the SAME functions at non-integer L:
+
+       RINGED      lambda_k = floor(k / petalCount)
+       CONTINUOUS  lambda_k = k / petalCount            k = 0 .. K-1
+                   K = petalCount * layerCount
+
+       radius_k = R0 * layerSize^lambda_k
+       scale_k  = layerSize^lambda_k
+       tilt_k   = lambda_k * layerTilt
+
+   NOTHING REINTERPRETS AND NO LABEL LIES, which was the constraint this had
+   to satisfy before any of it was worth building. `petalCount` is petals per
+   turn in both modes (under RINGED a "turn" is a ring). `layerCount` is how
+   many turns. `layerSize` is the shrink per turn. `layerTilt` is the tilt
+   gain per turn. That is why continuous mode ships NO sub-controls of its
+   own: there is nothing left for them to control. The one control that does
+   lose its meaning is `layerPhase` — a whorl-to-whorl offset with no whorls
+   to offset — and it is HIDDEN by a registry predicate, never reinterpreted.
+
+   THE DEPTH IS EXTRAPOLATION, NOT INTERPOLATION (Eva, Sep 1, ruled from the
+   numbers). lambda runs to layerCount - 1/petalCount, so a continuous bloom
+   winds a full `layerCount` turns and reaches DEEPER than the innermost of
+   `layerCount` stacked rings, which are only layerCount-1 turns apart. At the
+   config the ruling was made on (40 petals, spread 1.55, 3 layers, the
+   shipping 0.72 ratio) the innermost blade is 13.17 mm against the ringed
+   18.14 mm, and R0 is 7.5% smaller. The alternative — lambda = k(L-1)/(K-1),
+   matching ringed's extremes exactly and merely dissolving between them — was
+   costed and rejected because it breaks the label story: `petalCount` would
+   stop being petals-per-turn (59.5 per turn at that config) and CONTINUOUS
+   would collapse onto SPIRAL at layerCount 1. Recorded, not stubbed.
+
+   THE HUB SHRINKS, DERIVED, and that is the area rule working rather than a
+   side effect to correct: continuous mode has less total foot area at the
+   same settings, because its inner feet are smaller than a full ring of
+   innermost-layer feet. Measured — 0.9251 of the ringed R0 at Eva's config,
+   0.9749 at layerSize max, 0.8455 at layerSize min.
+
+   CONTAINMENT SURVIVES BY CONSTRUCTION AND GETS STRONGER. `layerSize` maxes
+   at 0.90 < 1 and lambda >= 0, so layerSize^lambda <= 1 for every REAL
+   lambda, not merely for integers — radius_k <= R0 at every slot, strictly
+   decreasing, with `Math.pow(s, 0)` exactly 1 keeping rings[0].radius ===
+   hub.radius an EQUALITY. Nothing clamps to achieve it.
+
+   THE OVERLAP BOX DOES NOT DEGRADE EITHER, for exactly the reason it did not
+   degrade under layers: none of `overhang` (1.5 mm absolute floor), `width`
+   (FOOT_MIN_WIDTH_MM) or `thickness` (MIN_FEATURE_MM in export) is a function
+   of the slot index. Measured at the deepest reachable foot — 3 turns x ALL
+   THIN x spread min x petalCount 40 x layerSize min, where the innermost ring
+   radius is 0.206 mm — the box is 1.500 x 1.600 x 1.000 = 2.400 mm^3, the
+   SAME number as the single-ring and layered corners.
+
+   AND THE VOXEL GATE IS BLINDER HERE THAN IT WAS UNDER LAYERS, which is why
+   J5 and J6 had to be written. Consecutive foot annuli overlap by 3.154 mm at
+   Eva's config (a 0.1735 mm radius step against an 8.486 mm overhang) against
+   1.981 mm at three layers: a wrong hub leaves 57 of 120 slots joined to
+   nothing and the flood fill still reports one region, chained through the
+   119 feet in between. See junctionAssertions() in tools/bloom-harness.mjs. */
 export function footRing(state, acc) {
   const thickness = acc.floorThickness(state.sheetThickness);
   const layerCount = Math.round(state.layerCount);
   if (!(layerCount >= 1 && layerCount <= MAX_LAYERS)) {
     throw new Error(`layerCount ${JSON.stringify(state.layerCount)} is outside 1..${MAX_LAYERS} — the registry and the builder have diverged`);
   }
+  /* PLACEMENT IS VALIDATED HERE TOO, and loudly, for the same reason
+     buildWhorlInto validates it: this function now BRANCHES on it, so an
+     unknown value would silently take the ringed arm and build a design
+     nobody asked for. Two validations of one enum are not two owners of a
+     boundary — the registry owns the option list, and each consumer that
+     branches says out loud when it is handed something outside it. */
+  if (state.placement !== 'RADIAL' && state.placement !== 'SPIRAL' && state.placement !== 'CONTINUOUS') {
+    throw new Error(`unknown placement ${JSON.stringify(state.placement)} — the registry and the builder have diverged`);
+  }
+  const continuousMode = state.placement === 'CONTINUOUS';
+  const n = Math.round(state.petalCount);
+  /* THE CONTINUOUS LAW ITSELF, as a closure, so the ring loop and the
+     quantizer cross-validation below evaluate the SAME expression. Written
+     inline in both places it would be two copies of the one thing this whole
+     layer is — and the cross-validation would then agree with a mutated loop
+     by mutating alongside it, which is a check that cannot fail. */
+  const lambdaAt = (k) => k / n;
+  /* THE GOLDEN-ANGLE SEQUENCE'S LENGTH — one owner, because two consumers
+     need it and neither may keep its own answer: buildBloomInto uses it as
+     the slot count of the single continuous whorl, and the read-out's
+     legibility flag compares it against SPIRAL_LEGIBLE_COUNT. Under SPIRAL
+     each whorl runs its OWN sequence, so the length is `petalCount`; under
+     CONTINUOUS there is one sequence over the whole bloom. RADIAL has no
+     golden-angle sequence at all and reports `petalCount`, which is what the
+     flag's predicate already ignores. */
+  const sequenceLength = continuousMode ? layerCount * n : n;
   /* Foot width follows the petal it feeds — a fraction of blade width, scaled
      by `footDelicacy`, with a floor so very narrow petals keep a printable
      root. THIS IS THE ONLY PLACE `footDelicacy` EXISTS, exactly as spread is
@@ -287,13 +381,42 @@ export function footRing(state, acc) {
      byte-identical here BY CONSTRUCTION; the byte report confirms it. */
   const raw = [];
   let sumSq = 0;
+  if (continuousMode) {
+    /* THE CONTINUOUS ARM — one ring per PETAL, `lambda` a real number.
+
+       IT IS A BRANCH AND NOT A REFORMULATION, exactly as buildWhorlInto's
+       RADIAL arm is, and for a reason measured rather than preferred: the
+       ringed arm accumulates `count * rFoot^2` once per layer and this arm
+       accumulates `rFoot^2` once per foot. Those are the same number in
+       algebra and NOT the same double — the `a*(b+c)` vs `a*b + a*c` trap
+       that fired on a real row when the layered law was written. Rewriting
+       the ringed sum as a per-foot sum "because it is the same rule" would
+       move every layered export by an ULP or two for nothing. So the ringed
+       loop below is untouched, character for character, and this one stands
+       beside it. Nothing is shared between them except the per-foot
+       expressions, which are identical in both.
+
+       WHAT THE AREA RULE SUMS IS UNCHANGED IN DEFINITION: r_ring^2 = SUM of
+       r_foot^2 over every foot that feeds the hub. Only the grouping of equal
+       terms differs. */
+    for (let k = 0; k < sequenceLength; k++) {
+      const lambda = lambdaAt(k);
+      const scale = Math.pow(state.layerSize, lambda);
+      const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
+      const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
+      const rFoot = Math.sqrt((width * thickness) / Math.PI);
+      sumSq += rFoot * rFoot;
+      raw.push({ lambda, scale, authoredWidth, width, rFoot });
+    }
+  } else {
   for (let L = 0; L < layerCount; L++) {
     const scale = Math.pow(state.layerSize, L);
     const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
     const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
     sumSq += state.petalCount * rFoot * rFoot;
-    raw.push({ scale, authoredWidth, width, rFoot });
+    raw.push({ lambda: L, scale, authoredWidth, width, rFoot });
+  }
   }
 
   /* THE GUARD, AND IT IS LOAD-BEARING RATHER THAN INSURANCE — the one place
@@ -322,13 +445,21 @@ export function footRing(state, acc) {
      layer there is no guard law to compare against and it is null: a claim
      nothing can make is reported as absent, never as a passing 0. */
   const generalDerived = Math.sqrt(sumSq);
-  const derivedRadius = layerCount === 1
+  /* THE GUARD IS A RINGED-ARM CLAIM. The pre-layer expression it
+     cross-validates against — one ring of `petalCount` identical feet —
+     describes no continuous design at all: at layerCount 1 the continuous arm
+     already has `petalCount` DIFFERENT feet. A residual computed there would
+     be a claim nothing can make, which this file reports as ABSENT (null) and
+     never as a passing 0. The continuous arm carries its own cross-validation
+     instead: `quantizerResiduals` below. */
+  const guarded = !continuousMode && layerCount === 1;
+  const derivedRadius = guarded
     ? raw[0].rFoot * Math.sqrt(state.petalCount)   // area rule — the pre-layer expression, verbatim
     : generalDerived;
-  const guardResidual = layerCount === 1 ? Math.abs(generalDerived - derivedRadius) : null;
+  const guardResidual = guarded ? Math.abs(generalDerived - derivedRadius) : null;
 
   const R0 = derivedRadius * state.spread;         // the ONLY use of spread
-  const layers = raw.map((p, L) => {
+  const rings = raw.map((p, L) => {
     const radius = R0 * p.scale;
     return {
       index: L,
@@ -347,8 +478,17 @@ export function footRing(state, acc) {
          three are EXACTLY 0/1 at layerCount 1, separately from the residual
          bound above, so a real leak cannot hide inside a tolerance. */
       scale: p.scale,
-      phase: (L * state.layerPhase * TAU) / state.petalCount,
-      tiltExtra: L * state.layerTilt,
+      /* PHASE IS A WHORL-TO-WHORL OFFSET AND CONTINUOUS HAS ONE WHORL, so it
+         is exactly 0 at every slot there — not a small number, and not a
+         reinterpretation of `layerPhase` into something the label would then
+         be lying about. `layerPhase` is hidden in that mode by its own
+         registry predicate, which is where every reason a control can be
+         hidden lives. */
+      phase: continuousMode ? 0 : (L * state.layerPhase * TAU) / state.petalCount,
+      /* THE AFFINE ANGLE, at this ring's own lambda. In the ringed arm
+         `p.lambda` IS the integer L, so this is `L * state.layerTilt`
+         character for character on the same doubles. */
+      tiltExtra: p.lambda * state.layerTilt,
       /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the
          read-out and the gates can say WHERE a floor started binding instead
          of a slider silently going quiet. Nothing geometric may read these. */
@@ -366,7 +506,70 @@ export function footRing(state, acc) {
      one-owner rule is about which is which. Containment is asserted (J2/J3)
      rather than achieved by picking the largest. */
   const hub = { radius: R0, thickness, derivedRadius };
-  return { layers, hub, derivedRadius, guardResidual, layerCount };
+
+  /* THE QUANTIZER IDENTITY, CROSS-VALIDATED IN THE OWNER — the continuous
+     arm's answer to `guardResidual`, and it exists for the same reason: a
+     guard must not be somewhere a bug can sit unexercised.
+
+     THE CLAIM THIS LAYER RESTS ON is that ringed and continuous are ONE LAW
+     under two quantizers of the same layer index:
+
+         RINGED      lambda_k = floor(k / petalCount)
+         CONTINUOUS  lambda_k = k / petalCount
+
+     which means the continuous sequence must pass exactly through every
+     ringed layer: at k = m * petalCount the two agree. `(m * n) / n` is
+     EXACTLY m in IEEE-754 for every reachable m and n (the true quotient is
+     representable, and division is correctly rounded), so `Math.pow(s, (m*n)/n)`
+     is the same call on the same double as `Math.pow(s, m)`. This is therefore
+     an EQUALITY, not a bound — unlike `guardResidual`, and stated here so
+     nobody later loosens it to a tolerance.
+
+     IT IS COMPUTED HERE RATHER THAN IN THE GATES on the guardResidual
+     precedent: a gate restating `Math.pow(layerSize, m)` would be a second
+     copy of the ringed law living inside the instrument built to police it.
+     Null under the ringed arm — there is no second law there to agree with. */
+  let quantizerResiduals = null;
+  if (continuousMode) {
+    quantizerResiduals = [];
+    /* ONE PAST THE END, and that bound is a POSITIVE-CONTROL FINDING rather
+       than a flourish. Checking only m < layerCount leaves layerCount 1 with
+       a single entry at m = 0, where every law agrees trivially — the
+       sequence stops at k = n-1, before its first multiple. A wrong-exponent
+       mutation was run against that and fired on the three-turn rows and NOT
+       on the one-turn row, so the assertion had a reachable blind spot at the
+       shipping depth. Evaluating the law at m = layerCount closes it: the law
+       is defined for every k, and "one more turn would land exactly on the
+       next ringed layer" is the same identity stated where the sequence can
+       still be asked about it.
+
+       INSIDE THE SEQUENCE IT READS THE RING THAT WAS ACTUALLY BUILT, not the
+       law again — otherwise a ring map that ignored `lambdaAt` would agree
+       with itself. Past the end there is no ring to read, so the law is
+       evaluated through the same closure the loop used. */
+    for (let m = 0; m <= layerCount; m++) {
+      const inSequence = m < layerCount;
+      const lam = inSequence ? null : lambdaAt(m * n);
+      const scale = inSequence ? rings[m * n].scale : Math.pow(state.layerSize, lam);
+      const tilt = inSequence ? rings[m * n].tiltExtra : lam * state.layerTilt;
+      quantizerResiduals.push({
+        m,
+        inSequence,
+        dScale: scale - Math.pow(state.layerSize, m),
+        dTilt: tilt - m * state.layerTilt,
+      });
+    }
+  }
+
+  return {
+    rings, hub, derivedRadius, guardResidual, layerCount,
+    continuousMode, sequenceLength, quantizerResiduals,
+    /* HOW MANY PETALS EACH RING CARRIES. One number rather than a shape the
+       consumers each infer: `rings.length * slotsPerRing` is the bloom's
+       petal count in both modes, and buildBloomInto reads exactly that
+       instead of deciding for itself what a ring means in which mode. */
+    slotsPerRing: continuousMode ? 1 : n,
+  };
 }
 
 /* ===================================================================
@@ -377,32 +580,63 @@ export function footRing(state, acc) {
    later are then more whorls, not a refactor.
 
    PLACEMENT (Sep 1) is the one thing this primitive computes: where slot i
-   sits around the axis. RADIAL is even spacing; SPIRAL steps by the golden
-   angle. It is a BRANCH, not a reformulation — the RADIAL arm is the
-   pre-spiral expression character for character — so byte-identity on that
-   side is structural and needs no residual to cross-validate it (there is no
-   algebraic identity between the two arms to check).
+   sits around the axis. RADIAL is even spacing; SPIRAL and CONTINUOUS both
+   step by the golden angle. It is a BRANCH, not a reformulation — the RADIAL
+   arm is the pre-spiral expression character for character — so byte-identity
+   on that side is structural and needs no residual to cross-validate it
+   (there is no algebraic identity between the two arms to check).
+
+   CONTINUOUS SHARES SPIRAL'S AZIMUTH LAW EXACTLY, and that is the point
+   rather than an economy: the difference between the two is NOT how slot i is
+   placed around the axis, it is HOW MANY RINGS THERE ARE. A layered spiral is
+   `layerCount` calls of `petalCount` slots, each call on its own ring; a
+   continuous spiral is ONE call of `petalCount * layerCount` slots, each slot
+   on a ring of its own. Both walk `phase + i * GOLDEN_ANGLE`. So the third
+   value is written here as a third NAME on the same expression — never a
+   second copy of it — and every quantity that actually differs comes from
+   footRing(), which owns the ring list. See footRing()'s CONTINUOUS section
+   for the law and for the quantizer identity that cross-validates it.
 
    SPIRAL MOVES AZIMUTH ONLY. Every foot stays on its layer's ring, so the
-   junction argument is untouched by placement: the feet the hub has to reach
-   are the same feet, at the same radius, in the same plane. A Vogel radius
-   ramp (r proportional to sqrt(i), petals crowding inward) is a DIFFERENT
-   feature — a spiral disc rather than a spiral whorl — with its own evidence
-   needs. It is recorded here and deliberately not built; there is no stub.
+   junction argument is untouched by that value: the feet the hub has to reach
+   are the same feet, at the same radius, in the same plane. CONTINUOUS DOES
+   MOVE RADIUS — every slot gets its own — and the junction argument survives
+   for a different, stronger reason: `layerSize < 1` makes radius_k <= R0 for
+   every k, so every foot's whole footprint lies inside the hub disc. That is
+   footRing()'s containment note, and J2/J3 assert it per slot rather than per
+   layer. A Vogel radius ramp (r proportional to sqrt(k), CONSTANT petal size,
+   the equal-area seed-head law) is still a DIFFERENT feature and is still not
+   built: it is the flat-disc packing law, and this model's petals shrink with
+   `layerSize`, so its per-turn ratio would have nothing to attach to and
+   `layerSize` would be orphaned. Recorded here, no stub.
+
+   RADIUS MAY BE A RAMP, like sizeRamp and angleRamp beside it. A layered
+   whorl passes the scalar its ring carries (the same double, so the slot
+   payload is unchanged bit for bit); a continuous whorl passes a function of
+   the slot index. Nothing in the petal builder reads `slot.radius` today — it
+   takes the radius from its `ring` argument — but a slot that CARRIED the hub
+   radius while sitting somewhere else would be a stored lie waiting for the
+   first consumer to believe it, which is this project family's most repeated
+   defect. So the payload tells the truth in both modes.
 
    LOW COUNTS ARE ALLOWED AND FLAGGED, NOT GATED. See GOLDEN_ANGLE's note:
    the "n >= 8" rule is an aesthetic legibility claim and the geometry
    contains no threshold to gate on, so the read-out labels the state and
-   nothing hides. */
+   nothing hides. What the flag compares the threshold against is the length
+   of the GOLDEN-ANGLE SEQUENCE — `petalCount` under SPIRAL, where each whorl
+   runs its own sequence, and `petalCount * layerCount` under CONTINUOUS,
+   where there is one. footRing() owns that number (`sequenceLength`) so the
+   read-out and the panel gate cannot keep two answers. */
 export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL' }) {
-  if (placement !== 'RADIAL' && placement !== 'SPIRAL') {
+  if (placement !== 'RADIAL' && placement !== 'SPIRAL' && placement !== 'CONTINUOUS') {
     throw new Error(`unknown placement "${placement}" — the registry and the builder have diverged`);
   }
+  const radiusAt = typeof radius === 'function' ? radius : () => radius;
   for (let i = 0; i < count; i++) {
     blade({
       index: i,
-      azimuth: placement === 'SPIRAL' ? phase + i * GOLDEN_ANGLE : phase + (i * TAU) / count,
-      radius,
+      azimuth: placement === 'RADIAL' ? phase + (i * TAU) / count : phase + i * GOLDEN_ANGLE,
+      radius: radiusAt(i, count),
       z: height,
       scale: sizeRamp(i, count),
       tiltExtra: angleRamp(i, count),
@@ -1610,14 +1844,45 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      `height` argument (it has carried it since session 1 and sepals will use
      it); it is passed the same literal 0 it has always been passed.
 
-     PER-LAYER MEASUREMENTS, not one of them. Slot 0 of each layer is that
-     layer's petal (sizeRamp and angleRamp are per-layer constants), so slot 0
-     is the whorl. Reporting a single `petal` would have silently meant "layer
-     0" the moment layers existed — the same defect the pre-layer comment here
-     warned per-slot overrides would cause. `petal` is kept pointing at layer
-     0 so every existing consumer reads what it always read. */
+     PER-RING MEASUREMENTS, not one of them. Under the ringed arm slot 0 of
+     each whorl is that ring's petal (sizeRamp and angleRamp are per-whorl
+     constants), so slot 0 is the whorl. Reporting a single `petal` would have
+     silently meant "layer 0" the moment layers existed — the same defect the
+     pre-layer comment here warned per-slot overrides would cause. `petal` is
+     kept pointing at ring 0 so every existing consumer reads what it always
+     read.
+
+     `petals` IS ONE ENTRY PER RING IN BOTH MODES, which is what keeps every
+     consumer — and J1 above all — mode-blind: under CONTINUOUS a ring carries
+     exactly one petal, so that array becomes every petal in the bloom and the
+     foot assertion goes from three frames to 3 * petalCount * layerCount of
+     them. Strictly more coverage, from the same expression.
+
+     THE CONTINUOUS ARM IS ONE WHORL, NOT petalCount OF THEM, and that is the
+     whole structural difference between the two placements. Every per-slot
+     quantity is read off the ring descriptor footRing() produced — the ramps
+     INDEX the ring list rather than computing anything, because a consumer
+     computing a per-slot value is exactly the arithmetic the one-owner rule
+     forbids, and it is the same rule that made the layered arm read
+     `ring.scale` instead of raising layerSize to a power out here. */
   const petals = [];
-  for (const ring of fr.layers) {
+  if (fr.continuousMode) {
+    buildWhorlInto({
+      count: fr.rings.length,
+      radius: (i) => fr.rings[i].radius,
+      height: 0,
+      sizeRamp: (i) => fr.rings[i].scale,
+      angleRamp: (i) => fr.rings[i].tiltExtra,
+      /* The sequence's own starting azimuth. rings[0].phase is exactly 0 in
+         this mode (footRing owns that); reading it rather than writing a
+         literal 0 keeps the one-owner rule honest if a start phase is ever
+         a thing. */
+      phase: fr.rings[0].phase,
+      placement: state.placement,
+      blade: (slot) => { petals.push(buildPetalInto(acc, state, fr.rings[slot.index], slot, capability)); },
+    });
+  } else {
+  for (const ring of fr.rings) {
     let petal = null;
     buildWhorlInto({
       count: state.petalCount,
@@ -1634,7 +1899,8 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     });
     petals.push(petal);
   }
+  }
   buildHubInto(acc, state, fr.hub);          // unconditional — the invariant's plumbing
   const center = buildCenterInto(acc, state, fr.hub);   // optional — the designed mass
-  return { ring: fr.layers[0], rings: fr.layers, hub: fr.hub, foot: fr, center, petal: petals[0], petals };
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, foot: fr, center, petal: petals[0], petals };
 }

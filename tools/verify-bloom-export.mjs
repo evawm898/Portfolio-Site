@@ -99,7 +99,14 @@ for (const row of rows) {
      annuli overlap each other, so connectedness under layers is
      over-determined. A lifted layer is detached by derivation at 1.20 mm and
      does not split the flood fill until roughly 2.5 mm. J1-J4 carry what the
-     bytes cannot show. */
+     bytes cannot show.
+     AND UNDER THE CONTINUOUS SPIRAL, NEITHER STL GATE NOR J1-J4 CAN SEE THE
+     ONE FAILURE THAT MODE INTRODUCES: continuous placement silently building
+     rings exports watertight, exports as one connected piece, carries the
+     identical triangle count, and passes J1, J2, J3 and J4 on every row —
+     it even passes the multiples-of-n identity, since floor(m*n/n) is m.
+     J5 (no two consecutive slots share a ring) and J6 (the quantizer
+     identity, an exact equality computed in footRing) are what observe it. */
   const jct = await junctionAssertions(page, row);
   if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);

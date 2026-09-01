@@ -527,19 +527,43 @@ for (const [driverId, dependents] of drivers) {
    threshold to gate on, so a label is the whole mechanism and it has to be
    worth something. A flag asserted only when it should appear is a flag that
    can be stuck on, so both directions are checked, and the threshold comes
-   from SPIRAL_LEGIBLE_COUNT rather than from a number retyped here. */
-for (const [placement, count] of [['SPIRAL', SPIRAL_LEGIBLE_COUNT - 1], ['SPIRAL', SPIRAL_LEGIBLE_COUNT], ['RADIAL', SPIRAL_LEGIBLE_COUNT - 1], ['SPIRAL', 3]]) {
+   from SPIRAL_LEGIBLE_COUNT rather than from a number retyped here.
+
+   WHAT IT COUNTS MOVED WITH THE CONTINUOUS ARM, and the rows below are what
+   says so. The flag is about how many elements the golden angle has to work
+   with: under SPIRAL each whorl runs its own sequence, so that is petalCount
+   and NOTHING about those rows changes; under CONTINUOUS there is one
+   sequence of petalCount x layerCount, so the SAME three petals that trip the
+   flag at one turn must NOT trip it at three (9 elements), and a two-petal
+   sequence has no reachable state at all since petalCount starts at 3. The
+   CONTINUOUS x 3 x 1 turn / CONTINUOUS x 3 x 3 turns pair is therefore the
+   two-directional assertion for the new mode specifically: same slider, same
+   threshold, opposite verdicts, decided by the geometry rather than by the
+   control. RADIAL rows stay in as the never-flagged control. */
+for (const [placement, count, depth] of [
+  ['SPIRAL', SPIRAL_LEGIBLE_COUNT - 1, 1], ['SPIRAL', SPIRAL_LEGIBLE_COUNT, 1],
+  ['RADIAL', SPIRAL_LEGIBLE_COUNT - 1, 1], ['SPIRAL', 3, 1],
+  ['SPIRAL', 3, 3],
+  ['CONTINUOUS', 3, 1], ['CONTINUOUS', 3, 3],
+  ['CONTINUOUS', SPIRAL_LEGIBLE_COUNT, 1], ['RADIAL', 3, 3],
+]) {
   await openBloom(page, port);
-  const set = [{ id: 'placement', value: placement }, { id: 'petalCount', value: String(count) }];
+  const set = [{ id: 'placement', value: placement }, { id: 'petalCount', value: String(count) }, { id: 'layerCount', value: String(depth) }];
   const bad = await applyConfig(page, set);
-  if (bad.length) { note(`[spiral flag] ${placement} x ${count}: read-back failed: ${bad.join('; ')}`); continue; }
+  if (bad.length) { note(`[spiral flag] ${placement} x ${count} x ${depth}: read-back failed: ${bad.join('; ')}`); continue; }
   const txt = await page.evaluate(() => document.getElementById('readout').textContent);
-  const shown = /SPIRAL BELOW \d+ PETALS/.test(txt);
-  const want = placement === 'SPIRAL' && count < SPIRAL_LEGIBLE_COUNT;
+  const shown = /SPIRAL BELOW \d+ IN THE SEQUENCE/.test(txt);
+  /* THE EXPECTATION IS DERIVED FROM THE SAME RULE THE APP STATES, not from a
+     second copy of it: the sequence is petalCount under SPIRAL (each whorl
+     its own) and petalCount x layerCount under CONTINUOUS. The app reads
+     footRing()'s `sequenceLength`; this reads the two controls the row set,
+     so the two agreeing is a real check rather than a tautology. */
+  const seq = placement === 'CONTINUOUS' ? count * depth : count;
+  const want = (placement === 'SPIRAL' || placement === 'CONTINUOUS') && seq < SPIRAL_LEGIBLE_COUNT;
   if (shown !== want) {
-    note(`[spiral flag] ${placement} x ${count} petals: flag ${shown ? 'SHOWN' : 'ABSENT'}, expected ${want ? 'SHOWN' : 'ABSENT'} (threshold SPIRAL_LEGIBLE_COUNT = ${SPIRAL_LEGIBLE_COUNT})`);
+    note(`[spiral flag] ${placement} x ${count} petals x ${depth}: flag ${shown ? 'SHOWN' : 'ABSENT'}, expected ${want ? 'SHOWN' : 'ABSENT'} (sequence ${seq}, threshold SPIRAL_LEGIBLE_COUNT = ${SPIRAL_LEGIBLE_COUNT})`);
   } else {
-    ok.push(`[spiral flag] ${placement} x ${count} petals: ${shown ? 'shown' : 'absent'}, as the threshold requires`);
+    ok.push(`[spiral flag] ${placement} x ${count} petals x ${depth} (sequence ${seq}): ${shown ? 'shown' : 'absent'}, as the threshold requires`);
   }
 }
 

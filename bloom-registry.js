@@ -377,6 +377,14 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
    gating field and it is `visibleWhen`, so there is one name, not two). */
 const CENTER_ON = { id: 'centerStyle', oneOf: ['DOME', 'DISC', 'RING'] };
 
+/* THE UNIT WORD FOR THE DEPTH AXIS — one owner, read by the three read-outs
+   that name it. A layered bloom stacks LAYERS; a continuous one winds TURNS,
+   and they are the same axis measured in the same units, which is exactly why
+   `layerCount`, `layerSize` and `layerTilt` mean the same thing in both modes
+   and need no reinterpretation. Three copies of this ternary would be three
+   places for the two modes to drift apart in wording alone. */
+const perDepth = (ui) => (String(ui.placement) === 'CONTINUOUS' ? 'turn' : 'layer');
+
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
     label: 'Petals', fmt: (v) => `${v}`, tier: 'standard', role: 'petal',
@@ -661,10 +669,28 @@ export const CONTROLS = [
      PLACEMENT — where slot i sits around the axis. The whorl primitive's one
      genuinely computed quantity, exposed as a choice (Sep 1).
 
-     SPIRAL MOVES AZIMUTH ONLY; every foot stays on its layer's ring, so the
-     junction argument is untouched by this control. A Vogel radius ramp
-     (petals crowding inward as r ~ sqrt(i)) is a different feature — a spiral
-     DISC — recorded in buildWhorlInto and deliberately not built.
+     SPIRAL MOVES AZIMUTH ONLY; every foot stays on its layer's ring.
+     CONTINUOUS moves radius, size and tilt as well — one sequence winding
+     inward with every petal on a ring of its own, which is the sunflower /
+     succulent construction rather than rings wearing spiral azimuths. It is
+     the SAME LAW as the layered arm under a different quantizer of the layer
+     index (floor(k/petalCount) against k/petalCount); footRing()'s CONTINUOUS
+     section is the one place that is stated. A Vogel radius ramp (r ~
+     sqrt(k) at CONSTANT petal size — the equal-area seed-head law) remains a
+     different feature and is still not built: this model's petals shrink with
+     `layerSize`, so Vogel would orphan that control.
+
+     WHY THREE VALUES AND NOT A REPLACEMENT (Eva, Sep 1). SPIRAL is not a
+     subset of CONTINUOUS at any layerCount — at one layer SPIRAL is n petals
+     on ONE ring with uneven angular gaps, which is the state the legibility
+     flag below exists for, while CONTINUOUS winds 0.875 of a turn inward. So
+     replacing SPIRAL would delete a reachable, flagged, gate-covered state
+     rather than upgrade it. Keeping both landed as ONE byte event (nothing
+     selects the new value, so every pre-existing export is bit-identical);
+     replacing it would have moved 11 of 158 live rows. Retiring the SPIRAL
+     option later is free while nothing persists a design and becomes a schema
+     bump plus a migration the moment something does — so the cheap ruling is
+     the one that stays available.
 
      LOW COUNTS ARE ALLOWED AND FLAGGED, NEVER GATED, and the reason is a
      measurement rather than a preference. The charter used to say "gate or
@@ -675,11 +701,24 @@ export const CONTROLS = [
      option would strand the model IN the spiral state with the control
      unreachable, and auto-resetting to RADIAL would move geometry as a side
      effect of a hidden rule. The read-out labels it; the panel gate asserts
-     the label in both directions. */
+     the label in both directions.
+
+     WHAT THE FLAG COUNTS IS THE SEQUENCE, NOT THE PETAL SLIDER, and the two
+     stopped being the same number when CONTINUOUS arrived: under SPIRAL each
+     whorl runs its own golden-angle sequence, so the length is `petalCount`;
+     under CONTINUOUS there is ONE sequence of `petalCount * layerCount`.
+     footRing() owns that number (`sequenceLength`) and the read-out reads it,
+     so SPIRAL's behaviour is unchanged to the character while the claim the
+     flag makes stays true in the new mode. */
   { id: 'placement', section: 'arrangement', kind: 'choice', default: 'RADIAL',
     options: [
       { value: 'RADIAL', label: 'Radial (even)' },
-      { value: 'SPIRAL', label: 'Spiral (golden angle)' },
+      /* "layered" earns its place in the label now that a second spiral
+         exists: the contrast is the whole ruling a visitor is making at this
+         select, and a bare "Spiral" beside "Continuous spiral" reads as a
+         shorthand for it rather than as its opposite. (Eva, Sep 1.) */
+      { value: 'SPIRAL', label: 'Spiral, layered (golden angle)' },
+      { value: 'CONTINUOUS', label: 'Continuous spiral (winds inward)' },
     ],
     label: 'Placement',
     /* The read-out carries the derived consequence, not the value the select
@@ -688,9 +727,17 @@ export const CONTROLS = [
        low counts it is where a visitor sees the step no longer divide the
        circle. The legibility flag itself lives in the model read-out, where
        the count it depends on also lives. */
-    fmt: (v, ui) => (v === 'SPIRAL'
-      ? `${((GOLDEN_ANGLE * 180) / Math.PI).toFixed(2)}° golden step`
-      : `${(360 / Number(ui.petalCount)).toFixed(1)}° even step`),
+    fmt: (v, ui) => {
+      if (v === 'RADIAL') return `${(360 / Number(ui.petalCount)).toFixed(1)}° even step`;
+      const golden = `${((GOLDEN_ANGLE * 180) / Math.PI).toFixed(2)}° golden step`;
+      /* CONTINUOUS shares the azimuth step exactly, so the step alone would
+         not tell the two apart at the control. What differs is the LENGTH of
+         the sequence it steps through, which is also the number the
+         legibility flag is about — so that is what the read-out adds. */
+      return v === 'CONTINUOUS'
+        ? `${golden}, ${Math.round(Number(ui.petalCount)) * Math.round(Number(ui.layerCount))} in one sequence`
+        : golden;
+    },
     tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [] } },
 
@@ -718,8 +765,18 @@ export const CONTROLS = [
      Max is MAX_LAYERS, asserted equal to it by the harness. The binding
      constraint is the PETAL, not triangles — 3 layers x 40 petals is 10% of
      the export budget; it is the blade shrinking that stops at three. */
+  /* "DEPTH", NOT "LAYERS" (Eva, Sep 1). The control is the same axis in both
+     placements — how far the arrangement goes inward — and it is measured in
+     layers under one and in turns under the other, so a label naming ONE of
+     the two units is a label that lies in the other mode. The LABEL names the
+     axis and the READ-OUT names the unit, which is the same split `placement`
+     has carried since it shipped (the select shows the value, the read-out
+     shows the derived step). The id does not move: `layerCount` is what the
+     quantity IS in both readings, nothing persists a design yet, and an id is
+     the expensive half of a rename — see RETIRED_IDS. */
   { id: 'layerCount', section: 'arrangement', kind: 'slider', min: 1, max: 3, step: 1, default: 1,
-    label: 'Layers', fmt: (v) => `${v}`, tier: 'standard', role: 'arrangement',
+    label: 'Depth', fmt: (v, ui) => `${v} ${perDepth(ui)}${Number(v) === 1 ? '' : 's'}`,
+    tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [] } },
 
   /* 0.35 – 0.90, and THE UPPER BOUND IS MEASURED, not tidy. At layerSize 1.00
@@ -731,8 +788,12 @@ export const CONTROLS = [
      The lower bound is where the third layer stops being a petal: at 0.35 the
      deepest blade is 4.3 mm and its foot is already floored by
      FOOT_MIN_WIDTH_MM. Reachable, reported with (CLAMPED), not a defect. */
+  /* LABELLED "SHRINK" for the reason `layerCount` is labelled "Depth": under
+     CONTINUOUS there are no layers for a "layer size" to be the size of, and
+     the quantity is the same either way — the ratio applied per unit of
+     depth. The read-out carries the unit. */
   { id: 'layerSize', section: 'arrangement', kind: 'slider', min: 0.35, max: 0.9, step: 0.01, default: 0.72,
-    label: 'Layer size', fmt: (v) => `${Number(v).toFixed(2)}x per layer`, tier: 'standard', role: 'arrangement',
+    label: 'Shrink', fmt: (v, ui) => `${Number(v).toFixed(2)}x per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'layerCount', min: 2 } },
 
   /* THE ALTERNATION, in slots. Default 0.50 — half a slot, which is the
@@ -740,9 +801,23 @@ export const CONTROLS = [
      (Sep 1): EXPOSED, because asking for phase variations on the sheet is a
      request to play with it; the derive-it argument survives as the DEFAULT
      VALUE rather than as the absence of a control. */
+  /* THE ONE CONTROL CONTINUOUS PLACEMENT LEAVES WITHOUT A JOB, and it HIDES
+     rather than being reinterpreted. This offsets successive WHORLS by a
+     fraction of a slot; a continuous bloom has one whorl, so there is nothing
+     to offset and `rings[k].phase` is exactly 0 at every slot. Giving it a
+     second meaning there — a global start azimuth, say — would be invisible
+     (a rigid rotation) under a label that named something else, which is the
+     stored-label-lie this project keeps finding. Its LABEL therefore keeps
+     the word "layer" while `layerCount`, `layerSize` and `layerTilt` gave
+     theirs up: this control only exists in the mode where layers do.
+     PARKED, and deliberately not built on this id: a DIVERGENCE ANGLE control
+     (golden angle against 1/3, 2/5, or free) is the genuinely interesting
+     phyllotaxis parameter continuous mode opens up — and this is the worst
+     available id to put it on, since a saved `layerPhase` would then feed a
+     slot fraction into an angle. It gets its own id and its own ruling. */
   { id: 'layerPhase', section: 'arrangement', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0.5,
     label: 'Layer offset', fmt: (v) => `${Number(v).toFixed(2)} slot`, tier: 'standard', role: 'arrangement',
-    visibleWhen: { id: 'layerCount', min: 2 } },
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
 
   /* THE PRIMITIVE'S angleRamp, per layer — and the control that does the work
      `height` was expected to do. Inner whorls stand more erect, which is what
@@ -761,7 +836,7 @@ export const CONTROLS = [
      ruling is made with eyes open. Capping is one range change with a picture
      as its evidence; do not cap it on the strength of reading this note. */
   { id: 'layerTilt', section: 'arrangement', kind: 'slider', min: 0, max: 30, step: 1, default: 12,
-    label: 'Layer tilt step', fmt: (v) => `+${v}° per layer`, tier: 'standard', role: 'arrangement',
+    label: 'Tilt step', fmt: (v, ui) => `+${v}° per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'layerCount', min: 2 } },
 
   /* CENTER — the A/B rig. */

@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, SPIRAL_LEGIBLE_COUNT } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -257,10 +257,10 @@ resize();
 const readout = document.getElementById('readout');
 let liveSummary = '';
 
-let lastRing = { radius: 0, derivedRadius: 0 };   // layer 0 — what every pre-layer consumer read
-let lastRings = [];                               // every layer, in build order
+let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
+let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1 };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, slotsPerRing: 1, quantizerResiduals: null };
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -329,12 +329,12 @@ function buildGeometry({ exportMode }) {
    re-deriving a radius: two throwaway accumulators differing only in mode,
    emitting no triangles. The one owner answers both. */
 function materialLines(ui) {
-  /* Layer 0's ring — the outer whorl, which is the ring this line has always
-     reported and the one the hub is built on (hub.radius IS layers[0].radius).
-     The inner layers' radii are on the arrangement line, where the layer
-     count that produced them is also visible. */
-  const live = footRing(ui, new MeshBuilder({ exportMode: false })).layers[0];
-  const printed = footRing(ui, new MeshBuilder({ exportMode: true })).layers[0];
+  /* Ring 0 — the outermost, which is the ring this line has always reported
+     and the one the hub is built on (hub.radius IS rings[0].radius in every
+     placement). The inner rings' radii are on the arrangement line, where the
+     depth that produced them is also visible. */
+  const live = footRing(ui, new MeshBuilder({ exportMode: false })).rings[0];
+  const printed = footRing(ui, new MeshBuilder({ exportMode: true })).rings[0];
   const say = (r) => {
     const tip = thicknessProfile(r, ui).at(1);
     const tipShown = r === printed ? Math.max(tip, MIN_FEATURE_MM) : tip;
@@ -369,11 +369,37 @@ function materialLines(ui) {
    ASSERTED IN BOTH DIRECTIONS by the panel gate — it must appear when the
    condition holds and must be absent when it does not. A flag nothing checks
    for absence is a flag that can be stuck on. */
-function spiralLowCount(ui) {
-  return ui.placement === 'SPIRAL' && Number(ui.petalCount) < SPIRAL_LEGIBLE_COUNT;
+/* WHAT IT COUNTS IS THE SEQUENCE, and `petalCount` stopped being that number
+   when CONTINUOUS arrived. The aesthetic claim is about how many elements the
+   golden angle has to work with before parastichies read: under SPIRAL each
+   whorl runs its own sequence, so that is `petalCount`; under CONTINUOUS the
+   whole bloom is one sequence of `petalCount * layerCount`. footRing() owns
+   the number and this reads it, so SPIRAL's behaviour is unchanged to the
+   character (sequenceLength IS petalCount there) while the claim stays true
+   in the new mode. */
+function spiralLowCount(ui, fr) {
+  return (ui.placement === 'SPIRAL' || ui.placement === 'CONTINUOUS')
+    && fr.sequenceLength < SPIRAL_LEGIBLE_COUNT;
 }
 
-function summarise(ui, acc, mode, rings) {
+/* THE FOOT-FLOOR RANGE, and why it is a RANGE now. Under the ringed arm
+   `widthClamped` was a per-layer flag and there were at most three of them.
+   A continuous bloom has up to 120 feet and the floor binds from some
+   crossing index onward — so "which slots" became a real question, and a bare
+   "(CLAMPED)" would answer it with a word where the honest answer is two
+   numbers. Same discipline as the roll clamp and the print-truth line: a
+   slider that has gone quiet must say where. Returns '' when nothing is
+   floored, so the line simply is not there rather than saying "none". */
+function footFloorLine(rings) {
+  const first = rings.findIndex((r) => r.widthClamped);
+  if (first < 0) return '';
+  const n = rings.filter((r) => r.widthClamped).length;
+  const last = rings.length - 1 - [...rings].reverse().findIndex((r) => r.widthClamped);
+  const which = rings.length === 1 ? 'the foot' : (first === last ? `ring ${first}` : `rings ${first}–${last}`);
+  return `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${which} (${n} of ${rings.length}) — the blade keeps shrinking, the root does not\n`;
+}
+
+function summarise(ui, acc, mode, rings, fr) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
   const layers = Number(ui.layerCount);
@@ -384,10 +410,27 @@ function summarise(ui, acc, mode, rings) {
      that same reason, and the layer RADII are printed because they are
      derived — a number the user cannot set is a number the user should be
      able to read. */
-  return `petals ${ui.petalCount} · ${ui.placement.toLowerCase()} · layers ${layers} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
+  /* THE DEPTH AXIS IN ITS OWN UNITS, matching the panel's read-outs rather
+     than restating the slider: a continuous bloom winds `layerCount` TURNS
+     and carries `petalCount * layerCount` petals, so printing "petals 40" and
+     "layers 3" beside a 120-petal object would be two true numbers adding up
+     to a false picture. */
+  const cont = fr.continuousMode;
+  const depth = `${layers} ${cont ? 'turn' : 'layer'}${layers === 1 ? '' : 's'}`;
+  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)` : `petals ${ui.petalCount}`;
+  /* EVERY RING'S RADIUS is what this line has always printed, and at up to
+     120 of them that stops being readable — so the continuous arm prints the
+     SPAN and the step instead. Both are derived quantities the user cannot
+     set, which is the reason the line exists at all. */
+  const ringLine = cont
+    ? `rings (${mode}) ${rings.length} from ${rings[0].radius.toFixed(2)} to ${rings[rings.length - 1].radius.toFixed(2)} mm`
+      + `, step ${(rings[0].radius - rings[1].radius).toFixed(3)}–${(rings[rings.length - 2].radius - rings[rings.length - 1].radius).toFixed(3)} mm\n`
+    : (layers > 1 ? `layer rings (${mode}) ${rings.map((r) => r.radius.toFixed(2)).join(' / ')} mm\n` : '');
+  return `${petalsSaid} · ${ui.placement.toLowerCase()} · ${depth} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
-       + (layers > 1 ? `layer rings (${mode}) ${rings.map((r) => r.radius.toFixed(2)).join(' / ')} mm\n` : '')
-       + (spiralLowCount(ui) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} PETALS: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
+       + (rings.length > 1 ? ringLine : '')
+       + footFloorLine(rings)
+       + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
 
@@ -405,7 +448,7 @@ function regenerate() {
   geo.computeBoundingSphere();
   lastFitRadius = geo.boundingSphere.radius;
   if (!userMoved) fitCamera(lastFitRadius);
-  liveSummary = summarise(ui, acc, 'live', built.rings) + `\n${materialLines(ui)}`;
+  liveSummary = summarise(ui, acc, 'live', built.rings, built.foot) + `\n${materialLines(ui)}`;
   readout.textContent = liveSummary;
 }
 
@@ -450,7 +493,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
      an index into a variable-length list is a bug waiting for the first
      multi-layer export — it would have printed the ring radii under the word
      "exported". The tris/max-dim line is always last, so ask for that. */
-  const exportLines = summarise(ui, acc, 'export', built.rings).split('\n');
+  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot).split('\n');
   readout.textContent = `${liveSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
@@ -538,17 +581,39 @@ window.__bloomMetrics = () => ({
      from an incorrect one. J3 below is the assertion that can. */
   hubRadius: lastHub.radius,
   hubThickness: lastHub.thickness,
-  ringLayers: lastRings.map((r) => ({
+  /* RENAMED FROM `ringLayers` WITH THE CONTINUOUS ARM, because under it a
+     descriptor is not a layer — it is a ring carrying exactly one petal, and
+     there are up to 120 of them. A key naming a thing that is not the thing
+     is what a later reader checks and believes. Nothing persists this (it is
+     a diagnostic hook, not a design), so the rename is free and no
+     retirement is owed; the gates and shot tools moved with it in the same
+     commit. */
+  rings: lastRings.map((r) => ({
     index: r.index, radius: r.radius, derivedRadius: r.derivedRadius,
     width: r.width, thickness: r.thickness,
     overhang: r.overhang, scale: r.scale, phase: r.phase, tiltExtra: r.tiltExtra,
     authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
   })),
-  /* Every layer's foot rows as EMITTED — J1's input. The pre-layer hook
+  /* Every ring's foot rows as EMITTED — J1's input. The pre-layer hook
      exposed slot 0 of the one whorl; reporting only that would have silently
-     meant "layer 0" and left every inner whorl's feet unasserted, which is
-     precisely the region this session added. */
-  petalLayerFootFrames: lastPetals.map((p) => (p ? p.footFrames : null)),
+     meant "layer 0" and left every inner whorl's feet unasserted. Under
+     CONTINUOUS a ring IS one petal, so this becomes every foot in the bloom
+     — 3 x petalCount x layerCount frames instead of 3 x layerCount — and J1
+     gets that coverage from the same expression. */
+  petalRingFootFrames: lastPetals.map((p) => (p ? p.footFrames : null)),
+  /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
+     `continuousMode` is what every assertion branches on, `sequenceLength` is
+     what the legibility flag counts, and `slotsPerRing` x rings.length is the
+     bloom's petal count in both modes. A gate deriving any of these from
+     `placement` would be a second copy of the branch. */
+  continuousMode: lastFoot.continuousMode,
+  sequenceLength: lastFoot.sequenceLength,
+  slotsPerRing: lastFoot.slotsPerRing,
+  /* THE QUANTIZER IDENTITY'S RESIDUALS — the continuous arm's answer to
+     `ringGuardResidual`, and an EQUALITY rather than a bound (footRing's
+     header says why). null under the ringed arm: there is no second law
+     there to agree with, and a claim nothing can make is reported absent. */
+  quantizerResiduals: lastFoot.quantizerResiduals,
   /* The guard's cross-validation residual (footRing's header): the layered
      area-rule law measured against the pre-layer expression on every
      single-layer build. null above one layer, where there is no guard law to
