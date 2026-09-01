@@ -571,7 +571,10 @@ export const CONTROLS = [
      prefix would claim less than the control does. The role stays 'petal'
      because the junction derives from the petal — there is no 'material'
      role and inventing a fourth is a stop-and-raise, not a side effect of
-     naming a slider.
+     naming a slider. (This control sits in the PART THICKNESS *section*, which
+     is a different axis and no contradiction: a section says where a control
+     is in the panel, a role says which part of the model it owns. The absence
+     of a 'material' ROLE is what this paragraph is about, and it still holds.)
 
      EVERY ONE OF THE THREE DEFAULTS REPRODUCES THE OLD CONSTANT EXACTLY:
      1.20 is the double SHEET_THICKNESS_MM holds (bloom-harness asserts the
