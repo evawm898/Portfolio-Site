@@ -168,10 +168,17 @@ Five numbers in this family are now load-bearing guesses that a single coupon pr
 turn into measurements — and since the tip ruling, `TIP_HALF_MM` is no longer merely
 reported: it is the floor that decides how pointed the PRINTED tip can be, on a shape Eva
 ruled by eye. `MIN_FEATURE_MM` 1.0 (which caps the tip's thickness and the foot),
-`FOOT_MIN_WIDTH_MM` 1.6 (the most delicate reachable connection), `TIP_HALF_MM` 0.8 (now
-the printed tip's terminal half-width, 1.60 mm across against 0.30 mm on screen),
-`TIP_CAP_HALF_MM` 0.15 (a mesh floor, not a print one) and `ROLL_MIN_RADIUS_FACTOR` 1.0 (one
-sheet thickness, and it now moves with the sheet). A
+`FOOT_MIN_WIDTH_MM` 1.6 (the most delicate reachable connection), `TIP_CAP_HALF_MM` 0.15 (a
+mesh floor, not a print one) and `ROLL_MIN_RADIUS_FACTOR` 1.0 (one sheet thickness, and it
+now moves with the sheet).
+
+**`TIP_HALF_MM` 0.8 CHANGED STATUS on Sep 1 and belongs at the top of that list.** For four
+sessions it was a quiet constant that blunted a tip nobody had ruled on. It is now the number
+that DECIDES HOW POINTED THE PRINTED TIP CAN BE, on a shape Eva ruled by eye and approved
+from a picture: live converges to a 0.30 mm terminal face and the print floors it at 1.60 mm,
+so the tip she approved is finer than the tip that would come out of a machine. **It has
+never been verified by a printer.** That is the sharpest form the standing gap has taken —
+an aesthetic decision, made on evidence, whose realisation is capped by a guess. A
 coupon print is cheap, converts all four at once, and would retroactively improve every
 clamp the thickness layer ships. It is the strongest candidate for the next session — a
 better one than arrangement, which can be designed against assumptions but cannot resolve
@@ -473,7 +480,11 @@ any of them.
   than a measurement, and the thin extreme is precisely the region this change affects.
 
 - ~~The tip's squared-off end~~ **RULED Sep 1, from the tip sheet: THE TIP COMES TO A
-  POINT.** The squared end was never the profile. `TIP_HALF_MM` floored EVERY row in BOTH
+  POINT — and the CONSTRUCTION was approved by eye on the before/after sheet, not only the
+  intent.** What Eva approved is specifically: the DERIVED cap entry, the TRUNCATED MINI-FACE
+  apex, and the partition on `petalTipBreadth === 0`. Three sheets' worth of alternatives
+  were not on the table — this is the shape that was seen and accepted, so reopening any of
+  the three is a fresh ruling needing a fresh picture, on the max-combinator precedent. The squared end was never the profile. `TIP_HALF_MM` floored EVERY row in BOTH
   modes, so at the shipping defaults four of the 28 blade rows — profile 0.795, 0.398,
   0.119, 0.000 — all clamped to 0.800 and ran PARALLEL, and a flat face square to the blade
   capped that stub. The exponent family already reaches zero; the floor truncated it and
@@ -515,6 +526,18 @@ any of them.
   face; export floors it at 1.60 mm. So the point on screen is finer than the point that
   prints — the same live-vs-printed divergence as the sheet thickness, now in the outline as
   well, and one more assumption riding on a coupon nobody has run.
+
+  **PARKED, deliberately, as a FUTURE RULING: the tiny-breadth floor artifact.** The
+  partition branches on `petalTipBreadth === 0` EXACTLY, which is what makes it sharp and is
+  what was ruled. But at a very small breadth — 0.01 gives a 0.08 mm tip that the print floor
+  lifts to 0.80 — the end is still a floor artifact wearing an "authored truncate" label, and
+  the sharp rule is what puts it there. The honest alternative is to converge whenever the
+  floor binds at the tip, which describes the geometry better and blurs the partition into
+  "rows where a floor happened to bind", so it could not have been asserted the way this one
+  was. NOT a defect and not open work: it is a ruling Eva has not been asked for, on a region
+  of the range nobody has yet had a reason to visit. Raise it with a picture of a
+  small-breadth tip beside a pointed one; do not change the branch on the strength of this
+  note.
 
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).
