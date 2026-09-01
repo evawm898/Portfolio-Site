@@ -745,6 +745,18 @@ another.handle"></textarea>
     return (first + last).toUpperCase();
   }
 
+  // Best-effort avatar lookup by Instagram handle, used when no explicit
+  // photo url is set. unavatar.io proxies public profile pictures; passing
+  // fallback=false makes it 404 (instead of returning its own generic
+  // placeholder icon) when it can't find one, so our own initials
+  // placeholder can take over via the <img> onerror handler.
+  function avatarUrlForHandle(handle){
+    if(!handle) return '';
+    const clean = handle.trim().replace(/^@/, '');
+    if(!clean) return '';
+    return 'https://unavatar.io/instagram/' + encodeURIComponent(clean) + '?fallback=false';
+  }
+
   function render(){
     const list = document.getElementById('list');
     let filtered = entries.filter(e => {
@@ -796,12 +808,20 @@ another.handle"></textarea>
     idx.textContent = String(index + 1).padStart(3, '0');
     row.appendChild(idx);
 
-    if(e.photo){
+    const photoSrc = e.photo || avatarUrlForHandle(e.handle);
+    if(photoSrc){
       const img = document.createElement('img');
       img.className = 'entry-photo';
-      img.src = e.photo;
+      img.src = photoSrc;
       img.alt = e.name || '';
-      img.onerror = () => { img.style.display = 'none'; };
+      img.loading = 'lazy';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => {
+        const ph = document.createElement('div');
+        ph.className = 'entry-photo-placeholder';
+        ph.textContent = initials(e.name);
+        img.replaceWith(ph);
+      };
       row.appendChild(img);
     }else{
       const ph = document.createElement('div');
