@@ -134,6 +134,107 @@ them as optional or experimental.
   before implementing** — explain the conflict and the options. Never ship a change
   that silently breaks export.
 
+## Artist Tracker (`artist-tracker.html`)
+
+Private, single-file, client-side artist/tattoo-artist tracker for
+eva-maskalenko.com — who to follow, tattoo artists and where they work,
+tour/release dates worth watching. No backend, no build step: a SHA-256
+password gate (`crypto.subtle` + a hardcoded hash, unlock flag in
+`sessionStorage`) guards a `localStorage`-backed CRUD tracker.
+
+**Status: not yet merged.** Everything below lives only on branch
+`claude/artist-tracker-testing-afc2ul` / PR #121 (draft, targeting `main`)
+and its Netlify Deploy Preview
+(`deploy-preview-121--eva-maskalenko.netlify.app`) — not the production
+domain. This matters because the app's only "database" is the browser's
+own `localStorage`, which is scoped per-origin: data added on the deploy
+preview does **not** carry over automatically once this merges to
+production. Use the app's own export/import JSON to move data across
+origins if needed.
+
+**Built so far, in order:**
+1. Core tracker (pre-existing before this branch): password gate,
+   add/edit/delete, search, category filter (following/tattoo/touring —
+   the only three real categories), sort, JSON export/import.
+2. Fixed two bugs found while testing the original page: a fixed "back to
+   top" button that could overlap the add/edit panel on mobile (now
+   hidden while the panel is open), and a JSON-import edge case where a
+   falsy `id` on an imported record could survive instead of regenerating.
+3. Auto-fill entry photos from the Instagram handle via unavatar.io (a
+   free public avatar-lookup proxy), falling back to the initials
+   placeholder on failure. **Unverified in production — see Open Items.**
+4. Merge-aware bulk paste: a pipe-delimited
+   (`name | handle | category | location | pronouns | status | link | photo url`)
+   or bare-handle line whose handle matches an existing entry
+   (case-insensitive, leading `@`/trailing `/` stripped) fills in that
+   entry's currently-blank fields and creates no duplicate, instead of
+   always adding a new entry. Non-blank fields are never overwritten.
+   Reports "X updated, Y added, Z unchanged."
+5. The Instagram handle renders as a real link to `instagram.com/<handle>`,
+   teal, underline on hover only (was plain dim text).
+6. Gender filter, bucketed from the free-text `pronouns` field into
+   she/her, he/him, they/them, other, unspecified (tokenized matching,
+   not substring — "she" can't false-match inside "he").
+7. Location filter: dropdown of distinct location strings already in
+   storage.
+8. Style tags: new `tags` field (comma-separated on the form, stored
+   lowercased), shown as pills per entry, filterable via OR'd
+   multi-select chips generated from every distinct tag in use.
+9. Map view, toggled alongside List on the same page: Leaflet +
+   OpenStreetMap tiles via CDN, pins color-matched to the category colors
+   via a `divIcon` (no default marker image assets needed). Locations are
+   geocoded lazily via Nominatim (rate-limited to 1/sec, cached on the
+   entry, deduped across entries sharing the same location string,
+   cleared and re-queried if the location text is edited). A location
+   that fails to geocode is skipped silently and logged to console.
+10. Bulk-paste category preservation: a category value that isn't
+    following/tattoo/touring (e.g. "Influencer", "Art", "Friend" — as used
+    in the user's real Instagram-export data) is now kept as a tag instead
+    of being silently discarded when it collapses into "following."
+
+**Requested but NOT built** — a later message asked for this summary to
+cover "slide-in panel" and "paste-to-image" as items 7–8. Neither exists
+anywhere in this codebase or this session's history; no prior discussion
+of either was found. Don't assume they're implemented — if wanted, they
+need to be scoped and built from scratch.
+
+**Testing approach:** no CI workflow covers this file (every GitHub
+Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
+only — only Netlify's own informational checks run on this PR).
+Verification has been manual: serve locally via `python3 -m http.server`
+(`crypto.subtle` needs a secure context — never test via `file://`), drive
+with Playwright (`NODE_PATH=/opt/node22/lib/node_modules` — Playwright is
+a global npm install in this environment, not a project devDependency;
+browsers live at `/opt/pw-browsers`). This session's sandbox blocked
+arbitrary outbound hosts (`fonts.googleapis.com`, `unavatar.io`,
+`unpkg.com`, and even the Netlify deploy-preview domain itself all
+403/reset) but *not* the npm registry — `npm install leaflet` got a real
+local copy of Leaflet to serve via Playwright route interception for map
+testing, rather than testing against a stub.
+
+**Open items:**
+- **The unavatar.io photo mystery.** Feature 3 above tested clean in the
+  sandbox (mocked responses), but on the real Deploy Preview *every*
+  entry showed initials instead of a photo — and the browser console
+  showed zero requests or errors mentioning "unavatar" at all, even after
+  a hard refresh, which points away from "the service is down" and
+  toward "the code path isn't even being reached for these entries" (most
+  likely: those entries already have a non-empty `photo` field from
+  before, which short-circuits the auto-lookup). Never resolved — the
+  user was asked to check one existing entry's "photo url" field in the
+  edit form and never followed up before the conversation moved to other
+  feature requests. Worth revisiting before trusting this feature.
+- **`bulkimport_1.txt`** (770 real entries, the user's actual Instagram
+  follow-list, cleaned into this app's pipe-delimited bulk-paste format)
+  was validated and dry-run tested against the real merge-import code —
+  confirmed to parse cleanly and merge correctly — but has **not**
+  actually been pasted into the user's real tracker yet, since that step
+  can only happen in their own browser.
+- PR #121 has an hourly self-scheduled check-in (via `send_later`)
+  watching for CI/mergeability/review-comment changes, set up mid-session
+  — check `list_triggers` for it if picking this back up, rather than
+  assuming none exists or creating a duplicate.
+
 ## Maintainability & performance (working agreement)
 
 As the project grows, keep it maintainable and performant. Flag these proactively —
