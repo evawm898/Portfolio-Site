@@ -758,7 +758,7 @@
         </div>
 
         <div class="mode-body" data-mode="bulk">
-          <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url</code>. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code>. Plain lines with no <code>|</code> are added as bare names using the category below. Lines whose handle matches an existing entry are merged in — blank fields on the existing entry get filled in, nothing is overwritten, and no duplicate is created.</p>
+          <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url</code>. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code> — anything else (e.g. <code>Influencer</code>, <code>Art</code>, <code>Friend</code>) becomes <code>following</code> but keeps the original label as a tag, so it isn't lost. Plain lines with no <code>|</code> are added as bare names using the category below. Lines whose handle matches an existing entry are merged in — blank fields on the existing entry get filled in, nothing is overwritten, and no duplicate is created.</p>
           <div class="field-row">
             <div class="field">
               <label for="bulkDefaultCategory">default category for plain lines</label>
@@ -886,6 +886,22 @@ another.handle"></textarea>
     if(v.startsWith('tat')) return 'tattoo';
     if(v.startsWith('tour') || v.startsWith('rel')) return 'touring';
     return 'following';
+  }
+
+  // A bulk-paste category value that doesn't map onto one of the three real
+  // categories above (e.g. "Influencer", "Art", "Friend") would otherwise
+  // just silently collapse into "following" with the original label lost.
+  // Returns that label as a tag instead, so it stays visible/filterable;
+  // returns null for anything that already maps onto a real category (or
+  // is blank, or is the literal word "following", which the default
+  // category already implies).
+  function categoryTagFor(raw){
+    if(!raw) return null;
+    const v = raw.trim().toLowerCase();
+    if(!v || v === 'following') return null;
+    if(v.startsWith('tat')) return null;
+    if(v.startsWith('tour') || v.startsWith('rel')) return null;
+    return v;
   }
 
   function initials(name){
@@ -1372,7 +1388,11 @@ another.handle"></textarea>
 
     let added = 0, updated = 0, unchanged = 0;
 
-    function mergeInto(existing, incoming){
+    // extraTag: a category label that didn't map onto a real category
+    // (e.g. "influencer", "art", "friend") — carried over as a tag so it
+    // isn't lost, unioned into the entry's tags rather than treated as a
+    // blank-fillable scalar field.
+    function mergeInto(existing, incoming, extraTag){
       let changed = false;
       FILLABLE_FIELDS.forEach(f => {
         if(!existing[f] && incoming[f]){
@@ -1380,15 +1400,24 @@ another.handle"></textarea>
           changed = true;
         }
       });
+      if(extraTag){
+        existing.tags = existing.tags || [];
+        if(!existing.tags.includes(extraTag)){
+          existing.tags.push(extraTag);
+          changed = true;
+        }
+      }
       if(changed) updated++; else unchanged++;
     }
 
     lines.forEach(line => {
       let parsed;
+      let extraTag = null;
       if(line.includes('|')){
         const parts = line.split('|').map(p => p.trim());
         const [name, handle, category, location, pronouns, status, link, photo] = parts;
         if(!name) return;
+        extraTag = categoryTagFor(category);
         parsed = {
           name,
           handle: handle || '',
@@ -1413,9 +1442,10 @@ another.handle"></textarea>
       const key = normalizeHandleKey(parsed.handle);
       const existing = key ? handleIndex.get(key) : null;
       if(existing){
-        mergeInto(existing, parsed);
+        mergeInto(existing, parsed, extraTag);
       }else{
-        const created = { id: uid(), ...parsed, date: '', tags: [] };
+        const tags = extraTag ? [extraTag] : [];
+        const created = { id: uid(), ...parsed, date: '', tags };
         entries.push(created);
         if(key) handleIndex.set(key, created);
         added++;
