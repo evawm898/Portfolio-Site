@@ -1889,6 +1889,12 @@ the duration of a single request.
 
 - Test it directly: `https://<your-service>.onrender.com/health` should
   return `{"status": "ok"}`.
+- Also check `https://<your-service>.onrender.com/version` and confirm
+  `commit` matches `git log -1 --format=%H origin/main` — see "How to
+  tell what's actually deployed" below. `/health` only proves *a*
+  process is answering; `/version` proves it's answering with *current*
+  code, which is the thing that actually matters after every future
+  push.
 - Open `../textile-gauge-reader.js`, find the `CONFIG` object near the
   top, and set:
   ```js
@@ -2066,6 +2072,96 @@ frontend API call is asserted to dispatch to a real backend route
 (never 404/405), so a route rename, a changed method, or a dropped
 endpoint is caught by name before it ships — verified directly that it
 fails with the exact "HTTP 405" signature when the route is renamed.
+
+### How to tell what's actually deployed
+
+All three symptoms above were diagnosed as "the live backend is running
+older code than `main`" by ruling everything else out — never confirmed
+directly, because this environment has no Render dashboard or log access
+(outbound network to `onrender.com` is blocked by this session's egress
+policy; every attempt to `curl` the live service from here fails at the
+network layer, not with an HTTP error). That meant the actual fix —
+getting Render to deploy current `main` — was something no session could
+verify from in here, only reason about from the outside.
+
+**`GET /version`** closes that gap: it reports exactly what commit the
+running process was built from, so this stops being a guess.
+
+```json
+{
+  "commit": "26f0577eadeccabe16eb5538fba05e3276b689f6",
+  "commit_short": "26f0577",
+  "branch": "main",
+  "source": "render_env",
+  "algorithm_version": "cv-v0.3",
+  "app_version": "0.1.0"
+}
+```
+
+- `source: "render_env"` means `commit`/`branch` came from Render's own
+  `RENDER_GIT_COMMIT` / `RENDER_GIT_BRANCH` environment variables, which
+  Render sets automatically on every service at deploy time — this is
+  the authoritative case, and what you'll see on the real deployment.
+- `source: "git_fallback"` means those env vars weren't set (a local
+  `uvicorn` run, not Render) and `commit`/`branch` came from `git
+  rev-parse` against the checkout instead.
+- `source: "unavailable"` means neither worked — shouldn't happen on
+  Render; would mean something unusual about how the instance was built.
+
+**To check the live site:** open
+`https://textile-gauge-reader-api.onrender.com/version` directly in a
+browser (or `curl` it — from a machine that isn't this sandboxed
+session). Compare `commit` against `git log -1 --format=%H origin/main`
+in this repo. If they differ, the live site is stale, full stop — no
+more inferring it from symptoms.
+
+**Why it wasn't updating (three possible causes, in the order to check
+them) and what fixes each:**
+
+1. **Auto-Deploy is off for this service.** Render dashboard → the
+   `textile-gauge-reader-api` service → **Settings** → **Build & Deploy**
+   → **Auto-Deploy**. If it's off, pushes to `main` never trigger a
+   redeploy at all — the fix is flipping it on (or clicking **Manual
+   Deploy** → **Deploy latest commit** once, immediately).
+2. **The service is tracking the wrong branch.** Same **Settings** →
+   **Build & Deploy** page has a **Branch** field. This is a *dashboard*
+   setting — a manually-created "Web Service" (README's Option B) has no
+   connection to `render.yaml` at all, so nothing in this repo could ever
+   have set it. If it's pointed at anything other than `main` (an old
+   feature branch from before this repo settled on trunk-based `main`
+   deploys, for instance), that fully explains months of "pushed to
+   `main`, live site never changes" with zero errors anywhere — the
+   deploy pipeline would be working exactly as configured, just against
+   the wrong branch. Fix: change it to `main`.
+
+   This repo's `render.yaml` now pins `branch: main` and
+   `autoDeploy: true` explicitly, so a **fresh** Blueprint-created
+   service reads the right branch from the repo instead of whatever was
+   clicked by hand — but it does **not** retroactively fix an
+   already-existing service. Blueprint settings apply on creation and on
+   an explicit **Sync** from the Blueprint page in the dashboard (Render
+   dashboard → the Blueprint, if this service was created as one → **Manual
+   Sync**); a manually-created Web Service (Option B) never reads
+   `render.yaml` at all, and its Branch field has to be changed by hand
+   regardless. Check `/version`'s `branch` field to know which situation
+   you're in.
+3. **A build failed silently and Render kept serving the last good
+   deploy.** Render dashboard → the service → **Events** (or **Logs**)
+   tab shows every deploy attempt and its outcome. A failed build on
+   `pip install -r requirements.txt` or the `uvicorn` start command would
+   show as a red/failed event there, with the old deploy still live and
+   answering `/health` normally the whole time — which is exactly
+   consistent with "the banner says online but nothing changed." Fix
+   depends on what the log says; if it's a dependency resolution failure
+   or similar, that's a `requirements.txt` problem to fix and re-push.
+
+None of this can be done from a repo change alone if the cause is (1) or
+(3) — those are dashboard/account actions only reachable by logging into
+Render directly. (2) is now partially addressed in-repo (see above) but
+still needs the dashboard checked to know whether it actually applied.
+**After making any of these changes, hit `/version` again to confirm the
+`commit` field moved** — that's the only way to know the fix actually
+took effect, rather than assuming it did because a button was clicked.
 
 ## Ground Truth / Correction System
 
