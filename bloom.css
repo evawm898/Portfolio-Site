@@ -53,6 +53,35 @@ body {
   border-radius: 10px; padding: 14px 16px 12px; backdrop-filter: blur(6px);
 }
 
+/* SECTIONS. The panel is generated from bloom-registry.js, so nothing here
+   knows a section's name or how many there are — these style whatever the
+   registry declares. <details>/<summary> carries the open/closed state
+   natively; the only job of this block is to make a summary read as a
+   heading rather than as a list bullet. */
+.bl-sec { border-top: 1px solid var(--bl-line); margin: 0 0 2px; }
+.bl-sec:first-of-type { border-top: 0; }
+.bl-sec > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 0 8px;
+  font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--bl-dim);
+}
+.bl-sec > summary::-webkit-details-marker { display: none; }
+/* The disclosure triangle, drawn rather than inherited so it points the same
+   way in every browser and rotates with the open state. */
+.bl-sec > summary::before {
+  content: ""; flex: none; width: 0; height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
+  transform-origin: 25% 50%; transition: transform .12s ease;
+}
+.bl-sec[open] > summary::before { transform: rotate(90deg); }
+.bl-sec > summary:hover { color: var(--bl-accent); }
+.bl-sec > summary:focus-visible { outline: 1px solid var(--bl-accent); outline-offset: 2px; }
+/* A section's last control keeps the gap to the next summary honest. */
+.bl-sec > .bl-ctrl:last-child { margin-bottom: 10px; }
+
 .bl-ctrl { margin-bottom: 12px; }
 .bl-ctrl label {
   display: flex; justify-content: space-between; align-items: baseline;

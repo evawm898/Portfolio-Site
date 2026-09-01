@@ -1,0 +1,61 @@
+# Build gate: every control the bloom registry declares must be REACHABLE in
+# the generated panel, and collapsing a section must not take it away.
+#
+# TWO ROUTES, and the reason this is its own workflow. The declaration route
+# (a render census over the generated DOM) and the path route (driving a real
+# input inside a COLLAPSED section and asserting the app rebuilt) catch
+# different failures — the flower project shipped 25 unreachable controls
+# through several releases with every geometry gate green, and separately
+# shipped a panel that stopped re-running while every declaration stayed
+# correct. Neither substitutes for the other; see the tool's header.
+#
+# WHY NOT FOLDED INTO AN EXISTING WORKFLOW. bloom-frozen-matrices is
+# deliberately browser-free and finishes in seconds — the panel is generated
+# by bloom.js at runtime, so a static parse cannot see it, and adding Chromium
+# there would blur that workflow's subject and multiply its cost. The export
+# and connectedness gates already carry a browser but run 125 rows for
+# minutes; this is a handful of pages and belongs beside them, not inside them.
+name: bloom-panel
+
+on:
+  pull_request:
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-registry.js
+      - tools/verify-bloom-panel.mjs
+      - tools/bloom-harness.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/bloom-panel.yml
+  push:
+    branches: [main]
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-registry.js
+      - tools/verify-bloom-panel.mjs
+      - tools/bloom-harness.mjs
+      - tools/chromium-harness.mjs
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright-core playwright
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every control renders once and reacts from inside a collapsed section
+        run: node tools/verify-bloom-panel.mjs
+      # A check nobody has seen fail is a hope. This deletes a control's
+      # wrapper and replaces another control with a listener-less clone, and
+      # requires BOTH routes to observe their own failure.
+      - name: The gate must fail when the panel is broken on purpose
+        run: node tools/verify-bloom-panel.mjs --negative-control

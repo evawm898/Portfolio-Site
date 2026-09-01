@@ -29,6 +29,11 @@ deliberately not repeated here. Its invariant is one connected watertight
 solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 `node tools/verify-bloom-connectedness.mjs` (voxel flood-fill, one region) —
 both run in CI and both must pass before any bloom geometry change is done.
+Control-panel changes have their own gate: `node tools/verify-bloom-panel.mjs`
+(every registry control renders exactly once in its declared section, and a
+control inside a collapsed section still reads, writes and rebuilds), with
+`--negative-control` required to fail. Its companion sheet is
+`node tools/shot-bloom-panel.mjs <dir>` — the panel, not the canvas.
 
 ## Flower generator — print-safety is a hard invariant
 

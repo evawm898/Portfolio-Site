@@ -564,3 +564,185 @@ any of them.
   separate piece of work needing its own before/after evidence, and it only becomes real
   work if the plate turns out to be objectionable at spreads anyone would actually use.
   Do not start it on the strength of this note alone.
+
+- ~~The control panel as one flat column~~ **GROUPED INTO SECTIONS Sep 1, on Eva's
+  ruling: "the panel is a lot to scroll through and it's only going to become more —
+  group it into sections before the arrangement work adds its controls."** Twenty
+  controls in one column, with layer and spiral controls still to come. **Zero geometry
+  change, and that is the whole acceptance bar:** 0 of 47, 0 of 76, 0 of 86, 0 of 106
+  frozen rows and 0 of 125 live rows moved — 440 rows, every exported byte untouched,
+  against a worktree at a5cac8b with zero tracked modifications. Both geometry gates
+  125/125 in CI on the same head. The default bloom is 11,136 tris live and export alike
+  and 543.8 KiB of STL, before and after.
+
+    - **THE GROUPING IS REGISTRY DATA AT SECTION GRANULARITY, and the split of ownership
+      is the design.** Membership is a field on the CONTROL (`section: 'form'`);
+      identity, order and first-load openness are the `SECTIONS` array; order WITHIN a
+      section is the `CONTROLS` array's own order, filtered. No list of ids lives in
+      `SECTIONS` — a section naming its members would be two lists to keep in sync in
+      the file that exists to state the registration rule, and the panel would silently
+      drop whichever an edit missed. `verifySections()` runs at module load and throws,
+      so the app, both gates and every shot tool get the relation checked for free.
+
+    - **SECTION IS NOT ROLE, and refusing to conflate them was the first design
+      decision.** `role` says which part of the MODEL a control owns and is load-bearing
+      in `buildMatrix()`; `section` says where it sits in the panel. They genuinely
+      disagree — `sheetThickness` is `role: 'petal'` because the junction derives from
+      the petal, and sits in PART THICKNESS because it also governs the hub slab
+      and the centre floors. Deriving sections from roles would have forced the re-role this
+      registry's own header calls a stop-and-raise, and produced one 14-control "Petal"
+      section, which is the problem rather than the fix. **No role changed. Two
+      mismatches are FLAGGED and deliberately not acted on:** `petalCount` is
+      `role: 'petal'` while being the whorl's own count — literally the first parameter
+      of the whorl primitive — and `petalTilt` likewise while being a per-slot rigid
+      orientation. Both are reasonable readings awaiting a ruling; neither is a defect.
+
+    - **THE PANEL IS AN ACCORDION — opening a section closes the others (Eva,
+      Sep 1, from the panel sheet), WITH THE TRADEOFF STATED AND ACCEPTED:**
+      tweaking across two sections costs a reopen click, and the
+      layers-are-sections structure makes single-focus the normal case. First
+      load is ARRANGEMENT ALONE. Exclusive-open has ONE owner in the panel
+      generator — a single capture-phase listener on the panel root, never a
+      listener per section, because N copies of one rule is the thing that
+      drifts.
+
+    - **THE SUPERSEDED TWO-OPEN RULING, BOTH HALVES, so the reversal is
+      legible.** Earlier the same day Eva ruled Arrangement AND Petal shape
+      open at first load with the other three collapsed, and that was right
+      for what it was ruling on — sections that opened and closed
+      independently. The accordion makes any two-open state UNREACHABLE, so
+      the earlier ruling was not overridden by preference; its subject stopped
+      existing. `open` in `SECTIONS` therefore stopped meaning "which sections
+      start open" and now means THE ONE SECTION OPEN AT FIRST LOAD, with
+      `verifySections()` enforcing at most one `true` — zero is legal, since
+      every section shut is a state a visitor reaches by closing the open one.
+
+    - **`open` IS AN AUTHORED LITERAL, AND THE RULE THAT WOULD HAVE DERIVED IT
+      IS DEAD — the second rationale on this one field to die while its
+      instruction stood, which is worth a reader's attention.** The proposal
+      was "collapse a section iff every control in it is at an identity
+      default", exactly true of Petal form's four curves (all 0, the flat
+      short-circuit) and Part thickness's three (all reproducing the old
+      constant). It was already false of the panel that shipped — CENTER's
+      DISC / 0.75 / 0.35 are authored aesthetic defaults, not identities, and
+      Petal tilt (default 25°) moved into Petal form — and the accordion makes
+      it incoherent as well, since at most one section can be open whatever
+      its contents are at. Do not reintroduce it, and do not make `open` a
+      predicate: that would put collapse under `visibleWhen` as a second
+      hiding mechanism and make the panel rearrange itself under the user
+      mid-drag.
+
+    - **"MATERIAL" IS NOW "PART THICKNESS", AND THE ID MOVED WITH THE LABEL**
+      (Eva, Sep 1). An id that contradicts its label is a stored label-lie: it
+      reads as a declaration, a later reader checks it and believes it, and a
+      name for a thing that is not the thing is this project family's most
+      repeated defect. Nothing weighed against the rename — `section` is panel
+      presentation, never persisted, and it is not a control id, so
+      `RETIRED_IDS` does not apply and no migration is owed. **Were a section
+      id ever to reach a saved design, that calculus inverts and a rename
+      becomes a retirement.** What the name is slightly wrong about is stated
+      in the registry rather than left to be discovered: the section also
+      holds `footDelicacy`, which scales a WIDTH. It belongs there because the
+      three are one layer — the part's own material dimensions, which decide
+      how delicate the printed object is — and because delicacy's width is
+      what the area rule reads to size the ring. If the name ever reads wrong,
+      the LABEL moves on one ruling and the id moves with it, exactly as here.
+      Do not fix it by re-homing the control.
+
+    - **`toggle` IS QUEUED, NOT SYNCHRONOUS, and it does NOT BUBBLE — measured
+      before the accordion was built on it, and both facts are load-bearing.**
+      Capture descends from the document through every ancestor regardless of
+      bubbling, which is what makes one listener on the panel root possible at
+      all. And because the event is queued, two programmatic opens in one tick
+      BOTH land and the handler settles afterwards — so exclusivity is
+      eventually-consistent within a tick. It is invisible to a visitor (one
+      click is one toggle) and it is exactly what a gate reading exclusivity
+      synchronously would fail on, which is the shape of a check that then
+      gets "fixed" by weakening the app. Every accordion assertion in
+      `verify-bloom-panel.mjs` awaits a frame for that reason. A third fact
+      came from the same probe and is the negative control: a capture listener
+      added later on the DOCUMENT still runs EARLIER than the panel's, so
+      `stopPropagation()` there makes the accordion handler unreachable
+      without touching it.
+
+    - **PARKED, and deliberately not work: if the sections outgrow the
+      accordion, the flower's VERTICAL TAB RAIL is the form Eva likes.** A
+      note about direction, not a queued task. Do not start it on the strength
+      of this note; it needs a panel that has actually outgrown five sections,
+      and a fresh ruling with a picture.
+
+    - **PETAL TILT SITS BESIDE SPINE CURL** (Eva), because `phi(u) = petalTilt + curl*u`
+      and the panel is where that adjacency is visible. One row moved in the `CONTROLS`
+      array and nothing else changed. The consequence was MEASURED rather than argued:
+      the live matrix's row SET is identical (125 = 125) and 10 rows change position,
+      which is inert because both runs of a byte report import the same matrix module
+      and `--compare` hard-fails on any label-sequence mismatch.
+
+    - **COLLAPSE IS PRESENTATION, ASSERTED RATHER THAN BELIEVED.** A control inside a
+      closed `<details>` keeps its value, listeners and read-out span, answers
+      `getElementById`, and takes a programmatic `.value` plus real input/change events —
+      which is exactly how every gate and the harness set controls, and never by
+      clicking. The whole-state snapshot is identical all-collapsed and all-expanded, and
+      toggling every section moves no geometry. **Sections carry no predicate of their
+      own:** `applyVisibility()` stays the only thing that hides a control and derives a
+      section's hidden state from the same snapshot — hidden iff every control in it is
+      hidden. A section needing its own condition is a stop-and-raise.
+
+    - **THE NEW GATE HAS THREE ROUTES because they catch different failures** —
+      `tools/verify-bloom-panel.mjs`, CI as `bloom-panel`. The DECLARATION route is a
+      render census (every non-retired control exactly once, in its declared section, in
+      registry order, one label and one read-out span, nothing in the panel the registry
+      does not declare, each wrapper's `hidden` agreeing with its own predicate). The
+      PATH route drives a control inside each collapsed section with real events and
+      requires the app to react. **Triangle count is deliberately NOT the path route's
+      witness:** the four form curves cost zero triangles by construction, so it would
+      have made that section's assertion a passing no-op. Each collapsed section names
+      its own witness instead — cup moves the metric ratio, the style moves the centre's
+      triangle count, the sheet moves the ring radius through the area rule — and the
+      witness table is checked against the registry so a later range change cannot leave
+      it quietly measuring nothing. The ACCORDION route asserts the panel holds
+      at most one open section: the declared one at first load, exactly the
+      clicked one after a real summary click, and none after the open one is
+      closed. A fourth assertion sits beside them and is the one the whole
+      grouping rests on, made BEHAVIOURALLY rather than by scanning source for
+      `.click(`: with EVERY section shut, the harness's own `applyConfig` sets
+      one control from every section and both its read-back and the
+      full-registry `fullStateDrift` must come back clean, with every section
+      still shut. `--negative-control` deletes a control's wrapper, replaces
+      another control with a listener-less clone (the flower's
+      declarations-right / app-doesn't-react defect, reproduced), and
+      suppresses the accordion's toggle before the panel's listener sees it —
+      and requires ALL THREE routes to observe their own failure; it runs as
+      its own CI step and caught 19 breaks on the run that shipped.
+
+      **THE GATE EARNED ITS KEEP ON THIS VERY CHANGE**, which is worth
+      recording because a gate that has never caught anything is a hope. The
+      accordion made Petal shape collapsed for the first time and the rename
+      moved a section id; the gate failed the run immediately with "section
+      shape ships collapsed but names no geometry witness" and the same for
+      "thickness" — two consequences of the rulings, caught before they could
+      ship as a pair of silently vacuous assertions.
+
+    - **MEASURED EFFECT: 2 control rows and a 431 px panel at first load; the
+      WORST CASE a visitor can reach is 584 px, the tallest single section
+      (Petal shape).** The flat panel this replaces was 18 rows and 1,241 px.
+      Worst case is the honest number under an accordion — the tallest the
+      panel can ever be is its tallest section — and it replaces the
+      "all expanded" figure, which stopped being a reachable state.
+      `tools/shot-bloom-panel.mjs` is the sheet: the panel, not the canvas, so
+      it never sets `body.bl-preview` (which hides it); every section cell is
+      opened by a REAL summary click so no frame shows a state the UI cannot
+      reach; and every frame asserts it is not cropped, because a cropped
+      panel is the one picture that could carry a grouping ruling with the
+      bottom of the list missing.
+
+    - **ROOM TO GROW, so the next session does not reorganise this one.** ARRANGEMENT is
+      the home for the arrangement work and ships with two controls precisely so it has
+      room: of the whorl primitive `(count, radius, height, sizeRamp, angleRamp, phase,
+      blade)`, `petalCount` and `spread` are count and radius, and the other four are
+      still derived — all of them land there, as do phyllotaxis and spiral placement. If
+      multi-whorl arrives, the shape that fits is a layer-count control in that section
+      with per-layer sub-controls gated on it by `visibleWhen` — the `centerStyle`
+      pattern one level up — not a section per layer. A stem, leaves or a base ornament
+      would be a NEW section, being new parts. **The junction never gets a section, for
+      the same reason it never gets a role.**
