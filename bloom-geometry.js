@@ -280,9 +280,46 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
    report attribute a moved export to one or the other.
    =================================================================== */
 
-/* The blunt-tip floor. A zero-width tip row would collapse the rim strip
-   into degenerate triangles, so the tip is blunted rather than pinched. */
+/* THE PRINT FLOOR on the tip's half-width — an ASSUMPTION with a number
+   attached, like every floor in this project family, and nothing here has ever
+   been printed. It applies IN EXPORT ONLY from the pointed-tip ruling onward.
+
+   WHAT IT USED TO DO, AND WHY EVA RULED AGAINST IT (Aug 31/Sep 1). It was a
+   floor on EVERY row in BOTH modes, so the last rows of the blade did not
+   taper — they ran PARALLEL at 2 x 0.8 mm and were then closed with a flat
+   face square to the blade. Measured at the shipping defaults: four of the
+   28 blade rows (u = 0.893 upward, where the profile falls to 0.795, 0.398,
+   0.119, 0.000) all clamped to 0.800. That stub, not the profile, was the
+   squared-off end. The exponent family already wants to reach zero; the floor
+   truncated it and then capped the truncation. */
 export const TIP_HALF_MM = 0.8;
+
+/* THE LIVE MESH FLOOR on the terminal face — NOT a print number and
+   deliberately an order of magnitude below one. Live is authoring-true, so it
+   should reach a point; a true apex cannot ship, for two measured reasons
+   stated where the cap is built (see CONVERGING TIP CAP below). 0.15 gives a
+   0.30 mm terminal face, five times under the print floor and well under a
+   pixel at any framing the contact sheet uses, so it reads as a point without
+   being one. It exists to keep the mesh non-degenerate, nothing else. */
+export const TIP_CAP_HALF_MM = 0.15;
+
+/* WHERE THE CONVERGING CAP BEGINS. Two rules, and the LATER of the two starts
+   is taken, because each fails alone:
+     - a fixed final fraction of the blade covers the stub at the shipping
+       defaults (the floor flattened the last 14% there), but is far too short
+       when the profile is very pointy — at petalTipTaper 4 the floor flattens
+       TEN of 28 rows and the profile is already at 0.125 mm by u = 0.80, so a
+       cap starting there would have to WIDEN toward the tip to reach the
+       export floor;
+     - a crossing rule alone (start where the profile falls to CAP_ENTRY)
+       starts absurdly early on a broad tip.
+   Taking min(1 - FRACTION, crossing) means the cap entry half-width is ALWAYS
+   at least CAP_ENTRY_FACTOR x TIP_HALF_MM, so in export the cap converges by
+   at least 2:1 rather than degenerating into the parallel stub it replaces.
+   The crossing is found by deterministic bisection on a monotone branch, so
+   it is bit-reproducible. */
+export const TIP_CAP_FRACTION = 0.20;
+export const CAP_ENTRY_FACTOR = 2;
 /* Where the foot's width stops floor-ing the blade. Frozen at the
    placeholder's value — moving it moves every export. */
 const ROOT_BLEND_END = 0.30;
@@ -354,7 +391,7 @@ const PANEL_OVERLAP_ROWS = 1;
                    shoulder and is deliberate.
      TIP_HALF_MM   the blunt-tip floor.
    =================================================================== */
-export function widthProfile(state, ring, halfW, cap) {
+export function widthProfile(state, ring, halfW, cap, acc) {
   const a = state.petalBaseTaper;
   const b = state.petalTipTaper;
   const uPk = a / (a + b);                                     // the derived widest point
@@ -362,6 +399,10 @@ export function widthProfile(state, ring, halfW, cap) {
   const core = (u) => (Math.pow(u, a) * Math.pow(1 - u, b)) / gPk;
   const footHalf = ring.width / 2;
   const stalk = (cap && cap.stalk) || null;
+  /* The TERMINAL half-width: the print floor in export, the mesh floor live.
+     This is the ONE mode-dependent quantity in the silhouette layer, and it
+     changes the cap's SHAPE, never its topology — see the cap's own note. */
+  const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
 
   const terms = [
     { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * core(u) },
@@ -374,16 +415,91 @@ export function widthProfile(state, ring, halfW, cap) {
      so the foot-continuity floor stands down for it — and ONLY for it. */
   const rootBlend = stalk ? () => 0 : (u) => footHalf * Math.max(0, 1 - u / ROOT_BLEND_END);
 
+  const shapeAt = (u) => {
+    let shape = 0;
+    for (const t of terms) {
+      if (u < t.from || u > t.to) continue;
+      const v = t.at(u);
+      if (v > shape) shape = v;
+    }
+    return shape;
+  };
+
+  /* ===================================================================
+     THE CONVERGING TIP CAP — Eva's ruling, Sep 1, from the tip sheet.
+
+     THE POINTED FAMILY ONLY. `petalTipBreadth === 0` is the exponent family,
+     which is pinched to zero at the tip by construction; above zero the flat
+     end is an AUTHORED TRUNCATE (rose, poppy) and stays exactly as it was,
+     byte for byte. That split is not a convenience — it is what makes this
+     change's partition sharp: every row at breadth 0 moves, every row above
+     it is bit-identical, asserted both ways.
+
+     WHAT REPLACES THE STUB. Below the cap the profile is floored at the
+     TERMINAL floor rather than the print floor, so it is free to taper; from
+     `uCap` the half-width lerps linearly to that terminal floor. The result
+     converges into the end instead of running parallel to it. In live the
+     terminal face is 0.30 mm wide; in export it is 1.60 mm — floored, and
+     reached by a taper of at least 2:1 rather than by truncation.
+
+     THE APEX IS AN EXPLICITLY TRUNCATED MINI-FACE, NOT A TRUE APEX VERTEX,
+     and the choice is forced rather than preferred:
+
+       1. TOPOLOGY MUST NOT DEPEND ON MODE. The export gate now asserts that
+          live and export triangle counts are identical on every row — the
+          property the whole fixed-topology argument rests on. A true apex in
+          live (columns collapsing to one edge) with a floored face in export
+          is two different meshes, and it would fail that assertion by
+          construction.
+       2. IT IS THE DOME'S BUG. `domeInto` closed its cap on a ring of 48
+          vertices 6.1e-17 apart, because `cos(PI/2)` is not 0 — 48 degenerate
+          triangles and 49 non-manifold edges on every dome, passing the gated
+          criterion while being wrong. Collapsing NV columns onto one apex
+          edge is that construction exactly, and the edge census welds at 1e-4.
+
+     So the cap keeps a real, measurable terminal face in both modes, and the
+     gates assert there are no degenerate triangles anywhere in the export.
+
+     THE COST IS ZERO TRIANGLES, and that was not the prediction. The cap
+     re-uses the grid it already had — same NU, same NV, same panel count,
+     same end face — and changes only where the vertices sit. A cap built as
+     new geometry beyond the last row would have moved the count for the first
+     time in three sessions; this one does not, and the zero-cost claim in the
+     charter stands unamended.
+     =================================================================== */
+  /* The capability rows are included deliberately: a claw's interior minimum
+     sits near u = 0.3 and a cleft's two lobes each end at the tip row, so both
+     exercise the cap rather than sidestepping it — and the cleft is the
+     stronger test, since it caps two panels that must stay on one arc. */
+  const pointed = state.petalTipBreadth === 0;
+  let uCap = 1, hEntry = 0;
+  if (pointed) {
+    /* The crossing of CAP_ENTRY_FACTOR x the print floor, by bisection on
+       (uPk, 1) where the pointed profile is monotone decreasing from halfW to
+       0. Deterministic, so the bytes are reproducible. */
+    const target = CAP_ENTRY_FACTOR * TIP_HALF_MM;
+    let lo = uPk, hi = 1;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (shapeAt(mid) > target) lo = mid; else hi = mid;
+    }
+    uCap = Math.min(1 - TIP_CAP_FRACTION, lo);
+    hEntry = Math.max(shapeAt(uCap), rootBlend(uCap), tipFloor);
+  }
+
   return {
-    uPk, terms, footHalf,
+    uPk, terms, footHalf, pointed, uCap, tipFloor,
+    /* The cap's entry and terminal half-widths, reported for the gates and
+       the contact sheet rather than re-derived by either. */
+    capEntryHalf: hEntry, capTerminalHalf: pointed ? tipFloor : TIP_HALF_MM,
     halfWidthAt(u) {
-      let shape = 0;
-      for (const t of terms) {
-        if (u < t.from || u > t.to) continue;
-        const v = t.at(u);
-        if (v > shape) shape = v;
+      const shape = shapeAt(u);
+      if (!pointed) return Math.max(shape, rootBlend(u), TIP_HALF_MM);
+      if (u >= uCap) {
+        const s = (u - uCap) / (1 - uCap);
+        return hEntry + (tipFloor - hEntry) * s;
       }
-      return Math.max(shape, rootBlend(u), TIP_HALF_MM);
+      return Math.max(shape, rootBlend(u), tipFloor);
     },
   };
 }
@@ -777,7 +893,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   const T = [-sinA, cosA, 0];
   const Z = [0, 0, 1];
 
-  const profile = widthProfile(state, ring, halfW, cap);
+  const profile = widthProfile(state, ring, halfW, cap, acc);
   /* THE GUARD. petalFormIsFlat() is the predicate; when it holds, `form`
      stays null and every row below takes the pre-form expression verbatim.
      That — not an IEEE-754 argument — is what makes the shipped default
@@ -933,6 +1049,24 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     /* Row half-widths, FOOT ROWS INCLUDED — a claw is narrower than both
        its foot and its blade, so the foot rows are part of the evidence. */
     profile: rows.map((r) => r.h),
+    /* THE TIP CAP's own numbers, from the profile that built it. The gates
+       assert the cap converges and the contact sheet prints these; neither
+       re-derives a crossing or a terminal width. */
+    /* NOT `tip` — that name is already taken, three keys below, by the tip's
+       POSITION (which the contact sheet frames on). Two quantities sharing one
+       word in an output is a defect this project has a rule about; here it
+       would also have silently shadowed the position, since a later key wins
+       in an object literal. */
+    tipCap: {
+      pointed: profile.pointed,
+      uCap: profile.uCap,
+      entryHalf: profile.capEntryHalf,
+      terminalHalf: profile.capTerminalHalf,
+      /* What the LAST ROW actually came out at — the emitted number, not the
+         intended one, for the same reason row.tUsed exists. */
+      lastRowHalf: rows[rows.length - 1].h,
+      exportMode: acc.exportMode,
+    },
     footRows: footS.length,
     panels: panels.map((p) => p.label),
     tipSpans: panels.filter((p) => p.rowTo === rows.length - 1).length,

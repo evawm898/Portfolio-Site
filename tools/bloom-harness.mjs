@@ -191,7 +191,21 @@ export async function exportStl(page, tmpDir) {
 /* Binary-STL edge census. Vertices quantised so coincident corners weld; an
    edge used by exactly one triangle is a BOUNDARY (open) edge — the gated
    failure. count > 2 → nonManifold; `shells` is union-find over the welded
-   vertex graph. Both of those are UNRATED — see the header. */
+   vertex graph. Both of those are UNRATED — see the header.
+
+   `degenerate` IS RATED, and it arrived with the converging tip cap (Sep 1).
+   A triangle of zero area contributes edges to the census while enclosing no
+   volume, so it can put a number in the nonManifold column with no cause a
+   reader can find — which is exactly what the DOME did for months, closing its
+   cap on 48 vertices 6.1e-17 apart because `cos(PI/2)` is not zero. A tip cap
+   that converges is that same construction, so the failure it can produce is
+   now MEASURED rather than argued away: any triangle whose area is at or below
+   DEGENERATE_AREA_MM2 is counted, and the gate fails on a nonzero count.
+   The threshold is in mm^2 because this model is in millimetres throughout;
+   1e-9 mm^2 is a triangle a thousandth of a micron on a side, i.e. numerically
+   zero rather than merely small. Measured at 0 across the whole matrix before
+   the cap landed, which is what makes it safe to gate rather than report. */
+const DEGENERATE_AREA_MM2 = 1e-9;
 export function analyzeStl(buf) {
   const tris = buf.readUInt32LE(80);
   const q = (x) => Math.round(x * 1e4) / 1e4;
@@ -201,11 +215,26 @@ export function analyzeStl(buf) {
   const root = (x) => { let r = x; while (parent.get(r) !== r) r = parent.get(r); let c = x; while (parent.get(c) !== r) { const n = parent.get(c); parent.set(c, r); c = n; } return r; };
   const union = (a, b) => { const ra = root(a), rb = root(b); if (ra !== rb) parent.set(ra, rb); };
   let off = 84;
+  let degenerate = 0;
   for (let i = 0; i < tris; i++) {
     off += 12;
     const v = [];
-    for (let k = 0; k < 3; k++) { v.push(q(buf.readFloatLE(off)) + ',' + q(buf.readFloatLE(off + 4)) + ',' + q(buf.readFloatLE(off + 8))); off += 12; }
+    /* Area is computed from the RAW floats, before quantisation: quantising
+       first would manufacture degeneracies that the exported file does not
+       have, and the question here is whether the emitted triangle encloses
+       area, not whether two corners round together. */
+    const P = [];
+    for (let k = 0; k < 3; k++) {
+      const x = buf.readFloatLE(off), y = buf.readFloatLE(off + 4), z = buf.readFloatLE(off + 8);
+      P.push([x, y, z]);
+      v.push(q(x) + ',' + q(y) + ',' + q(z));
+      off += 12;
+    }
     off += 2;
+    const e1 = [P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]];
+    const e2 = [P[2][0] - P[0][0], P[2][1] - P[0][1], P[2][2] - P[0][2]];
+    const cx = e1[1] * e2[2] - e1[2] * e2[1], cy = e1[2] * e2[0] - e1[0] * e2[2], cz = e1[0] * e2[1] - e1[1] * e2[0];
+    if (0.5 * Math.hypot(cx, cy, cz) <= DEGENERATE_AREA_MM2) degenerate++;
     for (const p of v) if (!parent.has(p)) parent.set(p, p);
     union(v[0], v[1]); union(v[1], v[2]);
     for (let k = 0; k < 3; k++) { const e = key(v[k], v[(k + 1) % 3]); edges.set(e, (edges.get(e) || 0) + 1); }
@@ -214,7 +243,7 @@ export function analyzeStl(buf) {
   for (const c of edges.values()) { if (c === 1) boundary++; else if (c > 2) nonManifold++; }
   const roots = new Set();
   for (const v of parent.keys()) roots.add(root(v));
-  return { tris, boundary, nonManifold, shells: tris > 0 ? roots.size : 0 };
+  return { tris, boundary, nonManifold, degenerate, shells: tris > 0 ? roots.size : 0 };
 }
 
 /* PREVIEW FRAME — chrome hidden and the camera still, ASSERTED.
@@ -526,6 +555,28 @@ export async function thicknessAssertions(page, row) {
      reader could find. */
   if (!(th.minEmitted > 1e-3)) bad.push(`minimum emitted sheet ${th.minEmitted} mm is at or below the 1e-3 mm degeneracy bound`);
 
+  /* THE CONVERGING TIP CAP (Eva's ruling, Sep 1). Both directions, like the
+     thickness guard: a pointed row must report a cap that actually converges,
+     and a truncate row must report no cap at all — the second is what makes
+     the byte partition a claim rather than a hope, since every breadth > 0 row
+     must be bit-identical to the pre-ruling tree. */
+  const tc = m.petalTipCap;
+  if (!tc) bad.push('no tip-cap telemetry reported');
+  else {
+    const wantsPointed = Number(sets.petalTipBreadth ?? DEFAULTS.petalTipBreadth) === 0;
+    if (wantsPointed !== tc.pointed) bad.push(`tip cap: row ${wantsPointed ? 'is' : 'is not'} the pointed family but the builder reports pointed=${tc.pointed}`);
+    if (tc.pointed) {
+      /* CONVERGING, not squared: the entry must be strictly wider than the
+         terminus. The cap-entry rule guarantees at least CAP_ENTRY_FACTOR x
+         the print floor at entry, so in export this is at least 2:1. */
+      if (!(tc.entryHalf > tc.terminalHalf)) bad.push(`tip cap does not converge: entry ${tc.entryHalf} <= terminal ${tc.terminalHalf} — the stub is back`);
+      /* The last emitted row IS the terminus, and it is never zero: a true
+         apex collapses NV columns onto one edge, which is the DOME's bug. */
+      if (Math.abs(tc.lastRowHalf - tc.terminalHalf) > 1e-9) bad.push(`tip cap: last row half-width ${tc.lastRowHalf} is not the terminal ${tc.terminalHalf}`);
+      if (!(tc.lastRowHalf > 0)) bad.push(`tip cap: terminal half-width is ${tc.lastRowHalf} — a true apex, which collapses NV columns onto one edge (the DOME's defect)`);
+    }
+  }
+
   /* THE FOOT IS THE PROFILE WHERE THE PROFILE IS THE IDENTITY. u = 0 gives
      base * (1 - thin*0) = base * 1 = base, exactly, at every thinning value
      — so this holds structurally rather than by a guard, and asserting it
@@ -768,6 +819,33 @@ export function buildMatrix() {
     ['THIN: THICK GRADIENT (sheet max × thinning max)', { sheetThickness: 2.4, tipThinning: 0.8 }],
   ];
   for (const [name, sets] of thinRows) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
+  /* 5c. THE CONVERGING TIP CAP's named rows (Eva's ruling, Sep 1). The four
+        FORM corners already sit at petalTipBreadth 0, so they exercise the cap
+        for free — but "for free" is exactly the coverage that disappears the
+        moment a default moves, which is the lesson the centre rig cost. These
+        are explicit, and each is one question:
+          x roll max / twist max   where the cap's columns are LEAST PLANAR.
+                                   A naive cap folds here and nowhere else.
+          x taper max              the case a fixed-length cap could not have
+                                   handled: at petalTipTaper 4 the print floor
+                                   flattens TEN of 28 rows and the profile is
+                                   0.125 mm by u = 0.80, so the cap entry is
+                                   found by the crossing rule instead.
+          truncate (breadth max)   THE HELD SIDE of the partition, named. It
+                                   must not converge and must be bit-identical
+                                   to the pre-ruling tree.
+          x ALL THIN               the new cap on the thinnest sheet, where the
+                                   terminal face is smallest in both modes. */
+  for (const [name, sets] of [
+    ['TIP: pointed × roll max', { petalRoll: 330 }],
+    ['TIP: pointed × twist max', { petalTwist: 180 }],
+    ['TIP: pointed × taper max (floor dominates)', { petalTipTaper: 4 }],
+    ['TIP: truncate (breadth max) — must NOT converge', { petalTipBreadth: 0.6 }],
+    ['TIP: pointed × ALL THIN', { ...ALL_THIN }],
+  ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 

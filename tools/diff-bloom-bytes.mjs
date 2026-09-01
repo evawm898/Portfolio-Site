@@ -373,6 +373,56 @@ if (process.argv.includes('--compare')) {
     process.exit(0);
   }
 
+  /* PARTITION BY VALUE: the moved set must EQUAL the set of rows whose
+     RESOLVED value of a control equals a given value — asserted both ways.
+
+     Why this is a second mode and not a flag on the first: `--partition <id>`
+     splits on whether a row SET the control, which is the right axis for a
+     default change (every row that inherits the new default moves). The
+     tip-cap ruling changes behaviour for a VALUE — the pointed family, i.e.
+     petalTipBreadth === 0 — regardless of whether the row named it. Those two
+     splits disagree on real rows here (`petalTipBreadth min (0)` pins and
+     moves; `ALL MAX` pins 0.6 and holds), so collapsing them into one flag
+     would have produced a confident, wrong report. */
+  const vi = process.argv.indexOf('--partition-value');
+  if (vi > 0) {
+    const id = process.argv[vi + 1], want = process.argv[vi + 2];
+    if (before.rows.some((r) => !r.state) || after.rows.some((r) => !r.state)) {
+      console.error('byte diff: INVALID — one of the runs carries no per-row state. Re-run both captures with this version of the tool.');
+      process.exit(1);
+    }
+    const valueOf = (r) => String(r.state[id]);
+    for (let k = 0; k < labels.length; k++) {
+      if (valueOf(before.rows[k]) !== valueOf(after.rows[k])) {
+        console.error(`byte diff: INVALID — row "${labels[k]}" resolves ${id} to ${valueOf(before.rows[k])} in one run and ${valueOf(after.rows[k])} in the other.`);
+        process.exit(1);
+      }
+    }
+    const inSet = labels.filter((l, k) => valueOf(before.rows[k]) === String(want));
+    const outSet = labels.filter((l, k) => valueOf(before.rows[k]) !== String(want));
+    const heldButIn = inSet.filter((l) => !movedSet.has(l));
+    const movedButOut = outSet.filter((l) => movedSet.has(l));
+    console.log(`partition on ${id} === ${want}: ${inSet.length} rows are IN the ruled set, ${outSet.length} are OUT\n`);
+    console.log(`  moved   : ${movedSet.size}`);
+    console.log(`  expected: ${inSet.length} (exactly the rows in the ruled set)\n`);
+    for (const l of outSet) {
+      const b = before.rows[labels.indexOf(l)];
+      console.log(`  ${movedSet.has(l) ? 'MOVED!' : 'held  '} [${id}=${valueOf(b)}] ${l.padEnd(46)} ${b.bytes}B/${b.tris}t`);
+    }
+    if (heldButIn.length) {
+      console.error(`\nbyte diff: FAIL — ${heldButIn.length} row(s) are IN the ruled set and did NOT move; the ruling is not reaching that geometry:`);
+      for (const l of heldButIn) console.error(`  - ${l}`);
+    }
+    if (movedButOut.length) {
+      console.error(`\nbyte diff: FAIL — ${movedButOut.length} row(s) are OUTSIDE the ruled set and moved anyway; the change leaked past the ruling:`);
+      for (const l of movedButOut) console.error(`  - ${l}`);
+    }
+    if (heldButIn.length || movedButOut.length) process.exit(1);
+    console.log(`\nbyte diff: PASS — the moved set EQUALS the ruled set exactly.`);
+    console.log(`  ${inSet.length} rows have ${id} === ${want} and all ${inSet.length} moved; ${outSet.length} do not and all ${outSet.length} are bit-identical.`);
+    process.exit(0);
+  }
+
   /* PARTITION: the moved set must EQUAL the set of rows that inherit the named
      control's default — asserted in both directions. */
   const pins = new Map(before.rows.map((r) => [r.label, (r.pins || []).includes(partition)]));
@@ -475,6 +525,13 @@ for (const row of MATRIX_FN[MATRIX]()) {
      inherits the default tilt must not be scoped by what its label omits. */
   rows.push({
     label: row.label, pins: row.set.map((s) => s.id), tilt: Number(got.petalTilt),
+    /* THE ROW'S RESOLVED STATE, from the app's own snapshot. `pins` answers
+       "did this row set the control"; this answers "what value did it end up
+       at", and those are different questions with different partitions. The
+       tip-cap ruling needs the second: `petalTipBreadth min (0)` PINS the
+       control and must MOVE, while `ALL MAX` pins it at 0.6 and must HOLD, so
+       a pins-vs-inherits split would have been the wrong axis entirely. */
+    state: got,
     bytes: buf.length, tris: analyzeStl(buf).tris,
     sha256: crypto.createHash('sha256').update(buf).digest('hex'),
     footHash: foot.hash, footTris: foot.tris, footHalf,

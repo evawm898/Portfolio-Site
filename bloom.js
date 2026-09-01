@@ -350,6 +350,9 @@ window.__bloomMetrics = () => ({
   petalTipSpans: lastPetal ? lastPetal.tipSpans : null,
   petalMid: lastPetal ? lastPetal.mid : null,
   petalTip: lastPetal ? lastPetal.tip : null,
+  /* The converging tip cap's own numbers (Eva's ruling, Sep 1). Named
+     `petalTipCap` and never `petalTip`, which is the tip's POSITION. */
+  petalTipCap: lastPetal ? lastPetal.tipCap : null,
   petalNormal: lastPetal ? lastPetal.normal : null,
   /* The blade's WIDTH direction at the midpoint — a profile view looks down
      this. It is reported rather than recomputed because under twist it is
