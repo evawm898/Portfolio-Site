@@ -79,6 +79,18 @@
        J1–J4 in junctionAssertions() carry what this gate cannot, in exact
        arithmetic from the app's own metrics, on every row. Do not weaken them
        on the strength of a green run here.
+     - **THE CONTINUOUS SPIRAL MAKES THAT BLINDNESS WORSE, NOT BETTER**, and
+       the number is the point (Sep 1). At the shipping continuous config the
+       radius step between consecutive slots is 0.1735 mm against an 8.486 mm
+       overhang, so consecutive foot annuli overlap by 3.154 mm — against
+       1.981 mm at three layers. A wrong hub there leaves 57 of 120 slots
+       joined to nothing and this gate still reports one region, chained
+       through the 119 feet in between. Worse still, THE ONE MUTATION THIS
+       SESSION IS ACTUALLY ABOUT — continuous mode silently building rings —
+       is invisible to every measure in this file AND to J1–J4: it exports
+       watertight, exports as one piece, and has the identical triangle count.
+       J5 and J6 are what observe it. A green run here endorses one connected
+       body and NOTHING about whether the arrangement is a continuum.
    There are no presets yet; when presets exist they become named rows here
    FIRST (charter: coverage starts where the flower's gate was blind).
 

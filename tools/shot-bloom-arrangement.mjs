@@ -78,7 +78,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
          junctionAssertions, JUNCTION_SCOPE, CONTROLS, DEFAULTS, SPIRAL_LEGIBLE_COUNT,
-         GOLDEN_ANGLE } from './bloom-harness.mjs';
+         GOLDEN_ANGLE, FOOT_MIN_WIDTH_MM } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -94,11 +94,16 @@ function die(msg) { console.error('HARNESS INVALID: ' + msg); return browser.clo
    definition; SPIRAL's gaps are what the golden angle leaves once the slots
    are sorted around the circle. This is the number that has no threshold in
    it, printed so the reader can see that for themselves. */
-function gapRatio(n, placement) {
+function gapRatio(seq, placement) {
   const TAU = Math.PI * 2;
-  if (placement !== 'SPIRAL') return 1;
-  const az = Array.from({ length: n }, (_, i) => ((i * GOLDEN_ANGLE) % TAU + TAU) % TAU).sort((a, b) => a - b);
-  const gaps = az.map((a, i) => (i === n - 1 ? az[0] + TAU : az[i + 1]) - a);
+  if (placement === 'RADIAL') return 1;
+  /* CONTINUOUS steps by the same golden angle, over the WHOLE sequence rather
+     than per whorl — so the statistic is the same computation on a longer
+     list, and it is passed the sequence length rather than petalCount. It is
+     still only a caption: at 120 slots the gaps are tiny and the number says
+     less about the picture than the picture does. */
+  const az = Array.from({ length: seq }, (_, i) => ((i * GOLDEN_ANGLE) % TAU + TAU) % TAU).sort((a, b) => a - b);
+  const gaps = az.map((a, i) => (i === seq - 1 ? az[0] + TAU : az[i + 1]) - a);
   return Math.max(...gaps) / Math.min(...gaps);
 }
 
@@ -120,22 +125,40 @@ async function cell({ label, set = [], views = ['whorl'], note = '' }) {
 
   const want = { ...DEFAULTS };
   for (const s of set) want[s.id] = s.value;
+  const isCont = String(want.placement) === 'CONTINUOUS';
+  /* THE SEQUENCE LENGTH, and the sheet derives it from the two controls it
+     SET rather than from the page — so agreeing with the app's own
+     `sequenceLength` is a check rather than a tautology. */
+  const seq = isCont ? Number(want.petalCount) * Number(want.layerCount) : Number(want.petalCount);
   const readout = (await page.evaluate(() => document.getElementById('readout')?.textContent || '')).replace(/\s+/g, ' ').trim();
-  if (!new RegExp(`petals ${Number(want.petalCount)}\\b`).test(readout)) {
-    await die(`${label}: set petalCount ${want.petalCount} through the UI but the readout says "${readout}" — the app did not react`);
+  /* WHAT THE READOUT SAYS UNDER EACH ARM: "petals 8" when a ring is a whorl,
+     "petals 120 (40/turn)" when the whole bloom is one sequence. Asserting
+     the ringed phrasing on a continuous cell would have made this reactivity
+     check fail on every new cell; asserting nothing would have made it stop
+     checking. It asserts the arm's own phrasing. */
+  const wantPetals = isCont ? `petals ${seq} (${Number(want.petalCount)}/turn)` : `petals ${Number(want.petalCount)}`;
+  if (!readout.includes(wantPetals)) {
+    await die(`${label}: set petalCount ${want.petalCount} through the UI but the readout says "${readout}" — expected "${wantPetals}"; the app did not react`);
   }
   /* THE FLAG IS READ BACK FROM THE PAGE, not predicted. This sheet exists to
      let Eva judge the flagged state, so a cell claiming the flag is on had
-     better be showing a bloom the app flagged. */
-  const flagShown = /SPIRAL BELOW \d+ PETALS/.test(readout);
-  const flagWanted = String(want.placement) === 'SPIRAL' && Number(want.petalCount) < SPIRAL_LEGIBLE_COUNT;
-  if (flagShown !== flagWanted) await die(`${label}: low-count spiral flag ${flagShown ? 'SHOWN' : 'ABSENT'}, expected ${flagWanted ? 'SHOWN' : 'ABSENT'}`);
+     better be showing a bloom the app flagged. What it counts is the
+     SEQUENCE, which is petalCount under SPIRAL and petalCount x layerCount
+     under CONTINUOUS. */
+  const flagShown = /SPIRAL BELOW \d+ IN THE SEQUENCE/.test(readout);
+  const flagWanted = (String(want.placement) === 'SPIRAL' || isCont) && seq < SPIRAL_LEGIBLE_COUNT;
+  if (flagShown !== flagWanted) await die(`${label}: low-count spiral flag ${flagShown ? 'SHOWN' : 'ABSENT'}, expected ${flagWanted ? 'SHOWN' : 'ABSENT'} (sequence ${seq})`);
 
   const m = await page.evaluate(() => window.__bloomMetrics());
   if (!(m.hubRadius > 0)) await die(`${label}: metrics report hub radius ${m.hubRadius}`);
-  if (m.ringLayers.length !== Number(want.layerCount)) {
-    await die(`${label}: asked for ${want.layerCount} layers, the builder reports ${m.ringLayers.length}`);
+  /* ONE RING PER LAYER, OR ONE PER PETAL — checked against the arm the cell
+     asked for, so a continuous cell that quietly built rings dies here as
+     well as at J5 rather than being photographed. */
+  const wantRings = isCont ? seq : Number(want.layerCount);
+  if (m.rings.length !== wantRings) {
+    await die(`${label}: asked for ${wantRings} rings (${want.placement}, depth ${want.layerCount}), the builder reports ${m.rings.length}`);
   }
+  if (m.continuousMode !== isCont) await die(`${label}: placement ${want.placement} but the builder reports continuousMode ${m.continuousMode}`);
 
   const shots = {};
   for (const v of views) {
@@ -153,15 +176,23 @@ async function cell({ label, set = [], views = ['whorl'], note = '' }) {
 
   const n = Number(want.petalCount);
   const layers = Number(want.layerCount);
-  const ratio = gapRatio(n, String(want.placement));
-  const rings = m.ringLayers.map((r) => r.radius.toFixed(1)).join(' / ');
+  const ratio = gapRatio(seq, String(want.placement));
+  const unit = isCont ? 'turn' : 'layer';
+  /* AT UP TO 120 RINGS THE LIST IS NOT A CAPTION. The continuous arm prints
+     the span and the per-slot step instead — the two numbers that say whether
+     the layers dissolved, which is the whole question this sheet is for. */
+  const ringSpan = isCont
+    ? `${m.rings.length} rings ${m.rings[0].radius.toFixed(1)} → ${m.rings[m.rings.length - 1].radius.toFixed(1)} mm, step ${(m.rings[0].radius - m.rings[1].radius).toFixed(3)}–${(m.rings[m.rings.length - 2].radius - m.rings[m.rings.length - 1].radius).toFixed(3)} mm`
+    : m.rings.map((r) => r.radius.toFixed(1)).join(' / ') + ' mm';
+  const floored = m.rings.filter((r) => r.widthClamped).length;
   /* Every number carries its MODE. `tris` is LIVE here and says so. */
-  const caption = `${n} petals · ${String(want.placement).toLowerCase()} · ${layers} layer${layers > 1 ? 's' : ''}`
-    + (layers > 1 ? ` · size ${Number(want.layerSize).toFixed(2)}x · offset ${Number(want.layerPhase).toFixed(2)} slot · tilt +${want.layerTilt}°/layer` : '')
-    + `<br>rings (live) ${rings} mm · hub ${m.hubRadius.toFixed(1)} mm · tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`
-    + `<br>gap max/min ${ratio.toFixed(2)}${flagShown ? ' · <b>FLAGGED: below ' + SPIRAL_LEGIBLE_COUNT + ' petals</b>' : ''}`
+  const caption = `${isCont ? `${seq} petals (${n}/turn)` : `${n} petals`} · ${String(want.placement).toLowerCase()} · ${layers} ${unit}${layers > 1 ? 's' : ''}`
+    + (layers > 1 ? ` · shrink ${Number(want.layerSize).toFixed(2)}x/${unit}${isCont ? '' : ` · offset ${Number(want.layerPhase).toFixed(2)} slot`} · tilt +${want.layerTilt}°/${unit}` : '')
+    + `<br>rings (live) ${ringSpan} · hub ${m.hubRadius.toFixed(1)} mm · tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`
+    + (floored ? `<br><b>${floored} of ${m.rings.length} feet at the ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm width floor</b>` : '')
+    + `<br>gap max/min ${ratio.toFixed(2)}${flagShown ? ' · <b>FLAGGED: sequence below ' + SPIRAL_LEGIBLE_COUNT + '</b>' : ''}`
     + (note ? `<br>${note}` : '');
-  console.log(`  ${label.padEnd(52)} ${layers}L ${String(want.placement).padEnd(6)} n=${String(n).padStart(2)} rings ${rings} · tris(live) ${m.liveTris}${flagShown ? ' · FLAGGED' : ''}`);
+  console.log(`  ${label.padEnd(56)} ${layers}${unit[0].toUpperCase()} ${String(want.placement).padEnd(10)} n=${String(n).padStart(2)} rings ${m.rings.length} · tris(live) ${m.liveTris}${floored ? ` · ${floored} floored` : ''}${flagShown ? ' · FLAGGED' : ''}`);
   return { label, caption, ...shots };
 }
 
@@ -199,15 +230,54 @@ for (const n of [5, SPIRAL_LEGIBLE_COUNT, 21]) {
     }));
   }
 }
-/* Spiral is applied PER LAYER — each whorl runs its own golden-angle
-   sequence, offset by its own layerPhase. The continuous cross-layer
-   sequence (index = L*count + i) is the more phyllotactic reading and is
-   recorded as an alternative, not built. */
+/* Spiral under SPIRAL is applied PER LAYER — each whorl runs its own
+   golden-angle sequence, offset by its own layerPhase. The continuous
+   cross-layer sequence that used to be recorded here as an alternative IS NOW
+   BUILT, as the third placement value; its own sheet is below. */
 placement.push(await cell({
   label: 'SPIRAL x 3 layers x 13 petals', set: set({ placement: 'SPIRAL', layerCount: 3, petalCount: 13 }),
   views: ['plan', 'whorl'],
-  note: 'The two arrangement axes together. Each layer runs its OWN golden-angle sequence offset by layerPhase; a single continuous sequence across all layers is a recorded alternative, deliberately not built.',
+  note: 'The two arrangement axes together under the LAYERED spiral. Each layer runs its OWN golden-angle sequence offset by layerPhase — which is exactly what reads as three stacked rings wearing spiral azimuths, and what the continuous sheet below is the answer to.',
 }));
+placement.push(await cell({
+  label: 'CONTINUOUS x 3 turns x 13 petals', set: set({ placement: 'CONTINUOUS', layerCount: 3, petalCount: 13 }),
+  views: ['plan', 'whorl'],
+  note: 'The same two axes under the CONTINUOUS spiral, for direct comparison with the cell beside it: one sequence of 39 slots winding inward, every petal on a ring of its own. Same golden angle, same controls, same petal budget — the rings are gone.',
+}));
+
+/* ---- 2b. THE HEADLINE: Eva's own screenshot config, ringed against
+       continuous. This is the pair the session exists to put in front of
+       her, and it is deliberately the FIRST thing on its sheet: 40 petals,
+       spread 1.55, three deep, tilt-stepped — the state she described as
+       "still very distinct layers". Both cells carry the identical petal
+       budget (120) and therefore the identical triangle count, so nothing in
+       the comparison is bought with geometry. ---- */
+console.log('the headline pair — Eva\'s config, ringed against continuous:');
+const EVA = { petalCount: 40, spread: 1.55, layerCount: 3 };
+const headline = [];
+headline.push(await cell({
+  label: 'RINGED — layered spiral, 40 petals x 3 layers',
+  set: set({ ...EVA, placement: 'SPIRAL' }), views: ['whorl', 'plan'],
+  note: 'THE STATE EVA DESCRIBED. Three whorls of 40, each running its own golden-angle sequence. The radius is a STEP FUNCTION over the build order: 117 of the 119 steps between consecutive petals are exactly 0.0000 mm and 2 of them are 6.4209 mm — 28.0% of the hub radius in one jump. That cliff is what reads as three stacked rings.',
+}));
+headline.push(await cell({
+  label: 'CONTINUOUS — one sequence, same 120 petals',
+  set: set({ ...EVA, placement: 'CONTINUOUS' }), views: ['whorl', 'plan'],
+  note: 'THE SAME CONTROLS, THE SAME 120 PETALS, THE SAME 149,568 EXPORT TRIANGLES. Every one of the 119 steps is now between 0.0658 and 0.1735 mm — 0.82% of the hub radius, about one percent of a petal width. The hub is 7.5% smaller because the area rule sums smaller inner feet, and the innermost blade is 13.17 mm against the ringed 18.14 mm because three TURNS wind deeper than three stacked rings, which are only two turns apart. Both are derived; neither is tuned.',
+}));
+
+/* ---- 2c. THE CONTINUUM'S OWN AXES: winding depth and shrink rate, plus the
+       whole-bloom default before and after. ---- */
+console.log('the continuum — winding depth and shrink rate:');
+const continuous = [];
+for (const [label, s2, note] of [
+  ['DEFAULT — 1 layer, RADIAL (unchanged)', {}, 'The shipping default, and the byte claim: nothing selects the new value, so every pre-existing export is bit-identical. 0 of 47, 0 of 76, 0 of 86, 0 of 106, 0 of 125 and 0 of 158 frozen rows moved — 598 rows, and the default bloom is 11,136 tris live and export alike at 543.8 KiB, before and after.'],
+  ['CONTINUOUS x 1 turn (the default, dissolved)', { placement: 'CONTINUOUS' }, 'THE DEFAULT BLOOM UNDER THE NEW VALUE — the whole-bloom before/after against the cell beside it. At one turn the sequence winds 0.875 of a turn inward, so CONTINUOUS is NOT the same object as SPIRAL even here: eight petals on eight rings rather than eight on one. Same 11,136 triangles.'],
+  ['CONTINUOUS x 2 turns', { placement: 'CONTINUOUS', layerCount: 2 }, 'Depth 2. `layerCount` is turns in this mode and the read-out says so; the law is the same one the layered arm uses, evaluated at a non-integer layer index.'],
+  ['CONTINUOUS x 3 turns', { placement: 'CONTINUOUS', layerCount: 3 }, 'Depth 3, the maximum. MAX_LAYERS still bounds the DEPTH — 24 rings here, not 24 layers — and the binding constraint is still the petal rather than the triangle count.'],
+  ['CONTINUOUS x 3 turns x shrink 0.90', { placement: 'CONTINUOUS', layerCount: 3, layerSize: 0.9 }, 'THE SHALLOWEST GRADIENT. The innermost blade is 25.58 mm against the outermost 35 — the sequence barely tapers, and the hub is only 2.5% smaller than the ringed equivalent. The 0.90 cap is the layered arm\'s measured coincidence bound and it carries over unchanged.'],
+  ['CONTINUOUS x 3 turns x shrink 0.35 (the deepest foot)', { placement: 'CONTINUOUS', layerCount: 3, layerSize: 0.35, petalCount: 40 }, 'THE EXTREME THIS SESSION\'S FAILURE MODES LIVE AT, and it is an AESTHETIC degeneracy rather than a topological one. The deepest reachable scale is 0.35^2.975 = 0.0440: a 1.54 mm blade on a foot floored at 1.60 mm — a blade narrower than its own root, which is the same condition that caps MAX_LAYERS at three. 67 of the 120 feet are at the floor and the read-out names the range. It stays watertight and one connected piece; it is a tab, not a petal. Photographed rather than capped, on the standing pattern.'],
+] ) continuous.push(await cell({ label, set: set(s2), views: ['whorl', 'plan'], note }));
 
 /* ---- 3. the extreme, photographed rather than capped ---- */
 console.log('the parked extreme:');
@@ -216,6 +286,17 @@ extremes.push(await cell({
   label: '135° EFFECTIVE TILT — petalTilt 75 x layerTilt 30',
   set: set({ layerCount: 3, petalTilt: 75, layerTilt: 30 }), views: ['profile', 'whorl'],
   note: 'RULED SHIP-AND-PHOTOGRAPH (Eva, Sep 1), on her own standing pattern for every extreme so far. The third whorl is at 135 degrees — past vertical, leaning back in over the centre, a state petalTilt (max 75) cannot reach alone. A blade sweeping into the hub adds no boundary edges and can only read as MORE connected; it is a shape decision, not a hazard. Exports watertight and as ONE piece — it is a named row in both gates. If it offends, capping layerTilt is one range change with this cell as its evidence.',
+}));
+extremes.push(await cell({
+  label: '161.25° EFFECTIVE TILT — CONTINUOUS x petalTilt 75 x tilt +30/turn',
+  set: set({ placement: 'CONTINUOUS', layerCount: 3, petalTilt: 75, layerTilt: 30 }), views: ['profile', 'whorl'],
+  note: 'A NEW EXTREME, past the 135-degree cell above and unreachable by any combination of the layered controls. Continuous accumulates the tilt gain over 2.975 TURNS rather than 2 layer steps, so it reaches 86.25 degrees of gain against the layered arm\'s 60. Same standing pattern applies — a blade sweeping back over the hub adds no boundary edges and can only read as MORE connected — so this ships photographed rather than capped, and it is a named row in both gates. Capping layerTilt is one range change with THIS cell as its evidence; do not cap it on the strength of the number.',
+}));
+extremes.push(await cell({
+  label: 'CONTINUOUS x 3 turns x ALL THIN x spread min — 120 rings at the worst corner',
+  set: set({ placement: 'CONTINUOUS', layerCount: 3, petalCount: 40, sheetThickness: 0.6, tipThinning: 0.8, footDelicacy: 0.25, spread: 0.6 }),
+  views: ['whorl', 'profile'],
+  note: `THE OVERLAP BOX AT 120 RINGS INSTEAD OF 3, and it is the SAME 1.50 x 1.60 x 1.00 mm = 2.400 mm³ — because none of overhang (1.5 mm absolute floor), width (FOOT_MIN_WIDTH_MM) or thickness (MIN_FEATURE_MM in export) is a function of the SLOT index any more than it was of the layer index. The innermost ring radius here is 0.206 mm, so the deepest feet run through the axis and out the other side; that is the same reachable design state spread-min has always had, not a new one. SCOPE: ${JUNCTION_SCOPE}`,
 }));
 extremes.push(await cell({
   label: '3 layers x ALL THIN x spread min — the junction\'s worst corner',
@@ -272,9 +353,12 @@ for (const [name, title, note, cells, which, perRow] of [
   ['arrangement-placement', 'The arrangement — radial against golden-angle placement',
    'PLAN VIEW FIRST, straight down the axis, because placement is an azimuth question and no other view answers it; the whorl view follows. The charter used to say "gate or flag golden-angle placement below eight petals". Measured: the gap ratio oscillates between 1.62 and 2.62 at EVERY count with no discontinuity at 8 or anywhere else, so there is no geometric threshold to gate on — low counts are ALLOWED and FLAGGED, and the flagged cells here are the state that claim is about. Gating was rejected on two further grounds: hiding the option would strand the model IN the spiral state with the control unreachable, and auto-resetting would move geometry as a side effect of a hidden rule.',
    pairs(placement, 'plan', 'whorl'), 'shot', 4],
-  ['arrangement-extremes', 'The arrangement — the parked extreme, and the junction\'s worst corner',
-   'Two cells, both shipped rather than capped, both photographed so the ruling is made with eyes open. The 135-degree effective tilt is a state petalTilt alone cannot reach (75 max) and it leans the innermost whorl back in over the centre; Eva ruled ship-and-photograph on her own standing pattern for extremes. The ALL THIN x spread min corner is where the junction argument is thinnest — and the overlap box is the SAME 1.50 x 1.60 x 1.00 mm on every layer, because none of its three dimensions is a function of the layer index. Both are named rows in both geometry gates and both export watertight and as one connected piece.',
-   pairs(extremes, 'profile', 'whorl'), 'shot', 2],
+  ['arrangement-continuous', 'The continuous spiral — Eva\'s config, ringed against continuous',
+   'THE HEADLINE PAIR IS THE FIRST TWO CELLS, and it is the whole brief: 40 petals, spread 1.55, three deep, tilt-stepped — the state Eva described as "still very distinct layers" — beside the same controls under the continuous law. Both carry 120 petals and 149,568 export triangles, so nothing in the comparison is bought with geometry; what changes is that the radius stops being a step function. RINGED: 117 of 119 steps between consecutive petals are exactly 0.0000 mm and 2 are 6.4209 mm (28.0% of the hub radius). CONTINUOUS: every step is 0.0658–0.1735 mm, about one percent of a petal width. The law is ONE law under two quantizers of the layer index — floor(k/petalCount) against k/petalCount — so `petalCount` is still petals per turn, `layerCount` still the depth, `layerSize` still the shrink per unit of depth, and nothing reinterprets. Rows three onward sweep the continuum\'s own axes and end at the deepest foot the ranges reach, which is where this session\'s failure modes live: an aesthetic degeneracy (a blade narrower than its own root), never a topological one.',
+   pairs([...headline, ...continuous], 'whorl', 'plan'), 'shot', 4],
+  ['arrangement-extremes', 'The arrangement — the parked extremes, and the junction\'s worst corners',
+   'Four cells, all shipped rather than capped, all photographed so the ruling is made with eyes open. The 135-degree effective tilt is a state petalTilt alone cannot reach (75 max); the 161.25-degree cell beside it is the continuous arm reaching further still, because it accumulates the same tilt gain over 2.975 turns rather than 2 layer steps — a NEW extreme this session introduces, and the one thing on this sheet that is not inherited. The two ALL THIN x spread min corners are where the junction argument is thinnest, at 3 rings and at 120: the overlap box is the SAME 1.50 x 1.60 x 1.00 mm = 2.400 mm³ in both, because none of its three dimensions is a function of the layer OR slot index. All four are named rows in both geometry gates and all four export watertight and as one connected piece.',
+   pairs(extremes, 'profile', 'whorl'), 'shot', 4],
 ]) {
   const p2 = await b2.newPage({ viewport: { width: perRow * (CELL + 10) + 30, height: 900 } });
   await p2.setContent(sheet(title, note, cells, which, perRow), { waitUntil: 'load' });
