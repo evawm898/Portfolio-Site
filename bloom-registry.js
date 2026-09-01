@@ -2,9 +2,13 @@
    bloom-registry.js — SINGLE SOURCE OF TRUTH for the Parametric Bloom control
    panel, from the very first control.
 
-   One row per control: id / kind / range / default / label / fmt / tier /
-   visibleWhen. bloom.js GENERATES the panel DOM from this array and derives
-   inputs, readUI, DEFAULTS, reset, labels and listeners from the same rows.
+   One row per control: id / section / kind / range / default / label / fmt /
+   tier / visibleWhen. bloom.js GENERATES the panel DOM from this array and
+   derives inputs, readUI, DEFAULTS, reset, labels and listeners from the same
+   rows. The panel's GROUPING is registry data too — `section` on each control
+   plus the SECTIONS array below (identity, order, first-load openness); see
+   that block for why membership sits on the control and never in a list of
+   ids here, and for why a section is not a role.
    There is deliberately NO hand-written control markup anywhere: the flower
    keeps its markup in flower.html and needs a sync gate (verify-registry-sync)
    to police drift between two representations; here the second representation
@@ -110,6 +114,131 @@ export function predicateDrivers(pred, out = new Set()) {
   return out;
 }
 
+/* ===================================================================
+   SECTIONS — the panel's grouping, declared here and NOWHERE ELSE.
+
+   WHY THIS EXISTS (Eva, Sep 1): "the panel is a lot to scroll through and
+   it's only going to become more — group it into sections before the
+   arrangement work adds its controls." Twenty controls in one flat column,
+   with layer and spiral controls still to come.
+
+   THE SPLIT OF OWNERSHIP, which is the whole design:
+     - MEMBERSHIP is a field on the CONTROL (`section: 'form'`), so a control
+       declares its own home exactly once, beside its id.
+     - IDENTITY, ORDER and FIRST-LOAD OPENNESS are this array, so a section
+       has exactly one definition of what it is called and where it sits.
+     - ORDER WITHIN A SECTION is the CONTROLS array's own order, filtered.
+       There is deliberately no per-control `order` field: the array is
+       already an order, and a second one would drift from it.
+   No list of ids lives here. A section that named its members would be the
+   registration rule broken in the file that exists to state it — two lists
+   to keep in sync, and the panel would silently drop whichever the edit
+   missed. verifySections() below turns the relation into a hard failure
+   instead of a hope.
+
+   SECTION IS NOT ROLE, and conflating them was the first thing this design
+   had to refuse. `role` says which part of the MODEL a control owns (petal /
+   arrangement / center; there is no 'junction' and never will be) and it is
+   load-bearing in the gates and the matrix builder — buildMatrix() skips
+   `role: 'center'` rows because they need a style. `section` says where a
+   control SITS IN THE PANEL. They answer different questions and they
+   genuinely disagree: `sheetThickness` is `role: 'petal'` because the
+   junction derives from the petal, and it sits in MATERIAL because it also
+   governs the hub slab and the centre floors. Deriving sections from roles
+   would have forced a re-role the registry's own header calls a
+   stop-and-raise, and would have produced one 14-control "Petal" section,
+   which is the problem rather than the fix.
+
+   `open` IS AN AUTHORED LITERAL — Eva's ruling, Sep 1 — NOT A DERIVED RULE.
+   Recorded because a rule WAS proposed and did not survive contact with the
+   ruling, and a later reader should find that rather than reconstruct it:
+   the proposal was "collapse a section iff every control in it is at an
+   identity default", which is exactly true of Petal form's four curves
+   (all 0, the flat short-circuit) and Material's three (all reproducing the
+   old constant). Eva collapsed CENTER as well, whose DISC / 0.75 / 0.35 are
+   authored aesthetic defaults and not identities, and moved Petal tilt
+   (default 25 degrees) into Petal form — so the rule is false of the panel
+   that shipped, twice over. It is not weakened here, it is gone: first-load
+   openness is taste, taste is a ruling, and a ruling is a literal. Do not
+   make `open` a predicate — that would put collapse state under `visibleWhen`
+   as a second hiding mechanism, and make the panel rearrange itself under
+   the user as they drag a slider.
+
+   COLLAPSE IS NOT HIDING, and the distinction is load-bearing for "shipped
+   means reachable". A collapsed section keeps every control in the DOM with
+   its value, its listeners and its read-out span; applyVisibility() is still
+   the only thing that hides a CONTROL. Measured rather than believed —
+   tools/verify-bloom-panel.mjs drives an input inside a collapsed section
+   through real events and asserts the readout and the geometry moved, and
+   asserts the app's whole state snapshot is identical collapsed and expanded.
+
+   ROOM TO GROW, stated so the next session does not reorganise this one:
+     - ARRANGEMENT is the home for the arrangement work. It ships with two
+       controls (`petalCount`, `spread`) precisely so it has room: of the
+       whorl primitive `(count, radius, height, sizeRamp, angleRamp, phase,
+       blade)` those two are count and radius, and height / sizeRamp /
+       angleRamp / phase are still derived. All four land here, as do
+       phyllotaxis and spiral placement. If multi-whorl arrives, the shape
+       that fits is a layer-count control in this section with per-layer
+       sub-controls gated on it by `visibleWhen` — the centerStyle pattern,
+       one level up — not a new section per layer.
+     - A STEM, LEAVES or A BASE ORNAMENT (`below` is `null` today, and the
+       parameter is 'stem' | 'branch' | null so a stem is a value rather than
+       a rewrite) would be a NEW section, because they are new parts, not a
+       stretch of an existing one.
+     - THE JUNCTION NEVER GETS A SECTION, for the same reason it never gets a
+       role: it is derived plumbing, sized from what feeds it, exposed
+       nowhere.
+
+   A SECTION IS NEVER GATED BY ITS OWN PREDICATE. Sections carry no
+   `visibleWhen`. A section is hidden when, and only when, every control in it
+   is hidden — derived by applyVisibility() from the same one state snapshot
+   that decided those controls, so it adds no declaration and cannot disagree
+   with one. No section can reach that state today (Center always shows
+   centerStyle). If one ever needs a condition of its own, that is a
+   stop-and-raise, not a field to add quietly.
+   =================================================================== */
+export const SECTIONS = [
+  { id: 'arrangement', label: 'Arrangement', open: true },
+  { id: 'shape', label: 'Petal shape', open: true },
+  { id: 'form', label: 'Petal form', open: false },
+  { id: 'center', label: 'Center', open: false },
+  { id: 'material', label: 'Material', open: false },
+];
+
+/* THE SECTION/CONTROL RELATION, checked at module load rather than trusted.
+   Throws, deliberately and loudly: a control naming a section that does not
+   exist would otherwise be appended to nothing and vanish from the panel
+   while every gate that sets values by id kept passing — a control that
+   builds, exports and cannot be reached is the "shipped means reachable"
+   defect exactly, and it would be introduced by a typo. Every importer gets
+   this for free (the app, both gates, every shot tool), so the check cannot
+   be the one thing a run forgot to do. The full render census — that each
+   control appears in the DOM exactly once, in the right section, in order —
+   needs a browser and lives in tools/verify-bloom-panel.mjs. */
+export function verifySections(controls = CONTROLS, sections = SECTIONS) {
+  const bad = [];
+  const ids = new Set();
+  for (const s of sections) {
+    if (ids.has(s.id)) bad.push(`duplicate section id "${s.id}"`);
+    ids.add(s.id);
+    if (typeof s.open !== 'boolean') bad.push(`section "${s.id}" must declare a literal boolean \`open\``);
+  }
+  const used = new Set();
+  for (const c of controls) {
+    if (!c.section) bad.push(`control "${c.id}" declares no section`);
+    else if (!ids.has(c.section)) bad.push(`control "${c.id}" names section "${c.section}", which is not in SECTIONS`);
+    else used.add(c.section);
+  }
+  /* An EMPTY section is a failure, not a tidy placeholder for later work: it
+     renders as a header that opens onto nothing, and the reason it is empty
+     is almost always that the controls meant for it name something else. */
+  for (const s of sections) if (!used.has(s.id)) bad.push(`section "${s.id}" has no controls`);
+  for (const id of RETIRED_IDS) if (controls.some((c) => c.id === id)) bad.push(`retired id "${id}" is a live control`);
+  if (bad.length) throw new Error(`bloom-registry: section declaration is broken:\n  - ${bad.join('\n  - ')}`);
+  return true;
+}
+
 /* THE CONTROLS.
 
    ROLE is a first-class field, not a comment. The flower project's junction
@@ -195,17 +324,14 @@ export function predicateDrivers(pred, out = new Set()) {
 const CENTER_ON = { id: 'centerStyle', oneOf: ['DOME', 'DISC', 'RING'] };
 
 export const CONTROLS = [
-  { id: 'petalCount', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
+  { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
     label: 'Petals', fmt: (v) => `${v}`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
-  { id: 'petalLength', kind: 'slider', min: 20, max: 60, step: 1, default: 35,
+  { id: 'petalLength', section: 'shape', kind: 'slider', min: 20, max: 60, step: 1, default: 35,
     label: 'Petal length', fmt: (v) => `${v} mm`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
-  { id: 'petalWidth', kind: 'slider', min: 8, max: 30, step: 1, default: 16,
+  { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 30, step: 1, default: 16,
     label: 'Petal width', fmt: (v) => `${v} mm`, tier: 'standard', role: 'petal',
-    visibleWhen: { all: [] } },
-  { id: 'petalTilt', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
-    label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 
   /* SILHOUETTE (Eva, Aug 31 — phase 3). All Standard: geometry and
@@ -241,12 +367,12 @@ export const CONTROLS = [
        - claw and cleft — architected, proven by non-shipping capability
          rows in both gates, exposed nowhere. Eva's ruling: rounded/ovate
          family only. */
-  { id: 'petalBaseTaper', kind: 'slider', min: 0.3, max: 3, step: 0.05, default: 1,
+  { id: 'petalBaseTaper', section: 'shape', kind: 'slider', min: 0.3, max: 3, step: 0.05, default: 1,
     label: 'Base taper', tier: 'standard', role: 'petal',
     fmt: (v) => `${Number(v).toFixed(2)}${Number(v) < 0.7 ? ' (broad base)' : Number(v) > 1.6 ? ' (narrow base)' : ''}`,
     visibleWhen: { all: [] } },
 
-  { id: 'petalTipTaper', kind: 'slider', min: 0.6, max: 4, step: 0.05, default: 1.8,
+  { id: 'petalTipTaper', section: 'shape', kind: 'slider', min: 0.6, max: 4, step: 0.05, default: 1.8,
     label: 'Tip taper', tier: 'standard', role: 'petal',
     /* Prints the DERIVED widest point. One owner: the geometry computes
        a/(a+b) from the same two values, and this read-out is the only place
@@ -258,7 +384,7 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'petalTipBreadth', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+  { id: 'petalTipBreadth', section: 'shape', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
     label: 'Tip breadth', tier: 'standard', role: 'petal',
     fmt: (v) => (Number(v) === 0 ? 'pointed' : `${(Number(v) * 100).toFixed(0)}% of width`),
     visibleWhen: { all: [] } },
@@ -295,7 +421,7 @@ export const CONTROLS = [
      flower's own gap analysis asked for reflex past 180. Nothing is below
      the bloom today (`below: null`), so the state is geometrically free.
      Reachable, never default. */
-  { id: 'petalCup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+  { id: 'petalCup', section: 'form', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
     label: 'Petal cup', tier: 'standard', role: 'petal',
     /* Prints the DERIVED edge lift in mm — the physical quantity — rather
        than the dimensionless amount alone. Cup is the only one of the four
@@ -310,7 +436,27 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'petalSpineCurl', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+  /* PETAL TILT SITS HERE, BESIDE SPINE CURL — Eva's ruling (Sep 1), and the
+     reason is the one the charter already states: `phi(u) = petalTilt +
+     curl*u`. They are the two terms of ONE affine angle function about the
+     same axis, which is exactly why they get conflated, and the panel is the
+     place that adjacency is visible. Tilt is the constant of integration (the
+     whole blade rotating rigidly, no radius); curl is the rate (and prints a
+     derived radius). This row MOVED in the array to achieve that adjacency —
+     it did not change one character otherwise, and the array's order is the
+     panel's order, so a second `order` field would be a second owner.
+
+     THE ALTERNATIVE THAT WAS PUT AND NOT TAKEN: tilt as `role: 'arrangement'`
+     in the Arrangement section, on the grounds that a per-slot rigid
+     orientation is the whorl's business. Recorded because it is a reasonable
+     reading and a later session should find the ruling rather than re-open it
+     from the code. `role` is UNCHANGED at 'petal' either way — see the ROLE
+     note above; a section is not a role. */
+  { id: 'petalTilt', section: 'form', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
+    label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
+    visibleWhen: { all: [] } },
+
+  { id: 'petalSpineCurl', section: 'form', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Spine curl', tier: 'standard', role: 'petal',
     /* Prints the DERIVED spine radius, which is the quantity that tells a
        bend apart from a tilt — Petal tilt above prints an angle and has no
@@ -325,7 +471,7 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'petalRoll', kind: 'slider', min: -330, max: 330, step: 5, default: 0,
+  { id: 'petalRoll', section: 'form', kind: 'slider', min: -330, max: 330, step: 5, default: 0,
     label: 'Cross-section roll', tier: 'standard', role: 'petal',
     /* Prints the achieved roll radius AND says when the curvature floor
        took over. Saturating silently would make a slider that stops doing
@@ -351,7 +497,7 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'petalTwist', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
+  { id: 'petalTwist', section: 'form', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
     label: 'Twist', tier: 'standard', role: 'petal',
     fmt: (v) => {
       const d = Number(v);
@@ -393,7 +539,7 @@ export const CONTROLS = [
      roll-clamp pattern. All three ranges reach past where a floor starts
      binding, on purpose, and every read-out says (CLAMPED) when it does, so
      a slider that has stopped moving the print does not read as broken. */
-  { id: 'sheetThickness', kind: 'slider', min: 0.6, max: 2.4, step: 0.05, default: 1.2,
+  { id: 'sheetThickness', section: 'material', kind: 'slider', min: 0.6, max: 2.4, step: 0.05, default: 1.2,
     label: 'Sheet thickness', tier: 'standard', role: 'petal',
     /* Prints the export floor's verdict, not only the authored value. Below
        1.00 mm the exported sheet is floored and the live view is showing
@@ -405,7 +551,7 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'tipThinning', kind: 'slider', min: 0, max: 0.8, step: 0.01, default: 0,
+  { id: 'tipThinning', section: 'material', kind: 'slider', min: 0, max: 0.8, step: 0.01, default: 0,
     label: 'Tip thinning', tier: 'standard', role: 'petal',
     /* Prints the DERIVED tip thickness in mm, live and printed, which is the
        physical quantity — the fraction alone cannot say where the floor
@@ -424,7 +570,7 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'footDelicacy', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 1,
+  { id: 'footDelicacy', section: 'material', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 1,
     label: 'Foot delicacy', tier: 'standard', role: 'petal',
     /* Prints the DERIVED foot cross-section in mm — the answer to "how thin
        can this connection get" is a pair of millimetres, not a multiplier.
@@ -450,12 +596,12 @@ export const CONTROLS = [
      180 mm dyed-PA12 cap, under standard white. The readout prints the max
      bounding dimension so that is visible at the slider, never a clamp: which
      process cap applies is the user's call at order time. */
-  { id: 'spread', kind: 'slider', min: 0.6, max: 6, step: 0.05, default: 2,
+  { id: 'spread', section: 'arrangement', kind: 'slider', min: 0.6, max: 6, step: 0.05, default: 2,
     label: 'Spread', fmt: (v) => `${Number(v).toFixed(2)}x`, tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [] } },
 
   /* CENTER — the A/B rig. */
-  { id: 'centerStyle', kind: 'choice', default: 'DISC',
+  { id: 'centerStyle', section: 'center', kind: 'choice', default: 'DISC',
     options: [
       { value: 'NONE', label: 'None' },
       { value: 'DOME', label: 'Dome' },
@@ -472,21 +618,25 @@ export const CONTROLS = [
      the hub disc, which is what makes centre-to-hub overlap a solid region of
      the centre's full footprint at every setting rather than a thin band that
      happens to be wider than a voxel. */
-  { id: 'centerSize', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 0.75,
+  { id: 'centerSize', section: 'center', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 0.75,
     label: 'Center size', fmt: (v) => `${(Number(v) * 100).toFixed(0)}% of ring`,
     tier: 'standard', role: 'center', visibleWhen: CENTER_ON },
 
-  { id: 'centerRise', kind: 'slider', min: 0.15, max: 1.2, step: 0.01, default: 0.6,
+  { id: 'centerRise', section: 'center', kind: 'slider', min: 0.15, max: 1.2, step: 0.01, default: 0.6,
     label: 'Dome rise', fmt: (v) => `${Number(v).toFixed(2)}x radius`,
     tier: 'standard', role: 'center', visibleWhen: { id: 'centerStyle', oneOf: ['DOME'] } },
 
-  { id: 'centerDish', kind: 'slider', min: 0, max: 0.9, step: 0.01, default: 0.35,
+  { id: 'centerDish', section: 'center', kind: 'slider', min: 0, max: 0.9, step: 0.01, default: 0.35,
     label: 'Disc dish', fmt: (v) => (Number(v) === 0 ? 'flat' : `${(Number(v) * 100).toFixed(0)}% dished`),
     tier: 'standard', role: 'center', visibleWhen: { id: 'centerStyle', oneOf: ['DISC'] } },
 
-  { id: 'centerBore', kind: 'slider', min: 0.2, max: 0.75, step: 0.01, default: 0.45,
+  { id: 'centerBore', section: 'center', kind: 'slider', min: 0.2, max: 0.75, step: 0.01, default: 0.45,
     label: 'Ring bore', fmt: (v) => `${(Number(v) * 100).toFixed(0)}% open`,
     tier: 'standard', role: 'center', visibleWhen: { id: 'centerStyle', oneOf: ['RING'] } },
 ];
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));
+
+/* Run the relation check at module load — see verifySections() above. */
+verifySections();
+

@@ -53,7 +53,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 
 /* The registry is the source of truth for ids and defaults; the harness reads
    it rather than keeping a second copy. */
-export const { CONTROLS, DEFAULTS, valuesEqual } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
+export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredicate, verifySections } =
+  await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
 
 /* The geometry module is read the same way, and for the same reason: the
    roll curvature floor the form assertions check must be the number the

@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import { CONTROLS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
+import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
@@ -25,6 +25,7 @@ const panelRoot = document.getElementById('panelControls');
 const inputs = {};   // id -> input element
 const valSpans = {}; // id -> read-out span
 const wrappers = {}; // id -> control wrapper div
+const sectionEls = {}; // section id -> <details>
 
 function makeInput(c) {
   if (c.kind === 'slider') {
@@ -45,6 +46,38 @@ function makeInput(c) {
   throw new Error(`unhandled control kind "${c.kind}" for ${c.id}`);
 }
 
+/* SECTIONS FIRST, in the registry's order, then each control into the section
+   IT declares. Two loops rather than one, because the section order and the
+   within-section order are different questions with different owners: the
+   SECTIONS array answers the first, the CONTROLS array's own order answers the
+   second. A control is appended to a section that must already exist —
+   verifySections() has thrown at module load if any control names one that
+   does not, so there is no silent-drop path to guard against here.
+
+   <details>/<summary> IS THE MECHANISM, and it is chosen for a property
+   rather than for being native: a control inside a CLOSED <details> keeps its
+   value, its listeners and its read-out span, answers getElementById, and
+   accepts a programmatic `.value` plus real input/change events — so collapse
+   cannot reach readUI, the gates' read-back, or the harness, which set values
+   exactly that way and never by clicking. Measured before it was built on,
+   and asserted every run by tools/verify-bloom-panel.mjs; the browser also
+   gives keyboard operation and open/close state for free, with no JS to hold
+   it and nothing to desync. */
+for (const s of SECTIONS) {
+  const det = document.createElement('details');
+  det.className = 'bl-sec';
+  det.id = `sec-${s.id}`;
+  det.dataset.section = s.id;
+  /* The FIRST-LOAD state, from the registry's literal. Never written again by
+     this file: once the page is up, open/close belongs to the visitor. */
+  det.open = s.open;
+  const sum = document.createElement('summary');
+  sum.textContent = s.label;
+  det.append(sum);
+  panelRoot.append(det);
+  sectionEls[s.id] = det;
+}
+
 for (const c of CONTROLS) {
   const wrap = document.createElement('div');
   wrap.className = 'bl-ctrl';
@@ -58,7 +91,7 @@ for (const c of CONTROLS) {
   input.id = c.id;
   input.value = c.default;
   wrap.append(label, input);
-  panelRoot.append(wrap);
+  sectionEls[c.section].append(wrap);
   inputs[c.id] = input; valSpans[c.id] = val; wrappers[c.id] = wrap;
 }
 
@@ -92,10 +125,24 @@ function refreshLabels(ui) {
 
 /* The ONLY setter of a control wrapper's hidden — evaluates the registry's
    predicate against one state snapshot, so every control is decided against
-   the same state. */
+   the same state.
+
+   A SECTION'S visibility is DERIVED here from the controls it holds, never
+   declared: a section is hidden when, and only when, every control in it is
+   hidden. That adds no second gating mechanism — the decision is made from
+   the same `ui` snapshot that decided those controls, so it cannot disagree
+   with one — and it means a section can never render as a header opening onto
+   nothing. No section reaches that state today (Center always shows
+   centerStyle), which is exactly why it is derived rather than predicted: the
+   rule is written once, here, instead of being a claim about today's
+   registry. Hiding a section is NOT collapsing it — `hidden` removes it; the
+   `open` attribute is the visitor's, and this function never touches it. */
 function applyVisibility() {
   const ui = readUI();
   for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);
+  for (const s of SECTIONS) {
+    sectionEls[s.id].hidden = CONTROLS.every((c) => c.section !== s.id || wrappers[c.id].hidden);
+  }
 }
 
 document.getElementById('resetBtn').addEventListener('click', () => {
