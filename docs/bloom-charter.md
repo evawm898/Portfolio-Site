@@ -945,3 +945,174 @@ any of them.
       pattern one level up — not a section per layer. A stem, leaves or a base ornament
       would be a NEW section, being new parts. **The junction never gets a section, for
       the same reason it never gets a role.**
+
+- ~~A continuous cross-layer spiral sequence, and a Vogel radius ramp — parked~~
+  **THE CONTINUOUS SPIRAL WAS BUILT Sep 1; VOGEL WAS NOT, and the two were never the
+  same proposal.** Eva's brief, verbatim: *"spiral is still very distinct layers, and I
+  don't know if it should be."* Her screenshot — 40 petals × 3 layers × spiral,
+  tilt-stepped — reads as three stacked rings wearing spiral azimuths, and what she was
+  reaching for is the sunflower / succulent construction: no rings, one sequence winding
+  inward, every petal at its own radius, size and tilt.
+
+    - **THE WHOLE LAW IS THAT THE LAYER INDEX STOPS BEING AN INTEGER.** Every per-layer
+      quantity in `footRing()` already IS a function of a layer index, so continuous mode
+      evaluates the same functions at a non-integer one:
+
+          RINGED      lambda_k = floor(k / petalCount)
+          CONTINUOUS  lambda_k = k / petalCount            k = 0 .. petalCount*layerCount - 1
+
+      **NOTHING REINTERPRETS AND NO LABEL LIES**, which was the constraint the design had
+      to satisfy before it was worth building. `petalCount` is petals per turn in both
+      modes (a ring IS a turn under the ringed arm), `layerCount` is how many turns,
+      `layerSize` is the shrink per turn, `layerTilt` the tilt gain per turn. So
+      continuous mode ships **no sub-controls of its own** — there is nothing left for
+      them to control — and that is the panel story, not an economy.
+
+    - **A THIRD VALUE, NOT A REPLACEMENT (Eva's ruling, Sep 1), and the deciding
+      measurement is that SPIRAL IS NOT A SUBSET OF CONTINUOUS AT ANY DEPTH.** At one
+      layer SPIRAL is n petals on ONE ring with uneven angular gaps — the state the
+      low-count legibility flag exists for — while CONTINUOUS winds 0.875 of a turn
+      inward on n rings. Replacing SPIRAL would have deleted a reachable, flagged,
+      11-gate-row state rather than upgrading one. The cost comparison was made with
+      numbers on the table: a third value lands as **ONE byte event** (nothing selects it,
+      so every pre-existing export is bit-identical), replacement as **two**, moving
+      exactly the 11 of 158 live rows that pin SPIRAL with all 440 older frozen rows
+      holding. And the calculus is asymmetric in TIME: retiring the SPIRAL *option value*
+      is free while nothing persists a design and becomes a schema bump plus a migration
+      the moment something does — so the ruling that stays available is the cheap one.
+      Eva can still kill the layered spiral from the sheet; she cannot un-kill it.
+
+    - **THE DEPTH IS EXTRAPOLATION, NOT INTERPOLATION (Eva, Sep 1, ruled from the
+      numbers), and it has a visible consequence recorded rather than discovered later.**
+      lambda runs to `layerCount - 1/petalCount`, so a continuous bloom winds a full
+      `layerCount` TURNS and reaches deeper than the innermost of `layerCount` stacked
+      rings, which are only `layerCount-1` turns apart. At her config the innermost blade
+      is **13.17 mm against the ringed 18.14 mm** and R0 is **7.5% smaller**. The
+      alternative — `lambda = k(L-1)/(K-1)`, matching ringed's extremes exactly and merely
+      dissolving between them — was costed and rejected because it breaks the label story:
+      `petalCount` would stop being petals-per-turn (59.5 per turn at that config) and
+      CONTINUOUS would collapse onto SPIRAL at layerCount 1. **Recorded, not stubbed.**
+
+    - **THE DISSOLUTION IS A NUMBER, and it is the acceptance evidence.** At Eva's config
+      the ringed radius is a STEP FUNCTION over the build order: **117 of the 119 steps
+      between consecutive petals are exactly 0.0000 mm and 2 are 6.4209 mm — 28.0% of the
+      hub radius in one jump.** Continuous: **every one of the 119 steps is between 0.0658
+      and 0.1735 mm**, 0.82% of R0 and about **one percent of a petal width**. Same 120
+      petals, same **149,568 export triangles**, same 7,303.2 KiB — the comparison is not
+      bought with geometry.
+
+    - **`footRing()` RETURNS `rings`, AND THE TWO ARMS ARE A BRANCH RATHER THAN A
+      REFORMULATION** — the precedent `buildWhorlInto`'s RADIAL arm set, applied one level
+      up. One descriptor per layer under the ringed arm, one per PETAL under the
+      continuous one. The ringed loop is untouched character for character, because
+      `SUM_L count*rFoot_L^2` and `SUM_k rFoot_k^2` are the same number in algebra and
+      **not the same double** — the `a*(b+c)` vs `a*b + a*c` trap that already fired on a
+      real row when layers were written. Rewriting the ringed sum "because it is the same
+      rule" would have moved every layered export for nothing. **What the area rule sums
+      is unchanged in DEFINITION**; only the grouping of equal terms differs.
+
+    - **CONTAINMENT AND THE OVERLAP BOX BOTH SURVIVE BY CONSTRUCTION, AND CONTAINMENT
+      GETS STRONGER.** `layerSize` maxes at 0.90 < 1 and lambda >= 0, so
+      `layerSize^lambda <= 1` for every REAL lambda rather than only for integers —
+      radius_k <= R0 at every slot, strictly decreasing, with `Math.pow(s, 0)` exactly 1
+      keeping `rings[0].radius === hub.radius` an EQUALITY. The overlap box does not
+      degrade for exactly the reason it did not degrade under layers: none of `overhang`
+      (1.5 mm absolute floor), `width` (`FOOT_MIN_WIDTH_MM`) or `thickness`
+      (`MIN_FEATURE_MM` in export) is a function of the slot index. **Measured at the
+      deepest reachable foot — 3 turns × ALL THIN × spread min × petalCount 40 ×
+      layerSize min, where the innermost ring radius is 0.206 mm — the box is
+      1.500 × 1.600 × 1.000 = 2.400 mm³, the SAME number as the single-ring and layered
+      corners.**
+
+    - **THE VOXEL GATE IS BLINDER HERE THAN IT WAS UNDER LAYERS — measured, and worse
+      than that, SO ARE J1–J4.** Consecutive foot annuli overlap by **3.154 mm** at Eva's
+      config (a 0.1735 mm radius step against an 8.486 mm overhang) against 1.981 mm at
+      three layers; a wrong hub leaves **57 of 120 slots** joined to nothing and the flood
+      fill still reports one region, chained through the 119 feet in between.
+      **AND THE MUTATION THIS SESSION IS ACTUALLY ABOUT PASSED EVERYTHING THAT EXISTED.**
+      The quantizer mutation — continuous mode silently building rings — exports
+      watertight, exports as ONE piece, has the IDENTICAL triangle count, and **passes
+      J1, J2, J3 and J4 on every row.** It even passes the multiples-of-*n* identity,
+      because `floor(m*n/n)` is `m`. The instrument as it stood could not observe the
+      thing the session was for, and that hole was found by checking the positive control
+      against the assertions BEFORE writing them rather than after.
+
+    - **SO THE LAYER SHIPPED TWO NEW ASSERTIONS, each catching what the other misses.**
+      **J5 — THERE ARE NO LAYERS:** under CONTINUOUS, radius and scale are strictly
+      decreasing across the whole sequence (no two consecutive slots share a ring) and
+      tiltExtra is non-decreasing, strictly increasing whenever it ends above 0. A
+      property of the arrangement, never a second copy of its law. **J6 — THE QUANTIZER
+      IDENTITY:** the continuous sequence passes EXACTLY through every ringed layer — at
+      `k = m*petalCount`, scale and tiltExtra equal ringed layer *m*'s to the bit.
+      Computed in `footRing()` on the `guardResidual` precedent (a gate restating
+      `Math.pow(layerSize, m)` would be a second copy of the ringed law inside the
+      instrument built to police it) and asserted as an **EQUALITY, not a bound**, because
+      `(m*n)/n` is exactly `m` in IEEE-754. A wrong-exponent law passes J5 and fires J6.
+      **The single-layer GUARD is now scoped to the ringed arm** — the pre-layer
+      expression describes no continuous design, since even a one-turn sequence has
+      `petalCount` different feet — and reports `null` there, never a passing 0.
+
+    - **J1 GAINED 40× THE COVERAGE FROM THE SAME EXPRESSION.** `petals` is one entry per
+      RING in both modes, and under CONTINUOUS a ring carries exactly one petal — so the
+      foot assertion goes from 3 frames per layer to 3 × petalCount × layerCount of them
+      (360 at Eva's config). Under the ringed arm slot 0 is representative because the
+      whorl shares a ring; under the continuous arm every foot is checked because every
+      foot is its own.
+
+    - **WHERE THE FLOORS BIND, AND WHAT BREAKS THERE IS TASTE, NOT TOPOLOGY.** The
+      foot-width floor now binds from a CROSSING INDEX onward rather than per layer, so
+      "which slots" became a real question and the read-out answers it with two numbers
+      (`FOOT WIDTH FLOORED at 1.60 mm on rings 53–119 (67 of 120)`) instead of a bare
+      "(CLAMPED)". **At the shipping defaults and at Eva's own config nothing is floored
+      at all** — the deepest foot is 2.409 mm. The extreme is `layerSize` min at three
+      turns: the deepest reachable scale is `0.35^2.975 = 0.0440`, **a 1.54 mm blade on a
+      1.60 mm floored foot — a blade narrower than its own root**, which is the same
+      condition that caps `MAX_LAYERS` at three. It stays watertight and one connected
+      piece. It is a tab, not a petal; photographed rather than capped, on the standing
+      pattern for extremes.
+
+    - **A NEW EXTREME THAT IS GENUINELY NEW: 161.25° EFFECTIVE TILT.** Continuous
+      accumulates the tilt gain over 2.975 turns rather than 2 layer steps, so
+      `petalTilt` 75 × `layerTilt` 30 reaches **86.25° of gain against the layered arm's
+      60** — past the 135° state the charter photographed, and unreachable by any
+      combination of the layered controls. Same standing pattern: ship it, photograph it,
+      name it in both gates. Capping `layerTilt` is one range change **with that cell as
+      its evidence**; do not cap it on the strength of this note.
+
+    - **`layerPhase` IS THE ONE CONTROL THE NEW MODE LEAVES WITHOUT A JOB, AND IT HIDES
+      RATHER THAN BEING REINTERPRETED.** It offsets successive whorls by a fraction of a
+      slot; a continuous bloom has one whorl, so `rings[k].phase` is exactly 0 at every
+      slot. Giving it a second meaning there — a global start azimuth, say — would be an
+      invisible rigid rotation under a label naming something else. Its `visibleWhen`
+      gains the term; nothing imperative. **PARKED, and deliberately not built on this
+      id: a DIVERGENCE ANGLE control** (golden angle against 1/3, 2/5, or free) is the
+      genuinely interesting phyllotaxis parameter this mode opens up, and `layerPhase` is
+      the worst available id to put it on — a saved slot fraction would feed straight
+      into an angle. It gets its own id and its own ruling.
+
+    - **"DEPTH", "SHRINK", "TILT STEP", AND "SPIRAL, LAYERED" (Eva, Sep 1).** A label
+      naming one of the two units lies in the other mode, so the LABEL names the axis and
+      the READ-OUT names the unit — the same split `placement` has carried since it
+      shipped. `layerPhase` KEEPS the word "layer" precisely because it only exists in the
+      mode where layers do. **No id moved**: an id is the expensive half of a rename (see
+      `RETIRED_IDS`), nothing persists a design yet, and `layerCount` is what the quantity
+      IS under both readings. One owner for the unit word — a `perDepth(ui)` helper — so
+      three read-outs cannot drift into three wordings.
+
+    - **A LATENT TRAP WAS CLOSED ON THE WAY PAST, and it is the more useful half of this
+      entry.** `LAYER_SUBS` matched `c.visibleWhen.id === 'layerCount'` — a SHAPE SNIFF,
+      correct only while every layer sub-control's predicate happened to be a bare leaf.
+      Giving `layerPhase` its second condition turned its predicate into an `all` node
+      with no `.id` at all, so the sniff would have silently stopped matching it, dropping
+      it OUT of the excluded set and INTO the blanket sweep — where a `layerPhase` row at
+      layerCount 1 builds the shipping default and reports a pass under a label naming a
+      control that did nothing. Exactly the defect the exclusion exists to prevent,
+      reintroduced by a registry edit two files away. It now derives from
+      `predicateDrivers`, which is the registry's own answer and cannot drift.
+
+    - **THE MATRIX GREW 158 → 180**, and `phase6Matrix()` — the 158 rows frozen at
+      c1886d0 — is the new baseline and now the strongest of the six, on the reasoning
+      that promoted phase5 and phase4 before it: it is the only one carrying the LAYER
+      corners and the SPIRAL count sweep, which is the region a placement change is most
+      likely to disturb. `--full` could not do the job at all here, since all 22 new rows
+      select an option value the old registry does not have.

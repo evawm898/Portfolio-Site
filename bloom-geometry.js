@@ -340,6 +340,12 @@ export function footRing(state, acc) {
   }
   const continuousMode = state.placement === 'CONTINUOUS';
   const n = Math.round(state.petalCount);
+  /* THE CONTINUOUS LAW ITSELF, as a closure, so the ring loop and the
+     quantizer cross-validation below evaluate the SAME expression. Written
+     inline in both places it would be two copies of the one thing this whole
+     layer is — and the cross-validation would then agree with a mutated loop
+     by mutating alongside it, which is a check that cannot fail. */
+  const lambdaAt = (k) => k / n;
   /* THE GOLDEN-ANGLE SEQUENCE'S LENGTH — one owner, because two consumers
      need it and neither may keep its own answer: buildBloomInto uses it as
      the slot count of the single continuous whorl, and the read-out's
@@ -394,7 +400,7 @@ export function footRing(state, acc) {
        r_foot^2 over every foot that feeds the hub. Only the grouping of equal
        terms differs. */
     for (let k = 0; k < sequenceLength; k++) {
-      const lambda = k / n;
+      const lambda = lambdaAt(k);
       const scale = Math.pow(state.layerSize, lambda);
       const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
       const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
@@ -526,12 +532,31 @@ export function footRing(state, acc) {
   let quantizerResiduals = null;
   if (continuousMode) {
     quantizerResiduals = [];
-    for (let m = 0; m < layerCount; m++) {
-      const r = rings[m * n];
+    /* ONE PAST THE END, and that bound is a POSITIVE-CONTROL FINDING rather
+       than a flourish. Checking only m < layerCount leaves layerCount 1 with
+       a single entry at m = 0, where every law agrees trivially — the
+       sequence stops at k = n-1, before its first multiple. A wrong-exponent
+       mutation was run against that and fired on the three-turn rows and NOT
+       on the one-turn row, so the assertion had a reachable blind spot at the
+       shipping depth. Evaluating the law at m = layerCount closes it: the law
+       is defined for every k, and "one more turn would land exactly on the
+       next ringed layer" is the same identity stated where the sequence can
+       still be asked about it.
+
+       INSIDE THE SEQUENCE IT READS THE RING THAT WAS ACTUALLY BUILT, not the
+       law again — otherwise a ring map that ignored `lambdaAt` would agree
+       with itself. Past the end there is no ring to read, so the law is
+       evaluated through the same closure the loop used. */
+    for (let m = 0; m <= layerCount; m++) {
+      const inSequence = m < layerCount;
+      const lam = inSequence ? null : lambdaAt(m * n);
+      const scale = inSequence ? rings[m * n].scale : Math.pow(state.layerSize, lam);
+      const tilt = inSequence ? rings[m * n].tiltExtra : lam * state.layerTilt;
       quantizerResiduals.push({
         m,
-        dScale: r.scale - Math.pow(state.layerSize, m),
-        dTilt: r.tiltExtra - m * state.layerTilt,
+        inSequence,
+        dScale: scale - Math.pow(state.layerSize, m),
+        dTilt: tilt - m * state.layerTilt,
       });
     }
   }

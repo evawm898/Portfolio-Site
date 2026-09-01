@@ -866,12 +866,19 @@ export async function junctionAssertions(page, row) {
      continuous law passes J5 and fires this. */
   const qr = m.quantizerResiduals;
   if (cont) {
-    if (!Array.isArray(qr) || qr.length !== m.layerCount) {
-      bad.push(`J6: a CONTINUOUS row reports quantizerResiduals ${JSON.stringify(qr)} — expected one entry per turn (${m.layerCount}); the continuum is not being cross-validated against the ringed law at all`);
+    /* ONE PER TURN PLUS ONE PAST THE END — see footRing()'s note. The extra
+       entry is what makes the identity checkable at layerCount 1, where the
+       sequence stops before its first multiple and every law agrees at m = 0.
+       Asserting the LENGTH is part of the assertion: an owner that quietly
+       went back to layerCount entries would take that coverage away in
+       silence. */
+    if (!Array.isArray(qr) || qr.length !== m.layerCount + 1) {
+      bad.push(`J6: a CONTINUOUS row reports quantizerResiduals ${JSON.stringify(qr)} — expected one entry per turn plus one past the end (${m.layerCount + 1}); the continuum is not being cross-validated against the ringed law at all`);
     } else {
       qr.forEach((q) => {
-        if (q.dScale !== 0) bad.push(`J6: at k = ${q.m} x petalCount the continuous scale differs from the ringed layer ${q.m}'s by ${q.dScale} — the two are meant to be ONE law under two quantizers, and this is an exact identity, not a tolerance`);
-        if (q.dTilt !== 0) bad.push(`J6: at k = ${q.m} x petalCount the continuous tiltExtra differs from the ringed layer ${q.m}'s by ${q.dTilt} — same identity, same exactness`);
+        const where = q.inSequence ? `at k = ${q.m} x petalCount` : `one turn past the end (m = ${q.m}, the law evaluated rather than a ring read)`;
+        if (q.dScale !== 0) bad.push(`J6: ${where} the continuous scale differs from the ringed layer ${q.m}'s by ${q.dScale} — the two are meant to be ONE law under two quantizers, and this is an exact identity, not a tolerance`);
+        if (q.dTilt !== 0) bad.push(`J6: ${where} the continuous tiltExtra differs from the ringed layer ${q.m}'s by ${q.dTilt} — same identity, same exactness`);
       });
     }
   } else if (qr !== null) {
