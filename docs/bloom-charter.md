@@ -1147,12 +1147,46 @@ any of them.
       two copies. M2 then fired on 5 of 7 rows instead of 4. **The gate that has never
       caught anything is a hope; this one caught a hole in itself before shipping.**
 
-    - **AN UNEXPLAINED INSTRUMENT ANOMALY, recorded rather than smoothed over.** M3 reported
-      67 failures on its first batch run, **0 on the second batch run**, and 67 on three
-      subsequent runs (two isolated, one batch). The mutation was present in the worktree
-      throughout, verified after the fact. No cause was found — Chromium's HTTP cache was
-      ruled out (a fresh browser and ephemeral context per process, random port per run),
-      and so was a write race (the mutation was applied minutes before that loop iteration).
-      It is reported because "run the same tree twice" cuts both ways: a control that
-      reports NOT FIRED once in five runs would, on a single run, have read as a passing
-      instrument. Anyone extending these mutations should run each more than once.
+    - **AN UNEXPLAINED INSTRUMENT ANOMALY — OPEN, and it cannot be closed by repetition.**
+      M3 reported 67 failures on its first batch run, **0 on the second batch run**, and 67
+      on three subsequent runs (two isolated, one batch). The mutation was present in the
+      worktree throughout, verified after the fact. No cause was found — Chromium's HTTP
+      cache was ruled out (a fresh browser and ephemeral context per process, a random port
+      per run) and so was a write race (the mutation was applied minutes before that loop
+      iteration). It is recorded because "run the same tree twice" cuts both ways: a
+      control that reports NOT FIRED once in five runs would, on a single run, have read as
+      a passing instrument.
+
+      **THIS IS THE FLOWER'S #88 SHAPE AND IT INHERITS #88'S RULE: ACCUMULATING CLEAN RUNS
+      CANNOT RETIRE IT.** Four agreeing runs are exactly what #88 had, and they are evidence
+      about the runs that agreed, not about the one that did not. Any number of further
+      green runs leaves this exactly where it is. **What would settle it is a DIFF OF A
+      DISAGREEING PAIR** — capture the app's own `rings` array (or the whole
+      `__bloomMetrics()` snapshot) on every run of the same seed and tree, keep them, and
+      when a pair disagrees compare them field by field to find whether the divergence is
+      in the geometry, in the metrics hook, or in the harness's read of it. Until such a
+      pair is captured and diffed, treat this as an open question about the INSTRUMENT, not
+      as a settled flake and not as a defect in the law: the shipped tree is green on every
+      run, and M1 and M2 have never once failed to fire.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 1): THE CONTINUOUS SPIRAL IS WHAT SHE WAS
+      REACHING FOR. MERGED.** This closes the brief the session was opened on —
+      *"spiral is still very distinct layers, and I don't know if it should be"* — and it
+      closes it with a measurement rather than with an impression, which is why the
+      headline pair was built the way it was: the same 40 petals × 3 deep at spread 1.55,
+      the same 120 petals and the same 149,568 export triangles on both sides, so the only
+      thing that could differ was the arrangement. **The evidence is that the radius stops
+      being a step function: 117 of 119 steps at exactly 0.0000 mm and two at 6.4209 mm
+      (28.0% of the hub radius in one jump) become 119 steps between 0.0658 and 0.1735 mm,
+      about one percent of a petal width.** The second half of her brief — "I don't know if
+      it should be" — was answered separately and deliberately NOT by this ruling: the
+      layered spiral survives as its own placement value, so ruling it out later remains a
+      fresh ruling needing fresh evidence rather than something this merge decided for her.
+
+    - **THE 161.25° EFFECTIVE TILT SHIPS AS PHOTOGRAPHED (Eva, Sep 1).** Ruled from the
+      extremes sheet on the same standing pattern as the 135° cell it supersedes in reach,
+      the max-roll faceting, the ROLL CLAMP look and the spread-6 plate: ship it,
+      photograph it, name it in both gates. **Capping `layerTilt` remains one range change
+      with that cell as its evidence** — available if it ever offends, and not to be
+      started on the strength of the number alone. Reopening it is a fresh ruling needing a
+      fresh picture, exactly as the max-combinator kink and the tip cap are.
