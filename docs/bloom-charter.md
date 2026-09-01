@@ -564,3 +564,98 @@ any of them.
   separate piece of work needing its own before/after evidence, and it only becomes real
   work if the plate turns out to be objectionable at spreads anyone would actually use.
   Do not start it on the strength of this note alone.
+
+- ~~The control panel as one flat column~~ **GROUPED INTO SECTIONS Sep 1, on Eva's
+  ruling: "the panel is a lot to scroll through and it's only going to become more —
+  group it into sections before the arrangement work adds its controls."** Twenty
+  controls in one column, with layer and spiral controls still to come. **Zero geometry
+  change, and that is the whole acceptance bar:** 0 of 47, 0 of 76, 0 of 86, 0 of 106
+  frozen rows and 0 of 125 live rows moved — 440 rows, every exported byte untouched,
+  against a worktree at a5cac8b with zero tracked modifications. Both geometry gates
+  125/125 in CI on the same head. The default bloom is 11,136 tris live and export alike
+  and 543.8 KiB of STL, before and after.
+
+    - **THE GROUPING IS REGISTRY DATA AT SECTION GRANULARITY, and the split of ownership
+      is the design.** Membership is a field on the CONTROL (`section: 'form'`);
+      identity, order and first-load openness are the `SECTIONS` array; order WITHIN a
+      section is the `CONTROLS` array's own order, filtered. No list of ids lives in
+      `SECTIONS` — a section naming its members would be two lists to keep in sync in
+      the file that exists to state the registration rule, and the panel would silently
+      drop whichever an edit missed. `verifySections()` runs at module load and throws,
+      so the app, both gates and every shot tool get the relation checked for free.
+
+    - **SECTION IS NOT ROLE, and refusing to conflate them was the first design
+      decision.** `role` says which part of the MODEL a control owns and is load-bearing
+      in `buildMatrix()`; `section` says where it sits in the panel. They genuinely
+      disagree — `sheetThickness` is `role: 'petal'` because the junction derives from
+      the petal, and sits in MATERIAL because it also governs the hub slab and the
+      centre floors. Deriving sections from roles would have forced the re-role this
+      registry's own header calls a stop-and-raise, and produced one 14-control "Petal"
+      section, which is the problem rather than the fix. **No role changed. Two
+      mismatches are FLAGGED and deliberately not acted on:** `petalCount` is
+      `role: 'petal'` while being the whorl's own count — literally the first parameter
+      of the whorl primitive — and `petalTilt` likewise while being a per-slot rigid
+      orientation. Both are reasonable readings awaiting a ruling; neither is a defect.
+
+    - **`open` IS AN AUTHORED LITERAL, AND THE RULE THAT WOULD HAVE DERIVED IT IS DEAD —
+      both halves recorded, because a rationale is a premise and only the instruction
+      binds.** The proposal was "collapse a section iff every control in it is at an
+      identity default", which is exactly true of the four form curves (all 0, the flat
+      short-circuit) and the three thickness controls (all reproducing the old constant).
+      Eva ruled Arrangement and Petal shape open and the other three collapsed — which
+      collapses CENTER, whose DISC / 0.75 / 0.35 are authored aesthetic defaults and not
+      identities — and moved Petal tilt (default 25°) into Petal form. The rule is false
+      of the panel that shipped, twice over, so it is gone rather than weakened. Do not
+      make `open` a predicate: that would put collapse under `visibleWhen` as a second
+      hiding mechanism and make the panel rearrange itself under the user mid-drag.
+
+    - **PETAL TILT SITS BESIDE SPINE CURL** (Eva), because `phi(u) = petalTilt + curl*u`
+      and the panel is where that adjacency is visible. One row moved in the `CONTROLS`
+      array and nothing else changed. The consequence was MEASURED rather than argued:
+      the live matrix's row SET is identical (125 = 125) and 10 rows change position,
+      which is inert because both runs of a byte report import the same matrix module
+      and `--compare` hard-fails on any label-sequence mismatch.
+
+    - **COLLAPSE IS PRESENTATION, ASSERTED RATHER THAN BELIEVED.** A control inside a
+      closed `<details>` keeps its value, listeners and read-out span, answers
+      `getElementById`, and takes a programmatic `.value` plus real input/change events —
+      which is exactly how every gate and the harness set controls, and never by
+      clicking. The whole-state snapshot is identical all-collapsed and all-expanded, and
+      toggling every section moves no geometry. **Sections carry no predicate of their
+      own:** `applyVisibility()` stays the only thing that hides a control and derives a
+      section's hidden state from the same snapshot — hidden iff every control in it is
+      hidden. A section needing its own condition is a stop-and-raise.
+
+    - **THE NEW GATE HAS TWO ROUTES because they catch different failures** —
+      `tools/verify-bloom-panel.mjs`, CI as `bloom-panel`. The DECLARATION route is a
+      render census (every non-retired control exactly once, in its declared section, in
+      registry order, one label and one read-out span, nothing in the panel the registry
+      does not declare, each wrapper's `hidden` agreeing with its own predicate). The
+      PATH route drives a control inside each collapsed section with real events and
+      requires the app to react. **Triangle count is deliberately NOT the path route's
+      witness:** the four form curves cost zero triangles by construction, so it would
+      have made that section's assertion a passing no-op. Each collapsed section names
+      its own witness instead — cup moves the metric ratio, the style moves the centre's
+      triangle count, the sheet moves the ring radius through the area rule — and the
+      witness table is checked against the registry so a later range change cannot leave
+      it quietly measuring nothing. `--negative-control` deletes a control's wrapper and
+      replaces another control with a listener-less clone (the flower's
+      declarations-right / app-doesn't-react defect, reproduced) and requires BOTH routes
+      to observe their own failure; it runs as its own CI step.
+
+    - **MEASURED EFFECT: 7 control rows and a 682 px panel at first load, against 18 rows
+      and 1,241 px fully expanded.** `tools/shot-bloom-panel.mjs` is the sheet — the
+      panel, not the canvas, so it never sets `body.bl-preview` (which hides it), and
+      every frame asserts it is not cropped, because a cropped panel is the one picture
+      that could carry a grouping ruling with the bottom of the list missing.
+
+    - **ROOM TO GROW, so the next session does not reorganise this one.** ARRANGEMENT is
+      the home for the arrangement work and ships with two controls precisely so it has
+      room: of the whorl primitive `(count, radius, height, sizeRamp, angleRamp, phase,
+      blade)`, `petalCount` and `spread` are count and radius, and the other four are
+      still derived — all of them land there, as do phyllotaxis and spiral placement. If
+      multi-whorl arrives, the shape that fits is a layer-count control in that section
+      with per-layer sub-controls gated on it by `visibleWhen` — the `centerStyle`
+      pattern one level up — not a section per layer. A stem, leaves or a base ornament
+      would be a NEW section, being new parts. **The junction never gets a section, for
+      the same reason it never gets a role.**
