@@ -18,7 +18,16 @@
    read-back assertions, never assumed from this file being correct.)
 
    Charter: docs/bloom-charter.md. Procedures: the flower-project skill.
+
+   THE ONE IMPORT, and why a file that had none now has one. `placement`'s
+   read-out prints the golden angle in degrees, and 137.51 is a number with an
+   owner (GOLDEN_ANGLE in bloom-geometry.js, written as pi*(3 - sqrt(5)) so
+   the constant IS its definition). Restating it here as a literal would be a
+   second owner of a number, which is this project's most repeated defect;
+   importing it cannot drift. bloom-geometry.js imports nothing at all, so no
+   cycle is possible in either direction.
    =================================================================== */
+import { GOLDEN_ANGLE } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
    Empty today, structurally present from day one: when the first control is
@@ -647,6 +656,113 @@ export const CONTROLS = [
   { id: 'spread', section: 'arrangement', kind: 'slider', min: 0.6, max: 6, step: 0.05, default: 2,
     label: 'Spread', fmt: (v) => `${Number(v).toFixed(2)}x`, tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [] } },
+
+  /* ===================================================================
+     PLACEMENT — where slot i sits around the axis. The whorl primitive's one
+     genuinely computed quantity, exposed as a choice (Sep 1).
+
+     SPIRAL MOVES AZIMUTH ONLY; every foot stays on its layer's ring, so the
+     junction argument is untouched by this control. A Vogel radius ramp
+     (petals crowding inward as r ~ sqrt(i)) is a different feature — a spiral
+     DISC — recorded in buildWhorlInto and deliberately not built.
+
+     LOW COUNTS ARE ALLOWED AND FLAGGED, NEVER GATED, and the reason is a
+     measurement rather than a preference. The charter used to say "gate or
+     flag golden-angle placement below n ~ 8"; the gap-ratio statistic
+     oscillates 1.62 / 2.62 at EVERY count with no discontinuity anywhere, so
+     there is no threshold to gate on (see GOLDEN_ANGLE in bloom-geometry.js).
+     Two further grounds, recorded so gating is not re-proposed: hiding the
+     option would strand the model IN the spiral state with the control
+     unreachable, and auto-resetting to RADIAL would move geometry as a side
+     effect of a hidden rule. The read-out labels it; the panel gate asserts
+     the label in both directions. */
+  { id: 'placement', section: 'arrangement', kind: 'choice', default: 'RADIAL',
+    options: [
+      { value: 'RADIAL', label: 'Radial (even)' },
+      { value: 'SPIRAL', label: 'Spiral (golden angle)' },
+    ],
+    label: 'Placement',
+    /* The read-out carries the derived consequence, not the value the select
+       already shows: the angular STEP each mode produces. It is what makes
+       the golden angle a number at the control rather than a word — and at
+       low counts it is where a visitor sees the step no longer divide the
+       circle. The legibility flag itself lives in the model read-out, where
+       the count it depends on also lives. */
+    fmt: (v, ui) => (v === 'SPIRAL'
+      ? `${((GOLDEN_ANGLE * 180) / Math.PI).toFixed(2)}° golden step`
+      : `${(360 / Number(ui.petalCount)).toFixed(1)}° even step`),
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { all: [] } },
+
+  /* ===================================================================
+     LAYERS — multiple whorls, the shape the registry predicted for this
+     (see ROOM TO GROW above): a layer-count control in THIS section with
+     per-layer sub-controls gated on it by `visibleWhen`, the centerStyle
+     pattern one level up. Not a section per layer.
+
+     Layers need NOTHING new in the arrangement primitive. Every per-layer
+     quantity is one of buildWhorlInto's existing arguments — count, radius,
+     height, sizeRamp, angleRamp, phase — which is what the full signature has
+     been carried for since session 1.
+
+     WHAT IS DERIVED, and why each answer is always the same:
+       height      0, for every layer, always. The ruling, and the one that
+                   owns the junction: see footRing()'s header. It is not a
+                   control and there is no stub for one.
+       count       shared. A per-layer count RATIO quantises (round(n*r^L)
+                   makes the slider jump), it makes "half a slot" ambiguous
+                   for layerPhase, and fewer-petals-inward reads almost
+                   exactly like smaller-petals-inward, which layerSize already
+                   gives. Recorded as an alternative, not built.
+       radius      R0 * layerSize^L, owned by footRing().
+     Max is MAX_LAYERS, asserted equal to it by the harness. The binding
+     constraint is the PETAL, not triangles — 3 layers x 40 petals is 10% of
+     the export budget; it is the blade shrinking that stops at three. */
+  { id: 'layerCount', section: 'arrangement', kind: 'slider', min: 1, max: 3, step: 1, default: 1,
+    label: 'Layers', fmt: (v) => `${v}`, tier: 'standard', role: 'arrangement',
+    visibleWhen: { all: [] } },
+
+  /* 0.35 – 0.90, and THE UPPER BOUND IS MEASURED, not tidy. At layerSize 1.00
+     with layerPhase 0 two whorls are exactly coincident and the export
+     carries 14,832 NON-MANIFOLD EDGES — duplicate geometry, this family's
+     known cause, the same defect that made the centre's flush base worth
+     dropping. At 0.95 and at 0.90 it is 0. Capping below 1.00 makes exact
+     coincidence unreachable rather than merely unlikely.
+     The lower bound is where the third layer stops being a petal: at 0.35 the
+     deepest blade is 4.3 mm and its foot is already floored by
+     FOOT_MIN_WIDTH_MM. Reachable, reported with (CLAMPED), not a defect. */
+  { id: 'layerSize', section: 'arrangement', kind: 'slider', min: 0.35, max: 0.9, step: 0.01, default: 0.72,
+    label: 'Layer size', fmt: (v) => `${Number(v).toFixed(2)}x per layer`, tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'layerCount', min: 2 } },
+
+  /* THE ALTERNATION, in slots. Default 0.50 — half a slot, which is the
+     botanically universal alternation of successive whorls. Eva's ruling
+     (Sep 1): EXPOSED, because asking for phase variations on the sheet is a
+     request to play with it; the derive-it argument survives as the DEFAULT
+     VALUE rather than as the absence of a control. */
+  { id: 'layerPhase', section: 'arrangement', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0.5,
+    label: 'Layer offset', fmt: (v) => `${Number(v).toFixed(2)} slot`, tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'layerCount', min: 2 } },
+
+  /* THE PRIMITIVE'S angleRamp, per layer — and the control that does the work
+     `height` was expected to do. Inner whorls stand more erect, which is what
+     makes a layered bloom read as depth: at layerSize 0.90 x this default the
+     inner whorl's tips sit 6.60 mm ABOVE the outer one's, with every foot
+     still flat at z = 0. That is 5.5x the 1.20 mm lift a height control could
+     reach before its feet left the hub slab.
+
+     THE EXTREME SHIPS PHOTOGRAPHED, NOT CAPPED (Eva, Sep 1). At petalTilt 75
+     x layerTilt 30 the third layer's effective tilt is 135 degrees and its
+     blades lean back in over the centre. That is past petalTilt's own 75
+     ceiling and is a state the tilt slider alone cannot reach. It is a shape
+     decision rather than a hazard — the charter's standing finding is that a
+     blade sweeping into the hub adds no boundary edges and can only read as
+     MORE connected — and it is on the arrangement sheet's own cell so the
+     ruling is made with eyes open. Capping is one range change with a picture
+     as its evidence; do not cap it on the strength of reading this note. */
+  { id: 'layerTilt', section: 'arrangement', kind: 'slider', min: 0, max: 30, step: 1, default: 12,
+    label: 'Layer tilt step', fmt: (v) => `+${v}° per layer`, tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'layerCount', min: 2 } },
 
   /* CENTER — the A/B rig. */
   { id: 'centerStyle', section: 'center', kind: 'choice', default: 'DISC',

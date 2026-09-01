@@ -130,12 +130,31 @@ What changes from the flower project:
 - **Vocabulary:** the four curve terms — cross-section roll, spine curl, petal cup,
   twist — govern the petal-shape phase directly. Never accept "curly" without asking
   which one.
-- **Arrangement facts worth having on day one:** phyllotaxis reads as intentional only
-  above roughly n≥8 — gate or flag golden-angle placement at low counts. Arrangement is
-  a whorl — `(count, radius, height, sizeRamp, angleRamp, phase, blade)` — and building
-  it as that primitive from the start makes sepals, epicalyx, and involucre free later
-  instead of a refactor (the flower learned this the expensive way, as a position paper
-  it never got to build).
+- **Arrangement facts worth having on day one:** ~~phyllotaxis reads as intentional only
+  above roughly n≥8 — gate or flag golden-angle placement at low counts.~~ **CORRECTED
+  Sep 1, when the arrangement was built: the aesthetic claim stands, "gate or flag" does
+  not, and there is no threshold to gate on.** The obvious statistic — the ratio of the
+  largest angular gap to the smallest — was measured across the whole count range and
+  OSCILLATES between 1.62 and 2.62 at *every* n, driven by which Fibonacci number the
+  count sits between: n=3 → 1.62, n=4 → 2.62, n=5 → 1.62, n=6,7 → 2.62, **n=8 → 1.62**,
+  n=13,21 → 1.62, n=40 → 2.62. It is scale-free. There is no discontinuity at 8 or
+  anywhere else, so a gate would have to invent its boundary. The claim that low-count
+  golden angle reads as an irregular whorl rather than as phyllotaxis is REAL and it is
+  AESTHETIC, so it ships as a **labelled read-out flag**, asserted in both directions by
+  the panel gate (present when it should be, ABSENT when it should not — a flag only ever
+  checked present is a flag that can be stuck on). Gating was rejected on two further
+  grounds, recorded so it is not re-proposed: hiding the option strands the model IN the
+  spiral state with the control unreachable ("shipped means reachable", violated for the
+  state the model is in), and auto-resetting to RADIAL moves geometry as a side effect of
+  a hidden rule. Same discipline as the roll clamp's "(clamped)" and the print-truth
+  line. The sub-8 state is on `tools/shot-bloom-arrangement.mjs`'s placement sheet beside
+  the same count in RADIAL, so the aesthetic claim gets ruled on from a picture.
+  Arrangement is a whorl — `(count, radius, height, sizeRamp, angleRamp, phase, blade)` —
+  and building it as that primitive from the start makes sepals, epicalyx, and involucre
+  free later instead of a refactor (the flower learned this the expensive way, as a
+  position paper it never got to build). **That prediction paid out in full: layers
+  needed NOTHING new in the primitive — every per-layer quantity is one of its existing
+  arguments.**
 
 ## Deliberately left behind
 
@@ -664,6 +683,186 @@ any of them.
       added later on the DOCUMENT still runs EARLIER than the panel's, so
       `stopPropagation()` there makes the accordion handler unreachable
       without touching it.
+
+- ~~The arrangement grows up: layers and spiral~~ **BUILT Sep 1. Five Standard controls,
+  all `role: 'arrangement'`, all in ARRANGEMENT — `placement` (RADIAL/SPIRAL),
+  `layerCount` (1–3, default 1), and three sub-controls gated on it by `visibleWhen`:
+  `layerSize` (0.35–0.90, default 0.72), `layerPhase` (0–1 slot, default 0.50),
+  `layerTilt` (0–30°, default +12).** Exactly the shape this charter's ROOM TO GROW note
+  predicted — a layer-count control in that section with per-layer sub-controls gated on
+  it, the `centerStyle` pattern one level up, not a section per layer. **Mirrored was
+  explicitly deferred and NOTHING was half-wired for it.**
+
+    - **LAYERS NEEDED NOTHING NEW IN THE WHORL PRIMITIVE, and that is the session's
+      cleanest finding.** Every per-layer quantity is one of `buildWhorlInto`'s existing
+      arguments: count (shared, derived), radius (derived), height (derived 0), sizeRamp
+      (`layerSize`), angleRamp (`layerTilt`), phase (`layerPhase`). The full signature
+      carried since session 1 is exactly what this needed. `placement` is the one thing
+      the primitive genuinely computes and is the only argument added.
+
+    - **HEIGHT IS NOT A CONTROL AND NEVER WILL BE — the trap this session owned, ruled on
+      a measurement.** A foot at z = h spans [h−t/2, h+t/2] against a hub slab spanning
+      [−t/2, +t/2], so solid overlap requires |h| < t: **1.20 mm at the shipping sheet,
+      0.60 ALL-THIN, against a 35 mm petal.** A height control constrained to keep feet in
+      the slab has a range nobody can see, and it CANNOT BE WIDENED because the bound is
+      the sheet itself — DEAD ≠ INVISIBLE says delete it, and "widen and re-test" is
+      unavailable. **Depth comes from TILT instead: inner whorls tilted steeper raise
+      their tips 6.60 mm above the outer whorl (layerSize 0.90 × layerTilt +12) with every
+      foot still flat at z = 0 — 5.5× what any safe height control could give.**
+      THE COSTED FALLBACK, recorded rather than re-derived: extending the junction to
+      REACH lifted feet (a derived collar spanning [0, h] under each inner ring), a second
+      junction primitive with its own watertightness argument and gate rows. It is NOT
+      built and there is NO STUB. **The only evidence that reopens it is Eva finding the
+      tilt-driven layering flat on `tools/shot-bloom-arrangement.mjs`'s layers sheet** —
+      which is why that sheet exists and why the ruling was made conditional on it.
+
+    - **BOTH SHIPPED GATES ARE BLIND TO THE JUNCTION UNDER LAYERS, and this is MEASURED,
+      not cautious. A GREEN CONNECTEDNESS RUN DOES NOT ENDORSE IT.** Two mutations were
+      run against the gate before the instrument was written:
+        * **THE WRONG HUB** — building the junction slab at the wrong layer's radius (min
+          over layers instead of the owner's R0). At the defaults with three layers the
+          outer whorl's feet end 7.94 mm out against a hub stopping at 6.86 mm: joined to
+          nothing. **The gate reports ONE region, 0.00% detached — it PASSES**, on all
+          five configurations tried. Consecutive foot annuli overlap EACH OTHER (layer 0's
+          feet span [7.94, 13.23], layer 1's [5.72, 9.53]), so the outer whorl hangs on by
+          a CHAIN through the inner layers, with blade interpenetration on top.
+          Connectedness under layers is OVER-DETERMINED and the flood fill cannot separate
+          a correct hub from an incorrect one.
+        * **THE LIFTED LAYER** — the junction derivation dies at |h| ≥ t = 1.20 mm and the
+          gate does not split until h ≥ 2.5 mm. **The band between is detached by
+          derivation and reads as one piece**, confirmed across eight scenarios; none
+          split before 2.0 mm.
+      So the arrangement layer shipped its own instrument, exactly as the form and
+      thickness layers each had to: **`junctionAssertions()` (J1–J4), in BOTH gates, on
+      EVERY row**, in exact arithmetic from the app's own metrics — J1 every layer's feet
+      in the hub plane carrying the ring's own cross-section, J2 containment, **J3 the
+      foot REACHES the hub disc (the wrong-hub mutation's only witness)**, J4 the overlap
+      box against its own floors plus hub thickness = foot thickness. The foot-frame
+      assertion MOVED here out of `formAssertions()`, where it only ever saw layer 0.
+
+    - **THE OVERLAP BOX DOES NOT DEGRADE WITH LAYERS.** None of `overhang` (1.5 mm
+      absolute floor), `width` (FOOT_MIN_WIDTH_MM) or `thickness` (MIN_FEATURE_MM in
+      export) is a function of the layer index, so the standing worst case — ≥1.5 × ≥1.6 ×
+      ≥1.0 mm — is the SAME bound per layer at any layerCount. Measured at ALL THIN ×
+      spread min × 3 layers: **2.40 mm³ on every layer**, exactly the single-ring number.
+      Containment is a CONSEQUENCE, not a clamp: `layerSize` maxes below 1, so
+      radius_L ≤ R0 and each foot's whole footprint lies inside the hub disc — strictly
+      stronger than the single-ring argument, where only layer 0's feet overlapped the rim.
+
+    - **`footRing()` RETURNS N RINGS PLUS THE HUB, and the layered return is the design.**
+      One call, one owner. A per-layer call satisfies "one owner" on its face and FAILS
+      "no per-layer consumer arithmetic": the hub radius and the area-rule total are
+      functions of every layer at once, so a consumer would have to sum them. R0 is now
+      the area rule over EVERY foot; radius_L = R0 · layerSize^L; hub.radius = R0, which
+      IS layers[0].radius rather than a `Math.max` that merely agrees with it.
+
+    - **THE 1-ULP TRAP FIRED ON A REAL ROW, so the guard is LOAD-BEARING rather than
+      insurance.** `Math.sqrt(count · rFoot²)` and `rFoot · Math.sqrt(count)` are the same
+      number in algebra and not the same double — the flower's `a*(b+c)` vs `a*b + a*c`
+      lesson, measured here before the guard was written: **8.88e-16 apart at the shipping
+      defaults (0.90 ULP, 4.4223251132330947 against …39) and 1.78e-15 at petalCount 40**,
+      exact at count 3, count 7, ALL THIN and sheet 2.40. So the guard is scoped to
+      exactly that one expression — everything else is identical without one (`scale` is
+      exactly 1, `x * 1 === x`, `radius_L` is `R0 * 1`), and a wider guard would be a
+      second copy of the layered law with a bug-shaped place to hide. **`guardResidual`
+      cannot be exactly 0 and both gates assert a BOUND (4 ULP relative), NOT a zero** —
+      unlike `formGuardResidual`, and stated so nobody "fixes" it to an equality. The
+      three components that ARE exact identity at one layer (scale, tiltExtra, phase) are
+      asserted separately as equalities, so the tolerance cannot cover a real leak in them.
+
+    - **`layerSize` CAPS AT 0.90, AND THE CAP IS MEASURED.** At 1.00 with `layerPhase` 0
+      two whorls are exactly coincident and the export carries **14,832 non-manifold
+      edges** — duplicate geometry, this family's known cause, the same defect that made
+      the centre's flush base worth dropping. At 0.95 and 0.90 it is **0**. The cap makes
+      exact coincidence unreachable rather than merely unlikely, and `LAYERS: 2 ×
+      layerSize max × layerPhase 0` is a named gate row that says the cap works.
+
+    - **MAX_LAYERS IS 3, AND THE BINDING CONSTRAINT IS THE PETAL, NOT TRIANGLES** — which
+      was not the prediction. Three layers at petalCount 40 is 149,568 export triangles,
+      **10% of the 1.5 M budget**, so a cap justified by triangle count would have been a
+      made-up number. What binds is the blade shrinking by `layerSize` per layer: the
+      third is an 18.1 mm blade at the shipping ratio, a fourth would be 13.0 mm, and at
+      `layerSize` ≤ 0.50 the deepest foot hits FOOT_MIN_WIDTH_MM and becomes a floored
+      stub narrower than its own root. Raising it is a range change plus gate rows.
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS: 0 of 47, 0 of 76, 0 of 86, 0 of 106 and 0 of 125
+      frozen rows moved** — 440 rows across four baselines plus the new fifth. Both
+      geometry gates 158/158. The default bloom is **11,136 tris live and export alike**,
+      unchanged, and the five new controls add ZERO triangles at layerCount 1.
+      **`phase5Matrix()` — the 125 rows frozen at deacded — is the new baseline and now
+      the strongest of the five**, on the same reasoning that made phase4 strongest of
+      three: it is the only one carrying the thickness layer's own corners and the tip
+      cap's partition. It was GENERATED from deacded's own `buildMatrix()` rather than
+      transcribed, and `--verify-frozen --phase5` proves it deep-equal, in CI.
+
+    - **ONE ROW-SET CHANGE WAS DECLARED BEFORE THE RUN, AND THE RUN SHOWED IT WAS NOT A
+      BYTE MOVE AT ALL — recorded because the prediction was wrong and the correction is
+      the useful part.** `ALL MAX` sweeps every non-centre slider to its maximum, which
+      now means three layers, so it was declared in advance that those four rows would
+      move, to be reported by `--partition-value` on the resolved `layerCount`. What
+      actually happens is cleaner: the FROZEN phase5 rows keep deacded's definition and
+      pin no `layerCount`, so they inherit the default 1 and are **bit-identical**; only
+      the LIVE matrix's row DEFINITION grew, which is added coverage with no `before` to
+      compare against. So the honest total is 0 moved everywhere, and "ALL MAX now means
+      three layers" is a coverage note, not a partition. The general lesson stands and is
+      why the declaration was made anyway: a frozen matrix pins only what existed at its
+      commit, so a corner row's MEANING can grow in the live matrix while its frozen twin
+      stays fixed — the two are different rows sharing a label.
+      The layer SUB-controls are excluded from that sweep and from the blanket min/max
+      sweep, under the centre rig's rule one level up: a `layerSize` row at layerCount 1
+      builds the default and measures nothing while printing a label saying it did.
+
+    - **THE MATRIX GREW 125 → 158**, including twelve named layered corners: max layers
+      against spread min, ALL THIN, petalCount 3 and 40, `layerSize` min, ALL FORM MAX,
+      SPIRAL, the coincidence corner, the 135°-effective corner, ALL MIN, and — on the
+      lesson that cost the flower a seven-piece bloom — **the layered BARE bloom**, since
+      DISC is the default and a layered centre-off state is exercised by nothing unless it
+      is written down.
+
+    - **`MAX_VOXELS` RAISED 90M → 160M, because this change made it bind.** `ALL MAX ×
+      DOME max` went from 403×403×239 (38.8 M, measured) to 605×605×360 (131.8 M,
+      SKIPPED). A row that used to be measured and is now skipped is coverage lost to a
+      change, and a skip is never a pass — so the ceiling moved rather than the row going
+      quiet. Sized against the matrix, not picked: 131.8 M is the largest of all 158 rows
+      and the next largest is 32.9 M. Cost, measured: 8.6 s and 397 MB RSS on that row
+      against a 345 s whole-gate run.
+
+    - **THE PANEL GATE GAINED A FOURTH ROUTE, and it closes a gap that predates this
+      work.** The census evaluates every predicate at DEFAULTS only — ONE DIRECTION — so a
+      control gated on `layerCount >= 2` would pass while never appearing at all, and so
+      would `centerRise`, gated on DOME since the centre rig shipped and never once
+      asserted to APPEAR. The visibility-transition route drives each driver (derived from
+      the registry, never listed) through the real UI to every value that changes the
+      dependent set and re-checks EVERY control's `hidden` against its own predicate at
+      the new state. It covers the centre's four sub-controls for free. A fifth route
+      asserts the low-count spiral flag in both directions. `--negative-control` now
+      requires all four routes to fire and does.
+
+    - **THE POSITIVE CONTROL, red then green.** The mutation is the height control this
+      session ruled out — `height: 0` → `index * 3.0 mm`, in a throwaway worktree, never a
+      switch that ships (the `PANEL_OVERLAP_ROWS` precedent). Mutated: 3 layers exports in
+      **2 components**, petalCount 3 in **7 components**, with boundary edges **0
+      throughout** — watertight and in pieces at the same time, which is exactly why
+      connectedness is a separate gate — and `junctionAssertions()` fires 6 times. Shipped
+      tree: one component, clean, on the same rows. **J1 fires at the first millimetre;
+      the voxel gate only at 2.5 mm**, which is the blind band above, made concrete.
+
+    - **PARKED, recorded with their reasons, deliberately not built and not stubbed:** a
+      per-layer COUNT RATIO (quantises — `round(n·r^L)` makes the slider jump; makes "half
+      a slot" ambiguous; reads almost exactly like `layerSize`); a CONTINUOUS CROSS-LAYER
+      spiral sequence (`index = L·count + i`, the more phyllotactic reading — each layer
+      runs its own sequence today); and a VOGEL RADIUS RAMP (`r ∝ √i`, a spiral *disc*
+      rather than a spiral whorl, with its own evidence needs). **MIRRORED remains
+      deferred to its own design conversation and nothing here anticipates it.**
+
+    - **THE 135°-EFFECTIVE TILT SHIPS PHOTOGRAPHED, NOT CAPPED (Eva, Sep 1).** petalTilt
+      75 × layerTilt 30 puts the third whorl past vertical, leaning back in over the
+      centre — a state `petalTilt` (max 75) cannot reach alone. Ruled on Eva's own
+      standing pattern for extremes (max-roll faceting, the spread-6 plate, the ROLL CLAMP
+      look): ship it and photograph it. It is a named row in both gates, exports
+      watertight and as one piece, and has its own cell on the extremes sheet. Capping
+      `layerTilt` is one range change **with that cell as its evidence**; do not cap it on
+      the strength of this note.
 
     - **PARKED, and deliberately not work: if the sections outgrow the
       accordion, the flower's VERTICAL TAB RAIL is the form Eva likes.** A

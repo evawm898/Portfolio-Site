@@ -48,7 +48,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -92,6 +92,16 @@ for (const row of rows) {
      sheet is still spanned by a hub built at the same thickness). */
   const thk = await thicknessAssertions(page, row);
   if (thk.length) { validity.push(`${row.label}: ${thk.join('; ')}`); continue; }
+  /* THE JUNCTION ASSERTIONS, on EVERY row, and THIS GATE CANNOT SUBSTITUTE
+     FOR THEM — measured, not supposed. Building the hub at the wrong layer's
+     radius leaves the outer whorl joined to nothing and this gate reports ONE
+     region, 0% detached, on all five configurations it was tried on: the foot
+     annuli overlap each other, so connectedness under layers is
+     over-determined. A lifted layer is detached by derivation at 1.20 mm and
+     does not split the flood fill until roughly 2.5 mm. J1-J4 carry what the
+     bytes cannot show. */
+  const jct = await junctionAssertions(page, row);
+  if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
@@ -150,6 +160,7 @@ for (const r of results) {
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
 console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
+console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 
 let bad = false;
 if (validity.length) {

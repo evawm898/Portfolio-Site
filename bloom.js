@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, SPIRAL_LEGIBLE_COUNT } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -257,9 +257,13 @@ resize();
 const readout = document.getElementById('readout');
 let liveSummary = '';
 
-let lastRing = { radius: 0, derivedRadius: 0 };
+let lastRing = { radius: 0, derivedRadius: 0 };   // layer 0 — what every pre-layer consumer read
+let lastRings = [];                               // every layer, in build order
+let lastHub = { radius: 0, thickness: 0 };
+let lastFoot = { guardResidual: null, layerCount: 1 };
 let lastCenter = { style: 'NONE', tris: 0 };
-let lastPetal = null;
+let lastPetal = null;                             // layer 0's petal — likewise
+let lastPetals = [];
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
@@ -276,11 +280,19 @@ let capability = null;
 function buildGeometry({ exportMode }) {
   const acc = new MeshBuilder({ exportMode });
   const built = buildBloomInto(acc, readUI(), { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
-  if (!exportMode) { lastRing = built.ring; lastCenter = built.center; lastPetal = built.petal; lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm; }
+  if (!exportMode) {
+    lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
+    lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals;
+    lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
   geo.computeVertexNormals();
-  return { geo, acc };
+  /* `built` is returned as well as cached, so the export path can summarise
+     the geometry IT built rather than reading the live cache — the two are
+     different geometry whenever a floor binds, and a summary that mixes them
+     is the unlabelled-mode defect this file's every other number avoids. */
+  return { geo, acc, built };
 }
 
 /* The readout's one-line summary. Every number carries its MODE, because live
@@ -317,8 +329,12 @@ function buildGeometry({ exportMode }) {
    re-deriving a radius: two throwaway accumulators differing only in mode,
    emitting no triangles. The one owner answers both. */
 function materialLines(ui) {
-  const live = footRing(ui, new MeshBuilder({ exportMode: false }));
-  const printed = footRing(ui, new MeshBuilder({ exportMode: true }));
+  /* Layer 0's ring — the outer whorl, which is the ring this line has always
+     reported and the one the hub is built on (hub.radius IS layers[0].radius).
+     The inner layers' radii are on the arrangement line, where the layer
+     count that produced them is also visible. */
+  const live = footRing(ui, new MeshBuilder({ exportMode: false })).layers[0];
+  const printed = footRing(ui, new MeshBuilder({ exportMode: true })).layers[0];
   const say = (r) => {
     const tip = thicknessProfile(r, ui).at(1);
     const tipShown = r === printed ? Math.max(tip, MIN_FEATURE_MM) : tip;
@@ -330,22 +346,55 @@ function materialLines(ui) {
   return a === b ? a : `${a}   ← live\nPRINTED (export floor ${MIN_FEATURE_MM.toFixed(2)} mm): ${b}`;
 }
 
-function summarise(ui, acc, mode) {
+/* THE LOW-COUNT SPIRAL FLAG — the whole of how phyllotaxis below eight petals
+   is handled, and it is a LABEL rather than a gate on purpose.
+
+   The charter used to say "gate or flag golden-angle placement at low counts".
+   Measured Sep 1 (see GOLDEN_ANGLE in bloom-geometry.js): the obvious
+   statistic, the ratio of largest to smallest angular gap, oscillates between
+   1.62 and 2.62 at EVERY count and has no discontinuity at 8 or anywhere
+   else. There is no geometric threshold to gate on. The rule is a real
+   AESTHETIC claim — below roughly eight petals the golden angle reads as an
+   irregular whorl rather than as a spiral — and the honest handling of an
+   aesthetic claim is to say so where the user is looking.
+
+   Gating was considered and rejected on two further grounds, recorded so it
+   is not re-proposed: hiding the option would leave the model IN the spiral
+   state with the control unreachable ("shipped means reachable", violated for
+   the state the model is in), and auto-resetting to RADIAL would move
+   geometry as a side effect of a hidden rule. Same discipline as the roll
+   clamp's "(clamped)" and the print-truth line: an unlabelled state is the
+   lie, a labelled one is honest.
+
+   ASSERTED IN BOTH DIRECTIONS by the panel gate — it must appear when the
+   condition holds and must be absent when it does not. A flag nothing checks
+   for absence is a flag that can be stuck on. */
+function spiralLowCount(ui) {
+  return ui.placement === 'SPIRAL' && Number(ui.petalCount) < SPIRAL_LEGIBLE_COUNT;
+}
+
+function summarise(ui, acc, mode, rings) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
+  const layers = Number(ui.layerCount);
   /* The capability appears in the readout for the same reason every other
      value does: the contact sheet and the gates assert the app REACTED
      through the real UI route, and a state they cannot see in the readout is
-     a state they cannot confirm was built. */
-  return `petals ${ui.petalCount} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
+     a state they cannot confirm was built. Layers and placement are here for
+     that same reason, and the layer RADII are printed because they are
+     derived — a number the user cannot set is a number the user should be
+     able to read. */
+  return `petals ${ui.petalCount} · ${ui.placement.toLowerCase()} · layers ${layers} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
+       + (layers > 1 ? `layer rings (${mode}) ${rings.map((r) => r.radius.toFixed(2)).join(' / ')} mm\n` : '')
+       + (spiralLowCount(ui) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} PETALS: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
 
 function regenerate() {
   const ui = readUI();
   refreshLabels(ui);
-  const { geo, acc } = buildGeometry({ exportMode: false });
+  const { geo, acc, built } = buildGeometry({ exportMode: false });
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
   else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
   /* The bounding SPHERE is the framing quantity (the accumulator's bounding
@@ -356,7 +405,7 @@ function regenerate() {
   geo.computeBoundingSphere();
   lastFitRadius = geo.boundingSphere.radius;
   if (!userMoved) fitCamera(lastFitRadius);
-  liveSummary = summarise(ui, acc, 'live') + `\n${materialLines(ui)}`;
+  liveSummary = summarise(ui, acc, 'live', built.rings) + `\n${materialLines(ui)}`;
   readout.textContent = liveSummary;
 }
 
@@ -376,7 +425,7 @@ for (const c of CONTROLS) {
 /* ---------------- STL export ---------------- */
 document.getElementById('exportStl').addEventListener('click', () => {
   const ui = readUI();
-  const { geo, acc } = buildGeometry({ exportMode: true });
+  const { geo, acc, built } = buildGeometry({ exportMode: true });
   const exportTris = acc.triangleCount;   // the accumulator owns the count, in both modes
   if (exportTris > EXPORT_TRI_BUDGET) {
     geo.dispose();
@@ -394,9 +443,16 @@ document.getElementById('exportStl').addEventListener('click', () => {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   /* Both counts, both LABELLED — live and export modes are not convertible
-     (the export floor changes geometry), so one word never covers both. */
+     (the export floor changes geometry), so one word never covers both.
+
+     THE LAST LINE, not line [1]. summarise() emits a variable number of lines
+     now (the layer radii and the low-count spiral flag are conditional), and
+     an index into a variable-length list is a bug waiting for the first
+     multi-layer export — it would have printed the ring radii under the word
+     "exported". The tris/max-dim line is always last, so ask for that. */
+  const exportLines = summarise(ui, acc, 'export', built.rings).split('\n');
   readout.textContent = `${liveSummary}\n`
-    + `exported bloom.stl · ${summarise(ui, acc, 'export').split('\n')[1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
+    + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
 
 /* Contact-sheet hooks (see the note beside __bloomUIState). __bloomFrame sets
@@ -465,6 +521,41 @@ window.__bloomMetrics = () => ({
   ringAuthoredWidth: lastRing.authoredWidth,
   ringWidthClamped: lastRing.widthClamped,
   ringThicknessFloorBinds: lastRing.thicknessFloorBinds,
+  /* THE ARRANGEMENT, PER LAYER — what junctionAssertions() reads. Every one
+     of these is footRing()'s OWN answer, exposed rather than re-derived, for
+     the same reason ringWidth/ringThickness were: a gate keeping its own copy
+     of a boundary is this project's most repeated defect, and it would arrive
+     here inside the instrument built to catch it.
+
+     WHY THIS EXISTS AT ALL — and it is a derivation, not a hedge. The voxel
+     gate CANNOT police the junction under layers, measured Sep 1: building
+     the hub at the WRONG layer's radius (min instead of max) leaves the outer
+     whorl's feet ending 7.94 mm out against a hub that stops at 6.86 mm —
+     detached from the hub by construction — and the gate reports ONE region,
+     0% detached. Consecutive foot annuli overlap each other, so the outer
+     whorl is held on by a CHAIN through the inner layers. Connectedness at
+     multi-layer is over-determined and the gate cannot tell a correct hub
+     from an incorrect one. J3 below is the assertion that can. */
+  hubRadius: lastHub.radius,
+  hubThickness: lastHub.thickness,
+  ringLayers: lastRings.map((r) => ({
+    index: r.index, radius: r.radius, derivedRadius: r.derivedRadius,
+    width: r.width, thickness: r.thickness,
+    overhang: r.overhang, scale: r.scale, phase: r.phase, tiltExtra: r.tiltExtra,
+    authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
+  })),
+  /* Every layer's foot rows as EMITTED — J1's input. The pre-layer hook
+     exposed slot 0 of the one whorl; reporting only that would have silently
+     meant "layer 0" and left every inner whorl's feet unasserted, which is
+     precisely the region this session added. */
+  petalLayerFootFrames: lastPetals.map((p) => (p ? p.footFrames : null)),
+  /* The guard's cross-validation residual (footRing's header): the layered
+     area-rule law measured against the pre-layer expression on every
+     single-layer build. null above one layer, where there is no guard law to
+     compare against — a claim nothing can make is reported absent, never as a
+     passing 0. */
+  ringGuardResidual: lastFoot.guardResidual,
+  layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to
      the form layer: thickness is pure vertex offset on a fixed-topology

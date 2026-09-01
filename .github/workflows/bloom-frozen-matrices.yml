@@ -20,6 +20,7 @@ on:
   pull_request:
     paths:
       - bloom-registry.js
+      - bloom-geometry.js
       - tools/bloom-harness.mjs
       - tools/diff-bloom-bytes.mjs
       - .github/workflows/bloom-frozen-matrices.yml
@@ -27,6 +28,7 @@ on:
     branches: [main]
     paths:
       - bloom-registry.js
+      - bloom-geometry.js
       - tools/bloom-harness.mjs
       - tools/diff-bloom-bytes.mjs
   workflow_dispatch: {}

@@ -53,14 +53,14 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
 
 /* The registry is the source of truth for ids and defaults; the harness reads
    it rather than keeping a second copy. */
-export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredicate, verifySections } =
+export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredicate, predicateDrivers, verifySections } =
   await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
 
 /* The geometry module is read the same way, and for the same reason: the
    roll curvature floor the form assertions check must be the number the
    builder actually clamps to. A second copy here would let the gate endorse
    a wall the geometry does not build. */
-export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 
 /* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
    name for the default sheet thickness and the registry carries a literal
@@ -70,6 +70,26 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
    green results about a design nobody characterised. */
 if (DEFAULTS.sheetThickness !== SHEET_THICKNESS_MM) {
   throw new Error(`registry default sheetThickness ${DEFAULTS.sheetThickness} !== SHEET_THICKNESS_MM ${SHEET_THICKNESS_MM} — the constant and the control have drifted`);
+}
+
+/* THE SAME MOVE FOR LAYERS, and the failure it prevents is worse than a
+   drifted number. `footRing()` THROWS on a layerCount outside 1..MAX_LAYERS,
+   so a registry max ABOVE the constant makes the top of a shipped slider
+   crash the build; a max BELOW it silently strands geometry the builder can
+   make and nothing can reach ("shipped means reachable"). One of the two is
+   the owner — MAX_LAYERS, because the builder is what the bound is about —
+   and this is what stops the other becoming a second one. Checked at module
+   load, so the app, both gates and every shot tool get it for free rather
+   than one run remembering to look. */
+const LAYER_COUNT_CONTROL = CONTROLS.find((c) => c.id === 'layerCount');
+if (!LAYER_COUNT_CONTROL) {
+  throw new Error('the registry declares no `layerCount` control — the arrangement matrix and junctionAssertions both read it');
+}
+if (LAYER_COUNT_CONTROL.max !== MAX_LAYERS) {
+  throw new Error(`registry layerCount.max ${LAYER_COUNT_CONTROL.max} !== MAX_LAYERS ${MAX_LAYERS} — the slider and the builder's own bound have drifted`);
+}
+if (LAYER_COUNT_CONTROL.min !== 1) {
+  throw new Error(`registry layerCount.min ${LAYER_COUNT_CONTROL.min} !== 1 — one whorl is the byte-identical default and the guard's only case`);
 }
 
 /* The four curves. Named once, read by formAssertions and by the matrix's
@@ -415,33 +435,15 @@ export async function formAssertions(page, row) {
   if (wantsForm && !m.petalForm) bad.push('form row reports NO form telemetry — the guard short-circuited a row that sets a curve');
   if (!wantsForm && m.petalForm) bad.push('flat row reports form telemetry — the guard did not short-circuit');
 
-  /* FOOT INVARIANCE, in EXACT arithmetic, and deliberately NOT by
-     re-deriving footRing()'s radius or overhang here — a gate keeping its
-     own copy of a boundary is this project's most repeated defect. These
-     are the three properties a form leak breaks: curl rotates the normal
-     and lifts the centre off the hub plane, twist rotates the width
-     direction. Slot 0 sits at azimuth 0, so its ring tangent is +y. */
-  const ff = m.petalFootFrames;
-  if (!Array.isArray(ff) || ff.length !== 3) bad.push(`foot frames: expected 3 rows, got ${JSON.stringify(ff && ff.length)}`);
-  else ff.forEach((f, i) => {
-    if (!(f.N[0] === 0 && f.N[1] === 0 && f.N[2] === 1)) bad.push(`foot row ${i}: normal ${JSON.stringify(f.N)} is not exactly the hub plane's [0,0,1] — a curve reached the foot`);
-    if (!(f.T[0] === 0 && f.T[1] === 1 && f.T[2] === 0)) bad.push(`foot row ${i}: width direction ${JSON.stringify(f.T)} is not exactly the ring tangent [0,1,0] — a twist reached the foot`);
-    if (f.C[2] !== 0) bad.push(`foot row ${i}: centre z = ${f.C[2]}, not exactly 0 — the foot left the hub plane`);
-    /* THE CROSS-SECTION, AGAINST EXPECTED-FROM-STATE. Until the thickness
-       layer the foot's dimensions were fixed, so an assertion could have
-       carried a number; with `sheetThickness` and `footDelicacy` the expected
-       foot DERIVES FROM STATE, and a gate re-deriving it would be a second
-       copy of footRing() — this project's most repeated defect, arriving in
-       the instrument built to catch it. So the comparison is against
-       footRing()'s OWN answer, read back from the app: the emitted foot must
-       BE the ring's cross-section, whatever state produced it. Exact
-       arithmetic, because both sides are literally the same double: the
-       builder reads ring.width and ring.thickness rather than computing
-       anything. Weakening this to a tolerance would let exactly the leak it
-       exists to catch through. */
-    if (f.h !== m.ringWidth / 2) bad.push(`foot row ${i}: half-width ${f.h} is not footRing()'s ring.width/2 = ${m.ringWidth / 2} — something reached the foot by a second path`);
-    if (f.t !== m.ringThickness) bad.push(`foot row ${i}: thickness ${f.t} is not footRing()'s ring.thickness = ${m.ringThickness} — a thickness gradient reached the foot`);
-  });
+  /* FOOT INVARIANCE MOVED OUT OF HERE (Sep 1) — it is now J1 in
+     junctionAssertions(), which runs on EVERY LAYER rather than on slot 0 of
+     one whorl. The properties and the reasoning are unchanged (curl rotates
+     the normal and lifts the centre off the hub plane; twist rotates the
+     width direction; the cross-section is compared against footRing()'s own
+     answer, never a re-derivation) — what changed is that "the foot" stopped
+     being one ring. Leaving a copy here would have been a second owner of the
+     same assertion, and the layer-0-only version would have kept passing
+     while every inner whorl went unchecked. */
 
   if (!m.petalForm) {
     const g = m.petalGuardResidual;
@@ -586,6 +588,185 @@ export async function thicknessAssertions(page, row) {
   return bad;
 }
 
+/* ===================================================================
+   JUNCTION ASSERTIONS — the instrument the LAYER work had to build, and the
+   only thing in this repository that can police the junction under layers.
+
+   WHY IT EXISTS IS A MEASUREMENT, NOT A HEDGE. Both shipped STL gates were
+   tested against the failure this session can cause, before this was written:
+
+     THE WRONG-HUB MUTATION — building the hub at the WRONG layer's radius
+     (min over layers instead of the owner's R0). At the defaults with three
+     layers the outer whorl's feet end 7.94 mm out against a hub that stops at
+     6.86 mm: DETACHED FROM THE HUB BY CONSTRUCTION. The connectedness gate
+     reports ONE region, 0.00% detached — it PASSES. It passes because
+     consecutive foot annuli overlap EACH OTHER (layer 0's feet span
+     [7.94, 13.23], layer 1's span [5.72, 9.53]), so the outer whorl is held
+     on by a CHAIN through the inner layers, and blades interpenetrate on top
+     of that. Connectedness under layers is OVER-DETERMINED: the gate cannot
+     tell a correct hub from an incorrect one. Measured across five
+     configurations (2 and 3 layers, layerSize max, ALL THIN x spread min,
+     petalCount 40) — all five pass while wrong.
+
+     THE LIFTED-LAYER MUTATION — feet lifted off the hub plane. The junction
+     derivation dies at |h| >= t = 1.20 mm (the foot's z-span stops meeting
+     the hub slab's). The gate does not fire until h >= 2.5 mm, so there is a
+     BLIND BAND, roughly 1.2–2.5 mm, in which the model is detached by
+     derivation and reads as one piece. Confirmed across eight scenarios
+     (layerSize 0.40 and 0.75, tilt step 0 and +10, phase aligned and
+     alternating, ALL THIN, petalCount 3): every one detaches eventually,
+     none before 2.0 mm.
+
+   SO: A GREEN CONNECTEDNESS RUN DOES NOT ENDORSE THE JUNCTION UNDER LAYERS.
+   It endorses what it measures — that the exported bytes form one body — and
+   that is a weaker statement than the invariant here. These assertions carry
+   the rest, in exact arithmetic, from the app's own metrics rather than from
+   the STL, and both gates run them on every row.
+
+     J1  every layer's feet are IN the hub plane and carry the ring's own
+         cross-section (the pre-layer foot assertion, extended to N rings)
+     J2  every layer's ring radius <= the hub radius        (containment)
+     J3  every layer's foot REACHES the hub disc            (the wrong-hub
+         mutation's only witness — radius - overhang < hub radius)
+     J4  the overlap box's three dimensions against their own floors, and
+         the hub built at the same thickness as the feet
+
+   Plus the single-layer GUARD's cross-validation, which is a BOUND and not a
+   zero, and the three placement components that ARE exactly 0/1 — asserted
+   separately so the bound cannot hide a real leak in them.
+
+   Like formAssertions and thicknessAssertions these read the APP'S OWN
+   evaluation, not the STL, and that scope is printed beside every result.
+   =================================================================== */
+export const JUNCTION_SCOPE =
+  "junction claims read footRing()'s own per-layer answer and the emitted foot frames, NOT the STL; a green connectedness run does not endorse them (the wrong-hub mutation passes it, measured)";
+
+/* The guard residual is a difference of two square roots that are the same
+   number in algebra and not in IEEE-754 (`a*(b+c)` vs `a*b + a*c`, firing on
+   a real row). Measured worst case at the shipping ranges: 8.88e-16 absolute
+   on the default, 0.90 ULP relative. The bound is 4 ULP of the radius — wide
+   enough that rounding cannot fail it, far too tight for any real leak, and
+   it is RELATIVE because the radius spans 0.57 mm to 26.5 mm. */
+const GUARD_ULPS = 4;
+
+export async function junctionAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const bad = [];
+  const layers = m.ringLayers;
+  const hub = { radius: m.hubRadius, thickness: m.hubThickness };
+
+  if (!Array.isArray(layers) || layers.length < 1) {
+    bad.push(`ringLayers is ${JSON.stringify(layers)} — the junction cannot be checked`);
+    return bad;
+  }
+  if (layers.length !== m.layerCount) {
+    bad.push(`footRing() returned ${layers.length} layers but reports layerCount ${m.layerCount} — the owner disagrees with itself`);
+  }
+  if (layers.length > MAX_LAYERS) bad.push(`${layers.length} layers exceeds MAX_LAYERS ${MAX_LAYERS}`);
+
+  /* J4a — THE HUB IS BUILT AT THE FEET'S OWN THICKNESS. The charter's overlap
+     derivation uses min(footT, hubT) and then says the two are EQUAL by
+     construction; this is what makes that a measurement. */
+  if (hub.thickness !== m.ringThickness) {
+    bad.push(`J4: hub thickness ${hub.thickness} is not the foot's ${m.ringThickness} — the overlap's vertical extent is no longer min(footT, hubT) = t by construction`);
+  }
+
+  const frames = m.petalLayerFootFrames;
+  if (!Array.isArray(frames) || frames.length !== layers.length) {
+    bad.push(`J1: expected foot frames for ${layers.length} layers, got ${JSON.stringify(frames && frames.length)}`);
+  }
+
+  layers.forEach((r, L) => {
+    /* J2 — CONTAINMENT. Exact, not toleranced: layerSize < 1 makes
+       radius_L <= R0 a consequence of the model, and the hub radius IS
+       layers[0].radius, so at L = 0 these are literally the same double. A
+       tolerance here would admit the very drift the exactness proves absent. */
+    if (!(r.radius <= hub.radius)) {
+      bad.push(`J2: layer ${L} ring radius ${r.radius} exceeds the hub radius ${hub.radius} — its feet land outside the disc that is supposed to span them`);
+    }
+    if (L === 0 && r.radius !== hub.radius) {
+      bad.push(`J2: layer 0 radius ${r.radius} is not the hub radius ${hub.radius} — they are one quantity and something has produced a second`);
+    }
+    /* J3 — THE FOOT REACHES THE HUB. THIS IS THE ONE THE VOXEL GATE CANNOT
+       MAKE. Feet land ON their ring and run INWARD by overhang, so the foot
+       overlaps the hub disc iff its inner edge is inside the disc. Under the
+       wrong-hub mutation this is the assertion that fires, and it fires on
+       the layer that is actually detached rather than on a component count
+       that never moves. Strict: an inner edge exactly ON the rim is a
+       hairline touch, not the solid annulus the invariant is built on. */
+    const innerEdge = r.radius - r.overhang;
+    if (!(innerEdge < hub.radius)) {
+      bad.push(`J3: layer ${L}'s foot runs inward only to ${innerEdge.toFixed(4)} mm, which is not inside the hub disc of ${hub.radius.toFixed(4)} mm — this layer is joined to nothing (note: the connectedness gate PASSES this state, see JUNCTION_SCOPE)`);
+    }
+    /* J4b — THE OVERLAP BOX. Each dimension against its own floor, none of
+       which is a function of the layer index — which is exactly why the
+       charter's >=1.5 x >=1.6 x >=1.0 mm worst case survives layers. */
+    if (!(r.overhang >= 1.5 - 1e-12)) bad.push(`J4: layer ${L} overhang ${r.overhang} is below the 1.5 mm absolute floor`);
+    if (!(r.width >= FOOT_MIN_WIDTH_MM - 1e-12)) bad.push(`J4: layer ${L} foot width ${r.width} is below FOOT_MIN_WIDTH_MM ${FOOT_MIN_WIDTH_MM}`);
+
+    /* J1 — THE FEET ARE IN THE HUB PLANE, per layer. Moved here from
+       formAssertions, where it only ever saw layer 0. Slot 0 of every layer
+       sits at its own azimuth: RADIAL layer L starts at phase = L*layerPhase
+       slots, so the ring tangent is NOT +y except where the phase is 0, and
+       asserting [0,1,0] on every layer would have been a gate asserting a
+       coincidence of the defaults. What is invariant is the RELATION: the
+       width direction is perpendicular to the radial direction and lies in
+       the hub plane, and the normal is the plane's own. */
+    const ff = frames && frames[L];
+    if (!Array.isArray(ff) || ff.length !== 3) {
+      bad.push(`J1: layer ${L} foot frames: expected 3 rows, got ${JSON.stringify(ff && ff.length)}`);
+      return;
+    }
+    ff.forEach((f, i) => {
+      if (!(f.N[0] === 0 && f.N[1] === 0 && f.N[2] === 1)) bad.push(`J1: layer ${L} foot row ${i}: normal ${JSON.stringify(f.N)} is not exactly the hub plane's [0,0,1] — a curve reached the foot`);
+      if (f.T[2] !== 0) bad.push(`J1: layer ${L} foot row ${i}: width direction ${JSON.stringify(f.T)} leaves the hub plane — a twist reached the foot`);
+      /* THE RULING, ASSERTED: every foot of every layer sits at z = 0
+         exactly. This is the whole of why no height control exists — a
+         non-zero z here is the lifted-layer failure, and it is caught at the
+         FIRST millimetre rather than at 2.5 mm where the voxel gate would
+         eventually notice. */
+      if (f.C[2] !== 0) bad.push(`J1: layer ${L} foot row ${i}: centre z = ${f.C[2]}, not exactly 0 — the foot left the hub plane (the junction derivation dies at |z| >= t = ${m.ringThickness}; the connectedness gate does not fire until roughly 2.5 mm)`);
+      /* THE CROSS-SECTION, AGAINST EXPECTED-FROM-STATE — compared against
+         footRing()'s OWN per-layer answer, never a re-derivation here. Exact,
+         because both sides are literally the same double: the builder reads
+         ring.width and ring.thickness rather than computing anything. */
+      if (f.h !== r.width / 2) bad.push(`J1: layer ${L} foot row ${i}: half-width ${f.h} is not footRing()'s width/2 = ${r.width / 2} — something reached the foot by a second path`);
+      if (f.t !== r.thickness) bad.push(`J1: layer ${L} foot row ${i}: thickness ${f.t} is not footRing()'s ${r.thickness} — a thickness gradient reached the foot`);
+    });
+  });
+
+  /* THE PLACEMENT COMPONENTS THAT ARE EXACTLY IDENTITY AT ONE LAYER, asserted
+     on their own rather than folded into the residual bound. Math.pow(x, 0)
+     is exactly 1, `0 * layerTilt` is +0 over layerTilt's range, and
+     `(0 * layerPhase * TAU) / count` is +0 — so byte-identity for scale, tilt
+     and phase is structural and an EQUALITY is the honest assertion. Only the
+     area-rule radius needs a tolerance, and keeping the two apart is what
+     stops the tolerance covering for a leak in the other three. */
+  if (m.layerCount === 1) {
+    const r0 = layers[0];
+    if (r0.scale !== 1) bad.push(`guard: layerCount 1 but layer 0 scale is ${r0.scale}, not exactly 1`);
+    if (r0.tiltExtra !== 0) bad.push(`guard: layerCount 1 but layer 0 tiltExtra is ${r0.tiltExtra}, not exactly 0`);
+    if (r0.phase !== 0) bad.push(`guard: layerCount 1 but layer 0 phase is ${r0.phase}, not exactly 0`);
+
+    const g = m.ringGuardResidual;
+    if (typeof g !== 'number') {
+      bad.push(`guard: single-layer row reports residual ${JSON.stringify(g)} — the guard is not being cross-validated`);
+    } else {
+      const bound = GUARD_ULPS * Number.EPSILON * Math.abs(r0.derivedRadius);
+      if (!(g <= bound)) {
+        bad.push(`guard: area-rule residual ${g.toExponential(3)} exceeds ${GUARD_ULPS} ULP (${bound.toExponential(3)}) — the layered law and the pre-layer expression have genuinely diverged, not merely rounded`);
+      }
+    }
+  } else if (m.ringGuardResidual !== null) {
+    /* Above one layer there IS no guard law, so a number here would be a
+       claim nothing can support — the "null that renders like a value" defect
+       this project has already been bitten by. */
+    bad.push(`guard: layerCount ${m.layerCount} reports a residual ${m.ringGuardResidual} — there is no single-layer guard law to compare against at this count`);
+  }
+
+  return bad;
+}
+
 /* THE EXPORT FLOOR, asserted through the REAL export path. The live build
    never floors — floorThickness() is a no-op outside export mode — so no
    live metric can answer "did the print stay above the minimum feature". The
@@ -648,6 +829,29 @@ function subControlsFor(style) {
 const SLIDERS = () => CONTROLS.filter((c) => c.kind === 'slider');
 const SHARED_CENTER = () => CONTROLS.filter((c) => c.id === 'centerSize');
 
+/* THE LAYER SUB-CONTROLS — the same rule `subControlsFor(style)` applies to
+   the centre, one level up, and derived from the registry's own predicates
+   rather than hand-listed for the same reason: a new gated control must not
+   be addable without the matrix noticing.
+
+   WHY THEY ARE EXCLUDED FROM THE BLANKET SWEEP. `layerSize` at layerCount 1
+   builds no second layer and measures NOTHING while printing a label saying
+   it did — exactly the defect the centre rig's "a sub-control row carries the
+   style that enables it" rule exists to prevent. They are swept under
+   layerCount 3 in block 7 instead.
+
+   `layerCount` ITSELF IS NOT EXCLUDED, and that has a pre-declared
+   consequence: ALL MAX sets every non-centre slider to its maximum, which now
+   means three layers, so those four rows legitimately MOVE. That is the
+   matrix's own definition of "ALL MAX" growing, not a default moving — no
+   default moves — and it is reported by `--partition-value` on the resolved
+   layerCount rather than explained afterwards. */
+const LAYER_SUBS = () => CONTROLS.filter((c) => c.visibleWhen && c.visibleWhen.id === 'layerCount');
+const LAYER_SUB_IDS = () => new Set(LAYER_SUBS().map((c) => c.id));
+/* Every non-centre, non-layer-gated slider — the set the blanket sweep and
+   the ALL MIN / ALL MAX corners are entitled to move. */
+const SWEEPABLE = () => SLIDERS().filter((c) => c.role !== 'center' && !LAYER_SUB_IDS().has(c.id));
+
 export function buildMatrix() {
   const rows = [{ label: 'DEFAULT (the shipping configuration)', set: [] }];
 
@@ -658,6 +862,7 @@ export function buildMatrix() {
   for (const c of SLIDERS()) {
     if (c.id === 'petalCount') continue;                 // swept exhaustively above
     if (c.role === 'center') continue;                   // needs a style; see block 3
+    if (LAYER_SUB_IDS().has(c.id)) continue;             // needs layerCount >= 2; see block 7
     rows.push({ label: `${c.id} min (${c.min})`, set: [{ id: c.id, value: String(c.min) }] });
     rows.push({ label: `${c.id} max (${c.max})`, set: [{ id: c.id, value: String(c.max) }] });
   }
@@ -722,7 +927,7 @@ export function buildMatrix() {
     rows.push({
       label: `ALL ${tag} (centre off)`,
       set: [
-        ...SLIDERS().filter((c) => c.role !== 'center').map((c) => ({ id: c.id, value: String(c[k]) })),
+        ...SWEEPABLE().map((c) => ({ id: c.id, value: String(c[k]) })),
         { id: 'centerStyle', value: 'NONE' },
       ],
     });
@@ -732,7 +937,7 @@ export function buildMatrix() {
       rows.push({
         label: `ALL ${tag} × ${style} ${k}`,
         set: [
-          ...SLIDERS().filter((c) => c.role !== 'center').map((c) => ({ id: c.id, value: String(c[k]) })),
+          ...SWEEPABLE().map((c) => ({ id: c.id, value: String(c[k]) })),
           { id: 'centerStyle', value: style },
           ...[...SHARED_CENTER(), ...subControlsFor(style)].map((c) => ({ id: c.id, value: String(c[k]) })),
         ],
@@ -871,6 +1076,88 @@ export function buildMatrix() {
   rows.push({ label: 'CAPABILITY: cleft x all thin', capability: CAPABILITY_CLEFT,
     set: Object.entries(ALL_THIN).map(([id, value]) => ({ id, value: String(value) })) });
 
+  /* 7. PLACEMENT. A CHOICE row is also the kind test (same reason the centre
+        styles are), and SPIRAL is swept across the count range because the
+        thing it changes IS the count-to-azimuth map — a single spiral row at
+        the default would sample one point of the only axis this control has.
+
+        THE SUB-8 ROWS ARE COVERAGE OF THE FLAGGED REGION, not of a defect.
+        Low-count spiral is a shipping state, allowed and labelled; it is in
+        the matrix because it is reachable, and because "the flag is on" must
+        not be allowed to mean "the geometry went unmeasured". */
+  for (const n of [3, 5, 7, SPIRAL_LEGIBLE_COUNT, 13, 21, 40]) {
+    rows.push({
+      label: `SPIRAL x petalCount ${n}${n < SPIRAL_LEGIBLE_COUNT ? ' (below the legibility flag)' : ''}`,
+      set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: String(n) }],
+    });
+  }
+  rows.push({ label: 'SPIRAL x defaults', set: [{ id: 'placement', value: 'SPIRAL' }] });
+
+  /* 8. THE LAYER SUB-CONTROLS, each at min and max UNDER A LAYER COUNT THAT
+        ENABLES IT — the centre rig's rule one level up. At layerCount 1 every
+        one of these rows would build the shipping default and report a pass
+        under a label naming a control that did nothing. */
+  const maxLayers = CONTROLS.find((c) => c.id === 'layerCount').max;
+  for (const c of LAYER_SUBS()) {
+    for (const [tag, v] of [['min', c.min], ['max', c.max]]) {
+      rows.push({
+        label: `${maxLayers} layers x ${c.id} ${tag} (${v})`,
+        set: [{ id: 'layerCount', value: String(maxLayers) }, { id: c.id, value: String(v) }],
+      });
+    }
+  }
+  /* Layer count x placement — the two arrangement axes crossed, because a
+     spiral is applied PER LAYER (each whorl runs its own golden-angle
+     sequence, offset by its own layerPhase) and nothing else in the matrix
+     exercises that combination. */
+  for (const n of [2, 3]) {
+    for (const p of ['RADIAL', 'SPIRAL']) {
+      rows.push({ label: `${n} layers x ${p}`, set: [{ id: 'layerCount', value: String(n) }, { id: 'placement', value: p }] });
+    }
+  }
+
+  /* 9. THE LAYERED CORNERS — max layers against the extremes, because that is
+        where this session's new failure modes live and A DEFAULT IS NOT
+        COVERAGE. The junction argument under layers rests on every foot
+        landing at radius <= hub radius, in the hub plane, with an overlap box
+        floored independently of the layer index; each row below is one
+        question about where that could stop being true.
+
+        LAYERS x CENTRE OFF is here for the reason the centre rig learned the
+        hard way: DISC is the default, so a layered BARE bloom is exercised by
+        nothing unless it is written down. That is the exact shape of the
+        flower's seven-piece bloom, which shipped for months because every
+        gate row enabled the thing that hid it.
+
+        THE COINCIDENCE ROW is the measured one: layerSize at its MAXIMUM with
+        layerPhase 0 is as close to two identical whorls as the ranges allow.
+        At layerSize 1.00 that state exports 14,832 non-manifold edges; the
+        0.90 cap is what makes it unreachable, and this row is what says the
+        cap works rather than asserting it. */
+  const layeredCorners = [
+    ['LAYERS: 3 x spread min', { layerCount: 3, spread: 0.6 }],
+    ['LAYERS: 3 x ALL THIN', { layerCount: 3, ...ALL_THIN }],
+    ['LAYERS: 3 x ALL THIN x spread min', { layerCount: 3, ...ALL_THIN, spread: 0.6 }],
+    ['LAYERS: 3 x ALL THIN x spread min x petalCount 40', { layerCount: 3, ...ALL_THIN, spread: 0.6, petalCount: 40 }],
+    ['LAYERS: 3 x ALL THIN x spread min x petalCount 3', { layerCount: 3, ...ALL_THIN, spread: 0.6, petalCount: 3 }],
+    ['LAYERS: 3 x layerSize min x ALL THIN (deepest foot floored)', { layerCount: 3, layerSize: 0.35, ...ALL_THIN }],
+    ['LAYERS: 3 x ALL FORM MAX', { layerCount: 3, ...ALL_FORM_MAX }],
+    ['LAYERS: 3 x SPIRAL x ALL THIN x spread min x petalCount 40', { layerCount: 3, placement: 'SPIRAL', ...ALL_THIN, spread: 0.6, petalCount: 40 }],
+    ['LAYERS: 3 x centre OFF (the layered BARE bloom)', { layerCount: 3, centerStyle: 'NONE' }],
+    ['LAYERS: 3 x layerTilt max (135° effective at petalTilt max)', { layerCount: 3, layerTilt: 30, petalTilt: 75 }],
+    ['LAYERS: 2 x layerSize max x layerPhase 0 (the coincidence corner)', { layerCount: 2, layerSize: 0.9, layerPhase: 0, layerTilt: 0 }],
+    ['LAYERS: 3 x ALL MIN elsewhere', { layerCount: 3, petalCount: 3, petalLength: 20, petalWidth: 8, petalTilt: 0, spread: 0.6 }],
+  ];
+  for (const [name, sets] of layeredCorners) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+  /* A clefted petal on an inner layer: three panels at a layer scale the
+     capability rows have never been evaluated at. The cleft's lobes are the
+     one place a panel seam could stop being a shared volume, and layerSize
+     scales the blade that carries it. */
+  rows.push({ label: 'CAPABILITY: cleft x 3 layers', capability: CAPABILITY_CLEFT,
+    set: [{ id: 'layerCount', value: '3' }] });
+
   return rows;
 }
 
@@ -1002,6 +1289,7 @@ export const FROZEN_BASE_COMMITS = {
   phase2: '21d4602',   // the A/B centre rig, spread exposed — before the silhouette model
   phase3: '6626961',   // the silhouette model — before the four form curves
   phase4: '3c542fb',   // the form curves and the DISC default — before the thickness layer
+  phase5: 'deacded',   // the thickness layer, tip cap and sectioned panel — before layers and spiral
 };
 
 /* ===================================================================
@@ -1120,6 +1408,172 @@ export function phase4Matrix() {
   rows.push({ label: 'CAPABILITY: cleft x roll max', capability: CAPABILITY_CLEFT,
     set: [{ id: 'petalRoll', value: '330' }] });
   return rows;
+}
+
+/* ===================================================================
+   phase5Matrix() — THE 125 ROWS AS THEY STOOD AT deacded, frozen.
+
+   The like-for-like baseline for the ARRANGEMENT layer (layers and spiral),
+   standing to it exactly as phase4Matrix() stands to the thickness layer. A
+   NEW frozen matrix beside the older three, never an edit to any of them: a
+   frozen matrix is a record of one commit, not a view over anything.
+
+   FROZEN AGAINST: deacded ("Bloom: group the control panel into sections,
+   declared in the registry", #120), the commit immediately before layerCount,
+   layerSize, layerPhase, layerTilt and placement.
+
+   WHY IT IS NOW THE STRONGEST OF THE FOUR, on the same reasoning that made
+   phase4 the strongest of three: it is the only frozen matrix that carries
+   the THICKNESS layer's own corners — the seven THIN rows, the five TIP rows
+   and the converging tip cap's held/moved partition — as well as everything
+   phase4 had. An arrangement change that moved a thin, capped or clefted
+   petal's bytes at the new defaults would show here and in none of the
+   others. All four still run: the 76 are the rows unmoved across FOUR
+   consecutive feature layers.
+
+   GENERATED FROM deacded's OWN buildMatrix(), not transcribed — 125 rows by
+   hand is exactly the sort of thing that looks right and is not — and then
+   proved deep-equal to it by
+   `node tools/diff-bloom-bytes.mjs --verify-frozen --phase5 --base <worktree>`,
+   which runs in CI. The rows are LITERALS regardless, so a later range change
+   cannot silently rewrite what the baseline means.
+
+   These rows PIN only the controls that existed at deacded, so they inherit
+   every later default. layerCount defaults to 1 and placement to RADIAL,
+   which take the pre-layer path verbatim, so the expected result is 0 of 125
+   moved. What that CANNOT show is a leak inside the new controls themselves —
+   every frozen row sits at their defaults, the same blindness every frozen
+   matrix has to the layer that follows it. The live-matrix partition on the
+   resolved (layerCount, placement) is the instrument for those.
+   =================================================================== */
+export function phase5Matrix() {
+  return [
+  { label: `DEFAULT (the shipping configuration)`, set: [] },
+  { label: `petalCount 3`, set: [{ id: 'petalCount', value: '3' }] },
+  { label: `petalCount 4`, set: [{ id: 'petalCount', value: '4' }] },
+  { label: `petalCount 5`, set: [{ id: 'petalCount', value: '5' }] },
+  { label: `petalCount 6`, set: [{ id: 'petalCount', value: '6' }] },
+  { label: `petalCount 7`, set: [{ id: 'petalCount', value: '7' }] },
+  { label: `petalCount 8`, set: [{ id: 'petalCount', value: '8' }] },
+  { label: `petalCount 9`, set: [{ id: 'petalCount', value: '9' }] },
+  { label: `petalCount 10`, set: [{ id: 'petalCount', value: '10' }] },
+  { label: `petalCount 11`, set: [{ id: 'petalCount', value: '11' }] },
+  { label: `petalCount 12`, set: [{ id: 'petalCount', value: '12' }] },
+  { label: `petalCount 13`, set: [{ id: 'petalCount', value: '13' }] },
+  { label: `petalCount 14`, set: [{ id: 'petalCount', value: '14' }] },
+  { label: `petalCount 15`, set: [{ id: 'petalCount', value: '15' }] },
+  { label: `petalCount 16`, set: [{ id: 'petalCount', value: '16' }] },
+  { label: `petalCount 17`, set: [{ id: 'petalCount', value: '17' }] },
+  { label: `petalCount 18`, set: [{ id: 'petalCount', value: '18' }] },
+  { label: `petalCount 19`, set: [{ id: 'petalCount', value: '19' }] },
+  { label: `petalCount 20`, set: [{ id: 'petalCount', value: '20' }] },
+  { label: `petalCount 21`, set: [{ id: 'petalCount', value: '21' }] },
+  { label: `petalCount 22`, set: [{ id: 'petalCount', value: '22' }] },
+  { label: `petalCount 23`, set: [{ id: 'petalCount', value: '23' }] },
+  { label: `petalCount 24`, set: [{ id: 'petalCount', value: '24' }] },
+  { label: `petalCount 25`, set: [{ id: 'petalCount', value: '25' }] },
+  { label: `petalCount 26`, set: [{ id: 'petalCount', value: '26' }] },
+  { label: `petalCount 27`, set: [{ id: 'petalCount', value: '27' }] },
+  { label: `petalCount 28`, set: [{ id: 'petalCount', value: '28' }] },
+  { label: `petalCount 29`, set: [{ id: 'petalCount', value: '29' }] },
+  { label: `petalCount 30`, set: [{ id: 'petalCount', value: '30' }] },
+  { label: `petalCount 31`, set: [{ id: 'petalCount', value: '31' }] },
+  { label: `petalCount 32`, set: [{ id: 'petalCount', value: '32' }] },
+  { label: `petalCount 33`, set: [{ id: 'petalCount', value: '33' }] },
+  { label: `petalCount 34`, set: [{ id: 'petalCount', value: '34' }] },
+  { label: `petalCount 35`, set: [{ id: 'petalCount', value: '35' }] },
+  { label: `petalCount 36`, set: [{ id: 'petalCount', value: '36' }] },
+  { label: `petalCount 37`, set: [{ id: 'petalCount', value: '37' }] },
+  { label: `petalCount 38`, set: [{ id: 'petalCount', value: '38' }] },
+  { label: `petalCount 39`, set: [{ id: 'petalCount', value: '39' }] },
+  { label: `petalCount 40`, set: [{ id: 'petalCount', value: '40' }] },
+  { label: `petalLength min (20)`, set: [{ id: 'petalLength', value: '20' }] },
+  { label: `petalLength max (60)`, set: [{ id: 'petalLength', value: '60' }] },
+  { label: `petalWidth min (8)`, set: [{ id: 'petalWidth', value: '8' }] },
+  { label: `petalWidth max (30)`, set: [{ id: 'petalWidth', value: '30' }] },
+  { label: `petalBaseTaper min (0.3)`, set: [{ id: 'petalBaseTaper', value: '0.3' }] },
+  { label: `petalBaseTaper max (3)`, set: [{ id: 'petalBaseTaper', value: '3' }] },
+  { label: `petalTipTaper min (0.6)`, set: [{ id: 'petalTipTaper', value: '0.6' }] },
+  { label: `petalTipTaper max (4)`, set: [{ id: 'petalTipTaper', value: '4' }] },
+  { label: `petalTipBreadth min (0)`, set: [{ id: 'petalTipBreadth', value: '0' }] },
+  { label: `petalTipBreadth max (0.6)`, set: [{ id: 'petalTipBreadth', value: '0.6' }] },
+  { label: `petalCup min (-0.8)`, set: [{ id: 'petalCup', value: '-0.8' }] },
+  { label: `petalCup max (1.2)`, set: [{ id: 'petalCup', value: '1.2' }] },
+  { label: `petalTilt min (0)`, set: [{ id: 'petalTilt', value: '0' }] },
+  { label: `petalTilt max (75)`, set: [{ id: 'petalTilt', value: '75' }] },
+  { label: `petalSpineCurl min (-180)`, set: [{ id: 'petalSpineCurl', value: '-180' }] },
+  { label: `petalSpineCurl max (360)`, set: [{ id: 'petalSpineCurl', value: '360' }] },
+  { label: `petalRoll min (-330)`, set: [{ id: 'petalRoll', value: '-330' }] },
+  { label: `petalRoll max (330)`, set: [{ id: 'petalRoll', value: '330' }] },
+  { label: `petalTwist min (-180)`, set: [{ id: 'petalTwist', value: '-180' }] },
+  { label: `petalTwist max (180)`, set: [{ id: 'petalTwist', value: '180' }] },
+  { label: `sheetThickness min (0.6)`, set: [{ id: 'sheetThickness', value: '0.6' }] },
+  { label: `sheetThickness max (2.4)`, set: [{ id: 'sheetThickness', value: '2.4' }] },
+  { label: `tipThinning min (0)`, set: [{ id: 'tipThinning', value: '0' }] },
+  { label: `tipThinning max (0.8)`, set: [{ id: 'tipThinning', value: '0.8' }] },
+  { label: `footDelicacy min (0.25)`, set: [{ id: 'footDelicacy', value: '0.25' }] },
+  { label: `footDelicacy max (1)`, set: [{ id: 'footDelicacy', value: '1' }] },
+  { label: `spread min (0.6)`, set: [{ id: 'spread', value: '0.6' }] },
+  { label: `spread max (6)`, set: [{ id: 'spread', value: '6' }] },
+  { label: `ROSE-ish (obovate, broad tip)`, set: [{ id: 'petalBaseTaper', value: '2' }, { id: 'petalTipTaper', value: '1.1' }, { id: 'petalTipBreadth', value: '0.3' }] },
+  { label: `POPPY-ish (orbicular, truncate)`, set: [{ id: 'petalBaseTaper', value: '0.6' }, { id: 'petalTipTaper', value: '0.7' }, { id: 'petalTipBreadth', value: '0.5' }] },
+  { label: `NONE × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'NONE' }, { id: 'spread', value: '0.6' }] },
+  { label: `NONE × spread default (2)`, set: [{ id: 'centerStyle', value: 'NONE' }, { id: 'spread', value: '2' }] },
+  { label: `NONE × spread max (6)`, set: [{ id: 'centerStyle', value: 'NONE' }, { id: 'spread', value: '6' }] },
+  { label: `DOME × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'spread', value: '0.6' }] },
+  { label: `DOME × spread default (2)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'spread', value: '2' }] },
+  { label: `DOME × spread max (6)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'spread', value: '6' }] },
+  { label: `DISC × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'spread', value: '0.6' }] },
+  { label: `DISC × spread default (2)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'spread', value: '2' }] },
+  { label: `DISC × spread max (6)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'spread', value: '6' }] },
+  { label: `RING × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'spread', value: '0.6' }] },
+  { label: `RING × spread default (2)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'spread', value: '2' }] },
+  { label: `RING × spread max (6)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'spread', value: '6' }] },
+  { label: `DOME × centerSize min (0.25)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '0.25' }] },
+  { label: `DOME × centerSize max (1)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '1' }] },
+  { label: `DOME × centerRise min (0.15)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerRise', value: '0.15' }] },
+  { label: `DOME × centerRise max (1.2)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerRise', value: '1.2' }] },
+  { label: `DISC × centerSize min (0.25)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '0.25' }] },
+  { label: `DISC × centerSize max (1)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '1' }] },
+  { label: `DISC × centerDish min (0)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerDish', value: '0' }] },
+  { label: `DISC × centerDish max (0.9)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerDish', value: '0.9' }] },
+  { label: `RING × centerSize min (0.25)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '0.25' }] },
+  { label: `RING × centerSize max (1)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '1' }] },
+  { label: `RING × centerBore min (0.2)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerBore', value: '0.2' }] },
+  { label: `RING × centerBore max (0.75)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerBore', value: '0.75' }] },
+  { label: `ALL MIN (centre off)`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `ALL MAX (centre off)`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `ALL MIN × DOME min`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '0.25' }, { id: 'centerRise', value: '0.15' }] },
+  { label: `ALL MIN × DISC min`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '0.25' }, { id: 'centerDish', value: '0' }] },
+  { label: `ALL MIN × RING min`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '0.25' }, { id: 'centerBore', value: '0.2' }] },
+  { label: `ALL MAX × DOME max`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '1' }, { id: 'centerRise', value: '1.2' }] },
+  { label: `ALL MAX × DISC max`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '1' }, { id: 'centerDish', value: '0.9' }] },
+  { label: `ALL MAX × RING max`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '1' }, { id: 'centerBore', value: '0.75' }] },
+  { label: `FORM: QUILL (roll alone, toward a tube)`, set: [{ id: 'petalRoll', value: '330' }] },
+  { label: `FORM: FIDDLEHEAD (spine curl alone)`, set: [{ id: 'petalSpineCurl', value: '360' }] },
+  { label: `FORM: CONTORTED (twist alone)`, set: [{ id: 'petalTwist', value: '180' }] },
+  { label: `FORM: REFLEXED (cup min x curl below the plane)`, set: [{ id: 'petalCup', value: '-0.8' }, { id: 'petalSpineCurl', value: '-180' }] },
+  { label: `FORM: ROLL CLAMP (roll max x narrowest petal)`, set: [{ id: 'petalRoll', value: '330' }, { id: 'petalWidth', value: '8' }] },
+  { label: `FORM: ALL MAX (all four curves together)`, set: [{ id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }] },
+  { label: `FORM: ALL MIN (all four curves together)`, set: [{ id: 'petalCup', value: '-0.8' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }] },
+  { label: `THIN: ALL THIN (centre off)`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `THIN: ALL THIN × DISC`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'centerStyle', value: 'DISC' }] },
+  { label: `THIN: ALL THIN × spread min`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }] },
+  { label: `THIN: ALL THIN × petalCount 40`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'petalCount', value: '40' }] },
+  { label: `THIN: ALL THIN × form max`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }] },
+  { label: `THIN: ALL THIN × ALL MIN`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalTilt', value: '0' }] },
+  { label: `THIN: THICK GRADIENT (sheet max × thinning max)`, set: [{ id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }] },
+  { label: `TIP: pointed × roll max`, set: [{ id: 'petalRoll', value: '330' }] },
+  { label: `TIP: pointed × twist max`, set: [{ id: 'petalTwist', value: '180' }] },
+  { label: `TIP: pointed × taper max (floor dominates)`, set: [{ id: 'petalTipTaper', value: '4' }] },
+  { label: `TIP: truncate (breadth max) — must NOT converge`, set: [{ id: 'petalTipBreadth', value: '0.6' }] },
+  { label: `TIP: pointed × ALL THIN`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }] },
+  { label: `CAPABILITY: claw (non-monotone width)`, set: [], capability: CAPABILITY_CLAW },
+  { label: `CAPABILITY: cleft (two-span domain)`, set: [], capability: CAPABILITY_CLEFT },
+  { label: `CAPABILITY: claw x form max`, set: [{ id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }], capability: CAPABILITY_CLAW },
+  { label: `CAPABILITY: cleft x roll max`, set: [{ id: 'petalRoll', value: '330' }], capability: CAPABILITY_CLEFT },
+  { label: `CAPABILITY: cleft x all thin`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }], capability: CAPABILITY_CLEFT },
+  ];
 }
 
 /* ===================================================================

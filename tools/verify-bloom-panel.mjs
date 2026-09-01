@@ -2,12 +2,13 @@
    verify-bloom-panel.mjs — BUILD GATE: every control the registry declares
    is REACHABLE in the panel, and collapsing a section does not take it away.
 
-   TWO ROUTES, AND NEITHER SUBSTITUTES FOR THE OTHER. This is the flower
+   SEVERAL ROUTES, AND NONE SUBSTITUTES FOR ANOTHER. This is the flower
    project's dump-versus-sheet lesson, moved to the thing it was learned on:
    a check that sets state and evaluates predicates proves the DECLARATIONS,
    and it cannot catch an app that never re-runs — `predicateDrivers` was
    imported and never called, and the panel silently stopped responding while
-   every declaration stayed correct.
+   every declaration stayed correct. Each route below names the failure it
+   exists for, and --negative-control requires every one of them to fire.
 
      (a) THE DECLARATION ROUTE — the render census. Every non-retired registry
          control appears in the panel EXACTLY ONCE, in the section it declares,
@@ -25,6 +26,26 @@
          assertion awaits a frame, because `toggle` is QUEUED rather than
          synchronous (measured) and a synchronous read would fail on correct
          code.
+
+     (d) THE VISIBILITY-TRANSITION ROUTE — does a gated control ever APPEAR?
+         Route (a) evaluates every predicate at DEFAULTS only, which is ONE
+         DIRECTION: a control gated on `layerCount >= 2` is hidden there and
+         would pass route (a) even if it never appeared at all, and so would
+         `centerRise`, gated on DOME since the centre rig shipped and never
+         asserted to appear by this gate. So each DRIVER named by any
+         predicate (derived from the registry, never listed) is driven through
+         the real UI to every value that can change the dependent set, and
+         EVERY control's `hidden` is re-checked against its own predicate at
+         the new state — appearance and disappearance in one pass. The flower
+         paid for checking only one direction: Advanced silently stopped
+         showing 25 controls while every gate passed.
+
+     (e) THE LOW-COUNT SPIRAL FLAG, BOTH DIRECTIONS. The flag is the entire
+         handling of golden-angle placement below eight petals (there is no
+         geometric threshold to gate on — measured, see GOLDEN_ANGLE), so it
+         must appear when the condition holds AND be absent when it does not:
+         a flag only ever asserted present is a flag that can be stuck on. The
+         threshold is imported, never retyped.
 
      (b) THE PATH ROUTE — reactivity through a CLOSED section. For every
          section collapsed at first load, a control inside it is driven with
@@ -67,11 +88,14 @@
            from the DOM, replaces another control's element with a
            listener-less clone (the app-does-not-react failure, exactly), and
            suppresses the accordion's toggle before the panel's own capture
-           listener can see it — and requires this run to FAIL on all three.
+           listener can see it, and freezes every wrapper's `hidden` so the
+           panel stops re-evaluating visibility while its declarations stay
+           perfect — and requires this run to FAIL on all four.
            A check nobody has seen fail is a hope.
    =================================================================== */
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
-         RETIRED_IDS, DEFAULTS, evalPredicate, verifySections } from './bloom-harness.mjs';
+         RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
+         SPIRAL_LEGIBLE_COUNT } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -426,6 +450,99 @@ for (const s of closed) {
   else ok.push(`${tag}: state "${res.stateBefore}"->"${res.stateAfter}", read-out "${res.labelBefore}"->"${res.labelAfter}", ${w.what} ${before}->${after}, section still closed`);
 }
 
+/* ---------------- (d) the VISIBILITY-TRANSITION route ---------------- */
+/* THE GAP THIS CLOSES, and it predates the layer work. Route (a) evaluates
+   every predicate at DEFAULTS and asserts each wrapper's `hidden` agrees. That
+   is ONE DIRECTION. A control gated on `layerCount >= 2` is hidden at DEFAULTS
+   and would pass route (a) even if it NEVER APPEARED — and so would
+   centerRise, which has been gated on `centerStyle: DOME` since the centre rig
+   shipped and has never had its appearance asserted by this gate. Doesn't-show
+   -when-off and does-show-when-on are two properties, and the flower project
+   paid for checking only one of them (Advanced silently stopped showing 25
+   controls while every gate passed).
+
+   This drives each gated control's DRIVER through the real UI and re-checks
+   EVERY control's `hidden` against its own predicate at the new state — so it
+   asserts appearance and disappearance in the same pass, and it does it for
+   controls this session did not add. The driver set is derived from the
+   registry's predicates, never listed: a new gated control is covered the day
+   it lands, or this loop has nothing to say about it and says so. */
+const gated = CONTROLS.filter((c) => predicateDrivers(c.visibleWhen).size > 0);
+const drivers = new Map();
+for (const c of gated) for (const d of predicateDrivers(c.visibleWhen)) {
+  if (!drivers.has(d)) drivers.set(d, []);
+  drivers.get(d).push(c.id);
+}
+if (!gated.length) note('no control declares a predicate with a driver, so the visibility-transition route has nothing to drive — it would be vacuous');
+for (const [driverId, dependents] of drivers) {
+  const dc = CONTROLS.find((c) => c.id === driverId);
+  /* Drive the driver to every value that changes the dependent set, so both
+     directions are exercised rather than one arbitrary end. For a slider that
+     is its two ends; for a choice, every option. */
+  const values = dc.kind === 'choice' ? dc.options.map((o) => o.value) : [String(dc.min), String(dc.max)];
+  for (const value of values) {
+    await openBloom(page, port);
+    const res = await page.evaluate(async ({ id, value, breakIt }) => {
+      const el = document.getElementById(id);
+      if (breakIt) {
+        /* NEGATIVE CONTROL, route (d): declarations stay perfect and
+           applyVisibility stops running. Freezing every wrapper's `hidden`
+           reproduces "the panel does not re-evaluate", which is the failure
+           this route exists for and which route (a) cannot see. */
+        for (const w of document.querySelectorAll('.bl-ctrl')) {
+          Object.defineProperty(w, 'hidden', { get: () => false, set: () => {}, configurable: true });
+        }
+      }
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const seen = {};
+      for (const w of document.querySelectorAll('.bl-ctrl')) {
+        const input = w.querySelector('input,select');
+        if (input) seen[input.id] = w.hidden;
+      }
+      return { state: window.__bloomUIState(), seen };
+    }, { id: driverId, value, breakIt: NEGATIVE_CONTROL });
+
+    const tag = `[visibility] ${driverId} -> ${value}`;
+    let wrong = 0;
+    for (const c of CONTROLS) {
+      const want = !evalPredicate(c.visibleWhen, res.state);
+      if (res.seen[c.id] !== want) {
+        note(`${tag}: control "${c.id}" wrapper hidden=${res.seen[c.id]}, its predicate at that state says hidden=${want} — the panel did not re-evaluate visibility`);
+        wrong++;
+      }
+    }
+    if (!wrong) {
+      const shown = dependents.filter((id) => res.seen[id] === false);
+      ok.push(`${tag}: all ${CONTROLS.length} wrappers agree with their predicates; dependents shown: ${shown.length ? shown.join(', ') : 'none'}`);
+    }
+  }
+}
+
+/* ---------------- (e) the LOW-COUNT SPIRAL FLAG, both directions ---------- */
+/* The flag is the ENTIRE handling of golden-angle placement below eight
+   petals — the charter's "gate or flag" was measured and there is no
+   threshold to gate on, so a label is the whole mechanism and it has to be
+   worth something. A flag asserted only when it should appear is a flag that
+   can be stuck on, so both directions are checked, and the threshold comes
+   from SPIRAL_LEGIBLE_COUNT rather than from a number retyped here. */
+for (const [placement, count] of [['SPIRAL', SPIRAL_LEGIBLE_COUNT - 1], ['SPIRAL', SPIRAL_LEGIBLE_COUNT], ['RADIAL', SPIRAL_LEGIBLE_COUNT - 1], ['SPIRAL', 3]]) {
+  await openBloom(page, port);
+  const set = [{ id: 'placement', value: placement }, { id: 'petalCount', value: String(count) }];
+  const bad = await applyConfig(page, set);
+  if (bad.length) { note(`[spiral flag] ${placement} x ${count}: read-back failed: ${bad.join('; ')}`); continue; }
+  const txt = await page.evaluate(() => document.getElementById('readout').textContent);
+  const shown = /SPIRAL BELOW \d+ PETALS/.test(txt);
+  const want = placement === 'SPIRAL' && count < SPIRAL_LEGIBLE_COUNT;
+  if (shown !== want) {
+    note(`[spiral flag] ${placement} x ${count} petals: flag ${shown ? 'SHOWN' : 'ABSENT'}, expected ${want ? 'SHOWN' : 'ABSENT'} (threshold SPIRAL_LEGIBLE_COUNT = ${SPIRAL_LEGIBLE_COUNT})`);
+  } else {
+    ok.push(`[spiral flag] ${placement} x ${count} petals: ${shown ? 'shown' : 'absent'}, as the threshold requires`);
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -443,8 +560,9 @@ if (NEGATIVE_CONTROL) {
     const sawCensus = fail.some((f) => /renders 0 times/.test(f));
     const sawPath = fail.some((f) => /did not change|did not move|state snapshot says/.test(f));
     const sawAccordion = fail.some((f) => /^accordion A[23]:/.test(f));
-    if (sawCensus && sawPath && sawAccordion) { console.log('\nALL THREE ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}. All three must.`);
+    const sawVisibility = fail.some((f) => /^\[visibility\]/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility) { console.log('\nALL FOUR ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}. All four must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input and an unreachable accordion handler. It is not measuring anything.');

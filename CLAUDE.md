@@ -30,10 +30,21 @@ solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 `node tools/verify-bloom-connectedness.mjs` (voxel flood-fill, one region) —
 both run in CI and both must pass before any bloom geometry change is done.
 Control-panel changes have their own gate: `node tools/verify-bloom-panel.mjs`
-(every registry control renders exactly once in its declared section, and a
-control inside a collapsed section still reads, writes and rebuilds), with
+(every registry control renders exactly once in its declared section, a control
+inside a collapsed section still reads, writes and rebuilds, and every
+predicate-gated control is asserted to APPEAR as well as to hide), with
 `--negative-control` required to fail. Its companion sheet is
 `node tools/shot-bloom-panel.mjs <dir>` — the panel, not the canvas.
+Arrangement changes have their own sheet too:
+`node tools/shot-bloom-arrangement.mjs <dir>` — layers, placement and the
+parked extremes.
+
+**A green connectedness run does NOT endorse the junction under layers** —
+measured, not cautious: building the hub at the wrong layer's radius leaves a
+whorl joined to nothing and that gate still reports ONE piece, because
+consecutive foot annuli overlap each other. `junctionAssertions()` (J1–J4) in
+both gates is what carries that claim; do not weaken it on the strength of a
+green flood fill.
 
 ## Flower generator — print-safety is a hard invariant
 
