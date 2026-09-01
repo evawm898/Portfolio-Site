@@ -159,6 +159,90 @@ def health_legacy() -> dict:
     return {"status": "ok"}
 
 
+def _detect_deployed_commit() -> dict:
+    """
+    Best-effort identification of exactly what code this running process
+    is built from -- see README's "How to tell what's actually deployed"
+    section, written after a live-site investigation where three separate
+    bug reports (a frontend crash, a missing field, a 405 on a route that
+    exists in the repo) all traced back to the same unprovable suspicion:
+    the deployed backend was running older code than `main`, with no way
+    to confirm it from outside.
+
+    Render sets RENDER_GIT_COMMIT and RENDER_GIT_BRANCH automatically on
+    every service at deploy time (undocumented in render.yaml because
+    they're not something you set -- Render provides them; see
+    https://render.com/docs/environment-variables#all-runtimes). Trust
+    those first: they're what Render itself recorded when it built this
+    exact instance, so they can't be stale the way a `git` call against
+    this checkout could be if the runtime filesystem ever diverged from
+    what was actually deployed. Fall back to asking git directly only
+    when those aren't set -- i.e. a local `uvicorn` run, not Render.
+    """
+    commit = os.environ.get("RENDER_GIT_COMMIT")
+    branch = os.environ.get("RENDER_GIT_BRANCH")
+    source = "render_env"
+    if not commit:
+        source = "git_fallback"
+        try:
+            import subprocess
+
+            repo_root = Path(__file__).resolve().parent.parent
+            commit = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "HEAD"], cwd=repo_root, stderr=subprocess.DEVNULL, timeout=5
+                )
+                .decode()
+                .strip()
+            )
+            branch = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root, stderr=subprocess.DEVNULL, timeout=5
+                )
+                .decode()
+                .strip()
+            )
+        except Exception:
+            commit, branch, source = None, None, "unavailable"
+    return {
+        "commit": commit,
+        "commit_short": commit[:7] if commit else None,
+        "branch": branch,
+        "source": source,
+    }
+
+
+# Computed once at process startup, not per-request -- it can't change
+# without a new deploy (a new process), and the git fallback path spawns
+# a subprocess that has no business running on every request.
+_DEPLOYED_COMMIT_INFO = _detect_deployed_commit()
+
+
+@app.get("/version")
+def version() -> dict:
+    """
+    What commit this running process was actually built from, so
+    "is the live site current" is a GET request instead of a guess. See
+    README's "How to tell what's actually deployed" section.
+
+    `source` tells you how much to trust `commit`/`branch`:
+      - "render_env": read from Render's own RENDER_GIT_COMMIT /
+        RENDER_GIT_BRANCH env vars, set automatically at deploy time --
+        authoritative on Render.
+      - "git_fallback": no Render env vars present, so this is a local
+        dev run; `git rev-parse` against this checkout instead.
+      - "unavailable": neither worked (shouldn't happen on Render).
+    """
+    return {
+        "commit": _DEPLOYED_COMMIT_INFO["commit"],
+        "commit_short": _DEPLOYED_COMMIT_INFO["commit_short"],
+        "branch": _DEPLOYED_COMMIT_INFO["branch"],
+        "source": _DEPLOYED_COMMIT_INFO["source"],
+        "algorithm_version": ALGORITHM_VERSION,
+        "app_version": app.version,
+    }
+
+
 def _period_px_to_per_inch(period_px: float, pixels_per_mm: float) -> Optional[float]:
     if pixels_per_mm <= 0:
         return None
