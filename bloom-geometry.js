@@ -57,6 +57,43 @@ export const SHEET_THICKNESS_MM = 1.2;
    A printed coupon replaces this guess with a measurement. */
 export const FOOT_MIN_WIDTH_MM = 1.6;
 
+/* HOW MANY WHORLS THE ARRANGEMENT MAY STACK. Three, and the binding
+   constraint is THE PETAL, not the triangle count — which was the surprise.
+   Measured Sep 1: three layers at petalCount 40 is 149,568 export triangles,
+   10% of EXPORT_TRI_BUDGET (1.5 M), so the budget is nowhere near binding and
+   a cap justified by triangles would have been a made-up number. What binds
+   is that the blade shrinks by `layerSize` per layer: at the shipping ratio
+   0.72 the third layer is an 18.1 mm blade, a fourth would be 13.0 mm, and at
+   `layerSize` <= 0.50 the deepest foot hits FOOT_MIN_WIDTH_MM and becomes a
+   floored stub with a blade narrower than its own root.
+   Raising this is a range change in the registry plus gate rows, not a
+   rewrite — `layerCount.max` is asserted equal to it by the harness so the
+   two cannot drift. */
+export const MAX_LAYERS = 3;
+
+/* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
+   pi*(3 - sqrt(5)) rather than a decimal literal so the constant IS the
+   definition instead of a rounding of it.
+
+   THE CHARTER'S "PHYLLOTAXIS NEEDS n >= 8" RULE WAS MEASURED AND DOES NOT
+   HOLD AS A GEOMETRIC THRESHOLD (Sep 1). The obvious statistic — the ratio of
+   the largest angular gap to the smallest — oscillates between 1.62 and 2.62
+   at EVERY count, driven by which Fibonacci number the count sits between:
+   n=3 -> 1.62, n=4 -> 2.62, n=5 -> 1.62, n=6,7 -> 2.62, n=8 -> 1.62,
+   n=13,21 -> 1.62, n=40 -> 2.62. It is scale-free; there is no discontinuity
+   at 8 or anywhere else. The rule is a real AESTHETIC claim about when
+   parastichies become legible, and it is not a number anything can gate on —
+   which is why low counts are ALLOWED and FLAGGED rather than hidden. See
+   the flag in bloom.js's read-out and the charter entry it corrected. */
+export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/* WHERE THE LOW-COUNT SPIRAL FLAG TURNS ON. An AESTHETIC boundary, and it
+   lives here — rather than in the read-out that prints it — so the panel gate
+   can assert the flag in BOTH directions without keeping its own copy of the
+   number. A gate re-stating a threshold is this project's most repeated
+   defect; a gate importing the one definition cannot drift from it. */
+export const SPIRAL_LEGIBLE_COUNT = 8;
+
 /* MeshBuilder — flat triangle-soup accumulator (positions only; the app wraps
    it in a three.js BufferGeometry, the exporter reads it directly). Rewritten
    from the flower's MeshAccumulator idea: the one behavior that matters here
@@ -160,9 +197,70 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
    Takes the accumulator because the foot thickness is floored geometry: the
    ring's answer in export mode must match what the solids are actually built
-   at, or the area rule would size the junction from a thickness nothing has. */
+   at, or the area rule would size the junction from a thickness nothing has.
+
+   ===================================================================
+   LAYERS: ONE OWNER, N RINGS (Sep 1). This function now returns
+   `{ layers: [...], hub, ... }` — one descriptor per whorl plus the hub the
+   junction is built on. Each layer descriptor has the SAME SHAPE the single
+   ring always had, so buildPetalInto is unchanged and reads one of them.
+
+   WHY A LAYERED RETURN AND NOT ONE CALL PER LAYER. Both satisfy "exactly one
+   owner" on their face; only one of them satisfies "no per-layer consumer
+   arithmetic". The hub radius and the area-rule total are NOT per-layer
+   quantities — they are functions of every layer at once — so a per-layer
+   call cannot produce them, and the consumer would have to sum. That is the
+   arithmetic the invariant forbids, so the sum happens here, once.
+
+   EACH LAYER'S PLACEMENT LIVES HERE TOO — `scale`, `phase`, `tiltExtra`
+   alongside `radius`, `width`, `thickness`, `overhang`. That is deliberate
+   and slightly wider than this function's name: `width` ALREADY derives from
+   the layer's scale, so scale is inside this function whether or not it is
+   returned, and a second owner for "what is layer L's placement" would be one
+   more thing to keep in step every time a layer parameter is added. One
+   owner answers "what is layer L", not merely "where is its foot ring".
+
+   THE RADIUS MODEL, and what derives from what:
+     R0        = sqrt( SUM over layers of count * rFoot_L^2 ) * spread
+                 the area rule, now over EVERY foot that feeds the hub
+     radius_L  = R0 * layerSize^L        (one factor, applied here)
+     hub.radius = R0  ( = layers[0].radius, since layerSize^0 is exactly 1)
+
+   CONTAINMENT IS A CONSEQUENCE, NOT A CLAMP. `layerSize` maxes at 0.90 < 1,
+   so radius_L <= R0 for every L and each foot's WHOLE footprint lies inside
+   the hub disc — strictly stronger than the single-ring argument, where only
+   layer 0's feet overlapped the rim. Nothing here clamps to achieve that; it
+   falls out of the model, which is why it cannot be tuned away by accident.
+
+   THE OVERLAP BOX DOES NOT DEGRADE WITH LAYERS. None of `overhang` (absolute
+   1.5 mm floor), `width` (FOOT_MIN_WIDTH_MM) or `thickness` (MIN_FEATURE_MM
+   in export) is a function of the layer index, so the charter's standing
+   worst case — >= 1.5 x >= 1.6 x >= 1.0 mm — is the SAME bound per layer at
+   any layerCount. Measured at ALL THIN x spread min x 3 layers: 2.40 mm^3 on
+   every layer, exactly the single-ring corner's number.
+
+   HEIGHT IS NOT HERE, AND THAT IS THE RULING (Eva, Sep 1). Every layer's feet
+   sit at z = 0. A foot at z = h spans [h - t/2, h + t/2] against a hub slab
+   spanning [-t/2, +t/2], so solid overlap requires |h| < t — 1.20 mm at the
+   shipping sheet and 0.60 mm ALL-THIN, against a 35 mm petal. A height
+   control constrained to keep feet in the slab has a range nobody can see and
+   CANNOT BE WIDENED, because the bound is the sheet itself: DEAD != INVISIBLE
+   says delete it. Depth comes from tilt instead, which lifts the inner
+   whorl's tips 6.60 mm above the outer one (layerSize 0.90, layerTilt +12)
+   with the feet never leaving the plane — 5.5x what a safe height control
+   could ever give.
+   THE COSTED FALLBACK, recorded so it is not re-derived: extending the
+   junction to REACH lifted feet (a derived collar spanning [0, h] under each
+   inner ring). It is a second junction primitive with its own watertightness
+   argument and gate rows. It is NOT built and there is no stub for it. The
+   evidence that would reopen it is Eva finding the tilt-driven layering flat
+   on the arrangement sheet — nothing else. */
 export function footRing(state, acc) {
   const thickness = acc.floorThickness(state.sheetThickness);
+  const layerCount = Math.round(state.layerCount);
+  if (!(layerCount >= 1 && layerCount <= MAX_LAYERS)) {
+    throw new Error(`layerCount ${JSON.stringify(state.layerCount)} is outside 1..${MAX_LAYERS} — the registry and the builder have diverged`);
+  }
   /* Foot width follows the petal it feeds — a fraction of blade width, scaled
      by `footDelicacy`, with a floor so very narrow petals keep a printable
      root. THIS IS THE ONLY PLACE `footDelicacy` EXISTS, exactly as spread is
@@ -182,25 +280,93 @@ export function footRing(state, acc) {
      interior local minimum, narrower than its own foot; this scales the foot
      and everything that reads it, monotonically, so no profile is made
      non-monotone. Eva's rounded/ovate ruling is untouched. */
-  const authoredWidth = state.petalWidth * 0.4 * state.footDelicacy;
-  const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
-  const rFoot = Math.sqrt((width * thickness) / Math.PI);
-  const derivedRadius = rFoot * Math.sqrt(state.petalCount);   // area rule
-  const radius = derivedRadius * state.spread;                 // the ONLY use of spread
-  /* How far inside the ring each foot continues, so foot–hub overlap is a
-     solid annulus, not a hairline touch. */
-  const overhang = Math.max(1.5, radius * 0.4);
-  /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the read-out
-     and the gates can say WHERE a floor started binding instead of a slider
-     silently going quiet. Nothing geometric may read these. */
-  return {
-    radius, derivedRadius, width, thickness, overhang,
-    authoredWidth,
-    widthClamped: authoredWidth < FOOT_MIN_WIDTH_MM,
-    /* A statement about the EXPORT, true in either mode — the read-out has to
-       warn about a floor it is not currently applying. */
-    thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
-  };
+  /* PER-LAYER FOOT CROSS-SECTIONS. At layerCount 1 the loop runs once with
+     `scale` EXACTLY 1 (Math.pow(x, 0) is exactly 1), so `petalWidth * 1` is
+     `petalWidth` and this evaluates the same operations, in the same order,
+     on the same doubles as the pre-layer code. The single-layer default is
+     byte-identical here BY CONSTRUCTION; the byte report confirms it. */
+  const raw = [];
+  let sumSq = 0;
+  for (let L = 0; L < layerCount; L++) {
+    const scale = Math.pow(state.layerSize, L);
+    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
+    const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
+    const rFoot = Math.sqrt((width * thickness) / Math.PI);
+    sumSq += state.petalCount * rFoot * rFoot;
+    raw.push({ scale, authoredWidth, width, rFoot });
+  }
+
+  /* THE GUARD, AND IT IS LOAD-BEARING RATHER THAN INSURANCE — the one place
+     the layered law is not bit-exact, scoped to exactly that place.
+
+     `Math.sqrt(count * rFoot^2)` and `rFoot * Math.sqrt(count)` are the same
+     number in algebra and NOT the same double: this is the flower's
+     `a*b + a*c` vs `a*(b+c)` trap firing on a real row, measured before the
+     guard was written. At the shipping defaults the two differ by 8.88e-16
+     (0.90 ULP, 4.4223251132330947 against ...39) and at petalCount 40 by
+     1.78e-15 (0.81 ULP); at count 3, count 7, ALL THIN and sheet 2.40 they
+     agree exactly. So the divergence is real, row-dependent, and invisible to
+     any argument that stops at "algebraically identical".
+
+     Everything ELSE in this function is identical without a guard, shown
+     rather than hoped: `scale` is exactly 1, `x * 1 === x`, and `radius_L`
+     below is `R0 * 1`. Only this line needed guarding, so only this line is
+     guarded — a wider guard would be a second copy of the layered law with a
+     bug-shaped place to hide.
+
+     `guardResidual` measures the two laws against each other on EVERY
+     single-layer build, so the guard is never somewhere a bug sits
+     unexercised (formGuardResidual's doctrine). UNLIKE formGuardResidual it
+     CANNOT be exactly 0 and both gates assert a BOUND, not a zero — stated
+     here so nobody later "fixes" the assertion to an equality. Above one
+     layer there is no guard law to compare against and it is null: a claim
+     nothing can make is reported as absent, never as a passing 0. */
+  const generalDerived = Math.sqrt(sumSq);
+  const derivedRadius = layerCount === 1
+    ? raw[0].rFoot * Math.sqrt(state.petalCount)   // area rule — the pre-layer expression, verbatim
+    : generalDerived;
+  const guardResidual = layerCount === 1 ? Math.abs(generalDerived - derivedRadius) : null;
+
+  const R0 = derivedRadius * state.spread;         // the ONLY use of spread
+  const layers = raw.map((p, L) => {
+    const radius = R0 * p.scale;
+    return {
+      index: L,
+      radius, derivedRadius, width: p.width, thickness,
+      /* How far inside the ring each foot continues, so foot–hub overlap is a
+         solid annulus, not a hairline touch. A FRACTION of this layer's own
+         radius with an absolute floor, so the guarantee is scale-free per
+         layer exactly as it was for the single ring. */
+      overhang: Math.max(1.5, radius * 0.4),
+      /* THE LAYER'S PLACEMENT, owned here so no consumer computes it. All
+         three are EXACTLY the pre-layer constants at L = 0: Math.pow(x, 0) is
+         1, `0 * layerTilt` is +0 for layerTilt >= 0 (its range starts at 0),
+         and `(0 * layerPhase * TAU) / count` is +0. buildBloomInto passed
+         literal 1 / 0 / 0 before this existed, so the shipped default takes
+         the same doubles through the same arithmetic. Both gates assert these
+         three are EXACTLY 0/1 at layerCount 1, separately from the residual
+         bound above, so a real leak cannot hide inside a tolerance. */
+      scale: p.scale,
+      phase: (L * state.layerPhase * TAU) / state.petalCount,
+      tiltExtra: L * state.layerTilt,
+      /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the
+         read-out and the gates can say WHERE a floor started binding instead
+         of a slider silently going quiet. Nothing geometric may read these. */
+      authoredWidth: p.authoredWidth,
+      widthClamped: p.authoredWidth < FOOT_MIN_WIDTH_MM,
+      /* A statement about the EXPORT, true in either mode — the read-out has
+         to warn about a floor it is not currently applying. */
+      thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
+    };
+  });
+
+  /* THE HUB the junction is built on. Its radius is R0, which is
+     layers[0].radius exactly — not a `Math.max` over the layers, because a max
+     would be a SECOND derivation that merely happens to agree, and the
+     one-owner rule is about which is which. Containment is asserted (J2/J3)
+     rather than achieved by picking the largest. */
+  const hub = { radius: R0, thickness, derivedRadius };
+  return { layers, hub, derivedRadius, guardResidual, layerCount };
 }
 
 /* ===================================================================
@@ -210,14 +376,32 @@ export function footRing(state, acc) {
    phase 1 feeds several of them constants; sepals / epicalyx / involucre
    later are then more whorls, not a refactor.
 
-   No golden-angle / spiral placement exists in phase 1 at all — slots are
-   evenly spaced, so the "gate phyllotaxis below n≈8" rule does not yet bind.
-   If spiral placement is added, gate or flag it below 8 petals (charter). */
-export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade }) {
+   PLACEMENT (Sep 1) is the one thing this primitive computes: where slot i
+   sits around the axis. RADIAL is even spacing; SPIRAL steps by the golden
+   angle. It is a BRANCH, not a reformulation — the RADIAL arm is the
+   pre-spiral expression character for character — so byte-identity on that
+   side is structural and needs no residual to cross-validate it (there is no
+   algebraic identity between the two arms to check).
+
+   SPIRAL MOVES AZIMUTH ONLY. Every foot stays on its layer's ring, so the
+   junction argument is untouched by placement: the feet the hub has to reach
+   are the same feet, at the same radius, in the same plane. A Vogel radius
+   ramp (r proportional to sqrt(i), petals crowding inward) is a DIFFERENT
+   feature — a spiral disc rather than a spiral whorl — with its own evidence
+   needs. It is recorded here and deliberately not built; there is no stub.
+
+   LOW COUNTS ARE ALLOWED AND FLAGGED, NOT GATED. See GOLDEN_ANGLE's note:
+   the "n >= 8" rule is an aesthetic legibility claim and the geometry
+   contains no threshold to gate on, so the read-out labels the state and
+   nothing hides. */
+export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL' }) {
+  if (placement !== 'RADIAL' && placement !== 'SPIRAL') {
+    throw new Error(`unknown placement "${placement}" — the registry and the builder have diverged`);
+  }
   for (let i = 0; i < count; i++) {
     blade({
       index: i,
-      azimuth: phase + (i * TAU) / count,
+      azimuth: placement === 'SPIRAL' ? phase + i * GOLDEN_ANGLE : phase + (i * TAU) / count,
       radius,
       z: height,
       scale: sizeRamp(i, count),
@@ -1414,25 +1598,43 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
   }
   if (below !== null) throw new Error(`below='${below}' is phase-2+ work; only null is built today`);
 
-  const ring = footRing(state, acc);
-  /* Slot 0's own measurements, kept for the metrics hook. Every slot in a
-     phase-3 whorl is the same petal (sizeRamp and angleRamp are constants),
-     so slot 0 is the whorl — when per-slot overrides arrive that stops being
-     true and this must report per slot, not one of them. */
-  let petal = null;
-  buildWhorlInto({
-    count: state.petalCount,
-    radius: ring.radius,
-    height: 0,
-    sizeRamp: () => 1,
-    angleRamp: () => 0,
-    phase: 0,
-    blade: (slot) => {
-      const p = buildPetalInto(acc, state, ring, slot, capability);
-      if (slot.index === 0) petal = p;
-    },
-  });
-  buildHubInto(acc, state, ring);          // unconditional — the invariant's plumbing
-  const center = buildCenterInto(acc, state, ring);   // optional — the designed mass
-  return { ring, center, petal };
+  const fr = footRing(state, acc);
+  /* ONE WHORL PER LAYER — layers are instances of the arrangement primitive,
+     which is what its full signature has been for since session 1. Every
+     per-layer quantity is read off the layer descriptor footRing() produced;
+     nothing is computed here, because a consumer computing a per-layer value
+     is exactly the arithmetic the one-owner rule forbids.
+
+     `height: 0` for EVERY layer, and it is not a control — see footRing()'s
+     header for the measurement that settled it. The whorl primitive keeps its
+     `height` argument (it has carried it since session 1 and sepals will use
+     it); it is passed the same literal 0 it has always been passed.
+
+     PER-LAYER MEASUREMENTS, not one of them. Slot 0 of each layer is that
+     layer's petal (sizeRamp and angleRamp are per-layer constants), so slot 0
+     is the whorl. Reporting a single `petal` would have silently meant "layer
+     0" the moment layers existed — the same defect the pre-layer comment here
+     warned per-slot overrides would cause. `petal` is kept pointing at layer
+     0 so every existing consumer reads what it always read. */
+  const petals = [];
+  for (const ring of fr.layers) {
+    let petal = null;
+    buildWhorlInto({
+      count: state.petalCount,
+      radius: ring.radius,
+      height: 0,
+      sizeRamp: () => ring.scale,
+      angleRamp: () => ring.tiltExtra,
+      phase: ring.phase,
+      placement: state.placement,
+      blade: (slot) => {
+        const p = buildPetalInto(acc, state, ring, slot, capability);
+        if (slot.index === 0) petal = p;
+      },
+    });
+    petals.push(petal);
+  }
+  buildHubInto(acc, state, fr.hub);          // unconditional — the invariant's plumbing
+  const center = buildCenterInto(acc, state, fr.hub);   // optional — the designed mass
+  return { ring: fr.layers[0], rings: fr.layers, hub: fr.hub, foot: fr, center, petal: petals[0], petals };
 }

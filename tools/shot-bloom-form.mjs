@@ -58,7 +58,9 @@
    connectedness are measured on the export by verify-bloom-export.mjs and
    verify-bloom-connectedness.mjs, and the form layer's own structural
    claims — foot invariance, roll isometry, the curvature floor, the
-   all-zero guard — are asserted by formAssertions() in both of those. This
+   all-zero guard — are asserted by formAssertions() in both of those, and
+   FOOT INVARIANCE by junctionAssertions() beside it (it moved there when
+   layers arrived, because "the foot" stopped being one ring). This
    shows what the geometry LOOKS like, which no gate can.
 
    RUN:  node tools/shot-bloom-form.mjs <out-dir>
@@ -66,7 +68,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, applyCapability,
-         formAssertions, FORM_SCOPE, CONTROLS, DEFAULTS, CAPABILITY_CLEFT } from './bloom-harness.mjs';
+         formAssertions, FORM_SCOPE, junctionAssertions, CONTROLS, DEFAULTS, CAPABILITY_CLEFT } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -97,11 +99,18 @@ async function cell({ label, set = [], capability = null, views = ['petal'], not
   if (drift.length) await die(`${label}: state is not DEFAULTS+set: ${drift.join('; ')}`);
   const cap = await applyCapability(page, { capability });
   if (cap.length) await die(`${label}: ${cap.join('; ')}`);
-  /* The sheet runs the gates' OWN form assertions rather than a relaxed
-     copy. A picture of geometry whose foot moved is not evidence of
-     anything, and the sheet is the one place a human would not notice. */
+  /* The sheet runs the gates' OWN assertions rather than a relaxed copy. A
+     picture of geometry whose foot moved is not evidence of anything, and the
+     sheet is the one place a human would not notice.
+
+     BOTH are called, and that is not belt-and-braces: FOOT INVARIANCE MOVED
+     out of formAssertions() into junctionAssertions() when layers arrived (it
+     had only ever seen layer 0). Calling formAssertions alone here would have
+     kept passing while quietly dropping the very check this comment claims. */
   const frm = await formAssertions(page, { set, capability });
   if (frm.length) await die(`${label}: ${frm.join('; ')}`);
+  const jct = await junctionAssertions(page, { set, capability });
+  if (jct.length) await die(`${label}: ${jct.join('; ')}`);
   await page.waitForTimeout(450);
 
   const want = { ...DEFAULTS };

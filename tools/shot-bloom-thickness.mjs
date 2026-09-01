@@ -66,16 +66,18 @@
    are measured on the export by verify-bloom-export.mjs and
    verify-bloom-connectedness.mjs; the thickness layer's own structural
    claims — foot invariance against footRing()'s own answer, the export
-   floor, the uniform guard — are asserted by formAssertions() and
-   thicknessAssertions() in both of those, and this tool runs them too,
-   because a picture of geometry whose foot moved is evidence of nothing.
+   floor, the uniform guard — are asserted by junctionAssertions() (foot
+   invariance, which moved there when layers made "the foot" N rings),
+   formAssertions() and thicknessAssertions() in both of those, and this tool
+   runs all three, because a picture of geometry whose foot moved is evidence
+   of nothing.
 
    RUN:  node tools/shot-bloom-thickness.mjs <out-dir> [--before <worktree>]
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
-         formAssertions, thicknessAssertions, THICKNESS_SCOPE, CONTROLS, DEFAULTS,
+         formAssertions, thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, CONTROLS, DEFAULTS,
          MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
@@ -150,6 +152,11 @@ async function cell({ label, set = [], views = ['foot'], note = '', prt = port, 
     if (drift.length) await die(`${label}: state is not DEFAULTS+set: ${drift.join('; ')}`);
     const frm = await formAssertions(pg, { set });
     if (frm.length) await die(`${label}: ${frm.join('; ')}`);
+    /* FOOT INVARIANCE lives in junctionAssertions() since layers arrived —
+       formAssertions() alone would leave this sheet's central claim
+       unchecked while still passing. */
+    const jct = await junctionAssertions(pg, { set });
+    if (jct.length) await die(`${label}: ${jct.join('; ')}`);
     const thk = await thicknessAssertions(pg, { set });
     if (thk.length) await die(`${label}: ${thk.join('; ')}`);
   }

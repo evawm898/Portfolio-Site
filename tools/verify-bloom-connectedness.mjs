@@ -56,6 +56,29 @@
        evaluation, not from the STL; what this gate measures on those rows is
        the same thing it measures everywhere — one connected body. The scope
        is printed beside each capability row, not only here.
+     - **THE JUNCTION UNDER LAYERS. A PASS HERE DOES NOT ENDORSE IT**, and
+       that is measured rather than cautious (Sep 1). Two mutations were run
+       against this gate before junctionAssertions() was written:
+         * THE WRONG HUB — building the junction slab at the wrong layer's
+           radius (min over layers, not the owner's R0). At the defaults with
+           three layers the outer whorl's feet end 7.94 mm out against a hub
+           stopping at 6.86 mm: joined to nothing. THIS GATE REPORTS ONE
+           REGION, 0.00% DETACHED, on all five configurations tried (2 and 3
+           layers, layerSize max, ALL THIN x spread min, petalCount 40). It
+           passes because consecutive foot annuli overlap EACH OTHER — layer
+           0's feet span [7.94, 13.23] and layer 1's span [5.72, 9.53] — so
+           the outer whorl hangs on by a CHAIN through the inner layers, with
+           blade interpenetration on top. Connectedness under layers is
+           OVER-DETERMINED and this measure cannot separate a correct hub from
+           an incorrect one.
+         * THE LIFTED LAYER — feet off the hub plane. The junction derivation
+           dies at |h| >= t (1.20 mm at the shipping sheet, 0.60 ALL-THIN),
+           and this gate does not split until h >= 2.5 mm. The band between is
+           DETACHED BY DERIVATION AND READS AS ONE PIECE. Confirmed across
+           eight scenarios; none split before 2.0 mm.
+       J1–J4 in junctionAssertions() carry what this gate cannot, in exact
+       arithmetic from the app's own metrics, on every row. Do not weaken them
+       on the strength of a green run here.
    There are no presets yet; when presets exist they become named rows here
    FIRST (charter: coverage starts where the flower's gate was blind).
 
@@ -86,10 +109,29 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
-const MAX_VOXELS = 90e6;    // grids beyond this are SKIPPED and reported, never passed
+/* Grids beyond this are SKIPPED and reported, NEVER passed — so this number
+   decides how much of the matrix is actually measured, and it is sized
+   against the matrix rather than picked.
+
+   RAISED 90M -> 160M (Sep 1), because the layer work made it bind. `ALL MAX`
+   sweeps every non-centre slider to its maximum, which now includes
+   layerCount 3, and `ALL MAX x DOME max` went from 403x403x239 (38.8M,
+   measured) to 605x605x360 (131.8M, skipped). A row that USED to be measured
+   and is now skipped is coverage lost to a change, which is exactly what this
+   report is supposed to make impossible to miss — so the ceiling moves rather
+   than the row going quiet.
+
+   SIZED, NOT GUESSED: the largest grid across all 158 rows is that row's
+   131.8M; the next largest is 32.9M. 160M leaves ~21% headroom over the
+   worst case with a real gap to everything else. COST, measured: that row
+   takes 8.6 s and peaks at 397 MB RSS (one byte per voxel, so the array
+   itself is 132 MB) against a 331 s whole-gate run — about 2.5%. If a future
+   control pushes the worst case past this, the honest move is the same one:
+   measure the new maximum and raise it, or shrink what the row reaches. */
+const MAX_VOXELS = 160e6;
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
 function voxelComponents(buf, cell) {
@@ -177,6 +219,16 @@ for (const row of rows) {
      sheet is still spanned by a hub built at the same thickness). */
   const thk = await thicknessAssertions(page, row);
   if (thk.length) { validity.push(`${row.label}: ${thk.join('; ')}`); continue; }
+  /* THE JUNCTION ASSERTIONS, on EVERY row, and THIS GATE CANNOT SUBSTITUTE
+     FOR THEM — measured, not supposed. Building the hub at the wrong layer's
+     radius leaves the outer whorl joined to nothing and this gate reports ONE
+     region, 0% detached, on all five configurations it was tried on: the foot
+     annuli overlap each other, so connectedness under layers is
+     over-determined. A lifted layer is detached by derivation at 1.20 mm and
+     does not split the flood fill until roughly 2.5 mm. J1-J4 carry what the
+     bytes cannot show. */
+  const jct = await junctionAssertions(page, row);
+  if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
@@ -246,6 +298,8 @@ console.log(`\n${results.length - failures.length - skipped.length}/${results.le
   + (skipped.length ? `; ${skipped.length} skipped (grid too large — NOT a pass)` : '')
   + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log('LIMITS: surface occupancy, not solid; cannot see free ends or sub-cell gaps; covers only the matrix above. See the header.');
+console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under layers — the wrong-hub mutation passes this gate on every configuration tried.');
+console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 
 let bad = false;
 if (validity.length) {

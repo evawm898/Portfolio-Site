@@ -31,6 +31,14 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase5   `phase5Matrix()` — the 125 rows frozen at deacded, the commit
+                before layers and spiral placement. NOW THE STRONGEST of the
+                frozen baselines, on the same reasoning that made --phase4 the
+                strongest of three: it is the only one carrying the THICKNESS
+                layer's own corners (the seven THIN rows, the five TIP rows,
+                and the tip cap's held/moved partition) as well as everything
+                --phase4 had. An arrangement change that moved a thin, capped
+                or clefted petal's bytes would show here and nowhere else.
      --phase4   `phase4Matrix()` — the 106 rows frozen at 3c542fb, the commit
                 before the thickness layer. The STRONGEST of the frozen
                 baselines: it is the only one that carries the seven named
@@ -177,7 +185,7 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2|--phase3] --root <dir> --out <file.json>
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2|--phase3|--phase4|--phase5] --root <dir> --out <file.json>
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
@@ -189,7 +197,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -266,10 +274,10 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 if (process.argv.includes('--verify-frozen')) {
   const base = arg('--base');
   if (!base) { console.error('--verify-frozen needs --base <dir> (a git worktree of the commit the matrix claims to snapshot)'); process.exit(2); }
-  const which = ['phase2', 'phase3', 'phase4'].filter((n) => process.argv.includes('--' + n));
-  if (which.length !== 1) { console.error('--verify-frozen needs exactly one of --phase2 --phase3 --phase4'); process.exit(2); }
+  const which = ['phase2', 'phase3', 'phase4', 'phase5'].filter((n) => process.argv.includes('--' + n));
+  if (which.length !== 1) { console.error('--verify-frozen needs exactly one of --phase2 --phase3 --phase4 --phase5'); process.exit(2); }
   const name = which[0];
-  const frozen = { phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix }[name]();
+  const frozen = { phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix }[name]();
   const baseHarness = await import(pathToFileURL(path.join(path.resolve(base), 'tools', 'bloom-harness.mjs')).href);
   const live = baseHarness.buildMatrix();
   /* Normalised to exactly what a row MEANS to every consumer: its label, the
@@ -489,6 +497,7 @@ const FULL = process.argv.includes('--full');
 const PHASE2 = process.argv.includes('--phase2');
 const PHASE3 = process.argv.includes('--phase3');
 const PHASE4 = process.argv.includes('--phase4');
+const PHASE5 = process.argv.includes('--phase5');
 /* Exactly one matrix. The guard and the LABEL are derived from one list so a
    new matrix cannot be added to the runner while the recorded label silently
    keeps saying something else — which is what happened when --phase3 landed:
@@ -496,13 +505,13 @@ const PHASE4 = process.argv.includes('--phase4');
    naming a computation nobody performed, in this project's most repeated
    defect shape. --compare does not read the field, so nothing drew a wrong
    conclusion from it; it was wrong in the record, which is enough. */
-const MATRIX_FLAGS = [[FULL, 'full'], [PHASE4, 'phase4'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
+const MATRIX_FLAGS = [[FULL, 'full'], [PHASE5, 'phase5'], [PHASE4, 'phase4'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
 const chosen = MATRIX_FLAGS.filter(([on]) => on);
 if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
 const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
 const rows = [];
 const validity = [];
-const MATRIX_FN = { full: buildMatrix, phase4: phase4Matrix, phase3: phase3Matrix, phase2: phase2Matrix, legacy: legacyMatrix };
+const MATRIX_FN = { full: buildMatrix, phase5: phase5Matrix, phase4: phase4Matrix, phase3: phase3Matrix, phase2: phase2Matrix, legacy: legacyMatrix };
 /* ONE list decides the flag, the recorded LABEL and the rows. It used to be
    two — a flag list for the guard and a ternary chain for the rows — and the
    chain silently fell through for any flag the chain did not know. That is

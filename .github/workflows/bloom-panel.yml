@@ -24,6 +24,7 @@ on:
       - bloom.css
       - bloom.js
       - bloom-registry.js
+      - bloom-geometry.js
       - tools/verify-bloom-panel.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
@@ -35,6 +36,7 @@ on:
       - bloom.css
       - bloom.js
       - bloom-registry.js
+      - bloom-geometry.js
       - tools/verify-bloom-panel.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
