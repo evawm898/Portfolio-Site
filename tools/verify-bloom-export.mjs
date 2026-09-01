@@ -48,7 +48,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -109,6 +109,14 @@ for (const row of rows) {
      identity, an exact equality computed in footRing) are what observe it. */
   const jct = await junctionAssertions(page, row);
   if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
+  /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
+     layer — measured on three worktrees before these assertions existed, not
+     derived: the wrong role, a record that never reaches the blade, and the
+     area rule regrouped per foot ALL export watertight, at an identical
+     triangle count and an identical byte length. See zygoAssertions()'s
+     header for the table. */
+  const zyg = await zygoAssertions(page, row);
+  if (zyg.length) { validity.push(`${row.label}: ${zyg.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
@@ -168,6 +176,7 @@ console.log(`\n${results.length - failures.length}/${results.length} configs wat
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
 console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
+console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 
 let bad = false;
 if (validity.length) {

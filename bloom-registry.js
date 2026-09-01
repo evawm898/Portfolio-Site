@@ -839,6 +839,83 @@ export const CONTROLS = [
     label: 'Tilt step', fmt: (v, ui) => `+${v}° per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'layerCount', min: 2 } },
 
+  /* ===================================================================
+     ZYGOMORPHY — THE INNER WHORLS' OWN FORM. Session A of two: per-LAYER
+     roles, which is the iris (falls at the outer whorl, standards above it).
+     Session B derives roles from a mirror plane and gives ONE SLOT its own
+     record — the orchid's labellum and hood. Charter: "Zygomorphy".
+
+     WHY THEY LIVE IN ARRANGEMENT AND NOT IN PETAL FORM, and it is not a
+     preference: the charter's own ROOM TO GROW note predicted this shape
+     exactly — "a layer-count control in that section with per-layer
+     sub-controls gated on it by visibleWhen, the centerStyle pattern one
+     level up, not a section per layer". `layerSize`, `layerPhase` and
+     `layerTilt` already sit here under that pattern and these are its next
+     three. It also keeps the panel gate honest: ARRANGEMENT ships OPEN, so
+     the path route does not need a WITNESS for a section whose every control
+     is hidden at the shipping default — a witness that has to set up its own
+     precondition before it can move anything is a witness that can quietly
+     measure nothing. When session B's slot roles arrive, a "Whorl
+     differences" SECTION is the right home for the pair, and it will need
+     that precondition mechanism; recorded so it is designed rather than
+     discovered.
+
+     TWO PREFIXES, TWO LAWS, and the distinction is load-bearing. `layer*` is
+     a lambda-RAMP: the quantity is `lambda * value`, defined at every real
+     depth, which is exactly why size and tilt survive CONTINUOUS. `inner*` is
+     a ROLE OVERRIDE: a delta applied to whichever whorls carry the INNER
+     role, with no lambda in it at all. Conflating them would put a ramp's
+     label on an override's law.
+
+     SIZE AND TILT ARE ABSENT ON PURPOSE (Eva's ruling, Sep 1). `layerSize`
+     and `layerTilt` already own per-layer size and tilt; a role override of
+     either would be a second owner of one quantity, and it would strand
+     CONTINUOUS, whose only depth controls those are. So the role overrides
+     cover exactly what the ramps do not.
+
+     THE SET IS TRIMMED, AND THE ASYMMETRY DECIDED IT (Eva, Sep 1): adding a
+     control later is one registry row and one row in ROLE_OVERRIDES, forever;
+     retiring one becomes a schema bump plus a migration the day anything
+     persists a design. RECORDED, NOT BUILT: `innerRoll`, `innerTwist`,
+     per-layer taper deltas and a per-layer `tipThinning` delta — mechanically
+     identical, none needed by the iris. Grow on evidence from real use.
+
+     ALL THREE ARE HIDDEN UNDER CONTINUOUS, and that is a ruling with a
+     measurement behind it rather than caution. Continuous placement has no
+     layers to differentiate — J5 asserts precisely that — so an INNER role
+     there would be a label for a group that does not exist. Reinterpreting it
+     as "the inner turns" would be `layerPhase`'s trap: a second meaning under
+     a name that already means something else. Named gate rows assert the
+     controls are hidden AND that the export is bit-identical to the same
+     design without them; a gated state is coverage, not the absence of it.
+
+     DEFAULT 0 ON ALL THREE, so the shipping bloom is unmoved by construction:
+     resolveRoleOverrides() SKIPS a zero delta outright, which leaves the ring
+     carrying no record and petalStateFor() handing the builder the caller's
+     own state object. The identity is object identity, not `x + 0`.
+
+     THE RANGES ARE THE BASE CONTROLS' OWN, MIRRORED — and both gates assert
+     that against ROLE_OVERRIDES rather than trusting this comment, because
+     bloom-geometry.js cannot import the registry and clamps composed values
+     into bounds it has to restate. Each delta spans the base control's full
+     range in the direction that reaches its form: curl runs the whole signed
+     span so standards can rise while falls hang, cup likewise, and tip
+     breadth runs upward only because the base already starts at 0. */
+  { id: 'innerCurl', section: 'arrangement', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+    label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
+    tier: 'standard', role: 'petal',
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
+
+  { id: 'innerCup', section: 'arrangement', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Inner cup', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
+    tier: 'standard', role: 'petal',
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
+
+  { id: 'innerTipBreadth', section: 'arrangement', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+    label: 'Inner tip', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `+${Number(v).toFixed(2)} breadth`),
+    tier: 'standard', role: 'petal',
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
+
   /* CENTER — the A/B rig. */
   { id: 'centerStyle', section: 'center', kind: 'choice', default: 'DISC',
     options: [

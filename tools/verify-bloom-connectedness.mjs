@@ -121,7 +121,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 /* Grids beyond this are SKIPPED and reported, NEVER passed — so this number
@@ -241,6 +241,13 @@ for (const row of rows) {
      bytes cannot show. */
   const jct = await junctionAssertions(page, row);
   if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
+  /* ZYGOMORPHY (Z1-Z3) — see zygoAssertions()'s header. This gate is as blind
+     to the layer as the export gate is: the foot is never written by anything
+     a role may override, and the hub disc spans every ring, so no reachable
+     override can split the flood fill. All three positive-control mutations
+     export as ONE piece. */
+  const zyg = await zygoAssertions(page, row);
+  if (zyg.length) { validity.push(`${row.label}: ${zyg.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
