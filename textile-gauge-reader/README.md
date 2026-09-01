@@ -2002,6 +2002,45 @@ treats them differently.
 - An HTTP-level failure (the server DID answer, just with an error) is
   never treated as a cold start — only genuine transport failures are.
 
+**Follow-up bug this same instinct almost missed.** After the fix above
+shipped, two live-site reports came in that looked unrelated at first: a
+raw JS crash ("Cannot read properties of undefined (reading 'length')")
+on Analyze, and "Accepted wale columns: 43 of undefined" in Developer
+diagnostics. Reproducing against the real backend locally (`pytest`
+`TestClient`, not a hand-built response) showed the CURRENT code returns
+every field the frontend reads — so the live Render deployment was
+almost certainly running older backend code, missing `no_measurement_
+labels` / `columns_considered` (both added together by the same earlier
+PR). That explained both symptoms directly: `no_measurement_labels`
+being absent throws exactly that "reading 'length' of undefined" error
+in `renderMeasurementConsistency`; `columns_considered` being absent
+just interpolates as the literal string "undefined".
+
+The real, separate bug this surfaced: **`err instanceof TypeError`, the
+check this section's own cold-start recovery is built on, cannot tell
+"the network failed" apart from "a JS bug threw a TypeError after a
+successful response"** — both are `TypeError`s. Every fetch handler in
+this file used to run its whole success path (parsing, rendering, state
+updates) inside the SAME try block being classified this way, so a crash
+like the one above was reported as "Could not reach the analysis
+service" — which is exactly what sent the original cold-start
+investigation chasing a connectivity problem that didn't exist. Fixed by
+restructuring every fetch call site so `isTransportFailure` (the shared,
+renamed version of this check) is applied ONLY to the fetch+parse+HTTP-
+status step itself — never to anything that runs after a response was
+already successfully received. Also hardened directly: `renderMeasurement
+Consistency` and the loop-lattice comparison card now default missing
+array fields to `[]` and missing `columns_considered` to a `"?"` display
+rather than crashing or showing "undefined", so a genuine schema drift
+degrades instead of breaking the page.
+
+`tests/test_frontend_response_contract.py` is the backend-side guard
+against this recurring: it drives the real `/propose-rois` → `/analyze-
+multi` flow through a real fixture image and asserts that every field
+the frontend reads *without* a defensive guard is actually present in
+the response, so a schema change that would break the UI fails a test
+before it ships, rather than surfacing as a live-site report again.
+
 ## Ground Truth / Correction System
 
 After a prediction, the Results screen has a **Verify Measurement**

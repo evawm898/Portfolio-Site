@@ -303,6 +303,30 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  // AbortError (our own timeout) and a bare TypeError (no HTTP response
+  // reached us at all) are exactly what a cold, still-waking free-tier
+  // instance looks like from here -- indistinguishable, from a single
+  // failed fetch, from the service actually being down. See README.md's
+  // "Why the health banner can lie" for the investigation this is built
+  // from. An HTTP-level failure (the server DID answer, just with an
+  // error) is NOT this.
+  //
+  // IMPORTANT, and the reason this exists as a NAMED, SHARED check rather
+  // than being inlined at each call site: `err instanceof TypeError` is
+  // also true for an ordinary JS bug with no connection to the network at
+  // all -- e.g. reading `.length` off a field the response didn't
+  // include. Every caller of this function MUST only apply it to errors
+  // thrown by the fetch+parse+HTTP-status step itself, never to errors
+  // from rendering/state code that runs after a response was already
+  // successfully received -- otherwise a real application crash gets
+  // mislabeled "could not reach the analysis service," which is exactly
+  // the bug this function's own history is named for (see the "reading
+  // 'length' of undefined" regression this was written to stop
+  // recurring, tests/test_frontend_response_contract.py).
+  function isTransportFailure(err) {
+    return (err && err.name === "AbortError") || err instanceof TypeError;
+  }
+
   async function pingHealthOnce() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
@@ -1755,27 +1779,41 @@
       if (hash) fd.append("image_sha256", hash);
       fd.append("save_image", false); // no image-save consent checkbox on this compact panel -- never opt in implicitly
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
       let data;
       try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || `Could not save ground truth (HTTP ${res.status}).`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
+            method: "POST",
+            body: fd,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        try {
+          data = await res.json();
+        } catch {
+          throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+        }
+        if (!res.ok || data.success === false) {
+          throw new Error(data.message || `Could not save ground truth (HTTP ${res.status}).`);
+        }
+      } catch (err) {
+        // isTransportFailure is only applied here, to the fetch+parse+
+        // status-check above -- never to the rendering code below, so a
+        // real JS bug there can't get mislabeled as a connectivity issue.
+        if (isTransportFailure(err)) {
+          throw new Error(
+            err.name === "AbortError"
+              ? "Saving timed out. Try again shortly."
+              : "Could not reach the analysis service to save this."
+          );
+        }
+        throw err;
       }
 
       gridBoxStatus.textContent = `Saved (sample ${data.id.slice(0, 8)}…).`;
@@ -1783,13 +1821,7 @@
       gridCourseCountInput.value = "";
     } catch (err) {
       gridBoxStatus.hidden = true;
-      if (err && err.name === "AbortError") {
-        gridBoxError.textContent = "Saving timed out. Try again shortly.";
-      } else if (err instanceof TypeError) {
-        gridBoxError.textContent = "Could not reach the analysis service to save this.";
-      } else {
-        gridBoxError.textContent = (err && err.message) || "Could not save. Please try again.";
-      }
+      gridBoxError.textContent = (err && err.message) || "Could not save. Please try again.";
       gridBoxError.hidden = false;
     } finally {
       updateGridBoxSaveButton();
@@ -1898,27 +1930,41 @@
       fd.append("known_distance", state.cal.knownDistance);
       fd.append("unit", state.cal.unit);
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/propose-rois`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
       let data;
       try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok) {
-        throw new Error(data.message || `Proposing measurement areas failed (HTTP ${res.status}).`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(`${CONFIG.API_BASE_URL}/propose-rois`, {
+            method: "POST",
+            body: fd,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        try {
+          data = await res.json();
+        } catch {
+          throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+        }
+        if (!res.ok) {
+          throw new Error(data.message || `Proposing measurement areas failed (HTTP ${res.status}).`);
+        }
+      } catch (err) {
+        // isTransportFailure is only applied here, to the fetch+parse+
+        // status-check above -- never to the rendering code below, so a
+        // real JS bug there can't get mislabeled as a connectivity issue.
+        if (isTransportFailure(err)) {
+          throw new Error(
+            err.name === "AbortError"
+              ? "Proposing measurement areas timed out."
+              : "Could not reach the analysis service to propose measurement areas."
+          );
+        }
+        throw err;
       }
 
       const proposed = (data.rois || []).map((r) => ({
@@ -1947,13 +1993,7 @@
       updateRoiUI();
       render();
     } catch (err) {
-      if (err && err.name === "AbortError") {
-        roiStatus.textContent = "Proposing measurement areas timed out.";
-      } else if (err instanceof TypeError) {
-        roiStatus.textContent = "Could not reach the analysis service to propose measurement areas.";
-      } else {
-        roiStatus.textContent = (err && err.message) || "Could not propose measurement areas.";
-      }
+      roiStatus.textContent = (err && err.message) || "Could not propose measurement areas.";
       roiError.textContent = "You can still add a measurement area manually below.";
       roiError.hidden = false;
       state.roiAddMode = true;
@@ -2444,23 +2484,12 @@
       return data;
     }
 
-    // AbortError (our own timeout) and a bare TypeError (no HTTP response
-    // reached us at all) are exactly what a cold, still-waking free-tier
-    // instance looks like from here -- indistinguishable, from a single
-    // failed fetch, from the service actually being down. See README.md's
-    // "Why the health banner can lie" for the investigation this is built
-    // from. An HTTP-level failure (thrown as a plain Error above) is NOT
-    // this -- the server answered, so it isn't a cold start.
-    function looksLikeColdStartOrUnreachable(err) {
-      return (err && err.name === "AbortError") || err instanceof TypeError;
-    }
-
     try {
       let data;
       try {
         data = await attemptAnalyze();
       } catch (err) {
-        if (!looksLikeColdStartOrUnreachable(err)) throw err;
+        if (!isTransportFailure(err)) throw err;
 
         // Don't just fail -- wait for /health to confirm the service is
         // actually back (reusing the exact same retry/backoff the status
@@ -2684,17 +2713,29 @@
 
     const regionCount = mr.per_roi.length;
     const row = (label, value) => `<div class="tgr-consistency-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(value))}</span></div>`;
+    // arr() defaults a possibly-missing array field to [] rather than
+    // letting `.length`/`for...of` crash on it -- defends this whole
+    // panel against exactly the class of bug found via a live-site
+    // report: a frontend/backend schema mismatch (e.g. an older backend
+    // deploy predating a field this code expects) throwing "Cannot read
+    // properties of undefined (reading 'length')" instead of just
+    // degrading. See tests/test_frontend_response_contract.py, which
+    // pins the CURRENT contract so drift is caught before it ships --
+    // this guard is the belt to that test's suspenders, for whatever
+    // drift reaches production anyway (a stale deploy, a hand-rolled
+    // response in a future refactor, etc).
+    const arr = (x) => x || [];
     // included + excluded always accounts for every region considered on
     // this axis (see AxisConsensusOut.excluded_labels) -- broken out by
     // reason (outlier vs. no usable measurement at all) so "2 of 4
     // contributed" is never silently indistinguishable from "2 of 2".
     const agreedText = (consensus) => {
-      const nOutliers = consensus.outliers.length;
-      const nNoMeasurement = consensus.no_measurement_labels.length;
+      const nOutliers = arr(consensus.outliers).length;
+      const nNoMeasurement = arr(consensus.no_measurement_labels).length;
       const parts = [];
       if (nOutliers) parts.push(`${nOutliers} excluded as outlier${nOutliers === 1 ? "" : "s"}`);
       if (nNoMeasurement) parts.push(`${nNoMeasurement} had no usable measurement`);
-      return `${consensus.included_labels.length} of ${regionCount} agreed` + (parts.length ? ` — ${parts.join(", ")}` : "");
+      return `${arr(consensus.included_labels).length} of ${regionCount} agreed` + (parts.length ? ` — ${parts.join(", ")}` : "");
     };
 
     let html = "";
@@ -2703,16 +2744,16 @@
     html += row("Course agreement", agreedText(mr.course_consensus));
 
     const outlierLines = [];
-    for (const o of mr.wale_consensus.outliers) {
+    for (const o of arr(mr.wale_consensus.outliers)) {
       outlierLines.push(`Wale ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
     }
-    for (const o of mr.course_consensus.outliers) {
+    for (const o of arr(mr.course_consensus.outliers)) {
       outlierLines.push(`Course ${o.label}: ${o.per_inch != null ? o.per_inch.toFixed(2) : "—"}/in — ${o.reason}`);
     }
-    for (const label of mr.wale_consensus.no_measurement_labels) {
+    for (const label of arr(mr.wale_consensus.no_measurement_labels)) {
       outlierLines.push(`Wale ${label}: no usable measurement for this region.`);
     }
-    for (const label of mr.course_consensus.no_measurement_labels) {
+    for (const label of arr(mr.course_consensus.no_measurement_labels)) {
       outlierLines.push(`Course ${label}: no usable measurement for this region.`);
     }
     const outlierHtml = outlierLines.map((line) => `<div class="tgr-consistency-outlier">⚠ ${escapeHtml(line)}</div>`).join("");
@@ -2927,7 +2968,7 @@
         ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
         <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
-        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered} candidate columns accepted</span></div>` : ""}
+        ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered != null ? d.columns_considered : "?"} candidate columns accepted</span></div>` : ""}
       </div>`;
     render(); // re-draw the results overlay so it reflects the newly selected region
   }
@@ -3062,7 +3103,7 @@
         </p>
         ${row("Direct loop detections", d.direct_center_count)}
         ${row("Course rows used as prior", d.row_count)}
-        ${row("Accepted wale columns", `${d.column_count} of ${d.columns_considered} candidates`)}
+        ${row("Accepted wale columns", `${d.column_count} of ${d.columns_considered != null ? d.columns_considered : "?"} candidates`)}
         ${row("Column row-support (min..max)", d.column_support_counts && d.column_support_counts.length ? `${Math.min(...d.column_support_counts)}..${Math.max(...d.column_support_counts)} of ${d.row_count}` : "—")}
         ${row("Lattice consistency", fmt(d.lattice_consistency, 2))}
         ${row("Loop-lattice wale spacing", fmt(d.wale_spacing_px, 1, " px"))}
@@ -3264,42 +3305,50 @@
         fd.append("file", state.file);
       }
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-      let res;
-      try {
-        res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
-          method: "POST",
-          body: fd,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
-
       let data;
       try {
-        data = await res.json();
-      } catch {
-        throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
-      }
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || `Could not save correction (HTTP ${res.status}).`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(`${CONFIG.API_BASE_URL}/corrections`, {
+            method: "POST",
+            body: fd,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        try {
+          data = await res.json();
+        } catch {
+          throw new Error(`Server returned an unexpected response (HTTP ${res.status}).`);
+        }
+        if (!res.ok || data.success === false) {
+          throw new Error(data.message || `Could not save correction (HTTP ${res.status}).`);
+        }
+      } catch (err) {
+        // isTransportFailure is only applied here, to the fetch+parse+
+        // status-check above -- never to the rendering code below, so a
+        // real JS bug there (e.g. renderCorrectionComparison reading a
+        // field the response didn't include) can't get mislabeled as a
+        // connectivity issue.
+        if (isTransportFailure(err)) {
+          throw new Error(
+            err.name === "AbortError"
+              ? "Saving timed out. The analysis service may be waking up from a cold start — try again shortly."
+              : "Could not reach the analysis service to save this correction. Try again shortly."
+          );
+        }
+        throw err;
       }
 
       correctionStatus.hidden = true;
       renderCorrectionComparison(data);
     } catch (err) {
       correctionStatus.hidden = true;
-      if (err && err.name === "AbortError") {
-        correctionError.textContent =
-          "Saving timed out. The analysis service may be waking up from a cold start — try again shortly.";
-      } else if (err instanceof TypeError) {
-        correctionError.textContent =
-          "Could not reach the analysis service to save this correction. Try again shortly.";
-      } else {
-        correctionError.textContent = (err && err.message) || "Could not save correction. Please try again.";
-      }
+      correctionError.textContent = (err && err.message) || "Could not save correction. Please try again.";
       correctionError.hidden = false;
     } finally {
       updateSaveCorrectionButton();
