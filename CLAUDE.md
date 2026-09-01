@@ -126,14 +126,14 @@ tour/release dates worth watching. No backend, no build step: a SHA-256
 password gate (`crypto.subtle` + a hardcoded hash, unlock flag in
 `sessionStorage`) guards a `localStorage`-backed CRUD tracker.
 
-**Status: not yet merged.** Everything below lives only on branch
-`claude/artist-tracker-testing-afc2ul` / PR #121 (draft, targeting `main`)
-and its Netlify Deploy Preview
-(`deploy-preview-121--eva-maskalenko.netlify.app`) — not the production
-domain. This matters because the app's only "database" is the browser's
-own `localStorage`, which is scoped per-origin: data added on the deploy
-preview does **not** carry over automatically once this merges to
-production. Use the app's own export/import JSON to move data across
+**Status: not yet merged.** Items 1–10 below live on branch
+`claude/artist-tracker-testing-afc2ul` / PR #121 (draft, targeting
+`main`); items 11–12 build on top of it on branch
+`claude/tracker-panel-paste-images-h46mti`. Review each through its own
+Netlify Deploy Preview — not the production domain. This matters because
+the app's only "database" is the browser's own `localStorage`, which is
+scoped per-origin: data added on the deploy preview does **not** carry
+over automatically once this merges to production. Use the app's own export/import JSON to move data across
 origins if needed.
 
 **Built so far, in order:**
@@ -175,16 +175,76 @@ origins if needed.
     following/tattoo/touring (e.g. "Influencer", "Art", "Friend" — as used
     in the user's real Instagram-export data) is now kept as a tag instead
     of being silently discarded when it collapses into "following."
-
-**Requested but NOT built** — a later message asked for this summary to
-cover "slide-in panel" and "paste-to-image" as items 7–8. Neither exists
-anywhere in this codebase or this session's history; no prior discussion
-of either was found. Don't assume they're implemented — if wanted, they
-need to be scoped and built from scratch.
+11. Slide-in detail drawer. Clicking anywhere on an entry row (the row is
+    the button — `role="button"`, tab-focusable, Enter/Space) slides a
+    ~400px panel in from the right; full width under 560px. No route
+    change, no scroll loss, the list stays where it was. Closes on the ×,
+    a backdrop click, or Escape, and focus returns to the row that opened
+    it. `prefers-reduced-motion` snaps instead of sliding.
+    - The row no longer contains a link. The handle used to be an `<a>`
+      straight to Instagram; that link is now the "Open on Instagram →"
+      button at the foot of the drawer (teal, `target="_blank"`), so
+      there is one predictable click target rather than a link inside a
+      button. The handle still renders teal, as text.
+    - Edit and Remove live **only** in the drawer — the per-row
+      edit/remove/open column is gone. With the whole row clickable,
+      keeping them would have meant three competing targets on one row.
+    - The drawer has two modes. View mode is a read-only spread of the
+      entry; edit mode is the *same* quick-add form, physically relocated
+      into the drawer (the fields, ids and save handler are unchanged).
+      There is no on-page add/edit panel any more — "+ add an entry"
+      opens the drawer in edit mode with a blank form. The on-page panel
+      still exists but is bulk-paste only, behind its own "bulk paste"
+      button, so the quick/bulk tab strip is gone.
+12. Paste-to-add photos. With the drawer in edit mode, Ctrl/⌘+V pastes a
+    copied image (screenshot, right-click → copy image) straight into the
+    entry's photo. Drag-and-drop onto the photo box works too.
+    - The `paste` listener is on the drawer element and is attached only
+      while edit mode is active — never on the document, and removed when
+      the drawer closes or returns to view mode.
+    - `preventDefault()` fires **only** when an image is actually taken.
+      A paste into a text field whose clipboard carries text is passed
+      through untouched, even if an image rides along with it (that is
+      how copying from a web page usually arrives). Copy-image and
+      screenshots put no text on the clipboard, so pasting still works
+      with a field focused.
+    - Stored photos are downscaled before they are saved: longest side
+      500px, re-encoded JPEG at 0.8 (`MAX_PHOTO_DIM` /
+      `PHOTO_JPEG_QUALITY`). A ~2MB screenshot lands at roughly 30–60KB.
+      The canvas is filled with the panel ink colour first, because JPEG
+      has no alpha and a transparent PNG would otherwise come out black.
+    - The pasted image is held in `pendingPhoto` and committed on save,
+      so Cancel discards it like every other field. The "photo url" text
+      field stays as the fallback path; the two are mutually exclusive
+      (typing a url drops the pasted image, and pasting clears the url).
+      A data-URL photo is never dumped into that text box — it shows as
+      "stored image · NN KB" with a "remove image" action.
+    - `persist()` now returns a boolean and handles a quota failure
+      loudly: it rolls `entries` back to `lastPersisted` (the last
+      snapshot that actually reached storage, so the screen can never
+      show unsaved data) and tells the user storage is full. Pasted
+      images make quota exhaustion a reachable failure rather than a
+      theoretical one.
+    - **Exports get much bigger.** Photos are data URLs inside each
+      entry, so they flow through JSON export/import with no special
+      handling — and a backup of 200 entries with images is megabytes
+      rather than tens of KB. Expected, not a bug.
 
 **Testing approach:** no CI workflow covers this file (every GitHub
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
-only — only Netlify's own informational checks run on this PR).
+only — only Netlify's own informational checks run on this PR). The
+drawer and paste-to-add work (items 11–12) shipped with a behaviour gate,
+`node tools/verify-tracker-drawer.mjs` (94 checks; `--shots <dir>` also
+writes a contact sheet). It serves the repo on a free port, seeds
+`sessionStorage` to skip the password gate, stubs unavatar.io and unpkg,
+and drives a real Chromium: open/close/Escape/backdrop, focus return,
+the edit round trip, the downscale (a 1200×800 paste must come out
+500×333 JPEG), every paste-scoping rule above, a stubbed
+`QuotaExceededError`, and a regression pass over bulk-paste merge, the
+filters and the map toggle. It is not wired into CI (no workflow here
+covers this file) — run it before calling a tracker change done.
+Verified falsifiable: widening `MAX_PHOTO_DIM` or dropping the
+text-field paste guard each turn it red.
 Verification has been manual: serve locally via `python3 -m http.server`
 (`crypto.subtle` needs a secure context — never test via `file://`), drive
 with Playwright (`NODE_PATH=/opt/node22/lib/node_modules` — Playwright is
