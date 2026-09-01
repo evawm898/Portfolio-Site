@@ -101,6 +101,16 @@ for (const row of rows) {
   const fm = await page.evaluate(() => window.__bloomMetrics());
   results.push({
     label: row.label, capability: !!row.capability, bytes: buf.length,
+    /* LIVE count beside the EXPORT count, per row. The charter's claim that
+       the export floor cannot move triangle counts here rests on every
+       primitive being a fixed-topology grid — NU, NV, the panel count and
+       every centre segment count depend on no control — and the thickness
+       layer is the first change that makes the floor actually BIND, so the
+       claim stops being free. Measured on every row rather than quoted: the
+       floor now changes geometry, and this is what says it still does not
+       change topology. `liveTris` comes from the app's last LIVE build;
+       `tris` is parsed from the exported STL's own header. */
+    liveTris: fm.liveTris,
     /* THE THICKNESS NUMBERS TRAVEL WITH THE ROW, so a green run is a record
        of where the clamps bound rather than only that nothing broke — and
        every figure carries its mode, because live and export geometry are no
@@ -126,16 +136,18 @@ server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
 
 console.log('export gate: pass criterion is boundary === 0, nothing else. nonManifold and shells are unrated diagnostics.\n');
-const failures = [];
+const failures = [], countMoved = [];
 for (const r of results) {
   const ok = r.boundary === 0;
   if (!ok) failures.push(r);
-  console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${r.label.padEnd(46)} tris(export)=${String(r.tris).padStart(6)} boundary=${r.boundary} nonManifold=${r.nonManifold} (unrated) shells=${r.shells} (unrated) ${(r.bytes / 1024).toFixed(0)} KiB`);
+  if (r.liveTris !== r.tris) countMoved.push(r);
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${r.label.padEnd(46)} tris(live)=${String(r.liveTris).padStart(6)} tris(export)=${String(r.tris).padStart(6)} boundary=${r.boundary} nonManifold=${r.nonManifold} (unrated) shells=${r.shells} (unrated) ${(r.bytes / 1024).toFixed(0)} KiB`);
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
 
 let bad = false;
 if (validity.length) {
@@ -147,6 +159,18 @@ if (failures.length) {
   bad = true;
   console.error(`\nexport gate: FAIL — ${failures.length} config(s) export with open (boundary) edges:`);
   for (const f of failures) console.error(`  - ${f.label}: boundary=${f.boundary}`);
+}
+/* A count that moved between modes means the fixed-topology premise is false
+   somewhere, which is a finding about the model rather than about this row —
+   the flower's floor moves features across a size threshold and adds or
+   removes tube segments, and the bloom is supposed to have no such mechanism.
+   Reported as its own failure rather than folded into the boundary criterion,
+   because it is a different property and this gate's pass criterion is stated
+   as boundary === 0 and nothing else. */
+if (countMoved.length) {
+  bad = true;
+  console.error(`\nexport gate: FAIL — ${countMoved.length} config(s) have DIFFERENT live and export triangle counts. The export floor is meant to change geometry and never topology:`);
+  for (const f of countMoved) console.error(`  - ${f.label}: tris(live)=${f.liveTris} tris(export)=${f.tris}`);
 }
 if (NEGATIVE_CONTROL) {
   if (bad) { console.log('\nNEGATIVE CONTROL: PASS — the harness rejected the clamped value, as it must.'); process.exit(0); }

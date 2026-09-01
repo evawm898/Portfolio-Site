@@ -912,6 +912,19 @@ export function phase3Matrix() {
   return rows;
 }
 
+/* THE COMMIT EACH FROZEN MATRIX CLAIMS TO SNAPSHOT — one list, read by
+   `--verify-frozen` in CI so the claim is checked rather than asserted, and
+   quoted by each function's own header. Until Aug 31 the claim lived only in
+   those headers, beside a citation of a check that did not exist; a name for
+   a commit is not a comparison against it. Never edit an entry: a frozen
+   matrix is a record of one commit, so a new baseline is a NEW entry beside
+   the old ones. */
+export const FROZEN_BASE_COMMITS = {
+  phase2: '21d4602',   // the A/B centre rig, spread exposed — before the silhouette model
+  phase3: '6626961',   // the silhouette model — before the four form curves
+  phase4: '3c542fb',   // the form curves and the DISC default — before the thickness layer
+};
+
 /* ===================================================================
    phase4Matrix() — THE 106 ROWS AS THEY STOOD AT 3c542fb, frozen.
 
