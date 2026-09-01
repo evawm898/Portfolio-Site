@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -264,6 +264,10 @@ let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequ
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
+/* THE BUILDER'S OWN TALLY of buildPetalInto calls — Z1's independent
+   quantity, so the role partition is checked against what was BUILT rather
+   than against another number the same owner produced. */
+let lastPetalsBuilt = 0;
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
@@ -283,6 +287,7 @@ function buildGeometry({ exportMode }) {
   if (!exportMode) {
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
     lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals;
+    lastPetalsBuilt = built.petalsBuilt;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
   const geo = new THREE.BufferGeometry();
@@ -390,13 +395,31 @@ function spiralLowCount(ui, fr) {
    numbers. Same discipline as the roll clamp and the print-truth line: a
    slider that has gone quiet must say where. Returns '' when nothing is
    floored, so the line simply is not there rather than saying "none". */
-function footFloorLine(rings) {
-  const first = rings.findIndex((r) => r.widthClamped);
-  if (first < 0) return '';
-  const n = rings.filter((r) => r.widthClamped).length;
-  const last = rings.length - 1 - [...rings].reverse().findIndex((r) => r.widthClamped);
+/* WHICH RINGS A FOOT CLAMP TOOK OVER ON — one owner for the phrasing, because
+   the floor and the ceiling ask the same question at opposite ends of one
+   clamp and two copies of it would drift in wording alone. */
+function clampedRingsPhrase(rings, hit) {
+  const idx = rings.map((r, i) => (hit(r) ? i : -1)).filter((i) => i >= 0);
+  if (!idx.length) return null;
+  const first = idx[0], last = idx[idx.length - 1];
   const which = rings.length === 1 ? 'the foot' : (first === last ? `ring ${first}` : `rings ${first}–${last}`);
-  return `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${which} (${n} of ${rings.length}) — the blade keeps shrinking, the root does not\n`;
+  return `${which} (${idx.length} of ${rings.length})`;
+}
+
+/* BOTH CLAMPS, BOTH REPORTED. The floor has said so since the thickness
+   layer; the CEILING never did, and it binds from petalWidth 25 upward — six
+   of that slider's 23 reachable values — where the blade keeps widening and
+   the area-ruled ring does not move at all (measured: 10.8324 mm at 24,
+   11.0558 mm at 25 and still 11.0558 mm at 30). A slider that has stopped
+   moving must say so: the same (CLAMPED) discipline the roll floor, the tip
+   floor and the foot floor already carry, arriving where it was always
+   missing (Eva, Sep 1 — found by discovery, not by a visitor wondering why
+   the ring stopped growing). No geometry moves; this is telemetry. */
+function footFloorLine(rings) {
+  const lo = clampedRingsPhrase(rings, (r) => r.widthClamped);
+  const hi = clampedRingsPhrase(rings, (r) => r.widthClampedHigh);
+  return (lo ? `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${lo} — the blade keeps shrinking, the root does not\n` : '')
+       + (hi ? `FOOT WIDTH CAPPED at ${FOOT_MAX_WIDTH_MM.toFixed(2)} mm on ${hi} — the blade keeps widening, the ring does not\n` : '');
 }
 
 function summarise(ui, acc, mode, rings, fr) {
@@ -434,7 +457,35 @@ function summarise(ui, acc, mode, rings, fr) {
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
 
+/* HOW MANY TIMES THE MODEL HAS BEEN BUILT — the REAL SIGNAL a harness waits
+   on, and it exists because a fixed sleep races the async rebuild (the flower
+   project's rule, and it fired here).
+
+   THE DEFECT IT CLOSES, found by this session and PRESENT SINCE THE FIRST
+   GATE. `regenerate()` is rAF-coalesced through scheduleRegen(), so when
+   applyConfig() returns — having set every value and fired every real event —
+   the model has NOT necessarily been rebuilt yet. Every assertion that then
+   reads __bloomMetrics() can be reading the PREVIOUS build: on a fresh page
+   that is the default bloom, so a row setting all four curves can report
+   `petalForm: null` and fail its own form assertion under a label naming a
+   design it never measured. It is rare because a Playwright evaluate
+   round-trip usually outlasts a frame — 0 of 40 unloaded on both trees, and
+   it fired once in a 205-row gate run competing for four CPUs.
+
+   Rare and silent is the worst combination this project knows: it is the
+   "73 of 185 configs measuring the wrong design" defect with a timer instead
+   of a read-back. settleBuild() in the harness waits on this counter. */
+let buildCount = 0;
+/* `pending` IS CLEARED AFTER THE BUILD, IN A `finally`, and both halves of
+   that matter. After it, so `pending === false` unambiguously means no build
+   is outstanding — cleared first, a waiter could observe false in the instant
+   before regenerate() ran. In a `finally`, so a throwing build cannot leave
+   the flag stuck true and silently stop the app rebuilding for the rest of
+   the session, which is what clearing it first was defending against. */
+window.__bloomBuildState = () => ({ count: buildCount, pending: regenQueued });
+
 function regenerate() {
+  buildCount++;
   const ui = readUI();
   refreshLabels(ui);
   const { geo, acc, built } = buildGeometry({ exportMode: false });
@@ -457,7 +508,7 @@ let regenQueued = false;
 function scheduleRegen() {
   if (regenQueued) return;
   regenQueued = true;
-  requestAnimationFrame(() => { regenQueued = false; regenerate(); });
+  requestAnimationFrame(() => { try { regenerate(); } finally { regenQueued = false; } });
 }
 
 for (const c of CONTROLS) {
@@ -593,6 +644,18 @@ window.__bloomMetrics = () => ({
     width: r.width, thickness: r.thickness,
     overhang: r.overhang, scale: r.scale, phase: r.phase, tiltExtra: r.tiltExtra,
     authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
+    /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
+       has always been able to bind - from petalWidth 25, a quarter of that
+       slider - with the blade widening and the area-ruled ring standing
+       still, and nothing reported it. See FOOT_MAX_WIDTH_MM. */
+    widthClampedHigh: r.widthClampedHigh,
+    /* THE ROLE AND ITS RECORD, footRing()'s OWN answer. Z1 reads roleCount to
+       check the partition; Z2 reads role and overrides against what the
+       builder reported it actually used. A gate deriving either from
+       layerCount would be a second copy of the derivation it exists to
+       police. */
+    role: r.role, roleCount: r.roleCount,
+    overrides: r.overrides ? { ...r.overrides } : null,
   })),
   /* Every ring's foot rows as EMITTED — J1's input. The pre-layer hook
      exposed slot 0 of the one whorl; reporting only that would have silently
@@ -620,6 +683,19 @@ window.__bloomMetrics = () => ({
      compare against — a claim nothing can make is reported absent, never as a
      passing 0. */
   ringGuardResidual: lastFoot.guardResidual,
+  /* THE ROLE-GROUPING RESIDUAL - an EQUALITY, not a bound, and footRing()'s
+     header says why: grouping by ROLE preserves the pre-role loop shape,
+     while grouping by SLOT would have moved every 40-petal export by 6 ULP.
+     null once a whorl carries more than one role, which is session B - a
+     claim nothing can make must read as absent, never as a passing 0. */
+  zygoGuardResidual: lastFoot.zygoGuardResidual,
+  petalsBuilt: lastPetalsBuilt,
+  /* WHAT EACH RING'S PETAL WAS ACTUALLY BUILT WITH, read from the builder's
+     own effective state and never from the resolver. This is the only thing
+     in the codebase that can see an override record that never reached the
+     blade - a failure invisible to both STL gates, to the triangle count and
+     to J1-J6 alike. Z2's third clause. */
+  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, overridden: p.overridden, applied: p.applied } : null)),
   layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to

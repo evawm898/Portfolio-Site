@@ -60,7 +60,8 @@ export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredi
    roll curvature floor the form assertions check must be the number the
    builder actually clamps to. A second copy here would let the gate endorse
    a wall the geometry does not build. */
-export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT,
+         ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 
 /* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
    name for the default sheet thickness and the registry carries a literal
@@ -90,6 +91,43 @@ if (LAYER_COUNT_CONTROL.max !== MAX_LAYERS) {
 }
 if (LAYER_COUNT_CONTROL.min !== 1) {
   throw new Error(`registry layerCount.min ${LAYER_COUNT_CONTROL.min} !== 1 — one whorl is the byte-identical default and the guard's only case`);
+}
+
+/* THE SAME MOVE FOR THE ROLE OVERRIDES, and here the drift it prevents is
+   silent rather than loud. bloom-geometry.js imports NOTHING — that is what
+   makes a cycle impossible in either direction — so it cannot read the
+   registry's ranges and has to RESTATE the bounds it clamps a composed value
+   into. A restated bound is a second owner, and this is what makes it one
+   instead: three things are checked, at module load, before any row is
+   measured.
+
+     - every ROLE_OVERRIDES entry names a real BASE control, and a real DELTA
+       control, so a renamed id cannot leave an override pointing at nothing
+       (`state[undefined]` is `undefined`, `undefined !== 0` is TRUE, and the
+       clamp of `NaN` is `NaN` — a whole whorl of NaN geometry from one
+       rename, with no error anywhere);
+     - the declared clamp bounds ARE the base control's own min/max, so a
+       composed value is always a value the base control could itself hold;
+     - each delta control's own range spans the same interval, so a delta
+       cannot ask for something the clamp will always refuse.
+
+   The last one is the weakest and it is still worth having: a delta whose
+   range exceeded the clamp's would have a dead zone at the end of a slider,
+   which is DEAD != INVISIBLE in the registry rather than in the geometry. */
+for (const o of ROLE_OVERRIDES) {
+  const base = CONTROLS.find((c) => c.id === o.base);
+  const delta = CONTROLS.find((c) => c.id === o.delta);
+  if (!base) throw new Error(`ROLE_OVERRIDES names base control "${o.base}", which the registry does not declare — an override pointing at nothing composes NaN silently`);
+  if (!delta) throw new Error(`ROLE_OVERRIDES names delta control "${o.delta}", which the registry does not declare — the override could never be reached`);
+  if (base.min !== o.min || base.max !== o.max) {
+    throw new Error(`ROLE_OVERRIDES clamps "${o.base}" to ${o.min}..${o.max}, but the registry declares ${base.min}..${base.max} — bloom-geometry.js cannot import the registry, so this is the check that keeps its restatement from becoming a second owner`);
+  }
+  if (delta.min !== o.min || delta.max !== o.max) {
+    throw new Error(`delta control "${o.delta}" spans ${delta.min}..${delta.max} against the base's ${o.min}..${o.max} — a delta reaching past the clamp is a dead zone at the end of a shipped slider`);
+  }
+  if (DEFAULTS[o.delta] !== 0) {
+    throw new Error(`delta control "${o.delta}" defaults to ${DEFAULTS[o.delta]}, not 0 — resolveRoleOverrides() SKIPS a zero delta, and that skip is the whole of the identity guard`);
+  }
 }
 
 /* The four curves. Named once, read by formAssertions and by the matrix's
@@ -144,10 +182,58 @@ export async function openBloom(page, port) {
   }, { timeout: 60000 });
 }
 
+/* WAIT FOR THE MODEL TO BE BUILT — the REAL SIGNAL, never a sleep.
+
+   THE DEFECT THIS CLOSES IS PRE-EXISTING AND WAS SILENT, and it is the worst
+   shape this project knows: rare, and wrong rather than loud. `regenerate()`
+   is rAF-coalesced, so when applyConfig() returns — every value set, every
+   real event fired, every read-back clean — the model has NOT necessarily
+   been rebuilt. Every assertion that then reads `__bloomMetrics()` may be
+   reading the PREVIOUS build, which on a fresh page is the DEFAULT bloom. A
+   row setting all four curves can therefore report `petalForm: null` and fail
+   its own form assertion, under a label naming a design it never measured —
+   and the inverse is worse, since a row that HAPPENS to agree with the
+   default would PASS while measuring the wrong design. That is the flower's
+   "73 of 185 configs measuring the wrong design" defect with a timer in place
+   of a read-back.
+
+   IT IS RARE BECAUSE A PLAYWRIGHT ROUND-TRIP USUALLY OUTLASTS A FRAME, which
+   is exactly why it went unnoticed: 0 of 40 immediate reads raced on an idle
+   machine on both the pre-change and post-change trees, and it fired ONCE in
+   a 205-row export-gate run that was competing for four CPUs with a byte
+   baseline. Headless Chromium can throttle rAF under load, so the window is
+   real and its width is not something a gate should depend on.
+
+   FOLDED INTO applyConfig RATHER THAN OFFERED BESIDE IT, so every existing
+   gate and shot tool gets it without anyone remembering to call it — a check
+   a caller has to remember is not a safety net. Waiting on `pending` handles
+   the empty-set row (the DEFAULT row queues nothing and returns at once)
+   without a special case. */
+export async function settleBuild(page) {
+  await page.waitForFunction(() => {
+    const st = window.__bloomBuildState;
+    /* A tree without the hook cannot be waited on, and pretending otherwise
+       would be a check that silently does nothing. The gates run against
+       older trees through --root (the byte diff's before/after), so this is
+       reachable rather than theoretical: it returns true, the caller proceeds
+       exactly as it did before this existed, and nothing claims a wait
+       happened. */
+    if (typeof st !== 'function') return true;
+    return st().pending === false;
+  }, null, { timeout: 30000 });
+}
+
 /* READ-BACK: set each value through the real input, fire the real events,
-   and compare what the element now holds. Returns failure strings; the
-   caller must treat any as fatal for the row. */
-export const applyConfig = (page, sets) => page.evaluate(({ ss, kinds }) => {
+   and compare what the element now holds, THEN wait for the rebuild the
+   events queued. Returns failure strings; the caller must treat any as fatal
+   for the row. */
+export async function applyConfig(page, sets) {
+  const bad = await applyConfigRaw(page, sets);
+  await settleBuild(page);
+  return bad;
+}
+
+const applyConfigRaw = (page, sets) => page.evaluate(({ ss, kinds }) => {
   const bad = [];
   for (const s of ss) {
     const el = document.getElementById(s.id);
@@ -888,6 +974,219 @@ export async function junctionAssertions(page, row) {
   return bad;
 }
 
+export const ZYGO_SCOPE =
+  "zygomorphy claims read footRing()'s own role records AND the effective state the BUILDER reported using; NOT the STL. All three positive-control mutations — the wrong role, a record that never reaches the blade, and the area rule regrouped per foot — export watertight, export as ONE piece, emit no degenerate triangles, and have IDENTICAL live and export triangle counts and byte lengths on every row (measured, Sep 1). A green export or connectedness run endorses none of this";
+
+/* ===================================================================
+   zygoAssertions — Z1, Z2, Z3. The instrument the zygomorphy layer had to
+   ship, exactly as the form, thickness and arrangement layers each shipped
+   theirs, and for the same reason: BOTH STL GATES ARE STRUCTURALLY BLIND TO
+   IT, and this time that was MEASURED BEFORE THESE ASSERTIONS WERE WRITTEN
+   rather than derived and hoped for.
+
+   The derivation first, because it says why no STL check could ever work
+   here. Topology is fixed — NU, NV, the panel count and every centre segment
+   count depend on no control — so an edge census cannot move. The foot is
+   never written by anything a role may override (the three foot rows are
+   emitted from footRing()'s own quantities before any curve exists, and every
+   profile is evaluated at `u`, where the foot rows carry u = 0). And the hub
+   disc spans every ring, so no flood fill can split. Then the measurement, on
+   three throwaway worktrees:
+
+     mutation                                   | boundary | tris live/export | bytes | seen by
+     -------------------------------------------|----------|------------------|-------|--------
+     shipped tree                               | 0        | identical        | —     | (green)
+     M1 wrong role (override lands on layer 0)  | 0        | identical        | same  | Z2(i)
+     M2 record never reaches the blade          | 0        | identical        | same  | Z2(iii) ONLY
+     M3 area rule regrouped per foot            | 0        | identical        | same  | Z3 ONLY
+
+   M2 IS THE ONE THAT MATTERS MOST. Every existing instrument passes it on
+   every row: J1-J6 clean, formAssertions clean, thicknessAssertions clean,
+   the guard residual 0, the ring radii identical to the bit, the read-out
+   identical. The ring even reports a perfectly correct override record. Only
+   comparing that record against what the BUILDER said it used can see it.
+
+   M3 IS WHY Z3 IS AN EQUALITY AND NOT A BOUND. It measures 8.88e-16 at two
+   layers and 3.55e-15 at three — 0.9 ULP on an 11.6 mm radius — so the 4-ULP
+   tolerance `guardResidual` legitimately needs would have passed it silently.
+   It also reports EXACTLY 0 on the shipping default (repeated addition of 8
+   identical doubles happens to be exact), so a gate that only ever looked at
+   the default row would have called the mutation clean.
+
+   M1 WAS PARTIALLY CAUGHT BY AN EXISTING INSTRUMENT, and the shape of that
+   is worth recording rather than claiming as coverage: formAssertions and
+   thicknessAssertions read RING 0's petal, and under M1 ring 0 carries the
+   record — so on rows whose BASE state is flat they fire with "the guard did
+   not short-circuit". On the IRIS row itself, where the base curl is already
+   -90, they see nothing at all. So the accidental catch is real, partial, and
+   not the assertion; Z2(i) is. Z2(v) then closes the premise those two
+   instruments actually rest on — that ring 0 carries no override — so session
+   B fails loudly the day slot 0 becomes a labellum instead of quietly
+   measuring the wrong petal.
+
+   WHAT THIS DOES NOT COVER, in its own header rather than only in a report:
+   whether the iris LOOKS like an iris (that is Eva's eye, from
+   tools/shot-bloom-zygomorphy.mjs), whether the export is watertight or
+   connected (the two STL gates, neither of which this replaces), and bytes
+   (tools/diff-bloom-bytes.mjs). Note that a byte diff can observe M1, M2 and
+   M3 only against a tree already known to be right — which is what an
+   assertion encodes and a diff does not, and is why the diff is evidence
+   about a change rather than a gate.
+   =================================================================== */
+export async function zygoAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const ui = await page.evaluate(() => window.__bloomUIState());
+  const bad = [];
+  const rings = m.rings;
+  const applied = m.petalRingApplied;
+  const cont = m.continuousMode === true;
+  const ROLES = new Set([ROLE_OUTER, ROLE_INNER]);
+
+  if (!Array.isArray(rings) || !rings.length) { bad.push('Z1: rings is empty — no role claim can be checked'); return bad; }
+  if (!Array.isArray(applied) || applied.length !== rings.length) {
+    bad.push(`Z2: expected one applied record per ring (${rings.length}), got ${JSON.stringify(applied && applied.length)} — the builder's own answer is missing, which is the ONLY witness for a record that never reaches the blade`);
+    return bad;
+  }
+
+  /* ===================================================================
+     Z1 — THE ROLE ASSIGNMENT IS A PARTITION. Total (every ring carries a
+     declared role), disjoint and accounted for (the group sizes add up to the
+     bloom's petal count, read from footRing()'s own sequenceLength rather
+     than recomputed from two controls). A derivation that dropped a whorl,
+     double-counted one, or invented a role would leave the area rule summing
+     the wrong set while every STL check stayed green. */
+  let slots = 0;
+  rings.forEach((r, i) => {
+    if (!ROLES.has(r.role)) bad.push(`Z1: ring ${i} carries role ${JSON.stringify(r.role)}, which is not one of the declared roles ${[...ROLES].join('/')}`);
+    if (!(Number.isFinite(r.roleCount) && r.roleCount > 0)) bad.push(`Z1: ring ${i} reports roleCount ${JSON.stringify(r.roleCount)} — a role group with no size cannot be summed by the area rule`);
+    else slots += r.roleCount;
+  });
+  /* AGAINST THE BUILDER'S OWN TALLY, not against another number footRing()
+     produced. `petalsBuilt` counts buildPetalInto calls at the whorl loops
+     themselves, so a role derivation that failed to cover the petals the
+     bloom actually emits cannot agree with this by being wrong alongside it —
+     which a comparison against `sequenceLength` or `rings.length *
+     slotsPerRing` would have been, since one owner produces all three.
+     (`sequenceLength` is petalCount under the RINGED arm and
+     petalCount * layerCount under the continuous one, so it is not the
+     bloom's petal count in both modes at all — this gate's first draft
+     compared against it and the SHIPPED tree failed, which is what the
+     positive control is for.) */
+  if (slots !== m.petalsBuilt) {
+    bad.push(`Z1: the role groups account for ${slots} slots against the ${m.petalsBuilt} petals the builder actually emitted — the partition is not total, so the area rule is summing a different set of feet from the one the bloom has`);
+  }
+  /* THE ROLE/PLACEMENT RELATION, asserted in BOTH directions because a flag
+     only ever checked one way is a flag that can be stuck. Under CONTINUOUS
+     there are no layers to differentiate (J5 asserts exactly that), so every
+     ring must be OUTER; under the ringed arm ring 0 must be OUTER and, above
+     one layer, an INNER role must actually exist — otherwise the controls the
+     panel is showing would name a group with no members. */
+  if (cont && !rings.every((r) => r.role === ROLE_OUTER)) {
+    bad.push(`Z1: a CONTINUOUS row reports ${rings.filter((r) => r.role !== ROLE_OUTER).length} non-OUTER ring(s) — continuous placement has no layers to carry a role, and the override controls are hidden there on exactly that ground`);
+  }
+  if (!cont) {
+    if (rings[0].role !== ROLE_OUTER) bad.push(`Z1: ring 0 carries role ${rings[0].role}, not ${ROLE_OUTER} — the outermost whorl is the base every override is a delta ON`);
+    const inners = rings.filter((r) => r.role === ROLE_INNER).length;
+    if (m.layerCount >= 2 && inners !== m.layerCount - 1) {
+      bad.push(`Z1: ${m.layerCount} layers carry ${inners} INNER ring(s), expected ${m.layerCount - 1} — the panel is showing controls for a group that does not have the members it claims`);
+    }
+    if (m.layerCount === 1 && inners !== 0) bad.push(`Z1: a single-whorl bloom reports ${inners} INNER ring(s) — there is nothing above the outermost whorl`);
+  }
+
+  /* ===================================================================
+     Z2 — THE RECORD AND THE BLADE AGREE, IN BOTH DIRECTIONS. */
+  const anyDelta = ROLE_OVERRIDES.some((o) => Number(ui[o.delta]) !== 0);
+  rings.forEach((r, i) => {
+    const a = applied[i];
+    if (!a) { bad.push(`Z2: ring ${i} reported no applied record from the builder`); return; }
+    if (a.role !== r.role) bad.push(`Z2: ring ${i}'s builder says role ${a.role}, footRing() says ${r.role} — two answers to one question`);
+
+    /* (i) AN OUTER RING CARRIES NO RECORD. The M1 witness: with the
+       assignment inverted, the outermost whorl is the one built from the
+       override and this is what says so. */
+    if (r.role === ROLE_OUTER && r.overrides !== null) {
+      bad.push(`Z2: ring ${i} is ${ROLE_OUTER} but carries an override record ${JSON.stringify(r.overrides)} — the base whorl is what every delta is measured FROM, and a record here means the assignment is inverted`);
+    }
+    /* (ii) AN INNER RING CARRIES A RECORD EXACTLY WHEN A DELTA IS NON-ZERO.
+       Both directions: a missing record means the override silently does
+       nothing, and a record with every delta at zero means the identity guard
+       has stopped being an identity guard — petalStateFor() would then build
+       a COPY of the state at the shipping default and the byte argument would
+       rest on a spread instead of on object identity. */
+    if (r.role === ROLE_INNER) {
+      if (anyDelta && r.overrides === null) bad.push(`Z2: ring ${i} is ${ROLE_INNER} and a delta is non-zero, yet it carries no override record — the control moves nothing`);
+      if (!anyDelta && r.overrides !== null) bad.push(`Z2: ring ${i} is ${ROLE_INNER} with every delta at 0 and still carries a record ${JSON.stringify(r.overrides)} — the guard is no longer object identity, and byte-identity at the default stops being a construction`);
+    }
+    if (a.overridden !== (r.overrides !== null)) {
+      bad.push(`Z2: ring ${i}: footRing() ${r.overrides ? 'has' : 'has no'} record, the builder says overridden=${a.overridden}`);
+    }
+
+    /* (iii) WHAT THE BLADE WAS ACTUALLY BUILT WITH. THE M2 WITNESS, and the
+       only one there is: every other instrument in this repo passes a build
+       whose override record is perfect and never reaches the geometry.
+       Compared against the RECORD where there is one and against the BASE
+       state where there is not, so "the override did not arrive" and "there
+       was no override" cannot both render as the base value. */
+    for (const o of ROLE_OVERRIDES) {
+      const want = (r.overrides && o.base in r.overrides) ? r.overrides[o.base] : Number(ui[o.base]);
+      const got = a.applied[o.base];
+      if (got !== want) {
+        bad.push(`Z2: ring ${i} (${r.role}) was built with ${o.base} = ${got}, but ${r.overrides && o.base in r.overrides ? `its own record says ${want}` : `the base state says ${want} and it carries no override for it`} — a record that never reaches the blade exports watertight, in one piece, at an identical triangle count, and passes every other check here`);
+      }
+      /* (iv) THE CLAMP ACTUALLY CLAMPED. A composed value must be one the
+         base control could itself hold; `petalTipBreadth` matters most,
+         because the tip cap partitions on `=== 0` EXACTLY and a negative
+         composed breadth would silently re-square the tip Eva ruled to a
+         point. */
+      if (!(got >= o.min - 1e-12 && got <= o.max + 1e-12)) {
+        bad.push(`Z2: ring ${i} was built with ${o.base} = ${got}, outside the base control's own ${o.min}..${o.max} — the composed value is not a value the control could hold`);
+      }
+    }
+  });
+
+  /* (v) THE PREMISE THE FORM AND THICKNESS ASSERTIONS REST ON. Both read
+     `petal` — ring 0's slot 0 — and evaluate their predicates against the
+     ROW's state, which is the base state. That is sound exactly while ring 0
+     carries no override, which is a property of session A's role derivation
+     and NOT of the architecture. Session B gives one slot in a whorl its own
+     record, and if that slot is ring 0's representative those two instruments
+     start measuring a petal built from a different state than the one they
+     are checking against — silently. Asserted here so it is a loud failure at
+     the boundary rather than a quiet wrong measurement after it. */
+  if (rings[0].overrides !== null) {
+    bad.push(`Z2(v): ring 0 carries an override record, and formAssertions/thicknessAssertions both read ring 0's petal while evaluating their predicates against the BASE state — they are now measuring a petal built from a different state than the one they check. This is the session-B boundary; those two instruments need the effective state before a slot role may land on ring 0.`);
+  }
+
+  /* ===================================================================
+     Z3 — THE ROLE GROUPING REPRODUCES THE PRE-ROLE AREA-RULE SUM EXACTLY.
+     An EQUALITY, and M3 is why: regrouping the ringed sum per foot measures
+     8.88e-16 at two layers and 3.55e-15 at three, which is 0.9 ULP and would
+     pass any tolerance wide enough for real rounding. It is exactly 0 on the
+     shipping default, so only the layered rows can see it at all.
+
+     Grouping by ROLE rather than by SLOT is what makes the equality available
+     in the first place — the per-slot grouping this session deliberately did
+     NOT build moves every 40-petal export by 6 ULP. That is the flower's
+     `a*(b+c)` vs `a*b + a*c` trap, now fired twice in this project family,
+     and this assertion is what stops a later session regrouping it "because
+     it is the same rule".
+
+     NULL IS A FAILURE IN SESSION A. It is reserved for a whorl carrying more
+     than one role, which is session B; until then the claim is always
+     available and a missing residual means the owner stopped making it. */
+  const z = m.zygoGuardResidual;
+  const multiRole = rings.some((r) => r.roleCount !== (cont ? 1 : Number(ui.petalCount)));
+  if (multiRole) {
+    if (z !== null) bad.push(`Z3: a whorl carries more than one role and a residual ${z} is still reported — there is no pre-role grouping to compare against there, and a claim nothing can make must read as absent`);
+  } else if (typeof z !== 'number') {
+    bad.push(`Z3: every whorl carries one role, so the pre-role grouping IS available, and the residual reads ${JSON.stringify(z)} — the guard has stopped being cross-validated`);
+  } else if (z !== 0) {
+    bad.push(`Z3: the role-grouped area rule differs from the pre-role expression by ${z.toExponential(3)} — this is an EXACT identity at one role per whorl, not a tolerance (a per-foot regrouping measures 8.88e-16 here and 6 ULP at petalCount 40, and would pass any bound wide enough for real rounding)`);
+  }
+
+  return bad;
+}
+
 /* THE EXPORT FLOOR, asserted through the REAL export path. The live build
    never floors — floorThickness() is a no-op outside export mode — so no
    live metric can answer "did the print stay above the minimum feature". The
@@ -1357,6 +1656,74 @@ export function buildMatrix() {
      could stop being a shared volume. */
   rows.push({ label: 'CAPABILITY: cleft x CONTINUOUS x 3 turns', capability: CAPABILITY_CLEFT,
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }] });
+
+  /* 11. ZYGOMORPHY — PER-LAYER ROLES (session A). The region this change
+         affects is "a whorl whose petals are built from a DIFFERENT effective
+         state than the whorl below it", and every row here is in it. The
+         registry-derived layer-sub sweep above already gives each of the three
+         deltas a min and a max row at three layers; these are the CORNERS,
+         which is where this layer's failure modes live rather than where its
+         range ends.
+
+         THE IRIS IS THE HEADLINE ROW and it is named as such, on the same
+         reasoning that made every preset a named fixture in the flower's
+         gates: a regression should read "the iris broke", not "config 187".
+
+         THE TWO GATED PLACEMENTS ARE ROWS, NOT ABSENCES. Under SPIRAL the
+         roles exist and only the azimuth law differs; under CONTINUOUS there
+         are no layers at all, the controls are hidden, and the deltas must be
+         INERT — so the CONTINUOUS row drives all three to their maximum and
+         is asserted bit-identical to the same design with them at zero
+         (diff-bloom-bytes --partition-value on the resolved placement). A
+         gated state that no row exercises is a claim nobody checked; that is
+         exactly how the flower shipped a seven-piece bare bloom.
+
+         THE CLAMP CORNERS ARE HERE BECAUSE THE CLAMP IS NEW. A composed value
+         is clamped into the base control's own range, so the states worth
+         naming are the ones where it BINDS: base curl at its max plus a
+         positive delta, base cup likewise. Saturating is the intended
+         behaviour and the row says the export survives it.
+
+         THE TIP PARTITION CORNER IS THE SUBTLE ONE. `petalTipBreadth === 0`
+         is an EXACT branch — the pointed tip cap Eva ruled on — so a bloom
+         with breadth 0 at the outer whorl and a positive delta at the inner
+         one carries BOTH tip constructions at once, a state no single-whorl
+         design can reach and the only place the two cap paths meet in one
+         export.
+
+         THE FOOT'S UPPER CLAMP gets its first named row here (Eva, Sep 1). It
+         has been reachable since session 5 and unreported; a zygomorphic
+         bloom is simply the fastest way to notice it. */
+  const IRIS = { layerCount: 2, petalSpineCurl: -90, innerCurl: 180, innerCup: 0.4, layerTilt: 30, petalTilt: 40 };
+  const ALL_INNER_MAX = { innerCurl: 360, innerCup: 1.2, innerTipBreadth: 0.6 };
+  const zygoCorners = [
+    ['ZYGO: THE IRIS (falls curl down, standards rise)', { ...IRIS }],
+    ['ZYGO: the iris x centre OFF (the zygomorphic BARE bloom)', { ...IRIS, centerStyle: 'NONE' }],
+    ['ZYGO: 2 layers x ALL INNER MAX', { layerCount: 2, ...ALL_INNER_MAX }],
+    ['ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)', { layerCount: 3, ...ALL_INNER_MAX }],
+    ['ZYGO: 3 layers x ALL INNER MAX x ALL THIN', { layerCount: 3, ...ALL_INNER_MAX, ...ALL_THIN }],
+    ['ZYGO: 3 layers x ALL INNER MAX x spread min (crowded feet)', { layerCount: 3, ...ALL_INNER_MAX, spread: 0.6 }],
+    ['ZYGO: 3 layers x ALL INNER MAX x petalCount 3', { layerCount: 3, ...ALL_INNER_MAX, petalCount: 3 }],
+    ['ZYGO: 3 layers x ALL INNER MAX x petalCount 40', { layerCount: 3, ...ALL_INNER_MAX, petalCount: 40 }],
+    ['ZYGO: 3 layers x ALL INNER MAX x ALL FORM MAX (every clamp binds)', { layerCount: 3, ...ALL_INNER_MAX, ...ALL_FORM_MAX }],
+    ['ZYGO: curl clamp binds (base 360 + delta 360 -> 360)', { layerCount: 2, petalSpineCurl: 360, innerCurl: 360 }],
+    ['ZYGO: cup clamp binds (base 1.2 + delta 1.2 -> 1.2)', { layerCount: 2, petalCup: 1.2, innerCup: 1.2 }],
+    ['ZYGO: curl clamp binds downward (base -180 + delta -180 -> -180)', { layerCount: 2, petalSpineCurl: -180, innerCurl: -180 }],
+    ['ZYGO: the tip partition, both ways in one bloom (outer pointed, inner truncate)', { layerCount: 2, petalTipBreadth: 0, innerTipBreadth: 0.6 }],
+    ['ZYGO: the tip partition inverted (outer truncate, inner more so)', { layerCount: 2, petalTipBreadth: 0.6, innerTipBreadth: 0.6 }],
+    ['ZYGO: the iris x SPIRAL (roles exist, azimuth differs)', { ...IRIS, placement: 'SPIRAL' }],
+    ['ZYGO: GATED — CONTINUOUS x 3 turns x ALL INNER MAX (hidden, and must be inert)', { placement: 'CONTINUOUS', layerCount: 3, ...ALL_INNER_MAX }],
+    ['ZYGO: GATED — CONTINUOUS x 1 turn x ALL INNER MAX (hidden, and must be inert)', { placement: 'CONTINUOUS', ...ALL_INNER_MAX }],
+    ['ZYGO: the foot UPPER clamp (petalWidth 30 — ring frozen at 11.06 mm)', { layerCount: 2, petalWidth: 30, ...ALL_INNER_MAX }],
+  ];
+  for (const [name, sets] of zygoCorners) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+  /* A clefted petal carrying an override: the cleft's two lobe panels are
+     built from the INNER role's effective state, which is the one place the
+     trim domain and the override layer meet. */
+  rows.push({ label: 'CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX', capability: CAPABILITY_CLEFT,
+    set: [{ id: 'layerCount', value: '2' }, ...Object.entries(ALL_INNER_MAX).map(([id, value]) => ({ id, value: String(value) }))] });
 
   return rows;
 }

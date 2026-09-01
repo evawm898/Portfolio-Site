@@ -1169,6 +1169,30 @@ any of them.
       as a settled flake and not as a defect in the law: the shipped tree is green on every
       run, and M1 and M2 have never once failed to fire.
 
+      **IT NOW HAS A NAMED SUSPECT (the zygomorphy session, Sep 1), AND THE SETTLING
+      STANDARD IS UNCHANGED.** `applyConfig()` did not wait for the rAF-coalesced rebuild
+      — see the zygomorphy entry below for the finding and the fix — so any assertion
+      reading `__bloomMetrics()` could be reading the PREVIOUS build. **A stale-build read
+      produces exactly M3's symptom: NOT FIRED.** M3 mutates the foot-width floor, which
+      binds on one row; a read that arrives before the rebuild sees the prior row's or the
+      default page's metrics, where the floor does not bind, and the mutation reads as
+      absent. That matches every feature of the anomaly — a mutation present in the
+      worktree throughout, firing on four runs of five, with no HTTP cache and no write
+      race to blame, and 67-versus-0 rather than a partial count (one stale read at the
+      wrong moment costs the whole row's assertions at once).
+
+      **THIS IS A SUSPECT, NOT A DIAGNOSIS, and it does not retire the anomaly.** The
+      settling standard stated above stands exactly as written: a DIFF OF A DISAGREEING
+      PAIR. Nothing here was reproduced, M3's run happened on a tree that has since
+      changed, and "a mechanism that could produce the symptom" is not "the mechanism that
+      did" — which is the same distinction #88 turns on. What changes is only the ORDER OF
+      INVESTIGATION: **any future M3-style flake is checked against build-counter
+      telemetry FIRST** (`__bloomBuildState()` — was the build that the assertion read the
+      build the row asked for?), because that is now cheap, and it separates "the
+      instrument read the wrong model" from "the model differed" before anyone reaches for
+      a harder explanation. If the counter is clean on a disagreeing pair, this suspect is
+      eliminated and the anomaly is exactly where it was.
+
     - **EVA'S RULING FROM THE SHEETS (Sep 1): THE CONTINUOUS SPIRAL IS WHAT SHE WAS
       REACHING FOR. MERGED.** This closes the brief the session was opened on —
       *"spiral is still very distinct layers, and I don't know if it should be"* — and it
@@ -1190,3 +1214,281 @@ any of them.
       with that cell as its evidence** — available if it ever offends, and not to be
       started on the strength of the number alone. Reopening it is a fresh ruling needing a
       fresh picture, exactly as the max-combinator kink and the tip cap are.
+
+- ~~Per-slot petal overrides — the only route to zygomorphy, and one of the two
+  capabilities the flower-project skill says nothing else unlocks~~ **OPENED Sep 1, AND
+  DELIBERATELY SPLIT IN TWO. SESSION A BUILT: the override architecture plus PER-LAYER
+  roles — the iris. Session B is the mirror plane, slot roles, and the orchid.** Eva's
+  ruling was full per-slot differentiation, not placement mirroring and not
+  modulation-only; this is the first half of that, and the seam is recorded below rather
+  than left to be re-derived.
+
+    - **A ROLE IS A GROUP OF SLOTS THAT SHARE ONE OVERRIDE RECORD — not a slot, and not a
+      layer. THAT THE GROUP IS THE UNIT IS THE WHOLE DESIGN, AND IT IS LOAD-BEARING
+      RATHER THAN STYLISTIC.** Measured before anything was written: the ringed area rule
+      accumulates `petalCount * rFoot²` once per whorl, and the obvious reading of
+      "per-slot overrides" — regrouping it per FOOT — is the same number in algebra and
+      **not the same double**. `n = 8` agrees exactly; **`n = 40` differs by 8.53e-14,
+      6.00 ULP**; petalWidth 30 × sheet 2.40 by 2.00 ULP; n = 13 by 1.00. So per-slot
+      grouping would have moved **every 40-petal export** for nothing. That is the
+      flower's `a*(b+c)` vs `a*b + a*c` trap, **now fired twice in this project family**
+      (it fired on a real row when layers were written, and it would have fired here).
+      Grouping by ROLE keeps the loop shape: `roleCount` is `state.petalCount` at one role
+      per whorl, the same double the pre-role expression multiplied by, so the sum is
+      bit-identical by construction. **Do not regroup it.**
+
+    - **SO `zygoGuardResidual` IS AN EQUALITY, NOT A BOUND** — unlike `guardResidual`
+      beside it, and stated here so nobody later loosens it. `footRing()` carries the
+      pre-role expression verbatim alongside the role-grouped one and compares the two on
+      every build where the claim is available; it measures **exactly 0** on every row,
+      the continuous arm included (where `roleCount` is 1 and `1 * x * x` is `x * x`
+      exactly). It reports **null** once a whorl carries more than one role — which is
+      session B — because there is then no pre-role grouping to compare against, and a
+      claim nothing can make must read as absent, never as a passing 0.
+
+    - **THE GUARD IS OBJECT IDENTITY, which is the cheapest one available and the
+      strongest.** `resolveRoleOverrides()` SKIPS a zero delta outright, so an OUTER ring
+      — or an INNER ring with every delta at 0 — carries no record at all, and
+      `petalStateFor(state, ring)` then returns **the caller's own `state` object**. Every
+      consumer (`widthProfile`, `petalForm`, `thicknessProfile` and the three inline reads
+      in `buildPetalInto`) therefore takes the pre-zygomorphy call on the pre-zygomorphy
+      object. There is no expression to have got subtly wrong and no `-0 + 0` case
+      analysis to rest on — the downgrade the form layer deliberately made is not needed
+      here. Z2(ii) asserts in BOTH directions that a record exists exactly when a delta is
+      non-zero, so the guard cannot quietly stop being one.
+
+    - **SESSION A'S ROLE DERIVATION IS DELIBERATELY COARSE: OUTER (the outermost whorl)
+      and INNER (every whorl above it).** At layerCount 2 that is exactly the iris. At 3
+      the second and third whorls are identical to each other, which is visible on the
+      sheet and is the evidence — the only evidence — that would refine INNER into
+      INNER/INNERMOST. That refinement is a **design ruling with its own partition
+      report**, not a rewrite: it changes the derivation and nothing else.
+
+    - **WHAT IS DELIBERATELY NOT OVERRIDABLE, each argued rather than listed.**
+      `sheetThickness` — **never**: J4a asserts `hub.thickness === ring.thickness`, and
+      one hub has one thickness, so a per-role sheet turns the overlap box's vertical
+      extent from *equal by construction* into a genuine `min(footT, hubT)`. That is a
+      structural guarantee traded for a control nobody asked for. `footDelicacy` —
+      **never**: it scales foot width and so does a per-role width override; two owners of
+      one quantity. `petalCount` — **never**: it is the whorl's count and the set the
+      partition is defined OVER. `petalWidth` is overridable but must be applied ONCE, in
+      `footRing()`, and read back by the builder. **`layerSize` and `layerTilt` are
+      absent from the role overrides on Eva's Q5 ruling**: they are λ-ramps that already
+      own per-layer size and tilt, and they are the only depth controls that survive
+      CONTINUOUS. Two prefixes, two laws — `layer*` is a ramp, `inner*` is a role
+      override.
+
+    - **THE OVERRIDE SET SHIPS TRIMMED, AND THE ASYMMETRY DECIDED IT (Eva, Sep 1).**
+      Three deltas: `innerCurl`, `innerCup`, `innerTipBreadth`, all Standard,
+      `role: 'petal'`, all in ARRANGEMENT, all default 0. Adding a control later is one
+      registry row plus one row in `ROLE_OVERRIDES`, forever; retiring one becomes a
+      schema bump plus a migration the day anything persists a design. So: minimal, and
+      grow on evidence from real use. **RECORDED, NOT BUILT:** `innerRoll`, `innerTwist`,
+      per-layer taper deltas, a per-layer `tipThinning` delta. All mechanically identical;
+      none needed by the iris.
+
+    - **THEY LIVE IN ARRANGEMENT, WHICH IS THE CHARTER'S OWN PREDICTION** — "a layer-count
+      control in that section with per-layer sub-controls gated on it by `visibleWhen`,
+      the `centerStyle` pattern one level up, not a section per layer". It also keeps the
+      panel gate honest: ARRANGEMENT ships OPEN, so the path route needs no WITNESS for a
+      section whose every control is hidden at the shipping default — **a witness that has
+      to set up its own precondition before it can move anything is a witness that can
+      quietly measure nothing.** When session B's slot roles arrive, a "Whorl differences"
+      SECTION is the right home for the pair, and it will need that precondition
+      mechanism. Recorded so it is designed rather than discovered.
+
+    - **THE GATING IS A RULING WITH A MEASUREMENT BEHIND IT, AND IT IS NOT THE
+      SHIP-THE-EXTREMES PATTERN (Eva, Sep 1 — the distinction is the entry).** Eva's
+      standing pattern covers honest extremes of honest controls: the max-roll faceting,
+      the ROLL CLAMP look, the spread-6 plate, the 135° and 161.25° tilts. A bilateral
+      control under SPIRAL is a different category. Reflecting a golden-angle arrangement
+      about any plane leaves the best mirror pairing off by **32.461° at n=5, 20.062° at
+      n=8 (45% of a slot gap), 12.399° at n=13 and 4.736° at n=40**, against **0.000° at
+      every count under RADIAL**. A "mirror" control there would be a symmetry label
+      sitting on a measured asymmetry — a label lying about a computation, which is this
+      project's oldest enemy and the one thing it never ships. So: **slot roles (session
+      B) are RADIAL-only; layer roles are hidden under CONTINUOUS**, where there are no
+      layers to differentiate and J5 asserts exactly that. Both are `visibleWhen`
+      predicates, nothing imperative. **Two named rows assert the CONTINUOUS state is
+      hidden AND bit-identical with all three deltas at MAXIMUM** — a gated state is
+      coverage, and a gated state nobody exercises is a claim nobody checked.
+
+    - **BOTH SHIPPED GATES ARE STRUCTURALLY BLIND TO THIS LAYER, AND THIS TIME THAT WAS
+      MEASURED BEFORE THE ASSERTIONS WERE WRITTEN rather than derived and hoped for** —
+      which is what found the hole in the first draft. The derivation: topology is fixed
+      (no edge census can move), the foot is never written by anything a role may override
+      (the three foot rows come from `footRing()`'s own quantities before any curve
+      exists, and every profile is evaluated at `u`, where the foot rows carry u = 0), and
+      the hub disc spans every ring (no flood fill can split). Then the measurement, on
+      three throwaway worktrees:
+
+      | mutation | boundary | degenerate | tris live/export | STL bytes | fired |
+      |---|---|---|---|---|---|
+      | shipped tree | 0 | 0 | identical | — | **0 of 7 rows** |
+      | M1 wrong role (override lands on layer 0) | **0** | 0 | **identical** | **same length** | Z1 on 6 rows (+ Z2(v)) |
+      | M2 record never reaches the blade | **0** | 0 | **identical** | **same length** | **Z2(iii) ONLY**, 4 rows |
+      | M3 area rule regrouped per foot | **0** | 0 | **identical** | **same length** | **Z3 ONLY**, 5 rows |
+
+      **M2 IS THE ONE THAT MATTERS.** Every existing instrument passes it on every row:
+      J1–J6 clean, `formAssertions` clean, `thicknessAssertions` clean, `guardResidual` and
+      `zygoGuardResidual` both clean, ring radii identical to the bit, read-out identical.
+      The ring even reports a perfectly correct override record. **Only comparing that
+      record against what the BUILDER said it used can see it** — which is why
+      `petalRingApplied` reports the effective state the builder actually read, and never
+      the resolver's answer.
+
+      **M3 IS WHY Z3 IS AN EQUALITY.** It measures 8.88e-16 at two layers, 3.55e-15 at
+      three and 5.33e-15 at petalCount 40 — **0.9 ULP on an 11.6 mm radius** — so the
+      4-ULP tolerance `guardResidual` legitimately needs would have passed it in silence.
+      It also reports **exactly 0 on the shipping default**, so a control that only looked
+      at the default row would have called the mutation clean.
+
+      **M1 WAS PARTIALLY CAUGHT BY AN EXISTING INSTRUMENT, and the shape of that is worth
+      more than the catch.** `formAssertions` and `thicknessAssertions` read RING 0's
+      petal while evaluating their predicates against the ROW's (base) state — so under M1
+      they fire on rows whose base state is flat, and see **nothing at all** on the iris
+      row itself, where the base curl is already −90. That soundness rests on ring 0
+      carrying no override, which is a property of session A's derivation and **not of the
+      architecture**. **Z2(v) asserts it**, so session B fails loudly at the boundary
+      instead of quietly measuring a petal built from a state it is not checking against.
+
+    - **THE POSITIVE CONTROL FOUND TWO BUGS IN THE ASSERTIONS, WHICH IS THE POINT OF
+      RUNNING IT FIRST.** Z1's first draft compared the role groups against
+      `m.sequenceLength` — which is `petalCount` under the RINGED arm and
+      `petalCount * layerCount` under the continuous one, so it is not the bloom's petal
+      count in both modes at all — and **the shipped tree failed on 5 of 7 rows**. It now
+      compares against `petalsBuilt`, a tally counted at the whorl loops themselves, so
+      the partition is checked against what was BUILT rather than against another number
+      the same owner produced. (The second was in the probe, not the tree:
+      `formAssertions` derives flatness from `row.set`, and a probe passing no set makes
+      it fire spuriously — worth knowing before reading any future run of it.)
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS**, and the default bloom is **11,136 tris live and
+      export alike at 543.8 KiB**, unchanged. The three deltas add ZERO triangles at every
+      setting — topology is fixed, so an override moves vertices and nothing else, the
+      pointed/truncate tip partition included. **`--full` cannot compare across the two
+      trees here**: 19 of the new rows set controls the old registry does not have, so the
+      frozen matrices are the like-for-like comparison, exactly as they were for the
+      continuous spiral.
+
+    - **THE MATRIX GREW 180 → 205** — six rows from the registry-derived layer-sub sweep
+      (which picked the three deltas up automatically, through `predicateDrivers` rather
+      than a shape sniff, exactly as the latent trap closed in #124 intended), plus
+      eighteen named corners and one capability row. The corners are the region this
+      change affects: the IRIS by name, the zygomorphic BARE bloom, ALL INNER MAX against
+      ALL THIN / spread min / petalCount 3 and 40 / ALL FORM MAX, all three clamp corners,
+      the tip partition both ways in one bloom, the SPIRAL row, the two GATED CONTINUOUS
+      rows, and the foot's upper clamp.
+
+    - **A PRE-EXISTING DEFECT FOUND BY DISCOVERY: THE FOOT'S UPPER CLAMP HAS BEEN SILENT
+      SINCE SESSION 5 (Eva's ruling, Sep 1 — option b, telemetry only).**
+      `clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10)` has always had an upper bound and
+      `widthClamped` reported only the lower one. So from `petalWidth` 25 upward — **six
+      of that slider's 23 reachable values, 26% of its range** — the blade keeps widening
+      and the area-ruled ring does not move at all: **10.8324 mm at 24, 11.0558 mm at 25,
+      still 11.0558 mm at 30**. The bare `10` is now `FOOT_MAX_WIDTH_MM`, `widthClampedHigh`
+      sits beside `widthClamped`, and the read-out gained a ceiling twin of its floor line
+      through one owner for the phrasing. **No geometry moves** — the constant is the same
+      double the literal was. This is the "(CLAMPED)" discipline the roll floor, the tip
+      floor and the foot floor already carry, arriving where it was always missing. It
+      predates the zygomorphy work by four sessions; a per-role size multiplier is simply
+      the fastest route to it, which is why it surfaced here rather than in a bug report.
+
+    - **THE SEAM, so session B starts from a stated boundary rather than re-deriving one.**
+      Session A built the override PLUMBING on the descriptor that already exists: the
+      role-grouped area rule (`roleCount` on every descriptor), `ROLE_OVERRIDES` as the one
+      table of what may be overridden and by what law, `resolveRoleOverrides()` and the
+      object-identity guard, the per-ring `role` / `overrides` telemetry, the builder's own
+      `applied` record, and Z1–Z3. **Session B changes exactly two things: the role
+      DERIVATION (from a mirror plane, giving LABELLUM / HOOD / LATERAL) and WHICH
+      DESCRIPTORS EXIST (one per (layer × role) instead of one per layer).** The override
+      mechanism is not rewritten — it is multiplied. Concretely, session B must:
+      `footRing()` returns per-(layer, role) descriptors with `roleCount` the role's own
+      group size (the sum stays grouped — **never** regroup it per foot);
+      `buildBloomInto` looks a descriptor up by slot index and computes nothing;
+      `zygoGuardResidual` goes null on those rows and Z3's `multiRole` branch covers it;
+      **Z2(v) fires the moment a record lands on ring 0**, so `formAssertions` and
+      `thicknessAssertions` must take the effective state before a slot role may reach it;
+      and the mirror-plane control is RADIAL-only on the measurement above. `slotsPerRing`
+      becomes per-descriptor and J1's accounting check generalises with it.
+
+    - **RECORDED, REJECTED, so it is not re-proposed: a role SELECTOR** ("editing:
+      Labellum / Hood") driving one shared override block. The registry cannot express it
+      — one control id is one value, so the per-role values would have to live outside the
+      registry. It is the second-source-of-truth defect wearing a UI convenience.
+
+    - **A SECOND PRE-EXISTING DEFECT, IN THE HARNESS ITSELF, AND IT IS THE MORE SERIOUS OF
+      THE TWO: `applyConfig()` DID NOT WAIT FOR THE MODEL TO BE BUILT.** `regenerate()` is
+      rAF-coalesced through `scheduleRegen()`, so when `applyConfig()` returned — every
+      value set, every real event fired, every read-back clean — the model had not
+      necessarily been rebuilt. Every assertion that then read `__bloomMetrics()` could be
+      reading the PREVIOUS build, which on a fresh page is the DEFAULT bloom. **This is
+      the flower's "73 of 185 configs measuring the wrong design" defect with a timer in
+      place of a read-back**, and it has been present since the first gate.
+
+      **HOW IT SURFACED, and it is the ugly way rather than the clean one.** The export
+      gate's first full run on this branch failed ONE validity assertion —
+      `ALL MIN × RING min: form row reports NO form telemetry — the guard short-circuited
+      a row that sets a curve` — on a row this session does not touch. That run was
+      competing for four CPUs with the byte baseline. The row then passed 3 of 3 in
+      isolation, which is precisely the shape that gets written off as a flake.
+
+      **WHAT IS MEASURED AND WHAT IS NOT, stated separately because they differ.** The
+      MECHANISM is certain and is a fact about the code, not a statistic: `applyConfig`
+      queued a rebuild and returned without waiting for it. The RATE is not: immediate
+      reads raced 0 of 40 on an idle machine on BOTH the pre-change and post-change trees;
+      a symptom probe under artificial load saw 1 null in 40 on this tree and 0 in 40 on
+      `e77bf67`, which is one event and decides nothing; and a direct counter probe under
+      load saw 0 of 60. **So this is NOT claimed as a regression and NOT claimed as
+      reproducible** — it is claimed as a window whose width no gate should depend on
+      (headless Chromium throttles rAF under load), and it was closed on the mechanism
+      rather than on the statistic. Accumulating clean runs could not have retired it, on
+      #88's rule.
+
+      **THE FIX IS THE REAL SIGNAL, FOLDED INTO `applyConfig` SO NOBODY HAS TO REMEMBER
+      IT.** The app exposes `__bloomBuildState() -> { count, pending }`; `settleBuild()`
+      waits for `pending === false` and `applyConfig` calls it. `pending` is now cleared
+      AFTER the build and in a `finally` — after it, so `false` unambiguously means no
+      build is outstanding rather than "the callback started"; in a `finally`, so a
+      throwing build cannot leave the flag stuck and silently stop the app rebuilding,
+      which is what clearing it first had been defending against. A tree without the hook
+      (the byte diff's `--root` before-tree) returns true and the caller proceeds exactly
+      as before, rather than a wait quietly claiming to have happened.
+
+      **THE BYTE BASELINE IS UNAFFECTED and that is a property of the export path, not
+      luck:** the STL comes from the export handler, which calls `readUI()` and builds
+      fresh in export mode, so exported bytes never depend on the coalesced LIVE rebuild.
+      The `--region foot` slab likewise reads `sheetThickness` from `__bloomUIState()`,
+      not from a build. Half the before-tree baseline ran on the pre-fix harness and half
+      on the post-fix one; that is recorded rather than hidden, and it cannot matter for
+      the reason just given.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 1): THE IRIS SHIPS. MERGED.** This closes the
+      first half of the brief the zygomorphy work was opened on — full per-slot
+      differentiation, with orchid and iris as the target forms — and it closes the IRIS
+      half specifically, on a picture rather than an impression. The headline pair is what
+      it was ruled from and it was built to make the comparison unfalsifiable: the same
+      arrangement, the same 8 petals, the same 21,024 triangles on both sides, so the only
+      thing that could differ is which state each whorl was built from. The outer whorl
+      curls −90° and hangs; the inner composes −90 + 180 = +90° and cups.
+
+    - **BOTH TASTE OBSERVATIONS WERE RAISED AND BOTH WERE RULED FINE AS-IS, and recording
+      the RULING rather than only the observation is the point — an unresolved-looking
+      note in a charter gets re-litigated by the next session that finds it.**
+
+        * **The clustered standards are A SLIDER POSITION, not a defect and not a range
+          problem.** On the headline cell the inner whorl reads as a tight central crown
+          rather than three distinct upright petals; that is `layerSize` 0.62 against
+          curl +90, and every one of those numbers is reachable and adjustable. Nothing
+          is queued. Do not "fix" the default, widen a range, or add a control on the
+          strength of this note.
+
+        * **INNER COVERING EVERY WHORL ABOVE THE OUTERMOST IS ACCEPTED FOR NOW.** At three
+          layers the second and third whorls are identical to each other, which is visible
+          on the extremes sheet and was ruled acceptable. **The INNER/INNERMOST SPLIT
+          STAYS A RECORDED CANDIDATE, and its reopening evidence is named so it cannot be
+          reopened on the strength of reading the code: the three-whorl cell READING WRONG
+          TO EVA LATER.** Not this look — she has seen this look and accepted it. A fresh
+          ruling needs a fresh picture, exactly as the max-combinator kink, the tip cap and
+          the parked tilt extremes do. When it comes, it is a design ruling with its own
+          partition report — it changes the DERIVATION and nothing else — never a rewrite.

@@ -57,6 +57,30 @@ export const SHEET_THICKNESS_MM = 1.2;
    A printed coupon replaces this guess with a measurement. */
 export const FOOT_MIN_WIDTH_MM = 1.6;
 
+/* THE FOOT'S UPPER CLAMP — a number that has always been here as a bare `10`
+   inside footRing()'s clamp, given a name (Eva's ruling, Sep 1, option b)
+   because it BINDS and nothing said so.
+
+   WHAT WAS WRONG, found by discovery rather than by a visitor wondering why
+   the ring stopped growing. `widthClamped` telemetry reports only the LOWER
+   floor, so from `petalWidth` 25 upward — SIX of the slider's 23 reachable
+   values, 26% of its range — the authored foot exceeds 10 mm, the clamp takes
+   over, and the blade keeps widening while the foot and therefore the whole
+   area-ruled ring stand still. Measured at n=8, t=1.2, spread 2:
+
+       petalWidth 24 -> foot  9.60 mm, ring 10.8324 mm
+       petalWidth 25 -> foot 10.00 mm, ring 11.0558 mm
+       petalWidth 30 -> foot 10.00 mm, ring 11.0558 mm   (blade +20%, ring +0%)
+
+   This predates the zygomorphy work by four sessions; a per-role size
+   multiplier is simply the fastest route to it, which is why it surfaced
+   here. NO GEOMETRY MOVES: the constant is the same double the literal was,
+   and the fix is the (CLAMPED) discipline this project already applies
+   everywhere else arriving where it was always missing — `widthClampedHigh`
+   beside `widthClamped`, and a ceiling twin of the read-out's floor line.
+   A slider that has stopped moving must say so. */
+export const FOOT_MAX_WIDTH_MM = 10;
+
 /* HOW MANY WHORLS THE ARRANGEMENT MAY STACK. Three, and the binding
    constraint is THE PETAL, not the triangle count — which was the surprise.
    Measured Sep 1: three layers at petalCount 40 is 149,568 export triangles,
@@ -323,6 +347,142 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
    1.981 mm at three layers: a wrong hub leaves 57 of 120 slots joined to
    nothing and the flood fill still reports one region, chained through the
    119 feet in between. See junctionAssertions() in tools/bloom-harness.mjs. */
+
+/* ===================================================================
+   ZYGOMORPHY — petals that differ by POSITION. Session A of two: the override
+   architecture plus PER-LAYER roles (the iris). Session B derives roles from a
+   mirror plane and gives one slot in a whorl its own record (the orchid's
+   labellum and hood). Charter: docs/bloom-charter.md, "Zygomorphy".
+
+   A ROLE IS A GROUP OF SLOTS THAT SHARE ONE OVERRIDE RECORD — not a slot and
+   not a layer. That the group is the unit is the whole design, and it is
+   MEASURED rather than preferred:
+
+     grouped `n * r^2`  vs  a per-foot `SUM r^2` at the same values
+       n = 8    19.556959407132098  ==  identical
+       n = 40   97.784797035660489  vs  97.784797035660574   = 6.00 ULP
+       n = 40 (petalWidth 30, sheet 2.40)                    = 2.00 ULP
+
+   Had "per-slot overrides" been built as PER-SLOT GROUPING — the obvious
+   reading — the ringed area-rule sum would have had to be regrouped per foot
+   and EVERY 40-petal export would have moved by 6 ULP for nothing. That is
+   the flower's `a*(b+c)` vs `a*b + a*c` trap, which has now fired twice in
+   this project family. Grouping by ROLE keeps the loop shape, so at one role
+   per layer `roleCount === petalCount` and the sum is bit-identical — which
+   `zygoGuardResidual` below asserts as an EQUALITY, not a bound. Grouping by
+   role is therefore LOAD-BEARING, not stylistic. Do not regroup it.
+
+   SESSION A'S ROLE DERIVATION IS DELIBERATELY COARSE: two roles, OUTER (the
+   outermost whorl) and INNER (every whorl above it). At layerCount 2 that is
+   exactly the iris — falls at OUTER, standards at INNER — which is the form
+   the session was opened on. It is a DERIVATION, and session B changes only
+   the derivation and which descriptors exist; the override MECHANISM below is
+   unchanged by it. That is the seam, stated so session B starts from a
+   boundary rather than re-deriving one.
+
+   ROLES ARE A RINGED-ARM FEATURE. Under CONTINUOUS there are no layers to
+   differentiate — that is precisely what J5 asserts — so every ring is OUTER
+   and the override controls are hidden by their own registry predicates.
+   Reinterpreting a layer role as a turn role would be a label naming
+   something else, which is `layerPhase`'s precedent exactly. Slot roles
+   (session B) are additionally RADIAL-only: reflecting a SPIRAL arrangement
+   about any plane leaves the best mirror pairing off by up to 20.062 deg at
+   n=8 — 45% of a slot gap, measured — so a "mirror" control there would be a
+   symmetry label sitting on a measured asymmetry. This project does not ship
+   labels that lie about a computation; it is gated, with named rows asserting
+   hidden-and-bit-identical, because a gated state is coverage.
+   =================================================================== */
+export const ROLE_OUTER = 'OUTER';
+export const ROLE_INNER = 'INNER';
+
+/* WHAT A ROLE MAY OVERRIDE, AND BY WHAT LAW — one owner, one table.
+
+   EVERY ENTRY IS A DELTA ON A BASE CONTROL, defaulting to 0, so byte-identity
+   at the shipping default is a CONSTRUCTION and not an argument: a zero delta
+   is skipped outright (see resolveRoleOverrides), which leaves the guard
+   below returning the caller's own `state` object and every consumer taking
+   the pre-zygomorphy call character for character. Absolute values were
+   rejected: they need a per-control "use base / override" flag, which is the
+   flower's CUSTOM problem and makes byte-identity an argument.
+
+   THE SET IS TRIMMED, AND THE ASYMMETRY IS WHY (Eva, Sep 1). Adding a control
+   later is one registry row and always will be; retiring one becomes a schema
+   bump plus a migration the day anything persists a design. So this starts
+   minimal and grows on evidence from real use. RECORDED, NOT BUILT: roll and
+   twist deltas, a per-layer tip-taper/base-taper delta, and a per-layer
+   `tipThinning` delta — all mechanically identical to the three below, none
+   asked for by either target form. A request for "roll on the standards" is
+   one row in this table plus one in the registry.
+
+   SIZE AND TILT ARE ABSENT ON PURPOSE (Eva's Q5 ruling). `layerSize` and
+   `layerTilt` are lambda-RAMPS that already own per-layer size and tilt, and
+   they are the only depth controls that survive CONTINUOUS. A per-layer role
+   override of either would be a second owner of one quantity. So layer roles
+   override exactly what the ramps do not. Two prefixes, two laws: `layer*` is
+   a ramp, `inner*` is a role override.
+
+   THE BOUNDS ARE DECLARED HERE AND ASSERTED AGAINST THE REGISTRY by both
+   gates (the SHEET_THICKNESS_MM precedent). bloom-geometry.js imports nothing,
+   so it cannot read the registry's ranges; restating them without a check
+   would be a second owner, and the check is what makes it one. A composed
+   value is clamped into the BASE control's own range so it is always a value
+   the base control could itself hold — which keeps every downstream
+   invariant, and every gate row's reasoning, inside the proven envelope.
+   `petalTipBreadth` matters most: the tip cap partitions on `=== 0` EXACTLY,
+   so a negative composed breadth would silently leave the pointed family and
+   re-square the tip Eva ruled to a point. */
+export const ROLE_OVERRIDES = [
+  { base: 'petalSpineCurl',  delta: 'innerCurl',       min: -180, max: 360 },
+  { base: 'petalCup',        delta: 'innerCup',        min: -0.8, max: 1.2 },
+  { base: 'petalTipBreadth', delta: 'innerTipBreadth', min: 0,    max: 0.6 },
+];
+
+/* THE SLOT -> ROLE ASSIGNMENT, and it has exactly ONE owner. footRing() calls
+   it and stamps the answer onto each descriptor; buildPetalInto READS
+   `ring.role` and computes nothing. That is the same relation `scale`,
+   `phase` and `tiltExtra` have carried since layers shipped. */
+export function roleForLayer(layerIndex, continuousMode) {
+  return (continuousMode || layerIndex === 0) ? ROLE_OUTER : ROLE_INNER;
+}
+
+/* THE RESOLVED RECORD, or null. Null is the guard's whole mechanism: an OUTER
+   ring, or an INNER ring with every delta at 0, carries no record at all, and
+   petalStateFor() then hands the builder the caller's own state OBJECT.
+
+   A zero delta is SKIPPED rather than added. `x + 0` is exact for every
+   finite x and the clamp would be a no-op, so the skip is not needed for the
+   arithmetic — it is needed so that "no overrides" produces `null` and the
+   identity guard has something to test. Resting the layer on `-0 + 0` being
+   `+0` is the case analysis the form layer deliberately declined to rest on;
+   this does not need it. */
+export function resolveRoleOverrides(state, role) {
+  if (role !== ROLE_INNER) return null;
+  let out = null;
+  for (const o of ROLE_OVERRIDES) {
+    const d = state[o.delta];
+    if (!(d !== 0)) continue;          // 0 and NaN alike take the shipped path
+    (out || (out = {}))[o.base] = clamp(state[o.base] + d, o.min, o.max);
+  }
+  return out;
+}
+
+/* THE GUARD, AND IT IS OBJECT IDENTITY — the cheapest one available and the
+   strongest. With no record this returns the SAME OBJECT it was handed, so
+   widthProfile, petalForm, thicknessProfile and the three inline reads in
+   buildPetalInto take the pre-zygomorphy call on the pre-zygomorphy object.
+   There is no expression to have got subtly wrong, which is why this is
+   stated as a construction rather than measured as a residual — and the byte
+   report is still what confirms it, on 598 frozen rows plus the live matrix.
+
+   NOT ALLOWED TO BE SOMEWHERE A BUG SITS UNEXERCISED (formGuardResidual's
+   doctrine): the gates assert, on every row, that a ring with no record makes
+   the builder report EXACTLY the base state's values (Z2), so the guarded
+   path is measured rather than assumed to be taken. */
+export function petalStateFor(state, ring) {
+  if (!ring.overrides) return state;
+  return { ...state, ...ring.overrides };
+}
+
 export function footRing(state, acc) {
   const thickness = acc.floorThickness(state.sheetThickness);
   const layerCount = Math.round(state.layerCount);
@@ -380,7 +540,22 @@ export function footRing(state, acc) {
      on the same doubles as the pre-layer code. The single-layer default is
      byte-identical here BY CONSTRUCTION; the byte report confirms it. */
   const raw = [];
+  /* THE AREA-RULE TOTAL, GROUPED BY ROLE — the shipped sum from here on, and
+     the reason the grouping is by role rather than by slot is measured in the
+     ZYGOMORPHY block above (per-slot grouping moves every 40-petal export by
+     6 ULP). At one role per ring `roleCount` is exactly the group size the
+     pre-role expression used, so both arms are bit-identical here today; that
+     is asserted, not asserted-by-comment, by `zygoGuardResidual` below.
+     WHAT THE AREA RULE SUMS IS UNCHANGED IN DEFINITION: r_ring^2 = SUM of
+     r_foot^2 over every foot that feeds the hub. Only the grouping is named. */
   let sumSq = 0;
+  /* THE PRE-ROLE EXPRESSION, VERBATIM, carried alongside purely to be
+     compared against — the guardResidual doctrine one layer up. It is the
+     ringed `state.petalCount * rFoot * rFoot` and the continuous
+     `rFoot * rFoot` character for character, so the comparison is between two
+     genuinely different groupings rather than between an expression and a
+     restatement of itself. Nothing geometric reads it. */
+  let preRoleSumSq = 0;
   if (continuousMode) {
     /* THE CONTINUOUS ARM — one ring per PETAL, `lambda` a real number.
 
@@ -403,19 +578,32 @@ export function footRing(state, acc) {
       const lambda = lambdaAt(k);
       const scale = Math.pow(state.layerSize, lambda);
       const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
-      const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
+      const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
       const rFoot = Math.sqrt((width * thickness) / Math.PI);
-      sumSq += rFoot * rFoot;
-      raw.push({ lambda, scale, authoredWidth, width, rFoot });
+      /* A CONTINUOUS RING CARRIES EXACTLY ONE PETAL, so its role group is one
+         slot. `1 * x * x` is `x * x` exactly in IEEE-754 (multiplication by
+         1.0 is exact for every finite x), which the residual measures rather
+         than assumes. */
+      const roleCount = 1;
+      sumSq += roleCount * rFoot * rFoot;
+      preRoleSumSq += rFoot * rFoot;
+      raw.push({ lambda, scale, authoredWidth, width, rFoot, roleCount, role: roleForLayer(k, true) });
     }
   } else {
   for (let L = 0; L < layerCount; L++) {
     const scale = Math.pow(state.layerSize, L);
     const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
-    const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10);
+    const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
-    sumSq += state.petalCount * rFoot * rFoot;
-    raw.push({ lambda: L, scale, authoredWidth, width, rFoot });
+    /* SESSION A HAS ONE ROLE PER WHORL, so the group is the whole whorl and
+       `roleCount` is `state.petalCount` — the SAME DOUBLE the pre-role
+       expression multiplied by, deliberately read unrounded exactly as that
+       expression read it. Session B splits this group; nothing else here
+       changes when it does. */
+    const roleCount = state.petalCount;
+    sumSq += roleCount * rFoot * rFoot;
+    preRoleSumSq += state.petalCount * rFoot * rFoot;
+    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: roleForLayer(L, false) });
   }
   }
 
@@ -492,8 +680,21 @@ export function footRing(state, acc) {
       /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the
          read-out and the gates can say WHERE a floor started binding instead
          of a slider silently going quiet. Nothing geometric may read these. */
+      /* THE ROLE AND ITS GROUP SIZE, owned here so no consumer derives them.
+         buildPetalInto READS `role` and `overrides`; it computes neither. */
+      role: p.role,
+      roleCount: p.roleCount,
+      /* THE RESOLVED OVERRIDE RECORD, or null. Null on every OUTER ring and
+         on any INNER ring whose deltas are all 0 — which is what makes
+         petalStateFor() an identity guard rather than a merge. */
+      overrides: resolveRoleOverrides(state, p.role),
       authoredWidth: p.authoredWidth,
       widthClamped: p.authoredWidth < FOOT_MIN_WIDTH_MM,
+      /* THE CEILING TWIN (Eva, Sep 1). The floor has been reported since the
+         thickness layer and the ceiling never was, so a quarter of the
+         petalWidth slider moved the blade and not the ring in silence. See
+         FOOT_MAX_WIDTH_MM's note for the measurement. Telemetry only. */
+      widthClampedHigh: p.authoredWidth > FOOT_MAX_WIDTH_MM,
       /* A statement about the EXPORT, true in either mode — the read-out has
          to warn about a floor it is not currently applying. */
       thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
@@ -561,9 +762,32 @@ export function footRing(state, acc) {
     }
   }
 
+  /* ===================================================================
+     THE ROLE-GROUPING RESIDUAL — an EQUALITY, deliberately not a bound, and
+     the reason it can be one is the measurement in the ZYGOMORPHY block:
+     grouping by ROLE preserves the pre-role loop shape, so at one role per
+     ring the two sums are the same double. Grouping by SLOT would not have
+     been, at 6 ULP on a real 40-petal row, and stating that here is what
+     stops a later session "simplifying" the grouping away.
+
+     ASSERTED ON EVERY BUILD THAT CAN MAKE THE CLAIM, so the guard is never
+     somewhere a bug sits unexercised. The claim is only available while every
+     ring's role group is the pre-role expression's own group — the whole
+     whorl under the ringed arm, the single petal under the continuous one.
+     Session B splits a whorl into LABELLUM / HOOD / LATERAL, at which point
+     the two groupings legitimately differ and there is no law to compare
+     against: it reports null there, never a passing 0. That is the same
+     shape as guardResidual above and for the same reason — a claim nothing
+     can make must read as absent. */
+  const preRoleGroup = continuousMode ? 1 : state.petalCount;
+  const oneRolePerRing = rings.every((r) => r.roleCount === preRoleGroup);
+  const zygoGuardResidual = oneRolePerRing
+    ? Math.abs(Math.sqrt(sumSq) - Math.sqrt(preRoleSumSq))
+    : null;
+
   return {
     rings, hub, derivedRadius, guardResidual, layerCount,
-    continuousMode, sequenceLength, quantizerResiduals,
+    continuousMode, sequenceLength, quantizerResiduals, zygoGuardResidual,
     /* HOW MANY PETALS EACH RING CARRIES. One number rather than a shape the
        consumers each infer: `rings.length * slotsPerRing` is the bloom's
        petal count in both modes, and buildBloomInto reads exactly that
@@ -1300,9 +1524,21 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   /* READ from footRing(), never a second floorThickness() of the same
      constant. Identical value, one producer. */
   const t = ring.thickness;
-  const length = state.petalLength * slot.scale;
-  const tilt = ((state.petalTilt + slot.tiltExtra) * Math.PI) / 180;
-  const halfW = (state.petalWidth * slot.scale) / 2;
+  /* THE EFFECTIVE STATE FOR THIS RING'S ROLE — and with no override record it
+     is the caller's own `state` OBJECT, not a copy of it (petalStateFor's
+     identity guard). Every read below therefore takes the pre-zygomorphy call
+     on the pre-zygomorphy object at the shipping default, which is why the
+     byte report is a construction here rather than a hope.
+
+     WHY THE WHOLE BUILDER READS `ps` AND NOT ONLY THE OVERRIDDEN KEYS: `ps`
+     inherits every key it does not override, so the two are the same value on
+     a non-overridable control — and a builder that read `state` for some
+     petal quantities and `ps` for others would be two sources for one petal,
+     which is the defect this project repeats most. One object, one petal. */
+  const ps = petalStateFor(state, ring);
+  const length = ps.petalLength * slot.scale;
+  const tilt = ((ps.petalTilt + slot.tiltExtra) * Math.PI) / 180;
+  const halfW = (ps.petalWidth * slot.scale) / 2;
   const footHalf = ring.width / 2;
 
   /* Local frame: R radial (out), T tangent, Z up. */
@@ -1311,12 +1547,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   const T = [-sinA, cosA, 0];
   const Z = [0, 0, 1];
 
-  const profile = widthProfile(state, ring, halfW, cap, acc);
+  const profile = widthProfile(ps, ring, halfW, cap, acc);
   /* THE GUARD. petalFormIsFlat() is the predicate; when it holds, `form`
      stays null and every row below takes the pre-form expression verbatim.
      That — not an IEEE-754 argument — is what makes the shipped default
      byte-identical. */
-  const form = petalFormIsFlat(state) ? null : petalForm(state, halfW, t);
+  const form = petalFormIsFlat(ps) ? null : petalForm(ps, halfW, t);
 
   /* THE THICKNESS GUARD, same doctrine as the form guard above. When the
      profile is uniform, `tAt` is the pre-change scalar verbatim, so every
@@ -1332,8 +1568,8 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      The roll curvature floor is expressed against `t` — the THICKEST row,
      since thinning only ever removes material — so the floor keeps
      protecting the whole blade rather than only its tip. */
-  const uniformThickness = thicknessIsUniform(state);
-  const profileT = thicknessProfile(ring, state);
+  const uniformThickness = thicknessIsUniform(ps);
+  const profileT = thicknessProfile(ring, ps);
   const tAt = uniformThickness ? () => t : (u) => acc.floorThickness(profileT.at(u));
 
   /* THE FLAT CROSS-SECTION, and the reason it is a closure.
@@ -1485,6 +1721,20 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       lastRowHalf: rows[rows.length - 1].h,
       exportMode: acc.exportMode,
     },
+    /* ZYGOMORPHY TELEMETRY — READ FROM THE EFFECTIVE STATE THE BUILDER
+       ACTUALLY USED, which is the whole point of reporting it here rather
+       than from the resolver. A ring can carry a perfectly correct override
+       record that never reaches the blade (petalStateFor short-circuiting
+       unconditionally is a one-word mutation), and that failure exports
+       watertight, exports as ONE piece, has an identical triangle count and
+       passes J1-J6 and the record-side assertions alike. This array is the
+       only thing that sees it — Z2's third clause. Every key in
+       ROLE_OVERRIDES appears, whether or not it was overridden, so "the
+       override did not arrive" and "there was no override" are distinguished
+       rather than both rendering as the base value with nothing to compare. */
+    role: ring.role,
+    applied: Object.fromEntries(ROLE_OVERRIDES.map((o) => [o.base, ps[o.base]])),
+    overridden: !!ring.overrides,
     footRows: footS.length,
     panels: panels.map((p) => p.label),
     tipSpans: panels.filter((p) => p.rowTo === rows.length - 1).length,
@@ -1522,8 +1772,8 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        the hub, so no flood fill can split. Scope is printed beside every
        gate result, never only in a header. */
     thickness: {
-      authored: state.sheetThickness,
-      thin: state.tipThinning,
+      authored: ps.sheetThickness,
+      thin: ps.tipThinning,
       base: rows[0].tUsed,
       /* The tip BEFORE and AFTER the floor, so "(CLAMPED)" is a measurement
          rather than a prediction from the slider value. */
@@ -1866,6 +2116,12 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      forbids, and it is the same rule that made the layered arm read
      `ring.scale` instead of raising layerSize to a power out here. */
   const petals = [];
+  /* HOW MANY PETALS THE WHORL LOOPS ACTUALLY EMITTED — counted at the call
+     site rather than derived from a control, because it is what Z1 compares
+     the role partition AGAINST. A partition checked against another number
+     footRing() invented would agree with a broken derivation by being broken
+     alongside it; checked against the builder's own tally it cannot. */
+  let petalsBuilt = 0;
   if (fr.continuousMode) {
     buildWhorlInto({
       count: fr.rings.length,
@@ -1879,7 +2135,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
          a thing. */
       phase: fr.rings[0].phase,
       placement: state.placement,
-      blade: (slot) => { petals.push(buildPetalInto(acc, state, fr.rings[slot.index], slot, capability)); },
+      blade: (slot) => { petalsBuilt++; petals.push(buildPetalInto(acc, state, fr.rings[slot.index], slot, capability)); },
     });
   } else {
   for (const ring of fr.rings) {
@@ -1893,6 +2149,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
       phase: ring.phase,
       placement: state.placement,
       blade: (slot) => {
+        petalsBuilt++;
         const p = buildPetalInto(acc, state, ring, slot, capability);
         if (slot.index === 0) petal = p;
       },
@@ -1902,5 +2159,5 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
   }
   buildHubInto(acc, state, fr.hub);          // unconditional — the invariant's plumbing
   const center = buildCenterInto(acc, state, fr.hub);   // optional — the designed mass
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, foot: fr, center, petal: petals[0], petals };
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, foot: fr, center, petal: petals[0], petals, petalsBuilt };
 }
