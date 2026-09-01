@@ -1585,10 +1585,23 @@ another.handle"></textarea>
     openDrawer();
   }
 
+  // Everything behind the drawer while it is open. `inert` is the honest way
+  // to say "modal": it removes this subtree from tab order AND from the
+  // accessibility tree, so a screen reader doesn't wander into the list
+  // underneath. The keydown trap below covers browsers that don't have it.
+  const BACKGROUND_SELECTOR = '.topbar, .wrap, .top-btn';
+  const SUPPORTS_INERT = 'inert' in HTMLElement.prototype;
+
+  function setBackgroundInert(on){
+    if(!SUPPORTS_INERT) return;
+    document.querySelectorAll(BACKGROUND_SELECTOR).forEach(el => { el.inert = on; });
+  }
+
   function openDrawer(){
     drawer.dataset.open = 'true';
     drawerBackdrop.dataset.open = 'true';
     drawer.setAttribute('aria-hidden', 'false');
+    setBackgroundInert(true);
     document.addEventListener('keydown', onDrawerKeydown);
     syncTopBtnVisibility();
     const first = drawerMode === 'edit'
@@ -1602,6 +1615,8 @@ another.handle"></textarea>
     drawer.dataset.open = 'false';
     drawerBackdrop.dataset.open = 'false';
     drawer.setAttribute('aria-hidden', 'true');
+    // Lift inert before restoring focus, or the row can't take it.
+    setBackgroundInert(false);
     document.removeEventListener('keydown', onDrawerKeydown);
     detachPhotoCapture();
     detailId = null;
@@ -1619,6 +1634,37 @@ another.handle"></textarea>
     if(ev.key === 'Escape'){
       ev.preventDefault();
       closeDrawer();
+      return;
+    }
+    if(ev.key === 'Tab') trapTab(ev);
+  }
+
+  // The drawer claims aria-modal="true", so Tab must not walk out of it into
+  // the list behind. Cycles focus within the drawer instead.
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  function trapTab(ev){
+    const focusable = Array.prototype.filter.call(
+      drawer.querySelectorAll(FOCUSABLE),
+      el => !el.hidden && el.offsetParent !== null
+    );
+    if(focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    // Focus can sit outside the drawer entirely (a backdrop click, or a
+    // browser without inert letting it drift) — pull it back in.
+    if(!drawer.contains(active)){
+      ev.preventDefault();
+      (ev.shiftKey ? last : first).focus();
+      return;
+    }
+    if(ev.shiftKey && active === first){
+      ev.preventDefault();
+      last.focus();
+    }else if(!ev.shiftKey && active === last){
+      ev.preventDefault();
+      first.focus();
     }
   }
 

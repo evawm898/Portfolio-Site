@@ -156,10 +156,28 @@ check('drawer is anchored right', Math.abs((box.x + box.width) - 1280) < 2, 'rig
 check('transition is ~250-300ms', (await drawer.evaluate(el => getComputedStyle(el).transitionDuration)).startsWith('0.28'),
   await drawer.evaluate(el => getComputedStyle(el).transitionDuration));
 
+section('focus is trapped while the drawer is open');
+check('focus starts on the close button', await page.evaluate(() => document.activeElement?.id) === 'drawerClose');
+check('the list behind is inert', await page.evaluate(() => document.querySelector('.wrap').inert === true));
+// Tab all the way round: focus must never leave the drawer.
+let escaped = null;
+for(let i = 0; i < 14; i++){
+  await page.keyboard.press('Tab');
+  const inside = await page.evaluate(() => document.getElementById('drawer').contains(document.activeElement));
+  if(!inside){ escaped = await page.evaluate(() => document.activeElement?.id || document.activeElement?.className || document.activeElement?.tagName); break; }
+}
+check('Tab cycles inside the drawer', escaped === null, escaped ? 'escaped to ' + escaped : '');
+await page.keyboard.press('Shift+Tab');
+check('Shift+Tab stays inside too',
+  await page.evaluate(() => document.getElementById('drawer').contains(document.activeElement)));
+
 section('closing: Escape');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(SLIDE);
 check('Escape closes the drawer', !(await isOpen()));
+check('the list is interactive again', await page.evaluate(() => document.querySelector('.wrap').inert === false));
+check('focus returned to the row that opened it',
+  await page.evaluate(() => document.activeElement?.classList.contains('entry')));
 
 section('closing: backdrop');
 await page.locator('.entry', { hasText:'Sam Reed' }).click();
