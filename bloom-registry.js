@@ -149,25 +149,42 @@ export function predicateDrivers(pred, out = new Set()) {
    stop-and-raise, and would have produced one 14-control "Petal" section,
    which is the problem rather than the fix.
 
-   `open` IS AN AUTHORED LITERAL — Eva's ruling, Sep 1 — NOT A DERIVED RULE.
-   Recorded because a rule WAS proposed and did not survive contact with the
-   ruling, and a later reader should find that rather than reconstruct it:
-   the proposal was "collapse a section iff every control in it is at an
-   identity default", which is exactly true of Petal form's four curves
-   (all 0, the flat short-circuit) and Material's three (all reproducing the
-   old constant). Eva collapsed CENTER as well, whose DISC / 0.75 / 0.35 are
-   authored aesthetic defaults and not identities, and moved Petal tilt
-   (default 25 degrees) into Petal form — so the rule is false of the panel
-   that shipped, twice over. It is not weakened here, it is gone: first-load
-   openness is taste, taste is a ruling, and a ruling is a literal. Do not
-   make `open` a predicate — that would put collapse state under `visibleWhen`
-   as a second hiding mechanism, and make the panel rearrange itself under
-   the user as they drag a slider.
+   THE PANEL IS AN ACCORDION: OPENING A SECTION CLOSES THE OTHERS (Eva's
+   ruling, Sep 1, with the tradeoff stated and accepted — tweaking across two
+   sections costs a reopen click, and the layers-are-sections structure makes
+   single-focus the normal case). So `open` here no longer means "which
+   sections start open"; it means THE ONE SECTION OPEN AT FIRST LOAD, and
+   verifySections() enforces at most one `true`. Zero is legal — every section
+   shut is a state the visitor can reach by closing the open one, so it is a
+   state the registry may declare too.
+
+   THE SUPERSEDED RULING, BOTH HALVES, so the reversal is legible rather than
+   mysterious. Earlier the same day Eva ruled Arrangement AND Petal shape open
+   at first load, with the other three collapsed, and that was right for the
+   panel it was ruling on — sections that opened and closed independently.
+   The accordion makes any two-open state UNREACHABLE, so the earlier ruling
+   is not overridden by preference; its subject stopped existing. First load
+   is now ARRANGEMENT ALONE.
+
+   `open` IS AN AUTHORED LITERAL, NOT A DERIVED RULE — and this is the second
+   rationale on this field to die while its instruction stood, which is worth
+   a reader's attention. The first proposal was "collapse a section iff every
+   control in it is at an identity default", exactly true of Petal form's four
+   curves (all 0, the flat short-circuit) and Part thickness's three (all
+   reproducing the old constant). It was already false of the panel that
+   shipped — CENTER's DISC / 0.75 / 0.35 are authored aesthetic defaults, not
+   identities, and Petal tilt (default 25 degrees) moved into Petal form — and
+   the accordion now makes it incoherent as well, since at most one section
+   can be open whatever its contents are at. Do not reintroduce it. Do not
+   make `open` a predicate either: that would put collapse under `visibleWhen`
+   as a second hiding mechanism and make the panel rearrange itself under the
+   user as they drag a slider.
 
    COLLAPSE IS NOT HIDING, and the distinction is load-bearing for "shipped
-   means reachable". A collapsed section keeps every control in the DOM with
-   its value, its listeners and its read-out span; applyVisibility() is still
-   the only thing that hides a CONTROL. Measured rather than believed —
+   means reachable" — never more so than under the accordion, where four of
+   the five sections are shut at any moment. A collapsed section keeps every
+   control in the DOM with its value, its listeners and its read-out span;
+   applyVisibility() is still the only thing that hides a CONTROL. Measured rather than believed —
    tools/verify-bloom-panel.mjs drives an input inside a collapsed section
    through real events and asserts the readout and the geometry moved, and
    asserts the app's whole state snapshot is identical collapsed and expanded.
@@ -200,10 +217,28 @@ export function predicateDrivers(pred, out = new Set()) {
    =================================================================== */
 export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
-  { id: 'shape', label: 'Petal shape', open: true },
+  { id: 'shape', label: 'Petal shape', open: false },
   { id: 'form', label: 'Petal form', open: false },
   { id: 'center', label: 'Center', open: false },
-  { id: 'material', label: 'Material', open: false },
+  /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
+     WITH THE LABEL on purpose. An id that contradicts its label is a stored
+     label-lie: it reads as a declaration, a later reader checks it and
+     believes it, and this project's most repeated defect is a name for a
+     thing that is not the thing. There is no saved-design debt to weigh
+     against that — `section` is panel presentation, never persisted, and it
+     is not a control id, so RETIRED_IDS does not apply and no migration is
+     owed. (Were a section id ever to reach a saved design, that calculus
+     inverts and the rename becomes a retirement.)
+
+     WHAT THE NAME IS SLIGHTLY WRONG ABOUT, stated rather than discovered:
+     this section also holds `footDelicacy`, which scales a WIDTH, not a
+     thickness. It sits here because the three controls are one layer — the
+     part's own material dimensions, the things that decide how delicate the
+     printed object is — and because delicacy's width is what the area rule
+     reads to size the ring. If the name ever reads wrong at the panel, the
+     LABEL moves on one ruling and the id moves with it, exactly as it did
+     here. Do not fix it by re-homing the control. */
+  { id: 'thickness', label: 'Part thickness', open: false },
 ];
 
 /* THE SECTION/CONTROL RELATION, checked at module load rather than trusted.
@@ -223,6 +258,16 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     if (ids.has(s.id)) bad.push(`duplicate section id "${s.id}"`);
     ids.add(s.id);
     if (typeof s.open !== 'boolean') bad.push(`section "${s.id}" must declare a literal boolean \`open\``);
+  }
+  /* THE ACCORDION'S OWN INVARIANT, checked where the literals live. The panel
+     opens at most one section at a time, so two `open: true` rows would
+     declare a first-load state the UI cannot hold — the generator would build
+     it and the first toggle would silently correct it, which is a panel whose
+     shipped appearance disagrees with its own registry until someone clicks.
+     Zero is legal: every section shut is reachable by closing the open one. */
+  const opens = sections.filter((s) => s.open === true).map((s) => s.id);
+  if (opens.length > 1) {
+    bad.push(`the panel is an accordion, so at most ONE section may declare open: true — found ${opens.length} (${opens.join(', ')})`);
   }
   const used = new Set();
   for (const c of controls) {
@@ -539,7 +584,7 @@ export const CONTROLS = [
      roll-clamp pattern. All three ranges reach past where a floor starts
      binding, on purpose, and every read-out says (CLAMPED) when it does, so
      a slider that has stopped moving the print does not read as broken. */
-  { id: 'sheetThickness', section: 'material', kind: 'slider', min: 0.6, max: 2.4, step: 0.05, default: 1.2,
+  { id: 'sheetThickness', section: 'thickness', kind: 'slider', min: 0.6, max: 2.4, step: 0.05, default: 1.2,
     label: 'Sheet thickness', tier: 'standard', role: 'petal',
     /* Prints the export floor's verdict, not only the authored value. Below
        1.00 mm the exported sheet is floored and the live view is showing
@@ -551,7 +596,7 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'tipThinning', section: 'material', kind: 'slider', min: 0, max: 0.8, step: 0.01, default: 0,
+  { id: 'tipThinning', section: 'thickness', kind: 'slider', min: 0, max: 0.8, step: 0.01, default: 0,
     label: 'Tip thinning', tier: 'standard', role: 'petal',
     /* Prints the DERIVED tip thickness in mm, live and printed, which is the
        physical quantity — the fraction alone cannot say where the floor
@@ -570,7 +615,7 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'footDelicacy', section: 'material', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 1,
+  { id: 'footDelicacy', section: 'thickness', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 1,
     label: 'Foot delicacy', tier: 'standard', role: 'petal',
     /* Prints the DERIVED foot cross-section in mm — the answer to "how thin
        can this connection get" is a pair of millimetres, not a multiplier.

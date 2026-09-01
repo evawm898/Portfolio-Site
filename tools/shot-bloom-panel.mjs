@@ -8,20 +8,37 @@
    of what counts as chrome, and neither tool re-implements the other's job.
 
    WHAT IT SHOOTS
-     first load   the panel exactly as a visitor finds it — the sections at the
-                  `open` literals the registry declares. This is the cell the
-                  grouping ruling is made from.
-     expanded     every section open, i.e. the whole control set, which is what
-                  the panel WAS before this change. The two cells together are
-                  the before/after of the scroll problem, measured: each
-                  caption carries the panel's own pixel height.
+     first load   the panel exactly as a visitor finds it — one section open,
+                  the one the registry declares. This is the cell the grouping
+                  ruling is made from.
+     per section  one cell per section, each OPENED THE WAY A VISITOR OPENS IT
+                  (a real click on its summary, through the accordion). Five
+                  cells that together show every control in the panel.
+
+                  THIS REPLACED AN "ALL EXPANDED" CELL, and the choice is worth
+                  stating because the alternative was to keep it and label it.
+                  Under the accordion there IS no all-expanded state: it is not
+                  reachable, so photographing it would mean setting `.open` on
+                  every section behind the panel's own back and captioning a
+                  picture of a panel that cannot exist. A sheet exists to be
+                  ruled from, and a state nobody can reach is the wrong thing
+                  to rule on. The per-section walk shows the same controls,
+                  every frame of it reachable, and it doubles as a visual
+                  census. What is lost is the single "how tall is everything"
+                  number the old cell carried — so this tool now prints the
+                  WORST-CASE panel height across the five instead, which is the
+                  honest version of that number under an accordion: the tallest
+                  the panel can ever be is its tallest single section.
+     accordion    the interaction itself, as a sequence: first load, then
+                  opening a second section (the first one shuts by itself),
+                  then a third, then closing it to reach the zero-open state.
+                  What tools/verify-bloom-panel.mjs asserts, this shows.
      reactivity   the collapsed-section assertion, PHOTOGRAPHED. A pair: the
-                  panel at first load with Material shut, then the same panel
-                  after `sheetThickness` was driven to 2.40 mm through real
-                  events while that section stayed shut. Material is visibly
-                  closed in both frames and the readout — which lives outside
-                  every section — has moved, sheet and ring alike. What
-                  verify-bloom-panel.mjs asserts, this shows.
+                  panel at first load with Part thickness shut, then the same
+                  panel after `sheetThickness` was driven to 2.40 mm through
+                  real events while that section stayed shut. The section is
+                  visibly closed in both frames and the readout — which lives
+                  outside every section — has moved, sheet and ring alike.
      gated centre the one-clear-choice-with-sub-panels pattern surviving the
                   grouping: the Center section open at DISC (size + dish) and
                   at RING (size + bore), the sub-controls swapping under one
@@ -73,25 +90,57 @@ async function shoot(label, note) {
   return { label, note, caption, readout: box.readout, png };
 }
 
-const cells = { firstLoad: [], expanded: [], reactivity: [], centre: [] };
+const cells = { firstLoad: [], perSection: [], accordion: [], reactivity: [], centre: [] };
 
-/* ---- first load: the registry's own literals ---- */
+/* Open a section THE WAY A VISITOR DOES — a real click on its summary, so
+   every frame on this sheet is a state the UI can actually reach. `toggle` is
+   queued rather than synchronous (measured), so this waits a frame before the
+   caller reads anything back. Clicking an already-open summary would CLOSE it,
+   hence the guard. */
+async function openSection(id) {
+  const already = await page.evaluate((x) => document.getElementById(`sec-${x}`).open, id);
+  if (!already) await page.click(`#sec-${id} > summary`);
+  await page.waitForTimeout(180);
+  const open = await page.evaluate((x) => document.getElementById(`sec-${x}`).open, id);
+  if (!open) await die(`section "${id}" did not open on a real summary click`);
+}
+async function closeSection(id) {
+  const open = await page.evaluate((x) => document.getElementById(`sec-${x}`).open, id);
+  if (open) await page.click(`#sec-${id} > summary`);
+  await page.waitForTimeout(180);
+}
+
+/* ---- first load: the registry's own literal, one section open ---- */
 await openBloom(page, port);
+const declaredOpen = SECTIONS.filter((x) => x.open).map((x) => x.label).join(', ') || 'none';
 cells.firstLoad.push(await shoot('FIRST LOAD (as the registry declares)',
-  `Sections at their declared \`open\` literals: ${SECTIONS.map((s) => `${s.label} ${s.open ? 'open' : 'collapsed'}`).join(', ')}.`));
+  `The panel is an accordion: at most one section open. The registry declares ${declaredOpen || 'no section'} open at first load.`));
 
-/* ---- all expanded: the panel this change is measured against ---- */
-await page.evaluate(() => document.querySelectorAll('#panelControls details').forEach((d) => { d.open = true; }));
-await page.waitForTimeout(200);
-cells.expanded.push(await shoot('EVERY SECTION EXPANDED',
-  `All ${CONTROLS.length} controls, minus the centre sub-controls the DISC default hides. This is the full list the panel used to open onto.`));
+/* ---- one cell per section, each opened through the accordion ---- */
+for (const sec of SECTIONS) {
+  await openSection(sec.id);
+  const shown = await page.evaluate((id) => [...document.querySelectorAll(`#sec-${id} .bl-ctrl`)]
+    .filter((w) => !w.hidden).map((w) => w.querySelector('label').firstChild.textContent).join(', '), sec.id);
+  cells.perSection.push(await shoot(`SECTION · ${sec.label}`,
+    `Opened by a real click on its summary; every other section shut itself. Controls: ${shown}.`));
+}
+
+/* ---- the accordion as a sequence ---- */
+await openBloom(page, port);
+cells.accordion.push(await shoot('1 · FIRST LOAD', `${declaredOpen} open, the other four shut.`));
+await openSection('shape');
+cells.accordion.push(await shoot('2 · OPEN "Petal shape"', 'One click. Arrangement closed itself — nothing else was touched.'));
+await openSection('thickness');
+cells.accordion.push(await shoot('3 · OPEN "Part thickness"', 'Petal shape closed itself in turn. At most one section is ever open.'));
+await closeSection('thickness');
+cells.accordion.push(await shoot('4 · CLOSE IT AGAIN', 'Zero sections open, and nothing sprang open in its place — a state the visitor can reach, so the registry is allowed to declare it too.'));
 
 /* ---- reactivity through a section that stays shut ---- */
 await openBloom(page, port);
-cells.reactivity.push(await shoot('BEFORE · Material collapsed',
-  'First load. The Material section is shut; the readout below the buttons reports the shipping sheet, tip, foot and ring.'));
+cells.reactivity.push(await shoot('BEFORE · Part thickness shut',
+  'First load. Part thickness is shut; the readout below the buttons reports the shipping sheet, tip, foot and ring.'));
 const drove = await page.evaluate(async () => {
-  const det = document.getElementById('sec-material');
+  const det = document.getElementById('sec-thickness');
   const el = document.getElementById('sheetThickness');
   el.value = '2.4';
   el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -99,16 +148,16 @@ const drove = await page.evaluate(async () => {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   return { stillShut: !det.open, state: window.__bloomUIState().sheetThickness, ring: window.__bloomMetrics().ringRadius };
 });
-if (!drove.stillShut) await die('driving sheetThickness opened the Material section — the picture would not show what it claims');
+if (!drove.stillShut) await die('driving sheetThickness opened the Part thickness section — the picture would not show what it claims');
 if (Number(drove.state) !== 2.4) await die(`sheetThickness reads ${drove.state} after being driven — the app did not take the value`);
 cells.reactivity.push(await shoot('AFTER · sheet 2.40 mm, section still shut',
-  `sheetThickness driven 1.20 → 2.40 mm with real input/change events while Material stayed collapsed. The section is still shut in this frame; the readout and the ring (${drove.ring.toFixed(2)} mm) moved.`));
+  `sheetThickness driven 1.20 → 2.40 mm with real input/change events while Part thickness stayed shut. The section is still shut in this frame; the readout and the ring (${drove.ring.toFixed(2)} mm) moved.`));
 
 /* ---- the gated centre, inside its section ---- */
 for (const style of ['DISC', 'RING']) {
   await openBloom(page, port);
+  await openSection('center');
   await page.evaluate((st) => {
-    document.getElementById('sec-center').open = true;
     const el = document.getElementById('centerStyle');
     el.value = st;
     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -123,6 +172,15 @@ for (const style of ['DISC', 'RING']) {
 
 await browser.close();
 server.close();
+
+/* THE WORST-CASE PANEL HEIGHT — the honest replacement for the old
+   "all expanded" number. Under an accordion the tallest the panel can ever be
+   is its tallest single section, so that is the scroll a visitor can actually
+   meet. Parsed from the captions this run produced, never recomputed. */
+const heights = cells.perSection.map((c) => Number(/panel (\d+)px/.exec(c.caption)[1]));
+const tallest = cells.perSection[heights.indexOf(Math.max(...heights))];
+console.log(`\nfirst load: ${/panel (\d+)px/.exec(cells.firstLoad[0].caption)[1]}px`
+  + ` · worst case (tallest single section, ${tallest.label}): ${Math.max(...heights)}px`);
 
 /* ---- compose ---- */
 const CELL = 300;
@@ -149,10 +207,13 @@ const b2 = await chromium.launch({ executablePath: findChromium(), args: ['--no-
 const written = [];
 for (const [name, title, note, list, perRow] of [
   ['panel-grouping', 'Bloom panel — the grouping',
-   'Left: the panel as a visitor first finds it, sections at the registry\'s declared open literals. Right: every section expanded — the whole control set, which is what the panel opened onto before this change. No geometry changed in this session; the two frames differ only in presentation.',
-   [...cells.firstLoad, ...cells.expanded], 2],
+   `First cell: the panel as a visitor first finds it — the accordion holds one section open, the one the registry declares. Then one cell per section, each opened by a real click on its summary, which is how a visitor reaches it and is why there is no "all expanded" cell: under an accordion that state does not exist. Together the five show every control in the panel. Tallest single section — the worst scroll reachable — is ${Math.max(...heights)}px against ${/panel (\d+)px/.exec(cells.firstLoad[0].caption)[1]}px at first load. No geometry changed in this session.`,
+   [...cells.firstLoad, ...cells.perSection], 3],
+  ['panel-accordion', 'Bloom panel — the accordion',
+   'Opening a section closes the others. Four frames, each reached by one real click: first load, open Petal shape (Arrangement shuts itself), open Part thickness (Petal shape shuts in turn), close it (zero open, and nothing springs open in its place). The tradeoff is stated and accepted: tweaking across two sections costs a reopen click, and the layers-are-sections structure makes single-focus the normal case.',
+   cells.accordion, 4],
   ['panel-reactivity', 'Bloom panel — a collapsed section is not a hidden control',
-   'The assertion tools/verify-bloom-panel.mjs makes, photographed. sheetThickness lives in Material, which is collapsed at first load. Driving it with real input/change events — the same route every gate uses — rebuilds the model and moves the readout, and the section stays shut. Collapse is presentation; readUI, the export path and the gates cannot see it.',
+   'The assertion tools/verify-bloom-panel.mjs makes, photographed. sheetThickness lives in Part thickness, which is shut at first load. Driving it with real input/change events — the same route every gate uses — rebuilds the model and moves the readout, and the section stays shut. Collapse and the accordion are presentation; readUI, the export path and the gates cannot see either.',
    cells.reactivity, 2],
   ['panel-centre', 'Bloom panel — the gated centre, inside its section',
    'The centre keeps the pattern it had: one clear choice, sub-panels gated per choice by visibleWhen. Grouping did not change which controls appear or when — applyVisibility() is still the only thing that hides a control, and a section is hidden only when every control in it is.',

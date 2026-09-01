@@ -78,6 +78,38 @@ for (const s of SECTIONS) {
   sectionEls[s.id] = det;
 }
 
+/* THE ACCORDION — opening a section closes the others (Eva's ruling, Sep 1,
+   with the tradeoff stated and accepted: tweaking across two sections costs a
+   reopen click, and the layers-are-sections structure makes single-focus the
+   normal case).
+
+   ONE LISTENER, ONE OWNER. `toggle` does NOT bubble, so this is registered in
+   the CAPTURE phase on the panel root — capture descends from the document
+   through every ancestor regardless of bubbling, so one listener here sees
+   every section's toggle. The alternative, a listener per <details>, is N
+   copies of one rule and the thing that drifts; measured before it was built
+   on rather than assumed from the spec.
+
+   `toggle` IS QUEUED, NOT SYNCHRONOUS — measured, and it is the reason this
+   is written as a correction rather than a veto. Two programmatic opens in one
+   tick BOTH land, and this handler then runs twice and settles on the last
+   one. So exclusivity is eventually-consistent within a tick, which is
+   invisible to a visitor (one click is one toggle) and is exactly what a test
+   asserting exclusivity synchronously would fail on. tools/verify-bloom-panel
+   awaits a frame before every accordion assertion for that reason.
+
+   It cannot recurse: closing the others fires their toggles, and a toggle
+   whose target is now CLOSED returns immediately. Closing the open section is
+   left alone — zero sections open is a state the visitor can reach and the
+   registry may declare. This never touches `hidden`; applyVisibility() owns
+   that, and open/closed and shown/hidden are different questions. */
+panelRoot.addEventListener('toggle', (e) => {
+  const det = e.target;
+  if (!(det instanceof HTMLDetailsElement) || det.parentElement !== panelRoot) return;
+  if (!det.open) return;
+  for (const other of Object.values(sectionEls)) if (other !== det) other.open = false;
+}, true);
+
 for (const c of CONTROLS) {
   const wrap = document.createElement('div');
   wrap.className = 'bl-ctrl';
