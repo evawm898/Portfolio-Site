@@ -85,7 +85,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
+         thicknessAssertions, THICKNESS_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 const MAX_VOXELS = 90e6;    // grids beyond this are SKIPPED and reported, never passed
@@ -169,12 +170,25 @@ for (const row of rows) {
      everywhere because the junction is everywhere. */
   const frm = await formAssertions(page, row);
   if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
+  /* THE THICKNESS ASSERTIONS, on EVERY row for the same reason as the form
+     ones: the foot is everywhere, the guard's both-directions read-back is
+     what byte-identity rests on, and both of this gate's own measures are
+     structurally blind to a thickness bug (fixed topology, and a thinner
+     sheet is still spanned by a hub built at the same thickness). */
+  const thk = await thicknessAssertions(page, row);
+  if (thk.length) { validity.push(`${row.label}: ${thk.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
+  /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
+     live build never floors, so no live metric can answer this. */
+  const flr = await exportFloorAssertion(page);
+  if (flr.length) { validity.push(`${row.label}: ${flr.join('; ')}`); continue; }
   const e = analyzeStl(buf);
   const v = voxelComponents(buf, CELL_MM);
-  if (v.skipped) results.push({ label: row.label, capability: !!row.capability, ok: null, ...e, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
-  else results.push({ label: row.label, capability: !!row.capability, ok: v.comps === 1, ...e, ...v });
+  const fm = await page.evaluate(() => window.__bloomMetrics());
+  const probe = { ringWidth: fm.ringWidth, ringThickness: fm.ringThickness, ringRadius: fm.ringRadius };
+  if (v.skipped) results.push({ label: row.label, capability: !!row.capability, ok: null, ...e, ...probe, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
+  else results.push({ label: row.label, capability: !!row.capability, ok: v.comps === 1, ...e, ...v, ...probe });
 }
 await browser.close();
 server.close();
@@ -186,6 +200,34 @@ if (!NEGATIVE_CONTROL) {
   const r40 = results.find((r) => r.label === 'petalCount 40');
   if (!r3 || !r40) validity.push('pairwise check: petalCount 3 / 40 rows missing from results');
   else if (!(r40.tris > r3.tris)) validity.push(`pairwise check: petalCount 40 exports ${r40.tris} tris(export), not more than petalCount 3 at ${r3.tris} — the slider did not drive geometry`);
+
+  /* VALIDITY 3 — THE FOOT CONTROLS ACTUALLY REACH footRing().
+
+     The reworked foot assertion compares the emitted foot against
+     footRing()'s OWN answer, which is the only comparison that is not a
+     second copy of the derivation — and it is therefore blind by
+     construction to footRing() ignoring its inputs entirely. A footRing()
+     that returned a constant would satisfy it on every row. So the second
+     half of that claim is asserted here, the same way the petalCount pair
+     asserts that a slider drove geometry rather than merely being held:
+     matched pairs against the DEFAULT row, never a global reference.
+     Thickness is a strict inequality both ways; the delicacy pair is strict
+     because 0.25 x 6.40 mm = 1.60 mm lands exactly ON the assumed floor and
+     the default does not. */
+  const base = results.find((r) => r.label === 'DEFAULT (the shipping configuration)');
+  const pairs = [
+    ['sheetThickness min (0.6)', 'ringThickness', (a, b) => a < b, 'thinner'],
+    ['sheetThickness max (2.4)', 'ringThickness', (a, b) => a > b, 'thicker'],
+    ['footDelicacy min (0.25)', 'ringWidth', (a, b) => a < b, 'narrower'],
+  ];
+  if (!base) validity.push('response check: DEFAULT row missing from results');
+  else for (const [label, key, cmp, word] of pairs) {
+    const row = results.find((r) => r.label === label);
+    if (!row) { validity.push(`response check: row "${label}" missing from results`); continue; }
+    if (!cmp(row[key], base[key])) {
+      validity.push(`response check: "${label}" reports ${key} ${row[key]}, not ${word} than the default's ${base[key]} — the control is not reaching footRing()`);
+    }
+  }
 }
 
 console.log(`connectedness: voxel flood fill at ${CELL_MM} mm (assumed min printable feature: 1.0 mm)\n`);

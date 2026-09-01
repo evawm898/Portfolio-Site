@@ -1,0 +1,58 @@
+# A frozen matrix is a record of ONE COMMIT — the like-for-like row set a byte
+# report is run against, transcribed as literals so a later range change cannot
+# silently rewrite what the baseline means. Transcribing a hundred rows by hand
+# is exactly the sort of thing that looks right and is not, which is why
+# phase3Matrix's header has cited `--verify-frozen` since #114 as the remedy.
+#
+# THAT CHECK DID NOT EXIST UNTIL Aug 31 — a label naming a computation nobody
+# performed, in the tool built to prevent that defect, load-bearing for two
+# frozen matrices. It exists now, and a check a developer has to remember to
+# run is not a safety net, so it runs here: each frozen matrix is proved
+# deep-equal to its base commit's own buildMatrix(), row for row.
+#
+# No browser and no gate matrix — this imports two module graphs and compares
+# arrays, so it is seconds rather than minutes. It needs full history to make a
+# worktree at each pinned commit, and node_modules only because the harness
+# imports playwright-core at module load.
+name: bloom-frozen-matrices
+
+on:
+  pull_request:
+    paths:
+      - bloom-registry.js
+      - tools/bloom-harness.mjs
+      - tools/diff-bloom-bytes.mjs
+      - .github/workflows/bloom-frozen-matrices.yml
+  push:
+    branches: [main]
+    paths:
+      - bloom-registry.js
+      - tools/bloom-harness.mjs
+      - tools/diff-bloom-bytes.mjs
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # worktrees at the pinned base commits need real history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install the harness's own deps (no browser download)
+        run: npm i --no-save three@0.161.0 playwright-core
+      - name: Every frozen matrix must equal its base commit's buildMatrix()
+        run: |
+          set -euo pipefail
+          # The commit each matrix claims to snapshot is read from the harness,
+          # never restated here — one owner, and a workflow is the last place a
+          # second copy should live.
+          PAIRS=$(node -e "import('./tools/bloom-harness.mjs').then(h=>console.log(Object.entries(h.FROZEN_BASE_COMMITS).map(([k,v])=>k+':'+v).join(' ')))")
+          for pair in $PAIRS; do
+            name="${pair%%:*}"; sha="${pair##*:}"
+            git worktree add -f "/tmp/base-$sha" "$sha"
+            ln -sfn "$PWD/node_modules" "/tmp/base-$sha/node_modules"
+            node tools/diff-bloom-bytes.mjs --verify-frozen "--$name" --base "/tmp/base-$sha"
+          done

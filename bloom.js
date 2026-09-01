@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -214,6 +214,43 @@ function buildGeometry({ exportMode }) {
    so this is a number at the slider, not a clamp and not a refusal. (The one
    thing this generator DOES refuse is triangle count, because that is a
    property of the file rather than of somebody's process.) */
+/* THE PRINT-TRUTH LINE — what the object will actually be made of, and where
+   that differs from what is on screen.
+
+   Until the thickness layer live and export geometry were the same thing:
+   SHEET_THICKNESS_MM (1.2) sat above MIN_FEATURE_MM (1.0), so the export
+   floor never bound and the preview was the print. The thickness controls end
+   that. Below 1.00 mm the exported sheet is floored, and because footRing()'s
+   AREA RULE reads the thickness the solids are actually built at, the floor
+   moves the RING RADIUS too — at a 0.60 mm sheet the ring is 6.25 mm live and
+   8.07 mm printed, a 29% difference in the whole arrangement, not a wall.
+
+   EVA'S RULING (Aug 31): no geometry change in either mode — the one-owner
+   rule is working exactly as footRing()'s header says it should, and live
+   mode stays authoring-true — but the divergence must be TOLD. A preview that
+   silently shows an arrangement the print will not produce is the same lie as
+   an unlabelled triangle count; a labelled one is honest. So both numbers
+   appear, labelled, whenever they differ, and the second line is absent when
+   they do not. A "print preview" toggle that renders the floored geometry
+   live is PARKED in the charter and deliberately not built here.
+
+   footRing() is asked the same question twice rather than anything
+   re-deriving a radius: two throwaway accumulators differing only in mode,
+   emitting no triangles. The one owner answers both. */
+function materialLines(ui) {
+  const live = footRing(ui, new MeshBuilder({ exportMode: false }));
+  const printed = footRing(ui, new MeshBuilder({ exportMode: true }));
+  const say = (r) => {
+    const tip = thicknessProfile(r, ui).at(1);
+    const tipShown = r === printed ? Math.max(tip, MIN_FEATURE_MM) : tip;
+    return `sheet ${r.thickness.toFixed(2)} mm · tip ${tipShown.toFixed(2)} mm`
+         + ` · foot ${r.width.toFixed(2)} × ${r.thickness.toFixed(2)} mm${r.widthClamped ? ' (CLAMPED)' : ''}`
+         + ` · ring ${r.radius.toFixed(2)} mm`;
+  };
+  const a = say(live), b = say(printed);
+  return a === b ? a : `${a}   ← live\nPRINTED (export floor ${MIN_FEATURE_MM.toFixed(2)} mm): ${b}`;
+}
+
 function summarise(ui, acc, mode) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
@@ -240,7 +277,7 @@ function regenerate() {
   geo.computeBoundingSphere();
   lastFitRadius = geo.boundingSphere.radius;
   if (!userMoved) fitCamera(lastFitRadius);
-  liveSummary = summarise(ui, acc, 'live');
+  liveSummary = summarise(ui, acc, 'live') + `\n${materialLines(ui)}`;
   readout.textContent = liveSummary;
 }
 
@@ -313,6 +350,9 @@ window.__bloomMetrics = () => ({
   petalTipSpans: lastPetal ? lastPetal.tipSpans : null,
   petalMid: lastPetal ? lastPetal.mid : null,
   petalTip: lastPetal ? lastPetal.tip : null,
+  /* The converging tip cap's own numbers (Eva's ruling, Sep 1). Named
+     `petalTipCap` and never `petalTip`, which is the tip's POSITION. */
+  petalTipCap: lastPetal ? lastPetal.tipCap : null,
   petalNormal: lastPetal ? lastPetal.normal : null,
   /* The blade's WIDTH direction at the midpoint — a profile view looks down
      this. It is reported rather than recomputed because under twist it is
@@ -332,6 +372,27 @@ window.__bloomMetrics = () => ({
   petalForm: lastPetal ? lastPetal.form : null,
   petalFootFrames: lastPetal ? lastPetal.footFrames : null,
   petalGuardResidual: lastPetal ? lastPetal.guardResidual : null,
+  /* THE FOOT RING'S OWN CROSS-SECTION, exposed so the reworked foot
+     assertion can compare the EMITTED foot against footRing()'s answer
+     rather than against a fixed expectation. Before the thickness layer the
+     expectation could be fixed, because the foot was; with foot controls it
+     derives from state, and a gate keeping its own copy of that derivation
+     would be this project's most repeated defect arriving in the instrument
+     built to catch it. `derivedRadius`, `authoredWidth` and the clamp flags
+     stay telemetry — nothing geometric reads them. */
+  ringWidth: lastRing.width,
+  ringThickness: lastRing.thickness,
+  ringOverhang: lastRing.overhang,
+  ringAuthoredWidth: lastRing.authoredWidth,
+  ringWidthClamped: lastRing.widthClamped,
+  ringThicknessFloorBinds: lastRing.thicknessFloorBinds,
+  /* THICKNESS TELEMETRY and its guard residual — the properties both STL
+     gates are structurally blind to, for the same reason they are blind to
+     the form layer: thickness is pure vertex offset on a fixed-topology
+     grid, so no edge census moves, and a thinner sheet is still spanned by
+     the hub, so no flood fill splits. */
+  petalThickness: lastPetal ? lastPetal.thickness : null,
+  petalThicknessGuardResidual: lastPetal ? lastPetal.thicknessGuardResidual : null,
 });
 window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null) => { userMoved = true; fitCamera(radius, lift, at, dir); };
 

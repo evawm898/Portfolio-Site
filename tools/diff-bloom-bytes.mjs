@@ -31,6 +31,12 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase4   `phase4Matrix()` — the 106 rows frozen at 3c542fb, the commit
+                before the thickness layer. The STRONGEST of the frozen
+                baselines: it is the only one that carries the seven named
+                FORM corners and all four CAPABILITY rows, so a change that
+                moved a curled, rolled or clefted petal's bytes at the new
+                defaults shows here and in neither of the others.
      --phase2   `phase2Matrix()` — the 76 rows frozen at 21d4602, the commit
                 before the petal silhouette model. This is the like-for-like
                 baseline for the silhouette engine: `--full` cannot do that
@@ -43,12 +49,39 @@
    THE REGION MODE — `--region foot`.
 
    WHAT IT HASHES: the export triangles ALL THREE of whose vertices satisfy
-   |z| <= t/2 + 1e-3, with t the sheet thickness (1.2 mm live and export
-   alike, above the 1.0 mm floor, so t/2 = 0.6 mm). At any petalTilt > 0 that
-   set is exactly the three FOOT rows plus the hub disc plus whatever of the
-   centre lies in the slab — the first blade row already reaches z = 1.07 mm
-   at the default tilt, and a triangle spanning the last foot row and the
-   first blade row has vertices on both sides and is therefore excluded.
+   |z| <= t/2 + 1e-3, where t is THE EXPORTED SHEET THICKNESS OF THAT ROW —
+   recorded per row from the app's own live state, exactly as `tilt` is, and
+   floored the way the export floors it. It was a hardcoded 0.6 until the
+   thickness layer, correctly, because the sheet was a constant; with
+   `sheetThickness` a control that constant would have sliced a 2.40 mm
+   design at 0.60 mm, quietly hashing part of the hub and calling it the
+   foot. --compare requires the two runs to AGREE on a row's half-slab and
+   reports the row rather than mis-slicing it if they do not.
+
+   WHAT THE SLAB ACTUALLY CONTAINS — corrected, because the claim this header
+   used to make was not the computation being performed. It said the set is
+   "the three FOOT rows plus the hub disc PLUS WHATEVER OF THE CENTRE LIES IN
+   THE SLAB" — the centre clause was right and is kept: a seated DOME or DISC
+   starts at z = -t/2 - t/8 and its base and lower wall are inside the slab,
+   which is why turning a centre on moves this region on every row that does
+   it, correctly and by design.
+
+   What was WRONG was the word "exactly", and the reasoning behind it: that
+   the first blade row reaches z = 1.07 mm at the default tilt. That is the
+   row's TOP surface. Its BOTTOM surface sits at 0.528 - 0.544 = -0.016 mm,
+   inside the slab, and so does the second row's at 0.513 mm — so the region
+   has always also carried the UNDERSIDE of the first two blade rows at the
+   shipping default, and more of them on a thicker sheet, fewer on a thinner
+   one.
+
+   That does not invalidate any earlier result and it is worth being precise
+   about why: the region is a SUPERSET of foot + hub, so "bit-identical over
+   this slab" is a STRONGER statement than "the foot did not move", not a
+   weaker one. Every prior 0-moved run stands, and stands for more than it
+   claimed. What was wrong was the label, which is this codebase's most
+   repeated defect shape and is worse in a tool header than anywhere else.
+   The kept-triangle count is printed per moved row so the extent is visible
+   rather than inferred.
 
    WHY: it turns "the silhouette does not touch the foot, so the junction
    argument is unchanged" from a sentence into a per-row measurement. The
@@ -67,6 +100,28 @@
        (`below: null`); when a stem exists this criterion admits it and the
        region stops meaning "foot + hub". Re-derive the criterion then rather
        than trusting this sentence.
+     - **THE BASE TREE MUST BE THE COMMIT THIS CHANGE SITS ON, not the commit
+       the MATRIX is named after.** The two are different choices and
+       conflating them cost a wrong reading (Aug 31): `--phase2` against
+       21d4602 came back 49 of 76 moved, which is not a regression and is not
+       this session's change at all — it is #115's deliberate DISC default
+       landing, since these rows pin only pre-21d4602 controls and inherit
+       every later default. `--partition centerStyle` on that same pair
+       returns the two-sided equality exactly (49 inherit and all 49 moved,
+       27 pin and all 27 identical), which is what says so. The MATRIX picks
+       which rows to measure; the `--root` picks what the change is being
+       measured against, and for a byte-identity claim that root is always
+       the parent commit.
+     - **A FOOT CONTROL MOVES THE FOOT REGION, LEGITIMATELY.** `sheetThickness`
+       and `footDelicacy` are the foot's own cross-section, so a row that
+       sets either MUST move this region — that is the control working, not
+       a leak. This mode's invariant claim is therefore scoped to matrices
+       whose rows do not set a foot control, which is every FROZEN matrix by
+       construction (they pin only the controls that existed at their
+       commit). On `--full` the question stops being "did the foot move" and
+       becomes "did exactly the right rows move it", and the instrument for
+       that is `--partition`, not `--region`. Do not read a `--full --region
+       foot` failure on a thickness row as a defect; read the partition.
      - **A FROZEN MATRIX CANNOT SEE A FORM LEAK, and this cost a wrong
        prediction to find (Aug 31).** The region mode proves whatever the
        MATRIX exercises, and a frozen matrix pins only the controls that
@@ -133,27 +188,42 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix } from './bloom-harness.mjs';
+import { pathToFileURL } from 'node:url';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
    definition written twice is a region definition that drifts, and the
    tilt-range caveat is the half that would be dropped. */
-const FOOT_T_HALF = 0.6;        // sheet thickness 1.2 mm / 2 — live and export alike
+const FOOT_T_HALF_LEGACY = 0.6;   // the sheet was a constant 1.2 mm before the thickness layer
+const FOOT_MIN_FEATURE = 1.0;     // the export floor, so the slab matches the EXPORTED sheet
 const FOOT_EPS = 1e-3;
+/* The exported half-thickness for a row, from that run's own live state. A
+   tree with no `sheetThickness` control (anything at or before 3c542fb)
+   reports undefined and falls back to the constant it actually built with —
+   which is what makes a frozen-matrix comparison across the two trees
+   like-for-like rather than a comparison of two different slabs. */
+export const footHalfSlab = (sheetThickness) =>
+  (sheetThickness === undefined || sheetThickness === null
+    ? FOOT_T_HALF_LEGACY
+    : Math.max(Number(sheetThickness), FOOT_MIN_FEATURE) / 2);
 export const FOOT_REGION_RULE =
-  `all three vertices with |z| <= ${FOOT_T_HALF} + ${FOOT_EPS} mm (= foot rows + hub disc at any petalTilt > 0; UNDEFINED at petalTilt 0, where the blade lies in the same plane)`;
+  `all three vertices with |z| <= (exported sheet thickness)/2 + ${FOOT_EPS} mm, per row`
+  + ` (a SUPERSET of foot rows + hub disc: it also carries whatever of the CENTRE lies in the slab,`
+  + ` and the underside of the first blade rows — two at the shipping default — so bit-identical here is`
+  + ` a stronger claim than "the foot did not move", and a row that turns a centre ON moves it by design;`
+  + ` UNDEFINED at petalTilt 0, where the blade lies in the same plane)`;
 
 /* Hash of the foot region alone. Triangles are hashed in file order — the
    builders are deterministic, so order is part of "did it move". */
-function footRegionHash(buf) {
+function footRegionHash(buf, tHalf) {
   const n = buf.readUInt32LE(80);
   const h = crypto.createHash('sha256');
   let kept = 0;
   for (let i = 0; i < n; i++) {
     const o = 84 + i * 50;
     let inside = true;
-    for (let k = 0; k < 3 && inside; k++) if (Math.abs(buf.readFloatLE(o + 12 + k * 12 + 8)) > FOOT_T_HALF + FOOT_EPS) inside = false;
+    for (let k = 0; k < 3 && inside; k++) if (Math.abs(buf.readFloatLE(o + 12 + k * 12 + 8)) > tHalf + FOOT_EPS) inside = false;
     if (!inside) continue;
     kept++;
     h.update(buf.subarray(o + 12, o + 48));
@@ -162,6 +232,70 @@ function footRegionHash(buf) {
 }
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null; };
+
+/* ===================================================================
+   --verify-frozen — THE CHECK THE HEADERS HAVE BEEN CITING SINCE #114,
+   WHICH DID NOT EXIST UNTIL NOW (found Aug 31, this session).
+
+   phase3Matrix()'s header said, in as many words, that transcribing 86 rows
+   by hand "is exactly the sort of thing that looks right and is not, so it
+   is not trusted either: `--verify-frozen` proves this function deep-equal
+   to the base commit's own buildMatrix() output rather than to a reading of
+   it." No such flag existed anywhere in tools/. That is a label naming a
+   computation nobody performed — this codebase's most repeated defect — in
+   the tool built to prevent it, and it had been load-bearing for two frozen
+   matrices. This is the computation.
+
+   WHAT IT DOES. Imports the BASE TREE's own bloom-harness.mjs and calls its
+   buildMatrix(), then deep-compares against the named frozen matrix in the
+   LIVE tree. Row order, labels, the set list (ids AND values, in order) and
+   any capability spec must all agree exactly. A frozen matrix that has
+   drifted from the commit it claims to snapshot makes every byte report
+   built on it a comparison of two things nobody characterised.
+
+   WHAT IT CANNOT CLAIM: that the frozen matrix is a GOOD matrix, or that
+   the base commit is the right baseline. It proves one equality — these
+   rows are those rows — which is exactly the claim the headers make.
+
+   The base tree needs its dependencies resolvable (the harness imports
+   playwright-core at module load); point --base at a `git worktree` with a
+   node_modules symlink, never at a mutated working tree.
+
+   RUN: node tools/diff-bloom-bytes.mjs --verify-frozen --phase2 --base <dir>
+   =================================================================== */
+if (process.argv.includes('--verify-frozen')) {
+  const base = arg('--base');
+  if (!base) { console.error('--verify-frozen needs --base <dir> (a git worktree of the commit the matrix claims to snapshot)'); process.exit(2); }
+  const which = ['phase2', 'phase3', 'phase4'].filter((n) => process.argv.includes('--' + n));
+  if (which.length !== 1) { console.error('--verify-frozen needs exactly one of --phase2 --phase3 --phase4'); process.exit(2); }
+  const name = which[0];
+  const frozen = { phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix }[name]();
+  const baseHarness = await import(pathToFileURL(path.join(path.resolve(base), 'tools', 'bloom-harness.mjs')).href);
+  const live = baseHarness.buildMatrix();
+  /* Normalised to exactly what a row MEANS to every consumer: its label, the
+     ordered (id, value) pairs it sets, and its capability. Values are
+     stringified because a row may carry 2 or '2' and applyConfig sets a DOM
+     value either way — a difference there is not a matrix difference. */
+  const norm = (rows) => rows.map((r) => JSON.stringify({
+    label: r.label,
+    set: (r.set || []).map((s) => [s.id, String(s.value)]),
+    capability: r.capability || null,
+  }));
+  const A = norm(live), B = norm(frozen);
+  const diffs = [];
+  for (let i = 0; i < Math.max(A.length, B.length); i++) {
+    if (A[i] !== B[i]) diffs.push(`  row ${i}:\n    base   ${A[i] ?? '(missing)'}\n    frozen ${B[i] ?? '(missing)'}`);
+  }
+  console.log(`--verify-frozen ${name}: base ${base} buildMatrix() = ${A.length} rows; ${name}Matrix() = ${B.length} rows`);
+  if (diffs.length) {
+    console.error(`\nFAIL — ${diffs.length} row(s) differ. The frozen matrix is NOT the commit it claims to snapshot:`);
+    for (const d of diffs.slice(0, 8)) console.error(d);
+    if (diffs.length > 8) console.error(`  ... and ${diffs.length - 8} more`);
+    process.exit(1);
+  }
+  console.log(`PASS — ${name}Matrix() is deep-equal to the base commit's own buildMatrix(), row for row.`);
+  process.exit(0);
+}
 const LEGACY_IDS = ['petalCount', 'petalLength', 'petalWidth', 'petalTilt'];
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 
@@ -193,7 +327,7 @@ if (process.argv.includes('--compare')) {
       process.exit(1);
     }
     console.log(`region "foot": ${FOOT_REGION_RULE}\n`);
-    const scoped = [], skipped = [], movedFoot = [];
+    const scoped = [], skipped = [], movedFoot = [], mismatched = [];
     for (let k = 0; k < labels.length; k++) {
       const b = before.rows[k], a = after.rows[k];
       /* petalTilt 0 is OUT OF SCOPE, never a pass and never a failure — with
@@ -201,18 +335,85 @@ if (process.argv.includes('--compare')) {
          separate it from the foot. Read from the row's own recorded tilt, so
          a matrix change cannot silently move a row in or out of scope. */
       if (Number(b.tilt) === 0 || Number(a.tilt) === 0) { skipped.push(labels[k]); continue; }
+      /* The two runs must be slicing the SAME slab. A row whose exported
+         sheet thickness differs between the trees is not a foot that moved —
+         it is two different regions being compared, and hashing them against
+         each other would be a number with no meaning. Reported, never folded
+         into either the passes or the failures. */
+      const bh = b.footHalf ?? 0.6, ah = a.footHalf ?? 0.6;
+      if (bh !== ah) { mismatched.push(`${labels[k]}: slab ${bh} mm vs ${ah} mm`); continue; }
       scoped.push(labels[k]);
       if (b.footHash !== a.footHash || b.footTris !== a.footTris) movedFoot.push({ l: labels[k], b, a });
     }
     for (const m of movedFoot) console.log(`  MOVED ${m.l}: ${m.b.footTris} -> ${m.a.footTris} tris, ${m.b.footHash.slice(0, 12)} -> ${m.a.footHash.slice(0, 12)}`);
     console.log(`  ${scoped.length - movedFoot.length}/${scoped.length} in-scope rows have a BIT-IDENTICAL foot region`);
     console.log(`  ${skipped.length} row(s) OUT OF SCOPE (petalTilt 0 — not a pass): ${skipped.join(', ') || 'none'}`);
+    if (mismatched.length) console.log(`  ${mismatched.length} row(s) NOT COMPARABLE (the two trees export different sheet thicknesses, so the slab differs — not a pass and not a failure): ${mismatched.join('; ')}`);
+    console.log(`  region extent at the default row: ${(before.rows[0] || {}).footTris} of ${(before.rows[0] || {}).tris} export triangles`);
     console.log(`  whole-export moves on the same rows: ${movedSet.size}/${labels.length} (that is the blade changing, which is the point)`);
     if (movedFoot.length) {
       console.error(`\nbyte diff: FAIL — ${movedFoot.length} row(s) moved bytes INSIDE the foot region. The silhouette reached the foot or the hub; the junction argument no longer holds by construction.`);
       process.exit(1);
     }
     console.log('\nbyte diff: PASS — the foot region is bit-identical on every in-scope row.');
+    process.exit(0);
+  }
+
+  /* MODE DISPATCH ORDER, stated because getting it wrong is silent. Every
+     mode below ends in process.exit, so a mode added AFTER the plain-compare
+     block never runs — its flag is accepted, the plain compare answers a
+     different question, and the run looks like a considered result. That
+     happened to --partition-value on its first run, and it is the same shape
+     as --phase4 falling through to legacyMatrix(). Order: region, then
+     partition-value, then partition, then plain.
+
+     PARTITION BY VALUE: the moved set must EQUAL the set of rows whose
+     RESOLVED value of a control equals a given value — asserted both ways.
+
+     Why this is a second mode and not a flag on the first: `--partition <id>`
+     splits on whether a row SET the control, which is the right axis for a
+     default change (every row that inherits the new default moves). The
+     tip-cap ruling changes behaviour for a VALUE — the pointed family, i.e.
+     petalTipBreadth === 0 — regardless of whether the row named it. Those two
+     splits disagree on real rows here (`petalTipBreadth min (0)` pins and
+     moves; `ALL MAX` pins 0.6 and holds), so collapsing them into one flag
+     would have produced a confident, wrong report. */
+  const vi = process.argv.indexOf('--partition-value');
+  if (vi > 0) {
+    const id = process.argv[vi + 1], want = process.argv[vi + 2];
+    if (before.rows.some((r) => !r.state) || after.rows.some((r) => !r.state)) {
+      console.error('byte diff: INVALID — one of the runs carries no per-row state. Re-run both captures with this version of the tool.');
+      process.exit(1);
+    }
+    const valueOf = (r) => String(r.state[id]);
+    for (let k = 0; k < labels.length; k++) {
+      if (valueOf(before.rows[k]) !== valueOf(after.rows[k])) {
+        console.error(`byte diff: INVALID — row "${labels[k]}" resolves ${id} to ${valueOf(before.rows[k])} in one run and ${valueOf(after.rows[k])} in the other.`);
+        process.exit(1);
+      }
+    }
+    const inSet = labels.filter((l, k) => valueOf(before.rows[k]) === String(want));
+    const outSet = labels.filter((l, k) => valueOf(before.rows[k]) !== String(want));
+    const heldButIn = inSet.filter((l) => !movedSet.has(l));
+    const movedButOut = outSet.filter((l) => movedSet.has(l));
+    console.log(`partition on ${id} === ${want}: ${inSet.length} rows are IN the ruled set, ${outSet.length} are OUT\n`);
+    console.log(`  moved   : ${movedSet.size}`);
+    console.log(`  expected: ${inSet.length} (exactly the rows in the ruled set)\n`);
+    for (const l of outSet) {
+      const b = before.rows[labels.indexOf(l)];
+      console.log(`  ${movedSet.has(l) ? 'MOVED!' : 'held  '} [${id}=${valueOf(b)}] ${l.padEnd(46)} ${b.bytes}B/${b.tris}t`);
+    }
+    if (heldButIn.length) {
+      console.error(`\nbyte diff: FAIL — ${heldButIn.length} row(s) are IN the ruled set and did NOT move; the ruling is not reaching that geometry:`);
+      for (const l of heldButIn) console.error(`  - ${l}`);
+    }
+    if (movedButOut.length) {
+      console.error(`\nbyte diff: FAIL — ${movedButOut.length} row(s) are OUTSIDE the ruled set and moved anyway; the change leaked past the ruling:`);
+      for (const l of movedButOut) console.error(`  - ${l}`);
+    }
+    if (heldButIn.length || movedButOut.length) process.exit(1);
+    console.log(`\nbyte diff: PASS — the moved set EQUALS the ruled set exactly.`);
+    console.log(`  ${inSet.length} rows have ${id} === ${want} and all ${inSet.length} moved; ${outSet.length} do not and all ${outSet.length} are bit-identical.`);
     process.exit(0);
   }
 
@@ -287,6 +488,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 const FULL = process.argv.includes('--full');
 const PHASE2 = process.argv.includes('--phase2');
 const PHASE3 = process.argv.includes('--phase3');
+const PHASE4 = process.argv.includes('--phase4');
 /* Exactly one matrix. The guard and the LABEL are derived from one list so a
    new matrix cannot be added to the runner while the recorded label silently
    keeps saying something else — which is what happened when --phase3 landed:
@@ -294,13 +496,22 @@ const PHASE3 = process.argv.includes('--phase3');
    naming a computation nobody performed, in this project's most repeated
    defect shape. --compare does not read the field, so nothing drew a wrong
    conclusion from it; it was wrong in the record, which is enough. */
-const MATRIX_FLAGS = [[FULL, 'full'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
+const MATRIX_FLAGS = [[FULL, 'full'], [PHASE4, 'phase4'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
 const chosen = MATRIX_FLAGS.filter(([on]) => on);
 if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
 const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
 const rows = [];
 const validity = [];
-for (const row of (FULL ? buildMatrix() : PHASE3 ? phase3Matrix() : PHASE2 ? phase2Matrix() : legacyMatrix())) {
+const MATRIX_FN = { full: buildMatrix, phase4: phase4Matrix, phase3: phase3Matrix, phase2: phase2Matrix, legacy: legacyMatrix };
+/* ONE list decides the flag, the recorded LABEL and the rows. It used to be
+   two — a flag list for the guard and a ternary chain for the rows — and the
+   chain silently fell through for any flag the chain did not know. That is
+   how `--phase3` once recorded matrix:"legacy" while running phase3Matrix();
+   it happened again in the other direction the moment `--phase4` was added
+   (the flag was accepted, legacyMatrix() ran, and the record said so while
+   nobody read it). The record was honest both times and the second copy was
+   the defect, so there is now only one. */
+for (const row of MATRIX_FN[MATRIX]()) {
   await openBloom(page, port);
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -315,15 +526,23 @@ for (const row of (FULL ? buildMatrix() : PHASE3 ? phase3Matrix() : PHASE2 ? pha
   if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
   /* `pins` records which controls the row set EXPLICITLY — the partition mode
      reads it rather than re-deriving the row's intent from its label. */
-  const foot = footRegionHash(buf);
+  const footHalf = footHalfSlab(got.sheetThickness);
+  const foot = footRegionHash(buf, footHalf);
   /* `tilt` is recorded from the app's LIVE state, not from the row's label
      or its set — the region mode uses it to decide scope, and a row that
      inherits the default tilt must not be scoped by what its label omits. */
   rows.push({
     label: row.label, pins: row.set.map((s) => s.id), tilt: Number(got.petalTilt),
+    /* THE ROW'S RESOLVED STATE, from the app's own snapshot. `pins` answers
+       "did this row set the control"; this answers "what value did it end up
+       at", and those are different questions with different partitions. The
+       tip-cap ruling needs the second: `petalTipBreadth min (0)` PINS the
+       control and must MOVE, while `ALL MAX` pins it at 0.6 and must HOLD, so
+       a pins-vs-inherits split would have been the wrong axis entirely. */
+    state: got,
     bytes: buf.length, tris: analyzeStl(buf).tris,
     sha256: crypto.createHash('sha256').update(buf).digest('hex'),
-    footHash: foot.hash, footTris: foot.tris,
+    footHash: foot.hash, footTris: foot.tris, footHalf,
   });
 }
 await browser.close(); server.close();
