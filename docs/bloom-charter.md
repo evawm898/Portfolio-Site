@@ -1169,6 +1169,30 @@ any of them.
       as a settled flake and not as a defect in the law: the shipped tree is green on every
       run, and M1 and M2 have never once failed to fire.
 
+      **IT NOW HAS A NAMED SUSPECT (the zygomorphy session, Sep 1), AND THE SETTLING
+      STANDARD IS UNCHANGED.** `applyConfig()` did not wait for the rAF-coalesced rebuild
+      — see the zygomorphy entry below for the finding and the fix — so any assertion
+      reading `__bloomMetrics()` could be reading the PREVIOUS build. **A stale-build read
+      produces exactly M3's symptom: NOT FIRED.** M3 mutates the foot-width floor, which
+      binds on one row; a read that arrives before the rebuild sees the prior row's or the
+      default page's metrics, where the floor does not bind, and the mutation reads as
+      absent. That matches every feature of the anomaly — a mutation present in the
+      worktree throughout, firing on four runs of five, with no HTTP cache and no write
+      race to blame, and 67-versus-0 rather than a partial count (one stale read at the
+      wrong moment costs the whole row's assertions at once).
+
+      **THIS IS A SUSPECT, NOT A DIAGNOSIS, and it does not retire the anomaly.** The
+      settling standard stated above stands exactly as written: a DIFF OF A DISAGREEING
+      PAIR. Nothing here was reproduced, M3's run happened on a tree that has since
+      changed, and "a mechanism that could produce the symptom" is not "the mechanism that
+      did" — which is the same distinction #88 turns on. What changes is only the ORDER OF
+      INVESTIGATION: **any future M3-style flake is checked against build-counter
+      telemetry FIRST** (`__bloomBuildState()` — was the build that the assertion read the
+      build the row asked for?), because that is now cheap, and it separates "the
+      instrument read the wrong model" from "the model differed" before anyone reaches for
+      a harder explanation. If the counter is clean on a disagreeing pair, this suspect is
+      eliminated and the anomaly is exactly where it was.
+
     - **EVA'S RULING FROM THE SHEETS (Sep 1): THE CONTINUOUS SPIRAL IS WHAT SHE WAS
       REACHING FOR. MERGED.** This closes the brief the session was opened on —
       *"spiral is still very distinct layers, and I don't know if it should be"* — and it
@@ -1438,3 +1462,33 @@ any of them.
       not from a build. Half the before-tree baseline ran on the pre-fix harness and half
       on the post-fix one; that is recorded rather than hidden, and it cannot matter for
       the reason just given.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 1): THE IRIS SHIPS. MERGED.** This closes the
+      first half of the brief the zygomorphy work was opened on — full per-slot
+      differentiation, with orchid and iris as the target forms — and it closes the IRIS
+      half specifically, on a picture rather than an impression. The headline pair is what
+      it was ruled from and it was built to make the comparison unfalsifiable: the same
+      arrangement, the same 8 petals, the same 21,024 triangles on both sides, so the only
+      thing that could differ is which state each whorl was built from. The outer whorl
+      curls −90° and hangs; the inner composes −90 + 180 = +90° and cups.
+
+    - **BOTH TASTE OBSERVATIONS WERE RAISED AND BOTH WERE RULED FINE AS-IS, and recording
+      the RULING rather than only the observation is the point — an unresolved-looking
+      note in a charter gets re-litigated by the next session that finds it.**
+
+        * **The clustered standards are A SLIDER POSITION, not a defect and not a range
+          problem.** On the headline cell the inner whorl reads as a tight central crown
+          rather than three distinct upright petals; that is `layerSize` 0.62 against
+          curl +90, and every one of those numbers is reachable and adjustable. Nothing
+          is queued. Do not "fix" the default, widen a range, or add a control on the
+          strength of this note.
+
+        * **INNER COVERING EVERY WHORL ABOVE THE OUTERMOST IS ACCEPTED FOR NOW.** At three
+          layers the second and third whorls are identical to each other, which is visible
+          on the extremes sheet and was ruled acceptable. **The INNER/INNERMOST SPLIT
+          STAYS A RECORDED CANDIDATE, and its reopening evidence is named so it cannot be
+          reopened on the strength of reading the code: the three-whorl cell READING WRONG
+          TO EVA LATER.** Not this look — she has seen this look and accepted it. A fresh
+          ruling needs a fresh picture, exactly as the max-combinator kink, the tip cap and
+          the parked tilt extremes do. When it comes, it is a design ruling with its own
+          partition report — it changes the DERIVATION and nothing else — never a rewrite.
