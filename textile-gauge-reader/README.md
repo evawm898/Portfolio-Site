@@ -2041,6 +2041,32 @@ the frontend reads *without* a defensive guard is actually present in
 the response, so a schema change that would break the UI fails a test
 before it ships, rather than surfacing as a live-site report again.
 
+**A third symptom of the same stale-deployment root cause, confirmed
+directly.** "Mark one repeat" failed with "Counting repeats failed (HTTP
+405)" on both axes on the deploy preview — apparently never having
+worked in production. Root cause: this app's local-dev-only catch-all
+(`app.mount("/", StaticFiles(...))`, bottom of `backend/main.py`) only
+accepts GET/HEAD, so ANY POST to a path with no matching route gets
+exactly 405 from it — confirmed directly (`curl -X POST` to a made-up
+path on this exact app returns 405; GET to the same path correctly
+404s). That's the precise signature this bug showed. Reproduced the
+real `/count-repeats` request against this repo's current backend code
+three separate ways — a direct HTTP client, and an actual headless-
+browser `fetch()` from the page as served locally — and all three
+returned real match counts, not just a bare 200. The route is correct
+and functional in the code this repo ships; the 405 on the live site
+points at the same stale/older deployed backend as the two symptoms
+above, not a bug fixable here. Cross-checked every other frontend→
+backend call (`/health`, `/detect-ruler`, `/corrections`,
+`/propose-rois`, `/analyze-multi`, `/corrections/export.{csv,json}`) the
+same way — all dispatch correctly; nothing else shows this pattern in
+the current code. `tests/test_frontend_route_contract.py` makes this an
+ongoing, automated check rather than a one-time manual audit: every
+frontend API call is asserted to dispatch to a real backend route
+(never 404/405), so a route rename, a changed method, or a dropped
+endpoint is caught by name before it ships — verified directly that it
+fails with the exact "HTTP 405" signature when the route is renamed.
+
 ## Ground Truth / Correction System
 
 After a prediction, the Results screen has a **Verify Measurement**
