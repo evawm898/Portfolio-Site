@@ -28,12 +28,11 @@ export const CORNER_FONT_OPTIONS = [
   { id: 'space-mono', label: 'Space Mono', family: '"Space Mono", "SFMono-Regular", monospace' },
 ];
 
-// Matches the previous hardcoded corner-index look exactly, so leaving the
-// Style panel untouched reproduces today's output pixel-for-pixel.
 export const DEFAULT_STYLE = {
   cornerInsetPct: 4.5, // % of the safe-rect width, from the corner
-  cornerFontId: 'plex-mono',
+  cornerFontId: 'plex-mono', // drives both the corner rank letter and the court-card center letter
   glyphScale: 1, // 0.5–1.5, relative to each context's own base size
+  glyphOffsetPct: 30, // 0–100% of one glyph-height of extra travel, on top of the anti-overlap floor
 };
 
 export function getCornerFontFamily(id) {
@@ -201,6 +200,11 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
   const pad = safe.w * (style.cornerInsetPct / 100);
   const fontFamily = getCornerFontFamily(style.cornerFontId);
 
+  // Fixed floor between the letter's true bottom edge and the top of the
+  // mini glyph below it, so the two never touch regardless of font or
+  // scale — also the zero point the glyph-offset slider travels from.
+  const MIN_LETTER_GLYPH_GAP = fontSize * 0.08;
+
   // Mirrored corner pair: top-left as drawn, bottom-right as the same
   // glyph rotated 180deg about its own inset point — one offset, applied
   // symmetrically, drives both instances.
@@ -217,7 +221,27 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'hanging';
     ctx.fillText(rank, 0, 0);
-    drawSuitGlyph(ctx, suit, glyphSize / 2, fontSize * 1.12, glyphSize, color, 0, suitImages);
+
+    // Measured, not assumed: actualBoundingBoxDescent (relative to the
+    // hanging baseline set above) is the real distance down to the
+    // glyph's bottom edge for whichever font is selected, so the gap
+    // stays correct across every option in CORNER_FONT_OPTIONS instead
+    // of only the one font this used to be tuned for.
+    const metrics = ctx.measureText(rank);
+    const letterBottom = metrics.actualBoundingBoxDescent || fontSize * 0.8;
+
+    // The corner cluster (letter + mini glyph) is already offset toward
+    // the card center by `pad` via the translate above, and ctx.rotate()
+    // makes local +x/+y "toward center" for both the top-left instance
+    // and the rotated bottom-right one. Sliding the glyph further along
+    // that same (1,1) diagonal — rather than straight down — keeps it
+    // moving the direction the whole cluster already moves in.
+    const diag = Math.SQRT1_2;
+    const extraTravel = (style.glyphOffsetPct / 100) * glyphSize * diag;
+    const glyphX = glyphSize / 2 + extraTravel;
+    const glyphY = letterBottom + MIN_LETTER_GLYPH_GAP + glyphSize / 2 + extraTravel;
+
+    drawSuitGlyph(ctx, suit, glyphX, glyphY, glyphSize, color, 0, suitImages);
     ctx.restore();
   }
 
@@ -268,10 +292,12 @@ function drawCourtCard(ctx, rank, suit, palette, safe, suitImages, style) {
   ctx.strokeRect(cx - plateW / 2, cy - plateH / 2, plateW, plateH);
   ctx.restore();
 
+  // Same corner-index font drives the big center-plate letter too — one
+  // control, not two settings that could drift apart.
   const letterSize = plateH * 0.62;
   ctx.save();
   ctx.fillStyle = other;
-  ctx.font = `600 ${letterSize}px "Fraunces", serif`;
+  ctx.font = `600 ${letterSize}px ${getCornerFontFamily(style.cornerFontId)}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(COURT_LETTERS[rank], cx, cy - plateH * 0.08);
@@ -288,8 +314,8 @@ function drawCourtCard(ctx, rank, suit, palette, safe, suitImages, style) {
 // cardSpec: { suit, rank } — see deck-builder.js buildDeckList()
 // palette: { primary: '#rrggbb', secondary: '#rrggbb' }
 // suitImages: { spades: HTMLImageElement|null, hearts: ..., ... }
-// style: deck-wide { cornerInsetPct, cornerFontId, glyphScale } — see
-// DEFAULT_STYLE above. Partial objects are filled in with the defaults.
+// style: deck-wide { cornerInsetPct, cornerFontId, glyphScale, glyphOffsetPct }
+// — see DEFAULT_STYLE above. Partial objects are filled in with the defaults.
 export function renderCardToCanvas(cardSpec, palette, suitImages, style) {
   const s = { ...DEFAULT_STYLE, ...style };
   const { suit, rank } = cardSpec;

@@ -80,6 +80,7 @@
       <div class="cd-field">
         <label class="cd-field__label" for="styleCornerFont">Corner index font</label>
         <select id="styleCornerFont" class="cd-select"></select>
+        <span class="cd-field__sub">Also sets the large center letter on court cards — one font, both places.</span>
       </div>
 
       <div class="cd-field">
@@ -89,6 +90,15 @@
         </div>
         <input type="range" id="styleGlyphScale" min="50" max="150" step="5" value="100">
         <span class="cd-field__sub">Scales the suit glyph relative to its size in each context (pips, ace, court plate).</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleGlyphOffset">Corner glyph offset</label>
+          <output class="cd-field__value" id="styleGlyphOffsetValue" for="styleGlyphOffset">30%</output>
+        </div>
+        <input type="range" id="styleGlyphOffset" min="0" max="100" step="5" value="30">
+        <span class="cd-field__sub">Gap between the corner letter and its mini suit glyph — 0% is the tightest non-touching gap; slides the glyph toward the card's center.</span>
       </div>
     </div>
 

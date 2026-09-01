@@ -35,6 +35,7 @@ function getStyle() {
     cornerInsetPct: parseFloat(document.getElementById('styleCornerInset').value),
     cornerFontId: document.getElementById('styleCornerFont').value,
     glyphScale: parseFloat(document.getElementById('styleGlyphScale').value) / 100,
+    glyphOffsetPct: parseFloat(document.getElementById('styleGlyphOffset').value),
   };
 }
 
@@ -64,6 +65,15 @@ function buildStyleControls() {
   scaleValue.textContent = `${scale.value}%`;
   scale.addEventListener('input', () => {
     scaleValue.textContent = `${scale.value}%`;
+    renderPreview();
+  });
+
+  const offset = document.getElementById('styleGlyphOffset');
+  const offsetValue = document.getElementById('styleGlyphOffsetValue');
+  offset.value = DEFAULT_STYLE.glyphOffsetPct;
+  offsetValue.textContent = `${offset.value}%`;
+  offset.addEventListener('input', () => {
+    offsetValue.textContent = `${offset.value}%`;
     renderPreview();
   });
 
