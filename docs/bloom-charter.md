@@ -164,11 +164,14 @@ print will not have it. Real printed tip delicacy needs either a thicker base sh
 (2.40 mm tapering to 1.00 mm is a genuine 2.4:1 wedge, and it ships) or a coupon showing
 1.0 mm is conservative.
 
-Four numbers in this family are now load-bearing guesses that a single coupon print would
-turn into measurements: `MIN_FEATURE_MM` 1.0 (which caps the tip and the foot),
-`FOOT_MIN_WIDTH_MM` 1.6 (the most delicate reachable connection), `TIP_HALF_MM` 0.8 (the
-tip's blunt WIDTH, which this session reports and does not touch), and
-`ROLL_MIN_RADIUS_FACTOR` 1.0 (one sheet thickness, and it now moves with the sheet). A
+Five numbers in this family are now load-bearing guesses that a single coupon print would
+turn into measurements — and since the tip ruling, `TIP_HALF_MM` is no longer merely
+reported: it is the floor that decides how pointed the PRINTED tip can be, on a shape Eva
+ruled by eye. `MIN_FEATURE_MM` 1.0 (which caps the tip's thickness and the foot),
+`FOOT_MIN_WIDTH_MM` 1.6 (the most delicate reachable connection), `TIP_HALF_MM` 0.8 (now
+the printed tip's terminal half-width, 1.60 mm across against 0.30 mm on screen),
+`TIP_CAP_HALF_MM` 0.15 (a mesh floor, not a print one) and `ROLL_MIN_RADIUS_FACTOR` 1.0 (one
+sheet thickness, and it now moves with the sheet). A
 coupon print is cheap, converts all four at once, and would retroactively improve every
 clamp the thickness layer ships. It is the strongest candidate for the next session — a
 better one than arrangement, which can be designed against assumptions but cannot resolve
@@ -468,6 +471,50 @@ any of them.
   floor, so it cannot shrink proportionally away. The ALL-THIN corner rows were added
   anyway, in both gates: a default is not coverage, by-construction is an argument rather
   than a measurement, and the thin extreme is precisely the region this change affects.
+
+- ~~The tip's squared-off end~~ **RULED Sep 1, from the tip sheet: THE TIP COMES TO A
+  POINT.** The squared end was never the profile. `TIP_HALF_MM` floored EVERY row in BOTH
+  modes, so at the shipping defaults four of the 28 blade rows — profile 0.795, 0.398,
+  0.119, 0.000 — all clamped to 0.800 and ran PARALLEL, and a flat face square to the blade
+  capped that stub. The exponent family already reaches zero; the floor truncated it and
+  then capped the truncation.
+
+  **THE POINTED FAMILY ONLY, and that is what makes the partition sharp.**
+  `petalTipBreadth === 0` converges; above zero the flat end is an AUTHORED TRUNCATE (rose,
+  poppy) and is untouched. Measured both ways on the 125-row live matrix: **117 rows have
+  breadth 0 and all 117 moved; 8 do not and all 8 are bit-identical.** This needed a new
+  instrument — `--partition-value` — because "pins the control" and "resolves to this value"
+  are different axes and they disagree on real rows here (`petalTipBreadth min` pins and
+  MOVES; `ALL MAX` pins 0.6 and HOLDS), so the existing `--partition` would have produced a
+  confident wrong report.
+
+  **THE CAP ENTRY IS DERIVED, not a fixed length**: `min(1 - TIP_CAP_FRACTION, crossing of
+  CAP_ENTRY_FACTOR x TIP_HALF_MM)`. Each rule fails alone — a fixed final fifth covers the
+  stub at the defaults, but at `petalTipTaper` 4 the floor flattens TEN rows and the profile
+  is 0.125 mm by u = 0.80, so a cap starting there would have to WIDEN toward the tip to
+  reach the export floor. Measured: the crossing rule takes over at uCap 0.592 on that row.
+  Taking the later start guarantees an entry of at least twice the print floor, so export
+  converges at least 2:1 instead of degenerating back into the stub it replaces.
+
+  **THE APEX IS AN EXPLICITLY TRUNCATED MINI-FACE, NOT A TRUE APEX VERTEX**, and the choice
+  is forced rather than preferred. (1) Topology must not depend on mode: the export gate now
+  rates live-vs-export triangle counts, and a true apex in live with a floored face in export
+  is two different meshes. (2) It is the DOME's bug — and this was MEASURED, not argued: a
+  true-apex build exports **288 degenerate triangles and 168 non-manifold edges per bloom
+  with boundary edges still 0**, watertight and wrong, exactly 36 per petal (the terminal
+  face's 9 quads top and bottom collapsing). `analyzeStl` now counts zero-area triangles from
+  the raw floats before quantisation, and the export gate FAILS on any.
+
+  **TRIANGLE COST IS STILL ZERO, which was not the prediction.** The cap re-uses the grid it
+  already had — same NU, NV, panel count and end face — and moves only where vertices sit. A
+  cap built as new geometry beyond the last row would have moved the count for the first time
+  in three sessions; this one does not, so the zero-cost claim above stands unamended. The
+  default bloom is 11,136 tris, live and export, before and after.
+
+  **WHAT THE FLOOR STILL DOES TO THE PRINTED TIP.** Live converges to a 0.30 mm terminal
+  face; export floors it at 1.60 mm. So the point on screen is finer than the point that
+  prints — the same live-vs-printed divergence as the sheet thickness, now in the outline as
+  well, and one more assumption riding on a coupon nobody has run.
 
 - Presets: Eva authors them herself once the panel is settled (standing ruling from the
   flower panel audit).

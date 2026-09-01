@@ -359,21 +359,15 @@ if (process.argv.includes('--compare')) {
     process.exit(0);
   }
 
-  if (!partition) {
-    for (const l of labels) if (movedSet.has(l)) {
-      const b = before.rows[labels.indexOf(l)], a = after.rows[labels.indexOf(l)];
-      console.log(`  MOVED ${l}: ${b.bytes}B/${b.tris}t ${b.sha256.slice(0, 12)} -> ${a.bytes}B/${a.tris}t ${a.sha256.slice(0, 12)}`);
-    }
-    console.log(`${labels.length - movedSet.size}/${labels.length} byte-identical; ${movedSet.size} moved`);
-    if (movedSet.size) {
-      console.error('\nbyte diff: FAIL — a default-behaviour change is a STOP-AND-REPORT, not a migration.');
-      process.exit(1);
-    }
-    console.log('byte diff: PASS — 0 of ' + labels.length + ' configs moved. Defaults are bit-identical.');
-    process.exit(0);
-  }
+  /* MODE DISPATCH ORDER, stated because getting it wrong is silent. Every
+     mode below ends in process.exit, so a mode added AFTER the plain-compare
+     block never runs — its flag is accepted, the plain compare answers a
+     different question, and the run looks like a considered result. That
+     happened to --partition-value on its first run, and it is the same shape
+     as --phase4 falling through to legacyMatrix(). Order: region, then
+     partition-value, then partition, then plain.
 
-  /* PARTITION BY VALUE: the moved set must EQUAL the set of rows whose
+     PARTITION BY VALUE: the moved set must EQUAL the set of rows whose
      RESOLVED value of a control equals a given value — asserted both ways.
 
      Why this is a second mode and not a flag on the first: `--partition <id>`
@@ -420,6 +414,20 @@ if (process.argv.includes('--compare')) {
     if (heldButIn.length || movedButOut.length) process.exit(1);
     console.log(`\nbyte diff: PASS — the moved set EQUALS the ruled set exactly.`);
     console.log(`  ${inSet.length} rows have ${id} === ${want} and all ${inSet.length} moved; ${outSet.length} do not and all ${outSet.length} are bit-identical.`);
+    process.exit(0);
+  }
+
+  if (!partition) {
+    for (const l of labels) if (movedSet.has(l)) {
+      const b = before.rows[labels.indexOf(l)], a = after.rows[labels.indexOf(l)];
+      console.log(`  MOVED ${l}: ${b.bytes}B/${b.tris}t ${b.sha256.slice(0, 12)} -> ${a.bytes}B/${a.tris}t ${a.sha256.slice(0, 12)}`);
+    }
+    console.log(`${labels.length - movedSet.size}/${labels.length} byte-identical; ${movedSet.size} moved`);
+    if (movedSet.size) {
+      console.error('\nbyte diff: FAIL — a default-behaviour change is a STOP-AND-REPORT, not a migration.');
+      process.exit(1);
+    }
+    console.log('byte diff: PASS — 0 of ' + labels.length + ' configs moved. Defaults are bit-identical.');
     process.exit(0);
   }
 

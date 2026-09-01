@@ -90,14 +90,17 @@ function die(msg) { console.error('HARNESS INVALID: ' + msg); return browser.clo
 
 /* Every number in a caption carries its MODE. Live and export are different
    geometry from this layer onward and the two are not convertible. */
-const numbers = (m, legacy = false) => {
-  /* THE BEFORE TREE HAS NO THICKNESS TELEMETRY, because it has no thickness
-     controls — that is the whole point of the pair, and a caption that
-     rendered its absence as a blank or a plausible default would be the
-     `f3(undefined)` defect: a null that reads exactly like a real value. It
-     is stated instead, and the constant that tree actually built with is
-     named as a constant. */
-  if (legacy) {
+/* CAPTIONS DEGRADE PER FIELD, never per hardcoded tree. A before/after pair
+   renders an OLD tree whose app reports fewer fields, and which fields are
+   missing depends on which commit it is — the thickness baseline (3c542fb) has
+   no thickness telemetry, the tip baseline (306d459) has thickness but no tip
+   cap. A caption keyed on "is this the legacy cell" gets that wrong the moment
+   a second baseline exists, and a missing field rendered as a blank or a
+   plausible default is the `f3(undefined)` defect: a null that reads exactly
+   like a real value. So each line asks whether its own field is present and
+   says so when it is not. */
+const numbers = (m) => {
+  if (!m.petalThickness) {
     return `sheet 1.20 mm — the CONSTANT, at both call sites, no control`
       + `<br>ring ${m.ringRadius.toFixed(2)} mm (live = printed: this tree cannot cross the export floor)`
       + `<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`;
@@ -110,10 +113,17 @@ const numbers = (m, legacy = false) => {
   const sheet = m.ringThicknessFloorBinds
     ? `sheet ${th.authored.toFixed(2)} mm live · ${MIN_FEATURE_MM.toFixed(2)} mm printed (CLAMPED)`
     : `sheet ${th.authored.toFixed(2)} mm`;
+  const tc = m.petalTipCap;
+  const capLine = !tc
+    ? `<br>tip end: the FLOORED STUB — TIP_HALF_MM clamps every row in both modes, so the last rows run parallel at ${(2 * 0.8).toFixed(2)} mm and are capped square`
+    : tc.pointed
+      ? `<br>tip end: CONVERGING from ${(2 * tc.entryHalf).toFixed(2)} mm at u=${tc.uCap.toFixed(2)} to a ${(2 * tc.terminalHalf).toFixed(2)} mm face (live) · ${(2 * 0.8).toFixed(2)} mm printed`
+      : `<br>tip end: AUTHORED TRUNCATE (tip breadth > 0) — flat by choice, not by floor; bit-identical to the pre-ruling tree`;
   return `${sheet} · ${tip}`
     + `<br>foot ${m.ringWidth.toFixed(2)} × ${m.ringThickness.toFixed(2)} mm`
     + `${m.ringWidthClamped ? ` (width CLAMPED at the assumed ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm floor)` : ''}`
     + ` · ring ${m.ringRadius.toFixed(2)} mm (live)`
+    + capLine
     + `<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`;
 };
 
@@ -157,6 +167,7 @@ async function cell({ label, set = [], views = ['foot'], note = '', prt = port, 
   const ff = m.petalFootFrames;
   if (!Array.isArray(ff) || !ff.length) await die(`${label}: no foot frames reported — a foot crop would be a guess`);
   if (!legacy && !m.petalThickness) await die(`${label}: no thickness telemetry reported — the caption would be describing an object it cannot see`);
+  if (!legacy && !m.petalTipCap) await die(`${label}: no tip-cap telemetry reported — the caption would be describing an object it cannot see`);
 
   const shots = {};
   const L = Number(want.petalLength);
@@ -166,6 +177,12 @@ async function cell({ label, set = [], views = ['foot'], note = '', prt = port, 
        a silhouette and its thickness is a measurable line. Face-on it is a
        rectangle at every thinning value. */
     else if (v === 'tip') await pg.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), { r: L * 0.13, at: m.petalTip, dir: m.petalTangent });
+    /* TIP, FACE-ON — down the petal's own NORMAL. The tip now has a WIDTH
+       story as well as a thickness one, and the width lives in the outline:
+       edge-on shows how thick the end is, face-on shows whether it comes to a
+       point. Both are needed, which is exactly why the first tip sheet's
+       single face-on crop was the wrong choice rather than a bad one. */
+    else if (v === 'tipface') await pg.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), { r: L * 0.13, at: m.petalTip, dir: m.petalNormal });
     /* The whole blade edge-on: the WEDGE, thick at the root and thin at the
        tip, which is what a gradient looks like. */
     else if (v === 'profile') await pg.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), { r: L * 0.62, at: m.petalMid, dir: m.petalTangent });
@@ -180,7 +197,7 @@ async function cell({ label, set = [], views = ['foot'], note = '', prt = port, 
     await pg.waitForTimeout(220);
     shots[v] = await pg.locator('#bloom-canvas').screenshot();
   }
-  const caption = `${numbers(m, legacy)}${note ? `<br>${note}` : ''}`;
+  const caption = `${numbers(m)}${note ? `<br>${note}` : ''}`;
   console.log(`  ${label.padEnd(52)} ${legacy ? 'foot n/a (no controls)' : `foot ${m.ringWidth.toFixed(2)}x${m.ringThickness.toFixed(2)}`} ring ${m.ringRadius.toFixed(2)} tris(live) ${m.liveTris}`);
   return { label, caption, ...shots };
 }
@@ -223,6 +240,29 @@ for (const [label, s, note] of [
   ['sheet 0.60 — live is NOT printed', { sheetThickness: 0.6 },
    'RULED (Eva, Aug 31): no geometry change in either mode, but the divergence must be TOLD. footRing()\'s area rule reads the thickness the solids are ACTUALLY built at, so flooring the sheet moves the RING — 6.25 mm live against 8.07 mm printed, a 29% difference in the arrangement, not a wall. The read-out prints both, labelled. A "print preview" toggle rendering the floored geometry live is PARKED in the charter and deliberately not built: a preview that silently shows an arrangement the print will not produce is the same lie as an unlabelled triangle count.'],
 ]) diverge.push(await cell({ label, set: set(s), views: ['whorl', 'junction'], note }));
+
+/* ---- 3b. THE TIP RULING: before / after, edge-on AND face-on ---- */
+const tipRuling = [];
+{
+  const tipBase = process.argv.indexOf('--tip-before') > 0 ? process.argv[process.argv.indexOf('--tip-before') + 1] : null;
+  if (tipBase) {
+    console.log(`the tip ruling, before/after (before = ${tipBase}):`);
+    const tb = await serveRepo(tipBase);
+    tipRuling.push(await cell({
+      label: 'BEFORE — the floored stub', views: ['tip', 'tipface', 'whorl'], prt: tb.port, legacy: true,
+      note: 'TIP_HALF_MM floored EVERY row in both modes, so the last four of 28 blade rows (profile 0.795, 0.398, 0.119, 0.000) all clamped to 0.800 and ran PARALLEL — then a flat face square to the blade closed the stub. The exponent family already reaches zero; the floor truncated it and capped the truncation.',
+    }));
+    tb.server.close();
+    tipRuling.push(await cell({
+      label: 'AFTER — the converging cap', views: ['tip', 'tipface', 'whorl'],
+      note: 'The cap enters where the profile falls to twice the print floor (or the final fifth, whichever is later) and converges linearly to the terminal face. Live reaches 0.30 mm; export floors it at 1.60 mm and still converges at least 2:1. The apex is an explicitly truncated mini-face, NOT a true apex vertex: a true apex collapses NV columns onto one edge, which is the DOME cos(PI/2) defect, and it would also make live and export different meshes — a property the export gate now rates.',
+    }));
+    tipRuling.push(await cell({
+      label: 'HELD — the authored truncate (breadth 0.60)', set: set({ petalTipBreadth: 0.6 }), views: ['tip', 'tipface', 'whorl'],
+      note: 'The other side of the partition. Above breadth 0 the flat end is a CHOSEN shape (rose, poppy), not a floor artifact, so it is untouched and bit-identical to the pre-ruling tree. Every row here must hold while every pointed row moves — asserted both ways.',
+    }));
+  }
+}
 
 /* ---- 4. BEFORE / AFTER at the shipping default ---- */
 const beforeAfter = [];
@@ -271,6 +311,11 @@ const SHEETS = [
    `The divergence this layer introduces, and Eva's ruling on it. Because footRing()'s area rule reads the thickness the solids are actually built at, the export floor moves the whole arrangement, not just a wall: at a 0.60 mm sheet the ring is 6.25 mm live and 8.07 mm printed. Nothing about the geometry changes in either mode — the one-owner rule is doing exactly what its header says — but the read-out now prints both numbers, labelled, whenever they differ, on the same discipline the triangle counts have carried since the counts stopped being convertible.`,
    pairs(diverge, 'whorl', 'junction'), 'shot', 2],
 ];
+if (tipRuling.length) SHEETS.push(['tip-ruling', 'The tip comes to a point — before, after, and the side that holds',
+  "Eva's ruling (Sep 1) and the evidence for it. Left cell is the tree immediately before, served from a git worktree and rendered by the same browser and camera. Three views per cell because the tip now has a WIDTH story as well as a thickness one: EDGE-ON (top) shows how thick the end is, FACE-ON (middle) shows whether it comes to a point, and the whole bloom (bottom) shows what it does at arm's length. The third cell is the held side of the partition — an authored truncate at tip breadth 0.60, which must not change and does not. Note what the export floor still does to the printed tip: live converges to a 0.30 mm face, the print to 1.60 mm, so the point you see is finer than the point that prints — the same divergence the sheet next door is about, and one more reason the coupon matters.",
+  [...tipRuling.map((c) => ({ ...c, shot: c.tip, label: c.label + ' (edge-on)' })),
+   ...tipRuling.map((c) => ({ ...c, shot: c.tipface, label: c.label + ' (face-on)' })),
+   ...tipRuling.map((c) => ({ ...c, shot: c.whorl, label: c.label + ' (whole bloom)' }))], 'shot', 3]);
 if (beforeAfter.length) SHEETS.push(['thickness-before-after', 'Before / after at the shipping default — what 0 of 106 looks like',
   'Two TREES, not two states: 3c542fb from a git worktree on the left, the thickness layer on the right, same browser, same camera, same framing. Three new controls landed and the shipping bloom is unmoved — the byte report measures that, and this is the picture of it. The working tree is never mutated to build a before; git checkout over it stages a revert that a stray commit can push.',
   pairs(beforeAfter, 'whorl', 'junction'), 'shot', 2]);
