@@ -266,6 +266,13 @@
     margin-bottom:26px;
   }
   .add-toggle:hover{border-color:var(--teal); color:var(--paper);}
+  .add-row{
+    display:flex;
+    gap:12px;
+    margin-bottom:26px;
+  }
+  .add-row .add-toggle{margin-bottom:0;}
+  .add-toggle-secondary{width:auto; flex:0 0 auto; text-align:center;}
 
   .panel{
     display:none;
@@ -275,32 +282,6 @@
     margin-bottom:32px;
   }
   .panel[data-open="true"]{display:block;}
-
-  .mode-tabs{
-    display:flex;
-    gap:20px;
-    margin-bottom:20px;
-    border-bottom:1px solid var(--line);
-  }
-  .mode-tab{
-    background:none;
-    border:none;
-    color:var(--dim-2);
-    font-family:var(--font-mono);
-    font-size:11px;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    padding:0 0 10px;
-    cursor:pointer;
-    border-bottom:2px solid transparent;
-  }
-  .mode-tab[data-active="true"]{
-    color:var(--paper);
-    border-bottom-color:var(--teal);
-  }
-
-  .mode-body{display:none;}
-  .mode-body[data-active="true"]{display:block;}
 
   .field-row{
     display:flex;
@@ -314,7 +295,7 @@
     flex-direction:column;
     gap:5px;
   }
-  .field label{
+  .field label, .field .field-label{
     font-family:var(--font-mono);
     font-size:10px;
     text-transform:uppercase;
@@ -379,7 +360,10 @@
     gap:16px;
     padding:20px 4px;
     border-bottom:1px solid var(--line);
+    cursor:pointer;
   }
+  .entry:hover{background:rgba(237,237,232,0.035);}
+  .entry:focus-visible{outline:1px solid var(--teal); outline-offset:-2px;}
   .entry-index{
     font-size:11px;
     color:var(--dim-2);
@@ -464,26 +448,6 @@
   .tag-touring{color:var(--teal);}
   .entry-status{font-size:13px; color:var(--paper); margin-top:6px; line-height:1.6;}
   .entry-status:empty{display:none;}
-  .entry-actions{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    font-family:var(--font-mono);
-    font-size:11px;
-    letter-spacing:0.5px;
-    text-transform:uppercase;
-    text-align:right;
-    flex-shrink:0;
-  }
-  .entry-actions a, .entry-actions button{
-    background:none;
-    border:none;
-    color:var(--dim-2);
-    cursor:pointer;
-    padding:0;
-  }
-  .entry-actions a:hover, .entry-actions button:hover{color:var(--teal);}
-
   .empty{
     color:var(--dim);
     font-size:13px;
@@ -534,12 +498,249 @@
 
   @media (max-width:560px){
     .entry{flex-direction:column;}
-    .entry-actions{flex-direction:row;}
+    .drawer{width:100%; border-left:none;}
+    /* A 240px empty square pushes everything below the fold on a phone. */
+    .detail-photo, .detail-photo-placeholder{max-width:160px;}
+    .detail-photo-placeholder{font-size:32px;}
     .entry-index{display:none;}
     h1{font-size:38px;}
     .wrap{padding-left:20px; border-left:none;}
     #mapContainer{height:340px;}
   }
+
+  /* --- slide-in detail drawer --- */
+  .drawer-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(10,10,12,0.66);
+    opacity:0;
+    visibility:hidden;
+    transition:opacity 280ms ease, visibility 0s linear 280ms;
+    z-index:900;
+  }
+  .drawer-backdrop[data-open="true"]{
+    opacity:1;
+    visibility:visible;
+    transition:opacity 280ms ease, visibility 0s;
+  }
+  .drawer{
+    position:fixed;
+    top:0;
+    right:0;
+    bottom:0;
+    width:400px;
+    max-width:100%;
+    background:var(--ink-soft);
+    border-left:1px solid var(--line-strong);
+    display:flex;
+    flex-direction:column;
+    transform:translateX(100%);
+    visibility:hidden;
+    transition:transform 280ms ease, visibility 0s linear 280ms;
+    z-index:901;
+  }
+  .drawer[data-open="true"]{
+    transform:translateX(0);
+    visibility:visible;
+    transition:transform 280ms ease, visibility 0s;
+  }
+  /* The whole point of this panel is that it is calm — honour a reduced
+     motion preference by snapping instead of sliding. */
+  @media (prefers-reduced-motion: reduce){
+    .drawer, .drawer-backdrop{transition:none;}
+  }
+  .drawer-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:20px 22px 14px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .drawer-eyebrow{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:var(--teal);
+  }
+  .drawer-close{
+    background:none;
+    border:none;
+    color:var(--dim);
+    font-family:var(--font-mono);
+    font-size:22px;
+    line-height:1;
+    padding:2px 8px;
+    cursor:pointer;
+  }
+  .drawer-close:hover{color:var(--paper);}
+  .drawer-body{
+    flex:1 1 auto;
+    overflow-y:auto;
+    padding:22px;
+  }
+  .drawer-foot{
+    flex:0 0 auto;
+    border-top:1px solid var(--line);
+    padding:16px 22px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .drawer-foot[hidden]{display:none;}
+
+  .detail-photo, .detail-photo-placeholder{
+    width:100%;
+    max-width:240px;
+    aspect-ratio:1 / 1;
+    border:1px solid var(--line-strong);
+    background:var(--ink);
+    margin:0 0 20px;
+    display:block;
+  }
+  .detail-photo{object-fit:cover; filter:grayscale(25%);}
+  .detail-photo-placeholder{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:var(--font-display);
+    font-size:44px;
+    color:var(--dim-2);
+  }
+  .detail-name{
+    font-family:var(--font-display);
+    font-size:30px;
+    font-weight:600;
+    line-height:1.15;
+    letter-spacing:0.3px;
+    margin:0 0 4px;
+    color:var(--paper);
+  }
+  .detail-handle{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:13px;
+    color:var(--teal);
+    margin-bottom:4px;
+  }
+  .detail-rows{
+    margin:18px 0 0;
+    border-top:1px solid var(--line);
+  }
+  .detail-row{
+    display:flex;
+    gap:14px;
+    padding:11px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .detail-row dt{
+    flex:0 0 82px;
+    margin:0;
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.8px;
+    text-transform:uppercase;
+    color:var(--dim-2);
+    padding-top:3px;
+  }
+  .detail-row dd{
+    flex:1 1 auto;
+    min-width:0;
+    margin:0;
+    font-size:13px;
+    line-height:1.65;
+    color:var(--paper);
+    overflow-wrap:anywhere;
+  }
+  .detail-row dd a{color:var(--teal);}
+  .detail-row dd a:hover{text-decoration:underline;}
+  .detail-actions{display:flex; gap:12px;}
+  .detail-actions .btn{flex:1 1 0; text-align:center;}
+  .detail-remove{color:var(--brick); border-color:rgba(166,93,74,0.45);}
+  .detail-remove:hover{border-color:var(--brick);}
+  .detail-ig{
+    display:block;
+    text-align:center;
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--teal);
+    border:1px solid var(--teal);
+    padding:11px 16px;
+    text-decoration:none;
+  }
+  .detail-ig:hover{background:var(--teal); color:var(--ink);}
+  .detail-ig[hidden]{display:none;}
+
+  /* --- paste-a-photo drop zone (edit mode) --- */
+  .photo-drop{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    border:1px dashed var(--line-strong);
+    padding:12px;
+    margin-bottom:12px;
+  }
+  .photo-drop[data-dragover="true"]{border-color:var(--teal); border-style:solid;}
+  .photo-drop-thumb{
+    width:64px;
+    height:64px;
+    flex:0 0 auto;
+    object-fit:cover;
+    border:1px solid var(--line-strong);
+    background:var(--ink);
+    display:block;
+  }
+  .photo-drop-thumb-placeholder{
+    width:64px;
+    height:64px;
+    flex:0 0 auto;
+    border:1px solid var(--line-strong);
+    background:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:var(--font-display);
+    font-size:18px;
+    color:var(--dim-2);
+  }
+  .photo-drop-copy{
+    font-family:var(--font-mono);
+    font-size:11px;
+    line-height:1.65;
+    color:var(--dim);
+    min-width:0;
+  }
+  .photo-drop-copy kbd{
+    font-family:var(--font-mono);
+    font-size:10px;
+    border:1px solid var(--line-strong);
+    padding:1px 4px;
+    color:var(--paper);
+  }
+  .photo-drop-state{
+    display:block;
+    margin-top:5px;
+    color:var(--teal);
+    overflow-wrap:anywhere;
+  }
+  .photo-drop-state[data-error="true"]{color:var(--brick);}
+  .photo-drop-clear{
+    background:none;
+    border:none;
+    padding:0;
+    margin-top:3px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--dim-2);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+  .photo-drop-clear:hover{color:var(--brick);}
+  .photo-drop-clear[hidden]{display:none;}
 
   /* lock gate */
   #gate{
@@ -688,99 +889,34 @@
         <button class="view-tab" data-view="map">map</button>
       </div>
 
-      <button class="add-toggle" id="addToggle">+ add an entry</button>
+      <div class="add-row">
+        <button class="add-toggle" id="addToggle">+ add an entry</button>
+        <button class="add-toggle add-toggle-secondary" id="bulkToggle">bulk paste</button>
+      </div>
 
       <div class="panel" id="panel">
-        <div class="mode-tabs">
-          <button class="mode-tab" data-mode="quick" data-active="true">quick add</button>
-          <button class="mode-tab" data-mode="bulk">bulk paste</button>
-        </div>
-
-        <div class="mode-body" data-mode="quick" data-active="true">
-          <div class="field-row">
-            <div class="field">
-              <label for="fName">name</label>
-              <input id="fName" type="text" placeholder="e.g. Jane Doe">
-            </div>
-            <div class="field">
-              <label for="fHandle">handle</label>
-              <input id="fHandle" type="text" placeholder="@janedoe">
-            </div>
-            <div class="field">
-              <label for="fPronouns">pronouns</label>
-              <input id="fPronouns" type="text" placeholder="she/her">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="fCategory">category</label>
-              <select id="fCategory">
-                <option value="following">following</option>
-                <option value="tattoo">tattoo artist</option>
-                <option value="touring">touring / release</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="fLocation">location</label>
-              <input id="fLocation" type="text" placeholder="Los Angeles, CA">
-            </div>
-            <div class="field">
-              <label for="fDate">date to watch</label>
-              <input id="fDate" type="date">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="fStatus">status / notes</label>
-              <input id="fStatus" type="text" placeholder="Guest spot NYC Oct 3–10, or drop date, etc.">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="fLink">link</label>
-              <input id="fLink" type="text" placeholder="instagram.com/janedoe">
-            </div>
-            <div class="field">
-              <label for="fPhoto">photo url</label>
-              <input id="fPhoto" type="text" placeholder="https://…jpg">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="fTags">style tags (comma-separated)</label>
-              <input id="fTags" type="text" placeholder="fine line, botanical, black &amp; grey">
-            </div>
-          </div>
-          <div class="panel-actions">
-            <button class="btn btn-primary" id="saveEntry">save entry</button>
-            <button class="btn" id="cancelEntry">cancel</button>
+        <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url</code>. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code> — anything else (e.g. <code>Influencer</code>, <code>Art</code>, <code>Friend</code>) becomes <code>following</code> but keeps the original label as a tag, so it isn't lost. Plain lines with no <code>|</code> are added as bare names using the category below. Lines whose handle matches an existing entry are merged in — blank fields on the existing entry get filled in, nothing is overwritten, and no duplicate is created.</p>
+        <div class="field-row">
+          <div class="field">
+            <label for="bulkDefaultCategory">default category for plain lines</label>
+            <select id="bulkDefaultCategory">
+              <option value="following">following</option>
+              <option value="tattoo">tattoo artist</option>
+              <option value="touring">touring / release</option>
+            </select>
           </div>
         </div>
-
-        <div class="mode-body" data-mode="bulk">
-          <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url</code>. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code> — anything else (e.g. <code>Influencer</code>, <code>Art</code>, <code>Friend</code>) becomes <code>following</code> but keeps the original label as a tag, so it isn't lost. Plain lines with no <code>|</code> are added as bare names using the category below. Lines whose handle matches an existing entry are merged in — blank fields on the existing entry get filled in, nothing is overwritten, and no duplicate is created.</p>
-          <div class="field-row">
-            <div class="field">
-              <label for="bulkDefaultCategory">default category for plain lines</label>
-              <select id="bulkDefaultCategory">
-                <option value="following">following</option>
-                <option value="tattoo">tattoo artist</option>
-                <option value="touring">touring / release</option>
-              </select>
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="bulkText">paste here</label>
-              <textarea id="bulkText" rows="7" placeholder="Jane Doe | @janedoe | tattoo | Los Angeles, CA | she/her | Guest spot NYC Oct 3–10 | instagram.com/janedoe | https://…jpg
+        <div class="field-row">
+          <div class="field">
+            <label for="bulkText">paste here</label>
+            <textarea id="bulkText" rows="7" placeholder="Jane Doe | @janedoe | tattoo | Los Angeles, CA | she/her | Guest spot NYC Oct 3–10 | instagram.com/janedoe | https://…jpg
 some.artist
 another.handle"></textarea>
-            </div>
           </div>
-          <div class="panel-actions">
-            <button class="btn btn-primary" id="saveBulk">add all</button>
-            <button class="btn" id="cancelBulk">cancel</button>
-          </div>
+        </div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" id="saveBulk">add all</button>
+          <button class="btn" id="cancelBulk">cancel</button>
         </div>
       </div>
     </header>
@@ -798,6 +934,97 @@ another.handle"></textarea>
     </footer>
     <input type="file" id="importFile" accept="application/json" style="display:none;">
   </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" data-open="false"></div>
+  <aside class="drawer" id="drawer" data-open="false" role="dialog" aria-modal="true" aria-hidden="true" aria-label="entry details">
+    <div class="drawer-head">
+      <span class="drawer-eyebrow" id="drawerEyebrow">entry</span>
+      <button class="drawer-close" id="drawerClose" type="button" aria-label="close panel">&times;</button>
+    </div>
+    <div class="drawer-body">
+      <div id="drawerView"></div>
+      <div id="drawerEdit" hidden>
+      <div class="field-row">
+        <div class="field">
+          <label for="fName">name</label>
+          <input id="fName" type="text" placeholder="e.g. Jane Doe">
+        </div>
+        <div class="field">
+          <label for="fHandle">handle</label>
+          <input id="fHandle" type="text" placeholder="@janedoe">
+        </div>
+        <div class="field">
+          <label for="fPronouns">pronouns</label>
+          <input id="fPronouns" type="text" placeholder="she/her">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fCategory">category</label>
+          <select id="fCategory">
+            <option value="following">following</option>
+            <option value="tattoo">tattoo artist</option>
+            <option value="touring">touring / release</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fLocation">location</label>
+          <input id="fLocation" type="text" placeholder="Los Angeles, CA">
+        </div>
+        <div class="field">
+          <label for="fDate">date to watch</label>
+          <input id="fDate" type="date">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fStatus">status / notes</label>
+          <input id="fStatus" type="text" placeholder="Guest spot NYC Oct 3–10, or drop date, etc.">
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">photo</span>
+        <div class="photo-drop" id="photoDrop" data-dragover="false">
+          <div id="photoThumb"></div>
+          <div class="photo-drop-copy">
+            Copy an image anywhere &mdash; a screenshot, or right-click &rarr; copy image on
+            Instagram &mdash; then press <kbd>Ctrl</kbd>/<kbd>&#8984;</kbd> + <kbd>V</kbd> with
+            this panel open. You can drop a file here too.
+            <span class="photo-drop-state" id="photoState"></span>
+            <button type="button" class="photo-drop-clear" id="photoClear" hidden>remove image</button>
+          </div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fLink">link</label>
+          <input id="fLink" type="text" placeholder="instagram.com/janedoe">
+        </div>
+        <div class="field">
+          <label for="fPhoto">photo url</label>
+          <input id="fPhoto" type="text" placeholder="https://…jpg">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fTags">style tags (comma-separated)</label>
+          <input id="fTags" type="text" placeholder="fine line, botanical, black &amp; grey">
+        </div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn btn-primary" id="saveEntry">save entry</button>
+        <button class="btn" id="cancelEntry">cancel</button>
+      </div>
+      </div>
+    </div>
+    <div class="drawer-foot" id="drawerFoot">
+      <div class="detail-actions">
+        <button class="btn" id="detailEdit" type="button">edit</button>
+        <button class="btn detail-remove" id="detailRemove" type="button">remove</button>
+      </div>
+      <a class="detail-ig" id="detailIg" target="_blank" rel="noopener noreferrer">Open on Instagram &rarr;</a>
+    </div>
+  </aside>
 
   <button class="top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">&uarr; top</button>
 
@@ -859,20 +1086,65 @@ another.handle"></textarea>
   let activeTags = new Set();
   let searchTerm = '';
   let sortMode = 'name';
-  let editingId = null;
   let currentView = 'list';
   let leafletMap = null;
   let markerLayer = null;
   let geocodingInFlight = false;
 
+  // --- detail drawer state ---
+  // detailId is the entry the drawer is showing; null while adding a new one.
+  let detailId = null;
+  let drawerMode = 'view';
+  // A photo captured by paste/drop lives here until the entry is saved, so
+  // Cancel discards it like every other field in the form.
+  let pendingPhoto = null;
+  let lastFocusedRow = null;
+
+  // Longest side of a stored photo, and its JPEG quality. These are list
+  // thumbnails and a ~240px drawer image, not gallery originals — and they
+  // go straight into localStorage, whose per-origin budget is a few MB
+  // total for the whole ledger.
+  const MAX_PHOTO_DIM = 500;
+  const PHOTO_JPEG_QUALITY = 0.8;
+
+  // The last snapshot that actually reached localStorage. persist() rolls
+  // back to it when a write fails, so the screen can never show entries
+  // that aren't stored.
+  let lastPersisted = '[]';
+
   function load(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       entries = raw ? JSON.parse(raw) : [];
-    }catch(e){ entries = []; }
+      lastPersisted = JSON.stringify(entries);
+    }catch(e){ entries = []; lastPersisted = '[]'; }
   }
+
+  function isQuotaError(err){
+    if(!err) return false;
+    return err.name === 'QuotaExceededError'
+      || err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+      || err.code === 22 || err.code === 1014;
+  }
+
+  // Returns true when the write landed. Pasted images are data URLs stored
+  // inline, so quota exhaustion is a real, reachable failure now rather
+  // than a theoretical one — never let it fail silently.
   function persist(){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    const json = JSON.stringify(entries);
+    try{
+      localStorage.setItem(STORAGE_KEY, json);
+      lastPersisted = json;
+      return true;
+    }catch(err){
+      try{ entries = JSON.parse(lastPersisted); }catch(e){ /* keep what we have */ }
+      if(isQuotaError(err)){
+        alert('Storage is full \u2014 try removing an image from an older entry, or export a backup and clear some data.\n\nThat last change was not saved.');
+      }else{
+        alert('Could not save to this browser\u2019s storage: ' + ((err && err.message) || err));
+      }
+      return false;
+    }
   }
   function uid(){
     return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -1079,6 +1351,10 @@ another.handle"></textarea>
       + (filtered.length !== entries.length ? ` · ${filtered.length} shown` : '');
 
     if(currentView === 'map') renderMap(filtered);
+
+    // The drawer shows a live entry, so anything that rewrites the list
+    // (an import, a bulk merge, a save) has to repaint it too.
+    if(drawer.dataset.open === 'true' && drawerMode === 'view') renderDetailView();
   }
 
   // --- location filter (dynamic dropdown of distinct location values) ---
@@ -1137,10 +1413,31 @@ another.handle"></textarea>
     });
   }
 
+  // A handle as it should read to a human: exactly one leading @.
+  function displayHandle(handle){
+    const h = (handle || '').trim();
+    if(!h) return '';
+    return h.startsWith('@') ? h : '@' + h;
+  }
+
   function renderEntry(e, index){
     const row = document.createElement('div');
     row.className = 'entry';
     row.dataset.category = e.category;
+    // The whole row opens the detail drawer. Nothing inside it is separately
+    // clickable any more — the handle used to be an <a> straight to
+    // Instagram, and that link now lives in the drawer instead, so there is
+    // one predictable target rather than a link inside a button.
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.setAttribute('aria-label', 'Open details for ' + (e.name || 'this entry'));
+    row.addEventListener('click', () => openDetail(e.id, row));
+    row.addEventListener('keydown', (ev) => {
+      if(ev.key === 'Enter' || ev.key === ' '){
+        ev.preventDefault();
+        openDetail(e.id, row);
+      }
+    });
 
     const idx = document.createElement('div');
     idx.className = 'entry-index';
@@ -1179,12 +1476,9 @@ another.handle"></textarea>
     nameEl.textContent = e.name || '(unnamed)';
     nameRow.appendChild(nameEl);
     if(e.handle){
-      const h = document.createElement('a');
+      const h = document.createElement('span');
       h.className = 'entry-handle';
-      h.href = instagramUrlForHandle(e.handle);
-      h.target = '_blank';
-      h.rel = 'noopener noreferrer';
-      h.textContent = e.handle.startsWith('@') ? e.handle : '@' + e.handle;
+      h.textContent = displayHandle(e.handle);
       nameRow.appendChild(h);
     }
     main.appendChild(nameRow);
@@ -1228,36 +1522,6 @@ another.handle"></textarea>
     }
 
     row.appendChild(main);
-
-    const actions = document.createElement('div');
-    actions.className = 'entry-actions';
-    if(e.link){
-      const a = document.createElement('a');
-      let href = e.link;
-      if(!/^https?:\/\//i.test(href)) href = 'https://' + href;
-      a.href = href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.textContent = 'open';
-      actions.appendChild(a);
-    }
-    const editBtn = document.createElement('button');
-    editBtn.textContent = 'edit';
-    editBtn.onclick = () => openForEdit(e.id);
-    actions.appendChild(editBtn);
-
-    const delBtn = document.createElement('button');
-    delBtn.textContent = 'remove';
-    delBtn.onclick = () => {
-      if(confirm('Remove "' + (e.name || 'this entry') + '"?')){
-        entries = entries.filter(x => x.id !== e.id);
-        persist();
-        render();
-      }
-    };
-    actions.appendChild(delBtn);
-
-    row.appendChild(actions);
     return row;
   }
 
@@ -1268,55 +1532,307 @@ another.handle"></textarea>
     }catch(e){ return iso; }
   }
 
-  // --- panel open/close ---
+  // --- bulk-paste panel open/close ---
   const panel = document.getElementById('panel');
-  const addToggle = document.getElementById('addToggle');
   const topBtn = document.querySelector('.top-btn');
 
-  // The floating "top" button is fixed to the bottom-right corner, which can
-  // sit directly over the add/edit panel's fields on narrow viewports.
-  // Hide it while the panel is open so it never blocks a form control.
+  // The floating "top" button is fixed to the bottom-right corner, where it
+  // can sit over the bulk panel's fields on narrow viewports and over the
+  // whole detail drawer. Hide it while either is open.
   function syncTopBtnVisibility(){
-    topBtn.style.display = panel.dataset.open === 'true' ? 'none' : '';
+    const blocked = panel.dataset.open === 'true' || drawer.dataset.open === 'true';
+    topBtn.style.display = blocked ? 'none' : '';
   }
 
-  addToggle.onclick = () => {
-    const isOpen = panel.dataset.open === 'true';
-    panel.dataset.open = isOpen ? 'false' : 'true';
-    if(!isOpen) setMode('quick');
+  document.getElementById('bulkToggle').onclick = () => {
+    panel.dataset.open = panel.dataset.open === 'true' ? 'false' : 'true';
     syncTopBtnVisibility();
   };
 
   function closePanel(){
     panel.dataset.open = 'false';
-    editingId = null;
+    syncTopBtnVisibility();
+  }
+  document.getElementById('cancelBulk').onclick = closePanel;
+
+  document.getElementById('addToggle').onclick = () => openDrawerForNew();
+
+  // --- detail drawer -------------------------------------------------------
+  const drawer = document.getElementById('drawer');
+  const drawerBackdrop = document.getElementById('drawerBackdrop');
+  const drawerView = document.getElementById('drawerView');
+  const drawerEdit = document.getElementById('drawerEdit');
+  const drawerFoot = document.getElementById('drawerFoot');
+  const drawerEyebrow = document.getElementById('drawerEyebrow');
+
+  function currentDetailEntry(){
+    return detailId ? entries.find(x => x.id === detailId) : null;
+  }
+
+  function openDetail(id, sourceRow){
+    if(!entries.some(x => x.id === id)) return;
+    detailId = id;
+    lastFocusedRow = sourceRow || null;
+    setDrawerMode('view');
+    openDrawer();
+  }
+
+  function openDrawerForNew(){
+    detailId = null;
+    lastFocusedRow = null;
+    closePanel();
+    setDrawerMode('edit');
+    openDrawer();
+  }
+
+  // Everything behind the drawer while it is open. `inert` is the honest way
+  // to say "modal": it removes this subtree from tab order AND from the
+  // accessibility tree, so a screen reader doesn't wander into the list
+  // underneath. The keydown trap below covers browsers that don't have it.
+  const BACKGROUND_SELECTOR = '.topbar, .wrap, .top-btn';
+  const SUPPORTS_INERT = 'inert' in HTMLElement.prototype;
+
+  function setBackgroundInert(on){
+    if(!SUPPORTS_INERT) return;
+    document.querySelectorAll(BACKGROUND_SELECTOR).forEach(el => { el.inert = on; });
+  }
+
+  function openDrawer(){
+    drawer.dataset.open = 'true';
+    drawerBackdrop.dataset.open = 'true';
+    drawer.setAttribute('aria-hidden', 'false');
+    setBackgroundInert(true);
+    document.addEventListener('keydown', onDrawerKeydown);
+    syncTopBtnVisibility();
+    const first = drawerMode === 'edit'
+      ? document.getElementById('fName')
+      : document.getElementById('drawerClose');
+    if(first) first.focus();
+  }
+
+  function closeDrawer(){
+    if(drawer.dataset.open !== 'true') return;
+    drawer.dataset.open = 'false';
+    drawerBackdrop.dataset.open = 'false';
+    drawer.setAttribute('aria-hidden', 'true');
+    // Lift inert before restoring focus, or the row can't take it.
+    setBackgroundInert(false);
+    document.removeEventListener('keydown', onDrawerKeydown);
+    detachPhotoCapture();
+    detailId = null;
+    drawerMode = 'view';
+    pendingPhoto = null;
     clearQuickForm();
     syncTopBtnVisibility();
+    // Send focus back to the row that opened this, so keyboard users land
+    // where they were instead of at the top of the document.
+    if(lastFocusedRow && document.contains(lastFocusedRow)) lastFocusedRow.focus();
+    lastFocusedRow = null;
   }
 
-  // --- mode tabs ---
-  document.querySelectorAll('.mode-tab').forEach(btn => {
-    btn.onclick = () => setMode(btn.dataset.mode);
-  });
-  function setMode(mode){
-    document.querySelectorAll('.mode-tab').forEach(b => b.dataset.active = (b.dataset.mode === mode) ? 'true' : 'false');
-    document.querySelectorAll('.mode-body').forEach(b => b.dataset.active = (b.dataset.mode === mode) ? 'true' : 'false');
+  function onDrawerKeydown(ev){
+    if(ev.key === 'Escape'){
+      ev.preventDefault();
+      closeDrawer();
+      return;
+    }
+    if(ev.key === 'Tab') trapTab(ev);
   }
 
-  // --- quick add / edit ---
+  // The drawer claims aria-modal="true", so Tab must not walk out of it into
+  // the list behind. Cycles focus within the drawer instead.
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  function trapTab(ev){
+    const focusable = Array.prototype.filter.call(
+      drawer.querySelectorAll(FOCUSABLE),
+      el => !el.hidden && el.offsetParent !== null
+    );
+    if(focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    // Focus can sit outside the drawer entirely (a backdrop click, or a
+    // browser without inert letting it drift) — pull it back in.
+    if(!drawer.contains(active)){
+      ev.preventDefault();
+      (ev.shiftKey ? last : first).focus();
+      return;
+    }
+    if(ev.shiftKey && active === first){
+      ev.preventDefault();
+      last.focus();
+    }else if(!ev.shiftKey && active === last){
+      ev.preventDefault();
+      first.focus();
+    }
+  }
+
+  document.getElementById('drawerClose').onclick = closeDrawer;
+  drawerBackdrop.onclick = closeDrawer;
+
+  function setDrawerMode(mode){
+    drawerMode = mode;
+    if(mode === 'edit'){
+      drawerView.hidden = true;
+      drawerEdit.hidden = false;
+      drawerFoot.hidden = true;
+      drawerEyebrow.textContent = detailId ? 'edit entry' : 'new entry';
+      fillQuickForm(currentDetailEntry());
+      attachPhotoCapture();
+    }else{
+      detachPhotoCapture();
+      pendingPhoto = null;
+      drawerEdit.hidden = true;
+      drawerView.hidden = false;
+      drawerFoot.hidden = false;
+      drawerEyebrow.textContent = 'entry';
+      renderDetailView();
+    }
+  }
+
+  // --- drawer: view mode ---
+  function detailPlaceholder(e){
+    const ph = document.createElement('div');
+    ph.className = 'detail-photo-placeholder';
+    ph.textContent = initials(e.name);
+    return ph;
+  }
+
+  function addDetailRow(dl, label, node){
+    if(!node) return;
+    const row = document.createElement('div');
+    row.className = 'detail-row';
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.appendChild(node);
+    row.appendChild(dt);
+    row.appendChild(dd);
+    dl.appendChild(row);
+  }
+
+  function textNode(value){
+    if(!value) return null;
+    return document.createTextNode(value);
+  }
+
+  function renderDetailView(){
+    const e = currentDetailEntry();
+    drawerView.innerHTML = '';
+    if(!e){ closeDrawer(); return; }
+
+    drawer.setAttribute('aria-label', (e.name || 'entry') + ' — details');
+
+    const photoSrc = e.photo || avatarUrlForHandle(e.handle);
+    if(photoSrc){
+      const img = document.createElement('img');
+      img.className = 'detail-photo';
+      img.src = photoSrc;
+      img.alt = e.name || '';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => img.replaceWith(detailPlaceholder(e));
+      drawerView.appendChild(img);
+    }else{
+      drawerView.appendChild(detailPlaceholder(e));
+    }
+
+    const nameEl = document.createElement('h2');
+    nameEl.className = 'detail-name';
+    nameEl.textContent = e.name || '(unnamed)';
+    drawerView.appendChild(nameEl);
+
+    if(e.handle){
+      const h = document.createElement('span');
+      h.className = 'detail-handle';
+      h.textContent = displayHandle(e.handle);
+      drawerView.appendChild(h);
+    }
+
+    const dl = document.createElement('dl');
+    dl.className = 'detail-rows';
+
+    const catEl = document.createElement('span');
+    catEl.className = 'tag tag-' + e.category;
+    catEl.textContent = '[ ' + (catLabel[e.category] || e.category) + ' ]';
+    addDetailRow(dl, 'category', catEl);
+
+    addDetailRow(dl, 'location', textNode(e.location));
+    addDetailRow(dl, 'pronouns', textNode(e.pronouns));
+    addDetailRow(dl, 'date', e.date ? textNode(formatDate(e.date)) : null);
+
+    if(e.tags && e.tags.length){
+      const tagsRow = document.createElement('div');
+      tagsRow.className = 'entry-tags';
+      tagsRow.style.marginTop = '0';
+      e.tags.forEach(t => {
+        const pill = document.createElement('span');
+        pill.className = 'entry-tag-pill';
+        pill.textContent = t;
+        tagsRow.appendChild(pill);
+      });
+      addDetailRow(dl, 'tags', tagsRow);
+    }
+
+    addDetailRow(dl, 'status', textNode(e.status));
+
+    if(e.link){
+      const a = document.createElement('a');
+      a.href = absoluteUrl(e.link);
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = e.link;
+      addDetailRow(dl, 'link', a);
+    }
+
+    drawerView.appendChild(dl);
+
+    // The Instagram link is the way out to the real profile — this panel only
+    // ever shows our own copy of the data.
+    const ig = document.getElementById('detailIg');
+    if(e.handle){
+      ig.href = instagramUrlForHandle(e.handle);
+      ig.hidden = false;
+    }else{
+      ig.removeAttribute('href');
+      ig.hidden = true;
+    }
+  }
+
+  function absoluteUrl(href){
+    return /^https?:\/\//i.test(href) ? href : 'https://' + href;
+  }
+
+  document.getElementById('detailEdit').onclick = () => {
+    if(!currentDetailEntry()) return;
+    setDrawerMode('edit');
+    document.getElementById('fName').focus();
+  };
+
+  document.getElementById('detailRemove').onclick = () => {
+    const e = currentDetailEntry();
+    if(!e) return;
+    if(!confirm('Remove "' + (e.name || 'this entry') + '"?')) return;
+    entries = entries.filter(x => x.id !== e.id);
+    if(!persist()){ render(); return; }
+    closeDrawer();
+    render();
+  };
+
+  // --- drawer: edit mode (the quick-add form, same fields as before) ---
+  const QUICK_TEXT_FIELDS = ['fName','fHandle','fPronouns','fLocation','fDate','fStatus','fLink','fPhoto','fTags'];
+
   function clearQuickForm(){
-    ['fName','fHandle','fPronouns','fLocation','fDate','fStatus','fLink','fPhoto','fTags'].forEach(id => document.getElementById(id).value = '');
+    QUICK_TEXT_FIELDS.forEach(id => document.getElementById(id).value = '');
     document.getElementById('fCategory').value = 'following';
     document.getElementById('saveEntry').textContent = 'save entry';
+    pendingPhoto = null;
+    setPhotoState('');
+    refreshPhotoPreview();
   }
 
-  function openForEdit(id){
-    const e = entries.find(x => x.id === id);
-    if(!e) return;
-    editingId = id;
-    panel.dataset.open = 'true';
-    syncTopBtnVisibility();
-    setMode('quick');
+  function fillQuickForm(e){
+    if(!e){ clearQuickForm(); return; }
     document.getElementById('fName').value = e.name || '';
     document.getElementById('fHandle').value = e.handle || '';
     document.getElementById('fPronouns').value = e.pronouns || '';
@@ -1325,10 +1841,16 @@ another.handle"></textarea>
     document.getElementById('fDate').value = e.date || '';
     document.getElementById('fStatus').value = e.status || '';
     document.getElementById('fLink').value = e.link || '';
-    document.getElementById('fPhoto').value = e.photo || '';
     document.getElementById('fTags').value = (e.tags || []).join(', ');
+    // A stored data-URL photo is an embedded image, not something to dump
+    // into a text box as 40KB of base64 — it stays in pendingPhoto and the
+    // url field shows only real URLs.
+    const isEmbedded = typeof e.photo === 'string' && e.photo.indexOf('data:') === 0;
+    pendingPhoto = isEmbedded ? e.photo : null;
+    document.getElementById('fPhoto').value = isEmbedded ? '' : (e.photo || '');
     document.getElementById('saveEntry').textContent = 'update entry';
-    panel.scrollIntoView({behavior:'smooth', block:'start'});
+    setPhotoState(isEmbedded ? 'stored image · ' + approxKb(pendingPhoto) + ' KB' : '');
+    refreshPhotoPreview();
   }
 
   document.getElementById('saveEntry').onclick = () => {
@@ -1343,11 +1865,14 @@ another.handle"></textarea>
       date: document.getElementById('fDate').value,
       status: document.getElementById('fStatus').value.trim(),
       link: document.getElementById('fLink').value.trim(),
-      photo: document.getElementById('fPhoto').value.trim(),
+      // A pasted image wins over the url field; typing in the url field
+      // clears the pasted one, so only one of the two is ever set.
+      photo: pendingPhoto || document.getElementById('fPhoto').value.trim(),
       tags: document.getElementById('fTags').value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean),
     };
-    if(editingId){
-      const idx = entries.findIndex(x => x.id === editingId);
+    let savedId = detailId;
+    if(detailId){
+      const idx = entries.findIndex(x => x.id === detailId);
       if(idx > -1){
         const prev = entries[idx];
         // The location text changed — the cached geocode (if any) no longer
@@ -1359,13 +1884,185 @@ another.handle"></textarea>
         entries[idx] = { ...prev, ...data };
       }
     }else{
-      entries.push({ id: uid(), ...data });
+      savedId = uid();
+      entries.push({ id: savedId, ...data });
     }
-    persist();
-    closePanel();
+    // A failed write has already rolled the list back; leave the form as the
+    // user typed it so nothing is lost while they free up space.
+    if(!persist()){ render(); return; }
+    detailId = savedId;
+    setDrawerMode('view');
     render();
   };
-  document.getElementById('cancelEntry').onclick = closePanel;
+
+  document.getElementById('cancelEntry').onclick = () => {
+    // Cancelling an edit returns to that entry; cancelling a new entry has
+    // nothing to return to, so it closes.
+    if(currentDetailEntry()) setDrawerMode('view');
+    else closeDrawer();
+  };
+
+  // --- paste (and drop) an image straight into the photo field -------------
+  // Listeners live on the drawer and only while it is in edit mode — never
+  // on the document, so a paste anywhere else on the page is untouched.
+  const photoDrop = document.getElementById('photoDrop');
+  const photoState = document.getElementById('photoState');
+  const photoClear = document.getElementById('photoClear');
+
+  function attachPhotoCapture(){
+    drawer.addEventListener('paste', onDrawerPaste);
+    photoDrop.addEventListener('dragover', onPhotoDragOver);
+    photoDrop.addEventListener('dragleave', onPhotoDragLeave);
+    photoDrop.addEventListener('drop', onPhotoDrop);
+  }
+  function detachPhotoCapture(){
+    drawer.removeEventListener('paste', onDrawerPaste);
+    photoDrop.removeEventListener('dragover', onPhotoDragOver);
+    photoDrop.removeEventListener('dragleave', onPhotoDragLeave);
+    photoDrop.removeEventListener('drop', onPhotoDrop);
+    photoDrop.dataset.dragover = 'false';
+  }
+
+  function onDrawerPaste(ev){
+    const cd = ev.clipboardData;
+    if(!cd) return;
+    // A text paste into a text field is left completely alone — no
+    // preventDefault, no interception. Only a clipboard carrying an image
+    // file, with no text the focused field could plausibly want instead,
+    // is treated as a photo. (Copy-image and screenshots put no text on the
+    // clipboard, so this still works with a field focused.)
+    const t = ev.target;
+    const intoTextField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    if(intoTextField && (cd.getData('text/plain') || '').trim()) return;
+
+    const items = cd.items ? Array.prototype.slice.call(cd.items) : [];
+    const imageItem = items.filter(it => it.kind === 'file' && it.type && it.type.indexOf('image/') === 0)[0];
+    if(!imageItem) return;
+    const file = imageItem.getAsFile();
+    if(!file) return;
+    ev.preventDefault();
+    acceptPhotoFile(file);
+  }
+
+  function onPhotoDragOver(ev){
+    ev.preventDefault();
+    photoDrop.dataset.dragover = 'true';
+  }
+  function onPhotoDragLeave(){
+    photoDrop.dataset.dragover = 'false';
+  }
+  function onPhotoDrop(ev){
+    ev.preventDefault();
+    photoDrop.dataset.dragover = 'false';
+    const files = (ev.dataTransfer && ev.dataTransfer.files) ? Array.prototype.slice.call(ev.dataTransfer.files) : [];
+    const image = files.filter(f => f.type && f.type.indexOf('image/') === 0)[0];
+    if(image) acceptPhotoFile(image);
+  }
+
+  function acceptPhotoFile(file){
+    setPhotoState('reading image…');
+    downscaleToDataUrl(file).then(dataUrl => {
+      pendingPhoto = dataUrl;
+      document.getElementById('fPhoto').value = '';
+      setPhotoState('pasted image · ' + approxKb(dataUrl) + ' KB');
+      refreshPhotoPreview();
+    }).catch(err => {
+      console.warn('[artist-tracker] could not read pasted image:', err);
+      setPhotoState('couldn’t read that image — try copying it again.', true);
+    });
+  }
+
+  // Decodes the file, scales the longest side down to MAX_PHOTO_DIM and
+  // re-encodes as JPEG. These end up inline in localStorage, so a 4MB
+  // screenshot must never be stored as-is.
+  function downscaleToDataUrl(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('could not read the file'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('could not decode the image'));
+        img.onload = () => {
+          try{
+            const scale = Math.min(1, MAX_PHOTO_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+            const w = Math.max(1, Math.round(img.naturalWidth * scale));
+            const h = Math.max(1, Math.round(img.naturalHeight * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            // JPEG has no alpha channel: paint the panel background under a
+            // transparent PNG screenshot so it doesn't come out black.
+            ctx.fillStyle = '#131316';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', PHOTO_JPEG_QUALITY));
+          }catch(err){
+            reject(err);
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Base64 carries 3 bytes per 4 characters, so this is close enough to
+  // show the user what a photo is costing them in storage.
+  function approxKb(dataUrl){
+    return Math.max(1, Math.round((dataUrl.length * 3 / 4) / 1024));
+  }
+
+  function setPhotoState(text, isError){
+    photoState.textContent = text || '';
+    if(isError) photoState.dataset.error = 'true';
+    else photoState.removeAttribute('data-error');
+  }
+
+  function refreshPhotoPreview(){
+    const thumb = document.getElementById('photoThumb');
+    const urlValue = document.getElementById('fPhoto').value.trim();
+    const src = pendingPhoto || urlValue || avatarUrlForHandle(document.getElementById('fHandle').value.trim());
+    photoClear.hidden = !(pendingPhoto || urlValue);
+    thumb.innerHTML = '';
+    if(src){
+      const img = document.createElement('img');
+      img.className = 'photo-drop-thumb';
+      img.src = src;
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => {
+        const ph = document.createElement('div');
+        ph.className = 'photo-drop-thumb-placeholder';
+        ph.textContent = initials(document.getElementById('fName').value);
+        img.replaceWith(ph);
+      };
+      thumb.appendChild(img);
+    }else{
+      const ph = document.createElement('div');
+      ph.className = 'photo-drop-thumb-placeholder';
+      ph.textContent = initials(document.getElementById('fName').value);
+      thumb.appendChild(ph);
+    }
+  }
+
+  photoClear.onclick = () => {
+    pendingPhoto = null;
+    document.getElementById('fPhoto').value = '';
+    setPhotoState('');
+    refreshPhotoPreview();
+  };
+
+  // Typing a url is the fallback path — it replaces whatever was pasted.
+  document.getElementById('fPhoto').addEventListener('input', () => {
+    if(pendingPhoto){
+      pendingPhoto = null;
+      setPhotoState('');
+    }
+    refreshPhotoPreview();
+  });
+  // The preview falls back to the handle's avatar, so it follows the handle.
+  document.getElementById('fHandle').addEventListener('input', refreshPhotoPreview);
 
   // --- bulk paste (merge-aware: matches existing entries by handle) ---
   // A parsed line only fills in fields that are currently blank on a
@@ -1452,13 +2149,12 @@ another.handle"></textarea>
       }
     });
 
-    persist();
+    const saved = persist();
     document.getElementById('bulkText').value = '';
     closePanel();
     render();
-    alert(`${updated} updated, ${added} added, ${unchanged} unchanged.`);
+    if(saved) alert(`${updated} updated, ${added} added, ${unchanged} unchanged.`);
   };
-  document.getElementById('cancelBulk').onclick = closePanel;
 
   // --- chips / search / sort ---
   document.getElementById('chips').addEventListener('click', (ev) => {
