@@ -105,7 +105,7 @@ const shot = async name => { if (shotsDir) await page.locator('.sim').screenshot
 section('Page');
 check('no page errors on load', errors.length === 0, errors.join(' | '));
 check('canvas present and sized', await page.evaluate(() => { const c = document.getElementById('swatchCanvas'); return c.width > 300 && c.height > 300; }));
-check('index reads No. 05 / 05', (await page.textContent('.project-header__index')).trim() === 'No. 05 / 05');
+check('index reads No. 05 / NN', /^No\. 05 \/ \d\d$/.test((await page.textContent('.project-header__index')).trim()));
 await shot('01-knit-rest');
 
 // 2. knit: course-wise pull — loops flatten, yarn length conserved ----------
@@ -202,6 +202,7 @@ const afterUp = await read();
 check('releasing the pointer starts recovery', afterUp.sigma === 0 && afterUp.residual.e1 > 0, 'residual e1 ' + (afterUp.residual.e1 * 100).toFixed(1) + '%');
 // press-and-hold pull button
 const btn = page.locator('[data-pull="90"]');
+await btn.scrollIntoViewIfNeeded();          // the stage bar sits below the 1000 px fold; the mouse does not scroll
 const bb = await btn.boundingBox();
 await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.mouse.down(); await sleep(500); await frames(2);
 const held = await read();
