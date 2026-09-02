@@ -11,6 +11,36 @@
 import { PRINT_SPEC, getSafeRect, SUIT_GROUP } from './deck-builder.js';
 
 // ---------------------------------------------------------------------
+// Deck-wide style controls — "04 Style" panel on cards.html. Global only
+// (no per-suit variants in this pass): corner-index inset + font, and a
+// suit-glyph scale applied relative to each context's own base size.
+// ---------------------------------------------------------------------
+
+// Curated, print-safe corner-index fonts spanning the site's Fraunces
+// (serif display) / IBM Plex Mono (mono body) pairing plus a couple of
+// siblings, so the dropdown offers real variety without free-text risk.
+// `family` is the full canvas font-family value, fallback stack included.
+export const CORNER_FONT_OPTIONS = [
+  { id: 'plex-mono', label: 'IBM Plex Mono', family: '"IBM Plex Mono", "SFMono-Regular", Consolas, monospace' },
+  { id: 'plex-sans', label: 'IBM Plex Sans', family: '"IBM Plex Sans", Helvetica, Arial, sans-serif' },
+  { id: 'fraunces', label: 'Fraunces', family: '"Fraunces", "Iowan Old Style", Georgia, serif' },
+  { id: 'playfair', label: 'Playfair Display', family: '"Playfair Display", Georgia, serif' },
+  { id: 'space-mono', label: 'Space Mono', family: '"Space Mono", "SFMono-Regular", monospace' },
+];
+
+export const DEFAULT_STYLE = {
+  cornerInsetPct: 4.5, // % of the safe-rect width, from the corner
+  cornerFontId: 'plex-mono', // drives both the corner rank letter and the court-card center letter
+  glyphScale: 1, // 0.5–1.5, relative to each context's own base size
+  glyphOffsetPct: 30, // 0–100% of one glyph-height of extra travel, on top of the anti-overlap floor
+};
+
+export function getCornerFontFamily(id) {
+  const opt = CORNER_FONT_OPTIONS.find((f) => f.id === id);
+  return (opt || CORNER_FONT_OPTIONS[0]).family;
+}
+
+// ---------------------------------------------------------------------
 // Placeholder suit glyphs — simple closed vector paths, one per suit,
 // each traced in a -1..1 box centered on the origin so they scale/rotate
 // uniformly regardless of size. Stand-ins for uploaded suit art.
@@ -163,12 +193,21 @@ function suitColor(suit, palette) {
 
 // Draw the two mirrored corner indices (rank stacked over a small suit
 // glyph, top-left; the same thing rotated 180deg, bottom-right).
-function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages) {
+function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
   const color = suitColor(suit, palette);
   const fontSize = Math.round(safe.w * 0.11);
-  const glyphSize = fontSize * 0.9;
-  const pad = safe.w * 0.045;
+  const glyphSize = fontSize * 0.9 * style.glyphScale;
+  const pad = safe.w * (style.cornerInsetPct / 100);
+  const fontFamily = getCornerFontFamily(style.cornerFontId);
 
+  // Fixed floor between the letter's true bottom edge and the top of the
+  // mini glyph below it, so the two never touch regardless of font or
+  // scale — also the zero point the glyph-offset slider travels from.
+  const MIN_LETTER_GLYPH_GAP = fontSize * 0.08;
+
+  // Mirrored corner pair: top-left as drawn, bottom-right as the same
+  // glyph rotated 180deg about its own inset point — one offset, applied
+  // symmetrically, drives both instances.
   function drawOne(rotate) {
     ctx.save();
     if (rotate) {
@@ -178,11 +217,31 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages) {
       ctx.translate(safe.x + pad, safe.y + pad);
     }
     ctx.fillStyle = color;
-    ctx.font = `600 ${fontSize}px "IBM Plex Mono", monospace`;
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'hanging';
     ctx.fillText(rank, 0, 0);
-    drawSuitGlyph(ctx, suit, glyphSize / 2, fontSize * 1.12, glyphSize, color, 0, suitImages);
+
+    // Measured, not assumed: actualBoundingBoxDescent (relative to the
+    // hanging baseline set above) is the real distance down to the
+    // glyph's bottom edge for whichever font is selected, so the gap
+    // stays correct across every option in CORNER_FONT_OPTIONS instead
+    // of only the one font this used to be tuned for.
+    const metrics = ctx.measureText(rank);
+    const letterBottom = metrics.actualBoundingBoxDescent || fontSize * 0.8;
+
+    // The corner cluster (letter + mini glyph) is already offset toward
+    // the card center by `pad` via the translate above, and ctx.rotate()
+    // makes local +x/+y "toward center" for both the top-left instance
+    // and the rotated bottom-right one. Sliding the glyph further along
+    // that same (1,1) diagonal — rather than straight down — keeps it
+    // moving the direction the whole cluster already moves in.
+    const diag = Math.SQRT1_2;
+    const extraTravel = (style.glyphOffsetPct / 100) * glyphSize * diag;
+    const glyphX = glyphSize / 2 + extraTravel;
+    const glyphY = letterBottom + MIN_LETTER_GLYPH_GAP + glyphSize / 2 + extraTravel;
+
+    drawSuitGlyph(ctx, suit, glyphX, glyphY, glyphSize, color, 0, suitImages);
     ctx.restore();
   }
 
@@ -190,9 +249,9 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages) {
   drawOne(true);
 }
 
-function drawPipCard(ctx, rank, suit, palette, safe, suitImages) {
+function drawPipCard(ctx, rank, suit, palette, safe, suitImages, style) {
   const layout = PIP_LAYOUTS[rank];
-  const pipSize = safe.w * 0.16;
+  const pipSize = safe.w * 0.16 * style.glyphScale;
   const fieldTop = safe.y + safe.h * 0.16;
   const fieldH = safe.h * 0.68;
   const color = suitColor(suit, palette);
@@ -204,9 +263,9 @@ function drawPipCard(ctx, rank, suit, palette, safe, suitImages) {
   }
 }
 
-function drawAceCard(ctx, suit, palette, safe, suitImages) {
+function drawAceCard(ctx, suit, palette, safe, suitImages, style) {
   const color = suitColor(suit, palette);
-  const size = safe.w * 0.52;
+  const size = safe.w * 0.52 * style.glyphScale;
   drawSuitGlyph(ctx, suit, safe.x + safe.w / 2, safe.y + safe.h / 2, size, color, 0, suitImages);
 }
 
@@ -216,7 +275,7 @@ function drawAceCard(ctx, suit, palette, safe, suitImages) {
 // real illustration later.
 const COURT_LETTERS = { J: 'J', Q: 'Q', K: 'K' };
 
-function drawCourtCard(ctx, rank, suit, palette, safe, suitImages) {
+function drawCourtCard(ctx, rank, suit, palette, safe, suitImages, style) {
   const color = suitColor(suit, palette);
   const other = SUIT_GROUP[suit] === 'primary' ? palette.secondary : palette.primary;
   const cx = safe.x + safe.w / 2;
@@ -233,16 +292,18 @@ function drawCourtCard(ctx, rank, suit, palette, safe, suitImages) {
   ctx.strokeRect(cx - plateW / 2, cy - plateH / 2, plateW, plateH);
   ctx.restore();
 
+  // Same corner-index font drives the big center-plate letter too — one
+  // control, not two settings that could drift apart.
   const letterSize = plateH * 0.62;
   ctx.save();
   ctx.fillStyle = other;
-  ctx.font = `600 ${letterSize}px "Fraunces", serif`;
+  ctx.font = `600 ${letterSize}px ${getCornerFontFamily(style.cornerFontId)}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(COURT_LETTERS[rank], cx, cy - plateH * 0.08);
   ctx.restore();
 
-  const glyphSize = safe.w * 0.24;
+  const glyphSize = safe.w * 0.24 * style.glyphScale;
   drawSuitGlyph(ctx, suit, cx, cy + plateH / 2 + glyphSize * 0.55, glyphSize, color, 0, suitImages);
   drawSuitGlyph(ctx, suit, cx, cy - plateH / 2 - glyphSize * 0.55, glyphSize, color, 180, suitImages);
 }
@@ -253,7 +314,10 @@ function drawCourtCard(ctx, rank, suit, palette, safe, suitImages) {
 // cardSpec: { suit, rank } — see deck-builder.js buildDeckList()
 // palette: { primary: '#rrggbb', secondary: '#rrggbb' }
 // suitImages: { spades: HTMLImageElement|null, hearts: ..., ... }
-export function renderCardToCanvas(cardSpec, palette, suitImages) {
+// style: deck-wide { cornerInsetPct, cornerFontId, glyphScale, glyphOffsetPct }
+// — see DEFAULT_STYLE above. Partial objects are filled in with the defaults.
+export function renderCardToCanvas(cardSpec, palette, suitImages, style) {
+  const s = { ...DEFAULT_STYLE, ...style };
   const { suit, rank } = cardSpec;
   const canvas = document.createElement('canvas');
   canvas.width = PRINT_SPEC.PAGE_W_PX;
@@ -267,14 +331,14 @@ export function renderCardToCanvas(cardSpec, palette, suitImages) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const safe = getSafeRect();
-  drawCornerIndices(ctx, rank, suit, palette, safe, suitImages);
+  drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, s);
 
   if (rank === 'A') {
-    drawAceCard(ctx, suit, palette, safe, suitImages);
+    drawAceCard(ctx, suit, palette, safe, suitImages, s);
   } else if (rank === 'J' || rank === 'Q' || rank === 'K') {
-    drawCourtCard(ctx, rank, suit, palette, safe, suitImages);
+    drawCourtCard(ctx, rank, suit, palette, safe, suitImages, s);
   } else {
-    drawPipCard(ctx, rank, suit, palette, safe, suitImages);
+    drawPipCard(ctx, rank, suit, palette, safe, suitImages, s);
   }
 
   return canvas;

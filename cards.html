@@ -11,7 +11,11 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Fraunces + IBM Plex Mono are the site's own display/body pair, already
+     loaded above; the rest of this family only serves the corner-index
+     font dropdown in "04 Style" (cards/card-template.js CORNER_FONT_OPTIONS)
+     and is loaded the same way — no build step. -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&family=Playfair+Display:wght@600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="cards.css">
 
 <!-- PDF + ZIP export, loaded globally via CDN (no bundler on this site).
@@ -62,20 +66,57 @@
     </div>
 
     <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>03</span>Export</div>
+      <div class="cd-panel__label"><span>03</span>Style</div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleCornerInset">Corner index inset</label>
+          <output class="cd-field__value" id="styleCornerInsetValue" for="styleCornerInset">4.5%</output>
+        </div>
+        <input type="range" id="styleCornerInset" min="2" max="10" step="0.5" value="4.5">
+        <span class="cd-field__sub">Distance of the rank/suit index from the corner — mirrored on all four instances.</span>
+      </div>
+
+      <div class="cd-field">
+        <label class="cd-field__label" for="styleCornerFont">Corner index font</label>
+        <select id="styleCornerFont" class="cd-select"></select>
+        <span class="cd-field__sub">Also sets the large center letter on court cards — one font, both places.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleGlyphScale">Suit glyph scale</label>
+          <output class="cd-field__value" id="styleGlyphScaleValue" for="styleGlyphScale">100%</output>
+        </div>
+        <input type="range" id="styleGlyphScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Scales the suit glyph relative to its size in each context (pips, ace, court plate).</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleGlyphOffset">Corner glyph offset</label>
+          <output class="cd-field__value" id="styleGlyphOffsetValue" for="styleGlyphOffset">30%</output>
+        </div>
+        <input type="range" id="styleGlyphOffset" min="0" max="100" step="5" value="30">
+        <span class="cd-field__sub">Gap between the corner letter and its mini suit glyph — 0% is the tightest non-touching gap; slides the glyph toward the card's center.</span>
+      </div>
+    </div>
+
+    <div class="cd-panel__section">
+      <div class="cd-panel__label"><span>04</span>Export</div>
       <button id="btnExportPdf" class="cd-export-btn">Download PDF (52 pages)</button>
       <button id="btnExportZip" class="cd-export-btn cd-export-btn--secondary">Download PNGs (ZIP)</button>
       <div id="exportStatus" class="cd-status" role="status" aria-live="polite"></div>
     </div>
 
     <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>04</span>Print Spec</div>
+      <div class="cd-panel__label"><span>05</span>Print Spec</div>
       <div class="cd-spec" id="specText"></div>
     </div>
   </section>
 
   <section aria-labelledby="preview-heading">
-    <h2 id="preview-heading" class="cd-preview__label"><span>05</span>Preview</h2>
+    <h2 id="preview-heading" class="cd-preview__label"><span>06</span>Preview</h2>
     <div id="previewGrid" class="cd-preview-grid"></div>
   </section>
 
