@@ -59,38 +59,41 @@ function getStyle() {
   return {
     cornerInsetPct: parseFloat(document.getElementById('styleCornerInset').value),
     cornerFontId: selectedFontId,
-    glyphScale: parseFloat(document.getElementById('styleGlyphScale').value) / 100,
+    glyphScale: pct('styleGlyphScale'),
     glyphOffsetPct: parseFloat(document.getElementById('styleGlyphOffset').value),
+    cornerFontScale: pct('styleCornerFontScale'),
+    courtPlateScale: pct('styleCourtPlateScale'),
+    courtLetterScale: pct('styleCourtLetterScale'),
   };
 }
 
+function pct(id) {
+  return parseFloat(document.getElementById(id).value) / 100;
+}
+
 function buildStyleControls() {
-  const inset = document.getElementById('styleCornerInset');
-  const insetValue = document.getElementById('styleCornerInsetValue');
-  inset.value = DEFAULT_STYLE.cornerInsetPct;
-  insetValue.textContent = `${DEFAULT_STYLE.cornerInsetPct}%`;
-  inset.addEventListener('input', () => {
-    insetValue.textContent = `${inset.value}%`;
-    requestPreview();
-  });
+  // [element id, initial value]. All six read as a percentage and all six read
+  // back through getStyle(), so each reaches the preview AND both export paths
+  // — there is no separate export-side style object to keep in step.
+  const SLIDERS = [
+    ['styleCornerInset', DEFAULT_STYLE.cornerInsetPct],
+    ['styleGlyphScale', Math.round(DEFAULT_STYLE.glyphScale * 100)],
+    ['styleGlyphOffset', DEFAULT_STYLE.glyphOffsetPct],
+    ['styleCornerFontScale', Math.round(DEFAULT_STYLE.cornerFontScale * 100)],
+    ['styleCourtPlateScale', Math.round(DEFAULT_STYLE.courtPlateScale * 100)],
+    ['styleCourtLetterScale', Math.round(DEFAULT_STYLE.courtLetterScale * 100)],
+  ];
 
-  const scale = document.getElementById('styleGlyphScale');
-  const scaleValue = document.getElementById('styleGlyphScaleValue');
-  scale.value = Math.round(DEFAULT_STYLE.glyphScale * 100);
-  scaleValue.textContent = `${scale.value}%`;
-  scale.addEventListener('input', () => {
-    scaleValue.textContent = `${scale.value}%`;
-    requestPreview();
-  });
-
-  const offset = document.getElementById('styleGlyphOffset');
-  const offsetValue = document.getElementById('styleGlyphOffsetValue');
-  offset.value = DEFAULT_STYLE.glyphOffsetPct;
-  offsetValue.textContent = `${offset.value}%`;
-  offset.addEventListener('input', () => {
-    offsetValue.textContent = `${offset.value}%`;
-    requestPreview();
-  });
+  for (const [id, initial] of SLIDERS) {
+    const input = document.getElementById(id);
+    const output = document.getElementById(`${id}Value`);
+    input.value = initial;
+    output.textContent = `${input.value}%`;
+    input.addEventListener('input', () => {
+      output.textContent = `${input.value}%`;
+      requestPreview();
+    });
+  }
 }
 
 // ---------------------------------------------------------------------

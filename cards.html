@@ -44,13 +44,13 @@
   <section class="cd-panel" aria-labelledby="controls-heading">
     <h2 id="controls-heading" class="sr-only" hidden>Deck controls</h2>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>01</span>Suit Glyphs</div>
+    <details class="cd-panel__section" id="section-01" open>
+      <summary class="cd-panel__label"><span>01</span>Suit Glyphs</summary>
       <div id="suitRows"></div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>02</span>Palette</div>
+    <details class="cd-panel__section" id="section-02" open>
+      <summary class="cd-panel__label"><span>02</span>Palette</summary>
       <div class="cd-color-row">
         <input type="color" id="colorPrimary" value="#1c6b6b">
         <div>
@@ -65,10 +65,10 @@
           <span class="cd-color-row__sub">Hearts &amp; Diamonds</span>
         </div>
       </div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>03</span>Style</div>
+    <details class="cd-panel__section" id="section-03">
+      <summary class="cd-panel__label"><span>03</span>Style</summary>
 
       <div class="cd-field">
         <div class="cd-field__row">
@@ -109,6 +109,33 @@
 
       <div class="cd-field">
         <div class="cd-field__row">
+          <label class="cd-field__label" for="styleCornerFontScale">Corner letter scale</label>
+          <output class="cd-field__value" id="styleCornerFontScaleValue" for="styleCornerFontScale">100%</output>
+        </div>
+        <input type="range" id="styleCornerFontScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the corner rank letter only. Its mini suit glyph keeps its own size, and the two are held apart at every setting.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleCourtPlateScale">Court plate scale</label>
+          <output class="cd-field__value" id="styleCourtPlateScaleValue" for="styleCourtPlateScale">100%</output>
+        </div>
+        <input type="range" id="styleCourtPlateScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the bordered box on J/Q/K. The letter inside it does not move with it.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleCourtLetterScale">Court letter scale</label>
+          <output class="cd-field__value" id="styleCourtLetterScaleValue" for="styleCourtLetterScale">100%</output>
+        </div>
+        <input type="range" id="styleCourtLetterScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the J/Q/K inside the plate. Stays centred on the letter's own ink at every size and in every font.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
           <label class="cd-field__label" for="styleGlyphScale">Suit glyph scale</label>
           <output class="cd-field__value" id="styleGlyphScaleValue" for="styleGlyphScale">100%</output>
         </div>
@@ -124,19 +151,19 @@
         <input type="range" id="styleGlyphOffset" min="0" max="100" step="5" value="30">
         <span class="cd-field__sub">Gap between the corner letter and its mini suit glyph — 0% is the tightest non-touching gap; slides the glyph toward the card's center.</span>
       </div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>04</span>Export</div>
+    <details class="cd-panel__section" id="section-04" open>
+      <summary class="cd-panel__label"><span>04</span>Export</summary>
       <button id="btnExportPdf" class="cd-export-btn">Download PDF (52 pages)</button>
       <button id="btnExportZip" class="cd-export-btn cd-export-btn--secondary">Download PNGs (ZIP)</button>
       <div id="exportStatus" class="cd-status" role="status" aria-live="polite"></div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>05</span>Print Spec</div>
+    <details class="cd-panel__section" id="section-05">
+      <summary class="cd-panel__label"><span>05</span>Print Spec</summary>
       <div class="cd-spec" id="specText"></div>
-    </div>
+    </details>
   </section>
 
   <section aria-labelledby="preview-heading">

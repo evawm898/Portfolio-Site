@@ -394,7 +394,42 @@ it. Any NEW render path inherits the same obligation.
   court-card centre letter share one control. They also share one function —
   `cardFont()` in `cards/card-template.js` is the only place a card's text font
   becomes a `ctx.font` string.
-- **Verify with `node tools/verify-cards-fonts.mjs`** (51 checks;
+- **The court letter is centred on its INK, never on the em box.**
+  `textBaseline: 'middle'` centres a font's design metrics, not its glyph, and
+  the offset between the two is a per-face property with no bound once any
+  Google family is selectable. Measured on the shipped card: em-box centring
+  put "K" **47.8 px** off centre in IBM Plex Mono, **52.5 px** in Bungee and
+  **91.5 px** in Great Vibes — the mono figure being the one the old fixed
+  −8%-of-plate-height fudge had been tuned against, so it was visibly wrong even
+  before the catalog existed. `fillTextInkCentered()` measures
+  `actualBoundingBox{Left,Right,Ascent,Descent}` per draw and centres the real
+  bounding box; every face then lands within 5 px, most within 1.
+- **The three scale sliders are INDEPENDENT, and that has a consequence.**
+  `cornerFontScale`, `courtPlateScale` and `courtLetterScale` each multiply a
+  base derived from the safe rect (the `BASE` table in `card-template.js`),
+  never another control's output — so a big plate around a small letter is
+  reachable, and so is a letter LARGER than its plate (Great Vibes "Q" at 150%
+  measures 297x424 in a 395x394 plate). That overflow is allowed on purpose:
+  clamping the letter to fit would make it depend on the plate, which is the one
+  thing these sliders are specified not to do. Two corollaries that are easy to
+  get backwards: the corner mini glyph is sized from the UNSCALED corner font so
+  `cornerFontScale` is not a second suit-glyph scale, and the court suit glyphs
+  are clamped to the safe rect so a 150% plate cannot push them off the card.
+- **Measuring the court letter by cropping to the plate is WRONG and passes.**
+  A letter bigger than the plate is clipped symmetrically by that crop and reads
+  as perfectly centred wherever it actually sits — measured: a plate-scale-50%
+  row scored (−0.5, −0.5) while its ink overflowed the crop on all four sides.
+  `letterInkBox()` in the gate isolates the letter by COLOUR instead (the plate
+  stroke and letter are the "other" palette colour, the court suit glyphs and
+  corner indices are the suit's own), then drops the band along the plate
+  stroke. That is the only instrument that sees the whole letter.
+- **Panel sections are native `<details>`** — `01`/`02`/`04` open by default,
+  `03 Style` (the long one) and `05 Print Spec` closed. No JS owns the state,
+  and a collapsed section genuinely hides its rows, so the font picker's
+  IntersectionObserver fetches nothing for a section nobody opened. The gate
+  drives a slider while its section is COLLAPSED and asserts the preview still
+  rebuilds — the failure the bloom panel already shipped once.
+- **Verify with `node tools/verify-cards-fonts.mjs`** (103 checks;
   `--negative-control` required before quoting a pass from a changed harness;
   `--shots <dir>` writes a contact sheet). It refuses to accept the preview
   canvas as evidence: every claim is measured against the BYTES OF AN EXPORTED

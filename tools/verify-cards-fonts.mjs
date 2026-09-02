@@ -110,6 +110,18 @@ const GOOGLE_TEST_ID = 'g:' + GOOGLE_TEST_FAMILY;
 const RACE_FAMILY = 'Rye';
 const RACE_ID = 'g:' + RACE_FAMILY;
 
+// The three faces the court-letter centring is measured on, chosen because
+// their vertical ink sits in three different places relative to the em box:
+// a script face hangs far below the baseline and reaches far above it, a heavy
+// display face is nearly all cap-height with no descender, and a monospace
+// face is the one the old fixed fudge factor happened to be tuned for.
+const CENTERING_FONTS = [
+  { id: 'g:Great Vibes', label: 'Great Vibes (script)' },
+  { id: 'g:Bungee', label: 'Bungee (heavy display)' },
+  { id: 'plex-mono', label: 'IBM Plex Mono (monospace)' },
+];
+const SCRIPT_FAMILY = 'Great Vibes';
+
 const CUSTOM_WOFF2 = path.join(FONT_FIX, 'bungee-latin.woff2');
 const CUSTOM_TTF = path.join(FONT_FIX, 'Silkscreen-Regular.ttf');
 
@@ -144,7 +156,8 @@ for (const [url, file] of Object.entries(CDN_LOCAL)) {
 // evaluating, so window.__harnessReady below is the only honest signal.
 const HARNESS_JS = `
 import { resolveFont, ensureFontLoaded } from '/cards/font-manager.js';
-import { renderCardToCanvas } from '/cards/card-template.js';
+import { renderCardToCanvas, getCourtPlateRect, DEFAULT_STYLE } from '/cards/card-template.js';
+import { getSafeRect } from '/cards/deck-builder.js';
 
 // Render one card and hand back its raw RGBA. \`awaitFont\` is the parameter
 // under test: false is the mutation the negative control uses.
@@ -196,6 +209,46 @@ window.__fontState = async (fontId) => {
 
 // Reads a canvas straight out of the on-page preview grid, so the preview
 // itself can be measured — not a re-render that does its own awaiting.
+// Render any card at any style and hand back its pixels PLUS the plate rect
+// the drawing code computed — so a centring claim is checked against the same
+// numbers that drew it, not against a re-derivation that agrees with itself.
+window.__renderStyledRGBA = async (spec, styleOverrides, { awaitFont = true } = {}) => {
+  const style = { ...DEFAULT_STYLE, ...window.__cards.getStyle(), ...styleOverrides };
+  if (awaitFont) await ensureFontLoaded(style.cornerFontId);
+  const canvas = renderCardToCanvas(spec, { primary: '#1c6b6b', secondary: '#b23b3b' }, {}, style);
+  const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+  return {
+    width: canvas.width,
+    height: canvas.height,
+    data: Array.from(d.data),
+    plate: getCourtPlateRect(getSafeRect(), style),
+    safe: getSafeRect(),
+  };
+};
+
+// The centring method this change REPLACED: em-box centring plus the fixed
+// -8%-of-plate-height fudge that was tuned against IBM Plex Mono. Drawn here
+// so the new checks can be shown to separate the two, rather than asserted to.
+window.__renderLegacyCenteredRGBA = async (rank, fontId, styleOverrides) => {
+  const style = { ...DEFAULT_STYLE, ...window.__cards.getStyle(), cornerFontId: fontId, ...styleOverrides };
+  await ensureFontLoaded(style.cornerFontId);
+  const safe = getSafeRect();
+  const plate = getCourtPlateRect(safe, style);
+  const spec = resolveFont(style.cornerFontId);
+  const canvas = document.createElement('canvas');
+  canvas.width = 825; canvas.height = 1125;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const letterSize = Math.round(safe.h * 0.42 * 0.62 * style.courtLetterScale);
+  ctx.fillStyle = '#b23b3b';
+  ctx.font = spec.weight + ' ' + letterSize + 'px ' + spec.family;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(rank, plate.cx, plate.cy - plate.h * 0.08);
+  const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return { width: canvas.width, height: canvas.height, data: Array.from(d.data), plate, safe };
+};
+
 window.__previewRGBA = (index) => {
   const c = document.querySelectorAll('#previewGrid canvas')[index];
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height);
@@ -315,6 +368,51 @@ function sigDistance(a, b) {
   return countDiff + (colTotal ? colDiff / colTotal : 0) + boxDiff;
 }
 
+// Ink bounding box inside an arbitrary sub-rect, in page pixels. Returns null
+// when the rect holds no ink at all.
+function inkBoxIn(rgba, width, x0, y0, x1, y1) {
+  let minX = 1e9, maxX = -1, minY = 1e9, maxY = -1, count = 0;
+  for (let y = Math.max(0, Math.floor(y0)); y < Math.ceil(y1); y++) {
+    for (let x = Math.max(0, Math.floor(x0)); x < Math.ceil(x1); x++) {
+      const i = (y * width + x) * 4;
+      const luma = (rgba[i] * 299 + rgba[i + 1] * 587 + rgba[i + 2] * 114) / 1000;
+      if (luma < 200) {
+        count++;
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (count === 0) return null;
+  return { minX, maxX, minY, maxY, count, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
+
+// Rows of ink in a sub-rect, grouped into vertically separated bands, with the
+// blank gap between consecutive bands. Two objects that never touch are two
+// bands; the moment they meet they become one.
+function inkBands(rgba, width, x0, y0, x1, y1) {
+  const rows = [];
+  for (let y = Math.floor(y0); y < Math.ceil(y1); y++) {
+    let has = false;
+    for (let x = Math.max(0, Math.floor(x0)); x < Math.ceil(x1) && !has; x++) {
+      const i = (y * width + x) * 4;
+      const luma = (rgba[i] * 299 + rgba[i + 1] * 587 + rgba[i + 2] * 114) / 1000;
+      if (luma < 200) has = true;
+    }
+    rows.push(has);
+  }
+  const bands = [];
+  let start = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i] && start < 0) start = i;
+    if (!rows[i] && start >= 0) { bands.push([start + Math.floor(y0), i - 1 + Math.floor(y0)]); start = -1; }
+  }
+  if (start >= 0) bands.push([start + Math.floor(y0), rows.length - 1 + Math.floor(y0)]);
+  const gaps = [];
+  for (let i = 1; i < bands.length; i++) gaps.push(bands[i][0] - bands[i - 1][1] - 1);
+  return { bands, gaps };
+}
+
 // Two renders of the same typeface must land here; two different typefaces
 // must not. Calibrated against the identical-render case, which measures 0.
 const SAME = 0.02;
@@ -324,6 +422,7 @@ const DIFFERENT = 0.15;
 await warmGoogleCache([
   { family: GOOGLE_TEST_FAMILY, weight: 400 },
   { family: RACE_FAMILY, weight: 400 },
+  { family: SCRIPT_FAMILY, weight: 400 },
 ]).catch((err) => {
   googleFontsReachable = false;
   console.error(`\n!! Could not reach fonts.googleapis.com: ${err.message}`);
@@ -431,17 +530,72 @@ check(sigDistance(defaultSig, defaultSig2) < SAME,
   `the same font rendered twice is identical (${sigDistance(defaultSig, defaultSig2).toFixed(4)} < ${SAME}) — the noise floor is zero`);
 
 // ---------------------------------------------------------------------
-section('2. Custom uploads — .woff2 and .ttf through the real file input');
+section('2. Disclosure — the panel collapses without disconnecting anything');
+// ---------------------------------------------------------------------
+// Native <details>, so the open/closed state is the browser's, not a flag this
+// page has to keep in step. The failure worth guarding against is the one the
+// bloom panel already shipped once (CLAUDE.md): a control that is present and
+// declared but no longer drives a rebuild once its section is folded away.
+const sections = await page.$$eval('details.cd-panel__section', (els) =>
+  els.map((e) => ({ id: e.id, open: e.open, summary: e.querySelector('summary').textContent.trim() })));
+check(sections.length === 5, `all 5 numbered sections are <details> (${sections.map((x) => x.id).join(', ')})`);
+check(sections.every((x) => /^\d\d/.test(x.summary)),
+  `every summary keeps its numbered label (${sections.map((x) => x.summary).join(' | ')})`);
+const openIds = sections.filter((x) => x.open).map((x) => x.id).join(',');
+check(openIds === 'section-01,section-02,section-04',
+  `default-open set is the short setup sections plus Export — got "${openIds}"`);
+
+// The long one starts closed; a slider inside it must still work while it is.
+const styleClosed = await page.$eval('#section-03', (e) => !e.open);
+check(styleClosed, '03 Style — the section that made the panel scroll — starts collapsed');
+
+async function driveSlider(id, value) {
+  return page.evaluate(([elId, v]) => {
+    const el = document.getElementById(elId);
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return { value: el.value, readback: document.getElementById(elId + 'Value').textContent };
+  }, [id, value]);
+}
+
+{
+  const before = await page.evaluate(() => window.__previewRGBA(1));
+  const beforeSig = inkSignature(Buffer.from(before.data), before.width, before.height);
+  const drive = await driveSlider('styleCornerFontScale', 150);
+  check(drive.value === '150' && drive.readback === '150%',
+    `a slider inside the COLLAPSED section still reads and writes (value ${drive.value}, label "${drive.readback}")`);
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(() => window.__previewRGBA(1));
+  const afterSig = inkSignature(Buffer.from(after.data), after.width, after.height);
+  check(sigDistance(beforeSig, afterSig) > DIFFERENT,
+    `...and still rebuilds the preview from inside a collapsed section (${sigDistance(beforeSig, afterSig).toFixed(3)} > ${DIFFERENT})`);
+  await driveSlider('styleCornerFontScale', 100);
+  await page.waitForTimeout(300);
+}
+
+// Opening a section is the browser's job; assert it actually opens, since the
+// summary is restyled (list-style:none + a ::after marker) and a mis-styled
+// summary that swallows its own click is a real failure mode.
+await page.click('#section-03 > summary');
+await page.waitForTimeout(200);
+check(await page.$eval('#section-03', (e) => e.open), 'clicking the 03 Style summary opens it');
+check(await page.$eval('#fontList', (e) => e.getBoundingClientRect().height > 0),
+  'the font list has layout once the section is open');
+
+// ---------------------------------------------------------------------
+section('3. Custom uploads — .woff2 and .ttf through the real file input');
 // ---------------------------------------------------------------------
 const customSigs = {};
 for (const [label, file] of [['woff2', CUSTOM_WOFF2], ['ttf', CUSTOM_TTF]]) {
   await page.setInputFiles('#fontUpload', file);
-  await page.waitForFunction(
-    (name) => document.getElementById('fontStatus').textContent.includes(name),
-    path.basename(file).replace(/\.(ttf|otf|woff2?)$/i, ''),
-    { timeout: 20000 },
-  );
+  // settled(), not "the status mentions the filename": the page sets
+  // "Reading <name>…" before it registers anything, so matching the name
+  // resolves while selectFont() is still in flight and the gate then reads the
+  // OLD selected font. That is a race in the harness, and it did fire.
+  await settled(20000);
   const status = await page.textContent('#fontStatus');
+  check(status.includes(path.basename(file).replace(/\.(ttf|otf|woff2?)$/i, '')),
+    `${label}: the status names the uploaded file — "${status.trim()}"`);
   check(!status.includes('could not') && !status.includes('Could not'), `${label}: upload reported ready — "${status.trim()}"`);
 
   const id = await page.evaluate(() => window.__cards.getStyle().cornerFontId);
@@ -463,7 +617,7 @@ check(sigDistance(customSigs.woff2.sig, customSigs.ttf.sig) > DIFFERENT,
   `the two uploads render as different typefaces from each other (${sigDistance(customSigs.woff2.sig, customSigs.ttf.sig).toFixed(3)})`);
 
 // ---------------------------------------------------------------------
-section('3. Google Fonts — search, filter, and a family loaded on selection');
+section('4. Google Fonts — search, filter, and a family loaded on selection');
 // ---------------------------------------------------------------------
 let googleSig = null;
 const catalogSize = await page.evaluate(() => document.getElementById('fontCount').textContent);
@@ -517,7 +671,7 @@ if (googleFontsReachable) {
 }
 
 // ---------------------------------------------------------------------
-section('4. THE RACE — pick a cold font and export 52 cards in the same tick');
+section('5. THE RACE — pick a cold font and export 52 cards in the same tick');
 // ---------------------------------------------------------------------
 // This is the check the whole gate is built around. No await between
 // selecting the font and starting the export: whatever protection exists has
@@ -561,7 +715,209 @@ if (googleFontsReachable) {
 }
 
 // ---------------------------------------------------------------------
-section('5. Exported PDF — inspect the file, not the preview');
+section('6. Court letter centring — measured on the letter\'s own ink');
+// ---------------------------------------------------------------------
+// textBaseline 'middle' centres the font's EM BOX, which is a design metric,
+// not a property of the glyph. With five curated faces that drift was a fixed
+// fudge factor; with the whole catalog selectable it is unbounded. So the
+// claim under test is specific: the letter's INK bounding box is centred on
+// the plate rect, in both axes, for faces whose ink sits in very different
+// places relative to their em box.
+
+async function renderStyled(spec, overrides) {
+  const r = await page.evaluate(([sp, ov]) => window.__renderStyledRGBA(sp, ov), [spec, overrides || {}]);
+  return { ...r, buf: Buffer.from(r.data) };
+}
+
+// Centring, measured — and measured on the WHOLE letter, including the parts
+// that stick out of the plate.
+//
+// Cropping to the plate interior is the obvious instrument and it is wrong: a
+// letter larger than the plate gets clipped symmetrically by the crop and then
+// reads as perfectly centred wherever it actually sits. That is not
+// hypothetical — Great Vibes' "K" at the default letter size overflows the
+// plate, and the first version of this section scored it 5px off while its ink
+// touched the crop on two sides.
+//
+// So the letter is isolated by COLOUR instead. drawCourtCard paints the plate
+// stroke and the letter in the "other" palette colour and the two court suit
+// glyphs in the suit's own colour, and the corner indices are the suit's own
+// colour too — so keeping only pixels nearest to `other`, then dropping the
+// band along the plate's stroke, leaves the letter and nothing else, anywhere
+// on the card.
+const PALETTE_RGB = { primary: [0x1c, 0x6b, 0x6b], secondary: [0xb2, 0x3b, 0x3b] };
+const PRIMARY_SUITS = new Set(['spades', 'clubs']);
+
+function dist2(rgba, i, [r, g, b]) {
+  const dr = rgba[i] - r, dg = rgba[i + 1] - g, db = rgba[i + 2] - b;
+  return dr * dr + dg * dg + db * db;
+}
+
+function letterInkBox(r, suit) {
+  const other = PRIMARY_SUITS.has(suit) ? PALETTE_RGB.secondary : PALETTE_RGB.primary;
+  const own = PRIMARY_SUITS.has(suit) ? PALETTE_RGB.primary : PALETTE_RGB.secondary;
+  const white = [255, 255, 255];
+  const lw = Math.max(2, r.safe.w * 0.012);
+  const band = lw + 3;
+  const px = r.plate.cx - r.plate.w / 2, py = r.plate.cy - r.plate.h / 2;
+  const qx = r.plate.cx + r.plate.w / 2, qy = r.plate.cy + r.plate.h / 2;
+  const onRing = (x, y) => (
+    x >= px - band && x <= qx + band && y >= py - band && y <= qy + band
+    && !(x >= px + band && x <= qx - band && y >= py + band && y <= qy - band)
+  );
+
+  const buf = r.buf || r.data;
+  let minX = 1e9, maxX = -1, minY = 1e9, maxY = -1, count = 0;
+  for (let y = 0; y < r.height; y++) {
+    for (let x = 0; x < r.width; x++) {
+      if (onRing(x, y)) continue;
+      const i = (y * r.width + x) * 4;
+      const dOther = dist2(buf, i, other);
+      if (dOther >= dist2(buf, i, own) || dOther >= dist2(buf, i, white)) continue;
+      count++;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+  }
+  if (!count) return null;
+  return { minX, maxX, minY, maxY, count, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
+
+function checkCentered(r, suit, label) {
+  const box = letterInkBox(r, suit);
+  if (!box) { check(false, `${label}: NO letter ink found`); return null; }
+  const dx = box.cx - r.plate.cx;
+  const dy = box.cy - r.plate.cy;
+  const overflows = (box.maxX - box.minX) > r.plate.w || (box.maxY - box.minY) > r.plate.h;
+  check(Math.abs(dx) <= CENTER_TOL && Math.abs(dy) <= CENTER_TOL,
+    `${label}: ink centre is ${dx.toFixed(1)}, ${dy.toFixed(1)} px from the plate centre (tol ${CENTER_TOL})`
+    + (overflows ? ` [letter ${box.maxX - box.minX}x${box.maxY - box.minY} is LARGER than the ${r.plate.w.toFixed(0)}x${r.plate.h.toFixed(0)} plate]` : ''));
+  return box;
+}
+
+// 6px on an 825px-wide card is 0.7% of the width — tight enough that the old
+// method fails it on every face tested, loose enough to absorb the half-pixel
+// the luma<200 threshold costs at a glyph's antialiased edge.
+const CENTER_TOL = 6;
+
+if (googleFontsReachable) {
+  for (const font of CENTERING_FONTS) {
+    for (const rank of ['J', 'Q', 'K']) {
+      const r = await renderStyled({ suit: 'spades', rank }, { cornerFontId: font.id });
+      checkCentered(r, 'spades', `${font.label} "${rank}"`);
+    }
+  }
+
+  // Same claim at both ends of the court-letter slider — a centring that only
+  // holds at 100% is a coincidence, not a method.
+  for (const scale of [0.5, 1.5]) {
+    const r = await renderStyled({ suit: 'hearts', rank: 'Q' },
+      { cornerFontId: 'g:Great Vibes', courtLetterScale: scale });
+    checkCentered(r, 'hearts', `Great Vibes "Q" at letter scale ${scale * 100}%`);
+  }
+
+  // And with the plate resized under it — the two sliders are independent, so
+  // the letter must stay centred in whatever box it is given, including one
+  // smaller than itself.
+  for (const scale of [0.5, 1.5]) {
+    const r = await renderStyled({ suit: 'clubs', rank: 'K' },
+      { cornerFontId: 'g:Bungee', courtPlateScale: scale });
+    checkCentered(r, 'clubs', `Bungee "K" at plate scale ${scale * 100}%`);
+  }
+
+  // NEGATIVE CONTROL for the whole section. The method this replaced, drawn
+  // side by side: if it also landed inside CENTER_TOL, every check above would
+  // be measuring nothing.
+  let legacyWorst = 0;
+  for (const font of CENTERING_FONTS) {
+    const r = await page.evaluate(([rank, id]) => window.__renderLegacyCenteredRGBA(rank, id, {}), ['K', font.id]);
+    r.buf = Buffer.from(r.data);
+    const box = letterInkBox(r, 'spades');
+    const off = box ? Math.hypot(box.cx - r.plate.cx, box.cy - r.plate.cy) : NaN;
+    legacyWorst = Math.max(legacyWorst, off || 0);
+    check(box && off > CENTER_TOL,
+      `LEGACY em-box centring puts ${font.label} "K" ${off.toFixed(1)} px off centre (> ${CENTER_TOL}) — the check above has teeth`);
+  }
+  check(legacyWorst > 20, `worst legacy offset was ${legacyWorst.toFixed(1)} px — visible, not a rounding artefact`);
+} else {
+  console.log('  skip the centring checks (they need two Google faces)');
+}
+
+// ---------------------------------------------------------------------
+section('7. Corner letter scale — the anti-overlap floor holds and grows');
+// ---------------------------------------------------------------------
+// The corner cluster is a rank letter with a mini suit glyph below it. They are
+// the same colour, so "they never touch" is measurable as "the corner region
+// holds exactly two vertically separated ink bands". Rank A with the built-in
+// spade path is used because both objects are single connected shapes: one
+// band would mean they had merged.
+//
+// The crop is the top-left corner only, above the ace glyph and left of it, so
+// nothing else in the card can add a band.
+const CORNER_CROP = (r) => [0, 0.02 * r.height, 0.5 * r.width, 0.32 * r.height];
+
+for (const offset of [0, 100]) {
+  const gapsByScale = [];
+  for (const scale of [0.5, 1, 1.5]) {
+    const r = await renderStyled({ suit: 'spades', rank: 'A' }, { cornerFontScale: scale, glyphOffsetPct: offset, glyphScale: 1 });
+    const { bands, gaps } = inkBands(r.buf, r.width, ...CORNER_CROP(r));
+    check(bands.length === 2,
+      `corner scale ${scale * 100}%, offset ${offset}%: exactly 2 ink bands (letter, glyph) — got ${bands.length}`);
+    const gap = gaps[0];
+    check(gap >= 1, `corner scale ${scale * 100}%, offset ${offset}%: ${gap}px of clear space between them`);
+    gapsByScale.push(gap);
+  }
+  check(gapsByScale[0] < gapsByScale[1] && gapsByScale[1] < gapsByScale[2],
+    `offset ${offset}%: the floor GROWS with the letter (${gapsByScale.join(' < ')} px) rather than staying a fixed gap under a doubled letter`);
+}
+
+// The mini glyph must NOT be dragged along by the corner-font slider — the
+// panel already has a suit-glyph scale, and two controls doing one job is how
+// they end up disagreeing.
+{
+  const small = await renderStyled({ suit: 'spades', rank: 'A' }, { cornerFontScale: 0.5, glyphOffsetPct: 0 });
+  const large = await renderStyled({ suit: 'spades', rank: 'A' }, { cornerFontScale: 1.5, glyphOffsetPct: 0 });
+  const gs = inkBands(small.buf, small.width, ...CORNER_CROP(small)).bands[1];
+  const gl = inkBands(large.buf, large.width, ...CORNER_CROP(large)).bands[1];
+  const hs = gs[1] - gs[0];
+  const hl = gl[1] - gl[0];
+  check(Math.abs(hs - hl) <= 2,
+    `the mini suit glyph is ${hs}px tall at corner scale 50% and ${hl}px at 150% — unchanged, as the separate suit-glyph slider requires`);
+}
+
+// ---------------------------------------------------------------------
+section('8. Court plate scale — the box moves, the letter does not');
+// ---------------------------------------------------------------------
+{
+  // courtLetterScale 0.5 so the letter comfortably fits the 60% plate: at the
+  // default size it clears that crop by 3px, and a comparison that depends on
+  // 3px is a comparison waiting to become a clipping artefact.
+  const small = await renderStyled({ suit: 'spades', rank: 'K' }, { courtPlateScale: 0.6 });
+  const large = await renderStyled({ suit: 'spades', rank: 'K' }, { courtPlateScale: 1.4 });
+  check(large.plate.w > small.plate.w * 2 - 1 && large.plate.h > small.plate.h * 2 - 1,
+    `plate is ${small.plate.w.toFixed(0)}x${small.plate.h.toFixed(0)} at 60% and ${large.plate.w.toFixed(0)}x${large.plate.h.toFixed(0)} at 140%`);
+
+  // The letter's ink height must not follow the plate.
+  const bs = letterInkBox(small, 'spades');
+  const bl = letterInkBox(large, 'spades');
+  const hs = bs ? bs.maxY - bs.minY : -1;
+  const hl = bl ? bl.maxY - bl.minY : -2;
+  check(Math.abs(hs - hl) <= 2,
+    `the letter is ${hs}px tall inside a 60% plate and ${hl}px inside a 140% one — independent, as asked`);
+}
+
+// The court suit glyphs sit outside the plate, so a large plate pushes them
+// out; they are clamped to the safe rect because art outside it is what a
+// cutter misregistration eats (PRINT_SPEC.SAFE_MARGIN_IN).
+{
+  const r = await renderStyled({ suit: 'spades', rank: 'J' }, { courtPlateScale: 1.5, glyphScale: 1.5 });
+  const box = inkBoxIn(r.buf, r.width, 0, 0, r.width, r.height);
+  check(box && box.minY >= r.safe.y - 1 && box.maxY <= r.safe.y + r.safe.h + 1,
+    `at plate 150% x glyph 150% all ink stays inside the safe rect (ink y ${box.minY}..${box.maxY}, safe ${r.safe.y}..${(r.safe.y + r.safe.h).toFixed(0)})`);
+}
+
+// ---------------------------------------------------------------------
+section('9. Exported PDF — inspect the file, not the preview');
 // ---------------------------------------------------------------------
 async function exportAndCapture(buttonId) {
   const [download] = await Promise.all([
@@ -576,12 +932,37 @@ async function exportAndCapture(buttonId) {
   return buf;
 }
 
-// Export under the font the race just selected, so the file under inspection
-// is the one produced by the least-safe path in the app.
+// Export under the font the race just selected AND with all three scale
+// sliders off their defaults, so the file under inspection is produced by the
+// least-safe path in the app carrying settings that only exist in the DOM.
+// Threading a control to the preview and forgetting the export is the whole
+// reason this is checked against the file rather than the canvas.
+const EXPORT_STYLE = { cornerFontScale: 1.3, courtPlateScale: 1.3, courtLetterScale: 0.7 };
 const pdfFontId = googleFontsReachable ? RACE_ID : customSigs.woff2.id;
-const pdfExpectSig = googleFontsReachable ? raceSig : customSigs.woff2.sig;
 await page.evaluate((id) => window.__cards.selectFont(id), pdfFontId);
 await settled();
+for (const [id, v] of [['styleCornerFontScale', 130], ['styleCourtPlateScale', 130], ['styleCourtLetterScale', 70]]) {
+  await driveSlider(id, v);
+}
+await page.waitForTimeout(500);
+const liveStyle = await page.evaluate(() => window.__cards.getStyle());
+check(liveStyle.cornerFontScale === 1.3 && liveStyle.courtPlateScale === 1.3 && liveStyle.courtLetterScale === 0.7,
+  `getStyle() carries the three sliders (${JSON.stringify({ c: liveStyle.cornerFontScale, p: liveStyle.courtPlateScale, l: liveStyle.courtLetterScale })})`);
+
+// The two expectations the exported file is measured against: the same card
+// rendered in-page WITH these slider values, and rendered at the defaults.
+// Matching the first and differing from the second is what "the sliders reached
+// the export" means; either alone would pass on a preview-only wiring.
+const styledRef = await renderStyled({ suit: 'spades', rank: 'K' }, { cornerFontId: pdfFontId, ...EXPORT_STYLE });
+const defaultRef = await renderStyled({ suit: 'spades', rank: 'K' }, {
+  cornerFontId: pdfFontId, cornerFontScale: 1, courtPlateScale: 1, courtLetterScale: 1,
+});
+const styledCornerSig = inkSignature(styledRef.buf, styledRef.width, styledRef.height);
+const defaultCornerSig = inkSignature(defaultRef.buf, defaultRef.width, defaultRef.height);
+const styledPlateBox = letterInkBox(styledRef, 'spades');
+const defaultPlateBox = letterInkBox(defaultRef, 'spades');
+check(sigDistance(styledCornerSig, defaultCornerSig) > DIFFERENT,
+  `the slider values change the card at all (corner ${sigDistance(styledCornerSig, defaultCornerSig).toFixed(3)} > ${DIFFERENT}) — otherwise the export check below proves nothing`);
 
 const pdfBuf = await exportAndCapture('btnExportPdf');
 check(pdfBuf.subarray(0, 5).toString() === '%PDF-', `the PDF export downloaded a real PDF (${(pdfBuf.length / 1024 / 1024).toFixed(1)} MB)`);
@@ -600,19 +981,35 @@ if (pdfCard) {
   const pdfSig = inkSignature(pdfCard.rgba, pdfCard.width, pdfCard.height);
   check(sigDistance(pdfSig, fallbackSig) > DIFFERENT,
     `PDF card 13 is NOT set in a fallback face (${sigDistance(pdfSig, fallbackSig).toFixed(3)} > ${DIFFERENT})`);
-  check(sigDistance(pdfSig, defaultSig) > DIFFERENT,
-    `PDF card 13 is NOT the default face (${sigDistance(pdfSig, defaultSig).toFixed(3)} > ${DIFFERENT})`);
-  check(sigDistance(pdfSig, pdfExpectSig) < SAME,
-    `PDF card 13 matches the verified in-page render of the same card (${sigDistance(pdfSig, pdfExpectSig).toFixed(4)} < ${SAME})`);
+  check(sigDistance(pdfSig, defaultCornerSig) > DIFFERENT,
+    `PDF card 13 does NOT carry the DEFAULT corner scale (${sigDistance(pdfSig, defaultCornerSig).toFixed(3)} > ${DIFFERENT}) — the slider reached the file`);
+  check(sigDistance(pdfSig, styledCornerSig) < SAME,
+    `PDF card 13 matches the verified in-page render at those slider values (${sigDistance(pdfSig, styledCornerSig).toFixed(4)} < ${SAME})`);
+
+  // The court sliders live in the plate, which the corner signature cannot
+  // see — so they get their own measurement out of the same file.
+  const pdfPlateBox = letterInkBox({ ...styledRef, buf: pdfCard.rgba, width: pdfCard.width, height: pdfCard.height }, 'spades');
+  const pdfLetterH = pdfPlateBox ? pdfPlateBox.maxY - pdfPlateBox.minY : -1;
+  const styledLetterH = styledPlateBox ? styledPlateBox.maxY - styledPlateBox.minY : -2;
+  const defaultLetterH = defaultPlateBox ? defaultPlateBox.maxY - defaultPlateBox.minY : -3;
+  check(Math.abs(pdfLetterH - styledLetterH) <= 2,
+    `the court letter in the PDF is ${pdfLetterH}px tall, matching the 70% in-page render (${styledLetterH}px)`);
+  check(Math.abs(pdfLetterH - defaultLetterH) > 10,
+    `...and not the ${defaultLetterH}px it would be at the default — the court-letter slider reached the file`);
+  check(pdfPlateBox && Math.abs(pdfPlateBox.cx - styledRef.plate.cx) <= CENTER_TOL && Math.abs(pdfPlateBox.cy - styledRef.plate.cy) <= CENTER_TOL,
+    `the court letter is still ink-centred IN THE EXPORTED PDF (${pdfPlateBox ? (pdfPlateBox.cx - styledRef.plate.cx).toFixed(1) + ', ' + (pdfPlateBox.cy - styledRef.plate.cy).toFixed(1) : 'NO INK'} px off)`);
 }
 
 // ---------------------------------------------------------------------
-section('6. Exported PNG/ZIP — inspect the file, not the preview');
+section('10. Exported PNG/ZIP — inspect the file, not the preview');
 // ---------------------------------------------------------------------
 // Switched to an UPLOADED font so the ZIP path is proven for the custom
-// source too, not only for a Google one.
+// source too, not only for a Google one. The sliders stay off their defaults.
 await page.evaluate((id) => window.__cards.selectFont(id), customSigs.ttf.id);
 await settled();
+const zipRef = await renderStyled({ suit: 'spades', rank: 'K' }, { cornerFontId: customSigs.ttf.id, ...EXPORT_STYLE });
+const zipRefSig = inkSignature(zipRef.buf, zipRef.width, zipRef.height);
+const zipRefPlate = letterInkBox(zipRef, 'spades');
 
 const zipBuf = await exportAndCapture('btnExportZip');
 check(zipBuf.subarray(0, 2).toString() === 'PK', `the PNG export downloaded a real ZIP (${(zipBuf.length / 1024 / 1024).toFixed(1)} MB)`);
@@ -629,11 +1026,16 @@ check(png.width === 825 && png.height === 1125, `${target} decodes to ${png.widt
 const pngSig = inkSignature(png.data, png.width, png.height);
 check(sigDistance(pngSig, fallbackSig) > DIFFERENT,
   `${target} is NOT set in a fallback face (${sigDistance(pngSig, fallbackSig).toFixed(3)} > ${DIFFERENT})`);
-check(sigDistance(pngSig, customSigs.ttf.sig) < SAME,
-  `${target} matches the verified in-page render under the uploaded .ttf (${sigDistance(pngSig, customSigs.ttf.sig).toFixed(4)} < ${SAME})`);
+check(sigDistance(pngSig, zipRefSig) < SAME,
+  `${target} matches the verified in-page render under the uploaded .ttf at those slider values (${sigDistance(pngSig, zipRefSig).toFixed(4)} < ${SAME})`);
+const pngPlate = letterInkBox({ ...zipRef, buf: png.data, width: png.width, height: png.height }, 'spades');
+check(pngPlate && zipRefPlate && Math.abs((pngPlate.maxY - pngPlate.minY) - (zipRefPlate.maxY - zipRefPlate.minY)) <= 2,
+  `the court letter in ${target} is ${pngPlate ? pngPlate.maxY - pngPlate.minY : -1}px tall, matching the in-page render — the court sliders reached the ZIP too`);
+check(pngPlate && Math.abs(pngPlate.cx - zipRef.plate.cx) <= CENTER_TOL && Math.abs(pngPlate.cy - zipRef.plate.cy) <= CENTER_TOL,
+  `the court letter is still ink-centred IN THE EXPORTED PNG (${pngPlate ? (pngPlate.cx - zipRef.plate.cx).toFixed(1) + ', ' + (pngPlate.cy - zipRef.plate.cy).toFixed(1) : 'NO INK'} px off)`);
 
 // ---------------------------------------------------------------------
-section('7. Hygiene');
+section('11. Hygiene');
 // ---------------------------------------------------------------------
 check(unroutedExternal.length === 0, `no unrouted external request escaped the harness (${[...new Set(unroutedExternal)].slice(0, 3).join(', ')})`);
 check(pageErrors.length === 0, `0 uncaught page errors (${pageErrors.slice(0, 3).join(' | ')})`);
