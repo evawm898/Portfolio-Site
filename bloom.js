@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -272,7 +272,7 @@ let liveSummary = '';
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null };
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -280,6 +280,13 @@ let lastPetals = [];
    quantity, so the role partition is checked against what was BUILT rather
    than against another number the same owner produced. */
 let lastPetalsBuilt = 0;
+/* EVERY SLOT'S AZIMUTH, one row per whorl — the input to J7 and Z4b, and new
+   in the fan session because nothing here had ever recorded a position around
+   the axis. See buildBloomInto's own note: before this existed, both STL
+   gates, every J-assertion and every Z-assertion were azimuth-blind, so a fan
+   that silently built a full ring would have passed all of them at an
+   identical triangle count and STL byte length. */
+let lastSlotAzimuths = [];
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
@@ -299,7 +306,7 @@ function buildGeometry({ exportMode }) {
   if (!exportMode) {
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
     lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals;
-    lastPetalsBuilt = built.petalsBuilt;
+    lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
   const geo = new THREE.BufferGeometry();
@@ -453,7 +460,18 @@ function footFloorLine(rings) {
    second copy of the composition law, and the second copy is the one that
    drifts. Returns '' when no whorl split, so the line is simply absent rather
    than saying "none". */
-function slotRoleLine(rings) {
+/* WHICH PLANE, IN WORDS — one owner for the phrasing, because the fan gave
+   the bloom a SECOND mirror and a line that says "through slot 0" on an
+   arrangement whose plane runs through a GAP is a label naming something that
+   is not the thing. The involution is footRing()'s answer; this only names
+   it. */
+function mirrorPhrase(mirror) {
+  return mirror === MIRROR_THROUGH_GAP
+    ? 'mirror plane through the gap between slots 0 and n-1 (pairs i with n-1-i)'
+    : 'mirror plane through slot 0 (pairs i with n-i)';
+}
+
+function slotRoleLine(rings, fr) {
   const split = rings.filter((r) => r.slotRole !== null);
   if (!split.length) return '';
   const seen = new Map();
@@ -464,8 +482,35 @@ function slotRoleLine(rings) {
   for (const r of split) for (const c of r.overrideClamped || []) clamps.set(c.base, c);
   const clampLine = [...clamps.values()]
     .map((c) => `${c.base} asked ${c.asked.toFixed(2)}, CLAMPED to ${c.got.toFixed(2)}`).join(' · ');
-  return `mirror plane through slot 0 — ${groups}\n`
+  return `${mirrorPhrase(fr.mirror)} — ${groups}\n`
        + (clampLine ? `ROLE VALUE CLAMPED to the base control's own range: ${clampLine}\n` : '');
+}
+
+/* ===================================================================
+   THE FAN LINE — the arrangement's derived shape, and the arc limit's
+   "(CAPPED)".
+
+   THREE THINGS A VISITOR CANNOT OTHERWISE SEE. The TOTAL petal count, because
+   `petalCount` is hidden under FAN and this is the number it used to show.
+   The ARC and the NOTCH, because both are derived from two controls and
+   neither is at a slider. And whether the arc limit BIT — the step saturates
+   before the spacing slider ends, and a slider that has stopped moving must
+   say so rather than read as broken. That is the same "(CLAMPED)" discipline
+   the roll floor, the tip floor and both foot clamps carry, arriving on the
+   fourth placement.
+
+   The asked-for and built steps both come from footRing()'s own `fan` record
+   rather than being recomputed here — a read-out that re-derived the cap
+   would be a second copy of the clamp law, and the second copy is the one
+   that drifts. Returns '' under every other placement, so the line is simply
+   absent rather than saying "not a fan". */
+function fanLine(fr) {
+  const f = fr.fan;
+  if (!f) return '';
+  return `fan ${f.spanDeg.toFixed(1)}° arc · ${f.gapDeg.toFixed(1)}° gap at the back`
+       + ` · step ${f.stepDeg.toFixed(2)}°`
+       + (f.capped ? ` (CAPPED from ${f.askedDeg.toFixed(0)}° — the ${f.limitDeg}° arc limit keeps the two sides apart)` : '')
+       + `\n`;
 }
 
 function summarise(ui, acc, mode, rings, fr) {
@@ -486,7 +531,12 @@ function summarise(ui, acc, mode, rings, fr) {
      to a false picture. */
   const cont = fr.continuousMode;
   const depth = `${layers} ${cont ? 'turn' : 'layer'}${layers === 1 ? '' : 's'}`;
-  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)` : `petals ${ui.petalCount}`;
+  /* UNDER FAN THE COUNT IS DERIVED AND `petalCount` IS HIDDEN, so printing
+     the slider would be printing a number nothing read. `fr.slotCount` is
+     footRing()'s own answer, which is what the builder actually placed. */
+  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)`
+    : fr.fan ? `petals ${fr.slotCount} (${fr.fan.perSide}/side${fr.fan.centre ? ' + one on the line' : ''})`
+    : `petals ${ui.petalCount}`;
   /* EVERY RING'S RADIUS is what this line has always printed, and at up to
      120 of them that stops being readable — so the continuous arm prints the
      SPAN and the step instead. Both are derived quantities the user cannot
@@ -501,8 +551,9 @@ function summarise(ui, acc, mode, rings, fr) {
   return `${petalsSaid} · ${ui.placement.toLowerCase()} · ${depth} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
        + (rings.length > 1 ? ringLine : '')
+       + fanLine(fr)
        + footFloorLine(rings)
-       + slotRoleLine(rings)
+       + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
@@ -731,6 +782,37 @@ window.__bloomMetrics = () => ({
      `placement` would be a second copy of the branch. */
   continuousMode: lastFoot.continuousMode,
   sequenceLength: lastFoot.sequenceLength,
+  /* ===================================================================
+     THE ARRANGEMENT'S POSITION AROUND THE AXIS — J7's and Z4b's only input,
+     and the reason this session had to ship an instrument at all.
+
+     MEASURED, NOT ASSUMED: before these four keys existed, `azimuth` appeared
+     in this repository only inside buildWhorlInto (where it is computed) and
+     buildPetalInto (where it is consumed). Nothing recorded one, so nothing
+     could assert one. Both STL gates are azimuth-blind BY CONSTRUCTION — an
+     edge census over a topology no control moves, and a flood fill over a hub
+     disc that spans every ring at every azimuth — and so is everything built
+     on them: J1 reads foot FRAMES, J2/J3 read RADII, J4 reads the overlap
+     box's three dimensions, J5/J6 read the depth sequence, and Z1-Z6 read
+     role membership and the effective state. A FAN that silently fell through
+     to the RADIAL arm would therefore export watertight, export as ONE piece,
+     carry the identical triangle count and the identical STL byte length, and
+     pass every assertion this project owns. J7 exists because of that grep.
+
+     `slotAzimuths` IS THE BUILDER'S OWN RECORD, one row per whorl indexed by
+     slot, taken from the slot payload the whorl primitive emitted — never
+     re-derived from `placement` and the controls, because an instrument that
+     recomputed the law would agree with a mutated law by mutating alongside
+     it. `fan` is footRing()'s derived law (null elsewhere, so a claim nothing
+     can make reads as absent rather than as a passing zero); `mirror` is
+     which involution this arrangement has; `slotRoleCensus` is how many slots
+     each role got, which is what Z1's amended clause checks the hood's
+     visibility against. */
+  slotAzimuths: lastSlotAzimuths.map((row) => [...row]),
+  fan: lastFoot.fan ? { ...lastFoot.fan } : null,
+  mirror: lastFoot.mirror,
+  slotCount: lastFoot.slotCount,
+  slotRoleCensus: lastFoot.slotRoleCensus ? { ...lastFoot.slotRoleCensus } : null,
   /* WHETHER SLOT ROLES APPLY, AND WHETHER A WHORL ACTUALLY SPLIT — two
      different claims, so two flags. The first is the gating (placement and
      depth) and is cross-checked against the registry's own

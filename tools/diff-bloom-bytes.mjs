@@ -208,7 +208,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -285,10 +285,10 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 if (process.argv.includes('--verify-frozen')) {
   const base = arg('--base');
   if (!base) { console.error('--verify-frozen needs --base <dir> (a git worktree of the commit the matrix claims to snapshot)'); process.exit(2); }
-  const which = ['phase2', 'phase3', 'phase4', 'phase5', 'phase6', 'phase7'].filter((n) => process.argv.includes('--' + n));
-  if (which.length !== 1) { console.error('--verify-frozen needs exactly one of --phase2 --phase3 --phase4 --phase5 --phase6 --phase7'); process.exit(2); }
+  const which = PHASE_NAMES.filter((n) => process.argv.includes('--' + n));
+  if (which.length !== 1) { console.error(`--verify-frozen needs exactly one of ${PHASE_NAMES.map((n) => '--' + n).join(' ')}`); process.exit(2); }
   const name = which[0];
-  const frozen = { phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix, phase6: phase6Matrix, phase7: phase7Matrix }[name]();
+  const frozen = FROZEN[name]();
   const baseHarness = await import(pathToFileURL(path.join(path.resolve(base), 'tools', 'bloom-harness.mjs')).href);
   const live = baseHarness.buildMatrix();
   /* Normalised to exactly what a row MEANS to every consumer: its label, the
@@ -505,26 +505,36 @@ const { browser, page } = await launchPage();
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 
 const FULL = process.argv.includes('--full');
-const PHASE2 = process.argv.includes('--phase2');
-const PHASE3 = process.argv.includes('--phase3');
-const PHASE4 = process.argv.includes('--phase4');
-const PHASE5 = process.argv.includes('--phase5');
-const PHASE7 = process.argv.includes('--phase7');
-const PHASE6 = process.argv.includes('--phase6');
-/* Exactly one matrix. The guard and the LABEL are derived from one list so a
-   new matrix cannot be added to the runner while the recorded label silently
-   keeps saying something else — which is what happened when --phase3 landed:
-   its runs recorded matrix:"legacy" while running phase3Matrix(), a label
-   naming a computation nobody performed, in this project's most repeated
-   defect shape. --compare does not read the field, so nothing drew a wrong
-   conclusion from it; it was wrong in the record, which is enough. */
-const MATRIX_FLAGS = [[FULL, 'full'], [PHASE7, 'phase7'], [PHASE6, 'phase6'], [PHASE5, 'phase5'], [PHASE4, 'phase4'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
+/* Exactly one matrix. The guard, the LABEL and the ROWS are derived from ONE
+   list so a new matrix cannot be added to the runner while something else
+   silently keeps saying something else.
+
+   THIS LIST IS NOW THE ONLY PLACE A PHASE NAME IS WRITTEN, and collapsing to
+   it is this session's doing — because the same trap had fired THREE TIMES by
+   the count in the charter, once per matrix added. First: --phase3 landed and
+   its runs recorded matrix:"legacy" while running phase3Matrix() — a label
+   naming a computation nobody performed. Then --phase4, in the other
+   direction: the flag was ACCEPTED and legacyMatrix() ran, and the record
+   honestly said "legacy" while nobody read it. Then --phase7, added to
+   MATRIX_FN and not to MATRIX_FLAGS: a 47-row report under a 205-row label.
+   Each fix removed one copy and left the next one standing, which is what a
+   fix to a duplication problem does when it does not remove the duplication.
+   There were FOUR lists as of #128 — this constant, MATRIX_FN, --verify-frozen's
+   name list and its own function map — and they are one now. Adding a matrix
+   is one entry in FROZEN and nothing else. */
+const FROZEN = {
+  phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
+  phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix,
+};
+const PHASE_NAMES = Object.keys(FROZEN);
+const MATRIX_FLAGS = [[FULL, 'full'],
+  ...[...PHASE_NAMES].reverse().map((n) => [process.argv.includes('--' + n), n])];
 const chosen = MATRIX_FLAGS.filter(([on]) => on);
 if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
 const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
 const rows = [];
 const validity = [];
-const MATRIX_FN = { full: buildMatrix, phase7: phase7Matrix, phase6: phase6Matrix, phase5: phase5Matrix, phase4: phase4Matrix, phase3: phase3Matrix, phase2: phase2Matrix, legacy: legacyMatrix };
+const MATRIX_FN = { full: buildMatrix, ...FROZEN, legacy: legacyMatrix };
 /* ONE list decides the flag, the recorded LABEL and the rows. It used to be
    two — a flag list for the guard and a ternary chain for the rows — and the
    chain silently fell through for any flag the chain did not know. That is
