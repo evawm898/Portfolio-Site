@@ -1747,6 +1747,68 @@ prose is read, in a fixed place, in fixed words. `WAITING ON EVA` carries exactl
 question, because two questions in a ball-holder line is a report that has not decided
 what it needs.
 
+## Incident, Sep 2 — one feature, two parallel sessions
+
+**A DUPLICATED KICKOFF PRODUCED TWO SESSIONS BUILDING THE FAN AT THE SAME TIME.** Both
+opened on the same brief against the same `main` (`7877bdf`, #128). One landed as #129 and
+is what ships; the other reached the point of an open PR (#130) before discovering the
+first had merged underneath it. #130 was closed unmerged and nothing from it reached
+`main`.
+
+**THE STALE-PREMISE CHECK IS WHAT CAUGHT IT, and it caught it late rather than early.**
+The charter's own rule — *every factual claim in a prompt is a hypothesis, and the
+snapshot goes stale the moment you commit* — was applied to the brief's opening line
+("`main` carries #128 merged"), which was TRUE at kickoff and FALSE by the time the
+second session pushed. The signal was a routine `git fetch` in the close-out, not
+anything clever. **A session that never re-fetches `main` before opening its PR would
+have proposed a merge of a duplicate and found out in the conflict.**
+
+**WHAT THE DUPLICATE COST, AND WHAT IT WAS WORTH.** It cost an afternoon of compute and
+produced nothing that shipped. What it produced instead is a genuine independent
+replication: two sessions, working separately, ruled the SAME way on every design
+question that had a ruling — full disc at the junction, a two-option choice rather than a
+new checkbox kind, `petalCount` HIDDEN rather than relabelled, the flower's 15–60/default-45
+spacing, and both involutions already written down. Where they differed, #129 was
+better on all three points, which is recorded here because "the duplicate was wasted" and
+"the duplicate agreed" are different facts and only the second is evidence about the
+design:
+
+  * **Z1's clause is stronger than a geometric assertion.** #130 was going to propose
+    "the labellum is the slot nearest the plane, the hood the slot furthest along the
+    arc". Measured against #129's shipped instrument — a `LABELLUM`/`HOOD` swap on the
+    mirror-through-gap arm, with a clean control run on the same tree (282/282, PASS, 0
+    assertions) — **Z1 fired 8 times across 4 rows**, catching it COMBINATORIALLY through
+    "a role's controls are visible IFF the role is non-empty" rather than geometrically.
+    At one per side with the mirror through the gap the tie-break gives both petals to
+    LABELLUM, so the swap empties it while its five sliders stay on screen. Tying
+    membership to visibility with ONE owner fires in both directions and is cheaper than
+    the assertion it made unnecessary.
+  * **`hoodEmpty` beats a minimum-count constant.** #130 gated slot roles below three
+    slots with a `MIN_SLOT_ROLE_COUNT`; #129 states the same boundary as a predicate about
+    the group itself, which is the condition rather than a proxy for it.
+  * **Keeping slot 0 in the labellum AVOIDS a coupling rather than fixing one.** #130
+    numbered slots azimuthally across the arc, which put slot 0 at an arc END — and both
+    guard residuals are computed for `slot.index === 0` while the metrics hook reports
+    DESCRIPTOR 0's petal. Those had been the same petal since the day they were written.
+    #130 had to fix it; #129's ordering never separates them.
+
+**THE COUPLING IS LATENT IN `main` AND IS NOT A DEFECT — recorded so it is not
+rediscovered as one.** `slot.index === 0` still selects the representative petal at both
+sites. It is unreachable today because the shipped derivation always keeps slot 0 in the
+labellum, and the swap mutation is the only thing that exposed it (two of its failing rows
+also read `guard residual null — not measured`). **A future session that changes the slot
+ORDERING re-opens it, and Z1 is not what would catch it** — Z1 saw the role swap, not the
+null residuals. The remedy, if that day comes, is to select the representative petal by
+"the first slot of THIS descriptor" rather than by index 0.
+
+**THE PREVENTION IS PROCESS, NOT AN INSTRUMENT: ONE KICKOFF, ONE SESSION.** No gate can
+see a second session; nothing in this repository can. What makes a duplicate cheap to
+detect is the ball-holder line above — a finished session's last message says `DONE —
+merged as <sha>`, so "is this already built?" is answerable by reading the previous
+session's last line instead of by reading `main`'s diff. **Re-fetch `main` before opening
+a PR, and read the ball-holder line of any session covering the same brief, before
+building rather than after.**
+
 ## Verification retention — how much of the frozen suite a close-out runs
 
 **RULED Sep 2, from this session's own close-out. FROM SESSION 11 ONWARD a session's
