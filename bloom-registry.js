@@ -27,7 +27,7 @@
    importing it cannot drift. bloom-geometry.js imports nothing at all, so no
    cycle is possible in either direction.
    =================================================================== */
-import { GOLDEN_ANGLE } from './bloom-geometry.js';
+import { GOLDEN_ANGLE, FAN_MAX_ARC_DEG } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
    Empty today, structurally present from day one: when the first control is
@@ -77,17 +77,40 @@ export const RETIRED_IDS = [];
    remedy: both gates assert the two agree on EVERY matrix row, rather than a
    comment claiming they do. */
 export const PREDICATES = {
-  slotRolesEligible: { all: [
-    { id: 'placement', oneOf: ['RADIAL'] },
-    /* layerCount 1 (nothing above the outermost whorl to fall out of step),
-       OR every whorl in phase so all of them share the one plane. `not min 2`
-       is "below 2"; `not awayFrom 0` is "is 0" — the registry's first use of
-       the awayFrom leaf, which has been in the vocabulary unused since day
-       one. The tolerance is half of layerPhase's own 0.01 step, so it admits
-       exactly the reachable value 0 and nothing else. */
-    { any: [
-      { not: { id: 'layerCount', min: 2 } },
-      { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
+  /* TWO PLACEMENTS NOW CARRY SLOT ROLES, and each states its OWN condition
+     rather than sharing a weakened one (session 10). They are different
+     involutions with different reasons to be eligible, so an `any` of two
+     `all`s is the honest shape; a common clause factored out of them would
+     read as one rule with an exception. */
+  slotRolesEligible: { any: [
+    { all: [
+      { id: 'placement', oneOf: ['RADIAL'] },
+      /* layerCount 1 (nothing above the outermost whorl to fall out of step),
+         OR every whorl in phase so all of them share the one plane. `not min 2`
+         is "below 2"; `not awayFrom 0` is "is 0" — the registry's first use of
+         the awayFrom leaf, which has been in the vocabulary unused since day
+         one. The tolerance is half of layerPhase's own 0.01 step, so it admits
+         exactly the reachable value 0 and nothing else. */
+      { any: [
+        { not: { id: 'layerCount', min: 2 } },
+        { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
+      ] },
+    ] },
+    { all: [
+      { id: 'placement', oneOf: ['FAN'] },
+      /* THE FAN NEEDS NO DEPTH CLAUSE: `layerPhase` is hidden here and
+         footRing() forces every ring's phase to exactly 0, so all whorls
+         share the plane by construction at any depth. What it needs is
+         THREE SLOTS, or the hood is a group with no members — see
+         roleForFanSlot() in bloom-geometry.js, and Z4's own clause, which
+         already fails a control-bearing role that has none. Written against
+         the two controls that DERIVE the count, because the count itself is
+         not a control: 2*perSide + (PETAL ? 1 : 0) >= 3 is exactly
+         "two or more per side, OR a petal on the line". */
+      { any: [
+        { id: 'fanPerSide', min: 2 },
+        { id: 'fanMirror', oneOf: ['PETAL'] },
+      ] },
     ] },
   ] },
 };
@@ -428,9 +451,20 @@ const CENTER_ON = { id: 'centerStyle', oneOf: ['DOME', 'DISC', 'RING'] };
 const perDepth = (ui) => (String(ui.placement) === 'CONTINUOUS' ? 'turn' : 'layer');
 
 export const CONTROLS = [
+  /* PETALS-PER-TURN, AND IT HIDES UNDER THE FAN RATHER THAN BEING RELABELLED
+     (session 10). A fan has no turn: its count is DERIVED from petals-per-side
+     and the mirror-line toggle, so this control describes nothing there. The
+     alternative — one control whose label changes with the mode — is the
+     stored-label-lie this project retires ids over, and the alternative to
+     THAT (a second count control that is dead in three modes) is the same
+     defect wearing a different hat. So it gets the `layerPhase` treatment:
+     hidden by predicate, inert by derivation (footRing() reads
+     fanArrangement().count on that arm and never this value), and the
+     read-out prints the derived number so the fan still says how many petals
+     it has. Its VALUE is untouched and returns the moment the placement does. */
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
     label: 'Petals', fmt: (v) => `${v}`, tier: 'standard', role: 'petal',
-    visibleWhen: { all: [] } },
+    visibleWhen: { not: { id: 'placement', oneOf: ['FAN'] } } },
   { id: 'petalLength', section: 'shape', kind: 'slider', min: 20, max: 60, step: 1, default: 35,
     label: 'Petal length', fmt: (v) => `${v} mm`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
@@ -761,6 +795,11 @@ export const CONTROLS = [
          shorthand for it rather than as its opposite. (Eva, Sep 1.) */
       { value: 'SPIRAL', label: 'Spiral, layered (golden angle)' },
       { value: 'CONTINUOUS', label: 'Continuous spiral (winds inward)' },
+      /* THE FAN (Eva, session 10). Named for what a visitor sees rather than
+         for its mathematics, on the same footing as "Radial (even)": the
+         thing being chosen is a symmetric arc with an open back, and the
+         mirror line is the next control down. */
+      { value: 'FAN', label: 'Fan (symmetric arc)' },
     ],
     label: 'Placement',
     /* The read-out carries the derived consequence, not the value the select
@@ -771,6 +810,22 @@ export const CONTROLS = [
        the count it depends on also lives. */
     fmt: (v, ui) => {
       if (v === 'RADIAL') return `${(360 / Number(ui.petalCount)).toFixed(1)}° even step`;
+      /* THE FAN'S READ-OUT IS THE STEP, THE COUNT AND THE ARC, because none
+         of the three is at a control: the count is derived, the arc is
+         derived, and the step is the spacing slider only until the arc cap
+         bites. Restating the cap here would be a second owner of a number, so
+         FAN_MAX_ARC_DEG is imported exactly as GOLDEN_ANGLE is. The
+         "(CLAMPED)" wording is the roll floor's, the tip floor's and both
+         foot clamps' — a slider that has stopped moving must not read broken. */
+      if (v === 'FAN') {
+        const perSide = Math.round(Number(ui.fanPerSide));
+        const onLine = String(ui.fanMirror) === 'PETAL';
+        const count = 2 * perSide + (onLine ? 1 : 0);
+        const asked = Number(ui.fanSpacing);
+        const step = Math.min(asked, FAN_MAX_ARC_DEG / (onLine ? perSide : perSide - 0.5));
+        return `${step.toFixed(1)}° step · ${count} petals · ${((count - 1) * step).toFixed(0)}° arc`
+             + (step < asked ? ` (CLAMPED from ${asked.toFixed(0)}°)` : '');
+      }
       const golden = `${((GOLDEN_ANGLE * 180) / Math.PI).toFixed(2)}° golden step`;
       /* CONTINUOUS shares the azimuth step exactly, so the step alone would
          not tell the two apart at the control. What differs is the LENGTH of
@@ -782,6 +837,92 @@ export const CONTROLS = [
     },
     tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [] } },
+
+  /* ===================================================================
+     THE FAN'S THREE CONTROLS (Eva, session 10). All Standard — geometry and
+     silhouette controls are a DESIGN tier — all `role: 'arrangement'`, all
+     gated on the placement by one predicate each, and all reading the
+     FLOWER'S OWN VOCABULARY: petals per side, petal spacing, and a petal on
+     the mirror line. That fan is the design Eva liked and this session was
+     told to read it as the reference. What did NOT come across is the
+     flower's per-petal control GROUPS (`PETAL 1 — INNER`): that is recorded
+     direction for a later session, and the eight slot-role controls below
+     already give the mirror-line petal its own sliders, which is the fan
+     principle's own first half arriving through the role mechanism.
+
+     THE COUNT IS DERIVED FROM TWO OF THESE AND IS NOT A CONTROL:
+     2*perSide + (petal on the line ? 1 : 0). fanArrangement() in
+     bloom-geometry.js is its one owner; `placement`'s read-out prints it and
+     the model read-out prints it, both by reading that owner. `petalCount`
+     hides here rather than being relabelled — see its own note.
+
+     THEY ARE INERT OFF THIS PLACEMENT, not merely hidden: footRing() reads
+     fanArrangement() only on the fan arm, so all three keep their values and
+     move nothing in RADIAL, SPIRAL or CONTINUOUS. That is what the named
+     GATED rows in both gates assert — hidden AND bit-identical — because a
+     gated state nobody exercises is a claim nobody checked. */
+  { id: 'fanPerSide', section: 'arrangement', kind: 'slider', min: 1, max: 6, step: 1, default: 3,
+    label: 'Petals per side',
+    /* Prints the DERIVED total, which is the number the visitor actually
+       wants and the one `petalCount` would have shown. One expression here,
+       one in fanArrangement(); no control for the derived number — the Tip
+       taper / Spine curl precedent. */
+    fmt: (v, ui) => {
+      const count = 2 * Math.round(Number(v)) + (String(ui.fanMirror) === 'PETAL' ? 1 : 0);
+      return `${v} each side · ${count} petals`;
+    },
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'placement', oneOf: ['FAN'] } },
+
+  /* THE ANGLE BETWEEN NEIGHBOURS. The flower's range verbatim (15–60, default
+     45), because the fan Eva approved was drawn on it. The ARC CAP is an
+     output clamp and never a range limit — the roll floor's pattern — so this
+     slider keeps its whole span and SATURATES from 6 per side above 30.9°,
+     with the placement read-out saying "(CLAMPED)". */
+  { id: 'fanSpacing', section: 'arrangement', kind: 'slider', min: 15, max: 60, step: 1, default: 45,
+    label: 'Petal spacing',
+    fmt: (v, ui) => {
+      const perSide = Math.round(Number(ui.fanPerSide));
+      const maxK = String(ui.fanMirror) === 'PETAL' ? perSide : perSide - 0.5;
+      const step = Math.min(Number(v), FAN_MAX_ARC_DEG / maxK);
+      return `${v}°` + (step < Number(v) ? ` · built ${step.toFixed(1)}° (CLAMPED — ${FAN_MAX_ARC_DEG}° arc limit)` : '');
+    },
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'placement', oneOf: ['FAN'] } },
+
+  /* THE TOGGLE, BUILT AS A TWO-OPTION CHOICE AND NOT A CHECKBOX (Eva,
+     session 10), which is a decision about this registry rather than about
+     the fan. The bloom has exactly two control kinds, `slider` and `choice`,
+     and a checkbox would be a third — new coercion, new DOM generation, new
+     equality, new harness handling, and a boolean for the predicate leaves to
+     learn. A choice needs none of it and its `oneOf` leaf already expresses
+     the gating the eligibility predicate needs. It also reads better: the
+     option labels can say what the two states ARE, where a checkbox label can
+     only name one of them.
+
+     THE PARITY IS THE TOGGLE, and that is the whole of what it does to the
+     roles: n is odd exactly when a petal is ON the line, and the fan's
+     involution i <-> n-1-i has a fixed point exactly at odd n. So one law
+     covers both positions and nothing in roleForFanSlot() branches on this
+     control. Default GAP — the flower's own default (its checkbox ships
+     unticked), and the arrangement Eva screenshotted. */
+  { id: 'fanMirror', section: 'arrangement', kind: 'choice', default: 'GAP',
+    options: [
+      { value: 'GAP', label: 'Mirror through the gap' },
+      { value: 'PETAL', label: 'Petal on the mirror line' },
+    ],
+    label: 'Mirror line',
+    /* The read-out carries the CONSEQUENCE the select cannot show: which
+       petals become the labellum. That is the one thing a visitor is choosing
+       between here once the roles exist, and it is derived, so it belongs at
+       the control rather than in a comment. */
+    fmt: (v, ui) => {
+      const count = 2 * Math.round(Number(ui.fanPerSide)) + (v === 'PETAL' ? 1 : 0);
+      if (count < 3) return 'through the gap · 2 petals, too few for petal roles';
+      return v === 'PETAL' ? 'one petal bisected — it is the labellum' : 'between the inner pair — they are the labellum';
+    },
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'placement', oneOf: ['FAN'] } },
 
   /* ===================================================================
      LAYERS — multiple whorls, the shape the registry predicted for this
@@ -857,9 +998,18 @@ export const CONTROLS = [
      phyllotaxis parameter continuous mode opens up — and this is the worst
      available id to put it on, since a saved `layerPhase` would then feed a
      slot fraction into an angle. It gets its own id and its own ruling. */
+  /* AND IT HIDES UNDER THE FAN TOO (Eva, session 10) — for the OPPOSITE
+     reason to CONTINUOUS's, which is why both are named rather than merged
+     into "the placements that do not want it". Under CONTINUOUS this control
+     has no job; under FAN it has one and the job destroys the placement. The
+     fan's mirror plane is the BLOOM's, so offsetting whorl L by L slots
+     swings every inner whorl off the one plane the arrangement exists to
+     have — the 30.000-deg-at-n=3 asymmetry session B measured. footRing()
+     forces the phase to exactly 0 there, so this is INERT as well as hidden,
+     and the GATED matrix rows assert both halves rather than either alone. */
   { id: 'layerPhase', section: 'arrangement', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0.5,
     label: 'Layer offset', fmt: (v) => `${Number(v).toFixed(2)} slot`, tier: 'standard', role: 'arrangement',
-    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS', 'FAN'] } }] } },
 
   /* THE PRIMITIVE'S angleRamp, per layer — and the control that does the work
      `height` was expected to do. Inner whorls stand more erect, which is what

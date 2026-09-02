@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, FAN_MAX_ARC_DEG } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -272,10 +272,15 @@ let liveSummary = '';
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fanMode: false, fan: null, slotsPerWhorl: 0 };
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
+/* THE AZIMUTHS AS EMITTED, one array per whorl. Collected by buildBloomInto
+   at the blade callback, so Z7's mirror claim is checked against what the
+   builder actually used rather than against a restatement of the azimuth
+   law — which would agree with a broken law by being broken alongside it. */
+let lastAzimuths = [];
 /* THE BUILDER'S OWN TALLY of buildPetalInto calls — Z1's independent
    quantity, so the role partition is checked against what was BUILT rather
    than against another number the same owner produced. */
@@ -297,7 +302,7 @@ function buildGeometry({ exportMode }) {
   const acc = new MeshBuilder({ exportMode });
   const built = buildBloomInto(acc, readUI(), { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (!exportMode) {
-    lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
+    lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot; lastAzimuths = built.azimuths;
     lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals;
     lastPetalsBuilt = built.petalsBuilt;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
@@ -486,7 +491,22 @@ function summarise(ui, acc, mode, rings, fr) {
      to a false picture. */
   const cont = fr.continuousMode;
   const depth = `${layers} ${cont ? 'turn' : 'layer'}${layers === 1 ? '' : 's'}`;
-  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)` : `petals ${ui.petalCount}`;
+  /* THE PETAL COUNT, FROM footRing() AND NOT FROM THE CONTROL under the fan.
+     `ui.petalCount` is petals-per-turn and a fan has no turn — printing it
+     there would name a control the bloom is not using, which is the
+     label-lie this project retires ids over. `slotsPerWhorl` is the owner's
+     answer and IS `petalCount` in every other placement. */
+  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)`
+    : fr.fanMode ? `petals ${fr.slotsPerWhorl} (${fr.fan.perSide}/side${fr.fan.onLine ? ' + one on the mirror line' : ''})`
+    : `petals ${ui.petalCount}`;
+  /* THE ARC, AND WHETHER THE CAP BIT — derived quantities the visitor cannot
+     set, which is the same reason every other line here exists. Read from
+     fanArrangement()'s own record via footRing(), never re-derived: a
+     read-out restating the cap would be a second owner of it. */
+  const fanLine = fr.fanMode
+    ? `fan ${(fr.fan.arcSpan * 180 / Math.PI).toFixed(0)}° arc · ${(360 - fr.fan.arcSpan * 180 / Math.PI).toFixed(0)}° open wedge · step ${(fr.fan.step * 180 / Math.PI).toFixed(1)}°`
+      + (fr.fan.capped ? ` (CLAMPED from ${(fr.fan.asked * 180 / Math.PI).toFixed(0)}° — ${FAN_MAX_ARC_DEG}° arc limit)` : '') + `\n`
+    : '';
   /* EVERY RING'S RADIUS is what this line has always printed, and at up to
      120 of them that stops being readable — so the continuous arm prints the
      SPAN and the step instead. Both are derived quantities the user cannot
@@ -501,6 +521,7 @@ function summarise(ui, acc, mode, rings, fr) {
   return `${petalsSaid} · ${ui.placement.toLowerCase()} · ${depth} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
        + (rings.length > 1 ? ringLine : '')
+       + fanLine
        + footFloorLine(rings)
        + slotRoleLine(rings)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
@@ -731,6 +752,19 @@ window.__bloomMetrics = () => ({
      `placement` would be a second copy of the branch. */
   continuousMode: lastFoot.continuousMode,
   sequenceLength: lastFoot.sequenceLength,
+  /* THE FAN'S SHAPE AND ITS EMITTED AZIMUTHS (session 10). `fanMode` is what
+     Z4 and Z7 branch on and is footRing()'s answer, never a re-read of
+     `placement`; `fan` is fanArrangement()'s own record, so a gate checking
+     the arc cap reads the owner rather than restating FAN_MAX_ARC_DEG;
+     `slotsPerWhorl` is how many petals a whorl carries, which stopped being
+     `petalCount` when the fan arrived and which Z1 and Z4 both need.
+     `petalAzimuths` is the ONLY witness for an arc that has lost its mirror —
+     a mutation with an identical triangle count, an identical STL byte
+     length, watertight and in one piece, invisible to J1-J6 and Z1-Z6. */
+  fanMode: lastFoot.fanMode,
+  fan: lastFoot.fan ? { ...lastFoot.fan } : null,
+  slotsPerWhorl: lastFoot.slotsPerWhorl,
+  petalAzimuths: lastAzimuths.map((a) => [...a]),
   /* WHETHER SLOT ROLES APPLY, AND WHETHER A WHORL ACTUALLY SPLIT — two
      different claims, so two flags. The first is the gating (placement and
      depth) and is cross-checked against the registry's own

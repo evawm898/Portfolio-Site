@@ -118,6 +118,70 @@ export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
    defect; a gate importing the one definition cannot drift from it. */
 export const SPIRAL_LEGIBLE_COUNT = 8;
 
+/* ===================================================================
+   THE FAN — session 10, Eva's ruling (Sep 2): a fourth `placement`, a
+   symmetric arc across one axis instead of a full circle. Its VOCABULARY is
+   the flower's own bilateral fan, which Eva likes and which this session was
+   told to READ as the reference rather than re-invent: petals per side,
+   petal spacing, and a petal on the mirror line. The flower's law is in
+   flower.js's buildLayerInto; what follows is that law expressed against
+   this project's disciplines, not a copy of that code.
+
+   THE ARC CAP IS AN OUTPUT CLAMP, NEVER A RANGE LIMIT — the roll floor's
+   pattern. The outermost petal may not swing past FAN_MAX_ARC_DEG, or the
+   arc wraps into itself and the open wedge the fan is FOR stops existing.
+   The spacing slider keeps its whole range and SATURATES, and the read-out
+   says "(CLAMPED)" so a slider that has stopped moving does not read as
+   broken. Measured: the cap binds from 6 per side above 30.909 deg, which is
+   a 340 deg arc with a 20 deg wedge left.
+
+   WHY 170 AND NOT 180: the two end petals straddle the wedge and are the
+   HOOD, so they must remain a legible pair rather than meeting behind the
+   axis. Like every number in this project family it is an assumption, and it
+   is the flower's own — inherited deliberately, since the fan Eva approved
+   was drawn under it.
+
+   SLOT ROLES NEED THREE SLOTS. At one per side with the mirror through the
+   GAP the whorl is TWO petals, both of them the labellum pair, and the HOOD
+   would be a group with no members — which is exactly what Z4 already fails
+   INNER and HOOD on. So the fan is INELIGIBLE for slot roles below this
+   count, stated here and mirrored by the registry's own predicate (the two
+   are cross-checked on every matrix row). Vacuous under RADIAL, whose
+   petalCount cannot go below 3. */
+export const FAN_MAX_ARC_DEG = 170;
+export const MIN_SLOT_ROLE_COUNT = 3;
+
+/* THE FAN'S DERIVED QUANTITIES — ONE OWNER, and every consumer reads it.
+   footRing() stamps the answer onto its return; buildWhorlInto takes the
+   step as an argument and computes nothing; the read-out and both gates read
+   the record. A second place deriving "how many petals is this fan" would be
+   the arithmetic the one-owner rule forbids, and it is the exact shape of
+   the M3 mutation this layer's positive controls include.
+
+   `count` REPLACES `petalCount` UNDER THIS PLACEMENT, it does not
+   reinterpret it. `petalCount` is petals-per-turn and a fan has no turn, so
+   the control is HIDDEN by its own registry predicate rather than relabelled
+   — the layerPhase treatment, one level up. Nothing reads `state.petalCount`
+   on the fan arm.
+
+   `capped` IS AN EXACT COMPARISON and needs no epsilon: Math.min returns one
+   of its two arguments, so `step < asked` is true precisely when the cap was
+   the one returned. */
+export function fanArrangement(state) {
+  const perSide = Math.round(state.fanPerSide);
+  const onLine = state.fanMirror === 'PETAL';
+  const count = 2 * perSide + (onLine ? 1 : 0);
+  /* HOW MANY STEPS THE OUTERMOST PETAL SITS FROM THE MIRROR LINE. A whole
+     step when a petal is ON the line, a half-step when the line runs through
+     the GAP — which is the same k - 1/2 the flower uses, and it is what makes
+     the two toggle states one law rather than two. */
+  const maxK = onLine ? perSide : perSide - 0.5;
+  const asked = (state.fanSpacing * Math.PI) / 180;
+  const cap = ((FAN_MAX_ARC_DEG * Math.PI) / 180) / maxK;
+  const step = Math.min(asked, cap);
+  return { perSide, onLine, count, step, asked, cap, capped: step < asked, arcSpan: (count - 1) * step };
+}
+
 /* MeshBuilder — flat triangle-soup accumulator (positions only; the app wraps
    it in a three.js BufferGeometry, the exporter reads it directly). Rewritten
    from the flower's MeshAccumulator idea: the one behavior that matters here
@@ -597,6 +661,53 @@ export const OVERRIDE_BOUNDS = (() => {
   return out;
 })();
 
+/* ===================================================================
+   THE FAN'S OWN INVOLUTION — session 10, and the charter derived it three
+   sessions before anything needed it. RADIAL numbers slots around a full
+   circle with slot 0 ON the plane, so its pairing is i <-> n-i (mod n) and
+   has FIXED POINTS. A fan numbers its slots in AZIMUTHAL ORDER across an arc
+   that is centred on the plane, so its pairing is i <-> n-1-i, which is
+   FIXED-POINT-FREE at even n and has exactly one fixed point at odd n.
+
+   THAT IS THE WHOLE OF WHAT THE TOGGLE DOES TO THE ROLES, and it is why one
+   law covers both of its positions rather than two: the mirror runs through a
+   PETAL exactly when n is odd (a petal on the line), and through the GAP
+   exactly when n is even. n = 2*perSide + (onLine ? 1 : 0), so the parity IS
+   the toggle. Nothing branches on the toggle here.
+
+   MEASURED, not asserted, on all 60 reachable (perSide x spacing x toggle)
+   configurations before this was written: the pairing error about the plane
+   at azimuth 0 is EXACTLY 0.000 deg on every one, the permutation is a
+   bijection on every one, and az[i] + az[n-1-i] === 0 on all 450 slot pairs.
+   The same instrument reproduces session A's four SPIRAL numbers to the digit
+   (32.461 / 20.062 / 12.399 / 4.736), so a zero here is a result and not a
+   harness that always says zero.
+
+   WRITTEN AS A SUM AND NEVER AS Object.is: at the mirror-line petal itself
+   the azimuth is +0 and its reflection is -0, so `Object.is(az[n-1-i],
+   -az[i])` is FALSE on every toggle-ON row while the residual is exactly 0.
+   That is the form layer's signed-zero case analysis arriving in a new place,
+   found before it could be written into an assertion. Z7 uses `a + b === 0`.
+
+   ROLES: LABELLUM is the slot or slots NEAREST the plane, HOOD is the arc's
+   two END slots — the pair straddling the OPEN WEDGE, which is a fan's
+   antipode and the direct analogue of RADIAL's hood. HOOD is therefore always
+   a PAIR and never singular: a fan has no slot opposite its labellum.
+
+     n odd    LABELLUM {(n-1)/2}      HOOD {0, n-1}   LATERAL n-3 slots
+     n even   LABELLUM {n/2-1, n/2}   HOOD {0, n-1}   LATERAL n-4 slots
+
+   AT n = 2 THE TWO GROUPS COLLIDE — both petals are the labellum pair and the
+   hood has no members. That state is not roled at all: slotRolesEligible()
+   below requires MIN_SLOT_ROLE_COUNT slots, which makes every slot LATERAL,
+   which resolves no record, which collapses the descriptor list on its own.
+   The gating needs no second mechanism, exactly as CONTINUOUS's does not. */
+export function roleForFanSlot(i, n) {
+  if (n % 2 === 1 ? i === (n - 1) / 2 : (i === n / 2 - 1 || i === n / 2)) return SLOT_LABELLUM;
+  if (i === 0 || i === n - 1) return SLOT_HOOD;
+  return SLOT_LATERAL;
+}
+
 /* THE SLOT -> ROLE ASSIGNMENT. Exact integer arithmetic; see the block above
    for the derivation and for why the odd-n hood is a pair. ONE OWNER:
    footRing() calls this and stamps the answer onto each descriptor, and
@@ -605,6 +716,25 @@ export function roleForSlot(i, n) {
   if (i === 0) return SLOT_LABELLUM;
   if (n % 2 === 0) return i === n / 2 ? SLOT_HOOD : SLOT_LATERAL;
   return (i === (n - 1) / 2 || i === (n + 1) / 2) ? SLOT_HOOD : SLOT_LATERAL;
+}
+
+/* THE DISPATCHER, and the reason it exists rather than a placement argument
+   threaded through the two functions above: the arms are DIFFERENT
+   INVOLUTIONS, not one law with a parameter, and naming each one separately
+   is what lets Z4 assert the right pairing per placement instead of
+   restating a branch. Every consumer — footRing() and both gates — goes
+   through here, so "which involution does this placement use" has one answer.
+
+   `mirrorPairFor` is the pairing ITSELF, exported because Z4 needs the
+   permutation to check the assignment is symmetric across it and Z7 needs it
+   to check the AZIMUTHS realise it. A gate that recomputed the ROLE would be
+   comparing the owner against itself; a gate given the PAIRING checks the
+   thing the mirror plane MEANS. */
+export function roleForSlotIn(placement, i, n) {
+  return placement === 'FAN' ? roleForFanSlot(i, n) : roleForSlot(i, n);
+}
+export function mirrorPairFor(placement, i, n) {
+  return placement === 'FAN' ? n - 1 - i : (n - i) % n;
 }
 
 /* WHETHER SLOT ROLES APPLY AT ALL — the gating, expressed HERE as well as in
@@ -620,6 +750,14 @@ export function roleForSlot(i, n) {
    record resolves and the descriptor list collapses on its own. That is
    session A's pattern for CONTINUOUS one level down. */
 export function slotRolesEligible(state) {
+  /* THE FAN IS ELIGIBLE AT EVERY DEPTH, and that is a property of the
+     arrangement rather than a relaxation. `layerPhase` is HIDDEN under FAN
+     and footRing() forces every ring's phase to exactly 0 there (Eva's
+     ruling, session 10), so all whorls share the one plane by construction
+     and the depth clause RADIAL needs has nothing to say. What it needs
+     instead is enough slots for the hood to have members — see
+     roleForFanSlot's note on n = 2. */
+  if (state.placement === 'FAN') return fanArrangement(state).count >= MIN_SLOT_ROLE_COUNT;
   if (state.placement !== 'RADIAL') return false;
   return Math.round(state.layerCount) === 1 || state.layerPhase === 0;
 }
@@ -723,11 +861,20 @@ export function footRing(state, acc) {
      nobody asked for. Two validations of one enum are not two owners of a
      boundary — the registry owns the option list, and each consumer that
      branches says out loud when it is handed something outside it. */
-  if (state.placement !== 'RADIAL' && state.placement !== 'SPIRAL' && state.placement !== 'CONTINUOUS') {
+  if (state.placement !== 'RADIAL' && state.placement !== 'SPIRAL' && state.placement !== 'CONTINUOUS' && state.placement !== 'FAN') {
     throw new Error(`unknown placement ${JSON.stringify(state.placement)} — the registry and the builder have diverged`);
   }
   const continuousMode = state.placement === 'CONTINUOUS';
-  const n = Math.round(state.petalCount);
+  /* THE FAN ARM. `fan` is fanArrangement()'s record, read and never re-derived
+     — the count, the step, and whether the arc cap bit. Null in every other
+     placement, so nothing off this arm can consult it by accident. */
+  const fanMode = state.placement === 'FAN';
+  const fan = fanMode ? fanArrangement(state) : null;
+  /* HOW MANY SLOTS A WHORL CARRIES. Under the fan that is the DERIVED count;
+     everywhere else it is the control, read exactly as it always was. This is
+     the one line where `petalCount` stops being the bloom's petal count, and
+     it is why the control is hidden there rather than relabelled. */
+  const n = fanMode ? fan.count : Math.round(state.petalCount);
   /* THE CONTINUOUS LAW ITSELF, as a closure, so the ring loop and the
      quantizer cross-validation below evaluate the SAME expression. Written
      inline in both places it would be two copies of the one thing this whole
@@ -743,6 +890,17 @@ export function footRing(state, acc) {
      golden-angle sequence at all and reports `petalCount`, which is what the
      flag's predicate already ignores. */
   const sequenceLength = continuousMode ? layerCount * n : n;
+  /* THE PRE-ROLE GROUP — how many feet the area rule's pre-role expression
+     multiplied one squared foot-radius by. HOISTED (session 10) so the
+     collapsed arm's `roleCount` and the cross-validated `preRoleSumSq` read
+     ONE expression instead of two that happen to agree: session A's comment
+     claimed they were the same double and now they are the same NAME.
+     Off the fan arm this is `state.petalCount`, deliberately UNROUNDED,
+     exactly as both expressions read it before this line existed — so the
+     ringed arm takes the same doubles through the same arithmetic and the
+     byte report stays a construction. On the fan arm it is the derived count,
+     because `petalCount` describes nothing there. */
+  const whorlGroup = fanMode ? n : state.petalCount;
   /* Foot width follows the petal it feeds — a fraction of blade width, scaled
      by `footDelicacy`, with a floor so very narrow petals keep a printable
      root. THIS IS THE ONLY PLACE `footDelicacy` EXISTS, exactly as spread is
@@ -809,7 +967,7 @@ export function footRing(state, acc) {
     if (continuousMode || !slotRolesEligible(state)) return null;
     const bySlot = new Map();
     for (let i = 0; i < n; i++) {
-      const r = roleForSlot(i, n);
+      const r = roleForSlotIn(state.placement, i, n);
       if (!bySlot.has(r)) bySlot.set(r, []);
       bySlot.get(r).push(i);
     }
@@ -857,14 +1015,14 @@ export function footRing(state, acc) {
     const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
     const layerRole = roleForLayer(L, false);
-    preRoleSumSq += state.petalCount * rFoot * rFoot;
+    preRoleSumSq += whorlGroup * rFoot * rFoot;
     if (slotGroups === null) {
       /* THE COLLAPSED ARM — SESSION A'S, CHARACTER FOR CHARACTER, and it is
          the shipped path at every default. The group is the whole whorl and
          `roleCount` is `state.petalCount` — the SAME DOUBLE the pre-role
          expression multiplied by, deliberately read unrounded exactly as that
          expression read it. */
-      const roleCount = state.petalCount;
+      const roleCount = whorlGroup;
       sumSq += roleCount * rFoot * rFoot;
       raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: layerRole, slotRole: null, slots: null, clamped: [] });
     } else {
@@ -916,7 +1074,18 @@ export function footRing(state, acc) {
      instead: `quantizerResiduals` below. */
   const guarded = !continuousMode && layerCount === 1;
   const derivedRadius = guarded
-    ? raw[0].rFoot * Math.sqrt(state.petalCount)   // area rule — the pre-layer expression, verbatim
+    /* AREA RULE — THE PRE-LAYER EXPRESSION, VERBATIM, now reading the hoisted
+       whorl group rather than the control directly. Off the fan arm
+       `whorlGroup` IS `state.petalCount`, the same double this line has
+       always multiplied by, so the ringed arm's arithmetic is unchanged to
+       the character. On the fan arm the control describes nothing and this
+       would otherwise size the ring for a whorl the bloom does not have —
+       a 15% error in R0 at the shipping fan, invisible to J2 and J3 (both
+       compare against the same wrong R0) and caught only by Z1, which checks
+       the role partition against the petals the builder actually emitted.
+       That is this session's M3 positive control, and it was a real bug here
+       before it was a mutation. */
+    ? raw[0].rFoot * Math.sqrt(whorlGroup)
     : generalDerived;
   const guardResidual = guarded ? Math.abs(generalDerived - derivedRadius) : null;
 
@@ -952,7 +1121,17 @@ export function footRing(state, acc) {
          index under the ringed arm — the same double `L` was — so the
          collapsed path takes the identical arithmetic, and the continuous arm
          takes the 0 branch as before. */
-      phase: continuousMode ? 0 : (p.lambda * state.layerPhase * TAU) / state.petalCount,
+      /* AND EXACTLY 0 UNDER THE FAN TOO (Eva, session 10), for a reason that
+         is the opposite of CONTINUOUS's. There a whorl offset has no job;
+         here it has one and the job destroys the placement. `layerPhase`
+         rotates ring L by L slots' worth of azimuth, and the fan's mirror
+         plane is the BLOOM's — so a non-zero phase swings every inner whorl
+         off the one plane the arrangement exists to have, which is the
+         30.000-deg-at-n=3 asymmetry session B measured under RADIAL. The
+         control is hidden by its own registry predicate and made INERT here,
+         the same two-statements-of-one-boundary treatment slotRolesEligible()
+         carries, and the GATED matrix rows assert both halves. */
+      phase: (continuousMode || fanMode) ? 0 : (p.lambda * state.layerPhase * TAU) / state.petalCount,
       /* THE AFFINE ANGLE, at this ring's own lambda. In the ringed arm
          `p.lambda` IS the integer L, so this is `L * state.layerTilt`
          character for character on the same doubles. */
@@ -1078,7 +1257,7 @@ export function footRing(state, acc) {
      against: it reports null there, never a passing 0. That is the same
      shape as guardResidual above and for the same reason — a claim nothing
      can make must read as absent. */
-  const preRoleGroup = continuousMode ? 1 : state.petalCount;
+  const preRoleGroup = continuousMode ? 1 : whorlGroup;
   /* SESSION B REACHES THIS. A split whorl carries LABELLUM / HOOD / LATERAL
      groups whose sizes are not the pre-role group, so there is no pre-role
      grouping to compare against and the residual is ABSENT rather than a
@@ -1125,6 +1304,20 @@ export function footRing(state, acc) {
     rings, hub, derivedRadius, guardResidual, layerCount,
     continuousMode, sequenceLength, quantizerResiduals, zygoGuardResidual,
     slotRings,
+    /* THE FAN'S OWN SHAPE, from fanArrangement() rather than re-derived, and
+       null off the fan arm so a consumer cannot read a stale record. */
+    fanMode, fan,
+    /* HOW MANY PETALS ONE WHORL CARRIES — the number that stopped being
+       `petalCount` when the fan arrived, owned here so the read-out, the
+       builder and both gates read one answer.
+
+       THIS IS NOT THE RETIRED `slotsPerRing`, and the distinction is the
+       reason it may exist. That answered "how many petals does this
+       DESCRIPTOR carry", which a split whorl has no single value for — 1
+       labellum, 2 hood, n-3 laterals. This answers "how many slots does this
+       WHORL have", which is well defined however the whorl is partitioned,
+       and each descriptor's own `roleCount` still sums to it. */
+    slotsPerWhorl: n,
     /* WHETHER SLOT ROLES APPLY IN THIS STATE, and whether a whorl actually
        split. Two different claims: the first is the gating (placement and
        depth), the second additionally needs a control off its identity. Both
@@ -1190,15 +1383,33 @@ export function footRing(state, acc) {
    runs its own sequence, and `petalCount * layerCount` under CONTINUOUS,
    where there is one. footRing() owns that number (`sequenceLength`) so the
    read-out and the panel gate cannot keep two answers. */
-export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL' }) {
-  if (placement !== 'RADIAL' && placement !== 'SPIRAL' && placement !== 'CONTINUOUS') {
+export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fanStep = null }) {
+  if (placement !== 'RADIAL' && placement !== 'SPIRAL' && placement !== 'CONTINUOUS' && placement !== 'FAN') {
     throw new Error(`unknown placement "${placement}" — the registry and the builder have diverged`);
+  }
+  /* THE ONE ARGUMENT THE FAN ADDED, and it is required exactly where it
+     means something. `fanStep` is footRing()'s answer via fanArrangement();
+     this primitive computes nothing about it, exactly as it computes nothing
+     about `radius` or `scale`. Checked in BOTH directions so a fan built
+     without a step, or a step handed to a placement that has no use for one,
+     is a loud error rather than a silently different arrangement. */
+  if ((placement === 'FAN') !== (fanStep !== null)) {
+    throw new Error(`placement "${placement}" with fanStep ${JSON.stringify(fanStep)} — the step exists exactly under FAN, and footRing() owns it`);
   }
   const radiusAt = typeof radius === 'function' ? radius : () => radius;
   for (let i = 0; i < count; i++) {
     blade({
       index: i,
-      azimuth: placement === 'RADIAL' ? phase + (i * TAU) / count : phase + i * GOLDEN_ANGLE,
+      /* THE FAN ARM sits between the two that shipped and neither is touched.
+         Slots run in AZIMUTHAL ORDER across the arc, centred on the mirror
+         plane at `phase`: the offset (i - (count-1)/2) is exactly negated by
+         i -> count-1-i, so az[i] + az[count-1-i] === 0 to the bit (measured on
+         all 450 reachable slot pairs) and the plane is a real symmetry of the
+         arrangement rather than a label on one. That antisymmetry is what
+         roleForFanSlot's involution reads and what Z7 asserts. */
+      azimuth: placement === 'RADIAL' ? phase + (i * TAU) / count
+             : placement === 'FAN' ? phase + (i - (count - 1) / 2) * fanStep
+             : phase + i * GOLDEN_ANGLE,
       radius: radiusAt(i, count),
       z: height,
       scale: sizeRamp(i, count),
@@ -1985,7 +2196,30 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      stops the short-circuit hiding a wrong thick path — the same role
      formGuardResidual plays for the four curves. */
   let thicknessGuardResidual = null;
-  if (uniformThickness && slot.index === 0) {
+  /* WHICH PETAL CARRIES THE GUARD RESIDUALS — ONE definition, read by both.
+     It used to be `slot.index === 0` in each of the two places below, and
+     that was correct only while "slot 0" and "the petal the builder reports
+     for this descriptor" were the same petal. THE FAN SEPARATED THEM: its
+     slots run in azimuthal order across the arc, so slot 0 is an END petal —
+     the HOOD — while descriptor 0 is the LABELLUM in the middle. The metrics
+     hook reports descriptor 0's petal, so on every split fan both residuals
+     came back NULL and the gates reported "not measured" on a row that had
+     measured nothing. Found by running the fan through the shipped
+     instrument before writing anything new; it is a pre-existing coupling
+     between two ways of saying "the representative petal", not a fan bug.
+
+     THE FIRST SLOT OF THIS DESCRIPTOR is what buildBloomInto reports
+     (`perDescriptor` keeps the first petal it sees per descriptor), so this
+     names the same petal in every placement. On an UNSPLIT whorl `slots` is
+     null and this is `slot.index === 0` — the pre-fan expression, character
+     for character, which is every shipped default. On a split whorl it now
+     measures ONE PETAL PER ROLE instead of one per bloom: strictly more
+     coverage from the same expression, the shape J1 already gained under
+     CONTINUOUS. Both residuals are telemetry and neither construction emits
+     geometry, so no byte moves either way. */
+  const reportedForDescriptor = ring.slots === null ? slot.index === 0 : slot.index === ring.slots[0];
+
+  if (uniformThickness && reportedForDescriptor) {
     thicknessGuardResidual = 0;
     for (const row of rows) {
       thicknessGuardResidual = Math.max(thicknessGuardResidual, Math.abs(acc.floorThickness(profileT.at(row.u)) - row.tUsed));
@@ -2011,7 +2245,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      which is the case that made a pure IEEE-754 argument unattractive in
      the first place. Both gates assert this below 1e-9 on every row. */
   let guardResidual = null;
-  if (!form && slot.index === 0) {
+  if (!form && reportedForDescriptor) {
     const zero = petalForm({ petalCup: 0, petalSpineCurl: 0, petalRoll: 0, petalTwist: 0 }, halfW, t);
     guardResidual = 0;
     const dev = (a, b) => { for (let k = 0; k < 3; k++) guardResidual = Math.max(guardResidual, Math.abs(a[k] - b[k])); };
@@ -2468,6 +2702,15 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      footRing() invented would agree with a broken derivation by being broken
      alongside it; checked against the builder's own tally it cannot. */
   let petalsBuilt = 0;
+  /* THE AZIMUTHS AS EMITTED, one array per whorl — TELEMETRY ONLY, and
+     collected at the blade callback rather than recomputed afterwards.
+     That is `petalRingApplied`'s doctrine pointed at the arrangement: a
+     mirror claim checked against a restatement of the azimuth law would
+     agree with a broken law by being broken alongside it, and the mutation
+     this exists for (an arc that loses its mirror) is invisible to every
+     other instrument here — same triangle count, same STL byte length,
+     watertight, one piece. Z7 reads this and nothing else. */
+  const azimuths = Array.from({ length: fr.continuousMode ? 1 : fr.layerCount }, () => []);
   if (fr.continuousMode) {
     buildWhorlInto({
       count: fr.rings.length,
@@ -2481,7 +2724,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
          a thing. */
       phase: fr.rings[0].phase,
       placement: state.placement,
-      blade: (slot) => { petalsBuilt++; petals.push(buildPetalInto(acc, state, fr.rings[slot.index], slot, capability)); },
+      blade: (slot) => { petalsBuilt++; azimuths[0][slot.index] = slot.azimuth; petals.push(buildPetalInto(acc, state, fr.rings[slot.index], slot, capability)); },
     });
   } else {
   /* ONE WHORL PER LAYER STILL — a split whorl is several DESCRIPTORS, never
@@ -2501,15 +2744,24 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     const ring = slotsFor[0];
     const perDescriptor = new Map();
     buildWhorlInto({
-      count: state.petalCount,
+      /* THE WHORL'S SLOT COUNT, from footRing() rather than from the control.
+         Off the fan arm `slotsPerWhorl` IS `Math.round(state.petalCount)`, and
+         the RADIAL azimuth divides by this same `count` — so reading the owner
+         changes no arithmetic and removes the second place that decided how
+         many petals a whorl has. */
+      count: fr.slotsPerWhorl,
       radius: ring.radius,
       height: 0,
       sizeRamp: () => ring.scale,
       angleRamp: () => ring.tiltExtra,
       phase: ring.phase,
       placement: state.placement,
+      /* Owned by footRing() via fanArrangement(); null off the fan arm, which
+         buildWhorlInto requires in both directions. */
+      fanStep: fr.fanMode ? fr.fan.step : null,
       blade: (slot) => {
         petalsBuilt++;
+        azimuths[L][slot.index] = slot.azimuth;
         const d = slotsFor[slot.index];
         const p = buildPetalInto(acc, state, d, slot, capability);
         /* ONE REPORTED PETAL PER DESCRIPTOR — its first slot's. Under the
@@ -2526,5 +2778,5 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
   }
   buildHubInto(acc, state, fr.hub);          // unconditional — the invariant's plumbing
   const center = buildCenterInto(acc, state, fr.hub);   // optional — the designed mass
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, foot: fr, center, petal: petals[0], petals, petalsBuilt };
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, foot: fr, center, petal: petals[0], petals, petalsBuilt, azimuths };
 }

@@ -51,8 +51,17 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
+/* --only <substring> — run just the rows whose label contains it. A
+   DIAGNOSTIC filter for positive-control work and nothing else: it is never
+   used by CI, and a filtered run is NEVER a gate pass. Every filtered run
+   says so on its own last line, because "the rows I chose to look at were
+   clean" and "the gate passed" are different claims and this project has
+   already reported one as the other once (the continuous-arm connectedness
+   measurement that self-reported HARNESS INVALID). */
+const ONLY = (() => { const i = process.argv.indexOf('--only'); return i >= 0 ? process.argv[i + 1] : null; })();
 
-const rows = buildMatrix();
+const rows = ONLY ? buildMatrix().filter((r) => r.label.includes(ONLY)) : buildMatrix();
+if (ONLY && !rows.length) { console.error(`--only ${JSON.stringify(ONLY)} matched no row`); process.exit(2); }
 if (NEGATIVE_CONTROL) {
   rows.length = 1;
   rows[0] = { label: 'NEGATIVE CONTROL: petalCount 999 (browser must clamp; read-back must reject)', set: [{ id: 'petalCount', value: '999' }] };
@@ -177,6 +186,7 @@ console.log(`${results.length - countMoved.length}/${results.length} configs hav
 console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
+if (ONLY) console.log(`\nFILTERED RUN — --only ${JSON.stringify(ONLY)} selected ${rows.length} of ${buildMatrix().length} rows. THIS IS NOT A GATE PASS; it is a measurement of the rows named.`);
 
 let bad = false;
 if (validity.length) {
