@@ -9,35 +9,33 @@
 // is the whole point of this file's shape.
 
 import { PRINT_SPEC, getSafeRect, SUIT_GROUP } from './deck-builder.js';
+import { resolveFont, fontShorthand, DEFAULT_FONT_ID } from './font-manager.js';
 
 // ---------------------------------------------------------------------
-// Deck-wide style controls — "04 Style" panel on cards.html. Global only
+// Deck-wide style controls — "03 Style" panel on cards.html. Global only
 // (no per-suit variants in this pass): corner-index inset + font, and a
 // suit-glyph scale applied relative to each context's own base size.
+//
+// The font is no longer a five-entry list here — cards/font-manager.js owns
+// the whole font system (the Google Fonts catalog, uploaded files, and the
+// loading contract). This file only asks it "what do I set ctx.font to?".
 // ---------------------------------------------------------------------
-
-// Curated, print-safe corner-index fonts spanning the site's Fraunces
-// (serif display) / IBM Plex Mono (mono body) pairing plus a couple of
-// siblings, so the dropdown offers real variety without free-text risk.
-// `family` is the full canvas font-family value, fallback stack included.
-export const CORNER_FONT_OPTIONS = [
-  { id: 'plex-mono', label: 'IBM Plex Mono', family: '"IBM Plex Mono", "SFMono-Regular", Consolas, monospace' },
-  { id: 'plex-sans', label: 'IBM Plex Sans', family: '"IBM Plex Sans", Helvetica, Arial, sans-serif' },
-  { id: 'fraunces', label: 'Fraunces', family: '"Fraunces", "Iowan Old Style", Georgia, serif' },
-  { id: 'playfair', label: 'Playfair Display', family: '"Playfair Display", Georgia, serif' },
-  { id: 'space-mono', label: 'Space Mono', family: '"Space Mono", "SFMono-Regular", monospace' },
-];
 
 export const DEFAULT_STYLE = {
   cornerInsetPct: 4.5, // % of the safe-rect width, from the corner
-  cornerFontId: 'plex-mono', // drives both the corner rank letter and the court-card center letter
+  cornerFontId: DEFAULT_FONT_ID, // drives both the corner rank letter and the court-card center letter
   glyphScale: 1, // 0.5–1.5, relative to each context's own base size
   glyphOffsetPct: 30, // 0–100% of one glyph-height of extra travel, on top of the anti-overlap floor
 };
 
-export function getCornerFontFamily(id) {
-  const opt = CORNER_FONT_OPTIONS.find((f) => f.id === id);
-  return (opt || CORNER_FONT_OPTIONS[0]).family;
+// The ONE place a card's text font is turned into a ctx.font string. Both the
+// corner rank letter and the court-card centre letter call it, so "one font,
+// both places" is structural rather than a convention two call sites have to
+// remember. The weight comes from the resolved spec, not a literal: asking a
+// family for a weight it does not ship is how you get a synthesised bold that
+// the preview and the export can disagree about.
+function cardFont(style, sizePx) {
+  return fontShorthand(resolveFont(style.cornerFontId), Math.round(sizePx));
 }
 
 // ---------------------------------------------------------------------
@@ -198,7 +196,7 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
   const fontSize = Math.round(safe.w * 0.11);
   const glyphSize = fontSize * 0.9 * style.glyphScale;
   const pad = safe.w * (style.cornerInsetPct / 100);
-  const fontFamily = getCornerFontFamily(style.cornerFontId);
+  const cornerFont = cardFont(style, fontSize);
 
   // Fixed floor between the letter's true bottom edge and the top of the
   // mini glyph below it, so the two never touch regardless of font or
@@ -217,7 +215,7 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
       ctx.translate(safe.x + pad, safe.y + pad);
     }
     ctx.fillStyle = color;
-    ctx.font = `600 ${fontSize}px ${fontFamily}`;
+    ctx.font = cornerFont;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'hanging';
     ctx.fillText(rank, 0, 0);
@@ -225,8 +223,9 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
     // Measured, not assumed: actualBoundingBoxDescent (relative to the
     // hanging baseline set above) is the real distance down to the
     // glyph's bottom edge for whichever font is selected, so the gap
-    // stays correct across every option in CORNER_FONT_OPTIONS instead
-    // of only the one font this used to be tuned for.
+    // stays correct across every family the picker can select — the whole
+    // Google Fonts catalog and any uploaded file — instead of only the one
+    // font this used to be tuned for.
     const metrics = ctx.measureText(rank);
     const letterBottom = metrics.actualBoundingBoxDescent || fontSize * 0.8;
 
@@ -297,7 +296,7 @@ function drawCourtCard(ctx, rank, suit, palette, safe, suitImages, style) {
   const letterSize = plateH * 0.62;
   ctx.save();
   ctx.fillStyle = other;
-  ctx.font = `600 ${letterSize}px ${getCornerFontFamily(style.cornerFontId)}`;
+  ctx.font = cardFont(style, letterSize);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(COURT_LETTERS[rank], cx, cy - plateH * 0.08);

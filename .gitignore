@@ -12,6 +12,12 @@ tools/dress-shell/out/
 audit-out/
 
 # package.json is committed so Netlify installs the Function's @netlify/blobs
-# dependency at deploy time. Local dev deps (three, playwright-core) live in the
-# gitignored node_modules and are NOT listed here — the browser loads three from
-# the CDN and the verify/shot tools use whatever is already in node_modules.
+# dependency at deploy time. Local dev deps (three, playwright-core, and for
+# tools/verify-cards-fonts.mjs: jspdf@2.5.1, jszip, google-font-metadata) live
+# in the gitignored node_modules and are NOT listed here — the browser loads
+# three, jsPDF and JSZip from the CDN, and the verify/shot tools use whatever
+# is already in node_modules.
+
+# tools/verify-cards-fonts.mjs replays real Google Fonts responses from here so
+# a second run needs no network. Regenerable, so not committed.
+tools/.cache/

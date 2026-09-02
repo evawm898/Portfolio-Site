@@ -294,7 +294,13 @@ a { color: var(--ink); text-decoration: none; }
   cursor: pointer;
 }
 
-.cd-select {
+/* Font picker — replaces the old five-entry <select>. Search + category
+   chips over a scrolling list of the whole Google Fonts catalog, plus the
+   uploaded-font path. Each row previews in its own family, but only once it
+   has actually scrolled into view (cards.js) — the catalog is never
+   preloaded. */
+
+.cd-font-search {
   display: block;
   width: 100%;
   margin-top: 0.5rem;
@@ -304,8 +310,149 @@ a { color: var(--ink); text-decoration: none; }
   background: var(--paper);
   border: 1px solid var(--line-strong);
   padding: 0.5rem 0.6rem;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
+.cd-font-search:focus {
+  outline: none;
+  border-color: var(--petrol);
+}
+
+.cd-font-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.cd-font-cat {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 0.3rem 0.45rem;
   cursor: pointer;
 }
+
+.cd-font-cat:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+.cd-font-cat[aria-pressed="true"] {
+  color: var(--paper-raised);
+  background: var(--petrol);
+  border-color: var(--petrol);
+}
+
+.cd-font-list {
+  margin-top: 0.5rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+}
+
+.cd-font-list:focus-visible { outline: 1px solid var(--petrol); outline-offset: -1px; }
+
+.cd-font-group {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--paper-raised);
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+}
+
+.cd-font-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+
+.cd-font-row:last-child { border-bottom: none; }
+.cd-font-row:hover { background: var(--paper-raised); }
+
+.cd-font-row[aria-selected="true"] {
+  background: var(--petrol);
+  color: var(--paper-raised);
+}
+
+.cd-font-row[aria-selected="true"] .cd-font-row__meta { color: var(--paper-raised); opacity: 0.75; }
+
+.cd-font-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Overridden inline, per row, once that row's family has loaded. */
+}
+
+.cd-font-row__meta {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.cd-font-empty {
+  font-size: 11px;
+  color: var(--ink-faint);
+  padding: 1rem 0.6rem;
+  text-align: center;
+}
+
+.cd-font-count {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 0.4rem;
+}
+
+.cd-font-upload {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.cd-font-upload .cd-file-btn { flex: none; }
+
+.cd-font-upload__note {
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+.cd-font-status {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  margin-top: 0.5rem;
+  min-height: 1.4em;
+}
+
+.cd-font-status--error { color: #a3372f; }
 
 /* Export buttons */
 

@@ -11,10 +11,12 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Fraunces + IBM Plex Mono are the site's own display/body pair, already
-     loaded above; the rest of this family only serves the corner-index
-     font dropdown in "04 Style" (cards/card-template.js CORNER_FONT_OPTIONS)
-     and is loaded the same way — no build step. -->
+<!-- Fraunces + IBM Plex Mono are the site's own display/body pair; the rest
+     of this request serves the five built-in options in the "03 Style" font
+     picker (cards/font-manager.js BUILTIN_FONTS), so the default corner index
+     paints real type on first frame with no extra round trip. Every OTHER
+     family in the picker — the whole 1,891-family Google Fonts catalog — is
+     fetched one at a time, only when selected. Nothing else is preloaded. -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&family=Playfair+Display:wght@600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="cards.css">
 
@@ -78,9 +80,31 @@
       </div>
 
       <div class="cd-field">
-        <label class="cd-field__label" for="styleCornerFont">Corner index font</label>
-        <select id="styleCornerFont" class="cd-select"></select>
-        <span class="cd-field__sub">Also sets the large center letter on court cards — one font, both places.</span>
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="fontSearch">Corner index font</label>
+          <output class="cd-field__value" id="fontCurrentName" for="fontSearch">IBM Plex Mono</output>
+        </div>
+
+        <input type="search" id="fontSearch" class="cd-font-search" autocomplete="off" spellcheck="false"
+               placeholder="Search fonts&hellip;" aria-describedby="fontCount">
+
+        <div class="cd-font-cats" id="fontCategories" role="group" aria-label="Filter fonts by category"></div>
+
+        <div class="cd-font-list" id="fontList" role="listbox" tabindex="0" aria-label="Fonts"></div>
+        <div class="cd-font-count" id="fontCount" role="status" aria-live="polite"></div>
+
+        <div class="cd-font-upload">
+          <label class="cd-file-btn">Upload font
+            <!-- accept is set from CUSTOM_FONT_ACCEPT in cards/font-manager.js,
+                 next to the extension check that enforces it. -->
+            <input type="file" id="fontUpload">
+          </label>
+          <span class="cd-font-upload__note">.ttf &middot; .otf &middot; .woff &middot; .woff2. You are responsible for holding print/commercial rights to any font you upload.</span>
+        </div>
+
+        <div id="fontStatus" class="cd-font-status" role="status" aria-live="polite"></div>
+
+        <span class="cd-field__sub">Also sets the large center letter on court cards — one font, both places. The chosen font is fully loaded before any card is drawn, in the preview and in both exports.</span>
       </div>
 
       <div class="cd-field">
