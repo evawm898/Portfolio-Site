@@ -1720,6 +1720,48 @@ any of them.
       session A recorded and rejected, since a group per petal is a registry row per petal
       rather than one control id holding several values.
 
+## Verification retention — how much of the frozen suite a close-out runs
+
+**RULED Sep 2, from this session's own close-out. FROM SESSION 11 ONWARD a session's
+close runs the NEWEST baseline plus the LIVE-MATRIX partition; the FULL historical suite
+runs only at MILESTONES.** The historical baselines are RETAINED, never deleted — only
+their routine byte-comparison is demoted.
+
+**THE REASONING, AND IT IS A MEASUREMENT RATHER THAN AN IMPRESSION.** The suite is
+1,049 rows and it grows by the whole live matrix every session — 47, then 76, 86, 106,
+125, 158, 205, 246. That is **quadratic in project age**: each session adds a baseline
+whose size is the current matrix, and every later close re-runs all of them, on two trees
+each. This close-out spent an afternoon on it. Session 11's would spend longer, for
+strictly less new information than the same minutes spent anywhere else.
+
+**WHAT A CLOSE RUNS, and why each piece is the right one:**
+
+  * **THE NEWEST BASELINE, on both trees.** It is the parent tree's own matrix, so it
+    carries every corner every earlier baseline carries PLUS the ones the last session
+    added — which is exactly the reasoning that has promoted each baseline to "strongest"
+    in turn since phase4. **This is the load-bearing byte-identity claim**: "nothing that
+    shipped before this change moved."
+  * **THE LIVE-MATRIX PARTITION.** The new rows cannot appear in any frozen matrix — for
+    the fourth session running, `--full` could not compare across the two trees at all
+    because the new rows set controls the old registry does not declare. The live
+    partition is the only instrument for the region a change actually affects.
+  * **CI's `--verify-frozen` IS UNCHANGED AND RUNS ON EVERY PUSH**, proving every frozen
+    matrix deep-equal to its own base commit's `buildMatrix()`. So the baselines keep
+    being checked for what they ARE; what is demoted is only re-exporting their bytes.
+
+**WHAT A MILESTONE IS, stated so it is not decided by mood:** before any production
+publish, or when a change touches the AREA RULE or the EXPORT PATH directly. Both are the
+places a byte can move on a row nobody thought to look at — the area rule because every
+foot feeds it and the trap has now fired five times, and the export path because the
+floor is evaluated there and live/export geometry legitimately differ.
+
+**WHAT THIS GIVES UP, said plainly rather than discovered later.** A defect that moves a
+row present in phase2 but absent from the newest baseline would now be caught at the next
+milestone instead of the next close. That row set shrinks every session (the newest
+baseline is a superset in coverage of nearly everything older) and no such defect has ever
+been observed in ten sessions — but "never observed" is not "impossible", and this is the
+exposure the ruling accepts in exchange for the minutes.
+
 - ~~Session 10 — the fan arrangement~~ **BUILT Sep 2. The fourth `placement` value ships:
   a symmetric arc across one axis, in the flower's own control vocabulary, with the
   zygomorphy roles composing onto it rather than being redone.** The ruling that queued it
@@ -1958,6 +2000,29 @@ any of them.
       figure outlives its run: the total would have sat in that cell across every later
       session whose matrix grew. The caption states the PROPERTY now and names the one
       owner of the number; the frozen matrices measure it and the shot tool does not.
+
+    - **EVA'S RULINGS FROM THE SHEET (Sep 2). THE FAN SHIPS.** Four rulings, and only
+      one of them moved anything:
+
+        * **THE TOGGLE DEFAULTS TO ON, DELIBERATELY DIVERGING FROM THE FLOWER'S OWN
+          DEFAULT — and both halves are recorded so the divergence reads as chosen.** The
+          flower ships `bilCenterPetal` FALSE, and every other thing about this control —
+          its range, its labels, its hint text, its spacing law — is the flower's exactly.
+          Matching it was the obvious call. What outranked it is Eva's own founding fan
+          principle, *the petal on the mirror line is petal number one, and it has its own
+          sliders*: with the toggle ON, slot 0 IS that petal and IS the labellum, because
+          slot 0 is the through-slot involution's fixed point. A fresh fan should open
+          showing the principle it was built on rather than the state where that principle
+          has no single petal to point at. **Consistency with the older page lost to the
+          idea the newer one is for**, and that is the ruling, not an oversight.
+        * **THE SPACING RANGE SHIPS AS-IS** — 15–60°, the flower's own, unchanged.
+        * **THE PAIRED LABELLUM ON TOGGLE-OFF IS FINE.** Ruled from the cell where one
+          control drives two petals and the area rule multiplies that group by 2.
+        * **THE 340° EXTREME KEEPS ITS 170° LIMIT, PHOTOGRAPHED** — the standing pattern
+          for extremes, joining the max-roll faceting, the ROLL CLAMP look, the spread-6
+          plate and the 135°/161.25° tilts. **Tightening the limit remains one constant
+          change with that cell as its evidence; do not tighten it on the strength of the
+          number alone.**
 
     - **THE FAN SHEET, and the mirror line is drawn from a measurement.**
       `node tools/shot-bloom-fan.mjs <dir>` — the flower-fan composition Eva liked: face-on
