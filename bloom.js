@@ -287,6 +287,13 @@ let lastPetalsBuilt = 0;
    that silently built a full ring would have passed all of them at an
    identical triangle count and STL byte length. */
 let lastSlotAzimuths = [];
+/* THE PLACEMENT THE BUILD WAS MADE FROM — the registry control's value, kept
+   beside footRing()'s own `fan` record so J7 can cross-check the two. They
+   are genuinely two owners of one boundary (the registry owns the option
+   list; footRing() branches on it), which is the same relation Z5 already
+   checks for slot-role eligibility, and the same remedy: assert they agree on
+   every row rather than comment that they do. */
+let lastPlacement = 'RADIAL';
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
@@ -302,8 +309,10 @@ let capability = null;
 
 function buildGeometry({ exportMode }) {
   const acc = new MeshBuilder({ exportMode });
-  const built = buildBloomInto(acc, readUI(), { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
+  const uiForBuild = readUI();
+  const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (!exportMode) {
+    lastPlacement = uiForBuild.placement;
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
     lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
@@ -809,6 +818,7 @@ window.__bloomMetrics = () => ({
      each role got, which is what Z1's amended clause checks the hood's
      visibility against. */
   slotAzimuths: lastSlotAzimuths.map((row) => [...row]),
+  placement: lastPlacement,
   fan: lastFoot.fan ? { ...lastFoot.fan } : null,
   mirror: lastFoot.mirror,
   slotCount: lastFoot.slotCount,

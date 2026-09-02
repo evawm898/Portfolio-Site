@@ -43,7 +43,10 @@ profile, always beside the same bloom undifferentiated as the control — and
 SLOT roles have their own: `node tools/shot-bloom-orchid.mjs <dir>` — the
 labellum below, the hood above, FACE-ON as the headline (the reverse of the
 iris sheet's order, on purpose), with session A's iris on it as a cell that
-must be unmoved.
+must be unmoved. The FAN placement has one too:
+`node tools/shot-bloom-fan.mjs <dir>` — face-on with the mirror line drawn
+(from a per-cell measurement, never a layout guess), the toggle's two
+positions as a pair, a spacing sweep, and a radial bloom as the control.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
@@ -51,6 +54,17 @@ whorl joined to nothing and that gate still reports ONE piece, because
 consecutive foot annuli overlap each other. `junctionAssertions()` (J1–J6) in
 both gates is what carries that claim; do not weaken it on the strength of a
 green flood fill.
+
+**NOTHING IN THIS PROJECT MEASURES AN AZIMUTH EXCEPT J7 AND Z4b** — established
+by grep, not assumed. Both STL gates are azimuth-blind by construction, and so
+is everything built on them: J1 reads foot frames, J2/J3 read radii, J4 reads
+three lengths, J5/J6 read the depth sequence, Z1–Z6 read role membership. A FAN
+that silently builds a full ring therefore exports watertight, as one piece, at
+an identical triangle count and STL byte length, and passes every other check
+here — measured on a worktree. `J7` (the arc, the notch, the minimum angular
+separation) and `Z4b` (the pairing is a bijection about ONE plane) are the only
+witnesses, and a wrong mirror involution is BIT-IDENTICAL, so only Z4b sees it.
+Do not read a green run as endorsing an arrangement's azimuths.
 
 **Neither STL gate can see zygomorphy at all** — measured on SEVEN worktrees
 across two sessions, not derived: an override that lands on the wrong whorl, a

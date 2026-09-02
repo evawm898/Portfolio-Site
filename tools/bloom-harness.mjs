@@ -62,7 +62,8 @@ export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredi
    a wall the geometry does not build. */
 export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT,
          ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
-         SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+         SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
+         FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 
 /* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
    name for the default sheet thickness and the registry carries a literal
@@ -1091,6 +1092,128 @@ export async function junctionAssertions(page, row) {
     bad.push(`J6: a ringed row reports quantizerResiduals ${JSON.stringify(qr)} — there is no second law to compare against here, and a claim nothing can make must read as absent`);
   }
 
+  /* ===================================================================
+     J7 — THERE IS AN ARC, AND THERE IS A GAP. The fan's own instrument, and
+     the one this session exists for.
+
+     WHY IT HAD TO BE WRITTEN, derived by GREP rather than assumed. Before
+     this session nothing in this repository recorded a petal's azimuth:
+     `azimuth` appeared only inside buildWhorlInto, where it is computed, and
+     buildPetalInto, where it is consumed. So EVERY instrument here is
+     structurally blind to where a petal sits around the axis — the export
+     gate counts boundary edges on a topology no control moves, the
+     connectedness gate floods a hub disc that spans every ring at every
+     azimuth, J1 reads foot FRAMES, J2/J3 read RADII, J4 reads the overlap
+     box's three dimensions, J5/J6 read the depth sequence, and Z1-Z6 read
+     role membership and the effective state.
+
+     MEASURED, on a throwaway worktree, before these clauses were written: a
+     FAN whose azimuth arm falls through to the RADIAL expression — a fan that
+     silently builds a FULL RING — fires NOTHING. Same petal count, same feet,
+     same ring radius, same hub, watertight, one connected piece, identical
+     triangle count and identical STL byte length. Ten sessions of instruments
+     and not one of them could see it.
+
+     THREE CLAUSES, each catching what the others miss, and all of them
+     PROPERTIES of the emitted azimuths rather than restatements of the law
+     (an instrument that recomputed `+-k * step` would agree with a mutated
+     law by mutating alongside it):
+
+       (a) THE SPAN. The angular extent the petals actually occupy equals the
+           span footRing() derived. A ring occupies 360 and fires here.
+       (b) THE GAP IS THE COMPLEMENT. The largest gap between neighbouring
+           azimuths equals 360 minus the span — which is what makes the
+           arrangement an ARC rather than a circle, and is exactly the claim
+           the word "fan" makes. A ring's largest gap is one step.
+       (c) THE MINIMUM SEPARATION IS BOUNDED BELOW. No two slots may share an
+           azimuth: coincident petals are duplicate geometry, this family's
+           known cause of non-manifold edges (14,832 of them when two whorls
+           coincided, which is why `layerSize` caps at 0.90). This is what the
+           arc limit exists for, and asserting it is what makes the cap
+           MEASURED rather than trusted.
+
+     AND THE NEGATIVE, because a check only ever made one way is a check that
+     can be stuck: every non-FAN placement must report no fan law at all. */
+  {
+    const DEG = 180 / Math.PI;
+    const f = m.fan;
+    const isFan = f !== null && f !== undefined;
+    if (isFan !== (m.placement === 'FAN')) {
+      bad.push(`J7: the build reports ${isFan ? 'a' : 'no'} fan law while the placement is ${m.placement} — a claim nothing can make must read as absent, and a law nothing applies must not`);
+    }
+    if (isFan) {
+      const rows7 = m.slotAzimuths;
+      if (!Array.isArray(rows7) || !rows7.length) {
+        bad.push('J7: a FAN row reports no slot azimuths — the arc cannot be checked, and NOTHING ELSE HERE CAN SEE IT (a fan that silently builds a full ring exports watertight, in one piece, at an identical triangle count and byte length)');
+      } else rows7.forEach((row, L) => {
+        if (!Array.isArray(row) || row.length < 1) { bad.push(`J7: whorl ${L} reported no azimuths`); return; }
+        /* SIGNED AZIMUTHS IN (-180, 180], because the span is measured THROUGH
+           THE MIRROR LINE and the notch is what is left over behind it.
+
+           THE OBVIOUS MEASUREMENT IS WRONG AND THE POSITIVE CONTROL SAID SO.
+           The first draft took the span as "360 minus the LARGEST gap", which
+           is the smallest arc containing every petal — and that is NOT the
+           fan's span wherever the arc limit bites hard: at 8 per side with a
+           mirror-line petal the step is capped to 21.25 deg and the back notch
+           is 20 deg, so the notch is SMALLER than the spacing and the largest
+           gap is an ordinary inter-petal one. The shipped tree failed its own
+           new assertion on that row. The span is the extent about the PLANE,
+           which is 2 x the furthest petal from it. */
+        const signed = row.map((a) => {
+          let d = ((a * DEG) % 360 + 360) % 360;
+          return d > 180 ? d - 360 : d;
+        });
+        const deg = row.map((a) => ((a * DEG) % 360 + 360) % 360).sort((x, y) => x - y);
+        /* THE GAPS AROUND THE CIRCLE, including the wrap. */
+        const gaps = deg.map((d, i) => (i + 1 < deg.length ? deg[i + 1] - d : 360 - d + deg[0]));
+        const minGap = Math.min(...gaps);
+        const hi = Math.max(...signed), lo = Math.min(...signed);
+        /* (a0) THE ARRANGEMENT IS CENTRED ON THE PLANE — the furthest petal on
+           each side is equally far. This is the fan's mirror symmetry stated
+           over the AZIMUTHS rather than over the roles, and it is what makes
+           the span below a well-defined quantity rather than an assumption
+           that the plane sits at zero. */
+        if (Math.abs(hi + lo) > 1e-9) {
+          bad.push(`J7: whorl ${L} reaches ${hi.toFixed(4)} deg on one side of the mirror line and ${lo.toFixed(4)} deg on the other — a fan is a SYMMETRIC arc, and this one is lopsided about its own plane`);
+        }
+        const span = hi - lo;
+        /* (a) */
+        if (Math.abs(span - f.spanDeg) > 1e-6) {
+          bad.push(`J7: whorl ${L}'s petals span ${span.toFixed(4)} deg about the mirror line but footRing() derived ${f.spanDeg.toFixed(4)} deg — the arrangement is not the fan it says it is. A FAN falling through to the RADIAL azimuth law lands here and is invisible to EVERYTHING else in this repository: same petals, same feet, same hub, watertight, one piece, identical triangle count and identical STL byte length.`);
+        }
+        /* (b) THE NOTCH IS THE COMPLEMENT — what is left of the circle behind
+           the fan, and the whole of what the word "fan" claims. */
+        const notch = 360 - span;
+        if (Math.abs(notch - f.gapDeg) > 1e-6) {
+          bad.push(`J7: whorl ${L} leaves a ${notch.toFixed(4)} deg notch behind it against the derived ${f.gapDeg.toFixed(4)} deg — the notch is what makes this an ARC and not a circle`);
+        }
+        /* (c) */
+        if (!(minGap > 1e-9)) {
+          bad.push(`J7: whorl ${L} has two slots ${minGap.toExponential(3)} deg apart — coincident petals are DUPLICATE GEOMETRY, which is this family's known cause of non-manifold edges (measured at 14,832 when two whorls coincided). The ${f.limitDeg} deg arc limit exists to make this unreachable; it did not.`);
+        }
+        const floor7 = Math.min(f.stepDeg, f.gapDeg);
+        if (minGap < floor7 - 1e-6) {
+          bad.push(`J7: whorl ${L}'s tightest neighbours are ${minGap.toFixed(4)} deg apart, below the min(step ${f.stepDeg.toFixed(4)}, notch ${f.gapDeg.toFixed(4)}) = ${floor7.toFixed(4)} deg the law guarantees — the two sides have swept past each other`);
+        }
+      });
+      if (!(f.gapDeg > 0)) {
+        bad.push(`J7: the derived back notch is ${f.gapDeg.toFixed(4)} deg — at or below zero the two sides meet and the arc has closed into a circle; the ${f.limitDeg} deg arc limit is what bounds it away from that`);
+      }
+      if (!(f.perSide >= 1 && f.perSide <= MAX_FAN_PER_SIDE)) {
+        bad.push(`J7: fan perSide ${f.perSide} is outside 1..${MAX_FAN_PER_SIDE} (MAX_FAN_PER_SIDE) — the registry's range and the geometry's bound have diverged`);
+      }
+      if (f.limitDeg !== FAN_ARC_LIMIT_DEG) {
+        bad.push(`J7: the build reports an arc limit of ${f.limitDeg} against FAN_ARC_LIMIT_DEG ${FAN_ARC_LIMIT_DEG} — two statements of one bound`);
+      }
+      /* THE CAP IS REPORTED IN BOTH DIRECTIONS. A "(CAPPED)" that can never
+         turn off, or one that never turns on, is a flag nobody checked. */
+      const wantCapped = f.stepDeg < f.askedDeg - 1e-12;
+      if (Boolean(f.capped) !== wantCapped) {
+        bad.push(`J7: the fan reports capped=${f.capped} while the built step ${f.stepDeg} ${wantCapped ? 'is' : 'is not'} below the asked-for ${f.askedDeg} — the read-out's "(CAPPED)" is a label on a computation nobody performed`);
+      }
+    }
+  }
+
   return bad;
 }
 
@@ -1175,7 +1298,27 @@ export async function zygoAssertions(page, row) {
   const cont = m.continuousMode === true;
   const LAYER_ROLES = new Set([ROLE_OUTER, ROLE_INNER]);
   const SLOT_ROLES = new Set(SLOT_ROLE_ORDER);
-  const n = Math.round(Number(ui.petalCount));
+  /* THE SLOT COUNT COMES FROM THE MODEL, NOT FROM THE CONTROL — and this was
+     a REAL DEFECT in the shipped instrument, found by running this session's
+     positive controls against the SHIPPED tree before writing any new
+     assertion (the discipline that caught session A's Z1 draft failing 5 of
+     7 rows).
+
+     It read `Math.round(Number(ui.petalCount))`. That was correct while every
+     placement's slot count WAS that slider — and the fan makes `petalCount`
+     inert and hidden, deriving the count from `fanPerSide` and the toggle
+     instead. So on every FAN row the gate compared a 6- or 7- or 17-slot
+     whorl against the slider's 8: Z3 read `multiRole` TRUE on an unsplit
+     whorl and demanded an absent residual, Z1 reported "claims 7 of its 8
+     slots" on a correct partition, and Z4 read a role for a slot that does
+     not exist and got `undefined`. Six of eight probe rows fired on the
+     SHIPPED tree.
+
+     A gate deriving a boundary from a control instead of from the owner is
+     this project's most repeated defect, and it had been sitting in the
+     instrument built to police exactly that. `m.slotCount` is footRing()'s
+     own answer — the same double buildWhorlInto was handed. */
+  const n = m.slotCount;
 
   if (!Array.isArray(rings) || !rings.length) { bad.push('Z1: rings is empty — no role claim can be checked'); return bad; }
   if (!Array.isArray(applied) || applied.length !== rings.length) {
@@ -1335,20 +1478,146 @@ export async function zygoAssertions(page, row) {
     }
     for (const [L, roleAt] of byLayer) {
       for (let i = 0; i < n; i++) {
-        const mirror = (n - i) % n;
-        if (roleAt.get(i) !== roleAt.get(mirror)) {
-          bad.push(`Z4: whorl ${L} gives slot ${i} the role ${roleAt.get(i)} and its mirror image slot ${mirror} the role ${roleAt.get(mirror)} — the plane through slot 0 pairs i with n-i, so an assignment that differs across it is not bilaterally symmetric and the word "mirror" is a label on a computation nobody performed. NOTHING ELSE HERE CAN SEE THIS: the partition is still total and disjoint, the group sizes are unchanged so the area-rule sum is bit-identical, and the export is watertight, one piece and the same length.`);
+        const partner = mirrorPartner(i, n, m.mirror);
+        if (roleAt.get(i) !== roleAt.get(partner)) {
+          bad.push(`Z4a: whorl ${L} gives slot ${i} the role ${roleAt.get(i)} and its mirror image slot ${partner} the role ${roleAt.get(partner)} — the ${m.mirror} plane pairs them, so an assignment that differs across it is not bilaterally symmetric and the word "mirror" is a label on a computation nobody performed. NOTHING ELSE HERE CAN SEE THIS: the partition is still total and disjoint, the group sizes are unchanged so the area-rule sum is bit-identical, and the export is watertight, one piece and the same length.`);
           break;
         }
       }
-      /* THE CONTROL-BEARING ROLES HAVE MEMBERS. LATERAL may legitimately be
-         empty — at petalCount 3 there are none — and that is exactly why the
-         empty group was pushed onto the role with no controls. A missing
-         LABELLUM or HOOD would be eight sliders naming a group that does not
-         exist, which is what Z1 already fails INNER on. */
-      for (const need of [SLOT_LABELLUM, SLOT_HOOD]) {
-        if (![...roleAt.values()].includes(need)) {
-          bad.push(`Z4: whorl ${L} has no ${need} at petalCount ${n}, yet its controls are shown — a control naming a group with no members`);
+    }
+  }
+
+  /* ===================================================================
+     Z4b — THE PAIRING IS THE ARRANGEMENT'S OWN, MEASURED FROM THE AZIMUTHS.
+
+     WHY Z4a IS NOT ENOUGH, and it took a positive control to show it. Z4a
+     asserts the ROLE assignment is symmetric under the DECLARED involution,
+     which catches an off-by-one in `roleForSlot` — session B's M1. It cannot
+     catch a wrong DECLARATION: mutate `mirrorFor` to return the through-slot
+     pairing on a through-gap fan and Z4a compares the roles against the very
+     pairing that is wrong, agrees with itself, and stays silent. Measured on
+     a throwaway worktree BEFORE this was written: that mutation fires nothing
+     in the entire shipped instrument, at an identical triangle count and an
+     identical STL byte length.
+
+     SO THIS ONE READS THE GEOMETRY. A mirror plane is a claim about where the
+     PETALS are, and until this session nothing in this repository recorded a
+     petal's azimuth at all (see __bloomMetrics's slotAzimuths note). Two
+     clauses, and each catches what the other misses:
+
+       (i)  THE PAIRING IS A BIJECTION. Every slot is some slot's partner
+            exactly once. A many-to-one "pairing" reports a beautiful
+            symmetry for an arrangement that has none — the trap the FIRST
+            instrument written for session B's SPIRAL measurement fell into,
+            reporting 0.000 deg for a golden-angle whorl. It is a permanent
+            clause here for that reason.
+       (ii) ONE PLANE. For every slot, the midpoint of its own azimuth and its
+            partner's is the SAME angle modulo pi — which is what "these two
+            are reflections of each other about one plane" means. The
+            FIXED-POINT slots are what make this bite: a fixed point must lie
+            ON the plane, so a pairing borrowed from the wrong arm puts the
+            self-paired slot somewhere the other pairs' midpoint is not.
+
+     A TOLERANCE, AND IT IS SAID SO. Under FAN the azimuths are built as +a
+     and -a from ONE magnitude, so this is exact; under RADIAL they are
+     `i * TAU / n` and the midpoints are genuine floating divisions. The bound
+     is 1e-9 rad — measured worst residual on the shipped tree is far below
+     it, and the asymmetries this is for are DEGREES (session A measured
+     4.736 to 32.461 deg), so nothing real can hide under it. */
+  {
+    const TWO_PI = Math.PI * 2;
+    const az = m.slotAzimuths;
+    if (!Array.isArray(az) || !az.length) {
+      bad.push('Z4b: the build reported no slot azimuths — the mirror plane is a claim about where the petals are, and nothing here can check it');
+    } else if (m.slotRolesEligible) {
+      az.forEach((row, L) => {
+        if (!Array.isArray(row) || row.length !== n) {
+          bad.push(`Z4b: whorl ${L} reported ${row && row.length} azimuths for ${n} slots`);
+          return;
+        }
+        /* (i) THE BIJECTION. */
+        const hit = new Array(n).fill(0);
+        for (let i = 0; i < n; i++) {
+          const partner = mirrorPartner(i, n, m.mirror);
+          if (!(partner >= 0 && partner < n)) { bad.push(`Z4b: slot ${i} pairs to ${partner}, outside 0..${n - 1}`); return; }
+          if (mirrorPartner(partner, n, m.mirror) !== i) { bad.push(`Z4b: the ${m.mirror} pairing is not an involution — slot ${i} pairs to ${partner}, which pairs back to ${mirrorPartner(partner, n, m.mirror)}`); return; }
+          hit[partner]++;
+        }
+        const notOnce = hit.map((c, i) => [i, c]).filter(([, c]) => c !== 1);
+        if (notOnce.length) {
+          bad.push(`Z4b: the ${m.mirror} pairing is not a BIJECTION — slot(s) ${notOnce.map(([i, c]) => `${i} (claimed ${c}x)`).join(', ')}. A many-to-one pairing reports a perfect symmetry for an arrangement that has none; this is the trap the first SPIRAL instrument fell into.`);
+          return;
+        }
+        /* (ii) ONE PLANE, from the emitted azimuths. */
+        const planes = [];
+        for (let i = 0; i < n; i++) {
+          const j = mirrorPartner(i, n, m.mirror);
+          let phi = (row[i] + row[j]) / 2;
+          phi = ((phi % Math.PI) + Math.PI) % Math.PI;      // the plane is an axis, so modulo pi
+          planes.push({ i, j, phi });
+        }
+        const ref = planes[0].phi;
+        const off = planes.find((p) => {
+          const d = Math.abs(p.phi - ref);
+          return Math.min(d, Math.PI - d) > 1e-9;
+        });
+        if (off) {
+          const deg = (r) => ((r * 180) / Math.PI).toFixed(3);
+          bad.push(`Z4b: whorl ${L}'s slots are NOT all reflections of each other about one plane. Slots ${planes[0].i}/${planes[0].j} put it at ${deg(ref)} deg and slots ${off.i}/${off.j} put it at ${deg(off.phi)} deg — so the ${m.mirror} pairing this bloom declares is not the symmetry its azimuths actually have. NOTHING ELSE HERE CAN SEE THIS: Z4a checks the roles against this same declaration and agrees with it, the partition and the group sizes are untouched, and the export is watertight, one piece, at an identical triangle count and byte length.`);
+        }
+      });
+    } else if (m.slotAzimuths.some((row) => !Array.isArray(row))) {
+      bad.push('Z4b: a whorl reported no azimuth row at all');
+    }
+    void TWO_PI;
+  }
+
+  /* ===================================================================
+     Z1 (AMENDED, session 10) — A ROLE'S CONTROLS ARE VISIBLE IF AND ONLY IF
+     THE ROLE HAS MEMBERS, asserted in BOTH directions.
+
+     WHAT IT REPLACES, and why the amendment is stronger. Session B asserted
+     "LABELLUM and HOOD are non-empty" — true of every state that existed
+     then, and it stopped being true the moment the fan could reach a
+     two-petal arrangement where the inner pair and the outer pair are the
+     same pair. The labellum takes it (Eva's tie-break) and the hood comes out
+     EMPTY, which under the old clause was a hard failure of a state that is
+     perfectly well-formed.
+
+     The old clause's real content was never "these groups are non-empty" — it
+     was "no control names a group with no members". That is a statement about
+     VISIBILITY and MEMBERSHIP together, and stating it as one biconditional
+     ties the registry's `hoodEmpty` predicate to footRing()'s own census
+     rather than leaving two rules to agree by inspection. It also catches the
+     converse the old form could not: a role that HAS members while its
+     controls are hidden is a control the visitor cannot reach for a group
+     that exists — "shipped means reachable", violated silently.
+
+     CHECKED AGAINST THE GEOMETRY'S CENSUS, never against a second copy of the
+     derivation: `slotRoleCensus` is what `roleForSlot` actually produced. */
+  if (m.slotRolesEligible) {
+    const census = m.slotRoleCensus;
+    if (!census) {
+      bad.push('Z1: slot roles are eligible but the build reported no role census — the group sizes the hood\'s visibility depends on are unavailable');
+    } else {
+      for (const role of SLOT_ROLE_ORDER) {
+        /* DEDUPED, because one control may drive several bases — `hoodSize`
+           scales petalLength AND petalWidth, so it is two ROLE_OVERRIDES rows
+           and one slider. Counting rows would print "4 controls" for a group
+           that has three, which is a number naming a thing that is not the
+           thing in the message a reader would act on. */
+        const controls = [...new Set(ROLE_OVERRIDES.filter((o) => o.role === role).map((o) => o.control))];
+        if (!controls.length) continue;             // LATERAL has none, and may be empty
+        const members = census[role] || 0;
+        const shown = controls.filter((id) => {
+          const c = CONTROLS.find((x) => x.id === id);
+          return c && evalPredicate(c.visibleWhen, ui);
+        });
+        if (members === 0 && shown.length) {
+          bad.push(`Z1: ${role} has NO members in this arrangement, yet ${shown.length} of its ${controls.length} control(s) are visible (${shown.join(', ')}) — a control naming a group that does not exist`);
+        }
+        if (members > 0 && shown.length !== controls.length) {
+          bad.push(`Z1: ${role} has ${members} member(s), yet only ${shown.length} of its ${controls.length} control(s) are visible — a group exists and the visitor cannot reach the controls for it ("shipped means reachable")`);
         }
       }
     }
