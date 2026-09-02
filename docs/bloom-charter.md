@@ -1747,6 +1747,14 @@ prose is read, in a fixed place, in fixed words. `WAITING ON EVA` carries exactl
 question, because two questions in a ball-holder line is a report that has not decided
 what it needs.
 
+**AN AMENDMENT IS PASTED ONLY INTO THE SESSION WHOSE REPORT IT ANSWERS** (Eva, Sep 2, the
+second duplicate-session occurrence). Ruling on a report and pasting the ruling back are
+two different actions separated in time, and the second one is where a stale tab or a
+copied brief can hand the answer to the wrong session — Eva's own amendment for #133 once
+reached a fresh, unrelated session instead, which opened on it as if it were a new kickoff.
+Verify the branch name in the session's LAST report before pasting; if it does not match
+the session in front of you, it is not this session's amendment to answer.
+
 ## Incident, Sep 2 — one feature, two parallel sessions
 
 **A DUPLICATED KICKOFF PRODUCED TWO SESSIONS BUILDING THE FAN AT THE SAME TIME.** Both
