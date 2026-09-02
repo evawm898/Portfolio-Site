@@ -1720,8 +1720,206 @@ any of them.
       session A recorded and rejected, since a group per petal is a registry row per petal
       rather than one control id holding several values.
 
-- ~~Session 10~~ **RULED AND QUEUED (Eva, Sep 2): SESSION 10 IS THE FAN ARRANGEMENT — a
-  FOURTH `placement` value.** Not a role, not an override: an arrangement, so it belongs to
+- ~~Session 10: the fan arrangement~~ **BUILT Sep 2. A FOURTH `placement` value ships:
+  FAN, a symmetric arc across one axis. Eva's ruling, in the flower's own vocabulary.**
+  The entry below records what was QUEUED; this block records what was BUILT and what the
+  measurements changed about the queue.
+
+    - **THE HUB KEEPS THE FULL DISC (Eva, Sep 2), AND THE PREMISE THAT MADE IT A QUESTION
+      WAS MEASURED AND IS TRUE-BUT-NOT-THE-FAN'S.** The Phase A analysis compared every fan
+      against its RADIAL TWIN — the same petal count placed evenly, the same R0, the same
+      feet — so the fan's own contribution is isolated from geometry that already ships.
+      Across **900 swept configurations the fan's excess bare hub over its twin has a
+      MEDIAN of 1.6 percentage points**, a full range of −0.1 to +49.5, and at spread 6
+      (the charter's own flagged plate) **−0.1 to +8.6**. At the loudest state a fan
+      reaches — spread 6 × centre NONE — the fan is **78.9% bare and its radial twin is
+      78.9% bare**, to the tenth of a point. The 49.5-point worst case is a hub 3.9 mm
+      across and amounts to **5.7 mm² of bare slab**. The cause is that `overhang` is
+      0.4·R0, so feet only ever occupy the outer 40% of the radius and bare hub is
+      dominated by the RADIAL direction, not the azimuthal one. **The spread-6 plate is a
+      spread problem that has shipped since #123. The fan does not meaningfully worsen it.**
+
+    - **AND THE SECTOR WAS COSTED RATHER THAN DISMISSED, so it is not re-proposed from the
+      idea alone.** Four measured costs: (1) **J2 and J3 are pure RADIUS statements with no
+      azimuth term** (`r.radius <= hub.radius`, `radius − overhang < hub.radius`), sound
+      only because a disc is rotationally symmetric — a sector makes them necessary but not
+      sufficient and needs a new clause that is an `atan2` extremum over the foot rectangle,
+      i.e. **a bound with a tolerance, in the one place this project has kept equalities**.
+      (2) **It saturates to the disc exactly where the geometry is delicate**: the minimum
+      sector containing every foot is **≥ 359.6° on 7 of 17 named corners**, because a
+      foot's angular half-extent reaches 34.8° at the defaults, 50.3° at fewest×widest,
+      76.0° at spread min and **130.7° at ALL THIN, where it crosses the axis and emerges on
+      the far side**. (3) **J4's overlap box loses a free guarantee**: the circumferential
+      extent is `ring.width` by construction today and becomes `min(ring.width, clipped)` at
+      the two end feet. (4) **Triangles are not an argument**: the disc is 192; a sector at
+      the same 48/turn is 4M+4 — 164 at 294.7°, 60 at 103.8°, a saving of **0.29–1.2%** of
+      the default bloom — and **196 when it saturates, MORE than the disc it replaces**.
+      **The area rule is untouched by the choice either way**, because it sizes the RING
+      (where feet land) and not the plate's extent. The area-ruled annular band stays parked.
+
+    - **THE COUNT IS DERIVED AND `petalCount` HIDES rather than being relabelled.** A fan
+      has no turn, so petals-per-turn describes nothing there. One control with a
+      mode-dependent label is the stored-label-lie this project retires ids over; a second
+      count control dead in three modes is the same defect in a different hat. So it gets
+      the `layerPhase` treatment: hidden by predicate, INERT by derivation (`footRing()`
+      reads `fanArrangement().count` on that arm and never the control), value untouched and
+      returned the moment the placement is. `fanArrangement()` is its one owner and both
+      read-outs print the derived number.
+
+    - **`layerPhase` HIDES TOO, AND IS FORCED TO EXACTLY 0 — for the OPPOSITE reason to
+      CONTINUOUS's, which is why both are named rather than merged.** Under CONTINUOUS the
+      control has no job. Under FAN it has one and **the job destroys the placement**: the
+      mirror plane is the BLOOM's, so offsetting whorl L by L slots swings every inner whorl
+      off the one plane the arrangement exists to have — session B's measured
+      30.000°-at-n=3. Forcing the phase makes the azimuth antisymmetry hold by construction
+      at any depth, which is why the fan needs no depth clause in `slotRolesEligible()`.
+
+    - **ONE LAW COVERS BOTH TOGGLE POSITIONS, AND THE PARITY IS THE TOGGLE.** Slots run in
+      AZIMUTHAL ORDER across the arc (`az_i = phase + (i − (n−1)/2)·step`), so the pairing is
+      `i ↔ n−1−i` — fixed-point-free at even n, one fixed point at odd n — and
+      `n = 2·perSide + (on the line ? 1 : 0)` is odd exactly when a petal is on the line.
+      **Nothing in `roleForFanSlot()` branches on the control.** The charter derived this
+      involution three sessions early while correcting session A's SPIRAL premise; it needed
+      exactly the one that had been written down for a different reason. Measured on all 60
+      reachable configurations before anything was built: **pairing error exactly 0.000°,
+      the permutation a bijection on every one, and `az[i] + az[n−1−i] === 0` on all 450
+      slot pairs.** The instrument's control reproduces session A's four SPIRAL numbers to
+      the digit (32.461 / 20.062 / 12.399 / 4.736), so the zero is a result and not a
+      harness that always says zero.
+
+    - **ROLES: LABELLUM nearest the plane, HOOD at the ARC'S ENDS.** The hood is the pair
+      straddling the OPEN WEDGE, which is the only antipode an arc has and the direct
+      analogue of RADIAL's antipodal hood — so it is always a PAIR and never singular. At
+      n = 2 the two groups COLLIDE (both petals are the labellum pair, the hood has no
+      members), and **Z4's existing clause already rules on that**: a control-bearing role
+      with no members is a failure. So `slotRolesEligible()` gains **MIN_SLOT_ROLE_COUNT =
+      3**, vacuous under RADIAL (petalCount min 3) and therefore bit-identical there.
+
+    - **A SIGNED-ZERO TRAP, FOUND BEFORE IT COULD BE WRITTEN INTO AN ASSERTION.**
+      `Object.is(az[n−1−i], −az[i])` is **FALSE on every toggle-ON row** — at the mirror-line
+      petal the azimuth is `+0` and its reflection `−0` — while the residual is exactly 0.
+      Z7 is written as `a + b === 0`, which is true for `+0` and `−0` alike. That is the form
+      layer's `−0 + 0` case analysis arriving in a new place.
+
+    - **TWO PRE-EXISTING COUPLINGS WERE FOUND BY RUNNING THE FAN THROUGH THE SHIPPED
+      INSTRUMENT BEFORE WRITING ANYTHING NEW, and both made assertions measure a design they
+      did not name.** Neither is a fan bug; the fan is what separated two things that had
+      always been the same thing.
+        * **`zygoAssertions` derived `n` from `ui.petalCount`.** Under FAN that names a whorl
+          the bloom does not have, and **Z3 fired on the very first fan row**. It now reads
+          `slotsPerWhorl` — footRing()'s own answer, cross-checked against `petalsBuilt`, the
+          tally counted at the BLADE CALL SITE. This is the flower's "73 of 185 configs
+          measuring the wrong design" defect arriving through a placement instead of a
+          read-back.
+        * **Both guard residuals were computed for SLOT 0 while the metrics hook reports
+          DESCRIPTOR 0's petal.** Identical until a fan put slot 0 in the HOOD and the
+          labellum in the middle; both then returned null and the gates said **"not
+          measured"** on rows that had measured nothing. One definition now
+          (`reportedForDescriptor`), and on a split whorl it measures ONE PETAL PER ROLE
+          instead of one per bloom — strictly more coverage from the same expression, the
+          shape J1 already gained under CONTINUOUS. **A consequence to carry forward: the
+          form guard residual is exactly 0 only at azimuth 0.** The charter's "measures
+          exactly 0" was a property of slot 0; the extended coverage measures up to
+          **3.55e-15**, five orders under the 1e-9 bound.
+
+    - **Z4 WAS GENERALISED, AND HARDCODING RADIAL'S PAIRING WAS NOT A NEUTRAL DEFAULT.** Run
+      against a correct fan, `(n − i) % n` pairs slot 1 with slot 5 at n = 6 — a LATERAL
+      against a HOOD — so **the shipped tree would have failed Z4 and the natural fix would
+      have been to weaken it**. The pairing now comes from `mirrorPairFor(placement, …)`;
+      the two arms are DIFFERENT INVOLUTIONS, not one law with a parameter.
+
+    - **BOTH SHIPPED GATES, AND EVERY ASSERTION THIS PROJECT HAD, ARE BLIND TO WHETHER THE
+      ARRANGEMENT IS SYMMETRIC AT ALL — measured on throwaway worktrees BEFORE Z7 was
+      written.** Four mutations, each run through the full instrument over all 41 fan rows:
+
+      | mutation | boundary | tris live/export | STL bytes | BEFORE Z7 | AFTER Z7 |
+      |---|---|---|---|---|---|
+      | shipped tree | 0 | identical | — | **0 of 41 rows** | **0 of 41 rows** |
+      | M1 the arc loses its mirror (`i − n/2`) | **0** | **identical** | **same length** | **NOTHING** | **Z7 only**, 39 rows |
+      | M2 role pairing off by one (`n − i`) | 0 | identical | same length | Z4 only, 12 rows | Z4 only, 12 rows |
+      | M3 area rule keeps `petalCount` | 0 | identical | same length | ring-list accounting only, 38 rows | same, 38 rows |
+      | M4 `layerPhase` reaches the fan | **0** | **identical** | **same length** | **NOTHING** | **Z7 only**, 6 rows |
+
+      **THE SCOPING IS COUNTED, NOT EYEBALLED.** M1 fires on **39 of 39 rows whose
+      placement is FAN and on neither of the two GATED rows that are not** — so it is
+      scoped to the new arm exactly. M4 fires on **6 of 6 fan rows with layerCount > 1 and
+      on no single-layer fan row**, which is the predicted behaviour rather than a gap: at
+      one whorl `lambda` is 0, so `0 · layerPhase · TAU / n` is 0 whatever the control
+      says. **A one-whorl run of M4 would have read as a passing instrument** — it had to
+      be run deep, which is the same lesson M2 taught session 9B's J6 from the other
+      direction.
+
+      **M1 AND M4 ARE THE ENTRY THAT MATTERS.** Every per-row report under both is
+      byte-for-byte identical to the shipped tree's — same live and export triangle counts,
+      boundary 0, degenerate 0, same KiB — so an arc one half-step off its own mirror plane,
+      and inner whorls swung off that plane by a phase offset, are invisible to the export
+      gate, the connectedness gate, the triangle count, the byte length, J1–J6, Z1–Z6,
+      `formAssertions` and `thicknessAssertions` alike.
+
+    - **SO THE LAYER SHIPPED Z7 — THE ARRANGEMENT ITSELF IS MIRROR-SYMMETRIC**, the first
+      assertion in this file about AZIMUTHS rather than roles, radii or records. It reads
+      the azimuths **as emitted**, collected at the blade callback — `petalRingApplied`'s
+      doctrine pointed at the arrangement, because a mirror claim checked against a
+      restatement of the azimuth law would agree with a broken law by being broken alongside
+      it. An **EQUALITY, not a bound**: the index offsets are exactly negated small integers
+      or half-integers, so IEEE multiplication gives exactly the negated product. It also
+      asserts the plane is where the role NAMES say it is — the slot nearest it is the
+      labellum, the slot furthest along the arc is the hood.
+
+      **Z4 CANNOT SEE M1 AND Z7 CANNOT SEE M2, and keeping that distinction is the point.**
+      Z4 is a statement about INTEGERS (the role assignment is symmetric across the pairing),
+      which an azimuth mutation leaves untouched. Z7 is a statement about GEOMETRY (the
+      azimuths realise that pairing). Together they say the mirror plane means what its name
+      says; **either alone is a label on half a computation.** Z7 is scoped to the FAN
+      deliberately: RADIAL is mirror-symmetric too, but its reflection needs a wrap modulo a
+      turn and stops being exact integer arithmetic, so one assertion covering both would buy
+      a tolerance for the placement that does not need one.
+
+    - **THE TOGGLE IS A TWO-OPTION CHOICE, NOT A CHECKBOX (Eva, Sep 2)**, and that is a
+      decision about this registry rather than about the fan. The bloom has exactly two
+      control kinds; a checkbox would be a third — new coercion, new DOM generation, new
+      equality, new harness handling, and boolean semantics for the predicate leaves. A
+      choice needs none of it, its `oneOf` leaf already expresses the eligibility gating, and
+      its option labels can name BOTH states where a checkbox label can only name one.
+
+    - **THE ARC CAP IS AN OUTPUT CLAMP, NEVER A RANGE LIMIT** — the roll floor's pattern,
+      and the flower's own 170° inherited deliberately because the fan Eva approved was drawn
+      under it. It binds only at 6 per side above 30.909°, leaving a 340° arc and a 20°
+      wedge, and the read-out says "(CLAMPED)". Photographed rather than hidden, on the
+      standing pattern for extremes.
+
+    - **A THIRD PLACE THE BLANKET-SWEEP TRAP COULD HAVE OPENED, closed by asking the
+      registry.** `fanPerSide` and `fanSpacing` are plain sliders — neither layer subs nor
+      slot subs — so they would have landed in the matrix's blanket min/max sweep, where
+      DEFAULTS is RADIAL, they are hidden, and each row builds the shipping default under a
+      label naming a control that did nothing. The skip is now the GENERAL form of the three
+      named ones: evaluate the control's own predicate at the state the row would build.
+      Checked when added: it removes the two fan sliders **and nothing else** — the matrix
+      stayed at 246 rows before the fan block was added.
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS, AND MEASURED TWO WAYS THAT COVER DIFFERENT
+      THINGS.** The FLOAT-LEVEL comparison imports both trees' geometry modules and
+      compares **every emitted coordinate** of every frozen row in BOTH modes against
+      `main`: **1,049 frozen rows, 2,098 builds, 0 moved** — 47 / 76 / 86 / 106 / 125 /
+      158 / 205 / 246 across the eight baselines. It is strictly finer than a hash (it
+      compares floats, not a digest) and it covers LIVE as well as export, which the byte
+      report cannot. What it does NOT cover is the shipped path: `readUI()`, the export
+      handler and the real Get STL button, which is what the browser byte report exercises
+      and what previous sessions quoted. **Both are run; neither substitutes for the
+      other**, and saying which is which is the point.
+
+    - **THE MATRIX GREW 246 → 287**, and **`phase8Matrix()` — the 246 rows frozen at
+      7877bdf — is the eighth baseline and now the strongest**, on the reasoning that
+      promoted each of its predecessors: it is the only one carrying BOTH zygomorphy
+      sessions' corners, which is the region a fourth placement value is most likely to
+      disturb, since the role derivation and the area rule's grouping are what it touches.
+      Generated from that commit's own `buildMatrix()` and proved deep-equal in CI.
+      `--full` cannot compare across the trees for the **fourth** time running.
+      **The `MATRIX_FLAGS` trap did NOT fire a fourth time**: `--phase8` went into both lists
+      in the same edit, which is what its own header says to do.
+
+    - ~~Session 10~~ **THE BRIEF AS IT WAS QUEUED (Eva, Sep 2): SESSION 10 IS THE FAN
+  ARRANGEMENT — a FOURTH `placement` value.** Not a role, not an override: an arrangement, so it belongs to
   `buildWhorlInto` and `footRing()` beside RADIAL / SPIRAL / CONTINUOUS. Its controls, as
   ruled: **petals per side, petal spacing, and a petal-on-mirror-line toggle** — the
   vocabulary is the flower's own fan implementation, which the session should READ as the

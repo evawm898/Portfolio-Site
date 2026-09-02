@@ -203,7 +203,7 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2|--phase3|--phase4|--phase5|--phase6] --root <dir> --out <file.json>
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2|--phase3|--phase4|--phase5|--phase6|--phase7|--phase8] --root <dir> --out <file.json>
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
