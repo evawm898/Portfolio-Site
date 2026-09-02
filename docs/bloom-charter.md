@@ -1687,3 +1687,75 @@ any of them.
       records this happening to `--phase3` and again to `--phase4`; it has now happened a
       third time. The one-list fix is in place and worked (the run said 47), but the flag
       constant is a second place to remember.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 2): THE ORCHID SHIPS. MERGED.** This closes the
+      SECOND half of the brief the zygomorphy work was opened on — full per-slot
+      differentiation, with orchid and iris as the target forms — and with it the whole
+      brief: **the bloom can now face you.** She ruled from **the `petalCount` 3 cell**,
+      which is the one that answers the question without needing its caption: one big lip
+      below, two raised tepals above, no laterals at all, and it reads as an orchid on
+      sight. The headline pair is what makes it unfalsifiable — the same arrangement, the
+      same eight petals, **the same 11,136 triangles on both sides**, so the only thing
+      that could differ between the control and the orchid is which state each SLOT was
+      built from.
+
+    - **THE BROAD FACE-ON READ IS A SLIDER POSITION, NOT A RANGE PROBLEM (Eva, Sep 2), and
+      recording the RULING rather than only the observation is the point** — an
+      unresolved-looking note in a charter gets re-litigated by the next session that finds
+      it. At the headline settings the labellum and hood read as broad rounded masses
+      face-on rather than as distinctly petal-shaped: that is `labellumTilt` clamping to
+      horizontal plus `labellumCurl` −60 bringing the blade toward the camera, and every one
+      of those numbers is reachable and adjustable. Same standing as session A's clustered
+      standards. **Nothing is queued. Do not "fix" a default, widen a range, or add a
+      control on the strength of this note.**
+
+    - **THE FAN LINEAGE, NAMED (Eva, Sep 2): THE LABELLUM SATISFIES HER ORIGINAL FAN
+      PRINCIPLE.** The principle is that *the petal on the mirror line is petal number one,
+      and it has its own sliders* — which is exactly what slot 0 became. So the orchid is
+      not a detour from the fan idea; it is the fan idea's first half, arriving through the
+      role mechanism rather than through an arrangement. **THE FLOWER'S OWN FAN UI IS THE
+      RECORDED PATTERN FOR PER-PETAL GRANULARITY** whenever it arrives here: per-petal
+      control GROUPS, labelled in the flower's own style (`PETAL 1 — INNER`). It is a
+      pattern to borrow, not queued work — and it is the answer to the SELECTOR that
+      session A recorded and rejected, since a group per petal is a registry row per petal
+      rather than one control id holding several values.
+
+- ~~Session 10~~ **RULED AND QUEUED (Eva, Sep 2): SESSION 10 IS THE FAN ARRANGEMENT — a
+  FOURTH `placement` value.** Not a role, not an override: an arrangement, so it belongs to
+  `buildWhorlInto` and `footRing()` beside RADIAL / SPIRAL / CONTINUOUS. Its controls, as
+  ruled: **petals per side, petal spacing, and a petal-on-mirror-line toggle** — the
+  vocabulary is the flower's own fan implementation, which the session should READ as the
+  reference rather than re-invent (control names, the spacing law, the toggle Eva
+  screenshotted). The bloom's disciplines stay the bloom's.
+
+    - **THE TOGGLE'S OFF-POSITION ALREADY HAS ITS MATHEMATICS, DERIVED AND RECORDED HERE
+      BEFORE ANYONE KNEW WHAT IT WAS FOR.** A symmetric arc with no petal on the mirror line
+      is a MIRROR THROUGH THE GAP, whose pairing is **fixed-point-free: `i <-> n-1-i`** —
+      the same involution session B measured while correcting session A's SPIRAL premise
+      (a golden-angle whorl is exactly mirror-symmetric about `(n-1)*g/2` under precisely
+      that pairing, at <= 8.14e-13 deg). Session B's shipped derivation is the OTHER
+      involution, `i <-> n-i`, which has fixed points and is why LABELLUM and HOOD can be
+      singular at all. **Both are now written down, with their fixed-point structure stated,
+      and the fan needs exactly the one that was built for a different reason.** That is the
+      THIRD time this project has derived a piece of mathematics before discovering its
+      purpose.
+
+    - **THE ZYGOMORPHY ROLES COMPOSE ONTO IT rather than being redone (Eva's ruling).**
+      LABELLUM is the mirror-line petal when the toggle is ON, and the INNER PAIR when it is
+      OFF; HOOD and LATERAL follow from the same pairing. So the fan changes the ARRANGEMENT
+      and the role DERIVATION reads it — the seam session A wrote and session B kept.
+
+    - **THE GENUINELY NEW PROBLEM IS AT THE JUNCTION, and it is the loud-plumbing question
+      from session 2 finally coming home.** A fan's feet occupy an ARC of the ring, not the
+      circle, so for the first time the hub's job changes SHAPE: a full disc spans feet that
+      are no longer all round it, and most of that disc would be plumbing with nothing on
+      it. **Full disc versus a derived SECTOR is the Phase A analysis** — with the
+      spread-6.00 plate note as its precedent (ship the disc, photograph it, let the sheet
+      decide) and the area-ruled annular band as the costed alternative that was parked
+      there. Every junction assertion J1–J4 is written per RING and will need re-reading
+      against an arc: containment, the foot reaching the hub, and the overlap box are all
+      stated over a full circle today.
+
+    - **AFTER THE FAN, THE STANDING BOARD (Eva, Sep 2):** edge treatments, infill, per-petal
+      sliders in the flower's fan UI pattern, and Eva's own presets. Recorded as direction,
+      not as queued work; each needs its own ruling and its own evidence.
