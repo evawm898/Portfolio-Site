@@ -423,12 +423,17 @@ it. Any NEW render path inherits the same obligation.
   stroke and letter are the "other" palette colour, the court suit glyphs and
   corner indices are the suit's own), then drops the band along the plate
   stroke. That is the only instrument that sees the whole letter.
-- **Panel sections are native `<details>`** — `01`/`02`/`04` open by default,
-  `03 Style` (the long one) and `05 Print Spec` closed. No JS owns the state,
-  and a collapsed section genuinely hides its rows, so the font picker's
-  IntersectionObserver fetches nothing for a section nobody opened. The gate
-  drives a slider while its section is COLLAPSED and asserts the preview still
-  rebuilds — the failure the bloom panel already shipped once.
+- **Panel sections are native `<details>`**, six of them: `01 Suit Glyphs`,
+  `02 Palette`, `03 Font`, `04 Style`, `05 Export`, `06 Print Spec`, with
+  `01`/`02`/`05` open by default. The font picker is its OWN section, not a
+  field inside Style — the two long things in the panel are long for different
+  reasons, and a searchable list of 1,891 families does not belong buried among
+  sliders. `03`'s summary carries the selected family as a value readout so it
+  is legible while shut. No JS owns the open/closed state, and a collapsed
+  section genuinely hides its rows, so the picker's IntersectionObserver
+  fetches nothing for a section nobody opened. The gate drives a slider while
+  `04 Style` is COLLAPSED and asserts the preview still rebuilds — the failure
+  the bloom panel already shipped once.
 - **Verify with `node tools/verify-cards-fonts.mjs`** (103 checks;
   `--negative-control` required before quoting a pass from a changed harness;
   `--shots <dir>` writes a contact sheet). It refuses to accept the preview

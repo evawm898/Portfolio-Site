@@ -12,7 +12,8 @@ import { PRINT_SPEC, getSafeRect, SUIT_GROUP } from './deck-builder.js';
 import { resolveFont, fontShorthand, DEFAULT_FONT_ID } from './font-manager.js';
 
 // ---------------------------------------------------------------------
-// Deck-wide style controls — "03 Style" panel on cards.html. Global only
+// Deck-wide style controls — the "04 Style" panel on cards.html (the font
+// itself is its own section, "03 Font"). Global only
 // (no per-suit variants in this pass): corner-index inset + font, and a
 // suit-glyph scale applied relative to each context's own base size.
 //

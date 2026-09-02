@@ -175,17 +175,38 @@ summary.cd-panel__label:focus-visible {
   outline-offset: 3px;
 }
 
+/* A section whose current value is worth reading while it is CLOSED can put it
+   here — today that is 03 Font, so the selected family is visible without
+   opening the picker. Same type as .cd-field__value, so it reads as the same
+   kind of readout it would be inside the section. */
+.cd-panel__label__value {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--petrol-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The marker sits at the far right of the summary row, on the panel's own
    hairline grid rather than as an icon. A closed section reads "+", an open
    one "–" — the same two characters the numbered index language already uses. */
 summary.cd-panel__label::after {
   content: "+";
   margin-left: auto;
+  padding-left: 0.75rem;
   font-family: var(--mono);
   font-size: 13px;
   line-height: 1;
   color: var(--petrol-bright);
 }
+
+/* With a value readout present it, not the marker, takes the free space. */
+summary.cd-panel__label:has(.cd-panel__label__value)::after { margin-left: 0; }
 
 details[open] > summary.cd-panel__label::after { content: "\2013"; }
 

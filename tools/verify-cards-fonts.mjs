@@ -538,16 +538,36 @@ section('2. Disclosure — the panel collapses without disconnecting anything');
 // declared but no longer drives a rebuild once its section is folded away.
 const sections = await page.$$eval('details.cd-panel__section', (els) =>
   els.map((e) => ({ id: e.id, open: e.open, summary: e.querySelector('summary').textContent.trim() })));
-check(sections.length === 5, `all 5 numbered sections are <details> (${sections.map((x) => x.id).join(', ')})`);
+check(sections.length === 6, `all 6 numbered sections are <details> (${sections.map((x) => x.id).join(', ')})`);
 check(sections.every((x) => /^\d\d/.test(x.summary)),
   `every summary keeps its numbered label (${sections.map((x) => x.summary).join(' | ')})`);
 const openIds = sections.filter((x) => x.open).map((x) => x.id).join(',');
-check(openIds === 'section-01,section-02,section-04',
-  `default-open set is the short setup sections plus Export — got "${openIds}"`);
+check(openIds === 'section-01,section-02,section-05',
+  `default-open set is the two short setup sections plus Export — got "${openIds}"`);
 
-// The long one starts closed; a slider inside it must still work while it is.
-const styleClosed = await page.$eval('#section-03', (e) => !e.open);
-check(styleClosed, '03 Style — the section that made the panel scroll — starts collapsed');
+// The font picker is its OWN section now, not a field buried in Style — the
+// two long things in this panel are long for different reasons and are reached
+// separately.
+check(sections[2].summary.startsWith('03Font'), `03 is the Font section (summary "${sections[2].summary}")`);
+check(sections[3].summary.startsWith('04Style'), `04 is Style (summary "${sections[3].summary}")`);
+check(await page.$eval('#section-03 #fontList', (e) => Boolean(e)), 'the font list lives inside 03 Font');
+check(await page.$eval('#section-04 #styleCourtPlateScale', (e) => Boolean(e)), 'the sliders live inside 04 Style');
+
+// The selected family is legible while the section is SHUT — the reason to
+// give the summary a value readout at all.
+const shutReadout = await page.$eval('#fontCurrentName', (e) => ({
+  text: e.textContent.trim(),
+  inSummary: Boolean(e.closest('summary')),
+  visible: e.getBoundingClientRect().height > 0,
+}));
+check(shutReadout.inSummary && shutReadout.visible && shutReadout.text === 'IBM Plex Mono',
+  `the collapsed 03 Font summary still names the selected family ("${shutReadout.text}")`);
+
+// Both long sections start closed; a slider inside one must still work while
+// it is.
+const fontClosed = await page.$eval('#section-03', (e) => !e.open);
+const styleClosed = await page.$eval('#section-04', (e) => !e.open);
+check(fontClosed && styleClosed, '03 Font and 04 Style — the two sections that made the panel scroll — start collapsed');
 
 async function driveSlider(id, value) {
   return page.evaluate(([elId, v]) => {
@@ -569,18 +589,23 @@ async function driveSlider(id, value) {
   const afterSig = inkSignature(Buffer.from(after.data), after.width, after.height);
   check(sigDistance(beforeSig, afterSig) > DIFFERENT,
     `...and still rebuilds the preview from inside a collapsed section (${sigDistance(beforeSig, afterSig).toFixed(3)} > ${DIFFERENT})`);
+  check(await page.$eval('#section-04', (e) => !e.open),
+    'and 04 Style was genuinely still collapsed while that happened');
   await driveSlider('styleCornerFontScale', 100);
   await page.waitForTimeout(300);
 }
 
 // Opening a section is the browser's job; assert it actually opens, since the
-// summary is restyled (list-style:none + a ::after marker) and a mis-styled
-// summary that swallows its own click is a real failure mode.
-await page.click('#section-03 > summary');
-await page.waitForTimeout(200);
-check(await page.$eval('#section-03', (e) => e.open), 'clicking the 03 Style summary opens it');
+// summary is restyled (list-style:none + a ::after marker, and on 03 a value
+// readout too) and a mis-styled summary that swallows its own click is a real
+// failure mode.
+for (const [id, label] of [['section-03', 'Font'], ['section-04', 'Style']]) {
+  await page.click(`#${id} > summary`);
+  await page.waitForTimeout(200);
+  check(await page.$eval(`#${id}`, (e) => e.open), `clicking the ${label} summary opens it`);
+}
 check(await page.$eval('#fontList', (e) => e.getBoundingClientRect().height > 0),
-  'the font list has layout once the section is open');
+  'the font list has layout once 03 Font is open');
 
 // ---------------------------------------------------------------------
 section('3. Custom uploads — .woff2 and .ttf through the real file input');
