@@ -282,6 +282,39 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 
    RUN: node tools/diff-bloom-bytes.mjs --verify-frozen --phase2 --base <dir>
    =================================================================== */
+/* Exactly one matrix. The guard, the LABEL and the ROWS are derived from ONE
+   list so a new matrix cannot be added to the runner while something else
+   silently keeps saying something else.
+
+   THIS LIST IS THE ONLY PLACE A PHASE NAME IS WRITTEN, and collapsing to it
+   is session 10's doing — because the same trap had fired THREE TIMES by the
+   count in the charter, once per matrix added. First: --phase3 landed and its
+   runs recorded matrix:"legacy" while running phase3Matrix() — a label naming
+   a computation nobody performed. Then --phase4, in the other direction: the
+   flag was ACCEPTED and legacyMatrix() ran, and the record honestly said
+   "legacy" while nobody read it. Then --phase7, added to MATRIX_FN and not to
+   MATRIX_FLAGS: a 47-row report under a 205-row label. Each fix removed one
+   copy and left the next one standing, which is what a fix to a duplication
+   problem does when it does not remove the duplication. There were FOUR lists
+   as of #128 — the flag constants, MATRIX_FN, --verify-frozen's name list and
+   its own function map — and they are one now. Adding a matrix is one entry
+   here and nothing else.
+
+   IT LIVES ABOVE `--verify-frozen`, AND THAT IS LOAD-BEARING RATHER THAN
+   TIDINESS. It was first written down beside MATRIX_FLAGS, 240 lines BELOW
+   the --verify-frozen block that now reads it, and `const` hoists without
+   initialising: every --verify-frozen run died with "Cannot access
+   'PHASE_NAMES' before initialization". The four separate lists had hidden
+   that by each sitting next to its own reader, so unifying them created an
+   ordering dependency that had not existed. CI caught it on the first run and
+   it cost a cycle. A single owner has to be declared before its first
+   consumer, and in this file that consumer is the block immediately below. */
+const FROZEN = {
+  phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
+  phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix,
+};
+const PHASE_NAMES = Object.keys(FROZEN);
+
 if (process.argv.includes('--verify-frozen')) {
   const base = arg('--base');
   if (!base) { console.error('--verify-frozen needs --base <dir> (a git worktree of the commit the matrix claims to snapshot)'); process.exit(2); }
@@ -505,28 +538,6 @@ const { browser, page } = await launchPage();
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-bytes-'));
 
 const FULL = process.argv.includes('--full');
-/* Exactly one matrix. The guard, the LABEL and the ROWS are derived from ONE
-   list so a new matrix cannot be added to the runner while something else
-   silently keeps saying something else.
-
-   THIS LIST IS NOW THE ONLY PLACE A PHASE NAME IS WRITTEN, and collapsing to
-   it is this session's doing — because the same trap had fired THREE TIMES by
-   the count in the charter, once per matrix added. First: --phase3 landed and
-   its runs recorded matrix:"legacy" while running phase3Matrix() — a label
-   naming a computation nobody performed. Then --phase4, in the other
-   direction: the flag was ACCEPTED and legacyMatrix() ran, and the record
-   honestly said "legacy" while nobody read it. Then --phase7, added to
-   MATRIX_FN and not to MATRIX_FLAGS: a 47-row report under a 205-row label.
-   Each fix removed one copy and left the next one standing, which is what a
-   fix to a duplication problem does when it does not remove the duplication.
-   There were FOUR lists as of #128 — this constant, MATRIX_FN, --verify-frozen's
-   name list and its own function map — and they are one now. Adding a matrix
-   is one entry in FROZEN and nothing else. */
-const FROZEN = {
-  phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
-  phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix,
-};
-const PHASE_NAMES = Object.keys(FROZEN);
 const MATRIX_FLAGS = [[FULL, 'full'],
   ...[...PHASE_NAMES].reverse().map((n) => [process.argv.includes('--' + n), n])];
 const chosen = MATRIX_FLAGS.filter(([on]) => on);
