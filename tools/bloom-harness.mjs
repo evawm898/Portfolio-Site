@@ -1464,6 +1464,88 @@ export async function zygoAssertions(page, row) {
     }
   }
 
+  /* ===================================================================
+     Z7 — THE ARRANGEMENT ITSELF IS MIRROR-SYMMETRIC. The fan's own witness
+     (session 10), and the FIRST assertion in this file about AZIMUTHS rather
+     than about roles, radii or records.
+
+     WHY IT HAD TO EXIST, measured on a throwaway worktree BEFORE it was
+     written: an off-by-half in the fan's azimuth law — `(i - n/2)` where
+     `(i - (n-1)/2)` belongs — leaves the arc one half-step off the plane, so
+     the mirror the roles are assigned across is not a symmetry of the
+     geometry at all. That mutation exports watertight, exports as ONE piece,
+     emits no degenerate triangles, has IDENTICAL live and export triangle
+     counts and the same STL byte length, and passes J1-J6, Z1-Z6,
+     formAssertions and thicknessAssertions alike. Only the bytes differ, and
+     a byte diff is evidence about a change rather than a gate.
+
+     Z4 CANNOT SEE IT, and that is the distinction worth keeping. Z4 asserts
+     the ROLE ASSIGNMENT is symmetric across the pairing — a statement about
+     integers, which an azimuth mutation leaves untouched. Z7 asserts the
+     GEOMETRY realises that pairing. Together they say the mirror plane means
+     what its name says; either alone is a label on half a computation.
+
+     IT IS AN EQUALITY, NOT A BOUND, and the arithmetic is why: az_i is
+     `(i - (n-1)/2) * step`, and the index offset for slot n-1-i is exactly
+     the negation of the one for slot i (both are small integers or
+     half-integers, exactly representable), so IEEE multiplication gives
+     exactly the negated product. Measured over all 60 reachable
+     (perSide x spacing x toggle) configurations: 450 of 450 slot pairs sum to
+     exactly 0.
+
+     WRITTEN AS A SUM AND NEVER AS Object.is — the signed-zero trap, found
+     before it could be written in. At the mirror-line petal az is +0 and its
+     reflection is -0, so `Object.is(az[pair], -az[i])` is FALSE on every
+     toggle-ON row while the residual is exactly 0. `a + b === 0` is true for
+     +0 and -0 alike. That is the form layer's `-0 + 0` case analysis arriving
+     in a new place.
+
+     SCOPED TO THE FAN, deliberately. RADIAL is mirror-symmetric too, about
+     the plane through slot 0 — but its azimuths are `phase + i*TAU/n` and the
+     reflection of slot i is slot n-i whose azimuth is `TAU - az_i` modulo a
+     turn, so the claim needs a wrap and stops being exact integer arithmetic.
+     Making one assertion cover both would buy a tolerance for the placement
+     that does not need one. SPIRAL and CONTINUOUS make no mirror claim at all
+     and slot roles are gated off there. */
+  if (m.fanMode) {
+    const az = m.petalAzimuths;
+    if (!Array.isArray(az) || az.length !== m.layerCount) {
+      bad.push(`Z7: expected one azimuth list per whorl (${m.layerCount}), got ${JSON.stringify(az && az.length)} — the only witness for an arc that has lost its mirror is missing, and every STL check passes such an arc`);
+    } else {
+      az.forEach((row, L) => {
+        if (row.length !== n) {
+          bad.push(`Z7: whorl ${L} emitted ${row.length} azimuths for ${n} slots — the mirror claim cannot be made about a whorl the builder did not fill`);
+          return;
+        }
+        for (let i = 0; i < n; i++) {
+          const j = mirrorPairFor('FAN', i, n);
+          if (!(row[i] + row[j] === 0)) {
+            bad.push(`Z7: whorl ${L} puts slot ${i} at ${(row[i] * 180 / Math.PI).toFixed(6)}° and its mirror image slot ${j} at ${(row[j] * 180 / Math.PI).toFixed(6)}° — they must be exact negations about the plane, and the residual is ${(row[i] + row[j]).toExponential(3)}. The arrangement is NOT symmetric about the plane its roles are assigned across, so "mirror" is a label on a computation nobody performed. NOTHING ELSE HERE CAN SEE THIS: the export is watertight, one piece, the same triangle count and the same byte length, and J1-J6 and Z1-Z6 are all clean.`);
+            break;
+          }
+        }
+        /* AND THE PLANE IS WHERE THE ROLES SAY IT IS. The antisymmetry above
+           is satisfied by any arc centred on azimuth 0; this adds that the
+           LABELLUM is the group nearest that plane and the HOOD the group
+           furthest along the arc, which is what makes the role names describe
+           the picture. Read from the emitted azimuths, never re-derived. */
+        const abs = row.map(Math.abs);
+        const nearest = abs.indexOf(Math.min(...abs));
+        const farthest = abs.indexOf(Math.max(...abs));
+        const roleAtSlot = new Map();
+        for (const r of rings) if (r.lambda === L && r.slots) for (const i of r.slots) roleAtSlot.set(i, r.slotRole);
+        if (roleAtSlot.size) {
+          if (roleAtSlot.get(nearest) !== SLOT_LABELLUM) {
+            bad.push(`Z7: whorl ${L}'s slot closest to the mirror line (slot ${nearest}, ${(row[nearest] * 180 / Math.PI).toFixed(3)}°) carries the role ${roleAtSlot.get(nearest)}, not ${SLOT_LABELLUM} — the labellum is defined as the petal ON or NEAREST the plane, so the name and the geometry have come apart`);
+          }
+          if (roleAtSlot.get(farthest) !== SLOT_HOOD) {
+            bad.push(`Z7: whorl ${L}'s slot furthest along the arc (slot ${farthest}, ${(row[farthest] * 180 / Math.PI).toFixed(3)}°) carries the role ${roleAtSlot.get(farthest)}, not ${SLOT_HOOD} — the fan's hood is the pair straddling the OPEN WEDGE, which is the only antipode an arc has`);
+          }
+        }
+      });
+    }
+  }
+
   return bad;
 }
 
