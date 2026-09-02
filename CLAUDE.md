@@ -412,9 +412,14 @@ it. Any NEW render path inherits the same obligation.
   mutation. Deleting the `await` in `drawPreviewNow()` moves exactly one, which
   is why that check reads the preview grid's own canvas instead of re-rendering.
 - The other cards gate, `node tools/verify-cards-svg-glyphs.mjs`, still covers
-  the suit-glyph upload path and must stay green alongside it. Neither runs in
-  CI — every GitHub Actions workflow here is path-filtered to `flower*`/`bloom*`
-  — so run both before calling a cards change done.
+  the suit-glyph upload path and must stay green alongside it. **Neither runs in
+  CI, and nothing else covers cards either — run both by hand before calling a
+  cards change done.** No workflow here names a `cards*` path. Note the corollary
+  that is easy to get wrong: `flower-export-watertight.yml` and
+  `flower-geometry-quality.yml` are path-filtered on `'tools/**'`, so ADDING A
+  CARDS TOOL makes both flower gates run on a cards PR. They still test flower
+  geometry, not cards — two green `verify` jobs on a cards PR are not evidence
+  that anything about cards was checked.
 - Dev-only deps, gitignored and not in `package.json` (same convention as the
   other gates): `npm i --no-save playwright-core jspdf@2.5.1 jszip
   google-font-metadata`. The gate serves jsPDF/JSZip from `node_modules` at the
