@@ -2374,15 +2374,32 @@ export function buildMatrix() {
          buildCenterInto's full-footprint clause. J1-J4 are stated over radii
          and thicknesses, never azimuths, so they survive the fan verbatim —
          which is exactly why J7 had to be written. */
+  /* THE TOGGLE IS PINNED WHEREVER A LABEL NAMES IT, and that is a lesson this
+     matrix learned the hard way at the default change. `FAN` inherits the
+     shipping default; when that default moved OFF -> ON (Eva, Sep 2), EIGHT
+     rows whose labels said "toggle OFF" silently began building the ON
+     arrangement — including the two-petal corner and the GATED empty-hood
+     row, which is the state this session's one design ruling is about. The
+     toggle-OFF region went to ZERO coverage while every label still claimed
+     it, and every one of those rows still passed, because they were passing
+     on a design nobody had asked them to check.
+
+     That is the charter's "A DEFAULT IS NOT COVERAGE" rule firing on a
+     default this very session moved, and the remedy is the one the centre
+     rig already uses: a row that NAMES a state SETS it. `FAN` is for rows
+     that genuinely mean "whatever ships"; `FAN_OFF` and `FAN_ON` are for rows
+     that mean a position. */
   const FAN = { placement: 'FAN' };
   const FAN_ON = { placement: 'FAN', fanCenterPetal: 'ON' };
+  const FAN_OFF = { placement: 'FAN', fanCenterPetal: 'OFF' };
   for (const [name, sets] of [
-    ['FAN: defaults (3/side, no mirror-line petal, 45deg)', { ...FAN }],
+    ['FAN: defaults (3/side, a mirror-line petal, 45deg)', { ...FAN }],
     /* THE TOGGLE PAIR — the same arrangement under the two involutions, which
        is the comparison Eva rules the fan from. ON gives a bisected centre
        petal and the through-slot pairing; OFF puts the plane in the gap and
        makes every role a pair. */
-    ['FAN: toggle ON (a petal on the mirror line)', { ...FAN_ON }],
+    ['FAN: toggle ON (a petal on the mirror line) — pinned, and the shipping default since Sep 2', { ...FAN_ON }],
+    ['FAN: toggle OFF (the line runs through the gap) — pinned', { ...FAN_OFF }],
     /* THE SPACING SWEEP, at the shipping count. */
     ['FAN: fanSpacing min (15)', { ...FAN, fanSpacing: 15 }],
     ['FAN: fanSpacing max (60)', { ...FAN, fanSpacing: 60 }],
@@ -2394,16 +2411,16 @@ export function buildMatrix() {
        and the hub disc is least covered (16.7% under feet at 2 petals, which
        is still less BARE PLATE in mm2 than the RADIAL 3 x spread 6.00 state
        that already ships). */
-    ['FAN: fewest x widest — 1/side x 60deg, toggle OFF (two petals, no hood)', { ...FAN, fanPerSide: 1, fanSpacing: 60 }],
+    ['FAN: fewest x widest — 1/side x 60deg, toggle OFF (two petals, no hood)', { ...FAN_OFF, fanPerSide: 1, fanSpacing: 60 }],
     ['FAN: fewest x widest — 1/side x 60deg, toggle ON (three petals)', { ...FAN_ON, fanPerSide: 1, fanSpacing: 60 }],
-    ['FAN: fewest x tightest — 1/side x 15deg, toggle OFF', { ...FAN, fanPerSide: 1, fanSpacing: 15 }],
+    ['FAN: fewest x tightest — 1/side x 15deg, toggle OFF', { ...FAN_OFF, fanPerSide: 1, fanSpacing: 15 }],
     ['FAN: most x tightest — 8/side x 15deg, toggle ON', { ...FAN_ON, fanPerSide: 8, fanSpacing: 15 }],
     /* THE ARC LIMIT BINDING, both ways. At 8 per side the cap takes over from
        21.25 deg (ON) and 22.67 deg (OFF), leaving the guaranteed 20 deg notch
        — the state that makes exact coincidence unreachable, and the cell the
        340-degree "fan" is photographed in. */
     ['FAN: the arc limit binds — 8/side x 60deg, toggle ON (340deg arc, 20deg notch)', { ...FAN_ON, fanPerSide: 8, fanSpacing: 60 }],
-    ['FAN: the arc limit binds — 8/side x 60deg, toggle OFF', { ...FAN, fanPerSide: 8, fanSpacing: 60 }],
+    ['FAN: the arc limit binds — 8/side x 60deg, toggle OFF', { ...FAN_OFF, fanPerSide: 8, fanSpacing: 60 }],
     /* THE BARE BLOOM, on the lesson that cost the flower a seven-piece export:
        DISC is the default, so a fan with the centre off is exercised by
        nothing unless it is written down. */
@@ -2430,10 +2447,10 @@ export function buildMatrix() {
        INNER PAIR, so one control drives two petals and the group size the
        area rule multiplies by is 2 rather than 1. */
     ['FAN x LABELLUM: toggle ON — the mirror-line petal is the labellum', { ...FAN_ON, ...ORCHID }],
-    ['FAN x LABELLUM: toggle OFF — the labellum is the INNER PAIR', { ...FAN, ...ORCHID }],
-    ['FAN x LABELLUM: toggle OFF x 1/side (the labellum is the whole bloom)', { ...FAN, ...ORCHID, fanPerSide: 1 }],
+    ['FAN x LABELLUM: toggle OFF — the labellum is the INNER PAIR', { ...FAN_OFF, ...ORCHID }],
+    ['FAN x LABELLUM: toggle OFF x 1/side (the labellum is the whole bloom)', { ...FAN_OFF, ...ORCHID, fanPerSide: 1 }],
     ['FAN: ALL SLOT MAX x toggle ON', { ...FAN_ON, ...ALL_SLOT_MAX }],
-    ['FAN: ALL SLOT MAX x toggle OFF', { ...FAN, ...ALL_SLOT_MAX }],
+    ['FAN: ALL SLOT MAX x toggle OFF', { ...FAN_OFF, ...ALL_SLOT_MAX }],
     ['FAN: ALL SLOT MAX x 3 layers (slot roles at depth — only the fan reaches this)', { ...FAN, ...ALL_SLOT_MAX, layerCount: 3 }],
     ['FAN: ALL SLOT MAX x 8/side x 60deg (roles on a capped arc)', { ...FAN_ON, ...ALL_SLOT_MAX, fanPerSide: 8, fanSpacing: 60 }],
     /* THE EMPTY HOOD. One per side with no mirror-line petal makes the inner
@@ -2441,7 +2458,7 @@ export function buildMatrix() {
        hood comes out EMPTY, so the hood's three controls are HIDDEN and must
        be inert. A gated state is coverage, and a gated state nobody exercises
        is a claim nobody checked. */
-    ['FAN: GATED — 1/side x toggle OFF x ALL SLOT MAX (the hood is empty, its controls hidden and inert)', { ...FAN, ...ALL_SLOT_MAX, fanPerSide: 1 }],
+    ['FAN: GATED — 1/side x toggle OFF x ALL SLOT MAX (the hood is empty, its controls hidden and inert)', { ...FAN_OFF, ...ALL_SLOT_MAX, fanPerSide: 1 }],
     /* THE HIDDEN-AND-INERT PAIR FOR `petalCount`. Under FAN the count is
        DERIVED, so this slider must move nothing at all — these two rows differ
        only in a control the fan does not read, and they must export

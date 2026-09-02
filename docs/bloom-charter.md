@@ -1720,6 +1720,33 @@ any of them.
       session A recorded and rejected, since a group per petal is a registry row per petal
       rather than one control id holding several values.
 
+## The working loop — who holds the ball
+
+**RULED Sep 2 (Eva). EVERY SESSION REPORT, AT EVERY STOP, ENDS WITH EXACTLY ONE
+BALL-HOLDER LINE.** Not a summary sentence, not a status paragraph — one line, in one of
+these three forms, as the last thing in the message:
+
+    WAITING ON EVA: <the single question>
+    WAITING ON MEASUREMENT/CI: nothing needed from Eva
+    DONE — merged as <sha>. Safe to archive this session.
+
+**A REPORT WITHOUT THE LINE IS INCOMPLETE.** It applies to every stop, including the
+final one, and including stops where the answer is obviously "nothing" — an obvious state
+that is never written down is a state the reader has to infer from prose, which is the
+whole problem this fixes.
+
+**EVA NEVER MERGES A PULL REQUEST HERSELF.** The merge is always the session's own final
+step, released by her ruling. Her only two recurring actions in this project are RULING ON
+SHEETS and CLICKING BRANCH DELETES; a session is archivable the moment its last message
+reports a merge sha.
+
+**WHY IT IS A RULE AND NOT A HABIT.** A close-out generates a lot of true sentences —
+gate results, row counts, partition tables — and every one of them competes with the only
+question the reader actually has: *is this mine now?* The line answers that before the
+prose is read, in a fixed place, in fixed words. `WAITING ON EVA` carries exactly ONE
+question, because two questions in a ball-holder line is a report that has not decided
+what it needs.
+
 ## Verification retention — how much of the frozen suite a close-out runs
 
 **RULED Sep 2, from this session's own close-out. FROM SESSION 11 ONWARD a session's
@@ -2023,6 +2050,36 @@ exposure the ruling accepts in exchange for the minutes.
           plate and the 135°/161.25° tilts. **Tightening the limit remains one constant
           change with that cell as its evidence; do not tighten it on the strength of the
           number alone.**
+
+    - **THE DEFAULT CHANGE IS ITS OWN EVENT, WITH THE PARTITION ASSERTED IN THREE
+      DIRECTIONS** — the `spread` 1.00 → 2.00 and `centerStyle` NONE → DISC precedent,
+      which this session followed rather than folding the ruling into the feature commit.
+      The third direction is the one worth naming, because it is a claim about the
+      GEOMETRY rather than about the rows: **`fanCenterPetal` is INERT outside FAN**, so
+      every non-FAN row must be bit-identical no matter what the default is. Measured on
+      the live matrix, before and after:
+
+      | partition | rows | expected | measured |
+      |---|---|---|---|
+      | non-FAN (the control is inert) | 246 | bit-identical | **246, 0 moved** |
+      | FAN, PINS the toggle | 10 | bit-identical | **10, 0 moved** |
+      | FAN, INHERITS the default | 25 | all move | **25, all 25 moved** |
+
+      **And the 1,049 frozen rows are the same claim at its strongest**: not one of them
+      can select FAN, so the whole historical suite is the non-FAN partition. Measured on phase8's 246 rows across both trees:
+      **0 moved.** Checked in BOTH directions rather than by counting: **no moved row is
+      anything but fan-inheriting, and no fan-inheriting row failed to move.**
+
+      **AND THE DEFAULT CHANGE COST EIGHT ROWS THEIR COVERAGE ON THE WAY THROUGH, which
+      is the charter's own "A DEFAULT IS NOT COVERAGE" rule firing on a default this
+      session moved.** Eight FAN rows named a toggle position in their LABEL and inherited
+      it rather than pinning it — including the two-petal corner and the GATED empty-hood
+      row, which is the state this session's one design ruling is about. The moment the
+      default moved they all began building the ON arrangement while every label still
+      said OFF, **the toggle-OFF region went to zero coverage, and every one of them still
+      passed** — on a design nobody had asked them to check. A row that NAMES a state now
+      SETS it (`FAN_OFF` / `FAN_ON` beside the inheriting `FAN`), which is the centre
+      rig's own rule arriving one level up. Matrix 281 -> 282.
 
     - **THE FAN SHEET, and the mirror line is drawn from a measurement.**
       `node tools/shot-bloom-fan.mjs <dir>` — the flower-fan composition Eva liked: face-on

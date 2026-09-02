@@ -55,6 +55,15 @@ consecutive foot annuli overlap each other. `junctionAssertions()` (J1–J6) in
 both gates is what carries that claim; do not weaken it on the strength of a
 green flood fill.
 
+**EVERY REPORT ENDS WITH A BALL-HOLDER LINE** (Eva, Sep 2) — one line, last thing in the
+message, exactly one of:
+`WAITING ON EVA: <the single question>` / `WAITING ON MEASUREMENT/CI: nothing needed from
+Eva` / `DONE — merged as <sha>. Safe to archive this session.`
+A report without it is incomplete, including when the answer is obviously "nothing".
+**Eva never merges a PR herself** — the merge is always the session's own final step,
+released by her ruling; her only recurring actions are ruling on sheets and clicking
+branch deletes. See the charter's "The working loop — who holds the ball".
+
 **A CLOSE-OUT RUNS THE NEWEST BASELINE PLUS THE LIVE PARTITION, NOT THE WHOLE SUITE**
 (Eva, Sep 2). The frozen suite is 1,049 rows and grows by the live matrix every session —
 quadratic in project age, and an afternoon by session 10. From session 11 a close runs the
