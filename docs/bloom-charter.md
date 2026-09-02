@@ -1927,6 +1927,38 @@ any of them.
       that predicate are load-bearing: without the second it would also exclude the eight
       slot-role controls, which read `placement` and are deliberately swept at the defaults.
 
+    - **THE EVIDENCE, COMPLETE.** Export gate **281/281** watertight, 0 degenerate, no
+      validity failures. Connectedness gate **281/281 one connected piece**, 0 strays, in
+      632 s — including the corner the whole junction analysis turned on, two petals at a
+      15 deg arc with 345 deg of empty circle behind them. Panel gate PASS, with
+      `--negative-control` firing all four routes; its visibility-transition route picked
+      up `placement -> FAN`, `fanPerSide` and `fanCenterPetal` from the registry with no
+      new code, so the hood's empty-group hide is covered for free. **BYTE-IDENTICAL ON
+      1,049 FROZEN ROWS, 0 MOVED**: legacy 47, phase2 76, phase3 86, phase4 106, phase5
+      125, phase6 158, phase7 205 and phase8 246, each compared against a worktree at its
+      own base commit. All four CI gates green on the head.
+
+    - **A CI FAILURE THIS SESSION CAUSED, AND IT WAS CAUSED BY THE FIX FOR ANOTHER
+      DEFECT — which is the part worth carrying.** Collapsing `diff-bloom-bytes.mjs`'s
+      four phase-name lists into one `FROZEN` map is the right change and it is what the
+      fall-through trap had been asking for since `--phase3`. It also put the list 240
+      lines BELOW the `--verify-frozen` block that now reads it, and `const` hoists
+      without initialising: every `--verify-frozen` run died with "Cannot access
+      'PHASE_NAMES' before initialization". **The four separate lists had been HIDING that
+      hazard rather than being free of it** — each sat beside its own reader, so no
+      ordering dependency existed to get wrong. Unifying duplicated constants creates one.
+      CI caught it on the first run; running `--verify-frozen` once locally would have
+      caught it sooner, and the gate that WAS run exercised the other code path.
+
+    - **AND A CAPTION ASSERTED A BYTE TOTAL NOBODY HAD MEASURED.** The sheet's control
+      cell read "(0 of 803 frozen rows moved)" as established fact while 293 of those rows
+      had actually been compared and the rest were still running. That is the
+      label-naming-a-computation-nobody-performed defect **inside the tool built to
+      photograph evidence** — and worse than a stale number, because a caption is where a
+      figure outlives its run: the total would have sat in that cell across every later
+      session whose matrix grew. The caption states the PROPERTY now and names the one
+      owner of the number; the frozen matrices measure it and the shot tool does not.
+
     - **THE FAN SHEET, and the mirror line is drawn from a measurement.**
       `node tools/shot-bloom-fan.mjs <dir>` — the flower-fan composition Eva liked: face-on
       as the headline with the plane running vertically down every frame, the toggle pair
@@ -1936,6 +1968,23 @@ any of them.
       is vertical — but a line drawn at a fixed place is exactly the kind of label that
       stops matching its computation, so **every cell measures the plane from the emitted
       azimuths and the sheet aborts if it is not where the line is.**
+
+      **BOTH OF THE SHEET'S OWN CHECKS FIRED BEFORE IT COULD BE PUBLISHED, and neither
+      defect was visible by eye.** (1) THE FIRST RENDER CROPPED THE TIGHT FANS. Every
+      arrangement before this one was radially symmetric, so its bounding sphere sat on the
+      axis and framing at the ORIGIN with a radius was correct; a fan puts all its mass on
+      one side, and the `Spacing 15°` cell — the one meant to show the fan at its most
+      closed — showed the top third of itself. It targets the model's own bounding-sphere
+      centre now (the app reports the sphere it already computes) and DECODES THE PNG to
+      require a 12 px clear margin on all four edges, widening in bounded steps and dying
+      rather than writing a picture nobody should rule from. (2) THE PLANE MEASUREMENT WAS
+      WRONG, and the radial CONTROL cell is what caught it: taking the plane as the
+      midpoint of the arrangement's angular EXTENT is right for an arc and meaningless for
+      a full circle, where +180 and −180 are the same direction and the normalisation
+      decides the answer. It measured 22.500° for a bloom whose plane is plainly at 0. It
+      uses the mirror-PAIR midpoints now — the same property Z4b asserts — which gives 0
+      for the ring and 0 for both fan arms, because it asks the question the plane
+      actually answers.
 
     - **TWO CLAIMS IN THE QUEUING RULING WERE MEASURED AND CORRECTED — the
       rationale-is-a-premise doctrine again, on this document, which is the failure mode it
