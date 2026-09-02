@@ -241,11 +241,14 @@ for (const row of rows) {
      bytes cannot show. */
   const jct = await junctionAssertions(page, row);
   if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
-  /* ZYGOMORPHY (Z1-Z3) — see zygoAssertions()'s header. This gate is as blind
+  /* ZYGOMORPHY (Z1-Z6) — see zygoAssertions()'s header. This gate is as blind
      to the layer as the export gate is: the foot is never written by anything
      a role may override, and the hub disc spans every ring, so no reachable
-     override can split the flood fill. All three positive-control mutations
-     export as ONE piece. */
+     override can split the flood fill. ALL SEVEN positive-control mutations
+     across both zygomorphy sessions export as ONE connected piece, the
+     off-by-one hood and the removed collapse guard included — and those two
+     fired nothing anywhere in the shipped instrument until Z4 and Z5 existed.
+     A green run here endorses none of it. */
   const zyg = await zygoAssertions(page, row);
   if (zyg.length) { validity.push(`${row.label}: ${zyg.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);

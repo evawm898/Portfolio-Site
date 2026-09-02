@@ -1492,3 +1492,270 @@ any of them.
           ruling needs a fresh picture, exactly as the max-combinator kink, the tip cap and
           the parked tilt extremes do. When it comes, it is a design ruling with its own
           partition report — it changes the DERIVATION and nothing else — never a rewrite.
+
+- ~~Session B: the mirror plane, slot roles, and the orchid~~ **BUILT Sep 2. The seam
+  held: the override MECHANISM was not rewritten, it was MULTIPLIED.** Session A's
+  `ROLE_OVERRIDES`, `resolveRoleOverrides()`, the object-identity guard and the builder's
+  own `applied` record all survive; what changed is the role DERIVATION (a mirror plane
+  giving LABELLUM / HOOD / LATERAL) and WHICH DESCRIPTORS EXIST (one per (layer × role)).
+
+    - **THE MIRROR PLANE IS DERIVED AND WILL NEVER BE A CONTROL.** It contains the axis and
+      slot 0's radial direction. An orientation slider would rotate which slots are the
+      labellum on an arrangement that is otherwise radially symmetric — an invisible rigid
+      rotation of the whole bloom under a label naming a symmetry, which is `layerPhase`'s
+      recorded trap exactly. Putting the labellum at the bottom of a picture is the shot
+      tool's CAMERA, not the geometry's azimuths, so it moves no bytes.
+
+    - **THE ASSIGNMENT IS EXACT INTEGER ARITHMETIC — no angle, no tie tolerance, no
+      epsilon**, which is what lets Z4 be a property rather than a bound. The plane pairs
+      slot *i* with slot *n−i*, and the roles that can be SINGULAR are exactly that
+      involution's FIXED POINTS: slot 0 always, and slot *n/2* when *n* is even. One owner,
+      `roleForSlot(i, n)`, called by `footRing()`; `buildBloomInto` looks a descriptor up by
+      slot index and computes nothing.
+
+    - **AT ODD COUNTS THE ANTIPODE FALLS IN A GAP, so the HOOD IS THE STRADDLING PAIR
+      (Eva, Sep 2)** — a mirror pair, so no symmetry claim weakens, and the ordinary
+      two-lobed upper lip. **THE EMPTY GROUP IS PUSHED ONTO LATERAL DELIBERATELY, and that
+      is the deciding argument rather than a detail:** LATERAL is the role with NO controls,
+      so an empty LATERAL strands nothing, whereas an empty HOOD would leave three hood
+      sliders naming a group with no members — which is what Z1 already fails INNER on. At
+      `petalCount` 3 that is LABELLUM {0}, HOOD {1,2}, LATERAL {} — one of three IS the
+      labellum, and it is the orchid.
+
+    - **A CHARTER PREMISE WAS MEASURED AND CORRECTED, AND THE RULING IT SUPPORTED SURVIVED
+      ON BETTER GROUND. This is the rationale-is-a-premise doctrine working across sessions,
+      on this document itself — which is the failure mode it was written to catch.**
+      Session A's four numbers are REAL and reproduce EXACTLY — 32.461° at n=5, 20.062° at
+      n=8, 12.399° at n=13, 4.736° at n=40 — but they measure ONE rule: reflect about the
+      plane through SLOT 0 and ask how far each image lands from the nearest slot. The
+      charter states them as *"reflecting a golden-angle arrangement about **any** plane"*,
+      and **that quantifier is FALSE.** A golden-angle whorl is an arithmetic progression on
+      a circle, so reversing it gives the same set: it IS exactly mirror-symmetric, about
+      the plane at `(n−1)·g/2`, pairing `i ↔ n−1−i`, measured at **≤ 8.14e-13°** at every
+      count, with the best free plane at 0.000° everywhere.
+      **SLOT ROLES STAY RADIAL-ONLY**, on the corrected and stronger ground: under SPIRAL
+      the plane is elsewhere and the pairing is a DIFFERENT involution, so sharing one
+      derivation across placements produces precisely session A's measured asymmetry. A
+      correct-for-SPIRAL derivation is **RECORDED, NOT BUILT** — it is a second derivation
+      needing its own evidence and its own ruling. Do not reopen the gating from the old
+      number; the old number was never about "any plane".
+      *(The first instrument written for this reported 0.000° for SPIRAL under a
+      many-to-one pairing and was caught by its own control — a bijection is required, and
+      the control existed because session A's published numbers were there to reproduce.)*
+
+    - **AND SLOT ROLES NEED `layerPhase` 0 ABOVE ONE WHORL (Eva, Sep 2), which is a second
+      measurement rather than caution.** The plane is the BLOOM's, so every whorl's slots
+      must be symmetric about it; ring L is offset by `L·layerPhase` slots and the
+      assignment is by index, so all whorls share the plane only at phase 0. Worst pairing
+      error over the best SHARED plane: **2 layers × phase 0.25 → 30.000° at n=3, 11.250° at
+      n=8, 2.250° at n=40; 3 layers × phase 0.33 → 39.600° / 14.850° / 2.970°; phase 0 →
+      0.000° at every count and depth.** **RECORDED, NOT BUILT:** at phase 0.50 the
+      ARRANGEMENT is exactly symmetric (0.000°, measured) because two slots TIE for the
+      plane — but expressing that costs a float tie-comparison inside a derivation that is
+      otherwise exact integer arithmetic, so it is a refinement with its own ruling.
+
+    - **THE COLLAPSE GUARD IS LOAD-BEARING, AND THE REGROUPING TRAP HAS NOW FIRED A FOURTH
+      TIME — prevented at design time again, by measurement.** Splitting a whorl's
+      `n · rFoot²` into `1·r² + h·r² + l·r²` **moves the derived ring radius on 46 of 264
+      measured (config × mode) rows**, worst **0.99 ULP** (3.553e-15 on a 17.26 mm radius at
+      n=39 × petalWidth 30 × sheet 2.40), and it moves at n=3 as readily as at n=40. So the
+      split is CONDITIONAL: unless a slot role actually resolves a record, `footRing()`
+      returns session A's descriptor list on session A's arithmetic, character for
+      character. The gating needs no second mechanism — an ineligible state makes every slot
+      LATERAL, LATERAL carries no rows in `ROLE_OVERRIDES`, so nothing resolves and the list
+      collapses on its own. **Z5 asserts the collapse in BOTH directions**, so the guard is
+      never somewhere a bug sits unexercised.
+
+    - **TWO LAWS NOW — `delta` and `mul` — AND THE TABLE'S KEY MOVED WITH THEM.** Session A
+      carried the control id under a key called `delta`, honest while every row was one; a
+      multiplier under that key is a stored label-lie. The id lives under `control` and the
+      law under `law`, with `LAW_IDENTITY` the one owner of "what is this law's identity".
+      **Both identities are SKIPPED rather than applied**, so neither `x + 0` nor `x * 1` is
+      evaluated on the shipped path — the guard is still object identity, re-pointed rather
+      than extended.
+
+    - **SIZE × NEVER REACHES THE RING, and the ruling's own stated guarantee turned out to
+      be the WRONG one — found by measuring the positive control before writing the
+      assertion.** J2's containment equality was expected to catch a size override plumbed
+      into `footRing()`. **It does not:** every descriptor still takes `radius = R0 · scale`,
+      so containment holds and J2 stays silent. What fired on the measured mutation was the
+      single-layer guard residual, and **only at layerCount 1**; on the three-layer row the
+      mutation fired **NOTHING AT ALL**. **Z6 is the only witness above one whorl** — every
+      descriptor of a whorl must report the same foot (`width`, `authoredWidth`, `radius`,
+      `overhang`, `thickness`, `scale`, `phase`, `tiltExtra`). A role differentiates the
+      BLADE and nothing else.
+
+    - **SIZE × SATURATES, AND IT IS TOLD.** A composed value is clamped into the base
+      control's own range, so ×2.00 on a 35 mm petal asks 70 × 32 and gets 60 × 30 — the
+      multiplier stops moving before its slider does. The read-out prints what was asked and
+      what was built, from `footRing()`'s own out-parameter rather than re-derived (a
+      read-out recomputing "what was asked for" would be a second copy of the composition
+      law). Same "(CLAMPED)" discipline as the roll floor, the tip floor and both foot
+      clamps.
+
+    - **A SESSION-A CHECK WAS MADE MORE GENERAL, NOT WEAKENED.** Its ROLE_OVERRIDES
+      load-time guard asserted `delta range === base range` under a header naming the
+      property "no dead zone at the end of a shipped slider". That equality is a PROXY that
+      holds only while the base's range straddles the delta's useful span — true of all
+      three session-A rows, so proxy and property agreed and nothing distinguished them.
+      `petalTilt` runs 0..75 and contains no negative part, so a labellum that tilts DOWN
+      needs a delta below zero; the genuinely usable reach is `baseMin − baseMax ..
+      baseMax − baseMin`. All three of session A's rows satisfy the corrected form
+      unchanged, and it still rejects everything the proxy rejected.
+
+    - **Z2(v) WAS DISCHARGED BEFORE THE BOUNDARY WAS CROSSED, not after.** Session A made it
+      fire the moment a record lands on ring 0; slot 0 IS the labellum, so it fires
+      immediately. **Keeping descriptor 0 clean was NOT available** — at `petalCount` 3 the
+      whorl splits into LABELLUM and HOOD with no laterals, so every descriptor carries a
+      record and there is no base-state petal to point at. `formAssertions` and
+      `thicknessAssertions` now take the effective state the BUILDER reported using, which
+      is what the seam named. The tip-partition check moved with them and it MATTERS there:
+      `petalTipBreadth` is overridable and the cap partitions on `=== 0` exactly, so reading
+      the row would have checked a converging cap against an authored truncate.
+
+    - **THE POSITIVE CONTROLS, RED THEN GREEN, in throwaway worktrees** (`git worktree
+      add`, never mutate-and-restore), each run against the FULL shipped instrument before
+      Z4–Z6 were written and again after:
+
+      | mutation | boundary | degen | STL bytes | before Z4–Z6 | after |
+      |---|---|---|---|---|---|
+      | shipped tree | 0 | 0 | — | **0 of 7 rows** | **0 of 7 rows** |
+      | M1 off-by-one hood index | 0 | 0 | same length | **NOTHING** | **Z4 only**, 6 across 4 rows |
+      | M2 slot record never reaches the blade | 0 | 0 | same length | Z2(iii) only | Z2(iii) only, 48 across 4 rows |
+      | M3 collapse guard removed | 0 | 0 | same length | **NOTHING** | **Z5 only**, on the DEFAULT row |
+      | M4 size × plumbed into `footRing()` | 0 | 0 | same length | guard only, and **silent at 3 layers** | **Z6**, 22 across 4 rows |
+
+      **M1 AND M3 ARE THE ENTRY THAT MATTERS.** Both are invisible to the entire shipped
+      instrument — both STL gates, the triangle count, the byte length, J1–J6,
+      `formAssertions`, `thicknessAssertions` and Z1–Z3 alike. M1 keeps the partition total,
+      disjoint and identically SIZED, so the area-rule sum is bit-identical; M3 silently
+      splits the DEFAULT bloom into three descriptors. Every mutation leaves session A's
+      IRIS row and the GATED rows clean, so all four are scoped to the new arm.
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS**, and the default bloom is **11,136 tris live and
+      export alike**, unchanged. The eight new controls add **ZERO triangles at every
+      setting** — topology is fixed, so an override moves vertices and nothing else — which
+      the ORCHID row confirms directly: 11,136 tris and the same STL byte length as the
+      undifferentiated control beside it, with R0 identical to the bit.
+
+    - **THE PANEL: A NEW SECTION, "Petal roles" (Eva, Sep 2)**, holding session A's three
+      `inner*` deltas (moved from ARRANGEMENT — presentation only, nothing persisted) and
+      the eight new ones. Session A predicted the name "Whorl differences"; it was passed
+      over because slot roles differentiate WITHIN a whorl, so that name would be wrong for
+      eight of eleven controls, and "Zygomorphy" was passed over as jargon on a
+      visitor-facing panel.
+
+    - **AND IT NEEDED NO PRECONDITION MECHANISM, which session A predicted it would.**
+      Session A reasoned the section would ship with every control hidden and warned that a
+      witness arranging its own preconditions is a witness that can quietly measure nothing.
+      The `layerPhase` gating ruling changed that before it was built: slot roles apply at
+      `layerCount` 1, so the predicate is TRUE at the shipping default and the section
+      RENDERS at first load — collapsed, with its eight slot controls visible and session
+      A's three hidden. **A session-B design report managed to state this BOTH WAYS in one
+      document.** It was settled by EVALUATING the predicate, and the panel gate now asserts
+      that exact first-load state in both directions on the DOM, so it can never again be
+      settled by reading two paragraphs.
+
+    - **THE MATRIX GREW 205 → 246**, and **`phase7Matrix()` — the 205 rows frozen at
+      f626828 — is the sixth baseline and now the strongest**, on the reasoning that
+      promoted each of its predecessors: it is the only one carrying session A's zygomorphy
+      corners, which is the region a second role axis is most likely to disturb. Generated
+      from f626828's own `buildMatrix()`, proved deep-equal in CI. `--full` cannot compare
+      across the trees for the third time running: 33 new rows set controls the old registry
+      does not declare. **The slot controls are excluded from the layer-sub sweep by
+      derivation** — their predicate reads `layerCount`, so `predicateDrivers` correctly
+      puts them there, where at three layers and the default phase they are HIDDEN and every
+      row would build the shipping default under a label naming a control that did nothing.
+      That is the latent trap #124 closed, arriving from the other direction.
+
+    - **`slotsPerRing` WAS RETIRED.** It answered "how many petals does a ring carry" with
+      one number, which a split whorl does not have. Its one real consumer was J1's
+      accounting, which now sums each descriptor's own `roleCount`. Nothing persists it, so
+      no `RETIRED_IDS` entry is owed — that list is for CONTROL ids, which reach saved
+      designs.
+
+    - **`fitCamera` GAINED AN EXPLICIT, DEFAULTED `up`.** Looking down the axis passed
+      `dir = [0,0,1]` with `up = [0,0,1]`, which are PARALLEL — so "face-on" has never had a
+      defined roll in this codebase, and got whatever three.js's degenerate fallback picked.
+      That did not matter while every bloom was radially symmetric and it matters completely
+      for a bloom with a face. Every existing caller omits the argument and frames
+      identically.
+
+    - **A TRAP IN `diff-bloom-bytes.mjs` FIRED EXACTLY AS ITS OWN HEADER PREDICTED.** Adding
+      `--phase7` to `MATRIX_FN` without adding it to `MATRIX_FLAGS` made the flag be
+      ACCEPTED and `legacyMatrix()` run — a 47-row report under a 205-row label. The header
+      records this happening to `--phase3` and again to `--phase4`; it has now happened a
+      third time. The one-list fix is in place and worked (the run said 47), but the flag
+      constant is a second place to remember.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 2): THE ORCHID SHIPS. MERGED.** This closes the
+      SECOND half of the brief the zygomorphy work was opened on — full per-slot
+      differentiation, with orchid and iris as the target forms — and with it the whole
+      brief: **the bloom can now face you.** She ruled from **the `petalCount` 3 cell**,
+      which is the one that answers the question without needing its caption: one big lip
+      below, two raised tepals above, no laterals at all, and it reads as an orchid on
+      sight. The headline pair is what makes it unfalsifiable — the same arrangement, the
+      same eight petals, **the same 11,136 triangles on both sides**, so the only thing
+      that could differ between the control and the orchid is which state each SLOT was
+      built from.
+
+    - **THE BROAD FACE-ON READ IS A SLIDER POSITION, NOT A RANGE PROBLEM (Eva, Sep 2), and
+      recording the RULING rather than only the observation is the point** — an
+      unresolved-looking note in a charter gets re-litigated by the next session that finds
+      it. At the headline settings the labellum and hood read as broad rounded masses
+      face-on rather than as distinctly petal-shaped: that is `labellumTilt` clamping to
+      horizontal plus `labellumCurl` −60 bringing the blade toward the camera, and every one
+      of those numbers is reachable and adjustable. Same standing as session A's clustered
+      standards. **Nothing is queued. Do not "fix" a default, widen a range, or add a
+      control on the strength of this note.**
+
+    - **THE FAN LINEAGE, NAMED (Eva, Sep 2): THE LABELLUM SATISFIES HER ORIGINAL FAN
+      PRINCIPLE.** The principle is that *the petal on the mirror line is petal number one,
+      and it has its own sliders* — which is exactly what slot 0 became. So the orchid is
+      not a detour from the fan idea; it is the fan idea's first half, arriving through the
+      role mechanism rather than through an arrangement. **THE FLOWER'S OWN FAN UI IS THE
+      RECORDED PATTERN FOR PER-PETAL GRANULARITY** whenever it arrives here: per-petal
+      control GROUPS, labelled in the flower's own style (`PETAL 1 — INNER`). It is a
+      pattern to borrow, not queued work — and it is the answer to the SELECTOR that
+      session A recorded and rejected, since a group per petal is a registry row per petal
+      rather than one control id holding several values.
+
+- ~~Session 10~~ **RULED AND QUEUED (Eva, Sep 2): SESSION 10 IS THE FAN ARRANGEMENT — a
+  FOURTH `placement` value.** Not a role, not an override: an arrangement, so it belongs to
+  `buildWhorlInto` and `footRing()` beside RADIAL / SPIRAL / CONTINUOUS. Its controls, as
+  ruled: **petals per side, petal spacing, and a petal-on-mirror-line toggle** — the
+  vocabulary is the flower's own fan implementation, which the session should READ as the
+  reference rather than re-invent (control names, the spacing law, the toggle Eva
+  screenshotted). The bloom's disciplines stay the bloom's.
+
+    - **THE TOGGLE'S OFF-POSITION ALREADY HAS ITS MATHEMATICS, DERIVED AND RECORDED HERE
+      BEFORE ANYONE KNEW WHAT IT WAS FOR.** A symmetric arc with no petal on the mirror line
+      is a MIRROR THROUGH THE GAP, whose pairing is **fixed-point-free: `i <-> n-1-i`** —
+      the same involution session B measured while correcting session A's SPIRAL premise
+      (a golden-angle whorl is exactly mirror-symmetric about `(n-1)*g/2` under precisely
+      that pairing, at <= 8.14e-13 deg). Session B's shipped derivation is the OTHER
+      involution, `i <-> n-i`, which has fixed points and is why LABELLUM and HOOD can be
+      singular at all. **Both are now written down, with their fixed-point structure stated,
+      and the fan needs exactly the one that was built for a different reason.** That is the
+      THIRD time this project has derived a piece of mathematics before discovering its
+      purpose.
+
+    - **THE ZYGOMORPHY ROLES COMPOSE ONTO IT rather than being redone (Eva's ruling).**
+      LABELLUM is the mirror-line petal when the toggle is ON, and the INNER PAIR when it is
+      OFF; HOOD and LATERAL follow from the same pairing. So the fan changes the ARRANGEMENT
+      and the role DERIVATION reads it — the seam session A wrote and session B kept.
+
+    - **THE GENUINELY NEW PROBLEM IS AT THE JUNCTION, and it is the loud-plumbing question
+      from session 2 finally coming home.** A fan's feet occupy an ARC of the ring, not the
+      circle, so for the first time the hub's job changes SHAPE: a full disc spans feet that
+      are no longer all round it, and most of that disc would be plumbing with nothing on
+      it. **Full disc versus a derived SECTOR is the Phase A analysis** — with the
+      spread-6.00 plate note as its precedent (ship the disc, photograph it, let the sheet
+      decide) and the area-ruled annular band as the costed alternative that was parked
+      there. Every junction assertion J1–J4 is written per RING and will need re-reading
+      against an arc: containment, the foot reaching the hub, and the overlap box are all
+      stated over a full circle today.
+
+    - **AFTER THE FAN, THE STANDING BOARD (Eva, Sep 2):** edge treatments, infill, per-petal
+      sliders in the flower's fan UI pattern, and Eva's own presets. Recorded as direction,
+      not as queued work; each needs its own ruling and its own evidence.

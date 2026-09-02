@@ -64,7 +64,33 @@ export const RETIRED_IDS = [];
    applyVisibility() in bloom.js EVALUATES these and is the only thing that
    hides a control wrapper. No gating data-attributes, no imperative hiding.
    If a fourth leaf shape is ever needed, stop and raise it. */
-export const PREDICATES = {};
+/* SLOT ROLES ARE RADIAL-ONLY AND NEED ONE SHARED MIRROR PLANE — declared once
+   here, under a name, because eight controls share it and eight copies of one
+   condition is what drifts. See bloom-geometry.js's SESSION B block for both
+   measurements behind it: the corrected SPIRAL ground, and the layerPhase
+   table (30.000 deg off at 2 layers x phase 0.25 x n=3, 0.000 at phase 0).
+
+   THE SECOND STATEMENT OF THIS BOUNDARY is `slotRolesEligible()` in
+   bloom-geometry.js, which makes the controls INERT where this one makes them
+   HIDDEN — neither file can read the other's answer and both must act on it.
+   That is the SHEET_THICKNESS_MM situation exactly, so it gets the same
+   remedy: both gates assert the two agree on EVERY matrix row, rather than a
+   comment claiming they do. */
+export const PREDICATES = {
+  slotRolesEligible: { all: [
+    { id: 'placement', oneOf: ['RADIAL'] },
+    /* layerCount 1 (nothing above the outermost whorl to fall out of step),
+       OR every whorl in phase so all of them share the one plane. `not min 2`
+       is "below 2"; `not awayFrom 0` is "is 0" — the registry's first use of
+       the awayFrom leaf, which has been in the vocabulary unused since day
+       one. The tolerance is half of layerPhase's own 0.01 step, so it admits
+       exactly the reachable value 0 and nothing else. */
+    { any: [
+      { not: { id: 'layerCount', min: 2 } },
+      { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
+    ] },
+  ] },
+};
 
 export function evalPredicate(pred, state) {
   if (pred == null) return true;
@@ -248,6 +274,22 @@ export const SECTIONS = [
      LABEL moves on one ruling and the id moves with it, exactly as it did
      here. Do not fix it by re-homing the control. */
   { id: 'thickness', label: 'Part thickness', open: false },
+  /* PETAL ROLES — which petals differ from the others, and how (Eva's name,
+     Sep 2). It holds two independent axes: session A's LAYER roles (whorl vs
+     whorl) and session B's SLOT roles (where a petal sits within its whorl).
+
+     WHY NOT "Whorl differences", which is what session A predicted this
+     section would be called: slot roles differentiate WITHIN a whorl, so that
+     name would be wrong for seven of the ten controls in it — a label naming
+     a thing that is not the thing, which is what this project retires ids
+     over. "Zygomorphy" is exact and is the charter's own word, and was passed
+     over as jargon on a visitor-facing panel.
+
+     AND WHY NOT Arrangement, where session A's three landed: Arrangement is
+     already nine controls, and session A recorded that the pair wanted a home
+     of its own once slot roles arrived. Moving `inner*` here is presentation
+     only — `section` is never persisted and no geometry reads it. */
+  { id: 'roles', label: 'Petal roles', open: false },
 ];
 
 /* THE SECTION/CONTROL RELATION, checked at module load rather than trusted.
@@ -901,20 +943,91 @@ export const CONTROLS = [
      range in the direction that reaches its form: curl runs the whole signed
      span so standards can rise while falls hang, cup likewise, and tip
      breadth runs upward only because the base already starts at 0. */
-  { id: 'innerCurl', section: 'arrangement', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+  { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
     tier: 'standard', role: 'petal',
     visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
 
-  { id: 'innerCup', section: 'arrangement', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+  { id: 'innerCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
     label: 'Inner cup', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
     tier: 'standard', role: 'petal',
     visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
 
-  { id: 'innerTipBreadth', section: 'arrangement', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+  { id: 'innerTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
     label: 'Inner tip', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `+${Number(v).toFixed(2)} breadth`),
     tier: 'standard', role: 'petal',
     visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
+
+  /* ===================================================================
+     SLOT ROLES — THE ORCHID (session B, Sep 2). Eight controls, all Standard,
+     all `role: 'petal'`, all in PETAL ROLES, all at their law's IDENTITY by
+     default so the shipping bloom is unmoved by construction.
+
+     TWO LAWS, AND THE SUFFIX SAYS WHICH. `*Size` is a MULTIPLIER (identity
+     1.00); everything else is a DELTA (identity 0). ROLE_OVERRIDES is the one
+     table that states this, and both gates assert these ranges against it —
+     bloom-geometry.js cannot import the registry, so it restates the base
+     control's bounds and the check is what makes it one owner rather than two.
+
+     THE SET IS EVA'S, RULED IN SESSION (Sep 2): labellum gets size, tip
+     breadth, tilt, cup and CURL; hood gets size, tilt and cup. The curl delta
+     was added to the originally-ruled four for a measured reason —
+     `petalTilt`'s own range starts at 0, so a tilt delta reaches HORIZONTAL
+     and can never droop, and spine curl is the only control that makes a lip
+     hang and reflex. LATERAL deliberately has NO controls: it is the residue,
+     it is what the labellum and hood are read against, and it is the group
+     that may legitimately be empty (at petalCount 3 there are no laterals at
+     all). RECORDED, NOT BUILT, on session A's asymmetry argument — adding a
+     control later is one registry row plus one ROLE_OVERRIDES row forever,
+     while retiring one becomes a schema bump plus a migration the day
+     anything persists a design: a lateral role override, a labellum roll or
+     twist delta, and a per-role thickness delta (which `sheetThickness` may
+     never have — see session A's never-overridable table, J4a).
+
+     ALL EIGHT SHARE ONE PREDICATE, by ref rather than by eight copies. It is
+     TRUE at the shipping default (RADIAL, layerCount 1), so this section
+     RENDERS at first load with these eight visible and session A's three
+     hidden — which is also what lets the panel gate witness this section with
+     no precondition. */
+  { id: 'labellumSize', section: 'roles', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
+    label: 'Labellum size',
+    /* SATURATION IS TOLD, on the "(clamped)" discipline the roll floor, the
+       tip floor and both foot clamps already carry: a composed value is
+       clamped into the base control's own range, so at a long petal the
+       multiplier stops moving before its slider does. The read-out cannot see
+       the clamp itself (fmt has only the UI state), so it prints the ASKED-FOR
+       millimetres and the app's read-out prints what was actually built. */
+    fmt: (v, ui) => (Number(v) === 1 ? 'same as the rest' : `x${Number(v).toFixed(2)} — asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+
+  { id: 'labellumTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+    label: 'Labellum tip', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `+${Number(v).toFixed(2)} breadth`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+
+  { id: 'labellumTilt', section: 'roles', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
+    label: 'Labellum tilt', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg tilt`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+
+  { id: 'labellumCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Labellum cup', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+
+  { id: 'labellumCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+    label: 'Labellum curl', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg spine curl`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+
+  { id: 'hoodSize', section: 'roles', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
+    label: 'Hood size',
+    fmt: (v, ui) => (Number(v) === 1 ? 'same as the rest' : `x${Number(v).toFixed(2)} — asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+
+  { id: 'hoodTilt', section: 'roles', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
+    label: 'Hood tilt', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg tilt`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+
+  { id: 'hoodCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Hood cup', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
   /* CENTER — the A/B rig. */
   { id: 'centerStyle', section: 'center', kind: 'choice', default: 'DISC',

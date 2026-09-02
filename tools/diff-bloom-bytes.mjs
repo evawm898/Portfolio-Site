@@ -31,6 +31,11 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase7   `phase7Matrix()` — the 205 rows frozen at f626828, the commit
+                that shipped the override architecture and per-layer roles.
+                The strongest baseline: the only one carrying session A's
+                zygomorphy corners, which is the region a second role axis is
+                most likely to disturb.
      --phase6   `phase6Matrix()` — the 158 rows frozen at c1886d0, the commit
                 before the continuous spiral. NOW THE STRONGEST of the frozen
                 baselines, on the same reasoning that promoted --phase5 and
@@ -203,7 +208,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -280,10 +285,10 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 if (process.argv.includes('--verify-frozen')) {
   const base = arg('--base');
   if (!base) { console.error('--verify-frozen needs --base <dir> (a git worktree of the commit the matrix claims to snapshot)'); process.exit(2); }
-  const which = ['phase2', 'phase3', 'phase4', 'phase5', 'phase6'].filter((n) => process.argv.includes('--' + n));
-  if (which.length !== 1) { console.error('--verify-frozen needs exactly one of --phase2 --phase3 --phase4 --phase5 --phase6'); process.exit(2); }
+  const which = ['phase2', 'phase3', 'phase4', 'phase5', 'phase6', 'phase7'].filter((n) => process.argv.includes('--' + n));
+  if (which.length !== 1) { console.error('--verify-frozen needs exactly one of --phase2 --phase3 --phase4 --phase5 --phase6 --phase7'); process.exit(2); }
   const name = which[0];
-  const frozen = { phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix, phase6: phase6Matrix }[name]();
+  const frozen = { phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix, phase6: phase6Matrix, phase7: phase7Matrix }[name]();
   const baseHarness = await import(pathToFileURL(path.join(path.resolve(base), 'tools', 'bloom-harness.mjs')).href);
   const live = baseHarness.buildMatrix();
   /* Normalised to exactly what a row MEANS to every consumer: its label, the
@@ -504,6 +509,7 @@ const PHASE2 = process.argv.includes('--phase2');
 const PHASE3 = process.argv.includes('--phase3');
 const PHASE4 = process.argv.includes('--phase4');
 const PHASE5 = process.argv.includes('--phase5');
+const PHASE7 = process.argv.includes('--phase7');
 const PHASE6 = process.argv.includes('--phase6');
 /* Exactly one matrix. The guard and the LABEL are derived from one list so a
    new matrix cannot be added to the runner while the recorded label silently
@@ -512,13 +518,13 @@ const PHASE6 = process.argv.includes('--phase6');
    naming a computation nobody performed, in this project's most repeated
    defect shape. --compare does not read the field, so nothing drew a wrong
    conclusion from it; it was wrong in the record, which is enough. */
-const MATRIX_FLAGS = [[FULL, 'full'], [PHASE6, 'phase6'], [PHASE5, 'phase5'], [PHASE4, 'phase4'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
+const MATRIX_FLAGS = [[FULL, 'full'], [PHASE7, 'phase7'], [PHASE6, 'phase6'], [PHASE5, 'phase5'], [PHASE4, 'phase4'], [PHASE3, 'phase3'], [PHASE2, 'phase2']];
 const chosen = MATRIX_FLAGS.filter(([on]) => on);
 if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
 const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
 const rows = [];
 const validity = [];
-const MATRIX_FN = { full: buildMatrix, phase6: phase6Matrix, phase5: phase5Matrix, phase4: phase4Matrix, phase3: phase3Matrix, phase2: phase2Matrix, legacy: legacyMatrix };
+const MATRIX_FN = { full: buildMatrix, phase7: phase7Matrix, phase6: phase6Matrix, phase5: phase5Matrix, phase4: phase4Matrix, phase3: phase3Matrix, phase2: phase2Matrix, legacy: legacyMatrix };
 /* ONE list decides the flag, the recorded LABEL and the rows. It used to be
    two — a flag list for the guard and a ternary chain for the rows — and the
    chain silently fell through for any flag the chain did not know. That is

@@ -217,7 +217,19 @@ let mesh = null;
    defect wearing a lens. `lift` raises the orbit target off the origin — the
    whole-bloom view looks slightly up into the whorl, a centre crop looks
    straight at the hub plane. */
-function fitCamera(radius, lift = 0.15, at = null, dir = null) {
+/* `up` IS EXPLICIT NOW, AND DEFAULTED SO NOTHING MOVES (session B, Sep 2).
+   Every existing caller omits it and gets [0,0,1] — the value this function
+   has always hardcoded — so every sheet taken before today frames identically.
+
+   WHY IT WAS WORTH ADDING. Looking straight down the axis passes
+   dir = [0,0,1] with up = [0,0,1], which are PARALLEL: the camera's roll is
+   then whatever three.js's degenerate fallback picks, so "face-on" has never
+   had a defined orientation in this codebase. That did not matter while every
+   bloom was radially symmetric — one roll is as good as another. It matters
+   the moment the flower has a FACE: a zygomorphic bloom read face-on has an
+   up and a down, and the sheet that shows the labellum below and the hood
+   above must be able to say so rather than hope. */
+function fitCamera(radius, lift = 0.15, at = null, dir = null, up = null) {
   /* The axis-framing path is byte-for-byte the original: a single-petal crop
      is a NEW capability, and widening a signature must never move the shot
      every existing sheet was taken with. The 40 mm distance floor belongs to
@@ -240,7 +252,7 @@ function fitCamera(radius, lift = 0.15, at = null, dir = null) {
   const v = dir || [0.75, -0.75, 0.6];
   const n = Math.hypot(v[0], v[1], v[2]) || 1;
   camera.position.set(at[0] + (v[0] / n) * d, at[1] + (v[1] / n) * d, at[2] + (v[2] / n) * d);
-  camera.up.set(0, 0, 1);
+  camera.up.set(...(up || [0, 0, 1]));
   controls.target.set(at[0], at[1], at[2]);
 }
 
@@ -260,7 +272,7 @@ let liveSummary = '';
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, slotsPerRing: 1, quantizerResiduals: null };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false };
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -399,11 +411,17 @@ function spiralLowCount(ui, fr) {
    the floor and the ceiling ask the same question at opposite ends of one
    clamp and two copies of it would drift in wording alone. */
 function clampedRingsPhrase(rings, hit) {
-  const idx = rings.map((r, i) => (hit(r) ? i : -1)).filter((i) => i >= 0);
+  /* COUNTED IN WHORLS, NOT DESCRIPTORS (session B). A split whorl is three
+     descriptors of ONE ring, and they share a foot by construction (Z6), so
+     counting descriptors would report "rings 0-2 (3 of 3)" for a single-whorl
+     bloom whose foot clamped once — three answers to one question, and a
+     number naming a thing that is not the thing. `lambda` is the whorl. */
+  const whorls = [...new Set(rings.map((r) => r.lambda))].sort((a, b) => a - b);
+  const idx = whorls.filter((L) => rings.some((r) => r.lambda === L && hit(r)));
   if (!idx.length) return null;
   const first = idx[0], last = idx[idx.length - 1];
-  const which = rings.length === 1 ? 'the foot' : (first === last ? `ring ${first}` : `rings ${first}–${last}`);
-  return `${which} (${idx.length} of ${rings.length})`;
+  const which = whorls.length === 1 ? 'the foot' : (first === last ? `ring ${first}` : `rings ${first}–${last}`);
+  return `${which} (${idx.length} of ${whorls.length})`;
 }
 
 /* BOTH CLAMPS, BOTH REPORTED. The floor has said so since the thickness
@@ -420,6 +438,34 @@ function footFloorLine(rings) {
   const hi = clampedRingsPhrase(rings, (r) => r.widthClampedHigh);
   return (lo ? `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${lo} — the blade keeps shrinking, the root does not\n` : '')
        + (hi ? `FOOT WIDTH CAPPED at ${FOOT_MAX_WIDTH_MM.toFixed(2)} mm on ${hi} — the blade keeps widening, the ring does not\n` : '');
+}
+
+/* THE SLOT-ROLE LINE — what the mirror plane actually did, and where the
+   envelope clamp bit. Two things a visitor cannot otherwise see: WHICH slots
+   the labellum and hood came out as (the derivation is exact but it is not
+   obvious that an odd count gives a hood PAIR), and that a size multiplier has
+   SATURATED. The second is the "(CLAMPED)" discipline the roll floor, the tip
+   floor and both foot clamps already carry: a slider that has stopped moving
+   must say so rather than read as broken.
+
+   The asked-for values come from footRing()'s own out-parameter, never
+   recomputed here — a read-out re-deriving "what was asked for" would be a
+   second copy of the composition law, and the second copy is the one that
+   drifts. Returns '' when no whorl split, so the line is simply absent rather
+   than saying "none". */
+function slotRoleLine(rings) {
+  const split = rings.filter((r) => r.slotRole !== null);
+  if (!split.length) return '';
+  const seen = new Map();
+  for (const r of split) if (!seen.has(r.slotRole)) seen.set(r.slotRole, r.slots);
+  const groups = [...seen].map(([role, slots]) =>
+    `${role.toLowerCase()} ${slots.length === 1 ? `slot ${slots[0]}` : `slots ${slots.join('+')}`}`).join(' · ');
+  const clamps = new Map();
+  for (const r of split) for (const c of r.overrideClamped || []) clamps.set(c.base, c);
+  const clampLine = [...clamps.values()]
+    .map((c) => `${c.base} asked ${c.asked.toFixed(2)}, CLAMPED to ${c.got.toFixed(2)}`).join(' · ');
+  return `mirror plane through slot 0 — ${groups}\n`
+       + (clampLine ? `ROLE VALUE CLAMPED to the base control's own range: ${clampLine}\n` : '');
 }
 
 function summarise(ui, acc, mode, rings, fr) {
@@ -448,11 +494,15 @@ function summarise(ui, acc, mode, rings, fr) {
   const ringLine = cont
     ? `rings (${mode}) ${rings.length} from ${rings[0].radius.toFixed(2)} to ${rings[rings.length - 1].radius.toFixed(2)} mm`
       + `, step ${(rings[0].radius - rings[1].radius).toFixed(3)}–${(rings[rings.length - 2].radius - rings[rings.length - 1].radius).toFixed(3)} mm\n`
-    : (layers > 1 ? `layer rings (${mode}) ${rings.map((r) => r.radius.toFixed(2)).join(' / ')} mm\n` : '');
+    /* ONE RADIUS PER WHORL, not per descriptor — same reason as
+       clampedRingsPhrase above: a split whorl's descriptors share a radius,
+       so listing them would print the same number three times. */
+    : (layers > 1 ? `layer rings (${mode}) ${[...new Map(rings.map((r) => [r.lambda, r])).values()].map((r) => r.radius.toFixed(2)).join(' / ')} mm\n` : '');
   return `${petalsSaid} · ${ui.placement.toLowerCase()} · ${depth} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
        + (rings.length > 1 ? ringLine : '')
        + footFloorLine(rings)
+       + slotRoleLine(rings)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
@@ -655,6 +705,16 @@ window.__bloomMetrics = () => ({
        layerCount would be a second copy of the derivation it exists to
        police. */
     role: r.role, roleCount: r.roleCount,
+    /* THE LAYER, SEPARATELY FROM THE DESCRIPTOR INDEX (session B). `index` is
+       the position in `rings`, which stopped being the layer the moment a
+       whorl could split into LABELLUM / HOOD / LATERAL descriptors. */
+    lambda: r.lambda,
+    /* THE SLOT ROLE AND ITS SLOTS. `slotRole` is null on an UNSPLIT
+       descriptor and never LATERAL there — "this whorl was not split" and
+       "this group is the laterals" are different claims. Z4 reads `slots` to
+       assert the assignment is mirror-symmetric. */
+    slotRole: r.slotRole, slots: r.slots ? [...r.slots] : null,
+    overrideClamped: (r.overrideClamped || []).map((c) => ({ ...c })),
     overrides: r.overrides ? { ...r.overrides } : null,
   })),
   /* Every ring's foot rows as EMITTED — J1's input. The pre-layer hook
@@ -666,12 +726,21 @@ window.__bloomMetrics = () => ({
   petalRingFootFrames: lastPetals.map((p) => (p ? p.footFrames : null)),
   /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
      `continuousMode` is what every assertion branches on, `sequenceLength` is
-     what the legibility flag counts, and `slotsPerRing` x rings.length is the
-     bloom's petal count in both modes. A gate deriving any of these from
+     what the legibility flag counts, and each descriptor's own `roleCount`
+     sums to the bloom's petal count in both modes. A gate deriving any of these from
      `placement` would be a second copy of the branch. */
   continuousMode: lastFoot.continuousMode,
   sequenceLength: lastFoot.sequenceLength,
-  slotsPerRing: lastFoot.slotsPerRing,
+  /* WHETHER SLOT ROLES APPLY, AND WHETHER A WHORL ACTUALLY SPLIT — two
+     different claims, so two flags. The first is the gating (placement and
+     depth) and is cross-checked against the registry's own
+     `slotRolesEligible` predicate by both gates; the second additionally
+     needs a control off its identity, and Z5 asserts it in both directions
+     against the descriptor count. `slotsPerRing` was RETIRED here (Sep 2):
+     it answered "how many petals does a ring carry" with one number, which a
+     split whorl does not have. */
+  slotRolesEligible: lastFoot.slotRolesEligible,
+  slotRolesSplit: lastFoot.slotRolesSplit,
   /* THE QUANTIZER IDENTITY'S RESIDUALS — the continuous arm's answer to
      `ringGuardResidual`, and an EQUALITY rather than a bound (footRing's
      header says why). null under the ringed arm: there is no second law
@@ -695,7 +764,7 @@ window.__bloomMetrics = () => ({
      in the codebase that can see an override record that never reached the
      blade - a failure invisible to both STL gates, to the triangle count and
      to J1-J6 alike. Z2's third clause. */
-  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, overridden: p.overridden, applied: p.applied } : null)),
+  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
   layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to
@@ -705,7 +774,7 @@ window.__bloomMetrics = () => ({
   petalThickness: lastPetal ? lastPetal.thickness : null,
   petalThicknessGuardResidual: lastPetal ? lastPetal.thicknessGuardResidual : null,
 });
-window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null) => { userMoved = true; fitCamera(radius, lift, at, dir); };
+window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null, up = null) => { userMoved = true; fitCamera(radius, lift, at, dir, up); };
 
 /* THE ONLY WRITER of `capability`. Rebuilds synchronously rather than
    through the rAF coalescer so a caller can read __bloomMetrics back on the

@@ -61,7 +61,8 @@ export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredi
    builder actually clamps to. A second copy here would let the gate endorse
    a wall the geometry does not build. */
 export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT,
-         ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+         ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
+         SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 
 /* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
    name for the default sheet thickness and the registry carries a literal
@@ -116,17 +117,84 @@ if (LAYER_COUNT_CONTROL.min !== 1) {
    which is DEAD != INVISIBLE in the registry rather than in the geometry. */
 for (const o of ROLE_OVERRIDES) {
   const base = CONTROLS.find((c) => c.id === o.base);
-  const delta = CONTROLS.find((c) => c.id === o.delta);
+  const ctl = CONTROLS.find((c) => c.id === o.control);
   if (!base) throw new Error(`ROLE_OVERRIDES names base control "${o.base}", which the registry does not declare — an override pointing at nothing composes NaN silently`);
-  if (!delta) throw new Error(`ROLE_OVERRIDES names delta control "${o.delta}", which the registry does not declare — the override could never be reached`);
+  if (!ctl) throw new Error(`ROLE_OVERRIDES names control "${o.control}", which the registry does not declare — the override could never be reached`);
   if (base.min !== o.min || base.max !== o.max) {
     throw new Error(`ROLE_OVERRIDES clamps "${o.base}" to ${o.min}..${o.max}, but the registry declares ${base.min}..${base.max} — bloom-geometry.js cannot import the registry, so this is the check that keeps its restatement from becoming a second owner`);
   }
-  if (delta.min !== o.min || delta.max !== o.max) {
-    throw new Error(`delta control "${o.delta}" spans ${delta.min}..${delta.max} against the base's ${o.min}..${o.max} — a delta reaching past the clamp is a dead zone at the end of a shipped slider`);
+  /* THE RANGE CHECK IS PER LAW (session B). A DELTA is measured in the base's
+     own units, so its range is the base's range and anything wider is a dead
+     zone at the end of a shipped slider. A MULTIPLIER is dimensionless — its
+     range is a ratio and has nothing to compare against the base's millimetres
+     — so what is checked instead is that it can actually REACH the clamp in
+     both directions from somewhere in the base's range, which is the same
+     "no dead slider" property stated in the units the control actually has. */
+  if (o.law === 'delta') {
+    /* THE DEAD-ZONE BOUND IS THE DIFFERENCE RANGE, NOT THE BASE RANGE — a
+       CORRECTION to session A's check, made because session B tripped it on a
+       control that is not wrong (Sep 2). The property this check names in its
+       own header is "no dead zone at the end of a shipped slider". Session A
+       stated it as `delta range === base range`, which is a PROXY that holds
+       only while the base's range straddles the delta's useful span; all three
+       of its rows did, so the proxy and the property agreed and nothing
+       distinguished them.
+       `petalTilt` runs 0..75 and contains no negative part, so a labellum that
+       tilts DOWN needs a delta below zero — and the reach that is genuinely
+       usable is baseMin - baseMax .. baseMax - baseMin, because from base 75 a
+       delta of -75 lands exactly on 0 and from base 0 a delta of +75 lands
+       exactly on 75. Under the old proxy a downward tilt was unexpressible;
+       under the property it is fine, and a delta wider than the difference
+       range is still dead and still caught.
+       This is a check being made MORE GENERAL, not weakened: session A's three
+       rows all satisfy the corrected form unchanged, and the corrected form
+       rejects everything the proxy rejected except the case the proxy was
+       never asked about. */
+    const reach = { lo: o.min - o.max, hi: o.max - o.min };
+    if (ctl.min < reach.lo || ctl.max > reach.hi) {
+      throw new Error(`delta control "${o.control}" spans ${ctl.min}..${ctl.max}, outside the ${o.base} clamp's usable reach ${reach.lo}..${reach.hi} — a delta that can never land unclamped from ANY base value is a dead zone at the end of a shipped slider`);
+    }
+    if (!(ctl.min < 0 || ctl.max > 0)) {
+      throw new Error(`delta control "${o.control}" spans ${ctl.min}..${ctl.max}, which cannot move ${o.base} in either direction`);
+    }
+  } else if (o.law === 'mul') {
+    if (!(ctl.min > 0)) throw new Error(`multiplier control "${o.control}" reaches ${ctl.min} — a non-positive size multiplier inverts or collapses the blade`);
+    if (!(ctl.min * o.max <= o.max && ctl.max * o.min >= o.min)) {
+      throw new Error(`multiplier control "${o.control}" spans ${ctl.min}..${ctl.max}, which cannot reach the ${o.base} clamp ${o.min}..${o.max} from inside the base's own range`);
+    }
+  } else {
+    throw new Error(`ROLE_OVERRIDES row for "${o.control}" declares unknown law "${o.law}"`);
   }
-  if (DEFAULTS[o.delta] !== 0) {
-    throw new Error(`delta control "${o.delta}" defaults to ${DEFAULTS[o.delta]}, not 0 — resolveRoleOverrides() SKIPS a zero delta, and that skip is the whole of the identity guard`);
+  /* THE IDENTITY IS THE LAW'S, not a hardcoded 0 — resolveRoleOverrides()
+     SKIPS a row at its identity, and that skip is the whole of the guard, so
+     a `mul` control defaulting to 0 would collapse every blade it touches at
+     the shipping default while a check against 0 called it correct. */
+  if (DEFAULTS[o.control] !== LAW_IDENTITY[o.law]) {
+    throw new Error(`${o.law} control "${o.control}" defaults to ${DEFAULTS[o.control]}, not its law's identity ${LAW_IDENTITY[o.law]} — the resolver SKIPS a row at its identity, and that skip is the whole of the identity guard`);
+  }
+}
+
+/* THE GATING HAS TWO STATEMENTS AND THEY MUST AGREE — bloom-geometry.js's
+   `slotRolesEligible()` (which makes the controls INERT) and the registry's
+   `slotRolesEligible` predicate (which makes them HIDDEN). Neither file can
+   read the other's answer, so this is the SHEET_THICKNESS_MM situation and it
+   gets the same remedy: the relation is CHECKED rather than commented. Here at
+   module load over a sweep of the states that decide it; per-row against the
+   real page in zygoAssertions, where the values are the ones actually built. */
+{
+  const bad = [];
+  for (const placement of ['RADIAL', 'SPIRAL', 'CONTINUOUS']) {
+    for (const layerCount of [1, 2, 3]) {
+      for (const layerPhase of [0, 0.01, 0.25, 0.5, 0.99, 1]) {
+        const st = { ...DEFAULTS, placement, layerCount, layerPhase };
+        const geo = slotRolesEligible(st);
+        const reg = evalPredicate({ ref: 'slotRolesEligible' }, st);
+        if (geo !== reg) bad.push(`${placement} x ${layerCount} layers x phase ${layerPhase}: geometry says ${geo}, registry says ${reg}`);
+      }
+    }
+  }
+  if (bad.length) {
+    throw new Error(`the two statements of the slot-role gating disagree — a control the registry HIDES that the geometry still lets move, or the reverse:\n  ${bad.join('\n  ')}`);
   }
 }
 
@@ -509,10 +577,34 @@ export const FORM_SCOPE =
    against the telemetry, so the floor cannot quietly stop being one sheet
    thickness. */
 
+/* THE EFFECTIVE VALUE OF A CONTROL FOR THE PETAL THE METRICS HOOK REPORTS —
+   and this is Z2(v)'s DISCHARGE, not a convenience (session B, Sep 2).
+
+   formAssertions and thicknessAssertions read `petal`, which is descriptor
+   0's petal, while deriving their predicates from `row.set` — the BASE state.
+   Session A asserted that this is sound exactly while descriptor 0 carries no
+   override, flagged it as the session-B boundary, and made Z2(v) fire the
+   moment a record lands there. Slot roles land one on descriptor 0
+   immediately: slot 0 IS the labellum. So the premise had to be repaired
+   BEFORE the boundary was crossed, not after.
+
+   KEEPING DESCRIPTOR 0 CLEAN WAS NOT AVAILABLE: at petalCount 3 the whorl
+   splits into LABELLUM and HOOD with no laterals at all, so EVERY descriptor
+   carries a record and there is no base-state petal to point at. The repair
+   is therefore the one the seam names — take the state the BUILDER reported
+   using, which it publishes for exactly this reason. Falls back to the row
+   and then to DEFAULTS for any control no override can reach. */
+function effectiveFor(m, row, id, index = 0) {
+  const a = m.petalRingApplied && m.petalRingApplied[index];
+  if (a && a.applied && id in a.applied) return Number(a.applied[id]);
+  const s = (row.set || []).find((x) => x.id === id);
+  return s ? Number(s.value) : Number(DEFAULTS[id]);
+}
+
 export async function formAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
   const bad = [];
-  const wantsForm = (row.set || []).some((s) => FORM_IDS.includes(s.id) && Number(s.value) !== 0);
+  const wantsForm = FORM_IDS.some((id) => effectiveFor(m, row, id) !== 0);
 
   /* READ-BACK, both directions. A form row whose telemetry is null built a
      flat petal under a label saying otherwise; a flat row WITH telemetry
@@ -620,8 +712,12 @@ export async function thicknessAssertions(page, row) {
   const th = m.petalThickness;
   if (!th) { bad.push('no thickness telemetry reported'); return bad; }
 
-  const sets = Object.fromEntries((row.set || []).map((s) => [s.id, Number(s.value)]));
-  const wantsThinning = (sets.tipThinning ?? 0) !== 0;
+  /* THE EFFECTIVE STATE, for the same reason formAssertions takes it — see
+     effectiveFor()'s header. `tipThinning` is not overridable today, so this
+     resolves to the row's own value; taking it through the same door is what
+     stops that from being a fact a future ROLE_OVERRIDES row silently
+     invalidates. */
+  const wantsThinning = effectiveFor(m, row, 'tipThinning') !== 0;
 
   /* READ-BACK, both directions — the guard's own premise. */
   if (wantsThinning && th.uniform) bad.push('a row that sets tipThinning reports a UNIFORM profile — the guard short-circuited a graded row');
@@ -652,7 +748,13 @@ export async function thicknessAssertions(page, row) {
   const tc = m.petalTipCap;
   if (!tc) bad.push('no tip-cap telemetry reported');
   else {
-    const wantsPointed = Number(sets.petalTipBreadth ?? DEFAULTS.petalTipBreadth) === 0;
+    /* THROUGH THE EFFECTIVE STATE TOO, and here it MATTERS rather than being
+       future-proofing: `petalTipBreadth` IS overridable, the tip cap
+       partitions on `=== 0` EXACTLY, and a labellum tip-breadth delta makes
+       descriptor 0's petal leave the pointed family while the row's own value
+       stays 0. Reading the row here would have checked the converging cap
+       against a petal that is an authored truncate. */
+    const wantsPointed = effectiveFor(m, row, 'petalTipBreadth') === 0;
     if (wantsPointed !== tc.pointed) bad.push(`tip cap: row ${wantsPointed ? 'is' : 'is not'} the pointed family but the builder reports pointed=${tc.pointed}`);
     if (tc.pointed) {
       /* CONVERGING, not squared: the entry must be strictly wider than the
@@ -792,12 +894,30 @@ export async function junctionAssertions(page, row) {
      recomputes from two controls. Checked in both directions — a continuous
      row reporting layerCount rings is the quantizer mutation arriving through
      the shape rather than through the values. */
-  const wantRings = cont ? m.sequenceLength : m.layerCount;
-  if (layers.length !== wantRings) {
-    bad.push(`footRing() returned ${layers.length} rings but the ${cont ? 'sequence length' : 'layer count'} is ${wantRings} — the owner disagrees with itself`);
+  /* HOW MANY DESCRIPTORS THERE SHOULD BE — asserted as a PROPERTY, not as a
+     restatement of the derivation (session B). A descriptor stopped being a
+     layer the moment a whorl could split into LABELLUM / HOOD / LATERAL, so
+     "rings.length === layerCount" is no longer the claim. What IS invariant:
+     the distinct WHORLS are the layers, and the group sizes account for every
+     petal. Checked in both directions — a continuous row reporting layerCount
+     rings is the quantizer mutation arriving through the shape rather than
+     through the values. */
+  if (cont) {
+    if (layers.length !== m.sequenceLength) {
+      bad.push(`footRing() returned ${layers.length} rings but the sequence length is ${m.sequenceLength} — the owner disagrees with itself`);
+    }
+  } else {
+    const whorls = new Set(layers.map((r) => r.lambda));
+    if (whorls.size !== m.layerCount) {
+      bad.push(`footRing() returned descriptors spanning ${whorls.size} whorl(s) but the layer count is ${m.layerCount} — the owner disagrees with itself`);
+    }
   }
-  if (layers.length * m.slotsPerRing !== m.sequenceLength * (cont ? 1 : m.layerCount)) {
-    bad.push(`rings ${layers.length} x slotsPerRing ${m.slotsPerRing} does not account for the bloom's petals (sequenceLength ${m.sequenceLength}, layerCount ${m.layerCount})`);
+  /* THE ACCOUNTING, from each descriptor's OWN group size. `slotsPerRing` was
+     retired with the split: it answered "how many petals does a ring carry"
+     with one number, which a split whorl does not have. */
+  const accounted = layers.reduce((t, r) => t + r.roleCount, 0);
+  if (accounted !== m.sequenceLength * (cont ? 1 : m.layerCount)) {
+    bad.push(`the descriptors' role groups account for ${accounted} petals (sequenceLength ${m.sequenceLength}, layerCount ${m.layerCount}) — the ring list does not cover the bloom`);
   }
   /* MAX_LAYERS bounds the DEPTH, never the ring count — a continuous bloom at
      three turns has 120 rings and is not three layers deep in violation of
@@ -975,7 +1095,7 @@ export async function junctionAssertions(page, row) {
 }
 
 export const ZYGO_SCOPE =
-  "zygomorphy claims read footRing()'s own role records AND the effective state the BUILDER reported using; NOT the STL. All three positive-control mutations — the wrong role, a record that never reaches the blade, and the area rule regrouped per foot — export watertight, export as ONE piece, emit no degenerate triangles, and have IDENTICAL live and export triangle counts and byte lengths on every row (measured, Sep 1). A green export or connectedness run endorses none of this";
+  "zygomorphy claims read footRing()'s own role records AND the effective state the BUILDER reported using; NOT the STL. SEVEN positive-control mutations across two sessions — the wrong layer role, a record that never reaches the blade, the area rule regrouped per foot (Sep 1), and an off-by-one hood index, a slot record that never reaches the blade, the collapse guard removed, and a size multiplier plumbed into footRing() (Sep 2) — ALL export watertight, export as ONE piece, emit no degenerate triangles, and have IDENTICAL live and export triangle counts and byte lengths on every row. Two of the four new ones (the off-by-one hood and the removed collapse guard) fired NOTHING AT ALL in the shipped instrument before Z4 and Z5 were written, and the size multiplier fired nothing above one whorl before Z6 was. A green export or connectedness run endorses none of this";
 
 /* ===================================================================
    zygoAssertions — Z1, Z2, Z3. The instrument the zygomorphy layer had to
@@ -1033,6 +1153,19 @@ export const ZYGO_SCOPE =
    assertion encodes and a diff does not, and is why the diff is evidence
    about a change rather than a gate.
    =================================================================== */
+/* THE ROLES A DESCRIPTOR CARRIES — one owner, because the resolver, the
+   builder and every clause below must agree on it. An UNSPLIT descriptor
+   carries its layer role alone (session A's shape); a split one carries the
+   layer role AND the slot role, and a row in ROLE_OVERRIDES applies when its
+   own role is in that list. */
+const rolesOf = (r) => (r.slotRole === null ? [r.role] : [r.role, r.slotRole]);
+
+/* WHETHER A DESCRIPTOR SHOULD CARRY A RECORD, derived from the registry
+   state rather than from footRing()'s answer — which is the whole point:
+   comparing footRing() against itself cannot fail. */
+const wantsRecord = (r, ui) =>
+  ROLE_OVERRIDES.some((o) => rolesOf(r).includes(o.role) && Number(ui[o.control]) !== LAW_IDENTITY[o.law]);
+
 export async function zygoAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
   const ui = await page.evaluate(() => window.__bloomUIState());
@@ -1040,85 +1173,93 @@ export async function zygoAssertions(page, row) {
   const rings = m.rings;
   const applied = m.petalRingApplied;
   const cont = m.continuousMode === true;
-  const ROLES = new Set([ROLE_OUTER, ROLE_INNER]);
+  const LAYER_ROLES = new Set([ROLE_OUTER, ROLE_INNER]);
+  const SLOT_ROLES = new Set(SLOT_ROLE_ORDER);
+  const n = Math.round(Number(ui.petalCount));
 
   if (!Array.isArray(rings) || !rings.length) { bad.push('Z1: rings is empty — no role claim can be checked'); return bad; }
   if (!Array.isArray(applied) || applied.length !== rings.length) {
-    bad.push(`Z2: expected one applied record per ring (${rings.length}), got ${JSON.stringify(applied && applied.length)} — the builder's own answer is missing, which is the ONLY witness for a record that never reaches the blade`);
+    bad.push(`Z2: expected one applied record per descriptor (${rings.length}), got ${JSON.stringify(applied && applied.length)} — the builder's own answer is missing, which is the ONLY witness for a record that never reaches the blade`);
     return bad;
   }
 
   /* ===================================================================
-     Z1 — THE ROLE ASSIGNMENT IS A PARTITION. Total (every ring carries a
-     declared role), disjoint and accounted for (the group sizes add up to the
-     bloom's petal count, read from footRing()'s own sequenceLength rather
-     than recomputed from two controls). A derivation that dropped a whorl,
-     double-counted one, or invented a role would leave the area rule summing
-     the wrong set while every STL check stayed green. */
+     Z1 — THE ROLE ASSIGNMENT IS A PARTITION, now over the (layer x slot role)
+     product. Total (every descriptor carries declared roles), disjoint and
+     accounted for (the group sizes add up to the petals the BUILDER emitted).
+     A derivation that dropped a whorl, double-counted a slot or invented a
+     role would leave the area rule summing the wrong set while every STL
+     check stayed green. */
   let slots = 0;
   rings.forEach((r, i) => {
-    if (!ROLES.has(r.role)) bad.push(`Z1: ring ${i} carries role ${JSON.stringify(r.role)}, which is not one of the declared roles ${[...ROLES].join('/')}`);
-    if (!(Number.isFinite(r.roleCount) && r.roleCount > 0)) bad.push(`Z1: ring ${i} reports roleCount ${JSON.stringify(r.roleCount)} — a role group with no size cannot be summed by the area rule`);
+    if (!LAYER_ROLES.has(r.role)) bad.push(`Z1: descriptor ${i} carries layer role ${JSON.stringify(r.role)}, which is not one of ${[...LAYER_ROLES].join('/')}`);
+    if (!(r.slotRole === null || SLOT_ROLES.has(r.slotRole))) bad.push(`Z1: descriptor ${i} carries slot role ${JSON.stringify(r.slotRole)}, which is not one of ${[...SLOT_ROLES].join('/')}`);
+    if (!(Number.isFinite(r.roleCount) && r.roleCount > 0)) bad.push(`Z1: descriptor ${i} reports roleCount ${JSON.stringify(r.roleCount)} — a role group with no size cannot be summed by the area rule`);
     else slots += r.roleCount;
+    /* THE GROUP'S OWN SLOT LIST MUST MATCH ITS SIZE. `roleCount` is what the
+       area rule multiplies by and `slots` is what the builder indexes with;
+       two answers to one question is how a group could be summed at one size
+       and built at another. */
+    if (r.slots !== null && r.slots.length !== r.roleCount) {
+      bad.push(`Z1: descriptor ${i} (${r.slotRole}) lists ${r.slots.length} slots but reports roleCount ${r.roleCount} — the area rule and the builder disagree about how big this group is`);
+    }
   });
-  /* AGAINST THE BUILDER'S OWN TALLY, not against another number footRing()
-     produced. `petalsBuilt` counts buildPetalInto calls at the whorl loops
-     themselves, so a role derivation that failed to cover the petals the
-     bloom actually emits cannot agree with this by being wrong alongside it —
-     which a comparison against `sequenceLength` or `rings.length *
-     slotsPerRing` would have been, since one owner produces all three.
-     (`sequenceLength` is petalCount under the RINGED arm and
-     petalCount * layerCount under the continuous one, so it is not the
-     bloom's petal count in both modes at all — this gate's first draft
-     compared against it and the SHIPPED tree failed, which is what the
-     positive control is for.) */
   if (slots !== m.petalsBuilt) {
     bad.push(`Z1: the role groups account for ${slots} slots against the ${m.petalsBuilt} petals the builder actually emitted — the partition is not total, so the area rule is summing a different set of feet from the one the bloom has`);
   }
+  /* THE SLOT PARTITION IS TOTAL AND DISJOINT WITHIN EACH WHORL — every slot
+     of every split whorl claimed exactly once. */
+  if (m.slotRolesSplit) {
+    const byLayer = new Map();
+    for (const r of rings) {
+      if (r.slots === null) continue;
+      if (!byLayer.has(r.lambda)) byLayer.set(r.lambda, []);
+      byLayer.get(r.lambda).push(...r.slots);
+    }
+    for (const [L, list] of byLayer) {
+      const seen = new Set(list);
+      if (seen.size !== list.length) bad.push(`Z1: whorl ${L} claims a slot more than once (${list.length} claims, ${seen.size} distinct) — two descriptors own one petal`);
+      if (seen.size !== n) bad.push(`Z1: whorl ${L} claims ${seen.size} of its ${n} slots — the partition is not total and some petals were built from a descriptor that does not describe them`);
+    }
+  }
   /* THE ROLE/PLACEMENT RELATION, asserted in BOTH directions because a flag
-     only ever checked one way is a flag that can be stuck. Under CONTINUOUS
-     there are no layers to differentiate (J5 asserts exactly that), so every
-     ring must be OUTER; under the ringed arm ring 0 must be OUTER and, above
-     one layer, an INNER role must actually exist — otherwise the controls the
-     panel is showing would name a group with no members. */
+     only ever checked one way is a flag that can be stuck. */
   if (cont && !rings.every((r) => r.role === ROLE_OUTER)) {
-    bad.push(`Z1: a CONTINUOUS row reports ${rings.filter((r) => r.role !== ROLE_OUTER).length} non-OUTER ring(s) — continuous placement has no layers to carry a role, and the override controls are hidden there on exactly that ground`);
+    bad.push(`Z1: a CONTINUOUS row reports ${rings.filter((r) => r.role !== ROLE_OUTER).length} non-OUTER descriptor(s) — continuous placement has no layers to carry a role, and the override controls are hidden there on exactly that ground`);
   }
   if (!cont) {
-    if (rings[0].role !== ROLE_OUTER) bad.push(`Z1: ring 0 carries role ${rings[0].role}, not ${ROLE_OUTER} — the outermost whorl is the base every override is a delta ON`);
-    const inners = rings.filter((r) => r.role === ROLE_INNER).length;
-    if (m.layerCount >= 2 && inners !== m.layerCount - 1) {
-      bad.push(`Z1: ${m.layerCount} layers carry ${inners} INNER ring(s), expected ${m.layerCount - 1} — the panel is showing controls for a group that does not have the members it claims`);
+    if (rings[0].role !== ROLE_OUTER) bad.push(`Z1: descriptor 0 carries role ${rings[0].role}, not ${ROLE_OUTER} — the outermost whorl is the base every override is a delta ON`);
+    const innerLayers = new Set(rings.filter((r) => r.role === ROLE_INNER).map((r) => r.lambda));
+    if (m.layerCount >= 2 && innerLayers.size !== m.layerCount - 1) {
+      bad.push(`Z1: ${m.layerCount} layers carry ${innerLayers.size} INNER whorl(s), expected ${m.layerCount - 1} — the panel is showing controls for a group that does not have the members it claims`);
     }
-    if (m.layerCount === 1 && inners !== 0) bad.push(`Z1: a single-whorl bloom reports ${inners} INNER ring(s) — there is nothing above the outermost whorl`);
+    if (m.layerCount === 1 && innerLayers.size !== 0) bad.push(`Z1: a single-whorl bloom reports ${innerLayers.size} INNER whorl(s) — there is nothing above the outermost whorl`);
   }
 
   /* ===================================================================
      Z2 — THE RECORD AND THE BLADE AGREE, IN BOTH DIRECTIONS. */
-  const anyDelta = ROLE_OVERRIDES.some((o) => Number(ui[o.delta]) !== 0);
   rings.forEach((r, i) => {
     const a = applied[i];
-    if (!a) { bad.push(`Z2: ring ${i} reported no applied record from the builder`); return; }
-    if (a.role !== r.role) bad.push(`Z2: ring ${i}'s builder says role ${a.role}, footRing() says ${r.role} — two answers to one question`);
+    if (!a) { bad.push(`Z2: descriptor ${i} reported no applied record from the builder`); return; }
+    if (a.role !== r.role) bad.push(`Z2: descriptor ${i}'s builder says layer role ${a.role}, footRing() says ${r.role} — two answers to one question`);
+    if (a.slotRole !== r.slotRole) bad.push(`Z2: descriptor ${i}'s builder says slot role ${a.slotRole}, footRing() says ${r.slotRole} — two answers to one question`);
 
-    /* (i) AN OUTER RING CARRIES NO RECORD. The M1 witness: with the
-       assignment inverted, the outermost whorl is the one built from the
-       override and this is what says so. */
-    if (r.role === ROLE_OUTER && r.overrides !== null) {
-      bad.push(`Z2: ring ${i} is ${ROLE_OUTER} but carries an override record ${JSON.stringify(r.overrides)} — the base whorl is what every delta is measured FROM, and a record here means the assignment is inverted`);
+    /* (i)/(ii) A DESCRIPTOR CARRIES A RECORD EXACTLY WHEN ITS OWN ROLES DO,
+       both directions. A record where none is due means the assignment is
+       inverted (M1's witness at layer level); a missing record means the
+       control moves nothing; and a record with every contributing control at
+       its identity means the guard has stopped being object identity, at
+       which point byte-identity at the default stops being a construction and
+       starts resting on a spread. */
+    const want = wantsRecord(r, ui);
+    if (want && r.overrides === null) {
+      bad.push(`Z2: descriptor ${i} (${rolesOf(r).join('+')}) has a contributing control off its identity, yet carries no override record — the control moves nothing`);
     }
-    /* (ii) AN INNER RING CARRIES A RECORD EXACTLY WHEN A DELTA IS NON-ZERO.
-       Both directions: a missing record means the override silently does
-       nothing, and a record with every delta at zero means the identity guard
-       has stopped being an identity guard — petalStateFor() would then build
-       a COPY of the state at the shipping default and the byte argument would
-       rest on a spread instead of on object identity. */
-    if (r.role === ROLE_INNER) {
-      if (anyDelta && r.overrides === null) bad.push(`Z2: ring ${i} is ${ROLE_INNER} and a delta is non-zero, yet it carries no override record — the control moves nothing`);
-      if (!anyDelta && r.overrides !== null) bad.push(`Z2: ring ${i} is ${ROLE_INNER} with every delta at 0 and still carries a record ${JSON.stringify(r.overrides)} — the guard is no longer object identity, and byte-identity at the default stops being a construction`);
+    if (!want && r.overrides !== null) {
+      bad.push(`Z2: descriptor ${i} (${rolesOf(r).join('+')}) has every contributing control at its identity and still carries a record ${JSON.stringify(r.overrides)} — the guard is no longer object identity, and byte-identity at the default stops being a construction`);
     }
     if (a.overridden !== (r.overrides !== null)) {
-      bad.push(`Z2: ring ${i}: footRing() ${r.overrides ? 'has' : 'has no'} record, the builder says overridden=${a.overridden}`);
+      bad.push(`Z2: descriptor ${i}: footRing() ${r.overrides ? 'has' : 'has no'} record, the builder says overridden=${a.overridden}`);
     }
 
     /* (iii) WHAT THE BLADE WAS ACTUALLY BUILT WITH. THE M2 WITNESS, and the
@@ -1127,61 +1268,163 @@ export async function zygoAssertions(page, row) {
        Compared against the RECORD where there is one and against the BASE
        state where there is not, so "the override did not arrive" and "there
        was no override" cannot both render as the base value. */
-    for (const o of ROLE_OVERRIDES) {
-      const want = (r.overrides && o.base in r.overrides) ? r.overrides[o.base] : Number(ui[o.base]);
-      const got = a.applied[o.base];
-      if (got !== want) {
-        bad.push(`Z2: ring ${i} (${r.role}) was built with ${o.base} = ${got}, but ${r.overrides && o.base in r.overrides ? `its own record says ${want}` : `the base state says ${want} and it carries no override for it`} — a record that never reaches the blade exports watertight, in one piece, at an identical triangle count, and passes every other check here`);
+    for (const [base, b] of OVERRIDE_BOUNDS) {
+      const wantV = (r.overrides && base in r.overrides) ? r.overrides[base] : Number(ui[base]);
+      const got = a.applied[base];
+      if (got !== wantV) {
+        bad.push(`Z2: descriptor ${i} (${rolesOf(r).join('+')}) was built with ${base} = ${got}, but ${r.overrides && base in r.overrides ? `its own record says ${wantV}` : `the base state says ${wantV} and it carries no override for it`} — a record that never reaches the blade exports watertight, in one piece, at an identical triangle count, and passes every other check here`);
       }
       /* (iv) THE CLAMP ACTUALLY CLAMPED. A composed value must be one the
          base control could itself hold; `petalTipBreadth` matters most,
          because the tip cap partitions on `=== 0` EXACTLY and a negative
          composed breadth would silently re-square the tip Eva ruled to a
-         point. */
-      if (!(got >= o.min - 1e-12 && got <= o.max + 1e-12)) {
-        bad.push(`Z2: ring ${i} was built with ${o.base} = ${got}, outside the base control's own ${o.min}..${o.max} — the composed value is not a value the control could hold`);
+         point. A size MULTIPLIER makes this reachable in ordinary use rather
+         than only at a slider end — x2.00 on a 35 mm petal asks for 70. */
+      if (!(got >= b.min - 1e-12 && got <= b.max + 1e-12)) {
+        bad.push(`Z2: descriptor ${i} was built with ${base} = ${got}, outside the base control's own ${b.min}..${b.max} — the composed value is not a value the control could hold`);
       }
     }
   });
 
-  /* (v) THE PREMISE THE FORM AND THICKNESS ASSERTIONS REST ON. Both read
-     `petal` — ring 0's slot 0 — and evaluate their predicates against the
-     ROW's state, which is the base state. That is sound exactly while ring 0
-     carries no override, which is a property of session A's role derivation
-     and NOT of the architecture. Session B gives one slot in a whorl its own
-     record, and if that slot is ring 0's representative those two instruments
-     start measuring a petal built from a different state than the one they
-     are checking against — silently. Asserted here so it is a loud failure at
-     the boundary rather than a quiet wrong measurement after it. */
-  if (rings[0].overrides !== null) {
-    bad.push(`Z2(v): ring 0 carries an override record, and formAssertions/thicknessAssertions both read ring 0's petal while evaluating their predicates against the BASE state — they are now measuring a petal built from a different state than the one they check. This is the session-B boundary; those two instruments need the effective state before a slot role may land on ring 0.`);
-  }
-
   /* ===================================================================
-     Z3 — THE ROLE GROUPING REPRODUCES THE PRE-ROLE AREA-RULE SUM EXACTLY.
-     An EQUALITY, and M3 is why: regrouping the ringed sum per foot measures
-     8.88e-16 at two layers and 3.55e-15 at three, which is 0.9 ULP and would
-     pass any tolerance wide enough for real rounding. It is exactly 0 on the
-     shipping default, so only the layered rows can see it at all.
+     Z3 — THE ROLE GROUPING REPRODUCES THE PRE-ROLE AREA-RULE SUM EXACTLY
+     WHERE THAT CLAIM EXISTS, and reads ABSENT where it does not.
 
-     Grouping by ROLE rather than by SLOT is what makes the equality available
-     in the first place — the per-slot grouping this session deliberately did
-     NOT build moves every 40-petal export by 6 ULP. That is the flower's
-     `a*(b+c)` vs `a*b + a*c` trap, now fired twice in this project family,
-     and this assertion is what stops a later session regrouping it "because
-     it is the same rule".
+     An EQUALITY, and session A's M3 is why: regrouping the ringed sum per
+     foot measures 8.88e-16 at two layers and 3.55e-15 at three — 0.9 ULP —
+     which would pass any tolerance wide enough for real rounding.
 
-     NULL IS A FAILURE IN SESSION A. It is reserved for a whorl carrying more
-     than one role, which is session B; until then the claim is always
-     available and a missing residual means the owner stopped making it. */
+     SESSION B REACHES THE NULL BRANCH FOR THE FIRST TIME. A split whorl has
+     no pre-role grouping to compare against, so a residual there would be a
+     claim nothing can make. That branch is no longer hypothetical, and Z5
+     below is what stops the null from being reachable by accident. */
   const z = m.zygoGuardResidual;
-  const multiRole = rings.some((r) => r.roleCount !== (cont ? 1 : Number(ui.petalCount)));
+  const multiRole = rings.some((r) => r.roleCount !== (cont ? 1 : n));
   if (multiRole) {
     if (z !== null) bad.push(`Z3: a whorl carries more than one role and a residual ${z} is still reported — there is no pre-role grouping to compare against there, and a claim nothing can make must read as absent`);
   } else if (typeof z !== 'number') {
     bad.push(`Z3: every whorl carries one role, so the pre-role grouping IS available, and the residual reads ${JSON.stringify(z)} — the guard has stopped being cross-validated`);
   } else if (z !== 0) {
     bad.push(`Z3: the role-grouped area rule differs from the pre-role expression by ${z.toExponential(3)} — this is an EXACT identity at one role per whorl, not a tolerance (a per-foot regrouping measures 8.88e-16 here and 6 ULP at petalCount 40, and would pass any bound wide enough for real rounding)`);
+  }
+
+  /* ===================================================================
+     Z4 — THE SLOT ASSIGNMENT IS MIRROR-SYMMETRIC. THE M1 WITNESS, and the
+     ONLY one there is: measured on a throwaway worktree BEFORE this was
+     written, an off-by-one hood index fires NOTHING in the entire shipped
+     instrument. The partition stays total and disjoint, so Z1 passes; the
+     record resolves and reaches the blade, so Z2 passes; the group SIZES are
+     unchanged, so the area-rule sum is bit-identical and Z3 passes; J1-J6,
+     formAssertions and thicknessAssertions are clean; the export is
+     watertight with no degenerate triangles and the STL is the same length.
+     Only the bytes differ, and a byte diff is evidence about a change rather
+     than a gate.
+
+     ASSERTED AS A PROPERTY, NEVER AS A SECOND COPY OF THE DERIVATION. A gate
+     that recomputed roleForSlot() and compared would be comparing the owner
+     against itself and could not fail. What is checked instead is the thing
+     the mirror plane MEANS: slot i and slot n-i are reflections of one
+     another, so they must carry the same role. An off-by-one hood pairs
+     n/2+1 with n/2-1, which is a LATERAL, and this says so. */
+  if (m.slotRolesSplit) {
+    const byLayer = new Map();
+    for (const r of rings) {
+      if (r.slots === null) continue;
+      if (!byLayer.has(r.lambda)) byLayer.set(r.lambda, new Map());
+      for (const i of r.slots) byLayer.get(r.lambda).set(i, r.slotRole);
+    }
+    for (const [L, roleAt] of byLayer) {
+      for (let i = 0; i < n; i++) {
+        const mirror = (n - i) % n;
+        if (roleAt.get(i) !== roleAt.get(mirror)) {
+          bad.push(`Z4: whorl ${L} gives slot ${i} the role ${roleAt.get(i)} and its mirror image slot ${mirror} the role ${roleAt.get(mirror)} — the plane through slot 0 pairs i with n-i, so an assignment that differs across it is not bilaterally symmetric and the word "mirror" is a label on a computation nobody performed. NOTHING ELSE HERE CAN SEE THIS: the partition is still total and disjoint, the group sizes are unchanged so the area-rule sum is bit-identical, and the export is watertight, one piece and the same length.`);
+          break;
+        }
+      }
+      /* THE CONTROL-BEARING ROLES HAVE MEMBERS. LATERAL may legitimately be
+         empty — at petalCount 3 there are none — and that is exactly why the
+         empty group was pushed onto the role with no controls. A missing
+         LABELLUM or HOOD would be eight sliders naming a group that does not
+         exist, which is what Z1 already fails INNER on. */
+      for (const need of [SLOT_LABELLUM, SLOT_HOOD]) {
+        if (![...roleAt.values()].includes(need)) {
+          bad.push(`Z4: whorl ${L} has no ${need} at petalCount ${n}, yet its controls are shown — a control naming a group with no members`);
+        }
+      }
+    }
+  }
+
+  /* ===================================================================
+     Z5 — THE COLLAPSE GUARD, IN BOTH DIRECTIONS. THE M3 WITNESS, and again
+     the only one: measured before this was written, removing the guard so
+     that an eligible bloom ALWAYS splits fires nothing at all — the default
+     bloom silently becomes three descriptors, and every STL fact, every
+     triangle count and every other assertion here is unmoved.
+
+     WHY IT MATTERS ENOUGH TO GATE: splitting a whorl regroups the area-rule
+     sum from `n * rFoot^2` into `1*r^2 + h*r^2 + l*r^2`, which MOVES the
+     derived ring radius on 46 of 264 measured (config x mode) rows at up to
+     0.99 ULP. So an unconditional split moves exports for nothing — the
+     `a*(b+c)` vs `a*b + a*c` trap, on its fourth appearance in this project
+     family. The guard is what keeps the shipped default on session A's
+     arithmetic character for character, and this is what keeps the guard from
+     sitting somewhere a bug is never exercised (formGuardResidual's
+     doctrine). */
+  {
+    const wantSplit = !cont && Boolean(m.slotRolesEligible)
+      && ROLE_OVERRIDES.some((o) => SLOT_ROLE_ORDER.includes(o.role) && Number(ui[o.control]) !== LAW_IDENTITY[o.law]);
+    if (m.slotRolesSplit !== wantSplit) {
+      bad.push(`Z5: the bloom reports slotRolesSplit=${m.slotRolesSplit} where the state calls for ${wantSplit} — ${wantSplit ? 'a slot-role control is off its identity and no whorl split, so the control moves nothing' : 'no slot-role control is off its identity and a whorl split anyway, which regroups the area rule and moves the derived ring radius by up to 0.99 ULP for nothing'}`);
+    }
+    if (!m.slotRolesSplit && !cont && rings.length !== m.layerCount) {
+      bad.push(`Z5: no whorl split, yet footRing() returned ${rings.length} descriptors for ${m.layerCount} layer(s) — the collapsed arm must be session A's list exactly, or byte-identity at the defaults stops being a construction`);
+    }
+    if (!m.slotRolesSplit && rings.some((r) => r.slotRole !== null)) {
+      bad.push(`Z5: no whorl split, yet a descriptor carries a slot role — "this whorl was not split" and "this group is the laterals" are different claims and must not render the same`);
+    }
+    /* THE TWO STATEMENTS OF THE GATING AGREE, on the row that was actually
+       built. bloom-geometry.js makes the controls INERT and the registry
+       makes them HIDDEN; neither can read the other, so the relation is
+       checked rather than commented (the SHEET_THICKNESS_MM precedent). */
+    const regSaysEligible = evalPredicate({ ref: 'slotRolesEligible' }, ui);
+    if (Boolean(m.slotRolesEligible) !== regSaysEligible) {
+      bad.push(`Z5: the geometry says slot roles are ${m.slotRolesEligible ? '' : 'not '}eligible here and the registry predicate says ${regSaysEligible ? '' : 'not '}eligible — one of them is hiding a control the other still lets move geometry, or showing one that can do nothing`);
+    }
+  }
+
+  /* ===================================================================
+     Z6 — A SIZE MULTIPLIER NEVER REACHES THE RING. THE M4 WITNESS.
+
+     AND THE MEASUREMENT CORRECTED A PREDICTION, which is why it was made
+     before this was written: J2's containment equality was expected to be the
+     thing that catches a size override plumbed into footRing(), and IT IS
+     NOT. Every descriptor in a layer still takes its radius as `R0 * scale`,
+     so containment holds and J2 stays silent. What actually fired on the
+     measured mutation was the SINGLE-LAYER guard residual — and only at
+     layerCount 1, because that is the only depth where the pre-layer
+     expression exists to disagree with. On the three-layer row M4 fired
+     NOTHING AT ALL. So this assertion is the only witness above one whorl.
+
+     The property: a role differentiates the BLADE, so every descriptor of one
+     whorl must report the same FOOT. That is what keeps the area rule, R0,
+     the hub radius, the overlap box and every junction argument outside the
+     reach of a role override. */
+  {
+    const byLayer = new Map();
+    for (const r of rings) {
+      if (!byLayer.has(r.lambda)) byLayer.set(r.lambda, []);
+      byLayer.get(r.lambda).push(r);
+    }
+    for (const [L, group] of byLayer) {
+      const a = group[0];
+      for (const r of group.slice(1)) {
+        for (const k of ['width', 'authoredWidth', 'radius', 'overhang', 'thickness', 'scale', 'phase', 'tiltExtra']) {
+          if (r[k] !== a[k]) {
+            bad.push(`Z6: whorl ${L} reports ${k} = ${r[k]} on its ${r.slotRole} descriptor and ${a[k]} on its ${a.slotRole} — a role may differentiate the BLADE and nothing else, and a per-role foot puts the area rule, R0, the hub radius and the whole junction argument under a control (measured: J2 does NOT catch this, and above one whorl nothing else does either)`);
+          }
+        }
+      }
+    }
   }
 
   return bad;
@@ -1282,6 +1525,21 @@ const SHARED_CENTER = () => CONTROLS.filter((c) => c.id === 'centerSize');
    control depend on" and cannot drift from the predicate. */
 const LAYER_SUBS = () => CONTROLS.filter((c) => c.visibleWhen && predicateDrivers(c.visibleWhen).has('layerCount'));
 const LAYER_SUB_IDS = () => new Set(LAYER_SUBS().map((c) => c.id));
+
+/* THE SLOT-ROLE CONTROLS, DERIVED THE SAME WAY AND FOR THE SAME REASON. They
+   share one named predicate, so `predicateDrivers` resolves the ref and
+   reports `placement`, `layerCount` and `layerPhase` — which means they would
+   otherwise land in LAYER_SUBS and be swept at layerCount 3, where they are
+   HIDDEN and inert unless layerPhase is also 0. A row that sets a control the
+   state makes inert builds the shipping default and reports a pass under a
+   label naming a control that did nothing — exactly the defect the layer-sub
+   exclusion exists to prevent, and exactly the latent trap #124 closed by
+   deriving from `predicateDrivers` instead of sniffing predicate SHAPE.
+   Identified by the control's own membership of the roles section's slot half
+   rather than by a hardcoded list: a row in ROLE_OVERRIDES whose role is a
+   SLOT role names it, and that table is the one owner of what a role may
+   override. */
+const SLOT_SUB_IDS = () => new Set(ROLE_OVERRIDES.filter((o) => SLOT_ROLE_ORDER.includes(o.role)).map((o) => o.control));
 /* Every non-centre, non-layer-gated slider — the set the blanket sweep and
    the ALL MIN / ALL MAX corners are entitled to move. */
 const SWEEPABLE = () => SLIDERS().filter((c) => c.role !== 'center' && !LAYER_SUB_IDS().has(c.id));
@@ -1297,6 +1555,7 @@ export function buildMatrix() {
     if (c.id === 'petalCount') continue;                 // swept exhaustively above
     if (c.role === 'center') continue;                   // needs a style; see block 3
     if (LAYER_SUB_IDS().has(c.id)) continue;             // needs layerCount >= 2; see block 7
+    if (SLOT_SUB_IDS().has(c.id)) continue;              // slot roles; see block 12
     rows.push({ label: `${c.id} min (${c.min})`, set: [{ id: c.id, value: String(c.min) }] });
     rows.push({ label: `${c.id} max (${c.max})`, set: [{ id: c.id, value: String(c.max) }] });
   }
@@ -1533,6 +1792,13 @@ export function buildMatrix() {
         under a label naming a control that did nothing. */
   const maxLayers = CONTROLS.find((c) => c.id === 'layerCount').max;
   for (const c of LAYER_SUBS()) {
+    /* THE SLOT-ROLE CONTROLS ARE LAYER SUBS BY DERIVATION AND MUST NOT BE
+       SWEPT HERE. Their predicate reads `layerCount`, so predicateDrivers
+       puts them in this set correctly — but at `maxLayers` with layerPhase at
+       its default 0.5 they are HIDDEN and inert, so each row would build the
+       shipping default and report a pass under a label naming a control that
+       did nothing. Block 12 sweeps them with their own precondition. */
+    if (SLOT_SUB_IDS().has(c.id)) continue;
     for (const [tag, v] of [['min', c.min], ['max', c.max]]) {
       rows.push({
         label: `${maxLayers} layers x ${c.id} ${tag} (${v})`,
@@ -1725,7 +1991,312 @@ export function buildMatrix() {
   rows.push({ label: 'CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX', capability: CAPABILITY_CLEFT,
     set: [{ id: 'layerCount', value: '2' }, ...Object.entries(ALL_INNER_MAX).map(([id, value]) => ({ id, value: String(value) }))] });
 
+  /* 12. ZYGOMORPHY — SLOT ROLES, THE MIRROR PLANE AND THE ORCHID (session B).
+         The region this change affects, and the corners are named rather than
+         numbered so a regression reads "ORCHID x petalCount 3", not "config
+         N". Every row here is RADIAL by default, which is the only placement
+         slot roles apply to.
+
+         THE SWEEP IS REGISTRY-DERIVED, with its precondition set. Each slot
+         control at min and max, at the shipping depth (layerCount 1) where
+         the predicate holds without any further setup — so unlike the layer
+         subs these need no `layerPhase` term to be live. */
+  for (const id of [...SLOT_SUB_IDS()]) {
+    const c = CONTROLS.find((x) => x.id === id);
+    for (const [tag, v] of [['min', c.min], ['max', c.max]]) {
+      rows.push({ label: `SLOT: ${id} ${tag} (${v})`, set: [{ id, value: String(v) }] });
+    }
+  }
+
+  /* THE ORCHID ITSELF — the headline, and the form the session was opened on:
+     a big low labellum, a raised hood, the laterals left alone. */
+  const ORCHID = { labellumSize: 1.6, labellumTilt: -25, labellumCup: 0.5, labellumCurl: -60, labellumTipBreadth: 0.25, hoodSize: 1.15, hoodTilt: 40, hoodCup: -0.3 };
+  const ALL_SLOT_MAX = { labellumSize: 2, labellumTipBreadth: 0.6, labellumTilt: 75, labellumCup: 1.2, labellumCurl: 360, hoodSize: 2, hoodTilt: 75, hoodCup: 1.2 };
+  const ALL_SLOT_MIN = { labellumSize: 0.5, labellumTilt: -75, labellumCup: -0.8, labellumCurl: -180, hoodSize: 0.5, hoodTilt: -75, hoodCup: -0.8 };
+  for (const [name, sets] of [
+    ['ORCHID: the labellum and the hood (the flower has a face)', { ...ORCHID }],
+    ['ORCHID x centre OFF (the zygomorphic BARE bloom)', { ...ORCHID, centerStyle: 'NONE' }],
+    /* THE PARITY CORNERS. The mirror's antipode is a SLOT at even counts and
+       a GAP at odd ones, so the hood is one petal or two — the one place the
+       derivation branches, and both sides need naming. petalCount 3 is the
+       extreme where one of three IS the labellum and there are NO laterals at
+       all, which is also the only reachable state where a control-bearing
+       role covers every petal in the whorl. */
+    ['ORCHID x petalCount 3 (one of three is the labellum, no laterals)', { ...ORCHID, petalCount: 3 }],
+    ['ORCHID x petalCount 4 (smallest even — hood is one slot)', { ...ORCHID, petalCount: 4 }],
+    ['ORCHID x petalCount 39 (odd at scale — hood is a straddling pair)', { ...ORCHID, petalCount: 39 }],
+    ['ORCHID x petalCount 40 (even at scale)', { ...ORCHID, petalCount: 40 }],
+    /* SLOT ROLES x LAYER ROLES — the (layer x role) product, which is the
+       whole of what session B changed about the descriptor shape. Needs
+       layerPhase 0, because the mirror plane is the BLOOM's and every whorl
+       must share it. */
+    ['ORCHID x 3 layers x phase 0 (slot roles x layer roles)', { ...ORCHID, layerCount: 3, layerPhase: 0 }],
+    ['ORCHID x the IRIS (both role axes, one bloom)', { ...ORCHID, layerCount: 2, layerPhase: 0, petalSpineCurl: -90, innerCurl: 180, innerCup: 0.4, layerTilt: 30, petalTilt: 40 }],
+    ['ORCHID x ALL THIN x spread min (the junction at its thinnest)', { ...ORCHID, ...ALL_THIN, spread: 0.6 }],
+    ['ORCHID x the foot UPPER clamp (petalWidth 30)', { ...ORCHID, petalWidth: 30 }],
+    ['SLOT: ALL MAX', { ...ALL_SLOT_MAX }],
+    ['SLOT: ALL MIN', { ...ALL_SLOT_MIN }],
+    ['SLOT: ALL MAX x 3 layers x phase 0', { ...ALL_SLOT_MAX, layerCount: 3, layerPhase: 0 }],
+    ['SLOT: ALL MAX x petalCount 3', { ...ALL_SLOT_MAX, petalCount: 3 }],
+    ['SLOT: ALL MAX x petalCount 40', { ...ALL_SLOT_MAX, petalCount: 40 }],
+    ['SLOT: ALL MAX x ALL FORM MAX (every clamp binds at once)', { ...ALL_SLOT_MAX, ...ALL_FORM_MAX }],
+    /* THE SIZE MULTIPLIER SATURATING — x2.00 against a 60 mm petal asks for
+       120 and gets 60. A clamp nobody exercises is a clamp nobody checked. */
+    ['SLOT: size x2.00 saturating (petalLength 60, petalWidth 30)', { labellumSize: 2, hoodSize: 2, petalLength: 60, petalWidth: 30 }],
+    ['SLOT: size x0.50 (a blade narrower than its own root)', { labellumSize: 0.5, hoodSize: 0.5, petalWidth: 8 }],
+    /* THE TIP PARTITION, BOTH WAYS IN ONE BLOOM — the labellum leaves the
+       pointed family while its neighbours converge, so one export carries two
+       different tip constructions. */
+    ['SLOT: the tip partition both ways (labellum truncate, laterals pointed)', { labellumTipBreadth: 0.6 }],
+    ['SLOT: the tip partition inverted (base truncate, labellum more so)', { petalTipBreadth: 0.6, labellumTipBreadth: 0.6 }],
+    /* THE CURL CLAMP, which is what the labellum curl delta reaches. */
+    ['SLOT: curl clamp binds downward (base -180 + delta -180 -> -180)', { petalSpineCurl: -180, labellumCurl: -180 }],
+    /* THE GATED STATES. A gated state is coverage, and a gated state nobody
+       exercises is a claim nobody checked: each of these sets every slot
+       control to MAXIMUM and must export bit-identically to the same design
+       without them. */
+    ['SLOT: GATED — SPIRAL x ALL SLOT MAX (hidden, and must be inert)', { placement: 'SPIRAL', ...ALL_SLOT_MAX }],
+    ['SLOT: GATED — CONTINUOUS x 3 turns x ALL SLOT MAX (hidden, and must be inert)', { placement: 'CONTINUOUS', layerCount: 3, ...ALL_SLOT_MAX }],
+    ['SLOT: GATED — 2 layers x phase 0.50 x ALL SLOT MAX (whorls out of phase)', { layerCount: 2, layerPhase: 0.5, ...ALL_SLOT_MAX }],
+    ['SLOT: GATED — 3 layers x phase 0.25 x ALL SLOT MAX (whorls out of phase)', { layerCount: 3, layerPhase: 0.25, ...ALL_SLOT_MAX }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
   return rows;
+}
+
+/* ===================================================================
+   phase7Matrix() — THE 205 ROWS AS THEY STOOD AT f626828, frozen.
+
+   The like-for-like baseline for SLOT ROLES, standing to session B exactly as
+   phase6Matrix() stands to the continuous spiral and phase5Matrix() to layers.
+   A NEW frozen matrix beside the old ones, never an edit to one: an edited
+   baseline stops being a baseline.
+
+   IT IS NOW THE STRONGEST OF THE SEVEN, on the reasoning that promoted each of
+   its predecessors: it is the only one carrying session A's ZYGOMORPHY corners
+   — the iris by name, the zygomorphic bare bloom, ALL INNER MAX against every
+   extreme, both clamp corners and the tip partition — which is precisely the
+   region a second role axis is most likely to disturb.
+
+   GENERATED FROM f626828's OWN buildMatrix(), never transcribed, and not
+   trusted either: `node tools/diff-bloom-bytes.mjs --verify-frozen --phase7
+   --base <worktree>` proves this function deep-equal to that commit's own
+   answer, and it runs in CI.
+
+   `--full` CANNOT DO THIS JOB HERE, for the third time running: 33 of the new
+   rows set controls the old registry does not declare, so the live matrix and
+   the old tree's have no common row set. The frozen matrices are the
+   like-for-like comparison. */
+export function phase7Matrix() {
+  return [
+  { label: `DEFAULT (the shipping configuration)`, set: [] },
+  { label: `petalCount 3`, set: [{ id: 'petalCount', value: '3' }] },
+  { label: `petalCount 4`, set: [{ id: 'petalCount', value: '4' }] },
+  { label: `petalCount 5`, set: [{ id: 'petalCount', value: '5' }] },
+  { label: `petalCount 6`, set: [{ id: 'petalCount', value: '6' }] },
+  { label: `petalCount 7`, set: [{ id: 'petalCount', value: '7' }] },
+  { label: `petalCount 8`, set: [{ id: 'petalCount', value: '8' }] },
+  { label: `petalCount 9`, set: [{ id: 'petalCount', value: '9' }] },
+  { label: `petalCount 10`, set: [{ id: 'petalCount', value: '10' }] },
+  { label: `petalCount 11`, set: [{ id: 'petalCount', value: '11' }] },
+  { label: `petalCount 12`, set: [{ id: 'petalCount', value: '12' }] },
+  { label: `petalCount 13`, set: [{ id: 'petalCount', value: '13' }] },
+  { label: `petalCount 14`, set: [{ id: 'petalCount', value: '14' }] },
+  { label: `petalCount 15`, set: [{ id: 'petalCount', value: '15' }] },
+  { label: `petalCount 16`, set: [{ id: 'petalCount', value: '16' }] },
+  { label: `petalCount 17`, set: [{ id: 'petalCount', value: '17' }] },
+  { label: `petalCount 18`, set: [{ id: 'petalCount', value: '18' }] },
+  { label: `petalCount 19`, set: [{ id: 'petalCount', value: '19' }] },
+  { label: `petalCount 20`, set: [{ id: 'petalCount', value: '20' }] },
+  { label: `petalCount 21`, set: [{ id: 'petalCount', value: '21' }] },
+  { label: `petalCount 22`, set: [{ id: 'petalCount', value: '22' }] },
+  { label: `petalCount 23`, set: [{ id: 'petalCount', value: '23' }] },
+  { label: `petalCount 24`, set: [{ id: 'petalCount', value: '24' }] },
+  { label: `petalCount 25`, set: [{ id: 'petalCount', value: '25' }] },
+  { label: `petalCount 26`, set: [{ id: 'petalCount', value: '26' }] },
+  { label: `petalCount 27`, set: [{ id: 'petalCount', value: '27' }] },
+  { label: `petalCount 28`, set: [{ id: 'petalCount', value: '28' }] },
+  { label: `petalCount 29`, set: [{ id: 'petalCount', value: '29' }] },
+  { label: `petalCount 30`, set: [{ id: 'petalCount', value: '30' }] },
+  { label: `petalCount 31`, set: [{ id: 'petalCount', value: '31' }] },
+  { label: `petalCount 32`, set: [{ id: 'petalCount', value: '32' }] },
+  { label: `petalCount 33`, set: [{ id: 'petalCount', value: '33' }] },
+  { label: `petalCount 34`, set: [{ id: 'petalCount', value: '34' }] },
+  { label: `petalCount 35`, set: [{ id: 'petalCount', value: '35' }] },
+  { label: `petalCount 36`, set: [{ id: 'petalCount', value: '36' }] },
+  { label: `petalCount 37`, set: [{ id: 'petalCount', value: '37' }] },
+  { label: `petalCount 38`, set: [{ id: 'petalCount', value: '38' }] },
+  { label: `petalCount 39`, set: [{ id: 'petalCount', value: '39' }] },
+  { label: `petalCount 40`, set: [{ id: 'petalCount', value: '40' }] },
+  { label: `petalLength min (20)`, set: [{ id: 'petalLength', value: '20' }] },
+  { label: `petalLength max (60)`, set: [{ id: 'petalLength', value: '60' }] },
+  { label: `petalWidth min (8)`, set: [{ id: 'petalWidth', value: '8' }] },
+  { label: `petalWidth max (30)`, set: [{ id: 'petalWidth', value: '30' }] },
+  { label: `petalBaseTaper min (0.3)`, set: [{ id: 'petalBaseTaper', value: '0.3' }] },
+  { label: `petalBaseTaper max (3)`, set: [{ id: 'petalBaseTaper', value: '3' }] },
+  { label: `petalTipTaper min (0.6)`, set: [{ id: 'petalTipTaper', value: '0.6' }] },
+  { label: `petalTipTaper max (4)`, set: [{ id: 'petalTipTaper', value: '4' }] },
+  { label: `petalTipBreadth min (0)`, set: [{ id: 'petalTipBreadth', value: '0' }] },
+  { label: `petalTipBreadth max (0.6)`, set: [{ id: 'petalTipBreadth', value: '0.6' }] },
+  { label: `petalCup min (-0.8)`, set: [{ id: 'petalCup', value: '-0.8' }] },
+  { label: `petalCup max (1.2)`, set: [{ id: 'petalCup', value: '1.2' }] },
+  { label: `petalTilt min (0)`, set: [{ id: 'petalTilt', value: '0' }] },
+  { label: `petalTilt max (75)`, set: [{ id: 'petalTilt', value: '75' }] },
+  { label: `petalSpineCurl min (-180)`, set: [{ id: 'petalSpineCurl', value: '-180' }] },
+  { label: `petalSpineCurl max (360)`, set: [{ id: 'petalSpineCurl', value: '360' }] },
+  { label: `petalRoll min (-330)`, set: [{ id: 'petalRoll', value: '-330' }] },
+  { label: `petalRoll max (330)`, set: [{ id: 'petalRoll', value: '330' }] },
+  { label: `petalTwist min (-180)`, set: [{ id: 'petalTwist', value: '-180' }] },
+  { label: `petalTwist max (180)`, set: [{ id: 'petalTwist', value: '180' }] },
+  { label: `sheetThickness min (0.6)`, set: [{ id: 'sheetThickness', value: '0.6' }] },
+  { label: `sheetThickness max (2.4)`, set: [{ id: 'sheetThickness', value: '2.4' }] },
+  { label: `tipThinning min (0)`, set: [{ id: 'tipThinning', value: '0' }] },
+  { label: `tipThinning max (0.8)`, set: [{ id: 'tipThinning', value: '0.8' }] },
+  { label: `footDelicacy min (0.25)`, set: [{ id: 'footDelicacy', value: '0.25' }] },
+  { label: `footDelicacy max (1)`, set: [{ id: 'footDelicacy', value: '1' }] },
+  { label: `spread min (0.6)`, set: [{ id: 'spread', value: '0.6' }] },
+  { label: `spread max (6)`, set: [{ id: 'spread', value: '6' }] },
+  { label: `layerCount min (1)`, set: [{ id: 'layerCount', value: '1' }] },
+  { label: `layerCount max (3)`, set: [{ id: 'layerCount', value: '3' }] },
+  { label: `ROSE-ish (obovate, broad tip)`, set: [{ id: 'petalBaseTaper', value: '2' }, { id: 'petalTipTaper', value: '1.1' }, { id: 'petalTipBreadth', value: '0.3' }] },
+  { label: `POPPY-ish (orbicular, truncate)`, set: [{ id: 'petalBaseTaper', value: '0.6' }, { id: 'petalTipTaper', value: '0.7' }, { id: 'petalTipBreadth', value: '0.5' }] },
+  { label: `NONE × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'NONE' }, { id: 'spread', value: '0.6' }] },
+  { label: `NONE × spread default (2)`, set: [{ id: 'centerStyle', value: 'NONE' }, { id: 'spread', value: '2' }] },
+  { label: `NONE × spread max (6)`, set: [{ id: 'centerStyle', value: 'NONE' }, { id: 'spread', value: '6' }] },
+  { label: `DOME × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'spread', value: '0.6' }] },
+  { label: `DOME × spread default (2)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'spread', value: '2' }] },
+  { label: `DOME × spread max (6)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'spread', value: '6' }] },
+  { label: `DISC × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'spread', value: '0.6' }] },
+  { label: `DISC × spread default (2)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'spread', value: '2' }] },
+  { label: `DISC × spread max (6)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'spread', value: '6' }] },
+  { label: `RING × spread min (0.6)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'spread', value: '0.6' }] },
+  { label: `RING × spread default (2)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'spread', value: '2' }] },
+  { label: `RING × spread max (6)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'spread', value: '6' }] },
+  { label: `DOME × centerSize min (0.25)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '0.25' }] },
+  { label: `DOME × centerSize max (1)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '1' }] },
+  { label: `DOME × centerRise min (0.15)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerRise', value: '0.15' }] },
+  { label: `DOME × centerRise max (1.2)`, set: [{ id: 'centerStyle', value: 'DOME' }, { id: 'centerRise', value: '1.2' }] },
+  { label: `DISC × centerSize min (0.25)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '0.25' }] },
+  { label: `DISC × centerSize max (1)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '1' }] },
+  { label: `DISC × centerDish min (0)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerDish', value: '0' }] },
+  { label: `DISC × centerDish max (0.9)`, set: [{ id: 'centerStyle', value: 'DISC' }, { id: 'centerDish', value: '0.9' }] },
+  { label: `RING × centerSize min (0.25)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '0.25' }] },
+  { label: `RING × centerSize max (1)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '1' }] },
+  { label: `RING × centerBore min (0.2)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerBore', value: '0.2' }] },
+  { label: `RING × centerBore max (0.75)`, set: [{ id: 'centerStyle', value: 'RING' }, { id: 'centerBore', value: '0.75' }] },
+  { label: `ALL MIN (centre off)`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'layerCount', value: '1' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `ALL MAX (centre off)`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'layerCount', value: '3' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `ALL MIN × DOME min`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'layerCount', value: '1' }, { id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '0.25' }, { id: 'centerRise', value: '0.15' }] },
+  { label: `ALL MIN × DISC min`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'layerCount', value: '1' }, { id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '0.25' }, { id: 'centerDish', value: '0' }] },
+  { label: `ALL MIN × RING min`, set: [{ id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalBaseTaper', value: '0.3' }, { id: 'petalTipTaper', value: '0.6' }, { id: 'petalTipBreadth', value: '0' }, { id: 'petalCup', value: '-0.8' }, { id: 'petalTilt', value: '0' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'layerCount', value: '1' }, { id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '0.25' }, { id: 'centerBore', value: '0.2' }] },
+  { label: `ALL MAX × DOME max`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'layerCount', value: '3' }, { id: 'centerStyle', value: 'DOME' }, { id: 'centerSize', value: '1' }, { id: 'centerRise', value: '1.2' }] },
+  { label: `ALL MAX × DISC max`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'layerCount', value: '3' }, { id: 'centerStyle', value: 'DISC' }, { id: 'centerSize', value: '1' }, { id: 'centerDish', value: '0.9' }] },
+  { label: `ALL MAX × RING max`, set: [{ id: 'petalCount', value: '40' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '30' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalTilt', value: '75' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }, { id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '1' }, { id: 'spread', value: '6' }, { id: 'layerCount', value: '3' }, { id: 'centerStyle', value: 'RING' }, { id: 'centerSize', value: '1' }, { id: 'centerBore', value: '0.75' }] },
+  { label: `FORM: QUILL (roll alone, toward a tube)`, set: [{ id: 'petalRoll', value: '330' }] },
+  { label: `FORM: FIDDLEHEAD (spine curl alone)`, set: [{ id: 'petalSpineCurl', value: '360' }] },
+  { label: `FORM: CONTORTED (twist alone)`, set: [{ id: 'petalTwist', value: '180' }] },
+  { label: `FORM: REFLEXED (cup min x curl below the plane)`, set: [{ id: 'petalCup', value: '-0.8' }, { id: 'petalSpineCurl', value: '-180' }] },
+  { label: `FORM: ROLL CLAMP (roll max x narrowest petal)`, set: [{ id: 'petalRoll', value: '330' }, { id: 'petalWidth', value: '8' }] },
+  { label: `FORM: ALL MAX (all four curves together)`, set: [{ id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }] },
+  { label: `FORM: ALL MIN (all four curves together)`, set: [{ id: 'petalCup', value: '-0.8' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'petalRoll', value: '-330' }, { id: 'petalTwist', value: '-180' }] },
+  { label: `THIN: ALL THIN (centre off)`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `THIN: ALL THIN × DISC`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'centerStyle', value: 'DISC' }] },
+  { label: `THIN: ALL THIN × spread min`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }] },
+  { label: `THIN: ALL THIN × petalCount 40`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'petalCount', value: '40' }] },
+  { label: `THIN: ALL THIN × form max`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }] },
+  { label: `THIN: ALL THIN × ALL MIN`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalTilt', value: '0' }] },
+  { label: `THIN: THICK GRADIENT (sheet max × thinning max)`, set: [{ id: 'sheetThickness', value: '2.4' }, { id: 'tipThinning', value: '0.8' }] },
+  { label: `TIP: pointed × roll max`, set: [{ id: 'petalRoll', value: '330' }] },
+  { label: `TIP: pointed × twist max`, set: [{ id: 'petalTwist', value: '180' }] },
+  { label: `TIP: pointed × taper max (floor dominates)`, set: [{ id: 'petalTipTaper', value: '4' }] },
+  { label: `TIP: truncate (breadth max) — must NOT converge`, set: [{ id: 'petalTipBreadth', value: '0.6' }] },
+  { label: `TIP: pointed × ALL THIN`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }] },
+  { label: `CAPABILITY: claw (non-monotone width)`, set: [], capability: CAPABILITY_CLAW },
+  { label: `CAPABILITY: cleft (two-span domain)`, set: [], capability: CAPABILITY_CLEFT },
+  { label: `CAPABILITY: claw x form max`, set: [{ id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }], capability: CAPABILITY_CLAW },
+  { label: `CAPABILITY: cleft x roll max`, set: [{ id: 'petalRoll', value: '330' }], capability: CAPABILITY_CLEFT },
+  { label: `CAPABILITY: cleft x all thin`, set: [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }], capability: CAPABILITY_CLEFT },
+  { label: `SPIRAL x petalCount 3 (below the legibility flag)`, set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: '3' }] },
+  { label: `SPIRAL x petalCount 5 (below the legibility flag)`, set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: '5' }] },
+  { label: `SPIRAL x petalCount 7 (below the legibility flag)`, set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: '7' }] },
+  { label: `SPIRAL x petalCount 8`, set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: '8' }] },
+  { label: `SPIRAL x petalCount 13`, set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: '13' }] },
+  { label: `SPIRAL x petalCount 21`, set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: '21' }] },
+  { label: `SPIRAL x petalCount 40`, set: [{ id: 'placement', value: 'SPIRAL' }, { id: 'petalCount', value: '40' }] },
+  { label: `SPIRAL x defaults`, set: [{ id: 'placement', value: 'SPIRAL' }] },
+  { label: `3 layers x layerSize min (0.35)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerSize', value: '0.35' }] },
+  { label: `3 layers x layerSize max (0.9)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerSize', value: '0.9' }] },
+  { label: `3 layers x layerPhase min (0)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerPhase', value: '0' }] },
+  { label: `3 layers x layerPhase max (1)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerPhase', value: '1' }] },
+  { label: `3 layers x layerTilt min (0)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerTilt', value: '0' }] },
+  { label: `3 layers x layerTilt max (30)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerTilt', value: '30' }] },
+  { label: `3 layers x innerCurl min (-180)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '-180' }] },
+  { label: `3 layers x innerCurl max (360)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }] },
+  { label: `3 layers x innerCup min (-0.8)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCup', value: '-0.8' }] },
+  { label: `3 layers x innerCup max (1.2)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCup', value: '1.2' }] },
+  { label: `3 layers x innerTipBreadth min (0)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerTipBreadth', value: '0' }] },
+  { label: `3 layers x innerTipBreadth max (0.6)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `2 layers x RADIAL`, set: [{ id: 'layerCount', value: '2' }, { id: 'placement', value: 'RADIAL' }] },
+  { label: `2 layers x SPIRAL`, set: [{ id: 'layerCount', value: '2' }, { id: 'placement', value: 'SPIRAL' }] },
+  { label: `3 layers x RADIAL`, set: [{ id: 'layerCount', value: '3' }, { id: 'placement', value: 'RADIAL' }] },
+  { label: `3 layers x SPIRAL`, set: [{ id: 'layerCount', value: '3' }, { id: 'placement', value: 'SPIRAL' }] },
+  { label: `LAYERS: 3 x spread min`, set: [{ id: 'layerCount', value: '3' }, { id: 'spread', value: '0.6' }] },
+  { label: `LAYERS: 3 x ALL THIN`, set: [{ id: 'layerCount', value: '3' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }] },
+  { label: `LAYERS: 3 x ALL THIN x spread min`, set: [{ id: 'layerCount', value: '3' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }] },
+  { label: `LAYERS: 3 x ALL THIN x spread min x petalCount 40`, set: [{ id: 'layerCount', value: '3' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'petalCount', value: '40' }] },
+  { label: `LAYERS: 3 x ALL THIN x spread min x petalCount 3`, set: [{ id: 'layerCount', value: '3' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'petalCount', value: '3' }] },
+  { label: `LAYERS: 3 x layerSize min x ALL THIN (deepest foot floored)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerSize', value: '0.35' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }] },
+  { label: `LAYERS: 3 x ALL FORM MAX`, set: [{ id: 'layerCount', value: '3' }, { id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }] },
+  { label: `LAYERS: 3 x SPIRAL x ALL THIN x spread min x petalCount 40`, set: [{ id: 'layerCount', value: '3' }, { id: 'placement', value: 'SPIRAL' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'petalCount', value: '40' }] },
+  { label: `LAYERS: 3 x centre OFF (the layered BARE bloom)`, set: [{ id: 'layerCount', value: '3' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `LAYERS: 3 x layerTilt max (135° effective at petalTilt max)`, set: [{ id: 'layerCount', value: '3' }, { id: 'layerTilt', value: '30' }, { id: 'petalTilt', value: '75' }] },
+  { label: `LAYERS: 2 x layerSize max x layerPhase 0 (the coincidence corner)`, set: [{ id: 'layerCount', value: '2' }, { id: 'layerSize', value: '0.9' }, { id: 'layerPhase', value: '0' }, { id: 'layerTilt', value: '0' }] },
+  { label: `LAYERS: 3 x ALL MIN elsewhere`, set: [{ id: 'layerCount', value: '3' }, { id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalTilt', value: '0' }, { id: 'spread', value: '0.6' }] },
+  { label: `CAPABILITY: cleft x 3 layers`, set: [{ id: 'layerCount', value: '3' }], capability: CAPABILITY_CLEFT },
+  { label: `CONTINUOUS x petalCount 3 x 3 turns (9 in sequence)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '3' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONTINUOUS x petalCount 5 x 3 turns (15 in sequence)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '5' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONTINUOUS x petalCount 7 x 3 turns (21 in sequence)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '7' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONTINUOUS x petalCount 8 x 3 turns (24 in sequence)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '8' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONTINUOUS x petalCount 13 x 3 turns (39 in sequence)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '13' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONTINUOUS x petalCount 21 x 3 turns (63 in sequence)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '21' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONTINUOUS x petalCount 40 x 3 turns (120 in sequence)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONTINUOUS x defaults (one turn)`, set: [{ id: 'placement', value: 'CONTINUOUS' }] },
+  { label: `CONTINUOUS x 2 turns`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '2' }] },
+  { label: `CONTINUOUS x 3 turns`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }] },
+  { label: `CONT: 3 turns x layerSize min x petalCount 40 (the deepest foot)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'layerSize', value: '0.35' }, { id: 'petalCount', value: '40' }] },
+  { label: `CONT: 3 turns x layerSize max x petalCount 40 (the shallowest gradient)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'layerSize', value: '0.9' }, { id: 'petalCount', value: '40' }] },
+  { label: `CONT: 3 turns x ALL THIN x spread min x petalCount 40 (the overlap box at 120 rings)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'petalCount', value: '40' }] },
+  { label: `CONT: 3 turns x ALL THIN x spread min x petalCount 3 (the sparsest continuum)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'petalCount', value: '3' }] },
+  { label: `CONT: 3 turns x layerSize min x ALL THIN x petalCount 40 (deepest foot, thinnest sheet)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'layerSize', value: '0.35' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }, { id: 'petalCount', value: '40' }] },
+  { label: `CONT: 3 turns x footDelicacy min (floored from ring 1)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'footDelicacy', value: '0.25' }] },
+  { label: `CONT: 3 turns x spread max (the hub plate under a continuum)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'spread', value: '6' }] },
+  { label: `CONT: 3 turns x layerTilt max x petalTilt max (161.25° effective — past the layered 135°)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'layerTilt', value: '30' }, { id: 'petalTilt', value: '75' }] },
+  { label: `CONT: 3 turns x ALL FORM MAX`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }] },
+  { label: `CONT: 3 turns x centre OFF (the continuous BARE bloom)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `CONT: 3 turns x ALL MIN elsewhere`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'petalCount', value: '3' }, { id: 'petalLength', value: '20' }, { id: 'petalWidth', value: '8' }, { id: 'petalTilt', value: '0' }, { id: 'spread', value: '0.6' }] },
+  { label: `CAPABILITY: cleft x CONTINUOUS x 3 turns`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }], capability: CAPABILITY_CLEFT },
+  { label: `ZYGO: THE IRIS (falls curl down, standards rise)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalSpineCurl', value: '-90' }, { id: 'innerCurl', value: '180' }, { id: 'innerCup', value: '0.4' }, { id: 'layerTilt', value: '30' }, { id: 'petalTilt', value: '40' }] },
+  { label: `ZYGO: the iris x centre OFF (the zygomorphic BARE bloom)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalSpineCurl', value: '-90' }, { id: 'innerCurl', value: '180' }, { id: 'innerCup', value: '0.4' }, { id: 'layerTilt', value: '30' }, { id: 'petalTilt', value: '40' }, { id: 'centerStyle', value: 'NONE' }] },
+  { label: `ZYGO: 2 layers x ALL INNER MAX`, set: [{ id: 'layerCount', value: '2' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `ZYGO: 3 layers x ALL INNER MAX x ALL THIN`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }] },
+  { label: `ZYGO: 3 layers x ALL INNER MAX x spread min (crowded feet)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }, { id: 'spread', value: '0.6' }] },
+  { label: `ZYGO: 3 layers x ALL INNER MAX x petalCount 3`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }, { id: 'petalCount', value: '3' }] },
+  { label: `ZYGO: 3 layers x ALL INNER MAX x petalCount 40`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }, { id: 'petalCount', value: '40' }] },
+  { label: `ZYGO: 3 layers x ALL INNER MAX x ALL FORM MAX (every clamp binds)`, set: [{ id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }, { id: 'petalCup', value: '1.2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'petalRoll', value: '330' }, { id: 'petalTwist', value: '180' }] },
+  { label: `ZYGO: curl clamp binds (base 360 + delta 360 -> 360)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalSpineCurl', value: '360' }, { id: 'innerCurl', value: '360' }] },
+  { label: `ZYGO: cup clamp binds (base 1.2 + delta 1.2 -> 1.2)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalCup', value: '1.2' }, { id: 'innerCup', value: '1.2' }] },
+  { label: `ZYGO: curl clamp binds downward (base -180 + delta -180 -> -180)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalSpineCurl', value: '-180' }, { id: 'innerCurl', value: '-180' }] },
+  { label: `ZYGO: the tip partition, both ways in one bloom (outer pointed, inner truncate)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalTipBreadth', value: '0' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `ZYGO: the tip partition inverted (outer truncate, inner more so)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalTipBreadth', value: '0.6' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `ZYGO: the iris x SPIRAL (roles exist, azimuth differs)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalSpineCurl', value: '-90' }, { id: 'innerCurl', value: '180' }, { id: 'innerCup', value: '0.4' }, { id: 'layerTilt', value: '30' }, { id: 'petalTilt', value: '40' }, { id: 'placement', value: 'SPIRAL' }] },
+  { label: `ZYGO: GATED — CONTINUOUS x 3 turns x ALL INNER MAX (hidden, and must be inert)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `ZYGO: GATED — CONTINUOUS x 1 turn x ALL INNER MAX (hidden, and must be inert)`, set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `ZYGO: the foot UPPER clamp (petalWidth 30 — ring frozen at 11.06 mm)`, set: [{ id: 'layerCount', value: '2' }, { id: 'petalWidth', value: '30' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }] },
+  { label: `CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX`, set: [{ id: 'layerCount', value: '2' }, { id: 'innerCurl', value: '360' }, { id: 'innerCup', value: '1.2' }, { id: 'innerTipBreadth', value: '0.6' }], capability: CAPABILITY_CLEFT },
+  ];
 }
 
 /* The pre-spread, pre-centre matrix, frozen. tools/diff-bloom-bytes.mjs runs
@@ -1858,6 +2429,7 @@ export const FROZEN_BASE_COMMITS = {
   phase4: '3c542fb',   // the form curves and the DISC default — before the thickness layer
   phase5: 'deacded',   // the thickness layer, tip cap and sectioned panel — before layers and spiral
   phase6: 'c1886d0',   // layers and spiral placement — before the continuous spiral
+  phase7: 'f626828',   // the override architecture and per-layer roles — before slot roles
 };
 
 /* ===================================================================

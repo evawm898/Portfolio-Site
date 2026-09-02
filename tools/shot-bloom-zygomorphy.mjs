@@ -54,7 +54,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
          junctionAssertions, zygoAssertions, ZYGO_SCOPE, CONTROLS, DEFAULTS,
-         ROLE_OVERRIDES, ROLE_INNER } from './bloom-harness.mjs';
+         ROLE_OVERRIDES, ROLE_INNER, LAW_IDENTITY } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -95,7 +95,11 @@ async function cell({ label, set = [], views = ['face', 'profile'], note = '' })
      not. Derived from the SET the cell asked for and compared against what
      the BUILDER said it used, so the caption cannot describe a design other
      than the one in the frame. */
-  const anyDelta = ROLE_OVERRIDES.some((o) => Number(want[o.delta]) !== 0);
+  /* SCOPED TO THE LAYER-ROLE ROWS (session B renamed the key and added slot
+     roles to this table). This sheet is session A's and photographs the IRIS
+     — a per-LAYER claim — so a slot-role control must not make its cells read
+     as differentiated. */
+  const anyDelta = ROLE_OVERRIDES.some((o) => o.role === ROLE_INNER && Number(want[o.control]) !== LAW_IDENTITY[o.law]);
   const innerIdx = m.rings.findIndex((r) => r.role === ROLE_INNER);
   const hasInner = innerIdx >= 0;
   /* A CELL IS DIFFERENTIATED IFF A DELTA IS NON-ZERO **AND** THERE IS AN INNER

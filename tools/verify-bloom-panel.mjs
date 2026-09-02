@@ -124,6 +124,30 @@ const WITNESS = {
             /* A style change rebuilds the centre; both the reported style and
                its own triangle count move off DISC's. */
             read: (m) => `${m.centerStyle}/${m.centerTris}`, what: 'centerStyle/centerTris' },
+  /* PETAL ROLES — witnessed by the labellum's SIZE, and the witness needed NO
+     PRECONDITION, which is worth recording because session A predicted it
+     would. Session A reasoned that a "whorl differences" section would ship
+     with every control hidden at the default (its three `inner*` deltas need
+     layerCount >= 2), so the path route would have to set up its own
+     precondition first — and warned that a witness which must arrange its own
+     preconditions is a witness that can quietly measure nothing.
+
+     The layerPhase gating ruling changed that before it was built. Slot roles
+     apply at layerCount 1, so `slotRolesEligible` is TRUE at the shipping
+     default: this section RENDERS at first load with its eight slot controls
+     visible and session A's three hidden, and one of them moves geometry from
+     a clean page. Evaluated, not assumed — the declaration route asserts that
+     exact first-load state in both directions below.
+
+     THE WITNESS REACHES PAST THE CONTROL'S OWN VALUE, like `shape` and
+     `thickness` above: a labellum size multiplier splits the whorl into three
+     descriptors and changes the effective petalLength the BUILDER reports
+     using. Triangle count could not be the witness — a role override moves
+     vertices on a fixed-topology grid and costs exactly zero triangles, which
+     would have made this assertion a passing no-op. */
+  roles: { id: 'labellumSize', value: '1.6',
+           read: (m) => `${m.rings.length}/${m.slotRolesSplit}/${m.petalRingApplied[0] && m.petalRingApplied[0].applied.petalLength}`,
+           what: 'descriptor count / split / the labellum petalLength the builder used' },
   thickness: { id: 'sheetThickness', value: '2.4',
               /* footRing()'s area rule reads the thickness the solids are
                  actually built at, so a thicker sheet moves the RING RADIUS —
@@ -388,6 +412,48 @@ if (!shutBad.length && !shutDrift.length && stillShut === 0) {
 }
 
 /* ---------------- (b) reactivity through a CLOSED section ---------------- */
+/* ---------------- (a3) WHICH SECTIONS AND CONTROLS A VISITOR ACTUALLY SEES
+     AT FIRST LOAD — asserted in BOTH directions, on the DOM rather than on
+     the predicates (session B, Sep 2).
+
+     WHY IT EXISTS AS ITS OWN ASSERTION. The declaration route already checks
+     every wrapper's `hidden` against its own predicate, which is the general
+     property. This is the SPECIFIC claim the session's panel story rests on,
+     and a session B design report managed to state it BOTH WAYS in one
+     document — the Petal roles section visible at first load in one paragraph
+     and hidden in another. That was settled by evaluating the predicate, and
+     a claim settled by evaluation should be settled by the gate from then on,
+     or the next reader is back to reading two paragraphs. Shown AND hidden are
+     different assertions (the flower's doesn't-leak-in / does-show-all rule),
+     so both are listed and both are checked. */
+{
+  await openBloom(page, port);
+  const seen = await page.evaluate(() => ({
+    sections: [...document.querySelectorAll('#panelControls details')].map((d) => ({ id: d.id.replace(/^sec-/, ''), hidden: d.hidden, open: d.open })),
+    shown: [...document.querySelectorAll('.bl-ctrl')].filter((w) => !w.hidden).map((w) => w.querySelector('input, select').id),
+  }));
+  const wantShown = CONTROLS.filter((c) => evalPredicate(c.visibleWhen, DEFAULTS)).map((c) => c.id);
+  const wantHidden = CONTROLS.filter((c) => !evalPredicate(c.visibleWhen, DEFAULTS)).map((c) => c.id);
+  const missing = wantShown.filter((id) => !seen.shown.includes(id));
+  const leaked = wantHidden.filter((id) => seen.shown.includes(id));
+  if (missing.length) note(`at first load these controls should be visible and are not: ${missing.join(', ')}`);
+  if (leaked.length) note(`at first load these controls should be hidden and are visible: ${leaked.join(', ')}`);
+  for (const sec of seen.sections) {
+    const members = CONTROLS.filter((c) => c.section === sec.id);
+    const allHidden = members.every((c) => !evalPredicate(c.visibleWhen, DEFAULTS));
+    if (sec.hidden !== allHidden) {
+      note(`at first load section "${sec.id}" is ${sec.hidden ? 'hidden' : 'shown'}, but ${allHidden ? 'every one of its controls is hidden' : 'it has at least one visible control'} — a section is hidden iff every control in it is`);
+    }
+  }
+  if (!missing.length && !leaked.length) {
+    const roles = seen.sections.find((x) => x.id === 'roles');
+    const rolesShown = CONTROLS.filter((c) => c.section === 'roles' && seen.shown.includes(c.id)).map((c) => c.id);
+    const rolesHidden = CONTROLS.filter((c) => c.section === 'roles' && !seen.shown.includes(c.id)).map((c) => c.id);
+    ok.push(`first load: ${seen.shown.length} of ${CONTROLS.length} controls visible, ${wantHidden.length} hidden, every section hidden iff empty of visible controls`);
+    ok.push(`first load: section "roles" is ${roles.hidden ? 'HIDDEN' : 'SHOWN'} and ${roles.open ? 'open' : 'collapsed'} — visible: [${rolesShown.join(', ')}]; hidden: [${rolesHidden.join(', ')}]`);
+  }
+}
+
 const closed = SECTIONS.filter((s) => !s.open);
 if (!closed.length) note('no section ships collapsed, so the path route has nothing to drive — the reactivity assertion would be vacuous');
 for (const s of closed) {

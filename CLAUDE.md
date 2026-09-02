@@ -39,7 +39,11 @@ Arrangement changes have their own sheet too:
 `node tools/shot-bloom-arrangement.mjs <dir>` — layers, placement and the
 parked extremes. Zygomorphy has one as well:
 `node tools/shot-bloom-zygomorphy.mjs <dir>` — the iris, face-on and in
-profile, always beside the same bloom undifferentiated as the control.
+profile, always beside the same bloom undifferentiated as the control — and
+SLOT roles have their own: `node tools/shot-bloom-orchid.mjs <dir>` — the
+labellum below, the hood above, FACE-ON as the headline (the reverse of the
+iris sheet's order, on purpose), with session A's iris on it as a cell that
+must be unmoved.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
@@ -48,15 +52,23 @@ consecutive foot annuli overlap each other. `junctionAssertions()` (J1–J6) in
 both gates is what carries that claim; do not weaken it on the strength of a
 green flood fill.
 
-**Neither STL gate can see zygomorphy at all** — measured on three worktrees,
-not derived: an override that lands on the wrong whorl, an override record
-that never reaches the blade, and the area rule regrouped per foot ALL export
+**Neither STL gate can see zygomorphy at all** — measured on SEVEN worktrees
+across two sessions, not derived: an override that lands on the wrong whorl, a
+record that never reaches the blade, the area rule regrouped per foot, an
+off-by-one hood index, a slot record that never reaches the blade, the collapse
+guard removed, and a size multiplier plumbed into `footRing()` ALL export
 watertight, as one piece, with no degenerate triangles and identical live and
-export triangle counts and byte lengths. `zygoAssertions()` (Z1–Z3) in both
+export triangle counts and byte lengths. `zygoAssertions()` (Z1–Z6) in both
 gates is what carries those claims. Z3 is an EQUALITY and not a bound on
 purpose: the regrouping mutation measures 0.9 ULP, which any real tolerance
 would pass. The area rule is grouped by ROLE and must stay that way —
-regrouping it per foot moves every 40-petal export by 6 ULP.
+regrouping it per foot moves every 40-petal export by 6 ULP, and splitting a
+whorl per slot role moves 46 of 264 measured rows, which is why the descriptor
+split is CONDITIONAL and why Z5 asserts that collapse in both directions.
+**Two of those mutations fired NOTHING anywhere in the shipped instrument**
+until Z4 (the assignment is mirror-symmetric) and Z5 existed, and a third was
+silent above one whorl until Z6 (a role differentiates the BLADE, never the
+foot). Do not read a green run as endorsing any of it.
 
 ## Flower generator — print-safety is a hard invariant
 
