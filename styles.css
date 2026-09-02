@@ -261,8 +261,18 @@ a {
   border-right: none;
 }
 
-.notes-grid .note-card:nth-child(n+3) {
+/* The last row carries no bottom border. With an odd count the final card
+   sits alone in the left column, so "last row" is the last card plus, when
+   the count is even, the one before it — nth-last-child, not nth-child. */
+.notes-grid .note-card:last-child,
+.notes-grid .note-card:nth-last-child(2):nth-child(odd) {
   border-bottom: none;
+}
+
+/* A lone final card spans both columns rather than leaving an empty cell. */
+.notes-grid .note-card:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  border-right: none;
 }
 
 .note-card:hover {
@@ -390,7 +400,7 @@ a {
   .note-card {
     border-right: none !important;
   }
-  .notes-grid .note-card:nth-child(n+3) {
+  .notes-grid .note-card:nth-last-child(2):nth-child(odd) {
     border-bottom: 1px solid var(--line);
   }
   .notes-grid .note-card:last-child {
