@@ -200,15 +200,18 @@ tour/release dates worth watching. No backend, no build step: a SHA-256
 password gate (`crypto.subtle` + a hardcoded hash, unlock flag in
 `sessionStorage`) guards a `localStorage`-backed CRUD tracker.
 
-**Status: not yet merged.** Items 1–10 below live on branch
-`claude/artist-tracker-testing-afc2ul` / PR #121 (draft, targeting
-`main`); items 11–12 build on top of it on branch
-`claude/tracker-panel-paste-images-h46mti`. Review each through its own
-Netlify Deploy Preview — not the production domain. This matters because
-the app's only "database" is the browser's own `localStorage`, which is
-scoped per-origin: data added on the deploy preview does **not** carry
-over automatically once this merges to production. Use the app's own export/import JSON to move data across
-origins if needed.
+**Status: items 1–12 are MERGED to `main`** (PRs #121 and #125); items
+13–18 are in review on branch `claude/tracker-shortlist-filters-h46mti`.
+Review through the Netlify Deploy Preview — `localStorage` is per-origin, so
+preview data does not carry over to production and vice versa; move it with
+the app's own JSON export/import.
+
+**What this tool is for.** It is primarily a TATTOO ARTIST SHORTLIST — the
+job is deciding who to get tattooed by and finding where they are. Friends,
+influencers and general art accounts are kept but are background. Three
+questions drive the design: who does the work I want (style tags), where are
+they and who is near who (region filter + map), and why did I save them
+(notes). Let that priority pick the defaults.
 
 **Built so far, in order:**
 1. Core tracker (pre-existing before this branch): password gate,
@@ -304,12 +307,57 @@ origins if needed.
       handling — and a backup of 200 entries with images is megabytes
       rather than tens of KB. Expected, not a bug.
 
+13. The view defaults to **tattoo artists**, not "all" — the other
+    categories are one click away.
+14. Location filter is two-level: **region, then city**. `parseLocation()`
+    derives both at render time from the free-text `location` (last
+    comma-separated segment = region, first = city) and NEVER writes back —
+    the user's original string is untouched. A trailing US state or Canadian
+    province code folds into `USA` / `Canada`, so "Los Angeles, CA" and
+    "Austin, TX, USA" land in one region instead of scattering. A
+    single-segment string ("Berlin") becomes its own region rather than
+    having a country guessed for it. Anything unparseable goes to
+    "Other / unspecified", pinned last; every other region is ordered by
+    count, descending.
+15. Style tags have a clickable **starter set** (`STARTER_TAGS`) plus every
+    tag already in use, shown as toggle chips in the drawer's edit mode.
+    Typing still works — Enter or a comma commits a custom tag. Filter chips
+    carry counts and sort by count, descending.
+16. `status` split into **`notes`** (why I saved them — a real textarea, the
+    field that matters most) and **`status`** (guest spots, books, tour
+    dates — still one line). The split of EXISTING data is a **button**
+    (`split status → notes` in the footer), never automatic on load: it
+    shows the counts and a sample before it touches anything, skips entries
+    that already have notes, and is safe to press twice. `LOGISTICS_RE`
+    decides what stays in `status`; "flash" is deliberately NOT a keyword
+    ("love her flash" is a reason to save someone, not a booking window).
+17. Gender is an **explicit field** (`woman` / `not-woman` / `unknown`,
+    default `unknown`), set by hand in the drawer. It replaced the old
+    pronouns-derived bucketing, which was blank for nearly every entry.
+    Seeded ONCE on load from an unambiguous she/her in `pronouns`; nothing
+    is ever inferred from names, handles or photos, and `pronouns` keeps its
+    own separate job of recording how someone refers to themselves. Filter
+    is All / Women only / Unknown — "unknown" is browsable on purpose, so
+    the backlog can be worked through.
+18. Map **clusters** (leaflet.markercluster via CDN, SRI-pinned), respects
+    every active filter, and prints how many artists are plotted vs. how
+    many have no usable location.
+
+**Facet counts are computed against every filter except themselves** — with
+the view defaulting to tattoo artists, a region count taken over the whole
+ledger would read "USA (40)" while showing 25. Each filter is its own
+predicate (`matchesCategory`, `matchesGender`, …) so the region and tag
+counts can exclude their own dimension.
+
 **Testing approach:** no CI workflow covers this file (every GitHub
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
 only — only Netlify's own informational checks run on this PR). The
-drawer and paste-to-add work (items 11–12) shipped with a behaviour gate,
-`node tools/verify-tracker-drawer.mjs` (94 checks; `--shots <dir>` also
-writes a contact sheet). It serves the repo on a free port, seeds
+drawer, paste-to-add and shortlist work (items 11–18) ship with a behaviour
+gate, `node tools/verify-tracker-drawer.mjs` (168 checks; `--shots <dir>`
+also writes a contact sheet). Its map checks serve the REAL leaflet and
+leaflet.markercluster from `node_modules` when present
+(`npm install --no-save leaflet@1.9.4 leaflet.markercluster@1.5.3`) and
+report as SKIPPED, never as passed, when they are missing. It serves the repo on a free port, seeds
 `sessionStorage` to skip the password gate, stubs unavatar.io and unpkg,
 and drives a real Chromium: open/close/Escape/backdrop, focus return,
 the edit round trip, the downscale (a 1200×800 paste must come out
@@ -317,8 +365,10 @@ the edit round trip, the downscale (a 1200×800 paste must come out
 `QuotaExceededError`, and a regression pass over bulk-paste merge, the
 filters and the map toggle. It is not wired into CI (no workflow here
 covers this file) — run it before calling a tracker change done.
-Verified falsifiable: widening `MAX_PHOTO_DIM` or dropping the
-text-field paste guard each turn it red.
+Verified falsifiable: widening `MAX_PHOTO_DIM`, dropping the text-field
+paste guard, restoring the "all" default, removing the US-state fold,
+inferring gender from he/him, running the status split on load, or swapping
+the cluster group for a plain layer group each turn it red.
 Verification has been manual: serve locally via `python3 -m http.server`
 (`crypto.subtle` needs a secure context — never test via `file://`), drive
 with Playwright (`NODE_PATH=/opt/node22/lib/node_modules` — Playwright is
