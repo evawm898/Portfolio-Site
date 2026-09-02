@@ -55,6 +55,17 @@ consecutive foot annuli overlap each other. `junctionAssertions()` (J1–J6) in
 both gates is what carries that claim; do not weaken it on the strength of a
 green flood fill.
 
+**A CLOSE-OUT RUNS THE NEWEST BASELINE PLUS THE LIVE PARTITION, NOT THE WHOLE SUITE**
+(Eva, Sep 2). The frozen suite is 1,049 rows and grows by the live matrix every session —
+quadratic in project age, and an afternoon by session 10. From session 11 a close runs the
+NEWEST frozen baseline on both trees (the load-bearing "nothing that shipped before this
+moved") plus the live-matrix partition (the only instrument for the region a change
+affects). The FULL historical suite runs at MILESTONES only: before any production
+publish, or when a change touches the area rule or the export path directly. Baselines are
+RETAINED, never deleted, and CI's `--verify-frozen` still proves every one deep-equal on
+every push — only their routine byte re-export is demoted. Full reasoning, and what it
+gives up, in the charter's "Verification retention" section.
+
 **NOTHING IN THIS PROJECT MEASURES AN AZIMUTH EXCEPT J7 AND Z4b** — established
 by grep, not assumed. Both STL gates are azimuth-blind by construction, and so
 is everything built on them: J1 reads foot frames, J2/J3 read radii, J4 reads

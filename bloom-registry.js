@@ -928,7 +928,32 @@ export const CONTROLS = [
      control would put a new branch in the app, in fullStateDrift and in both
      gates to save one word. The option LABELS carry the flower's own
      explanation of what each position does. */
-  { id: 'fanCenterPetal', section: 'arrangement', kind: 'choice', default: 'OFF',
+  /* ===================================================================
+     DEFAULT ON (Eva, Sep 2, ruled from the fan sheet) — AND IT DELIBERATELY
+     DIVERGES FROM THE FLOWER'S OWN DEFAULT. Both halves are recorded so the
+     divergence reads as chosen rather than accidental.
+
+     THE FLOWER SHIPS `bilCenterPetal` FALSE, and this control's vocabulary,
+     range and labels are otherwise the flower's exactly. Matching it here was
+     the obvious call and it was passed over.
+
+     WHAT OUTRANKED IT: Eva's own founding fan principle — *the petal on the
+     mirror line is petal number one, and it has its own sliders* — which the
+     charter records as the thing the labellum satisfied a session before this
+     arrangement existed. With the toggle ON, slot 0 IS that petal and IS the
+     labellum, because slot 0 is the through-slot involution's fixed point. A
+     fresh fan should therefore open showing the principle it was built on,
+     not the state where the principle has no single petal to point at.
+     Consistency with the older page lost to the idea the newer one is for.
+
+     IT IS A RULED DEFAULT CHANGE, so it lands as its own event with a
+     partition asserted in three directions rather than folded into the
+     feature commit — the `spread` 1.00 -> 2.00 and `centerStyle` NONE -> DISC
+     precedent. The third direction is the one worth naming: every non-FAN row
+     is bit-identical because this control is INERT outside FAN, which is a
+     claim about the geometry rather than about the rows, and it is measured
+     rather than argued. */
+  { id: 'fanCenterPetal', section: 'arrangement', kind: 'choice', default: 'ON',
     options: [
       { value: 'OFF', label: 'Off — the line runs through the gap' },
       { value: 'ON', label: 'On — a petal sits on the line' },
