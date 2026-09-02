@@ -193,6 +193,26 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0c0f0e);
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
+/* THE ORBIT AXIS BUG (Eva, Sep 2 — "feels really difficult... like it's
+   fighting against me"), root-caused rather than guessed at. OrbitControls
+   captures its orbit-math pole from `object.up` ONCE, inside an IIFE at
+   construction time (three.js's own OrbitControls.js: `this.update =
+   (function () { const quat = Quaternion().setFromUnitVectors(object.up,
+   Vector3(0,1,0)); ...; return function update() {...}; })()`) — it is NOT
+   re-read on later frames even though `camera.up` itself can still be
+   reassigned afterward for rendering. `camera.up` defaults to three.js's
+   own (0,1,0) until fitCamera() first runs and sets it to (0,0,1) — but
+   fitCamera only runs inside regenerate(), AFTER `new OrbitControls(...)`
+   below had already captured the WRONG pole (Y) as this app's model is
+   Z-up throughout (buildPetalInto's own R/T/Z frame). Measured directly
+   (a probe exposing camera/controls to a headless page): a purely
+   horizontal drag moved Y not at all and rotated X/Z instead of X/Y, and a
+   vertical drag drove the camera toward alignment with the Y axis rather
+   than tilting over the bloom — orbiting a pole that has nothing to do
+   with what is on screen, which is exactly what reads as fighting/hitting
+   a wall. The fix is ORDER: set camera.up to this app's real vertical
+   BEFORE OrbitControls captures it, not after. */
+camera.up.set(0, 0, 1);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.autoRotate = document.getElementById('autoRotate').checked;

@@ -26,15 +26,25 @@
    frameCameraOnce: picking DEFAULT from the dropdown must never look
    different from a fresh page load.
 
-   TOP-DOWN reuses the up vector shot-bloom-fan.mjs and shot-bloom-orchid.mjs
-   already ship as `FACE_UP = [-1, 0, 0]` — not a fresh choice here. Both
-   tools independently derived it as the orientation that reads "labellum
-   below, hood above" for a zygomorphic bloom, which is exactly the reading
-   Eva's FAN top-down snap needs. Using any other up vector here would be a
-   second, disagreeing owner of the same convention. (It is currently
-   inlined in both tools rather than exported from one shared module —
-   worth consolidating later; out of scope for the view system itself.)
-   Because dir = [0,0,1] and up = [-1,0,0] are already perpendicular, this
+   TOP-DOWN's up is [1, 0, 0], and it is a DELIBERATE DIVERGENCE from the
+   shot-bloom-fan.mjs / shot-bloom-orchid.mjs sheets' own `FACE_UP =
+   [-1, 0, 0]` — not a fresh guess, and not an accidental disagreement.
+   Eva ruled directly on THIS live view (Sep 2, an amendment after seeing
+   the deploy preview): "the top-down framing of the fan must ALWAYS put
+   the labellum at the top of the screen — the mirror axis vertical, the
+   arc opening downward" — in BOTH toggle states (toggle OFF has no
+   bisected labellum, but the labellum-nearest content still sits nearest
+   azimuth 0, so the same orientation governs). Those PRINTED SHEETS put
+   the mirror-line trace (+X) at the BOTTOM on purpose, reading "labellum
+   below, hood above" like a real orchid's hanging lip — a ruling for a
+   different audience (a static comparison sheet) that this interactive
+   snap does not share. Flipping the up vector's sign is the whole fix:
+   `dir` is unchanged, the camera still sits directly above looking
+   straight down; only the in-plane roll changes, rotating the image 180°
+   so +X reads at the top instead of the bottom. Do not "reconcile" this
+   with the shot tools by changing THEM — their own ruling stands for what
+   they are, and this file's job is the live view, not print sheets.
+   Because dir = [0,0,1] and up = [1,0,0] are already perpendicular, this
    is the one preset that needs no epsilon nudge to dodge a degenerate
    cross product (the flower's own `top` needed one for exactly that
    reason, looking straight down its OWN vertical axis, Y).
@@ -43,6 +53,6 @@ export const VIEW_PRESETS = {
   default: { dir: [0.75, -0.75, 0.60], up: [0, 0, 1], fit: 1.6 },
   front:   { dir: [0.00, 1.00, 0.15], up: [0, 0, 1], fit: 1.5 },
   side:    { dir: [1.00, 0.00, 0.15], up: [0, 0, 1], fit: 1.5 },
-  top:     { dir: [0.00, 0.00, 1.00], up: [-1, 0, 0], fit: 1.45 },
+  top:     { dir: [0.00, 0.00, 1.00], up: [1, 0, 0], fit: 1.45 },
   iso:     { dir: [1.00, 1.00, 0.85], up: [0, 0, 1], fit: 1.6 },
 };

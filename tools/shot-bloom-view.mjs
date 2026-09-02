@@ -20,6 +20,19 @@
        checking it would be exactly the kind of claim this project's own
        discipline refuses to make.
 
+   (3) THE ORIENTATION FIX IS ALSO A BEFORE/AFTER PAIR (Eva, Sep 2
+       amendment: the top-down snap landed the bloom upside down — the
+       labellum must read at the TOP, mirror axis vertical, arc opening
+       downward). Both cells use the SAME fan (LABELLUM overrides applied
+       so the mirror-line petal is visually distinct, exactly the technique
+       shot-bloom-fan.mjs/shot-bloom-orchid.mjs already use) and the SAME
+       __bloomFrame harness hook, differing ONLY in the up vector: "before"
+       passes [-1,0,0] — the value the app shipped with, reproduced
+       directly here since the app itself no longer offers it, not a
+       drawing — and "after" passes VIEW_PRESETS.top.up, the shipped fix,
+       imported rather than retyped so this cell cannot silently drift from
+       what the dropdown and the FAN snap actually use.
+
    VIEW STATE'S OWN REGRESSION TEST IS IN THE SAME RUN, NOT A SEPARATE ONE:
    after every preset cycle and the fan snap, fullStateDrift(page, []) must
    still report zero — proof, not assertion, that picking a view preset
@@ -32,6 +45,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame } from './bloom-harness.mjs';
+import { VIEW_PRESETS } from '../bloom-view-presets.js';
 
 const outDir = process.argv[2] || '/tmp/bloom-view';
 const { server, port } = await serveRepo();
@@ -112,6 +126,32 @@ if (driftAfterFan.length) await die(`FAN snap moved OTHER registry state beyond 
 console.log(`preset cycle: 0 registry controls moved (${PRESETS.length} presets)`);
 console.log(`fan snap: auto-rotate off (${!fanState.autoRotateChecked}), dropdown reads "${fanState.viewPresetValue}", 0 registry controls moved beyond placement`);
 
+/* ---- (3) the orientation fix, before/after ---- */
+await openBloom(page, port);
+const bad3 = await stillFrame(page);
+if (bad3.length) await die(`orientation setup: ${bad3.join('; ')}`);
+/* THE LABELLUM MUST BE VISUALLY DISTINCT for "which end is up" to be a
+   legible claim at all — the same overrides shot-bloom-fan.mjs's LAB uses. */
+const bad4 = await applyConfig(page, [
+  { id: 'placement', value: 'FAN' }, { id: 'fanCenterPetal', value: 'ON' },
+  { id: 'labellumSize', value: '1.6' }, { id: 'labellumTilt', value: '-25' },
+  { id: 'labellumCup', value: '0.5' }, { id: 'labellumCurl', value: '-60' },
+  { id: 'labellumTipBreadth', value: '0.25' },
+]);
+if (bad4.length) await die(`orientation: ${bad4.join('; ')}`);
+const m = await page.evaluate(() => window.__bloomMetrics());
+const orientBeforeFile = path.join(outDir, 'orientation-before.png');
+const orientAfterFile = path.join(outDir, 'orientation-after.png');
+/* SAME fan, SAME __bloomFrame call, ONLY the up vector differs — an
+   apples-to-apples pair, not two different code paths photographed. */
+await page.evaluate(([r, c, d, u]) => window.__bloomFrame(r, 0, c, d, u), [m.fitRadius, m.fitCenter, [0, 0, 1], [-1, 0, 0]]);
+await page.waitForTimeout(250);
+await shot(orientBeforeFile);
+await page.evaluate(([r, c, d, u]) => window.__bloomFrame(r, 0, c, d, u), [m.fitRadius, m.fitCenter, [0, 0, 1], VIEW_PRESETS.top.up]);
+await page.waitForTimeout(250);
+await shot(orientAfterFile);
+console.log(`orientation: before up=[-1,0,0] (the shipped bug), after up=[${VIEW_PRESETS.top.up}] (VIEW_PRESETS.top.up, the fix) — see ${outDir}/orientation-*.png`);
+
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const fig = (label, file) => `<figure><img src="${file}"><figcaption>${esc(label)}</figcaption></figure>`;
 const html = `<title>The VIEW box — five presets, and the fan snap</title>
@@ -126,7 +166,10 @@ figcaption{margin-top:8px;text-align:center;color:#9fb3a9}</style>
 <main>${cells.map((c) => fig(c.label, c.file)).join('')}</main>
 <h1 style="margin-top:28px">Selecting FAN — immediate snap, no tween</h1>
 <p class="note">Left: a fresh page's DEFAULT framing (RADIAL, the shipping default). Right: the instant placement selects FAN — top-down, centred on the fan's own bounding-sphere centre, auto-rotate forced off (measured: ${!fanState.autoRotateChecked}) and the dropdown reading "${esc(fanState.viewPresetValue)}" rather than left stale. No wait was inserted between applying FAN and the shot beyond what the build itself needs, so a regression that made this tween would show as a half-finished frame here.</p>
-<main class="pair">${fig('before — DEFAULT (3/4), RADIAL', 'fan-before.png')}${fig('after — FAN selected, immediate TOP-DOWN snap', 'fan-after.png')}</main>`;
+<main class="pair">${fig('before — DEFAULT (3/4), RADIAL', 'fan-before.png')}${fig('after — FAN selected, immediate TOP-DOWN snap', 'fan-after.png')}</main>
+<h1 style="margin-top:28px">The orientation fix — labellum at the top, not the bottom</h1>
+<p class="note">Same fan (labellum overrides applied so the mirror-line petal is visually distinct), same top-down framing, same __bloomFrame call — only the up vector differs. Left: up = [-1, 0, 0], the value this shipped with (reproduced directly here, since the app no longer offers it). Right: up = VIEW_PRESETS.top.up, imported rather than retyped, so this cell cannot silently drift from what the dropdown and the FAN snap actually use.</p>
+<main class="pair">${fig('before — labellum at the BOTTOM (the reported bug)', 'orientation-before.png')}${fig('after — labellum at the TOP (the fix)', 'orientation-after.png')}</main>`;
 fs.writeFileSync(path.join(outDir, 'index.html'), html);
 console.log(`\nwrote ${outDir}/index.html`);
 await browser.close(); server.close();

@@ -2400,7 +2400,12 @@ export function buildMatrix() {
        makes every role a pair. */
     ['FAN: toggle ON (a petal on the mirror line) — pinned, and the shipping default since Sep 2', { ...FAN_ON }],
     ['FAN: toggle OFF (the line runs through the gap) — pinned', { ...FAN_OFF }],
-    /* THE SPACING SWEEP, at the shipping count. */
+    /* THE SPACING SWEEP, at the shipping count. `max (60)` is no longer the
+       slider's ceiling (Eva raised it to FAN_ARC_LIMIT_DEG, Sep 2 amendment)
+       — its LABEL and VALUE are kept exactly as they were on purpose, so the
+       row stays a stable, byte-comparable interior point of the widened
+       range rather than a moving target; the rows below cover the ceiling
+       itself and the region the old range never reached. */
     ['FAN: fanSpacing min (15)', { ...FAN, fanSpacing: 15 }],
     ['FAN: fanSpacing max (60)', { ...FAN, fanSpacing: 60 }],
     ['FAN: fanPerSide min (1)', { ...FAN, fanPerSide: 1 }],
@@ -2415,17 +2420,45 @@ export function buildMatrix() {
     ['FAN: fewest x widest — 1/side x 60deg, toggle ON (three petals)', { ...FAN_ON, fanPerSide: 1, fanSpacing: 60 }],
     ['FAN: fewest x tightest — 1/side x 15deg, toggle OFF', { ...FAN_OFF, fanPerSide: 1, fanSpacing: 15 }],
     ['FAN: most x tightest — 8/side x 15deg, toggle ON', { ...FAN_ON, fanPerSide: 8, fanSpacing: 15 }],
+    /* THE CORNER THAT MOVED (Eva, Sep 2 amendment): "widest spacing at fewest
+       petals" used to mean 1/side x 60deg — the OLD range's own widest
+       reach. Under the widened range the SAME corner is 1/side x 170deg, a
+       genuinely different geometry (three or two petals spanning most of
+       the circle, not a fraction of it), and it is THIS corner the
+       connectedness argument must survive now — citing the old 60deg cells
+       would be citing a corner that is no longer the widest anything. Toggle
+       ON lands EXACTLY on the arc-limit threshold at perSide 1 (170/1 =
+       170), so this is the SAME 340deg-arc/20deg-notch extreme previously
+       reachable only at 8 per side — now reachable at the FEWEST, with just
+       three petals total rather than seventeen. Toggle OFF is not capped at
+       all here (threshold 170/0.5 = 340) — a genuinely NEW, half-open shape
+       (170deg arc, 190deg notch) the old 60deg ceiling never let this toggle
+       state approach. */
+    ['FAN: fewest x new max — 1/side x 170deg, toggle ON (340deg arc, 20deg notch, now at the FEWEST petals)', { ...FAN_ON, fanPerSide: 1, fanSpacing: 170 }],
+    ['FAN: fewest x new max — 1/side x 170deg, toggle OFF (170deg arc, 190deg notch — UNCAPPED, a shape the old ceiling never reached)', { ...FAN_OFF, fanPerSide: 1, fanSpacing: 170 }],
     /* THE ARC LIMIT BINDING, both ways. At 8 per side the cap takes over from
        21.25 deg (ON) and 22.67 deg (OFF), leaving the guaranteed 20 deg notch
        — the state that makes exact coincidence unreachable, and the cell the
        340-degree "fan" is photographed in. */
     ['FAN: the arc limit binds — 8/side x 60deg, toggle ON (340deg arc, 20deg notch)', { ...FAN_ON, fanPerSide: 8, fanSpacing: 60 }],
     ['FAN: the arc limit binds — 8/side x 60deg, toggle OFF', { ...FAN_OFF, fanPerSide: 8, fanSpacing: 60 }],
+    /* THE CAP NOW BITES WELL BELOW 8 PER SIDE (Eva, Sep 2 amendment) — under
+       the OLD 60deg ceiling the cap only ever visibly bound at 8 per side
+       (threshold 21.25deg, miles under 60); every lower perSide's threshold
+       (2/side: 85deg; 3/side: 56.67deg) sat ABOVE the old max and was
+       unreachable. The SAME nominal 90deg ask now demonstrates both sides of
+       that line at once: toggle ON (threshold 85) is capped to the SAME
+       universal 340/20 extreme every capped row reaches; toggle OFF
+       (threshold 113.33) is not capped at all, landing on a genuinely
+       different, uncapped 270deg-arc/90deg-notch shape. */
+    ['FAN: the arc limit now binds below 8/side — 2/side x 90deg, toggle ON (340deg arc, 20deg notch)', { ...FAN_ON, fanPerSide: 2, fanSpacing: 90 }],
+    ['FAN: same nominal spacing, UNCAPPED under toggle OFF — 2/side x 90deg, toggle OFF (270deg arc, 90deg notch)', { ...FAN_OFF, fanPerSide: 2, fanSpacing: 90 }],
     /* THE BARE BLOOM, on the lesson that cost the flower a seven-piece export:
        DISC is the default, so a fan with the centre off is exercised by
        nothing unless it is written down. */
     ['FAN: centre OFF (the BARE fan)', { ...FAN, centerStyle: 'NONE' }],
     ['FAN: centre OFF x fewest x widest (the barest reachable fan)', { ...FAN, centerStyle: 'NONE', fanPerSide: 1, fanSpacing: 60 }],
+    ['FAN: centre OFF x fewest x new max (the barest reachable fan, now wider)', { ...FAN, centerStyle: 'NONE', fanPerSide: 1, fanSpacing: 170 }],
     /* THE JUNCTION AT ITS THINNEST, where the overlap box's floors are all
        that hold the model together. Measured at 2.400 mm3 per whorl — the
        SAME number as the single-ring, layered and continuous corners, because
