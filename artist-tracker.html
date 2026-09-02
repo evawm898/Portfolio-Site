@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" integrity="sha256-YU3qCpj/P06tdPBJGPax0bm6Q1wltfwjsho5TR4+TYc=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" integrity="sha256-YSWCMtmNZNwqex4CEw1nQhvFub2lmU7vcCKP+XVwwXA=" crossorigin="">
 <style>
   :root{
     --ink:#0A0A0C;
@@ -312,7 +314,7 @@
     outline:none;
   }
   .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--teal);}
-  .field textarea{resize:vertical;min-height:60px;font-size:12px;}
+  .field textarea{resize:vertical;min-height:60px;font-size:12px;line-height:1.6;}
 
   .bulk-hint{
     color:var(--dim);
@@ -507,6 +509,66 @@
     .wrap{padding-left:20px; border-left:none;}
     #mapContainer{height:340px;}
   }
+
+  /* --- style-tag picker (edit mode) --- */
+  .tag-picker{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:8px;
+  }
+  .tag-toggle{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.3px;
+    padding:4px 9px;
+    border:1px solid var(--line-strong);
+    background:transparent;
+    color:var(--dim-2);
+    cursor:pointer;
+  }
+  .tag-toggle:hover{color:var(--dim); border-color:var(--dim-2);}
+  .tag-toggle[data-on="true"]{
+    border-color:var(--teal);
+    color:var(--ink);
+    background:var(--teal);
+    font-weight:700;
+  }
+  /* A tag the user typed that isn't in the starter set — same control, but
+     marked so it reads as theirs rather than as one of ours. */
+  .tag-toggle[data-custom="true"]{border-style:dashed;}
+  .tag-toggle[data-custom="true"][data-on="true"]{border-style:solid;}
+
+  .tag-chip-count{opacity:0.65; margin-left:4px;}
+
+  .filter-row .location-select + .location-select{margin-left:2px;}
+
+  /* --- map footer count --- */
+  .map-count{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.4px;
+    color:var(--dim-2);
+    margin:-12px 0 20px;
+  }
+  .map-count[hidden]{display:none;}
+  .map-count .unplotted{color:var(--brick);}
+
+  /* Cluster bubbles, restyled to the page's palette — the plugin's default
+     green/yellow/orange belongs to a different site. */
+  .marker-cluster{background:rgba(95,160,160,0.25);}
+  .marker-cluster div{
+    background:rgba(95,160,160,0.85);
+    color:var(--ink);
+    font-family:var(--font-mono);
+    font-weight:700;
+  }
+  .marker-cluster-medium{background:rgba(95,160,160,0.3);}
+  .marker-cluster-large{background:rgba(166,93,74,0.3);}
+  .marker-cluster-large div{background:rgba(166,93,74,0.9); color:var(--paper);}
+
+  /* --- notes, in the drawer's read-only spread --- */
+  .detail-notes{white-space:pre-wrap;}
 
   /* --- slide-in detail drawer --- */
   .drawer-backdrop{
@@ -859,26 +921,26 @@
       </div>
 
       <div class="chips" id="chips">
-        <button class="chip" data-cat="all" data-active="true">all</button>
+        <button class="chip" data-cat="tattoo" data-active="true">tattoo artists</button>
+        <button class="chip" data-cat="all">all</button>
         <button class="chip" data-cat="following">following</button>
-        <button class="chip" data-cat="tattoo">tattoo artists</button>
         <button class="chip" data-cat="touring">touring / releases</button>
       </div>
 
       <div class="filter-row" id="genderChips">
         <span class="filter-label">gender</span>
         <button class="chip" data-gender="all" data-active="true">all</button>
-        <button class="chip" data-gender="she/her">she/her</button>
-        <button class="chip" data-gender="he/him">he/him</button>
-        <button class="chip" data-gender="they/them">they/them</button>
-        <button class="chip" data-gender="other">other</button>
-        <button class="chip" data-gender="unspecified">unspecified</button>
+        <button class="chip" data-gender="woman">women only</button>
+        <button class="chip" data-gender="unknown">unknown</button>
       </div>
 
       <div class="filter-row">
-        <span class="filter-label">location</span>
-        <select class="location-select" id="locationSelect">
-          <option value="all">all locations</option>
+        <span class="filter-label">region</span>
+        <select class="location-select" id="regionSelect">
+          <option value="all">all regions</option>
+        </select>
+        <select class="location-select" id="citySelect">
+          <option value="all">all cities</option>
         </select>
       </div>
 
@@ -923,12 +985,14 @@ another.handle"></textarea>
 
     <div class="list" id="list"></div>
     <div id="mapContainer"></div>
+    <div class="map-count" id="mapCount" hidden></div>
 
     <footer>
       <span id="countLabel">0 entries</span>
       <div class="footer-actions">
         <button id="exportBtn">export json</button>
         <button id="importBtn">import json</button>
+        <button id="splitStatusBtn">split status → notes</button>
         <button id="clearBtn">clear all</button>
       </div>
     </footer>
@@ -978,8 +1042,24 @@ another.handle"></textarea>
       </div>
       <div class="field-row">
         <div class="field">
-          <label for="fStatus">status / notes</label>
-          <input id="fStatus" type="text" placeholder="Guest spot NYC Oct 3–10, or drop date, etc.">
+          <label for="fGender">gender</label>
+          <select id="fGender">
+            <option value="unknown">unknown</option>
+            <option value="woman">woman</option>
+            <option value="not-woman">not a woman</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fNotes">notes — why I saved them</label>
+          <textarea id="fNotes" rows="4" placeholder="What I like, what I'd want from them, anything worth remembering."></textarea>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fStatus">status — guest spots, books, tour dates</label>
+          <input id="fStatus" type="text" placeholder="Guest spot NYC Oct 3–10, books open in Jan, etc.">
         </div>
       </div>
       <div class="field">
@@ -1007,8 +1087,9 @@ another.handle"></textarea>
       </div>
       <div class="field-row">
         <div class="field">
-          <label for="fTags">style tags (comma-separated)</label>
-          <input id="fTags" type="text" placeholder="fine line, botanical, black &amp; grey">
+          <span class="field-label">style tags</span>
+          <div class="tag-picker" id="tagPicker"></div>
+          <input id="fTags" type="text" placeholder="type a custom tag, then Enter" autocomplete="off">
         </div>
       </div>
       <div class="panel-actions">
@@ -1076,13 +1157,17 @@ another.handle"></textarea>
 })();
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha256-Hk4dIpcqOSb0hZjgyvFOP+cEmDXUKKNE/tT542ZbNQg=" crossorigin=""></script>
 <script>
 (function(){
   const STORAGE_KEY = 'artistTracker.entries.v1';
   let entries = [];
-  let activeCategory = 'all';
+  // This is a tattoo shortlist first: lead with the artists, keep the rest
+  // one click away rather than mixed into the default view.
+  let activeCategory = 'tattoo';
   let activeGender = 'all';
-  let activeLocationFilter = 'all';
+  let activeRegion = 'all';
+  let activeCity = 'all';
   let activeTags = new Set();
   let searchTerm = '';
   let sortMode = 'name';
@@ -1118,6 +1203,28 @@ another.handle"></textarea>
       entries = raw ? JSON.parse(raw) : [];
       lastPersisted = JSON.stringify(entries);
     }catch(e){ entries = []; lastPersisted = '[]'; }
+    seedGender();
+  }
+
+  // One-time, additive: gives every entry an explicit `gender` where it has
+  // none. The ONLY thing that produces 'woman' is an unambiguous she/her in
+  // the pronouns field the user typed themselves; everything else becomes
+  // 'unknown' for them to fill in. Nothing is inferred from names, handles or
+  // photos, and no existing field is touched or removed — `pronouns` keeps
+  // its own separate job of saying how someone refers to themselves.
+  function seedGender(){
+    let changed = 0;
+    entries.forEach(e => {
+      if(GENDER_VALUES.includes(e.gender)) return;
+      const tokens = (e.pronouns || '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+      const sheHer = tokens.includes('she') || tokens.includes('her') || tokens.includes('hers');
+      const heHim  = tokens.includes('he') || tokens.includes('him') || tokens.includes('his');
+      // "she/they" still reads as a woman for this filter's purpose; "she/he"
+      // is ambiguous enough to leave for the user to decide.
+      e.gender = (sheHer && !heHim) ? 'woman' : 'unknown';
+      changed++;
+    });
+    if(changed) persist();
   }
 
   function isQuotaError(err){
@@ -1176,6 +1283,85 @@ another.handle"></textarea>
     return v;
   }
 
+  // Click-to-apply style tags. Free typing still works — this is a floor,
+  // not a fence.
+  const STARTER_TAGS = [
+    'fine line', 'bold line', 'color', 'black & grey', 'blackwork',
+    'illustrative', 'ornamental', 'botanical / floral', 'gothic', 'baroque',
+    'cute', 'anime', 'traditional', 'neo-traditional', 'realism',
+    'watercolor', 'lettering', 'micro / tiny',
+  ];
+
+  const UNPLACED = 'Other / unspecified';
+
+  // Country/state spellings that show up in the same list under several
+  // names. Only folds obvious duplicates — it is not a gazetteer.
+  const REGION_ALIASES = {
+    'usa':'USA', 'us':'USA', 'u.s.':'USA', 'u.s.a.':'USA',
+    'united states':'USA', 'united states of america':'USA', 'america':'USA',
+    'uk':'UK', 'u.k.':'UK', 'united kingdom':'UK', 'great britain':'UK',
+    'england':'UK', 'scotland':'UK', 'wales':'UK',
+    'south korea':'South Korea', 'korea':'South Korea', 'republic of korea':'South Korea',
+    'netherlands':'Netherlands', 'the netherlands':'Netherlands', 'holland':'Netherlands',
+    'czechia':'Czech Republic', 'czech republic':'Czech Republic',
+    'deutschland':'Germany', 'germany':'Germany',
+  };
+
+  // "Los Angeles, CA" and "Austin, TX, USA" are both the United States, but a
+  // naive last-segment rule files them under "CA" and "USA" and scatters the
+  // one cluster the user most wants to see whole. Folding a trailing state or
+  // province code into its country fixes that; the city is still the first
+  // segment, so nothing is lost. Only exact two-letter codes are folded, so a
+  // real place name is never swallowed.
+  const US_STATES = new Set(('AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI '
+    + 'MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC').split(' '));
+  const CA_PROVINCES = new Set('AB BC MB NB NL NS NT NU ON PE QC SK YT'.split(' '));
+
+  function countryForSubdivision(seg){
+    const code = seg.trim().toUpperCase();
+    if(code.length !== 2) return null;
+    if(US_STATES.has(code)) return 'USA';
+    if(CA_PROVINCES.has(code)) return 'Canada';
+    return null;
+  }
+
+  function canonicalRegion(raw){
+    const key = raw.trim().toLowerCase().replace(/\.$/, '');
+    if(REGION_ALIASES[key]) return REGION_ALIASES[key];
+    // Title-case a bare word so "berlin" and "Berlin" don't split the list.
+    return raw.trim().replace(/\s+/g, ' ');
+  }
+
+  // Splits a free-text location into a rough {region, city} for the two-level
+  // filter. The last comma-separated segment is usually the country or the US
+  // state, the first is usually the city. This is a HEURISTIC over text the
+  // user typed by hand: it will misread some entries, so nothing here is ever
+  // written back — e.location stays exactly as entered, and anything that
+  // doesn't parse lands in "Other / unspecified" rather than disappearing.
+  function parseLocation(raw){
+    const text = (raw || '').trim();
+    if(!text) return { region: UNPLACED, city: '' };
+    const parts = text.split(',').map(p => p.trim()).filter(Boolean);
+    if(parts.length === 0) return { region: UNPLACED, city: '' };
+    // A single segment ("Berlin", "Japan") is its own region — there is no
+    // second segment to promote, and guessing a country from a city name is
+    // exactly the kind of inference that would quietly mislabel entries.
+    if(parts.length === 1) return { region: canonicalRegion(parts[0]), city: parts[0] };
+    const last = parts[parts.length - 1];
+    const folded = countryForSubdivision(last);
+    return { region: folded || canonicalRegion(last), city: parts[0] };
+  }
+
+  // Explicit, user-set gender. Never inferred from a name, handle or photo —
+  // the only seed is an unambiguous she/her in the pronouns field, and
+  // everything else stays 'unknown' until it is set by hand.
+  const GENDER_VALUES = ['unknown', 'woman', 'not-woman'];
+  const GENDER_LABEL = { woman:'woman', 'not-woman':'not a woman', unknown:'unknown — not set yet' };
+
+  function genderOf(e){
+    return GENDER_VALUES.includes(e.gender) ? e.gender : 'unknown';
+  }
+
   function initials(name){
     if(!name) return '?';
     const parts = name.trim().split(/\s+/);
@@ -1194,20 +1380,6 @@ another.handle"></textarea>
   function instagramUrlForHandle(handle){
     const clean = (handle || '').trim().replace(/^@/, '');
     return 'https://instagram.com/' + encodeURIComponent(clean);
-  }
-
-  // Buckets a free-text pronouns field into a few common groups for the
-  // gender filter. Tokenized (not substring) matching so "she" can't
-  // accidentally match inside "he". First matching bucket wins, so a dual
-  // set like "she/they" lands on she/her — a deliberate simplification.
-  function genderBucket(pronouns){
-    if(!pronouns || !pronouns.trim()) return 'unspecified';
-    const tokens = pronouns.toLowerCase().split(/[^a-z]+/).filter(Boolean);
-    const has = w => tokens.includes(w);
-    if(has('she') || has('her') || has('hers')) return 'she/her';
-    if(has('he') || has('him') || has('his')) return 'he/him';
-    if(has('they') || has('them') || has('theirs')) return 'they/them';
-    return 'other';
   }
 
   function escapeHtml(str){
@@ -1300,26 +1472,43 @@ another.handle"></textarea>
     return 'https://unavatar.io/instagram/' + encodeURIComponent(clean) + '?fallback=false';
   }
 
+  // Each filter as its own predicate, so the region and tag COUNTS can be
+  // computed against everything except themselves. Without that, defaulting
+  // the view to tattoo artists would leave "USA (40)" on screen while only 25
+  // of those are artists — a count that lies is worse than no count.
+  function matchesCategory(e){ return activeCategory === 'all' || e.category === activeCategory; }
+  function matchesGender(e){ return activeGender === 'all' || genderOf(e) === activeGender; }
+  function matchesLocation(e){
+    if(activeRegion === 'all') return true;
+    const parsed = parseLocation(e.location);
+    if(parsed.region !== activeRegion) return false;
+    return activeCity === 'all' || parsed.city === activeCity;
+  }
+  function matchesTags(e){
+    if(activeTags.size === 0) return true;
+    const entryTags = new Set((e.tags || []).map(t => t.toLowerCase()));
+    return [...activeTags].some(t => entryTags.has(t));
+  }
+  function matchesSearch(e){
+    if(!searchTerm) return true;
+    const hay = [e.name, e.handle, e.location, e.status, e.notes, e.pronouns, (e.tags||[]).join(' ')]
+      .join(' ').toLowerCase();
+    return hay.includes(searchTerm);
+  }
+
   function render(){
     const list = document.getElementById('list');
-    populateLocationOptions();
-    populateTagChips();
 
-    let filtered = entries.filter(e => {
-      if(activeCategory !== 'all' && e.category !== activeCategory) return false;
-      if(activeGender !== 'all' && genderBucket(e.pronouns) !== activeGender) return false;
-      if(activeLocationFilter !== 'all' && e.location !== activeLocationFilter) return false;
-      if(activeTags.size > 0){
-        const entryTags = new Set((e.tags || []).map(t => t.toLowerCase()));
-        const matchesAnyTag = [...activeTags].some(t => entryTags.has(t));
-        if(!matchesAnyTag) return false;
-      }
-      if(searchTerm){
-        const hay = [e.name, e.handle, e.location, e.status, e.pronouns, (e.tags||[]).join(' ')].join(' ').toLowerCase();
-        if(!hay.includes(searchTerm)) return false;
-      }
-      return true;
-    });
+    // Facet bases: everything except the dimension being counted.
+    populateLocationOptions(entries.filter(e =>
+      matchesCategory(e) && matchesGender(e) && matchesTags(e) && matchesSearch(e)));
+    populateTagChips(entries.filter(e =>
+      matchesCategory(e) && matchesGender(e) && matchesLocation(e) && matchesSearch(e)));
+    syncGenderChips();
+
+    let filtered = entries.filter(e =>
+      matchesCategory(e) && matchesGender(e) && matchesLocation(e)
+      && matchesTags(e) && matchesSearch(e));
 
     filtered.sort((a,b) => {
       if(sortMode === 'category'){
@@ -1357,39 +1546,97 @@ another.handle"></textarea>
     if(drawer.dataset.open === 'true' && drawerMode === 'view') renderDetailView();
   }
 
-  // --- location filter (dynamic dropdown of distinct location values) ---
-  function populateLocationOptions(){
-    const select = document.getElementById('locationSelect');
-    const distinct = [...new Set(entries.map(e => (e.location || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-    const previousValue = select.value || 'all';
-    select.innerHTML = '';
-    const allOpt = document.createElement('option');
-    allOpt.value = 'all';
-    allOpt.textContent = 'all locations';
-    select.appendChild(allOpt);
-    distinct.forEach(loc => {
-      const opt = document.createElement('option');
-      opt.value = loc;
-      opt.textContent = loc;
-      select.appendChild(opt);
+  // --- location filter: region first, then city within it ---------------
+  // Regions are ordered by how many entries sit in them, so the biggest
+  // clusters are the first thing in the list rather than whatever sorts
+  // alphabetically. "Other / unspecified" is always pinned last.
+  function locationIndex(source){
+    const regions = new Map();
+    source.forEach(e => {
+      const { region, city } = parseLocation(e.location);
+      if(!regions.has(region)) regions.set(region, { count: 0, cities: new Map() });
+      const bucket = regions.get(region);
+      bucket.count++;
+      if(city) bucket.cities.set(city, (bucket.cities.get(city) || 0) + 1);
     });
-    // Keep the current selection if it's still a valid option; otherwise
-    // fall back to "all" rather than silently landing on whatever sorts first.
-    if(distinct.includes(previousValue) || previousValue === 'all'){
-      select.value = previousValue;
-      activeLocationFilter = previousValue;
-    }else{
-      select.value = 'all';
-      activeLocationFilter = 'all';
-    }
+    return regions;
   }
 
-  // --- style tag filter (dynamic multi-select chips, OR'd together) ---
-  function populateTagChips(){
+  function populateLocationOptions(source){
+    const regionSelect = document.getElementById('regionSelect');
+    const citySelect = document.getElementById('citySelect');
+    const index = locationIndex(source);
+
+    // Keep the chosen region on screen even when the other filters leave it
+    // empty, so the user can always unpick it. Only a region that has left
+    // the data entirely resets the selection.
+    const fullIndex = locationIndex(entries);
+    if(activeRegion !== 'all' && !index.has(activeRegion) && fullIndex.has(activeRegion)){
+      index.set(activeRegion, { count: 0, cities: fullIndex.get(activeRegion).cities });
+    }
+
+    const ordered = [...index.entries()].sort((a, b) => {
+      if(a[0] === UNPLACED) return 1;
+      if(b[0] === UNPLACED) return -1;
+      return b[1].count - a[1].count || a[0].localeCompare(b[0]);
+    });
+
+    regionSelect.innerHTML = '';
+    const allRegions = document.createElement('option');
+    allRegions.value = 'all';
+    allRegions.textContent = 'all regions (' + source.length + ')';
+    regionSelect.appendChild(allRegions);
+    ordered.forEach(([region, bucket]) => {
+      const opt = document.createElement('option');
+      opt.value = region;
+      opt.textContent = region + ' (' + bucket.count + ')';
+      regionSelect.appendChild(opt);
+    });
+
+    // A region that no longer exists anywhere in the data (its last entry was
+    // edited or removed) falls back to "all" rather than silently landing on
+    // whatever happens to sort first.
+    if(activeRegion !== 'all' && !index.has(activeRegion)){
+      activeRegion = 'all';
+      activeCity = 'all';
+    }
+    regionSelect.value = activeRegion;
+
+    citySelect.innerHTML = '';
+    const allCities = document.createElement('option');
+    allCities.value = 'all';
+    allCities.textContent = 'all cities';
+    citySelect.appendChild(allCities);
+    if(activeRegion === 'all'){
+      citySelect.disabled = true;
+      activeCity = 'all';
+    }else{
+      citySelect.disabled = false;
+      const cities = [...index.get(activeRegion).cities.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      cities.forEach(([city, count]) => {
+        const opt = document.createElement('option');
+        opt.value = city;
+        opt.textContent = city + ' (' + count + ')';
+        citySelect.appendChild(opt);
+      });
+      if(activeCity !== 'all' && !index.get(activeRegion).cities.has(activeCity)) activeCity = 'all';
+    }
+    citySelect.value = activeCity;
+  }
+
+  // --- style tag filter (multi-select chips, OR'd, counted, biggest first) ---
+  function populateTagChips(source){
     const container = document.getElementById('tagChips');
-    const distinct = [...new Set(entries.flatMap(e => e.tags || []))].sort((a,b) => a.localeCompare(b));
+    const counts = new Map();
+    source.forEach(e => (e.tags || []).forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+    // A tag that is currently selected must stay on screen even when the
+    // other filters leave it with no matches — otherwise it vanishes and the
+    // user can't unselect the thing that emptied their list.
+    activeTags.forEach(t => { if(!counts.has(t)) counts.set(t, 0); });
+
     container.innerHTML = '';
-    if(distinct.length === 0){
+    if(counts.size === 0){
       container.hidden = true;
       return;
     }
@@ -1398,18 +1645,31 @@ another.handle"></textarea>
     label.className = 'filter-label';
     label.textContent = 'tags';
     container.appendChild(label);
-    distinct.forEach(tag => {
-      const btn = document.createElement('button');
-      btn.className = 'tag-chip';
-      btn.dataset.tag = tag;
-      btn.dataset.active = activeTags.has(tag) ? 'true' : 'false';
-      btn.textContent = tag;
-      btn.onclick = () => {
-        if(activeTags.has(tag)) activeTags.delete(tag);
-        else activeTags.add(tag);
-        render();
-      };
-      container.appendChild(btn);
+
+    [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .forEach(([tag, count]) => {
+        const btn = document.createElement('button');
+        btn.className = 'tag-chip';
+        btn.dataset.tag = tag;
+        btn.dataset.active = activeTags.has(tag) ? 'true' : 'false';
+        btn.appendChild(document.createTextNode(tag + ' '));
+        const n = document.createElement('span');
+        n.className = 'tag-chip-count';
+        n.textContent = '(' + count + ')';
+        btn.appendChild(n);
+        btn.onclick = () => {
+          if(activeTags.has(tag)) activeTags.delete(tag);
+          else activeTags.add(tag);
+          render();
+        };
+        container.appendChild(btn);
+      });
+  }
+
+  function syncGenderChips(){
+    document.querySelectorAll('#genderChips .chip').forEach(c => {
+      c.dataset.active = (c.dataset.gender === activeGender) ? 'true' : 'false';
     });
   }
 
@@ -1502,9 +1762,16 @@ another.handle"></textarea>
     });
     main.appendChild(meta);
 
+    if(e.notes){
+      const nt = document.createElement('div');
+      nt.className = 'entry-status';
+      nt.textContent = e.notes;
+      main.appendChild(nt);
+    }
     if(e.status){
       const st = document.createElement('div');
       st.className = 'entry-status';
+      st.style.color = 'var(--dim)';
       st.textContent = e.status;
       main.appendChild(st);
     }
@@ -1759,6 +2026,7 @@ another.handle"></textarea>
 
     addDetailRow(dl, 'location', textNode(e.location));
     addDetailRow(dl, 'pronouns', textNode(e.pronouns));
+    addDetailRow(dl, 'gender', textNode(GENDER_LABEL[genderOf(e)]));
     addDetailRow(dl, 'date', e.date ? textNode(formatDate(e.date)) : null);
 
     if(e.tags && e.tags.length){
@@ -1774,6 +2042,12 @@ another.handle"></textarea>
       addDetailRow(dl, 'tags', tagsRow);
     }
 
+    if(e.notes){
+      const notesEl = document.createElement('div');
+      notesEl.className = 'detail-notes';
+      notesEl.textContent = e.notes;
+      addDetailRow(dl, 'notes', notesEl);
+    }
     addDetailRow(dl, 'status', textNode(e.status));
 
     if(e.link){
@@ -1820,16 +2094,72 @@ another.handle"></textarea>
   };
 
   // --- drawer: edit mode (the quick-add form, same fields as before) ---
-  const QUICK_TEXT_FIELDS = ['fName','fHandle','fPronouns','fLocation','fDate','fStatus','fLink','fPhoto','fTags'];
+  const QUICK_TEXT_FIELDS = ['fName','fHandle','fPronouns','fLocation','fDate','fStatus','fNotes','fLink','fPhoto','fTags'];
+
+  // Tags being edited right now. Committed on save like every other field.
+  let pendingTags = new Set();
 
   function clearQuickForm(){
     QUICK_TEXT_FIELDS.forEach(id => document.getElementById(id).value = '');
     document.getElementById('fCategory').value = 'following';
+    document.getElementById('fGender').value = 'unknown';
     document.getElementById('saveEntry').textContent = 'save entry';
+    pendingTags = new Set();
+    renderTagPicker();
     pendingPhoto = null;
     setPhotoState('');
     refreshPhotoPreview();
   }
+
+  // The starter set plus whatever else is already in use across the ledger,
+  // so a tag coined on one entry is one click away on the next.
+  function pickerTags(){
+    const inUse = new Set();
+    entries.forEach(e => (e.tags || []).forEach(t => inUse.add(t)));
+    const extras = [...inUse, ...pendingTags]
+      .filter(t => STARTER_TAGS.indexOf(t) === -1)
+      .sort((a, b) => a.localeCompare(b));
+    return STARTER_TAGS.concat([...new Set(extras)]);
+  }
+
+  function renderTagPicker(){
+    const picker = document.getElementById('tagPicker');
+    picker.innerHTML = '';
+    pickerTags().forEach(tag => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tag-toggle';
+      btn.textContent = tag;
+      btn.dataset.on = pendingTags.has(tag) ? 'true' : 'false';
+      if(STARTER_TAGS.indexOf(tag) === -1) btn.dataset.custom = 'true';
+      btn.onclick = () => {
+        if(pendingTags.has(tag)) pendingTags.delete(tag);
+        else pendingTags.add(tag);
+        renderTagPicker();
+      };
+      picker.appendChild(btn);
+    });
+  }
+
+  // Typing stays available for tags that don't exist yet: Enter or a comma
+  // commits what's in the box.
+  function commitTypedTags(){
+    const field = document.getElementById('fTags');
+    const typed = field.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    if(typed.length === 0) return;
+    typed.forEach(t => pendingTags.add(t));
+    field.value = '';
+    renderTagPicker();
+  }
+
+  document.getElementById('fTags').addEventListener('keydown', (ev) => {
+    if(ev.key === 'Enter' || ev.key === ','){
+      ev.preventDefault();
+      commitTypedTags();
+    }
+  });
+  // A tag left sitting in the box when the user clicks save still counts.
+  document.getElementById('fTags').addEventListener('blur', commitTypedTags);
 
   function fillQuickForm(e){
     if(!e){ clearQuickForm(); return; }
@@ -1840,8 +2170,12 @@ another.handle"></textarea>
     document.getElementById('fLocation').value = e.location || '';
     document.getElementById('fDate').value = e.date || '';
     document.getElementById('fStatus').value = e.status || '';
+    document.getElementById('fNotes').value = e.notes || '';
+    document.getElementById('fGender').value = genderOf(e);
     document.getElementById('fLink').value = e.link || '';
-    document.getElementById('fTags').value = (e.tags || []).join(', ');
+    document.getElementById('fTags').value = '';
+    pendingTags = new Set(e.tags || []);
+    renderTagPicker();
     // A stored data-URL photo is an embedded image, not something to dump
     // into a text box as 40KB of base64 — it stays in pendingPhoto and the
     // url field shows only real URLs.
@@ -1854,6 +2188,7 @@ another.handle"></textarea>
   }
 
   document.getElementById('saveEntry').onclick = () => {
+    commitTypedTags();
     const name = document.getElementById('fName').value.trim();
     if(!name){ alert('Give this entry a name.'); return; }
     const data = {
@@ -1864,11 +2199,13 @@ another.handle"></textarea>
       location: document.getElementById('fLocation').value.trim(),
       date: document.getElementById('fDate').value,
       status: document.getElementById('fStatus').value.trim(),
+      notes: document.getElementById('fNotes').value.trim(),
+      gender: document.getElementById('fGender').value,
       link: document.getElementById('fLink').value.trim(),
       // A pasted image wins over the url field; typing in the url field
       // clears the pasted one, so only one of the two is ever set.
       photo: pendingPhoto || document.getElementById('fPhoto').value.trim(),
-      tags: document.getElementById('fTags').value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean),
+      tags: [...pendingTags],
     };
     let savedId = detailId;
     if(detailId){
@@ -2175,8 +2512,14 @@ another.handle"></textarea>
     render();
   });
 
-  document.getElementById('locationSelect').addEventListener('change', (ev) => {
-    activeLocationFilter = ev.target.value;
+  document.getElementById('regionSelect').addEventListener('change', (ev) => {
+    activeRegion = ev.target.value;
+    activeCity = 'all';
+    render();
+  });
+
+  document.getElementById('citySelect').addEventListener('change', (ev) => {
+    activeCity = ev.target.value;
     render();
   });
 
@@ -2198,6 +2541,7 @@ another.handle"></textarea>
     tab.dataset.active = 'true';
     currentView = tab.dataset.view;
     document.getElementById('list').hidden = currentView !== 'list';
+    document.getElementById('mapCount').hidden = currentView !== 'map';
     const mapEl = document.getElementById('mapContainer');
     mapEl.dataset.visible = currentView === 'map' ? 'true' : 'false';
     if(currentView === 'map'){
@@ -2215,7 +2559,16 @@ another.handle"></textarea>
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(leafletMap);
-    markerLayer = L.layerGroup().addTo(leafletMap);
+    // Clustering is the whole point of the map here — who is near who. At a
+    // world zoom, 150 pins on top of each other answers nothing.
+    markerLayer = (typeof L.markerClusterGroup === 'function')
+      ? L.markerClusterGroup({
+          zoomToBoundsOnClick: true,
+          showCoverageOnHover: false,
+          maxClusterRadius: 45,
+        })
+      : L.layerGroup();   // plugin blocked or failed to load: plain pins still work
+    markerLayer.addTo(leafletMap);
   }
 
   function markerIconForCategory(category){
@@ -2237,7 +2590,9 @@ another.handle"></textarea>
   function renderMap(filteredEntries){
     if(!leafletMap || !markerLayer) return;
     markerLayer.clearLayers();
-    filteredEntries.filter(e => e.geo).forEach(e => {
+    const plotted = filteredEntries.filter(e => e.geo);
+    updateMapCount(plotted.length, filteredEntries.length - plotted.length);
+    plotted.forEach(e => {
       const handleLink = e.handle
         ? '<a href="' + escapeHtml(instagramUrlForHandle(e.handle)) + '" target="_blank" rel="noopener noreferrer">'
           + escapeHtml(e.handle.startsWith('@') ? e.handle : '@' + e.handle) + '</a>'
@@ -2246,10 +2601,29 @@ another.handle"></textarea>
         + (handleLink ? handleLink + '<br>' : '')
         + escapeHtml(e.location || '') + '<br>'
         + '[ ' + escapeHtml(catLabel[e.category] || e.category) + ' ]';
-      L.marker([e.geo.lat, e.geo.lng], { icon: markerIconForCategory(e.category) })
-        .bindPopup(popupHtml)
-        .addTo(markerLayer);
+      markerLayer.addLayer(
+        L.marker([e.geo.lat, e.geo.lng], { icon: markerIconForCategory(e.category) })
+          .bindPopup(popupHtml)
+      );
     });
+  }
+
+  // How much of the current filter actually made it onto the map. Entries
+  // with no location, or one Nominatim couldn't place, are silently absent
+  // from the pins — this is what says so.
+  function updateMapCount(plotted, missing){
+    const el = document.getElementById('mapCount');
+    el.hidden = currentView !== 'map';
+    el.innerHTML = '';
+    el.appendChild(document.createTextNode(
+      plotted + (plotted === 1 ? ' artist plotted' : ' artists plotted')
+    ));
+    if(missing > 0){
+      const span = document.createElement('span');
+      span.className = 'unplotted';
+      span.textContent = ' · ' + missing + ' without a usable location';
+      el.appendChild(span);
+    }
   }
 
   // --- export / import / clear ---
@@ -2283,6 +2657,61 @@ another.handle"></textarea>
     reader.readAsText(file);
     ev.target.value = '';
   });
+
+  // --- one-time split of the old combined `status` into notes + status -----
+  // This rewrites existing data, so it is NOT run on load. The user presses
+  // the button, sees exactly how many entries move which way and a sample of
+  // the calls being made, and confirms. Entries that already have notes are
+  // left alone, so pressing it twice is harmless.
+  //
+  // The rule: anything that reads like logistics (a guest spot, a booking
+  // window, a month) stays in `status`; everything else was the user
+  // explaining why they saved someone, which is what `notes` is for. It is a
+  // keyword heuristic over free text and it WILL misjudge some lines — which
+  // is exactly why it shows its work first and why an export is one click
+  // away. Deliberately NOT a keyword: "flash" — in this domain "love her
+  // flash" is a reason to save someone, not a booking window.
+  const LOGISTICS_RE = new RegExp([
+    'guest', 'touring', 'tour\\\\b', 'spot', 'booking', 'books?\\\\b',
+    '\\\\bopen\\\\b', '\\\\bclosed\\\\b', 'waitlist',
+    'jan(uary)?', 'feb(ruary)?', 'mar(ch)?', 'apr(il)?', '\\\\bmay\\\\b',
+    'jun(e)?', 'jul(y)?', 'aug(ust)?', 'sep(t|tember)?', 'oct(ober)?',
+    'nov(ember)?', 'dec(ember)?',
+  ].join('|'), 'i');
+
+  function planStatusSplit(){
+    const toNotes = [];
+    const keep = [];
+    entries.forEach(e => {
+      if(!e.status || e.notes) return;      // nothing to move, or already split
+      if(LOGISTICS_RE.test(e.status)) keep.push(e);
+      else toNotes.push(e);
+    });
+    return { toNotes, keep };
+  }
+
+  document.getElementById('splitStatusBtn').onclick = () => {
+    const { toNotes, keep } = planStatusSplit();
+    if(toNotes.length === 0 && keep.length === 0){
+      alert('Nothing to split — every entry either has no status text, or already has notes.');
+      return;
+    }
+    const sample = toNotes.slice(0, 5)
+      .map(e => '  • ' + (e.name || '(unnamed)') + ': "' + e.status.slice(0, 60) + '"')
+      .join('\n');
+    const message =
+      'Split the old "status / notes" field:\n\n'
+      + '  ' + toNotes.length + ' → moved into NOTES\n'
+      + '  ' + keep.length + ' → kept in STATUS (reads like a guest spot, booking or date)\n\n'
+      + (sample ? 'Moving to notes, for example:\n' + sample + '\n\n' : '')
+      + 'This rewrites existing entries. Export a backup first if you want one.\n\nGo ahead?';
+    if(!confirm(message)) return;
+
+    toNotes.forEach(e => { e.notes = e.status; e.status = ''; });
+    if(!persist()){ render(); return; }
+    render();
+    alert(toNotes.length + ' moved to notes, ' + keep.length + ' kept as status.');
+  };
 
   document.getElementById('clearBtn').onclick = () => {
     if(entries.length === 0) return;
