@@ -238,13 +238,129 @@
     border-bottom-color:var(--teal);
   }
 
-  #mapContainer{
+  /* Map and its results panel share one row; the panel is the map's index. */
+  .map-wrap{
     display:none;
-    height:480px;
-    border:1px solid var(--line-strong);
-    background:var(--ink-soft);
     margin-bottom:20px;
+    border:1px solid var(--line-strong);
   }
+  .map-wrap[data-visible="true"]{display:flex; align-items:stretch;}
+  /* The page is a 760px reading column, which a map with a side panel beside
+     it does not fit into — at that width the map came out 385px and showed a
+     third of the world. This one component breaks out and centres on the
+     viewport instead. Centring by transform rather than by negative margins
+     keeps it independent of the column's asymmetric padding. */
+  @media (min-width:1024px){
+    .map-wrap[data-visible="true"]{
+      position:relative;
+      left:50%;
+      transform:translateX(-50%);
+      width:calc(100vw - 96px);
+      max-width:1200px;
+    }
+  }
+  #mapContainer{
+    flex:1 1 auto;
+    min-width:0;
+    height:480px;
+    background:var(--ink-soft);
+  }
+  .map-panel{
+    flex:0 0 320px;
+    display:flex;
+    flex-direction:column;
+    height:480px;
+    border-left:1px solid var(--line-strong);
+    background:var(--ink-soft);
+    min-width:0;
+  }
+  .map-panel-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+    padding:12px 14px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  .map-panel-heading{display:flex; flex-direction:column; gap:3px; min-width:0;}
+  .map-panel-title{
+    font-family:var(--font-display);
+    font-size:15px;
+    color:var(--paper);
+    line-height:1.25;
+    overflow-wrap:anywhere;
+  }
+  .map-panel-sub{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--dim-2);
+  }
+  .map-panel-close{
+    flex:0 0 auto;
+    background:transparent;
+    border:1px solid var(--line-strong);
+    color:var(--dim);
+    font-size:15px;
+    line-height:1;
+    padding:3px 8px;
+    cursor:pointer;
+  }
+  .map-panel-close:hover{color:var(--paper); border-color:var(--teal);}
+  .map-panel-list{
+    overflow-y:auto;
+    overflow-x:hidden;
+    flex:1 1 auto;
+    /* The floating "top" button is fixed to the bottom-right of the viewport,
+       which is exactly where this panel is. Leave room so the last row can
+       always be scrolled clear of it rather than sitting under it. */
+    padding-bottom:52px;
+  }
+  .map-panel-empty{
+    padding:16px 14px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    line-height:1.7;
+    color:var(--dim-2);
+  }
+  /* Rows are the SAME .entry markup the list uses — one card style, one
+     behaviour (click opens the drawer). Only the spacing is tightened. */
+  .map-panel-item{border-bottom:1px solid var(--line); padding:2px 0 8px;}
+  .map-panel-item:last-child{border-bottom:none;}
+  .map-panel-item .entry{padding:10px 14px 6px; gap:10px;}
+  .map-panel-item .entry-index{display:none;}
+  .map-panel-item .entry-photo,
+  .map-panel-item .entry-photo-placeholder{width:34px; height:34px; font-size:10px;}
+  .map-panel-item[data-hi="true"]{background:rgba(95,160,160,0.10);}
+  .map-panel-notes{
+    padding:0 14px;
+    font-size:11px;
+    line-height:1.65;
+    color:var(--dim);
+    overflow-wrap:anywhere;
+  }
+  /* The Instagram link is a SIBLING of the row, never nested inside it — the
+     row is a button, and a link inside a button is neither valid nor
+     predictable to click. */
+  .map-panel-ig{
+    display:inline-block;
+    margin:6px 14px 0;
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--teal);
+    text-decoration:none;
+    border-bottom:1px solid transparent;
+  }
+  .map-panel-ig:hover{border-bottom-color:var(--teal);}
+  /* Marker highlight, driven from the panel and from the map alike. */
+  .map-pin[data-hi="true"] span{
+    box-shadow:0 0 0 3px var(--teal) !important;
+    transform:scale(1.25);
+  }
+  .marker-cluster[data-hi="true"]{outline:2px solid var(--teal); outline-offset:2px;}
   #mapContainer[data-visible="true"]{display:block;}
   .leaflet-container{background:var(--ink-soft) !important;}
   .leaflet-popup-content-wrapper, .leaflet-popup-tip{
@@ -554,7 +670,17 @@
     .entry-index{display:none;}
     h1{font-size:38px;}
     .wrap{padding-left:20px; border-left:none;}
+    /* Stack rather than squeeze: a 320px panel beside a phone-width map
+       leaves neither usable. */
+    .map-wrap[data-visible="true"]{flex-direction:column;}
     #mapContainer{height:340px;}
+    .map-panel{
+      flex:none;
+      width:100%;
+      height:320px;
+      border-left:none;
+      border-top:1px solid var(--line-strong);
+    }
   }
 
   /* --- style-tag picker (edit mode) --- */
@@ -598,8 +724,8 @@
     color:var(--dim-2);
     margin:-12px 0 20px;
   }
-  .map-count[hidden]{display:none;}
   .map-count .unplotted{color:var(--brick);}
+  .map-count[hidden]{display:none;}
 
   /* Cluster bubbles, restyled to the page's palette — the plugin's default
      green/yellow/orange belongs to a different site. */
@@ -1041,7 +1167,20 @@ another.handle"></textarea>
     </header>
 
     <div class="list" id="list"></div>
-    <div id="mapContainer"></div>
+    <div class="map-wrap" id="mapWrap">
+      <div id="mapContainer"></div>
+      <aside class="map-panel" id="mapPanel" aria-live="polite">
+        <div class="map-panel-head">
+          <div class="map-panel-heading">
+            <span class="map-panel-title" id="mapPanelTitle"></span>
+            <span class="map-panel-sub" id="mapPanelSub"></span>
+          </div>
+          <button type="button" class="map-panel-close" id="mapPanelClose"
+                  aria-label="Close this selection" hidden>&times;</button>
+        </div>
+        <div class="map-panel-list" id="mapPanelList"></div>
+      </aside>
+    </div>
     <div class="map-count" id="mapCount" hidden></div>
 
     <footer>
@@ -1262,7 +1401,20 @@ another.handle"></textarea>
       entries = raw ? JSON.parse(raw) : [];
       lastPersisted = JSON.stringify(entries);
     }catch(e){ entries = []; lastPersisted = '[]'; }
+    clearLegacyGeoFailures();
     seedGender();
+  }
+
+  // The previous geocoder marked a location geoStatus:'failed' and never
+  // looked at it again, so a Nominatim throttle burned it permanently. That
+  // field is gone; sweep it once so those entries get a fresh chance — most
+  // of them now resolve from the static table with no request at all.
+  function clearLegacyGeoFailures(){
+    let swept = 0;
+    entries.forEach(e => {
+      if(e.geoStatus !== undefined){ delete e.geoStatus; swept++; }
+    });
+    if(swept) persist();
   }
 
   // One-time, additive: gives every entry an explicit `gender` where it has
@@ -1460,11 +1612,21 @@ another.handle"></textarea>
   // needing a hand-written table is the small-caps / phonetic capitals,
   // which carry no compatibility decomposition at all. Everything else is
   // Unicode's own mapping rather than a table of ours to keep current.
-  const SMALL_CAP_FOLD = {
+  const CHAR_FOLD = {
+    // Small caps / phonetic capitals — no compatibility decomposition at all.
     'ᴀ':'a', 'ʙ':'b', 'ᴄ':'c', 'ᴅ':'d', 'ᴇ':'e', 'ꜰ':'f', 'ɢ':'g',
     'ʜ':'h', 'ɪ':'i', 'ᴊ':'j', 'ᴋ':'k', 'ʟ':'l', 'ᴍ':'m', 'ɴ':'n',
     'ᴏ':'o', 'ᴘ':'p', 'ǫ':'q', 'ꞯ':'q', 'ʀ':'r', 'ꜱ':'s', 'ᴛ':'t',
     'ᴜ':'u', 'ᴠ':'v', 'ᴡ':'w', 'ʏ':'y', 'ᴢ':'z',
+    // Stroked and barred Latin letters. NFKD decomposes an ACCENT (é -> e plus
+    // a combining acute) but a stroke is part of the letter itself, so ł stays
+    // ł — and "wroclaw" silently misses Wrocław, in search AND on the map.
+    'ł':'l', 'Ł':'l', 'đ':'d', 'Đ':'d', 'ħ':'h', 'Ħ':'h', 'ŧ':'t', 'Ŧ':'t',
+    'ø':'o', 'Ø':'o', 'ɵ':'o', 'ƀ':'b', 'ƙ':'k', 'Ƙ':'k', 'ɖ':'d', 'ɗ':'d',
+    'ı':'i', 'ȷ':'j', 'ſ':'s',
+    // Ligatures and eszett, which have no decomposition either.
+    'ß':'ss', 'ẞ':'ss', 'æ':'ae', 'Æ':'ae', 'œ':'oe', 'Œ':'oe',
+    'þ':'th', 'Þ':'th', 'ð':'d', 'Ð':'d',
   };
 
   // Folded text is for MATCHING ONLY — search, region aliasing, tag and
@@ -1473,7 +1635,7 @@ another.handle"></textarea>
   function foldText(str){
     if(!str) return '';
     let out = '';
-    for(const ch of str){ out += SMALL_CAP_FOLD[ch] || ch; }
+    for(const ch of str){ out += CHAR_FOLD[ch] || ch; }
     return out.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   }
 
@@ -1508,6 +1670,196 @@ another.handle"></textarea>
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  // --- static gazetteer ---------------------------------------------------
+  // Coordinates are CITY/REGION CENTROIDS to about a kilometre — enough to put
+  // a pin in the right place on a world map, not a street address. They exist
+  // so the common case needs no network at all: Nominatim allows roughly one
+  // request a second and refuses bulk use, so a 240-row paste spends minutes
+  // being throttled and half of it never resolves.
+  const COUNTRY_COORDS = {
+    usa:[39.83,-98.58], canada:[56.13,-106.35], uk:[54.00,-2.00],
+    germany:[51.17,10.45], france:[46.60,2.20], 'south korea':[36.50,127.90],
+    netherlands:[52.13,5.29], poland:[51.92,19.15], italy:[41.87,12.57],
+    spain:[40.46,-3.75], belgium:[50.50,4.47], australia:[-25.27,133.78],
+    japan:[36.20,138.25], china:[35.86,104.20], taiwan:[23.70,120.96],
+    brazil:[-14.24,-51.93], mexico:[23.63,-102.55], russia:[61.52,105.32],
+    greece:[39.07,21.82], hungary:[47.16,19.50], 'hong kong':[22.32,114.17],
+    portugal:[39.40,-8.22], ireland:[53.14,-7.69], austria:[47.52,14.55],
+    switzerland:[46.82,8.23], sweden:[60.13,18.64], norway:[60.47,8.47],
+    denmark:[56.26,9.50], finland:[61.92,25.75], 'czech republic':[49.82,15.47],
+    thailand:[15.87,100.99], vietnam:[14.06,108.28], singapore:[1.35,103.82],
+    philippines:[12.88,121.77], indonesia:[-0.79,113.92], india:[20.59,78.96],
+    'new zealand':[-40.90,174.89], argentina:[-38.42,-63.62], chile:[-35.68,-71.54],
+    colombia:[4.57,-74.30], peru:[-9.19,-75.02], turkey:[38.96,35.24],
+    ukraine:[48.38,31.17], romania:[45.94,24.97], israel:[31.05,34.85],
+  };
+  const US_STATE_COORDS = {
+    al:[32.81,-86.79], ak:[63.59,-154.49], az:[34.05,-111.09], ar:[35.20,-91.83],
+    ca:[36.78,-119.42], co:[39.55,-105.78], ct:[41.60,-73.09], de:[38.91,-75.53],
+    fl:[27.66,-81.52], ga:[32.17,-82.91], hi:[19.90,-155.58], id:[44.07,-114.74],
+    il:[40.63,-89.40], in:[40.27,-86.13], ia:[41.88,-93.10], ks:[39.01,-98.48],
+    ky:[37.84,-84.27], la:[30.98,-91.96], me:[45.25,-69.45], md:[39.05,-76.64],
+    ma:[42.41,-71.38], mi:[44.31,-85.60], mn:[46.73,-94.69], ms:[32.35,-89.40],
+    mo:[37.96,-91.83], mt:[46.88,-110.36], ne:[41.49,-99.90], nv:[38.80,-116.42],
+    nh:[43.19,-71.57], nj:[40.06,-74.41], nm:[34.52,-105.87], ny:[43.00,-75.00],
+    nc:[35.76,-79.02], nd:[47.55,-101.00], oh:[40.42,-82.91], ok:[35.01,-97.09],
+    or:[43.80,-120.55], pa:[41.20,-77.19], ri:[41.58,-71.48], sc:[33.84,-81.16],
+    sd:[43.97,-99.90], tn:[35.52,-86.58], tx:[31.97,-99.90], ut:[39.32,-111.09],
+    vt:[44.56,-72.58], va:[37.43,-78.66], wa:[47.75,-120.74], wv:[38.60,-80.45],
+    wi:[43.78,-88.79], wy:[43.08,-107.29], dc:[38.91,-77.04],
+  };
+  // Spelled-out state and province names seen in free text, mapped to the code.
+  const SUBDIVISION_NAMES = {
+    alabama:'al', alaska:'ak', arizona:'az', arkansas:'ar', california:'ca',
+    colorado:'co', connecticut:'ct', delaware:'de', florida:'fl', georgia:'ga',
+    hawaii:'hi', idaho:'id', illinois:'il', indiana:'in', iowa:'ia', kansas:'ks',
+    kentucky:'ky', louisiana:'la', maine:'me', maryland:'md', massachusetts:'ma',
+    michigan:'mi', minnesota:'mn', mississippi:'ms', missouri:'mo', montana:'mt',
+    nebraska:'ne', nevada:'nv', 'new hampshire':'nh', 'new jersey':'nj',
+    'new mexico':'nm', 'new york state':'ny', 'north carolina':'nc',
+    'north dakota':'nd', ohio:'oh', oklahoma:'ok', oregon:'or', pennsylvania:'pa',
+    'rhode island':'ri', 'south carolina':'sc', 'south dakota':'sd',
+    tennessee:'tn', texas:'tx', utah:'ut', vermont:'vt', virginia:'va',
+    washington:'wa', 'washington state':'wa', 'west virginia':'wv',
+    wisconsin:'wi', wyoming:'wy',
+  };
+  const CA_PROVINCE_COORDS = {
+    ab:[53.93,-116.58], bc:[53.73,-127.65], mb:[53.76,-98.81], nb:[46.57,-66.46],
+    nl:[53.14,-57.66], ns:[44.68,-63.74], nt:[64.83,-124.85], nu:[70.30,-83.11],
+    on:[51.25,-85.32], pe:[46.51,-63.42], qc:[52.94,-73.55], sk:[52.94,-106.45],
+    yt:[64.28,-135.00],
+  };
+  const CA_PROVINCE_NAMES = {
+    alberta:'ab', 'british columbia':'bc', manitoba:'mb', 'new brunswick':'nb',
+    'newfoundland and labrador':'nl', 'nova scotia':'ns',
+    'northwest territories':'nt', nunavut:'nu', ontario:'on',
+    'prince edward island':'pe', quebec:'qc', saskatchewan:'sk', yukon:'yt',
+  };
+  // Cities, keyed by folded name. A name that means two different places in
+  // this data carries a "<city>@<context>" key too — "athens@ga" is Georgia,
+  // plain "athens" is Greece — and the context key is tried first.
+  const CITY_COORDS = {
+    // North America
+    'new york':[40.71,-74.01], nyc:[40.71,-74.01], brooklyn:[40.65,-73.95],
+    'los angeles':[34.05,-118.24], 'long beach':[33.77,-118.19],
+    seattle:[47.61,-122.33], 'west seattle':[47.56,-122.39], tacoma:[47.25,-122.44],
+    'federal way':[47.32,-122.31], austin:[30.27,-97.74], dallas:[32.78,-96.80],
+    denton:[33.21,-97.13], houston:[29.76,-95.37], 'new braunfels':[29.70,-98.12],
+    'san jose':[37.34,-121.89], 'san francisco':[37.77,-122.42], oakland:[37.80,-122.27],
+    'san francisco bay area':[37.80,-122.30], berkeley:[37.87,-122.27],
+    'san diego':[32.72,-117.16], 'orange county':[33.70,-117.76],
+    'southern california':[34.00,-117.50], 'la puente':[34.02,-117.95],
+    portland:[45.52,-122.68], 'grants pass':[42.44,-123.33], phoenix:[33.45,-112.07],
+    tucson:[32.22,-110.97], denver:[39.74,-104.99], lakewood:[39.70,-105.08],
+    centennial:[39.58,-104.88], 'las vegas':[36.17,-115.14], reno:[39.53,-119.81],
+    midvale:[40.61,-111.90], chicago:[41.88,-87.63], 'sterling heights':[42.58,-83.03],
+    southfield:[42.47,-83.22], perrysburg:[41.56,-83.63], salem:[42.52,-70.90],
+    'bel air':[39.54,-76.35], wilmington:[39.74,-75.55], pennsauken:[39.96,-75.06],
+    orlando:[28.54,-81.38], norfolk:[36.85,-76.29], 'hampton roads':[36.85,-76.29],
+    fairport:[43.10,-77.44], rochester:[43.16,-77.61], 'athens@ga':[33.96,-83.38],
+    // Bare "Washington" is the state (it falls through to WA below); the
+    // district has to be written out, the way people actually write it.
+    'washington dc':[38.91,-77.04], 'washington d.c.':[38.91,-77.04],
+    'washington@dc':[38.91,-77.04],
+    vancouver:[49.28,-123.12], toronto:[43.65,-79.38], montreal:[45.50,-73.57],
+    ottawa:[45.42,-75.70], calgary:[51.05,-114.07], barrie:[44.39,-79.69],
+    'sainte-therese':[45.64,-73.85], 'mexico city':[19.43,-99.13],
+    // South America
+    'sao paulo':[-23.55,-46.63], 'santo andre':[-23.66,-46.53],
+    // Europe
+    paris:[48.86,2.35], lyon:[45.76,4.84], toulouse:[43.60,1.44], tours:[47.39,0.69],
+    nantes:[47.22,-1.55], london:[51.51,-0.13], birmingham:[52.49,-1.89],
+    manchester:[53.48,-2.24], wakefield:[53.68,-1.50], tring:[51.79,-0.66],
+    berlin:[52.52,13.40], stuttgart:[48.78,9.18], leipzig:[51.34,12.37],
+    dusseldorf:[51.23,6.78], frankfurt:[50.11,8.68], bremen:[53.08,8.80],
+    nurnberg:[49.45,11.08], nuremberg:[49.45,11.08], osnabruck:[52.28,8.05],
+    stadtroda:[50.86,11.72], erfurt:[50.98,11.03], 'baden-wurttemberg':[48.66,9.35],
+    munich:[48.14,11.58], hamburg:[53.55,9.99], cologne:[50.94,6.96],
+    wroclaw:[51.11,17.03], warsaw:[52.23,21.01], gdansk:[54.35,18.65],
+    krakow:[50.06,19.94], milan:[45.46,9.19], rome:[41.90,12.50], bari:[41.12,16.87],
+    girona:[41.98,2.82], castellon:[39.99,-0.04], barcelona:[41.39,2.17],
+    madrid:[40.42,-3.70], amsterdam:[52.37,4.90], groningen:[53.22,6.57],
+    rotterdam:[51.92,4.48], leuven:[50.88,4.70], ghent:[51.05,3.72],
+    brussels:[50.85,4.35], budapest:[47.50,19.04], athens:[37.98,23.73],
+    'st. petersburg':[59.94,30.31], 'st petersburg':[59.94,30.31],
+    moscow:[55.76,37.62], petrozavodsk:[61.79,34.35], lisbon:[38.72,-9.14],
+    porto:[41.15,-8.61], vienna:[48.21,16.37], zurich:[47.38,8.54],
+    copenhagen:[55.68,12.57], stockholm:[59.33,18.07], oslo:[59.91,10.75],
+    helsinki:[60.17,24.94], dublin:[53.35,-6.26], prague:[50.08,14.44],
+    // Asia / Pacific
+    seoul:[37.57,126.98], hongdae:[37.56,126.92], daegu:[35.87,128.60],
+    busan:[35.18,129.08], incheon:[37.46,126.71], tokyo:[35.68,139.69],
+    osaka:[34.69,135.50], kyoto:[35.01,135.77], taipei:[25.03,121.57],
+    beijing:[39.90,116.41], shanghai:[31.23,121.47], 'hong kong':[22.32,114.17],
+    bangkok:[13.76,100.50], singapore:[1.35,103.82],
+    melbourne:[-37.81,144.96], sydney:[-33.87,151.21], brisbane:[-27.47,153.03],
+    townsville:[-19.26,146.82], perth:[-31.95,115.86], auckland:[-36.85,174.76],
+  };
+
+  // Resolves a free-text location from the tables above, with NO network call.
+  // Segments are read the same way parseLocation() reads them, so the map and
+  // the region filter agree about what a string means. A "/" or "📍" pair
+  // ("Toronto/Vancouver", "ʟᴏꜱ ᴀɴɢᴇʟᴇꜱ 📍 ᴀᴜꜱᴛɪɴ") resolves to the FIRST place
+  // named — the artist's base, with the rest usually being where they tour.
+  // Returns {lat,lng} or null; null means "ask Nominatim", not "nowhere".
+  function staticGeocode(raw){
+    const text = (raw || '').trim();
+    if(!text) return null;
+    const parts = text.split(',').map(p => foldText(p).trim()).filter(Boolean);
+    if(parts.length === 0) return null;
+
+    const firstOf = s => s.split(/\s*(?:\/|📍|\||·)\s*/)[0].trim();
+    const city = firstOf(parts[0]);
+
+    // Context: the trailing segments, used only to disambiguate a city name
+    // that means two places. Scan from the end so "Athens, GA, USA" finds ga.
+    let ctx = '';
+    for(let i = parts.length - 1; i >= 1 && !ctx; i--){
+      const seg = firstOf(parts[i]);
+      if(US_STATE_COORDS[seg]) ctx = seg;
+      else if(SUBDIVISION_NAMES[seg]) ctx = SUBDIVISION_NAMES[seg];
+      else if(CA_PROVINCE_COORDS[seg]) ctx = seg;
+      else if(CA_PROVINCE_NAMES[seg]) ctx = CA_PROVINCE_NAMES[seg];
+    }
+
+    const hit = (ctx && CITY_COORDS[city + '@' + ctx]) || CITY_COORDS[city];
+    if(hit) return { lat: hit[0], lng: hit[1] };
+
+    // No city match: fall back through the segments MOST SPECIFIC FIRST, so
+    // "Georgia, USA" lands in the state rather than at the centre of the USA,
+    // and "Somewhere Unknown, TX, USA" lands in Texas rather than nowhere.
+    for(let i = 0; i < parts.length; i++){
+      const seg = firstOf(parts[i]);
+      const code = US_STATE_COORDS[seg] ? seg : SUBDIVISION_NAMES[seg];
+      if(code && US_STATE_COORDS[code]) return { lat:US_STATE_COORDS[code][0], lng:US_STATE_COORDS[code][1] };
+      const prov = CA_PROVINCE_COORDS[seg] ? seg : CA_PROVINCE_NAMES[seg];
+      if(prov && CA_PROVINCE_COORDS[prov]) return { lat:CA_PROVINCE_COORDS[prov][0], lng:CA_PROVINCE_COORDS[prov][1] };
+      const country = COUNTRY_COORDS[seg] || COUNTRY_COORDS[canonicalRegion(seg).toLowerCase()];
+      if(country) return { lat:country[0], lng:country[1] };
+      const cityLate = CITY_COORDS[seg];
+      if(cityLate) return { lat:cityLate[0], lng:cityLate[1] };
+    }
+    // A segment with no comma can still name two things — "Melbourne Australia",
+    // "Berlin Germany". Scan its word runs, longest first, so the most specific
+    // name in it wins and a stray word can't match something short by accident.
+    for(const part of parts){
+      const words = firstOf(part).split(/\s+/).filter(Boolean);
+      for(let len = words.length; len >= 1; len--){
+        for(let i = 0; i + len <= words.length; i++){
+          const phrase = words.slice(i, i + len).join(' ');
+          if(phrase.length < 3) continue;
+          const c = CITY_COORDS[phrase];
+          if(c) return { lat:c[0], lng:c[1] };
+          const k = COUNTRY_COORDS[phrase];
+          if(k) return { lat:k[0], lng:k[1] };
+          const st = US_STATE_COORDS[phrase] ? phrase : SUBDIVISION_NAMES[phrase];
+          if(st && US_STATE_COORDS[st]) return { lat:US_STATE_COORDS[st][0], lng:US_STATE_COORDS[st][1] };
+        }
+      }
+    }
+    return null;
+  }
+
   // Geocodes a free-text location via Nominatim (OpenStreetMap). Browsers
   // cannot set a custom User-Agent header from client-side fetch (it's a
   // forbidden header name), so this relies on the Referer header the
@@ -1530,43 +1882,62 @@ another.handle"></textarea>
     }
   }
 
-  // Geocodes every entry with a location that isn't cached yet, one request
-  // per second (Nominatim's usage policy). Entries sharing the exact same
-  // location string reuse one lookup instead of re-querying. Runs once at
-  // a time (geocodingInFlight guards re-entry) and persists + repaints the
-  // map incrementally as each result comes in, so pins appear as they
-  // resolve rather than all at once at the end.
+  // Where an entry sits on the map. The static table is consulted FIRST and
+  // costs nothing; `e.geo` is only ever a cached Nominatim result for a string
+  // the table could not place. Nothing static is written to storage — improving
+  // the table takes effect immediately rather than being shadowed by a stale
+  // cached value, and storage does not grow by a coordinate per entry.
+  function geoFor(e){
+    if(e && e.geo && typeof e.geo.lat === 'number' && typeof e.geo.lng === 'number') return e.geo;
+    return staticGeocode(e && e.location);
+  }
+
+  // A network lookup is only ever attempted for a location the table missed.
+  // A FAILURE IS NOT PERMANENT. The previous version wrote geoStatus:'failed'
+  // and filtered those entries out for good, so one burst of Nominatim 429s —
+  // which is what a 240-row paste gets, since it allows roughly one request a
+  // second and refuses bulk use — silently retired those locations forever and
+  // the plotted count could only ever go down. A failure now records when and
+  // how often, and is retried on a later visit, up to a small cap.
+  const GEO_RETRY_MS = 6 * 60 * 60 * 1000;   // six hours
+  const GEO_MAX_TRIES = 3;
+
+  function geoRetryDue(e){
+    if((e.geoTries || 0) >= GEO_MAX_TRIES) return false;
+    if(!e.geoFailedAt) return true;
+    return (Date.now() - e.geoFailedAt) > GEO_RETRY_MS;
+  }
+
   async function ensureGeocoded(){
     if(geocodingInFlight) return;
     geocodingInFlight = true;
     try{
-      const known = new Map();
-      entries.forEach(e => {
-        if(!e.location) return;
-        const key = e.location.trim().toLowerCase();
-        if(e.geo) known.set(key, e.geo);
-        else if(e.geoStatus === 'failed') known.set(key, 'failed');
-      });
+      // Everything the table can place is already placed, so this loop only
+      // sees the leftovers — usually a handful rather than hundreds.
+      const pending = entries.filter(e => e.location && !geoFor(e) && geoRetryDue(e));
+      if(pending.length === 0) return;
 
-      const pending = entries.filter(e => e.location && !e.geo && e.geoStatus !== 'failed');
+      const known = new Map();
       for(const e of pending){
-        const key = e.location.trim().toLowerCase();
+        const key = foldText(e.location);
         if(known.has(key)){
           const cached = known.get(key);
-          if(cached === 'failed') e.geoStatus = 'failed';
-          else e.geo = cached;
+          if(cached){ e.geo = cached; }
+          else { e.geoTries = (e.geoTries || 0) + 1; e.geoFailedAt = Date.now(); }
           persist();
           continue;
         }
         const result = await geocodeLocation(e.location);
         if(result){
           e.geo = result;
-          known.set(key, result);
+          delete e.geoTries;
+          delete e.geoFailedAt;
         }else{
-          e.geoStatus = 'failed';
-          known.set(key, 'failed');
+          e.geoTries = (e.geoTries || 0) + 1;
+          e.geoFailedAt = Date.now();
           console.warn('[artist-tracker] geocoding failed for location:', e.location);
         }
+        known.set(key, result || null);
         persist();
         if(currentView === 'map') render();
         await sleep(1100);
@@ -2429,7 +2800,8 @@ another.handle"></textarea>
         // applies, so drop it and let ensureGeocoded() pick it back up.
         if(prev.location !== data.location){
           delete prev.geo;
-          delete prev.geoStatus;
+          delete prev.geoTries;
+          delete prev.geoFailedAt;
         }
         entries[idx] = { ...prev, ...data };
       }
@@ -2877,7 +3249,7 @@ another.handle"></textarea>
     currentView = tab.dataset.view;
     document.getElementById('list').hidden = currentView !== 'list';
     document.getElementById('mapCount').hidden = currentView !== 'map';
-    const mapEl = document.getElementById('mapContainer');
+    const mapEl = document.getElementById('mapWrap');
     mapEl.dataset.visible = currentView === 'map' ? 'true' : 'false';
     if(currentView === 'map'){
       initMapIfNeeded();
@@ -2898,12 +3270,51 @@ another.handle"></textarea>
     // world zoom, 150 pins on top of each other answers nothing.
     markerLayer = (typeof L.markerClusterGroup === 'function')
       ? L.markerClusterGroup({
-          zoomToBoundsOnClick: true,
+          // Clicking a cluster opens the results panel instead of zooming.
+          // Zooming was all it did before, which answered "how many" and never
+          // "who" — the panel is the answer to "who". Scroll and the +/-
+          // control still zoom.
+          zoomToBoundsOnClick: false,
           showCoverageOnHover: false,
           maxClusterRadius: 45,
         })
       : L.layerGroup();   // plugin blocked or failed to load: plain pins still work
     markerLayer.addTo(leafletMap);
+
+    // Clicking a cluster opens the panel instead of zooming. Zooming was the
+    // only thing it did before, and it answered "how many" without ever
+    // answering "who" — which is the question the panel exists for. The map
+    // still zooms by scroll and by the +/- control.
+    if(typeof markerLayer.on === 'function' && typeof L.markerClusterGroup === 'function'){
+      markerLayer.on('clustermouseover', (ev) => setMapHover(entriesForCluster(ev.layer)));
+      markerLayer.on('clustermouseout', () => setMapHover(null));
+      markerLayer.on('clusterclick', (ev) => {
+        stopMapEvent(ev);
+        pinMapSelection(entriesForCluster(ev.layer));
+      });
+    }
+    // Clicking bare map dismisses the pinned selection, the way a map should.
+    leafletMap.on('click', () => clearMapSelection());
+    // In viewport mode the panel follows the map.
+    leafletMap.on('moveend zoomend', () => { if(!mapPinned && !mapHover) renderMapPanel(); });
+  }
+
+  // A Leaflet event is not a DOM event — the DOM one hangs off originalEvent,
+  // and passing the wrapper to stopPropagation silently does nothing, which
+  // lets the map's own click handler clear the selection the click just made.
+  function stopMapEvent(ev){
+    const dom = ev && (ev.originalEvent || ev);
+    if(dom && L.DomEvent && typeof L.DomEvent.stopPropagation === 'function'){
+      L.DomEvent.stopPropagation(dom);
+    }
+  }
+
+  // A cluster knows its own markers; map them back to entries by identity so
+  // the panel lists exactly what the bubble counted.
+  function entriesForCluster(cluster){
+    if(!cluster || typeof cluster.getAllChildMarkers !== 'function') return [];
+    const inCluster = new Set(cluster.getAllChildMarkers());
+    return mapPlotted.filter(e => inCluster.has(markersById.get(e.id)));
   }
 
   function markerIconForCategory(category){
@@ -2925,7 +3336,9 @@ another.handle"></textarea>
   function renderMap(filteredEntries){
     if(!leafletMap || !markerLayer) return;
     markerLayer.clearLayers();
-    const plotted = filteredEntries.filter(e => e.geo);
+    markersById = new Map();
+    const plotted = filteredEntries.filter(e => geoFor(e));
+    mapPlotted = plotted;
     updateMapCount(plotted.length, filteredEntries.length - plotted.length);
     plotted.forEach(e => {
       const handleLink = e.handle
@@ -2936,11 +3349,216 @@ another.handle"></textarea>
         + (handleLink ? handleLink + '<br>' : '')
         + escapeHtml(e.location || '') + '<br>'
         + '[ ' + escapeHtml(catLabel[e.category] || e.category) + ' ]';
-      markerLayer.addLayer(
-        L.marker([e.geo.lat, e.geo.lng], { icon: markerIconForCategory(e.category) })
-          .bindPopup(popupHtml)
-      );
+      const marker = L.marker([geoFor(e).lat, geoFor(e).lng], { icon: markerIconForCategory(e.category) })
+        .bindPopup(popupHtml);
+      // Everyone sharing this pin's exact spot is what the panel lists — one
+      // artist per pin would make the panel a slower popup.
+      marker.on('mouseover', () => setMapHover(entriesAtSameSpot(e)));
+      marker.on('mouseout', () => setMapHover(null));
+      marker.on('click', (ev) => {
+        stopMapEvent(ev);
+        pinMapSelection(entriesAtSameSpot(e));
+      });
+      markersById.set(e.id, marker);
+      markerLayer.addLayer(marker);
     });
+    fitMapOnce();
+    renderMapPanel();
+  }
+
+  // Open on the artists rather than on a fixed world view. Without this the
+  // panel's resting "in view" list is whatever happens to fall inside a
+  // [20,0] zoom-2 rectangle, which on a narrow map is a handful of them. Fit
+  // ONCE per page load — refitting on every filter change would yank the map
+  // out from under someone who has panned somewhere deliberately.
+  let mapFitted = false;
+  function fitMapOnce(){
+    if(mapFitted || !leafletMap || mapPlotted.length === 0) return;
+    mapFitted = true;
+    const bounds = L.latLngBounds(mapPlotted.map(e => {
+      const g = geoFor(e);
+      return [g.lat, g.lng];
+    }));
+    if(bounds.isValid()) leafletMap.fitBounds(bounds, { padding:[40,40], maxZoom:6 });
+  }
+
+  // Pins land on shared coordinates constantly here — thirteen artists all
+  // reading "Seoul, South Korea" are one dot. Comparing rounded coordinates
+  // rather than the location string keeps two spellings of one city together.
+  function entriesAtSameSpot(entry){
+    const g = geoFor(entry);
+    if(!g) return [entry];
+    const key = g.lat.toFixed(3) + ',' + g.lng.toFixed(3);
+    return mapPlotted.filter(other => {
+      const og = geoFor(other);
+      return og && (og.lat.toFixed(3) + ',' + og.lng.toFixed(3)) === key;
+    });
+  }
+
+
+  // --- map results panel ---------------------------------------------------
+  // The panel is the map's index: it lists the artists behind whatever is
+  // selected, hovered, or simply in view. It is driven from the SAME filtered
+  // array the list view renders, so it can never show an artist the current
+  // category / gender / region / tag / search filters exclude.
+  //
+  // Three states, in priority order:
+  //   hover      — previewing a marker or cluster, not committed
+  //   pinned     — a marker or cluster was clicked; survives panning
+  //   viewport   — nothing chosen: whatever is currently on screen
+  // Viewport is the resting state rather than an empty panel, because an empty
+  // 320px column beside the map answers nothing, and "who is near who" is one
+  // of the questions the map exists to answer.
+  let mapPinned = null;         // { title, ids }
+  let mapHover = null;          // { title, ids }
+  let markersById = new Map();  // entry id -> leaflet marker
+  let mapPlotted = [];          // filtered + geocodable, in render order
+
+  function mapPanelEls(){
+    return {
+      panel: document.getElementById('mapPanel'),
+      title: document.getElementById('mapPanelTitle'),
+      sub:   document.getElementById('mapPanelSub'),
+      list:  document.getElementById('mapPanelList'),
+      close: document.getElementById('mapPanelClose'),
+    };
+  }
+
+  // A pin's label: the shared location text when everyone agrees, otherwise a
+  // count. Never invent a place name the entries don't actually carry.
+  function placeLabelFor(list){
+    const names = [...new Set(list.map(e => (e.location || '').trim()).filter(Boolean))];
+    if(names.length === 1) return names[0];
+    if(names.length === 0) return list.length + (list.length === 1 ? ' artist' : ' artists');
+    return names.length + ' locations';
+  }
+
+  function entriesInView(){
+    if(!leafletMap) return [];
+    const bounds = leafletMap.getBounds();
+    return mapPlotted.filter(e => {
+      const g = geoFor(e);
+      return g && bounds.contains(L.latLng(g.lat, g.lng));
+    });
+  }
+
+  function currentMapPanelState(){
+    if(mapHover) return { ...mapHover, mode:'hover' };
+    if(mapPinned) return { ...mapPinned, mode:'pinned' };
+    return { title:'in view', ids:entriesInView().map(e => e.id), mode:'viewport' };
+  }
+
+  function renderMapPanel(){
+    const els = mapPanelEls();
+    if(!els.panel) return;
+    const state = currentMapPanelState();
+    const byId = new Map(mapPlotted.map(e => [e.id, e]));
+    // A pinned selection can be emptied by a filter change — drop it rather
+    // than leaving a stale list of artists the filters now exclude.
+    const list = state.ids.map(id => byId.get(id)).filter(Boolean);
+    if(state.mode === 'pinned' && list.length === 0){
+      mapPinned = null;
+      return renderMapPanel();
+    }
+
+    els.title.textContent = state.mode === 'viewport' ? 'in view' : state.title;
+    els.sub.textContent = state.mode === 'hover'
+      ? 'hovering · ' + list.length
+      : list.length + (list.length === 1 ? ' artist' : ' artists');
+    // The close control belongs to the PINNED selection, not to whatever the
+    // panel happens to be showing this instant. Tying it to the display mode
+    // made it vanish while the pointer still rested on the marker that had
+    // just been clicked — the one moment you are most likely to reach for it.
+    els.close.hidden = !mapPinned;
+
+    els.list.innerHTML = '';
+    if(list.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'map-panel-empty';
+      empty.textContent = mapPlotted.length === 0
+        ? 'No artists match the current filters, so there is nothing to plot.'
+        : 'Nothing in view. Pan or zoom out, or click a pin.';
+      els.list.appendChild(empty);
+      return;
+    }
+
+    list.forEach((e, i) => {
+      const item = document.createElement('div');
+      item.className = 'map-panel-item';
+      item.dataset.id = e.id;
+      // The row is the list view's own .entry markup, so the panel cannot
+      // drift into a second card style and clicking still opens the drawer.
+      item.appendChild(renderEntry(e, i));
+      if(e.notes){
+        const notes = document.createElement('div');
+        notes.className = 'map-panel-notes';
+        notes.textContent = e.notes;
+        item.appendChild(notes);
+      }
+      if(e.handle){
+        const a = document.createElement('a');
+        a.className = 'map-panel-ig';
+        a.href = instagramUrlForHandle(e.handle);
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = 'open on instagram ↗';
+        item.appendChild(a);
+      }
+      item.addEventListener('mouseenter', () => highlightMarker(e.id, true));
+      item.addEventListener('mouseleave', () => highlightMarker(e.id, false));
+      els.list.appendChild(item);
+    });
+  }
+
+  // Highlighting works in both directions. A marker swallowed by a collapsed
+  // cluster cannot show a highlight itself, so the cluster wearing it is
+  // highlighted instead — otherwise hovering a panel row at world zoom does
+  // nothing visible at all.
+  function markerElementFor(id){
+    const marker = markersById.get(id);
+    if(!marker) return null;
+    if(markerLayer && typeof markerLayer.getVisibleParent === 'function'){
+      const visible = markerLayer.getVisibleParent(marker);
+      if(visible && visible !== marker) return visible._icon || null;
+    }
+    return marker._icon || null;
+  }
+
+  function highlightMarker(id, on){
+    const el = markerElementFor(id);
+    if(!el) return;
+    if(on) el.dataset.hi = 'true';
+    else delete el.dataset.hi;
+  }
+
+  function highlightPanelRows(ids){
+    const set = new Set(ids || []);
+    document.querySelectorAll('#mapPanelList .map-panel-item').forEach(item => {
+      if(set.has(item.dataset.id)) item.dataset.hi = 'true';
+      else delete item.dataset.hi;
+    });
+  }
+
+  function setMapHover(entryList){
+    mapHover = entryList
+      ? { title: placeLabelFor(entryList), ids: entryList.map(e => e.id) }
+      : null;
+    renderMapPanel();
+    if(!entryList) highlightPanelRows([]);
+    else highlightPanelRows(entryList.map(e => e.id));
+  }
+
+  function pinMapSelection(entryList){
+    mapPinned = { title: placeLabelFor(entryList), ids: entryList.map(e => e.id) };
+    mapHover = null;
+    renderMapPanel();
+  }
+
+  function clearMapSelection(){
+    if(!mapPinned && !mapHover) return;
+    mapPinned = null;
+    mapHover = null;
+    renderMapPanel();
   }
 
   // How much of the current filter actually made it onto the map. Entries
@@ -2960,6 +3578,20 @@ another.handle"></textarea>
       el.appendChild(span);
     }
   }
+
+  document.getElementById('mapPanelClose').onclick = () => clearMapSelection();
+
+  // Escape clears a pinned selection — but only when the drawer is not the
+  // thing on screen. The drawer owns Escape while it is open (its own handler
+  // closes it), and dismissing both at once from one keypress would be a
+  // surprise.
+  document.addEventListener('keydown', (ev) => {
+    if(ev.key !== 'Escape') return;
+    if(currentView !== 'map') return;
+    if(drawer.dataset.open === 'true') return;
+    if(!mapPinned && !mapHover) return;
+    clearMapSelection();
+  });
 
   // --- export / import / clear ---
   document.getElementById('exportBtn').onclick = () => {

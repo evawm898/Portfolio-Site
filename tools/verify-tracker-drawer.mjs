@@ -119,6 +119,34 @@ const SEED = [
 ];
 const TATTOO_COUNT = SEED.filter(e => e.category === 'tattoo').length;
 
+
+// --- source extraction ------------------------------------------------------
+// staticGeocode is a pure function of its tables, so its ANSWERS are checked
+// directly against the shipped source rather than inferred from pin positions
+// on screen. The app runs inside an IIFE, so the declarations are sliced out by
+// name; a failed slice throws rather than quietly skipping the checks.
+function sliceDecl(src, header){
+  const at = src.indexOf(header);
+  if(at === -1) throw new Error('verify-tracker-drawer: could not find ' + JSON.stringify(header)
+    + ' in artist-tracker.html — the geocoding checks would silently pass. Fix the slice.');
+  const open = src.indexOf(header.trimEnd().endsWith('{') ? '{' : '{', at);
+  let depth = 0, i = open;
+  for(; i < src.length; i++){
+    if(src[i] === '{') depth++;
+    else if(src[i] === '}'){ depth--; if(depth === 0){ i++; break; } }
+  }
+  return src.slice(at, i) + (header.startsWith('const') ? ';' : '');
+}
+const PAGE_SRC = fs.readFileSync(path.join(REPO, 'artist-tracker.html'), 'utf8');
+const geoModule = [
+  'const CHAR_FOLD = {', 'function foldText(str){',
+  'const COUNTRY_COORDS = {', 'const US_STATE_COORDS = {', 'const SUBDIVISION_NAMES = {',
+  'const CA_PROVINCE_COORDS = {', 'const CA_PROVINCE_NAMES = {', 'const CITY_COORDS = {',
+  'const REGION_ALIASES = {', 'function canonicalRegion(raw){', 'function staticGeocode(raw){',
+].map(h => sliceDecl(PAGE_SRC, h)).join('\n');
+const staticGeocode = new Function(geoModule + '\nreturn staticGeocode;')();
+const foldText = new Function(geoModule + '\nreturn foldText;')();
+
 const browser = await chromium.launch({
   executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined,
 });
@@ -184,7 +212,7 @@ const pageErrors = [];
 page.on('pageerror', e => pageErrors.push(e.message));
 await stub(page);
 await page.goto(URL_, { waitUntil:'domcontentloaded' });
-await page.waitForSelector('.entry');
+await page.waitForSelector('#list .entry');
 
 const drawer = page.locator('#drawer');
 const isOpen = async () => (await drawer.getAttribute('data-open')) === 'true';
@@ -201,22 +229,22 @@ async function ensureClosed(){
 section('item 9 — the shortlist leads with tattoo artists');
 check('category defaults to tattoo, not all',
   (await page.locator('.chip[data-cat="tattoo"]').getAttribute('data-active')) === 'true');
-check('only tattoo artists on load', await page.locator('.entry').count() === TATTOO_COUNT,
-  await page.locator('.entry').count() + ' of ' + SEED.length);
+check('only tattoo artists on load', await page.locator('#list .entry').count() === TATTOO_COUNT,
+  await page.locator('#list .entry').count() + ' of ' + SEED.length);
 check('other categories still reachable', await page.locator('.chip[data-cat="following"]').isVisible());
 // The rest of the suite predates this default and expects the whole list.
 await page.locator('.chip[data-cat="all"]').click();
 
 section('item 7 — the slide-in detail panel');
-check('gate bypassed, list rendered', await page.locator('.entry').count() === SEED.length);
-check('row carries no anchor any more', await page.locator('.entry a').count() === 0);
+check('gate bypassed, list rendered', await page.locator('#list .entry').count() === SEED.length);
+check('row carries no anchor any more', await page.locator('#list .entry a').count() === 0);
 check('handle still renders',
-  (await page.locator('.entry', { hasText:'Jane Doe' }).innerText()).includes('@janedoe'));
+  (await page.locator('#list .entry', { hasText:'Jane Doe' }).innerText()).includes('@janedoe'));
 
 check('drawer starts closed', !(await isOpen()));
 
 // click anywhere on the row (the name, not a control)
-await page.locator('.entry', { hasText:'Jane Doe' }).click();
+await page.locator('#list .entry', { hasText:'Jane Doe' }).click();
 await page.waitForTimeout(SLIDE);
 check('row click opens the drawer', await isOpen());
 check('drawer is visible', await drawer.isVisible());
@@ -232,7 +260,7 @@ check('Instagram link href', await ig.getAttribute('href') === 'https://instagra
 check('Instagram link target', await ig.getAttribute('target') === '_blank');
 check('Instagram link is teal', (await ig.evaluate(el => getComputedStyle(el).color)) === 'rgb(95, 160, 160)');
 
-check('list still in place behind the drawer', await page.locator('.entry').first().isVisible());
+check('list still in place behind the drawer', await page.locator('#list .entry').first().isVisible());
 const box = await drawer.boundingBox();
 check('drawer width in the 380-420 band', box.width >= 380 && box.width <= 420, box.width + 'px');
 check('drawer is anchored right', Math.abs((box.x + box.width) - 1280) < 2, 'right edge ' + (box.x+box.width));
@@ -263,7 +291,7 @@ check('focus returned to the row that opened it',
   await page.evaluate(() => document.activeElement?.classList.contains('entry')));
 
 section('closing: backdrop');
-await page.locator('.entry', { hasText:'Sam Reed' }).click();
+await page.locator('#list .entry', { hasText:'Sam Reed' }).click();
 await page.waitForTimeout(SLIDE);
 check('second row opens the drawer', await isOpen());
 await page.locator('#drawerBackdrop').click({ position:{ x:100, y:400 } });
@@ -271,7 +299,7 @@ await page.waitForTimeout(SLIDE);
 check('backdrop click closes the drawer', !(await isOpen()));
 
 section('closing: the x button');
-await page.locator('.entry', { hasText:'Jane Doe' }).click();
+await page.locator('#list .entry', { hasText:'Jane Doe' }).click();
 await page.waitForTimeout(SLIDE);
 await page.locator('#drawerClose').click();
 await page.waitForTimeout(SLIDE);
@@ -280,7 +308,7 @@ check('close button closes the drawer', !(await isOpen()));
 section('scroll position is not lost');
 await page.evaluate(() => window.scrollTo(0, 300));
 const beforeScroll = await page.evaluate(() => window.scrollY);
-await page.locator('.entry', { hasText:'Jane Doe' }).click();
+await page.locator('#list .entry', { hasText:'Jane Doe' }).click();
 await page.waitForTimeout(SLIDE);
 check('scroll position preserved', await page.evaluate(() => window.scrollY) === beforeScroll,
   beforeScroll + ' -> ' + await page.evaluate(() => window.scrollY));
@@ -308,7 +336,7 @@ await page.locator('#saveEntry').click();
 await page.waitForTimeout(200);
 check('save returns to view mode', await page.locator('#drawerView').isVisible());
 check('view shows the edit', (await drawer.innerText()).includes('Portland, OR'));
-check('list shows the edit', (await page.locator('.entry', { hasText:'Jane Doe' }).innerText()).includes('Portland, OR'));
+check('list shows the edit', (await page.locator('#list .entry', { hasText:'Jane Doe' }).innerText()).includes('Portland, OR'));
 check('edit persisted', (await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e => e.id==='a1').location)) === 'Portland, OR');
 check('stale geocode dropped on location change',
   await page.evaluate(() => !('geo' in JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='a1'))));
@@ -353,7 +381,7 @@ await page.waitForTimeout(200);
 const storedPhoto = await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='a1').photo);
 check('photo saved to the entry', storedPhoto.startsWith('data:image/jpeg;base64,'));
 check('drawer view shows the photo', (await page.locator('#drawerView img.detail-photo').getAttribute('src')) === storedPhoto);
-check('list row shows the photo', (await page.locator('.entry', { hasText:'Jane Doe' }).locator('img.entry-photo').getAttribute('src')) === storedPhoto);
+check('list row shows the photo', (await page.locator('#list .entry', { hasText:'Jane Doe' }).locator('img.entry-photo').getAttribute('src')) === storedPhoto);
 
 // text paste into a text field must NOT be intercepted
 await page.locator('#detailEdit').click();
@@ -411,7 +439,7 @@ const globalPaste = await page.evaluate(async () => {
 });
 check('image paste outside the drawer is not intercepted', globalPaste === false);
 
-await page.locator('.entry', { hasText:'Sam Reed' }).click();
+await page.locator('#list .entry', { hasText:'Sam Reed' }).click();
 await page.waitForTimeout(SLIDE);
 const viewModePaste = await page.evaluate(async () => {
   const c = document.createElement('canvas'); c.width = 40; c.height = 40;
@@ -437,16 +465,16 @@ await page.fill('#fName', 'New Person');
 await page.fill('#fHandle', 'newperson');
 await page.locator('#saveEntry').click();
 await page.waitForTimeout(250);
-check('new entry added', await page.locator('.entry').count() === SEED.length + 1);
+check('new entry added', await page.locator('#list .entry').count() === SEED.length + 1);
 check('new entry shown in the drawer', (await page.locator('#drawerView').innerText()).includes('New Person'));
 
 page.once('dialog', d => d.accept());
 await page.locator('#detailRemove').click();
 await page.waitForTimeout(SLIDE);
-check('remove deletes and closes', await page.locator('.entry').count() === SEED.length && !(await isOpen()));
+check('remove deletes and closes', await page.locator('#list .entry').count() === SEED.length && !(await isOpen()));
 
 section('quota');
-await page.locator('.entry', { hasText:'Sam Reed' }).click();
+await page.locator('#list .entry', { hasText:'Sam Reed' }).click();
 await page.waitForTimeout(SLIDE);
 await page.locator('#detailEdit').click();
 await page.evaluate(() => {
@@ -474,7 +502,7 @@ check('form keeps what was typed after a failed save', await page.inputValue('#f
 // and the drawer is still open over the toolbar.
 await page.evaluate(() => { if(Storage.prototype.__realSetItem) Storage.prototype.setItem = Storage.prototype.__realSetItem; });
 await page.reload({ waitUntil:'domcontentloaded' });
-await page.waitForSelector('.entry');
+await page.waitForSelector('#list .entry');
 
 section('bulk paste, filters and map (regression)');
 await page.locator('.chip[data-cat="all"]').click();
@@ -490,7 +518,7 @@ await page.waitForTimeout(300);
 const report1 = await page.locator('#bulkReport').innerText();
 check('merge summary reported in the report card',
   /1 added/.test(report1) && /(1 updated|1 already complete)/.test(report1), JSON.stringify(report1));
-check('no duplicate for the existing handle', await page.locator('.entry').count() === SEED.length + 1);
+check('no duplicate for the existing handle', await page.locator('#list .entry').count() === SEED.length + 1);
 check('non-standard category kept as a tag',
   await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.handle==='@noorh').tags.includes('influencer')));
 check('bulk panel stays open so the report can be read', await page.locator('#panel').isVisible());
@@ -504,22 +532,22 @@ await page.locator('#cancelBulk').click();
 
 section('filters / search / sort untouched');
 await page.locator('.chip[data-cat="tattoo"]').click();
-check('category filter still filters', await page.locator('.entry').count() === TATTOO_COUNT,
-  String(await page.locator('.entry').count()));
+check('category filter still filters', await page.locator('#list .entry').count() === TATTOO_COUNT,
+  String(await page.locator('#list .entry').count()));
 await page.locator('.chip[data-cat="all"]').click();
 await page.locator('.chip[data-gender="woman"]').click();
-check('gender filter still filters', (await page.locator('.entry').count()) < SEED.length + 1,
-  String(await page.locator('.entry').count()));
+check('gender filter still filters', (await page.locator('#list .entry').count()) < SEED.length + 1,
+  String(await page.locator('#list .entry').count()));
 await page.locator('.chip[data-gender="all"]').click();
 await page.locator('.tag-chip[data-tag="ambient"]').click();
-check('tag filter still filters', await page.locator('.entry').count() === 1);
+check('tag filter still filters', await page.locator('#list .entry').count() === 1);
 await page.locator('.tag-chip[data-tag="ambient"]').click();
 await page.fill('#searchInput', 'lisbon');
 await page.waitForTimeout(100);
-check('search still filters', await page.locator('.entry').count() === 1);
+check('search still filters', await page.locator('#list .entry').count() === 1);
 await page.fill('#searchInput', '');
 await page.selectOption('#regionSelect', 'Berlin');
-check('region filter still filters', await page.locator('.entry').count() === 1);
+check('region filter still filters', await page.locator('#list .entry').count() === 1);
 await page.selectOption('#regionSelect', 'all');
 
 section('map view still toggles');
@@ -530,7 +558,7 @@ await page.locator('.view-tab[data-view="list"]').click();
 check('list view toggles back', await page.locator('#list').isVisible());
 
 section('export includes the embedded image');
-await page.locator('.entry', { hasText:'Jane Doe' }).click();
+await page.locator('#list .entry', { hasText:'Jane Doe' }).click();
 await page.waitForTimeout(SLIDE);
 await page.locator('#detailEdit').click();
 await page.evaluate(async () => {
@@ -572,21 +600,21 @@ check('Other / unspecified is pinned last', opts[opts.length-1].startsWith('Othe
 check('city select disabled until a region is picked', await page.locator('#citySelect').isDisabled());
 
 await page.selectOption('#regionSelect', 'USA');
-check('picking a region filters the list', await page.locator('.entry').count() === 2,
-  String(await page.locator('.entry').count()));
+check('picking a region filters the list', await page.locator('#list .entry').count() === 2,
+  String(await page.locator('#list .entry').count()));
 const cityOpts = await page.locator('#citySelect option').allTextContents();
 check('cities are scoped to the region', cityOpts.some(o => o.startsWith('Austin')) && cityOpts.some(o => o.startsWith('Los Angeles')),
   cityOpts.join(' | '));
 check('city select enabled once a region is picked', !(await page.locator('#citySelect').isDisabled()));
 await page.selectOption('#citySelect', 'Austin');
-check('narrowing to a city works', await page.locator('.entry').count() === 1);
-check('the right entry survives', (await page.locator('.entry').innerText()).includes('Lena Novak'));
+check('narrowing to a city works', await page.locator('#list .entry').count() === 1);
+check('the right entry survives', (await page.locator('#list .entry').innerText()).includes('Lena Novak'));
 check('stored location text is untouched by parsing',
   await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='a4').location) === 'Austin, TX, USA');
 await page.selectOption('#regionSelect', 'all');
 const totalNow = await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).length);
-check('resetting the region clears the city too', await page.locator('.entry').count() === totalNow,
-  await page.locator('.entry').count() + ' of ' + totalNow);
+check('resetting the region clears the city too', await page.locator('#list .entry').count() === totalNow,
+  await page.locator('#list .entry').count() + ' of ' + totalNow);
 
 section('item 11 — style tags');
 await ensureClosed();
@@ -599,7 +627,7 @@ check('tag chips sort by count, descending', (() => {
 })(), chips.join(' | '));
 check('the biggest tag leads', chips[0].startsWith('fine line (3)'), chips[0]);
 
-await page.locator('.entry', { hasText:'Ana Silva' }).click();
+await page.locator('#list .entry', { hasText:'Ana Silva' }).click();
 await page.waitForTimeout(SLIDE);
 await page.locator('#detailEdit').click();
 const toggles = await page.locator('#tagPicker .tag-toggle').allTextContents();
@@ -655,7 +683,7 @@ check('blank pronouns left unknown',
 check('pronouns field is preserved, not replaced',
   await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='a2').pronouns) === 'they/them');
 await page.locator('.chip[data-gender="woman"]').click();
-const womenShown = await page.locator('.entry').count();
+const womenShown = await page.locator('#list .entry').count();
 const womenExpected = await page.evaluate(() =>
   JSON.parse(localStorage.getItem('artistTracker.entries.v1')).filter(e => e.gender === 'woman').length);
 check('women only shows just the woman entries', womenShown === womenExpected,
@@ -664,11 +692,11 @@ await page.locator('.chip[data-gender="unknown"]').click();
 const unknownExpected = await page.evaluate(() =>
   JSON.parse(localStorage.getItem('artistTracker.entries.v1')).filter(e => (e.gender || 'unknown') === 'unknown').length);
 check('unknown is browsable so it can be filled in over time',
-  await page.locator('.entry').count() === unknownExpected,
-  await page.locator('.entry').count() + ' of ' + unknownExpected);
+  await page.locator('#list .entry').count() === unknownExpected,
+  await page.locator('#list .entry').count() + ' of ' + unknownExpected);
 await page.locator('.chip[data-gender="all"]').click();
 
-await page.locator('.entry', { hasText:'Mira Okonkwo' }).click();
+await page.locator('#list .entry', { hasText:'Mira Okonkwo' }).click();
 await page.waitForTimeout(SLIDE);
 await page.locator('#detailEdit').click();
 check('gender is a control in edit mode', await page.locator('#fGender').isVisible());
@@ -683,7 +711,7 @@ await page.waitForTimeout(SLIDE);
 
 section('item 12 — status splits into notes + status');
 await ensureClosed();
-await page.locator('.entry', { hasText:'Jane Doe' }).click();
+await page.locator('#list .entry', { hasText:'Jane Doe' }).click();
 await page.waitForTimeout(SLIDE);
 await page.locator('#detailEdit').click();
 check('notes is a multi-line textarea',
@@ -737,8 +765,9 @@ if(HAVE_MAP_LIBS){
     clustersAtWorldZoom + ' cluster bubbles');
   check('clusters show a count', /\d/.test(await page.locator('.marker-cluster').first().innerText()),
     await page.locator('.marker-cluster').first().innerText());
-  // Zooming to a cluster's bounds must break it apart — that is the whole
-  // behaviour, and it is observable without reaching into Leaflet's internals.
+  // Clicking a cluster USED to zoom to its bounds and do nothing else. It now
+  // opens the results panel on that cluster's artists instead, and deliberately
+  // does NOT zoom: the panel answers "who is here", which the zoom never did.
   // Zoom level is readable straight off the tile URLs (/{z}/{x}/{y}.png), so
   // this stays a DOM assertion rather than reaching into Leaflet.
   const tileZoom = () => page.evaluate(() => {
@@ -750,8 +779,14 @@ if(HAVE_MAP_LIBS){
   await page.locator('.marker-cluster').first().click();
   await page.waitForTimeout(1200);
   const zoomAfter = await tileZoom();
-  check('clicking a cluster zooms to fit its contents', zoomAfter > zoomBefore,
+  check('clicking a cluster no longer just zooms', zoomAfter === zoomBefore,
     'zoom ' + zoomBefore + ' -> ' + zoomAfter);
+  check('...it opens the results panel on that cluster instead',
+    (await page.locator('#mapPanelList .map-panel-item').count()) > 0
+      && (await page.locator('#mapPanelTitle').innerText()).trim() !== 'in view',
+    JSON.stringify(await page.locator('#mapPanelTitle').innerText()));
+  await page.locator('#mapPanelClose').click();
+  await page.waitForTimeout(250);
 }else{
   console.log('  SKIP cluster checks — run: npm install --no-save leaflet@1.9.4 leaflet.markercluster@1.5.3');
 }
@@ -785,9 +820,13 @@ check('map count hidden in list view', !(await page.locator('#mapCount').isVisib
 // into the same list, so nothing escapes the final health check.
 let tp = null;
 let tctx = null;
-async function reseed(rows){
+// `setup` runs against the fresh context before the page opens — used to give
+// a section its own network stubs (e.g. aborting Nominatim so the static
+// gazetteer is measured on its own rather than quietly propped up by it).
+async function reseed(rows, setup){
   if(tp) await tctx.close();
   tctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
+  if(setup) await setup(tctx);
   await tctx.addInitScript(([store, seed]) => {
     sessionStorage.setItem('artistTracker.unlocked', '1');
     localStorage.setItem(store, JSON.stringify(seed));
@@ -801,14 +840,14 @@ async function reseed(rows){
   await stub(tp);
   tp.on('pageerror', e => pageErrors.push(e.message));
   await tp.goto(URL_, { waitUntil:'domcontentloaded' });
-  await tp.waitForSelector('.entry');
+  await tp.waitForSelector('#list .entry');
   await tp.locator('.chip[data-cat="all"]').click();
   return tp;
 }
 // Rows lead with an .entry-index ("001"), so read the name element itself.
 async function visibleNames(){
   return await tp.evaluate(() =>
-    [...document.querySelectorAll('.entry .entry-name')].map(el => el.textContent.trim()));
+    [...document.querySelectorAll('#list .entry .entry-name')].map(el => el.textContent.trim()));
 }
 
 section('item 15a — decorative unicode folds for search and region');
@@ -838,20 +877,20 @@ check('plain-ascii search finds a fraktur name', (await visibleNames()).includes
   JSON.stringify(await visibleNames()));
 await tp.fill('#searchInput', 'alyssa');
 await tp.waitForTimeout(120);
-check('...and a fullwidth one', (await tp.locator('.entry').count()) === 1);
+check('...and a fullwidth one', (await tp.locator('#list .entry').count()) === 1);
 await tp.fill('#searchInput', 'los angeles');
 await tp.waitForTimeout(120);
-check('...and a small-caps location', (await tp.locator('.entry').count()) === 1);
+check('...and a small-caps location', (await tp.locator('#list .entry').count()) === 1);
 await tp.fill('#searchInput', '𝕾𝖆𝖗𝖆𝖍');
 await tp.waitForTimeout(120);
-check('typing the decorative form still works too', (await tp.locator('.entry').count()) === 1);
+check('typing the decorative form still works too', (await tp.locator('#list .entry').count()) === 1);
 await tp.fill('#searchInput', 'goldenharvest');
 await tp.waitForTimeout(120);
-check('searching by handle still works', (await tp.locator('.entry').count()) === 1,
-  String(await tp.locator('.entry').count()));
+check('searching by handle still works', (await tp.locator('#list .entry').count()) === 1,
+  String(await tp.locator('#list .entry').count()));
 await tp.fill('#searchInput', 'plain');
 await tp.waitForTimeout(120);
-check('a plain entry is still found the ordinary way', (await tp.locator('.entry').count()) === 1);
+check('a plain entry is still found the ordinary way', (await tp.locator('#list .entry').count()) === 1);
 await tp.fill('#searchInput', '');
 await tp.waitForTimeout(120);
 
@@ -882,8 +921,8 @@ const fineKey = await tp.evaluate(() =>
   [...document.querySelectorAll('#tagChips .tag-chip')].map(b => b.dataset.tag).find(k => /fine/.test(k)));
 await tp.locator('.tag-chip[data-tag="' + fineKey + '"]').click();
 await tp.waitForTimeout(120);
-check('selecting it matches every spelling', (await tp.locator('.entry').count()) === 3,
-  String(await tp.locator('.entry').count()));
+check('selecting it matches every spelling', (await tp.locator('#list .entry').count()) === 3,
+  String(await tp.locator('#list .entry').count()));
 await tp.locator('.tag-chip[data-tag="' + fineKey + '"]').click();
 await tp.waitForTimeout(120);
 check('entries keep their own spelling — nothing is rewritten',
@@ -896,7 +935,7 @@ check('entries keep their own spelling — nothing is rewritten',
 // The drawer's picker must not offer a second button meaning the same thing.
 // Rows sort by name, so "One" (tagged "Fine Line") is not the first row —
 // open it explicitly rather than whichever happens to sort first.
-await tp.locator('.entry', { has: tp.locator('.entry-name', { hasText: /^One$/ }) }).click();
+await tp.locator('#list .entry', { has: tp.locator('.entry-name', { hasText: /^One$/ }) }).click();
 await tp.waitForTimeout(SLIDE);
 await tp.locator('#detailEdit').click();
 await tp.waitForTimeout(150);
@@ -949,8 +988,8 @@ if(haveMore){
   check('...and can be cleared', await tp.locator('.tag-chip-clear').isVisible());
   await tp.locator('.tag-chip-clear').click();
   await tp.waitForTimeout(120);
-  check('clear releases the filter', (await tp.locator('.entry').count()) === 24,
-    String(await tp.locator('.entry').count()));
+  check('clear releases the filter', (await tp.locator('#list .entry').count()) === 24,
+    String(await tp.locator('#list .entry').count()));
 }else{
   check('"more" reveals all of them', false, 'no cap — nothing to reveal');
   check('...and offers the way back', false, 'no cap');
@@ -1020,7 +1059,7 @@ let e1 = (await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker
 check('skip leaves the existing entry completely untouched',
   e1.location === 'Berlin' && e1.gender === 'unknown' && e1.tags.join() === 'ornamental');
 check('...and says so in the report', /1 skipped as duplicates/.test(rep), JSON.stringify(rep.slice(0,140)));
-check('...and creates no second entry', (await tp.locator('.entry').count()) === 1);
+check('...and creates no second entry', (await tp.locator('#list .entry').count()) === 1);
 
 rep = await pasteWith('merge', LINE);
 e1 = (await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))))[0];
@@ -1039,8 +1078,8 @@ check('...but a BLANK cell never wipes a field that has a value',
   e1.location === 'Paris, France' && e1.gender === 'woman', e1.location + '/' + e1.gender);
 
 rep = await pasteWith('add', LINE);
-check('add makes a second entry on purpose', (await tp.locator('.entry').count()) === 2,
-  String(await tp.locator('.entry').count()));
+check('add makes a second entry on purpose', (await tp.locator('#list .entry').count()) === 2,
+  String(await tp.locator('#list .entry').count()));
 
 await reseed([
   { id:'h1', name:'Styled Handle', handle:'@ᴋɪʀᴀɴ.ᴛᴀ2', category:'tattoo', location:'', pronouns:'',
@@ -1048,7 +1087,296 @@ await reseed([
 ]);
 await pasteWith('merge', 'Kiran|@kiran.ta2|Tattoo|South Korea|||instagram.com/kiran.ta2|||');
 check('a decorative stored handle still matches the plain pasted one',
-  (await tp.locator('.entry').count()) === 1, String(await tp.locator('.entry').count()));
+  (await tp.locator('#list .entry').count()) === 1, String(await tp.locator('#list .entry').count()));
+
+await tctx.close();
+tp = null;
+
+// ---------------------------------------------------------------------------
+// item 16 — locations resolve from a table, and failures are not permanent
+// ---------------------------------------------------------------------------
+section('item 16a — static gazetteer places locations with no network call');
+// Nominatim is ABORTED for this whole section. Anything that plots here was
+// placed by the table; if the table regressed, these go to zero rather than
+// quietly falling back to the network and looking fine.
+const GEO_SEED = [
+  { id:'g1', name:'Plain City', handle:'@g1', category:'tattoo', location:'Seoul, South Korea',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g2', name:'State Code', handle:'@g2', category:'tattoo', location:'Austin, TX, USA',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g3', name:'Small Caps', handle:'@g3', category:'tattoo', location:'ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g4', name:'Stroked L', handle:'@g4', category:'tattoo', location:'Wrocław, Poland',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g5', name:'Trailing Noise', handle:'@g5', category:'tattoo',
+    location:'Frankfurt, Germany, moderate confidence',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g6', name:'Slash Pair', handle:'@g6', category:'tattoo', location:'Toronto/Vancouver, Canada',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g7', name:'No Comma', handle:'@g7', category:'tattoo', location:'Melbourne Australia',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g8', name:'Bare Country', handle:'@g8', category:'tattoo', location:'South Korea',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g9', name:'Genuinely Blank', handle:'@g9', category:'tattoo', location:'',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'g10', name:'Unplaceable', handle:'@g10', category:'tattoo', location:'Zzyzx Quadrant 9',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+];
+let nominatimCalls = 0;
+await reseed(GEO_SEED, async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => { nominatimCalls++; return r.abort(); });
+});
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(600);
+const geoCount = await tp.locator('#mapCount').innerText();
+check('every table-resolvable location plots, offline',
+  /^8 artists plotted/.test(geoCount), JSON.stringify(geoCount));
+check('...and only the truly unplaceable are counted out',
+  /2 without a usable location/.test(geoCount), JSON.stringify(geoCount));
+check('a blank location is never sent to the network', nominatimCalls <= 1, String(nominatimCalls));
+// Coordinates, not just "resolved": a table that answers with the WRONG place
+// still plots the same number of pins. These call the shipped staticGeocode
+// directly, so a mis-keyed city is a failure rather than a plausible-looking map.
+const GEO_CASES = [
+  ['Seoul, South Korea', 37.57, 126.98, 'a plain city, country pair'],
+  ['Austin, TX, USA', 30.27, -97.74, 'a US state code'],
+  ['ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ', 33.77, -118.19, 'small caps, including the state code'],
+  ['Wrocław, Poland', 51.11, 17.03, 'a stroked ł, not the centre of Poland'],
+  ['Frankfurt, Germany, moderate confidence', 50.11, 8.68, 'a trailing note segment'],
+  ['Toronto/Vancouver, Canada', 43.65, -79.38, 'a slash pair takes the first place'],
+  ['ʟᴏꜱ ᴀɴɢᴇʟᴇꜱ 📍 ᴀᴜꜱᴛɪɴ', 34.05, -118.24, 'a 📍 pair takes the first place'],
+  ['Melbourne Australia', -37.81, 144.96, 'no comma at all'],
+  ['South Korea', 36.50, 127.90, 'a bare country'],
+  ['Athens, GA, USA', 33.96, -83.38, 'Athens in Georgia'],
+  ['Athens, Greece', 37.98, 23.73, '...and Athens in Greece, told apart'],
+  ['Georgia, USA', 32.17, -82.91, 'Georgia the state, not the country'],
+  ['Washington, USA', 47.75, -120.74, 'bare Washington is the state'],
+  ['Washington, DC', 38.91, -77.04, '...and the district when written as one'],
+  ['Nowhereville, TX, USA', 31.97, -99.90, 'an unknown town still lands in its state'],
+  ['São Paulo, Brazil, Vila Madalena', -23.55, -46.63, 'a neighbourhood suffix'],
+];
+for(const [q, lat, lng, why] of GEO_CASES){
+  const got = staticGeocode(q);
+  check(why, !!got && Math.abs(got.lat - lat) < 0.05 && Math.abs(got.lng - lng) < 0.05,
+    JSON.stringify(q) + ' -> ' + (got ? got.lat + ',' + got.lng : 'null'));
+}
+check('a blank location resolves to nothing, never to a guess', staticGeocode('') === null);
+check('an unplaceable string resolves to nothing rather than a wrong pin',
+  staticGeocode('Zzyzx Quadrant 9') === null);
+check('the fold reaches the gazetteer: "wroclaw" and "Wrocław" agree',
+  JSON.stringify(staticGeocode('wroclaw, poland')) === JSON.stringify(staticGeocode('Wrocław, Poland')));
+
+section('item 16b — a geocoding failure is retried, never permanent');
+// The old code wrote geoStatus:'failed' and filtered those out forever, so one
+// burst of 429s permanently retired a location. Storage carrying that legacy
+// tombstone must be swept, and a fresh failure must not become one.
+await reseed([
+  { id:'x1', name:'Legacy Tombstone', handle:'@x1', category:'tattoo', location:'Seoul, South Korea',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'',
+    geoStatus:'failed' },
+], async (c) => { await c.route('**://nominatim.openstreetmap.org/**', r => r.abort()); });
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(500);
+check('a legacy geoStatus tombstone is swept on load',
+  await tp.evaluate(() => !('geoStatus' in JSON.parse(localStorage.getItem('artistTracker.entries.v1'))[0])));
+check('...and the entry plots again', /^1 artist plotted/.test(await tp.locator('#mapCount').innerText()),
+  JSON.stringify(await tp.locator('#mapCount').innerText()));
+
+// Backoff and retry are seeded as STATE rather than produced by a reload:
+// ctx.addInitScript re-seeds localStorage on every navigation, so a
+// write-then-reload is silently clobbered and the check ends up measuring the
+// harness. (Verified: a mutation making failures permanent again passed the
+// reload-based version of this check.)
+let backoffCalls = 0;
+await reseed([
+  { id:'x2', name:'Fresh Failure', handle:'@x2', category:'tattoo', location:'Nowhere Quadrant Zzyzx',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'',
+    geoTries:1, geoFailedAt:Date.now() },
+], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => {
+    backoffCalls++;
+    return r.fulfill({ status:429, contentType:'text/plain', body:'Too Many Requests' });
+  });
+});
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(1600);
+check('a failure just recorded is left alone rather than hammered',
+  backoffCalls === 0, String(backoffCalls));
+
+let retryCalls = 0;
+await reseed([
+  { id:'x3', name:'Aged Failure', handle:'@x3', category:'tattoo', location:'Nowhere Quadrant Zzyzx',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'',
+    geoTries:1, geoFailedAt: Date.now() - (8 * 60 * 60 * 1000) },
+], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => {
+    retryCalls++;
+    return r.fulfill({ status:429, contentType:'text/plain', body:'Too Many Requests' });
+  });
+});
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(1600);
+check('once the backoff expires the location IS retried, not retired forever',
+  retryCalls >= 1, String(retryCalls));
+const retryState = await tp.evaluate(() =>
+  JSON.parse(localStorage.getItem('artistTracker.entries.v1'))[0]);
+check('...and the retry is counted, so it cannot spin forever',
+  (retryState.geoTries || 0) === 2, JSON.stringify(retryState.geoTries));
+
+let cappedCalls = 0;
+await reseed([
+  { id:'x4', name:'Exhausted', handle:'@x4', category:'tattoo', location:'Nowhere Quadrant Zzyzx',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'',
+    geoTries:3, geoFailedAt: Date.now() - (8 * 60 * 60 * 1000) },
+], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => {
+    cappedCalls++;
+    return r.fulfill({ status:429, contentType:'text/plain', body:'Too Many Requests' });
+  });
+});
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(1600);
+check('a location that has failed its cap stops being asked about',
+  cappedCalls === 0, String(cappedCalls));
+
+// ---------------------------------------------------------------------------
+// item 17 — the map results panel
+// ---------------------------------------------------------------------------
+section('item 17 — map results panel');
+const PANEL_SEED = [
+  { id:'p1', name:'Seoul One', handle:'@p1', category:'tattoo', location:'Seoul, South Korea',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:['fine line'], gender:'woman',
+    notes:'Books open in spring, worth the wait.' },
+  { id:'p2', name:'Seoul Two', handle:'@p2', category:'tattoo', location:'Seoul, South Korea',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:['ornamental'], gender:'unknown', notes:'' },
+  { id:'p3', name:'Seoul Three', handle:'@p3', category:'following', location:'Seoul, South Korea',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+  { id:'p4', name:'Berlin One', handle:'@p4', category:'tattoo', location:'Berlin, Germany',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:['blackwork'], gender:'unknown', notes:'' },
+  { id:'p5', name:'Nowhere', handle:'@p5', category:'tattoo', location:'',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'' },
+];
+await reseed(PANEL_SEED, async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => r.abort());
+});
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(700);
+
+check('the panel sits beside the map', await tp.locator('#mapPanel').isVisible());
+check('with nothing selected it lists what is in view',
+  (await tp.locator('#mapPanelTitle').innerText()).trim() === 'in view',
+  JSON.stringify(await tp.locator('#mapPanelTitle').innerText()));
+const inView = await tp.locator('#mapPanelList .map-panel-item').count();
+check('...and that is the plottable, filtered set', inView === 4, String(inView));
+check('the panel reuses the list row markup rather than a second card style',
+  await tp.locator('#mapPanelList .map-panel-item .entry').count() === inView);
+check('notes are shown in the panel',
+  (await tp.locator('#mapPanelList').innerText()).includes('Books open in spring'));
+check('an Instagram link is offered per artist',
+  await tp.locator('#mapPanelList .map-panel-ig').count() === inView);
+check('...pointing at the right profile',
+  (await tp.locator('#mapPanelList .map-panel-ig').first().getAttribute('href')).includes('instagram.com/'));
+check('...and it is a SIBLING of the row, never a link inside a button',
+  await tp.locator('#mapPanelList .entry a').count() === 0);
+
+// Filters must reach the panel, not just the pins.
+await tp.locator('.chip[data-cat="tattoo"]').click();
+await tp.waitForTimeout(400);
+const tattooOnly = await tp.locator('#mapPanelList .map-panel-item').count();
+check('the panel respects the category filter', tattooOnly === 3, String(tattooOnly));
+await tp.fill('#searchInput', 'berlin');
+await tp.waitForTimeout(400);
+check('...and the search box',
+  (await tp.locator('#mapPanelList .map-panel-item').count()) === 1,
+  String(await tp.locator('#mapPanelList .map-panel-item').count()));
+await tp.fill('#searchInput', '');
+await tp.locator('.chip[data-cat="all"]').click();
+await tp.waitForTimeout(400);
+
+// Clicking a pin pins the selection and lists everyone sharing that spot.
+const pinCount = await tp.locator('.map-pin').count();
+check('pins are on the map to click', pinCount > 0, String(pinCount));
+if(pinCount > 0){
+  await tp.locator('.map-pin').first().click({ force:true });
+  await tp.waitForTimeout(400);
+  const title = (await tp.locator('#mapPanelTitle').innerText()).trim();
+  const listed = await tp.locator('#mapPanelList .map-panel-item').count();
+  check('clicking a pin names the place', title !== 'in view', JSON.stringify(title));
+  check('...and lists what is at it', listed >= 1, String(listed));
+  check('...and offers a close control', await tp.locator('#mapPanelClose').isVisible());
+  await tp.locator('#mapPanelClose').click();
+  await tp.waitForTimeout(300);
+  check('close returns the panel to the viewport list',
+    (await tp.locator('#mapPanelTitle').innerText()).trim() === 'in view');
+
+  // A LONE pin listing one artist proves nothing about "everyone at this
+  // location" — the three Seoul entries collapse into a cluster, and that is
+  // the case worth asserting. Clicking it must list all three, and must NOT
+  // just zoom the way it used to.
+  const clusters = await tp.locator('.marker-cluster').count();
+  check('the Seoul entries collapse into a cluster to click', clusters === 1, String(clusters));
+  if(clusters > 0){
+    const zoomBefore = await tp.evaluate(() => document.querySelectorAll('.marker-cluster').length);
+    await tp.locator('.marker-cluster').first().click({ force:true });
+    await tp.waitForTimeout(500);
+    check('clicking a cluster lists every artist in it',
+      (await tp.locator('#mapPanelList .map-panel-item').count()) === 3,
+      String(await tp.locator('#mapPanelList .map-panel-item').count()));
+    check('...names their shared location',
+      (await tp.locator('#mapPanelTitle').innerText()).trim() === 'Seoul, South Korea',
+      JSON.stringify(await tp.locator('#mapPanelTitle').innerText()));
+    check('...and opens the panel instead of only zooming',
+      (await tp.locator('.marker-cluster').count()) === zoomBefore,
+      'clusters before ' + zoomBefore + ', after ' + (await tp.locator('.marker-cluster').count()));
+    await tp.locator('#mapPanelClose').click();
+    await tp.waitForTimeout(250);
+  }
+
+  await tp.locator('.map-pin').first().click({ force:true });
+  await tp.waitForTimeout(300);
+  await tp.keyboard.press('Escape');
+  await tp.waitForTimeout(300);
+  check('Escape clears a pinned selection',
+    (await tp.locator('#mapPanelTitle').innerText()).trim() === 'in view');
+
+  // Hovering a panel row highlights its marker, and the reverse.
+  await tp.locator('#mapPanelList .map-panel-item').first().hover();
+  await tp.waitForTimeout(250);
+  check('hovering a panel row highlights something on the map',
+    await tp.evaluate(() => !!document.querySelector('[data-hi="true"]')));
+  await tp.locator('#mapPanelTitle').hover();
+  await tp.waitForTimeout(250);
+  check('...and the highlight is released',
+    await tp.evaluate(() => !document.querySelector('.map-pin[data-hi="true"], .marker-cluster[data-hi="true"]')));
+}
+
+// A pinned selection that the filters empty must not linger as a stale list.
+if(pinCount > 0){
+  await tp.locator('.map-pin').first().click({ force:true });
+  await tp.waitForTimeout(300);
+  await tp.fill('#searchInput', 'zzzz-no-match');
+  await tp.waitForTimeout(400);
+  check('a pinned selection emptied by a filter drops itself',
+    (await tp.locator('#mapPanelTitle').innerText()).trim() === 'in view',
+    JSON.stringify(await tp.locator('#mapPanelTitle').innerText()));
+  await tp.fill('#searchInput', '');
+  await tp.waitForTimeout(300);
+}
+
+// Narrow viewport: stacked, not squeezed.
+await tp.setViewportSize({ width:390, height:780 });
+await tp.waitForTimeout(400);
+const stacked = await tp.evaluate(() => {
+  const m = document.getElementById('mapContainer').getBoundingClientRect();
+  const p = document.getElementById('mapPanel').getBoundingClientRect();
+  return { mapW:Math.round(m.width), panelW:Math.round(p.width), below: p.top >= m.bottom - 2 };
+});
+check('on a phone the panel stacks below the map', stacked.below, JSON.stringify(stacked));
+check('...at full width, not squeezed beside it', stacked.panelW > 300, JSON.stringify(stacked));
+check('no horizontal overflow with the panel open',
+  await tp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+await tp.setViewportSize({ width:1280, height:900 });
+await tp.waitForTimeout(300);
 
 await tctx.close();
 tp = null;
@@ -1058,8 +1386,8 @@ const m = await ctx.newPage();
 await stub(m);
 await m.setViewportSize({ width:390, height:780 });
 await m.goto(URL_, { waitUntil:'domcontentloaded' });
-await m.waitForSelector('.entry');
-await m.locator('.entry').first().click();
+await m.waitForSelector('#list .entry');
+await m.locator('#list .entry').first().click();
 await m.waitForTimeout(SLIDE);
 const mbox = await m.locator('#drawer').boundingBox();
 check('drawer is full-width on mobile', Math.abs(mbox.width - 390) < 2, mbox.width + 'px');
@@ -1070,7 +1398,7 @@ check('no horizontal overflow on mobile',
 section('screenshots + page health');
 if(shotsDir){
   if(await isOpen()){ await page.keyboard.press('Escape'); await page.waitForTimeout(SLIDE); }
-  await page.locator('.entry').first().click();
+  await page.locator('#list .entry').first().click();
   await page.waitForTimeout(SLIDE);
   await page.screenshot({ path: path.join(shotsDir, 'drawer-view.png') });
   await page.locator('#detailEdit').click();
