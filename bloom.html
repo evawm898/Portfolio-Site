@@ -30,8 +30,25 @@
 
 <canvas id="bloom-canvas"></canvas>
 
+<!-- VIEW box — the flower's own vocabulary (DEFAULT/FRONT/SIDE/TOP-DOWN/
+     ISOMETRIC), framed to whatever is currently built. Selecting FAN
+     placement snaps this to TOP-DOWN itself (bloom.js, on the placement
+     transition) — no button, unlike the flower's manual "Auto-center
+     (top-down)". Pure view chrome: `viewPreset` is a raw DOM reference in
+     bloom.js, exactly like `autoRotate` below — neither is a registry
+     control, so neither is visible to readUI(), DEFAULTS, export, or any
+     gate that reads UI state. -->
 <aside class="bl-viewpanel" aria-label="View controls">
   <div class="bl-eyebrow">View</div>
+  <div class="bl-ctrl">
+    <select id="viewPreset" aria-label="Camera preset">
+      <option value="default">DEFAULT (3/4)</option>
+      <option value="front">FRONT</option>
+      <option value="side">SIDE</option>
+      <option value="top">TOP-DOWN</option>
+      <option value="iso">ISOMETRIC</option>
+    </select>
+  </div>
   <div class="bl-toggle">
     <label for="autoRotate">Auto-rotate</label>
     <input type="checkbox" id="autoRotate" checked>
