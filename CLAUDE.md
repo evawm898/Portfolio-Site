@@ -43,7 +43,10 @@ profile, always beside the same bloom undifferentiated as the control — and
 SLOT roles have their own: `node tools/shot-bloom-orchid.mjs <dir>` — the
 labellum below, the hood above, FACE-ON as the headline (the reverse of the
 iris sheet's order, on purpose), with session A's iris on it as a cell that
-must be unmoved.
+must be unmoved. The FAN placement has one too:
+`node tools/shot-bloom-fan.mjs <dir>` — face-on with the mirror line drawn
+(from a per-cell measurement, never a layout guess), the toggle's two
+positions as a pair, a spacing sweep, and a radial bloom as the control.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
@@ -51,6 +54,37 @@ whorl joined to nothing and that gate still reports ONE piece, because
 consecutive foot annuli overlap each other. `junctionAssertions()` (J1–J6) in
 both gates is what carries that claim; do not weaken it on the strength of a
 green flood fill.
+
+**EVERY REPORT ENDS WITH A BALL-HOLDER LINE** (Eva, Sep 2) — one line, last thing in the
+message, exactly one of:
+`WAITING ON EVA: <the single question>` / `WAITING ON MEASUREMENT/CI: nothing needed from
+Eva` / `DONE — merged as <sha>. Safe to archive this session.`
+A report without it is incomplete, including when the answer is obviously "nothing".
+**Eva never merges a PR herself** — the merge is always the session's own final step,
+released by her ruling; her only recurring actions are ruling on sheets and clicking
+branch deletes. See the charter's "The working loop — who holds the ball".
+
+**A CLOSE-OUT RUNS THE NEWEST BASELINE PLUS THE LIVE PARTITION, NOT THE WHOLE SUITE**
+(Eva, Sep 2). The frozen suite is 1,049 rows and grows by the live matrix every session —
+quadratic in project age, and an afternoon by session 10. From session 11 a close runs the
+NEWEST frozen baseline on both trees (the load-bearing "nothing that shipped before this
+moved") plus the live-matrix partition (the only instrument for the region a change
+affects). The FULL historical suite runs at MILESTONES only: before any production
+publish, or when a change touches the area rule or the export path directly. Baselines are
+RETAINED, never deleted, and CI's `--verify-frozen` still proves every one deep-equal on
+every push — only their routine byte re-export is demoted. Full reasoning, and what it
+gives up, in the charter's "Verification retention" section.
+
+**NOTHING IN THIS PROJECT MEASURES AN AZIMUTH EXCEPT J7 AND Z4b** — established
+by grep, not assumed. Both STL gates are azimuth-blind by construction, and so
+is everything built on them: J1 reads foot frames, J2/J3 read radii, J4 reads
+three lengths, J5/J6 read the depth sequence, Z1–Z6 read role membership. A FAN
+that silently builds a full ring therefore exports watertight, as one piece, at
+an identical triangle count and STL byte length, and passes every other check
+here — measured on a worktree. `J7` (the arc, the notch, the minimum angular
+separation) and `Z4b` (the pairing is a bijection about ONE plane) are the only
+witnesses, and a wrong mirror involution is BIT-IDENTICAL, so only Z4b sees it.
+Do not read a green run as endorsing an arrangement's azimuths.
 
 **Neither STL gate can see zygomorphy at all** — measured on SEVEN worktrees
 across two sessions, not derived: an override that lands on the wrong whorl, a

@@ -1720,6 +1720,410 @@ any of them.
       session A recorded and rejected, since a group per petal is a registry row per petal
       rather than one control id holding several values.
 
+## The working loop — who holds the ball
+
+**RULED Sep 2 (Eva). EVERY SESSION REPORT, AT EVERY STOP, ENDS WITH EXACTLY ONE
+BALL-HOLDER LINE.** Not a summary sentence, not a status paragraph — one line, in one of
+these three forms, as the last thing in the message:
+
+    WAITING ON EVA: <the single question>
+    WAITING ON MEASUREMENT/CI: nothing needed from Eva
+    DONE — merged as <sha>. Safe to archive this session.
+
+**A REPORT WITHOUT THE LINE IS INCOMPLETE.** It applies to every stop, including the
+final one, and including stops where the answer is obviously "nothing" — an obvious state
+that is never written down is a state the reader has to infer from prose, which is the
+whole problem this fixes.
+
+**EVA NEVER MERGES A PULL REQUEST HERSELF.** The merge is always the session's own final
+step, released by her ruling. Her only two recurring actions in this project are RULING ON
+SHEETS and CLICKING BRANCH DELETES; a session is archivable the moment its last message
+reports a merge sha.
+
+**WHY IT IS A RULE AND NOT A HABIT.** A close-out generates a lot of true sentences —
+gate results, row counts, partition tables — and every one of them competes with the only
+question the reader actually has: *is this mine now?* The line answers that before the
+prose is read, in a fixed place, in fixed words. `WAITING ON EVA` carries exactly ONE
+question, because two questions in a ball-holder line is a report that has not decided
+what it needs.
+
+## Verification retention — how much of the frozen suite a close-out runs
+
+**RULED Sep 2, from this session's own close-out. FROM SESSION 11 ONWARD a session's
+close runs the NEWEST baseline plus the LIVE-MATRIX partition; the FULL historical suite
+runs only at MILESTONES.** The historical baselines are RETAINED, never deleted — only
+their routine byte-comparison is demoted.
+
+**THE REASONING, AND IT IS A MEASUREMENT RATHER THAN AN IMPRESSION.** The suite is
+1,049 rows and it grows by the whole live matrix every session — 47, then 76, 86, 106,
+125, 158, 205, 246. That is **quadratic in project age**: each session adds a baseline
+whose size is the current matrix, and every later close re-runs all of them, on two trees
+each. This close-out spent an afternoon on it. Session 11's would spend longer, for
+strictly less new information than the same minutes spent anywhere else.
+
+**WHAT A CLOSE RUNS, and why each piece is the right one:**
+
+  * **THE NEWEST BASELINE, on both trees.** It is the parent tree's own matrix, so it
+    carries every corner every earlier baseline carries PLUS the ones the last session
+    added — which is exactly the reasoning that has promoted each baseline to "strongest"
+    in turn since phase4. **This is the load-bearing byte-identity claim**: "nothing that
+    shipped before this change moved."
+  * **THE LIVE-MATRIX PARTITION.** The new rows cannot appear in any frozen matrix — for
+    the fourth session running, `--full` could not compare across the two trees at all
+    because the new rows set controls the old registry does not declare. The live
+    partition is the only instrument for the region a change actually affects.
+  * **CI's `--verify-frozen` IS UNCHANGED AND RUNS ON EVERY PUSH**, proving every frozen
+    matrix deep-equal to its own base commit's `buildMatrix()`. So the baselines keep
+    being checked for what they ARE; what is demoted is only re-exporting their bytes.
+
+**WHAT A MILESTONE IS, stated so it is not decided by mood:** before any production
+publish, or when a change touches the AREA RULE or the EXPORT PATH directly. Both are the
+places a byte can move on a row nobody thought to look at — the area rule because every
+foot feeds it and the trap has now fired five times, and the export path because the
+floor is evaluated there and live/export geometry legitimately differ.
+
+**WHAT THIS GIVES UP, said plainly rather than discovered later.** A defect that moves a
+row present in phase2 but absent from the newest baseline would now be caught at the next
+milestone instead of the next close. That row set shrinks every session (the newest
+baseline is a superset in coverage of nearly everything older) and no such defect has ever
+been observed in ten sessions — but "never observed" is not "impossible", and this is the
+exposure the ruling accepts in exchange for the minutes.
+
+- ~~Session 10 — the fan arrangement~~ **BUILT Sep 2. The fourth `placement` value ships:
+  a symmetric arc across one axis, in the flower's own control vocabulary, with the
+  zygomorphy roles composing onto it rather than being redone.** The ruling that queued it
+  is kept below the build notes, unchanged, because every one of its predictions is
+  answerable now and three of them were wrong in instructive ways.
+
+    - **THE HUB STAYS A FULL DISC, AND THE LOUD-PLUMBING QUESTION ANSWERED ITSELF IN mm².**
+      The sector was analysed and rejected from four directions at once, each measured
+      rather than argued. (1) **A sector is not a sector.** A foot is a box of `ring.width`
+      across, so it subtends an ANGLE that grows as it runs inward: 13.94° at the ring and
+      22.47° at the foot's inner edge at 17 petals, 35.89°/50.33° at two, and **52.20° at
+      the ring at spread 0.60**. A sector derived from the occupied span would have to be
+      padded by that on both sides — at the tight corner (2 petals × 15° spacing) the
+      arrangement spans 15° and the sector needs 15 + 2×50.33 = **115.7°, 7.7× the fan's
+      own span**. (2) **It must contain the axis, where its width vanishes.** At spread
+      0.60 the feet CROSS the axis — inner edge **−0.894 mm** at two petals ALL THIN — so a
+      sector apexed at the axis has vanishing width exactly where J4's overlap box must be
+      ≥ 1.5 × 1.6 × 1.0 mm. (3) It breaks `buildCenterInto`'s connectedness clause, which
+      is *"centre ∩ hub is a solid region of the centre's FULL footprint — not a band whose
+      width has to be argued about"*; over a sector it becomes exactly such a band. (4) It
+      **does not reliably save triangles**: 28 at a 30° span but **274 against the disc's
+      192 at 340°**, so the state where a sector would matter most is the one where it
+      costs more.
+
+      **AND THE DECIDING NUMBER IS THAT THE FAN CANNOT MAKE A PLATE ANYONE HAS NOT ALREADY
+      RULED ON.** The fan's worst hub is 17 petals × spread 6.00 → **77.4 mm diameter,
+      3,013 mm² of bare plate**, against the RADIAL 40 × spread 6.00 plate that already
+      ships at **118.7 mm and 5,064 mm²**. Even by FRACTION the fan's least-covered state
+      (2 petals × 15°, **8.7%** under feet) has less bare plate in absolute terms —
+      **505 mm² against the shipping RADIAL 3 × spread 6.00's 706 mm²**. The disc was the
+      right answer because spread, not the fan, is what makes plumbing loud, and spread was
+      ruled Aug 31. **The area-ruled annular band stays parked, now with this evidence
+      attached** — and the area rule itself is untouched, because it sums `rFoot²` over
+      feet and is blind to where they sit around the axis.
+
+      **J1–J4 SURVIVE THE FAN VERBATIM, and that is a property of how they were written:**
+      every clause is stated over radii, thicknesses and foot FRAMES, and not one of them
+      mentions an azimuth. The overlap box measures **2.400 mm³ per whorl** at the fan's
+      worst corner — the SAME number as the single-ring, layered and continuous corners,
+      because none of `overhang`, `width` or `thickness` is a function of azimuth either.
+
+    - **THE COUNT IS DERIVED AND `petalCount` IS HIDDEN — the `layerPhase` treatment
+      (Eva, Sep 2).** A fan's count is `2 × perSide + (a mirror-line petal ? 1 : 0)`.
+      Reusing `petalCount` was costed and rejected on a sharper ground than a read-out
+      lie: a stored 8 would render as 8 petals under RADIAL and **17 under FAN**, which is
+      a label lie on a **PERSISTED key** — the thing `RETIRED_IDS` exists for — and
+      switching RADIAL → FAN at 40 would silently ask for 81 petals, past every measured
+      extreme. Making `petalCount` the TOTAL instead was also rejected: the toggle fixes
+      the count's PARITY, so the two controls would fight. The read-out prints the derived
+      total, so the number the visitor loses is still on screen, and **three named rows
+      assert `petalCount` is hidden AND inert** (3, 8 and 40 under FAN must be
+      bit-identical). `layerPhase` hides too, for a reason of its own: offsetting a whorl
+      would rotate the inner fan OFF the mirror line — which is also **why the fan is the
+      first placement where slot roles reach three whorls**, since `phase` is 0 on every
+      descriptor by construction rather than by a value the visitor happened to leave alone.
+
+    - **BOTH INVOLUTIONS WERE ALREADY WRITTEN DOWN, and the fan needed the one derived for
+      a different reason.** Toggle ON uses session B's shipped `i ↔ n−i`, whose FIXED POINT
+      is slot 0 — so the labellum is the mirror-line petal, which is Eva's original fan
+      principle arriving through the role mechanism. Toggle OFF uses the fixed-point-free
+      `i ↔ n−1−i` that session B derived while correcting session A's SPIRAL premise, so
+      every role is a PAIR: the labellum is the INNER pair, the hood the outer one. The
+      arrangement's slot ORDER was built to fit the pairings, not the other way round.
+      **That is the third time this project has derived a piece of mathematics before
+      discovering its purpose, and the first time the earlier session's spare half was
+      picked up unchanged.**
+
+    - **THE TWO-PETAL COLLISION BECAME A STRUCTURAL IMPROVEMENT, which is the entry worth
+      keeping.** One per side with the toggle off is `n = 2`, where the inner pair and the
+      outer pair are the SAME pair. A slot cannot carry two slot roles, so the tie breaks
+      toward the LABELLUM (the fan's defining petal) and the **HOOD comes out EMPTY**.
+      Session B's remedy — push the empty group onto LATERAL, which has no controls — is
+      unavailable, because here the collision is between two CONTROL-BEARING roles. So the
+      other half of that argument was discharged instead: **the hood's controls hide when
+      the hood is empty, and Z1's clause was amended from "every control-bearing role is
+      non-empty at every reachable count" to "a role's controls are VISIBLE if and only if
+      the role is NON-EMPTY", asserted in both directions against `footRing()`'s own
+      census.** Membership and visibility became ONE statement with one owner instead of
+      two rules that could drift, and the amended form catches a converse the old one could
+      not: a role that HAS members while its controls are hidden is "shipped means
+      reachable" violated silently. The panel gate's transition route covers the new hide
+      for free.
+
+    - **THE HEADLINE FINDING: NOTHING IN TEN SESSIONS OF INSTRUMENTS HAD EVER MEASURED AN
+      AZIMUTH — established by grep, not by assumption.** Before this session `azimuth`
+      appeared in this repository only inside `buildWhorlInto`, where it is computed, and
+      `buildPetalInto`, where it is consumed. Nothing recorded one, so nothing could assert
+      one. Both STL gates are azimuth-blind BY CONSTRUCTION — an edge census over a
+      topology no control moves, and a flood fill over a hub disc that spans every ring at
+      every azimuth — and so is everything built on them: J1 reads foot FRAMES, J2/J3 read
+      RADII, J4 reads the overlap box's three dimensions, J5/J6 read the depth sequence,
+      and Z1–Z6 read role membership and the effective state. **A FAN that silently built a
+      full ring would have passed the export gate, the connectedness gate, the triangle
+      count, the STL byte LENGTH, J1–J6 and Z1–Z6 alike.** It was measured on a throwaway
+      worktree and it did exactly that. Azimuth telemetry entered `__bloomMetrics` with the
+      BUILDER as its owner — the slot payload the whorl primitive emitted, never re-derived
+      from `placement` and the controls, because an instrument that recomputed the law
+      would agree with a mutated law by mutating alongside it.
+
+    - **J7 — THERE IS AN ARC, AND THERE IS A GAP.** Three clauses, all properties of the
+      emitted azimuths: (a) the petals span, about the mirror line, exactly what
+      `footRing()` derived; (b) the notch behind them is its complement — which is the
+      whole of what the word "fan" claims; (c) the minimum angular separation is bounded
+      below, because coincident petals are duplicate geometry (this family's known cause of
+      non-manifold edges, measured at 14,832 when two whorls coincided, which is why
+      `layerSize` caps at 0.90). A fourth clause asserts the arrangement is CENTRED on its
+      own plane, and the "(CAPPED)" flag is asserted in both directions.
+
+      **J7's FIRST DRAFT WAS WRONG AND ITS OWN CONTROL SAID SO, at the corner it exists
+      for.** It measured the span as *"360 minus the LARGEST gap"* — the smallest arc
+      containing every petal, which is right everywhere except where the arc limit bites
+      hard. At 8 per side with a mirror-line petal the step caps to **21.25°** and the
+      notch is **20°**, so **the notch is SMALLER than the spacing** and the largest gap is
+      an ordinary inter-petal one: the shipped tree failed its own new assertion on that
+      row, reporting a 338.82° span against the derived 340°. The span is the extent about
+      the PLANE, which is twice the furthest petal from it. A gate that had only ever been
+      run on the easy rows would have shipped saying something false about the one state it
+      was written for.
+
+    - **Z4 SPLIT INTO Z4a AND Z4b, and the split is what catches a wrong DECLARATION.**
+      Z4a is session B's clause with the involution read from one owner rather than
+      restated: the ROLE assignment must be symmetric under the pairing this bloom
+      declares. It catches an off-by-one in `roleForSlot` — and it cannot catch a wrong
+      declaration, because it compares the roles against the very pairing that is wrong and
+      agrees with itself. **Z4b reads the GEOMETRY instead**, in two clauses: (i) the
+      pairing is a BIJECTION — a permanent clause, because a many-to-one "pairing" reports
+      a perfect symmetry for an arrangement that has none, which is the trap the first
+      instrument written for session B's SPIRAL measurement fell into; and (ii) there is
+      ONE plane — for every slot, the midpoint of its azimuth and its partner's is the same
+      angle modulo π. **The FIXED-POINT slots are what make (ii) bite:** a self-paired slot
+      must lie ON the plane, and a pairing borrowed from the wrong arm puts it where the
+      other pairs' midpoint is not.
+
+    - **THE POSITIVE CONTROLS, RED THEN GREEN, in throwaway worktrees** (`git worktree
+      add`, never mutate-and-restore), each run against the FULL shipped instrument BEFORE
+      the new assertions were written and again after. Every mutation exports watertight,
+      with zero degenerate triangles, at an identical live and export triangle count and an
+      identical STL byte LENGTH, and every one leaves the RADIAL and SPIRAL control rows
+      clean — so all five are scoped to the new arm.
+
+      | mutation | boundary | degen | STL bytes | before J7/Z4b | after |
+      |---|---|---|---|---|---|
+      | shipped tree | 0 | 0 | — | (see below) | **0 of 8 rows** |
+      | F1 the fan silently builds a RING | 0 | 0 | same length, different bytes | **NOTHING** | **J7 only**, 15 across 6 rows |
+      | F2 the toggle is inverted | 0 | 0 | same length | **NOTHING** | **Z4b + Z1 only**, 8 across 6 rows |
+      | F3 the arc limit never applied | 0 | 0 | same length | **NOTHING** | **J7 only**, 5 on the one row where it binds |
+      | F4 the derived count never reaches the area rule | 0 | 0 | same length | J1 accounting + guard | J1 + guard + Z1, 12 across 4 rows |
+      | F5 the WRONG INVOLUTION | 0 | 0 | **BIT-IDENTICAL** | **NOTHING** | **Z4b + Z1 only**, 4 across 3 rows |
+
+      **F5 IS THE ONE THAT MATTERS.** On the fan's default row it is bit-identical to the
+      shipped tree — `sha c623982e` on both — because with no slot override engaged the
+      role assignment moves no vertex at all. There is no byte to diff, no triangle to
+      count and no STL property to measure; **only comparing the declared pairing against
+      the emitted azimuths can see it.** F1 is the second: same byte LENGTH, different
+      bytes, and invisible to every instrument that existed.
+
+    - **AND THE CONTROLS FOUND A REAL DEFECT IN THE SHIPPED INSTRUMENT BEFORE ANY MUTATION
+      DID — six of eight probe rows fired on the SHIPPED tree.** `zygoAssertions` derived
+      the slot count as `Math.round(Number(ui.petalCount))`, which was correct while every
+      placement's count WAS that slider. The fan makes it inert, so on every FAN row the
+      gate compared a 6- or 7- or 17-slot whorl against the slider's 8: Z3 read `multiRole`
+      TRUE on an unsplit whorl and demanded an absent residual, Z1 reported *"claims 7 of
+      its 8 slots"* on a correct partition, and Z4 read a role for a slot that does not
+      exist and got `undefined`. **A gate deriving a boundary from a control instead of
+      from the owner is this project's most repeated defect, and it had been sitting inside
+      the instrument built to police exactly that.** It reads `m.slotCount` now —
+      `footRing()`'s own answer. This is session A's "Z1's first draft failed the shipped
+      tree on 5 of 7 rows" repeating, and it is the entire argument for running the control
+      before writing the assertion.
+
+    - **BYTE-IDENTITY IS A CONSTRUCTION, AND THE REGROUPING TRAP WAS PREVENTED A FIFTH
+      TIME.** The fan is a BRANCH everywhere — `footRing()`, `buildWhorlInto`,
+      `roleForSlot` — and never a reformulation, so every pre-existing expression is
+      character-for-character what it was. The one thing that had to change shape is the
+      effective count, and it is carried in a variable holding **the same double** the
+      pre-fan expressions held. Measured on 396 (count × width × sheet × delicacy × mode)
+      rows before it was written: substituting that variable is **bit-identical on all
+      396**, while REGROUPING the area-rule sum per foot — the tempting "it is the same
+      rule" rewrite — moves the derived radius on **124 of 396 at up to 4.00 ULP**.
+
+    - **`--phase8` LANDED IN ONE LIST, because the fall-through trap had fired three
+      times.** `diff-bloom-bytes.mjs` carried FOUR places a phase name had to be written —
+      the flag constants, `MATRIX_FN`, `--verify-frozen`'s name list and its own function
+      map — and the charter records the trap firing once per matrix added: `--phase3`
+      recorded `matrix:"legacy"` while running `phase3Matrix()`; `--phase4` was accepted
+      while `legacyMatrix()` ran; `--phase7` was added to `MATRIX_FN` and not to
+      `MATRIX_FLAGS`, giving a 47-row report under a 205-row label. Each fix removed one
+      copy and left the next standing, **which is what a fix to a duplication problem does
+      when it does not remove the duplication.** There is one `FROZEN` map now, and adding
+      a matrix is one entry in it.
+
+    - **THE MATRIX GREW 246 → 281**, and **`phase8Matrix()` — the 246 rows frozen at
+      7877bdf — is the seventh baseline and now the strongest**, on the reasoning that
+      promoted each of its predecessors: it is the only one carrying session B's SLOT-ROLE
+      corners, which is the region a fourth placement with its OWN involution is most
+      likely to disturb. The 35 new rows are the region this change affects, named rather
+      than numbered: both toggle positions, the four corners of (perSide × spacing), the
+      arc limit binding both ways, the BARE fan, ALL THIN × spread min (with and without
+      feet crossing the axis), nested fans at three layers, the roles on both involutions,
+      slot roles at depth (which only the fan reaches), the empty-hood gated state, and the
+      hidden-and-inert rows for `petalCount` and `layerPhase`. The three fan controls are
+      kept out of the blanket sweep by a **derived** `PLACEMENT_SUBS` exclusion — a control
+      whose predicate reads `placement` and which is hidden at the shipping defaults —
+      which is the latent trap #124 closed arriving from a third direction. Both clauses of
+      that predicate are load-bearing: without the second it would also exclude the eight
+      slot-role controls, which read `placement` and are deliberately swept at the defaults.
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **281/281** watertight, 0 degenerate, no
+      validity failures. Connectedness gate **281/281 one connected piece**, 0 strays, in
+      632 s — including the corner the whole junction analysis turned on, two petals at a
+      15 deg arc with 345 deg of empty circle behind them. Panel gate PASS, with
+      `--negative-control` firing all four routes; its visibility-transition route picked
+      up `placement -> FAN`, `fanPerSide` and `fanCenterPetal` from the registry with no
+      new code, so the hood's empty-group hide is covered for free. **BYTE-IDENTICAL ON
+      1,049 FROZEN ROWS, 0 MOVED**: legacy 47, phase2 76, phase3 86, phase4 106, phase5
+      125, phase6 158, phase7 205 and phase8 246, each compared against a worktree at its
+      own base commit. All four CI gates green on the head.
+
+    - **A CI FAILURE THIS SESSION CAUSED, AND IT WAS CAUSED BY THE FIX FOR ANOTHER
+      DEFECT — which is the part worth carrying.** Collapsing `diff-bloom-bytes.mjs`'s
+      four phase-name lists into one `FROZEN` map is the right change and it is what the
+      fall-through trap had been asking for since `--phase3`. It also put the list 240
+      lines BELOW the `--verify-frozen` block that now reads it, and `const` hoists
+      without initialising: every `--verify-frozen` run died with "Cannot access
+      'PHASE_NAMES' before initialization". **The four separate lists had been HIDING that
+      hazard rather than being free of it** — each sat beside its own reader, so no
+      ordering dependency existed to get wrong. Unifying duplicated constants creates one.
+      CI caught it on the first run; running `--verify-frozen` once locally would have
+      caught it sooner, and the gate that WAS run exercised the other code path.
+
+    - **AND A CAPTION ASSERTED A BYTE TOTAL NOBODY HAD MEASURED.** The sheet's control
+      cell read "(0 of 803 frozen rows moved)" as established fact while 293 of those rows
+      had actually been compared and the rest were still running. That is the
+      label-naming-a-computation-nobody-performed defect **inside the tool built to
+      photograph evidence** — and worse than a stale number, because a caption is where a
+      figure outlives its run: the total would have sat in that cell across every later
+      session whose matrix grew. The caption states the PROPERTY now and names the one
+      owner of the number; the frozen matrices measure it and the shot tool does not.
+
+    - **EVA'S RULINGS FROM THE SHEET (Sep 2). THE FAN SHIPS.** Four rulings, and only
+      one of them moved anything:
+
+        * **THE TOGGLE DEFAULTS TO ON, DELIBERATELY DIVERGING FROM THE FLOWER'S OWN
+          DEFAULT — and both halves are recorded so the divergence reads as chosen.** The
+          flower ships `bilCenterPetal` FALSE, and every other thing about this control —
+          its range, its labels, its hint text, its spacing law — is the flower's exactly.
+          Matching it was the obvious call. What outranked it is Eva's own founding fan
+          principle, *the petal on the mirror line is petal number one, and it has its own
+          sliders*: with the toggle ON, slot 0 IS that petal and IS the labellum, because
+          slot 0 is the through-slot involution's fixed point. A fresh fan should open
+          showing the principle it was built on rather than the state where that principle
+          has no single petal to point at. **Consistency with the older page lost to the
+          idea the newer one is for**, and that is the ruling, not an oversight.
+        * **THE SPACING RANGE SHIPS AS-IS** — 15–60°, the flower's own, unchanged.
+        * **THE PAIRED LABELLUM ON TOGGLE-OFF IS FINE.** Ruled from the cell where one
+          control drives two petals and the area rule multiplies that group by 2.
+        * **THE 340° EXTREME KEEPS ITS 170° LIMIT, PHOTOGRAPHED** — the standing pattern
+          for extremes, joining the max-roll faceting, the ROLL CLAMP look, the spread-6
+          plate and the 135°/161.25° tilts. **Tightening the limit remains one constant
+          change with that cell as its evidence; do not tighten it on the strength of the
+          number alone.**
+
+    - **THE DEFAULT CHANGE IS ITS OWN EVENT, WITH THE PARTITION ASSERTED IN THREE
+      DIRECTIONS** — the `spread` 1.00 → 2.00 and `centerStyle` NONE → DISC precedent,
+      which this session followed rather than folding the ruling into the feature commit.
+      The third direction is the one worth naming, because it is a claim about the
+      GEOMETRY rather than about the rows: **`fanCenterPetal` is INERT outside FAN**, so
+      every non-FAN row must be bit-identical no matter what the default is. Measured on
+      the live matrix, before and after:
+
+      | partition | rows | expected | measured |
+      |---|---|---|---|
+      | non-FAN (the control is inert) | 246 | bit-identical | **246, 0 moved** |
+      | FAN, PINS the toggle | 10 | bit-identical | **10, 0 moved** |
+      | FAN, INHERITS the default | 25 | all move | **25, all 25 moved** |
+
+      **And the 1,049 frozen rows are the same claim at its strongest**: not one of them
+      can select FAN, so the whole historical suite is the non-FAN partition. Measured on phase8's 246 rows across both trees:
+      **0 moved.** Checked in BOTH directions rather than by counting: **no moved row is
+      anything but fan-inheriting, and no fan-inheriting row failed to move.**
+
+      **AND THE DEFAULT CHANGE COST EIGHT ROWS THEIR COVERAGE ON THE WAY THROUGH, which
+      is the charter's own "A DEFAULT IS NOT COVERAGE" rule firing on a default this
+      session moved.** Eight FAN rows named a toggle position in their LABEL and inherited
+      it rather than pinning it — including the two-petal corner and the GATED empty-hood
+      row, which is the state this session's one design ruling is about. The moment the
+      default moved they all began building the ON arrangement while every label still
+      said OFF, **the toggle-OFF region went to zero coverage, and every one of them still
+      passed** — on a design nobody had asked them to check. A row that NAMES a state now
+      SETS it (`FAN_OFF` / `FAN_ON` beside the inheriting `FAN`), which is the centre
+      rig's own rule arriving one level up. Matrix 281 -> 282.
+
+    - **THE FAN SHEET, and the mirror line is drawn from a measurement.**
+      `node tools/shot-bloom-fan.mjs <dir>` — the flower-fan composition Eva liked: face-on
+      as the headline with the plane running vertically down every frame, the toggle pair
+      side by side, a spacing sweep, fan × labellum on both involutions, the two-petal
+      corner, the capped extreme, and one RADIAL bloom unchanged as the control. The
+      vertical line is legitimate because the face-on camera is rolled so the plane's trace
+      is vertical — but a line drawn at a fixed place is exactly the kind of label that
+      stops matching its computation, so **every cell measures the plane from the emitted
+      azimuths and the sheet aborts if it is not where the line is.**
+
+      **BOTH OF THE SHEET'S OWN CHECKS FIRED BEFORE IT COULD BE PUBLISHED, and neither
+      defect was visible by eye.** (1) THE FIRST RENDER CROPPED THE TIGHT FANS. Every
+      arrangement before this one was radially symmetric, so its bounding sphere sat on the
+      axis and framing at the ORIGIN with a radius was correct; a fan puts all its mass on
+      one side, and the `Spacing 15°` cell — the one meant to show the fan at its most
+      closed — showed the top third of itself. It targets the model's own bounding-sphere
+      centre now (the app reports the sphere it already computes) and DECODES THE PNG to
+      require a 12 px clear margin on all four edges, widening in bounded steps and dying
+      rather than writing a picture nobody should rule from. (2) THE PLANE MEASUREMENT WAS
+      WRONG, and the radial CONTROL cell is what caught it: taking the plane as the
+      midpoint of the arrangement's angular EXTENT is right for an arc and meaningless for
+      a full circle, where +180 and −180 are the same direction and the normalisation
+      decides the answer. It measured 22.500° for a bloom whose plane is plainly at 0. It
+      uses the mirror-PAIR midpoints now — the same property Z4b asserts — which gives 0
+      for the ring and 0 for both fan arms, because it asks the question the plane
+      actually answers.
+
+    - **TWO CLAIMS IN THE QUEUING RULING WERE MEASURED AND CORRECTED — the
+      rationale-is-a-premise doctrine again, on this document, which is the failure mode it
+      was written to catch.** The ruling below says *"for the first time the hub's job
+      changes SHAPE"*: it does not. The feet do occupy an arc, and the hub's job — span
+      every foot with a solid overlap — is stated over RADII and is unchanged by where the
+      feet sit around the axis. And it says *"every junction assertion J1–J4 is written per
+      RING and will need re-reading against an arc: containment, the foot reaching the hub,
+      and the overlap box are all stated over a full circle today."* **They are not stated
+      over a circle at all** — J1 reads foot frames, J2/J3 read radii, J4 reads three
+      lengths, and not one clause mentions an azimuth. None of them needed a character
+      changed. That is the same property that made them useless against the fan's own
+      failure mode, which is why J7 exists: **the reason J1–J4 survived the fan untouched
+      and the reason they could not police it are one reason.**
+
+  **THE RULING THAT QUEUED THIS SESSION, kept verbatim below.**
+
 - ~~Session 10~~ **RULED AND QUEUED (Eva, Sep 2): SESSION 10 IS THE FAN ARRANGEMENT — a
   FOURTH `placement` value.** Not a role, not an override: an arrangement, so it belongs to
   `buildWhorlInto` and `footRing()` beside RADIAL / SPIRAL / CONTINUOUS. Its controls, as
