@@ -295,6 +295,7 @@ let lastSlotAzimuths = [];
    every row rather than comment that they do. */
 let lastPlacement = 'RADIAL';
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
+let lastFitCenter = [0, 0, 0];
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
    there is no registry row, no DOM input, and no listener that writes it —
@@ -608,6 +609,14 @@ function regenerate() {
      instead of inventing a proxy from the bounding box. */
   geo.computeBoundingSphere();
   lastFitRadius = geo.boundingSphere.radius;
+  /* THE SPHERE'S CENTRE, not just its radius — and the fan is what made it
+     matter. Every arrangement before this one was radially symmetric, so the
+     bounding sphere sat on the axis and framing at the origin with a radius
+     was enough. A FAN puts all its mass on one side: at 3 per side x 15 deg
+     its centre is metres from the origin in model terms, and a shot framed at
+     the origin crops it. `fitCamera` already accepts a target; it had nothing
+     truthful to point at until now. Telemetry only — no geometry reads it. */
+  lastFitCenter = [geo.boundingSphere.center.x, geo.boundingSphere.center.y, geo.boundingSphere.center.z];
   if (!userMoved) fitCamera(lastFitRadius);
   liveSummary = summarise(ui, acc, 'live', built.rings, built.foot) + `\n${materialLines(ui)}`;
   readout.textContent = liveSummary;
@@ -672,6 +681,7 @@ window.__bloomMetrics = () => ({
   liveTris: lastTris,
   maxDimMm: lastMaxDim,
   fitRadius: lastFitRadius,
+  fitCenter: [...lastFitCenter],
   capability: capability ? capability.label : null,
   /* THE PETAL'S OWN MEASUREMENTS, from the builder that made it. The
      capability assertions and the single-petal framing read these rather

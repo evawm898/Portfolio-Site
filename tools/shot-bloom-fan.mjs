@@ -44,8 +44,9 @@
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
+import { decodePNG } from './pngdec.mjs';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
-         junctionAssertions, zygoAssertions, JUNCTION_SCOPE, DEFAULTS } from './bloom-harness.mjs';
+         junctionAssertions, zygoAssertions, JUNCTION_SCOPE, DEFAULTS, mirrorPartner } from './bloom-harness.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-fan';
 const { server, port } = await serveRepo();
@@ -87,11 +88,32 @@ async function cell({ label, set = [], note = '', expectFan = true }) {
   let plane = null;
   if (m.slotRolesEligible && Array.isArray(m.slotAzimuths) && m.slotAzimuths.length) {
     const row = m.slotAzimuths[0];
-    const hi = Math.max(...row.map((a) => { const d = ((a * DEG) % 360 + 360) % 360; return d > 180 ? d - 360 : d; }));
-    const lo = Math.min(...row.map((a) => { const d = ((a * DEG) % 360 + 360) % 360; return d > 180 ? d - 360 : d; }));
-    plane = (hi + lo) / 2;
-    if (Math.abs(plane) > 1e-9) {
-      await die(`${label}: the arrangement's mirror plane measures ${plane.toFixed(6)} deg, not 0 — the vertical line this sheet draws would not be the model's plane`);
+    const n = row.length;
+    /* THE PLANE FROM THE MIRROR PAIRS, which is the same property Z4b
+       asserts: for two slots that are reflections of each other, the midpoint
+       of their azimuths IS the plane, modulo pi (a plane is an axis, not a
+       direction).
+
+       THE OBVIOUS MEASUREMENT WAS WRONG AND THIS SHEET'S OWN CHECK CAUGHT IT.
+       The first draft took the plane as the midpoint of the arrangement's
+       angular EXTENT — max and min signed azimuth — which is right for an arc
+       and MEANINGLESS for a full circle: the RADIAL control cell has petals
+       at 0..315 deg, where +180 and -180 are the same direction and which one
+       the normalisation picks decides the answer. It measured 22.500 deg for
+       a bloom whose plane is plainly at 0, and refused to render. Using the
+       pairs instead gives 0 for the ring and 0 for both fan arms, because it
+       asks the question the plane actually answers. */
+    const planes = [];
+    for (let i = 0; i < n; i++) {
+      const j = mirrorPartner(i, n, m.mirror);
+      let phi = ((row[i] + row[j]) / 2) * DEG;
+      phi = ((phi % 180) + 180) % 180;
+      planes.push(phi);
+    }
+    const off = planes.find((phi) => Math.min(Math.abs(phi), 180 - Math.abs(phi)) > 1e-6);
+    plane = planes[0];
+    if (off !== undefined) {
+      await die(`${label}: a mirror pair puts the plane at ${off.toFixed(6)} deg rather than vertical — the line this sheet draws would not be the model's plane`);
     }
   }
 
@@ -102,16 +124,58 @@ async function cell({ label, set = [], note = '', expectFan = true }) {
     .filter((r, i, a) => a.findIndex((x) => x.slotRole === r.slotRole) === i)
     .map((r) => `${r.slotRole.toLowerCase()} ${r.slots.length === 1 ? `slot ${r.slots[0]}` : `slots ${r.slots.join('+')}`}`).join(' · ');
 
+  /* ===================================================================
+     FRAMING, AND IT IS ASSERTED FROM THE PIXELS RATHER THAN TRUSTED.
+
+     THE FAN BROKE THE FRAMING EVERY EARLIER SHEET RELIED ON, and the sheet's
+     own check is what caught it. Every arrangement before this one was
+     radially symmetric, so its bounding sphere sat on the axis and framing at
+     the ORIGIN with a radius was correct. A fan puts all of its mass on one
+     side: at 3 per side x 15 degrees the first render ran clean off the
+     bottom of the frame, and the cell that was supposed to show the fan at
+     its most closed showed the top third of it.
+
+     A CROPPED CELL IS THE ONE PICTURE THAT COULD CARRY A RULING WITH THE
+     SUBJECT MISSING — the same rule the panel sheet states, which asserts its
+     own frame for the same reason. So this targets the model's OWN centre
+     (the app reports the bounding sphere it already computed) and then DECODES
+     THE PNG and requires a clear margin of background on all four edges. If
+     it cannot frame the cell it dies rather than writing a picture nobody
+     should rule from. */
   const shots = {};
   for (const [view, dir, up] of [['face', [0, 0, 1], FACE_UP], ['profile', [1, 0, 0], null]]) {
-    await page.evaluate(([r, d, u]) => window.__bloomFrame(r, 0, [0, 0, 0], d, u), [m.fitRadius, dir, up]);
-    await page.waitForTimeout(220);
     const file = path.join(outDir, `${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${view}.png`);
-    await page.screenshot({ path: file, clip: { x: 0, y: 0, width: 900, height: 900 } });
+    let framed = false;
+    /* The radius the app's own fit would use, widened in steps only if the
+       measured content still reaches an edge. Widening is bounded and every
+       step is checked, so a cell can never quietly settle for a crop. */
+    for (const grow of [1.15, 1.4, 1.8, 2.4]) {
+      await page.evaluate(([r, c, d, u]) => window.__bloomFrame(r, 0, c, d, u), [m.fitRadius * grow, m.fitCenter, dir, up]);
+      await page.waitForTimeout(220);
+      await page.screenshot({ path: file, clip: { x: 0, y: 0, width: 900, height: 900 } });
+      const { width, height, data: pixels } = decodePNG(fs.readFileSync(file));
+      /* The canvas background is a known flat colour (0x0c0f0e), so "content"
+         is any pixel far enough from it. A 12px margin, because a petal tip
+         touching the very edge is already a crop in the making. */
+      const M = 12;
+      const isBg = (x, y) => {
+        const o = (y * width + x) * 4;
+        return Math.abs(pixels[o] - 0x0c) < 10 && Math.abs(pixels[o + 1] - 0x0f) < 10 && Math.abs(pixels[o + 2] - 0x0e) < 10;
+      };
+      let touches = false;
+      for (let x = 0; x < width && !touches; x++) {
+        for (let y = 0; y < M; y++) if (!isBg(x, y) || !isBg(x, height - 1 - y)) { touches = true; break; }
+      }
+      for (let y = 0; y < height && !touches; y++) {
+        for (let x = 0; x < M; x++) if (!isBg(x, y) || !isBg(width - 1 - x, y)) { touches = true; break; }
+      }
+      if (!touches) { framed = true; break; }
+    }
+    if (!framed) await die(`${label}: the ${view} view still reaches the frame edge at 2.4x the fitted radius — this cell would be a crop, and a cropped cell is the one picture that could carry a ruling with the subject missing`);
     shots[view] = path.basename(file);
   }
   console.log(`  ${label.padEnd(50)} petals=${m.slotCount} ${arc}${roleLine ? '  ' + roleLine : ''}`);
-  return { label, note, shots, arc, roleLine, petals: m.slotCount, liveTris: m.liveTris, mirror: m.mirror };
+  return { label, note, shots, arc, roleLine, petals: m.slotCount, liveTris: m.liveTris, mirror: m.mirror, isFan: Boolean(m.fan) };
 }
 
 fs.mkdirSync(outDir, { recursive: true });
@@ -148,7 +212,10 @@ cells.push(await cell({ label: 'The arc limit — 8 per side, 60°, toggle ON', 
   note: 'THE EXTREME, SHIPPED PHOTOGRAPHED RATHER THAN CAPPED — Eva\'s standing pattern (max-roll faceting, the ROLL CLAMP look, the spread-6 plate, the 135° and 161.25° tilts). The step saturates at 21.25° against the 60° asked for, and the read-out says "(CAPPED)": the 170° arc limit is what keeps the two sides from meeting, and without it two petals would land on ONE azimuth — duplicate geometry, this family\'s known cause of non-manifold edges. What it leaves is a 340° fan with a 20° notch, which reads as a ring with a nick rather than as a fan. That is a TASTE question and it is Eva\'s: tightening the limit is one constant change with THIS CELL as its evidence.' }));
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-const fig = (c, view) => `<figure><div class="frame${view === 'face' && c.mirror ? ' mirror' : ''}"><img src="${c.shots[view]}"></div>`
+/* THE LINE IS DRAWN ONLY WHERE THERE IS ONE TO DRAW. A radially symmetric
+   bloom has no plane it prefers — every direction is equivalent — so the
+   control cell carries no line, which is also what its caption says. */
+const fig = (c, view) => `<figure><div class="frame${view === 'face' && c.isFan ? ' mirror' : ''}"><img src="${c.shots[view]}"></div>`
   + `<figcaption><b>${esc(c.label)}</b>${view === 'profile' ? ' <i>(profile)</i>' : ''}<br>`
   + `<small>${esc(c.arc)} · ${c.petals} petals · ${esc(c.roleLine || 'no slot roles engaged')} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live)</small>`
   + `<p>${esc(c.note)}</p></figcaption></figure>`;
