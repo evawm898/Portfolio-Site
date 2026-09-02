@@ -187,6 +187,20 @@
   }
   .location-select option{background:var(--ink-soft); color:var(--paper);}
 
+  .tag-chip-more, .tag-chip-clear{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.5px;
+    padding:4px 8px;
+    border:none;
+    background:transparent;
+    color:var(--teal);
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .tag-chip-more:hover, .tag-chip-clear:hover{color:var(--paper);}
+
   .tag-chip{
     font-family:var(--font-mono);
     font-size:11px;
@@ -326,6 +340,39 @@
     font-family:var(--font-mono);
     background:var(--ink);
     padding:1px 5px;
+    border:1px solid var(--line);
+    color:var(--paper);
+  }
+
+  /* bulk import report — replaces the old one-line alert() */
+  .import-report{
+    border:1px solid var(--line);
+    border-left:2px solid var(--teal);
+    background:var(--ink-soft);
+    padding:12px 14px;
+    margin:0 0 14px;
+    font-size:12px;
+    line-height:1.7;
+    color:var(--dim);
+  }
+  .import-report[data-tone="warn"]{border-left-color:var(--brick);}
+  .import-report h4{
+    margin:0 0 6px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--paper);
+    font-weight:400;
+  }
+  .import-report ul{margin:6px 0 0; padding-left:18px;}
+  .import-report li{margin-bottom:3px;}
+  .import-report .num{color:var(--paper); font-family:var(--font-mono);}
+  .import-report .warn-num{color:var(--brick); font-family:var(--font-mono);}
+  .import-report code{
+    font-family:var(--font-mono);
+    background:var(--ink);
+    padding:1px 4px;
     border:1px solid var(--line);
     color:var(--paper);
   }
@@ -957,7 +1004,8 @@
       </div>
 
       <div class="panel" id="panel">
-        <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url</code>. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code> — anything else (e.g. <code>Influencer</code>, <code>Art</code>, <code>Friend</code>) becomes <code>following</code> but keeps the original label as a tag, so it isn't lost. Plain lines with no <code>|</code> are added as bare names using the category below. Lines whose handle matches an existing entry are merged in — blank fields on the existing entry get filled in, nothing is overwritten, and no duplicate is created.</p>
+        <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url | tags | gender</code>. The last two are optional — 8- and 9-field lines still work. Tags are comma-separated inside their field. Gender can be <code>woman</code>, <code>nonbinary</code>, <code>man</code>, or blank for unknown; it is never guessed from a name. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code> — anything else (e.g. <code>Influencer</code>, <code>Art</code>, <code>Friend</code>) becomes <code>following</code> but keeps the original label as a tag, so it isn't lost. Plain lines with no <code>|</code> are added as bare names using the category below. Any other field count is skipped and reported rather than imported, since one stray <code>|</code> shifts every field into the wrong column.</p>
+        <div id="bulkReport"></div>
         <div class="field-row">
           <div class="field">
             <label for="bulkDefaultCategory">default category for plain lines</label>
@@ -967,11 +1015,20 @@
               <option value="touring">touring / release</option>
             </select>
           </div>
+          <div class="field">
+            <label for="bulkDedupe">if a handle is already in the list</label>
+            <select id="bulkDedupe">
+              <option value="merge">fill in its blank fields only</option>
+              <option value="overwrite">replace with the pasted values</option>
+              <option value="skip">leave it alone</option>
+              <option value="add">add it again anyway</option>
+            </select>
+          </div>
         </div>
         <div class="field-row">
           <div class="field">
             <label for="bulkText">paste here</label>
-            <textarea id="bulkText" rows="7" placeholder="Jane Doe | @janedoe | tattoo | Los Angeles, CA | she/her | Guest spot NYC Oct 3–10 | instagram.com/janedoe | https://…jpg
+            <textarea id="bulkText" rows="7" placeholder="Jane Doe | @janedoe | tattoo | Los Angeles, CA | she/her | Guest spot NYC Oct 3–10 | instagram.com/janedoe | https://…jpg | fine line, floral | woman
 some.artist
 another.handle"></textarea>
           </div>
@@ -1046,6 +1103,7 @@ another.handle"></textarea>
           <select id="fGender">
             <option value="unknown">unknown</option>
             <option value="woman">woman</option>
+            <option value="nonbinary">nonbinary</option>
             <option value="not-woman">not a woman</option>
           </select>
         </div>
@@ -1169,6 +1227,7 @@ another.handle"></textarea>
   let activeRegion = 'all';
   let activeCity = 'all';
   let activeTags = new Set();
+  let showAllTags = false;
   let searchTerm = '';
   let sortMode = 'name';
   let currentView = 'list';
@@ -1317,8 +1376,10 @@ another.handle"></textarea>
     + 'MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC').split(' '));
   const CA_PROVINCES = new Set('AB BC MB NB NL NS NT NU ON PE QC SK YT'.split(' '));
 
+  // Folded before the lookup, so the small-caps ᴄᴀ in "ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ"
+  // reaches USA the same way a plain CA does.
   function countryForSubdivision(seg){
-    const code = seg.trim().toUpperCase();
+    const code = foldText(seg.trim()).toUpperCase();
     if(code.length !== 2) return null;
     if(US_STATES.has(code)) return 'USA';
     if(CA_PROVINCES.has(code)) return 'Canada';
@@ -1326,9 +1387,11 @@ another.handle"></textarea>
   }
 
   function canonicalRegion(raw){
-    const key = raw.trim().toLowerCase().replace(/\.$/, '');
+    const key = foldText(raw.trim()).replace(/\.$/, '');
     if(REGION_ALIASES[key]) return REGION_ALIASES[key];
-    // Title-case a bare word so "berlin" and "Berlin" don't split the list.
+    // No alias match: keep the user's own spelling as the region label. A
+    // decorative one that matches no alias stays its own region rather than
+    // being rewritten into something they never typed.
     return raw.trim().replace(/\s+/g, ' ');
   }
 
@@ -1355,11 +1418,27 @@ another.handle"></textarea>
   // Explicit, user-set gender. Never inferred from a name, handle or photo —
   // the only seed is an unambiguous she/her in the pronouns field, and
   // everything else stays 'unknown' until it is set by hand.
-  const GENDER_VALUES = ['unknown', 'woman', 'not-woman'];
-  const GENDER_LABEL = { woman:'woman', 'not-woman':'not a woman', unknown:'unknown — not set yet' };
+  const GENDER_VALUES = ['unknown', 'woman', 'nonbinary', 'not-woman'];
+  const GENDER_LABEL = {
+    woman:'woman', nonbinary:'nonbinary', 'not-woman':'not a woman',
+    unknown:'unknown — not set yet',
+  };
 
   function genderOf(e){
     return GENDER_VALUES.includes(e.gender) ? e.gender : 'unknown';
+  }
+
+  // Maps a pasted gender cell onto the stored vocabulary. Blank stays blank —
+  // it becomes 'unknown', never a guess. 'nonbinary' is kept as itself rather
+  // than folded into 'not a woman': the filter's job is to find women, and an
+  // entry that is neither shows under "all" without being mislabelled.
+  function normalizeGender(raw){
+    const v = (raw || '').trim().toLowerCase();
+    if(!v) return 'unknown';
+    if(v.startsWith('wom') || v === 'f' || v === 'female' || v === 'w') return 'woman';
+    if(v.startsWith('non') || v.startsWith('enby') || v === 'nb' || v === 'nonbinary') return 'nonbinary';
+    if(v.startsWith('man') || v.startsWith('male') || v === 'm' || v.startsWith('not')) return 'not-woman';
+    return 'unknown';
   }
 
   function initials(name){
@@ -1370,11 +1449,48 @@ another.handle"></textarea>
     return (first + last).toUpperCase();
   }
 
+  // --- decorative-unicode folding --------------------------------------
+  // Instagram display names are full of styled letters — 𝕾𝖆𝖗𝖆𝖍, 𝔅𝔯𝔢𝔫𝔫𝔞,
+  // Ａｌｙｓｓａ — and locations arrive in small caps (ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ).
+  // Left unfolded, typing "sarah" silently misses the entry, and ᴄᴀ never
+  // folds into USA the way a plain CA does — it becomes its own region.
+  //
+  // NFKD already flattens the Mathematical Alphanumeric Symbols, the
+  // letterlike symbols (ℬ, ℤ) and the fullwidth forms, so the only block
+  // needing a hand-written table is the small-caps / phonetic capitals,
+  // which carry no compatibility decomposition at all. Everything else is
+  // Unicode's own mapping rather than a table of ours to keep current.
+  const SMALL_CAP_FOLD = {
+    'ᴀ':'a', 'ʙ':'b', 'ᴄ':'c', 'ᴅ':'d', 'ᴇ':'e', 'ꜰ':'f', 'ɢ':'g',
+    'ʜ':'h', 'ɪ':'i', 'ᴊ':'j', 'ᴋ':'k', 'ʟ':'l', 'ᴍ':'m', 'ɴ':'n',
+    'ᴏ':'o', 'ᴘ':'p', 'ǫ':'q', 'ꞯ':'q', 'ʀ':'r', 'ꜱ':'s', 'ᴛ':'t',
+    'ᴜ':'u', 'ᴠ':'v', 'ᴡ':'w', 'ʏ':'y', 'ᴢ':'z',
+  };
+
+  // Folded text is for MATCHING ONLY — search, region aliasing, tag and
+  // handle keys. Nothing folded is ever written back to an entry: the name
+  // the user pasted stays exactly as they pasted it.
+  function foldText(str){
+    if(!str) return '';
+    let out = '';
+    for(const ch of str){ out += SMALL_CAP_FOLD[ch] || ch; }
+    return out.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
   // Handle-matching key for dedup/merge: strip a leading @, strip trailing
-  // slashes (some pasted handles carry one), lowercase, trim.
+  // slashes (some pasted handles carry one), fold, trim. Folding matters
+  // here too — a handle pasted in styled characters has to match the
+  // plain-ASCII one already stored, or the merge quietly makes a duplicate.
   function normalizeHandleKey(handle){
     if(!handle) return '';
-    return handle.trim().replace(/^@/, '').replace(/\/+$/, '').toLowerCase();
+    return foldText(handle.trim()).replace(/^@/, '').replace(/\/+$/, '').trim();
+  }
+
+  // Groups near-identical style tags, so "Fine Line", "fineline" and
+  // "fine-line" are one filter rather than three chips splitting the count.
+  // The entry keeps its own spelling; only the key is normalized.
+  function tagKey(t){
+    return foldText(t).replace(/[\s_\-&/]+/g, '');
   }
 
   function instagramUrlForHandle(handle){
@@ -1484,15 +1600,21 @@ another.handle"></textarea>
     if(parsed.region !== activeRegion) return false;
     return activeCity === 'all' || parsed.city === activeCity;
   }
+  // activeTags holds normalized KEYS, not display spellings, so selecting
+  // the "fine line" chip also matches an entry tagged "fineline".
   function matchesTags(e){
     if(activeTags.size === 0) return true;
-    const entryTags = new Set((e.tags || []).map(t => t.toLowerCase()));
-    return [...activeTags].some(t => entryTags.has(t));
+    const entryKeys = new Set((e.tags || []).map(tagKey));
+    return [...activeTags].some(k => entryKeys.has(k));
   }
+  // Folded on both sides, so "sarah" finds 𝕾𝖆𝖗𝖆𝖍 𝕽𝖔𝖘𝖊 and "austin" finds
+  // ᴀᴜꜱᴛɪɴ. Typing the decorative form still works too — it folds to the
+  // same thing.
   function matchesSearch(e){
     if(!searchTerm) return true;
-    const hay = [e.name, e.handle, e.location, e.status, e.notes, e.pronouns, (e.tags||[]).join(' ')]
-      .join(' ').toLowerCase();
+    const hay = foldText(
+      [e.name, e.handle, e.location, e.status, e.notes, e.pronouns, (e.tags||[]).join(' ')].join(' ')
+    );
     return hay.includes(searchTerm);
   }
 
@@ -1626,17 +1748,46 @@ another.handle"></textarea>
   }
 
   // --- style tag filter (multi-select chips, OR'd, counted, biggest first) ---
+  // One chip per normalized key, not per spelling: a list carrying both
+  // "fine line" and "fineline" gets one chip with the combined count rather
+  // than two chips each showing half the artists. The chip is LABELLED with
+  // whichever spelling is most common in the data (ties break alphabetically,
+  // so the label doesn't flicker as counts move), and entries keep their own.
+  function tagGroups(source){
+    const groups = new Map();
+    source.forEach(e => (e.tags || []).forEach(t => {
+      const key = tagKey(t);
+      if(!key) return;
+      if(!groups.has(key)) groups.set(key, { key, count: 0, spellings: new Map() });
+      const g = groups.get(key);
+      g.count++;
+      g.spellings.set(t, (g.spellings.get(t) || 0) + 1);
+    }));
+    groups.forEach(g => {
+      g.label = [...g.spellings.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+    });
+    return groups;
+  }
+
   function populateTagChips(source){
     const container = document.getElementById('tagChips');
-    const counts = new Map();
-    source.forEach(e => (e.tags || []).forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+    const groups = tagGroups(source);
     // A tag that is currently selected must stay on screen even when the
     // other filters leave it with no matches — otherwise it vanishes and the
-    // user can't unselect the thing that emptied their list.
-    activeTags.forEach(t => { if(!counts.has(t)) counts.set(t, 0); });
+    // user can't unselect the thing that emptied their list. Its label comes
+    // from the whole ledger, since the filtered set no longer contains it.
+    if(activeTags.size){
+      const all = tagGroups(entries);
+      activeTags.forEach(key => {
+        if(groups.has(key)) return;
+        const known = all.get(key);
+        groups.set(key, { key, count: 0, label: known ? known.label : key });
+      });
+    }
 
     container.innerHTML = '';
-    if(counts.size === 0){
+    if(groups.size === 0){
       container.hidden = true;
       return;
     }
@@ -1646,25 +1797,59 @@ another.handle"></textarea>
     label.textContent = 'tags';
     container.appendChild(label);
 
-    [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .forEach(([tag, count]) => {
+    // A real ledger reaches well past a hundred distinct tags — the 242-artist
+    // research list produces 119, which is over 1000px of chips on a 900px
+    // viewport and buries the list under its own filter bar. So only the
+    // busiest TOP_N show by default, with the rest one click away. A SELECTED
+    // tag is always shown regardless of rank: a filter you cannot see is a
+    // filter you cannot turn off.
+    const TOP_N = 18;
+    const ordered = [...groups.values()]
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    const shown = showAllTags
+      ? ordered
+      : ordered.filter((g, i) => i < TOP_N || activeTags.has(g.key));
+    const hiddenCount = ordered.length - shown.length;
+
+    if(activeTags.size){
+      const clear = document.createElement('button');
+      clear.className = 'tag-chip-clear';
+      clear.textContent = 'clear ' + activeTags.size + ' selected';
+      clear.onclick = () => { activeTags.clear(); render(); };
+      container.appendChild(clear);
+    }
+
+    shown.forEach(g => {
         const btn = document.createElement('button');
         btn.className = 'tag-chip';
-        btn.dataset.tag = tag;
-        btn.dataset.active = activeTags.has(tag) ? 'true' : 'false';
-        btn.appendChild(document.createTextNode(tag + ' '));
+        btn.dataset.tag = g.key;
+        btn.dataset.active = activeTags.has(g.key) ? 'true' : 'false';
+        btn.appendChild(document.createTextNode(g.label + ' '));
         const n = document.createElement('span');
         n.className = 'tag-chip-count';
-        n.textContent = '(' + count + ')';
+        n.textContent = '(' + g.count + ')';
         btn.appendChild(n);
         btn.onclick = () => {
-          if(activeTags.has(tag)) activeTags.delete(tag);
-          else activeTags.add(tag);
+          if(activeTags.has(g.key)) activeTags.delete(g.key);
+          else activeTags.add(g.key);
           render();
         };
-        container.appendChild(btn);
-      });
+      container.appendChild(btn);
+    });
+
+    if(hiddenCount > 0){
+      const more = document.createElement('button');
+      more.className = 'tag-chip-more';
+      more.textContent = '+ ' + hiddenCount + ' more';
+      more.onclick = () => { showAllTags = true; render(); };
+      container.appendChild(more);
+    }else if(showAllTags && ordered.length > TOP_N){
+      const less = document.createElement('button');
+      less.className = 'tag-chip-more';
+      less.textContent = 'show fewer';
+      less.onclick = () => { showAllTags = false; render(); };
+      container.appendChild(less);
+    }
   }
 
   function syncGenderChips(){
@@ -1812,7 +1997,11 @@ another.handle"></textarea>
   }
 
   document.getElementById('bulkToggle').onclick = () => {
-    panel.dataset.open = panel.dataset.open === 'true' ? 'false' : 'true';
+    const opening = panel.dataset.open !== 'true';
+    panel.dataset.open = opening ? 'true' : 'false';
+    // A fresh open starts without the previous run's report, so an old
+    // "3 skipped" can never be read as the result of the paste in the box.
+    if(opening) document.getElementById('bulkReport').innerHTML = '';
     syncTopBtnVisibility();
   };
 
@@ -1820,7 +2009,10 @@ another.handle"></textarea>
     panel.dataset.open = 'false';
     syncTopBtnVisibility();
   }
-  document.getElementById('cancelBulk').onclick = closePanel;
+  document.getElementById('cancelBulk').onclick = () => {
+    document.getElementById('bulkReport').innerHTML = '';
+    closePanel();
+  };
 
   document.getElementById('addToggle').onclick = () => openDrawerForNew();
 
@@ -2112,28 +2304,47 @@ another.handle"></textarea>
   }
 
   // The starter set plus whatever else is already in use across the ledger,
-  // so a tag coined on one entry is one click away on the next.
+  // so a tag coined on one entry is one click away on the next. Deduped by
+  // normalized key: a stored "fineline" does not earn its own button beside
+  // the starter "fine line", it just lights that one up.
   function pickerTags(){
-    const inUse = new Set();
-    entries.forEach(e => (e.tags || []).forEach(t => inUse.add(t)));
-    const extras = [...inUse, ...pendingTags]
-      .filter(t => STARTER_TAGS.indexOf(t) === -1)
-      .sort((a, b) => a.localeCompare(b));
-    return STARTER_TAGS.concat([...new Set(extras)]);
+    const seen = new Set(STARTER_TAGS.map(tagKey));
+    const extras = [];
+    const consider = [];
+    entries.forEach(e => (e.tags || []).forEach(t => consider.push(t)));
+    pendingTags.forEach(t => consider.push(t));
+    consider.sort((a, b) => a.localeCompare(b)).forEach(t => {
+      const key = tagKey(t);
+      if(!key || seen.has(key)) return;
+      seen.add(key);
+      extras.push(t);
+    });
+    return STARTER_TAGS.concat(extras);
+  }
+
+  // pendingTags holds the entry's own spellings, so a button is "on" when any
+  // pending tag shares its key, and toggling off clears every spelling of it.
+  function pendingSpellingsFor(key){
+    return [...pendingTags].filter(t => tagKey(t) === key);
   }
 
   function renderTagPicker(){
     const picker = document.getElementById('tagPicker');
+    const starterKeys = new Set(STARTER_TAGS.map(tagKey));
     picker.innerHTML = '';
     pickerTags().forEach(tag => {
+      const key = tagKey(tag);
+      const on = pendingSpellingsFor(key);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'tag-toggle';
-      btn.textContent = tag;
-      btn.dataset.on = pendingTags.has(tag) ? 'true' : 'false';
-      if(STARTER_TAGS.indexOf(tag) === -1) btn.dataset.custom = 'true';
+      // Show the entry's own spelling when it has one, so the picker never
+      // silently renames a tag the user typed.
+      btn.textContent = on.length ? on[0] : tag;
+      btn.dataset.on = on.length ? 'true' : 'false';
+      if(!starterKeys.has(key)) btn.dataset.custom = 'true';
       btn.onclick = () => {
-        if(pendingTags.has(tag)) pendingTags.delete(tag);
+        if(on.length) on.forEach(t => pendingTags.delete(t));
         else pendingTags.add(tag);
         renderTagPicker();
       };
@@ -2147,7 +2358,9 @@ another.handle"></textarea>
     const field = document.getElementById('fTags');
     const typed = field.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
     if(typed.length === 0) return;
-    typed.forEach(t => pendingTags.add(t));
+    // Typing a spelling of a tag the entry already carries is a no-op rather
+    // than a second pill meaning the same thing.
+    typed.forEach(t => { if(pendingSpellingsFor(tagKey(t)).length === 0) pendingTags.add(t); });
     field.value = '';
     renderTagPicker();
   }
@@ -2401,97 +2614,219 @@ another.handle"></textarea>
   // The preview falls back to the handle's avatar, so it follows the handle.
   document.getElementById('fHandle').addEventListener('input', refreshPhotoPreview);
 
-  // --- bulk paste (merge-aware: matches existing entries by handle) ---
-  // A parsed line only fills in fields that are currently blank on a
-  // matching existing entry — it never overwrites a value that's already
-  // there, so manual edits stay authoritative. A handle with no existing
-  // match becomes a new entry, same as before. Handles repeated within the
-  // same paste also merge into one entry rather than creating duplicates.
+  // --- bulk paste -------------------------------------------------------
+  // Accepts the 8-field original shape and the 10-field one that adds tags
+  // and gender (9 is allowed as tags-without-gender). ANY OTHER COUNT IS
+  // SKIPPED AND REPORTED rather than imported: one stray `|` inside a name
+  // shifts every field one column left, so a location lands in `pronouns`
+  // and a link in `photo` — silently, and only visible entry by entry much
+  // later. Refusing the line is recoverable; importing it wrong is not.
+  //
+  // What happens to a handle already in the ledger is the user's choice:
+  //   merge     — fill blank fields only, never overwrite (the default, and
+  //               the behaviour this panel had before the choice existed)
+  //   overwrite — take the pasted value wherever the paste HAS one; a blank
+  //               cell never wipes a field that already holds something
+  //   skip      — leave the existing entry completely untouched
+  //   add       — add a second entry anyway
+  const BULK_FIELD_COUNTS = [8, 9, 10];
+  const FILLABLE_FIELDS = ['category', 'location', 'pronouns', 'status', 'link', 'photo'];
+
+  function bulkParseLine(line, defaultCat){
+    if(!line.includes('|')){
+      const bare = line.replace(/^@/, '').trim();
+      if(!bare) return { error: 'noName' };
+      return {
+        data: {
+          name: bare,
+          handle: line.startsWith('@') ? line : '@' + line,
+          category: defaultCat,
+          location: '', pronouns: '', status: '', link: '', photo: '',
+          tags: [], gender: 'unknown',
+        },
+        extraTag: null,
+      };
+    }
+
+    const parts = line.split('|').map(p => p.trim());
+    if(!BULK_FIELD_COUNTS.includes(parts.length)){
+      return { error: 'oddFields', count: parts.length };
+    }
+    const [name, handle, category, location, pronouns, status, link, photo, tagsRaw, genderRaw] = parts;
+    if(!name) return { error: 'noName' };
+
+    return {
+      // A category that isn't one of the three real ones is kept as a tag
+      // rather than discarded when it collapses into "following".
+      extraTag: categoryTagFor(category),
+      data: {
+        name,
+        handle: handle || '',
+        category: normalizeCategory(category),
+        location: location || '',
+        pronouns: pronouns || '',
+        status: status || '',
+        link: link || '',
+        photo: photo || '',
+        tags: (tagsRaw || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean),
+        gender: normalizeGender(genderRaw),
+      },
+    };
+  }
+
+  // Unions incoming tags into an entry without letting two spellings of the
+  // same tag both land on it.
+  function addTags(entry, incoming){
+    let changed = false;
+    entry.tags = entry.tags || [];
+    incoming.forEach(t => {
+      if(!t) return;
+      const key = tagKey(t);
+      if(entry.tags.some(existing => tagKey(existing) === key)) return;
+      entry.tags.push(t);
+      changed = true;
+    });
+    return changed;
+  }
+
   document.getElementById('saveBulk').onclick = () => {
     const text = document.getElementById('bulkText').value;
     const defaultCat = document.getElementById('bulkDefaultCategory').value;
+    const dupeMode = document.getElementById('bulkDedupe').value;
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if(lines.length === 0) return;
 
-    const FILLABLE_FIELDS = ['category', 'location', 'pronouns', 'status', 'link', 'photo'];
     const handleIndex = new Map();
     entries.forEach(e => {
       const key = normalizeHandleKey(e.handle);
       if(key) handleIndex.set(key, e);
     });
 
-    let added = 0, updated = 0, unchanged = 0;
+    const seenThisPaste = new Set();
+    const r = {
+      added: 0, updated: 0, unchanged: 0, skipped: 0, noName: 0,
+      oddFields: [], dupeNames: [], withinPaste: 0,
+    };
 
-    // extraTag: a category label that didn't map onto a real category
-    // (e.g. "influencer", "art", "friend") — carried over as a tag so it
-    // isn't lost, unioned into the entry's tags rather than treated as a
-    // blank-fillable scalar field.
-    function mergeInto(existing, incoming, extraTag){
+    function applyToExisting(existing, incoming, extraTag){
       let changed = false;
-      FILLABLE_FIELDS.forEach(f => {
-        if(!existing[f] && incoming[f]){
-          existing[f] = incoming[f];
+      if(dupeMode === 'overwrite'){
+        // A blank cell in the paste is "no opinion", not "erase this".
+        FILLABLE_FIELDS.forEach(f => {
+          if(incoming[f] && existing[f] !== incoming[f]){ existing[f] = incoming[f]; changed = true; }
+        });
+        if(incoming.gender !== 'unknown' && existing.gender !== incoming.gender){
+          existing.gender = incoming.gender;
           changed = true;
         }
-      });
-      if(extraTag){
-        existing.tags = existing.tags || [];
-        if(!existing.tags.includes(extraTag)){
-          existing.tags.push(extraTag);
+      }else{
+        FILLABLE_FIELDS.forEach(f => {
+          if(!existing[f] && incoming[f]){ existing[f] = incoming[f]; changed = true; }
+        });
+        if(genderOf(existing) === 'unknown' && incoming.gender !== 'unknown'){
+          existing.gender = incoming.gender;
           changed = true;
         }
       }
-      if(changed) updated++; else unchanged++;
+      // Tags union in either mode — a tag is additive by nature, and dropping
+      // ones already on the entry would lose work no paste asked to remove.
+      if(addTags(existing, incoming.tags)) changed = true;
+      if(extraTag && addTags(existing, [extraTag])) changed = true;
+      if(changed) r.updated++; else r.unchanged++;
     }
 
-    lines.forEach(line => {
-      let parsed;
-      let extraTag = null;
-      if(line.includes('|')){
-        const parts = line.split('|').map(p => p.trim());
-        const [name, handle, category, location, pronouns, status, link, photo] = parts;
-        if(!name) return;
-        extraTag = categoryTagFor(category);
-        parsed = {
-          name,
-          handle: handle || '',
-          category: normalizeCategory(category),
-          location: location || '',
-          pronouns: pronouns || '',
-          status: status || '',
-          link: link || '',
-          photo: photo || '',
-        };
-      }else{
-        const name = line.replace(/^@/, '');
-        if(!name) return;
-        parsed = {
-          name,
-          handle: line.startsWith('@') ? line : '@' + line,
-          category: defaultCat,
-          location: '', pronouns: '', status: '', link: '', photo: '',
-        };
+    lines.forEach((line, i) => {
+      const parsed = bulkParseLine(line, defaultCat);
+      if(parsed.error === 'oddFields'){
+        r.oddFields.push({ line: i + 1, count: parsed.count, preview: line.slice(0, 48) });
+        return;
+      }
+      if(parsed.error === 'noName'){ r.noName++; return; }
+
+      const { data, extraTag } = parsed;
+      const key = normalizeHandleKey(data.handle);
+      if(key && seenThisPaste.has(key)) r.withinPaste++;
+      if(key) seenThisPaste.add(key);
+
+      const existing = key ? handleIndex.get(key) : null;
+      if(existing && dupeMode !== 'add'){
+        if(dupeMode === 'skip'){
+          r.skipped++;
+          if(r.dupeNames.length < 6) r.dupeNames.push(displayHandle(data.handle) || data.name);
+          return;
+        }
+        applyToExisting(existing, data, extraTag);
+        return;
       }
 
-      const key = normalizeHandleKey(parsed.handle);
-      const existing = key ? handleIndex.get(key) : null;
-      if(existing){
-        mergeInto(existing, parsed, extraTag);
-      }else{
-        const tags = extraTag ? [extraTag] : [];
-        const created = { id: uid(), ...parsed, date: '', tags };
-        entries.push(created);
-        if(key) handleIndex.set(key, created);
-        added++;
-      }
+      const created = { id: uid(), ...data, date: '', notes: '' };
+      if(extraTag) addTags(created, [extraTag]);
+      entries.push(created);
+      if(key) handleIndex.set(key, created);
+      r.added++;
     });
 
-    const saved = persist();
-    document.getElementById('bulkText').value = '';
-    closePanel();
+    const touched = r.added > 0 || r.updated > 0;
+    const saved = touched ? persist() : true;
+    // The panel stays OPEN on purpose: the report is the point of this run,
+    // and it lives inside the panel. Cancel closes it and clears the report.
     render();
-    if(saved) alert(`${updated} updated, ${added} added, ${unchanged} unchanged.`);
+    showImportReport(r, lines.length, saved && touched);
+    document.getElementById('bulkReport').scrollIntoView({ block:'nearest' });
   };
+
+  // The old one-line alert() could not say WHICH lines it refused, so a
+  // malformed line in a 242-line paste was invisible. This is that report.
+  function showImportReport(r, totalLines, clearBox){
+    const box = document.getElementById('bulkReport');
+    const problems = r.oddFields.length > 0 || r.noName > 0;
+    box.innerHTML = '';
+
+    const card = document.createElement('div');
+    card.className = 'import-report';
+    card.dataset.tone = problems ? 'warn' : 'ok';
+
+    const h = document.createElement('h4');
+    h.textContent = problems ? 'imported, with problems' : 'import complete';
+    card.appendChild(h);
+
+    const bits = ['<span class="num">' + r.added + '</span> added'];
+    if(r.updated) bits.push('<span class="num">' + r.updated + '</span> updated');
+    if(r.unchanged) bits.push('<span class="num">' + r.unchanged + '</span> already complete');
+    if(r.skipped) bits.push('<span class="num">' + r.skipped + '</span> skipped as duplicates');
+    const summary = document.createElement('div');
+    summary.innerHTML = bits.join(' · ') + ' — from ' + totalLines + ' lines.';
+    card.appendChild(summary);
+
+    const issues = [];
+    if(r.oddFields.length){
+      const list = r.oddFields.slice(0, 5)
+        .map(o => 'line ' + o.line + ' has ' + o.count + ' fields — "' + escapeHtml(o.preview) + '…"')
+        .join('</li><li>');
+      issues.push('<span class="warn-num">' + r.oddFields.length + '</span> line(s) skipped for a wrong field '
+        + 'count (expected 8, 9 or 10 — an extra or missing <code>|</code> shifts every field): '
+        + '<ul><li>' + list + '</li></ul>');
+    }
+    if(r.noName) issues.push('<span class="warn-num">' + r.noName + '</span> line(s) skipped with no name in the first field.');
+    if(r.skipped && r.dupeNames.length){
+      issues.push('Duplicates skipped include: ' + escapeHtml(r.dupeNames.join(', '))
+        + (r.skipped > r.dupeNames.length ? ' and ' + (r.skipped - r.dupeNames.length) + ' more.' : ''));
+    }
+    if(r.withinPaste){
+      issues.push('<span class="warn-num">' + r.withinPaste + '</span> handle(s) appeared more than once '
+        + 'inside this paste itself; the later line was applied to the same entry, not a new one.');
+    }
+    if(issues.length){
+      const ul = document.createElement('ul');
+      ul.innerHTML = '<li>' + issues.join('</li><li>') + '</li>';
+      card.appendChild(ul);
+    }
+
+    box.appendChild(card);
+    // Only clear the textarea once the write actually reached storage, so a
+    // quota failure never eats the paste the user still needs.
+    if(clearBox) document.getElementById('bulkText').value = '';
+  }
 
   // --- chips / search / sort ---
   document.getElementById('chips').addEventListener('click', (ev) => {
@@ -2524,7 +2859,7 @@ another.handle"></textarea>
   });
 
   document.getElementById('searchInput').addEventListener('input', (ev) => {
-    searchTerm = ev.target.value.trim().toLowerCase();
+    searchTerm = foldText(ev.target.value.trim());
     render();
   });
 

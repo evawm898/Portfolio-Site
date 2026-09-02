@@ -482,16 +482,25 @@ check('bulk panel starts closed', !(await page.locator('#panel').isVisible()));
 await page.locator('#bulkToggle').click();
 check('bulk toggle opens the panel', await page.locator('#panel').isVisible());
 check('bulk textarea present', await page.locator('#bulkText').isVisible());
-let msg = '';
-page.once('dialog', async d => { msg = d.message(); await d.accept(); });
+// The old one-line alert() is gone — the run now reports into #bulkReport,
+// and the panel deliberately STAYS OPEN so that report can be read.
 await page.fill('#bulkText', 'Jane Doe | @janedoe | tattoo | | she/her | | | \nNoor Haddad | @noorh | Influencer | Cairo | she/her | | | ');
 await page.locator('#saveBulk').click();
 await page.waitForTimeout(300);
-check('merge summary reported', /1 updated, 1 added, 0 unchanged|0 updated, 1 added, 1 unchanged/.test(msg), JSON.stringify(msg));
+const report1 = await page.locator('#bulkReport').innerText();
+check('merge summary reported in the report card',
+  /1 added/.test(report1) && /(1 updated|1 already complete)/.test(report1), JSON.stringify(report1));
 check('no duplicate for the existing handle', await page.locator('.entry').count() === SEED.length + 1);
 check('non-standard category kept as a tag',
   await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.handle==='@noorh').tags.includes('influencer')));
-check('bulk panel closed after save', !(await page.locator('#panel').isVisible()));
+check('bulk panel stays open so the report can be read', await page.locator('#panel').isVisible());
+check('textarea cleared once the write landed', (await page.inputValue('#bulkText')) === '');
+await page.locator('#cancelBulk').click();
+check('cancel closes the panel', !(await page.locator('#panel').isVisible()));
+await page.locator('#bulkToggle').click();
+check('reopening clears the previous report',
+  (await page.locator('#bulkReport').innerText()).trim() === '');
+await page.locator('#cancelBulk').click();
 
 section('filters / search / sort untouched');
 await page.locator('.chip[data-cat="tattoo"]').click();
@@ -761,6 +770,288 @@ await page.locator('.chip[data-cat="all"]').click();
 
 await page.locator('.view-tab[data-view="list"]').click();
 check('map count hidden in list view', !(await page.locator('#mapCount').isVisible()));
+
+// ---------------------------------------------------------------------------
+// item 15 — decorative-unicode folding, tag grouping, and the 10-field paste
+// ---------------------------------------------------------------------------
+// These three are what the 242-artist research file actually needs. Each is
+// asserted against data written the way the real file writes it, not a
+// convenient ascii stand-in.
+
+// The shared context seeds SEED into localStorage on EVERY navigation, so a
+// write-then-reload would be clobbered by the init script and the checks below
+// would silently run against the old fixture. Each of these sections therefore
+// gets its own context with its own seed — and its own page errors folded back
+// into the same list, so nothing escapes the final health check.
+let tp = null;
+let tctx = null;
+async function reseed(rows){
+  if(tp) await tctx.close();
+  tctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
+  await tctx.addInitScript(([store, seed]) => {
+    sessionStorage.setItem('artistTracker.unlocked', '1');
+    localStorage.setItem(store, JSON.stringify(seed));
+  }, [STORE, rows]);
+  await tctx.route('**/artist-tracker.html', async (r) => {
+    const res = await r.fetch();
+    const body = (await res.text()).replace(/ integrity="sha256-[^"]*"/g, '');
+    await r.fulfill({ response: res, body, headers: { ...res.headers(), 'content-type':'text/html' } });
+  });
+  tp = await tctx.newPage();
+  await stub(tp);
+  tp.on('pageerror', e => pageErrors.push(e.message));
+  await tp.goto(URL_, { waitUntil:'domcontentloaded' });
+  await tp.waitForSelector('.entry');
+  await tp.locator('.chip[data-cat="all"]').click();
+  return tp;
+}
+// Rows lead with an .entry-index ("001"), so read the name element itself.
+async function visibleNames(){
+  return await tp.evaluate(() =>
+    [...document.querySelectorAll('.entry .entry-name')].map(el => el.textContent.trim()));
+}
+
+section('item 15a — decorative unicode folds for search and region');
+const FOLD_SEED = [
+  // Exactly the shapes the real file carries: fraktur, script, small caps,
+  // fullwidth, and a small-caps US state code.
+  // NOTE: this handle deliberately does NOT contain "sarah". The haystack
+  // includes the handle, so a realistic @sarahrose_tattoo would satisfy the
+  // search check on its own and the fold would never be exercised.
+  { id:'f1', name:'𝕾𝖆𝖗𝖆𝖍 𝕽𝖔𝖘𝖊', handle:'@goldenharvest.resident', pronouns:'', category:'tattoo',
+    location:'Baden-Württemberg, Germany', date:'', status:'', link:'', photo:'',
+    tags:['blackwork','floral'], gender:'unknown' },
+  { id:'f2', name:'𝑨𝒃𝒊', handle:'@abitatts', pronouns:'', category:'tattoo',
+    location:'ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown' },
+  { id:'f3', name:'Ａｌｙｓｓａ . Ｖｉｌｌｅｌａ', handle:'@vitruvian.ink', pronouns:'', category:'tattoo',
+    location:'', date:'', status:'', link:'', photo:'', tags:['realism'], gender:'unknown' },
+  { id:'f4', name:'Sage', handle:'@_wisesage', pronouns:'', category:'tattoo',
+    location:'ʟᴏꜱ ᴀɴɢᴇʟᴇꜱ', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown' },
+  { id:'f5', name:'Plain Person', handle:'@plainperson', pronouns:'', category:'tattoo',
+    location:'Austin, TX, USA', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown' },
+];
+await reseed(FOLD_SEED);
+
+await tp.fill('#searchInput', 'sarah');
+await tp.waitForTimeout(120);
+check('plain-ascii search finds a fraktur name', (await visibleNames()).includes('𝕾𝖆𝖗𝖆𝖍 𝕽𝖔𝖘𝖊'),
+  JSON.stringify(await visibleNames()));
+await tp.fill('#searchInput', 'alyssa');
+await tp.waitForTimeout(120);
+check('...and a fullwidth one', (await tp.locator('.entry').count()) === 1);
+await tp.fill('#searchInput', 'los angeles');
+await tp.waitForTimeout(120);
+check('...and a small-caps location', (await tp.locator('.entry').count()) === 1);
+await tp.fill('#searchInput', '𝕾𝖆𝖗𝖆𝖍');
+await tp.waitForTimeout(120);
+check('typing the decorative form still works too', (await tp.locator('.entry').count()) === 1);
+await tp.fill('#searchInput', 'goldenharvest');
+await tp.waitForTimeout(120);
+check('searching by handle still works', (await tp.locator('.entry').count()) === 1,
+  String(await tp.locator('.entry').count()));
+await tp.fill('#searchInput', 'plain');
+await tp.waitForTimeout(120);
+check('a plain entry is still found the ordinary way', (await tp.locator('.entry').count()) === 1);
+await tp.fill('#searchInput', '');
+await tp.waitForTimeout(120);
+
+const foldRegionOpts = await tp.locator('#regionSelect option').allTextContents();
+check('small-caps ᴄᴀ folds into USA rather than becoming its own region',
+  foldRegionOpts.some(o => /^USA \(2\)/.test(o)) && !foldRegionOpts.some(o => /ᴄᴀ/.test(o)),
+  JSON.stringify(foldRegionOpts));
+
+section('item 15b — style tags group by normalized key');
+const TAG_SEED = [
+  { id:'t1', name:'One', handle:'@one', category:'tattoo', location:'', pronouns:'', date:'',
+    status:'', link:'', photo:'', tags:['Fine Line'], gender:'unknown' },
+  { id:'t2', name:'Two', handle:'@two', category:'tattoo', location:'', pronouns:'', date:'',
+    status:'', link:'', photo:'', tags:['fineline'], gender:'unknown' },
+  { id:'t3', name:'Three', handle:'@three', category:'tattoo', location:'', pronouns:'', date:'',
+    status:'', link:'', photo:'', tags:['fine-line'], gender:'unknown' },
+  { id:'t4', name:'Four', handle:'@four', category:'tattoo', location:'', pronouns:'', date:'',
+    status:'', link:'', photo:'', tags:['blackwork'], gender:'unknown' },
+];
+await reseed(TAG_SEED);
+const chipText = await tp.evaluate(() =>
+  [...document.querySelectorAll('#tagChips .tag-chip')].map(b => b.innerText.replace(/\s+/g,' ').trim()));
+check('three spellings collapse into one chip',
+  chipText.filter(t => /fine/i.test(t)).length === 1, JSON.stringify(chipText));
+check('...carrying the combined count',
+  chipText.some(t => /fine.*\(3\)/i.test(t)), JSON.stringify(chipText));
+const fineKey = await tp.evaluate(() =>
+  [...document.querySelectorAll('#tagChips .tag-chip')].map(b => b.dataset.tag).find(k => /fine/.test(k)));
+await tp.locator('.tag-chip[data-tag="' + fineKey + '"]').click();
+await tp.waitForTimeout(120);
+check('selecting it matches every spelling', (await tp.locator('.entry').count()) === 3,
+  String(await tp.locator('.entry').count()));
+await tp.locator('.tag-chip[data-tag="' + fineKey + '"]').click();
+await tp.waitForTimeout(120);
+check('entries keep their own spelling — nothing is rewritten',
+  await tp.evaluate(() => {
+    const rows = JSON.parse(localStorage.getItem('artistTracker.entries.v1'));
+    return rows.find(e=>e.id==='t1').tags[0] === 'Fine Line'
+        && rows.find(e=>e.id==='t2').tags[0] === 'fineline'
+        && rows.find(e=>e.id==='t3').tags[0] === 'fine-line';
+  }));
+// The drawer's picker must not offer a second button meaning the same thing.
+// Rows sort by name, so "One" (tagged "Fine Line") is not the first row —
+// open it explicitly rather than whichever happens to sort first.
+await tp.locator('.entry', { has: tp.locator('.entry-name', { hasText: /^One$/ }) }).click();
+await tp.waitForTimeout(SLIDE);
+await tp.locator('#detailEdit').click();
+await tp.waitForTimeout(150);
+const pickerKeys = await tp.evaluate(() =>
+  [...document.querySelectorAll('#tagPicker .tag-toggle')].map(b => b.textContent));
+check('tag picker offers one button per key, not per spelling',
+  pickerKeys.filter(t => t.replace(/[\s\-]/g,'').toLowerCase() === 'fineline').length === 1,
+  JSON.stringify(pickerKeys.filter(t => /fine/i.test(t))));
+check('...and it reads as selected for this entry',
+  await tp.evaluate(() => [...document.querySelectorAll('#tagPicker .tag-toggle')]
+    .some(b => b.dataset.on === 'true' && /fine/i.test(b.textContent))));
+await tp.keyboard.press('Escape');
+await tp.waitForTimeout(SLIDE);
+
+section('item 15b2 — the tag bar caps itself instead of burying the list');
+// 24 distinct tags with one artist each: past the TOP_N of 18, so the cap and
+// its toggle are exercised rather than assumed.
+const MANY = Array.from({length: 24}, (_, i) => ({
+  id:'m'+i, name:'Artist '+i, handle:'@a'+i, category:'tattoo', location:'', pronouns:'',
+  date:'', status:'', link:'', photo:'', tags:['style'+String(i).padStart(2,'0')], gender:'unknown',
+}));
+await reseed(MANY);
+const capped = await tp.locator('#tagChips .tag-chip').count();
+check('only the busiest tags show by default', capped === 18, String(capped));
+check('...with the rest one click away', /\+ 6 more/.test(await tp.locator('#tagChips').innerText()),
+  JSON.stringify(await tp.locator('#tagChips').innerText()));
+const cappedH = await tp.evaluate(() => Math.round(document.getElementById('tagChips').getBoundingClientRect().height));
+check('...so the filter bar stays shorter than the viewport', cappedH < 400, cappedH + 'px');
+// If the cap is gone there is no toggle to drive, and clicking a missing
+// button would abort the whole run and hide every check after it. Report the
+// failures and move on instead.
+const haveMore = await tp.locator('.tag-chip-more').count() > 0;
+check('a "+ N more" control exists to open the rest', haveMore);
+if(haveMore){
+  await tp.locator('.tag-chip-more').click();
+  await tp.waitForTimeout(120);
+  check('"more" reveals all of them', (await tp.locator('#tagChips .tag-chip').count()) === 24,
+    String(await tp.locator('#tagChips .tag-chip').count()));
+  check('...and offers the way back', /show fewer/.test(await tp.locator('#tagChips').innerText()));
+  // Select a tag that is NOT in the top 18, then collapse: it must stay on
+  // screen, or the user is left filtered by something they cannot unclick.
+  const lastKey = await tp.evaluate(() =>
+    [...document.querySelectorAll('#tagChips .tag-chip')].pop().dataset.tag);
+  await tp.locator('.tag-chip[data-tag="' + lastKey + '"]').click();
+  await tp.waitForTimeout(120);
+  await tp.locator('.tag-chip-more').click();
+  await tp.waitForTimeout(120);
+  check('a selected low-rank tag survives collapsing',
+    await tp.locator('.tag-chip[data-tag="' + lastKey + '"]').isVisible());
+  check('...and can be cleared', await tp.locator('.tag-chip-clear').isVisible());
+  await tp.locator('.tag-chip-clear').click();
+  await tp.waitForTimeout(120);
+  check('clear releases the filter', (await tp.locator('.entry').count()) === 24,
+    String(await tp.locator('.entry').count()));
+}else{
+  check('"more" reveals all of them', false, 'no cap — nothing to reveal');
+  check('...and offers the way back', false, 'no cap');
+  check('a selected low-rank tag survives collapsing', false, 'no cap');
+  check('...and can be cleared', false, 'no cap');
+  check('clear releases the filter', false, 'no cap');
+}
+
+section('item 15c — bulk paste takes 10 fields, and refuses the wrong count');
+await reseed([
+  { id:'b1', name:'Existing Artist', handle:'@existing', category:'tattoo', location:'', pronouns:'',
+    date:'', status:'', link:'', photo:'', tags:['ornamental'], gender:'unknown' },
+]);
+await tp.locator('#bulkToggle').click();
+await tp.selectOption('#bulkDedupe', 'merge');
+// Lines lifted from the real research file's shape, plus two deliberately
+// malformed ones. A stray | is the failure this validation exists for: it
+// shifts every field one column and lands a location in `pronouns`.
+await tp.fill('#bulkText', [
+  'Marta Madrigal|@marta.madrigal_tattoos|Tattoo|Toulouse, France|||instagram.com/marta.madrigal_tattoos||floral, fine line|woman',
+  'VOID LAVENDER|@void.lavender.ttt|Tattoo|Tours, France||Queer/nonbinary|instagram.com/void.lavender.ttt||flash tattoos|nonbinary',
+  'Eight Field Only|@eightfield|Tattoo|Berlin|||instagram.com/eightfield|',
+  'Broken | Line | with | too | few',
+  'Way | too | many | fields | here | by | a | long | way | indeed | truly | so',
+].join('\n'));
+await tp.locator('#saveBulk').click();
+await tp.waitForTimeout(400);
+const rows = await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')));
+const marta = rows.find(e => e.handle === '@marta.madrigal_tattoos');
+const voidL = rows.find(e => e.handle === '@void.lavender.ttt');
+check('a 10-field line imports its tags', marta && marta.tags.join(',') === 'floral,fine line',
+  JSON.stringify(marta && marta.tags));
+check('...and its gender', marta && marta.gender === 'woman', marta && marta.gender);
+check('nonbinary is kept as itself, not folded into "not a woman"',
+  voidL && voidL.gender === 'nonbinary', voidL && voidL.gender);
+check('a blank gender cell stays unknown, never guessed',
+  rows.find(e => e.handle === '@eightfield').gender === 'unknown');
+check('an 8-field line still imports', !!rows.find(e => e.handle === '@eightfield'));
+check('malformed lines are NOT imported', rows.length === 4, String(rows.length));
+
+const report = await tp.locator('#bulkReport').innerText();
+check('the report names the wrong-field-count lines', /2 line\(s\) skipped for a wrong field count/.test(report),
+  JSON.stringify(report.slice(0, 200)));
+check('...with their line numbers', /line 4 has 5 fields/.test(report) && /line 5 has 12 fields/.test(report),
+  JSON.stringify(report.slice(0, 300)));
+check('the report is toned as a warning', await tp.evaluate(() =>
+  document.querySelector('.import-report').dataset.tone === 'warn'));
+check('the report counts what did land', /3 added/.test(report), JSON.stringify(report.slice(0,120)));
+
+section('item 15d — what happens to a handle already in the list');
+async function pasteWith(mode, text){
+  if(!(await tp.locator('#panel').isVisible())) await tp.locator('#bulkToggle').click();
+  await tp.selectOption('#bulkDedupe', mode);
+  await tp.fill('#bulkText', text);
+  await tp.locator('#saveBulk').click();
+  await tp.waitForTimeout(350);
+  return await tp.locator('#bulkReport').innerText();
+}
+await reseed([
+  { id:'d1', name:'Held Name', handle:'@dupe', category:'tattoo', location:'Berlin', pronouns:'',
+    date:'', status:'', link:'', photo:'', tags:['ornamental'], gender:'unknown' },
+]);
+const LINE = 'Pasted Name|@dupe|Tattoo|Paris, France|she/her||instagram.com/dupe||fine line|woman';
+
+let rep = await pasteWith('skip', LINE);
+let e1 = (await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))))[0];
+check('skip leaves the existing entry completely untouched',
+  e1.location === 'Berlin' && e1.gender === 'unknown' && e1.tags.join() === 'ornamental');
+check('...and says so in the report', /1 skipped as duplicates/.test(rep), JSON.stringify(rep.slice(0,140)));
+check('...and creates no second entry', (await tp.locator('.entry').count()) === 1);
+
+rep = await pasteWith('merge', LINE);
+e1 = (await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))))[0];
+check('merge fills a blank field', e1.pronouns === 'she/her');
+check('...never overwrites a filled one', e1.location === 'Berlin', e1.location);
+check('...fills gender only because it was unknown', e1.gender === 'woman');
+check('...and unions tags rather than replacing them',
+  e1.tags.includes('ornamental') && e1.tags.includes('fine line'), JSON.stringify(e1.tags));
+
+rep = await pasteWith('overwrite', LINE);
+e1 = (await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))))[0];
+check('overwrite replaces a filled field', e1.location === 'Paris, France', e1.location);
+rep = await pasteWith('overwrite', 'Pasted Name|@dupe|Tattoo||||||' + '|');
+e1 = (await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))))[0];
+check('...but a BLANK cell never wipes a field that has a value',
+  e1.location === 'Paris, France' && e1.gender === 'woman', e1.location + '/' + e1.gender);
+
+rep = await pasteWith('add', LINE);
+check('add makes a second entry on purpose', (await tp.locator('.entry').count()) === 2,
+  String(await tp.locator('.entry').count()));
+
+await reseed([
+  { id:'h1', name:'Styled Handle', handle:'@ᴋɪʀᴀɴ.ᴛᴀ2', category:'tattoo', location:'', pronouns:'',
+    date:'', status:'', link:'', photo:'', tags:[], gender:'unknown' },
+]);
+await pasteWith('merge', 'Kiran|@kiran.ta2|Tattoo|South Korea|||instagram.com/kiran.ta2|||');
+check('a decorative stored handle still matches the plain pasted one',
+  (await tp.locator('.entry').count()) === 1, String(await tp.locator('.entry').count()));
+
+await tctx.close();
+tp = null;
 
 section('mobile');
 const m = await ctx.newPage();

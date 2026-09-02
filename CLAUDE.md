@@ -342,6 +342,61 @@ they and who is near who (region filter + map), and why did I save them
 18. Map **clusters** (leaflet.markercluster via CDN, SRI-pinned), respects
     every active filter, and prints how many artists are plotted vs. how
     many have no usable location.
+19. **Decorative unicode folds** for matching. Instagram display names and
+    locations arrive as 𝕾𝖆𝖗𝖆𝖍 𝕽𝖔𝖘𝖊, Ａｌｙｓｓａ, ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ. `foldText()`
+    is applied to search (both sides), region aliasing, the US/Canada
+    subdivision codes, handle-matching keys and tag keys — for MATCHING
+    ONLY. Nothing folded is written back; the entry keeps the user's text.
+    Without it, typing "sarah" silently misses the entry and ᴄᴀ becomes its
+    own region instead of folding into USA.
+    **The implementation is 26 lines, not a 6,000-character table.** NFKD
+    already flattens the Mathematical Alphanumeric Symbols, the letterlike
+    symbols (ℬ, ℤ) and the fullwidth forms; the ONLY block needing a
+    hand-written map is small caps / phonetic capitals, which carry no
+    compatibility decomposition. Measured equivalent to a full explicit
+    FOLD_MAP across all 2,420 cells of the 242-artist research file — zero
+    divergences. Do not re-add a hand-maintained table for the rest.
+20. **Style tags group by a normalized key** (`tagKey()` — fold, then strip
+    spaces, `_`, `-`, `&`, `/`). "Fine Line", "fineline" and "fine-line" are
+    ONE chip with the combined count, not three splitting it. The entry
+    stores its own spelling verbatim; only the key is normalized, and the
+    chip is labelled with whichever spelling is commonest (ties alphabetical,
+    so the label doesn't flicker as counts move). The drawer's picker dedupes
+    by key too, and shows the entry's own spelling when it has one.
+21. **The tag bar caps itself at 18** with `+ N more` / `show fewer`. The
+    242-artist list yields 119 distinct tag groups — 1046px of chips on a
+    900px viewport, burying the list under its own filter bar. Measured:
+    122px capped. A SELECTED tag is always shown regardless of rank — a
+    filter you cannot see is a filter you cannot turn off — and a
+    `clear N selected` control appears whenever any are active.
+22. **Bulk paste takes 10 fields**: `name | handle | category | location |
+    pronouns | status | link | photo url | tags | gender`. 8 and 9 still
+    work. Tags are comma-separated inside their field; gender accepts
+    `woman` / `nonbinary` / `man` (and blank → `unknown`) and is NEVER
+    guessed from a name. `nonbinary` is kept as its own value rather than
+    folded into `not-woman`, so the one nonbinary artist in the research
+    file is neither mislabelled nor swept into "women only".
+    **Any other field count is skipped and reported, never imported** — one
+    stray `|` inside a name shifts every field a column left, landing a
+    location in `pronouns` and a link in `photo`, silently, visible only
+    entry-by-entry much later. Refusing the line is recoverable; importing
+    it wrong is not.
+23. **What happens to a handle already in the list is the user's choice**
+    (`#bulkDedupe`): `merge` (fill blanks only — the default and the old
+    behaviour), `overwrite` (take the pasted value where the paste HAS one;
+    a blank cell never wipes a field that holds something), `skip`, `add`.
+    Tags union in every merging mode — a tag is additive by nature, and
+    dropping ones already on the entry would lose work no paste asked to
+    remove. NOTE the reference implementation's "update" mode did a
+    `{...existing, ...data}` spread, which blanks a filled field from an
+    empty cell; that was deliberately not ported.
+24. **The import report replaced the one-line `alert()`** (`#bulkReport`,
+    inside the panel — which therefore STAYS OPEN after a run, and clears
+    on cancel or on reopening). It counts added / updated / already-complete
+    / skipped, and names the wrong-field-count lines WITH THEIR LINE NUMBERS
+    and a preview. An alert could not say which line of a 242-line paste it
+    refused. The textarea is cleared only once the write actually reached
+    storage, so a quota failure never eats the paste.
 
 **Facet counts are computed against every filter except themselves** — with
 the view defaulting to tattoo artists, a region count taken over the whole
@@ -352,9 +407,9 @@ counts can exclude their own dimension.
 **Testing approach:** no CI workflow covers this file (every GitHub
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
 only — only Netlify's own informational checks run on this PR). The
-drawer, paste-to-add and shortlist work (items 11–18) ship with a behaviour
-gate, `node tools/verify-tracker-drawer.mjs` (168 checks; `--shots <dir>`
-also writes a contact sheet). Its map checks serve the REAL leaflet and
+drawer, paste-to-add, shortlist and import work (items 11–24) ship with a
+behaviour gate, `node tools/verify-tracker-drawer.mjs` (214 checks;
+`--shots <dir>` also writes a contact sheet). Its map checks serve the REAL leaflet and
 leaflet.markercluster from `node_modules` when present
 (`npm install --no-save leaflet@1.9.4 leaflet.markercluster@1.5.3`) and
 report as SKIPPED, never as passed, when they are missing. It serves the repo on a free port, seeds
@@ -367,8 +422,24 @@ filters and the map toggle. It is not wired into CI (no workflow here
 covers this file) — run it before calling a tracker change done.
 Verified falsifiable: widening `MAX_PHOTO_DIM`, dropping the text-field
 paste guard, restoring the "all" default, removing the US-state fold,
-inferring gender from he/him, running the status split on load, or swapping
-the cluster group for a plain layer group each turn it red.
+inferring gender from he/him, running the status split on load, swapping
+the cluster group for a plain layer group, neutering `foldText()`, making
+`tagKey()` the identity, widening `BULK_FIELD_COUNTS` to accept anything,
+lifting the tag cap, or un-pinning a selected tag when the bar collapses —
+each turns it red, on the checks that name that behaviour.
+
+**A fixture whose handle contains the name it searches for proves nothing.**
+The search haystack includes `e.handle`, so a realistic `@sarahrose_tattoo`
+satisfies "plain-ascii search finds a fraktur name" with folding switched
+OFF. Two of these checks passed a neutered `foldText()` for exactly that
+reason before the fixture was changed to `@goldenharvest.resident`. Keep the
+fold fixture's handles free of the text being searched.
+
+**Sections that need their own seed data get their own browser CONTEXT.**
+`ctx.addInitScript` re-seeds `SEED` into localStorage on every navigation, so
+a write-then-reload is silently clobbered and the checks run against the old
+fixture while appearing to pass. `reseed()` builds a fresh context per
+fixture and folds its page errors back into the shared list.
 Verification has been manual: serve locally via `python3 -m http.server`
 (`crypto.subtle` needs a secure context — never test via `file://`), drive
 with Playwright (`NODE_PATH=/opt/node22/lib/node_modules` — Playwright is
@@ -398,6 +469,16 @@ testing, rather than testing against a stub.
   confirmed to parse cleanly and merge correctly — but has **not**
   actually been pasted into the user's real tracker yet, since that step
   can only happen in their own browser.
+- **`bulk-paste-v2.txt`** (242 researched tattoo artists, 10-field format)
+  was driven end-to-end through a real Chromium against the current page:
+  242 added / 0 malformed, 98 with tags, 31 with no location, 5 `woman` +
+  1 `nonbinary`, 33 regions, 119 tag groups, 70.6 KB in localStorage,
+  ~2.6s wall time, no page errors — and a re-paste of the identical file
+  reports "0 added · 242 already complete" rather than duplicating. It has
+  **not** been pasted into the user's real tracker; that only happens in
+  their browser, and localStorage is per-origin, so data added on the deploy
+  preview does not follow the merge to production. Use the app's own
+  export/import JSON to carry it across.
 - PR #121 has an hourly self-scheduled check-in (via `send_later`)
   watching for CI/mergeability/review-comment changes, set up mid-session
   — check `list_triggers` for it if picking this back up, rather than
