@@ -12,6 +12,49 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles.css">
+<style>
+  /* Per-page figures, same pattern as skirt.html (.skirt-figure): stills sit
+     full-column (landscape) or capped at 28rem (portrait); the process
+     footage is two portrait phone clips side by side, click-to-play. */
+  .thermo-figure {
+    margin: 1.75rem 0 0;
+  }
+  .thermo-figure__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .thermo-figure video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 9 / 16;
+    background: var(--black-raised);
+    border: 1px solid var(--line-strong);
+  }
+  .thermo-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--black-raised);
+    border: 1px solid var(--line-strong);
+  }
+  .thermo-figure--portrait {
+    max-width: 28rem;
+  }
+  .thermo-figure__caption {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-dim);
+    margin: 0.75rem 0 0;
+    line-height: 1.6;
+  }
+  @media (max-width: 480px) {
+    .thermo-figure__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
 </head>
 <body id="top">
 
@@ -70,6 +113,14 @@
           <li><strong>Thermochromic Pigments:</strong> These pigments were mixed with a gel medium and applied to the TPU film, changing color as a reaction to temperature changes, creating a visual representation of environmental data through color shifts.</li>
           <li><strong>Heating Elements:</strong> Off the shelf mesh polyester filament with embedded micro metal conductive fibers, encapsulated in polyimide film.</li>
         </ul>
+        <figure class="thermo-figure">
+          <img src="../assets/thermochromic/pigment-swatches-736.jpg"
+               srcset="../assets/thermochromic/pigment-swatches-736.jpg 736w, ../assets/thermochromic/pigment-swatches-1472.jpg 1472w"
+               sizes="(max-width: 800px) 88vw, 736px"
+               width="1472" height="768" loading="lazy"
+               alt="Studio table with a row of thermochromic pigment sample pots, a test board of brushed pigment swatches, fashion figure sketches, and a strip of white cotton stamped with a red-to-violet grid of square tile swatches">
+          <figcaption class="thermo-figure__caption">Pigment sampling &mdash; thermochromic powders in gel medium, brushed out on board and stamped through a stencil onto cotton to compare the tile colors at rest.</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -81,6 +132,31 @@
           <li><strong>Technology Integration:</strong> This phase involved carefully embedding the heating elements and configuring a microcontroller to ensure the thermochromic pigments responded accurately to temperature changes.</li>
           <li><strong>Prototyping and Testing:</strong> Through multiple iterations, the garments were refined to achieve the desired balance of visual impact and user comfort, ensuring reliable performance during wear.</li>
         </ul>
+        <figure class="thermo-figure thermo-figure--portrait">
+          <img src="../assets/thermochromic/toile-448.jpg"
+               srcset="../assets/thermochromic/toile-448.jpg 448w, ../assets/thermochromic/toile-896.jpg 896w"
+               sizes="(max-width: 800px) 88vw, 448px"
+               width="896" height="1195" loading="lazy"
+               alt="White cotton toile of a strapless dress on a dress form: a folded, layered bodice band over a full circle skirt, in front of a classroom chalkboard">
+          <figcaption class="thermo-figure__caption">The dress in toile &mdash; strapless bodice with a folded band, full circle skirt &mdash; before the pigment tiles were applied.</figcaption>
+        </figure>
+        <figure class="thermo-figure">
+          <div class="thermo-figure__grid">
+            <video controls muted playsinline loop preload="metadata"
+                   poster="../assets/thermochromic/laser-cut-squares-poster.jpg"
+                   aria-label="Laser cutter tracing a grid of square tiles into violet thermochromic TPU film">
+              <source src="../assets/thermochromic/laser-cut-squares.webm" type="video/webm">
+              <source src="../assets/thermochromic/laser-cut-squares.mp4" type="video/mp4">
+            </video>
+            <video controls muted playsinline loop preload="metadata"
+                   poster="../assets/thermochromic/laser-cut-rings-poster.jpg"
+                   aria-label="Laser cutter tracing a cluster of ring tiles into teal thermochromic TPU film">
+              <source src="../assets/thermochromic/laser-cut-rings.webm" type="video/webm">
+              <source src="../assets/thermochromic/laser-cut-rings.mp4" type="video/mp4">
+            </video>
+          </div>
+          <figcaption class="thermo-figure__caption">Laser-cutting the pigment-coated TPU film into tile patterns, March 2018 &mdash; squares in the violet film, rings in the teal. Both clips are silent.</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -95,6 +171,14 @@
       <h2 class="project__section-title"><span>07</span>Outcome &amp; Impact</h2>
       <div class="project__section-body">
         <p>The project culminated in a successful showcase at a fashion event, where the dresses illustrated the fluctuating health of our planet. "Disappearance" not only highlighted the potential of smart textiles in fashion but also sparked important conversations about sustainability and environmental responsibility.</p>
+        <figure class="thermo-figure thermo-figure--portrait">
+          <img src="../assets/thermochromic/final-look-448.jpg"
+               srcset="../assets/thermochromic/final-look-448.jpg 448w, ../assets/thermochromic/final-look-896.jpg 896w"
+               sizes="(max-width: 800px) 88vw, 448px"
+               width="896" height="1344" loading="lazy"
+               alt="Model seated in the finished white strapless dress, scattered blue and violet thermochromic tiles across the bodice and skirt hem">
+          <figcaption class="thermo-figure__caption">The finished dress &mdash; blue and violet tiles at their cool, resting color. Heat from the elements underneath clears them to white, the disappearance the project is named for.</figcaption>
+        </figure>
       </div>
     </section>
 
