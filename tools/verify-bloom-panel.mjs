@@ -40,6 +40,19 @@
          paid for checking only one direction: Advanced silently stopped
          showing 25 controls while every gate passed.
 
+     (f) ROLES ELIGIBILITY, COMBINED (Eva, Sep 2 amendment). Route (d) moves
+         one driver at a time off DEFAULTS; `slotRolesEligible` reads THREE
+         drivers at once (placement, layerCount, layerPhase), so a state that
+         moves two of them together — SPIRAL at layerCount 3, FAN at a
+         non-zero layerPhase — is never reached by route (d) at all. This
+         route drives those combined states through the real UI and checks
+         THREE-WAY agreement: the DOM wrapper's `hidden`, the registry
+         predicate, and bloom-geometry.js's OWN `slotRolesEligible(state)`
+         (exposed via `__bloomMetrics()`) — because a control that is visible
+         but whose role the geometry never applies is "showing where it
+         drives nothing" even when the DOM and the registry agree with each
+         other.
+
      (e) THE LOW-COUNT SPIRAL FLAG, BOTH DIRECTIONS. The flag is the entire
          handling of golden-angle placement below eight petals (there is no
          geometric threshold to gate on — measured, see GOLDEN_ANGLE), so it
@@ -585,6 +598,72 @@ for (const [driverId, dependents] of drivers) {
       ok.push(`${tag}: all ${CONTROLS.length} wrappers agree with their predicates; dependents shown: ${shown.length ? shown.join(', ') : 'none'}`);
     }
   }
+}
+
+/* ---------------- (f) ROLES ELIGIBILITY, COMBINED — Eva's Sep 2 amendment ---------------- */
+/* THE GAP ROUTE (d) LEAVES, stated so it is not re-discovered as a mystery.
+   Route (d) drives ONE driver away from DEFAULTS at a time — `placement` to
+   RADIAL/SPIRAL/CONTINUOUS/FAN with `layerCount`/`layerPhase` left at their
+   OWN defaults (1 / 0), and `layerCount`/`layerPhase` likewise with
+   `placement` left at RADIAL. `slotRolesEligible` reads all three AT ONCE
+   (RADIAL needs layerCount 1 OR layerPhase 0; FAN is unconditional; SPIRAL
+   and CONTINUOUS are always false), so a state that moves TWO of them off
+   DEFAULTS together — SPIRAL with layerCount 3, FAN with layerPhase away
+   from 0 — is never reached by route (d) at all. That is exactly the shape
+   of gap Eva's amendment asked to close: "verify which placements actually
+   show the section today... if it shows where the zygomorphy sessions ruled
+   it hidden, that's a defect to report."
+
+   THREE-WAY AGREEMENT, not two. Each row checks the DOM wrapper's `hidden`
+   against the REGISTRY predicate (the same thing route (d) checks) AND
+   against bloom-geometry.js's OWN `slotRolesEligible(state)` — exposed as
+   `__bloomMetrics().slotRolesEligible` — because a control that is VISIBLE
+   but whose role the geometry never applies is "hide it exactly where it
+   drives nothing" (Eva's words) even if the registry predicate and the DOM
+   happen to agree with EACH OTHER. Both files keep their own copy of this
+   condition (bloom-geometry.js imports nothing, so it cannot import the
+   registry's), and the existing Z5 assertion already checks the two agree
+   on every buildMatrix() row — this route checks it on COMBINED states that
+   row set does not happen to cover. */
+const ROLES_COMBOS = [
+  // RADIAL: layerCount 1 shows regardless of layerPhase (the "nothing above
+  // the outermost whorl to fall out of step" arm) — a stale/non-zero
+  // layerPhase must not leak through.
+  ['RADIAL', 1, 0, true], ['RADIAL', 1, 1, true],
+  // RADIAL: layerCount >= 2 needs layerPhase exactly 0.
+  ['RADIAL', 3, 0, true], ['RADIAL', 3, 0.5, false], ['RADIAL', 2, 1, false],
+  // SPIRAL: always hidden, INCLUDING away from layerCount/layerPhase
+  // defaults — route (d) only ever tried SPIRAL at layerCount 1, layerPhase
+  // 0. This is the combined check Eva's ruling asked for by name.
+  ['SPIRAL', 1, 0, false], ['SPIRAL', 3, 0, false],
+  // CONTINUOUS: same claim, same reason.
+  ['CONTINUOUS', 1, 1, false], ['CONTINUOUS', 3, 0, false],
+  // FAN: eligible at every depth, UNCONDITIONALLY — layerPhase is hidden
+  // and irrelevant under FAN, but its stale DOM value must not matter.
+  ['FAN', 1, 1, true], ['FAN', 3, 0.5, true],
+];
+for (const [placement, layerCount, layerPhase, want] of ROLES_COMBOS) {
+  await openBloom(page, port);
+  const set = [{ id: 'placement', value: placement }, { id: 'layerCount', value: String(layerCount) }, { id: 'layerPhase', value: String(layerPhase) }];
+  const bad = await applyConfig(page, set);
+  const tag = `[roles combined] ${placement} layerCount=${layerCount} layerPhase=${layerPhase}`;
+  if (bad.length) { note(`${tag}: read-back failed: ${bad.join('; ')}`); continue; }
+  const res = await page.evaluate(() => {
+    const w = document.getElementById('labellumSize')?.closest('.bl-ctrl');
+    return {
+      domHidden: w ? w.hidden : null,
+      geomEligible: window.__bloomMetrics().slotRolesEligible,
+      state: window.__bloomUIState(),
+    };
+  });
+  if (res.domHidden === null) { note(`${tag}: #labellumSize wrapper missing from the DOM`); continue; }
+  const regEligible = evalPredicate({ ref: 'slotRolesEligible' }, res.state);
+  const bad2 = [];
+  if (res.domHidden !== !want) bad2.push(`DOM hidden=${res.domHidden}, expected ${!want}`);
+  if (regEligible !== want) bad2.push(`registry predicate says eligible=${regEligible}, expected ${want}`);
+  if (res.geomEligible !== want) bad2.push(`geometry's own slotRolesEligible() says eligible=${res.geomEligible}, expected ${want}`);
+  if (bad2.length) note(`${tag}: ${bad2.join('; ')}`);
+  else ok.push(`${tag}: DOM/registry/geometry all agree — eligible=${want}`);
 }
 
 /* ---------------- (e) the LOW-COUNT SPIRAL FLAG, both directions ---------- */

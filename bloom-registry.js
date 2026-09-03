@@ -19,15 +19,18 @@
 
    Charter: docs/bloom-charter.md. Procedures: the flower-project skill.
 
-   THE ONE IMPORT, and why a file that had none now has one. `placement`'s
-   read-out prints the golden angle in degrees, and 137.51 is a number with an
-   owner (GOLDEN_ANGLE in bloom-geometry.js, written as pi*(3 - sqrt(5)) so
-   the constant IS its definition). Restating it here as a literal would be a
-   second owner of a number, which is this project's most repeated defect;
-   importing it cannot drift. bloom-geometry.js imports nothing at all, so no
-   cycle is possible in either direction.
+   THE IMPORTS, and why a file that once had exactly one now has two, on the
+   same rule both times. `placement`'s read-out prints the golden angle in
+   degrees, and 137.51 is a number with an owner (GOLDEN_ANGLE in
+   bloom-geometry.js, written as pi*(3 - sqrt(5)) so the constant IS its
+   definition). `fanSpacing`'s max is the SAME number as the arc-limit
+   ceiling the geometry already clamps the step to (FAN_ARC_LIMIT_DEG, 170) —
+   restating either as a literal here would be a second owner of a number,
+   which is this project's most repeated defect; importing them cannot
+   drift. bloom-geometry.js imports nothing at all, so no cycle is possible
+   in either direction.
    =================================================================== */
-import { GOLDEN_ANGLE } from './bloom-geometry.js';
+import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
    Empty today, structurally present from day one: when the first control is
@@ -905,8 +908,40 @@ export const CONTROLS = [
      coincidence measurement the cap exists for, and note that the cap binds
      across most of this slider at 8 per side — the read-out prints "(CAPPED)"
      there for the same reason the roll floor prints "(clamped)": a slider
-     that has stopped moving must not read as broken. */
-  { id: 'fanSpacing', section: 'arrangement', kind: 'slider', min: 15, max: 60, step: 1, default: 45,
+     that has stopped moving must not read as broken.
+
+     MAX RAISED 60 -> FAN_ARC_LIMIT_DEG (Eva, Sep 2 amendment): 60 was an
+     arbitrary ceiling with no relationship to the geometry's own bound, and
+     she wanted more than 60 reachable. The natural ceiling ALREADY HAD A
+     NAME — asking for more than FAN_ARC_LIMIT_DEG degrees between neighbours
+     is asking for more than the arc limit permits at ANY perSide (the
+     tightest bind, perSide 1 with a mirror-line petal, has its own threshold
+     at exactly FAN_ARC_LIMIT_DEG/1 = 170), so a max beyond it would move the
+     slider without moving the model — an input-space dead zone, which this
+     project's "cap the output" rule exists to avoid on the OUTPUT side and
+     is just as wrong on the INPUT side. Importing the same constant instead
+     of a second "170" literal is what makes this bound un-driftable from the
+     one it mirrors.
+
+     WHAT WIDENS, MEASURED RATHER THAN ASSUMED: at perSide 1 (toggle ON) the
+     new max is now exactly the arc-limit threshold (170/1), so the slider's
+     full range is reachable UNCAPPED there for the first time — the fan can
+     open to the same 340deg-arc/20deg-notch extreme previously reachable
+     only at 8 per side, but with just 3 petals total. At perSide 1 (toggle
+     OFF) the threshold is 170/0.5 = 340, so 170 is nowhere near it — a
+     genuinely new, UNCAPPED half-open shape (170deg arc, 190deg notch) that
+     the old 60deg ceiling never let this toggle state reach at all. Toggle-ON
+     thresholds at LOW/MID perSide fall inside the new range for the first
+     time too (perSide 2: 170/2 = 85; perSide 3: 170/3 = 56.67, already
+     brushed by the OLD max) — so the cap now binds well below 8 per side,
+     which used to be the only place it visibly did. FAN_ARC_LIMIT_DEG
+     ITSELF STANDS UNCHANGED: it already protected every perSide against
+     exact coincidence regardless of what this slider's ceiling was, and nothing
+     about widening the INPUT range changes what that constant does or why
+     170 was chosen (the flower's own value, ported — see its header). New
+     gate rows cover the newly reachable region; see bloom-harness.mjs's FAN
+     section. */
+  { id: 'fanSpacing', section: 'arrangement', kind: 'slider', min: 15, max: FAN_ARC_LIMIT_DEG, step: 1, default: 45,
     label: 'Petal spacing', fmt: (v) => `${Number(v).toFixed(0)}° between neighbours`,
     tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'placement', oneOf: ['FAN'] } },

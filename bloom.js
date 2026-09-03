@@ -12,6 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP } from './bloom-geometry.js';
+import { VIEW_PRESETS } from './bloom-view-presets.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -192,6 +193,26 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0c0f0e);
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
+/* THE ORBIT AXIS BUG (Eva, Sep 2 — "feels really difficult... like it's
+   fighting against me"), root-caused rather than guessed at. OrbitControls
+   captures its orbit-math pole from `object.up` ONCE, inside an IIFE at
+   construction time (three.js's own OrbitControls.js: `this.update =
+   (function () { const quat = Quaternion().setFromUnitVectors(object.up,
+   Vector3(0,1,0)); ...; return function update() {...}; })()`) — it is NOT
+   re-read on later frames even though `camera.up` itself can still be
+   reassigned afterward for rendering. `camera.up` defaults to three.js's
+   own (0,1,0) until fitCamera() first runs and sets it to (0,0,1) — but
+   fitCamera only runs inside regenerate(), AFTER `new OrbitControls(...)`
+   below had already captured the WRONG pole (Y) as this app's model is
+   Z-up throughout (buildPetalInto's own R/T/Z frame). Measured directly
+   (a probe exposing camera/controls to a headless page): a purely
+   horizontal drag moved Y not at all and rotated X/Z instead of X/Y, and a
+   vertical drag drove the camera toward alignment with the Y axis rather
+   than tilting over the bloom — orbiting a pole that has nothing to do
+   with what is on screen, which is exactly what reads as fighting/hitting
+   a wall. The fix is ORDER: set camera.up to this app's real vertical
+   BEFORE OrbitControls captures it, not after. */
+camera.up.set(0, 0, 1);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.autoRotate = document.getElementById('autoRotate').checked;
@@ -200,7 +221,21 @@ document.getElementById('autoRotate').addEventListener('change', (e) => {
   controls.autoRotate = e.target.checked;
 });
 let userMoved = false;
-controls.addEventListener('start', () => { userMoved = true; });
+/* True only between a FAN placement-snap and whatever ends it — a manual
+   orbit, a manual VIEW-dropdown pick, or leaving FAN. While true, every
+   rebuild re-centres the (already top-down) camera on the model's fresh
+   bounding-sphere centre — see recenterFanView(). It is a NARROWER flag
+   than `userMoved`: `userMoved` means "the automatic default fit is the
+   user's to drive now" and is permanent once set (existing behaviour,
+   unchanged); this one means "still actively holding the FAN's own snap",
+   and either a drag or a fresh preset pick ends it without touching
+   `userMoved`. */
+let fanViewLocked = false;
+controls.addEventListener('start', () => {
+  userMoved = true;
+  fanViewLocked = false;
+  if (viewTween) { controls.autoRotate = document.getElementById('autoRotate').checked; viewTween = null; }
+});
 
 scene.add(new THREE.HemisphereLight(0xdfefe6, 0x1a221e, 1.1));
 const key = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -209,6 +244,8 @@ scene.add(key);
 
 const material = new THREE.MeshStandardMaterial({ color: 0xc9dfd2, roughness: 0.62, metalness: 0.05 });
 let mesh = null;
+
+const DEG = Math.PI / 180;   // VIEW_PRESETS' distances are fov-aware (radius/tan(fov/2)), not a bare radius*k
 
 /* THE ONE OWNER of "frame a sphere of this radius". The automatic fit and the
    contact sheet's centre zoom are the same operation at two radii, so they are
@@ -599,6 +636,7 @@ function regenerate() {
   buildCount++;
   const ui = readUI();
   refreshLabels(ui);
+  const wasPlacement = lastPlacement;   // captured before buildGeometry() below overwrites it
   const { geo, acc, built } = buildGeometry({ exportMode: false });
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
   else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
@@ -617,7 +655,19 @@ function regenerate() {
      the origin crops it. `fitCamera` already accepts a target; it had nothing
      truthful to point at until now. Telemetry only — no geometry reads it. */
   lastFitCenter = [geo.boundingSphere.center.x, geo.boundingSphere.center.y, geo.boundingSphere.center.z];
-  if (!userMoved) fitCamera(lastFitRadius);
+  /* THE FAN SNAP, keyed off a PLACEMENT TRANSITION rather than "is FAN" on
+     every rebuild — it fires once on entry and never re-fights a manual
+     orbit or a fresh dropdown pick taken since (both clear fanViewLocked).
+     Leaving FAN does nothing here on purpose (Eva's ruling: stay in place,
+     no snap back) — `userMoved` is already true from the entry snap, so the
+     plain `!userMoved` branch below stays silent too. */
+  if (ui.placement === 'FAN' && wasPlacement !== 'FAN') {
+    snapToFan();
+  } else if (ui.placement === 'FAN' && fanViewLocked) {
+    recenterFanView();
+  } else if (!userMoved) {
+    fitCamera(lastFitRadius);
+  }
   liveSummary = summarise(ui, acc, 'live', built.rings, built.foot) + `\n${materialLines(ui)}`;
   readout.textContent = liveSummary;
 }
@@ -633,6 +683,119 @@ function scheduleRegen() {
 for (const c of CONTROLS) {
   inputs[c.id].addEventListener('input', () => { applyVisibility(); scheduleRegen(); });
   inputs[c.id].addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
+}
+
+/* ---------------------------------------------------
+   VIEW PRESETS — the VIEW box's dropdown. Pure camera chrome: reads
+   lastFitRadius/lastFitCenter (the #129 bounding-sphere machinery — one
+   owner, read here rather than recomputed) and drives the same
+   camera/controls fitCamera() does, but never touches geometry, the
+   registry, or readUI(). `viewPresetSelect` is a raw DOM reference exactly
+   like the `autoRotate` checkbox above: not in `inputs`, not a CONTROLS
+   row, invisible to readUI(), DEFAULTS, reset, export and every gate that
+   reads UI state.
+
+   A DROPDOWN PICK ANIMATES (a 650 ms ease, ported from the flower's own
+   applyViewPreset/stepViewTween); THE FAN SNAP DOES NOT — Eva's ruling was
+   specifically "immediate snap without rotation", so snapToFan() below sets
+   the camera directly and shares no code path with the tween. */
+const viewPresetSelect = document.getElementById('viewPreset');
+let viewTween = null;
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+// One formula, every preset and the fan re-centre alike — the frustum-aware
+// distance the flower's own applyViewPreset uses, so `fit` means the same
+// thing here it does in bloom-view-presets.js's own header.
+function presetDistance(radius, fit) {
+  return (radius / Math.tan((camera.fov * DEG) / 2)) * fit;
+}
+
+function applyViewPreset(name) {
+  const p = VIEW_PRESETS[name] || VIEW_PRESETS.default;
+  if (!(lastFitRadius > 0)) return;   // nothing built yet
+  const c = new THREE.Vector3(lastFitCenter[0], lastFitCenter[1], lastFitCenter[2]);
+  const dist = presetDistance(lastFitRadius, p.fit);
+  const dn = Math.hypot(p.dir[0], p.dir[1], p.dir[2]) || 1;
+  const endPos = c.clone().add(new THREE.Vector3(p.dir[0] / dn, p.dir[1] / dn, p.dir[2] / dn).multiplyScalar(dist));
+  const endUp = new THREE.Vector3(p.up[0], p.up[1], p.up[2]).normalize();
+  camera.far = Math.max(camera.far, dist * 20);   // widen up front so nothing clips mid-flight; tightened on arrival
+  camera.updateProjectionMatrix();
+  viewTween = {
+    startPos: camera.position.clone(), endPos,
+    startTarget: controls.target.clone(), endTarget: c,
+    startUp: camera.up.clone(), endUp,
+    endNear: Math.max(0.05, dist * 0.02), endFar: dist * 20,
+    t0: performance.now(), dur: 650,
+  };
+  controls.autoRotate = false;   // paused during the flight; resumed per the checkbox on arrival
+  /* A chosen preset is a deliberate camera placement, same standing as a
+     manual drag: without this, the next slider tweak's `!userMoved` branch
+     (or, mid-FAN, the re-centre branch) would silently undo it. */
+  userMoved = true;
+  fanViewLocked = false;
+}
+
+function stepViewTween() {
+  const e = easeInOutCubic(Math.min(1, (performance.now() - viewTween.t0) / viewTween.dur));
+  camera.position.lerpVectors(viewTween.startPos, viewTween.endPos, e);
+  controls.target.lerpVectors(viewTween.startTarget, viewTween.endTarget, e);
+  camera.up.copy(viewTween.startUp).lerp(viewTween.endUp, e).normalize();
+  camera.lookAt(controls.target);
+  if (e >= 1) {
+    camera.up.copy(viewTween.endUp);
+    camera.near = viewTween.endNear; camera.far = viewTween.endFar;
+    camera.updateProjectionMatrix();
+    controls.update();
+    controls.autoRotate = document.getElementById('autoRotate').checked;
+    viewTween = null;
+  }
+}
+if (viewPresetSelect) viewPresetSelect.addEventListener('change', () => applyViewPreset(viewPresetSelect.value));
+
+/* THE FAN SNAP (Eva's ruling). Selecting FAN placement moves the camera to
+   TOP-DOWN, centred on the model's own bounding-sphere centre, immediately
+   and without an animation — no button, unlike the flower's manual
+   "Auto-center (top-down)". Shares VIEW_PRESETS.top with the dropdown's own
+   TOP-DOWN entry (one owner for that framing, however it's reached) but
+   sets the camera directly rather than through the tween. */
+function snapToFan() {
+  const p = VIEW_PRESETS.top;
+  const c = new THREE.Vector3(lastFitCenter[0], lastFitCenter[1], lastFitCenter[2]);
+  const dist = presetDistance(lastFitRadius, p.fit);
+  const dn = Math.hypot(p.dir[0], p.dir[1], p.dir[2]) || 1;
+  camera.up.set(p.up[0], p.up[1], p.up[2]);
+  controls.target.copy(c);
+  camera.position.set(c.x + (p.dir[0] / dn) * dist, c.y + (p.dir[1] / dn) * dist, c.z + (p.dir[2] / dn) * dist);
+  camera.near = Math.max(0.05, dist * 0.02);
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+  controls.update();
+  controls.autoRotate = false;
+  document.getElementById('autoRotate').checked = false;   // OFF, and nothing resumes it silently — Eva's ruling
+  userMoved = true;
+  fanViewLocked = true;
+  if (viewPresetSelect) viewPresetSelect.value = 'top';   // keep the dropdown honest about the framing it now shows
+}
+
+/* Re-centre only, same direction/distance ratio — a fan control tweaked
+   after the snap (spacing, per-side count, the mirror toggle) can shift the
+   bounding-sphere centre without the user having touched the camera since.
+   Same correction principle as the flower's refitCamera when a stem grows
+   the plant past its initial framing: keep the view direction, recentre and
+   redistance to the fresh bounds. Runs only while fanViewLocked — a manual
+   orbit or a fresh dropdown pick already cleared it, and holds the camera
+   wherever the user left it instead. */
+function recenterFanView() {
+  const c = new THREE.Vector3(lastFitCenter[0], lastFitCenter[1], lastFitCenter[2]);
+  let dx = camera.position.x - controls.target.x, dy = camera.position.y - controls.target.y, dz = camera.position.z - controls.target.z;
+  const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
+  const dist = presetDistance(lastFitRadius, VIEW_PRESETS.top.fit);
+  controls.target.copy(c);
+  camera.position.set(c.x + dx * dist, c.y + dy * dist, c.z + dz * dist);
+  camera.near = Math.max(0.05, dist * 0.02);
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+  controls.update();
 }
 
 /* ---------------- STL export ---------------- */
@@ -886,4 +1049,7 @@ window.__bloomCapability = (spec) => { capability = spec || null; regenerate(); 
 /* ---------------- go ---------------- */
 applyVisibility();
 regenerate();
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+renderer.setAnimationLoop(() => {
+  if (viewTween) stepViewTween(); else controls.update();
+  renderer.render(scene, camera);
+});
