@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" integrity="sha256-YU3qCpj/P06tdPBJGPax0bm6Q1wltfwjsho5TR4+TYc=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" integrity="sha256-YSWCMtmNZNwqex4CEw1nQhvFub2lmU7vcCKP+XVwwXA=" crossorigin="">
 <style>
   :root{
     --ink:#0A0A0C;
@@ -185,6 +187,20 @@
   }
   .location-select option{background:var(--ink-soft); color:var(--paper);}
 
+  .tag-chip-more, .tag-chip-clear{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.5px;
+    padding:4px 8px;
+    border:none;
+    background:transparent;
+    color:var(--teal);
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .tag-chip-more:hover, .tag-chip-clear:hover{color:var(--paper);}
+
   .tag-chip{
     font-family:var(--font-mono);
     font-size:11px;
@@ -222,13 +238,129 @@
     border-bottom-color:var(--teal);
   }
 
-  #mapContainer{
+  /* Map and its results panel share one row; the panel is the map's index. */
+  .map-wrap{
     display:none;
-    height:480px;
-    border:1px solid var(--line-strong);
-    background:var(--ink-soft);
     margin-bottom:20px;
+    border:1px solid var(--line-strong);
   }
+  .map-wrap[data-visible="true"]{display:flex; align-items:stretch;}
+  /* The page is a 760px reading column, which a map with a side panel beside
+     it does not fit into — at that width the map came out 385px and showed a
+     third of the world. This one component breaks out and centres on the
+     viewport instead. Centring by transform rather than by negative margins
+     keeps it independent of the column's asymmetric padding. */
+  @media (min-width:1024px){
+    .map-wrap[data-visible="true"]{
+      position:relative;
+      left:50%;
+      transform:translateX(-50%);
+      width:calc(100vw - 96px);
+      max-width:1200px;
+    }
+  }
+  #mapContainer{
+    flex:1 1 auto;
+    min-width:0;
+    height:480px;
+    background:var(--ink-soft);
+  }
+  .map-panel{
+    flex:0 0 320px;
+    display:flex;
+    flex-direction:column;
+    height:480px;
+    border-left:1px solid var(--line-strong);
+    background:var(--ink-soft);
+    min-width:0;
+  }
+  .map-panel-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+    padding:12px 14px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  .map-panel-heading{display:flex; flex-direction:column; gap:3px; min-width:0;}
+  .map-panel-title{
+    font-family:var(--font-display);
+    font-size:15px;
+    color:var(--paper);
+    line-height:1.25;
+    overflow-wrap:anywhere;
+  }
+  .map-panel-sub{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--dim-2);
+  }
+  .map-panel-close{
+    flex:0 0 auto;
+    background:transparent;
+    border:1px solid var(--line-strong);
+    color:var(--dim);
+    font-size:15px;
+    line-height:1;
+    padding:3px 8px;
+    cursor:pointer;
+  }
+  .map-panel-close:hover{color:var(--paper); border-color:var(--teal);}
+  .map-panel-list{
+    overflow-y:auto;
+    overflow-x:hidden;
+    flex:1 1 auto;
+    /* The floating "top" button is fixed to the bottom-right of the viewport,
+       which is exactly where this panel is. Leave room so the last row can
+       always be scrolled clear of it rather than sitting under it. */
+    padding-bottom:52px;
+  }
+  .map-panel-empty{
+    padding:16px 14px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    line-height:1.7;
+    color:var(--dim-2);
+  }
+  /* Rows are the SAME .entry markup the list uses — one card style, one
+     behaviour (click opens the drawer). Only the spacing is tightened. */
+  .map-panel-item{border-bottom:1px solid var(--line); padding:2px 0 8px;}
+  .map-panel-item:last-child{border-bottom:none;}
+  .map-panel-item .entry{padding:10px 14px 6px; gap:10px;}
+  .map-panel-item .entry-index{display:none;}
+  .map-panel-item .entry-photo,
+  .map-panel-item .entry-photo-placeholder{width:34px; height:34px; font-size:10px;}
+  .map-panel-item[data-hi="true"]{background:rgba(95,160,160,0.10);}
+  .map-panel-notes{
+    padding:0 14px;
+    font-size:11px;
+    line-height:1.65;
+    color:var(--dim);
+    overflow-wrap:anywhere;
+  }
+  /* The Instagram link is a SIBLING of the row, never nested inside it — the
+     row is a button, and a link inside a button is neither valid nor
+     predictable to click. */
+  .map-panel-ig{
+    display:inline-block;
+    margin:6px 14px 0;
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--teal);
+    text-decoration:none;
+    border-bottom:1px solid transparent;
+  }
+  .map-panel-ig:hover{border-bottom-color:var(--teal);}
+  /* Marker highlight, driven from the panel and from the map alike. */
+  .map-pin[data-hi="true"] span{
+    box-shadow:0 0 0 3px var(--teal) !important;
+    transform:scale(1.25);
+  }
+  .marker-cluster[data-hi="true"]{outline:2px solid var(--teal); outline-offset:2px;}
   #mapContainer[data-visible="true"]{display:block;}
   .leaflet-container{background:var(--ink-soft) !important;}
   .leaflet-popup-content-wrapper, .leaflet-popup-tip{
@@ -312,7 +444,7 @@
     outline:none;
   }
   .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--teal);}
-  .field textarea{resize:vertical;min-height:60px;font-size:12px;}
+  .field textarea{resize:vertical;min-height:60px;font-size:12px;line-height:1.6;}
 
   .bulk-hint{
     color:var(--dim);
@@ -324,6 +456,39 @@
     font-family:var(--font-mono);
     background:var(--ink);
     padding:1px 5px;
+    border:1px solid var(--line);
+    color:var(--paper);
+  }
+
+  /* bulk import report — replaces the old one-line alert() */
+  .import-report{
+    border:1px solid var(--line);
+    border-left:2px solid var(--teal);
+    background:var(--ink-soft);
+    padding:12px 14px;
+    margin:0 0 14px;
+    font-size:12px;
+    line-height:1.7;
+    color:var(--dim);
+  }
+  .import-report[data-tone="warn"]{border-left-color:var(--brick);}
+  .import-report h4{
+    margin:0 0 6px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--paper);
+    font-weight:400;
+  }
+  .import-report ul{margin:6px 0 0; padding-left:18px;}
+  .import-report li{margin-bottom:3px;}
+  .import-report .num{color:var(--paper); font-family:var(--font-mono);}
+  .import-report .warn-num{color:var(--brick); font-family:var(--font-mono);}
+  .import-report code{
+    font-family:var(--font-mono);
+    background:var(--ink);
+    padding:1px 4px;
     border:1px solid var(--line);
     color:var(--paper);
   }
@@ -505,8 +670,78 @@
     .entry-index{display:none;}
     h1{font-size:38px;}
     .wrap{padding-left:20px; border-left:none;}
+    /* Stack rather than squeeze: a 320px panel beside a phone-width map
+       leaves neither usable. */
+    .map-wrap[data-visible="true"]{flex-direction:column;}
     #mapContainer{height:340px;}
+    .map-panel{
+      flex:none;
+      width:100%;
+      height:320px;
+      border-left:none;
+      border-top:1px solid var(--line-strong);
+    }
   }
+
+  /* --- style-tag picker (edit mode) --- */
+  .tag-picker{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:8px;
+  }
+  .tag-toggle{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.3px;
+    padding:4px 9px;
+    border:1px solid var(--line-strong);
+    background:transparent;
+    color:var(--dim-2);
+    cursor:pointer;
+  }
+  .tag-toggle:hover{color:var(--dim); border-color:var(--dim-2);}
+  .tag-toggle[data-on="true"]{
+    border-color:var(--teal);
+    color:var(--ink);
+    background:var(--teal);
+    font-weight:700;
+  }
+  /* A tag the user typed that isn't in the starter set — same control, but
+     marked so it reads as theirs rather than as one of ours. */
+  .tag-toggle[data-custom="true"]{border-style:dashed;}
+  .tag-toggle[data-custom="true"][data-on="true"]{border-style:solid;}
+
+  .tag-chip-count{opacity:0.65; margin-left:4px;}
+
+  .filter-row .location-select + .location-select{margin-left:2px;}
+
+  /* --- map footer count --- */
+  .map-count{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.4px;
+    color:var(--dim-2);
+    margin:-12px 0 20px;
+  }
+  .map-count .unplotted{color:var(--brick);}
+  .map-count[hidden]{display:none;}
+
+  /* Cluster bubbles, restyled to the page's palette — the plugin's default
+     green/yellow/orange belongs to a different site. */
+  .marker-cluster{background:rgba(95,160,160,0.25);}
+  .marker-cluster div{
+    background:rgba(95,160,160,0.85);
+    color:var(--ink);
+    font-family:var(--font-mono);
+    font-weight:700;
+  }
+  .marker-cluster-medium{background:rgba(95,160,160,0.3);}
+  .marker-cluster-large{background:rgba(166,93,74,0.3);}
+  .marker-cluster-large div{background:rgba(166,93,74,0.9); color:var(--paper);}
+
+  /* --- notes, in the drawer's read-only spread --- */
+  .detail-notes{white-space:pre-wrap;}
 
   /* --- slide-in detail drawer --- */
   .drawer-backdrop{
@@ -859,26 +1094,26 @@
       </div>
 
       <div class="chips" id="chips">
-        <button class="chip" data-cat="all" data-active="true">all</button>
+        <button class="chip" data-cat="tattoo" data-active="true">tattoo artists</button>
+        <button class="chip" data-cat="all">all</button>
         <button class="chip" data-cat="following">following</button>
-        <button class="chip" data-cat="tattoo">tattoo artists</button>
         <button class="chip" data-cat="touring">touring / releases</button>
       </div>
 
       <div class="filter-row" id="genderChips">
         <span class="filter-label">gender</span>
         <button class="chip" data-gender="all" data-active="true">all</button>
-        <button class="chip" data-gender="she/her">she/her</button>
-        <button class="chip" data-gender="he/him">he/him</button>
-        <button class="chip" data-gender="they/them">they/them</button>
-        <button class="chip" data-gender="other">other</button>
-        <button class="chip" data-gender="unspecified">unspecified</button>
+        <button class="chip" data-gender="woman">women only</button>
+        <button class="chip" data-gender="unknown">unknown</button>
       </div>
 
       <div class="filter-row">
-        <span class="filter-label">location</span>
-        <select class="location-select" id="locationSelect">
-          <option value="all">all locations</option>
+        <span class="filter-label">region</span>
+        <select class="location-select" id="regionSelect">
+          <option value="all">all regions</option>
+        </select>
+        <select class="location-select" id="citySelect">
+          <option value="all">all cities</option>
         </select>
       </div>
 
@@ -895,7 +1130,8 @@
       </div>
 
       <div class="panel" id="panel">
-        <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url</code>. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code> — anything else (e.g. <code>Influencer</code>, <code>Art</code>, <code>Friend</code>) becomes <code>following</code> but keeps the original label as a tag, so it isn't lost. Plain lines with no <code>|</code> are added as bare names using the category below. Lines whose handle matches an existing entry are merged in — blank fields on the existing entry get filled in, nothing is overwritten, and no duplicate is created.</p>
+        <p class="bulk-hint">One entry per line. Use <code>|</code> to separate fields in this order: <code>name | handle | category | location | pronouns | status | link | photo url | tags | gender</code>. The last two are optional — 8- and 9-field lines still work. Tags are comma-separated inside their field. Gender can be <code>woman</code>, <code>nonbinary</code>, <code>man</code>, or blank for unknown; it is never guessed from a name. Category can be <code>following</code>, <code>tattoo</code>, or <code>touring</code> — anything else (e.g. <code>Influencer</code>, <code>Art</code>, <code>Friend</code>) becomes <code>following</code> but keeps the original label as a tag, so it isn't lost. Plain lines with no <code>|</code> are added as bare names using the category below. Any other field count is skipped and reported rather than imported, since one stray <code>|</code> shifts every field into the wrong column.</p>
+        <div id="bulkReport"></div>
         <div class="field-row">
           <div class="field">
             <label for="bulkDefaultCategory">default category for plain lines</label>
@@ -905,11 +1141,20 @@
               <option value="touring">touring / release</option>
             </select>
           </div>
+          <div class="field">
+            <label for="bulkDedupe">if a handle is already in the list</label>
+            <select id="bulkDedupe">
+              <option value="merge">fill in its blank fields only</option>
+              <option value="overwrite">replace with the pasted values</option>
+              <option value="skip">leave it alone</option>
+              <option value="add">add it again anyway</option>
+            </select>
+          </div>
         </div>
         <div class="field-row">
           <div class="field">
             <label for="bulkText">paste here</label>
-            <textarea id="bulkText" rows="7" placeholder="Jane Doe | @janedoe | tattoo | Los Angeles, CA | she/her | Guest spot NYC Oct 3–10 | instagram.com/janedoe | https://…jpg
+            <textarea id="bulkText" rows="7" placeholder="Jane Doe | @janedoe | tattoo | Los Angeles, CA | she/her | Guest spot NYC Oct 3–10 | instagram.com/janedoe | https://…jpg | fine line, floral | woman
 some.artist
 another.handle"></textarea>
           </div>
@@ -922,13 +1167,28 @@ another.handle"></textarea>
     </header>
 
     <div class="list" id="list"></div>
-    <div id="mapContainer"></div>
+    <div class="map-wrap" id="mapWrap">
+      <div id="mapContainer"></div>
+      <aside class="map-panel" id="mapPanel" aria-live="polite">
+        <div class="map-panel-head">
+          <div class="map-panel-heading">
+            <span class="map-panel-title" id="mapPanelTitle"></span>
+            <span class="map-panel-sub" id="mapPanelSub"></span>
+          </div>
+          <button type="button" class="map-panel-close" id="mapPanelClose"
+                  aria-label="Close this selection" hidden>&times;</button>
+        </div>
+        <div class="map-panel-list" id="mapPanelList"></div>
+      </aside>
+    </div>
+    <div class="map-count" id="mapCount" hidden></div>
 
     <footer>
       <span id="countLabel">0 entries</span>
       <div class="footer-actions">
         <button id="exportBtn">export json</button>
         <button id="importBtn">import json</button>
+        <button id="splitStatusBtn">split status → notes</button>
         <button id="clearBtn">clear all</button>
       </div>
     </footer>
@@ -978,8 +1238,25 @@ another.handle"></textarea>
       </div>
       <div class="field-row">
         <div class="field">
-          <label for="fStatus">status / notes</label>
-          <input id="fStatus" type="text" placeholder="Guest spot NYC Oct 3–10, or drop date, etc.">
+          <label for="fGender">gender</label>
+          <select id="fGender">
+            <option value="unknown">unknown</option>
+            <option value="woman">woman</option>
+            <option value="nonbinary">nonbinary</option>
+            <option value="not-woman">not a woman</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fNotes">notes — why I saved them</label>
+          <textarea id="fNotes" rows="4" placeholder="What I like, what I'd want from them, anything worth remembering."></textarea>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fStatus">status — guest spots, books, tour dates</label>
+          <input id="fStatus" type="text" placeholder="Guest spot NYC Oct 3–10, books open in Jan, etc.">
         </div>
       </div>
       <div class="field">
@@ -1007,8 +1284,9 @@ another.handle"></textarea>
       </div>
       <div class="field-row">
         <div class="field">
-          <label for="fTags">style tags (comma-separated)</label>
-          <input id="fTags" type="text" placeholder="fine line, botanical, black &amp; grey">
+          <span class="field-label">style tags</span>
+          <div class="tag-picker" id="tagPicker"></div>
+          <input id="fTags" type="text" placeholder="type a custom tag, then Enter" autocomplete="off">
         </div>
       </div>
       <div class="panel-actions">
@@ -1076,14 +1354,19 @@ another.handle"></textarea>
 })();
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha256-Hk4dIpcqOSb0hZjgyvFOP+cEmDXUKKNE/tT542ZbNQg=" crossorigin=""></script>
 <script>
 (function(){
   const STORAGE_KEY = 'artistTracker.entries.v1';
   let entries = [];
-  let activeCategory = 'all';
+  // This is a tattoo shortlist first: lead with the artists, keep the rest
+  // one click away rather than mixed into the default view.
+  let activeCategory = 'tattoo';
   let activeGender = 'all';
-  let activeLocationFilter = 'all';
+  let activeRegion = 'all';
+  let activeCity = 'all';
   let activeTags = new Set();
+  let showAllTags = false;
   let searchTerm = '';
   let sortMode = 'name';
   let currentView = 'list';
@@ -1118,6 +1401,41 @@ another.handle"></textarea>
       entries = raw ? JSON.parse(raw) : [];
       lastPersisted = JSON.stringify(entries);
     }catch(e){ entries = []; lastPersisted = '[]'; }
+    clearLegacyGeoFailures();
+    seedGender();
+  }
+
+  // The previous geocoder marked a location geoStatus:'failed' and never
+  // looked at it again, so a Nominatim throttle burned it permanently. That
+  // field is gone; sweep it once so those entries get a fresh chance — most
+  // of them now resolve from the static table with no request at all.
+  function clearLegacyGeoFailures(){
+    let swept = 0;
+    entries.forEach(e => {
+      if(e.geoStatus !== undefined){ delete e.geoStatus; swept++; }
+    });
+    if(swept) persist();
+  }
+
+  // One-time, additive: gives every entry an explicit `gender` where it has
+  // none. The ONLY thing that produces 'woman' is an unambiguous she/her in
+  // the pronouns field the user typed themselves; everything else becomes
+  // 'unknown' for them to fill in. Nothing is inferred from names, handles or
+  // photos, and no existing field is touched or removed — `pronouns` keeps
+  // its own separate job of saying how someone refers to themselves.
+  function seedGender(){
+    let changed = 0;
+    entries.forEach(e => {
+      if(GENDER_VALUES.includes(e.gender)) return;
+      const tokens = (e.pronouns || '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+      const sheHer = tokens.includes('she') || tokens.includes('her') || tokens.includes('hers');
+      const heHim  = tokens.includes('he') || tokens.includes('him') || tokens.includes('his');
+      // "she/they" still reads as a woman for this filter's purpose; "she/he"
+      // is ambiguous enough to leave for the user to decide.
+      e.gender = (sheHer && !heHim) ? 'woman' : 'unknown';
+      changed++;
+    });
+    if(changed) persist();
   }
 
   function isQuotaError(err){
@@ -1176,6 +1494,105 @@ another.handle"></textarea>
     return v;
   }
 
+  // Click-to-apply style tags. Free typing still works — this is a floor,
+  // not a fence.
+  const STARTER_TAGS = [
+    'fine line', 'bold line', 'color', 'black & grey', 'blackwork',
+    'illustrative', 'ornamental', 'botanical / floral', 'gothic', 'baroque',
+    'cute', 'anime', 'traditional', 'neo-traditional', 'realism',
+    'watercolor', 'lettering', 'micro / tiny',
+  ];
+
+  const UNPLACED = 'Other / unspecified';
+
+  // Country/state spellings that show up in the same list under several
+  // names. Only folds obvious duplicates — it is not a gazetteer.
+  const REGION_ALIASES = {
+    'usa':'USA', 'us':'USA', 'u.s.':'USA', 'u.s.a.':'USA',
+    'united states':'USA', 'united states of america':'USA', 'america':'USA',
+    'uk':'UK', 'u.k.':'UK', 'united kingdom':'UK', 'great britain':'UK',
+    'england':'UK', 'scotland':'UK', 'wales':'UK',
+    'south korea':'South Korea', 'korea':'South Korea', 'republic of korea':'South Korea',
+    'netherlands':'Netherlands', 'the netherlands':'Netherlands', 'holland':'Netherlands',
+    'czechia':'Czech Republic', 'czech republic':'Czech Republic',
+    'deutschland':'Germany', 'germany':'Germany',
+  };
+
+  // "Los Angeles, CA" and "Austin, TX, USA" are both the United States, but a
+  // naive last-segment rule files them under "CA" and "USA" and scatters the
+  // one cluster the user most wants to see whole. Folding a trailing state or
+  // province code into its country fixes that; the city is still the first
+  // segment, so nothing is lost. Only exact two-letter codes are folded, so a
+  // real place name is never swallowed.
+  const US_STATES = new Set(('AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI '
+    + 'MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC').split(' '));
+  const CA_PROVINCES = new Set('AB BC MB NB NL NS NT NU ON PE QC SK YT'.split(' '));
+
+  // Folded before the lookup, so the small-caps ᴄᴀ in "ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ"
+  // reaches USA the same way a plain CA does.
+  function countryForSubdivision(seg){
+    const code = foldText(seg.trim()).toUpperCase();
+    if(code.length !== 2) return null;
+    if(US_STATES.has(code)) return 'USA';
+    if(CA_PROVINCES.has(code)) return 'Canada';
+    return null;
+  }
+
+  function canonicalRegion(raw){
+    const key = foldText(raw.trim()).replace(/\.$/, '');
+    if(REGION_ALIASES[key]) return REGION_ALIASES[key];
+    // No alias match: keep the user's own spelling as the region label. A
+    // decorative one that matches no alias stays its own region rather than
+    // being rewritten into something they never typed.
+    return raw.trim().replace(/\s+/g, ' ');
+  }
+
+  // Splits a free-text location into a rough {region, city} for the two-level
+  // filter. The last comma-separated segment is usually the country or the US
+  // state, the first is usually the city. This is a HEURISTIC over text the
+  // user typed by hand: it will misread some entries, so nothing here is ever
+  // written back — e.location stays exactly as entered, and anything that
+  // doesn't parse lands in "Other / unspecified" rather than disappearing.
+  function parseLocation(raw){
+    const text = (raw || '').trim();
+    if(!text) return { region: UNPLACED, city: '' };
+    const parts = text.split(',').map(p => p.trim()).filter(Boolean);
+    if(parts.length === 0) return { region: UNPLACED, city: '' };
+    // A single segment ("Berlin", "Japan") is its own region — there is no
+    // second segment to promote, and guessing a country from a city name is
+    // exactly the kind of inference that would quietly mislabel entries.
+    if(parts.length === 1) return { region: canonicalRegion(parts[0]), city: parts[0] };
+    const last = parts[parts.length - 1];
+    const folded = countryForSubdivision(last);
+    return { region: folded || canonicalRegion(last), city: parts[0] };
+  }
+
+  // Explicit, user-set gender. Never inferred from a name, handle or photo —
+  // the only seed is an unambiguous she/her in the pronouns field, and
+  // everything else stays 'unknown' until it is set by hand.
+  const GENDER_VALUES = ['unknown', 'woman', 'nonbinary', 'not-woman'];
+  const GENDER_LABEL = {
+    woman:'woman', nonbinary:'nonbinary', 'not-woman':'not a woman',
+    unknown:'unknown — not set yet',
+  };
+
+  function genderOf(e){
+    return GENDER_VALUES.includes(e.gender) ? e.gender : 'unknown';
+  }
+
+  // Maps a pasted gender cell onto the stored vocabulary. Blank stays blank —
+  // it becomes 'unknown', never a guess. 'nonbinary' is kept as itself rather
+  // than folded into 'not a woman': the filter's job is to find women, and an
+  // entry that is neither shows under "all" without being mislabelled.
+  function normalizeGender(raw){
+    const v = (raw || '').trim().toLowerCase();
+    if(!v) return 'unknown';
+    if(v.startsWith('wom') || v === 'f' || v === 'female' || v === 'w') return 'woman';
+    if(v.startsWith('non') || v.startsWith('enby') || v === 'nb' || v === 'nonbinary') return 'nonbinary';
+    if(v.startsWith('man') || v.startsWith('male') || v === 'm' || v.startsWith('not')) return 'not-woman';
+    return 'unknown';
+  }
+
   function initials(name){
     if(!name) return '?';
     const parts = name.trim().split(/\s+/);
@@ -1184,30 +1601,63 @@ another.handle"></textarea>
     return (first + last).toUpperCase();
   }
 
+  // --- decorative-unicode folding --------------------------------------
+  // Instagram display names are full of styled letters — 𝕾𝖆𝖗𝖆𝖍, 𝔅𝔯𝔢𝔫𝔫𝔞,
+  // Ａｌｙｓｓａ — and locations arrive in small caps (ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ).
+  // Left unfolded, typing "sarah" silently misses the entry, and ᴄᴀ never
+  // folds into USA the way a plain CA does — it becomes its own region.
+  //
+  // NFKD already flattens the Mathematical Alphanumeric Symbols, the
+  // letterlike symbols (ℬ, ℤ) and the fullwidth forms, so the only block
+  // needing a hand-written table is the small-caps / phonetic capitals,
+  // which carry no compatibility decomposition at all. Everything else is
+  // Unicode's own mapping rather than a table of ours to keep current.
+  const CHAR_FOLD = {
+    // Small caps / phonetic capitals — no compatibility decomposition at all.
+    'ᴀ':'a', 'ʙ':'b', 'ᴄ':'c', 'ᴅ':'d', 'ᴇ':'e', 'ꜰ':'f', 'ɢ':'g',
+    'ʜ':'h', 'ɪ':'i', 'ᴊ':'j', 'ᴋ':'k', 'ʟ':'l', 'ᴍ':'m', 'ɴ':'n',
+    'ᴏ':'o', 'ᴘ':'p', 'ǫ':'q', 'ꞯ':'q', 'ʀ':'r', 'ꜱ':'s', 'ᴛ':'t',
+    'ᴜ':'u', 'ᴠ':'v', 'ᴡ':'w', 'ʏ':'y', 'ᴢ':'z',
+    // Stroked and barred Latin letters. NFKD decomposes an ACCENT (é -> e plus
+    // a combining acute) but a stroke is part of the letter itself, so ł stays
+    // ł — and "wroclaw" silently misses Wrocław, in search AND on the map.
+    'ł':'l', 'Ł':'l', 'đ':'d', 'Đ':'d', 'ħ':'h', 'Ħ':'h', 'ŧ':'t', 'Ŧ':'t',
+    'ø':'o', 'Ø':'o', 'ɵ':'o', 'ƀ':'b', 'ƙ':'k', 'Ƙ':'k', 'ɖ':'d', 'ɗ':'d',
+    'ı':'i', 'ȷ':'j', 'ſ':'s',
+    // Ligatures and eszett, which have no decomposition either.
+    'ß':'ss', 'ẞ':'ss', 'æ':'ae', 'Æ':'ae', 'œ':'oe', 'Œ':'oe',
+    'þ':'th', 'Þ':'th', 'ð':'d', 'Ð':'d',
+  };
+
+  // Folded text is for MATCHING ONLY — search, region aliasing, tag and
+  // handle keys. Nothing folded is ever written back to an entry: the name
+  // the user pasted stays exactly as they pasted it.
+  function foldText(str){
+    if(!str) return '';
+    let out = '';
+    for(const ch of str){ out += CHAR_FOLD[ch] || ch; }
+    return out.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
   // Handle-matching key for dedup/merge: strip a leading @, strip trailing
-  // slashes (some pasted handles carry one), lowercase, trim.
+  // slashes (some pasted handles carry one), fold, trim. Folding matters
+  // here too — a handle pasted in styled characters has to match the
+  // plain-ASCII one already stored, or the merge quietly makes a duplicate.
   function normalizeHandleKey(handle){
     if(!handle) return '';
-    return handle.trim().replace(/^@/, '').replace(/\/+$/, '').toLowerCase();
+    return foldText(handle.trim()).replace(/^@/, '').replace(/\/+$/, '').trim();
+  }
+
+  // Groups near-identical style tags, so "Fine Line", "fineline" and
+  // "fine-line" are one filter rather than three chips splitting the count.
+  // The entry keeps its own spelling; only the key is normalized.
+  function tagKey(t){
+    return foldText(t).replace(/[\s_\-&/]+/g, '');
   }
 
   function instagramUrlForHandle(handle){
     const clean = (handle || '').trim().replace(/^@/, '');
     return 'https://instagram.com/' + encodeURIComponent(clean);
-  }
-
-  // Buckets a free-text pronouns field into a few common groups for the
-  // gender filter. Tokenized (not substring) matching so "she" can't
-  // accidentally match inside "he". First matching bucket wins, so a dual
-  // set like "she/they" lands on she/her — a deliberate simplification.
-  function genderBucket(pronouns){
-    if(!pronouns || !pronouns.trim()) return 'unspecified';
-    const tokens = pronouns.toLowerCase().split(/[^a-z]+/).filter(Boolean);
-    const has = w => tokens.includes(w);
-    if(has('she') || has('her') || has('hers')) return 'she/her';
-    if(has('he') || has('him') || has('his')) return 'he/him';
-    if(has('they') || has('them') || has('theirs')) return 'they/them';
-    return 'other';
   }
 
   function escapeHtml(str){
@@ -1218,6 +1668,196 @@ another.handle"></textarea>
 
   function sleep(ms){
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // --- static gazetteer ---------------------------------------------------
+  // Coordinates are CITY/REGION CENTROIDS to about a kilometre — enough to put
+  // a pin in the right place on a world map, not a street address. They exist
+  // so the common case needs no network at all: Nominatim allows roughly one
+  // request a second and refuses bulk use, so a 240-row paste spends minutes
+  // being throttled and half of it never resolves.
+  const COUNTRY_COORDS = {
+    usa:[39.83,-98.58], canada:[56.13,-106.35], uk:[54.00,-2.00],
+    germany:[51.17,10.45], france:[46.60,2.20], 'south korea':[36.50,127.90],
+    netherlands:[52.13,5.29], poland:[51.92,19.15], italy:[41.87,12.57],
+    spain:[40.46,-3.75], belgium:[50.50,4.47], australia:[-25.27,133.78],
+    japan:[36.20,138.25], china:[35.86,104.20], taiwan:[23.70,120.96],
+    brazil:[-14.24,-51.93], mexico:[23.63,-102.55], russia:[61.52,105.32],
+    greece:[39.07,21.82], hungary:[47.16,19.50], 'hong kong':[22.32,114.17],
+    portugal:[39.40,-8.22], ireland:[53.14,-7.69], austria:[47.52,14.55],
+    switzerland:[46.82,8.23], sweden:[60.13,18.64], norway:[60.47,8.47],
+    denmark:[56.26,9.50], finland:[61.92,25.75], 'czech republic':[49.82,15.47],
+    thailand:[15.87,100.99], vietnam:[14.06,108.28], singapore:[1.35,103.82],
+    philippines:[12.88,121.77], indonesia:[-0.79,113.92], india:[20.59,78.96],
+    'new zealand':[-40.90,174.89], argentina:[-38.42,-63.62], chile:[-35.68,-71.54],
+    colombia:[4.57,-74.30], peru:[-9.19,-75.02], turkey:[38.96,35.24],
+    ukraine:[48.38,31.17], romania:[45.94,24.97], israel:[31.05,34.85],
+  };
+  const US_STATE_COORDS = {
+    al:[32.81,-86.79], ak:[63.59,-154.49], az:[34.05,-111.09], ar:[35.20,-91.83],
+    ca:[36.78,-119.42], co:[39.55,-105.78], ct:[41.60,-73.09], de:[38.91,-75.53],
+    fl:[27.66,-81.52], ga:[32.17,-82.91], hi:[19.90,-155.58], id:[44.07,-114.74],
+    il:[40.63,-89.40], in:[40.27,-86.13], ia:[41.88,-93.10], ks:[39.01,-98.48],
+    ky:[37.84,-84.27], la:[30.98,-91.96], me:[45.25,-69.45], md:[39.05,-76.64],
+    ma:[42.41,-71.38], mi:[44.31,-85.60], mn:[46.73,-94.69], ms:[32.35,-89.40],
+    mo:[37.96,-91.83], mt:[46.88,-110.36], ne:[41.49,-99.90], nv:[38.80,-116.42],
+    nh:[43.19,-71.57], nj:[40.06,-74.41], nm:[34.52,-105.87], ny:[43.00,-75.00],
+    nc:[35.76,-79.02], nd:[47.55,-101.00], oh:[40.42,-82.91], ok:[35.01,-97.09],
+    or:[43.80,-120.55], pa:[41.20,-77.19], ri:[41.58,-71.48], sc:[33.84,-81.16],
+    sd:[43.97,-99.90], tn:[35.52,-86.58], tx:[31.97,-99.90], ut:[39.32,-111.09],
+    vt:[44.56,-72.58], va:[37.43,-78.66], wa:[47.75,-120.74], wv:[38.60,-80.45],
+    wi:[43.78,-88.79], wy:[43.08,-107.29], dc:[38.91,-77.04],
+  };
+  // Spelled-out state and province names seen in free text, mapped to the code.
+  const SUBDIVISION_NAMES = {
+    alabama:'al', alaska:'ak', arizona:'az', arkansas:'ar', california:'ca',
+    colorado:'co', connecticut:'ct', delaware:'de', florida:'fl', georgia:'ga',
+    hawaii:'hi', idaho:'id', illinois:'il', indiana:'in', iowa:'ia', kansas:'ks',
+    kentucky:'ky', louisiana:'la', maine:'me', maryland:'md', massachusetts:'ma',
+    michigan:'mi', minnesota:'mn', mississippi:'ms', missouri:'mo', montana:'mt',
+    nebraska:'ne', nevada:'nv', 'new hampshire':'nh', 'new jersey':'nj',
+    'new mexico':'nm', 'new york state':'ny', 'north carolina':'nc',
+    'north dakota':'nd', ohio:'oh', oklahoma:'ok', oregon:'or', pennsylvania:'pa',
+    'rhode island':'ri', 'south carolina':'sc', 'south dakota':'sd',
+    tennessee:'tn', texas:'tx', utah:'ut', vermont:'vt', virginia:'va',
+    washington:'wa', 'washington state':'wa', 'west virginia':'wv',
+    wisconsin:'wi', wyoming:'wy',
+  };
+  const CA_PROVINCE_COORDS = {
+    ab:[53.93,-116.58], bc:[53.73,-127.65], mb:[53.76,-98.81], nb:[46.57,-66.46],
+    nl:[53.14,-57.66], ns:[44.68,-63.74], nt:[64.83,-124.85], nu:[70.30,-83.11],
+    on:[51.25,-85.32], pe:[46.51,-63.42], qc:[52.94,-73.55], sk:[52.94,-106.45],
+    yt:[64.28,-135.00],
+  };
+  const CA_PROVINCE_NAMES = {
+    alberta:'ab', 'british columbia':'bc', manitoba:'mb', 'new brunswick':'nb',
+    'newfoundland and labrador':'nl', 'nova scotia':'ns',
+    'northwest territories':'nt', nunavut:'nu', ontario:'on',
+    'prince edward island':'pe', quebec:'qc', saskatchewan:'sk', yukon:'yt',
+  };
+  // Cities, keyed by folded name. A name that means two different places in
+  // this data carries a "<city>@<context>" key too — "athens@ga" is Georgia,
+  // plain "athens" is Greece — and the context key is tried first.
+  const CITY_COORDS = {
+    // North America
+    'new york':[40.71,-74.01], nyc:[40.71,-74.01], brooklyn:[40.65,-73.95],
+    'los angeles':[34.05,-118.24], 'long beach':[33.77,-118.19],
+    seattle:[47.61,-122.33], 'west seattle':[47.56,-122.39], tacoma:[47.25,-122.44],
+    'federal way':[47.32,-122.31], austin:[30.27,-97.74], dallas:[32.78,-96.80],
+    denton:[33.21,-97.13], houston:[29.76,-95.37], 'new braunfels':[29.70,-98.12],
+    'san jose':[37.34,-121.89], 'san francisco':[37.77,-122.42], oakland:[37.80,-122.27],
+    'san francisco bay area':[37.80,-122.30], berkeley:[37.87,-122.27],
+    'san diego':[32.72,-117.16], 'orange county':[33.70,-117.76],
+    'southern california':[34.00,-117.50], 'la puente':[34.02,-117.95],
+    portland:[45.52,-122.68], 'grants pass':[42.44,-123.33], phoenix:[33.45,-112.07],
+    tucson:[32.22,-110.97], denver:[39.74,-104.99], lakewood:[39.70,-105.08],
+    centennial:[39.58,-104.88], 'las vegas':[36.17,-115.14], reno:[39.53,-119.81],
+    midvale:[40.61,-111.90], chicago:[41.88,-87.63], 'sterling heights':[42.58,-83.03],
+    southfield:[42.47,-83.22], perrysburg:[41.56,-83.63], salem:[42.52,-70.90],
+    'bel air':[39.54,-76.35], wilmington:[39.74,-75.55], pennsauken:[39.96,-75.06],
+    orlando:[28.54,-81.38], norfolk:[36.85,-76.29], 'hampton roads':[36.85,-76.29],
+    fairport:[43.10,-77.44], rochester:[43.16,-77.61], 'athens@ga':[33.96,-83.38],
+    // Bare "Washington" is the state (it falls through to WA below); the
+    // district has to be written out, the way people actually write it.
+    'washington dc':[38.91,-77.04], 'washington d.c.':[38.91,-77.04],
+    'washington@dc':[38.91,-77.04],
+    vancouver:[49.28,-123.12], toronto:[43.65,-79.38], montreal:[45.50,-73.57],
+    ottawa:[45.42,-75.70], calgary:[51.05,-114.07], barrie:[44.39,-79.69],
+    'sainte-therese':[45.64,-73.85], 'mexico city':[19.43,-99.13],
+    // South America
+    'sao paulo':[-23.55,-46.63], 'santo andre':[-23.66,-46.53],
+    // Europe
+    paris:[48.86,2.35], lyon:[45.76,4.84], toulouse:[43.60,1.44], tours:[47.39,0.69],
+    nantes:[47.22,-1.55], london:[51.51,-0.13], birmingham:[52.49,-1.89],
+    manchester:[53.48,-2.24], wakefield:[53.68,-1.50], tring:[51.79,-0.66],
+    berlin:[52.52,13.40], stuttgart:[48.78,9.18], leipzig:[51.34,12.37],
+    dusseldorf:[51.23,6.78], frankfurt:[50.11,8.68], bremen:[53.08,8.80],
+    nurnberg:[49.45,11.08], nuremberg:[49.45,11.08], osnabruck:[52.28,8.05],
+    stadtroda:[50.86,11.72], erfurt:[50.98,11.03], 'baden-wurttemberg':[48.66,9.35],
+    munich:[48.14,11.58], hamburg:[53.55,9.99], cologne:[50.94,6.96],
+    wroclaw:[51.11,17.03], warsaw:[52.23,21.01], gdansk:[54.35,18.65],
+    krakow:[50.06,19.94], milan:[45.46,9.19], rome:[41.90,12.50], bari:[41.12,16.87],
+    girona:[41.98,2.82], castellon:[39.99,-0.04], barcelona:[41.39,2.17],
+    madrid:[40.42,-3.70], amsterdam:[52.37,4.90], groningen:[53.22,6.57],
+    rotterdam:[51.92,4.48], leuven:[50.88,4.70], ghent:[51.05,3.72],
+    brussels:[50.85,4.35], budapest:[47.50,19.04], athens:[37.98,23.73],
+    'st. petersburg':[59.94,30.31], 'st petersburg':[59.94,30.31],
+    moscow:[55.76,37.62], petrozavodsk:[61.79,34.35], lisbon:[38.72,-9.14],
+    porto:[41.15,-8.61], vienna:[48.21,16.37], zurich:[47.38,8.54],
+    copenhagen:[55.68,12.57], stockholm:[59.33,18.07], oslo:[59.91,10.75],
+    helsinki:[60.17,24.94], dublin:[53.35,-6.26], prague:[50.08,14.44],
+    // Asia / Pacific
+    seoul:[37.57,126.98], hongdae:[37.56,126.92], daegu:[35.87,128.60],
+    busan:[35.18,129.08], incheon:[37.46,126.71], tokyo:[35.68,139.69],
+    osaka:[34.69,135.50], kyoto:[35.01,135.77], taipei:[25.03,121.57],
+    beijing:[39.90,116.41], shanghai:[31.23,121.47], 'hong kong':[22.32,114.17],
+    bangkok:[13.76,100.50], singapore:[1.35,103.82],
+    melbourne:[-37.81,144.96], sydney:[-33.87,151.21], brisbane:[-27.47,153.03],
+    townsville:[-19.26,146.82], perth:[-31.95,115.86], auckland:[-36.85,174.76],
+  };
+
+  // Resolves a free-text location from the tables above, with NO network call.
+  // Segments are read the same way parseLocation() reads them, so the map and
+  // the region filter agree about what a string means. A "/" or "📍" pair
+  // ("Toronto/Vancouver", "ʟᴏꜱ ᴀɴɢᴇʟᴇꜱ 📍 ᴀᴜꜱᴛɪɴ") resolves to the FIRST place
+  // named — the artist's base, with the rest usually being where they tour.
+  // Returns {lat,lng} or null; null means "ask Nominatim", not "nowhere".
+  function staticGeocode(raw){
+    const text = (raw || '').trim();
+    if(!text) return null;
+    const parts = text.split(',').map(p => foldText(p).trim()).filter(Boolean);
+    if(parts.length === 0) return null;
+
+    const firstOf = s => s.split(/\s*(?:\/|📍|\||·)\s*/)[0].trim();
+    const city = firstOf(parts[0]);
+
+    // Context: the trailing segments, used only to disambiguate a city name
+    // that means two places. Scan from the end so "Athens, GA, USA" finds ga.
+    let ctx = '';
+    for(let i = parts.length - 1; i >= 1 && !ctx; i--){
+      const seg = firstOf(parts[i]);
+      if(US_STATE_COORDS[seg]) ctx = seg;
+      else if(SUBDIVISION_NAMES[seg]) ctx = SUBDIVISION_NAMES[seg];
+      else if(CA_PROVINCE_COORDS[seg]) ctx = seg;
+      else if(CA_PROVINCE_NAMES[seg]) ctx = CA_PROVINCE_NAMES[seg];
+    }
+
+    const hit = (ctx && CITY_COORDS[city + '@' + ctx]) || CITY_COORDS[city];
+    if(hit) return { lat: hit[0], lng: hit[1] };
+
+    // No city match: fall back through the segments MOST SPECIFIC FIRST, so
+    // "Georgia, USA" lands in the state rather than at the centre of the USA,
+    // and "Somewhere Unknown, TX, USA" lands in Texas rather than nowhere.
+    for(let i = 0; i < parts.length; i++){
+      const seg = firstOf(parts[i]);
+      const code = US_STATE_COORDS[seg] ? seg : SUBDIVISION_NAMES[seg];
+      if(code && US_STATE_COORDS[code]) return { lat:US_STATE_COORDS[code][0], lng:US_STATE_COORDS[code][1] };
+      const prov = CA_PROVINCE_COORDS[seg] ? seg : CA_PROVINCE_NAMES[seg];
+      if(prov && CA_PROVINCE_COORDS[prov]) return { lat:CA_PROVINCE_COORDS[prov][0], lng:CA_PROVINCE_COORDS[prov][1] };
+      const country = COUNTRY_COORDS[seg] || COUNTRY_COORDS[canonicalRegion(seg).toLowerCase()];
+      if(country) return { lat:country[0], lng:country[1] };
+      const cityLate = CITY_COORDS[seg];
+      if(cityLate) return { lat:cityLate[0], lng:cityLate[1] };
+    }
+    // A segment with no comma can still name two things — "Melbourne Australia",
+    // "Berlin Germany". Scan its word runs, longest first, so the most specific
+    // name in it wins and a stray word can't match something short by accident.
+    for(const part of parts){
+      const words = firstOf(part).split(/\s+/).filter(Boolean);
+      for(let len = words.length; len >= 1; len--){
+        for(let i = 0; i + len <= words.length; i++){
+          const phrase = words.slice(i, i + len).join(' ');
+          if(phrase.length < 3) continue;
+          const c = CITY_COORDS[phrase];
+          if(c) return { lat:c[0], lng:c[1] };
+          const k = COUNTRY_COORDS[phrase];
+          if(k) return { lat:k[0], lng:k[1] };
+          const st = US_STATE_COORDS[phrase] ? phrase : SUBDIVISION_NAMES[phrase];
+          if(st && US_STATE_COORDS[st]) return { lat:US_STATE_COORDS[st][0], lng:US_STATE_COORDS[st][1] };
+        }
+      }
+    }
+    return null;
   }
 
   // Geocodes a free-text location via Nominatim (OpenStreetMap). Browsers
@@ -1242,43 +1882,62 @@ another.handle"></textarea>
     }
   }
 
-  // Geocodes every entry with a location that isn't cached yet, one request
-  // per second (Nominatim's usage policy). Entries sharing the exact same
-  // location string reuse one lookup instead of re-querying. Runs once at
-  // a time (geocodingInFlight guards re-entry) and persists + repaints the
-  // map incrementally as each result comes in, so pins appear as they
-  // resolve rather than all at once at the end.
+  // Where an entry sits on the map. The static table is consulted FIRST and
+  // costs nothing; `e.geo` is only ever a cached Nominatim result for a string
+  // the table could not place. Nothing static is written to storage — improving
+  // the table takes effect immediately rather than being shadowed by a stale
+  // cached value, and storage does not grow by a coordinate per entry.
+  function geoFor(e){
+    if(e && e.geo && typeof e.geo.lat === 'number' && typeof e.geo.lng === 'number') return e.geo;
+    return staticGeocode(e && e.location);
+  }
+
+  // A network lookup is only ever attempted for a location the table missed.
+  // A FAILURE IS NOT PERMANENT. The previous version wrote geoStatus:'failed'
+  // and filtered those entries out for good, so one burst of Nominatim 429s —
+  // which is what a 240-row paste gets, since it allows roughly one request a
+  // second and refuses bulk use — silently retired those locations forever and
+  // the plotted count could only ever go down. A failure now records when and
+  // how often, and is retried on a later visit, up to a small cap.
+  const GEO_RETRY_MS = 6 * 60 * 60 * 1000;   // six hours
+  const GEO_MAX_TRIES = 3;
+
+  function geoRetryDue(e){
+    if((e.geoTries || 0) >= GEO_MAX_TRIES) return false;
+    if(!e.geoFailedAt) return true;
+    return (Date.now() - e.geoFailedAt) > GEO_RETRY_MS;
+  }
+
   async function ensureGeocoded(){
     if(geocodingInFlight) return;
     geocodingInFlight = true;
     try{
-      const known = new Map();
-      entries.forEach(e => {
-        if(!e.location) return;
-        const key = e.location.trim().toLowerCase();
-        if(e.geo) known.set(key, e.geo);
-        else if(e.geoStatus === 'failed') known.set(key, 'failed');
-      });
+      // Everything the table can place is already placed, so this loop only
+      // sees the leftovers — usually a handful rather than hundreds.
+      const pending = entries.filter(e => e.location && !geoFor(e) && geoRetryDue(e));
+      if(pending.length === 0) return;
 
-      const pending = entries.filter(e => e.location && !e.geo && e.geoStatus !== 'failed');
+      const known = new Map();
       for(const e of pending){
-        const key = e.location.trim().toLowerCase();
+        const key = foldText(e.location);
         if(known.has(key)){
           const cached = known.get(key);
-          if(cached === 'failed') e.geoStatus = 'failed';
-          else e.geo = cached;
+          if(cached){ e.geo = cached; }
+          else { e.geoTries = (e.geoTries || 0) + 1; e.geoFailedAt = Date.now(); }
           persist();
           continue;
         }
         const result = await geocodeLocation(e.location);
         if(result){
           e.geo = result;
-          known.set(key, result);
+          delete e.geoTries;
+          delete e.geoFailedAt;
         }else{
-          e.geoStatus = 'failed';
-          known.set(key, 'failed');
+          e.geoTries = (e.geoTries || 0) + 1;
+          e.geoFailedAt = Date.now();
           console.warn('[artist-tracker] geocoding failed for location:', e.location);
         }
+        known.set(key, result || null);
         persist();
         if(currentView === 'map') render();
         await sleep(1100);
@@ -1300,26 +1959,49 @@ another.handle"></textarea>
     return 'https://unavatar.io/instagram/' + encodeURIComponent(clean) + '?fallback=false';
   }
 
+  // Each filter as its own predicate, so the region and tag COUNTS can be
+  // computed against everything except themselves. Without that, defaulting
+  // the view to tattoo artists would leave "USA (40)" on screen while only 25
+  // of those are artists — a count that lies is worse than no count.
+  function matchesCategory(e){ return activeCategory === 'all' || e.category === activeCategory; }
+  function matchesGender(e){ return activeGender === 'all' || genderOf(e) === activeGender; }
+  function matchesLocation(e){
+    if(activeRegion === 'all') return true;
+    const parsed = parseLocation(e.location);
+    if(parsed.region !== activeRegion) return false;
+    return activeCity === 'all' || parsed.city === activeCity;
+  }
+  // activeTags holds normalized KEYS, not display spellings, so selecting
+  // the "fine line" chip also matches an entry tagged "fineline".
+  function matchesTags(e){
+    if(activeTags.size === 0) return true;
+    const entryKeys = new Set((e.tags || []).map(tagKey));
+    return [...activeTags].some(k => entryKeys.has(k));
+  }
+  // Folded on both sides, so "sarah" finds 𝕾𝖆𝖗𝖆𝖍 𝕽𝖔𝖘𝖊 and "austin" finds
+  // ᴀᴜꜱᴛɪɴ. Typing the decorative form still works too — it folds to the
+  // same thing.
+  function matchesSearch(e){
+    if(!searchTerm) return true;
+    const hay = foldText(
+      [e.name, e.handle, e.location, e.status, e.notes, e.pronouns, (e.tags||[]).join(' ')].join(' ')
+    );
+    return hay.includes(searchTerm);
+  }
+
   function render(){
     const list = document.getElementById('list');
-    populateLocationOptions();
-    populateTagChips();
 
-    let filtered = entries.filter(e => {
-      if(activeCategory !== 'all' && e.category !== activeCategory) return false;
-      if(activeGender !== 'all' && genderBucket(e.pronouns) !== activeGender) return false;
-      if(activeLocationFilter !== 'all' && e.location !== activeLocationFilter) return false;
-      if(activeTags.size > 0){
-        const entryTags = new Set((e.tags || []).map(t => t.toLowerCase()));
-        const matchesAnyTag = [...activeTags].some(t => entryTags.has(t));
-        if(!matchesAnyTag) return false;
-      }
-      if(searchTerm){
-        const hay = [e.name, e.handle, e.location, e.status, e.pronouns, (e.tags||[]).join(' ')].join(' ').toLowerCase();
-        if(!hay.includes(searchTerm)) return false;
-      }
-      return true;
-    });
+    // Facet bases: everything except the dimension being counted.
+    populateLocationOptions(entries.filter(e =>
+      matchesCategory(e) && matchesGender(e) && matchesTags(e) && matchesSearch(e)));
+    populateTagChips(entries.filter(e =>
+      matchesCategory(e) && matchesGender(e) && matchesLocation(e) && matchesSearch(e)));
+    syncGenderChips();
+
+    let filtered = entries.filter(e =>
+      matchesCategory(e) && matchesGender(e) && matchesLocation(e)
+      && matchesTags(e) && matchesSearch(e));
 
     filtered.sort((a,b) => {
       if(sortMode === 'category'){
@@ -1357,39 +2039,126 @@ another.handle"></textarea>
     if(drawer.dataset.open === 'true' && drawerMode === 'view') renderDetailView();
   }
 
-  // --- location filter (dynamic dropdown of distinct location values) ---
-  function populateLocationOptions(){
-    const select = document.getElementById('locationSelect');
-    const distinct = [...new Set(entries.map(e => (e.location || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-    const previousValue = select.value || 'all';
-    select.innerHTML = '';
-    const allOpt = document.createElement('option');
-    allOpt.value = 'all';
-    allOpt.textContent = 'all locations';
-    select.appendChild(allOpt);
-    distinct.forEach(loc => {
-      const opt = document.createElement('option');
-      opt.value = loc;
-      opt.textContent = loc;
-      select.appendChild(opt);
+  // --- location filter: region first, then city within it ---------------
+  // Regions are ordered by how many entries sit in them, so the biggest
+  // clusters are the first thing in the list rather than whatever sorts
+  // alphabetically. "Other / unspecified" is always pinned last.
+  function locationIndex(source){
+    const regions = new Map();
+    source.forEach(e => {
+      const { region, city } = parseLocation(e.location);
+      if(!regions.has(region)) regions.set(region, { count: 0, cities: new Map() });
+      const bucket = regions.get(region);
+      bucket.count++;
+      if(city) bucket.cities.set(city, (bucket.cities.get(city) || 0) + 1);
     });
-    // Keep the current selection if it's still a valid option; otherwise
-    // fall back to "all" rather than silently landing on whatever sorts first.
-    if(distinct.includes(previousValue) || previousValue === 'all'){
-      select.value = previousValue;
-      activeLocationFilter = previousValue;
-    }else{
-      select.value = 'all';
-      activeLocationFilter = 'all';
-    }
+    return regions;
   }
 
-  // --- style tag filter (dynamic multi-select chips, OR'd together) ---
-  function populateTagChips(){
+  function populateLocationOptions(source){
+    const regionSelect = document.getElementById('regionSelect');
+    const citySelect = document.getElementById('citySelect');
+    const index = locationIndex(source);
+
+    // Keep the chosen region on screen even when the other filters leave it
+    // empty, so the user can always unpick it. Only a region that has left
+    // the data entirely resets the selection.
+    const fullIndex = locationIndex(entries);
+    if(activeRegion !== 'all' && !index.has(activeRegion) && fullIndex.has(activeRegion)){
+      index.set(activeRegion, { count: 0, cities: fullIndex.get(activeRegion).cities });
+    }
+
+    const ordered = [...index.entries()].sort((a, b) => {
+      if(a[0] === UNPLACED) return 1;
+      if(b[0] === UNPLACED) return -1;
+      return b[1].count - a[1].count || a[0].localeCompare(b[0]);
+    });
+
+    regionSelect.innerHTML = '';
+    const allRegions = document.createElement('option');
+    allRegions.value = 'all';
+    allRegions.textContent = 'all regions (' + source.length + ')';
+    regionSelect.appendChild(allRegions);
+    ordered.forEach(([region, bucket]) => {
+      const opt = document.createElement('option');
+      opt.value = region;
+      opt.textContent = region + ' (' + bucket.count + ')';
+      regionSelect.appendChild(opt);
+    });
+
+    // A region that no longer exists anywhere in the data (its last entry was
+    // edited or removed) falls back to "all" rather than silently landing on
+    // whatever happens to sort first.
+    if(activeRegion !== 'all' && !index.has(activeRegion)){
+      activeRegion = 'all';
+      activeCity = 'all';
+    }
+    regionSelect.value = activeRegion;
+
+    citySelect.innerHTML = '';
+    const allCities = document.createElement('option');
+    allCities.value = 'all';
+    allCities.textContent = 'all cities';
+    citySelect.appendChild(allCities);
+    if(activeRegion === 'all'){
+      citySelect.disabled = true;
+      activeCity = 'all';
+    }else{
+      citySelect.disabled = false;
+      const cities = [...index.get(activeRegion).cities.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      cities.forEach(([city, count]) => {
+        const opt = document.createElement('option');
+        opt.value = city;
+        opt.textContent = city + ' (' + count + ')';
+        citySelect.appendChild(opt);
+      });
+      if(activeCity !== 'all' && !index.get(activeRegion).cities.has(activeCity)) activeCity = 'all';
+    }
+    citySelect.value = activeCity;
+  }
+
+  // --- style tag filter (multi-select chips, OR'd, counted, biggest first) ---
+  // One chip per normalized key, not per spelling: a list carrying both
+  // "fine line" and "fineline" gets one chip with the combined count rather
+  // than two chips each showing half the artists. The chip is LABELLED with
+  // whichever spelling is most common in the data (ties break alphabetically,
+  // so the label doesn't flicker as counts move), and entries keep their own.
+  function tagGroups(source){
+    const groups = new Map();
+    source.forEach(e => (e.tags || []).forEach(t => {
+      const key = tagKey(t);
+      if(!key) return;
+      if(!groups.has(key)) groups.set(key, { key, count: 0, spellings: new Map() });
+      const g = groups.get(key);
+      g.count++;
+      g.spellings.set(t, (g.spellings.get(t) || 0) + 1);
+    }));
+    groups.forEach(g => {
+      g.label = [...g.spellings.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+    });
+    return groups;
+  }
+
+  function populateTagChips(source){
     const container = document.getElementById('tagChips');
-    const distinct = [...new Set(entries.flatMap(e => e.tags || []))].sort((a,b) => a.localeCompare(b));
+    const groups = tagGroups(source);
+    // A tag that is currently selected must stay on screen even when the
+    // other filters leave it with no matches — otherwise it vanishes and the
+    // user can't unselect the thing that emptied their list. Its label comes
+    // from the whole ledger, since the filtered set no longer contains it.
+    if(activeTags.size){
+      const all = tagGroups(entries);
+      activeTags.forEach(key => {
+        if(groups.has(key)) return;
+        const known = all.get(key);
+        groups.set(key, { key, count: 0, label: known ? known.label : key });
+      });
+    }
+
     container.innerHTML = '';
-    if(distinct.length === 0){
+    if(groups.size === 0){
       container.hidden = true;
       return;
     }
@@ -1398,18 +2167,65 @@ another.handle"></textarea>
     label.className = 'filter-label';
     label.textContent = 'tags';
     container.appendChild(label);
-    distinct.forEach(tag => {
-      const btn = document.createElement('button');
-      btn.className = 'tag-chip';
-      btn.dataset.tag = tag;
-      btn.dataset.active = activeTags.has(tag) ? 'true' : 'false';
-      btn.textContent = tag;
-      btn.onclick = () => {
-        if(activeTags.has(tag)) activeTags.delete(tag);
-        else activeTags.add(tag);
-        render();
-      };
+
+    // A real ledger reaches well past a hundred distinct tags — the 242-artist
+    // research list produces 119, which is over 1000px of chips on a 900px
+    // viewport and buries the list under its own filter bar. So only the
+    // busiest TOP_N show by default, with the rest one click away. A SELECTED
+    // tag is always shown regardless of rank: a filter you cannot see is a
+    // filter you cannot turn off.
+    const TOP_N = 18;
+    const ordered = [...groups.values()]
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    const shown = showAllTags
+      ? ordered
+      : ordered.filter((g, i) => i < TOP_N || activeTags.has(g.key));
+    const hiddenCount = ordered.length - shown.length;
+
+    if(activeTags.size){
+      const clear = document.createElement('button');
+      clear.className = 'tag-chip-clear';
+      clear.textContent = 'clear ' + activeTags.size + ' selected';
+      clear.onclick = () => { activeTags.clear(); render(); };
+      container.appendChild(clear);
+    }
+
+    shown.forEach(g => {
+        const btn = document.createElement('button');
+        btn.className = 'tag-chip';
+        btn.dataset.tag = g.key;
+        btn.dataset.active = activeTags.has(g.key) ? 'true' : 'false';
+        btn.appendChild(document.createTextNode(g.label + ' '));
+        const n = document.createElement('span');
+        n.className = 'tag-chip-count';
+        n.textContent = '(' + g.count + ')';
+        btn.appendChild(n);
+        btn.onclick = () => {
+          if(activeTags.has(g.key)) activeTags.delete(g.key);
+          else activeTags.add(g.key);
+          render();
+        };
       container.appendChild(btn);
+    });
+
+    if(hiddenCount > 0){
+      const more = document.createElement('button');
+      more.className = 'tag-chip-more';
+      more.textContent = '+ ' + hiddenCount + ' more';
+      more.onclick = () => { showAllTags = true; render(); };
+      container.appendChild(more);
+    }else if(showAllTags && ordered.length > TOP_N){
+      const less = document.createElement('button');
+      less.className = 'tag-chip-more';
+      less.textContent = 'show fewer';
+      less.onclick = () => { showAllTags = false; render(); };
+      container.appendChild(less);
+    }
+  }
+
+  function syncGenderChips(){
+    document.querySelectorAll('#genderChips .chip').forEach(c => {
+      c.dataset.active = (c.dataset.gender === activeGender) ? 'true' : 'false';
     });
   }
 
@@ -1502,9 +2318,16 @@ another.handle"></textarea>
     });
     main.appendChild(meta);
 
+    if(e.notes){
+      const nt = document.createElement('div');
+      nt.className = 'entry-status';
+      nt.textContent = e.notes;
+      main.appendChild(nt);
+    }
     if(e.status){
       const st = document.createElement('div');
       st.className = 'entry-status';
+      st.style.color = 'var(--dim)';
       st.textContent = e.status;
       main.appendChild(st);
     }
@@ -1545,7 +2368,11 @@ another.handle"></textarea>
   }
 
   document.getElementById('bulkToggle').onclick = () => {
-    panel.dataset.open = panel.dataset.open === 'true' ? 'false' : 'true';
+    const opening = panel.dataset.open !== 'true';
+    panel.dataset.open = opening ? 'true' : 'false';
+    // A fresh open starts without the previous run's report, so an old
+    // "3 skipped" can never be read as the result of the paste in the box.
+    if(opening) document.getElementById('bulkReport').innerHTML = '';
     syncTopBtnVisibility();
   };
 
@@ -1553,7 +2380,10 @@ another.handle"></textarea>
     panel.dataset.open = 'false';
     syncTopBtnVisibility();
   }
-  document.getElementById('cancelBulk').onclick = closePanel;
+  document.getElementById('cancelBulk').onclick = () => {
+    document.getElementById('bulkReport').innerHTML = '';
+    closePanel();
+  };
 
   document.getElementById('addToggle').onclick = () => openDrawerForNew();
 
@@ -1759,6 +2589,7 @@ another.handle"></textarea>
 
     addDetailRow(dl, 'location', textNode(e.location));
     addDetailRow(dl, 'pronouns', textNode(e.pronouns));
+    addDetailRow(dl, 'gender', textNode(GENDER_LABEL[genderOf(e)]));
     addDetailRow(dl, 'date', e.date ? textNode(formatDate(e.date)) : null);
 
     if(e.tags && e.tags.length){
@@ -1774,6 +2605,12 @@ another.handle"></textarea>
       addDetailRow(dl, 'tags', tagsRow);
     }
 
+    if(e.notes){
+      const notesEl = document.createElement('div');
+      notesEl.className = 'detail-notes';
+      notesEl.textContent = e.notes;
+      addDetailRow(dl, 'notes', notesEl);
+    }
     addDetailRow(dl, 'status', textNode(e.status));
 
     if(e.link){
@@ -1820,16 +2657,93 @@ another.handle"></textarea>
   };
 
   // --- drawer: edit mode (the quick-add form, same fields as before) ---
-  const QUICK_TEXT_FIELDS = ['fName','fHandle','fPronouns','fLocation','fDate','fStatus','fLink','fPhoto','fTags'];
+  const QUICK_TEXT_FIELDS = ['fName','fHandle','fPronouns','fLocation','fDate','fStatus','fNotes','fLink','fPhoto','fTags'];
+
+  // Tags being edited right now. Committed on save like every other field.
+  let pendingTags = new Set();
 
   function clearQuickForm(){
     QUICK_TEXT_FIELDS.forEach(id => document.getElementById(id).value = '');
     document.getElementById('fCategory').value = 'following';
+    document.getElementById('fGender').value = 'unknown';
     document.getElementById('saveEntry').textContent = 'save entry';
+    pendingTags = new Set();
+    renderTagPicker();
     pendingPhoto = null;
     setPhotoState('');
     refreshPhotoPreview();
   }
+
+  // The starter set plus whatever else is already in use across the ledger,
+  // so a tag coined on one entry is one click away on the next. Deduped by
+  // normalized key: a stored "fineline" does not earn its own button beside
+  // the starter "fine line", it just lights that one up.
+  function pickerTags(){
+    const seen = new Set(STARTER_TAGS.map(tagKey));
+    const extras = [];
+    const consider = [];
+    entries.forEach(e => (e.tags || []).forEach(t => consider.push(t)));
+    pendingTags.forEach(t => consider.push(t));
+    consider.sort((a, b) => a.localeCompare(b)).forEach(t => {
+      const key = tagKey(t);
+      if(!key || seen.has(key)) return;
+      seen.add(key);
+      extras.push(t);
+    });
+    return STARTER_TAGS.concat(extras);
+  }
+
+  // pendingTags holds the entry's own spellings, so a button is "on" when any
+  // pending tag shares its key, and toggling off clears every spelling of it.
+  function pendingSpellingsFor(key){
+    return [...pendingTags].filter(t => tagKey(t) === key);
+  }
+
+  function renderTagPicker(){
+    const picker = document.getElementById('tagPicker');
+    const starterKeys = new Set(STARTER_TAGS.map(tagKey));
+    picker.innerHTML = '';
+    pickerTags().forEach(tag => {
+      const key = tagKey(tag);
+      const on = pendingSpellingsFor(key);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tag-toggle';
+      // Show the entry's own spelling when it has one, so the picker never
+      // silently renames a tag the user typed.
+      btn.textContent = on.length ? on[0] : tag;
+      btn.dataset.on = on.length ? 'true' : 'false';
+      if(!starterKeys.has(key)) btn.dataset.custom = 'true';
+      btn.onclick = () => {
+        if(on.length) on.forEach(t => pendingTags.delete(t));
+        else pendingTags.add(tag);
+        renderTagPicker();
+      };
+      picker.appendChild(btn);
+    });
+  }
+
+  // Typing stays available for tags that don't exist yet: Enter or a comma
+  // commits what's in the box.
+  function commitTypedTags(){
+    const field = document.getElementById('fTags');
+    const typed = field.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    if(typed.length === 0) return;
+    // Typing a spelling of a tag the entry already carries is a no-op rather
+    // than a second pill meaning the same thing.
+    typed.forEach(t => { if(pendingSpellingsFor(tagKey(t)).length === 0) pendingTags.add(t); });
+    field.value = '';
+    renderTagPicker();
+  }
+
+  document.getElementById('fTags').addEventListener('keydown', (ev) => {
+    if(ev.key === 'Enter' || ev.key === ','){
+      ev.preventDefault();
+      commitTypedTags();
+    }
+  });
+  // A tag left sitting in the box when the user clicks save still counts.
+  document.getElementById('fTags').addEventListener('blur', commitTypedTags);
 
   function fillQuickForm(e){
     if(!e){ clearQuickForm(); return; }
@@ -1840,8 +2754,12 @@ another.handle"></textarea>
     document.getElementById('fLocation').value = e.location || '';
     document.getElementById('fDate').value = e.date || '';
     document.getElementById('fStatus').value = e.status || '';
+    document.getElementById('fNotes').value = e.notes || '';
+    document.getElementById('fGender').value = genderOf(e);
     document.getElementById('fLink').value = e.link || '';
-    document.getElementById('fTags').value = (e.tags || []).join(', ');
+    document.getElementById('fTags').value = '';
+    pendingTags = new Set(e.tags || []);
+    renderTagPicker();
     // A stored data-URL photo is an embedded image, not something to dump
     // into a text box as 40KB of base64 — it stays in pendingPhoto and the
     // url field shows only real URLs.
@@ -1854,6 +2772,7 @@ another.handle"></textarea>
   }
 
   document.getElementById('saveEntry').onclick = () => {
+    commitTypedTags();
     const name = document.getElementById('fName').value.trim();
     if(!name){ alert('Give this entry a name.'); return; }
     const data = {
@@ -1864,11 +2783,13 @@ another.handle"></textarea>
       location: document.getElementById('fLocation').value.trim(),
       date: document.getElementById('fDate').value,
       status: document.getElementById('fStatus').value.trim(),
+      notes: document.getElementById('fNotes').value.trim(),
+      gender: document.getElementById('fGender').value,
       link: document.getElementById('fLink').value.trim(),
       // A pasted image wins over the url field; typing in the url field
       // clears the pasted one, so only one of the two is ever set.
       photo: pendingPhoto || document.getElementById('fPhoto').value.trim(),
-      tags: document.getElementById('fTags').value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean),
+      tags: [...pendingTags],
     };
     let savedId = detailId;
     if(detailId){
@@ -1879,7 +2800,8 @@ another.handle"></textarea>
         // applies, so drop it and let ensureGeocoded() pick it back up.
         if(prev.location !== data.location){
           delete prev.geo;
-          delete prev.geoStatus;
+          delete prev.geoTries;
+          delete prev.geoFailedAt;
         }
         entries[idx] = { ...prev, ...data };
       }
@@ -2064,97 +2986,219 @@ another.handle"></textarea>
   // The preview falls back to the handle's avatar, so it follows the handle.
   document.getElementById('fHandle').addEventListener('input', refreshPhotoPreview);
 
-  // --- bulk paste (merge-aware: matches existing entries by handle) ---
-  // A parsed line only fills in fields that are currently blank on a
-  // matching existing entry — it never overwrites a value that's already
-  // there, so manual edits stay authoritative. A handle with no existing
-  // match becomes a new entry, same as before. Handles repeated within the
-  // same paste also merge into one entry rather than creating duplicates.
+  // --- bulk paste -------------------------------------------------------
+  // Accepts the 8-field original shape and the 10-field one that adds tags
+  // and gender (9 is allowed as tags-without-gender). ANY OTHER COUNT IS
+  // SKIPPED AND REPORTED rather than imported: one stray `|` inside a name
+  // shifts every field one column left, so a location lands in `pronouns`
+  // and a link in `photo` — silently, and only visible entry by entry much
+  // later. Refusing the line is recoverable; importing it wrong is not.
+  //
+  // What happens to a handle already in the ledger is the user's choice:
+  //   merge     — fill blank fields only, never overwrite (the default, and
+  //               the behaviour this panel had before the choice existed)
+  //   overwrite — take the pasted value wherever the paste HAS one; a blank
+  //               cell never wipes a field that already holds something
+  //   skip      — leave the existing entry completely untouched
+  //   add       — add a second entry anyway
+  const BULK_FIELD_COUNTS = [8, 9, 10];
+  const FILLABLE_FIELDS = ['category', 'location', 'pronouns', 'status', 'link', 'photo'];
+
+  function bulkParseLine(line, defaultCat){
+    if(!line.includes('|')){
+      const bare = line.replace(/^@/, '').trim();
+      if(!bare) return { error: 'noName' };
+      return {
+        data: {
+          name: bare,
+          handle: line.startsWith('@') ? line : '@' + line,
+          category: defaultCat,
+          location: '', pronouns: '', status: '', link: '', photo: '',
+          tags: [], gender: 'unknown',
+        },
+        extraTag: null,
+      };
+    }
+
+    const parts = line.split('|').map(p => p.trim());
+    if(!BULK_FIELD_COUNTS.includes(parts.length)){
+      return { error: 'oddFields', count: parts.length };
+    }
+    const [name, handle, category, location, pronouns, status, link, photo, tagsRaw, genderRaw] = parts;
+    if(!name) return { error: 'noName' };
+
+    return {
+      // A category that isn't one of the three real ones is kept as a tag
+      // rather than discarded when it collapses into "following".
+      extraTag: categoryTagFor(category),
+      data: {
+        name,
+        handle: handle || '',
+        category: normalizeCategory(category),
+        location: location || '',
+        pronouns: pronouns || '',
+        status: status || '',
+        link: link || '',
+        photo: photo || '',
+        tags: (tagsRaw || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean),
+        gender: normalizeGender(genderRaw),
+      },
+    };
+  }
+
+  // Unions incoming tags into an entry without letting two spellings of the
+  // same tag both land on it.
+  function addTags(entry, incoming){
+    let changed = false;
+    entry.tags = entry.tags || [];
+    incoming.forEach(t => {
+      if(!t) return;
+      const key = tagKey(t);
+      if(entry.tags.some(existing => tagKey(existing) === key)) return;
+      entry.tags.push(t);
+      changed = true;
+    });
+    return changed;
+  }
+
   document.getElementById('saveBulk').onclick = () => {
     const text = document.getElementById('bulkText').value;
     const defaultCat = document.getElementById('bulkDefaultCategory').value;
+    const dupeMode = document.getElementById('bulkDedupe').value;
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if(lines.length === 0) return;
 
-    const FILLABLE_FIELDS = ['category', 'location', 'pronouns', 'status', 'link', 'photo'];
     const handleIndex = new Map();
     entries.forEach(e => {
       const key = normalizeHandleKey(e.handle);
       if(key) handleIndex.set(key, e);
     });
 
-    let added = 0, updated = 0, unchanged = 0;
+    const seenThisPaste = new Set();
+    const r = {
+      added: 0, updated: 0, unchanged: 0, skipped: 0, noName: 0,
+      oddFields: [], dupeNames: [], withinPaste: 0,
+    };
 
-    // extraTag: a category label that didn't map onto a real category
-    // (e.g. "influencer", "art", "friend") — carried over as a tag so it
-    // isn't lost, unioned into the entry's tags rather than treated as a
-    // blank-fillable scalar field.
-    function mergeInto(existing, incoming, extraTag){
+    function applyToExisting(existing, incoming, extraTag){
       let changed = false;
-      FILLABLE_FIELDS.forEach(f => {
-        if(!existing[f] && incoming[f]){
-          existing[f] = incoming[f];
+      if(dupeMode === 'overwrite'){
+        // A blank cell in the paste is "no opinion", not "erase this".
+        FILLABLE_FIELDS.forEach(f => {
+          if(incoming[f] && existing[f] !== incoming[f]){ existing[f] = incoming[f]; changed = true; }
+        });
+        if(incoming.gender !== 'unknown' && existing.gender !== incoming.gender){
+          existing.gender = incoming.gender;
           changed = true;
         }
-      });
-      if(extraTag){
-        existing.tags = existing.tags || [];
-        if(!existing.tags.includes(extraTag)){
-          existing.tags.push(extraTag);
+      }else{
+        FILLABLE_FIELDS.forEach(f => {
+          if(!existing[f] && incoming[f]){ existing[f] = incoming[f]; changed = true; }
+        });
+        if(genderOf(existing) === 'unknown' && incoming.gender !== 'unknown'){
+          existing.gender = incoming.gender;
           changed = true;
         }
       }
-      if(changed) updated++; else unchanged++;
+      // Tags union in either mode — a tag is additive by nature, and dropping
+      // ones already on the entry would lose work no paste asked to remove.
+      if(addTags(existing, incoming.tags)) changed = true;
+      if(extraTag && addTags(existing, [extraTag])) changed = true;
+      if(changed) r.updated++; else r.unchanged++;
     }
 
-    lines.forEach(line => {
-      let parsed;
-      let extraTag = null;
-      if(line.includes('|')){
-        const parts = line.split('|').map(p => p.trim());
-        const [name, handle, category, location, pronouns, status, link, photo] = parts;
-        if(!name) return;
-        extraTag = categoryTagFor(category);
-        parsed = {
-          name,
-          handle: handle || '',
-          category: normalizeCategory(category),
-          location: location || '',
-          pronouns: pronouns || '',
-          status: status || '',
-          link: link || '',
-          photo: photo || '',
-        };
-      }else{
-        const name = line.replace(/^@/, '');
-        if(!name) return;
-        parsed = {
-          name,
-          handle: line.startsWith('@') ? line : '@' + line,
-          category: defaultCat,
-          location: '', pronouns: '', status: '', link: '', photo: '',
-        };
+    lines.forEach((line, i) => {
+      const parsed = bulkParseLine(line, defaultCat);
+      if(parsed.error === 'oddFields'){
+        r.oddFields.push({ line: i + 1, count: parsed.count, preview: line.slice(0, 48) });
+        return;
+      }
+      if(parsed.error === 'noName'){ r.noName++; return; }
+
+      const { data, extraTag } = parsed;
+      const key = normalizeHandleKey(data.handle);
+      if(key && seenThisPaste.has(key)) r.withinPaste++;
+      if(key) seenThisPaste.add(key);
+
+      const existing = key ? handleIndex.get(key) : null;
+      if(existing && dupeMode !== 'add'){
+        if(dupeMode === 'skip'){
+          r.skipped++;
+          if(r.dupeNames.length < 6) r.dupeNames.push(displayHandle(data.handle) || data.name);
+          return;
+        }
+        applyToExisting(existing, data, extraTag);
+        return;
       }
 
-      const key = normalizeHandleKey(parsed.handle);
-      const existing = key ? handleIndex.get(key) : null;
-      if(existing){
-        mergeInto(existing, parsed, extraTag);
-      }else{
-        const tags = extraTag ? [extraTag] : [];
-        const created = { id: uid(), ...parsed, date: '', tags };
-        entries.push(created);
-        if(key) handleIndex.set(key, created);
-        added++;
-      }
+      const created = { id: uid(), ...data, date: '', notes: '' };
+      if(extraTag) addTags(created, [extraTag]);
+      entries.push(created);
+      if(key) handleIndex.set(key, created);
+      r.added++;
     });
 
-    const saved = persist();
-    document.getElementById('bulkText').value = '';
-    closePanel();
+    const touched = r.added > 0 || r.updated > 0;
+    const saved = touched ? persist() : true;
+    // The panel stays OPEN on purpose: the report is the point of this run,
+    // and it lives inside the panel. Cancel closes it and clears the report.
     render();
-    if(saved) alert(`${updated} updated, ${added} added, ${unchanged} unchanged.`);
+    showImportReport(r, lines.length, saved && touched);
+    document.getElementById('bulkReport').scrollIntoView({ block:'nearest' });
   };
+
+  // The old one-line alert() could not say WHICH lines it refused, so a
+  // malformed line in a 242-line paste was invisible. This is that report.
+  function showImportReport(r, totalLines, clearBox){
+    const box = document.getElementById('bulkReport');
+    const problems = r.oddFields.length > 0 || r.noName > 0;
+    box.innerHTML = '';
+
+    const card = document.createElement('div');
+    card.className = 'import-report';
+    card.dataset.tone = problems ? 'warn' : 'ok';
+
+    const h = document.createElement('h4');
+    h.textContent = problems ? 'imported, with problems' : 'import complete';
+    card.appendChild(h);
+
+    const bits = ['<span class="num">' + r.added + '</span> added'];
+    if(r.updated) bits.push('<span class="num">' + r.updated + '</span> updated');
+    if(r.unchanged) bits.push('<span class="num">' + r.unchanged + '</span> already complete');
+    if(r.skipped) bits.push('<span class="num">' + r.skipped + '</span> skipped as duplicates');
+    const summary = document.createElement('div');
+    summary.innerHTML = bits.join(' · ') + ' — from ' + totalLines + ' lines.';
+    card.appendChild(summary);
+
+    const issues = [];
+    if(r.oddFields.length){
+      const list = r.oddFields.slice(0, 5)
+        .map(o => 'line ' + o.line + ' has ' + o.count + ' fields — "' + escapeHtml(o.preview) + '…"')
+        .join('</li><li>');
+      issues.push('<span class="warn-num">' + r.oddFields.length + '</span> line(s) skipped for a wrong field '
+        + 'count (expected 8, 9 or 10 — an extra or missing <code>|</code> shifts every field): '
+        + '<ul><li>' + list + '</li></ul>');
+    }
+    if(r.noName) issues.push('<span class="warn-num">' + r.noName + '</span> line(s) skipped with no name in the first field.');
+    if(r.skipped && r.dupeNames.length){
+      issues.push('Duplicates skipped include: ' + escapeHtml(r.dupeNames.join(', '))
+        + (r.skipped > r.dupeNames.length ? ' and ' + (r.skipped - r.dupeNames.length) + ' more.' : ''));
+    }
+    if(r.withinPaste){
+      issues.push('<span class="warn-num">' + r.withinPaste + '</span> handle(s) appeared more than once '
+        + 'inside this paste itself; the later line was applied to the same entry, not a new one.');
+    }
+    if(issues.length){
+      const ul = document.createElement('ul');
+      ul.innerHTML = '<li>' + issues.join('</li><li>') + '</li>';
+      card.appendChild(ul);
+    }
+
+    box.appendChild(card);
+    // Only clear the textarea once the write actually reached storage, so a
+    // quota failure never eats the paste the user still needs.
+    if(clearBox) document.getElementById('bulkText').value = '';
+  }
 
   // --- chips / search / sort ---
   document.getElementById('chips').addEventListener('click', (ev) => {
@@ -2175,13 +3219,19 @@ another.handle"></textarea>
     render();
   });
 
-  document.getElementById('locationSelect').addEventListener('change', (ev) => {
-    activeLocationFilter = ev.target.value;
+  document.getElementById('regionSelect').addEventListener('change', (ev) => {
+    activeRegion = ev.target.value;
+    activeCity = 'all';
+    render();
+  });
+
+  document.getElementById('citySelect').addEventListener('change', (ev) => {
+    activeCity = ev.target.value;
     render();
   });
 
   document.getElementById('searchInput').addEventListener('input', (ev) => {
-    searchTerm = ev.target.value.trim().toLowerCase();
+    searchTerm = foldText(ev.target.value.trim());
     render();
   });
 
@@ -2198,7 +3248,8 @@ another.handle"></textarea>
     tab.dataset.active = 'true';
     currentView = tab.dataset.view;
     document.getElementById('list').hidden = currentView !== 'list';
-    const mapEl = document.getElementById('mapContainer');
+    document.getElementById('mapCount').hidden = currentView !== 'map';
+    const mapEl = document.getElementById('mapWrap');
     mapEl.dataset.visible = currentView === 'map' ? 'true' : 'false';
     if(currentView === 'map'){
       initMapIfNeeded();
@@ -2215,7 +3266,55 @@ another.handle"></textarea>
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 18,
     }).addTo(leafletMap);
-    markerLayer = L.layerGroup().addTo(leafletMap);
+    // Clustering is the whole point of the map here — who is near who. At a
+    // world zoom, 150 pins on top of each other answers nothing.
+    markerLayer = (typeof L.markerClusterGroup === 'function')
+      ? L.markerClusterGroup({
+          // Clicking a cluster opens the results panel instead of zooming.
+          // Zooming was all it did before, which answered "how many" and never
+          // "who" — the panel is the answer to "who". Scroll and the +/-
+          // control still zoom.
+          zoomToBoundsOnClick: false,
+          showCoverageOnHover: false,
+          maxClusterRadius: 45,
+        })
+      : L.layerGroup();   // plugin blocked or failed to load: plain pins still work
+    markerLayer.addTo(leafletMap);
+
+    // Clicking a cluster opens the panel instead of zooming. Zooming was the
+    // only thing it did before, and it answered "how many" without ever
+    // answering "who" — which is the question the panel exists for. The map
+    // still zooms by scroll and by the +/- control.
+    if(typeof markerLayer.on === 'function' && typeof L.markerClusterGroup === 'function'){
+      markerLayer.on('clustermouseover', (ev) => setMapHover(entriesForCluster(ev.layer)));
+      markerLayer.on('clustermouseout', () => setMapHover(null));
+      markerLayer.on('clusterclick', (ev) => {
+        stopMapEvent(ev);
+        pinMapSelection(entriesForCluster(ev.layer));
+      });
+    }
+    // Clicking bare map dismisses the pinned selection, the way a map should.
+    leafletMap.on('click', () => clearMapSelection());
+    // In viewport mode the panel follows the map.
+    leafletMap.on('moveend zoomend', () => { if(!mapPinned && !mapHover) renderMapPanel(); });
+  }
+
+  // A Leaflet event is not a DOM event — the DOM one hangs off originalEvent,
+  // and passing the wrapper to stopPropagation silently does nothing, which
+  // lets the map's own click handler clear the selection the click just made.
+  function stopMapEvent(ev){
+    const dom = ev && (ev.originalEvent || ev);
+    if(dom && L.DomEvent && typeof L.DomEvent.stopPropagation === 'function'){
+      L.DomEvent.stopPropagation(dom);
+    }
+  }
+
+  // A cluster knows its own markers; map them back to entries by identity so
+  // the panel lists exactly what the bubble counted.
+  function entriesForCluster(cluster){
+    if(!cluster || typeof cluster.getAllChildMarkers !== 'function') return [];
+    const inCluster = new Set(cluster.getAllChildMarkers());
+    return mapPlotted.filter(e => inCluster.has(markersById.get(e.id)));
   }
 
   function markerIconForCategory(category){
@@ -2237,7 +3336,11 @@ another.handle"></textarea>
   function renderMap(filteredEntries){
     if(!leafletMap || !markerLayer) return;
     markerLayer.clearLayers();
-    filteredEntries.filter(e => e.geo).forEach(e => {
+    markersById = new Map();
+    const plotted = filteredEntries.filter(e => geoFor(e));
+    mapPlotted = plotted;
+    updateMapCount(plotted.length, filteredEntries.length - plotted.length);
+    plotted.forEach(e => {
       const handleLink = e.handle
         ? '<a href="' + escapeHtml(instagramUrlForHandle(e.handle)) + '" target="_blank" rel="noopener noreferrer">'
           + escapeHtml(e.handle.startsWith('@') ? e.handle : '@' + e.handle) + '</a>'
@@ -2246,11 +3349,249 @@ another.handle"></textarea>
         + (handleLink ? handleLink + '<br>' : '')
         + escapeHtml(e.location || '') + '<br>'
         + '[ ' + escapeHtml(catLabel[e.category] || e.category) + ' ]';
-      L.marker([e.geo.lat, e.geo.lng], { icon: markerIconForCategory(e.category) })
-        .bindPopup(popupHtml)
-        .addTo(markerLayer);
+      const marker = L.marker([geoFor(e).lat, geoFor(e).lng], { icon: markerIconForCategory(e.category) })
+        .bindPopup(popupHtml);
+      // Everyone sharing this pin's exact spot is what the panel lists — one
+      // artist per pin would make the panel a slower popup.
+      marker.on('mouseover', () => setMapHover(entriesAtSameSpot(e)));
+      marker.on('mouseout', () => setMapHover(null));
+      marker.on('click', (ev) => {
+        stopMapEvent(ev);
+        pinMapSelection(entriesAtSameSpot(e));
+      });
+      markersById.set(e.id, marker);
+      markerLayer.addLayer(marker);
+    });
+    fitMapOnce();
+    renderMapPanel();
+  }
+
+  // Open on the artists rather than on a fixed world view. Without this the
+  // panel's resting "in view" list is whatever happens to fall inside a
+  // [20,0] zoom-2 rectangle, which on a narrow map is a handful of them. Fit
+  // ONCE per page load — refitting on every filter change would yank the map
+  // out from under someone who has panned somewhere deliberately.
+  let mapFitted = false;
+  function fitMapOnce(){
+    if(mapFitted || !leafletMap || mapPlotted.length === 0) return;
+    mapFitted = true;
+    const bounds = L.latLngBounds(mapPlotted.map(e => {
+      const g = geoFor(e);
+      return [g.lat, g.lng];
+    }));
+    if(bounds.isValid()) leafletMap.fitBounds(bounds, { padding:[40,40], maxZoom:6 });
+  }
+
+  // Pins land on shared coordinates constantly here — thirteen artists all
+  // reading "Seoul, South Korea" are one dot. Comparing rounded coordinates
+  // rather than the location string keeps two spellings of one city together.
+  function entriesAtSameSpot(entry){
+    const g = geoFor(entry);
+    if(!g) return [entry];
+    const key = g.lat.toFixed(3) + ',' + g.lng.toFixed(3);
+    return mapPlotted.filter(other => {
+      const og = geoFor(other);
+      return og && (og.lat.toFixed(3) + ',' + og.lng.toFixed(3)) === key;
     });
   }
+
+
+  // --- map results panel ---------------------------------------------------
+  // The panel is the map's index: it lists the artists behind whatever is
+  // selected, hovered, or simply in view. It is driven from the SAME filtered
+  // array the list view renders, so it can never show an artist the current
+  // category / gender / region / tag / search filters exclude.
+  //
+  // Three states, in priority order:
+  //   hover      — previewing a marker or cluster, not committed
+  //   pinned     — a marker or cluster was clicked; survives panning
+  //   viewport   — nothing chosen: whatever is currently on screen
+  // Viewport is the resting state rather than an empty panel, because an empty
+  // 320px column beside the map answers nothing, and "who is near who" is one
+  // of the questions the map exists to answer.
+  let mapPinned = null;         // { title, ids }
+  let mapHover = null;          // { title, ids }
+  let markersById = new Map();  // entry id -> leaflet marker
+  let mapPlotted = [];          // filtered + geocodable, in render order
+
+  function mapPanelEls(){
+    return {
+      panel: document.getElementById('mapPanel'),
+      title: document.getElementById('mapPanelTitle'),
+      sub:   document.getElementById('mapPanelSub'),
+      list:  document.getElementById('mapPanelList'),
+      close: document.getElementById('mapPanelClose'),
+    };
+  }
+
+  // A pin's label: the shared location text when everyone agrees, otherwise a
+  // count. Never invent a place name the entries don't actually carry.
+  function placeLabelFor(list){
+    const names = [...new Set(list.map(e => (e.location || '').trim()).filter(Boolean))];
+    if(names.length === 1) return names[0];
+    if(names.length === 0) return list.length + (list.length === 1 ? ' artist' : ' artists');
+    return names.length + ' locations';
+  }
+
+  function entriesInView(){
+    if(!leafletMap) return [];
+    const bounds = leafletMap.getBounds();
+    return mapPlotted.filter(e => {
+      const g = geoFor(e);
+      return g && bounds.contains(L.latLng(g.lat, g.lng));
+    });
+  }
+
+  function currentMapPanelState(){
+    if(mapHover) return { ...mapHover, mode:'hover' };
+    if(mapPinned) return { ...mapPinned, mode:'pinned' };
+    return { title:'in view', ids:entriesInView().map(e => e.id), mode:'viewport' };
+  }
+
+  function renderMapPanel(){
+    const els = mapPanelEls();
+    if(!els.panel) return;
+    const state = currentMapPanelState();
+    const byId = new Map(mapPlotted.map(e => [e.id, e]));
+    // A pinned selection can be emptied by a filter change — drop it rather
+    // than leaving a stale list of artists the filters now exclude.
+    const list = state.ids.map(id => byId.get(id)).filter(Boolean);
+    if(state.mode === 'pinned' && list.length === 0){
+      mapPinned = null;
+      return renderMapPanel();
+    }
+
+    els.title.textContent = state.mode === 'viewport' ? 'in view' : state.title;
+    els.sub.textContent = state.mode === 'hover'
+      ? 'hovering · ' + list.length
+      : list.length + (list.length === 1 ? ' artist' : ' artists');
+    // The close control belongs to the PINNED selection, not to whatever the
+    // panel happens to be showing this instant. Tying it to the display mode
+    // made it vanish while the pointer still rested on the marker that had
+    // just been clicked — the one moment you are most likely to reach for it.
+    els.close.hidden = !mapPinned;
+
+    els.list.innerHTML = '';
+    if(list.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'map-panel-empty';
+      empty.textContent = mapPlotted.length === 0
+        ? 'No artists match the current filters, so there is nothing to plot.'
+        : 'Nothing in view. Pan or zoom out, or click a pin.';
+      els.list.appendChild(empty);
+      return;
+    }
+
+    list.forEach((e, i) => {
+      const item = document.createElement('div');
+      item.className = 'map-panel-item';
+      item.dataset.id = e.id;
+      // The row is the list view's own .entry markup, so the panel cannot
+      // drift into a second card style and clicking still opens the drawer.
+      item.appendChild(renderEntry(e, i));
+      if(e.notes){
+        const notes = document.createElement('div');
+        notes.className = 'map-panel-notes';
+        notes.textContent = e.notes;
+        item.appendChild(notes);
+      }
+      if(e.handle){
+        const a = document.createElement('a');
+        a.className = 'map-panel-ig';
+        a.href = instagramUrlForHandle(e.handle);
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = 'open on instagram ↗';
+        item.appendChild(a);
+      }
+      item.addEventListener('mouseenter', () => highlightMarker(e.id, true));
+      item.addEventListener('mouseleave', () => highlightMarker(e.id, false));
+      els.list.appendChild(item);
+    });
+  }
+
+  // Highlighting works in both directions. A marker swallowed by a collapsed
+  // cluster cannot show a highlight itself, so the cluster wearing it is
+  // highlighted instead — otherwise hovering a panel row at world zoom does
+  // nothing visible at all.
+  function markerElementFor(id){
+    const marker = markersById.get(id);
+    if(!marker) return null;
+    if(markerLayer && typeof markerLayer.getVisibleParent === 'function'){
+      const visible = markerLayer.getVisibleParent(marker);
+      if(visible && visible !== marker) return visible._icon || null;
+    }
+    return marker._icon || null;
+  }
+
+  function highlightMarker(id, on){
+    const el = markerElementFor(id);
+    if(!el) return;
+    if(on) el.dataset.hi = 'true';
+    else delete el.dataset.hi;
+  }
+
+  function highlightPanelRows(ids){
+    const set = new Set(ids || []);
+    document.querySelectorAll('#mapPanelList .map-panel-item').forEach(item => {
+      if(set.has(item.dataset.id)) item.dataset.hi = 'true';
+      else delete item.dataset.hi;
+    });
+  }
+
+  function setMapHover(entryList){
+    mapHover = entryList
+      ? { title: placeLabelFor(entryList), ids: entryList.map(e => e.id) }
+      : null;
+    renderMapPanel();
+    if(!entryList) highlightPanelRows([]);
+    else highlightPanelRows(entryList.map(e => e.id));
+  }
+
+  function pinMapSelection(entryList){
+    mapPinned = { title: placeLabelFor(entryList), ids: entryList.map(e => e.id) };
+    mapHover = null;
+    renderMapPanel();
+  }
+
+  function clearMapSelection(){
+    if(!mapPinned && !mapHover) return;
+    mapPinned = null;
+    mapHover = null;
+    renderMapPanel();
+  }
+
+  // How much of the current filter actually made it onto the map. Entries
+  // with no location, or one Nominatim couldn't place, are silently absent
+  // from the pins — this is what says so.
+  function updateMapCount(plotted, missing){
+    const el = document.getElementById('mapCount');
+    el.hidden = currentView !== 'map';
+    el.innerHTML = '';
+    el.appendChild(document.createTextNode(
+      plotted + (plotted === 1 ? ' artist plotted' : ' artists plotted')
+    ));
+    if(missing > 0){
+      const span = document.createElement('span');
+      span.className = 'unplotted';
+      span.textContent = ' · ' + missing + ' without a usable location';
+      el.appendChild(span);
+    }
+  }
+
+  document.getElementById('mapPanelClose').onclick = () => clearMapSelection();
+
+  // Escape clears a pinned selection — but only when the drawer is not the
+  // thing on screen. The drawer owns Escape while it is open (its own handler
+  // closes it), and dismissing both at once from one keypress would be a
+  // surprise.
+  document.addEventListener('keydown', (ev) => {
+    if(ev.key !== 'Escape') return;
+    if(currentView !== 'map') return;
+    if(drawer.dataset.open === 'true') return;
+    if(!mapPinned && !mapHover) return;
+    clearMapSelection();
+  });
 
   // --- export / import / clear ---
   document.getElementById('exportBtn').onclick = () => {
@@ -2283,6 +3624,61 @@ another.handle"></textarea>
     reader.readAsText(file);
     ev.target.value = '';
   });
+
+  // --- one-time split of the old combined `status` into notes + status -----
+  // This rewrites existing data, so it is NOT run on load. The user presses
+  // the button, sees exactly how many entries move which way and a sample of
+  // the calls being made, and confirms. Entries that already have notes are
+  // left alone, so pressing it twice is harmless.
+  //
+  // The rule: anything that reads like logistics (a guest spot, a booking
+  // window, a month) stays in `status`; everything else was the user
+  // explaining why they saved someone, which is what `notes` is for. It is a
+  // keyword heuristic over free text and it WILL misjudge some lines — which
+  // is exactly why it shows its work first and why an export is one click
+  // away. Deliberately NOT a keyword: "flash" — in this domain "love her
+  // flash" is a reason to save someone, not a booking window.
+  const LOGISTICS_RE = new RegExp([
+    'guest', 'touring', 'tour\\\\b', 'spot', 'booking', 'books?\\\\b',
+    '\\\\bopen\\\\b', '\\\\bclosed\\\\b', 'waitlist',
+    'jan(uary)?', 'feb(ruary)?', 'mar(ch)?', 'apr(il)?', '\\\\bmay\\\\b',
+    'jun(e)?', 'jul(y)?', 'aug(ust)?', 'sep(t|tember)?', 'oct(ober)?',
+    'nov(ember)?', 'dec(ember)?',
+  ].join('|'), 'i');
+
+  function planStatusSplit(){
+    const toNotes = [];
+    const keep = [];
+    entries.forEach(e => {
+      if(!e.status || e.notes) return;      // nothing to move, or already split
+      if(LOGISTICS_RE.test(e.status)) keep.push(e);
+      else toNotes.push(e);
+    });
+    return { toNotes, keep };
+  }
+
+  document.getElementById('splitStatusBtn').onclick = () => {
+    const { toNotes, keep } = planStatusSplit();
+    if(toNotes.length === 0 && keep.length === 0){
+      alert('Nothing to split — every entry either has no status text, or already has notes.');
+      return;
+    }
+    const sample = toNotes.slice(0, 5)
+      .map(e => '  • ' + (e.name || '(unnamed)') + ': "' + e.status.slice(0, 60) + '"')
+      .join('\n');
+    const message =
+      'Split the old "status / notes" field:\n\n'
+      + '  ' + toNotes.length + ' → moved into NOTES\n'
+      + '  ' + keep.length + ' → kept in STATUS (reads like a guest spot, booking or date)\n\n'
+      + (sample ? 'Moving to notes, for example:\n' + sample + '\n\n' : '')
+      + 'This rewrites existing entries. Export a backup first if you want one.\n\nGo ahead?';
+    if(!confirm(message)) return;
+
+    toNotes.forEach(e => { e.notes = e.status; e.status = ''; });
+    if(!persist()){ render(); return; }
+    render();
+    alert(toNotes.length + ' moved to notes, ' + keep.length + ' kept as status.');
+  };
 
   document.getElementById('clearBtn').onclick = () => {
     if(entries.length === 0) return;

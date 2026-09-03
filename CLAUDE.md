@@ -200,15 +200,18 @@ tour/release dates worth watching. No backend, no build step: a SHA-256
 password gate (`crypto.subtle` + a hardcoded hash, unlock flag in
 `sessionStorage`) guards a `localStorage`-backed CRUD tracker.
 
-**Status: not yet merged.** Items 1–10 below live on branch
-`claude/artist-tracker-testing-afc2ul` / PR #121 (draft, targeting
-`main`); items 11–12 build on top of it on branch
-`claude/tracker-panel-paste-images-h46mti`. Review each through its own
-Netlify Deploy Preview — not the production domain. This matters because
-the app's only "database" is the browser's own `localStorage`, which is
-scoped per-origin: data added on the deploy preview does **not** carry
-over automatically once this merges to production. Use the app's own export/import JSON to move data across
-origins if needed.
+**Status: items 1–12 are MERGED to `main`** (PRs #121 and #125); items
+13–18 are in review on branch `claude/tracker-shortlist-filters-h46mti`.
+Review through the Netlify Deploy Preview — `localStorage` is per-origin, so
+preview data does not carry over to production and vice versa; move it with
+the app's own JSON export/import.
+
+**What this tool is for.** It is primarily a TATTOO ARTIST SHORTLIST — the
+job is deciding who to get tattooed by and finding where they are. Friends,
+influencers and general art accounts are kept but are background. Three
+questions drive the design: who does the work I want (style tags), where are
+they and who is near who (region filter + map), and why did I save them
+(notes). Let that priority pick the defaults.
 
 **Built so far, in order:**
 1. Core tracker (pre-existing before this branch): password gate,
@@ -304,12 +307,170 @@ origins if needed.
       handling — and a backup of 200 entries with images is megabytes
       rather than tens of KB. Expected, not a bug.
 
+13. The view defaults to **tattoo artists**, not "all" — the other
+    categories are one click away.
+14. Location filter is two-level: **region, then city**. `parseLocation()`
+    derives both at render time from the free-text `location` (last
+    comma-separated segment = region, first = city) and NEVER writes back —
+    the user's original string is untouched. A trailing US state or Canadian
+    province code folds into `USA` / `Canada`, so "Los Angeles, CA" and
+    "Austin, TX, USA" land in one region instead of scattering. A
+    single-segment string ("Berlin") becomes its own region rather than
+    having a country guessed for it. Anything unparseable goes to
+    "Other / unspecified", pinned last; every other region is ordered by
+    count, descending.
+15. Style tags have a clickable **starter set** (`STARTER_TAGS`) plus every
+    tag already in use, shown as toggle chips in the drawer's edit mode.
+    Typing still works — Enter or a comma commits a custom tag. Filter chips
+    carry counts and sort by count, descending.
+16. `status` split into **`notes`** (why I saved them — a real textarea, the
+    field that matters most) and **`status`** (guest spots, books, tour
+    dates — still one line). The split of EXISTING data is a **button**
+    (`split status → notes` in the footer), never automatic on load: it
+    shows the counts and a sample before it touches anything, skips entries
+    that already have notes, and is safe to press twice. `LOGISTICS_RE`
+    decides what stays in `status`; "flash" is deliberately NOT a keyword
+    ("love her flash" is a reason to save someone, not a booking window).
+17. Gender is an **explicit field** (`woman` / `not-woman` / `unknown`,
+    default `unknown`), set by hand in the drawer. It replaced the old
+    pronouns-derived bucketing, which was blank for nearly every entry.
+    Seeded ONCE on load from an unambiguous she/her in `pronouns`; nothing
+    is ever inferred from names, handles or photos, and `pronouns` keeps its
+    own separate job of recording how someone refers to themselves. Filter
+    is All / Women only / Unknown — "unknown" is browsable on purpose, so
+    the backlog can be worked through.
+18. Map **clusters** (leaflet.markercluster via CDN, SRI-pinned), respects
+    every active filter, and prints how many artists are plotted vs. how
+    many have no usable location.
+19. **Decorative unicode folds** for matching. Instagram display names and
+    locations arrive as 𝕾𝖆𝖗𝖆𝖍 𝕽𝖔𝖘𝖊, Ａｌｙｓｓａ, ʟᴏɴɢ ʙᴇᴀᴄʜ, ᴄᴀ. `foldText()`
+    is applied to search (both sides), region aliasing, the US/Canada
+    subdivision codes, handle-matching keys and tag keys — for MATCHING
+    ONLY. Nothing folded is written back; the entry keeps the user's text.
+    Without it, typing "sarah" silently misses the entry and ᴄᴀ becomes its
+    own region instead of folding into USA.
+    **The implementation is 26 lines, not a 6,000-character table.** NFKD
+    already flattens the Mathematical Alphanumeric Symbols, the letterlike
+    symbols (ℬ, ℤ) and the fullwidth forms; the ONLY block needing a
+    hand-written map is small caps / phonetic capitals, which carry no
+    compatibility decomposition. Measured equivalent to a full explicit
+    FOLD_MAP across all 2,420 cells of the 242-artist research file — zero
+    divergences. Do not re-add a hand-maintained table for the rest.
+20. **Style tags group by a normalized key** (`tagKey()` — fold, then strip
+    spaces, `_`, `-`, `&`, `/`). "Fine Line", "fineline" and "fine-line" are
+    ONE chip with the combined count, not three splitting it. The entry
+    stores its own spelling verbatim; only the key is normalized, and the
+    chip is labelled with whichever spelling is commonest (ties alphabetical,
+    so the label doesn't flicker as counts move). The drawer's picker dedupes
+    by key too, and shows the entry's own spelling when it has one.
+21. **The tag bar caps itself at 18** with `+ N more` / `show fewer`. The
+    242-artist list yields 119 distinct tag groups — 1046px of chips on a
+    900px viewport, burying the list under its own filter bar. Measured:
+    122px capped. A SELECTED tag is always shown regardless of rank — a
+    filter you cannot see is a filter you cannot turn off — and a
+    `clear N selected` control appears whenever any are active.
+22. **Bulk paste takes 10 fields**: `name | handle | category | location |
+    pronouns | status | link | photo url | tags | gender`. 8 and 9 still
+    work. Tags are comma-separated inside their field; gender accepts
+    `woman` / `nonbinary` / `man` (and blank → `unknown`) and is NEVER
+    guessed from a name. `nonbinary` is kept as its own value rather than
+    folded into `not-woman`, so the one nonbinary artist in the research
+    file is neither mislabelled nor swept into "women only".
+    **Any other field count is skipped and reported, never imported** — one
+    stray `|` inside a name shifts every field a column left, landing a
+    location in `pronouns` and a link in `photo`, silently, visible only
+    entry-by-entry much later. Refusing the line is recoverable; importing
+    it wrong is not.
+23. **What happens to a handle already in the list is the user's choice**
+    (`#bulkDedupe`): `merge` (fill blanks only — the default and the old
+    behaviour), `overwrite` (take the pasted value where the paste HAS one;
+    a blank cell never wipes a field that holds something), `skip`, `add`.
+    Tags union in every merging mode — a tag is additive by nature, and
+    dropping ones already on the entry would lose work no paste asked to
+    remove. NOTE the reference implementation's "update" mode did a
+    `{...existing, ...data}` spread, which blanks a filled field from an
+    empty cell; that was deliberately not ported.
+24. **The import report replaced the one-line `alert()`** (`#bulkReport`,
+    inside the panel — which therefore STAYS OPEN after a run, and clears
+    on cancel or on reopening). It counts added / updated / already-complete
+    / skipped, and names the wrong-field-count lines WITH THEIR LINE NUMBERS
+    and a preview. An alert could not say which line of a 242-line paste it
+    refused. The textarea is cleared only once the write actually reached
+    storage, so a quota failure never eats the paste.
+25. **Locations resolve from a STATIC GAZETTEER, not from the network.**
+    Live Nominatim was diagnosed and replaced as the primary path. The
+    diagnosis, reproduced headlessly: successes were cached, but so were
+    FAILURES — `geoStatus:'failed'` was persisted and filtered out forever, so
+    a single burst of 429s (Nominatim allows ~1 req/sec and refuses bulk use;
+    126 distinct strings needs ~2.5 min of uninterrupted map-tab time)
+    permanently retired those locations. The plotted count could only ever go
+    down. A stub that succeeds 40 times then 429s reproduced Eva's
+    "73 plotted · 169 without" as "65 · 177", and a reload retried NONE of the
+    failures while burning 13 more.
+    Now `staticGeocode()` reads city / US-state / CA-province / country tables
+    (~120 cities) the same way `parseLocation()` reads segments: `/` and `📍`
+    pairs take the FIRST place named, trailing note segments are ignored,
+    fallback runs MOST SPECIFIC FIRST so "Georgia, USA" is the state and not
+    the middle of the country. **Measured: 211 of 211 non-blank locations,
+    zero network calls, on the real 242-artist file.** The 31 that don't plot
+    are exactly the 31 with a blank location field.
+    Nothing static is written to storage — `geoFor(e)` prefers a cached
+    Nominatim result and otherwise computes from the table, so improving the
+    table takes effect immediately instead of being shadowed by a stale value.
+    Nominatim remains the fallback for a table miss, and **a failure is no
+    longer permanent**: `geoTries` + `geoFailedAt` back off for six hours and
+    retry, capped at three attempts. `clearLegacyGeoFailures()` sweeps the old
+    tombstone once on load so existing data recovers.
+26. **The fold covers stroked Latin letters, not just accents.** NFKD
+    decomposes an accent (é → e + combining acute) but a STROKE is part of the
+    letter, so `ł` stayed `ł` and "wroclaw" silently missed Wrocław — in search
+    AND in the gazetteer. `CHAR_FOLD` now carries ł đ ø ħ ŧ ı ƙ ß æ œ þ ð and
+    their capitals. Measured against the research file: the only Latin-script
+    characters that did not fold were `ł`/`Ł` (6) and `Ƙ` (1). Hangul and
+    Cyrillic are left alone on purpose — they are scripts, not decoration.
+27. **Map results panel** (`#mapPanel`) — the map's index, to the right of it,
+    stacked below at ≤900px. Three states in priority order: **hover**
+    (previewing a marker or cluster), **pinned** (one was clicked; survives
+    panning; close button, Escape, or a click on bare map clears it), and
+    **viewport** (the resting state — whatever is currently on screen). An
+    empty 320px column beside the map answers nothing, which is why viewport
+    rather than hidden is the resting state.
+    Rows are the list view's own `renderEntry()` markup — one card style, one
+    behaviour (click opens the drawer). Notes and an Instagram link are added
+    as SIBLINGS of the row, never nested inside it: the row is a button, and
+    item 11 removed links from inside it on purpose.
+    Driven from the same filtered array `render()` computes, so it can never
+    list an artist the current filters exclude; a pinned selection that a
+    filter empties drops itself rather than lingering.
+    **Clicking a cluster no longer zooms** (`zoomToBoundsOnClick:false`) — it
+    lists that cluster's artists. Zoom answered "how many" and never "who".
+    Hover highlights in both directions; a marker inside a collapsed cluster
+    highlights the CLUSTER instead (`getVisibleParent`), or hovering a panel
+    row at world zoom would do nothing visible.
+    Two things the panel forced: the map+panel row **breaks out of the 760px
+    reading column** on ≥1024px (at column width the map came out 385px and
+    showed a third of the world), and the map **fits to its pins once** per
+    load rather than opening on a fixed `[20,0]` zoom-2 rectangle.
+
+**Facet counts are computed against every filter except themselves** — with
+the view defaulting to tattoo artists, a region count taken over the whole
+ledger would read "USA (40)" while showing 25. Each filter is its own
+predicate (`matchesCategory`, `matchesGender`, …) so the region and tag
+counts can exclude their own dimension.
+
 **Testing approach:** no CI workflow covers this file (every GitHub
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
 only — only Netlify's own informational checks run on this PR). The
-drawer and paste-to-add work (items 11–12) shipped with a behaviour gate,
-`node tools/verify-tracker-drawer.mjs` (94 checks; `--shots <dir>` also
-writes a contact sheet). It serves the repo on a free port, seeds
+drawer, paste-to-add, shortlist and import work (items 11–24) ship with a
+behaviour gate, `node tools/verify-tracker-drawer.mjs` (269 checks;
+`--shots <dir>` also writes a contact sheet). `staticGeocode()` is a pure
+function, so its ANSWERS are unit-checked against declarations SLICED OUT of
+`artist-tracker.html` itself (the app is inside an IIFE) rather than inferred
+from pin positions — a table that answers with the wrong place still plots the
+same number of pins. A failed slice throws rather than skipping. Its map checks serve the REAL leaflet and
+leaflet.markercluster from `node_modules` when present
+(`npm install --no-save leaflet@1.9.4 leaflet.markercluster@1.5.3`) and
+report as SKIPPED, never as passed, when they are missing. It serves the repo on a free port, seeds
 `sessionStorage` to skip the password gate, stubs unavatar.io and unpkg,
 and drives a real Chromium: open/close/Escape/backdrop, focus return,
 the edit round trip, the downscale (a 1200×800 paste must come out
@@ -317,8 +478,34 @@ the edit round trip, the downscale (a 1200×800 paste must come out
 `QuotaExceededError`, and a regression pass over bulk-paste merge, the
 filters and the map toggle. It is not wired into CI (no workflow here
 covers this file) — run it before calling a tracker change done.
-Verified falsifiable: widening `MAX_PHOTO_DIM` or dropping the
-text-field paste guard each turn it red.
+Verified falsifiable: widening `MAX_PHOTO_DIM`, dropping the text-field
+paste guard, restoring the "all" default, removing the US-state fold,
+inferring gender from he/him, running the status split on load, swapping
+the cluster group for a plain layer group, neutering `foldText()`, making
+`tagKey()` the identity, widening `BULK_FIELD_COUNTS` to accept anything,
+lifting the tag cap, un-pinning a selected tag when the bar collapses,
+emptying `CITY_COORDS`, making a geocoding failure permanent again, removing
+the retry backoff, and dropping the legacy-tombstone sweep — each turns it
+red, on the checks that name that behaviour.
+
+**A fixture whose handle contains the name it searches for proves nothing.**
+The search haystack includes `e.handle`, so a realistic `@sarahrose_tattoo`
+satisfies "plain-ascii search finds a fraktur name" with folding switched
+OFF. Two of these checks passed a neutered `foldText()` for exactly that
+reason before the fixture was changed to `@goldenharvest.resident`. Keep the
+fold fixture's handles free of the text being searched.
+
+**Sections that need their own seed data get their own browser CONTEXT.**
+`ctx.addInitScript` re-seeds `SEED` into localStorage on every navigation, so
+a write-then-reload is silently clobbered and the checks run against the old
+fixture while appearing to pass. `reseed(rows, setup)` builds a fresh context
+per fixture (with optional per-section network stubs) and folds its page
+errors back into the shared list.
+**This bites INSIDE a section too, not just across them.** The geocoding
+retry check first aged `geoFailedAt` with `page.evaluate` and then reloaded —
+the init script restored the original row, so the check was measuring the
+harness. It passed a mutation that made failures permanent again. State that
+a check depends on is SEEDED, never written-then-reloaded.
 Verification has been manual: serve locally via `python3 -m http.server`
 (`crypto.subtle` needs a secure context — never test via `file://`), drive
 with Playwright (`NODE_PATH=/opt/node22/lib/node_modules` — Playwright is
@@ -348,6 +535,18 @@ testing, rather than testing against a stub.
   confirmed to parse cleanly and merge correctly — but has **not**
   actually been pasted into the user's real tracker yet, since that step
   can only happen in their own browser.
+- **`bulk-paste-v2.txt`** (242 researched tattoo artists, 10-field format)
+  was driven end-to-end through a real Chromium against the current page:
+  242 added / 0 malformed, 98 with tags, 31 with no location, 5 `woman` +
+  1 `nonbinary`, 33 regions, 119 tag groups, 70.6 KB in localStorage,
+  ~2.6s wall time, no page errors — and a re-paste of the identical file
+  reports "0 added · 242 already complete" rather than duplicating. On the
+  map, the same run reports **211 artists plotted · 31 without a usable
+  location with ZERO Nominatim requests**, and the panel lists all 211. It has
+  **not** been pasted into the user's real tracker; that only happens in
+  their browser, and localStorage is per-origin, so data added on the deploy
+  preview does not follow the merge to production. Use the app's own
+  export/import JSON to carry it across.
 - PR #121 has an hourly self-scheduled check-in (via `send_later`)
   watching for CI/mergeability/review-comment changes, set up mid-session
   — check `list_triggers` for it if picking this back up, rather than
