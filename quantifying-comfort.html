@@ -315,19 +315,21 @@
         <p>Both come from the <strong>sweating guarded hotplate</strong>, the &ldquo;skin model,&rdquo; under <strong>ISO 11092</strong>.</p>
         <p>Before Ret, a primer. Diffusion:</p>
         <figure class="qc-fig" id="qcDiff" aria-labelledby="qcDiffCap">
-          <canvas class="qc-fig__canvas" id="qcDiffC" role="img" aria-label="Two hundred particles start dense on the left and sparse on the right, and random motion alone spreads them evenly. Click to reset."></canvas>
-          <figcaption class="qc-fig__cap" id="qcDiffCap">Left <span id="qcDiffL">170</span> &middot; right <span id="qcDiffR">30</span>. Nothing pushes them; each one just wanders. <strong>Breathability is just this, through fabric.</strong> Click to reset.</figcaption>
+          <canvas class="qc-fig__canvas" id="qcDiffC" role="img" aria-label="Two hundred particles start crowded on the far left, and random motion alone spreads them evenly across the box over about forty seconds. Click to reset."></canvas>
+          <figcaption class="qc-fig__cap" id="qcDiffCap">Left <span id="qcDiffL">190</span> &middot; right <span id="qcDiffR">10</span> &middot; <span id="qcDiffT">holding the start</span>. Nothing pushes them; each one just wanders. <strong>Breathability is just this, through fabric.</strong> Click to reset.</figcaption>
         </figure>
         <script>
         (() => {
           // Diffusion as it actually happens: 200 walkers, no force, no flow.
-          // Dense on the left, sparse on the right, and the counts even out
-          // because more of them happen to wander right than left.
+          // Crowded on the far left, a few on the right, and the counts even
+          // out because more of them happen to wander right than left. The
+          // start is held for a moment, the walk is slow enough to watch, and
+          // once it has evened out it holds again and restarts on its own.
           const c = document.getElementById('qcDiffC'), ctx = c.getContext('2d');
-          const outL = document.getElementById('qcDiffL'), outR = document.getElementById('qcDiffR');
+          const outL = document.getElementById('qcDiffL'), outR = document.getElementById('qcDiffR'), outT = document.getElementById('qcDiffT');
           const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
           const N = 200, P = new Float32Array(N * 2);
-          let w = 0, h = 0, visible = true, running = false;
+          let w = 0, h = 0, visible = true, running = false, t = 0, evenSince = null, withinSince = null;
           function fit() {
             const r = c.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
             w = Math.round(r.width); h = Math.round(r.height);
@@ -336,40 +338,58 @@
           }
           function seed(even) {
             fit();
-            for (let i = 0; i < N; i++) {
-              const left = i < 170;   // 170 : 30, or a flat spread for the static end state
-              P[2 * i] = even ? Math.random() * w : left ? Math.random() * w * 0.3 : w * 0.3 + Math.random() * w * 0.7;
+            for (let i = 0; i < N; i++) {   // 190 in the left fifth, 10 scattered on the right; or a flat spread for the static end state
+              const left = i < 190;
+              P[2 * i] = even ? Math.random() * w : left ? Math.random() * w * 0.2 : w * 0.5 + Math.random() * w * 0.5;
               P[2 * i + 1] = Math.random() * h;
             }
+            t = 0; evenSince = null; withinSince = null;
           }
           function step() {
-            const s = w / 50;   // step scales with the canvas: ~20 s to even out at any width
-            for (let k = 0; k < 5; k++) for (let i = 0; i < N; i++) {
+            const s = w / 60;   // three small steps a frame: about forty seconds to even out, at any width
+            for (let k = 0; k < 3; k++) for (let i = 0; i < N; i++) {
               let x = P[2 * i] + (Math.random() - 0.5) * 2 * s, y = P[2 * i + 1] + (Math.random() - 0.5) * 2 * s;
               if (x < 2) x = 4 - x; else if (x > w - 2) x = 2 * (w - 2) - x;   // walls reflect
               if (y < 2) y = 4 - y; else if (y > h - 2) y = 2 * (h - 2) - y;
               P[2 * i] = x; P[2 * i + 1] = y;
             }
           }
-          function draw() {
+          function draw(phase) {
+            let l = 0; for (let i = 0; i < N; i++) if (P[2 * i] < w / 2) l++;
             ctx.clearRect(0, 0, w, h);
-            ctx.strokeStyle = 'rgba(233,236,236,0.25)'; ctx.setLineDash([3, 4]);
+            // each half tinted by how many it holds: the gradient you can see at a glance
+            ctx.fillStyle = 'rgba(47,163,163,' + (0.02 + 0.16 * l / N).toFixed(3) + ')'; ctx.fillRect(0, 0, w / 2, h);
+            ctx.fillStyle = 'rgba(47,163,163,' + (0.02 + 0.16 * (N - l) / N).toFixed(3) + ')'; ctx.fillRect(w / 2, 0, w / 2, h);
+            ctx.strokeStyle = 'rgba(233,236,236,0.3)'; ctx.setLineDash([3, 4]);
             ctx.beginPath(); ctx.moveTo(w / 2 + 0.5, 0); ctx.lineTo(w / 2 + 0.5, h); ctx.stroke(); ctx.setLineDash([]);
             ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--petrol-bright').trim() || '#2fa3a3';
-            let l = 0;
-            for (let i = 0; i < N; i++) {
-              const x = P[2 * i], y = P[2 * i + 1]; if (x < w / 2) l++;
-              ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
-            }
-            outL.textContent = l; outR.textContent = N - l;
+            for (let i = 0; i < N; i++) { ctx.beginPath(); ctx.arc(P[2 * i], P[2 * i + 1], 2.6, 0, Math.PI * 2); ctx.fill(); }
+            outL.textContent = l; outR.textContent = N - l; outT.textContent = phase;
+            return l;
           }
-          function loop() { if (!running) return; if (visible) { fit(); step(); draw(); } requestAnimationFrame(loop); }
-          function start() { seed(still); draw(); if (still) return; running = true; requestAnimationFrame(loop); }
-          c.addEventListener('click', () => { running = false; start(); });
-          c.addEventListener('keydown', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); running = false; start(); } });
+          function loop(now) {
+            if (!running) return;
+            if (visible) {
+              fit();
+              if (t === 0) t = now;
+              const el = (now - t) / 1000;
+              let phase;
+              if (el < 1.5) phase = 'holding the start';
+              else if (evenSince == null) { step(); phase = 'wandering · ' + Math.round(el - 1.5) + ' s'; }
+              else phase = 'evened out';
+              const l = draw(phase);
+              // evened out = within ±10 of half for three seconds straight, not a lucky frame
+              if (evenSince == null && el > 10) { if (Math.abs(l - N / 2) <= 10) { if (withinSince == null) withinSince = now; else if (now - withinSince > 3000) evenSince = now; } else withinSince = null; }
+              if (evenSince != null && now - evenSince > 4000) { seed(false); }
+            }
+            requestAnimationFrame(loop);
+          }
+          function start() { running = false; seed(still); draw(still ? 'evened out' : 'holding the start'); if (still) return; running = true; requestAnimationFrame(loop); }
+          c.addEventListener('click', start);
+          c.addEventListener('keydown', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); start(); } });
           c.tabIndex = 0;
           if ('IntersectionObserver' in window) new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(c);
-          window.addEventListener('resize', () => { fit(); draw(); });
+          window.addEventListener('resize', () => { fit(); draw(outT.textContent); });
           start();
         })();
         </script>
