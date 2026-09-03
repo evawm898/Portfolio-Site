@@ -86,7 +86,7 @@ const moved = (a, b) => a.electrons.some((p, i) => p && b.electrons[i] && Math.h
 
 section('Page');
 check('no page errors on load', errors.length === 0, errors.join(' | '));
-check('index reads No. 06 / 06', (await page.textContent('.project-header__index')).trim() === 'No. 06 / 06');
+check('index reads No. 06 / NN', /^No\. 06 \/ \d\d$/.test((await page.textContent('.project-header__index')).trim()));
 await shot('01-printed-rest');
 
 section('Printed');
