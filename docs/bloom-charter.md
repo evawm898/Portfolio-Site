@@ -2727,9 +2727,12 @@ exposure the ruling accepts in exchange for the minutes.
           none of a layered one (`allPetalsEligible(state)`, twin `PREDICATES.allPetalsEligible`,
           Z5 checking the two agree), and the FIRST three rows of `ROLE_OVERRIDES` so a petal
           that is also a fan group reads base, then the whole-whorl delta, then its own — "the
-          group, then the petal". The labels, proposed here for her eye: **"All-petals curl" /
-          "All-petals cup" / "All-petals tip"** beside "Inner curl / cup / tip", read-outs at
-          identity naming the slider that owns the number (*"as Petal form sets it"*, *"as
+          group, then the petal". The labels, proposed as "All-petals curl / cup / tip" and RULED
+          to the short set **"All curl" / "All cup" / "All tip"** beside "Inner curl / cup /
+          tip" — Eva's reason being panel height, not aesthetics: the long form wraps to two
+          lines in a 250 px panel, this PR already grows the worst case 933 → 1,113 px, and the
+          delta semantics are carried by the read-outs, so the label need not do that work
+          twice. Read-outs at identity naming the slider that owns the number (*"as Petal form sets it"*, *"as
           Petal shape sets it"*) and off identity naming the delta and its base (*"+50° on
           Spine curl"*, *"+0.30 on Cup"*, *"+0.20 on Tip breadth"*); the app's readout prints
           what the whorl was BUILT with (*"all petals as a group · spine curl 50° · cup 0.30"*).

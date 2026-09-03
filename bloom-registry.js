@@ -1441,21 +1441,28 @@ export const CONTROLS = [
      three rows.
 
      THE LABELS SAY WHAT THEY ARE AND THE READ-OUTS SAY WHAT THEY RIDE ON, on
-     the same split every label in this panel keeps: "All-petals curl" beside
-     "Inner curl", and a read-out that at identity names the slider that owns
-     the number ("as Petal form sets it") and off identity names the delta and
-     its base ("+50° on Spine curl"). Nothing here claims to BE the curl; the
-     base slider is, and the app's read-out prints what was built. */
+     the same split every label in this panel keeps: "All curl" beside "Inner
+     curl", and a read-out that at identity names the slider that owns the
+     number ("as Petal form sets it") and off identity names the delta and its
+     base ("+50° on Spine curl"). Nothing here claims to BE the curl; the base
+     slider is, and the app's read-out prints what was built.
+
+     "ALL", NOT "ALL-PETALS" — EVA'S RULING (Sep 3), FOR PANEL HEIGHT, NOT
+     TASTE. The session proposed "All-petals curl"; in a 250 px panel that
+     wraps to two lines, and this PR already grows the panel's worst case from
+     933 to 1,113 px on its own, which is exactly the scrolling she had ruled
+     on once. The delta semantics are carried by the read-outs, so the label
+     does not do that work twice. */
   { id: 'allCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
-    label: 'All-petals curl', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${v}° on Spine curl`),
+    label: 'All curl', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${v}° on Spine curl`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
 
   { id: 'allCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'All-petals cup', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} on Cup`),
+    label: 'All cup', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} on Cup`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
 
   { id: 'allTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
-    label: 'All-petals tip', fmt: (v) => (Number(v) === 0 ? 'as Petal shape sets it' : `+${Number(v).toFixed(2)} on Tip breadth`),
+    label: 'All tip', fmt: (v) => (Number(v) === 0 ? 'as Petal shape sets it' : `+${Number(v).toFixed(2)} on Tip breadth`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
 
   { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
