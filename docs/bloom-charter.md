@@ -3047,7 +3047,11 @@ exposure the ruling accepts in exchange for the minutes.
       live. Its negative control is the listener-less clone. And BOTH STL gates now assert
       `shownMode === 'live'` on every row as a validity failure, because every "(live)" label
       they print depends on it. Re-run with the real box on a mutant copy (`exportMode:
-      shownMode() === 'live'`, correct with the box OFF and wrong with it ON): «T1REAL».
+      shownMode() === 'live'`, correct with the box OFF and wrong with it ON): the gate fails on exactly one clause, `the STL exported with the box ON
+      differs from the one with it OFF (556884 vs 556884 bytes) — the toggle reached the
+      export path`, with every other assertion in the run green; the same gate passes on the
+      real tree, and its negative control (the listener-less clone) fires on the rebuild
+      clause. Red on the mutant, green on the fix: the route measures the property.
 
     - **THE CAPTION CONVENTION: every contact-sheet cell states its mode, from the app.**
       `modeTag(m)` in the harness reads `__bloomMetrics().shownMode` and returns
