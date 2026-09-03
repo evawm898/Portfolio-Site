@@ -1817,7 +1817,26 @@ session's last line instead of by reading `main`'s diff. **Re-fetch `main` befor
 a PR, and read the ball-holder line of any session covering the same brief, before
 building rather than after.**
 
-## Verification retention — how much of the frozen suite a close-out runs
+**SECOND OCCURRENCE, SEP 2, A DIFFERENT SHAPE OF THE SAME FAILURE.** The first
+duplicate was two sessions kicked off on the same brief; this one was ONE session that
+never should have been kicked off at all. Eva's amendment to the view-system session's
+report (four rulings on an already-built, already-green PR #133) reached a fresh,
+unrelated session instead — which had no report of its own to check against, so it read
+the amendment as a new brief, opened Phase A discovery, then found #133 already built and
+matching, and adopted its implementation by cherry-pick rather than re-deriving it. It
+added the one thing genuinely missing — the orientation ruling, made from the rendered
+preview rather than the numbers — as PR #135, and closed #133 as "superseded." It was not:
+#133 was the amendment's actual target and, by the time #135 opened, already carried all
+four ruled items (orientation included) plus a fully verified evidence bar #135 never
+built. #133 was reopened, reconfirmed green on its unchanged head, and merged; #135 was
+closed unmerged by its own session once it re-checked and found the duplication.
+
+**"ONE KICKOFF, ONE SESSION" DID NOT COVER THIS FAILURE, because nothing was kicked off
+twice.** The first incident's prevention is about STARTING work; this one is about
+ROUTING an answer to work already in flight. The remedy recorded in this charter's working
+loop above — verify the branch name in a session's own last report before pasting an
+amendment into it — is the corresponding rule for this half of the loop, the same way the
+first incident's remedy (re-fetch, read the ball-holder line) covers the kickoff half.
 
 **RULED Sep 2, from this session's own close-out. FROM SESSION 11 ONWARD a session's
 close runs the NEWEST baseline plus the LIVE-MATRIX partition; the FULL historical suite
