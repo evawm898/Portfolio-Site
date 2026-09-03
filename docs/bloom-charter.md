@@ -2252,3 +2252,625 @@ exposure the ruling accepts in exchange for the minutes.
     - **AFTER THE FAN, THE STANDING BOARD (Eva, Sep 2):** edge treatments, infill, per-petal
       sliders in the flower's fan UI pattern, and Eva's own presets. Recorded as direction,
       not as queued work; each needs its own ruling and its own evidence.
+      **PER-PETAL SLIDERS CAME OFF THIS BOARD ON Sep 3 — see the session 11 entry below.
+      Edge treatments, infill and Eva's own presets remain on it, unchanged.**
+
+- ~~Session 11 — per-petal sliders for the fan~~ **BUILT Sep 3. Every petal in the fan
+  gets its own control group, the mirror-line petal is petal one, and per-petal roles
+  SUPERSEDE slot roles there on Eva's ruling — against the session's own recommendation,
+  with the cost stated to her and accepted.**
+
+    - **THE HEADLINE FINDING: THE PER-PETAL GROUPS ALREADY EXISTED, UNNAMED — measured
+      from the emitted azimuths before anything was written, never from the derivation.**
+      The orbits of the involution this bloom declares ARE the mirror pairs, ordered by
+      distance from the plane: at 3 per side with the toggle ON, `P1{0}@0.0` `P2{1,6}@45.0`
+      `P3{2,5}@90.0` `P4{3,4}@135.0`; with it OFF, `P1{0,5}@22.5` `P2{1,4}@67.5`
+      `P3{2,3}@112.5`; at 8 per side ON, nine groups ending `P9{8,9}@170.0`. **So P1 with
+      the toggle on IS the singleton mirror-line petal at 0.0 deg — Eva's founding fan
+      principle, measured rather than asserted.** And in EVERY arm `LABELLUM = P1`,
+      `HOOD = P_last`, `LATERAL = everything between`: per-petal roles are session B's
+      slot-role partition REFINED, from three coarse groups to
+      `perSide + (a mirror-line petal ? 1 : 0)` fine ones. Every group is a mirror orbit by
+      construction, which is why Z4a needed no new clause and why per-PAIR was structural
+      rather than a preference.
+
+    - **THE SEAM HELD FOR THE SECOND TIME, AND THE MECHANISM WAS NOT REWRITTEN.** Session A
+      wrote "adding a third axis later is a longer list, not a rewritten resolver"; that is
+      exactly what this was. `resolveRoleOverrides()` is untouched; `petalStateFor()`'s
+      object-identity guard is untouched CHARACTER FOR CHARACTER; the builder computes
+      nothing new, because `slotRings` simply became finer. **`buildBloomInto` needed no
+      change at all.**
+
+    - **THE BRIEF'S "OBVIOUS CANDIDATE" WAS THE WRONG OWNER, and naming the real one
+      matters.** The kickoff proposed `petalStateFor()` as the one owner of the resolution
+      order. It is not: it owns exactly one question — *does a record exist* — and is three
+      lines. **The resolution ORDER is `ROLE_OVERRIDES`'s own array order**, walked by the
+      resolver's single loop, which iterates the TABLE and tests membership in the roles
+      list. Precedence is therefore declared by where a row sits in one table and by nothing
+      else; per-petal rows sit last, so per-petal has the last word, clamped once at the end
+      into the base's own range.
+
+    - **EVA'S FOUR RULINGS (Sep 3).**
+        * **PANEL: ONE SECTION PER GROUP**, in the existing accordion, static labels
+          ("Petal 1") with the read-out naming what the group currently is. **Ruled from
+          measured heights, with real control rows cloned into the real page** — the
+          alternative was the flower's own form, sub-headings inside one section, which is
+          what she likes and what the brief pointed at:
+
+          | | 4 groups (the shipping fan) | 9 groups |
+          |---|---|---|
+          | one section, sub-headings | section **904 px**, panel **1,314 px** | 2,001 / **2,411 px** |
+          | one section per group | section 216 px, panel **719 px** | 216 / **874 px** |
+          | (today, for scale) | tallest section 417 px, panel 788 px | |
+
+          The sub-heading form is already past the **1,241 px flat panel the accordion was
+          built to replace**, at the shipping default. One section per group is BELOW
+          today's worst case at the default and 86 px above it at the extreme, needs no cap,
+          and needs no new mechanism: a section is hidden when and only when every control
+          in it is hidden, which `applyVisibility()` already derives, so groups beyond
+          `fanPerSide` and every group under a non-FAN placement disappear for free.
+        * **CONTROL SET: size x / tilt / cup / CURL** — the labellum's five minus tip
+          breadth, argued rather than inherited: at fan scale the tip silhouette is the
+          least legible per-petal difference, while spine curl is what makes a petal hang
+          and reflex and is the one control that can. **TIP BREADTH IS DELIBERATELY ABSENT
+          per-petal and is ONE ROW IN TWO TABLES the day she wants it.**
+        * **NUMBERING: SEQUENTIAL FROM THE PLANE.** Group one is the mirror-line petal with
+          the toggle on and the inner PAIR with it off. **The ruled cost, measured:** turning
+          the toggle off drops the group count by one and moves "the inner pair" from slider
+          group 2 to group 1. Nothing persists a design yet, so no migration is owed — **the
+          day something does, this is RETIRED_IDS material**, because a saved `petal2Cup`
+          names a different petal on either side of a toggle.
+        * **PRECEDENCE: PER-PETAL SUPERSEDES SLOT ROLES ON THE FAN** — see below.
+
+    - **RULING 4 WENT AGAINST THE RECOMMENDATION, AND BOTH HALVES ARE RECORDED SO THE
+      DECISION READS AS ONE.** The session proposed COMPOSITION: per-petal as a third axis,
+      with `labellumCup` and `petal1Cup` both reaching slot 0 through the one resolver, on
+      the grounds that supersession retires a shipped, photographed, ruled behaviour. Eva
+      ruled the other way: on a fan there is exactly one per-position axis, and it is the one
+      that says which petal it is.
+        * **NOTHING IS RETIRED, which is the shape of the ruling.** Slot roles stay FULLY
+          live under RADIAL — same controls, same ids, same laws, same gate rows. It is a
+          VISIBILITY plus APPLICABILITY change, so `RETIRED_IDS` does not apply and no
+          migration is owed.
+        * **WHAT IT COSTS, ruled and accepted rather than overlooked: the fan loses labellum
+          TIP BREADTH outright**, because the per-petal set ships without a tip-breadth row.
+          Nothing else — size, tilt, cup and curl all exist per group. Stated at both ends,
+          in `ROLE_OVERRIDES` and at `slotRolesEligible`.
+        * **COMPOSITION REMAINS THE RECOVERABLE ALTERNATIVE** (Eva's instruction): it is one
+          arm of `slotRolesEligible()` in `bloom-geometry.js` plus its twin in the registry's
+          predicate, and nothing was written to depend on their absence.
+        * **LAYER ROLES ARE A DIFFERENT AXIS AND COMPOSE EVERYWHERE — reading confirmed
+          before building, as Eva asked.** `inner*` is DEPTH (`roleForLayer`), per-petal is
+          POSITION (mirror orbits); they are orthogonal, a three-layer nested fan genuinely
+          has both, and under FAN a descriptor is one per (layer x orbit).
+
+    - **TWO CODE PATHS BECAME UNREACHABLE AND ARE KEPT — ASSERTED UNREACHABLE, NEVER
+      CLAIMED.** `roleForSlot`'s THROUGH_GAP arm and `PREDICATES.hoodEmpty` were both
+      written for the fan with the toggle off, which no longer has slot roles. Deleting them
+      would make recovery a rewrite instead of a predicate arm, which is what Eva ruled
+      against; leaving them SILENT would be the dead-label defect this project retires ids
+      over. **Z9 measures both on every row, in both directions** — the "never-true predicate
+      with a reason, over a boolean flag" pattern arriving on a pair of never-true code paths.
+
+    - **THE REGROUPING TRAP WOULD HAVE FIRED A SIXTH TIME, and it was prevented at design
+      time again by measurement.** Every foot in a whorl shares one `rFoot`, so each grouping
+      is a different PARTITION OF n multiplying the same `r^2`. Measured across **6,912**
+      (centre x perSide x width x sheet x delicacy x layerSize x depth x mode) rows before a
+      line was written: **per-ORBIT against the whole whorl moves the derived radius on
+      1,119 of 6,912 rows at up to 2.00 ULP** (8.882e-16 on R = 3.2422007466), and against
+      session B's three-role split on **889 of 6,912**. So the split is CONDITIONAL on a
+      per-petal control being off its identity and NESTS — with only slot roles engaged the
+      partition stays session B's three groups character for character. **Z7 asserts the
+      partition is the COARSEST that serves the engaged axis**, checked as a relation between
+      two separately-computed things (an unconditional census loop against the conditional,
+      filtered partition) rather than footRing() against itself.
+
+    - **A CHARTER-ADJACENT PREMISE IN THE BRIEF WAS MEASURED AND IS FALSE: "per-petal size
+      means per-petal feet".** `footRing()` reads `state.petalWidth`; only `buildPetalInto`
+      reads `ps.petalWidth`. Measured with `labellumSize` x2 against the same row without it:
+      **R0 = 5.41622000205846 both times, identical to the bit, and every foot quantity
+      identical.** So the area rule sums exactly what it summed —
+      `SUM_groups roleCount * rFoot_L^2`, with `rFoot` per LAYER — and **J1-J7 generalise
+      without a character changed**, because not one of their clauses mentions an azimuth or
+      a group count. Z6 is what holds a size multiplier out of the ring, and it is still the
+      only witness above one whorl.
+
+    - **THE CORNER, measured through `footRing()` itself.** Largest single petal x widest
+      spacing x fewest petals — 1/side x 170 deg, a 340 deg arc with a 20 deg notch: overlap
+      box **2.166 x 6.400 x 1.200 = 16.639 mm3** live. At ALL THIN x spread min, and at the
+      deepest reachable foot (8/side x 3 layers x layerSize min), **1.500 x 1.600 x 1.000 =
+      2.400 mm3 in export — the SAME standing number as the single-ring, layered, continuous
+      and fan corners**, because none of `overhang`, `width` or `thickness` is a function of
+      the group index either. Containment holds at every corner; Z6 equal-foot holds at every
+      corner.
+
+    - **TWO INSTRUMENTS WOULD HAVE GONE SILENT ON THE FAN BECAUSE A PREDICATE MOVED UNDER
+      THEM, and that is the entry worth carrying.** `Z4b` (the pairing is a bijection about
+      ONE plane) ran wherever SLOT roles were eligible — which included every fan. The
+      supersession makes `slotRolesEligible` FALSE there, so the clause written to check the
+      fan's own mirror would have stopped running on exactly the placement it was written
+      for, **while every row still passed**. The fan SHEET had the same shape: its drawn
+      mirror line is licensed by a per-cell measurement gated on the same flag, so the line
+      would have kept being drawn with nothing checking it. Both were widened. **This is "a
+      default is not coverage" arriving through a RULING rather than through a default, and
+      nothing in the repository would have reported it.**
+
+    - **THE POSITIVE CONTROLS, RED THEN GREEN, in six throwaway worktrees** (`git worktree
+      add`, never mutate-and-restore), each run against the FULL shipped instrument BEFORE
+      Z7/Z8/Z9 were written and again after. **Every one exports watertight, with zero
+      degenerate triangles, at an identical live and export triangle count and an identical
+      STL byte LENGTH**, and every one leaves the RADIAL, SPIRAL and CONTINUOUS control rows
+      clean:
+
+      | mutation | before Z7/Z8/Z9 | after | bit-identical rows |
+      |---|---|---|---|
+      | shipped tree | **0 of 11** | **0 of 11** | — |
+      | PP1 the per-petal split made unconditional | Z5, 2 rows | Z5, 2 rows | **11 of 11** |
+      | PP2 off-by-one orbit index (groups 2/3 swapped) | **NOTHING** | **Z8 only**, 14 across 5 | 10 of 11 |
+      | PP3 the per-petal record never reaches the blade | Z2 only, 27 across 5 | Z2 only, 27 across 5 | 6 of 11 |
+      | PP4 the numbering does not follow the toggle | Z1 + Z5, 3 on 1 row | Z1 + Z5, 3 on 1 row | 10 of 11 |
+      | PP5 the group ORDER reversed | 2 per row (see below) | **+ Z7**, 20 across 6 | **11 of 11** |
+      | PP6 the supersession quietly comes undone | **NOTHING** | **Z9 only**, 12 across 7 | 5 of 11 |
+
+      **PP2 AND PP6 ARE THE ONES THAT MATTER.** Both fire NOTHING in the entire shipped
+      instrument — both STL gates, the triangle count, the byte length, J1-J7, Z1-Z6,
+      `formAssertions` and `thicknessAssertions` alike. **PP1 AND PP5 ARE BIT-IDENTICAL ON
+      EVERY PROBE ROW**, so for those two there is not even a byte to diff: the assertion is
+      the only instrument there is.
+
+      **PP1 CORRECTED A PREDICTION, which is why the control is run rather than reasoned
+      about.** Z7 was written expecting to be PP1's witness; it is not — **Z5's generalised
+      `wantSplit` clause catches it and Z7 fires nothing.** Z7 earns its place on PP5
+      instead, and the division of labour is now stated in its header: Z5 owns "the split
+      happens exactly when a control is engaged", Z7 owns "and it splits into exactly these
+      groups, in this order".
+
+      **PP5 ALSO REACHED THE CHARTER'S OWN LATENT COUPLING, exactly where it was predicted.**
+      The Sep 2 incident note records that `slot.index === 0` selects the representative
+      petal at two sites, that it is unreachable today, and that "a future session that
+      changes the slot ORDERING re-opens it". A reversed group order IS such a change, and
+      the two assertions that fired on PP5 before Z7 existed are `formAssertions` and
+      `thicknessAssertions` reporting *"guard residual null — not measured"* — the coupling,
+      firing as predicted, under a message that would have sent a reader to the wrong place.
+      **It is still latent and still not a defect; Z7 is now a second, correctly-named
+      witness for the class.**
+
+    - **A PRE-EXISTING LABEL-LIE WAS FOUND IN THE RESOLVER AND CORRECTED.** `// identity and
+      NaN alike take the shipped path` sat on the guard's own skip since session A. It is
+      FALSE: `!(NaN !== 0)` is `false`, so a NaN never skipped — it composed to NaN and the
+      clamp carried it through. **The expression is left exactly as it was** (nothing
+      reachable behaves differently, and changing a guard on the strength of an unreachable
+      case is how a byte moves for nothing); only the claim is corrected, to the reachability
+      argument that IS true: every control here is a slider, `coerceValue` reads it with
+      `Number(...)` from an `<input type="range">`, and a range input's value is always
+      numeric, so NaN cannot arrive through the registry at all.
+
+    - **THE `const`-HOISTING TRAP FIRED AGAIN AND WAS CAUGHT LOCALLY THIS TIME.**
+      `ROLE_OVERRIDES` spreads `PETAL_ROLE_ORDER` at module load, and the first draft declared
+      it 250 lines below — "Cannot access 'PETAL_ROLE_ORDER' before initialization", the same
+      failure the charter records from collapsing `diff-bloom-bytes.mjs`'s four phase lists
+      into one. **The charter's own remedy is what shortened it**: that entry says running the
+      check once locally would have caught it sooner, and this one was caught by importing the
+      module rather than by CI. The derived constants now sit beside `MAX_FAN_PER_SIDE`, which
+      is where that constant's own note already pointed.
+
+    - **A RATIONALE EXPIRED EXACTLY WHERE IT SAID IT WOULD.** `MAX_FAN_PER_SIDE`'s header
+      justified 8 partly by "the flower caps ITS fan at 3 per side because it carries a
+      per-petal control GROUP for each one; the bloom has no per-petal controls, so that bound
+      does not transfer." The bloom has them now. **The conclusion survives on a different
+      measurement** and both halves are recorded: the flower's cap is a PANEL bound because
+      its groups are headings in one scrolling column, while the bloom's are SECTIONS, so an
+      unopened group costs one 29 px summary — nine groups leave the panel at 874 px where the
+      same nine as headings reach 2,411 px.
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS**, and the default bloom is **11,136 tris live and
+      export alike at 543.8 KiB**, unchanged; the shipping FAN is **9,900 tris at 483.5 KiB**,
+      unchanged. The 36 new controls add **ZERO triangles at every setting** — topology is
+      fixed, so an override moves vertices and nothing else.
+
+    - **THE MATRIX GREW 287 -> 376**, and **`phase9Matrix()` — the 287 rows frozen at
+      98dcdbe — is the eighth baseline and now the strongest**, on the reasoning that promoted
+      each of its predecessors: it is the only one carrying the FAN's own corners, which is
+      the region a ruling that takes an axis AWAY from the fan is most likely to disturb.
+      Generated from 98dcdbe's own `buildMatrix()`, proved deep-equal by `--verify-frozen` in
+      CI. The 89 new rows are 17 named per-petal corners plus a 72-row registry-derived sweep
+      — **and the sweep is pinned at the SMALLEST arrangement in which each group has members
+      (`perSide = k - 1`) rather than at 8 per side**, which is both cheaper and a better
+      state, since there group k is the outermost orbit. `PLACEMENT_SUB_IDS` kept all 36 out
+      of the blanket sweep automatically (they read `placement` and are hidden at the RADIAL
+      defaults) — the trap #124 closed, arriving from a FIFTH direction — but "excluded from
+      the blanket sweep" is not "covered", which is why the derived sweep exists.
+
+    - **NINE MATRIX ROWS CHANGED MEANING RATHER THAN GOING AWAY.** Every row that drove
+      `labellum*` or `hood*` under FAN now asserts the opposite claim — hidden and inert — and
+      its LABEL says so, because a row whose claim has inverted keeps passing under a sentence
+      that is no longer true. That is the "eight FAN rows still said OFF" defect the toggle
+      default already taught this matrix once. Keeping their SETS is the point: they are now
+      the strongest inertness rows in the matrix, since every one drives controls that used to
+      move geometry.
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **376/376** watertight, 0 degenerate, identical
+      live and export triangle counts, 1,087 s. Connectedness **376/376 one connected piece**,
+      828 s in CI. Panel gate PASS on all four routes, with `--negative-control` making all
+      four observe their own failure. `--verify-frozen` PASS on all nine frozen matrices,
+      phase9 included, in CI on every push.
+
+      **THE CLOSE IS AN EXACT PARTITION, NOT 0-MOVED — because this is a ruled behaviour
+      change, and the prediction was written down before the run.** phase9 (287 rows) on both
+      trees:
+
+      | partition | rows | predicted | measured |
+      |---|---|---|---|
+      | non-FAN, and FAN without slot-role controls | 278 | bit-identical | **278, 0 moved** |
+      | FAN **with** slot-role controls engaged | 9 | all move | **9, all 9 moved** |
+      | legacy + phase2..phase8 | 1,049 | cannot select FAN at all | **verified, 0 FAN rows** |
+
+      **"phase8 and earlier predate the fan" WAS VERIFIED RATHER THAN ASSUMED**, as the
+      ruling's own instruction required: every baseline before phase9 carries ZERO rows that
+      select FAN, and phase9 carries 41, of which exactly 9 engage a slot-role control. So the
+      whole historical suite IS the non-FAN partition and this change cannot reach it.
+
+      **AND EVERY MOVED ROW LANDS ON ITS NO-OVERRIDE COUNTERPART, which is the stronger
+      claim.** Seven of the nine are bit-identical to a plain fan row already in phase9; the
+      other two had no counterpart in the matrix at all, so it was BUILT FRESH — a 1/side
+      toggle-OFF fan with the ORCHID sets, with ALL SLOT MAX, and with nothing set export the
+      same sha. **None of the nine were equal before**; the ruling is what made them so.
+
+    - **THE FIRST FULL GATE RUN FAILED SEVEN ROWS, AND BOTH BUGS WERE IN THE NEW ASSERTIONS.**
+      This is session A's "Z1's first draft failed the shipped tree on 5 of 7 rows" and session
+      10's "six of eight probe rows fired on the SHIPPED tree", for the third time, and it is
+      the entire argument for running a control before trusting an assertion.
+        * **Z9 ASSERTED THE WRONG PROPERTY.** It said `hoodEmpty` is NEVER TRUE. It is not: the
+          predicate is a statement about STATE — a fan, toggle off, one per side — and that
+          state is the two-petal corner the whole junction analysis turned on. What the ruling
+          makes unreachable is its EFFECT. It now asserts the inertness itself: every control
+          mentioning the term must be visible exactly when slot roles are eligible, so removing
+          the term would change no outcome. That cannot be satisfied vacuously.
+        * **Z5 DID NOT ACCOUNT FOR EMPTY GROUPS.** `petal7Cup` at its maximum with one per side
+          is a control off its identity whose ROLE HAS NO MEMBERS — nothing resolves, no whorl
+          splits, and that is correct. `wantSplit` counts only roles the census says are
+          peopled. The GATED row for exactly that state is what failed the draft.
+        * **NEITHER FIX WEAKENED ANYTHING, and that was checked rather than assumed**: PP1, PP4
+          and PP6 were re-run against the corrected assertions and all three still fire. PP4's
+          witness SHARPENED to Z1 alone — its old Z5 firing was the bug.
+
+    - **AND CI FOUND A THIRD STALE EXPECTATION, IN THE PANEL GATE'S OWN TABLE.** Its
+      `ROLES_COMBOS` route declared FAN eligible for slot roles at every depth. On the first
+      push the DOM, the registry predicate AND the geometry all agreed on `false` and only the
+      table disagreed — the nine-matrix-rows defect, a third time, in a third file. It was not
+      merely flipped: each combo now declares BOTH axes, each is checked in all three of its
+      statements, and the route asserts that never both report eligible — so the supersession
+      is a measurement on states `buildMatrix()` does not cover rather than a sentence here.
+
+    - **THE PANEL GATE GAINED THE PRECONDITION MECHANISM SESSION A PREDICTED IT WOULD NEED.**
+      Session A warned that "a witness that has to set up its own precondition before it can
+      move anything is a witness that can quietly measure nothing", expecting a section that
+      ships with every control hidden; the `layerPhase` ruling spared session B. Per-petal
+      roles are FAN-only and the shipping placement is RADIAL, so all nine sections ship BOTH
+      collapsed and HIDDEN and this is the case that arrived. `pre` is applied through the same
+      real-events path, the `before` metrics are read AFTER it so the delta belongs to the
+      witness, and **the gate refuses a witness whose control is still hidden once the
+      precondition has run** — which is what stops the mechanism becoming the thing session A
+      warned about.
+
+    - **A SHEET HAD BEEN CARRYING THREE CAPTIONS THAT STOPPED MATCHING THEIR CELLS, and it was
+      found by reading the tool's own OUTPUT rather than by looking at the pictures.**
+      `tools/shot-bloom-fan.mjs`'s three "toggle OFF" cells INHERITED `fanCenterPetal` rather
+      than pinning it, so from the moment Eva moved that default to ON (Sep 2) they rendered a
+      seven-petal toggle-ON fan under captions describing a six-petal through-the-gap one, and
+      "fewest x widest" showed THREE petals under a caption about the two-petal empty-hood
+      corner. **The MATRIX was corrected for exactly this at the time and the SHEET was not**;
+      nothing reported it because every cell still rendered and every assertion still passed.
+      The `Spacing 60` caption expired the same day for the same reason. All four fixed.
+      **A cell that NAMES a state must SET it — the rule now exists in both places.**
+
+    - **THE PANEL WAS RE-SHAPED TWICE MORE FROM THE DEPLOY PREVIEW, BOTH TIMES BY GENERALISING
+      A RULE THAT EXISTED RATHER THAN ADDING ONE.** Eva, from the preview at `fe730c8`, with two
+      screenshots: *"have the roles be its own drop down which then enables all the other petals
+      and their roles to be drop downs / also the names like petal 1 -2 -3 etc should apply to
+      the radial option as well."* Two requests; two commits.
+
+        * **NESTING (`5c0b719`).** The nine per-petal sections moved INSIDE "Petal roles" as
+          drop-downs of it. Membership is a `parent` field on the CHILD, exactly as a
+          control's `section` sits on the control — a parent naming its children would be two
+          lists in the file that exists to state the registration rule — and `verifySections()`
+          checks the relation at module load (parent exists, nesting is ONE level deep, at most
+          one `open: true` PER SIBLING GROUP rather than in the whole array, and a section
+          satisfies the non-empty check with child sections as well as controls). **The
+          accordion needed no second mechanism**: its one capture listener used to close every
+          OTHER top-level section; it now closes a drop-down's SIBLINGS, which is the same rule
+          stated one level more generally — at the top level the siblings ARE the sections, so
+          the shipped behaviour is unchanged and nesting falls out of it. `applyVisibility()`
+          derives a parent's hidden from its controls AND its children, walking `SECTIONS`
+          backwards so children settle first. The indent is the ONLY structural signal
+          (`.bl-sec--sub`): a second border colour would read as "a different kind of thing",
+          and these are sections with sections' behaviour. **WHAT NESTING COSTS AND BUYS, measured
+          like for like** (fe730c8 flat against HEAD nested, one fresh page per row, open
+          states set directly, 1100 x 1600 viewport): nine groups with petal 1 open, 920 px
+          flat against 890 px nested; the shipping fan's four groups with petal 1 open, 741
+          against 746; nine groups with no group open, 672 against 640. So nesting is a WASH
+          at the shipping fan and 30 px smaller at the extreme — the "652 px against 874 px
+          flat" quoted when the nesting commit was reported does not reproduce under this
+          measurement and is withdrawn; what nesting actually buys is the SHUT-PARENT state,
+          where nine summaries collapse to one and the panel is the pre-fan panel again. The
+          ruling was made from the preview's own screenshots, not from a height. The panel gate's
+          accordion assertions A2/A3 had to generalise with it — they said "exactly one open in
+          the whole panel", and closing "Petal roles" does NOT reset a child (that is what
+          `<details>` does, and it is why the panel remembers where you were), so they now
+          assert over the REACHABLE open set (a section counts as open only if every ancestor
+          is). Asserting over the raw set would have made the assertion dictate behaviour.
+
+        * **RULING A — THE ROSETTE'S GROUPS NUMBERED THE FAN'S WAY (this commit).** Two options
+          were put to Eva: **A**, rename the existing labellum/hood groups by orbit number,
+          leaving gaps like "Petal 1, Petal 5"; **B**, extend the fan's full per-orbit set to
+          RADIAL, which would have retired the labellum and hood NAMES, retired the labellum's
+          tip breadth with them (the per-petal set has no tip-breadth row), and put nineteen
+          empty-by-default groups under a forty-petal rosette. **Eva chose A.** So the
+          labellum's five sliders and the hood's three moved into two drop-downs inside "Petal
+          roles" — `labellumGroup`, `hoodGroup`; the ids name the ROLE because that is what the
+          code's vocabulary is for, the labels carry the NUMBER because that is the visitor's —
+          with the fan's labels ("Size", "Tip", "Tilt", "Cup", "Spine curl") and read-outs that
+          name the group on the fan's `said(ui)` pattern ("same as the rest — the labellum, on
+          the line"; "the hood pair, opposite the line" at an odd count). The word "labellum"
+          left the label and lives in the read-out, on the split every static label here keeps.
+          **Control ids are unchanged, `section` is never persisted, nothing is retired.**
+
+          **THE NUMBERS ARE THE ORBITS', NOT A SECOND NUMBERING — verified before it was
+          built.** Under RADIAL the plane is the through-slot involution, whose orbits are the
+          per-petal groups ordered by distance from it: slot 0 is orbit 0, so the labellum is
+          PETAL 1 at every count; the hood is the orbit farthest from the plane, the LAST
+          group, `petalGroupCount(n, THROUGH_SLOT)` — 2 at three petals, 5 at eight, 21 at
+          forty. Probed through `petalRoleForSlot` at nine counts (3, 4, 5, 7, 8, 13, 20, 39,
+          40): the hood's orbit index equalled `petalGroupCount` at every one. It is the same
+          `HOOD = P_last` relation the fan already carried, so the rosette got no rule of its
+          own — which is what let A be a rename rather than a mechanism.
+
+          **ONE LABEL IS A LITERAL AND THE OTHER IS THE PANEL'S FIRST DERIVED SECTION LABEL,
+          and the asymmetry is the relation itself.** "Petal 1" is a constant because orbit 0
+          exists at every reachable count and is always the labellum; a `labelFrom` there would
+          tell a reader it might vary. The hood's number moves with `petalCount`, so
+          `SECTIONS` gained an optional `labelFrom(ui)`, `refreshLabels()` rewrites every
+          summary from the same snapshot the read-outs use, the generator paints the first
+          label from DEFAULTS through the same function so nothing flashes wrong before the
+          first rebuild, and **`sectionLabel(section, state)` is the ONE owner** for the app,
+          the panel gate and the panel sheet. `verifySections()` requires EXACTLY ONE of
+          `label` / `labelFrom` — a literal beside a derivation is a stored label-lie waiting
+          for a reader to believe it, which is this project's most repeated defect.
+
+          **THE GATE READS THE NUMBER FROM WHAT THE BUILDER EMITTED, never from the function
+          that wrote the label** (the Z8 doctrine one level up). Route (g) drives `petalCount`
+          to 3 / 8 / 13 / 40 with `hoodSize` off identity so the whorl splits, reads the HOOD
+          petals' slot indices from `petalRingApplied`, folds each through `mirrorPartner`
+          into its orbit, requires all hood slots to agree on ONE orbit (the odd-count hood is
+          a pair) and requires the label's number to equal it — `sectionLabel()` and this check
+          share nothing but the state, so a label that hard-codes the wrong plane, or a count
+          that is not the count the geometry built, is a red row rather than a matching pair
+          of wrong answers. Measured: `[1] of 3 -> Petal 2`, `[4] of 8 -> Petal 5`,
+          `[6] of 13 -> Petal 7`, `[20] of 40 -> Petal 21`. **And no two sections on screen may
+          share a name**: the fan's `petal1` and the rosette's `labellumGroup` are both
+          "Petal 1" by design and never share a screen — the visibility route now reads the
+          visible summaries back on every state it drives and refuses a duplicate (RADIAL
+          shows 8 sections, FAN 10, SPIRAL and CONTINUOUS 5). The section-hidden rule in the
+          gate became parent-aware in both places it is stated (a section is hidden iff every
+          control AND every child section is — "Petal roles" now holds only session A's three
+          layer deltas as controls of its own and is on screen because its two rosette groups
+          are), "Petal roles" got the witness with a precondition session A predicted for it
+          (`innerCup` at two whorls, the anti-vacuity clause refusing a still-hidden control),
+          and the negative control freezes the hood summary's `textContent` so a generator
+          that writes the label once and never refreshes it — exactly the static-label
+          generator this replaced — is a failure the gate has been SEEN to catch. **Five
+          routes, all five required to fire.**
+
+          **THE PANEL SHEET HAD BEEN BROKEN SINCE THE PER-PETAL SECTIONS EXISTED, AND NOBODY
+          HAD RUN IT.** `tools/shot-bloom-panel.mjs` walked every section clicking its summary;
+          a hidden section's summary cannot be clicked, and neither can a nested one's while
+          its parent is shut, so from the moment nine hidden sections appeared the tool would
+          have died on `petal1` — and it was not run for the nesting commit, whose ruling was
+          made from the deploy preview's own screenshots. Fixed on the gate's pattern: a
+          declared `REACH` precondition per hidden section (FAN, mirror-line petal ON, eight
+          per side — the one arrangement in which all nine groups have members), applied
+          through real events, with the run DYING if the section is still hidden afterwards;
+          a nested section opened by first opening its parent with the same real click; a
+          fresh page per cell so a precondition cannot leak into the cells after it; and a new
+          NUMBERING row — the rosette at 3 / 8 / 40 petals with its last drop-down open, and
+          the fan beside it for the comparison the ruling was made from. Measured heights from
+          the sheet's own captions: 569 px at first load; 730 px with Petal roles and the
+          rosette's Petal 1 open (five sliders); 592 px with its Petal 5 open (three); 894 px
+          under FAN at eight per side with Petal roles and the fan's Petal 1 open, and 933 px
+          with its Petal 3 open — the sheet's worst case, the nine-summary extreme, taller
+          than Petal 1's cell because "the pair 2 out from the line" wraps one line more in
+          each of four read-outs (these are the re-render's numbers, after the gap below).
+          **And the first render of the fixed sheet showed a defect this branch had made**:
+          "Sizesame as the rest — the hood pair, opposite the line" — a control's label and
+          its read-out flush against each other, because the label row is `space-between`
+          with no `gap` and had nothing to stand apart on once read-outs grew long enough to
+          wrap, which they did the day they began naming their group. One line of CSS
+          (`gap: 10px` on `.bl-ctrl label`), every control row in the panel, no geometry,
+          no visibility — and the sheet re-rendered after it: the gap moved Petal shape from 615
+          to 628 px and the fan's Petal 3–8 cells from 907 to 933 px, because a read-out that
+          now stands 10 px further from its label wraps a line sooner. The heights above are
+          the re-render's.
+
+          **WHAT THIS DID NOT TOUCH, measured rather than asserted.** No `visibleWhen` changed
+          (deep-equal on all 75 controls across the two trees), `DEFAULTS` is deep-equal, the
+          control id list is identical, and no geometry file changed. The full live-matrix byte
+          diff against `5c0b719` (376 rows, both trees, `tools/diff-bloom-bytes.mjs --full`,
+          22 min 36 s for the base tree and 17 min 16 s for the head while the panel sheet
+          rendered beside it): **376/376 byte-identical, 0 moved, defaults bit-identical** —
+          the panel commits from `8931206` through the gap fix moved nothing a slicer can see.
+          Every frozen baseline is a subset of the same untouched geometry and is proved
+          deep-equal by CI's `--verify-frozen` on every push, so under the retention policy
+          this is the whole close for a presentation-only change.
+
+          **RECORDED, NOT BUILT.** A per-petal set on the rosette (option B) remains one
+          `perPetalEligible` arm in two files plus the retirement it implies — the reason it
+          was declined is the reason it is written down. And the day anything persists a
+          design, `labellumGroup` / `hoodGroup` are section ids, never persisted, so the
+          rename costs nothing then either; what a persisted design would owe is the fan's
+          own note above (`petal2Cup` meaning a different petal across the toggle).
+
+    - **EVA OVERRULED THE (b) ANSWER AFTER SEEING THE PANEL, AND THE RULING RESHAPED "PETAL
+      ROLES" AT EVERY DEPTH (Sep 3, from the deploy preview, three screenshots).** Her words:
+      *"petal roles for depth 1 of Radial (even) can match depth 2 options meaning that the
+      petal adjustments for all petals when there is only depth 1."* The session read it two
+      ways, said that the whorl-wide sliders already existed under Petal form / Petal shape,
+      and asked which was the ask. Eva's design, hers:
+
+        * **PETAL ROLES IS THE "ADJUST PETALS AS A GROUP" SECTION AT EVERY DEPTH.** At two or
+          more whorls the group is the inner whorl — session A's Inner trio, unchanged. At one
+          whorl the group is ALL PETALS: `allCurl` / `allCup` / `allTipBreadth`, implemented
+          THE WAY THE INNER TRIO ALREADY WORKS — deltas riding on the base sliders, defaulting
+          to zero, NOT a second copy of the base sliders. That is her answer to the session's
+          two-owners objection, and it is the right one: the base slider owns the number, the
+          delta owns a change to it, one composition law at every depth. In code it is
+          `ROLE_ALL`, stamped by `footRing()` on every descriptor of a one-whorl bloom and on
+          none of a layered one (`allPetalsEligible(state)`, twin `PREDICATES.allPetalsEligible`,
+          Z5 checking the two agree), and the FIRST three rows of `ROLE_OVERRIDES` so a petal
+          that is also a fan group reads base, then the whole-whorl delta, then its own — "the
+          group, then the petal". The labels, proposed as "All-petals curl / cup / tip" and RULED
+          to the short set **"All curl" / "All cup" / "All tip"** beside "Inner curl / cup /
+          tip" — Eva's reason being panel height, not aesthetics: the long form wraps to two
+          lines in a 250 px panel, this PR already grows the worst case 933 → 1,113 px, and the
+          delta semantics are carried by the read-outs, so the label need not do that work
+          twice. Read-outs at identity naming the slider that owns the number (*"as Petal form sets it"*, *"as
+          Petal shape sets it"*) and off identity naming the delta and its base (*"+50° on
+          Spine curl"*, *"+0.30 on Cup"*, *"+0.20 on Tip breadth"*); the app's readout prints
+          what the whorl was BUILT with (*"all petals as a group · spine curl 50° · cup 0.30"*).
+          No label claims to be the curl; the base slider is.
+
+        * **PETAL 1 / PETAL N ARE HIDDEN AT ONE WHORL — RETIRED THERE BY EVA'S EXPLICIT RULING,
+          WITH THE COST STATED TO HER AND ACCEPTED: THE SINGLE-LAYER RADIAL ORCHID IS
+          DELIBERATELY GIVEN UP.** Session B built the labellum and hood on the one-whorl
+          rosette; from Sep 3 slot roles need TWO OR MORE WHORLS IN STEP —
+          `slotRolesEligible`'s RADIAL arm went from `layerCount === 1 || layerPhase === 0` to
+          `layerCount >= 2 && layerPhase === 0`, and the registry's predicate with it. Hidden
+          means INERT, per the standing doctrine: a labellum/hood record must not reach the
+          geometry at one whorl, and that is what the byte partition below measures. What
+          survives: the orchid on RADIAL at two or more whorls with Layer offset 0, and the
+          fan's per-petal groups at every depth. NOT `RETIRED_IDS`: ids, laws, ranges and gate
+          rows are unchanged and fully live above one whorl; recovery is that one arm in two
+          files. **The retirement is photographed, not only recorded** — the orchid sheet now
+          carries a BEFORE/AFTER pair of the one-whorl orchid rendered from a worktree of the
+          base commit and from this tree, the same eight sliders at the same values, a face on
+          one and an undifferentiated rosette on the other; every other cell on that sheet,
+          the CONTROL included, moved up to two whorls in step, because a control that is not
+          the same arrangement is not a control.
+
+        * **THE PANEL SAYS WHY TWO DROP-DOWNS ARE MISSING — `hiddenReason` (item 1 of Eva's
+          earlier wording instruction, which STANDS; item 2, pointing one-whorl visitors to
+          Petal form / Petal shape, is moot now that the all-petals sliders live in Petal
+          roles).** A nested section may declare `hiddenReason: { when, text(ui) }`; the
+          registry declares ONE reason object (`SLOT_ROLES_BEHIND_OFFSET`) and both rosette
+          groups reference it, the app renders one caption per DISTINCT reason object inside
+          the parent — identity is what makes the caption single — `applyVisibility()` is the
+          only thing that shows it (exactly when the reason holds and every section naming it
+          is hidden), and `refreshLabels()` writes its derived text, which reads the Layer
+          offset control's OWN label so a rename cannot leave it naming a slider that no
+          longer exists: *"Petal 1 and Petal 5 need the whorls in step — set Layer offset to
+          0.00 to bring them back."* Not said at one whorl: there the groups are retired by
+          ruling, not hidden behind a slider, and the section holds the all-petals group
+          instead. The earlier wording instruction itself was not in this session's context
+          after the compaction, so the caption's mechanism and sentence are this session's
+          reconstruction of it, offered for Eva's eye with the labels.
+
+        * **THE EVIDENCE, PREDICTED BEFORE IT WAS MEASURED, and it is an EXACT PARTITION.**
+          A script over every matrix — live and all nine frozen — enumerated the rows with a
+          labellum or hood control engaged at one whorl on RADIAL before a byte was hashed:
+          **33 in the live matrix, 33 in phase8, 33 in phase9 (the same 33 definitions), and
+          NONE in legacy or phase2–phase7** — Eva's "verify which baselines contain depth-1
+          labellum rows rather than assuming", answered by enumeration. Predicted moved: exactly
+          those 33 × 3, each bit-identical to its no-override counterpart on the new tree.
+          Predicted unmoved: every other row of every matrix. The live matrix as it stood at
+          `4f39118` was frozen as **`phase10Matrix()`** (376 rows, `--verify-frozen --phase10`
+          deep-equal to that commit's own `buildMatrix()`, base `4f39118`), because the live
+          matrix itself changed shape: the 33 one-whorl slot rows moved to two whorls in step
+          (the extremes are measured where the feature LIVES), five GATED one-whorl rows were
+          added to police the inertness (the ORCHID, the one-slot hood at four petals, ALL SLOT
+          MAX, ALL SLOT MAX at three petals, and the corner the OLD rule admitted by phase
+          alone), and the newly reachable all-petals region got its named corners — the
+          extremes together at the bare bloom, both count extremes at ALL THIN × spread min,
+          the negative corner where every petal folds under, every clamp binding, the
+          composition with a per-petal fan group, the other one-whorl placements, and GATED
+          rows above one whorl. The blanket sweep picked the three new controls up at min and
+          max on its own. **Matrix 376 → 401.**
+
+          **MEASURED: 30 MOVED, 3 UNMOVED, 0 OUTSIDE — ON ALL THREE MATRICES, IDENTICALLY**
+          (`tools/diff-bloom-bytes.mjs --compare` of `4f39118` against this tree: phase10
+          346/376 identical, phase9 257/287, phase8 216/246; every moved row in the predicted
+          set, and the 30 moved rows bit-identical to their no-override counterparts on this
+          tree — 33 of 33 predicted rows equal on this tree, plus the live matrix's five
+          GATED one-whorl rows, 5 of 5). **The prediction was three rows too wide, and the
+          three are the same three on every matrix**: `SLOT: size x2.00 saturating`, `SLOT:
+          the tip partition inverted`, and `SLOT: curl clamp binds downward`. Each is a row
+          whose override CLAMPS BACK TO THE BASE'S OWN VALUE (x2.00 on a 60 mm petal asks 120
+          and gets 60; 0.6 + 0.6 breadth clamps to 0.6; −180 + −180 curl clamps to −180), so
+          the labellum was built from the base numbers even on the old tree. Measured rather
+          than argued: on the BASE worktree those three rows were ALREADY bit-identical to
+          their no-override counterparts and the other 30 were not — the retirement moved
+          exactly the rows whose override changed the built geometry, and the three had
+          nothing to lose. Eva ruled thirty the honest set and asked two things of the
+          close-out: that phase8 come back 30 / 3 / 0 (it did), and whether the "engaged"
+          predicate that over-predicted has any consumer besides the prediction.
+
+          **FOOTNOTE, NOT DEFECT — the predicate had one consumer, and it was the prediction
+          script.** Established by grep, not assumed: the off-identity filter
+          (`control !== LAW_IDENTITY[law]`) has six readers — the resolver itself, the
+          harness's load-time default check, Z2's `wantsRecord`, Z5's `wantSplit`, the orchid
+          sheet's `anySlot` and the zygomorphy sheet's `anyDelta` — and every one of them
+          states what the producer states: a control off its identity yields a RECORD and the
+          whorl SPLITS. None of them claims the built value differs from the base, none selects
+          gate rows and none drives panel visibility, so producer and consumers share one
+          filter and there is no E3 shape. The claim "engaged ⇒ moved" existed only in the
+          session's enumeration script (`enum-orchid-rows.mjs`, scratch) and in this
+          prediction table.
+
+          **RECORDED, NOT BUILT — what the three rows do point at.** A record that clamps to
+          the base value still SPLITS the whorl, and the split serves nothing: the same
+          regrouping the sixth prevention above guards against, on rows where the override is
+          engaged and inert at once. It was byte-identical on all three rows on both trees
+          (the regrouped sum happened to be exact), so it is not a defect today; a value-aware
+          guard — the resolver returning null when every composed value equals its base —
+          is one line, but it changes which whorls split and must be measured before it is
+          written. Z7 reads "the engaged axis" as the producer does, so it would move with the
+          guard rather than against it.
+
+        * **TWO POSITIVE CONTROLS, RED THEN GREEN, in throwaway copies of the tree.** PP7 —
+          the geometry keeps the old one-whorl arm while the registry hides — was caught at
+          HARNESS LOAD by the two-statement guard on six states before any row ran, which is
+          the earliest an instrument here has ever fired. PP8 — the all-petals group never
+          inert above one whorl — fired Z1 + Z5 on every GATED row above one whorl and Z9
+          beside a live orchid, and stayed silent on every one-whorl row: exactly the partition
+          the mutation touches. And the FIRST probe of the shipped tree found the session's
+          own bug: `footRing()`'s descriptor mapping enumerates its fields, so the `allRole`
+          stamp never reached the metrics and Z1/Z2 fired on every one-whorl row — fixed by
+          carrying the stamp through the mapping, which is the reason Z1 reads it back from
+          the metrics rather than trusting the resolver's list. **The panel gate** gained a
+          depth route (one page, real events, one whorl → two out of step → in step → three →
+          out of step → one; the ruling's own statements asserted by name at every step, every
+          wrapper against its predicate, the caption shown exactly twice with the registry's
+          text), a third axis in `ROLES_COMBOS` (never slot AND all; all iff one whorl), the
+          two rosette witnesses now carrying the two-whorls-in-step precondition, and a sixth
+          negative-control route that freezes the caption — **949 breaks caught, all six
+          routes fired**, the panel gate itself PASSING on the new panel with the depth route
+          reading the caption's text back exactly and every wrapper agreeing with its
+          predicate at all six steps.
+
+        * **WHAT THE SHEETS SHOW.** The orchid sheet: the CONTROL and every orchid cell at two
+          whorls in step (21,024 live tris at eight petals, six descriptors split three ways
+          per whorl; the three-petal cell 8,664 with the hood a straddling pair; forty petals
+          100,128 with the hood one slot), the ORCHID x IRIS product at nine descriptors, and
+          session A's iris unmoved — plus the pair: **BEFORE, the one-whorl orchid on the base
+          tree, three descriptors, split, a face; AFTER, the same eight sliders at one whorl on
+          this tree, ONE descriptor, no split, an undifferentiated rosette, at the same 11,136
+          triangles.** The panel sheet: "Petal roles" at one whorl is 544 px holding the three
+          all-petals rows and no drop-down; the rosette's numbering cells at two whorls in step
+          read Petal 1 / Petal 2, Petal 1 / Petal 5, Petal 1 / Petal 21 beside the Inner trio
+          at 755–794 px; the caption cell at two whorls with the offset at its default reads
+          the registry's own sentence; and the fan's per-petal cells grew from 933 px to
+          **1,113 px worst case** (Petal 3 open at eight per side), because at one whorl the
+          all-petals trio sits under the nine drop-downs — the ruling's "at every depth" means
+          every one-whorl placement, the fan included, and that is the honest cost of it on the
+          tallest panel there is. **The short labels Eva then ruled took 39 px of that back**:
+          "All curl / All cup / All tip" put "Petal roles" at one whorl at 505 px (from 544)
+          and the worst case at **1,074 px** (from 1,113), re-rendered and re-gated before the
+          merge — her reason for the ruling, measured.

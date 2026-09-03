@@ -31,9 +31,11 @@ solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 both run in CI and both must pass before any bloom geometry change is done.
 Control-panel changes have their own gate: `node tools/verify-bloom-panel.mjs`
 (every registry control renders exactly once in its declared section, a control
-inside a collapsed section still reads, writes and rebuilds, and every
-predicate-gated control is asserted to APPEAR as well as to hide), with
-`--negative-control` required to fail. Its companion sheet is
+inside a collapsed section still reads, writes and rebuilds, every
+predicate-gated control is asserted to APPEAR as well as to hide, a DERIVED
+section label is read back against the slots the builder emitted, and no two
+sections on screen share a name), with `--negative-control` required to fail on
+all five routes. Its companion sheet is
 `node tools/shot-bloom-panel.mjs <dir>` — the panel, not the canvas.
 Arrangement changes have their own sheet too:
 `node tools/shot-bloom-arrangement.mjs <dir>` — layers, placement and the
@@ -47,6 +49,12 @@ must be unmoved. The FAN placement has one too:
 `node tools/shot-bloom-fan.mjs <dir>` — face-on with the mirror line drawn
 (from a per-cell measurement, never a layout guess), the toggle's two
 positions as a pair, a spacing sweep, and a radial bloom as the control.
+PER-PETAL sliders have their own:
+`node tools/shot-bloom-per-petal.mjs <dir> [base-tree]` — petal one called out
+on the mirror line, a middle group against its neighbours, the extreme, and a
+BEFORE/AFTER pair rendered from a git worktree of the base commit, because the
+fan's slot roles were superseded and a removed capability is photographed
+rather than only recorded.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
@@ -75,10 +83,67 @@ RETAINED, never deleted, and CI's `--verify-frozen` still proves every one deep-
 every push — only their routine byte re-export is demoted. Full reasoning, and what it
 gives up, in the charter's "Verification retention" section.
 
-**NOTHING IN THIS PROJECT MEASURES AN AZIMUTH EXCEPT J7 AND Z4b** — established
+**PER-PETAL ROLES SUPERSEDE SLOT ROLES ON THE FAN, AND NOTHING IS RETIRED**
+(Eva, Sep 3). `labellum*` / `hood*` are hidden AND inert under FAN and stay
+fully live under RADIAL, so `RETIRED_IDS` does not apply and no migration is
+owed. The two position axes are DISJOINT BY PLACEMENT and `Z9` asserts that in
+both directions — along with the two code paths the ruling makes unreachable
+and which are KEPT so composition stays one predicate arm away:
+`roleForSlot`'s THROUGH_GAP arm and `PREDICATES.hoodEmpty`. Restoring
+composition is that one arm in `bloom-geometry.js` plus its twin in
+`bloom-registry.js`. The fan loses labellum TIP BREADTH outright, because the
+per-petal set ships without a tip-breadth row — one row in `ROLE_OVERRIDES`
+and one in the registry the day it is wanted. **The panel names both axes by
+petal number** (Eva, Sep 3, ruling A): the per-petal groups are drop-downs
+inside "Petal roles", and under RADIAL the labellum's and hood's sliders are
+two more of them — "Petal 1" (slot 0, the plane's fixed point, at every count)
+and "Petal N" for the LAST orbit, `petalGroupCount(n, THROUGH_SLOT)`, so the
+rosette reads "Petal 1, Petal 5" at eight petals with the gap the ruling
+accepted (the laterals carry no controls). The hood's label is the panel's one
+DERIVED summary — `labelFrom(ui)` in `SECTIONS`, `sectionLabel()` the one owner
+for the app, the gate and the sheet, and `verifySections()` refusing a literal
+beside a derivation. Control ids are unchanged; nothing is retired.
+
+**PETAL ROLES IS THE "ADJUST PETALS AS A GROUP" SECTION AT EVERY DEPTH, AND THE
+ONE-WHORL ORCHID IS GIVEN UP** (Eva, Sep 3, from the deploy preview, overruling
+the session's "nothing to build"). At one whorl the group is ALL petals: three
+DELTAS (`allCurl` / `allCup` / `allTipBreadth`, role `ALL`, the first three
+`ROLE_OVERRIDES` rows) riding on Petal form's Spine curl and Cup and Petal
+shape's Tip breadth exactly as the Inner trio rides on them above one whorl —
+one composition law, nothing owns a number twice. Slot roles need TWO OR MORE
+WHORLS IN STEP now (`slotRolesEligible`'s RADIAL arm and the registry's twin,
+both flipped): Petal 1 / Petal N are hidden AND INERT at one whorl, still fully
+live on RADIAL at 2+ whorls with Layer offset 0 and on the fan as per-petal
+groups. Not `RETIRED_IDS` — ids, laws and gate rows unchanged; recovery is one
+arm in two files. Where they hide behind the offset the panel SAYS SO: a
+section's `hiddenReason` (`when` predicate + derived `text(ui)`, declared once
+and referenced by both groups) renders one caption in the parent, `applyVisibility()`
+the only thing that shows it, and the panel gate asserts the depth 1↔2
+transitions of all three groups and the caption in both directions.
+**A green run does not endorse the inertness**: PP7 (geometry keeps the old arm)
+is caught at harness load by the two-statement guard, PP8 (all-petals never
+inert above one whorl) by Z1/Z5/Z9 on exactly the GATED rows — measured, not
+derived. The retirement is photographed as a BEFORE/AFTER pair on
+`node tools/shot-bloom-orchid.mjs <dir> [base-tree]`, whose every orchid cell
+is now at two whorls in step.
+
+**A GREEN RUN DOES NOT ENDORSE THE PER-PETAL NUMBERING** — measured on six
+worktrees, not derived. An off-by-one orbit index and a supersession that
+quietly comes undone BOTH export watertight, as one piece, with zero
+degenerate triangles, at identical live and export triangle counts and
+identical STL byte lengths, and fired NOTHING anywhere in the shipped
+instrument until `Z8` and `Z9` existed. Two more (an unconditional per-petal
+split, a reversed group order) are BIT-IDENTICAL on every probe row, so there
+is not even a byte to diff. `Z7` (the partition is the coarsest that serves
+the engaged axis), `Z8` (the group index is the distance from the plane, read
+from the emitted azimuths) and `Z9` carry those claims; `Z1`'s
+visible-iff-non-empty biconditional is what polices the numbering across the
+mirror-line toggle.
+
+**NOTHING IN THIS PROJECT MEASURES AN AZIMUTH EXCEPT J7, Z4b AND Z8** — established
 by grep, not assumed. Both STL gates are azimuth-blind by construction, and so
 is everything built on them: J1 reads foot frames, J2/J3 read radii, J4 reads
-three lengths, J5/J6 read the depth sequence, Z1–Z6 read role membership. A FAN
+three lengths, J5/J6 read the depth sequence, Z1–Z7 and Z9 read role membership. A FAN
 that silently builds a full ring therefore exports watertight, as one piece, at
 an identical triangle count and STL byte length, and passes every other check
 here — measured on a worktree. `J7` (the arc, the notch, the minimum angular

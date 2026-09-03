@@ -82,9 +82,51 @@ body {
 /* A section's last control keeps the gap to the next summary honest. */
 .bl-sec > .bl-ctrl:last-child { margin-bottom: 10px; }
 
+/* ===================================================================
+   NESTED DROP-DOWNS — the per-petal groups inside "Petal roles" (Eva,
+   Sep 3). They are the SAME element and the same accordion rule one level
+   in, so they inherit everything above and change only what has to differ:
+   an indent and a rule down the left, so a visitor can see at a glance
+   which drop-downs belong to the group they opened.
+
+   THE INDENT IS THE ONLY STRUCTURAL SIGNAL, deliberately. A second border
+   colour or a fill would read as "a different kind of thing", and these are
+   not a different kind of thing — they are sections, with sections'
+   behaviour. The rule is the accent at low alpha rather than the line
+   colour, because it marks CONTAINMENT rather than separation. */
+.bl-sec--sub {
+  border-top: 0;
+  margin: 0 0 0 2px;
+  padding-left: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--bl-accent) 22%, transparent);
+}
+.bl-sec--sub > summary {
+  padding: 7px 0 6px;
+  font-size: 9.5px;
+  letter-spacing: .14em;
+}
+/* The parent's own last child keeps the same breathing room a control gets. */
+.bl-sec > .bl-sec--sub:last-child { margin-bottom: 10px; }
+
+/* WHY A DROP-DOWN IS MISSING — the registry's `hiddenReason` caption (Eva,
+   Sep 3), rendered where the hidden drop-downs would be. It is a sentence, not
+   a control, so it takes the dim ink and the sub-section's indent and rule and
+   nothing that could read as a slider row. */
+.bl-why {
+  margin: 0 0 10px 2px; padding: 4px 0 4px 10px;
+  border-left: 1px solid color-mix(in srgb, var(--bl-accent) 22%, transparent);
+  font-size: 10.5px; line-height: 1.45; color: var(--bl-dim); letter-spacing: .02em;
+}
+
 .bl-ctrl { margin-bottom: 12px; }
 .bl-ctrl label {
   display: flex; justify-content: space-between; align-items: baseline;
+  /* The gap is what keeps a long read-out off its label. space-between
+     gives the two nothing to stand apart on once the read-out is long enough
+     to wrap — "Sizesame as the rest — the hood pair, opposite the line" was
+     the panel sheet's own picture of it the day the read-outs began naming
+     their group (Sep 3). */
+  gap: 10px;
   font-size: 11px; color: var(--bl-dim); letter-spacing: .04em; margin-bottom: 4px;
 }
 .bl-val { color: var(--bl-ink); }

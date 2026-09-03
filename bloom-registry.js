@@ -30,7 +30,7 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
-import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG } from './bloom-geometry.js';
+import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
    Empty today, structurally present from day one: when the first control is
@@ -80,30 +80,66 @@ export const RETIRED_IDS = [];
    remedy: both gates assert the two agree on EVERY matrix row, rather than a
    comment claiming they do. */
 export const PREDICATES = {
-  /* THE FAN IS ELIGIBLE AT EVERY DEPTH (session 10), and it is an `any` arm
-     rather than a widened `oneOf` because the two placements qualify for
-     DIFFERENT reasons. RADIAL needs every whorl in phase; a FAN has no
-     whorl-to-whorl offset to be out of — `layerPhase` is hidden there and
-     `phase` is exactly 0 on every descriptor by construction — so the shared
-     plane holds unconditionally. Folding FAN into the RADIAL arm would have
-     made it depend on a `layerPhase` value it does not read, which is a
-     predicate naming a condition that is not the condition. */
-  slotRolesEligible: { any: [
-    { id: 'placement', oneOf: ['FAN'] },
-    { all: [
+  /* THE FAN ARM IS GONE (Eva's ruling 4, Sep 3) — per-petal roles SUPERSEDE
+     slot roles there, so this is RADIAL-only again and `perPetalEligible`
+     below is the fan's own gate. Session 10 admitted the fan here on a real
+     consequence (a fan has no whorl-to-whorl offset to be out of, so the
+     shared plane held unconditionally); that consequence is still TRUE and is
+     now simply not what decides it.
+
+     WHAT THIS HIDES, so it reads as a ruling rather than as a regression: on a
+     FAN the eight `labellum*` / `hood*` controls disappear and the fan loses
+     labellum TIP BREADTH outright, because the per-petal set ships without a
+     tip-breadth row. Nothing is RETIRED — slot roles stay fully live under
+     RADIAL, same ids, same laws, same rows — so this is a visibility plus
+     applicability change and RETIRED_IDS does not apply. Restoring COMPOSITION
+     is this one arm plus the matching arm in bloom-geometry.js's
+     `slotRolesEligible()`, and nothing was written to depend on their absence.
+
+     THE PANEL GATE COVERS THE TRANSITION IN BOTH DIRECTIONS, because a
+     control that stops appearing is exactly as much a claim as one that
+     starts: `predicateDrivers` reports `placement` here, so the
+     visibility-transition route drives RADIAL -> FAN -> RADIAL and re-checks
+     every control's `hidden` against its own predicate at each state. */
+  slotRolesEligible: { all: [
     { id: 'placement', oneOf: ['RADIAL'] },
-    /* layerCount 1 (nothing above the outermost whorl to fall out of step),
-       OR every whorl in phase so all of them share the one plane. `not min 2`
-       is "below 2"; `not awayFrom 0` is "is 0" — the registry's first use of
-       the awayFrom leaf, which has been in the vocabulary unused since day
-       one. The tolerance is half of layerPhase's own 0.01 step, so it admits
+    /* TWO OR MORE WHORLS, ALL IN STEP (Eva's ruling, Sep 3, from the deploy
+       preview — the ONE-WHORL ARM IS GONE and the single-layer orchid with it,
+       with the cost stated to her and accepted; bloom-geometry.js's
+       `slotRolesEligible` carries the full record). At one whorl "Petal
+       roles" is the ALL-PETALS group instead (`allPetalsEligible` below) and
+       Petal 1 / Petal N are hidden AND inert. `not awayFrom 0` is "is 0" —
+       the tolerance is half of layerPhase's own 0.01 step, so it admits
        exactly the reachable value 0 and nothing else. */
-    { any: [
-      { not: { id: 'layerCount', min: 2 } },
-      { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
-    ] },
-    ] },
+    { id: 'layerCount', min: 2 },
+    { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
   ] },
+
+  /* ===================================================================
+     WHERE THE ALL-PETALS GROUP APPLIES — one whorl, every placement (Eva's
+     ruling, Sep 3): "Petal roles is the 'adjust petals as a group' section at
+     every depth; at 2+ layers that group is the inner whorl, at depth 1 it is
+     ALL petals." The three `all*` controls ride on the base sliders in Petal
+     form / Petal shape as deltas, exactly as the `inner*` trio rides on them
+     for the inner whorl, and this predicate is the twin of
+     bloom-geometry.js's `allPetalsEligible()`: the registry HIDES above one
+     whorl, the geometry makes INERT there, and Z5 checks the two agree on
+     every row. `not min 2` is "below 2", i.e. exactly one. */
+  allPetalsEligible: { not: { id: 'layerCount', min: 2 } },
+
+  /* ===================================================================
+     WHERE PER-PETAL ROLES APPLY — the fan, and only the fan (Eva's ruling 4,
+     Sep 3). The counterpart of `slotRolesEligible` above, and MUTUALLY
+     EXCLUSIVE with it: per-petal SUPERSEDES slot roles on the fan, so a fan
+     has exactly one per-position axis and a rosette has the other.
+
+     bloom-geometry.js states the same boundary in `perPetalEligible()`,
+     because neither file can read the other's answer and both must act on it
+     — the registry HIDES the controls, the geometry makes them INERT. Two
+     statements of one boundary is a registration risk, so both gates assert
+     the two agree on every matrix row (Z5), exactly as they already do for
+     the slot-role twin. */
+  perPetalEligible: { id: 'placement', oneOf: ['FAN'] },
 
   /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
@@ -294,6 +330,39 @@ export function predicateDrivers(pred, out = new Set()) {
    centerStyle). If one ever needs a condition of its own, that is a
    stop-and-raise, not a field to add quietly.
    =================================================================== */
+/* WHY A SECTION IS HIDDEN, SAID IN THE PANEL — `hiddenReason` (Eva, Sep 3).
+   A control or section that disappears for a reason a visitor could undo is a
+   control the visitor cannot find; the panel therefore carries ONE caption
+   where Petal 1 / Petal N would be, exactly while they are hidden for THIS
+   reason: a RADIAL bloom of two or more whorls whose Layer offset is not
+   zero. `when` is a registry predicate like any `visibleWhen` (evaluated by
+   the app and asserted by the panel gate in both directions), `text(ui)` is
+   derived so the hood's petal number is the real one, and the caption reads
+   the Layer offset control's OWN label so a rename cannot leave it naming a
+   slider that no longer exists.
+
+   DECLARED ONCE AND REFERENCED TWICE, on purpose: both groups hide for the
+   same reason and the visitor should read it once. The app renders one
+   caption per DISTINCT reason object inside a parent, so sharing the object
+   is what makes the caption single — two literals with the same text would
+   be two captions, and two owners of one sentence.
+
+   NOT SAID AT ONE WHORL: there Petal 1 / Petal N are retired by ruling rather
+   than hidden behind a slider, and the section holds the all-petals group
+   instead; the caption is for the state a visitor can undo. */
+const SLOT_ROLES_BEHIND_OFFSET = {
+  when: { all: [
+    { id: 'placement', oneOf: ['RADIAL'] },
+    { id: 'layerCount', min: 2 },
+    { id: 'layerPhase', awayFrom: 0, by: 0.005 },
+  ] },
+  text: (ui) => {
+    const offset = CONTROLS.find((c) => c.id === 'layerPhase').label;
+    const last = petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT);
+    return `Petal 1 and Petal ${last} need the whorls in step — set ${offset} to 0.00 to bring them back.`;
+  },
+};
+
 export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
   { id: 'shape', label: 'Petal shape', open: false },
@@ -334,7 +403,130 @@ export const SECTIONS = [
      of its own once slot roles arrived. Moving `inner*` here is presentation
      only — `section` is never persisted and no geometry reads it. */
   { id: 'roles', label: 'Petal roles', open: false },
+
+  /* ===================================================================
+     THE ROSETTE'S TWO GROUPS, NUMBERED THE FAN'S WAY (Eva's ruling A, Sep 3,
+     from the deploy preview): "the names like petal 1 -2 -3 etc should apply
+     to the radial option as well." The labellum's five sliders and the hood's
+     three keep their ids, their laws and their predicates and move into two
+     drop-downs inside "Petal roles", exactly as the fan's groups did — the
+     SAME element, the same accordion rule, the same indent.
+
+     THE NUMBERS ARE THE ORBITS', NOT A SECOND NUMBERING. Under RADIAL the
+     plane is the through-slot involution (`mirrorFor`), whose orbits are the
+     per-petal groups ordered by distance from it: slot 0 is orbit 0, so the
+     labellum is PETAL 1 at every count; the hood is the orbit FARTHEST from
+     the plane, which is the LAST group — `petalGroupCount(n, THROUGH_SLOT)`,
+     2 at three petals, 5 at eight, 21 at forty. Measured through
+     `petalRoleForSlot` at nine counts before this was written (charter,
+     session 11), not read off the derivation: the same `HOOD = P_last`
+     relation the fan already carried, so the rosette gets no rule of its own.
+
+     WHAT WAS DECLINED, so the gaps read as the ruling rather than a defect
+     (option B, offered and refused): extending the fan's full per-orbit set to
+     the rosette would have retired the labellum and hood NAMES, retired the
+     labellum's tip breadth with them, and put nineteen empty-by-default groups
+     under a forty-petal rosette. A's cost is stated instead: the panel reads
+     "Petal 1, Petal 5" with nothing between, because the laterals carry no
+     controls — which the read-outs say in words, and which is the truth.
+
+     ONE LABEL IS A LITERAL AND THE OTHER IS DERIVED, and that asymmetry is the
+     relation itself. "Petal 1" is a constant because orbit 0 exists at every
+     reachable count and is always the labellum — a `labelFrom` there would
+     tell a reader it might vary. The hood's number moves with `petalCount`,
+     so its summary is the FIRST derived section label in this panel:
+     `labelFrom(ui)` is refreshed by the app on every rebuild through the same
+     `refreshLabels()` path the read-outs use, and `sectionLabel()` below is
+     the one owner of "what does this summary say" for the app, the panel gate
+     and the panel sheet alike. verifySections() requires exactly one of
+     `label` / `labelFrom`: a literal beside a derivation would be a stored
+     label-lie waiting for a reader to believe it.
+
+     NOTHING IS RETIRED. The control ids are unchanged (`labellumSize`,
+     `hoodCup`, ...), `section` is never persisted, and the two new section ids
+     name the ROLE each group holds because that is what the code's vocabulary
+     is for; the visitor's vocabulary — the number — is the label. Under FAN
+     both groups are hidden with their controls, by the same predicate the
+     controls carry (Eva's ruling 4): the fan's `petal1` section and this
+     "Petal 1" share a name and never share a screen, which the panel gate
+     asserts on every visibility state it drives.
+
+     `open: false` ON BOTH — ARRANGEMENT holds the one first-load `open`. */
+  { id: 'labellumGroup', label: 'Petal 1', open: false, parent: 'roles', hiddenReason: SLOT_ROLES_BEHIND_OFFSET },
+  { id: 'hoodGroup', open: false, parent: 'roles', hiddenReason: SLOT_ROLES_BEHIND_OFFSET,
+    labelFrom: (ui) => `Petal ${petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT)}` },
+
+  /* ===================================================================
+     ONE SECTION PER PER-PETAL GROUP (Eva's ruling 1, Sep 3) — the accordion
+     doing exactly what it was built for, and the ruling was made from
+     measured heights rather than from a preference.
+
+     The alternative on the table was the flower's own form, which Eva likes
+     and which this session's brief pointed at: ONE "Per-petal" section with
+     `PETAL 1 — INNER` sub-headings inside it. Measured with real control rows
+     cloned into the real page:
+
+                                   4 groups (the shipping fan)   9 groups
+       one section, sub-headings   section 904 px, panel 1,314   2,001 / 2,411
+       one section per group       section 216 px, panel   719     216 /   874
+       (today, for scale: tallest section 417 px, panel 788 px)
+
+     The sub-heading form is already past the 1,241 px FLAT panel the accordion
+     was built to replace, at the shipping default. One section per group is
+     BELOW today's worst case at the default and 86 px above it at the extreme,
+     and it needs no cap, no new collapse mechanism and no new hiding rule: a
+     section is hidden when and only when every control in it is hidden, which
+     applyVisibility() already derives, so groups beyond `fanPerSide` and every
+     group under a non-FAN placement disappear for free.
+
+     THE LABELS ARE STATIC AND THE READ-OUTS ARE NOT, which is the split
+     `placement` and `layerCount` have carried since they shipped: a label
+     naming one toggle position lies in the other. Group 1 is the mirror-line
+     petal with the toggle ON and the inner PAIR with it OFF, so the section
+     says "Petal 1" and each control's read-out says which it currently is.
+
+     GENERATED, LIKE THE CONTROLS THEY HOLD, from the one ceiling
+     (MAX_FAN_GROUPS, derived in bloom-geometry.js from MAX_FAN_PER_SIDE and
+     imported rather than restated). Nine hand-written rows would be nine
+     places for the count to drift from the geometry's own.
+
+     `open: false` ON EVERY ONE. verifySections() enforces at most one
+     `open: true` across the whole array, and ARRANGEMENT already holds it. */
+  ...Array.from({ length: MAX_FAN_GROUPS }, (_, k) => ({
+    id: `petal${k + 1}`, label: `Petal ${k + 1}`, open: false,
+    /* NESTED INSIDE "Petal roles" (Eva, Sep 3, from the deploy preview): "have
+       the roles be its own drop down which then enables all the other petals
+       and their roles to be drop downs."
+
+       WHY IT IS A `parent` FIELD AND NOT A SECOND LIST. Membership sits on the
+       CHILD, exactly as a control's `section` sits on the control — a parent
+       naming its children would be two lists to keep in step in the file that
+       exists to state the registration rule, and the panel would silently drop
+       whichever an edit missed. `verifySections()` checks the relation at
+       module load, so the app, both gates and every shot tool get it for free.
+
+       AND THE ACCORDION NEEDED NO SECOND MECHANISM. Its one capture listener
+       used to close every OTHER top-level section; it now closes a
+       drop-down's SIBLINGS, which is the same rule stated one level more
+       generally — at the top level the siblings ARE the sections, so the
+       shipped behaviour is unchanged, and nesting falls out of it. One owner,
+       one listener, one rule; a nested accordion with its own handler would
+       have been the N-copies-of-one-rule defect this panel was built to
+       avoid. */
+    parent: 'roles',
+  })),
 ];
+
+/* WHAT A SECTION'S SUMMARY SAYS, at a given state — THE ONE OWNER, used by
+   the app's generator and its refreshLabels(), by the panel gate's census and
+   by the panel sheet. A section declares either a literal `label` or a
+   `labelFrom(ui)`; verifySections() below refuses both and neither. The
+   derived form exists for exactly one section today (the rosette's hood
+   group, whose petal number moves with petalCount) and is written once here
+   rather than as `s.labelFrom ? ... : ...` in four files. */
+export function sectionLabel(section, state) {
+  return section.labelFrom ? section.labelFrom(state) : section.label;
+}
 
 /* THE SECTION/CONTROL RELATION, checked at module load rather than trusted.
    Throws, deliberately and loudly: a control naming a section that does not
@@ -348,11 +540,32 @@ export const SECTIONS = [
    needs a browser and lives in tools/verify-bloom-panel.mjs. */
 export function verifySections(controls = CONTROLS, sections = SECTIONS) {
   const bad = [];
+  /* The defaults of the CONTROLS PASSED IN, not the module's — this runs at
+     module load before DEFAULTS exists, and a caller handing in its own
+     control set should have its labels evaluated against that set. */
+  const defaultsOf = (cs) => Object.fromEntries(cs.map((c) => [c.id, c.default]));
   const ids = new Set();
   for (const s of sections) {
     if (ids.has(s.id)) bad.push(`duplicate section id "${s.id}"`);
     ids.add(s.id);
     if (typeof s.open !== 'boolean') bad.push(`section "${s.id}" must declare a literal boolean \`open\``);
+    /* EXACTLY ONE OF `label` / `labelFrom`. A section with both would show the
+       derived text while the literal sat there reading as a declaration —
+       the stored label-lie this project retires ids over — and one with
+       neither renders an empty summary. sectionLabel() is the one reader. */
+    const hasLabel = typeof s.label === 'string' && s.label.length > 0;
+    const hasFrom = typeof s.labelFrom === 'function';
+    if (hasLabel === hasFrom) bad.push(`section "${s.id}" must declare exactly one of a literal \`label\` or a \`labelFrom(ui)\` — it declares ${hasLabel && hasFrom ? 'both' : 'neither'}`);
+    else if (hasFrom && typeof s.labelFrom(defaultsOf(controls)) !== 'string') bad.push(`section "${s.id}"'s labelFrom(DEFAULTS) did not return a string`);
+    /* A hiddenReason is a predicate plus a derived sentence, on a NESTED
+       section only (the caption renders inside the parent, where the hidden
+       drop-down would be). */
+    if (s.hiddenReason !== undefined) {
+      const r = s.hiddenReason;
+      if (!s.parent) bad.push(`section "${s.id}" declares a hiddenReason but no parent — a caption needs a section to sit in`);
+      if (!r || typeof r !== 'object' || !r.when || typeof r.when !== 'object') bad.push(`section "${s.id}"'s hiddenReason must carry a \`when\` predicate`);
+      if (!r || typeof r.text !== 'function') bad.push(`section "${s.id}"'s hiddenReason must carry a \`text(ui)\` function`);
+    }
   }
   /* THE ACCORDION'S OWN INVARIANT, checked where the literals live. The panel
      opens at most one section at a time, so two `open: true` rows would
@@ -360,9 +573,34 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
      it and the first toggle would silently correct it, which is a panel whose
      shipped appearance disagrees with its own registry until someone clicks.
      Zero is legal: every section shut is reachable by closing the open one. */
-  const opens = sections.filter((s) => s.open === true).map((s) => s.id);
-  if (opens.length > 1) {
-    bad.push(`the panel is an accordion, so at most ONE section may declare open: true — found ${opens.length} (${opens.join(', ')})`);
+  /* AT MOST ONE OPEN PER SIBLING GROUP, which is the accordion's rule stated
+     where the literals live. It used to be "at most one in the whole array";
+     nesting makes that too strong — a child drop-down may be open inside its
+     open parent, and the two are siblings of nothing. Grouping by `parent`
+     (top-level sections share the group `null`) says the same thing about the
+     top level and the right thing about each nested set. */
+  const byParent = new Map();
+  for (const s of sections) {
+    const k = s.parent ?? null;
+    if (!byParent.has(k)) byParent.set(k, []);
+    byParent.get(k).push(s);
+  }
+  for (const [k, group] of byParent) {
+    const opens = group.filter((s) => s.open === true).map((s) => s.id);
+    if (opens.length > 1) {
+      bad.push(`the panel is an accordion, so at most ONE section may declare open: true among siblings${k === null ? ' at the top level' : ` of "${k}"`} — found ${opens.length} (${opens.join(', ')})`);
+    }
+  }
+  /* A PARENT MUST EXIST, AND NESTING IS ONE LEVEL DEEP. The second clause is a
+     real bound rather than caution: `applyVisibility()` derives a section's
+     hidden state from its controls AND its child sections, and the panel gate
+     walks the tree to assert it — both are written for one level, so a
+     grandchild would be a structure the instruments do not describe. */
+  for (const s of sections) {
+    if (s.parent === undefined || s.parent === null) continue;
+    const par = sections.find((x) => x.id === s.parent);
+    if (!par) bad.push(`section "${s.id}" names parent "${s.parent}", which is not in SECTIONS`);
+    else if (par.parent) bad.push(`section "${s.id}" nests under "${par.id}", which is itself nested — the panel is one level deep`);
   }
   const used = new Set();
   for (const c of controls) {
@@ -371,9 +609,15 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     else used.add(c.section);
   }
   /* An EMPTY section is a failure, not a tidy placeholder for later work: it
-     renders as a header that opens onto nothing, and the reason it is empty
-     is almost always that the controls meant for it name something else. */
-  for (const s of sections) if (!used.has(s.id)) bad.push(`section "${s.id}" has no controls`);
+     renders as a header that opens onto nothing, and the reason it is empty is
+     almost always that the controls meant for it name something else. A parent
+     satisfies this with CHILD SECTIONS instead of controls — "Petal roles"
+     holds the per-petal drop-downs and no sliders of its own — so the check is
+     "holds something", not "holds controls". */
+  const hasChildren = new Set(sections.filter((s) => s.parent).map((s) => s.parent));
+  for (const s of sections) {
+    if (!used.has(s.id) && !hasChildren.has(s.id)) bad.push(`section "${s.id}" has neither controls nor child sections`);
+  }
   for (const id of RETIRED_IDS) if (controls.some((c) => c.id === id)) bad.push(`retired id "${id}" is a live control`);
   if (bad.length) throw new Error(`bloom-registry: section declaration is broken:\n  - ${bad.join('\n  - ')}`);
   return true;
@@ -470,6 +714,17 @@ const CENTER_ON = { id: 'centerStyle', oneOf: ['DOME', 'DISC', 'RING'] };
    and need no reinterpretation. Three copies of this ternary would be three
    places for the two modes to drift apart in wording alone. */
 const perDepth = (ui) => (String(ui.placement) === 'CONTINUOUS' ? 'turn' : 'layer');
+
+/* WHAT THE ROSETTE'S TWO SLOT-ROLE GROUPS CURRENTLY ARE — one owner per group,
+   read by every read-out in the group, the fan's `said(ui)` precedent (Eva's
+   ruling A, Sep 3: the labels say "Petal 1" / "Petal N", so the read-out is
+   where the word "labellum" now lives). Written for the states in which the
+   controls are VISIBLE: slot roles are RADIAL-only, so the plane is the
+   through-slot involution, the labellum is slot 0 — its fixed point, one
+   petal at every count — and the hood is `roleForSlot`'s far end: one petal
+   opposite the line at an even count, the far pair at an odd one. */
+const saidLabellum = () => 'the labellum, on the line';
+const saidHood = (ui) => (Math.round(Number(ui.petalCount)) % 2 === 0 ? 'the hood, opposite the line' : 'the hood pair, opposite the line');
 
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
@@ -1175,6 +1430,41 @@ export const CONTROLS = [
      range in the direction that reaches its form: curl runs the whole signed
      span so standards can rise while falls hang, cup likewise, and tip
      breadth runs upward only because the base already starts at 0. */
+  /* ===================================================================
+     THE ALL-PETALS GROUP — one whorl's "adjust petals as a group" (Eva's
+     ruling, Sep 3, from the deploy preview; she overruled the session's
+     "nothing to build" after seeing the panel). Three DELTAS riding on the
+     base sliders in Petal form (Spine curl, Cup) and Petal shape (Tip
+     breadth), identity 0, hidden and inert above one whorl where the INNER
+     trio below is the group instead. Same bases, laws and bounds as that trio
+     — see ROLE_OVERRIDES in bloom-geometry.js, where these are the first
+     three rows.
+
+     THE LABELS SAY WHAT THEY ARE AND THE READ-OUTS SAY WHAT THEY RIDE ON, on
+     the same split every label in this panel keeps: "All curl" beside "Inner
+     curl", and a read-out that at identity names the slider that owns the
+     number ("as Petal form sets it") and off identity names the delta and its
+     base ("+50° on Spine curl"). Nothing here claims to BE the curl; the base
+     slider is, and the app's read-out prints what was built.
+
+     "ALL", NOT "ALL-PETALS" — EVA'S RULING (Sep 3), FOR PANEL HEIGHT, NOT
+     TASTE. The session proposed "All-petals curl"; in a 250 px panel that
+     wraps to two lines, and this PR already grows the panel's worst case from
+     933 to 1,113 px on its own, which is exactly the scrolling she had ruled
+     on once. The delta semantics are carried by the read-outs, so the label
+     does not do that work twice. */
+  { id: 'allCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+    label: 'All curl', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${v}° on Spine curl`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
+
+  { id: 'allCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'All cup', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} on Cup`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
+
+  { id: 'allTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+    label: 'All tip', fmt: (v) => (Number(v) === 0 ? 'as Petal shape sets it' : `+${Number(v).toFixed(2)} on Tip breadth`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
+
   { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
     tier: 'standard', role: 'petal',
@@ -1217,49 +1507,147 @@ export const CONTROLS = [
      never have — see session A's never-overridable table, J4a).
 
      ALL EIGHT SHARE ONE PREDICATE, by ref rather than by eight copies. It is
-     TRUE at the shipping default (RADIAL, layerCount 1), so this section
-     RENDERS at first load with these eight visible and session A's three
-     hidden — which is also what lets the panel gate witness this section with
-     no precondition. */
-  { id: 'labellumSize', section: 'roles', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
-    label: 'Labellum size',
+     TRUE at the shipping default (RADIAL, layerCount 1), so their two
+     drop-downs RENDER at first load with these eight visible and session A's
+     three hidden — which is also what lets the panel gate witness them with
+     no precondition.
+
+     THEY LIVE IN TWO DROP-DOWNS NAMED BY PETAL NUMBER (Eva's ruling A, Sep 3;
+     see the two `labellumGroup` / `hoodGroup` rows in SECTIONS), and the
+     LABELS ARE THE FAN'S — "Size", "Tip", "Tilt", "Cup", "Spine curl" — so a
+     visitor who has learned one placement's groups has learned the other's.
+     The word "labellum" left the label and moved into the READ-OUT, on the
+     split every static label in this panel keeps: the label names the slot in
+     the panel, the read-out names what is in it right now. `said*` below is
+     the one owner of that phrase per group, the fan's `said(ui)` precedent,
+     and it is written for the states these controls are VISIBLE in — RADIAL,
+     hence the through-slot plane, hence a labellum that is always the single
+     petal on the line and a hood that is one petal at an even count and a
+     pair at an odd one. Under FAN they are hidden and inert (ruling 4), so no
+     phrase is evaluated where it could be read wrong. */
+
+  { id: 'labellumSize', section: 'labellumGroup', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
+    label: 'Size',
     /* SATURATION IS TOLD, on the "(clamped)" discipline the roll floor, the
        tip floor and both foot clamps already carry: a composed value is
        clamped into the base control's own range, so at a long petal the
        multiplier stops moving before its slider does. The read-out cannot see
        the clamp itself (fmt has only the UI state), so it prints the ASKED-FOR
        millimetres and the app's read-out prints what was actually built. */
-    fmt: (v, ui) => (Number(v) === 1 ? 'same as the rest' : `x${Number(v).toFixed(2)} — asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
+    fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${saidLabellum(ui)}`
+      : `x${Number(v).toFixed(2)} — ${saidLabellum(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
-    label: 'Labellum tip', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `+${Number(v).toFixed(2)} breadth`),
+  { id: 'labellumTipBreadth', section: 'labellumGroup', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+    label: 'Tip', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `+${Number(v).toFixed(2)} breadth — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumTilt', section: 'roles', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
-    label: 'Labellum tilt', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg tilt`),
+  { id: 'labellumTilt', section: 'labellumGroup', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
+    label: 'Tilt', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'Labellum cup', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
+  { id: 'labellumCup', section: 'labellumGroup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Cup', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
-    label: 'Labellum curl', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg spine curl`),
+  { id: 'labellumCurl', section: 'labellumGroup', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+    label: 'Spine curl', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${v}deg spine curl — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'hoodSize', section: 'roles', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
-    label: 'Hood size',
-    fmt: (v, ui) => (Number(v) === 1 ? 'same as the rest' : `x${Number(v).toFixed(2)} — asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
+  { id: 'hoodSize', section: 'hoodGroup', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
+    label: 'Size',
+    fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${saidHood(ui)}`
+      : `x${Number(v).toFixed(2)} — ${saidHood(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
 
-  { id: 'hoodTilt', section: 'roles', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
-    label: 'Hood tilt', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg tilt`),
+  { id: 'hoodTilt', section: 'hoodGroup', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
+    label: 'Tilt', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidHood(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${saidHood(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
 
-  { id: 'hoodCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'Hood cup', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
+  { id: 'hoodCup', section: 'hoodGroup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Cup', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidHood(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${saidHood(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
+
+  /* ===================================================================
+     PER-PETAL CONTROLS — session 11, four per group, GENERATED from one
+     declaration in the same order and from the same ceiling as the matching
+     rows in ROLE_OVERRIDES, so the two tables cannot drift into two lists.
+     Every id is an ordinary id with an ordinary DOM input; only the typing is
+     saved. A grep for `petal3Cup` lands here, which names the pattern.
+
+     THE SET (Eva's ruling 2, Sep 3): size x, tilt delta, cup delta, curl
+     delta — the labellum's five MINUS tip breadth, with spine curl taking its
+     place because curl is what makes a petal hang and reflex and it is the
+     one control that can. TIP BREADTH IS DELIBERATELY ABSENT and is one row
+     here plus one in ROLE_OVERRIDES the day Eva wants it; see that table's
+     header, and see bloom-geometry.js's `slotRolesEligible` for the cost the
+     supersession ruling attaches to its absence.
+
+     RANGES ARE THE LABELLUM'S, deliberately: the same base clamps, so
+     OVERRIDE_BOUNDS gains no entry, and the harness's per-law dead-zone check
+     passes unchanged (a delta's range must sit inside baseMin-baseMax ..
+     baseMax-baseMin; a multiplier must be able to reach the clamp both ways).
+
+     VISIBILITY IS THE GROUP'S OWN EXISTENCE, and it is the numbering's guard
+     as well as its presentation. Group k exists iff the fan has at least k
+     orbits: `perSide + 1` of them with a mirror-line petal, `perSide` without.
+     Z1's biconditional asserts these predicates against footRing()'s OWN
+     census in BOTH directions — a group with members whose sliders are hidden
+     is "shipped means reachable" violated silently, and a group with no
+     members whose sliders show is a control naming something that does not
+     exist. That is what catches a numbering that fails to follow the toggle. */
+  ...Array.from({ length: MAX_FAN_GROUPS }, (_, i) => {
+    const k = i + 1;
+    /* ONE OWNER FOR "WHAT IS THIS GROUP RIGHT NOW", shared by all four
+       read-outs of the group so they cannot end up with four wordings — the
+       `perDepth(ui)` precedent. It names MEMBERSHIP, which is the thing the
+       static label cannot: with a mirror-line petal group 1 is that single
+       petal and group k>1 is the pair k-1 steps out; without one, group k is
+       the pair k out. */
+    const said = (ui) => {
+      const centre = String(ui.fanCenterPetal) === 'ON';
+      if (centre && k === 1) return 'the mirror-line petal';
+      const out = centre ? k - 1 : k;
+      return out === 1 ? 'the inner pair' : `the pair ${out} out from the line`;
+    };
+    const seen = {
+      all: [
+        { ref: 'perPetalEligible' },
+        { any: [
+          { all: [{ id: 'fanCenterPetal', oneOf: ['ON'] },  { id: 'fanPerSide', min: k - 1 }] },
+          { all: [{ id: 'fanCenterPetal', oneOf: ['OFF'] }, { id: 'fanPerSide', min: k }] },
+        ] },
+      ],
+    };
+    const row = (suffix, extra) => ({
+      id: `petal${k}${suffix}`, section: `petal${k}`, kind: 'slider',
+      tier: 'standard', role: 'petal', visibleWhen: seen, ...extra,
+    });
+    return [
+      row('Size', {
+        min: 0.5, max: 2, step: 0.05, default: 1, label: 'Size',
+        /* The asked-for millimetres, on the labellum's own discipline: the
+           composed value is clamped into the base control's range, so a
+           multiplier saturates before its slider does. This prints what was
+           ASKED; the app's read-out prints what was BUILT, from footRing()'s
+           out-parameter rather than re-derived. */
+        fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${said(ui)}`
+          : `x${Number(v).toFixed(2)} — ${said(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
+      }),
+      row('Tilt', {
+        min: -75, max: 75, step: 1, default: 0, label: 'Tilt',
+        fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${said(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${said(ui)}`),
+      }),
+      row('Cup', {
+        min: -0.8, max: 1.2, step: 0.01, default: 0, label: 'Cup',
+        fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${said(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${said(ui)}`),
+      }),
+      row('Curl', {
+        min: -180, max: 360, step: 5, default: 0, label: 'Spine curl',
+        fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${said(ui)}` : `${v > 0 ? '+' : ''}${v}deg spine curl — ${said(ui)}`),
+      }),
+    ];
+  }).flat(),
 
   /* CENTER — the A/B rig. */
   { id: 'centerStyle', section: 'center', kind: 'choice', default: 'DISC',

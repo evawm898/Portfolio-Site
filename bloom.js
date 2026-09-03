@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
+import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 
@@ -27,6 +27,11 @@ const inputs = {};   // id -> input element
 const valSpans = {}; // id -> read-out span
 const wrappers = {}; // id -> control wrapper div
 const sectionEls = {}; // section id -> <details>
+const summaryEls = {}; // section id -> its <summary>, for the derived labels refreshLabels() rewrites
+/* hiddenReason captions: ONE element per distinct reason object per parent —
+   the registry declares the reason once and references it from every section
+   that hides for it, so identity is what makes the caption single. */
+const whyEls = new Map(); // reason object -> { el, parent, sections: [ids] }
 
 function makeInput(c) {
   if (c.kind === 'slider') {
@@ -66,16 +71,44 @@ function makeInput(c) {
    it and nothing to desync. */
 for (const s of SECTIONS) {
   const det = document.createElement('details');
-  det.className = 'bl-sec';
+  det.className = s.parent ? 'bl-sec bl-sec--sub' : 'bl-sec';
   det.id = `sec-${s.id}`;
   det.dataset.section = s.id;
+  if (s.parent) det.dataset.parent = s.parent;
   /* The FIRST-LOAD state, from the registry's literal. Never written again by
      this file: once the page is up, open/close belongs to the visitor. */
   det.open = s.open;
   const sum = document.createElement('summary');
-  sum.textContent = s.label;
+  /* Through the registry's one owner of the summary text, at the DEFAULTS the
+     page loads with — a derived label (the rosette's hood group, whose petal
+     number moves with petalCount) is right from the first paint rather than
+     after the first rebuild corrects it. */
+  sum.textContent = sectionLabel(s, DEFAULTS);
   det.append(sum);
-  panelRoot.append(det);
+  summaryEls[s.id] = sum;
+  /* A NESTED SECTION GOES INSIDE ITS PARENT'S ELEMENT, which the registry
+     guarantees already exists: SECTIONS is authored parents-first and
+     verifySections() has thrown at module load if a parent is missing or is
+     itself nested, so there is no ordering to get wrong here and no
+     silent-drop path to guard against. */
+  /* THE CAPTION GOES WHERE THE FIRST DROP-DOWN THAT HIDES FOR THIS REASON
+     WOULD BE — appended before that section's own element, once. It is text,
+     never a control: applyVisibility() is still the only thing that decides
+     whether it shows, and refreshLabels() the only thing that writes it. */
+  if (s.hiddenReason) {
+    let w = whyEls.get(s.hiddenReason);
+    if (!w) {
+      const el = document.createElement('p');
+      el.className = 'bl-why';
+      el.hidden = true;
+      sectionEls[s.parent].append(el);
+      w = { el, parent: s.parent, sections: [] };
+      whyEls.set(s.hiddenReason, w);
+    }
+    w.sections.push(s.id);
+    w.el.dataset.why = w.sections.join(' ');
+  }
+  (s.parent ? sectionEls[s.parent] : panelRoot).append(det);
   sectionEls[s.id] = det;
 }
 
@@ -106,9 +139,19 @@ for (const s of SECTIONS) {
    that, and open/closed and shown/hidden are different questions. */
 panelRoot.addEventListener('toggle', (e) => {
   const det = e.target;
-  if (!(det instanceof HTMLDetailsElement) || det.parentElement !== panelRoot) return;
+  if (!(det instanceof HTMLDetailsElement) || !panelRoot.contains(det)) return;
   if (!det.open) return;
-  for (const other of Object.values(sectionEls)) if (other !== det) other.open = false;
+  /* OPENING A DROP-DOWN CLOSES ITS SIBLINGS — the same rule this listener has
+     always applied, stated one level more generally so nesting falls out of it
+     (Eva, Sep 3). At the top level a section's siblings ARE the other
+     sections, so the shipped behaviour is unchanged; inside "Petal roles",
+     opening Petal 2 closes Petal 1 and leaves the parent open, because the
+     parent is not a sibling. A second listener for the nested set would have
+     been N copies of one rule, which is the thing that drifts — and it is why
+     the guard is "inside the panel" rather than "a direct child of it". */
+  for (const other of det.parentElement.children) {
+    if (other !== det && other instanceof HTMLDetailsElement) other.open = false;
+  }
 }, true);
 
 for (const c of CONTROLS) {
@@ -154,6 +197,13 @@ window.__bloomUIState = () => readUI();
    widest point would be a second owner of a derived quantity. */
 function refreshLabels(ui) {
   for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id], ui);
+  /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3): the
+     rosette's hood group is "Petal N" where N is the last orbit's number,
+     which moves with petalCount. Same snapshot, same pass, same owner
+     (sectionLabel) as the generator used — a static label is rewritten with
+     itself, which is cheaper than a second list of which sections vary. */
+  for (const s of SECTIONS) summaryEls[s.id].textContent = sectionLabel(s, ui);
+  for (const [reason, w] of whyEls) w.el.textContent = reason.text(ui);
 }
 
 /* The ONLY setter of a control wrapper's hidden — evaluates the registry's
@@ -173,8 +223,34 @@ function refreshLabels(ui) {
 function applyVisibility() {
   const ui = readUI();
   for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);
+  /* CHILDREN FIRST, THEN PARENTS — one pass each, because a parent's answer
+     READS its children's. SECTIONS is authored parents-first, so this walks it
+     backwards for the child pass; a parent holding only child sections has no
+     controls of its own, and `every` over an empty set is true, so without the
+     second term it would hide itself while its children were on screen. */
+  const childrenOf = new Map();
   for (const s of SECTIONS) {
-    sectionEls[s.id].hidden = CONTROLS.every((c) => c.section !== s.id || wrappers[c.id].hidden);
+    if (!s.parent) continue;
+    if (!childrenOf.has(s.parent)) childrenOf.set(s.parent, []);
+    childrenOf.get(s.parent).push(s.id);
+  }
+  for (let i = SECTIONS.length - 1; i >= 0; i--) {
+    const s = SECTIONS[i];
+    const noControls = CONTROLS.every((c) => c.section !== s.id || wrappers[c.id].hidden);
+    const kids = childrenOf.get(s.id) || [];
+    const noKids = kids.every((id) => sectionEls[id].hidden);
+    /* A CAPTION SHOWS EXACTLY WHEN ITS REASON HOLDS AND EVERY SECTION THAT
+       NAMES IT IS HIDDEN — decided here, once, on the way up: this parent's
+       children have already settled (they come later in SECTIONS, so earlier
+       in this walk), so the caption can read them, and a visible caption is
+       content that keeps its parent on screen. */
+    let noWhy = true;
+    for (const [reason, w] of whyEls) {
+      if (w.parent !== s.id) continue;
+      w.el.hidden = !(evalPredicate(reason.when, ui) && w.sections.every((id) => sectionEls[id].hidden));
+      if (!w.el.hidden) noWhy = false;
+    }
+    sectionEls[s.id].hidden = noControls && noKids && noWhy;
   }
 }
 
@@ -309,7 +385,7 @@ let liveSummary = '';
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false };
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -518,13 +594,40 @@ function mirrorPhrase(mirror) {
     : 'mirror plane through slot 0 (pairs i with n-i)';
 }
 
+/* ONE LINE FOR BOTH POSITION AXES (session 11), because the thing a visitor
+   needs to see is the same in both: WHICH slots each group came out as. The
+   axes are mutually exclusive by placement — slot roles under RADIAL,
+   per-petal under FAN (Eva's ruling 4) — so this reads whichever one split
+   rather than printing two lines that can never both apply. Naming the group
+   from the descriptor's own `slotRole ?? petalRole` keeps footRing() the one
+   owner of which axis this bloom has; a line deriving it from `placement`
+   would be a second copy of that branch.
+
+   PER-PETAL GROUPS PRINT AS "petal 3", not "PETAL_3": the role id is an
+   internal key and the visitor's word for it is the panel's own. */
+/* THE ALL-PETALS LINE — what the one-whorl group was actually BUILT with,
+   printed from the descriptor's own record (base + delta, clamped once) so a
+   visitor reads the number the blade got rather than the delta the slider
+   shows. Absent when the group is not engaged, absent above one whorl. */
+function allPetalsLine(rings, fr) {
+  if (!fr.allPetalsEligible) return '';
+  const r = rings.find((x) => x.allRole !== null && x.allRole !== undefined && x.overrides);
+  if (!r) return '';
+  const said = [];
+  if ('petalSpineCurl' in r.overrides) said.push(`spine curl ${r.overrides.petalSpineCurl.toFixed(0)}°`);
+  if ('petalCup' in r.overrides) said.push(`cup ${r.overrides.petalCup.toFixed(2)}`);
+  if ('petalTipBreadth' in r.overrides) said.push(`tip breadth ${r.overrides.petalTipBreadth.toFixed(2)}`);
+  return said.length ? `all petals as a group · ${said.join(' · ')}\n` : '';
+}
+
 function slotRoleLine(rings, fr) {
-  const split = rings.filter((r) => r.slotRole !== null);
+  const split = rings.filter((r) => r.slotRole !== null || r.petalRole !== null);
   if (!split.length) return '';
+  const said = (r) => (r.slotRole !== null ? r.slotRole.toLowerCase() : r.petalRole.replace('PETAL_', 'petal '));
   const seen = new Map();
-  for (const r of split) if (!seen.has(r.slotRole)) seen.set(r.slotRole, r.slots);
+  for (const r of split) if (!seen.has(said(r))) seen.set(said(r), r.slots);
   const groups = [...seen].map(([role, slots]) =>
-    `${role.toLowerCase()} ${slots.length === 1 ? `slot ${slots[0]}` : `slots ${slots.join('+')}`}`).join(' · ');
+    `${role} ${slots.length === 1 ? `slot ${slots[0]}` : `slots ${slots.join('+')}`}`).join(' · ');
   const clamps = new Map();
   for (const r of split) for (const c of r.overrideClamped || []) clamps.set(c.base, c);
   const clampLine = [...clamps.values()]
@@ -600,7 +703,7 @@ function summarise(ui, acc, mode, rings, fr) {
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
        + footFloorLine(rings)
-       + slotRoleLine(rings, fr)
+       + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
@@ -946,7 +1049,13 @@ window.__bloomMetrics = () => ({
        descriptor and never LATERAL there — "this whorl was not split" and
        "this group is the laterals" are different claims. Z4 reads `slots` to
        assert the assignment is mirror-symmetric. */
-    slotRole: r.slotRole, slots: r.slots ? [...r.slots] : null,
+    slotRole: r.slotRole,
+    allRole: r.allRole ?? null,
+    /* THE PER-PETAL ROLE (session 11) — the descriptor's mirror ORBIT counted
+       outward from the plane, or null. Z8 compares these against the emitted
+       azimuths; Z9 asserts this and `slotRole` are never both non-null. */
+    petalRole: r.petalRole,
+    slots: r.slots ? [...r.slots] : null,
     overrideClamped: (r.overrideClamped || []).map((c) => ({ ...c })),
     overrides: r.overrides ? { ...r.overrides } : null,
   })),
@@ -1005,6 +1114,15 @@ window.__bloomMetrics = () => ({
      it answered "how many petals does a ring carry" with one number, which a
      split whorl does not have. */
   slotRolesEligible: lastFoot.slotRolesEligible,
+  /* THE FAN'S OWN POSITION AXIS (session 11). Cross-checked against the
+     registry's `perPetalEligible` predicate by both gates, exactly as its
+     slot-role twin is: bloom-geometry.js makes the controls INERT and the
+     registry makes them HIDDEN, neither file can read the other, so the
+     relation is measured rather than commented. */
+  perPetalEligible: lastFoot.perPetalEligible,
+  allPetalsEligible: lastFoot.allPetalsEligible,
+  petalRoleCensus: lastFoot.petalRoleCensus ? { ...lastFoot.petalRoleCensus } : null,
+  petalGroupCount: lastFoot.petalGroupCount,
   slotRolesSplit: lastFoot.slotRolesSplit,
   /* THE QUANTIZER IDENTITY'S RESIDUALS — the continuous arm's answer to
      `ringGuardResidual`, and an EQUALITY rather than a bound (footRing's
@@ -1029,7 +1147,7 @@ window.__bloomMetrics = () => ({
      in the codebase that can see an override record that never reached the
      blade - a failure invisible to both STL gates, to the triangle count and
      to J1-J6 alike. Z2's third clause. */
-  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
+  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, allRole: p.allRole ?? null, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
   layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to
