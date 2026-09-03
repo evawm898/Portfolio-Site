@@ -3914,9 +3914,14 @@ export function legacyMatrix() {
    partition: the 33 rows with a labellum or hood control engaged at ONE WHORL
    on RADIAL — enumerated by a script over every matrix before a byte was
    hashed, and found in exactly phase8, phase9 and this one (legacy and
-   phase2–phase7 carry none). Every one of the 33 is predicted bit-identical to
-   its no-override counterpart on the new tree; every other row is predicted
-   unmoved. The measurement is in the charter's session-11 entry.
+   phase2–phase7 carry none). MEASURED: 30 of the 33 moved and 3 did not, on
+   all three matrices identically, and nothing outside the 33 moved. The three
+   are rows whose override CLAMPS TO THE BASE'S OWN VALUE (size x2.00 on a
+   60 mm petal, tip 0.6 + 0.6, curl -180 + -180) — already bit-identical to
+   their no-override counterparts on the base tree, so the retirement had
+   nothing to move there. All 33 are bit-identical to their counterparts on
+   the new tree. Eva ruled thirty the honest set; the charter's session-11
+   entry carries the measurement and the footnote on the predicate.
 
    GENERATED FROM 4f39118's OWN buildMatrix() rather than transcribed, and
    `--verify-frozen --phase10` proves it deep-equal to that commit's output in

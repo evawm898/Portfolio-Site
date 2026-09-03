@@ -1039,11 +1039,14 @@ export function slotRolesEligible(state) {
      Recovery is this one `>= 2` back to `=== 1 ||` plus the matching arm of
      the registry's predicate — nothing else was written to depend on it.
 
-     MEASURED, NOT ASSUMED: the change moves exactly the matrix rows with a
-     labellum or hood control engaged at one whorl on RADIAL (33 rows in each
-     of the live matrix, phase8 and phase9; none in any earlier baseline),
-     and every one of them is predicted bit-identical to its no-override
-     counterpart — see the charter's session-11 entry for the measurement.
+     MEASURED, NOT ASSUMED: of the 33 matrix rows with a labellum or hood
+     control engaged at one whorl on RADIAL (33 in each of phase10, phase9 and
+     phase8; none in any earlier baseline) exactly 30 moved and 3 did not, on
+     all three identically, and nothing outside them moved. The three are
+     rows whose override clamps back to the base's own value, already
+     identical to their no-override counterparts before the change. All 33
+     are bit-identical to those counterparts on this tree — see the charter's
+     session-11 entry.
      =================================================================== */
   if (state.placement !== 'RADIAL') return false;
   return Math.round(state.layerCount) >= 2 && state.layerPhase === 0;

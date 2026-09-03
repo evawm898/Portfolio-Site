@@ -2789,7 +2789,47 @@ exposure the ruling accepts in exchange for the minutes.
           the negative corner where every petal folds under, every clamp binding, the
           composition with a per-petal fan group, the other one-whorl placements, and GATED
           rows above one whorl. The blanket sweep picked the three new controls up at min and
-          max on its own. **Matrix 376 → 401.** The byte measurement was still running when this was committed; the commit that follows carries it.
+          max on its own. **Matrix 376 → 401.**
+
+          **MEASURED: 30 MOVED, 3 UNMOVED, 0 OUTSIDE — ON ALL THREE MATRICES, IDENTICALLY**
+          (`tools/diff-bloom-bytes.mjs --compare` of `4f39118` against this tree: phase10
+          346/376 identical, phase9 257/287, phase8 216/246; every moved row in the predicted
+          set, and the 30 moved rows bit-identical to their no-override counterparts on this
+          tree — 33 of 33 predicted rows equal on this tree, plus the live matrix's five
+          GATED one-whorl rows, 5 of 5). **The prediction was three rows too wide, and the
+          three are the same three on every matrix**: `SLOT: size x2.00 saturating`, `SLOT:
+          the tip partition inverted`, and `SLOT: curl clamp binds downward`. Each is a row
+          whose override CLAMPS BACK TO THE BASE'S OWN VALUE (x2.00 on a 60 mm petal asks 120
+          and gets 60; 0.6 + 0.6 breadth clamps to 0.6; −180 + −180 curl clamps to −180), so
+          the labellum was built from the base numbers even on the old tree. Measured rather
+          than argued: on the BASE worktree those three rows were ALREADY bit-identical to
+          their no-override counterparts and the other 30 were not — the retirement moved
+          exactly the rows whose override changed the built geometry, and the three had
+          nothing to lose. Eva ruled thirty the honest set and asked two things of the
+          close-out: that phase8 come back 30 / 3 / 0 (it did), and whether the "engaged"
+          predicate that over-predicted has any consumer besides the prediction.
+
+          **FOOTNOTE, NOT DEFECT — the predicate had one consumer, and it was the prediction
+          script.** Established by grep, not assumed: the off-identity filter
+          (`control !== LAW_IDENTITY[law]`) has six readers — the resolver itself, the
+          harness's load-time default check, Z2's `wantsRecord`, Z5's `wantSplit`, the orchid
+          sheet's `anySlot` and the zygomorphy sheet's `anyDelta` — and every one of them
+          states what the producer states: a control off its identity yields a RECORD and the
+          whorl SPLITS. None of them claims the built value differs from the base, none selects
+          gate rows and none drives panel visibility, so producer and consumers share one
+          filter and there is no E3 shape. The claim "engaged ⇒ moved" existed only in the
+          session's enumeration script (`enum-orchid-rows.mjs`, scratch) and in this
+          prediction table.
+
+          **RECORDED, NOT BUILT — what the three rows do point at.** A record that clamps to
+          the base value still SPLITS the whorl, and the split serves nothing: the same
+          regrouping the sixth prevention above guards against, on rows where the override is
+          engaged and inert at once. It was byte-identical on all three rows on both trees
+          (the regrouped sum happened to be exact), so it is not a defect today; a value-aware
+          guard — the resolver returning null when every composed value equals its base —
+          is one line, but it changes which whorls split and must be measured before it is
+          written. Z7 reads "the engaged axis" as the producer does, so it would move with the
+          guard rather than against it.
 
         * **TWO POSITIVE CONTROLS, RED THEN GREEN, in throwaway copies of the tree.** PP7 —
           the geometry keeps the old one-whorl arm while the registry hides — was caught at
