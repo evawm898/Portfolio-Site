@@ -66,16 +66,22 @@ function makeInput(c) {
    it and nothing to desync. */
 for (const s of SECTIONS) {
   const det = document.createElement('details');
-  det.className = 'bl-sec';
+  det.className = s.parent ? 'bl-sec bl-sec--sub' : 'bl-sec';
   det.id = `sec-${s.id}`;
   det.dataset.section = s.id;
+  if (s.parent) det.dataset.parent = s.parent;
   /* The FIRST-LOAD state, from the registry's literal. Never written again by
      this file: once the page is up, open/close belongs to the visitor. */
   det.open = s.open;
   const sum = document.createElement('summary');
   sum.textContent = s.label;
   det.append(sum);
-  panelRoot.append(det);
+  /* A NESTED SECTION GOES INSIDE ITS PARENT'S ELEMENT, which the registry
+     guarantees already exists: SECTIONS is authored parents-first and
+     verifySections() has thrown at module load if a parent is missing or is
+     itself nested, so there is no ordering to get wrong here and no
+     silent-drop path to guard against. */
+  (s.parent ? sectionEls[s.parent] : panelRoot).append(det);
   sectionEls[s.id] = det;
 }
 
@@ -106,9 +112,19 @@ for (const s of SECTIONS) {
    that, and open/closed and shown/hidden are different questions. */
 panelRoot.addEventListener('toggle', (e) => {
   const det = e.target;
-  if (!(det instanceof HTMLDetailsElement) || det.parentElement !== panelRoot) return;
+  if (!(det instanceof HTMLDetailsElement) || !panelRoot.contains(det)) return;
   if (!det.open) return;
-  for (const other of Object.values(sectionEls)) if (other !== det) other.open = false;
+  /* OPENING A DROP-DOWN CLOSES ITS SIBLINGS — the same rule this listener has
+     always applied, stated one level more generally so nesting falls out of it
+     (Eva, Sep 3). At the top level a section's siblings ARE the other
+     sections, so the shipped behaviour is unchanged; inside "Petal roles",
+     opening Petal 2 closes Petal 1 and leaves the parent open, because the
+     parent is not a sibling. A second listener for the nested set would have
+     been N copies of one rule, which is the thing that drifts — and it is why
+     the guard is "inside the panel" rather than "a direct child of it". */
+  for (const other of det.parentElement.children) {
+    if (other !== det && other instanceof HTMLDetailsElement) other.open = false;
+  }
 }, true);
 
 for (const c of CONTROLS) {
@@ -173,8 +189,23 @@ function refreshLabels(ui) {
 function applyVisibility() {
   const ui = readUI();
   for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);
+  /* CHILDREN FIRST, THEN PARENTS — one pass each, because a parent's answer
+     READS its children's. SECTIONS is authored parents-first, so this walks it
+     backwards for the child pass; a parent holding only child sections has no
+     controls of its own, and `every` over an empty set is true, so without the
+     second term it would hide itself while its children were on screen. */
+  const childrenOf = new Map();
   for (const s of SECTIONS) {
-    sectionEls[s.id].hidden = CONTROLS.every((c) => c.section !== s.id || wrappers[c.id].hidden);
+    if (!s.parent) continue;
+    if (!childrenOf.has(s.parent)) childrenOf.set(s.parent, []);
+    childrenOf.get(s.parent).push(s.id);
+  }
+  for (let i = SECTIONS.length - 1; i >= 0; i--) {
+    const s = SECTIONS[i];
+    const noControls = CONTROLS.every((c) => c.section !== s.id || wrappers[c.id].hidden);
+    const kids = childrenOf.get(s.id) || [];
+    const noKids = kids.every((id) => sectionEls[id].hidden);
+    sectionEls[s.id].hidden = noControls && noKids;
   }
 }
 

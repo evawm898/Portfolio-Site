@@ -894,9 +894,31 @@ export function roleForSlot(i, n, mirror = MIRROR_THROUGH_SLOT) {
    the answer onto each descriptor, the registry's per-group predicates are
    asserted against it by Z1's biconditional, and no consumer counts orbits for
    itself. Derived from the slot count and the plane, which is what makes it
-   true in both toggle positions without naming the toggle. */
+   true in both toggle positions without naming the toggle.
+
+   THE THROUGH-SLOT ARM WAS WRONG FOR EVEN n, AND IT WAS UNREACHABLE — found
+   Sep 3, by enumerating the orbits and comparing rather than by reading the
+   expression. It said `(n + 1) >> 1`, which counts the orbits of
+   `i <-> (n-i) mod n` correctly only when that involution has ONE fixed point.
+   It has TWO at even n: slot 0 AND slot n/2. So the count is short by one on
+   every even n — measured, 20 disagreements across n = 2..40.
+
+   WHY NOTHING SAW IT. Under FAN the two arms are paired with a parity: a
+   mirror-line petal gives `n = 2*perSide + 1`, always ODD, and that is the
+   only way the through-slot arm is reached; the toggle-off arm is
+   through-GAP, where `n / 2` is right. So every reachable state was correct
+   and a general-looking function was wrong everywhere else — which is this
+   project's label-lie shape, in arithmetic. `Math.floor(n/2) + 1` is the
+   orbit count for the through-slot arm at BOTH parities (fixed points plus
+   pairs, `(n + fixedPoints) / 2`), and it agrees with the old expression on
+   every state the fan can reach, so nothing shipped moves.
+
+   IT IS ASSERTED AGAINST THE CENSUS NOW rather than trusted: footRing()'s
+   `slotRoleCensus`/`petalRoleCensus` are built by an unconditional loop over
+   the slots, so comparing this closed form against that count is a comparison
+   between two separate computations. See Z8's group-count clause. */
 export function petalGroupCount(n, mirror) {
-  return mirror === MIRROR_THROUGH_GAP ? n / 2 : (n + 1) >> 1;
+  return mirror === MIRROR_THROUGH_GAP ? n / 2 : Math.floor(n / 2) + 1;
 }
 
 /* THE SLOT -> PER-PETAL-ROLE ASSIGNMENT, and it has exactly ONE owner.

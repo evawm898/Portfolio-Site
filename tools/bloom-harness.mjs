@@ -1669,6 +1669,26 @@ export async function zygoAssertions(page, row) {
     if (!census) {
       bad.push(`Z1: ${eligibleAxis} roles are eligible but the build reported no role census — the group sizes those controls' visibility depends on are unavailable`);
     } else {
+      /* THE CLOSED FORM AGREES WITH THE CENSUS — two SEPARATE computations, not
+         one restated. `petalGroupCount()` is an arithmetic expression over the
+         slot count and the plane; the census is an unconditional loop over every
+         slot. Comparing them is what turns "how many groups are there" from a
+         claim into a measurement.
+
+         IT CAUGHT A REAL ONE ON THE DAY IT WAS WRITTEN (Sep 3). The through-slot
+         arm read `(n + 1) >> 1`, which counts the orbits of `i <-> (n-i) mod n`
+         correctly only when that involution has ONE fixed point; it has TWO at
+         even n (slot 0 and slot n/2), so the count was short by one on all 20
+         even counts. Nothing saw it because the fan pairs a mirror-line petal
+         with an ODD slot count, so the through-slot arm was only ever reached at
+         odd n — a general-looking function right on every state its callers
+         could produce. */
+      if (m.perPetalEligible && typeof m.petalGroupCount === 'number') {
+        const peopled = roleList.filter((r) => (census[r] || 0) > 0).length;
+        if (m.petalGroupCount !== peopled) {
+          bad.push(`Z1: the build reports petalGroupCount ${m.petalGroupCount} and its own census has ${peopled} non-empty group(s) — the closed form and the slot-by-slot count disagree, so one of them is describing an arrangement this bloom does not have`);
+        }
+      }
       for (const role of roleList) {
         /* DEDUPED, because one control may drive several bases — `hoodSize`
            scales petalLength AND petalWidth, so it is two ROLE_OVERRIDES rows

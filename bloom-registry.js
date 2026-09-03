@@ -397,6 +397,26 @@ export const SECTIONS = [
      `open: true` across the whole array, and ARRANGEMENT already holds it. */
   ...Array.from({ length: MAX_FAN_GROUPS }, (_, k) => ({
     id: `petal${k + 1}`, label: `Petal ${k + 1}`, open: false,
+    /* NESTED INSIDE "Petal roles" (Eva, Sep 3, from the deploy preview): "have
+       the roles be its own drop down which then enables all the other petals
+       and their roles to be drop downs."
+
+       WHY IT IS A `parent` FIELD AND NOT A SECOND LIST. Membership sits on the
+       CHILD, exactly as a control's `section` sits on the control — a parent
+       naming its children would be two lists to keep in step in the file that
+       exists to state the registration rule, and the panel would silently drop
+       whichever an edit missed. `verifySections()` checks the relation at
+       module load, so the app, both gates and every shot tool get it for free.
+
+       AND THE ACCORDION NEEDED NO SECOND MECHANISM. Its one capture listener
+       used to close every OTHER top-level section; it now closes a
+       drop-down's SIBLINGS, which is the same rule stated one level more
+       generally — at the top level the siblings ARE the sections, so the
+       shipped behaviour is unchanged, and nesting falls out of it. One owner,
+       one listener, one rule; a nested accordion with its own handler would
+       have been the N-copies-of-one-rule defect this panel was built to
+       avoid. */
+    parent: 'roles',
   })),
 ];
 
@@ -424,9 +444,34 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
      it and the first toggle would silently correct it, which is a panel whose
      shipped appearance disagrees with its own registry until someone clicks.
      Zero is legal: every section shut is reachable by closing the open one. */
-  const opens = sections.filter((s) => s.open === true).map((s) => s.id);
-  if (opens.length > 1) {
-    bad.push(`the panel is an accordion, so at most ONE section may declare open: true — found ${opens.length} (${opens.join(', ')})`);
+  /* AT MOST ONE OPEN PER SIBLING GROUP, which is the accordion's rule stated
+     where the literals live. It used to be "at most one in the whole array";
+     nesting makes that too strong — a child drop-down may be open inside its
+     open parent, and the two are siblings of nothing. Grouping by `parent`
+     (top-level sections share the group `null`) says the same thing about the
+     top level and the right thing about each nested set. */
+  const byParent = new Map();
+  for (const s of sections) {
+    const k = s.parent ?? null;
+    if (!byParent.has(k)) byParent.set(k, []);
+    byParent.get(k).push(s);
+  }
+  for (const [k, group] of byParent) {
+    const opens = group.filter((s) => s.open === true).map((s) => s.id);
+    if (opens.length > 1) {
+      bad.push(`the panel is an accordion, so at most ONE section may declare open: true among siblings${k === null ? ' at the top level' : ` of "${k}"`} — found ${opens.length} (${opens.join(', ')})`);
+    }
+  }
+  /* A PARENT MUST EXIST, AND NESTING IS ONE LEVEL DEEP. The second clause is a
+     real bound rather than caution: `applyVisibility()` derives a section's
+     hidden state from its controls AND its child sections, and the panel gate
+     walks the tree to assert it — both are written for one level, so a
+     grandchild would be a structure the instruments do not describe. */
+  for (const s of sections) {
+    if (s.parent === undefined || s.parent === null) continue;
+    const par = sections.find((x) => x.id === s.parent);
+    if (!par) bad.push(`section "${s.id}" names parent "${s.parent}", which is not in SECTIONS`);
+    else if (par.parent) bad.push(`section "${s.id}" nests under "${par.id}", which is itself nested — the panel is one level deep`);
   }
   const used = new Set();
   for (const c of controls) {
@@ -435,9 +480,15 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     else used.add(c.section);
   }
   /* An EMPTY section is a failure, not a tidy placeholder for later work: it
-     renders as a header that opens onto nothing, and the reason it is empty
-     is almost always that the controls meant for it name something else. */
-  for (const s of sections) if (!used.has(s.id)) bad.push(`section "${s.id}" has no controls`);
+     renders as a header that opens onto nothing, and the reason it is empty is
+     almost always that the controls meant for it name something else. A parent
+     satisfies this with CHILD SECTIONS instead of controls — "Petal roles"
+     holds the per-petal drop-downs and no sliders of its own — so the check is
+     "holds something", not "holds controls". */
+  const hasChildren = new Set(sections.filter((s) => s.parent).map((s) => s.parent));
+  for (const s of sections) {
+    if (!used.has(s.id) && !hasChildren.has(s.id)) bad.push(`section "${s.id}" has neither controls nor child sections`);
+  }
   for (const id of RETIRED_IDS) if (controls.some((c) => c.id === id)) bad.push(`retired id "${id}" is a live control`);
   if (bad.length) throw new Error(`bloom-registry: section declaration is broken:\n  - ${bad.join('\n  - ')}`);
   return true;

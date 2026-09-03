@@ -376,6 +376,7 @@ const accordion = await page.evaluate(async ({ ids, declared, breakIt }) => {
 
   out.firstLoad = openNow();
   out.declared = declared;
+  out.lastOpened = null;
   snap();
 
   /* A2 — every section, opened the way a visitor opens it.
@@ -400,10 +401,15 @@ const accordion = await page.evaluate(async ({ ids, declared, breakIt }) => {
     out.steps.push({ opened: id, open: openNow(), clicked: true });
     snap();
   }
-  /* A3 — close the one that is open; nothing may spring open in its place. */
-  const last = openNow();
-  if (last.length === 1) {
-    document.querySelector(`#sec-${last[0]} > summary`).click();
+  /* A3 — close the section the walk ended on; nothing may spring open in its
+     place. It is the LAST-OPENED one rather than "the only open one", because
+     with nesting its ancestors are legitimately open beside it — and closing
+     an ancestor instead would be a different transition from the one this
+     clause is about. */
+  out.lastOpened = order[order.length - 1];
+  const lastDet = document.getElementById(`sec-${out.lastOpened}`);
+  if (lastDet && lastDet.open) {
+    document.querySelector(`#sec-${out.lastOpened} > summary`).click();
     await frame();
   }
   out.afterClosingLast = openNow();
@@ -416,18 +422,57 @@ if (JSON.stringify(accordion.firstLoad) !== JSON.stringify(accordion.declared)) 
 } else {
   ok.push(`accordion A1: at first load exactly the declared section is open [${accordion.declared.join(', ') || 'none'}]`);
 }
+/* THE RULE IS EXCLUSIVITY AMONG SIBLINGS (Eva, Sep 3), which is the rule this
+   panel has always had, stated one level more generally so nesting falls out
+   of it. At the top level a section's siblings ARE the other top-level
+   sections, so this is the old assertion verbatim there; inside "Petal roles",
+   opening Petal 4 must close Petal 2 and must LEAVE THE PARENT OPEN — a child
+   whose opening closed its own parent would be a panel that cannot be used.
+
+   THE OLD FORM SAID "exactly one open in the whole panel" and CI failed 11
+   rows on it the moment the sections nested. That was the gate's expectation
+   going stale against a ruling, for the second time on this branch — the same
+   shape as ROLES_COMBOS. What is asserted now is stronger, not looser: every
+   sibling group is checked, so a nested set that failed to be exclusive would
+   fire here even though the old clause had nothing to say about it. */
+const parentOf = new Map(SECTIONS.map((sec) => [sec.id, sec.parent ?? null]));
+const ancestorsOf = (id) => { const out = []; let p = parentOf.get(id); while (p) { out.push(p); p = parentOf.get(p); } return out; };
+/* EFFECTIVELY OPEN — open, AND every ancestor open too. The distinction is not
+   pedantry and the gate found it: closing "Petal roles" does not reset the
+   petal drop-down open inside it (that is what `<details>` does, and it is
+   what makes the panel remember where you were), so the raw open set can hold
+   a section no visitor can see. Asserting over the raw set would demand the
+   app forget that state — the assertion writing a behaviour rather than
+   checking one. What a visitor experiences is the reachable set, so that is
+   what is asserted. */
+const effectivelyOpen = (open) => open.filter((id) => ancestorsOf(id).every((a) => open.includes(a)));
 let exclusive = true;
 for (const st of accordion.steps) {
-  if (st.open.length !== 1 || st.open[0] !== st.opened) {
+  /* What should be REACHABLY open after opening `id`: the section itself plus
+     every ancestor, and nothing else. */
+  const want = new Set([st.opened, ...ancestorsOf(st.opened)]);
+  const seen = effectivelyOpen(st.open);
+  const extra = seen.filter((id) => !want.has(id));
+  const missing = [...want].filter((id) => !seen.includes(id));
+  if (extra.length || missing.length) {
     exclusive = false;
-    note(`accordion A2: opening "${st.opened}" left [${st.open.join(', ')}] open — the panel must hold exactly one`);
+    note(`accordion A2: opening "${st.opened}" left [${st.open.join(', ')}] open`
+      + (extra.length ? ` — ${extra.join(', ')} should have closed (a drop-down closes its SIBLINGS)` : '')
+      + (missing.length ? ` — ${missing.join(', ')} should have stayed open (an open child inside a shut parent is unreachable)` : ''));
   }
 }
-if (exclusive) ok.push(`accordion A2: opening each of the ${accordion.steps.length} sections by a real summary click left exactly that one open, every time (walk order ${accordion.order.join(' > ')} — the initially-open section last, so every click is an opening)`);
-if (accordion.afterClosingLast.length !== 0) {
-  note(`accordion A3: closing the open section left [${accordion.afterClosingLast.join(', ')}] open — nothing may spring open by itself`);
-} else {
-  ok.push('accordion A3: closing the open section leaves zero open, and nothing springs open in its place');
+if (exclusive) ok.push(`accordion A2: opening each of the ${accordion.steps.length} sections by a real summary click left exactly that one plus its ancestors open, every time (walk order ${accordion.order.join(' > ')} — the initially-open section last, so every click is an opening)`);
+/* A3 — closing the last-opened section. What may remain is its ANCESTORS: the
+   walk ends on a nested section, and closing a child does not close its
+   parent. Nothing else may be open, and nothing may spring open. */
+{
+  const allowed = new Set(ancestorsOf(accordion.lastOpened));
+  const sprang = effectivelyOpen(accordion.afterClosingLast).filter((id) => !allowed.has(id));
+  if (sprang.length) {
+    note(`accordion A3: closing the open section left [${sprang.join(', ')}] open — nothing may spring open by itself`);
+  } else {
+    ok.push(`accordion A3: closing the open section leaves only its ancestors [${[...allowed].join(', ') || 'none'}] open, and nothing springs open in its place`);
+  }
 }
 
 const stateSet = new Set(accordion.states);

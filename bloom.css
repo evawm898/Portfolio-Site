@@ -82,6 +82,32 @@ body {
 /* A section's last control keeps the gap to the next summary honest. */
 .bl-sec > .bl-ctrl:last-child { margin-bottom: 10px; }
 
+/* ===================================================================
+   NESTED DROP-DOWNS — the per-petal groups inside "Petal roles" (Eva,
+   Sep 3). They are the SAME element and the same accordion rule one level
+   in, so they inherit everything above and change only what has to differ:
+   an indent and a rule down the left, so a visitor can see at a glance
+   which drop-downs belong to the group they opened.
+
+   THE INDENT IS THE ONLY STRUCTURAL SIGNAL, deliberately. A second border
+   colour or a fill would read as "a different kind of thing", and these are
+   not a different kind of thing — they are sections, with sections'
+   behaviour. The rule is the accent at low alpha rather than the line
+   colour, because it marks CONTAINMENT rather than separation. */
+.bl-sec--sub {
+  border-top: 0;
+  margin: 0 0 0 2px;
+  padding-left: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--bl-accent) 22%, transparent);
+}
+.bl-sec--sub > summary {
+  padding: 7px 0 6px;
+  font-size: 9.5px;
+  letter-spacing: .14em;
+}
+/* The parent's own last child keeps the same breathing room a control gets. */
+.bl-sec > .bl-sec--sub:last-child { margin-bottom: 10px; }
+
 .bl-ctrl { margin-bottom: 12px; }
 .bl-ctrl label {
   display: flex; justify-content: space-between; align-items: baseline;
