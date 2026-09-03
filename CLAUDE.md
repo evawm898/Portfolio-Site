@@ -31,9 +31,11 @@ solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 both run in CI and both must pass before any bloom geometry change is done.
 Control-panel changes have their own gate: `node tools/verify-bloom-panel.mjs`
 (every registry control renders exactly once in its declared section, a control
-inside a collapsed section still reads, writes and rebuilds, and every
-predicate-gated control is asserted to APPEAR as well as to hide), with
-`--negative-control` required to fail. Its companion sheet is
+inside a collapsed section still reads, writes and rebuilds, every
+predicate-gated control is asserted to APPEAR as well as to hide, a DERIVED
+section label is read back against the slots the builder emitted, and no two
+sections on screen share a name), with `--negative-control` required to fail on
+all five routes. Its companion sheet is
 `node tools/shot-bloom-panel.mjs <dir>` — the panel, not the canvas.
 Arrangement changes have their own sheet too:
 `node tools/shot-bloom-arrangement.mjs <dir>` — layers, placement and the
@@ -91,7 +93,16 @@ and which are KEPT so composition stays one predicate arm away:
 composition is that one arm in `bloom-geometry.js` plus its twin in
 `bloom-registry.js`. The fan loses labellum TIP BREADTH outright, because the
 per-petal set ships without a tip-breadth row — one row in `ROLE_OVERRIDES`
-and one in the registry the day it is wanted.
+and one in the registry the day it is wanted. **The panel names both axes by
+petal number** (Eva, Sep 3, ruling A): the per-petal groups are drop-downs
+inside "Petal roles", and under RADIAL the labellum's and hood's sliders are
+two more of them — "Petal 1" (slot 0, the plane's fixed point, at every count)
+and "Petal N" for the LAST orbit, `petalGroupCount(n, THROUGH_SLOT)`, so the
+rosette reads "Petal 1, Petal 5" at eight petals with the gap the ruling
+accepted (the laterals carry no controls). The hood's label is the panel's one
+DERIVED summary — `labelFrom(ui)` in `SECTIONS`, `sectionLabel()` the one owner
+for the app, the gate and the sheet, and `verifySections()` refusing a literal
+beside a derivation. Control ids are unchanged; nothing is retired.
 
 **A GREEN RUN DOES NOT ENDORSE THE PER-PETAL NUMBERING** — measured on six
 worktrees, not derived. An off-by-one orbit index and a supersession that

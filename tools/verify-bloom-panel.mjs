@@ -103,12 +103,16 @@
            suppresses the accordion's toggle before the panel's own capture
            listener can see it, and freezes every wrapper's `hidden` so the
            panel stops re-evaluating visibility while its declarations stay
-           perfect — and requires this run to FAIL on all four.
+           perfect, and freezes a derived section label so the panel stops
+           renaming a drop-down whose petal number moved — and requires this
+           run to FAIL on all five.
            A check nobody has seen fail is a hope.
    =================================================================== */
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
          RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
          SPIRAL_LEGIBLE_COUNT, MAX_FAN_GROUPS } from './bloom-harness.mjs';
+import { sectionLabel } from '../bloom-registry.js';
+import { mirrorPartner } from '../bloom-geometry.js';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -158,9 +162,35 @@ const WITNESS = {
      using. Triangle count could not be the witness — a role override moves
      vertices on a fixed-topology grid and costs exactly zero triangles, which
      would have made this assertion a passing no-op. */
-  roles: { id: 'labellumSize', value: '1.6',
+  /* "PETAL ROLES" ITSELF NOW HOLDS ONLY SESSION A'S THREE LAYER DELTAS as
+     controls of its own (Eva's ruling A, Sep 3, moved the eight slot-role
+     sliders into the two rosette drop-downs below), and all three need a
+     second whorl — so this witness carries the precondition session A
+     predicted for exactly this section, and the anti-vacuity clause below
+     refuses to drive a control that is still hidden after it. The `before`
+     is read AFTER layerCount is 2, so the delta belongs to innerCup. */
+  roles: { id: 'innerCup', value: '0.6',
+           pre: [{ id: 'layerCount', value: '2' }],
+           read: (m) => {
+             const idx = m.rings.findIndex((r) => r.role === 'INNER');
+             const applied = idx >= 0 && m.petalRingApplied[idx] ? m.petalRingApplied[idx].applied.petalCup : 'no descriptor';
+             return `${m.rings.length}/${idx}/${applied}`;
+           },
+           what: 'descriptor count / index and effective petalCup of the INNER whorl' },
+  /* THE ROSETTE'S TWO GROUPS — the labellum's witness is the one "roles"
+     carried until ruling A (no precondition: slot roles are eligible at the
+     shipping default), and the hood's is its twin read from the HOOD
+     descriptor, which exists only once the override splits the whorl. */
+  labellumGroup: { id: 'labellumSize', value: '1.6',
            read: (m) => `${m.rings.length}/${m.slotRolesSplit}/${m.petalRingApplied[0] && m.petalRingApplied[0].applied.petalLength}`,
            what: 'descriptor count / split / the labellum petalLength the builder used' },
+  hoodGroup: { id: 'hoodSize', value: '1.6',
+           read: (m) => {
+             const idx = m.rings.findIndex((r) => r.slotRole === 'HOOD');
+             const applied = idx >= 0 && m.petalRingApplied[idx] ? m.petalRingApplied[idx].applied.petalLength : 'no descriptor';
+             return `${m.rings.length}/${m.slotRolesSplit}/${idx}/${applied}`;
+           },
+           what: 'descriptor count / split / index and effective petalLength of the HOOD descriptor' },
   /* ===================================================================
      THE PER-PETAL SECTIONS — nine of them, and they are the case SESSION A
      PREDICTED THIS GATE WOULD ONE DAY HAVE TO HANDLE and session B escaped.
@@ -285,7 +315,7 @@ for (const s of SECTIONS) {
   const rendered = census.sections.filter((r) => r.id === s.id);
   if (rendered.length !== 1) { note(`section "${s.id}" renders ${rendered.length} times, expected exactly 1`); continue; }
   if (rendered[0].open !== s.open) note(`section "${s.id}" first-load open=${rendered[0].open}, registry declares open=${s.open}`);
-  if (rendered[0].summary !== s.label) note(`section "${s.id}" summary reads "${rendered[0].summary}", registry declares "${s.label}"`);
+  if (rendered[0].summary !== sectionLabel(s, DEFAULTS)) note(`section "${s.id}" summary reads "${rendered[0].summary}", registry declares "${sectionLabel(s, DEFAULTS)}" at DEFAULTS`);
 }
 ok.push('first-load open state matches the registry literal for every section: '
   + SECTIONS.map((s) => `${s.id}=${s.open ? 'open' : 'closed'}`).join(' '));
@@ -317,17 +347,24 @@ if (census.strayInputs.length) note(`panel contains input(s) no registry control
 if (census.straySpans.length) note(`panel contains orphan read-out span(s): ${census.straySpans.join(', ')}`);
 if (census.retiredPresent.length) note(`retired id(s) present in the DOM: ${census.retiredPresent.join(', ')}`);
 
-/* A section is hidden iff every control in it is hidden — the derived rule,
-   checked against the DOM rather than trusted from the code that wrote it. */
+/* A section is hidden iff every control in it is hidden AND every child
+   section is — the derived rule, checked against the DOM rather than trusted
+   from the code that wrote it. The child clause is what a parent holding only
+   drop-downs needs: "Petal roles" has three controls of its own, all hidden at
+   one whorl, and is on screen because its two rosette groups are. */
+const wantSectionHidden = (secId, controlHidden, sectionHidden) => {
+  const members = CONTROLS.filter((c) => c.section === secId);
+  const kids = SECTIONS.filter((x) => x.parent === secId);
+  return members.every((c) => controlHidden(c.id) === true) && kids.every((k) => sectionHidden(k.id) === true);
+};
 for (const s of SECTIONS) {
-  const members = CONTROLS.filter((c) => c.section === s.id);
-  const allHidden = members.every((c) => byId[c.id].hidden === true);
   const rendered = census.sections.find((r) => r.id === s.id);
-  if (rendered && rendered.hidden !== allHidden) {
-    note(`section "${s.id}" hidden=${rendered.hidden}, but "every member hidden" is ${allHidden}`);
+  const want = wantSectionHidden(s.id, (id) => byId[id].hidden, (id) => census.sections.find((r) => r.id === id)?.hidden);
+  if (rendered && rendered.hidden !== want) {
+    note(`section "${s.id}" hidden=${rendered.hidden}, but "every member control and child section hidden" is ${want}`);
   }
 }
-ok.push('every section\'s hidden state equals "every control in it is hidden"');
+ok.push('every section\'s hidden state equals "every control in it, and every child section, is hidden"');
 
 /* ---------------- the accordion, and the collapse invariant ----------------
 
@@ -541,19 +578,25 @@ if (!shutBad.length && !shutDrift.length && stillShut === 0) {
   const leaked = wantHidden.filter((id) => seen.shown.includes(id));
   if (missing.length) note(`at first load these controls should be visible and are not: ${missing.join(', ')}`);
   if (leaked.length) note(`at first load these controls should be hidden and are visible: ${leaked.join(', ')}`);
+  /* Predicted from the PREDICATES (not from the DOM's own answers), children
+     first so a parent's prediction reads its children's predictions. */
+  const predHidden = {};
+  for (let i = SECTIONS.length - 1; i >= 0; i--) {
+    const sec = SECTIONS[i];
+    predHidden[sec.id] = wantSectionHidden(sec.id, (id) => !evalPredicate(CONTROLS.find((c) => c.id === id).visibleWhen, DEFAULTS), (id) => predHidden[id]);
+  }
   for (const sec of seen.sections) {
-    const members = CONTROLS.filter((c) => c.section === sec.id);
-    const allHidden = members.every((c) => !evalPredicate(c.visibleWhen, DEFAULTS));
-    if (sec.hidden !== allHidden) {
-      note(`at first load section "${sec.id}" is ${sec.hidden ? 'hidden' : 'shown'}, but ${allHidden ? 'every one of its controls is hidden' : 'it has at least one visible control'} — a section is hidden iff every control in it is`);
+    if (sec.hidden !== predHidden[sec.id]) {
+      note(`at first load section "${sec.id}" is ${sec.hidden ? 'hidden' : 'shown'}, but ${predHidden[sec.id] ? 'every one of its controls and child sections is hidden' : 'it has at least one visible control or child section'} — a section is hidden iff every control and child in it is`);
     }
   }
   if (!missing.length && !leaked.length) {
     const roles = seen.sections.find((x) => x.id === 'roles');
     const rolesShown = CONTROLS.filter((c) => c.section === 'roles' && seen.shown.includes(c.id)).map((c) => c.id);
     const rolesHidden = CONTROLS.filter((c) => c.section === 'roles' && !seen.shown.includes(c.id)).map((c) => c.id);
-    ok.push(`first load: ${seen.shown.length} of ${CONTROLS.length} controls visible, ${wantHidden.length} hidden, every section hidden iff empty of visible controls`);
-    ok.push(`first load: section "roles" is ${roles.hidden ? 'HIDDEN' : 'SHOWN'} and ${roles.open ? 'open' : 'collapsed'} — visible: [${rolesShown.join(', ')}]; hidden: [${rolesHidden.join(', ')}]`);
+    const kidsShown = seen.sections.filter((x) => SECTIONS.find((k) => k.id === x.id)?.parent === 'roles' && !x.hidden).map((x) => x.id);
+    ok.push(`first load: ${seen.shown.length} of ${CONTROLS.length} controls visible, ${wantHidden.length} hidden, every section hidden iff empty of visible controls and child sections`);
+    ok.push(`first load: section "roles" is ${roles.hidden ? 'HIDDEN' : 'SHOWN'} and ${roles.open ? 'open' : 'collapsed'} — own controls visible: [${rolesShown.join(', ') || 'none'}]; hidden: [${rolesHidden.join(', ')}]; child drop-downs visible: [${kidsShown.join(', ') || 'none'}]`);
   }
 }
 
@@ -698,10 +741,34 @@ for (const [driverId, dependents] of drivers) {
         const input = w.querySelector('input,select');
         if (input) seen[input.id] = w.hidden;
       }
-      return { state: window.__bloomUIState(), seen };
+      /* The summaries a visitor can currently SEE — a section hidden by its
+         own derivation, or inside a hidden parent, is not on screen. */
+      const visibleLabels = [...document.querySelectorAll('#panelControls details')]
+        .filter((d) => !d.hidden && !d.parentElement.closest('details')?.hidden)
+        .map((d) => ({ id: d.dataset.section, label: d.querySelector(':scope > summary').textContent }));
+      return { state: window.__bloomUIState(), seen, visibleLabels };
     }, { id: driverId, value, breakIt: NEGATIVE_CONTROL });
 
+
     const tag = `[visibility] ${driverId} -> ${value}`;
+    /* NO TWO SECTIONS ON SCREEN AT ONCE MAY SHARE A NAME (Eva's ruling A, Sep
+       3). The fan's `petal1` and the rosette's `labellumGroup` are BOTH called
+       "Petal 1", and the rosette's hood group is "Petal N" for an N a fan
+       group may also carry — by design, since the number is the orbit's and
+       the two placements never share a screen. That last clause is the claim,
+       and this is where it is measured rather than trusted: every state this
+       route drives (placement to each of its four values among them) reads
+       the visible summaries back and refuses a duplicate. */
+    {
+      const byLabel = new Map();
+      for (const { id, label } of res.visibleLabels) {
+        if (!byLabel.has(label)) byLabel.set(label, []);
+        byLabel.get(label).push(id);
+      }
+      const dup = [...byLabel].filter(([, ids]) => ids.length > 1);
+      if (dup.length) note(`${tag}: two visible sections share a name — ${dup.map(([l, ids]) => `"${l}" on ${ids.join(' and ')}`).join('; ')}`);
+      else ok.push(`${tag}: ${res.visibleLabels.length} sections on screen, no two sharing a name`);
+    }
     let wrong = 0;
     for (const c of CONTROLS) {
       const want = !evalPredicate(c.visibleWhen, res.state);
@@ -714,6 +781,81 @@ for (const [driverId, dependents] of drivers) {
       const shown = dependents.filter((id) => res.seen[id] === false);
       ok.push(`${tag}: all ${CONTROLS.length} wrappers agree with their predicates; dependents shown: ${shown.length ? shown.join(', ') : 'none'}`);
     }
+  }
+}
+
+/* ---------------- (g) THE DERIVED SECTION LABEL — the rosette's hood group ----------------
+
+   THE FIRST SECTION WHOSE NAME MOVES (Eva's ruling A, Sep 3): the labellum is
+   "Petal 1" at every count, and the hood is "Petal N" where N is the LAST
+   orbit's number — 2 at three petals, 5 at eight, 21 at forty. The registry
+   derives that through `labelFrom(ui)`; the app rewrites the summary on every
+   rebuild. Two things are asserted, and the second is the one that matters:
+
+     1. THE DOM SAYS WHAT THE OWNER SAYS — the summary text equals
+        sectionLabel(section, state) at the state the row drove. This is the
+        reactivity half: a generator that wrote the label once and never
+        refreshed it passes at the default and fails here.
+     2. THE NUMBER IS THE ONE THE BUILDER USED — read from the EMITTED hood
+        descriptor's slot indices, never from the same function that wrote
+        the label. With `hoodSize` off identity the whorl splits and every
+        petal the builder built for the hood carries its slot index; its
+        orbit is `min(i, partner(i))`, its petal number is that plus one, and
+        all hood slots must agree on it. sectionLabel() and this check share
+        NOTHING but the state, so a label that hard-codes the wrong plane, or
+        a count that is not the count the geometry built, is a red row rather
+        than a matching pair of wrong answers. (The Z8 doctrine one level up:
+        numbering is read from what was emitted.)
+
+   THE ROWS are the control's minimum, the shipping default, an odd count
+   (whose hood is a PAIR — the read-out says so, and both slots must still
+   agree on one number) and the maximum. The default-count row reads the same
+   label before and after by construction, so it cannot see a frozen summary
+   and is there for statement 2 alone; the other three carry statement 1, and
+   the negative control is seen to fire on exactly those three. */
+{
+  const hoodSec = SECTIONS.find((x) => x.id === 'hoodGroup');
+  const pc = CONTROLS.find((c) => c.id === 'petalCount');
+  if (!hoodSec || typeof hoodSec.labelFrom !== 'function') note('[label] section "hoodGroup" no longer declares a derived labelFrom — the derived-label route has nothing to measure');
+  else for (const n of [pc.min, DEFAULTS.petalCount, 13, pc.max]) {
+    await openBloom(page, port);
+    const tag = `[label] hoodGroup at ${n} petals`;
+    const res = await page.evaluate(async ({ n, breakIt }) => {
+      const sum = document.querySelector('#sec-hoodGroup > summary');
+      const before = sum.textContent;
+      if (breakIt) {
+        /* NEGATIVE CONTROL, route (g): the label is written once at build and
+           never refreshed — which is exactly what a static-label generator
+           does, and what this route exists to see. */
+        Object.defineProperty(sum, 'textContent', { get: () => before, set: () => {}, configurable: true });
+      }
+      for (const [id, value] of [['petalCount', String(n)], ['hoodSize', '1.6']]) {
+        const el = document.getElementById(id);
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const m = window.__bloomMetrics();
+      return {
+        before, after: sum.textContent, state: window.__bloomUIState(),
+        hidden: document.getElementById('sec-hoodGroup').hidden,
+        slotCount: m.slotCount, mirror: m.mirror,
+        hoodSlots: (m.petalRingApplied || []).filter((p) => p && p.slotRole === 'HOOD').map((p) => p.slotIndex),
+      };
+    }, { n, breakIt: NEGATIVE_CONTROL });
+    if (Number(res.state.petalCount) !== n) { note(`${tag}: petalCount reads ${res.state.petalCount} after being driven`); continue; }
+    if (res.hidden) { note(`${tag}: the hood group is hidden at a rosette of ${n} — the row would be asserting the name of a section nobody can see`); continue; }
+    if (!res.hoodSlots.length) { note(`${tag}: no HOOD petal in the builder's record with hoodSize at 1.6 — the whorl did not split, so there is no emitted numbering to read`); continue; }
+    const want = sectionLabel(hoodSec, res.state);
+    const numbers = [...new Set(res.hoodSlots.map((i) => Math.min(i, mirrorPartner(i, res.slotCount, res.mirror)) + 1))];
+    const said = Number((/Petal (\d+)/.exec(res.after) || [])[1]);
+    const bad = [];
+    if (res.after !== want) bad.push(`summary reads "${res.after}", sectionLabel() says "${want}" (it read "${res.before}" before the count moved)`);
+    if (numbers.length !== 1) bad.push(`the builder's hood slots [${res.hoodSlots.join(', ')}] fall in ${numbers.length} orbits (${numbers.join(', ')}) — a group must be one orbit`);
+    else if (said !== numbers[0]) bad.push(`the label says petal ${said}, but the builder's hood slots [${res.hoodSlots.join(', ')}] of ${res.slotCount} (plane ${res.mirror}) are orbit ${numbers[0]}`);
+    if (bad.length) note(`${tag}: ${bad.join('; ')}`);
+    else ok.push(`${tag}: summary "${res.before}" -> "${res.after}", and the builder's hood slots [${res.hoodSlots.join(', ')}] of ${res.slotCount} are orbit ${numbers[0]} — the label's number is the emitted one`);
   }
 }
 
@@ -881,11 +1023,12 @@ if (NEGATIVE_CONTROL) {
     const sawPath = fail.some((f) => /did not change|did not move|state snapshot says/.test(f));
     const sawAccordion = fail.some((f) => /^accordion A[23]:/.test(f));
     const sawVisibility = fail.some((f) => /^\[visibility\]/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility) { console.log('\nALL FOUR ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}. All four must.`);
+    const sawLabel = fail.some((f) => /^\[label\] .* summary reads/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel) { console.log('\nALL FIVE ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}. All five must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input and an unreachable accordion handler. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler and a frozen derived label. It is not measuring anything.');
   process.exit(1);
 }
 

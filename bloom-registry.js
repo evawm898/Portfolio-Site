@@ -30,7 +30,7 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
-import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS } from './bloom-geometry.js';
+import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
    Empty today, structurally present from day one: when the first control is
@@ -360,6 +360,58 @@ export const SECTIONS = [
   { id: 'roles', label: 'Petal roles', open: false },
 
   /* ===================================================================
+     THE ROSETTE'S TWO GROUPS, NUMBERED THE FAN'S WAY (Eva's ruling A, Sep 3,
+     from the deploy preview): "the names like petal 1 -2 -3 etc should apply
+     to the radial option as well." The labellum's five sliders and the hood's
+     three keep their ids, their laws and their predicates and move into two
+     drop-downs inside "Petal roles", exactly as the fan's groups did — the
+     SAME element, the same accordion rule, the same indent.
+
+     THE NUMBERS ARE THE ORBITS', NOT A SECOND NUMBERING. Under RADIAL the
+     plane is the through-slot involution (`mirrorFor`), whose orbits are the
+     per-petal groups ordered by distance from it: slot 0 is orbit 0, so the
+     labellum is PETAL 1 at every count; the hood is the orbit FARTHEST from
+     the plane, which is the LAST group — `petalGroupCount(n, THROUGH_SLOT)`,
+     2 at three petals, 5 at eight, 21 at forty. Measured through
+     `petalRoleForSlot` at nine counts before this was written (charter,
+     session 11), not read off the derivation: the same `HOOD = P_last`
+     relation the fan already carried, so the rosette gets no rule of its own.
+
+     WHAT WAS DECLINED, so the gaps read as the ruling rather than a defect
+     (option B, offered and refused): extending the fan's full per-orbit set to
+     the rosette would have retired the labellum and hood NAMES, retired the
+     labellum's tip breadth with them, and put nineteen empty-by-default groups
+     under a forty-petal rosette. A's cost is stated instead: the panel reads
+     "Petal 1, Petal 5" with nothing between, because the laterals carry no
+     controls — which the read-outs say in words, and which is the truth.
+
+     ONE LABEL IS A LITERAL AND THE OTHER IS DERIVED, and that asymmetry is the
+     relation itself. "Petal 1" is a constant because orbit 0 exists at every
+     reachable count and is always the labellum — a `labelFrom` there would
+     tell a reader it might vary. The hood's number moves with `petalCount`,
+     so its summary is the FIRST derived section label in this panel:
+     `labelFrom(ui)` is refreshed by the app on every rebuild through the same
+     `refreshLabels()` path the read-outs use, and `sectionLabel()` below is
+     the one owner of "what does this summary say" for the app, the panel gate
+     and the panel sheet alike. verifySections() requires exactly one of
+     `label` / `labelFrom`: a literal beside a derivation would be a stored
+     label-lie waiting for a reader to believe it.
+
+     NOTHING IS RETIRED. The control ids are unchanged (`labellumSize`,
+     `hoodCup`, ...), `section` is never persisted, and the two new section ids
+     name the ROLE each group holds because that is what the code's vocabulary
+     is for; the visitor's vocabulary — the number — is the label. Under FAN
+     both groups are hidden with their controls, by the same predicate the
+     controls carry (Eva's ruling 4): the fan's `petal1` section and this
+     "Petal 1" share a name and never share a screen, which the panel gate
+     asserts on every visibility state it drives.
+
+     `open: false` ON BOTH — ARRANGEMENT holds the one first-load `open`. */
+  { id: 'labellumGroup', label: 'Petal 1', open: false, parent: 'roles' },
+  { id: 'hoodGroup', open: false, parent: 'roles',
+    labelFrom: (ui) => `Petal ${petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT)}` },
+
+  /* ===================================================================
      ONE SECTION PER PER-PETAL GROUP (Eva's ruling 1, Sep 3) — the accordion
      doing exactly what it was built for, and the ruling was made from
      measured heights rather than from a preference.
@@ -420,6 +472,17 @@ export const SECTIONS = [
   })),
 ];
 
+/* WHAT A SECTION'S SUMMARY SAYS, at a given state — THE ONE OWNER, used by
+   the app's generator and its refreshLabels(), by the panel gate's census and
+   by the panel sheet. A section declares either a literal `label` or a
+   `labelFrom(ui)`; verifySections() below refuses both and neither. The
+   derived form exists for exactly one section today (the rosette's hood
+   group, whose petal number moves with petalCount) and is written once here
+   rather than as `s.labelFrom ? ... : ...` in four files. */
+export function sectionLabel(section, state) {
+  return section.labelFrom ? section.labelFrom(state) : section.label;
+}
+
 /* THE SECTION/CONTROL RELATION, checked at module load rather than trusted.
    Throws, deliberately and loudly: a control naming a section that does not
    exist would otherwise be appended to nothing and vanish from the panel
@@ -432,11 +495,23 @@ export const SECTIONS = [
    needs a browser and lives in tools/verify-bloom-panel.mjs. */
 export function verifySections(controls = CONTROLS, sections = SECTIONS) {
   const bad = [];
+  /* The defaults of the CONTROLS PASSED IN, not the module's — this runs at
+     module load before DEFAULTS exists, and a caller handing in its own
+     control set should have its labels evaluated against that set. */
+  const defaultsOf = (cs) => Object.fromEntries(cs.map((c) => [c.id, c.default]));
   const ids = new Set();
   for (const s of sections) {
     if (ids.has(s.id)) bad.push(`duplicate section id "${s.id}"`);
     ids.add(s.id);
     if (typeof s.open !== 'boolean') bad.push(`section "${s.id}" must declare a literal boolean \`open\``);
+    /* EXACTLY ONE OF `label` / `labelFrom`. A section with both would show the
+       derived text while the literal sat there reading as a declaration —
+       the stored label-lie this project retires ids over — and one with
+       neither renders an empty summary. sectionLabel() is the one reader. */
+    const hasLabel = typeof s.label === 'string' && s.label.length > 0;
+    const hasFrom = typeof s.labelFrom === 'function';
+    if (hasLabel === hasFrom) bad.push(`section "${s.id}" must declare exactly one of a literal \`label\` or a \`labelFrom(ui)\` — it declares ${hasLabel && hasFrom ? 'both' : 'neither'}`);
+    else if (hasFrom && typeof s.labelFrom(defaultsOf(controls)) !== 'string') bad.push(`section "${s.id}"'s labelFrom(DEFAULTS) did not return a string`);
   }
   /* THE ACCORDION'S OWN INVARIANT, checked where the literals live. The panel
      opens at most one section at a time, so two `open: true` rows would
@@ -585,6 +660,17 @@ const CENTER_ON = { id: 'centerStyle', oneOf: ['DOME', 'DISC', 'RING'] };
    and need no reinterpretation. Three copies of this ternary would be three
    places for the two modes to drift apart in wording alone. */
 const perDepth = (ui) => (String(ui.placement) === 'CONTINUOUS' ? 'turn' : 'layer');
+
+/* WHAT THE ROSETTE'S TWO SLOT-ROLE GROUPS CURRENTLY ARE — one owner per group,
+   read by every read-out in the group, the fan's `said(ui)` precedent (Eva's
+   ruling A, Sep 3: the labels say "Petal 1" / "Petal N", so the read-out is
+   where the word "labellum" now lives). Written for the states in which the
+   controls are VISIBLE: slot roles are RADIAL-only, so the plane is the
+   through-slot involution, the labellum is slot 0 — its fixed point, one
+   petal at every count — and the hood is `roleForSlot`'s far end: one petal
+   opposite the line at an even count, the far pair at an odd one. */
+const saidLabellum = () => 'the labellum, on the line';
+const saidHood = (ui) => (Math.round(Number(ui.petalCount)) % 2 === 0 ? 'the hood, opposite the line' : 'the hood pair, opposite the line');
 
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
@@ -1332,48 +1418,65 @@ export const CONTROLS = [
      never have — see session A's never-overridable table, J4a).
 
      ALL EIGHT SHARE ONE PREDICATE, by ref rather than by eight copies. It is
-     TRUE at the shipping default (RADIAL, layerCount 1), so this section
-     RENDERS at first load with these eight visible and session A's three
-     hidden — which is also what lets the panel gate witness this section with
-     no precondition. */
-  { id: 'labellumSize', section: 'roles', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
-    label: 'Labellum size',
+     TRUE at the shipping default (RADIAL, layerCount 1), so their two
+     drop-downs RENDER at first load with these eight visible and session A's
+     three hidden — which is also what lets the panel gate witness them with
+     no precondition.
+
+     THEY LIVE IN TWO DROP-DOWNS NAMED BY PETAL NUMBER (Eva's ruling A, Sep 3;
+     see the two `labellumGroup` / `hoodGroup` rows in SECTIONS), and the
+     LABELS ARE THE FAN'S — "Size", "Tip", "Tilt", "Cup", "Spine curl" — so a
+     visitor who has learned one placement's groups has learned the other's.
+     The word "labellum" left the label and moved into the READ-OUT, on the
+     split every static label in this panel keeps: the label names the slot in
+     the panel, the read-out names what is in it right now. `said*` below is
+     the one owner of that phrase per group, the fan's `said(ui)` precedent,
+     and it is written for the states these controls are VISIBLE in — RADIAL,
+     hence the through-slot plane, hence a labellum that is always the single
+     petal on the line and a hood that is one petal at an even count and a
+     pair at an odd one. Under FAN they are hidden and inert (ruling 4), so no
+     phrase is evaluated where it could be read wrong. */
+
+  { id: 'labellumSize', section: 'labellumGroup', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
+    label: 'Size',
     /* SATURATION IS TOLD, on the "(clamped)" discipline the roll floor, the
        tip floor and both foot clamps already carry: a composed value is
        clamped into the base control's own range, so at a long petal the
        multiplier stops moving before its slider does. The read-out cannot see
        the clamp itself (fmt has only the UI state), so it prints the ASKED-FOR
        millimetres and the app's read-out prints what was actually built. */
-    fmt: (v, ui) => (Number(v) === 1 ? 'same as the rest' : `x${Number(v).toFixed(2)} — asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
+    fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${saidLabellum(ui)}`
+      : `x${Number(v).toFixed(2)} — ${saidLabellum(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
-    label: 'Labellum tip', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `+${Number(v).toFixed(2)} breadth`),
+  { id: 'labellumTipBreadth', section: 'labellumGroup', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+    label: 'Tip', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `+${Number(v).toFixed(2)} breadth — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumTilt', section: 'roles', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
-    label: 'Labellum tilt', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg tilt`),
+  { id: 'labellumTilt', section: 'labellumGroup', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
+    label: 'Tilt', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'Labellum cup', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
+  { id: 'labellumCup', section: 'labellumGroup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Cup', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'labellumCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
-    label: 'Labellum curl', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg spine curl`),
+  { id: 'labellumCurl', section: 'labellumGroup', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+    label: 'Spine curl', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${v}deg spine curl — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
-  { id: 'hoodSize', section: 'roles', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
-    label: 'Hood size',
-    fmt: (v, ui) => (Number(v) === 1 ? 'same as the rest' : `x${Number(v).toFixed(2)} — asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
+  { id: 'hoodSize', section: 'hoodGroup', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
+    label: 'Size',
+    fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${saidHood(ui)}`
+      : `x${Number(v).toFixed(2)} — ${saidHood(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
 
-  { id: 'hoodTilt', section: 'roles', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
-    label: 'Hood tilt', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${v}deg tilt`),
+  { id: 'hoodTilt', section: 'hoodGroup', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
+    label: 'Tilt', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidHood(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${saidHood(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
 
-  { id: 'hoodCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'Hood cup', fmt: (v) => (Number(v) === 0 ? 'same as the rest' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
+  { id: 'hoodCup', section: 'hoodGroup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Cup', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidHood(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${saidHood(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
 
   /* ===================================================================

@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue } from './bloom-registry.js';
+import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 
@@ -27,6 +27,7 @@ const inputs = {};   // id -> input element
 const valSpans = {}; // id -> read-out span
 const wrappers = {}; // id -> control wrapper div
 const sectionEls = {}; // section id -> <details>
+const summaryEls = {}; // section id -> its <summary>, for the derived labels refreshLabels() rewrites
 
 function makeInput(c) {
   if (c.kind === 'slider') {
@@ -74,8 +75,13 @@ for (const s of SECTIONS) {
      this file: once the page is up, open/close belongs to the visitor. */
   det.open = s.open;
   const sum = document.createElement('summary');
-  sum.textContent = s.label;
+  /* Through the registry's one owner of the summary text, at the DEFAULTS the
+     page loads with — a derived label (the rosette's hood group, whose petal
+     number moves with petalCount) is right from the first paint rather than
+     after the first rebuild corrects it. */
+  sum.textContent = sectionLabel(s, DEFAULTS);
   det.append(sum);
+  summaryEls[s.id] = sum;
   /* A NESTED SECTION GOES INSIDE ITS PARENT'S ELEMENT, which the registry
      guarantees already exists: SECTIONS is authored parents-first and
      verifySections() has thrown at module load if a parent is missing or is
@@ -170,6 +176,12 @@ window.__bloomUIState = () => readUI();
    widest point would be a second owner of a derived quantity. */
 function refreshLabels(ui) {
   for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id], ui);
+  /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3): the
+     rosette's hood group is "Petal N" where N is the last orbit's number,
+     which moves with petalCount. Same snapshot, same pass, same owner
+     (sectionLabel) as the generator used — a static label is rewritten with
+     itself, which is cheaper than a second list of which sections vary. */
+  for (const s of SECTIONS) summaryEls[s.id].textContent = sectionLabel(s, ui);
 }
 
 /* The ONLY setter of a control wrapper's hidden — evaluates the registry's

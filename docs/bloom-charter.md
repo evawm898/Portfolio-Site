@@ -2563,3 +2563,132 @@ exposure the ruling accepts in exchange for the minutes.
       nothing reported it because every cell still rendered and every assertion still passed.
       The `Spacing 60` caption expired the same day for the same reason. All four fixed.
       **A cell that NAMES a state must SET it — the rule now exists in both places.**
+
+    - **THE PANEL WAS RE-SHAPED TWICE MORE FROM THE DEPLOY PREVIEW, BOTH TIMES BY GENERALISING
+      A RULE THAT EXISTED RATHER THAN ADDING ONE.** Eva, from the preview at `fe730c8`, with two
+      screenshots: *"have the roles be its own drop down which then enables all the other petals
+      and their roles to be drop downs / also the names like petal 1 -2 -3 etc should apply to
+      the radial option as well."* Two requests; two commits.
+
+        * **NESTING (`5c0b719`).** The nine per-petal sections moved INSIDE "Petal roles" as
+          drop-downs of it. Membership is a `parent` field on the CHILD, exactly as a
+          control's `section` sits on the control — a parent naming its children would be two
+          lists in the file that exists to state the registration rule — and `verifySections()`
+          checks the relation at module load (parent exists, nesting is ONE level deep, at most
+          one `open: true` PER SIBLING GROUP rather than in the whole array, and a section
+          satisfies the non-empty check with child sections as well as controls). **The
+          accordion needed no second mechanism**: its one capture listener used to close every
+          OTHER top-level section; it now closes a drop-down's SIBLINGS, which is the same rule
+          stated one level more generally — at the top level the siblings ARE the sections, so
+          the shipped behaviour is unchanged and nesting falls out of it. `applyVisibility()`
+          derives a parent's hidden from its controls AND its children, walking `SECTIONS`
+          backwards so children settle first. The indent is the ONLY structural signal
+          (`.bl-sec--sub`): a second border colour would read as "a different kind of thing",
+          and these are sections with sections' behaviour. **WHAT NESTING COSTS AND BUYS, measured
+          like for like** (fe730c8 flat against HEAD nested, one fresh page per row, open
+          states set directly, 1100 x 1600 viewport): nine groups with petal 1 open, 920 px
+          flat against 890 px nested; the shipping fan's four groups with petal 1 open, 741
+          against 746; nine groups with no group open, 672 against 640. So nesting is a WASH
+          at the shipping fan and 30 px smaller at the extreme — the "652 px against 874 px
+          flat" quoted when the nesting commit was reported does not reproduce under this
+          measurement and is withdrawn; what nesting actually buys is the SHUT-PARENT state,
+          where nine summaries collapse to one and the panel is the pre-fan panel again. The
+          ruling was made from the preview's own screenshots, not from a height. The panel gate's
+          accordion assertions A2/A3 had to generalise with it — they said "exactly one open in
+          the whole panel", and closing "Petal roles" does NOT reset a child (that is what
+          `<details>` does, and it is why the panel remembers where you were), so they now
+          assert over the REACHABLE open set (a section counts as open only if every ancestor
+          is). Asserting over the raw set would have made the assertion dictate behaviour.
+
+        * **RULING A — THE ROSETTE'S GROUPS NUMBERED THE FAN'S WAY (this commit).** Two options
+          were put to Eva: **A**, rename the existing labellum/hood groups by orbit number,
+          leaving gaps like "Petal 1, Petal 5"; **B**, extend the fan's full per-orbit set to
+          RADIAL, which would have retired the labellum and hood NAMES, retired the labellum's
+          tip breadth with them (the per-petal set has no tip-breadth row), and put nineteen
+          empty-by-default groups under a forty-petal rosette. **Eva chose A.** So the
+          labellum's five sliders and the hood's three moved into two drop-downs inside "Petal
+          roles" — `labellumGroup`, `hoodGroup`; the ids name the ROLE because that is what the
+          code's vocabulary is for, the labels carry the NUMBER because that is the visitor's —
+          with the fan's labels ("Size", "Tip", "Tilt", "Cup", "Spine curl") and read-outs that
+          name the group on the fan's `said(ui)` pattern ("same as the rest — the labellum, on
+          the line"; "the hood pair, opposite the line" at an odd count). The word "labellum"
+          left the label and lives in the read-out, on the split every static label here keeps.
+          **Control ids are unchanged, `section` is never persisted, nothing is retired.**
+
+          **THE NUMBERS ARE THE ORBITS', NOT A SECOND NUMBERING — verified before it was
+          built.** Under RADIAL the plane is the through-slot involution, whose orbits are the
+          per-petal groups ordered by distance from it: slot 0 is orbit 0, so the labellum is
+          PETAL 1 at every count; the hood is the orbit farthest from the plane, the LAST
+          group, `petalGroupCount(n, THROUGH_SLOT)` — 2 at three petals, 5 at eight, 21 at
+          forty. Probed through `petalRoleForSlot` at nine counts (3, 4, 5, 7, 8, 13, 20, 39,
+          40): the hood's orbit index equalled `petalGroupCount` at every one. It is the same
+          `HOOD = P_last` relation the fan already carried, so the rosette got no rule of its
+          own — which is what let A be a rename rather than a mechanism.
+
+          **ONE LABEL IS A LITERAL AND THE OTHER IS THE PANEL'S FIRST DERIVED SECTION LABEL,
+          and the asymmetry is the relation itself.** "Petal 1" is a constant because orbit 0
+          exists at every reachable count and is always the labellum; a `labelFrom` there would
+          tell a reader it might vary. The hood's number moves with `petalCount`, so
+          `SECTIONS` gained an optional `labelFrom(ui)`, `refreshLabels()` rewrites every
+          summary from the same snapshot the read-outs use, the generator paints the first
+          label from DEFAULTS through the same function so nothing flashes wrong before the
+          first rebuild, and **`sectionLabel(section, state)` is the ONE owner** for the app,
+          the panel gate and the panel sheet. `verifySections()` requires EXACTLY ONE of
+          `label` / `labelFrom` — a literal beside a derivation is a stored label-lie waiting
+          for a reader to believe it, which is this project's most repeated defect.
+
+          **THE GATE READS THE NUMBER FROM WHAT THE BUILDER EMITTED, never from the function
+          that wrote the label** (the Z8 doctrine one level up). Route (g) drives `petalCount`
+          to 3 / 8 / 13 / 40 with `hoodSize` off identity so the whorl splits, reads the HOOD
+          petals' slot indices from `petalRingApplied`, folds each through `mirrorPartner`
+          into its orbit, requires all hood slots to agree on ONE orbit (the odd-count hood is
+          a pair) and requires the label's number to equal it — `sectionLabel()` and this check
+          share nothing but the state, so a label that hard-codes the wrong plane, or a count
+          that is not the count the geometry built, is a red row rather than a matching pair
+          of wrong answers. Measured: `[1] of 3 -> Petal 2`, `[4] of 8 -> Petal 5`,
+          `[6] of 13 -> Petal 7`, `[20] of 40 -> Petal 21`. **And no two sections on screen may
+          share a name**: the fan's `petal1` and the rosette's `labellumGroup` are both
+          "Petal 1" by design and never share a screen — the visibility route now reads the
+          visible summaries back on every state it drives and refuses a duplicate (RADIAL
+          shows 8 sections, FAN 10, SPIRAL and CONTINUOUS 5). The section-hidden rule in the
+          gate became parent-aware in both places it is stated (a section is hidden iff every
+          control AND every child section is — "Petal roles" now holds only session A's three
+          layer deltas as controls of its own and is on screen because its two rosette groups
+          are), "Petal roles" got the witness with a precondition session A predicted for it
+          (`innerCup` at two whorls, the anti-vacuity clause refusing a still-hidden control),
+          and the negative control freezes the hood summary's `textContent` so a generator
+          that writes the label once and never refreshes it — exactly the static-label
+          generator this replaced — is a failure the gate has been SEEN to catch. **Five
+          routes, all five required to fire.**
+
+          **THE PANEL SHEET HAD BEEN BROKEN SINCE THE PER-PETAL SECTIONS EXISTED, AND NOBODY
+          HAD RUN IT.** `tools/shot-bloom-panel.mjs` walked every section clicking its summary;
+          a hidden section's summary cannot be clicked, and neither can a nested one's while
+          its parent is shut, so from the moment nine hidden sections appeared the tool would
+          have died on `petal1` — and it was not run for the nesting commit, whose ruling was
+          made from the deploy preview's own screenshots. Fixed on the gate's pattern: a
+          declared `REACH` precondition per hidden section (FAN, mirror-line petal ON, eight
+          per side — the one arrangement in which all nine groups have members), applied
+          through real events, with the run DYING if the section is still hidden afterwards;
+          a nested section opened by first opening its parent with the same real click; a
+          fresh page per cell so a precondition cannot leak into the cells after it; and a new
+          NUMBERING row — the rosette at 3 / 8 / 40 petals with its last drop-down open, and
+          the fan beside it for the comparison the ruling was made from. Measured heights from
+          the sheet's own captions: 569 px at first load; 730 px with Petal roles and the
+          rosette's Petal 1 open (five sliders); 592 px with its Petal 5 open (three); 894 px
+          under FAN at eight per side with Petal roles and the fan's Petal 1 open — the
+          sheet's worst case, the nine-summary extreme.
+
+          **WHAT THIS DID NOT TOUCH, measured rather than asserted.** No `visibleWhen` changed
+          (deep-equal on all 75 controls across the two trees), `DEFAULTS` is deep-equal, the
+          control id list is identical, and no geometry file changed. The full live-matrix byte
+          diff against `5c0b719` (376 rows, both trees, `tools/diff-bloom-bytes.mjs --full`)
+          was still running when this was committed; its result is recorded in the commit
+          that follows this one.
+
+          **RECORDED, NOT BUILT.** A per-petal set on the rosette (option B) remains one
+          `perPetalEligible` arm in two files plus the retirement it implies — the reason it
+          was declined is the reason it is written down. And the day anything persists a
+          design, `labellumGroup` / `hoodGroup` are section ids, never persisted, so the
+          rename costs nothing then either; what a persisted design would owe is the fan's
+          own note above (`petal2Cup` meaning a different petal across the toggle).
