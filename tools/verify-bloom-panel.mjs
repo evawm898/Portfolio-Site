@@ -697,22 +697,39 @@ for (const [driverId, dependents] of drivers) {
    registry's), and the existing Z5 assertion already checks the two agree
    on every buildMatrix() row — this route checks it on COMBINED states that
    row set does not happen to cover. */
+/* EACH COMBO NOW DECLARES BOTH POSITION AXES (session 11), because the thing
+   that has to hold is a statement about the PAIR: per-petal SUPERSEDES slot
+   roles on the fan (Eva's ruling 4, Sep 3), so exactly one axis is eligible at
+   any state and neither is eligible where the placement has no plane. Checking
+   only `slotRolesEligible` — which is what this route did — would have gone on
+   asserting one half of a relation whose other half is the whole ruling.
+
+   THE FAN ROWS FLIPPED, AND THAT IS THE RULING RATHER THAN A REGRESSION. They
+   said `slot: true` because session 10 composed the labellum onto the fan;
+   CI failed them on the first run of this branch with DOM, registry AND
+   GEOMETRY all agreeing on `false` and only this table disagreeing — a stale
+   expectation, which is the same shape as the nine matrix rows whose claim
+   this ruling inverted. */
 const ROLES_COMBOS = [
   // RADIAL: layerCount 1 shows regardless of layerPhase (the "nothing above
   // the outermost whorl to fall out of step" arm) — a stale/non-zero
-  // layerPhase must not leak through.
-  ['RADIAL', 1, 0, true], ['RADIAL', 1, 1, true],
+  // layerPhase must not leak through. Per-petal is never eligible here.
+  ['RADIAL', 1, 0, { slot: true, perPetal: false }], ['RADIAL', 1, 1, { slot: true, perPetal: false }],
   // RADIAL: layerCount >= 2 needs layerPhase exactly 0.
-  ['RADIAL', 3, 0, true], ['RADIAL', 3, 0.5, false], ['RADIAL', 2, 1, false],
-  // SPIRAL: always hidden, INCLUDING away from layerCount/layerPhase
-  // defaults — route (d) only ever tried SPIRAL at layerCount 1, layerPhase
-  // 0. This is the combined check Eva's ruling asked for by name.
-  ['SPIRAL', 1, 0, false], ['SPIRAL', 3, 0, false],
+  ['RADIAL', 3, 0, { slot: true, perPetal: false }],
+  ['RADIAL', 3, 0.5, { slot: false, perPetal: false }],
+  ['RADIAL', 2, 1, { slot: false, perPetal: false }],
+  // SPIRAL: NEITHER axis, INCLUDING away from the layerCount/layerPhase
+  // defaults — route (d) only ever tried SPIRAL at layerCount 1, layerPhase 0.
+  ['SPIRAL', 1, 0, { slot: false, perPetal: false }], ['SPIRAL', 3, 0, { slot: false, perPetal: false }],
   // CONTINUOUS: same claim, same reason.
-  ['CONTINUOUS', 1, 1, false], ['CONTINUOUS', 3, 0, false],
-  // FAN: eligible at every depth, UNCONDITIONALLY — layerPhase is hidden
-  // and irrelevant under FAN, but its stale DOM value must not matter.
-  ['FAN', 1, 1, true], ['FAN', 3, 0.5, true],
+  ['CONTINUOUS', 1, 1, { slot: false, perPetal: false }], ['CONTINUOUS', 3, 0, { slot: false, perPetal: false }],
+  // FAN: PER-PETAL at every depth, unconditionally, and slot roles NOWHERE.
+  // `layerPhase` is hidden and irrelevant under FAN, but its stale DOM value
+  // must not leak into either answer — which is why these two rows carry
+  // awkward depths and phases rather than the defaults.
+  ['FAN', 1, 1, { slot: false, perPetal: true }], ['FAN', 3, 0.5, { slot: false, perPetal: true }],
+  ['FAN', 1, 0, { slot: false, perPetal: true }],
 ];
 for (const [placement, layerCount, layerPhase, want] of ROLES_COMBOS) {
   await openBloom(page, port);
@@ -721,21 +738,38 @@ for (const [placement, layerCount, layerPhase, want] of ROLES_COMBOS) {
   const tag = `[roles combined] ${placement} layerCount=${layerCount} layerPhase=${layerPhase}`;
   if (bad.length) { note(`${tag}: read-back failed: ${bad.join('; ')}`); continue; }
   const res = await page.evaluate(() => {
-    const w = document.getElementById('labellumSize')?.closest('.bl-ctrl');
+    const wrapOf = (id) => { const el = document.getElementById(id); return el ? el.closest('.bl-ctrl').hidden : null; };
+    const m = window.__bloomMetrics();
     return {
-      domHidden: w ? w.hidden : null,
-      geomEligible: window.__bloomMetrics().slotRolesEligible,
+      slotHidden: wrapOf('labellumSize'), perPetalHidden: wrapOf('petal1Size'),
+      geomSlot: m.slotRolesEligible, geomPerPetal: m.perPetalEligible,
       state: window.__bloomUIState(),
     };
   });
-  if (res.domHidden === null) { note(`${tag}: #labellumSize wrapper missing from the DOM`); continue; }
-  const regEligible = evalPredicate({ ref: 'slotRolesEligible' }, res.state);
+  if (res.slotHidden === null) { note(`${tag}: #labellumSize wrapper missing from the DOM`); continue; }
+  if (res.perPetalHidden === null) { note(`${tag}: #petal1Size wrapper missing from the DOM`); continue; }
   const bad2 = [];
-  if (res.domHidden !== !want) bad2.push(`DOM hidden=${res.domHidden}, expected ${!want}`);
-  if (regEligible !== want) bad2.push(`registry predicate says eligible=${regEligible}, expected ${want}`);
-  if (res.geomEligible !== want) bad2.push(`geometry's own slotRolesEligible() says eligible=${res.geomEligible}, expected ${want}`);
+  /* THE THREE STATEMENTS OF ONE BOUNDARY, per axis: the DOM (what a visitor
+     can reach), the registry predicate (what is declared), and the geometry's
+     own eligibility (what can move a vertex). Three, because two agreeing
+     tells you nothing about which is right. */
+  for (const [axis, ref, domHidden, geom, expect] of [
+    ['slot roles', 'slotRolesEligible', res.slotHidden, res.geomSlot, want.slot],
+    ['per-petal', 'perPetalEligible', res.perPetalHidden, res.geomPerPetal, want.perPetal],
+  ]) {
+    const reg = evalPredicate({ ref }, res.state);
+    if (domHidden !== !expect) bad2.push(`${axis}: DOM hidden=${domHidden}, expected ${!expect}`);
+    if (reg !== expect) bad2.push(`${axis}: registry predicate says eligible=${reg}, expected ${expect}`);
+    if (Boolean(geom) !== expect) bad2.push(`${axis}: the geometry's own eligibility says ${Boolean(geom)}, expected ${expect}`);
+  }
+  /* AND THE SUPERSESSION ITSELF, as a property of the pair rather than of
+     either row: never both, which is what makes "one per-position axis" a
+     measurement instead of a sentence in a charter. */
+  if (res.geomSlot && res.geomPerPetal) {
+    bad2.push('BOTH position axes report eligible — per-petal supersedes slot roles on the fan, so a bloom has at most one');
+  }
   if (bad2.length) note(`${tag}: ${bad2.join('; ')}`);
-  else ok.push(`${tag}: DOM/registry/geometry all agree — eligible=${want}`);
+  else ok.push(`${tag}: DOM/registry/geometry agree on both axes — slot=${want.slot}, per-petal=${want.perPetal}`);
 }
 
 /* ---------------- (e) the LOW-COUNT SPIRAL FLAG, both directions ---------- */
