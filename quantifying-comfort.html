@@ -315,21 +315,23 @@
         <p>Both come from the <strong>sweating guarded hotplate</strong>, the &ldquo;skin model,&rdquo; under <strong>ISO 11092</strong>.</p>
         <p>Before Ret, a primer. Diffusion:</p>
         <figure class="qc-fig" id="qcDiff" aria-labelledby="qcDiffCap">
-          <canvas class="qc-fig__canvas" id="qcDiffC" role="img" aria-label="Two hundred particles start crowded on the far left, and random motion alone spreads them evenly across the box over about forty seconds. Click to reset."></canvas>
-          <figcaption class="qc-fig__cap" id="qcDiffCap">Left <span id="qcDiffL">190</span> &middot; right <span id="qcDiffR">10</span> &middot; <span id="qcDiffT">holding the start</span>. Nothing pushes them; each one just wanders. <strong>Breathability is just this, through fabric.</strong> Click to reset.</figcaption>
+          <canvas class="qc-fig__canvas qc-fig__canvas--tall" id="qcDiffC" role="img" aria-label="Two hundred particles start crowded on the left. Each wanders at random. A concentration profile under them flattens over about forty seconds, and a net-flow arrow across the midline shrinks to nothing as the gradient disappears. Click to reset."></canvas>
+          <figcaption class="qc-fig__cap" id="qcDiffCap"><strong id="qcDiffT">Concentrated on the left.</strong> Left <span id="qcDiffL">190</span> &middot; right <span id="qcDiffR">10</span> &middot; net flow <span id="qcDiffF">0</span>/s. Each particle only wanders. More cross rightward because more are on the left, so the crowd flows without anything pushing it. <strong>Breathability is just this, through fabric.</strong> Click to reset.</figcaption>
         </figure>
         <script>
         (() => {
-          // Diffusion as it actually happens: 200 walkers, no force, no flow.
-          // Crowded on the far left, a few on the right, and the counts even
-          // out because more of them happen to wander right than left. The
-          // start is held for a moment, the walk is slow enough to watch, and
-          // once it has evened out it holds again and restarts on its own.
+          // Diffusion made legible: the particles wander at random, a
+          // concentration profile under them flattens, and one arrow across
+          // the midline shows the net flow — left-to-right crossings minus
+          // right-to-left, per second — shrinking to nothing as the
+          // gradient goes. Steps are time-based, so it takes about forty
+          // seconds on any screen.
           const c = document.getElementById('qcDiffC'), ctx = c.getContext('2d');
-          const outL = document.getElementById('qcDiffL'), outR = document.getElementById('qcDiffR'), outT = document.getElementById('qcDiffT');
+          const O = id => document.getElementById(id);
           const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          const N = 200, P = new Float32Array(N * 2);
-          let w = 0, h = 0, visible = true, running = false, t = 0, evenSince = null, withinSince = null;
+          const N = 200, BINS = 8, P = new Float32Array(N * 2);
+          let w = 0, h = 0, visible = true, running = false, last = 0, acc = 0, el = 0, evenSince = null;
+          const cross = [];   // recent crossings: [time, +1 rightward | -1 leftward]
           function fit() {
             const r = c.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
             w = Math.round(r.width); h = Math.round(r.height);
@@ -338,58 +340,66 @@
           }
           function seed(even) {
             fit();
-            for (let i = 0; i < N; i++) {   // 190 in the left fifth, 10 scattered on the right; or a flat spread for the static end state
-              const left = i < 190;
-              P[2 * i] = even ? Math.random() * w : left ? Math.random() * w * 0.2 : w * 0.5 + Math.random() * w * 0.5;
-              P[2 * i + 1] = Math.random() * h;
+            for (let i = 0; i < N; i++) {   // 190 in the left fifth, 10 on the right; or a flat spread for the static end state
+              P[2 * i] = even ? Math.random() * w : i < 190 ? Math.random() * w * 0.2 : w * 0.5 + Math.random() * w * 0.5;
+              P[2 * i + 1] = h * 0.05 + Math.random() * h * 0.62;
             }
-            t = 0; evenSince = null; withinSince = null;
+            el = 0; acc = 0; evenSince = null; cross.length = 0;
           }
-          function step() {
-            const s = w / 60;   // three small steps a frame: about forty seconds to even out, at any width
-            for (let k = 0; k < 3; k++) for (let i = 0; i < N; i++) {
-              let x = P[2 * i] + (Math.random() - 0.5) * 2 * s, y = P[2 * i + 1] + (Math.random() - 0.5) * 2 * s;
-              if (x < 2) x = 4 - x; else if (x > w - 2) x = 2 * (w - 2) - x;   // walls reflect
-              if (y < 2) y = 4 - y; else if (y > h - 2) y = 2 * (h - 2) - y;
+          function step(now) {   // 150 small steps a second, whatever the frame rate
+            const s = w / 62, top = h * 0.05, bot = h * 0.67;
+            for (let i = 0; i < N; i++) {
+              const x0 = P[2 * i];
+              let x = x0 + (Math.random() - 0.5) * 2 * s, y = P[2 * i + 1] + (Math.random() - 0.5) * 2 * s;
+              if (x < 2) x = 4 - x; else if (x > w - 2) x = 2 * (w - 2) - x;
+              if (y < top) y = 2 * top - y; else if (y > bot) y = 2 * bot - y;
+              if ((x0 < w / 2) !== (x < w / 2)) cross.push([now, x >= w / 2 ? 1 : -1]);
               P[2 * i] = x; P[2 * i + 1] = y;
             }
           }
-          function draw(phase) {
-            let l = 0; for (let i = 0; i < N; i++) if (P[2 * i] < w / 2) l++;
+          function draw(now) {
+            const teal = getComputedStyle(document.documentElement).getPropertyValue('--petrol-bright').trim() || '#2fa3a3';
+            const bins = new Array(BINS).fill(0); let l = 0;
+            for (let i = 0; i < N; i++) { const x = P[2 * i]; bins[Math.min(BINS - 1, Math.floor(x / w * BINS))]++; if (x < w / 2) l++; }
             ctx.clearRect(0, 0, w, h);
-            // each half tinted by how many it holds: the gradient you can see at a glance
-            ctx.fillStyle = 'rgba(47,163,163,' + (0.02 + 0.16 * l / N).toFixed(3) + ')'; ctx.fillRect(0, 0, w / 2, h);
-            ctx.fillStyle = 'rgba(47,163,163,' + (0.02 + 0.16 * (N - l) / N).toFixed(3) + ')'; ctx.fillRect(w / 2, 0, w / 2, h);
-            ctx.strokeStyle = 'rgba(233,236,236,0.3)'; ctx.setLineDash([3, 4]);
-            ctx.beginPath(); ctx.moveTo(w / 2 + 0.5, 0); ctx.lineTo(w / 2 + 0.5, h); ctx.stroke(); ctx.setLineDash([]);
-            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--petrol-bright').trim() || '#2fa3a3';
-            for (let i = 0; i < N; i++) { ctx.beginPath(); ctx.arc(P[2 * i], P[2 * i + 1], 2.6, 0, Math.PI * 2); ctx.fill(); }
-            outL.textContent = l; outR.textContent = N - l; outT.textContent = phase;
+            // the profile: how many sit in each slice of the box
+            const bw = w / BINS, pTop = h * 0.72, pH = h * 0.24;
+            for (let k = 0; k < BINS; k++) { const bh = pH * Math.min(1, bins[k] / 100); ctx.fillStyle = 'rgba(47,163,163,0.45)'; ctx.fillRect(k * bw + 2, pTop + pH - bh, bw - 4, bh); }
+            ctx.strokeStyle = 'rgba(233,236,236,0.3)'; ctx.beginPath(); ctx.moveTo(0, pTop + pH + 0.5); ctx.lineTo(w, pTop + pH + 0.5); ctx.stroke();
+            ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(0, pTop + pH - pH * 0.25 + 0.5); ctx.lineTo(w, pTop + pH - pH * 0.25 + 0.5); ctx.stroke(); ctx.setLineDash([]);
+            ctx.font = '9.5px ' + (getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace'); ctx.fillStyle = 'rgba(139,148,148,0.95)'; ctx.textBaseline = 'bottom';
+            ctx.textAlign = 'left'; ctx.fillText('concentration by slice', 6, pTop + pH - pH * 0.25 - 3); ctx.textAlign = 'right'; ctx.fillText('even', w - 6, pTop + pH - pH * 0.25 - 3);
+            // midline and the particles
+            ctx.strokeStyle = 'rgba(233,236,236,0.3)'; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(w / 2 + 0.5, 0); ctx.lineTo(w / 2 + 0.5, h * 0.7); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = teal;
+            for (let i = 0; i < N; i++) { ctx.beginPath(); ctx.arc(P[2 * i], P[2 * i + 1], 2.4, 0, Math.PI * 2); ctx.fill(); }
+            // net flow across the midline, averaged over the last two seconds
+            while (cross.length && now - cross[0][0] > 2000) cross.shift();
+            const net = Math.round(cross.reduce((a, e) => a + e[1], 0) / 2), len = Math.min(w * 0.3, Math.abs(net) * (w / 120)), y0 = h * 0.36;
+            if (len > 3) { const dir = net > 0 ? 1 : -1, x1 = w / 2 + dir * len; ctx.strokeStyle = '#e9ecec'; ctx.fillStyle = '#e9ecec'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(w / 2, y0); ctx.lineTo(x1, y0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x1, y0); ctx.lineTo(x1 - dir * 8, y0 - 5); ctx.lineTo(x1 - dir * 8, y0 + 5); ctx.closePath(); ctx.fill(); ctx.lineWidth = 1; }
+            ctx.fillStyle = '#e9ecec'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(len > 3 ? 'net flow ' + Math.abs(net) + '/s' : 'no gradient · no net flow', w / 2, y0 + 8);
+            O('qcDiffL').textContent = l; O('qcDiffR').textContent = N - l; O('qcDiffF').textContent = net > 0 ? '+' + net : net;
             return l;
           }
           function loop(now) {
             if (!running) return;
             if (visible) {
               fit();
-              if (t === 0) t = now;
-              const el = (now - t) / 1000;
-              let phase;
-              if (el < 1.5) phase = 'holding the start';
-              else if (evenSince == null) { step(); phase = 'wandering · ' + Math.round(el - 1.5) + ' s'; }
-              else phase = 'evened out';
-              const l = draw(phase);
-              // evened out = within ±10 of half for three seconds straight, not a lucky frame
-              if (evenSince == null && el > 10) { if (Math.abs(l - N / 2) <= 10) { if (withinSince == null) withinSince = now; else if (now - withinSince > 3000) evenSince = now; } else withinSince = null; }
-              if (evenSince != null && now - evenSince > 4000) { seed(false); }
-            }
+              const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now; el += dt;
+              if (evenSince == null) { acc += dt * 150; while (acc >= 1) { step(now); acc--; } }
+              const l = draw(now);
+              O('qcDiffT').textContent = evenSince != null ? 'Evened out.' : el < 8 ? 'Concentrated on the left.' : 'Spreading · ' + Math.round(el) + ' s.';
+              if (evenSince == null && el > 20 && Math.abs(l - N / 2) <= 10) evenSince = now;
+              if (evenSince != null && now - evenSince > 5000) { seed(false); last = 0; }
+            } else last = 0;
             requestAnimationFrame(loop);
           }
-          function start() { running = false; seed(still); draw(still ? 'evened out' : 'holding the start'); if (still) return; running = true; requestAnimationFrame(loop); }
+          function start() { running = false; seed(still); last = 0; draw(performance.now()); O('qcDiffT').textContent = still ? 'Evened out.' : 'Concentrated on the left.'; if (still) return; running = true; requestAnimationFrame(loop); }
           c.addEventListener('click', start);
           c.addEventListener('keydown', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); start(); } });
           c.tabIndex = 0;
           if ('IntersectionObserver' in window) new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(c);
-          window.addEventListener('resize', () => { fit(); draw(outT.textContent); });
+          window.addEventListener('resize', () => { fit(); draw(performance.now()); });
           start();
         })();
         </script>
