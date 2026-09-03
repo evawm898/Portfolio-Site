@@ -12,6 +12,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<style>
+  /* Page-local: styles.css has no table rule. Same hairlines and mono as the rest of the note. */
+  .qc-table { border-collapse: collapse; width: 100%; max-width: 22rem; margin: 1.25rem 0; font-size: 13px; }
+  .qc-table th, .qc-table td { text-align: left; padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
+  .qc-table th { font-weight: 500; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+  .qc-table td { color: var(--ink); }
+  .qc-table td:last-child, .qc-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .qc-placeholder { color: var(--ink-faint); font-style: italic; }
+</style>
 </head>
 <body id="top">
 
@@ -32,15 +41,107 @@
       <span class="project__year">Field Notes</span>
     </div>
     <h1 class="project__title">Quantifying Comfort</h1>
-    <p class="project__lede">Exploring how subjective textile comfort can be translated into measurable physical properties.</p>
+    <p class="project__lede">&mdash; Notes from a Hohenstein talk on how textile labs put numbers on a feeling.</p>
   </div>
 
   <div class="project__body">
 
     <section class="project__section">
-      <h2 class="project__section-title"><span>01</span>Coming Soon</h2>
+      <h2 class="project__section-title"><span>01</span>The problem</h2>
       <div class="project__section-body">
-        <p>Full write-up in progress &mdash; check back soon.</p>
+        <p>&ldquo;Comfortable&rdquo; is not a measurement. Ask ten people to rate the same shirt and you get ten numbers, and none of them tells you what to change in the fabric.</p>
+        <p>So the lab does not measure comfort. It splits it. Three buckets came up in the talk, and I have seen the same three everywhere since:</p>
+        <ul class="project__list">
+          <li><strong>Thermo-physiological</strong> &mdash; heat and moisture. Does the garment let the body stay in balance, dry and at temperature, while it does whatever it is doing?</li>
+          <li><strong>Skin-sensorial</strong> &mdash; touch. Scratchy, clammy, clingy, stiff. The signals the skin sends before you have thought about them.</li>
+          <li><strong>Ergonomic</strong> &mdash; fit. Can you move, and does the garment move with you or against you?</li>
+        </ul>
+        <p>Each bucket has its own instruments. The first one has the most, and it is the one the rest of these notes are about.</p>
+        <p>The other thing I wrote down and underlined: the factors that set comfort run in a chain, and every link can undo the one before it. <strong>Fiber &rarr; yarn &rarr; fabric &rarr; finishing &rarr; garment and fit &rarr; layering.</strong> A wicking fiber in a dense yarn in a tight weave with a water-repellent finish worn under a shell is not a wicking garment. You have to measure at the level you are actually wearing.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>02</span>The system</h2>
+      <div class="project__section-body">
+        <p>The model the lab works from has three parts: the <strong>body</strong>, the <strong>climate</strong> around it, and the <strong>clothing</strong> in between. Clothing is not the point of the system. It is the resistance in the middle of it.</p>
+        <p>The body gains heat two ways: it makes it (metabolism, and a lot more of it when you move) and it can take it from a hot environment. It loses heat five ways: <strong>conduction</strong> into whatever it touches, <strong>convection</strong> into moving air, <strong>radiation</strong> to cooler surfaces, <strong>evaporation</strong> of sweat, and <strong>respiration</strong>, the warm wet air you breathe out.</p>
+        <p>Gain has to equal loss. When it does, core temperature holds. When it does not, the body starts spending its reserves to fix it.</p>
+        <p>The controller is the <strong>hypothalamus</strong>. Its effectors are the <strong>sweat glands</strong> (open the evaporation channel), <strong>skeletal muscle</strong> (shiver, which is metabolism on demand) and the <strong>skin arterioles</strong> (dilate to push warm blood to the surface, constrict to keep it in the core). Everything a garment does, it does by changing how easily those five loss channels work.</p>
+        <p>The part that reframed it for me: at rest in a mild room, most of the loss is convection and radiation, and evaporation is a small share. Turn up the temperature or the effort and those two channels shrink toward nothing, because the air is no longer cooler than the skin. Evaporation is the only channel left. That is why breathability is not a nice-to-have in a hot garment. It is the whole budget.</p>
+        <!-- A: heat-balance seesaw goes here -->
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>03</span>What gets measured</h2>
+      <div class="project__section-body">
+        <p>Two numbers do most of the work, and both come off the same instrument.</p>
+        <p>The instrument is the <strong>sweating guarded hotplate</strong>, which everyone in the room called the <strong>skin model</strong>. A metal plate held at skin temperature, 35&nbsp;&deg;C, fed with water from underneath so it can &ldquo;sweat,&rdquo; with guard heaters round the edge so heat only leaves through the top. You lay the fabric on it, run conditioned air across at a fixed speed, and measure how much power the plate needs to hold its temperature. The method is <strong>ISO 11092</strong>.</p>
+        <p><strong>Rct, thermal resistance, in m&sup2;&middot;K/W.</strong> Dry plate. How hard is it for heat to get through the fabric? Higher Rct is warmer. This is the number behind insulation claims and, with a conversion, behind the clo and tog values on the label.</p>
+        <p>Before the second number, a word I had to look up properly afterwards. <strong>Diffusion</strong> is the net movement of anything from where there is more of it to where there is less, driven by nothing but the random motion of the molecules themselves. No pump, no fan. Water vapor next to sweating skin is dense; the air a few millimetres out is dry; so vapor moves outward on its own, and a fabric either gets out of its way or does not.</p>
+        <!-- B: diffusion canvas goes here -->
+        <p><strong>Ret, water vapor resistance, in m&sup2;&middot;Pa/W.</strong> Wet plate. The plate sweats, the vapor has to cross the fabric, and the plate&rsquo;s power draw tells you how much evaporation the fabric is allowing. Lower Ret is more breathable. This is the number that breathability claims should be quoting, and often are not.</p>
+        <p>Hohenstein adds three of its own, because Rct and Ret describe vapor and heat at steady state and a real body does neither:</p>
+        <ul class="project__list">
+          <li><strong>F<sub>d</sub>, buffering</strong> &mdash; how much of a sudden burst of vapor the fabric can take up before the microclimate next to the skin turns humid.</li>
+          <li><strong>K<sub>f</sub>, sweat absorption</strong> &mdash; what happens once sweat is liquid: how much the fabric takes in.</li>
+          <li><strong>F, sweat transport</strong> &mdash; and whether it then moves that liquid away from the skin, or holds it there against you.</li>
+        </ul>
+        <p>All of that is flat fabric. A garment has seams, layers, openings, and air gaps that change with every movement, so whole garments go on <strong>thermal and sweating manikins</strong>: a heated, sweating body-shaped instrument that measures the same resistances for the assembled thing, sometimes while walking.</p>
+        <!-- C: skin-model cross-section (only if A and B land) -->
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>04</span>Scale</h2>
+      <div class="project__section-body">
+        <p>One slide put the volumes on the table, and they are worth keeping because they set the size of the problem a fabric is being asked to solve.</p>
+        <table class="qc-table">
+          <thead><tr><th scope="col">Activity</th><th scope="col">Sweat</th></tr></thead>
+          <tbody>
+            <tr><td>100&nbsp;m sprint</td><td>0.1&nbsp;L</td></tr>
+            <tr><td>90&nbsp;min tennis</td><td>2.0&nbsp;L</td></tr>
+            <tr><td>90&nbsp;min soccer</td><td>3.0&nbsp;L</td></tr>
+            <tr><td>Marathon</td><td>4.6&nbsp;L</td></tr>
+            <tr><td>Ironman</td><td>20&nbsp;L</td></tr>
+          </tbody>
+        </table>
+        <p>Two litres over a tennis match is a two-litre bottle poured through your clothes. The garment&rsquo;s job is to get most of that to evaporate at the surface instead of pooling against the skin. See the corrections below on the last two rows before quoting them.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>05</span>What I checked</h2>
+      <div class="project__section-body">
+        <p>Talk notes are hearsay until checked. What held up, and what did not:</p>
+        <ul class="project__list">
+          <li><strong>Verified.</strong> The definition of diffusion, the thermoregulation loop (hypothalamus and its three effectors), the heat-balance model with its five loss channels, and the description of ISO 11092 all match the sources I could find.</li>
+          <li><strong>Sweat table: right order, high top end.</strong> Published endurance rates run roughly 0.5&ndash;2.5&nbsp;L/hr; a marathon measures around 2.5&nbsp;L median, with individual losses up to about 6.8&nbsp;L. So 4.6&nbsp;L is inside the range but above typical. The Ironman figure of 20&nbsp;L is gross sweat production over a 10&ndash;17&nbsp;hour day, not net loss &mdash; finishers typically lose 1&ndash;6% of body weight, and they drink throughout. I found no primary source for the slide&rsquo;s numbers. Treat the table as illustrative.</li>
+          <li><strong>Core-temperature graphic: half right.</strong> The slide claimed severe damage or death at &plusmn;4&nbsp;&deg;F from normal. The hot side is close: heat stroke is defined at about 104&nbsp;&deg;F. The cold side is badly understated. 94.6&nbsp;&deg;F is only mild hypothermia; the life-threatening range starts below roughly 82&ndash;92&nbsp;&deg;F. Symmetric limits make a tidy diagram and a wrong one.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>06</span>Why this matters to me</h2>
+      <div class="project__section-body">
+        <p class="qc-placeholder">[Two lines to come.]</p>
+        <p class="qc-placeholder">[&nbsp;]</p>
+      </div>
+    </section>
+
+    <section class="project__section project__section--disclaimer">
+      <h2 class="project__section-title"><span>07</span>Sources</h2>
+      <div class="project__section-body">
+        <ul class="project__list">
+          <li>ISO 11092:2014, <em>Textiles &mdash; Physiological effects &mdash; Measurement of thermal and water-vapour resistance under steady-state conditions (sweating guarded-hotplate test)</em>.</li>
+          <li>Johns Hopkins Medicine, 2019 &mdash; marathon sweat and sodium loss study.</li>
+          <li>Sharwood, K. et al., 2004 &mdash; weight changes and performance in Ironman triathletes, <em>British Journal of Sports Medicine</em>.</li>
+          <li>Cleveland Clinic &mdash; hypothermia stages and core-temperature thresholds.</li>
+          <li>Wikipedia, &ldquo;Diffusion.&rdquo;</li>
+          <li>Slides &copy; Hohenstein, [event, date TBD]. Diagrams on this page are redrawn, not reproduced.</li>
+        </ul>
       </div>
     </section>
 
