@@ -108,7 +108,7 @@
    =================================================================== */
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
          RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
-         SPIRAL_LEGIBLE_COUNT } from './bloom-harness.mjs';
+         SPIRAL_LEGIBLE_COUNT, MAX_FAN_GROUPS } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -161,6 +161,51 @@ const WITNESS = {
   roles: { id: 'labellumSize', value: '1.6',
            read: (m) => `${m.rings.length}/${m.slotRolesSplit}/${m.petalRingApplied[0] && m.petalRingApplied[0].applied.petalLength}`,
            what: 'descriptor count / split / the labellum petalLength the builder used' },
+  /* ===================================================================
+     THE PER-PETAL SECTIONS — nine of them, and they are the case SESSION A
+     PREDICTED THIS GATE WOULD ONE DAY HAVE TO HANDLE and session B escaped.
+
+     Session A's note: "a witness that has to set up its own precondition
+     before it can move anything is a witness that can quietly measure
+     nothing", recorded when it expected a "Whorl differences" section to ship
+     with every control hidden. The `layerPhase` ruling spared session B — slot
+     roles apply at layerCount 1, so `roles` renders at first load. Per-petal
+     roles are FAN-only and the shipping placement is RADIAL, so these nine
+     sections ship BOTH collapsed and HIDDEN, and driving `petal3Cup` from a
+     clean page would move exactly nothing while reporting a pass.
+
+     SO THE PRECONDITION IS DECLARED AND THEN ASSERTED. `pre` is applied first,
+     through the same real-events path (never by clicking), and the gate then
+     requires the witness control to be VISIBLE before it is driven — which is
+     what stops the mechanism from becoming the very thing session A warned
+     about. The `before` metrics are read AFTER the precondition, so the delta
+     is attributable to the witness control and not to the placement change
+     that made it reachable.
+
+     8 PER SIDE WITH A MIRROR-LINE PETAL, because that is the only arrangement
+     in which ALL NINE groups have members — a witness for group 7 at the
+     default three per side would be driving a control for a group that does
+     not exist, which is the same vacuity one level down.
+
+     THE WITNESS REACHES PAST THE CONTROL'S OWN VALUE, like every other entry
+     here: triangle count is ZERO-delta for an override by construction, so
+     what moves is the descriptor count, the split flag, and the effective
+     petalCup THAT GROUP's petal was built with — read from the builder's own
+     record, which is the only thing that can see a value that never arrives. */
+  ...Object.fromEntries(Array.from({ length: MAX_FAN_GROUPS }, (_, i) => {
+    const k = i + 1;
+    return [`petal${k}`, {
+      id: `petal${k}Cup`, value: '0.6',
+      pre: [{ id: 'placement', value: 'FAN' }, { id: 'fanCenterPetal', value: 'ON' }, { id: 'fanPerSide', value: '8' }],
+      read: (m) => {
+        const idx = m.rings.findIndex((r) => r.petalRole === `PETAL_${k}`);
+        const applied = idx >= 0 && m.petalRingApplied[idx] ? m.petalRingApplied[idx].applied.petalCup : 'no descriptor';
+        return `${m.rings.length}/${m.slotRolesSplit}/${idx}/${applied}`;
+      },
+      what: `descriptor count / split / index and effective petalCup of group ${k}'s own petal`,
+    }];
+  })),
+
   thickness: { id: 'sheetThickness', value: '2.4',
               /* footRing()'s area rule reads the thickness the solids are
                  actually built at, so a thicker sheet moves the RING RADIUS —
@@ -488,10 +533,23 @@ for (const s of closed) {
   /* Fresh page per section, so each assertion starts from the real first-load
      state — collapsed exactly as a visitor finds it. */
   await openBloom(page, port);
-  const res = await page.evaluate(async ({ id, value, section, breakIt }) => {
+  const res = await page.evaluate(async ({ id, value, section, breakIt, pre }) => {
     const det = document.getElementById(`sec-${section}`);
     const el = document.getElementById(id);
     const span = el.closest('.bl-ctrl').querySelector('.bl-val');
+    /* THE PRECONDITION, through real events — never by clicking, which is how
+       every gate and the harness set a control. Applied BEFORE the `before`
+       metrics are read, so the witness delta belongs to the witness. */
+    const preState = [];
+    for (const q of (pre || [])) {
+      const pel = document.getElementById(q.id);
+      if (!pel) { preState.push(`${q.id}: not in the DOM`); continue; }
+      pel.value = q.value;
+      pel.dispatchEvent(new Event('input', { bubbles: true }));
+      pel.dispatchEvent(new Event('change', { bubbles: true }));
+      if (String(pel.value) !== String(q.value)) preState.push(`${q.id}: set "${q.value}", reads back "${pel.value}"`);
+    }
+    if (pre && pre.length) await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     if (breakIt) {
       /* NEGATIVE CONTROL, route (b): the declarations stay perfect and the app
          stops reacting. cloneNode copies the element, its id and its value and
@@ -501,6 +559,12 @@ for (const s of closed) {
     }
     const target = document.getElementById(id);
     const openBefore = det.open;
+    /* THE PRECONDITION HAS TO HAVE WORKED, and this is where that is checked
+       rather than hoped: a witness whose control is still HIDDEN would move
+       nothing and report a pass, which is exactly the vacuity `pre` exists to
+       avoid. Reported out and asserted below. */
+    const witnessHidden = target.closest('.bl-ctrl').hidden;
+    const sectionHidden = det.hidden;
     const labelBefore = span.textContent;
     const stateBefore = window.__bloomUIState()[id];
     const witnessBefore = window.__bloomMetrics();
@@ -509,6 +573,7 @@ for (const s of closed) {
     target.dispatchEvent(new Event('change', { bubbles: true }));
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     return {
+      preState, witnessHidden, sectionHidden,
       openBefore, openAfter: det.open,
       readback: target.value,
       labelBefore, labelAfter: span.textContent,
@@ -516,9 +581,16 @@ for (const s of closed) {
       metricsBefore: witnessBefore, metricsAfter: window.__bloomMetrics(),
       readout: document.getElementById('readout').textContent,
     };
-  }, { id: w.id, value: w.value, section: s.id, breakIt: NEGATIVE_CONTROL });
+  }, { id: w.id, value: w.value, section: s.id, breakIt: NEGATIVE_CONTROL, pre: w.pre || null });
 
   const tag = `[${s.id}] ${w.id} -> ${w.value} while collapsed`;
+  if (res.preState.length) note(`${tag}: the precondition did not take: ${res.preState.join('; ')}`);
+  /* THE ANTI-VACUITY CLAUSE. A section reachable only behind a precondition is
+     exactly where a witness can quietly measure nothing (session A's warning),
+     so the gate refuses to accept one whose control is still hidden after the
+     precondition ran. */
+  if (res.witnessHidden) note(`${tag}: after the precondition the witness control is still HIDDEN — it would move nothing and this assertion would pass vacuously, which is precisely what a precondition mechanism must not be allowed to become`);
+  if (res.sectionHidden) note(`${tag}: after the precondition the section is still HIDDEN`);
   if (res.openBefore !== false) note(`${tag}: the section was not collapsed at first load (open=${res.openBefore})`);
   if (res.openAfter !== false) note(`${tag}: driving the control OPENED the section — collapse state must belong to the visitor`);
   if (String(res.readback) !== String(w.value)) note(`${tag}: set "${w.value}", the element reads back "${res.readback}"`);

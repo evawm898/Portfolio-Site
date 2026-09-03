@@ -309,7 +309,7 @@ let liveSummary = '';
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null };
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -518,13 +518,25 @@ function mirrorPhrase(mirror) {
     : 'mirror plane through slot 0 (pairs i with n-i)';
 }
 
+/* ONE LINE FOR BOTH POSITION AXES (session 11), because the thing a visitor
+   needs to see is the same in both: WHICH slots each group came out as. The
+   axes are mutually exclusive by placement — slot roles under RADIAL,
+   per-petal under FAN (Eva's ruling 4) — so this reads whichever one split
+   rather than printing two lines that can never both apply. Naming the group
+   from the descriptor's own `slotRole ?? petalRole` keeps footRing() the one
+   owner of which axis this bloom has; a line deriving it from `placement`
+   would be a second copy of that branch.
+
+   PER-PETAL GROUPS PRINT AS "petal 3", not "PETAL_3": the role id is an
+   internal key and the visitor's word for it is the panel's own. */
 function slotRoleLine(rings, fr) {
-  const split = rings.filter((r) => r.slotRole !== null);
+  const split = rings.filter((r) => r.slotRole !== null || r.petalRole !== null);
   if (!split.length) return '';
+  const said = (r) => (r.slotRole !== null ? r.slotRole.toLowerCase() : r.petalRole.replace('PETAL_', 'petal '));
   const seen = new Map();
-  for (const r of split) if (!seen.has(r.slotRole)) seen.set(r.slotRole, r.slots);
+  for (const r of split) if (!seen.has(said(r))) seen.set(said(r), r.slots);
   const groups = [...seen].map(([role, slots]) =>
-    `${role.toLowerCase()} ${slots.length === 1 ? `slot ${slots[0]}` : `slots ${slots.join('+')}`}`).join(' · ');
+    `${role} ${slots.length === 1 ? `slot ${slots[0]}` : `slots ${slots.join('+')}`}`).join(' · ');
   const clamps = new Map();
   for (const r of split) for (const c of r.overrideClamped || []) clamps.set(c.base, c);
   const clampLine = [...clamps.values()]
@@ -946,7 +958,12 @@ window.__bloomMetrics = () => ({
        descriptor and never LATERAL there — "this whorl was not split" and
        "this group is the laterals" are different claims. Z4 reads `slots` to
        assert the assignment is mirror-symmetric. */
-    slotRole: r.slotRole, slots: r.slots ? [...r.slots] : null,
+    slotRole: r.slotRole,
+    /* THE PER-PETAL ROLE (session 11) — the descriptor's mirror ORBIT counted
+       outward from the plane, or null. Z8 compares these against the emitted
+       azimuths; Z9 asserts this and `slotRole` are never both non-null. */
+    petalRole: r.petalRole,
+    slots: r.slots ? [...r.slots] : null,
     overrideClamped: (r.overrideClamped || []).map((c) => ({ ...c })),
     overrides: r.overrides ? { ...r.overrides } : null,
   })),
@@ -1005,6 +1022,14 @@ window.__bloomMetrics = () => ({
      it answered "how many petals does a ring carry" with one number, which a
      split whorl does not have. */
   slotRolesEligible: lastFoot.slotRolesEligible,
+  /* THE FAN'S OWN POSITION AXIS (session 11). Cross-checked against the
+     registry's `perPetalEligible` predicate by both gates, exactly as its
+     slot-role twin is: bloom-geometry.js makes the controls INERT and the
+     registry makes them HIDDEN, neither file can read the other, so the
+     relation is measured rather than commented. */
+  perPetalEligible: lastFoot.perPetalEligible,
+  petalRoleCensus: lastFoot.petalRoleCensus ? { ...lastFoot.petalRoleCensus } : null,
+  petalGroupCount: lastFoot.petalGroupCount,
   slotRolesSplit: lastFoot.slotRolesSplit,
   /* THE QUANTIZER IDENTITY'S RESIDUALS — the continuous arm's answer to
      `ringGuardResidual`, and an EQUALITY rather than a bound (footRing's
@@ -1029,7 +1054,7 @@ window.__bloomMetrics = () => ({
      in the codebase that can see an override record that never reached the
      blade - a failure invisible to both STL gates, to the triangle count and
      to J1-J6 alike. Z2's third clause. */
-  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
+  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
   layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to

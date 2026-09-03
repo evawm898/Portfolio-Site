@@ -63,7 +63,8 @@ export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredi
 export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT,
          ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
-         FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+         FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
+         MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 
 /* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
    name for the default sheet thickness and the registry carries a literal
@@ -93,6 +94,40 @@ if (LAYER_COUNT_CONTROL.max !== MAX_LAYERS) {
 }
 if (LAYER_COUNT_CONTROL.min !== 1) {
   throw new Error(`registry layerCount.min ${LAYER_COUNT_CONTROL.min} !== 1 — one whorl is the byte-identical default and the guard's only case`);
+}
+
+/* THE SAME MOVE FOR THE PER-PETAL GROUP CEILING (session 11). MAX_FAN_GROUPS
+   is DERIVED in bloom-geometry.js from MAX_FAN_PER_SIDE, and the registry
+   GENERATES exactly that many sections and control groups from it — so the two
+   cannot drift while the import holds. What CAN drift is the generation itself
+   quietly emitting a different count (a stray filter, an off-by-one in the
+   Array.from length), which would strand a group the geometry can reach with
+   no control to reach it: "shipped means reachable", violated silently and in
+   the direction no visibility assertion looks, because a control that does not
+   EXIST has no `hidden` to check.
+
+   Checked in three places at once, at module load, so the app, both gates and
+   every shot tool get it for free: one section per group, four controls per
+   group, and the geometry's own role list the same length. */
+const PER_PETAL_SUFFIXES = ['Size', 'Tilt', 'Cup', 'Curl'];
+if (PETAL_ROLE_ORDER.length !== MAX_FAN_GROUPS) {
+  throw new Error(`PETAL_ROLE_ORDER has ${PETAL_ROLE_ORDER.length} roles for MAX_FAN_GROUPS ${MAX_FAN_GROUPS}`);
+}
+for (let k = 1; k <= MAX_FAN_GROUPS; k++) {
+  if (!SECTIONS.some((sec) => sec.id === `petal${k}`)) {
+    throw new Error(`the registry declares no section "petal${k}", but the fan can reach ${MAX_FAN_GROUPS} per-petal groups — a group the geometry builds with nowhere to control it`);
+  }
+  for (const suffix of PER_PETAL_SUFFIXES) {
+    const id = `petal${k}${suffix}`;
+    if (!CONTROLS.some((c) => c.id === id)) {
+      throw new Error(`the registry declares no control "${id}" — the per-petal set is generated from one declaration and this group is missing a member of it`);
+    }
+  }
+}
+const STRAY_PP = CONTROLS.filter((c) => /^petal\d+(Size|Tilt|Cup|Curl)$/.test(c.id))
+  .filter((c) => Number(c.id.match(/^petal(\d+)/)[1]) > MAX_FAN_GROUPS);
+if (STRAY_PP.length) {
+  throw new Error(`the registry declares per-petal controls beyond MAX_FAN_GROUPS ${MAX_FAN_GROUPS}: ${STRAY_PP.map((c) => c.id).join(', ')} — a slider for a group no arrangement can reach is a dead zone with a label`);
 }
 
 /* THE SAME MOVE FOR THE ROLE OVERRIDES, and here the drift it prevents is
@@ -1218,7 +1253,7 @@ export async function junctionAssertions(page, row) {
 }
 
 export const ZYGO_SCOPE =
-  "zygomorphy claims read footRing()'s own role records AND the effective state the BUILDER reported using; NOT the STL. SEVEN positive-control mutations across two sessions — the wrong layer role, a record that never reaches the blade, the area rule regrouped per foot (Sep 1), and an off-by-one hood index, a slot record that never reaches the blade, the collapse guard removed, and a size multiplier plumbed into footRing() (Sep 2) — ALL export watertight, export as ONE piece, emit no degenerate triangles, and have IDENTICAL live and export triangle counts and byte lengths on every row. Two of the four new ones (the off-by-one hood and the removed collapse guard) fired NOTHING AT ALL in the shipped instrument before Z4 and Z5 were written, and the size multiplier fired nothing above one whorl before Z6 was. A green export or connectedness run endorses none of this";
+  "zygomorphy claims read footRing()'s own role records AND the effective state the BUILDER reported using; NOT the STL. THIRTEEN positive-control mutations across three sessions — session 11 adding the per-petal split made unconditional, an off-by-one orbit index, a per-petal record that never reaches the blade, a numbering that does not follow the mirror-line toggle, a reversed group order, and the supersession quietly coming undone. EVERY ONE of the thirteen exports watertight, exports as ONE piece, emits no degenerate triangles, and has IDENTICAL live and export triangle counts and IDENTICAL STL byte lengths on every row; TWO of session 11's six are BIT-IDENTICAL on every probe row, so there is not even a byte to diff. The off-by-one orbit index and the undone supersession fired NOTHING AT ALL in the shipped instrument before Z8 and Z9 existed. SEVEN positive-control mutations across two sessions — the wrong layer role, a record that never reaches the blade, the area rule regrouped per foot (Sep 1), and an off-by-one hood index, a slot record that never reaches the blade, the collapse guard removed, and a size multiplier plumbed into footRing() (Sep 2) — ALL export watertight, export as ONE piece, emit no degenerate triangles, and have IDENTICAL live and export triangle counts and byte lengths on every row. Two of the four new ones (the off-by-one hood and the removed collapse guard) fired NOTHING AT ALL in the shipped instrument before Z4 and Z5 were written, and the size multiplier fired nothing above one whorl before Z6 was. A green export or connectedness run endorses none of this";
 
 /* ===================================================================
    zygoAssertions — Z1, Z2, Z3. The instrument the zygomorphy layer had to
@@ -1281,7 +1316,18 @@ export const ZYGO_SCOPE =
    carries its layer role alone (session A's shape); a split one carries the
    layer role AND the slot role, and a row in ROLE_OVERRIDES applies when its
    own role is in that list. */
-const rolesOf = (r) => (r.slotRole === null ? [r.role] : [r.role, r.slotRole]);
+/* SESSION 11 ADDS THE THIRD ENTRY, and the shape did not have to change: the
+   seam session A wrote said "adding a third axis later is a longer list, not a
+   rewritten resolver", and that is what this is. A descriptor carries its
+   LAYER role always, plus AT MOST ONE position role — `slotRole` under RADIAL,
+   `petalRole` under FAN, never both, because per-petal supersedes slot roles
+   on the fan (Eva's ruling 4). Z9 asserts the exclusivity rather than trusting
+   the filter to be describing something true. */
+const rolesOf = (r) => [r.role, r.slotRole, r.petalRole].filter((x) => x !== null && x !== undefined);
+
+/* THE POSITION ROLE, whichever axis produced it, for the messages and the
+   clauses that do not care which. Null on an unsplit descriptor. */
+const positionRoleOf = (r) => (r.slotRole !== null ? r.slotRole : (r.petalRole ?? null));
 
 /* WHETHER A DESCRIPTOR SHOULD CARRY A RECORD, derived from the registry
    state rather than from footRing()'s answer — which is the whole point:
@@ -1474,7 +1520,12 @@ export async function zygoAssertions(page, row) {
     for (const r of rings) {
       if (r.slots === null) continue;
       if (!byLayer.has(r.lambda)) byLayer.set(r.lambda, new Map());
-      for (const i of r.slots) byLayer.get(r.lambda).set(i, r.slotRole);
+      /* THE POSITION ROLE, WHICHEVER AXIS SPLIT THIS WHORL (session 11). The
+         property is the same for both and it is why per-petal needed no new
+         symmetry clause: every per-petal group IS a mirror orbit by
+         construction, so an assignment that differs across the plane is as
+         much a lie about the word "mirror" here as it was for the hood. */
+      for (const i of r.slots) byLayer.get(r.lambda).set(i, positionRoleOf(r));
     }
     for (const [L, roleAt] of byLayer) {
       for (let i = 0; i < n; i++) {
@@ -1529,7 +1580,16 @@ export async function zygoAssertions(page, row) {
     const az = m.slotAzimuths;
     if (!Array.isArray(az) || !az.length) {
       bad.push('Z4b: the build reported no slot azimuths — the mirror plane is a claim about where the petals are, and nothing here can check it');
-    } else if (m.slotRolesEligible) {
+    } else if (m.slotRolesEligible || m.perPetalEligible) {
+      /* SESSION 11 WIDENED THIS CONDITION, and the widening is the point
+         rather than a tidy-up. Z4b used to run wherever SLOT roles were
+         eligible, which included the fan. The supersession ruling makes
+         `slotRolesEligible` FALSE on every fan — so left alone, the clause
+         that exists to check the fan's own mirror would have gone SILENT on
+         exactly the placement it was written for, while every row still
+         passed. A gate losing coverage because a predicate moved underneath it
+         is this project's "a default is not coverage" lesson arriving through
+         a ruling, and nothing would have reported it. */
       az.forEach((row, L) => {
         if (!Array.isArray(row) || row.length !== n) {
           bad.push(`Z4b: whorl ${L} reported ${row && row.length} azimuths for ${n} slots`);
@@ -1595,12 +1655,21 @@ export async function zygoAssertions(page, row) {
 
      CHECKED AGAINST THE GEOMETRY'S CENSUS, never against a second copy of the
      derivation: `slotRoleCensus` is what `roleForSlot` actually produced. */
-  if (m.slotRolesEligible) {
-    const census = m.slotRoleCensus;
+  /* SESSION 11 RUNS IT OVER WHICHEVER AXIS IS LIVE, from ONE loop. The two are
+     mutually exclusive by placement, so this is a choice of census and role
+     list rather than two copies of the clause — and the per-petal case is
+     where it does the most work: a per-petal group's visibility predicate is
+     the NUMBERING's own statement ("group k exists iff the fan has k orbits"),
+     so checking it against footRing()'s census in both directions is what
+     catches a numbering that fails to follow the mirror-line toggle. */
+  const eligibleAxis = m.slotRolesEligible ? 'slot' : (m.perPetalEligible ? 'petal' : null);
+  if (eligibleAxis !== null) {
+    const census = eligibleAxis === 'slot' ? m.slotRoleCensus : m.petalRoleCensus;
+    const roleList = eligibleAxis === 'slot' ? SLOT_ROLE_ORDER : PETAL_ROLE_ORDER;
     if (!census) {
-      bad.push('Z1: slot roles are eligible but the build reported no role census — the group sizes the hood\'s visibility depends on are unavailable');
+      bad.push(`Z1: ${eligibleAxis} roles are eligible but the build reported no role census — the group sizes those controls' visibility depends on are unavailable`);
     } else {
-      for (const role of SLOT_ROLE_ORDER) {
+      for (const role of roleList) {
         /* DEDUPED, because one control may drive several bases — `hoodSize`
            scales petalLength AND petalWidth, so it is two ROLE_OVERRIDES rows
            and one slider. Counting rows would print "4 controls" for a group
@@ -1640,16 +1709,35 @@ export async function zygoAssertions(page, row) {
      sitting somewhere a bug is never exercised (formGuardResidual's
      doctrine). */
   {
-    const wantSplit = !cont && Boolean(m.slotRolesEligible)
-      && ROLE_OVERRIDES.some((o) => SLOT_ROLE_ORDER.includes(o.role) && Number(ui[o.control]) !== LAW_IDENTITY[o.law]);
+    /* SESSION 11: THE SPLIT IS ABOUT WHICHEVER POSITION AXIS IS ELIGIBLE, and
+       the roles that count are that axis's own. Asking about slot roles on a
+       fan would demand a split the ruling has made impossible there, and
+       asking about neither would let an engaged per-petal control collapse in
+       silence — a control that moves nothing. */
+    const axisRoles = m.slotRolesEligible ? SLOT_ROLE_ORDER : (m.perPetalEligible ? PETAL_ROLE_ORDER : []);
+    /* ONLY ROLES WITH MEMBERS COUNT — a CORRECTION this session's own gate run
+       made, and it is a correction to the ASSERTION rather than to the code.
+       The first draft asked "is any control of the engaged axis off its
+       identity", which was true of every axis that existed when session B
+       wrote it. Per-petal breaks it: at one per side there are two groups, so
+       `petal7Cup` at its maximum is a control off its identity whose ROLE has
+       no members — nothing resolves, no whorl splits, and that is correct
+       rather than a control moving nothing. The GATED row for exactly that
+       state (`groups 3..9 at MAX`) failed the draft on the shipped tree.
+       Membership comes from footRing()'s own census, which is the same answer
+       Z1's biconditional checks the visibility against. */
+    const axisCensus = m.slotRolesEligible ? m.slotRoleCensus : (m.perPetalEligible ? m.petalRoleCensus : null);
+    const peopled = axisRoles.filter((r) => ((axisCensus || {})[r] || 0) > 0);
+    const wantSplit = !cont && peopled.length > 0
+      && ROLE_OVERRIDES.some((o) => peopled.includes(o.role) && Number(ui[o.control]) !== LAW_IDENTITY[o.law]);
     if (m.slotRolesSplit !== wantSplit) {
       bad.push(`Z5: the bloom reports slotRolesSplit=${m.slotRolesSplit} where the state calls for ${wantSplit} — ${wantSplit ? 'a slot-role control is off its identity and no whorl split, so the control moves nothing' : 'no slot-role control is off its identity and a whorl split anyway, which regroups the area rule and moves the derived ring radius by up to 0.99 ULP for nothing'}`);
     }
     if (!m.slotRolesSplit && !cont && rings.length !== m.layerCount) {
       bad.push(`Z5: no whorl split, yet footRing() returned ${rings.length} descriptors for ${m.layerCount} layer(s) — the collapsed arm must be session A's list exactly, or byte-identity at the defaults stops being a construction`);
     }
-    if (!m.slotRolesSplit && rings.some((r) => r.slotRole !== null)) {
-      bad.push(`Z5: no whorl split, yet a descriptor carries a slot role — "this whorl was not split" and "this group is the laterals" are different claims and must not render the same`);
+    if (!m.slotRolesSplit && rings.some((r) => positionRoleOf(r) !== null)) {
+      bad.push(`Z5: no whorl split, yet a descriptor carries a position role — "this whorl was not split" and "this group is the laterals" are different claims and must not render the same`);
     }
     /* THE TWO STATEMENTS OF THE GATING AGREE, on the row that was actually
        built. bloom-geometry.js makes the controls INERT and the registry
@@ -1658,6 +1746,13 @@ export async function zygoAssertions(page, row) {
     const regSaysEligible = evalPredicate({ ref: 'slotRolesEligible' }, ui);
     if (Boolean(m.slotRolesEligible) !== regSaysEligible) {
       bad.push(`Z5: the geometry says slot roles are ${m.slotRolesEligible ? '' : 'not '}eligible here and the registry predicate says ${regSaysEligible ? '' : 'not '}eligible — one of them is hiding a control the other still lets move geometry, or showing one that can do nothing`);
+    }
+    /* THE PER-PETAL TWIN (session 11), and it is the same relation: the
+       registry HIDES and the geometry makes INERT, neither file can read the
+       other, so the agreement is measured. */
+    const regSaysPerPetal = evalPredicate({ ref: 'perPetalEligible' }, ui);
+    if (Boolean(m.perPetalEligible) !== regSaysPerPetal) {
+      bad.push(`Z5: the geometry says per-petal roles are ${m.perPetalEligible ? '' : 'not '}eligible here and the registry predicate says ${regSaysPerPetal ? '' : 'not '}eligible — one of them is hiding a control the other still lets move geometry, or showing one that can do nothing`);
     }
   }
 
@@ -1689,10 +1784,195 @@ export async function zygoAssertions(page, row) {
       for (const r of group.slice(1)) {
         for (const k of ['width', 'authoredWidth', 'radius', 'overhang', 'thickness', 'scale', 'phase', 'tiltExtra']) {
           if (r[k] !== a[k]) {
-            bad.push(`Z6: whorl ${L} reports ${k} = ${r[k]} on its ${r.slotRole} descriptor and ${a[k]} on its ${a.slotRole} — a role may differentiate the BLADE and nothing else, and a per-role foot puts the area rule, R0, the hub radius and the whole junction argument under a control (measured: J2 does NOT catch this, and above one whorl nothing else does either)`);
+            bad.push(`Z6: whorl ${L} reports ${k} = ${r[k]} on its ${positionRoleOf(r)} descriptor and ${a[k]} on its ${positionRoleOf(a)} — a role may differentiate the BLADE and nothing else, and a per-role foot puts the area rule, R0, the hub radius and the whole junction argument under a control (measured: J2 does NOT catch this, and above one whorl nothing else does either)`);
           }
         }
       }
+    }
+  }
+
+  /* ===================================================================
+     Z7 — THE PARTITION IS THE COARSEST THAT SERVES THE ENGAGED AXIS. THE PP1
+     WITNESS, and the SIXTH prevention of the regrouping trap.
+
+     WHAT Z5 ALREADY OWNS, so the division of labour is legible: Z5 asserts
+     the split HAPPENS exactly when a control of the engaged axis is off its
+     identity, and that a collapsed bloom carries one descriptor per whorl.
+     What it cannot see is a whorl that splits into the RIGHT number of
+     descriptors under the WRONG grouping, or into a FINER one than the axis
+     calls for — and finer is the expensive direction, because every foot in a
+     whorl shares one `rFoot`, so each grouping is a different PARTITION OF n
+     multiplying the same `r^2`. Measured across 6,912 (centre x perSide x
+     width x sheet x delicacy x layerSize x depth x mode) rows before any of
+     this was written:
+
+       per-ORBIT vs the whole whorl        moved 1,119 / 6,912   worst 2.00 ULP
+       per-ORBIT vs the 3-role slot split  moved   889 / 6,912   worst 2.00 ULP
+
+     — invisible to both STL gates, at an identical triangle count and an
+     identical STL byte length. That is the `a*(b+c)` vs `a*b + a*c` trap on
+     its sixth appearance in this project family.
+
+     CHECKED AS A RELATION BETWEEN TWO SEPARATE COMPUTATIONS, never as
+     footRing() against itself: the CENSUS is built by an unconditional loop
+     over every slot, the PARTITION by the conditional, filtered `positionGroups`
+     arm. A mutation to either alone makes them disagree. The declared ORDER is
+     asserted too, because the order the groups are visited IS the order the
+     area rule sums them, so a reorder is a byte event that must be made on
+     purpose. */
+  if (m.slotRolesSplit && !cont) {
+    const axis = m.slotRolesEligible ? 'slot' : (m.perPetalEligible ? 'petal' : null);
+    const census = axis === 'slot' ? m.slotRoleCensus : (axis === 'petal' ? m.petalRoleCensus : null);
+    const order = axis === 'slot' ? SLOT_ROLE_ORDER : PETAL_ROLE_ORDER;
+    if (axis === null || !census) {
+      bad.push(`Z7: a whorl split with no eligible position axis (slot=${m.slotRolesEligible}, per-petal=${m.perPetalEligible}) — the area rule is grouped by something nothing declares`);
+    } else {
+      const want = order.filter((r) => (census[r] || 0) > 0);
+      const byLayer = new Map();
+      for (const r of rings) {
+        if (!byLayer.has(r.lambda)) byLayer.set(r.lambda, []);
+        byLayer.get(r.lambda).push(r);
+      }
+      for (const [L, group] of byLayer) {
+        const got = group.map((r) => positionRoleOf(r));
+        if (got.length !== want.length || got.some((r, i) => r !== want[i])) {
+          bad.push(`Z7: whorl ${L} is partitioned as [${got.join(', ')}] where the ${axis} axis's non-empty groups, in declared order, are [${want.join(', ')}] — a partition finer or coarser than the engaged axis regroups the area rule and MOVES THE DERIVED RING RADIUS (measured: 1,119 of 6,912 rows at up to 2.00 ULP for a per-orbit regrouping), while both STL gates stay green at an identical triangle count and byte length`);
+        }
+      }
+    }
+  }
+
+  /* ===================================================================
+     Z8 — THE GROUP INDEX IS THE DISTANCE FROM THE PLANE, READ FROM THE
+     EMITTED AZIMUTHS. THE PP4 WITNESS, and the only one there is.
+
+     Eva's founding fan principle is "the petal on the mirror line is petal
+     number one, and it has its own sliders". That is a claim about ORDER, and
+     a numbering can be total, disjoint, mirror-symmetric, correctly SIZED and
+     correctly VISIBLE and still label the petals in the wrong sequence — at
+     which point every other clause here agrees with it. Measured on a
+     throwaway worktree before this was written.
+
+     READ FROM THE GEOMETRY, ON THE Z4b DOCTRINE. An instrument that recomputed
+     `petalRoleForSlot` and compared would be comparing the owner against
+     itself and could not fail. So the plane is measured from the mirror-PAIR
+     midpoints (the same property Z4b asserts, and the same one the fan sheet
+     draws its line from), each descriptor's angular distance from that plane
+     is taken from the emitted azimuths, and the groups are required to come
+     out in ascending order of it: the j-th closest group must be PETAL_(j+1).
+
+     A TOLERANCE, AND IT IS SAID SO: the azimuths are built as +a and -a from
+     one magnitude, so a pair's distance is exact, but two DIFFERENT groups are
+     separated by a whole step — 21.25 deg at the tightest reachable fan — so
+     1e-9 rad cannot hide anything this is for. */
+  if (m.slotRolesSplit && m.perPetalEligible && !cont) {
+    const az = m.slotAzimuths;
+    const byLayer = new Map();
+    for (const r of rings) {
+      if (r.slots === null) continue;
+      if (!byLayer.has(r.lambda)) byLayer.set(r.lambda, []);
+      byLayer.get(r.lambda).push(r);
+    }
+    for (const [L, group] of byLayer) {
+      const row = az[L];
+      if (!Array.isArray(row)) { bad.push(`Z8: whorl ${L} reported no azimuths — the numbering cannot be checked against the geometry`); continue; }
+      /* THE PLANE, from the pair midpoints rather than from the arrangement's
+         angular extent — the fan sheet's own correction, which the RADIAL
+         control cell caught: a midpoint of the EXTENT is meaningless on a full
+         circle and gave 22.5 deg for a bloom whose plane is plainly at 0. */
+      /* ONE PAIR IS ENOUGH TO LOCATE THE PLANE, because Z4b has already run on
+         this row and asserts that EVERY pair puts it in the same place. Taking
+         slot 0's pair rather than averaging is deliberate: an average would
+         quietly survive a row where the pairs disagree, which is the state Z4b
+         exists to fail on. */
+      const plane = (row[0] + row[mirrorPartner(0, n, m.mirror)]) / 2;
+      const distOf = (a) => {
+        let d = Math.abs(((a - plane) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
+        if (d > Math.PI) d = 2 * Math.PI - d;
+        return d;
+      };
+      const ranked = group.map((r) => ({ role: r.petalRole, d: Math.min(...r.slots.map((i) => distOf(row[i]))) }))
+        .sort((a, b) => a.d - b.d);
+      ranked.forEach((g, j) => {
+        const want = PETAL_ROLE_ORDER[j];
+        if (g.role !== want) {
+          const deg = (r) => ((r * 180) / Math.PI).toFixed(2);
+          bad.push(`Z8: whorl ${L}'s group ${j + 1} counting outward from the mirror plane sits at ${deg(g.d)} deg and is labelled ${g.role}, but petal ${j + 1} must be the ${j + 1}th group out — Eva's fan principle is that the petal ON the mirror line is petal number ONE, so a numbering that does not follow the plane puts every slider on a different petal from the one its section names. NOTHING ELSE HERE CAN SEE THIS: the partition stays total, disjoint, mirror-symmetric and identically sized, every group's controls stay correctly visible, and the export is watertight, one piece, at an identical triangle count.`);
+        }
+      });
+    }
+  }
+
+  /* ===================================================================
+     Z9 — THE TWO POSITION AXES ARE DISJOINT BY PLACEMENT, AND THE PATHS THE
+     RULING MADE UNREACHABLE ARE ASSERTED UNREACHABLE RATHER THAN ASSUMED SO.
+
+     Eva ruled (4, Sep 3) that per-petal roles SUPERSEDE slot roles on the fan:
+     the fan gets one per-position axis and the rosette gets the other. That is
+     a behaviour claim, so it gets a witness — a ruling with no assertion is a
+     comment.
+
+     AND IT KEEPS TWO NOW-UNREACHABLE CODE PATHS HONEST. `roleForSlot`'s
+     THROUGH_GAP arm and `PREDICATES.hoodEmpty` were both written for the fan
+     with the toggle off, which no longer has slot roles. They are KEPT, because
+     Eva ruled composition must stay recoverable and deleting them would make
+     recovery a rewrite instead of a predicate arm — but unreachable-and-silent
+     is the dead-label defect this project retires ids over. So their
+     unreachability is measured on every row, in both directions, and the day
+     the fan arm comes back these clauses fail loudly instead of the code
+     quietly starting to matter again. */
+  {
+    if (m.slotRolesEligible && m.perPetalEligible) {
+      bad.push('Z9: both position axes report eligible on one row — per-petal SUPERSEDES slot roles on the fan (Eva, Sep 3), so a bloom has at most one per-position axis; two would put `labellumCup` and `petal1Cup` on the same petal through two vocabularies');
+    }
+    const fan = m.placement === 'FAN';
+    if (fan !== Boolean(m.perPetalEligible) && !cont) {
+      bad.push(`Z9: placement is ${m.placement} and per-petal roles report ${m.perPetalEligible ? '' : 'not '}eligible — per-petal is the FAN's axis and no other placement's`);
+    }
+    if (fan && rings.some((r) => r.slotRole !== null)) {
+      bad.push('Z9: a FAN row carries a slot-role descriptor — slot roles are superseded there, so a labellum or hood group reaching the geometry means the ruling is not in force and two axes are driving one petal');
+    }
+    if (!fan && rings.some((r) => r.petalRole !== null && r.petalRole !== undefined)) {
+      bad.push(`Z9: a ${m.placement} row carries a per-petal descriptor — per-petal roles are the fan's own numbering and mean nothing on an arrangement with no mirror line`);
+    }
+    for (const r of rings) {
+      if (r.slotRole !== null && r.petalRole !== null && r.petalRole !== undefined) {
+        bad.push(`Z9: descriptor ${r.index} carries BOTH a slot role (${r.slotRole}) and a per-petal role (${r.petalRole}) — a descriptor is one (layer x position) cell and two position roles break the partition Z1 checks`);
+      }
+    }
+    /* (iv) THE KEPT PREDICATE IS INERT — AND THE FIRST DRAFT ASSERTED THE
+       WRONG PROPERTY, which this session's own gate run caught on six rows of
+       the shipped tree.
+
+       The draft said `hoodEmpty` is NEVER TRUE. It is not: the predicate is a
+       statement about STATE (a fan, toggle off, one per side) and that state is
+       perfectly reachable — it is the two-petal corner the whole junction
+       analysis turned on. What the ruling makes unreachable is its EFFECT.
+       `hoodEmpty` exists only as a `not` term inside the hood controls'
+       visibility, and those controls are now hidden under FAN for a different
+       reason entirely, so the term can no longer decide anything.
+
+       SO THE CLAIM IS STATED AS THE INERTNESS ITSELF, which cannot be
+       satisfied vacuously: every control whose predicate mentions `hoodEmpty`
+       must be visible exactly when slot roles are eligible — i.e. removing the
+       term would change no outcome. The day the fan arm comes back, the term
+       starts deciding again and this fires, which is the point of keeping it
+       rather than deleting it. */
+    {
+      const mentions = (pred) => predicateDrivers(pred).size >= 0 && JSON.stringify(pred).includes('hoodEmpty');
+      const slotElig = evalPredicate({ ref: 'slotRolesEligible' }, ui);
+      for (const c of CONTROLS) {
+        if (!c.visibleWhen || !mentions(c.visibleWhen)) continue;
+        if (evalPredicate(c.visibleWhen, ui) !== slotElig) {
+          bad.push(`Z9: "${c.id}" carries the \`hoodEmpty\` term and its visibility (${evalPredicate(c.visibleWhen, ui)}) differs from slot-role eligibility (${slotElig}) — that term is kept ONLY so composition stays one predicate arm away and is meant to decide nothing while the fan has no slot roles. If this fires the term is live again, which is a design change and not a passing state`);
+        }
+      }
+    }
+    /* (v) THE NEVER-TAKEN ARM. `roleForSlot`'s THROUGH_GAP branch belongs to
+       the fan with the toggle off; wherever slot roles are eligible the plane
+       must be the through-slot one. */
+    if (m.slotRolesEligible && m.mirror !== MIRROR_THROUGH_SLOT) {
+      bad.push(`Z9: slot roles are eligible on a bloom whose plane is ${m.mirror} — roleForSlot's THROUGH_GAP arm is kept for recoverability and is meant to be unreachable, so this says it is being taken again`);
     }
   }
 
@@ -2392,6 +2672,27 @@ export function buildMatrix() {
   const FAN = { placement: 'FAN' };
   const FAN_ON = { placement: 'FAN', fanCenterPetal: 'ON' };
   const FAN_OFF = { placement: 'FAN', fanCenterPetal: 'OFF' };
+  /* ===================================================================
+     THE PER-PETAL SETS (session 11), DERIVED FROM THE REGISTRY'S OWN ROWS
+     rather than typed out — nine groups times four controls is thirty-six
+     literals, and a corner row whose set has quietly stopped matching the
+     control set is a row that builds the shipping default under a label
+     naming controls that did nothing. That is the latent trap #124 closed,
+     and deriving these is how it stays closed as the group set changes.
+
+     THE VALUES COME FROM THE CONTROL'S OWN min/max, so "MAX" means the top of
+     the shipped slider and cannot drift from a range change. */
+  const PP_IDS = (k) => ['Size', 'Tilt', 'Cup', 'Curl'].map((x) => `petal${k}${x}`);
+  const ppAt = (k, pick) => Object.fromEntries(PP_IDS(k).map((id) => {
+    const c = CONTROLS.find((x) => x.id === id);
+    return [id, pick(c)];
+  }));
+  const PETAL1 = { petal1Size: 1.6, petal1Tilt: -40, petal1Cup: 0.6, petal1Curl: -60 };
+  const PETAL1_MAX = ppAt(1, (c) => c.max);
+  const ALL_PER_PETAL_MAX = Object.assign({}, ...Array.from({ length: MAX_FAN_GROUPS }, (_, i) => ppAt(i + 1, (c) => c.max)));
+  /* GROUPS BEYOND WHAT ONE PER SIDE CAN REACH — 3..9, which have no members
+     there, so their sliders are hidden and must be inert. */
+  const BEYOND_REACH = Object.assign({}, ...Array.from({ length: MAX_FAN_GROUPS - 2 }, (_, i) => ppAt(i + 3, (c) => c.max)));
   for (const [name, sets] of [
     ['FAN: defaults (3/side, a mirror-line petal, 45deg)', { ...FAN }],
     /* THE TOGGLE PAIR — the same arrangement under the two involutions, which
@@ -2474,24 +2775,116 @@ export function buildMatrix() {
     ['FAN: 3 layers (nested fans)', { ...FAN, layerCount: 3 }],
     ['FAN: 3 layers x ALL THIN x spread min', { ...FAN, layerCount: 3, ...ALL_THIN, spread: 0.6 }],
     ['FAN: 3 layers x toggle ON x layerTilt max', { ...FAN_ON, layerCount: 3, layerTilt: 30, petalTilt: 75 }],
-    /* THE ROLES COMPOSING ONTO THE FAN — Eva's ruling, and the whole reason
-       the arrangement was built to fit the two involutions. Toggle ON: the
-       labellum IS the mirror-line petal. Toggle OFF: the labellum is the
-       INNER PAIR, so one control drives two petals and the group size the
-       area rule multiplies by is 2 rather than 1. */
-    ['FAN x LABELLUM: toggle ON — the mirror-line petal is the labellum', { ...FAN_ON, ...ORCHID }],
-    ['FAN x LABELLUM: toggle OFF — the labellum is the INNER PAIR', { ...FAN_OFF, ...ORCHID }],
-    ['FAN x LABELLUM: toggle OFF x 1/side (the labellum is the whole bloom)', { ...FAN_OFF, ...ORCHID, fanPerSide: 1 }],
-    ['FAN: ALL SLOT MAX x toggle ON', { ...FAN_ON, ...ALL_SLOT_MAX }],
-    ['FAN: ALL SLOT MAX x toggle OFF', { ...FAN_OFF, ...ALL_SLOT_MAX }],
-    ['FAN: ALL SLOT MAX x 3 layers (slot roles at depth — only the fan reaches this)', { ...FAN, ...ALL_SLOT_MAX, layerCount: 3 }],
-    ['FAN: ALL SLOT MAX x 8/side x 60deg (roles on a capped arc)', { ...FAN_ON, ...ALL_SLOT_MAX, fanPerSide: 8, fanSpacing: 60 }],
-    /* THE EMPTY HOOD. One per side with no mirror-line petal makes the inner
-       pair and the outer pair the same pair; the labellum takes it and the
-       hood comes out EMPTY, so the hood's three controls are HIDDEN and must
-       be inert. A gated state is coverage, and a gated state nobody exercises
-       is a claim nobody checked. */
-    ['FAN: GATED — 1/side x toggle OFF x ALL SLOT MAX (the hood is empty, its controls hidden and inert)', { ...FAN_OFF, ...ALL_SLOT_MAX, fanPerSide: 1 }],
+    /* ===================================================================
+       THE SLOT ROLES ARE SUPERSEDED ON THE FAN (Eva's ruling 4, Sep 3), AND
+       THESE NINE ROWS CHANGED MEANING RATHER THAN GOING AWAY.
+
+       They used to assert that the labellum and hood COMPOSE onto the fan —
+       the shipped behaviour session 10 photographed. Per-petal roles are the
+       fan's only per-position axis now, so the same sets must produce a bloom
+       IDENTICAL to the same fan with those controls untouched: hidden, and
+       inert. A ROW THAT NAMES A STATE MUST SET IT, and a row whose CLAIM has
+       inverted must say the new claim in its label — otherwise it keeps
+       passing under a sentence that is no longer true, which is the "eight FAN
+       rows still said OFF" defect the toggle default already taught this
+       matrix once.
+
+       KEEPING THE SETS IS THE POINT: these are now the strongest inertness
+       rows in the matrix, because every one of them drives the superseded
+       controls to values that USED to move geometry. Measured on the shipped
+       tree: `FAN: GATED — ALL SLOT MAX x toggle ON` exports sha c9c686d9,
+       BIT-IDENTICAL to `FAN: defaults`. */
+    ['FAN: GATED — ORCHID sets x toggle ON (slot roles superseded by per-petal, hidden and inert)', { ...FAN_ON, ...ORCHID }],
+    ['FAN: GATED — ORCHID sets x toggle OFF (slot roles superseded, hidden and inert)', { ...FAN_OFF, ...ORCHID }],
+    ['FAN: GATED — ORCHID sets x toggle OFF x 1/side (slot roles superseded, hidden and inert)', { ...FAN_OFF, ...ORCHID, fanPerSide: 1 }],
+    ['FAN: GATED — ALL SLOT MAX x toggle ON (hidden and inert)', { ...FAN_ON, ...ALL_SLOT_MAX }],
+    ['FAN: GATED — ALL SLOT MAX x toggle OFF (hidden and inert)', { ...FAN_OFF, ...ALL_SLOT_MAX }],
+    ['FAN: GATED — ALL SLOT MAX x 3 layers (hidden and inert at depth)', { ...FAN, ...ALL_SLOT_MAX, layerCount: 3 }],
+    ['FAN: GATED — ALL SLOT MAX x 8/side x 60deg (hidden and inert on a capped arc)', { ...FAN_ON, ...ALL_SLOT_MAX, fanPerSide: 8, fanSpacing: 60 }],
+    /* THE EMPTY HOOD, KEPT AND REPURPOSED. It used to assert the hood's three
+       controls were hidden because the group was empty; the whole slot-role
+       set is hidden on a fan now, for a different reason. The ROW still earns
+       its place — it is the two-petal arrangement, which is the corner the
+       junction analysis turned on — and its label now says which claim it
+       carries. `PREDICATES.hoodEmpty` is what became unreachable, and Z9
+       asserts that rather than this row implying it. */
+    ['FAN: GATED — 1/side x toggle OFF x ALL SLOT MAX (two petals; slot roles superseded, hidden and inert)', { ...FAN_OFF, ...ALL_SLOT_MAX, fanPerSide: 1 }],
+
+    /* ===================================================================
+       PER-PETAL — session 11's own region, named rather than numbered.
+
+       WHAT IS ACTUALLY NEW HERE, geometrically. A size x or a tilt delta on
+       the mirror-line petal is what `labellumSize` already did at these
+       corners, so those are re-covered rather than new. The two genuinely new
+       things are (a) a MIDDLE group — an orbit that was LATERAL and carried no
+       controls at all — and (b) the per-ORBIT regrouping of the area rule,
+       which is why the extremes and the thin corner are here. */
+    ['FAN x PER-PETAL: petal 1 extreme x toggle ON (the mirror-line petal, alone)', { ...FAN_ON, ...PETAL1 }],
+    ['FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)', { ...FAN_OFF, ...PETAL1 }],
+    ['FAN x PER-PETAL: a MIDDLE group only (petal 2 — an orbit that was LATERAL and had no controls)', { ...FAN, petal2Size: 1.5, petal2Tilt: 45, petal2Cup: 0.5, petal2Curl: -60 }],
+    ['FAN x PER-PETAL: the OUTERMOST group only (petal 4 at 3/side)', { ...FAN_ON, petal4Size: 1.5, petal4Tilt: 60, petal4Curl: 120 }],
+    /* THE CORNER THE CONTAINMENT ARGUMENT MUST SURVIVE: the largest single
+       petal at the widest spacing at the fewest petals. Measured through
+       footRing(): overlap box 2.166 x 6.400 x 1.200 = 16.639 mm3 live, and
+       1.500 x 1.600 x 1.000 = 2.400 mm3 at ALL THIN in export — the SAME
+       standing number as every previous corner, because a size multiplier
+       never reaches the ring (Z6). */
+    ['FAN x PER-PETAL: 1/side x 170deg x petal 1 MAX (largest petal, widest spacing, fewest petals)', { ...FAN_ON, fanPerSide: 1, fanSpacing: 170, ...PETAL1_MAX }],
+    ['FAN x PER-PETAL: 1/side x 170deg x toggle OFF x petal 1 MAX (two petals, both are petal 1)', { ...FAN_OFF, fanPerSide: 1, fanSpacing: 170, ...PETAL1_MAX }],
+    ['FAN x PER-PETAL: ALL PER-PETAL MAX x 8/side x 60deg (nine groups on a capped arc)', { ...FAN_ON, fanPerSide: 8, fanSpacing: 60, ...ALL_PER_PETAL_MAX }],
+    ['FAN x PER-PETAL: ALL PER-PETAL MAX x 1/side (one group is the whole bloom)', { ...FAN_ON, fanPerSide: 1, ...ALL_PER_PETAL_MAX }],
+    /* PER-PETAL COMPOSED WITH THE LAYER AXIS — the two that DO compose, since
+       `inner*` is depth and per-petal is position. Only the fan reaches
+       per-position roles at three whorls. */
+    ['FAN x PER-PETAL: petal 1 x 3 layers x inner* (position and depth composing)', { ...FAN, layerCount: 3, ...PETAL1, innerCurl: 120, innerCup: 0.4 }],
+    ['FAN x PER-PETAL: ALL PER-PETAL MAX x 3 layers', { ...FAN, layerCount: 3, ...ALL_PER_PETAL_MAX }],
+    /* THE BARE BLOOM AGAIN — a default is not coverage, and DISC is the
+       default, so a per-petal fan with no centre is exercised by nothing
+       unless it is written down. */
+    ['FAN x PER-PETAL: petal 1 x centre OFF (the BARE per-petal fan)', { ...FAN, centerStyle: 'NONE', ...PETAL1 }],
+    ['FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min', { ...FAN, ...ALL_THIN, spread: 0.6, ...ALL_PER_PETAL_MAX }],
+    ['FAN x PER-PETAL: ALL PER-PETAL MAX x ALL FORM MAX', { ...FAN, ...ALL_FORM_MAX, ...ALL_PER_PETAL_MAX }],
+    /* THE REGISTRY-DERIVED SWEEP, WITH ITS PRECONDITION SET — block 12's move
+       one axis over, and it is needed for the same reason.
+       `PLACEMENT_SUB_IDS` correctly keeps these 36 controls OUT of the blanket
+       min/max sweep (they read `placement` and are hidden at the RADIAL
+       defaults, so a blanket row would build the shipping bloom and report a
+       pass under a label naming a control that did nothing — the trap #124
+       closed, arriving from a fifth direction). But "excluded from the
+       blanket sweep" is not "covered": a control with no min/max row is
+       unknown, not passing. So each one gets its own row WITH the fan set,
+       at the SMALLEST arrangement in which its own group has members.
+       Derived from the registry rather than listed, so a new group or a fifth
+       per-petal control is swept the day it is declared.
+
+       WHY THE SMALLEST AND NOT 8 PER SIDE, which was the first draft: with a
+       mirror-line petal, group k first has members at `perSide = k - 1`, so
+       that is the lightest state in which the row measures anything — and it
+       is a BETTER state as well as a cheaper one, because there group k is the
+       OUTERMOST orbit, which is where a per-petal override is most visible.
+       Pinning every row at 8 per side would have swept 72 seventeen-petal
+       blooms (22,260 export triangles each against the default's 11,136) to
+       measure exactly the same controls. Middle orbits are covered by the
+       named corners, which is what named corners are for. */
+    ...['Size', 'Tilt', 'Cup', 'Curl'].flatMap((suffix) =>
+      Array.from({ length: MAX_FAN_GROUPS }, (_, i) => i + 1).flatMap((k) => {
+        const c = CONTROLS.find((x) => x.id === `petal${k}${suffix}`);
+        const perSide = Math.max(1, k - 1);
+        return [['min', c.min], ['max', c.max]].map(([tag, v]) =>
+          [`PER-PETAL: ${c.id} ${tag} (${v}) at ${perSide}/side`, { ...FAN_ON, fanPerSide: perSide, [c.id]: v }]);
+      })),
+
+    /* THE GATED ROWS — per-petal is FAN-only, so on every other placement
+       these sliders must be hidden AND bit-identical to the same row without
+       them. Three placements, because "hidden" is a claim about each. */
+    ['PER-PETAL: GATED — RADIAL x ALL PER-PETAL MAX (hidden under RADIAL, and must be inert)', { ...ALL_PER_PETAL_MAX }],
+    ['PER-PETAL: GATED — SPIRAL x ALL PER-PETAL MAX (hidden, and must be inert)', { placement: 'SPIRAL', ...ALL_PER_PETAL_MAX }],
+    ['PER-PETAL: GATED — CONTINUOUS x 3 x ALL PER-PETAL MAX (hidden, and must be inert)', { placement: 'CONTINUOUS', layerCount: 3, ...ALL_PER_PETAL_MAX }],
+    /* AND A GROUP BEYOND THE ARRANGEMENT'S REACH: at one per side there are
+       two groups at most, so groups 3..9 have no members, their sliders are
+       hidden, and they must move nothing. Z1's biconditional is what ties
+       those two halves together; this is the row that exercises it. */
+    ['PER-PETAL: GATED — 1/side x groups 3..9 at MAX (no members, hidden, and must be inert)', { ...FAN_ON, fanPerSide: 1, ...BEYOND_REACH }],
     /* THE HIDDEN-AND-INERT PAIR FOR `petalCount`. Under FAN the count is
        DERIVED, so this slider must move nothing at all — these two rows differ
        only in a control the fan does not read, and they must export
@@ -2511,11 +2904,344 @@ export function buildMatrix() {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
   /* A clefted petal on a fan — the trim domain meeting the second involution,
-     and the one capability row that exercises the new azimuth arm. */
-  rows.push({ label: 'CAPABILITY: cleft x FAN x toggle ON x ALL SLOT MAX', capability: CAPABILITY_CLEFT,
-    set: Object.entries({ ...FAN_ON, ...ALL_SLOT_MAX }).map(([id, value]) => ({ id, value: String(value) })) });
+     and the one capability row that exercises the fan's azimuth arm.
+
+     ITS SETS MOVED WITH THE RULING (session 11). It drove ALL SLOT MAX, which
+     the supersession makes inert on a fan, so left alone it would have gone on
+     exercising a clefted fan at the shipping default under a label naming eight
+     controls that no longer do anything — the ninth of the nine rows this
+     ruling changed the meaning of. It drives ALL PER-PETAL MAX now, which is
+     the axis the fan actually has. */
+  rows.push({ label: 'CAPABILITY: cleft x FAN x toggle ON x ALL PER-PETAL MAX', capability: CAPABILITY_CLEFT,
+    set: Object.entries({ ...FAN_ON, ...ALL_PER_PETAL_MAX }).map(([id, value]) => ({ id, value: String(value) })) });
 
   return rows;
+}
+
+/* ===================================================================
+   phase9Matrix() — THE 287 ROWS AS THEY STOOD AT 98dcdbe, frozen.
+
+   The like-for-like baseline for PER-PETAL ROLES, standing to session 11
+   exactly as phase8Matrix() stands to the fan and phase7Matrix() to slot
+   roles. A NEW frozen matrix beside the eight older ones, never an edit to
+   any of them — a frozen matrix is a record of ONE COMMIT, not a view over
+   anything, and FROZEN MEANS FROZEN.
+
+   FROZEN AGAINST: 98dcdbe, this branch's own base — the state of `main`
+   carrying the VIEW box (#133) and the incident note (#137), immediately
+   before per-petal roles and the supersession ruling.
+
+   WHY IT IS THE STRONGEST OF THE NINE, on the reasoning that promoted each of
+   its predecessors in turn: it is the only one carrying the FAN's own corners
+   — both toggle positions, the four corners of (perSide x spacing), the arc
+   limit binding both ways, the bare fan, the nested fans, and the slot roles
+   composed onto the fan. A ruling that takes an axis AWAY from the fan is
+   most likely to disturb exactly that region, so this is the baseline the
+   close-out's load-bearing claim rests on.
+
+   AND IT IS THE ONE BASELINE THIS SESSION EXPECTS TO MOVE — the only one, and
+   only on a NAMED partition. Every frozen matrix older than phase8 predates
+   the FAN entirely, so not one of their rows can select it and the whole
+   historical suite is the non-FAN partition, which this change cannot touch.
+   phase8 (246 rows, frozen at 7877bdf) predates the fan too. phase9 is the
+   first frozen matrix that CAN select FAN, so it is the first that can carry
+   a fan row whose slot-role controls the supersession has made inert. That
+   partition is stated and asserted in the close-out rather than discovered.
+
+   GENERATED FROM 98dcdbe's OWN buildMatrix() rather than transcribed, and
+   `--verify-frozen --phase9` proves it deep-equal to that commit's output in
+   CI on every push — the check that exists because transcribing a few hundred
+   rows by hand is exactly the sort of thing that looks right and is not. */
+export function phase9Matrix() {
+  return [
+  { label: "DEFAULT (the shipping configuration)", set: [] },
+  { label: "petalCount 3", set: [{ id: "petalCount", value: "3" }] },
+  { label: "petalCount 4", set: [{ id: "petalCount", value: "4" }] },
+  { label: "petalCount 5", set: [{ id: "petalCount", value: "5" }] },
+  { label: "petalCount 6", set: [{ id: "petalCount", value: "6" }] },
+  { label: "petalCount 7", set: [{ id: "petalCount", value: "7" }] },
+  { label: "petalCount 8", set: [{ id: "petalCount", value: "8" }] },
+  { label: "petalCount 9", set: [{ id: "petalCount", value: "9" }] },
+  { label: "petalCount 10", set: [{ id: "petalCount", value: "10" }] },
+  { label: "petalCount 11", set: [{ id: "petalCount", value: "11" }] },
+  { label: "petalCount 12", set: [{ id: "petalCount", value: "12" }] },
+  { label: "petalCount 13", set: [{ id: "petalCount", value: "13" }] },
+  { label: "petalCount 14", set: [{ id: "petalCount", value: "14" }] },
+  { label: "petalCount 15", set: [{ id: "petalCount", value: "15" }] },
+  { label: "petalCount 16", set: [{ id: "petalCount", value: "16" }] },
+  { label: "petalCount 17", set: [{ id: "petalCount", value: "17" }] },
+  { label: "petalCount 18", set: [{ id: "petalCount", value: "18" }] },
+  { label: "petalCount 19", set: [{ id: "petalCount", value: "19" }] },
+  { label: "petalCount 20", set: [{ id: "petalCount", value: "20" }] },
+  { label: "petalCount 21", set: [{ id: "petalCount", value: "21" }] },
+  { label: "petalCount 22", set: [{ id: "petalCount", value: "22" }] },
+  { label: "petalCount 23", set: [{ id: "petalCount", value: "23" }] },
+  { label: "petalCount 24", set: [{ id: "petalCount", value: "24" }] },
+  { label: "petalCount 25", set: [{ id: "petalCount", value: "25" }] },
+  { label: "petalCount 26", set: [{ id: "petalCount", value: "26" }] },
+  { label: "petalCount 27", set: [{ id: "petalCount", value: "27" }] },
+  { label: "petalCount 28", set: [{ id: "petalCount", value: "28" }] },
+  { label: "petalCount 29", set: [{ id: "petalCount", value: "29" }] },
+  { label: "petalCount 30", set: [{ id: "petalCount", value: "30" }] },
+  { label: "petalCount 31", set: [{ id: "petalCount", value: "31" }] },
+  { label: "petalCount 32", set: [{ id: "petalCount", value: "32" }] },
+  { label: "petalCount 33", set: [{ id: "petalCount", value: "33" }] },
+  { label: "petalCount 34", set: [{ id: "petalCount", value: "34" }] },
+  { label: "petalCount 35", set: [{ id: "petalCount", value: "35" }] },
+  { label: "petalCount 36", set: [{ id: "petalCount", value: "36" }] },
+  { label: "petalCount 37", set: [{ id: "petalCount", value: "37" }] },
+  { label: "petalCount 38", set: [{ id: "petalCount", value: "38" }] },
+  { label: "petalCount 39", set: [{ id: "petalCount", value: "39" }] },
+  { label: "petalCount 40", set: [{ id: "petalCount", value: "40" }] },
+  { label: "petalLength min (20)", set: [{ id: "petalLength", value: "20" }] },
+  { label: "petalLength max (60)", set: [{ id: "petalLength", value: "60" }] },
+  { label: "petalWidth min (8)", set: [{ id: "petalWidth", value: "8" }] },
+  { label: "petalWidth max (30)", set: [{ id: "petalWidth", value: "30" }] },
+  { label: "petalBaseTaper min (0.3)", set: [{ id: "petalBaseTaper", value: "0.3" }] },
+  { label: "petalBaseTaper max (3)", set: [{ id: "petalBaseTaper", value: "3" }] },
+  { label: "petalTipTaper min (0.6)", set: [{ id: "petalTipTaper", value: "0.6" }] },
+  { label: "petalTipTaper max (4)", set: [{ id: "petalTipTaper", value: "4" }] },
+  { label: "petalTipBreadth min (0)", set: [{ id: "petalTipBreadth", value: "0" }] },
+  { label: "petalTipBreadth max (0.6)", set: [{ id: "petalTipBreadth", value: "0.6" }] },
+  { label: "petalCup min (-0.8)", set: [{ id: "petalCup", value: "-0.8" }] },
+  { label: "petalCup max (1.2)", set: [{ id: "petalCup", value: "1.2" }] },
+  { label: "petalTilt min (0)", set: [{ id: "petalTilt", value: "0" }] },
+  { label: "petalTilt max (75)", set: [{ id: "petalTilt", value: "75" }] },
+  { label: "petalSpineCurl min (-180)", set: [{ id: "petalSpineCurl", value: "-180" }] },
+  { label: "petalSpineCurl max (360)", set: [{ id: "petalSpineCurl", value: "360" }] },
+  { label: "petalRoll min (-330)", set: [{ id: "petalRoll", value: "-330" }] },
+  { label: "petalRoll max (330)", set: [{ id: "petalRoll", value: "330" }] },
+  { label: "petalTwist min (-180)", set: [{ id: "petalTwist", value: "-180" }] },
+  { label: "petalTwist max (180)", set: [{ id: "petalTwist", value: "180" }] },
+  { label: "sheetThickness min (0.6)", set: [{ id: "sheetThickness", value: "0.6" }] },
+  { label: "sheetThickness max (2.4)", set: [{ id: "sheetThickness", value: "2.4" }] },
+  { label: "tipThinning min (0)", set: [{ id: "tipThinning", value: "0" }] },
+  { label: "tipThinning max (0.8)", set: [{ id: "tipThinning", value: "0.8" }] },
+  { label: "footDelicacy min (0.25)", set: [{ id: "footDelicacy", value: "0.25" }] },
+  { label: "footDelicacy max (1)", set: [{ id: "footDelicacy", value: "1" }] },
+  { label: "spread min (0.6)", set: [{ id: "spread", value: "0.6" }] },
+  { label: "spread max (6)", set: [{ id: "spread", value: "6" }] },
+  { label: "layerCount min (1)", set: [{ id: "layerCount", value: "1" }] },
+  { label: "layerCount max (3)", set: [{ id: "layerCount", value: "3" }] },
+  { label: "ROSE-ish (obovate, broad tip)", set: [{ id: "petalBaseTaper", value: "2" }, { id: "petalTipTaper", value: "1.1" }, { id: "petalTipBreadth", value: "0.3" }] },
+  { label: "POPPY-ish (orbicular, truncate)", set: [{ id: "petalBaseTaper", value: "0.6" }, { id: "petalTipTaper", value: "0.7" }, { id: "petalTipBreadth", value: "0.5" }] },
+  { label: "NONE × spread min (0.6)", set: [{ id: "centerStyle", value: "NONE" }, { id: "spread", value: "0.6" }] },
+  { label: "NONE × spread default (2)", set: [{ id: "centerStyle", value: "NONE" }, { id: "spread", value: "2" }] },
+  { label: "NONE × spread max (6)", set: [{ id: "centerStyle", value: "NONE" }, { id: "spread", value: "6" }] },
+  { label: "DOME × spread min (0.6)", set: [{ id: "centerStyle", value: "DOME" }, { id: "spread", value: "0.6" }] },
+  { label: "DOME × spread default (2)", set: [{ id: "centerStyle", value: "DOME" }, { id: "spread", value: "2" }] },
+  { label: "DOME × spread max (6)", set: [{ id: "centerStyle", value: "DOME" }, { id: "spread", value: "6" }] },
+  { label: "DISC × spread min (0.6)", set: [{ id: "centerStyle", value: "DISC" }, { id: "spread", value: "0.6" }] },
+  { label: "DISC × spread default (2)", set: [{ id: "centerStyle", value: "DISC" }, { id: "spread", value: "2" }] },
+  { label: "DISC × spread max (6)", set: [{ id: "centerStyle", value: "DISC" }, { id: "spread", value: "6" }] },
+  { label: "RING × spread min (0.6)", set: [{ id: "centerStyle", value: "RING" }, { id: "spread", value: "0.6" }] },
+  { label: "RING × spread default (2)", set: [{ id: "centerStyle", value: "RING" }, { id: "spread", value: "2" }] },
+  { label: "RING × spread max (6)", set: [{ id: "centerStyle", value: "RING" }, { id: "spread", value: "6" }] },
+  { label: "DOME × centerSize min (0.25)", set: [{ id: "centerStyle", value: "DOME" }, { id: "centerSize", value: "0.25" }] },
+  { label: "DOME × centerSize max (1)", set: [{ id: "centerStyle", value: "DOME" }, { id: "centerSize", value: "1" }] },
+  { label: "DOME × centerRise min (0.15)", set: [{ id: "centerStyle", value: "DOME" }, { id: "centerRise", value: "0.15" }] },
+  { label: "DOME × centerRise max (1.2)", set: [{ id: "centerStyle", value: "DOME" }, { id: "centerRise", value: "1.2" }] },
+  { label: "DISC × centerSize min (0.25)", set: [{ id: "centerStyle", value: "DISC" }, { id: "centerSize", value: "0.25" }] },
+  { label: "DISC × centerSize max (1)", set: [{ id: "centerStyle", value: "DISC" }, { id: "centerSize", value: "1" }] },
+  { label: "DISC × centerDish min (0)", set: [{ id: "centerStyle", value: "DISC" }, { id: "centerDish", value: "0" }] },
+  { label: "DISC × centerDish max (0.9)", set: [{ id: "centerStyle", value: "DISC" }, { id: "centerDish", value: "0.9" }] },
+  { label: "RING × centerSize min (0.25)", set: [{ id: "centerStyle", value: "RING" }, { id: "centerSize", value: "0.25" }] },
+  { label: "RING × centerSize max (1)", set: [{ id: "centerStyle", value: "RING" }, { id: "centerSize", value: "1" }] },
+  { label: "RING × centerBore min (0.2)", set: [{ id: "centerStyle", value: "RING" }, { id: "centerBore", value: "0.2" }] },
+  { label: "RING × centerBore max (0.75)", set: [{ id: "centerStyle", value: "RING" }, { id: "centerBore", value: "0.75" }] },
+  { label: "ALL MIN (centre off)", set: [{ id: "petalCount", value: "3" }, { id: "petalLength", value: "20" }, { id: "petalWidth", value: "8" }, { id: "petalBaseTaper", value: "0.3" }, { id: "petalTipTaper", value: "0.6" }, { id: "petalTipBreadth", value: "0" }, { id: "petalCup", value: "-0.8" }, { id: "petalTilt", value: "0" }, { id: "petalSpineCurl", value: "-180" }, { id: "petalRoll", value: "-330" }, { id: "petalTwist", value: "-180" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "layerCount", value: "1" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "ALL MAX (centre off)", set: [{ id: "petalCount", value: "40" }, { id: "petalLength", value: "60" }, { id: "petalWidth", value: "30" }, { id: "petalBaseTaper", value: "3" }, { id: "petalTipTaper", value: "4" }, { id: "petalTipBreadth", value: "0.6" }, { id: "petalCup", value: "1.2" }, { id: "petalTilt", value: "75" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }, { id: "sheetThickness", value: "2.4" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "1" }, { id: "spread", value: "6" }, { id: "layerCount", value: "3" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "ALL MIN × DOME min", set: [{ id: "petalCount", value: "3" }, { id: "petalLength", value: "20" }, { id: "petalWidth", value: "8" }, { id: "petalBaseTaper", value: "0.3" }, { id: "petalTipTaper", value: "0.6" }, { id: "petalTipBreadth", value: "0" }, { id: "petalCup", value: "-0.8" }, { id: "petalTilt", value: "0" }, { id: "petalSpineCurl", value: "-180" }, { id: "petalRoll", value: "-330" }, { id: "petalTwist", value: "-180" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "layerCount", value: "1" }, { id: "centerStyle", value: "DOME" }, { id: "centerSize", value: "0.25" }, { id: "centerRise", value: "0.15" }] },
+  { label: "ALL MIN × DISC min", set: [{ id: "petalCount", value: "3" }, { id: "petalLength", value: "20" }, { id: "petalWidth", value: "8" }, { id: "petalBaseTaper", value: "0.3" }, { id: "petalTipTaper", value: "0.6" }, { id: "petalTipBreadth", value: "0" }, { id: "petalCup", value: "-0.8" }, { id: "petalTilt", value: "0" }, { id: "petalSpineCurl", value: "-180" }, { id: "petalRoll", value: "-330" }, { id: "petalTwist", value: "-180" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "layerCount", value: "1" }, { id: "centerStyle", value: "DISC" }, { id: "centerSize", value: "0.25" }, { id: "centerDish", value: "0" }] },
+  { label: "ALL MIN × RING min", set: [{ id: "petalCount", value: "3" }, { id: "petalLength", value: "20" }, { id: "petalWidth", value: "8" }, { id: "petalBaseTaper", value: "0.3" }, { id: "petalTipTaper", value: "0.6" }, { id: "petalTipBreadth", value: "0" }, { id: "petalCup", value: "-0.8" }, { id: "petalTilt", value: "0" }, { id: "petalSpineCurl", value: "-180" }, { id: "petalRoll", value: "-330" }, { id: "petalTwist", value: "-180" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "layerCount", value: "1" }, { id: "centerStyle", value: "RING" }, { id: "centerSize", value: "0.25" }, { id: "centerBore", value: "0.2" }] },
+  { label: "ALL MAX × DOME max", set: [{ id: "petalCount", value: "40" }, { id: "petalLength", value: "60" }, { id: "petalWidth", value: "30" }, { id: "petalBaseTaper", value: "3" }, { id: "petalTipTaper", value: "4" }, { id: "petalTipBreadth", value: "0.6" }, { id: "petalCup", value: "1.2" }, { id: "petalTilt", value: "75" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }, { id: "sheetThickness", value: "2.4" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "1" }, { id: "spread", value: "6" }, { id: "layerCount", value: "3" }, { id: "centerStyle", value: "DOME" }, { id: "centerSize", value: "1" }, { id: "centerRise", value: "1.2" }] },
+  { label: "ALL MAX × DISC max", set: [{ id: "petalCount", value: "40" }, { id: "petalLength", value: "60" }, { id: "petalWidth", value: "30" }, { id: "petalBaseTaper", value: "3" }, { id: "petalTipTaper", value: "4" }, { id: "petalTipBreadth", value: "0.6" }, { id: "petalCup", value: "1.2" }, { id: "petalTilt", value: "75" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }, { id: "sheetThickness", value: "2.4" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "1" }, { id: "spread", value: "6" }, { id: "layerCount", value: "3" }, { id: "centerStyle", value: "DISC" }, { id: "centerSize", value: "1" }, { id: "centerDish", value: "0.9" }] },
+  { label: "ALL MAX × RING max", set: [{ id: "petalCount", value: "40" }, { id: "petalLength", value: "60" }, { id: "petalWidth", value: "30" }, { id: "petalBaseTaper", value: "3" }, { id: "petalTipTaper", value: "4" }, { id: "petalTipBreadth", value: "0.6" }, { id: "petalCup", value: "1.2" }, { id: "petalTilt", value: "75" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }, { id: "sheetThickness", value: "2.4" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "1" }, { id: "spread", value: "6" }, { id: "layerCount", value: "3" }, { id: "centerStyle", value: "RING" }, { id: "centerSize", value: "1" }, { id: "centerBore", value: "0.75" }] },
+  { label: "FORM: QUILL (roll alone, toward a tube)", set: [{ id: "petalRoll", value: "330" }] },
+  { label: "FORM: FIDDLEHEAD (spine curl alone)", set: [{ id: "petalSpineCurl", value: "360" }] },
+  { label: "FORM: CONTORTED (twist alone)", set: [{ id: "petalTwist", value: "180" }] },
+  { label: "FORM: REFLEXED (cup min x curl below the plane)", set: [{ id: "petalCup", value: "-0.8" }, { id: "petalSpineCurl", value: "-180" }] },
+  { label: "FORM: ROLL CLAMP (roll max x narrowest petal)", set: [{ id: "petalRoll", value: "330" }, { id: "petalWidth", value: "8" }] },
+  { label: "FORM: ALL MAX (all four curves together)", set: [{ id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "FORM: ALL MIN (all four curves together)", set: [{ id: "petalCup", value: "-0.8" }, { id: "petalSpineCurl", value: "-180" }, { id: "petalRoll", value: "-330" }, { id: "petalTwist", value: "-180" }] },
+  { label: "THIN: ALL THIN (centre off)", set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "THIN: ALL THIN × DISC", set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "centerStyle", value: "DISC" }] },
+  { label: "THIN: ALL THIN × spread min", set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }] },
+  { label: "THIN: ALL THIN × petalCount 40", set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "petalCount", value: "40" }] },
+  { label: "THIN: ALL THIN × form max", set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "THIN: ALL THIN × ALL MIN", set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "petalCount", value: "3" }, { id: "petalLength", value: "20" }, { id: "petalWidth", value: "8" }, { id: "petalTilt", value: "0" }] },
+  { label: "THIN: THICK GRADIENT (sheet max × thinning max)", set: [{ id: "sheetThickness", value: "2.4" }, { id: "tipThinning", value: "0.8" }] },
+  { label: "TIP: pointed × roll max", set: [{ id: "petalRoll", value: "330" }] },
+  { label: "TIP: pointed × twist max", set: [{ id: "petalTwist", value: "180" }] },
+  { label: "TIP: pointed × taper max (floor dominates)", set: [{ id: "petalTipTaper", value: "4" }] },
+  { label: "TIP: truncate (breadth max) — must NOT converge", set: [{ id: "petalTipBreadth", value: "0.6" }] },
+  { label: "TIP: pointed × ALL THIN", set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }] },
+  { label: "CAPABILITY: claw (non-monotone width)", capability: CAPABILITY_CLAW, set: [] },
+  { label: "CAPABILITY: cleft (two-span domain)", capability: CAPABILITY_CLEFT, set: [] },
+  { label: "CAPABILITY: claw x form max", capability: CAPABILITY_CLAW, set: [{ id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "CAPABILITY: cleft x roll max", capability: CAPABILITY_CLEFT, set: [{ id: "petalRoll", value: "330" }] },
+  { label: "CAPABILITY: cleft x all thin", capability: CAPABILITY_CLEFT, set: [{ id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }] },
+  { label: "SPIRAL x petalCount 3 (below the legibility flag)", set: [{ id: "placement", value: "SPIRAL" }, { id: "petalCount", value: "3" }] },
+  { label: "SPIRAL x petalCount 5 (below the legibility flag)", set: [{ id: "placement", value: "SPIRAL" }, { id: "petalCount", value: "5" }] },
+  { label: "SPIRAL x petalCount 7 (below the legibility flag)", set: [{ id: "placement", value: "SPIRAL" }, { id: "petalCount", value: "7" }] },
+  { label: "SPIRAL x petalCount 8", set: [{ id: "placement", value: "SPIRAL" }, { id: "petalCount", value: "8" }] },
+  { label: "SPIRAL x petalCount 13", set: [{ id: "placement", value: "SPIRAL" }, { id: "petalCount", value: "13" }] },
+  { label: "SPIRAL x petalCount 21", set: [{ id: "placement", value: "SPIRAL" }, { id: "petalCount", value: "21" }] },
+  { label: "SPIRAL x petalCount 40", set: [{ id: "placement", value: "SPIRAL" }, { id: "petalCount", value: "40" }] },
+  { label: "SPIRAL x defaults", set: [{ id: "placement", value: "SPIRAL" }] },
+  { label: "3 layers x layerSize min (0.35)", set: [{ id: "layerCount", value: "3" }, { id: "layerSize", value: "0.35" }] },
+  { label: "3 layers x layerSize max (0.9)", set: [{ id: "layerCount", value: "3" }, { id: "layerSize", value: "0.9" }] },
+  { label: "3 layers x layerPhase min (0)", set: [{ id: "layerCount", value: "3" }, { id: "layerPhase", value: "0" }] },
+  { label: "3 layers x layerPhase max (1)", set: [{ id: "layerCount", value: "3" }, { id: "layerPhase", value: "1" }] },
+  { label: "3 layers x layerTilt min (0)", set: [{ id: "layerCount", value: "3" }, { id: "layerTilt", value: "0" }] },
+  { label: "3 layers x layerTilt max (30)", set: [{ id: "layerCount", value: "3" }, { id: "layerTilt", value: "30" }] },
+  { label: "3 layers x innerCurl min (-180)", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "-180" }] },
+  { label: "3 layers x innerCurl max (360)", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }] },
+  { label: "3 layers x innerCup min (-0.8)", set: [{ id: "layerCount", value: "3" }, { id: "innerCup", value: "-0.8" }] },
+  { label: "3 layers x innerCup max (1.2)", set: [{ id: "layerCount", value: "3" }, { id: "innerCup", value: "1.2" }] },
+  { label: "3 layers x innerTipBreadth min (0)", set: [{ id: "layerCount", value: "3" }, { id: "innerTipBreadth", value: "0" }] },
+  { label: "3 layers x innerTipBreadth max (0.6)", set: [{ id: "layerCount", value: "3" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "2 layers x RADIAL", set: [{ id: "layerCount", value: "2" }, { id: "placement", value: "RADIAL" }] },
+  { label: "2 layers x SPIRAL", set: [{ id: "layerCount", value: "2" }, { id: "placement", value: "SPIRAL" }] },
+  { label: "3 layers x RADIAL", set: [{ id: "layerCount", value: "3" }, { id: "placement", value: "RADIAL" }] },
+  { label: "3 layers x SPIRAL", set: [{ id: "layerCount", value: "3" }, { id: "placement", value: "SPIRAL" }] },
+  { label: "LAYERS: 3 x spread min", set: [{ id: "layerCount", value: "3" }, { id: "spread", value: "0.6" }] },
+  { label: "LAYERS: 3 x ALL THIN", set: [{ id: "layerCount", value: "3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }] },
+  { label: "LAYERS: 3 x ALL THIN x spread min", set: [{ id: "layerCount", value: "3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }] },
+  { label: "LAYERS: 3 x ALL THIN x spread min x petalCount 40", set: [{ id: "layerCount", value: "3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "petalCount", value: "40" }] },
+  { label: "LAYERS: 3 x ALL THIN x spread min x petalCount 3", set: [{ id: "layerCount", value: "3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "petalCount", value: "3" }] },
+  { label: "LAYERS: 3 x layerSize min x ALL THIN (deepest foot floored)", set: [{ id: "layerCount", value: "3" }, { id: "layerSize", value: "0.35" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }] },
+  { label: "LAYERS: 3 x ALL FORM MAX", set: [{ id: "layerCount", value: "3" }, { id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "LAYERS: 3 x SPIRAL x ALL THIN x spread min x petalCount 40", set: [{ id: "layerCount", value: "3" }, { id: "placement", value: "SPIRAL" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "petalCount", value: "40" }] },
+  { label: "LAYERS: 3 x centre OFF (the layered BARE bloom)", set: [{ id: "layerCount", value: "3" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "LAYERS: 3 x layerTilt max (135° effective at petalTilt max)", set: [{ id: "layerCount", value: "3" }, { id: "layerTilt", value: "30" }, { id: "petalTilt", value: "75" }] },
+  { label: "LAYERS: 2 x layerSize max x layerPhase 0 (the coincidence corner)", set: [{ id: "layerCount", value: "2" }, { id: "layerSize", value: "0.9" }, { id: "layerPhase", value: "0" }, { id: "layerTilt", value: "0" }] },
+  { label: "LAYERS: 3 x ALL MIN elsewhere", set: [{ id: "layerCount", value: "3" }, { id: "petalCount", value: "3" }, { id: "petalLength", value: "20" }, { id: "petalWidth", value: "8" }, { id: "petalTilt", value: "0" }, { id: "spread", value: "0.6" }] },
+  { label: "CAPABILITY: cleft x 3 layers", capability: CAPABILITY_CLEFT, set: [{ id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x petalCount 3 x 3 turns (9 in sequence)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "petalCount", value: "3" }, { id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x petalCount 5 x 3 turns (15 in sequence)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "petalCount", value: "5" }, { id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x petalCount 7 x 3 turns (21 in sequence)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "petalCount", value: "7" }, { id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x petalCount 8 x 3 turns (24 in sequence)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "petalCount", value: "8" }, { id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x petalCount 13 x 3 turns (39 in sequence)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "petalCount", value: "13" }, { id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x petalCount 21 x 3 turns (63 in sequence)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "petalCount", value: "21" }, { id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x petalCount 40 x 3 turns (120 in sequence)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "petalCount", value: "40" }, { id: "layerCount", value: "3" }] },
+  { label: "CONTINUOUS x defaults (one turn)", set: [{ id: "placement", value: "CONTINUOUS" }] },
+  { label: "CONTINUOUS x 2 turns", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "2" }] },
+  { label: "CONTINUOUS x 3 turns", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }] },
+  { label: "CONT: 3 turns x layerSize min x petalCount 40 (the deepest foot)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "layerSize", value: "0.35" }, { id: "petalCount", value: "40" }] },
+  { label: "CONT: 3 turns x layerSize max x petalCount 40 (the shallowest gradient)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "layerSize", value: "0.9" }, { id: "petalCount", value: "40" }] },
+  { label: "CONT: 3 turns x ALL THIN x spread min x petalCount 40 (the overlap box at 120 rings)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "petalCount", value: "40" }] },
+  { label: "CONT: 3 turns x ALL THIN x spread min x petalCount 3 (the sparsest continuum)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "petalCount", value: "3" }] },
+  { label: "CONT: 3 turns x layerSize min x ALL THIN x petalCount 40 (deepest foot, thinnest sheet)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "layerSize", value: "0.35" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "petalCount", value: "40" }] },
+  { label: "CONT: 3 turns x footDelicacy min (floored from ring 1)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "footDelicacy", value: "0.25" }] },
+  { label: "CONT: 3 turns x spread max (the hub plate under a continuum)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "spread", value: "6" }] },
+  { label: "CONT: 3 turns x layerTilt max x petalTilt max (161.25° effective — past the layered 135°)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "layerTilt", value: "30" }, { id: "petalTilt", value: "75" }] },
+  { label: "CONT: 3 turns x ALL FORM MAX", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "CONT: 3 turns x centre OFF (the continuous BARE bloom)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "CONT: 3 turns x ALL MIN elsewhere", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "petalCount", value: "3" }, { id: "petalLength", value: "20" }, { id: "petalWidth", value: "8" }, { id: "petalTilt", value: "0" }, { id: "spread", value: "0.6" }] },
+  { label: "CAPABILITY: cleft x CONTINUOUS x 3 turns", capability: CAPABILITY_CLEFT, set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }] },
+  { label: "ZYGO: THE IRIS (falls curl down, standards rise)", set: [{ id: "layerCount", value: "2" }, { id: "petalSpineCurl", value: "-90" }, { id: "innerCurl", value: "180" }, { id: "innerCup", value: "0.4" }, { id: "layerTilt", value: "30" }, { id: "petalTilt", value: "40" }] },
+  { label: "ZYGO: the iris x centre OFF (the zygomorphic BARE bloom)", set: [{ id: "layerCount", value: "2" }, { id: "petalSpineCurl", value: "-90" }, { id: "innerCurl", value: "180" }, { id: "innerCup", value: "0.4" }, { id: "layerTilt", value: "30" }, { id: "petalTilt", value: "40" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "ZYGO: 2 layers x ALL INNER MAX", set: [{ id: "layerCount", value: "2" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "ZYGO: 3 layers x ALL INNER MAX x ALL THIN", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }] },
+  { label: "ZYGO: 3 layers x ALL INNER MAX x spread min (crowded feet)", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }, { id: "spread", value: "0.6" }] },
+  { label: "ZYGO: 3 layers x ALL INNER MAX x petalCount 3", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }, { id: "petalCount", value: "3" }] },
+  { label: "ZYGO: 3 layers x ALL INNER MAX x petalCount 40", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }, { id: "petalCount", value: "40" }] },
+  { label: "ZYGO: 3 layers x ALL INNER MAX x ALL FORM MAX (every clamp binds)", set: [{ id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }, { id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "ZYGO: curl clamp binds (base 360 + delta 360 -> 360)", set: [{ id: "layerCount", value: "2" }, { id: "petalSpineCurl", value: "360" }, { id: "innerCurl", value: "360" }] },
+  { label: "ZYGO: cup clamp binds (base 1.2 + delta 1.2 -> 1.2)", set: [{ id: "layerCount", value: "2" }, { id: "petalCup", value: "1.2" }, { id: "innerCup", value: "1.2" }] },
+  { label: "ZYGO: curl clamp binds downward (base -180 + delta -180 -> -180)", set: [{ id: "layerCount", value: "2" }, { id: "petalSpineCurl", value: "-180" }, { id: "innerCurl", value: "-180" }] },
+  { label: "ZYGO: the tip partition, both ways in one bloom (outer pointed, inner truncate)", set: [{ id: "layerCount", value: "2" }, { id: "petalTipBreadth", value: "0" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "ZYGO: the tip partition inverted (outer truncate, inner more so)", set: [{ id: "layerCount", value: "2" }, { id: "petalTipBreadth", value: "0.6" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "ZYGO: the iris x SPIRAL (roles exist, azimuth differs)", set: [{ id: "layerCount", value: "2" }, { id: "petalSpineCurl", value: "-90" }, { id: "innerCurl", value: "180" }, { id: "innerCup", value: "0.4" }, { id: "layerTilt", value: "30" }, { id: "petalTilt", value: "40" }, { id: "placement", value: "SPIRAL" }] },
+  { label: "ZYGO: GATED — CONTINUOUS x 3 turns x ALL INNER MAX (hidden, and must be inert)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "ZYGO: GATED — CONTINUOUS x 1 turn x ALL INNER MAX (hidden, and must be inert)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "ZYGO: the foot UPPER clamp (petalWidth 30 — ring frozen at 11.06 mm)", set: [{ id: "layerCount", value: "2" }, { id: "petalWidth", value: "30" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX", capability: CAPABILITY_CLEFT, set: [{ id: "layerCount", value: "2" }, { id: "innerCurl", value: "360" }, { id: "innerCup", value: "1.2" }, { id: "innerTipBreadth", value: "0.6" }] },
+  { label: "SLOT: labellumSize min (0.5)", set: [{ id: "labellumSize", value: "0.5" }] },
+  { label: "SLOT: labellumSize max (2)", set: [{ id: "labellumSize", value: "2" }] },
+  { label: "SLOT: labellumTipBreadth min (0)", set: [{ id: "labellumTipBreadth", value: "0" }] },
+  { label: "SLOT: labellumTipBreadth max (0.6)", set: [{ id: "labellumTipBreadth", value: "0.6" }] },
+  { label: "SLOT: labellumTilt min (-75)", set: [{ id: "labellumTilt", value: "-75" }] },
+  { label: "SLOT: labellumTilt max (75)", set: [{ id: "labellumTilt", value: "75" }] },
+  { label: "SLOT: labellumCup min (-0.8)", set: [{ id: "labellumCup", value: "-0.8" }] },
+  { label: "SLOT: labellumCup max (1.2)", set: [{ id: "labellumCup", value: "1.2" }] },
+  { label: "SLOT: labellumCurl min (-180)", set: [{ id: "labellumCurl", value: "-180" }] },
+  { label: "SLOT: labellumCurl max (360)", set: [{ id: "labellumCurl", value: "360" }] },
+  { label: "SLOT: hoodSize min (0.5)", set: [{ id: "hoodSize", value: "0.5" }] },
+  { label: "SLOT: hoodSize max (2)", set: [{ id: "hoodSize", value: "2" }] },
+  { label: "SLOT: hoodTilt min (-75)", set: [{ id: "hoodTilt", value: "-75" }] },
+  { label: "SLOT: hoodTilt max (75)", set: [{ id: "hoodTilt", value: "75" }] },
+  { label: "SLOT: hoodCup min (-0.8)", set: [{ id: "hoodCup", value: "-0.8" }] },
+  { label: "SLOT: hoodCup max (1.2)", set: [{ id: "hoodCup", value: "1.2" }] },
+  { label: "ORCHID: the labellum and the hood (the flower has a face)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }] },
+  { label: "ORCHID x centre OFF (the zygomorphic BARE bloom)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "ORCHID x petalCount 3 (one of three is the labellum, no laterals)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "petalCount", value: "3" }] },
+  { label: "ORCHID x petalCount 4 (smallest even — hood is one slot)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "petalCount", value: "4" }] },
+  { label: "ORCHID x petalCount 39 (odd at scale — hood is a straddling pair)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "petalCount", value: "39" }] },
+  { label: "ORCHID x petalCount 40 (even at scale)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "petalCount", value: "40" }] },
+  { label: "ORCHID x 3 layers x phase 0 (slot roles x layer roles)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "layerCount", value: "3" }, { id: "layerPhase", value: "0" }] },
+  { label: "ORCHID x the IRIS (both role axes, one bloom)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "layerCount", value: "2" }, { id: "layerPhase", value: "0" }, { id: "petalSpineCurl", value: "-90" }, { id: "innerCurl", value: "180" }, { id: "innerCup", value: "0.4" }, { id: "layerTilt", value: "30" }, { id: "petalTilt", value: "40" }] },
+  { label: "ORCHID x ALL THIN x spread min (the junction at its thinnest)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }] },
+  { label: "ORCHID x the foot UPPER clamp (petalWidth 30)", set: [{ id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "petalWidth", value: "30" }] },
+  { label: "SLOT: ALL MAX", set: [{ id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  { label: "SLOT: ALL MIN", set: [{ id: "labellumSize", value: "0.5" }, { id: "labellumTilt", value: "-75" }, { id: "labellumCup", value: "-0.8" }, { id: "labellumCurl", value: "-180" }, { id: "hoodSize", value: "0.5" }, { id: "hoodTilt", value: "-75" }, { id: "hoodCup", value: "-0.8" }] },
+  { label: "SLOT: ALL MAX x 3 layers x phase 0", set: [{ id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }, { id: "layerCount", value: "3" }, { id: "layerPhase", value: "0" }] },
+  { label: "SLOT: ALL MAX x petalCount 3", set: [{ id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }, { id: "petalCount", value: "3" }] },
+  { label: "SLOT: ALL MAX x petalCount 40", set: [{ id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }, { id: "petalCount", value: "40" }] },
+  { label: "SLOT: ALL MAX x ALL FORM MAX (every clamp binds at once)", set: [{ id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }, { id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "SLOT: size x2.00 saturating (petalLength 60, petalWidth 30)", set: [{ id: "labellumSize", value: "2" }, { id: "hoodSize", value: "2" }, { id: "petalLength", value: "60" }, { id: "petalWidth", value: "30" }] },
+  { label: "SLOT: size x0.50 (a blade narrower than its own root)", set: [{ id: "labellumSize", value: "0.5" }, { id: "hoodSize", value: "0.5" }, { id: "petalWidth", value: "8" }] },
+  { label: "SLOT: the tip partition both ways (labellum truncate, laterals pointed)", set: [{ id: "labellumTipBreadth", value: "0.6" }] },
+  { label: "SLOT: the tip partition inverted (base truncate, labellum more so)", set: [{ id: "petalTipBreadth", value: "0.6" }, { id: "labellumTipBreadth", value: "0.6" }] },
+  { label: "SLOT: curl clamp binds downward (base -180 + delta -180 -> -180)", set: [{ id: "petalSpineCurl", value: "-180" }, { id: "labellumCurl", value: "-180" }] },
+  { label: "SLOT: GATED — SPIRAL x ALL SLOT MAX (hidden, and must be inert)", set: [{ id: "placement", value: "SPIRAL" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  { label: "SLOT: GATED — CONTINUOUS x 3 turns x ALL SLOT MAX (hidden, and must be inert)", set: [{ id: "placement", value: "CONTINUOUS" }, { id: "layerCount", value: "3" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  { label: "SLOT: GATED — 2 layers x phase 0.50 x ALL SLOT MAX (whorls out of phase)", set: [{ id: "layerCount", value: "2" }, { id: "layerPhase", value: "0.5" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  { label: "SLOT: GATED — 3 layers x phase 0.25 x ALL SLOT MAX (whorls out of phase)", set: [{ id: "layerCount", value: "3" }, { id: "layerPhase", value: "0.25" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  { label: "FAN: defaults (3/side, a mirror-line petal, 45deg)", set: [{ id: "placement", value: "FAN" }] },
+  { label: "FAN: toggle ON (a petal on the mirror line) — pinned, and the shipping default since Sep 2", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }] },
+  { label: "FAN: toggle OFF (the line runs through the gap) — pinned", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }] },
+  { label: "FAN: fanSpacing min (15)", set: [{ id: "placement", value: "FAN" }, { id: "fanSpacing", value: "15" }] },
+  { label: "FAN: fanSpacing max (60)", set: [{ id: "placement", value: "FAN" }, { id: "fanSpacing", value: "60" }] },
+  { label: "FAN: fanPerSide min (1)", set: [{ id: "placement", value: "FAN" }, { id: "fanPerSide", value: "1" }] },
+  { label: "FAN: fanPerSide max (8)", set: [{ id: "placement", value: "FAN" }, { id: "fanPerSide", value: "8" }] },
+  { label: "FAN: fewest x widest — 1/side x 60deg, toggle OFF (two petals, no hood)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "fanPerSide", value: "1" }, { id: "fanSpacing", value: "60" }] },
+  { label: "FAN: fewest x widest — 1/side x 60deg, toggle ON (three petals)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "fanPerSide", value: "1" }, { id: "fanSpacing", value: "60" }] },
+  { label: "FAN: fewest x tightest — 1/side x 15deg, toggle OFF", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "fanPerSide", value: "1" }, { id: "fanSpacing", value: "15" }] },
+  { label: "FAN: most x tightest — 8/side x 15deg, toggle ON", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "fanPerSide", value: "8" }, { id: "fanSpacing", value: "15" }] },
+  { label: "FAN: fewest x new max — 1/side x 170deg, toggle ON (340deg arc, 20deg notch, now at the FEWEST petals)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "fanPerSide", value: "1" }, { id: "fanSpacing", value: "170" }] },
+  { label: "FAN: fewest x new max — 1/side x 170deg, toggle OFF (170deg arc, 190deg notch — UNCAPPED, a shape the old ceiling never reached)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "fanPerSide", value: "1" }, { id: "fanSpacing", value: "170" }] },
+  { label: "FAN: the arc limit binds — 8/side x 60deg, toggle ON (340deg arc, 20deg notch)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "fanPerSide", value: "8" }, { id: "fanSpacing", value: "60" }] },
+  { label: "FAN: the arc limit binds — 8/side x 60deg, toggle OFF", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "fanPerSide", value: "8" }, { id: "fanSpacing", value: "60" }] },
+  { label: "FAN: the arc limit now binds below 8/side — 2/side x 90deg, toggle ON (340deg arc, 20deg notch)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "fanPerSide", value: "2" }, { id: "fanSpacing", value: "90" }] },
+  { label: "FAN: same nominal spacing, UNCAPPED under toggle OFF — 2/side x 90deg, toggle OFF (270deg arc, 90deg notch)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "fanPerSide", value: "2" }, { id: "fanSpacing", value: "90" }] },
+  { label: "FAN: centre OFF (the BARE fan)", set: [{ id: "placement", value: "FAN" }, { id: "centerStyle", value: "NONE" }] },
+  { label: "FAN: centre OFF x fewest x widest (the barest reachable fan)", set: [{ id: "placement", value: "FAN" }, { id: "centerStyle", value: "NONE" }, { id: "fanPerSide", value: "1" }, { id: "fanSpacing", value: "60" }] },
+  { label: "FAN: centre OFF x fewest x new max (the barest reachable fan, now wider)", set: [{ id: "placement", value: "FAN" }, { id: "centerStyle", value: "NONE" }, { id: "fanPerSide", value: "1" }, { id: "fanSpacing", value: "170" }] },
+  { label: "FAN: ALL THIN x spread min", set: [{ id: "placement", value: "FAN" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }] },
+  { label: "FAN: ALL THIN x spread min x 1/side (feet cross the axis)", set: [{ id: "placement", value: "FAN" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }, { id: "fanPerSide", value: "1" }] },
+  { label: "FAN: spread max (the plate, at the fan's widest hub)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "fanPerSide", value: "8" }, { id: "spread", value: "6" }] },
+  { label: "FAN: ALL FORM MAX", set: [{ id: "placement", value: "FAN" }, { id: "petalCup", value: "1.2" }, { id: "petalSpineCurl", value: "360" }, { id: "petalRoll", value: "330" }, { id: "petalTwist", value: "180" }] },
+  { label: "FAN: 3 layers (nested fans)", set: [{ id: "placement", value: "FAN" }, { id: "layerCount", value: "3" }] },
+  { label: "FAN: 3 layers x ALL THIN x spread min", set: [{ id: "placement", value: "FAN" }, { id: "layerCount", value: "3" }, { id: "sheetThickness", value: "0.6" }, { id: "tipThinning", value: "0.8" }, { id: "footDelicacy", value: "0.25" }, { id: "spread", value: "0.6" }] },
+  { label: "FAN: 3 layers x toggle ON x layerTilt max", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "layerCount", value: "3" }, { id: "layerTilt", value: "30" }, { id: "petalTilt", value: "75" }] },
+  { label: "FAN x LABELLUM: toggle ON — the mirror-line petal is the labellum", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }] },
+  { label: "FAN x LABELLUM: toggle OFF — the labellum is the INNER PAIR", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }] },
+  { label: "FAN x LABELLUM: toggle OFF x 1/side (the labellum is the whole bloom)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "labellumSize", value: "1.6" }, { id: "labellumTilt", value: "-25" }, { id: "labellumCup", value: "0.5" }, { id: "labellumCurl", value: "-60" }, { id: "labellumTipBreadth", value: "0.25" }, { id: "hoodSize", value: "1.15" }, { id: "hoodTilt", value: "40" }, { id: "hoodCup", value: "-0.3" }, { id: "fanPerSide", value: "1" }] },
+  { label: "FAN: ALL SLOT MAX x toggle ON", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  { label: "FAN: ALL SLOT MAX x toggle OFF", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  { label: "FAN: ALL SLOT MAX x 3 layers (slot roles at depth — only the fan reaches this)", set: [{ id: "placement", value: "FAN" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }, { id: "layerCount", value: "3" }] },
+  { label: "FAN: ALL SLOT MAX x 8/side x 60deg (roles on a capped arc)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }, { id: "fanPerSide", value: "8" }, { id: "fanSpacing", value: "60" }] },
+  { label: "FAN: GATED — 1/side x toggle OFF x ALL SLOT MAX (the hood is empty, its controls hidden and inert)", set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "OFF" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }, { id: "fanPerSide", value: "1" }] },
+  { label: "FAN: GATED — petalCount 8 (hidden under FAN, and must be inert)", set: [{ id: "placement", value: "FAN" }, { id: "petalCount", value: "8" }] },
+  { label: "FAN: GATED — petalCount 40 (hidden under FAN, and must be inert)", set: [{ id: "placement", value: "FAN" }, { id: "petalCount", value: "40" }] },
+  { label: "FAN: GATED — petalCount 3 (hidden under FAN, and must be inert)", set: [{ id: "placement", value: "FAN" }, { id: "petalCount", value: "3" }] },
+  { label: "FAN: GATED — 3 layers x layerPhase max (hidden under FAN, and must be inert)", set: [{ id: "placement", value: "FAN" }, { id: "layerCount", value: "3" }, { id: "layerPhase", value: "1" }] },
+  { label: "FAN: GATED — 3 layers x layerPhase 0 (the same bloom, stated)", set: [{ id: "placement", value: "FAN" }, { id: "layerCount", value: "3" }, { id: "layerPhase", value: "0" }] },
+  { label: "CAPABILITY: cleft x FAN x toggle ON x ALL SLOT MAX", capability: CAPABILITY_CLEFT, set: [{ id: "placement", value: "FAN" }, { id: "fanCenterPetal", value: "ON" }, { id: "labellumSize", value: "2" }, { id: "labellumTipBreadth", value: "0.6" }, { id: "labellumTilt", value: "75" }, { id: "labellumCup", value: "1.2" }, { id: "labellumCurl", value: "360" }, { id: "hoodSize", value: "2" }, { id: "hoodTilt", value: "75" }, { id: "hoodCup", value: "1.2" }] },
+  ];
 }
 
 /* ===================================================================
@@ -3165,6 +3891,7 @@ export const FROZEN_BASE_COMMITS = {
   phase6: 'c1886d0',   // layers and spiral placement — before the continuous spiral
   phase7: 'f626828',   // the override architecture and per-layer roles — before slot roles
   phase8: '7877bdf',   // the mirror plane, slot roles and the orchid — before the fan
+  phase9: '98dcdbe',   // the VIEW box and the incident note — before per-petal roles
 };
 
 /* ===================================================================

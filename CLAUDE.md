@@ -47,6 +47,12 @@ must be unmoved. The FAN placement has one too:
 `node tools/shot-bloom-fan.mjs <dir>` — face-on with the mirror line drawn
 (from a per-cell measurement, never a layout guess), the toggle's two
 positions as a pair, a spacing sweep, and a radial bloom as the control.
+PER-PETAL sliders have their own:
+`node tools/shot-bloom-per-petal.mjs <dir> [base-tree]` — petal one called out
+on the mirror line, a middle group against its neighbours, the extreme, and a
+BEFORE/AFTER pair rendered from a git worktree of the base commit, because the
+fan's slot roles were superseded and a removed capability is photographed
+rather than only recorded.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
@@ -75,10 +81,35 @@ RETAINED, never deleted, and CI's `--verify-frozen` still proves every one deep-
 every push — only their routine byte re-export is demoted. Full reasoning, and what it
 gives up, in the charter's "Verification retention" section.
 
-**NOTHING IN THIS PROJECT MEASURES AN AZIMUTH EXCEPT J7 AND Z4b** — established
+**PER-PETAL ROLES SUPERSEDE SLOT ROLES ON THE FAN, AND NOTHING IS RETIRED**
+(Eva, Sep 3). `labellum*` / `hood*` are hidden AND inert under FAN and stay
+fully live under RADIAL, so `RETIRED_IDS` does not apply and no migration is
+owed. The two position axes are DISJOINT BY PLACEMENT and `Z9` asserts that in
+both directions — along with the two code paths the ruling makes unreachable
+and which are KEPT so composition stays one predicate arm away:
+`roleForSlot`'s THROUGH_GAP arm and `PREDICATES.hoodEmpty`. Restoring
+composition is that one arm in `bloom-geometry.js` plus its twin in
+`bloom-registry.js`. The fan loses labellum TIP BREADTH outright, because the
+per-petal set ships without a tip-breadth row — one row in `ROLE_OVERRIDES`
+and one in the registry the day it is wanted.
+
+**A GREEN RUN DOES NOT ENDORSE THE PER-PETAL NUMBERING** — measured on six
+worktrees, not derived. An off-by-one orbit index and a supersession that
+quietly comes undone BOTH export watertight, as one piece, with zero
+degenerate triangles, at identical live and export triangle counts and
+identical STL byte lengths, and fired NOTHING anywhere in the shipped
+instrument until `Z8` and `Z9` existed. Two more (an unconditional per-petal
+split, a reversed group order) are BIT-IDENTICAL on every probe row, so there
+is not even a byte to diff. `Z7` (the partition is the coarsest that serves
+the engaged axis), `Z8` (the group index is the distance from the plane, read
+from the emitted azimuths) and `Z9` carry those claims; `Z1`'s
+visible-iff-non-empty biconditional is what polices the numbering across the
+mirror-line toggle.
+
+**NOTHING IN THIS PROJECT MEASURES AN AZIMUTH EXCEPT J7, Z4b AND Z8** — established
 by grep, not assumed. Both STL gates are azimuth-blind by construction, and so
 is everything built on them: J1 reads foot frames, J2/J3 read radii, J4 reads
-three lengths, J5/J6 read the depth sequence, Z1–Z6 read role membership. A FAN
+three lengths, J5/J6 read the depth sequence, Z1–Z7 and Z9 read role membership. A FAN
 that silently builds a full ring therefore exports watertight, as one piece, at
 an identical triangle count and STL byte length, and passes every other check
 here — measured on a worktree. `J7` (the arc, the notch, the minimum angular
