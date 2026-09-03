@@ -3034,6 +3034,18 @@ export function buildMatrix() {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 
+  /* 17. FOOT CROWDING — the row that raises the flag BY NAME (Eva's mum
+         run, Sep 3, ruled bad from the live page), so the CROWDED direction
+         of the flag is exercised by a state somebody has actually ruled on
+         rather than by whichever corner happens to stack past the threshold.
+         A default is not coverage, and a corner is not a ruling. Both gates
+         print its D_max and mark it CROWDED; tools/bloom-crowding.mjs says
+         what that number is and is not. Over-connection, not detachment: this
+         row exports watertight and as ONE piece, and that is the point. */
+  rows.push({ label: 'CROWDING: the mum run — 120 CONTINUOUS x spread min x feet floored (ruled BAD, Eva Sep 3)',
+    set: Object.entries({ placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 0.6, petalLength: 60, petalWidth: 8, layerSize: 0.8, layerTilt: 11, sheetThickness: 0.6, footDelicacy: 0.25 })
+      .map(([id, value]) => ({ id, value: String(value) })) });
+
   return rows;
 }
 

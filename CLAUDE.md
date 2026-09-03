@@ -55,6 +55,17 @@ on the mirror line, a middle group against its neighbours, the extreme, and a
 BEFORE/AFTER pair rendered from a git worktree of the base commit, because the
 fan's slot roles were superseded and a removed capability is photographed
 rather than only recorded.
+FOOT CROWDING has its own instrument and sheet, and it is a FLAG, not a gate
+(Eva, Sep 3): `tools/bloom-crowding.mjs` measures how many feet stack on the
+most crowded point of the base, in EXPORT mode, from `footRing()`'s own rings;
+both STL gates print its line on every row and mark `CROWDED` at
+`D_max >= 11` without failing. `node tools/shot-bloom-crowding.mjs <dir>` is
+its sheet — the base from BELOW, cropped to the hub, the mum run beside the
+ruled-clean blooms. **It is BLIND to blade-to-blade crowding above the root**
+(the feet sit inside the hub slab; what the eye sees is the roots leaving the
+ring, whose exit width IS the foot width) — that second instrument is
+recorded, not built, and a clean D_max is a clean BASE, never a clean bloom.
+Re-derive the threshold when the depth cap is raised.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a

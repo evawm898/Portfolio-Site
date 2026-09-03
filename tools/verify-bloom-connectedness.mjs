@@ -122,6 +122,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 /* Grids beyond this are SKIPPED and reported, NEVER passed — so this number
@@ -258,9 +259,18 @@ for (const row of rows) {
   const flr = await exportFloorAssertion(page);
   if (flr.length) { validity.push(`${row.label}: ${flr.join('; ')}`); continue; }
   const e = analyzeStl(buf);
+  /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the ONE thing in
+     this file that can see OVER-connection. This gate's whole criterion is
+     "one region": 120 feet fused into a single mass at the base are the most
+     connected bloom there is, and it passes here with 0% stray on the very
+     configuration Eva called a fused mass. Read from footRing()'s own
+     export-mode rings and registered against THIS row's STL header (R1). Its
+     validity assertions are hard; the CROWDED mark is not. */
+  const crowd = await footCrowding(page, row, e);
+  if (crowd.bad.length) { validity.push(`${row.label}: ${crowd.bad.join('; ')}`); continue; }
   const v = voxelComponents(buf, CELL_MM);
   const fm = await page.evaluate(() => window.__bloomMetrics());
-  const probe = { ringWidth: fm.ringWidth, ringThickness: fm.ringThickness, ringRadius: fm.ringRadius };
+  const probe = { ringWidth: fm.ringWidth, ringThickness: fm.ringThickness, ringRadius: fm.ringRadius, crowding: crowd.r };
   if (v.skipped) results.push({ label: row.label, capability: !!row.capability, ok: null, ...e, ...probe, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
   else results.push({ label: row.label, capability: !!row.capability, ok: v.comps === 1, ...e, ...v, ...probe });
 }
@@ -315,6 +325,7 @@ for (const r of results) {
     : (r.note || '');
   console.log(`  ${verdict} ${r.label.padEnd(46)} ${detail}`);
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
+  console.log(`       ^ ${crowdingLine(r.crowding)}`);
 }
 console.log(`\n${results.length - failures.length - skipped.length}/${results.length} rows are ONE connected piece`
   + (skipped.length ? `; ${skipped.length} skipped (grid too large — NOT a pass)` : '')
@@ -322,6 +333,10 @@ console.log(`\n${results.length - failures.length - skipped.length}/${results.le
 console.log('LIMITS: surface occupancy, not solid; cannot see free ends or sub-cell gaps; covers only the matrix above. See the header.');
 console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under layers — the wrong-hub mutation passes this gate on every configuration tried.');
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
+const crowdedRows = results.filter((r) => r.crowding.crowded);
+console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
+/* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
+if (!NEGATIVE_CONTROL) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
 
 let bad = false;
 if (validity.length) {

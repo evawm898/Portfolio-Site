@@ -2874,3 +2874,124 @@ exposure the ruling accepts in exchange for the minutes.
           "All curl / All cup / All tip" put "Petal roles" at one whorl at 505 px (from 544)
           and the worst case at **1,074 px** (from 1,113), re-rendered and re-gated before the
           merge — her reason for the ruling, measured.
+
+- ~~Foot crowding — the instrument nobody had~~ **BUILT Sep 3, as a FLAG (Eva's ruling).
+  Nothing this project owned could report a bloom whose feet fuse into one mass at the
+  base: both STL gates are green on it and stay green, because over-connection adds no
+  boundary edge and splits no flood fill. Eva found it by looking at a render. The
+  instrument is `tools/bloom-crowding.mjs`, wired into both gates on every row, with its
+  own sheet.**
+
+    - **THE RUN THAT OPENED IT, reproduced from her readout to the last digit.** 120
+      continuous petals (40 per turn, 3 turns), spread 0.60, an 8 mm blade 60 mm long,
+      shrink 0.80, tilt step +11°, sheet 0.60, delicacy 0.25 — so every foot is floored at
+      1.60 mm and all 120 rings span 1.76 mm of radius live. Ring 3.633 mm live against
+      4.691 mm printed: **+29%**, not the +27% the brief quoted, and the reason the metric
+      reads the EXPORT.
+
+    - **WHAT IT MEASURES: STACK DEPTH.** Every foot is a rectangle `footRing()` already
+      specifies — landing on `ring.radius` at the builder's emitted azimuth, running inward
+      by `ring.overhang`, `ring.width` across. The base plane is rasterised and each cell
+      counts the feet that contain it. **`D_max`** is the depth at the worst point (an
+      integer); **`D_mean`** is Σ foot area ÷ the area of their union. Three candidates were
+      costed on twelve configurations before one was chosen, and the two rejected ones are
+      recorded so they are not re-proposed: **all-pairs nearest-neighbour ÷ width** reads
+      the 8-petal spread-0.60 bloom (D_max 3) as WORSE than the mum, because two feet are
+      close while only eight exist — it measures pairwise proximity and is blind to how
+      many feet stack; **Σ foot area ÷ hub disc area** is dominated by overhang ÷ hub radius,
+      so at a small hub it measures the 1.5 mm overhang floor and reads that same bloom near
+      the mum. Both survive as unrated diagnostics beside D_max.
+
+    - **IT IS FINISHED BECAUSE IT SEPARATES RULINGS, NOT BECAUSE IT IS PRECISE — the `A_k`
+      trap, named.** Export numbers, against pictures Eva had already ruled on:
+
+      | configuration | ruling | D_max | D_mean |
+      |---|---|---|---|
+      | the mum run | bad | **11** (live 17) | 4.97 |
+      | shipping defaults | clean | 2 | 1.12 |
+      | the layers sheet's depth cell, 3 × 0.90 × tilt 12 | clean, "reads as depth" | 3 | 1.62 |
+      | the session-7 continuous headline, 40/turn × 3, spread 1.55 | clean, merged | 5 | 2.53 |
+      | RADIAL × 40 — predicted **4 / ≈2.6** before the raster ran | unruled | **4** | **2.52** |
+
+      The prediction held. The separation is one measured interval, not five: the highest
+      ruled-clean reading is 5 and the ruled-bad is 11, with unruled states at 9 (the mum at
+      spread 1.00) and 10 (RADIAL × 40 × spread 0.60) beside them. The raster is CONVERGED —
+      on the mum, D_max 11 at every cell from 0.04 mm to 0.0025 mm and D_mean 4.969 to three
+      decimals from 0.02 mm down — and convergence is asserted on every gate row (R5), never
+      assumed.
+
+    - **NEIGHBOURS: NONE ARE CHOSEN, and the mum is the evidence.** The golden angle puts
+      the tightest approaches at FIBONACCI index gaps: the mum's closest pair of feet is
+      slots 98 and 119 — gap **21** — at 0.385 mm, 0.24 widths, while an index-adjacent
+      metric reads **1.95 widths** on the same bloom and calls it clean. The depth field is
+      exhaustive over every foot at every cell, so no neighbour set has to be justified; the
+      all-pairs and index-adjacent figures are both printed so the blind reading is visible.
+
+    - **FLAG, NOT GATE (Eva, Sep 3), AND THE THRESHOLD IS HERS.** Her Aug 31 ruling that
+      spread below 1.00 is reachable on purpose settles it: a gate would forbid a design she
+      approved, and over-connection is not a print defect. **`CROWDED_DMAX` is 11**, not
+      the 8 the session proposed: the only evidence is that 5 and below reads clean and 11
+      reads bad, 6..10 are UNRULED, and she would rather see them in the printout than have
+      them marked before she has looked at one. The number prints on every row either way,
+      so the printout carries the sensitivity and the threshold carries only the claim. **RE-
+      DERIVE IT WHEN THE DEPTH CAP IS RAISED** — depth 6 adds rings at small radii and lifts
+      every reading, so an inherited threshold would be wrong in both directions. The flag
+      is asserted in BOTH directions at matrix level (the sub-8 spiral precedent): the mum
+      is a named row so the raised state is exercised by a ruling rather than by a corner.
+
+    - **WHAT IT IS BLIND TO — RECORDED PROMINENTLY, ON EVA'S INSTRUCTION, because a clean
+      D_max will be mistaken for a clean bloom.** In the artefact the feet are not
+      separately visible at all: each lies inside the hub disc, at the hub's own thickness,
+      in the hub's own slab. What the eye sees fusing is the blade ROOTS leaving the ring —
+      and the root's exit half-width IS `ring.width / 2` by construction, so foot stacking
+      at the base is exactly root-exit stacking. Above that exit the blade widens to
+      `petalWidth`, tilts, and curls, and none of it moves this number. **Short, wide blades
+      at high tilt crowd above the base with a clean D_max. BLADE-TO-BLADE CROWDING ABOVE
+      THE ROOT IS A SECOND INSTRUMENT NOBODY HAS — RECORDED, NOT BUILT — and it is the one
+      the mum work will need.** A collar session, or any session reading a green D_max, must
+      not take it as a clean bloom; it is a clean BASE.
+
+    - **READING `footRing()`, NOT DUPLICATING IT, and this is what makes it survive #140 for
+      free.** The module imports the app's own geometry module INSIDE THE PAGE — the same
+      module instance the app built from — calls `buildBloomInto()` with an export-mode
+      accumulator, and reads `foot.slotRings[L][i]` and the builder's own `slotAzimuths`.
+      No area rule, clamp, overhang law or azimuth law is restated. Five validity assertions
+      make that a measurement rather than a claim, all fatal for the run and none a row
+      result: **R1** the in-page export build's triangle count equals the exported STL's
+      header (the geometry read is the geometry shipped); **R2** the in-page live build
+      equals the app's own `liveTris` and hub radius; **R3** feet === `petalsBuilt`; **R4**
+      every emitted foot frame sits exactly where the rectangle built from its descriptor's
+      numbers puts it — SIGNED along the slot's radial direction, because a foot that crosses
+      the axis has an inner row on the far side of the origin, where `hypot()` reads the
+      distance unsigned and `atan2()` the azimuth 180° out; the first draft did exactly that
+      and fired on every axis-crossing foot of the positive control; **R5** convergence at
+      twice the cell. A per-petal descriptor still arrives through `slotRings`, and Z6
+      already asserts a role never differentiates the foot.
+
+    - **THE POSITIVE CONTROL, in a throwaway worktree: the overhang law doubled**
+      (`max(1.5, 0.4r)` → `max(3.0, 0.8r)`). Predicted before measuring: every reading
+      rises and nothing shipped sees it, since J4 bounds overhang only from below. Measured:
+      mum **11 → 42**, default **2 → 3**, depth cell **3 → 7**, continuous headline
+      **5 → 20** (it would flag), RADIAL × 40 **4 → 9**, RADIAL × 40 × spread 0.60
+      **10 → 16** — with the export gate and the connectedness gate BOTH GREEN on the
+      mutant across the whole matrix (the export gate 287/287 watertight, 0 degenerate, identical live and export triangle counts, every J and Z assertion clean; the connectedness gate 287/287 ONE piece). The instrument moves; the gates do
+      not; the tool was not changed.
+
+    - **THE SHEET, and it is the validation rather than decoration:**
+      `node tools/shot-bloom-crowding.mjs <dir>` — the base cropped at a magnification set by
+      each bloom's own hub radius, with that configuration's export number in the caption,
+      for the four ruled configurations plus the two unruled ones nearest the line. **From
+      BELOW the hub plane, and that was forced by the sheet's own frame check:** a camera
+      close enough to read the base stands inside the canopy of a 60 mm blade from every
+      other side (the first mum frame came back 99.8% content), and every blade rises from
+      the plane, so beneath it is the one place the roots are unoccluded. The picture is the
+      LIVE render and the caption is the EXPORT number, stated on every cell.
+
+    - **THE GATES: §GATES§.** Byte identity is A PRIORI here — no geometry file is touched,
+      so the export handler builds the same bytes — and it was measured anyway on the
+      charter's retention ruling (newest baseline on both trees plus the live partition, not
+      the whole suite; the brief said "every frozen baseline" and was corrected to the
+      ruling): §BYTES§. Cost: under a second per row, dominated by the two in-page builds
+      rather than the raster (a fixed grid of ~2,400 cells across the hub, floored at 5 µm;
+      the first draft capped the pitch instead, which made the LARGEST blooms the finest
+      sampled at 37 million cells for no gain).
