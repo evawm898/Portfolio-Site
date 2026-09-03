@@ -1,0 +1,605 @@
+/* ---------------------------------------------------
+   Textile 101 — Field Notes (BASICS)
+
+   Site chrome (nav, project-header, hero, footer, back-to-top)
+   all come straight from styles.css and its shared --black /
+   --ink / --petrol-bright tokens plus Fraunces / IBM Plex Mono —
+   this file only covers what's unique to this page: the on-page
+   TOC, the nine topic sections, and their diagrams, grids, and
+   native <details> reveals.
+
+   Reading columns (headings + copy) match .project__body's
+   22rem/46rem measure so body text lines up with every other
+   Field Notes page. Diagrams and grids are NOT held to that
+   46rem column — they're full section width (the same 6vw-gutter
+   convention .hero/.grid/.footer already use sitewide), since a
+   920-wide woven/knit diagram or a 4-up icon grid reads badly
+   squeezed into a 46rem prose column.
+--------------------------------------------------- */
+
+/* ---------- On-page TOC (sits inside .project__hero) ---------- */
+.tx-toc {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.tx-toc__label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 1.1rem;
+}
+
+.tx-toc__list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem 2rem;
+}
+
+.tx-toc__list li {
+  font-size: 13px;
+}
+
+.tx-toc__list a {
+  color: var(--ink-dim);
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tx-toc__list a:hover {
+  color: var(--petrol-bright);
+  border-color: var(--petrol-bright);
+}
+
+.tx-toc__list .n {
+  color: var(--petrol-bright);
+  margin-right: 0.5em;
+}
+
+/* ---------- Topic sections ---------- */
+.tx-topic {
+  padding: 5.5rem 6vw;
+  border-top: 1px solid var(--line);
+}
+
+.tx-topic:first-of-type {
+  border-top: none;
+}
+
+.tx-topic-head {
+  display: grid;
+  grid-template-columns: minmax(0, 22rem) minmax(0, 46rem);
+  gap: 4vw;
+  align-items: start;
+}
+
+.tx-topic-head h2 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+  position: sticky;
+  top: 2.5rem;
+}
+
+.tx-topic-copy p {
+  max-width: 62ch;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.75;
+  margin: 0 0 1.1rem;
+}
+
+.tx-topic-copy p:last-child {
+  margin-bottom: 0;
+}
+
+.tx-topic-copy .muted {
+  color: var(--ink-dim);
+}
+
+.tx-topic-copy .project__list {
+  margin-top: 1.25rem;
+}
+
+/* ---------- Diagram blocks (warp/weft, weft/warp knit) ---------- */
+.tx-diagram {
+  margin-top: 3rem;
+  padding: 2.5rem clamp(1rem, 4vw, 2.5rem);
+  border: 1px solid var(--line);
+  background: rgba(233, 236, 236, 0.02);
+}
+
+.tx-diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.tx-diagram__caption {
+  margin-top: 1.1rem;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.tx-diagram__caption .accent {
+  color: var(--petrol-bright);
+}
+
+.axis-label {
+  font-family: var(--mono);
+  font-size: 13px;
+  fill: var(--ink-dim);
+  letter-spacing: 0.06em;
+}
+
+/* draw-on animation shared by the warp/weft weave and weft/warp knit
+   diagrams — a continuous strand traces its path, holds, then resets. */
+.yarn-path,
+.weave-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.yarn-path {
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  animation: tx-draw 3.6s ease-in-out infinite;
+}
+
+.weave-path {
+  stroke-dasharray: 700;
+  stroke-dashoffset: 700;
+  animation: tx-draw 4.2s ease-in-out infinite;
+}
+
+.yarn-path.delay1 { animation-delay: 0.15s; }
+.yarn-path.delay2 { animation-delay: 0.3s; }
+.yarn-path.delay3 { animation-delay: 0.45s; }
+
+@keyframes tx-draw {
+  0%   { stroke-dashoffset: 900; }
+  45%  { stroke-dashoffset: 0; }
+  80%  { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -900; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yarn-path,
+  .weave-path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------- Fiber -> yarn -> fabric chain ---------- */
+.tx-chain {
+  margin-top: 3rem;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.tx-chain-node {
+  flex: 1;
+  text-align: center;
+  padding: 2.25rem 1rem;
+  border: 1px solid var(--line);
+}
+
+.tx-chain-node .icon {
+  margin: 0 auto 1.1rem;
+  width: 44px;
+  height: 44px;
+}
+
+.tx-chain-node .label {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.25rem;
+  color: var(--ink);
+}
+
+.tx-chain-node .sub {
+  margin-top: 0.5rem;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.tx-chain-arrow {
+  flex: 0 0 auto;
+  width: 48px;
+  display: flex;
+  justify-content: center;
+  color: var(--petrol-bright);
+  font-size: 20px;
+}
+
+@media (max-width: 700px) {
+  .tx-chain {
+    flex-direction: column;
+  }
+  .tx-chain-arrow {
+    transform: rotate(90deg);
+  }
+}
+
+/* ---------- Icon grids (fiber families, cross-sections, yarn types) ---------- */
+.tx-icon-grid {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.tx-icon-grid.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.tx-icon-cell {
+  background: var(--black);
+  padding: 1.9rem 1.1rem;
+  text-align: center;
+}
+
+.tx-icon-cell svg {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 1rem;
+}
+
+.tx-icon-cell .name {
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  margin-bottom: 0.4rem;
+}
+
+.tx-icon-cell .desc {
+  font-size: 12px;
+  color: var(--ink-dim);
+  line-height: 1.6;
+}
+
+@media (max-width: 860px) {
+  .tx-icon-grid,
+  .tx-icon-grid.cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .tx-icon-grid,
+  .tx-icon-grid.cols-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Definition list (reading a yarn spec) ---------- */
+.tx-def-list {
+  margin-top: 2.5rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.tx-def-list dt {
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 0.25rem;
+}
+
+.tx-def-list dt .accent {
+  color: var(--petrol-bright);
+}
+
+.tx-def-list dd {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  max-width: 60ch;
+}
+
+/* ---------- Decode-a-yarn-spec interactive ---------- */
+.tx-decode {
+  margin-top: 3.5rem;
+}
+
+.tx-decode__intro {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--petrol-bright);
+  margin-bottom: 1.25rem;
+}
+
+details.tx-decode-card {
+  border: 1px solid var(--line);
+  margin-bottom: -1px;
+}
+
+details.tx-decode-card summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1.4rem 1.6rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+
+details.tx-decode-card summary::-webkit-details-marker {
+  display: none;
+}
+
+details.tx-decode-card summary .reveal-cta {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+details.tx-decode-card[open] summary .reveal-cta {
+  color: var(--petrol-bright);
+}
+
+details.tx-decode-card[open] summary .reveal-cta::before {
+  content: "\2212 HIDE";
+}
+
+details.tx-decode-card:not([open]) summary .reveal-cta::before {
+  content: "+ REVEAL";
+}
+
+.tx-decode-answer {
+  padding: 0.25rem 1.6rem 1.6rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.tx-decode-answer .field {
+  font-size: 12px;
+}
+
+.tx-decode-answer .field .k {
+  color: var(--ink-dim);
+  letter-spacing: 0.06em;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.tx-decode-answer .field .v {
+  color: var(--petrol-bright);
+}
+
+@media (max-width: 700px) {
+  .tx-decode-answer {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------- Three-way compare (wovens / knits / nonwovens) ---------- */
+.tx-tri-compare {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--line);
+}
+
+.tx-tri-compare .col {
+  padding: 1.9rem 1.6rem;
+}
+
+.tx-tri-compare .col + .col {
+  border-left: 1px solid var(--line);
+}
+
+.tx-tri-compare h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin-bottom: 0.75rem;
+}
+
+.tx-tri-compare p {
+  font-size: 13px;
+  color: var(--ink-dim);
+  margin: 0;
+  line-height: 1.7;
+}
+
+@media (max-width: 860px) {
+  .tx-tri-compare {
+    grid-template-columns: 1fr;
+  }
+  .tx-tri-compare .col + .col {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* ---------- "Go deeper" accordion (structural variations) ---------- */
+.tx-advanced {
+  margin-top: 3.5rem;
+}
+
+details.tx-advanced-panel {
+  border-top: 1px solid var(--line);
+}
+
+details.tx-advanced-panel summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1.4rem 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  transition: color 0.15s ease;
+}
+
+details.tx-advanced-panel summary:hover {
+  color: var(--ink);
+}
+
+details.tx-advanced-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+details.tx-advanced-panel summary .plus {
+  color: var(--petrol-bright);
+  font-size: 16px;
+  transition: transform 0.15s ease;
+}
+
+details.tx-advanced-panel[open] summary .plus {
+  transform: rotate(45deg);
+}
+
+.tx-advanced-body {
+  padding: 0.5rem 0 2.25rem;
+}
+
+.tx-struct-groups {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2.25rem;
+}
+
+.tx-struct-groups h4 {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--petrol-bright);
+  font-weight: 500;
+  margin: 0 0 0.9rem;
+}
+
+.tx-struct-groups ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.tx-struct-groups li {
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  line-height: 1.6;
+}
+
+.tx-struct-groups li strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+@media (max-width: 700px) {
+  .tx-struct-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Wovens-vs-knits / weft-vs-warp compare strip ---------- */
+.tx-compare {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+}
+
+.tx-compare .col {
+  padding: 1.9rem;
+}
+
+.tx-compare .col + .col {
+  border-left: 1px solid var(--line);
+}
+
+.tx-compare h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin-bottom: 1rem;
+}
+
+.tx-compare ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+}
+
+.tx-compare li {
+  padding-left: 1rem;
+  position: relative;
+}
+
+.tx-compare li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  width: 5px;
+  height: 5px;
+  background: var(--petrol-bright);
+  border-radius: 50%;
+}
+
+@media (max-width: 700px) {
+  .tx-compare {
+    grid-template-columns: 1fr;
+  }
+  .tx-compare .col + .col {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* ---------- Responsive: topic head + TOC ---------- */
+@media (max-width: 860px) {
+  .tx-toc__list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .tx-topic-head {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .tx-topic-head h2 {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .tx-toc__list {
+    grid-template-columns: 1fr;
+  }
+  .tx-topic {
+    padding: 4rem 6vw;
+  }
+}
