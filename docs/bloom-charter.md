@@ -2789,7 +2789,7 @@ exposure the ruling accepts in exchange for the minutes.
           the negative corner where every petal folds under, every clamp binding, the
           composition with a per-petal fan group, the other one-whorl placements, and GATED
           rows above one whorl. The blanket sweep picked the three new controls up at min and
-          max on its own. **Matrix 376 → 401.** «BYTES»
+          max on its own. **Matrix 376 → 401.** The byte measurement was still running when this was committed; the commit that follows carries it.
 
         * **TWO POSITIVE CONTROLS, RED THEN GREEN, in throwaway copies of the tree.** PP7 —
           the geometry keeps the old one-whorl arm while the registry hides — was caught at
@@ -2808,6 +2808,23 @@ exposure the ruling accepts in exchange for the minutes.
           text), a third axis in `ROLES_COMBOS` (never slot AND all; all iff one whorl), the
           two rosette witnesses now carrying the two-whorls-in-step precondition, and a sixth
           negative-control route that freezes the caption — **949 breaks caught, all six
-          routes fired.** «PANEL»
+          routes fired**, the panel gate itself PASSING on the new panel with the depth route
+          reading the caption's text back exactly and every wrapper agreeing with its
+          predicate at all six steps.
 
-        * **WHAT THE SHEETS SHOW.** «SHEETS»
+        * **WHAT THE SHEETS SHOW.** The orchid sheet: the CONTROL and every orchid cell at two
+          whorls in step (21,024 live tris at eight petals, six descriptors split three ways
+          per whorl; the three-petal cell 8,664 with the hood a straddling pair; forty petals
+          100,128 with the hood one slot), the ORCHID x IRIS product at nine descriptors, and
+          session A's iris unmoved — plus the pair: **BEFORE, the one-whorl orchid on the base
+          tree, three descriptors, split, a face; AFTER, the same eight sliders at one whorl on
+          this tree, ONE descriptor, no split, an undifferentiated rosette, at the same 11,136
+          triangles.** The panel sheet: "Petal roles" at one whorl is 544 px holding the three
+          all-petals rows and no drop-down; the rosette's numbering cells at two whorls in step
+          read Petal 1 / Petal 2, Petal 1 / Petal 5, Petal 1 / Petal 21 beside the Inner trio
+          at 755–794 px; the caption cell at two whorls with the offset at its default reads
+          the registry's own sentence; and the fan's per-petal cells grew from 933 px to
+          **1,113 px worst case** (Petal 3 open at eight per side), because at one whorl the
+          all-petals trio sits under the nine drop-downs — the ruling's "at every depth" means
+          every one-whorl placement, the fan included, and that is the honest cost of it on the
+          tallest panel there is.
