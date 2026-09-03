@@ -2694,9 +2694,13 @@ exposure the ruling accepts in exchange for the minutes.
           **WHAT THIS DID NOT TOUCH, measured rather than asserted.** No `visibleWhen` changed
           (deep-equal on all 75 controls across the two trees), `DEFAULTS` is deep-equal, the
           control id list is identical, and no geometry file changed. The full live-matrix byte
-          diff against `5c0b719` (376 rows, both trees, `tools/diff-bloom-bytes.mjs --full`)
-          was still running when this was committed; its result is recorded in the commit
-          that follows this one.
+          diff against `5c0b719` (376 rows, both trees, `tools/diff-bloom-bytes.mjs --full`,
+          22 min 36 s for the base tree and 17 min 16 s for the head while the panel sheet
+          rendered beside it): **376/376 byte-identical, 0 moved, defaults bit-identical** —
+          the panel commits from `8931206` through the gap fix moved nothing a slicer can see.
+          Every frozen baseline is a subset of the same untouched geometry and is proved
+          deep-equal by CI's `--verify-frozen` on every push, so under the retention policy
+          this is the whole close for a presentation-only change.
 
           **RECORDED, NOT BUILT.** A per-petal set on the rosette (option B) remains one
           `perPetalEligible` arm in two files plus the retirement it implies — the reason it
