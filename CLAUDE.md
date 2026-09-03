@@ -104,6 +104,29 @@ DERIVED summary — `labelFrom(ui)` in `SECTIONS`, `sectionLabel()` the one owne
 for the app, the gate and the sheet, and `verifySections()` refusing a literal
 beside a derivation. Control ids are unchanged; nothing is retired.
 
+**PETAL ROLES IS THE "ADJUST PETALS AS A GROUP" SECTION AT EVERY DEPTH, AND THE
+ONE-WHORL ORCHID IS GIVEN UP** (Eva, Sep 3, from the deploy preview, overruling
+the session's "nothing to build"). At one whorl the group is ALL petals: three
+DELTAS (`allCurl` / `allCup` / `allTipBreadth`, role `ALL`, the first three
+`ROLE_OVERRIDES` rows) riding on Petal form's Spine curl and Cup and Petal
+shape's Tip breadth exactly as the Inner trio rides on them above one whorl —
+one composition law, nothing owns a number twice. Slot roles need TWO OR MORE
+WHORLS IN STEP now (`slotRolesEligible`'s RADIAL arm and the registry's twin,
+both flipped): Petal 1 / Petal N are hidden AND INERT at one whorl, still fully
+live on RADIAL at 2+ whorls with Layer offset 0 and on the fan as per-petal
+groups. Not `RETIRED_IDS` — ids, laws and gate rows unchanged; recovery is one
+arm in two files. Where they hide behind the offset the panel SAYS SO: a
+section's `hiddenReason` (`when` predicate + derived `text(ui)`, declared once
+and referenced by both groups) renders one caption in the parent, `applyVisibility()`
+the only thing that shows it, and the panel gate asserts the depth 1↔2
+transitions of all three groups and the caption in both directions.
+**A green run does not endorse the inertness**: PP7 (geometry keeps the old arm)
+is caught at harness load by the two-statement guard, PP8 (all-petals never
+inert above one whorl) by Z1/Z5/Z9 on exactly the GATED rows — measured, not
+derived. The retirement is photographed as a BEFORE/AFTER pair on
+`node tools/shot-bloom-orchid.mjs <dir> [base-tree]`, whose every orchid cell
+is now at two whorls in step.
+
 **A GREEN RUN DOES NOT ENDORSE THE PER-PETAL NUMBERING** — measured on six
 worktrees, not derived. An off-by-one orbit index and a supersession that
 quietly comes undone BOTH export watertight, as one piece, with zero

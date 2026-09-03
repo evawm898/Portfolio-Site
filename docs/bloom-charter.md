@@ -2708,3 +2708,106 @@ exposure the ruling accepts in exchange for the minutes.
           design, `labellumGroup` / `hoodGroup` are section ids, never persisted, so the
           rename costs nothing then either; what a persisted design would owe is the fan's
           own note above (`petal2Cup` meaning a different petal across the toggle).
+
+    - **EVA OVERRULED THE (b) ANSWER AFTER SEEING THE PANEL, AND THE RULING RESHAPED "PETAL
+      ROLES" AT EVERY DEPTH (Sep 3, from the deploy preview, three screenshots).** Her words:
+      *"petal roles for depth 1 of Radial (even) can match depth 2 options meaning that the
+      petal adjustments for all petals when there is only depth 1."* The session read it two
+      ways, said that the whorl-wide sliders already existed under Petal form / Petal shape,
+      and asked which was the ask. Eva's design, hers:
+
+        * **PETAL ROLES IS THE "ADJUST PETALS AS A GROUP" SECTION AT EVERY DEPTH.** At two or
+          more whorls the group is the inner whorl — session A's Inner trio, unchanged. At one
+          whorl the group is ALL PETALS: `allCurl` / `allCup` / `allTipBreadth`, implemented
+          THE WAY THE INNER TRIO ALREADY WORKS — deltas riding on the base sliders, defaulting
+          to zero, NOT a second copy of the base sliders. That is her answer to the session's
+          two-owners objection, and it is the right one: the base slider owns the number, the
+          delta owns a change to it, one composition law at every depth. In code it is
+          `ROLE_ALL`, stamped by `footRing()` on every descriptor of a one-whorl bloom and on
+          none of a layered one (`allPetalsEligible(state)`, twin `PREDICATES.allPetalsEligible`,
+          Z5 checking the two agree), and the FIRST three rows of `ROLE_OVERRIDES` so a petal
+          that is also a fan group reads base, then the whole-whorl delta, then its own — "the
+          group, then the petal". The labels, proposed here for her eye: **"All-petals curl" /
+          "All-petals cup" / "All-petals tip"** beside "Inner curl / cup / tip", read-outs at
+          identity naming the slider that owns the number (*"as Petal form sets it"*, *"as
+          Petal shape sets it"*) and off identity naming the delta and its base (*"+50° on
+          Spine curl"*, *"+0.30 on Cup"*, *"+0.20 on Tip breadth"*); the app's readout prints
+          what the whorl was BUILT with (*"all petals as a group · spine curl 50° · cup 0.30"*).
+          No label claims to be the curl; the base slider is.
+
+        * **PETAL 1 / PETAL N ARE HIDDEN AT ONE WHORL — RETIRED THERE BY EVA'S EXPLICIT RULING,
+          WITH THE COST STATED TO HER AND ACCEPTED: THE SINGLE-LAYER RADIAL ORCHID IS
+          DELIBERATELY GIVEN UP.** Session B built the labellum and hood on the one-whorl
+          rosette; from Sep 3 slot roles need TWO OR MORE WHORLS IN STEP —
+          `slotRolesEligible`'s RADIAL arm went from `layerCount === 1 || layerPhase === 0` to
+          `layerCount >= 2 && layerPhase === 0`, and the registry's predicate with it. Hidden
+          means INERT, per the standing doctrine: a labellum/hood record must not reach the
+          geometry at one whorl, and that is what the byte partition below measures. What
+          survives: the orchid on RADIAL at two or more whorls with Layer offset 0, and the
+          fan's per-petal groups at every depth. NOT `RETIRED_IDS`: ids, laws, ranges and gate
+          rows are unchanged and fully live above one whorl; recovery is that one arm in two
+          files. **The retirement is photographed, not only recorded** — the orchid sheet now
+          carries a BEFORE/AFTER pair of the one-whorl orchid rendered from a worktree of the
+          base commit and from this tree, the same eight sliders at the same values, a face on
+          one and an undifferentiated rosette on the other; every other cell on that sheet,
+          the CONTROL included, moved up to two whorls in step, because a control that is not
+          the same arrangement is not a control.
+
+        * **THE PANEL SAYS WHY TWO DROP-DOWNS ARE MISSING — `hiddenReason` (item 1 of Eva's
+          earlier wording instruction, which STANDS; item 2, pointing one-whorl visitors to
+          Petal form / Petal shape, is moot now that the all-petals sliders live in Petal
+          roles).** A nested section may declare `hiddenReason: { when, text(ui) }`; the
+          registry declares ONE reason object (`SLOT_ROLES_BEHIND_OFFSET`) and both rosette
+          groups reference it, the app renders one caption per DISTINCT reason object inside
+          the parent — identity is what makes the caption single — `applyVisibility()` is the
+          only thing that shows it (exactly when the reason holds and every section naming it
+          is hidden), and `refreshLabels()` writes its derived text, which reads the Layer
+          offset control's OWN label so a rename cannot leave it naming a slider that no
+          longer exists: *"Petal 1 and Petal 5 need the whorls in step — set Layer offset to
+          0.00 to bring them back."* Not said at one whorl: there the groups are retired by
+          ruling, not hidden behind a slider, and the section holds the all-petals group
+          instead. The earlier wording instruction itself was not in this session's context
+          after the compaction, so the caption's mechanism and sentence are this session's
+          reconstruction of it, offered for Eva's eye with the labels.
+
+        * **THE EVIDENCE, PREDICTED BEFORE IT WAS MEASURED, and it is an EXACT PARTITION.**
+          A script over every matrix — live and all nine frozen — enumerated the rows with a
+          labellum or hood control engaged at one whorl on RADIAL before a byte was hashed:
+          **33 in the live matrix, 33 in phase8, 33 in phase9 (the same 33 definitions), and
+          NONE in legacy or phase2–phase7** — Eva's "verify which baselines contain depth-1
+          labellum rows rather than assuming", answered by enumeration. Predicted moved: exactly
+          those 33 × 3, each bit-identical to its no-override counterpart on the new tree.
+          Predicted unmoved: every other row of every matrix. The live matrix as it stood at
+          `4f39118` was frozen as **`phase10Matrix()`** (376 rows, `--verify-frozen --phase10`
+          deep-equal to that commit's own `buildMatrix()`, base `4f39118`), because the live
+          matrix itself changed shape: the 33 one-whorl slot rows moved to two whorls in step
+          (the extremes are measured where the feature LIVES), five GATED one-whorl rows were
+          added to police the inertness (the ORCHID, the one-slot hood at four petals, ALL SLOT
+          MAX, ALL SLOT MAX at three petals, and the corner the OLD rule admitted by phase
+          alone), and the newly reachable all-petals region got its named corners — the
+          extremes together at the bare bloom, both count extremes at ALL THIN × spread min,
+          the negative corner where every petal folds under, every clamp binding, the
+          composition with a per-petal fan group, the other one-whorl placements, and GATED
+          rows above one whorl. The blanket sweep picked the three new controls up at min and
+          max on its own. **Matrix 376 → 401.** «BYTES»
+
+        * **TWO POSITIVE CONTROLS, RED THEN GREEN, in throwaway copies of the tree.** PP7 —
+          the geometry keeps the old one-whorl arm while the registry hides — was caught at
+          HARNESS LOAD by the two-statement guard on six states before any row ran, which is
+          the earliest an instrument here has ever fired. PP8 — the all-petals group never
+          inert above one whorl — fired Z1 + Z5 on every GATED row above one whorl and Z9
+          beside a live orchid, and stayed silent on every one-whorl row: exactly the partition
+          the mutation touches. And the FIRST probe of the shipped tree found the session's
+          own bug: `footRing()`'s descriptor mapping enumerates its fields, so the `allRole`
+          stamp never reached the metrics and Z1/Z2 fired on every one-whorl row — fixed by
+          carrying the stamp through the mapping, which is the reason Z1 reads it back from
+          the metrics rather than trusting the resolver's list. **The panel gate** gained a
+          depth route (one page, real events, one whorl → two out of step → in step → three →
+          out of step → one; the ruling's own statements asserted by name at every step, every
+          wrapper against its predicate, the caption shown exactly twice with the registry's
+          text), a third axis in `ROLES_COMBOS` (never slot AND all; all iff one whorl), the
+          two rosette witnesses now carrying the two-whorls-in-step precondition, and a sixth
+          negative-control route that freezes the caption — **949 breaks caught, all six
+          routes fired.** «PANEL»
+
+        * **WHAT THE SHEETS SHOW.** «SHEETS»

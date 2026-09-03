@@ -28,6 +28,10 @@ const valSpans = {}; // id -> read-out span
 const wrappers = {}; // id -> control wrapper div
 const sectionEls = {}; // section id -> <details>
 const summaryEls = {}; // section id -> its <summary>, for the derived labels refreshLabels() rewrites
+/* hiddenReason captions: ONE element per distinct reason object per parent —
+   the registry declares the reason once and references it from every section
+   that hides for it, so identity is what makes the caption single. */
+const whyEls = new Map(); // reason object -> { el, parent, sections: [ids] }
 
 function makeInput(c) {
   if (c.kind === 'slider') {
@@ -87,6 +91,23 @@ for (const s of SECTIONS) {
      verifySections() has thrown at module load if a parent is missing or is
      itself nested, so there is no ordering to get wrong here and no
      silent-drop path to guard against. */
+  /* THE CAPTION GOES WHERE THE FIRST DROP-DOWN THAT HIDES FOR THIS REASON
+     WOULD BE — appended before that section's own element, once. It is text,
+     never a control: applyVisibility() is still the only thing that decides
+     whether it shows, and refreshLabels() the only thing that writes it. */
+  if (s.hiddenReason) {
+    let w = whyEls.get(s.hiddenReason);
+    if (!w) {
+      const el = document.createElement('p');
+      el.className = 'bl-why';
+      el.hidden = true;
+      sectionEls[s.parent].append(el);
+      w = { el, parent: s.parent, sections: [] };
+      whyEls.set(s.hiddenReason, w);
+    }
+    w.sections.push(s.id);
+    w.el.dataset.why = w.sections.join(' ');
+  }
   (s.parent ? sectionEls[s.parent] : panelRoot).append(det);
   sectionEls[s.id] = det;
 }
@@ -182,6 +203,7 @@ function refreshLabels(ui) {
      (sectionLabel) as the generator used — a static label is rewritten with
      itself, which is cheaper than a second list of which sections vary. */
   for (const s of SECTIONS) summaryEls[s.id].textContent = sectionLabel(s, ui);
+  for (const [reason, w] of whyEls) w.el.textContent = reason.text(ui);
 }
 
 /* The ONLY setter of a control wrapper's hidden — evaluates the registry's
@@ -217,7 +239,18 @@ function applyVisibility() {
     const noControls = CONTROLS.every((c) => c.section !== s.id || wrappers[c.id].hidden);
     const kids = childrenOf.get(s.id) || [];
     const noKids = kids.every((id) => sectionEls[id].hidden);
-    sectionEls[s.id].hidden = noControls && noKids;
+    /* A CAPTION SHOWS EXACTLY WHEN ITS REASON HOLDS AND EVERY SECTION THAT
+       NAMES IT IS HIDDEN — decided here, once, on the way up: this parent's
+       children have already settled (they come later in SECTIONS, so earlier
+       in this walk), so the caption can read them, and a visible caption is
+       content that keeps its parent on screen. */
+    let noWhy = true;
+    for (const [reason, w] of whyEls) {
+      if (w.parent !== s.id) continue;
+      w.el.hidden = !(evalPredicate(reason.when, ui) && w.sections.every((id) => sectionEls[id].hidden));
+      if (!w.el.hidden) noWhy = false;
+    }
+    sectionEls[s.id].hidden = noControls && noKids && noWhy;
   }
 }
 
@@ -352,7 +385,7 @@ let liveSummary = '';
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false };
 let lastCenter = { style: 'NONE', tris: 0 };
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -572,6 +605,21 @@ function mirrorPhrase(mirror) {
 
    PER-PETAL GROUPS PRINT AS "petal 3", not "PETAL_3": the role id is an
    internal key and the visitor's word for it is the panel's own. */
+/* THE ALL-PETALS LINE — what the one-whorl group was actually BUILT with,
+   printed from the descriptor's own record (base + delta, clamped once) so a
+   visitor reads the number the blade got rather than the delta the slider
+   shows. Absent when the group is not engaged, absent above one whorl. */
+function allPetalsLine(rings, fr) {
+  if (!fr.allPetalsEligible) return '';
+  const r = rings.find((x) => x.allRole !== null && x.allRole !== undefined && x.overrides);
+  if (!r) return '';
+  const said = [];
+  if ('petalSpineCurl' in r.overrides) said.push(`spine curl ${r.overrides.petalSpineCurl.toFixed(0)}°`);
+  if ('petalCup' in r.overrides) said.push(`cup ${r.overrides.petalCup.toFixed(2)}`);
+  if ('petalTipBreadth' in r.overrides) said.push(`tip breadth ${r.overrides.petalTipBreadth.toFixed(2)}`);
+  return said.length ? `all petals as a group · ${said.join(' · ')}\n` : '';
+}
+
 function slotRoleLine(rings, fr) {
   const split = rings.filter((r) => r.slotRole !== null || r.petalRole !== null);
   if (!split.length) return '';
@@ -655,7 +703,7 @@ function summarise(ui, acc, mode, rings, fr) {
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
        + footFloorLine(rings)
-       + slotRoleLine(rings, fr)
+       + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
@@ -1002,6 +1050,7 @@ window.__bloomMetrics = () => ({
        "this group is the laterals" are different claims. Z4 reads `slots` to
        assert the assignment is mirror-symmetric. */
     slotRole: r.slotRole,
+    allRole: r.allRole ?? null,
     /* THE PER-PETAL ROLE (session 11) — the descriptor's mirror ORBIT counted
        outward from the plane, or null. Z8 compares these against the emitted
        azimuths; Z9 asserts this and `slotRole` are never both non-null. */
@@ -1071,6 +1120,7 @@ window.__bloomMetrics = () => ({
      registry makes them HIDDEN, neither file can read the other, so the
      relation is measured rather than commented. */
   perPetalEligible: lastFoot.perPetalEligible,
+  allPetalsEligible: lastFoot.allPetalsEligible,
   petalRoleCensus: lastFoot.petalRoleCensus ? { ...lastFoot.petalRoleCensus } : null,
   petalGroupCount: lastFoot.petalGroupCount,
   slotRolesSplit: lastFoot.slotRolesSplit,
@@ -1097,7 +1147,7 @@ window.__bloomMetrics = () => ({
      in the codebase that can see an override record that never reached the
      blade - a failure invisible to both STL gates, to the triangle count and
      to J1-J6 alike. Z2's third clause. */
-  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
+  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, allRole: p.allRole ?? null, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
   layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to

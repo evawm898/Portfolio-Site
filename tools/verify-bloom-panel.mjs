@@ -104,8 +104,9 @@
            listener can see it, and freezes every wrapper's `hidden` so the
            panel stops re-evaluating visibility while its declarations stay
            perfect, and freezes a derived section label so the panel stops
-           renaming a drop-down whose petal number moved — and requires this
-           run to FAIL on all five.
+           renaming a drop-down whose petal number moved, and freezes the
+           hiddenReason caption so the panel stops saying why two drop-downs
+           are missing — and requires this run to FAIL on all six.
            A check nobody has seen fail is a hope.
    =================================================================== */
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
@@ -169,22 +170,29 @@ const WITNESS = {
      predicted for exactly this section, and the anti-vacuity clause below
      refuses to drive a control that is still hidden after it. The `before`
      is read AFTER layerCount is 2, so the delta belongs to innerCup. */
-  roles: { id: 'innerCup', value: '0.6',
-           pre: [{ id: 'layerCount', value: '2' }],
+  /* SINCE EVA'S RULING OF SEP 3 "PETAL ROLES" HOLDS THE ALL-PETALS TRIO AT THE
+     SHIPPING DEPTH, so the section is witnessed by one of them with NO
+     precondition again (the innerCup-with-layerCount-2 witness this replaced
+     is kept in the git record); the delta must reach the one whorl's blade. */
+  roles: { id: 'allCurl', value: '180',
            read: (m) => {
-             const idx = m.rings.findIndex((r) => r.role === 'INNER');
-             const applied = idx >= 0 && m.petalRingApplied[idx] ? m.petalRingApplied[idx].applied.petalCup : 'no descriptor';
-             return `${m.rings.length}/${idx}/${applied}`;
+             const a = m.petalRingApplied[0];
+             return `${m.rings.length}/${m.allPetalsEligible}/${a ? a.applied.petalSpineCurl : 'no descriptor'}`;
            },
-           what: 'descriptor count / index and effective petalCup of the INNER whorl' },
+           what: 'descriptor count / all-petals eligibility / the spine curl the builder used on the one whorl' },
   /* THE ROSETTE'S TWO GROUPS — the labellum's witness is the one "roles"
      carried until ruling A (no precondition: slot roles are eligible at the
      shipping default), and the hood's is its twin read from the HOOD
      descriptor, which exists only once the override splits the whorl. */
+  /* BOTH ROSETTE GROUPS NEED TWO WHORLS IN STEP NOW (Eva, Sep 3: the one-whorl
+     orchid is retired), so both carry that precondition and the anti-vacuity
+     clause refuses to drive a control still hidden after it. */
   labellumGroup: { id: 'labellumSize', value: '1.6',
+           pre: [{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }],
            read: (m) => `${m.rings.length}/${m.slotRolesSplit}/${m.petalRingApplied[0] && m.petalRingApplied[0].applied.petalLength}`,
            what: 'descriptor count / split / the labellum petalLength the builder used' },
   hoodGroup: { id: 'hoodSize', value: '1.6',
+           pre: [{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }],
            read: (m) => {
              const idx = m.rings.findIndex((r) => r.slotRole === 'HOOD');
              const applied = idx >= 0 && m.petalRingApplied[idx] ? m.petalRingApplied[idx].applied.petalLength : 'no descriptor';
@@ -352,14 +360,30 @@ if (census.retiredPresent.length) note(`retired id(s) present in the DOM: ${cens
    from the code that wrote it. The child clause is what a parent holding only
    drop-downs needs: "Petal roles" has three controls of its own, all hidden at
    one whorl, and is on screen because its two rosette groups are. */
-const wantSectionHidden = (secId, controlHidden, sectionHidden) => {
+/* THE CAPTIONS A PARENT HOLDS — one per distinct hiddenReason object among its
+   children (the registry declares a reason once and references it from every
+   section that hides for it). A caption is predicted visible exactly when its
+   `when` holds AND every section naming it is hidden. */
+const captionsOf = (parentId) => {
+  const seen = new Map();
+  for (const x of SECTIONS) {
+    if (x.parent !== parentId || !x.hiddenReason) continue;
+    if (!seen.has(x.hiddenReason)) seen.set(x.hiddenReason, []);
+    seen.get(x.hiddenReason).push(x.id);
+  }
+  return [...seen].map(([reason, sections]) => ({ reason, sections }));
+};
+const captionWantHidden = (cap, state, sectionHidden) => !(evalPredicate(cap.reason.when, state) && cap.sections.every((id) => sectionHidden(id) === true));
+const wantSectionHidden = (secId, controlHidden, sectionHidden, captionHidden = () => true) => {
   const members = CONTROLS.filter((c) => c.section === secId);
   const kids = SECTIONS.filter((x) => x.parent === secId);
-  return members.every((c) => controlHidden(c.id) === true) && kids.every((k) => sectionHidden(k.id) === true);
+  return members.every((c) => controlHidden(c.id) === true) && kids.every((k) => sectionHidden(k.id) === true)
+    && captionsOf(secId).every((cap) => captionHidden(cap) === true);
 };
 for (const s of SECTIONS) {
   const rendered = census.sections.find((r) => r.id === s.id);
-  const want = wantSectionHidden(s.id, (id) => byId[id].hidden, (id) => census.sections.find((r) => r.id === id)?.hidden);
+  const want = wantSectionHidden(s.id, (id) => byId[id].hidden, (id) => census.sections.find((r) => r.id === id)?.hidden,
+    (cap) => captionWantHidden(cap, DEFAULTS, (id) => census.sections.find((r) => r.id === id)?.hidden));
   if (rendered && rendered.hidden !== want) {
     note(`section "${s.id}" hidden=${rendered.hidden}, but "every member control and child section hidden" is ${want}`);
   }
@@ -583,7 +607,8 @@ if (!shutBad.length && !shutDrift.length && stillShut === 0) {
   const predHidden = {};
   for (let i = SECTIONS.length - 1; i >= 0; i--) {
     const sec = SECTIONS[i];
-    predHidden[sec.id] = wantSectionHidden(sec.id, (id) => !evalPredicate(CONTROLS.find((c) => c.id === id).visibleWhen, DEFAULTS), (id) => predHidden[id]);
+    predHidden[sec.id] = wantSectionHidden(sec.id, (id) => !evalPredicate(CONTROLS.find((c) => c.id === id).visibleWhen, DEFAULTS), (id) => predHidden[id],
+      (cap) => captionWantHidden(cap, DEFAULTS, (id) => predHidden[id]));
   }
   for (const sec of seen.sections) {
     if (sec.hidden !== predHidden[sec.id]) {
@@ -829,7 +854,9 @@ for (const [driverId, dependents] of drivers) {
            does, and what this route exists to see. */
         Object.defineProperty(sum, 'textContent', { get: () => before, set: () => {}, configurable: true });
       }
-      for (const [id, value] of [['petalCount', String(n)], ['hoodSize', '1.6']]) {
+      /* TWO WHORLS IN STEP FIRST (Eva, Sep 3) — the group is hidden at one
+         whorl, and a label nobody can see is not the label under test. */
+      for (const [id, value] of [['layerCount', '2'], ['layerPhase', '0'], ['petalCount', String(n)], ['hoodSize', '1.6']]) {
         const el = document.getElementById(id);
         el.value = value;
         el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -856,6 +883,109 @@ for (const [driverId, dependents] of drivers) {
     else if (said !== numbers[0]) bad.push(`the label says petal ${said}, but the builder's hood slots [${res.hoodSlots.join(', ')}] of ${res.slotCount} (plane ${res.mirror}) are orbit ${numbers[0]}`);
     if (bad.length) note(`${tag}: ${bad.join('; ')}`);
     else ok.push(`${tag}: summary "${res.before}" -> "${res.after}", and the builder's hood slots [${res.hoodSlots.join(', ')}] of ${res.slotCount} are orbit ${numbers[0]} — the label's number is the emitted one`);
+  }
+}
+
+/* ---------------- (h) THE DEPTH TRANSITIONS, BOTH DIRECTIONS, AND THE CAPTION ----------------
+
+   EVA'S RULING OF SEP 3, PHOTOGRAPHED BY A GATE: "Petal roles" is the
+   adjust-petals-as-a-group section at every depth — the ALL-PETALS trio at
+   one whorl, the INNER trio above it — and Petal 1 / Petal N are hidden at
+   one whorl, reachable at two or more whorls with Layer offset 0, and in
+   between (two or more whorls, offset away from 0) the panel SAYS WHY THEY
+   ARE MISSING through the registry's hiddenReason caption.
+
+   ONE PAGE, REAL EVENTS, BOTH DIRECTIONS: one whorl -> two whorls (offset at
+   its default, away from 0) -> offset 0 -> back to one whorl. At every step
+   every wrapper is checked against its own predicate (the general property),
+   AND the ruling's own statements are asserted by name (the specific one) —
+   a route that only checked predicates would pass a registry that quietly
+   moved the trio to the wrong depth, because the DOM would agree with it.
+   The caption is asserted in both directions too: shown exactly at the
+   "behind the offset" step, its text the registry's own text(ui), and absent
+   at every other step — a caption stuck on is a lie in the panel. */
+{
+  const steps = [
+    { name: 'one whorl (the shipping default)', set: [],
+      want: { all: true, inner: false, slot: false, caption: false } },
+    { name: 'two whorls, Layer offset at its default (away from 0)', set: [['layerCount', '2']],
+      want: { all: false, inner: true, slot: false, caption: true } },
+    { name: 'two whorls in step (Layer offset 0)', set: [['layerPhase', '0']],
+      want: { all: false, inner: true, slot: true, caption: false } },
+    { name: 'three whorls, still in step', set: [['layerCount', '3']],
+      want: { all: false, inner: true, slot: true, caption: false } },
+    { name: 'offset away from 0 again at three whorls', set: [['layerPhase', '0.25']],
+      want: { all: false, inner: true, slot: false, caption: true } },
+    { name: 'back to one whorl (offset still 0.25 — must not matter)', set: [['layerCount', '1']],
+      want: { all: true, inner: false, slot: false, caption: false } },
+  ];
+  const groups = {
+    all: ['allCurl', 'allCup', 'allTipBreadth'],
+    inner: ['innerCurl', 'innerCup', 'innerTipBreadth'],
+    slot: ['labellumSize', 'labellumTipBreadth', 'labellumTilt', 'labellumCup', 'labellumCurl', 'hoodSize', 'hoodTilt', 'hoodCup'],
+  };
+  const captions = captionsOf('roles');
+  if (captions.length !== 1) note(`[depth] expected exactly one hiddenReason caption under "roles", the registry declares ${captions.length}`);
+  await openBloom(page, port);
+  const frozen = await page.evaluate((breakIt) => {
+    const el = document.querySelector('#sec-roles > .bl-why');
+    if (!el) return 'no caption element';
+    if (breakIt) {
+      /* NEGATIVE CONTROL, route (h): the caption's `hidden` stops moving —
+         the panel keeps or loses its explanation regardless of state. */
+      const v = el.hidden;
+      Object.defineProperty(el, 'hidden', { get: () => v, set: () => {}, configurable: true });
+    }
+    return null;
+  }, NEGATIVE_CONTROL);
+  if (frozen) note(`[depth] ${frozen} — the hiddenReason caption is not rendered inside "Petal roles"`);
+  for (const step of steps) {
+    const res = await page.evaluate(async ({ set }) => {
+      for (const [id, value] of set) {
+        const el = document.getElementById(id);
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const seen = {};
+      for (const w of document.querySelectorAll('.bl-ctrl')) {
+        const input = w.querySelector('input,select');
+        if (input) seen[input.id] = w.hidden;
+      }
+      const cap = document.querySelector('#sec-roles > .bl-why');
+      const secs = {};
+      for (const d of document.querySelectorAll('#panelControls details')) secs[d.dataset.section] = d.hidden;
+      return { state: window.__bloomUIState(), seen, secs, caption: cap ? { hidden: cap.hidden, text: cap.textContent, why: cap.dataset.why } : null, m: (() => { const x = window.__bloomMetrics(); return { slot: x.slotRolesEligible, all: x.allPetalsEligible, layers: x.layerCount }; })() };
+    }, { set: step.set });
+    const tag = `[depth] ${step.name}`;
+    const bad = [];
+    for (const c of CONTROLS) {
+      const want = !evalPredicate(c.visibleWhen, res.state);
+      if (res.seen[c.id] !== want) bad.push(`"${c.id}" hidden=${res.seen[c.id]}, its predicate says ${want}`);
+    }
+    for (const [axis, ids] of Object.entries(groups)) {
+      const shown = ids.filter((id) => res.seen[id] === false);
+      const wantShown = step.want[axis];
+      if (wantShown && shown.length !== ids.length) bad.push(`${axis} trio: ${shown.length} of ${ids.length} visible, the ruling says all`);
+      if (!wantShown && shown.length) bad.push(`${axis}: ${shown.join(', ')} visible, the ruling says none`);
+    }
+    if (res.secs.labellumGroup !== !step.want.slot || res.secs.hoodGroup !== !step.want.slot) bad.push(`Petal 1 / Petal N drop-downs hidden=${res.secs.labellumGroup}/${res.secs.hoodGroup}, the ruling says ${step.want.slot ? 'shown' : 'hidden'}`);
+    if (Boolean(res.m.slot) !== step.want.slot) bad.push(`the geometry says slot roles ${res.m.slot ? '' : 'not '}eligible, the ruling says ${step.want.slot}`);
+    if (Boolean(res.m.all) !== step.want.all) bad.push(`the geometry says the all-petals group ${res.m.all ? '' : 'not '}eligible, the ruling says ${step.want.all}`);
+    if (!res.caption) bad.push('no caption element under "Petal roles"');
+    else {
+      if (res.caption.hidden !== !step.want.caption) bad.push(`the hiddenReason caption is ${res.caption.hidden ? 'HIDDEN' : 'SHOWN'}, the ruling says ${step.want.caption ? 'shown' : 'hidden'}`);
+      if (!res.caption.hidden) {
+        const wantText = captions[0] ? captions[0].reason.text(res.state) : '';
+        if (res.caption.text !== wantText) bad.push(`caption reads "${res.caption.text}", the registry's text(ui) says "${wantText}"`);
+        if (!/Petal 1 and Petal \d+/.test(res.caption.text)) bad.push(`caption "${res.caption.text}" does not name the two drop-downs it stands for`);
+      }
+      const wantWhy = captions[0] ? captions[0].sections.join(' ') : '';
+      if (res.caption.why !== wantWhy) bad.push(`caption stands for [${res.caption.why}], the registry says [${wantWhy}]`);
+    }
+    if (bad.length) note(`${tag}: ${bad.join('; ')}`);
+    else ok.push(`${tag}: all-petals ${step.want.all ? 'shown' : 'hidden'}, Inner ${step.want.inner ? 'shown' : 'hidden'}, Petal 1 / Petal N ${step.want.slot ? 'shown' : 'hidden'}, caption ${step.want.caption ? `SHOWN — "${res.caption.text}"` : 'hidden'}; every wrapper agrees with its predicate`);
   }
 }
 
@@ -901,22 +1031,29 @@ const ROLES_COMBOS = [
   // RADIAL: layerCount 1 shows regardless of layerPhase (the "nothing above
   // the outermost whorl to fall out of step" arm) — a stale/non-zero
   // layerPhase must not leak through. Per-petal is never eligible here.
-  ['RADIAL', 1, 0, { slot: true, perPetal: false }], ['RADIAL', 1, 1, { slot: true, perPetal: false }],
-  // RADIAL: layerCount >= 2 needs layerPhase exactly 0.
-  ['RADIAL', 3, 0, { slot: true, perPetal: false }],
-  ['RADIAL', 3, 0.5, { slot: false, perPetal: false }],
-  ['RADIAL', 2, 1, { slot: false, perPetal: false }],
-  // SPIRAL: NEITHER axis, INCLUDING away from the layerCount/layerPhase
+  // RADIAL at ONE WHORL: the one-whorl orchid is retired (Eva, Sep 3) — slot
+  // roles NOWHERE at depth 1, phase 0 included, and the ALL-PETALS group is
+  // the group there.
+  ['RADIAL', 1, 0, { slot: false, perPetal: false, all: true }], ['RADIAL', 1, 1, { slot: false, perPetal: false, all: true }],
+  // RADIAL: layerCount >= 2 needs layerPhase exactly 0; the all-petals group
+  // is never eligible above one whorl.
+  ['RADIAL', 2, 0, { slot: true, perPetal: false, all: false }],
+  ['RADIAL', 3, 0, { slot: true, perPetal: false, all: false }],
+  ['RADIAL', 3, 0.5, { slot: false, perPetal: false, all: false }],
+  ['RADIAL', 2, 1, { slot: false, perPetal: false, all: false }],
+  // SPIRAL: NEITHER position axis, INCLUDING away from the layerCount/layerPhase
   // defaults — route (d) only ever tried SPIRAL at layerCount 1, layerPhase 0.
-  ['SPIRAL', 1, 0, { slot: false, perPetal: false }], ['SPIRAL', 3, 0, { slot: false, perPetal: false }],
-  // CONTINUOUS: same claim, same reason.
-  ['CONTINUOUS', 1, 1, { slot: false, perPetal: false }], ['CONTINUOUS', 3, 0, { slot: false, perPetal: false }],
+  ['SPIRAL', 1, 0, { slot: false, perPetal: false, all: true }], ['SPIRAL', 3, 0, { slot: false, perPetal: false, all: false }],
+  // CONTINUOUS: same claim, same reason; one turn is one whorl.
+  ['CONTINUOUS', 1, 1, { slot: false, perPetal: false, all: true }], ['CONTINUOUS', 3, 0, { slot: false, perPetal: false, all: false }],
   // FAN: PER-PETAL at every depth, unconditionally, and slot roles NOWHERE.
-  // `layerPhase` is hidden and irrelevant under FAN, but its stale DOM value
-  // must not leak into either answer — which is why these two rows carry
+  // At one whorl the all-petals group COMPOSES with per-petal ("the group,
+  // then the petal") — the one state where two axes are both eligible, by
+  // design. `layerPhase` is hidden and irrelevant under FAN, but its stale
+  // DOM value must not leak into any answer — which is why these rows carry
   // awkward depths and phases rather than the defaults.
-  ['FAN', 1, 1, { slot: false, perPetal: true }], ['FAN', 3, 0.5, { slot: false, perPetal: true }],
-  ['FAN', 1, 0, { slot: false, perPetal: true }],
+  ['FAN', 1, 1, { slot: false, perPetal: true, all: true }], ['FAN', 3, 0.5, { slot: false, perPetal: true, all: false }],
+  ['FAN', 1, 0, { slot: false, perPetal: true, all: true }],
 ];
 for (const [placement, layerCount, layerPhase, want] of ROLES_COMBOS) {
   await openBloom(page, port);
@@ -928,13 +1065,14 @@ for (const [placement, layerCount, layerPhase, want] of ROLES_COMBOS) {
     const wrapOf = (id) => { const el = document.getElementById(id); return el ? el.closest('.bl-ctrl').hidden : null; };
     const m = window.__bloomMetrics();
     return {
-      slotHidden: wrapOf('labellumSize'), perPetalHidden: wrapOf('petal1Size'),
-      geomSlot: m.slotRolesEligible, geomPerPetal: m.perPetalEligible,
+      slotHidden: wrapOf('labellumSize'), perPetalHidden: wrapOf('petal1Size'), allHidden: wrapOf('allCurl'),
+      geomSlot: m.slotRolesEligible, geomPerPetal: m.perPetalEligible, geomAll: m.allPetalsEligible,
       state: window.__bloomUIState(),
     };
   });
   if (res.slotHidden === null) { note(`${tag}: #labellumSize wrapper missing from the DOM`); continue; }
   if (res.perPetalHidden === null) { note(`${tag}: #petal1Size wrapper missing from the DOM`); continue; }
+  if (res.allHidden === null) { note(`${tag}: #allCurl wrapper missing from the DOM`); continue; }
   const bad2 = [];
   /* THE THREE STATEMENTS OF ONE BOUNDARY, per axis: the DOM (what a visitor
      can reach), the registry predicate (what is declared), and the geometry's
@@ -943,6 +1081,7 @@ for (const [placement, layerCount, layerPhase, want] of ROLES_COMBOS) {
   for (const [axis, ref, domHidden, geom, expect] of [
     ['slot roles', 'slotRolesEligible', res.slotHidden, res.geomSlot, want.slot],
     ['per-petal', 'perPetalEligible', res.perPetalHidden, res.geomPerPetal, want.perPetal],
+    ['all-petals', 'allPetalsEligible', res.allHidden, res.geomAll, want.all],
   ]) {
     const reg = evalPredicate({ ref }, res.state);
     if (domHidden !== !expect) bad2.push(`${axis}: DOM hidden=${domHidden}, expected ${!expect}`);
@@ -955,8 +1094,16 @@ for (const [placement, layerCount, layerPhase, want] of ROLES_COMBOS) {
   if (res.geomSlot && res.geomPerPetal) {
     bad2.push('BOTH position axes report eligible — per-petal supersedes slot roles on the fan, so a bloom has at most one');
   }
+  /* AND THE DEPTH RULE (Eva, Sep 3): slot roles need two or more whorls in
+     step, the all-petals group is the one-whorl group — never both. */
+  if (res.geomSlot && res.geomAll) {
+    bad2.push('slot roles AND the all-petals group report eligible — slot roles need two or more whorls and the all-petals group is the one-whorl group');
+  }
+  if (Boolean(res.geomAll) !== (layerCount === 1)) {
+    bad2.push(`the all-petals group reports ${res.geomAll ? '' : 'not '}eligible at ${layerCount} whorl(s) — it is the one-whorl group and no other depth's`);
+  }
   if (bad2.length) note(`${tag}: ${bad2.join('; ')}`);
-  else ok.push(`${tag}: DOM/registry/geometry agree on both axes — slot=${want.slot}, per-petal=${want.perPetal}`);
+  else ok.push(`${tag}: DOM/registry/geometry agree on all three axes — slot=${want.slot}, per-petal=${want.perPetal}, all-petals=${want.all}`);
 }
 
 /* ---------------- (e) the LOW-COUNT SPIRAL FLAG, both directions ---------- */
@@ -1024,11 +1171,12 @@ if (NEGATIVE_CONTROL) {
     const sawAccordion = fail.some((f) => /^accordion A[23]:/.test(f));
     const sawVisibility = fail.some((f) => /^\[visibility\]/.test(f));
     const sawLabel = fail.some((f) => /^\[label\] .* summary reads/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel) { console.log('\nALL FIVE ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}. All five must.`);
+    const sawDepth = fail.some((f) => /^\[depth\] .*hiddenReason caption is/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth) { console.log('\nALL SIX ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}. All six must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler and a frozen derived label. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label and a frozen caption. It is not measuring anything.');
   process.exit(1);
 }
 

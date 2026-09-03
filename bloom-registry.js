@@ -103,17 +103,29 @@ export const PREDICATES = {
      every control's `hidden` against its own predicate at each state. */
   slotRolesEligible: { all: [
     { id: 'placement', oneOf: ['RADIAL'] },
-    /* layerCount 1 (nothing above the outermost whorl to fall out of step),
-       OR every whorl in phase so all of them share the one plane. `not min 2`
-       is "below 2"; `not awayFrom 0` is "is 0" — the registry's first use of
-       the awayFrom leaf, which has been in the vocabulary unused since day
-       one. The tolerance is half of layerPhase's own 0.01 step, so it admits
+    /* TWO OR MORE WHORLS, ALL IN STEP (Eva's ruling, Sep 3, from the deploy
+       preview — the ONE-WHORL ARM IS GONE and the single-layer orchid with it,
+       with the cost stated to her and accepted; bloom-geometry.js's
+       `slotRolesEligible` carries the full record). At one whorl "Petal
+       roles" is the ALL-PETALS group instead (`allPetalsEligible` below) and
+       Petal 1 / Petal N are hidden AND inert. `not awayFrom 0` is "is 0" —
+       the tolerance is half of layerPhase's own 0.01 step, so it admits
        exactly the reachable value 0 and nothing else. */
-    { any: [
-      { not: { id: 'layerCount', min: 2 } },
-      { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
-    ] },
+    { id: 'layerCount', min: 2 },
+    { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
   ] },
+
+  /* ===================================================================
+     WHERE THE ALL-PETALS GROUP APPLIES — one whorl, every placement (Eva's
+     ruling, Sep 3): "Petal roles is the 'adjust petals as a group' section at
+     every depth; at 2+ layers that group is the inner whorl, at depth 1 it is
+     ALL petals." The three `all*` controls ride on the base sliders in Petal
+     form / Petal shape as deltas, exactly as the `inner*` trio rides on them
+     for the inner whorl, and this predicate is the twin of
+     bloom-geometry.js's `allPetalsEligible()`: the registry HIDES above one
+     whorl, the geometry makes INERT there, and Z5 checks the two agree on
+     every row. `not min 2` is "below 2", i.e. exactly one. */
+  allPetalsEligible: { not: { id: 'layerCount', min: 2 } },
 
   /* ===================================================================
      WHERE PER-PETAL ROLES APPLY — the fan, and only the fan (Eva's ruling 4,
@@ -318,6 +330,39 @@ export function predicateDrivers(pred, out = new Set()) {
    centerStyle). If one ever needs a condition of its own, that is a
    stop-and-raise, not a field to add quietly.
    =================================================================== */
+/* WHY A SECTION IS HIDDEN, SAID IN THE PANEL — `hiddenReason` (Eva, Sep 3).
+   A control or section that disappears for a reason a visitor could undo is a
+   control the visitor cannot find; the panel therefore carries ONE caption
+   where Petal 1 / Petal N would be, exactly while they are hidden for THIS
+   reason: a RADIAL bloom of two or more whorls whose Layer offset is not
+   zero. `when` is a registry predicate like any `visibleWhen` (evaluated by
+   the app and asserted by the panel gate in both directions), `text(ui)` is
+   derived so the hood's petal number is the real one, and the caption reads
+   the Layer offset control's OWN label so a rename cannot leave it naming a
+   slider that no longer exists.
+
+   DECLARED ONCE AND REFERENCED TWICE, on purpose: both groups hide for the
+   same reason and the visitor should read it once. The app renders one
+   caption per DISTINCT reason object inside a parent, so sharing the object
+   is what makes the caption single — two literals with the same text would
+   be two captions, and two owners of one sentence.
+
+   NOT SAID AT ONE WHORL: there Petal 1 / Petal N are retired by ruling rather
+   than hidden behind a slider, and the section holds the all-petals group
+   instead; the caption is for the state a visitor can undo. */
+const SLOT_ROLES_BEHIND_OFFSET = {
+  when: { all: [
+    { id: 'placement', oneOf: ['RADIAL'] },
+    { id: 'layerCount', min: 2 },
+    { id: 'layerPhase', awayFrom: 0, by: 0.005 },
+  ] },
+  text: (ui) => {
+    const offset = CONTROLS.find((c) => c.id === 'layerPhase').label;
+    const last = petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT);
+    return `Petal 1 and Petal ${last} need the whorls in step — set ${offset} to 0.00 to bring them back.`;
+  },
+};
+
 export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
   { id: 'shape', label: 'Petal shape', open: false },
@@ -407,8 +452,8 @@ export const SECTIONS = [
      asserts on every visibility state it drives.
 
      `open: false` ON BOTH — ARRANGEMENT holds the one first-load `open`. */
-  { id: 'labellumGroup', label: 'Petal 1', open: false, parent: 'roles' },
-  { id: 'hoodGroup', open: false, parent: 'roles',
+  { id: 'labellumGroup', label: 'Petal 1', open: false, parent: 'roles', hiddenReason: SLOT_ROLES_BEHIND_OFFSET },
+  { id: 'hoodGroup', open: false, parent: 'roles', hiddenReason: SLOT_ROLES_BEHIND_OFFSET,
     labelFrom: (ui) => `Petal ${petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT)}` },
 
   /* ===================================================================
@@ -512,6 +557,15 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     const hasFrom = typeof s.labelFrom === 'function';
     if (hasLabel === hasFrom) bad.push(`section "${s.id}" must declare exactly one of a literal \`label\` or a \`labelFrom(ui)\` — it declares ${hasLabel && hasFrom ? 'both' : 'neither'}`);
     else if (hasFrom && typeof s.labelFrom(defaultsOf(controls)) !== 'string') bad.push(`section "${s.id}"'s labelFrom(DEFAULTS) did not return a string`);
+    /* A hiddenReason is a predicate plus a derived sentence, on a NESTED
+       section only (the caption renders inside the parent, where the hidden
+       drop-down would be). */
+    if (s.hiddenReason !== undefined) {
+      const r = s.hiddenReason;
+      if (!s.parent) bad.push(`section "${s.id}" declares a hiddenReason but no parent — a caption needs a section to sit in`);
+      if (!r || typeof r !== 'object' || !r.when || typeof r.when !== 'object') bad.push(`section "${s.id}"'s hiddenReason must carry a \`when\` predicate`);
+      if (!r || typeof r.text !== 'function') bad.push(`section "${s.id}"'s hiddenReason must carry a \`text(ui)\` function`);
+    }
   }
   /* THE ACCORDION'S OWN INVARIANT, checked where the literals live. The panel
      opens at most one section at a time, so two `open: true` rows would
@@ -1376,6 +1430,34 @@ export const CONTROLS = [
      range in the direction that reaches its form: curl runs the whole signed
      span so standards can rise while falls hang, cup likewise, and tip
      breadth runs upward only because the base already starts at 0. */
+  /* ===================================================================
+     THE ALL-PETALS GROUP — one whorl's "adjust petals as a group" (Eva's
+     ruling, Sep 3, from the deploy preview; she overruled the session's
+     "nothing to build" after seeing the panel). Three DELTAS riding on the
+     base sliders in Petal form (Spine curl, Cup) and Petal shape (Tip
+     breadth), identity 0, hidden and inert above one whorl where the INNER
+     trio below is the group instead. Same bases, laws and bounds as that trio
+     — see ROLE_OVERRIDES in bloom-geometry.js, where these are the first
+     three rows.
+
+     THE LABELS SAY WHAT THEY ARE AND THE READ-OUTS SAY WHAT THEY RIDE ON, on
+     the same split every label in this panel keeps: "All-petals curl" beside
+     "Inner curl", and a read-out that at identity names the slider that owns
+     the number ("as Petal form sets it") and off identity names the delta and
+     its base ("+50° on Spine curl"). Nothing here claims to BE the curl; the
+     base slider is, and the app's read-out prints what was built. */
+  { id: 'allCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+    label: 'All-petals curl', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${v}° on Spine curl`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
+
+  { id: 'allCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'All-petals cup', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} on Cup`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
+
+  { id: 'allTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
+    label: 'All-petals tip', fmt: (v) => (Number(v) === 0 ? 'as Petal shape sets it' : `+${Number(v).toFixed(2)} on Tip breadth`),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
+
   { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
     tier: 'standard', role: 'petal',

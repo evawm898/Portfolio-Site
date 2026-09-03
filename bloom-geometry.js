@@ -470,6 +470,19 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
    =================================================================== */
 export const ROLE_OUTER = 'OUTER';
 export const ROLE_INNER = 'INNER';
+/* THE WHOLE-WHORL ROLE AT ONE WHORL (Eva's ruling, Sep 3, from the deploy
+   preview): "Petal roles is the 'adjust petals as a group' section at EVERY
+   depth. At 2+ layers that group is the inner whorl; at depth 1 the group is
+   ALL petals." So a single-whorl bloom carries this role on every descriptor
+   and a layered one on none — `allPetalsEligible()` is the one statement of
+   that boundary here, `PREDICATES.allPetalsEligible` its twin in the
+   registry, and Z5 checks the two agree on every row. It composes exactly as
+   INNER does: three DELTA rows in ROLE_OVERRIDES riding on the base sliders
+   in Petal form / Petal shape, identity 0, skipped at identity, clamped once
+   into the base's own range. Nothing owns a number twice — the base slider
+   owns the number and this owns a delta on it, which is the same relation
+   `innerCurl` has had to `petalSpineCurl` since session A. */
+export const ROLE_ALL = 'ALL';
 
 /* ===================================================================
    SESSION B — SLOT ROLES, THE MIRROR PLANE, AND THE ORCHID.
@@ -629,6 +642,14 @@ export const SLOT_ROLE_ORDER = [SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL];
    delta (Eva, Sep 2): spine curl is what makes a lip hang and reflex, and it
    is the one control that can. */
 export const ROLE_OVERRIDES = [
+  /* ALL PETALS AT ONE WHORL — first in the table on purpose. Row order is the
+     composition order (see resolveRoleOverrides), so a petal that is also a
+     labellum or a per-petal group reads base, then the whole-whorl delta,
+     then its own: "the group, then the petal". Same bases, same laws, same
+     bounds as the INNER trio below; only the role differs. */
+  { role: ROLE_ALL, base: 'petalSpineCurl',  control: 'allCurl',       law: 'delta', min: -180, max: 360 },
+  { role: ROLE_ALL, base: 'petalCup',        control: 'allCup',        law: 'delta', min: -0.8, max: 1.2 },
+  { role: ROLE_ALL, base: 'petalTipBreadth', control: 'allTipBreadth', law: 'delta', min: 0,    max: 0.6 },
   /* LAYER ROLES — session A's three, unchanged in law, range and effect. */
   { role: ROLE_INNER, base: 'petalSpineCurl',  control: 'innerCurl',       law: 'delta', min: -180, max: 360 },
   { role: ROLE_INNER, base: 'petalCup',        control: 'innerCup',        law: 'delta', min: -0.8, max: 1.2 },
@@ -1001,8 +1022,43 @@ export function slotRolesEligible(state) {
      "never-true predicate with a reason, over a boolean flag" pattern arriving
      on a pair of never-true code paths.
      =================================================================== */
+  /* ===================================================================
+     THE ONE-WHORL ARM IS GONE TOO — THE SINGLE-LAYER ORCHID IS RETIRED (Eva's
+     ruling, Sep 3, from the deploy preview, WITH THE COST STATED TO HER AND
+     ACCEPTED). Session B built the labellum and hood on the one-whorl rosette
+     and this function admitted it with "nothing above the outermost whorl to
+     fall out of step". Eva ruled that at one whorl "Petal roles" is the
+     ALL-PETALS group (ROLE_ALL, above) and Petal 1 / Petal N are HIDDEN there
+     — and hidden means INERT, so a labellum or hood record must not reach the
+     geometry at one whorl. What survives: the orchid on RADIAL at two or more
+     whorls with Layer offset 0, and the fan's per-petal groups at every
+     depth. What is given up: the one-whorl radial orchid, deliberately.
+
+     RECOVERABLE, NOT RETIRED IN THE `RETIRED_IDS` SENSE: the controls, their
+     ids, laws and gate rows are unchanged and fully live above one whorl.
+     Recovery is this one `>= 2` back to `=== 1 ||` plus the matching arm of
+     the registry's predicate — nothing else was written to depend on it.
+
+     MEASURED, NOT ASSUMED: the change moves exactly the matrix rows with a
+     labellum or hood control engaged at one whorl on RADIAL (33 rows in each
+     of the live matrix, phase8 and phase9; none in any earlier baseline),
+     and every one of them is predicted bit-identical to its no-override
+     counterpart — see the charter's session-11 entry for the measurement.
+     =================================================================== */
   if (state.placement !== 'RADIAL') return false;
-  return Math.round(state.layerCount) === 1 || state.layerPhase === 0;
+  return Math.round(state.layerCount) >= 2 && state.layerPhase === 0;
+}
+
+/* WHERE THE ALL-PETALS GROUP APPLIES — one whorl, every placement. At one
+   whorl "all petals" is well-defined everywhere: the rosette's one ring, the
+   spiral's one sequence, the continuous mode's one turn, the fan's one arc.
+   Above one whorl the group is the INNER whorl (session A's trio) and this
+   returns false, which makes the three `all*` controls INERT there exactly as
+   the registry HIDES them — two statements of one boundary, checked against
+   each other by Z5 on every row rather than trusted. `layerCount` is rounded
+   as everywhere else it is read. */
+export function allPetalsEligible(state) {
+  return Math.round(state.layerCount) === 1;
 }
 
 /* THE SLOT -> ROLE ASSIGNMENT, and it has exactly ONE owner. footRing() calls
@@ -1122,6 +1178,10 @@ export function footRing(state, acc) {
     throw new Error(`unknown placement ${JSON.stringify(state.placement)} — the registry and the builder have diverged`);
   }
   const continuousMode = state.placement === 'CONTINUOUS';
+  /* THE ALL-PETALS ROLE, stamped on every descriptor of a one-whorl bloom and
+     on none of a layered one — decided once here, read by the resolver and
+     reported to the read-out and the gates, exactly as `role` is. */
+  const allRole = allPetalsEligible(state) ? ROLE_ALL : null;
   /* ===================================================================
      THE FAN'S OWN DERIVED QUANTITIES, owned HERE (session 10) — the step, the
      span, the notch and whether the arc limit bit. They live in footRing()
@@ -1381,7 +1441,7 @@ export function footRing(state, acc) {
       const roleCount = 1;
       sumSq += roleCount * rFoot * rFoot;
       preRoleSumSq += rFoot * rFoot;
-      raw.push({ lambda, scale, authoredWidth, width, rFoot, roleCount, role: roleForLayer(k, true), slotRole: null, petalRole: null, slots: null, clamped: [] });
+      raw.push({ lambda, scale, authoredWidth, width, rFoot, roleCount, role: roleForLayer(k, true), allRole, slotRole: null, petalRole: null, slots: null, clamped: [] });
     }
   } else {
   for (let L = 0; L < layerCount; L++) {
@@ -1399,7 +1459,7 @@ export function footRing(state, acc) {
          expression read it. */
       const roleCount = slotCount;
       sumSq += roleCount * rFoot * rFoot;
-      raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: layerRole, slotRole: null, petalRole: null, slots: null, clamped: [] });
+      raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: layerRole, allRole, slotRole: null, petalRole: null, slots: null, clamped: [] });
     } else {
       /* THE SPLIT ARM — one descriptor per (layer x slot role), in
          SLOT_ROLE_ORDER. The sum stays GROUPED BY ROLE and is never regrouped
@@ -1408,7 +1468,7 @@ export function footRing(state, acc) {
       for (const g of positionGroups) {
         const roleCount = g.slots.length;
         sumSq += roleCount * rFoot * rFoot;
-        raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: layerRole, slotRole: g.slotRole, petalRole: g.petalRole, slots: g.slots, clamped: [] });
+        raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: layerRole, allRole, slotRole: g.slotRole, petalRole: g.petalRole, slots: g.slots, clamped: [] });
       }
     }
   }
@@ -1522,6 +1582,9 @@ export function footRing(state, acc) {
          position axes are mutually exclusive by placement (Eva's ruling 4),
          and Z9 asserts that rather than trusting it. */
       petalRole: p.petalRole,
+      /* THE ALL-PETALS STAMP TRAVELS WITH THE OTHER ROLES — the probe that
+         found it missing here is why Z1 reads it back from the metrics. */
+      allRole: p.allRole,
       slots: p.slots,
       /* THE RESOLVED OVERRIDE RECORD, or null. Null on every descriptor whose
          roles carry no non-identity control — every OUTER-and-unsplit ring,
@@ -1535,7 +1598,7 @@ export function footRing(state, acc) {
          Per-petal rows sit last, so per-petal has the last word, and the
          composed value is clamped ONCE at the end into the base's own
          range. */
-      overrides: resolveRoleOverrides(state, [p.role, p.slotRole, p.petalRole].filter((r) => r !== null), p.clamped),
+      overrides: resolveRoleOverrides(state, [p.role, p.allRole, p.slotRole, p.petalRole].filter((r) => r !== null), p.clamped),
       /* TELEMETRY ONLY — which composed values the envelope clamp bit, for
          the read-out and for the gates. Nothing geometric reads it. */
       overrideClamped: p.clamped,
@@ -1688,6 +1751,7 @@ export function footRing(state, acc) {
        exactly as its slot-role twin is. Two statements of one boundary is a
        registration risk; checking them is what makes it one owner. */
     perPetalEligible: !continuousMode && perPetalEligible(state),
+    allPetalsEligible: allRole !== null,
     /* WHETHER A WHORL ACTUALLY SPLIT. One flag for both axes, because the
        question it answers — "is the area rule summing the whole whorl or a
        partition of it" — is the same question whichever axis did it, and it
@@ -2708,7 +2772,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        beside `slotRole` for the same reason it is: Z2 compares the builder's
        own answer against footRing()'s, and a descriptor looked up under the
        wrong axis would otherwise be indistinguishable from a correct one. */
-    petalRole: ring.petalRole,
+    petalRole: ring.petalRole, allRole: ring.allRole ?? null,
     slotIndex: slot.index,
     /* WHERE THIS PETAL SITS AROUND THE AXIS, from the slot payload the whorl
        primitive produced. Reported for the same reason `tangent` is: a shot

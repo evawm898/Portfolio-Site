@@ -108,6 +108,16 @@ body {
 /* The parent's own last child keeps the same breathing room a control gets. */
 .bl-sec > .bl-sec--sub:last-child { margin-bottom: 10px; }
 
+/* WHY A DROP-DOWN IS MISSING — the registry's `hiddenReason` caption (Eva,
+   Sep 3), rendered where the hidden drop-downs would be. It is a sentence, not
+   a control, so it takes the dim ink and the sub-section's indent and rule and
+   nothing that could read as a slider row. */
+.bl-why {
+  margin: 0 0 10px 2px; padding: 4px 0 4px 10px;
+  border-left: 1px solid color-mix(in srgb, var(--bl-accent) 22%, transparent);
+  font-size: 10.5px; line-height: 1.45; color: var(--bl-dim); letter-spacing: .02em;
+}
+
 .bl-ctrl { margin-bottom: 12px; }
 .bl-ctrl label {
   display: flex; justify-content: space-between; align-items: baseline;
