@@ -598,6 +598,81 @@ a {
   border-bottom-color: var(--ink);
 }
 
+/* ---------------------------------------------------
+   Section label + plain-language summary + verbatim-source toggle --
+   built for a patent's Abstract section (plain-English paraphrase up
+   front, the original legal text collapsed behind it) but written as
+   general-purpose, reusable classes rather than patent-specific ones,
+   since the same "paraphrase, then the verbatim source" shape shows up
+   anywhere a section quotes primary-source text.
+--------------------------------------------------- */
+
+.project__section-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  margin-bottom: 0.75rem;
+}
+
+.project__summary {
+  color: var(--ink);
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--petrol);
+}
+
+.source-toggle {
+  border-top: 1px solid var(--line);
+  padding-top: 1.25rem;
+}
+
+.source-toggle summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  transition: color 0.15s ease;
+}
+
+.source-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.source-toggle summary:hover,
+.source-toggle[open] summary {
+  color: var(--ink);
+}
+
+.source-toggle summary .source-toggle__marker {
+  color: var(--petrol-bright);
+  font-size: 14px;
+}
+
+.source-toggle summary .source-toggle__marker::before {
+  content: "+";
+}
+
+.source-toggle[open] summary .source-toggle__marker::before {
+  content: "\2212";
+}
+
+.source-toggle__body {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  background: var(--black-raised);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-dim);
+}
+
 .project__nav {
   padding: 3rem 6vw 5rem;
   border-bottom: 1px solid var(--line);
