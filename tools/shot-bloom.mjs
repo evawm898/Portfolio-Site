@@ -54,7 +54,7 @@
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, CONTROLS, DEFAULTS } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, CONTROLS, DEFAULTS, modeTag } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -115,7 +115,7 @@ async function cell({ label, set, zoom }) {
   }
   const caption = `ring ${m.ringRadius.toFixed(2)} mm (derived ${m.derivedRadius.toFixed(2)}) · tris (live) ${m.liveTris.toLocaleString('en-US')}`
     + (m.centerTris ? ` (+${m.centerTris.toLocaleString('en-US')} centre)` : '')
-    + ` · max dim (live) ${m.maxDimMm.toFixed(1)} mm`;
+    + ` · max dim (live) ${m.maxDimMm.toFixed(1)} mm · ${modeTag(m)}`;
   console.log(`  ${label.padEnd(34)} ${caption}`);
   return { label, caption, ...shots };
 }

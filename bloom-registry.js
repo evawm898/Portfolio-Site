@@ -1276,9 +1276,12 @@ export const CONTROLS = [
                    exactly like smaller-petals-inward, which layerSize already
                    gives. Recorded as an alternative, not built.
        radius      R0 * layerSize^L, owned by footRing().
-     Max is MAX_LAYERS, asserted equal to it by the harness. The binding
-     constraint is the PETAL, not triangles — 3 layers x 40 petals is 10% of
-     the export budget; it is the blade shrinking that stops at three. */
+     Max is MAX_LAYERS, asserted equal to it by the harness. SIX since Sep 3
+     (Eva's ruling, from a measurement: the ring-versus-foot-floor formula
+     that was expected to cap depth does not hold, because the area rule
+     makes ring0 grow with depth; see MAX_LAYERS's own note for why six). No
+     derived clamp — the read-out's INNER RINGS line says where a ring falls
+     under a foot instead. */
   /* "DEPTH", NOT "LAYERS" (Eva, Sep 1). The control is the same axis in both
      placements — how far the arrangement goes inward — and it is measured in
      layers under one and in turns under the other, so a label naming ONE of
@@ -1288,7 +1291,7 @@ export const CONTROLS = [
      shows the derived step). The id does not move: `layerCount` is what the
      quantity IS in both readings, nothing persists a design yet, and an id is
      the expensive half of a rename — see RETIRED_IDS. */
-  { id: 'layerCount', section: 'arrangement', kind: 'slider', min: 1, max: 3, step: 1, default: 1,
+  { id: 'layerCount', section: 'arrangement', kind: 'slider', min: 1, max: 6, step: 1, default: 1,
     label: 'Depth', fmt: (v, ui) => `${v} ${perDepth(ui)}${Number(v) === 1 ? '' : 's'}`,
     tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [] } },

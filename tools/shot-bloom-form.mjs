@@ -68,7 +68,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, applyCapability,
-         formAssertions, FORM_SCOPE, junctionAssertions, CONTROLS, DEFAULTS, CAPABILITY_CLEFT } from './bloom-harness.mjs';
+         formAssertions, FORM_SCOPE, junctionAssertions, CONTROLS, DEFAULTS, CAPABILITY_CLEFT, modeTag } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -147,7 +147,7 @@ async function cell({ label, set = [], capability = null, views = ['petal'], not
       + ` · emitted/flat width ${f.polylineMin.toFixed(4)}..${f.polylineMax.toFixed(4)}`
       + (f.rollDeg !== 0 ? ` · roll radius ${f.rollRadiusMm.toFixed(2)} mm${f.rollClamped ? ' (CLAMPED)' : ''}` : '')
     : `flat — no form law built (the guard short-circuited); guard residual ${m.petalGuardResidual}`;
-  const caption = `${formCaption(want)}<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm<br>${nums}`
+  const caption = `${formCaption(want)}<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm · ${modeTag(m)}<br>${nums}`
     + (note ? `<br>${note}` : '');
   console.log(`  ${label.padEnd(46)} ${formCaption(want)} · tris(live) ${m.liveTris} · maxdim ${m.maxDimMm.toFixed(1)}`);
   return { label, caption, ...shots };

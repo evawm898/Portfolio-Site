@@ -31,6 +31,10 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase11  `phase11Matrix()` — the 402 rows frozen at 174cc2f, the commit
+                that shipped the crowding instrument. THE NEWEST baseline and
+                the first to carry the mum as a named row; the like-for-like
+                baseline for the print-preview toggle and the depth raise.
      --phase7   `phase7Matrix()` — the 205 rows frozen at f626828, the commit
                 that shipped the override architecture and per-layer roles.
                 The strongest baseline: the only one carrying session A's
@@ -196,7 +200,7 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase10] --root <dir> --out <file.json>
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase11] --root <dir> --out <file.json>
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
@@ -208,7 +212,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -312,6 +316,7 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 const FROZEN = {
   phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
   phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix, phase9: phase9Matrix, phase10: phase10Matrix,
+  phase11: phase11Matrix,
 };
 const PHASE_NAMES = Object.keys(FROZEN);
 

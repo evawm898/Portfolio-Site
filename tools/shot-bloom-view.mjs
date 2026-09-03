@@ -44,7 +44,7 @@
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, modeTag } from './bloom-harness.mjs';
 import { VIEW_PRESETS } from '../bloom-view-presets.js';
 
 const outDir = process.argv[2] || '/tmp/bloom-view';
@@ -89,7 +89,7 @@ for (const [value, label] of PRESETS) {
   await pickPreset(value);
   const file = path.join(outDir, `preset-${value}.png`);
   await shot(file);
-  cells.push({ label, file: path.basename(file) });
+  cells.push({ label: `${label} · ${modeTag(await page.evaluate(() => window.__bloomMetrics()))}`, file: path.basename(file) });
 }
 
 /* Proof, not assertion: cycling every preset must not have moved a single

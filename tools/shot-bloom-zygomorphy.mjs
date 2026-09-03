@@ -54,7 +54,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
          junctionAssertions, zygoAssertions, ZYGO_SCOPE, CONTROLS, DEFAULTS,
-         ROLE_OVERRIDES, ROLE_INNER, LAW_IDENTITY } from './bloom-harness.mjs';
+         ROLE_OVERRIDES, ROLE_INNER, LAW_IDENTITY, modeTag } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -158,7 +158,7 @@ async function cell({ label, set = [], views = ['face', 'profile'], note = '' })
     + ` · tilt ${want.petalTilt}° +${want.layerTilt}°/layer · shrink ${Number(want.layerSize).toFixed(2)}x`
     + `<br>outer → inner: ${diffs.length ? `<b>${diffs.join(' · ')}</b>` : (gatedInert ? '<b>IDENTICAL — deltas at MAXIMUM and gated off</b>' : 'IDENTICAL (the control)')}`
     + `<br>rings (live) ${m.rings.map((r) => `${r.radius.toFixed(1)}`).join(' / ')} mm · hub ${m.hubRadius.toFixed(1)} mm`
-    + ` · tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`
+    + ` · tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm · ${modeTag(m)}`
     + (note ? `<br>${note}` : '');
   console.log(`  ${label.padEnd(52)} ${isDiff ? 'DIFFERENTIATED' : (gatedInert ? 'GATED+INERT   ' : 'control       ')} ${diffs.join(', ') || '—'} · tris(live) ${m.liveTris}`);
   return { label, caption, ...shots };

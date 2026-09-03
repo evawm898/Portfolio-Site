@@ -78,7 +78,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
          junctionAssertions, JUNCTION_SCOPE, CONTROLS, DEFAULTS, SPIRAL_LEGIBLE_COUNT,
-         GOLDEN_ANGLE, FOOT_MIN_WIDTH_MM } from './bloom-harness.mjs';
+         GOLDEN_ANGLE, FOOT_MIN_WIDTH_MM, modeTag } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -188,7 +188,7 @@ async function cell({ label, set = [], views = ['whorl'], note = '' }) {
   /* Every number carries its MODE. `tris` is LIVE here and says so. */
   const caption = `${isCont ? `${seq} petals (${n}/turn)` : `${n} petals`} · ${String(want.placement).toLowerCase()} · ${layers} ${unit}${layers > 1 ? 's' : ''}`
     + (layers > 1 ? ` · shrink ${Number(want.layerSize).toFixed(2)}x/${unit}${isCont ? '' : ` · offset ${Number(want.layerPhase).toFixed(2)} slot`} · tilt +${want.layerTilt}°/${unit}` : '')
-    + `<br>rings (live) ${ringSpan} · hub ${m.hubRadius.toFixed(1)} mm · tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`
+    + `<br>rings (live) ${ringSpan} · hub ${m.hubRadius.toFixed(1)} mm · tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm · ${modeTag(m)}`
     + (floored ? `<br><b>${floored} of ${m.rings.length} feet at the ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm width floor</b>` : '')
     + `<br>gap max/min ${ratio.toFixed(2)}${flagShown ? ' · <b>FLAGGED: sequence below ' + SPIRAL_LEGIBLE_COUNT + '</b>' : ''}`
     + (note ? `<br>${note}` : '');

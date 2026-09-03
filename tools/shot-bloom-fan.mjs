@@ -46,7 +46,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { decodePNG } from './pngdec.mjs';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
-         junctionAssertions, zygoAssertions, JUNCTION_SCOPE, DEFAULTS, mirrorPartner } from './bloom-harness.mjs';
+         junctionAssertions, zygoAssertions, JUNCTION_SCOPE, DEFAULTS, mirrorPartner, modeTag } from './bloom-harness.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-fan';
 const { server, port } = await serveRepo();
@@ -187,7 +187,7 @@ async function cell({ label, set = [], note = '', expectFan = true }) {
     shots[view] = path.basename(file);
   }
   console.log(`  ${label.padEnd(50)} petals=${m.slotCount} ${arc}${roleLine ? '  ' + roleLine : ''}`);
-  return { label, note, shots, arc, roleLine, petals: m.slotCount, liveTris: m.liveTris, mirror: m.mirror, isFan: Boolean(m.fan) };
+  return { label, note, shots, arc, roleLine, petals: m.slotCount, liveTris: m.liveTris, mirror: m.mirror, isFan: Boolean(m.fan), mode: modeTag(m) };
 }
 
 fs.mkdirSync(outDir, { recursive: true });
@@ -259,7 +259,7 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
    control cell carries no line, which is also what its caption says. */
 const fig = (c, view) => `<figure><div class="frame${view === 'face' && c.isFan ? ' mirror' : ''}"><img src="${c.shots[view]}"></div>`
   + `<figcaption><b>${esc(c.label)}</b>${view === 'profile' ? ' <i>(profile)</i>' : ''}<br>`
-  + `<small>${esc(c.arc)} · ${c.petals} petals · ${esc(c.roleLine || 'no slot roles engaged')} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live)</small>`
+  + `<small>${esc(c.arc)} · ${c.petals} petals · ${esc(c.roleLine || 'no slot roles engaged')} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live) · ${esc(c.mode)}</small>`
   + `<p>${esc(c.note)}</p></figcaption></figure>`;
 const html = `<title>The fan — a symmetric arc across one axis</title>
 <style>body{background:#0c0f0e;color:#dfe9e3;font:14px/1.5 system-ui,sans-serif;margin:24px}

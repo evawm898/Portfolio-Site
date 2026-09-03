@@ -106,12 +106,45 @@
            perfect, and freezes a derived section label so the panel stops
            renaming a drop-down whose petal number moved, and freezes the
            hiddenReason caption so the panel stops saying why two drop-downs
-           are missing — and requires this run to FAIL on all six.
-           A check nobody has seen fail is a hope.
+           are missing — and replaces the print-preview box with a
+           listener-less clone so the viewport never switches geometry, and
+           freezes the read-out on the depth rows so the RINGS NARROWER THAN
+           A FOOT line can never appear — and requires this run to FAIL on
+           all eight. A check nobody has seen fail is a hope.
+
+     (i) THE PRINT-PREVIEW TOGGLE (Sep 3). View chrome, not a registry
+         control, so route (a)'s census would fail it as a stray input if it
+         ever landed inside the panel — that is asserted. Then the box is
+         flipped through its real 'change' event on a configuration where
+         the export floor BINDS (ALL THIN), and the app must switch
+         geometry: a rebuild counted, `shownMode` reading export, `liveTris`
+         null (never the export count under a live label), the hub radius
+         equal to footRing()'s own export-mode answer and different from
+         its live one, the read-out's first line naming PRINT PREVIEW and
+         the print-truth pair's marker on the PRINTED line — with the whole
+         registry state unmoved. Then the load-bearing claim: the STL
+         exported with the box ON is BYTE-IDENTICAL to the one exported
+         with it OFF, on the same page. Then OFF restores live. Measured on
+         two mutants before this existed: an export path that read view
+         chrome was invisible to every shipped instrument in the gates' own
+         state (8/8 rows byte-identical), which is why this route exists.
+
+     (j) THE INNER-RING LINE, BOTH DIRECTIONS (Sep 3). Where a derived depth
+         clamp was proposed and rejected, the read-out SAYS which rings are
+         narrower than one foot. Present iff footRing()'s own
+         `underFootFloor` is set on some ring — asserted on rows where it
+         must appear (six layers at spread min; a shipped depth-3 row that
+         was already under the floor) and rows where it must not (the
+         defaults; six layers at spread max), from the app's metrics rather
+         than from the row's own expectation alone, so a frozen flag in the
+         owner and a stuck line in the read-out both fire.
    =================================================================== */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
          RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
-         SPIRAL_LEGIBLE_COUNT, MAX_FAN_GROUPS } from './bloom-harness.mjs';
+         SPIRAL_LEGIBLE_COUNT, MAX_FAN_GROUPS, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM } from './bloom-harness.mjs';
 import { sectionLabel } from '../bloom-registry.js';
 import { mirrorPartner } from '../bloom-geometry.js';
 
@@ -1152,6 +1185,103 @@ for (const [placement, count, depth] of [
   }
 }
 
+/* ---------------- (i) THE PRINT-PREVIEW TOGGLE ---------------- */
+{
+  const tag = '[preview]';
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-panel-preview-'));
+  const THIN = [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }];
+  await openBloom(page, port);
+  const where = await page.evaluate(() => {
+    const el = document.getElementById('printPreview');
+    return { present: !!el, inPanel: !!(el && el.closest('#panelControls')), inView: !!(el && el.closest('.bl-viewpanel')), checked: el ? el.checked : null };
+  });
+  if (!where.present) note(`${tag}: no #printPreview box in the page`);
+  else {
+    if (where.inPanel || !where.inView) note(`${tag}: the box is ${where.inPanel ? 'inside #panelControls' : 'outside the VIEW box'} — it is view chrome and belongs beside Auto-rotate, not among the registry's controls`);
+    if (where.checked !== false) note(`${tag}: the box is checked at first load — the page must open on LIVE geometry`);
+    const bad = await applyConfig(page, THIN);
+    if (bad.length) note(`${tag}: ALL THIN did not take: ${bad.join('; ')}`);
+    const before = await page.evaluate(() => { const m = window.__bloomMetrics(); return { shownMode: m.shownMode, liveTris: m.liveTris, shownTris: m.shownTris, hub: m.hubRadius, builds: window.__bloomBuildState().count, first: document.getElementById('readout').textContent.split('\n')[0] }; });
+    const offBuf = await exportStl(page, tmp);
+    const owner = await page.evaluate(async () => {
+      const mod = await import('/bloom-geometry.js');
+      const ui = window.__bloomUIState();
+      return { liveHub: mod.footRing(ui, new mod.MeshBuilder({ exportMode: false })).hub.radius, exportHub: mod.footRing(ui, new mod.MeshBuilder({ exportMode: true })).hub.radius };
+    });
+    await page.evaluate(({ breakIt }) => {
+      let el = document.getElementById('printPreview');
+      if (breakIt) {
+        /* NEGATIVE CONTROL, route (i): the box is declared, renders, and
+           nothing listens — the declarations-right / app-doesn't-react
+           defect, pointed at view chrome. */
+        const clone = el.cloneNode(true); el.replaceWith(clone); el = clone;
+      }
+      el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, { breakIt: NEGATIVE_CONTROL });
+    await settleBuild(page);
+    await page.waitForTimeout(80);
+    const on = await page.evaluate(() => { const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; return { shownMode: m.shownMode, liveTris: m.liveTris, shownTris: m.shownTris, hub: m.hubRadius, builds: window.__bloomBuildState().count, first: txt.split('\n')[0], printedMarked: /PRINTED \(export floor [0-9.]+ mm\): .*← on screen/.test(txt), liveMarked: /← live, on screen/.test(txt) }; });
+    const onBuf = await exportStl(page, tmp);
+    const drift = await fullStateDrift(page, THIN);
+    await page.evaluate(() => { const el = document.getElementById('printPreview'); el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await settleBuild(page);
+    await page.waitForTimeout(80);
+    const off = await page.evaluate(() => { const m = window.__bloomMetrics(); return { shownMode: m.shownMode, liveTris: m.liveTris, hub: m.hubRadius, first: document.getElementById('readout').textContent.split('\n')[0] }; });
+    const problems = [];
+    if (!(on.builds > before.builds)) problems.push(`flipping the box did not rebuild (build count ${before.builds} -> ${on.builds})`);
+    if (on.shownMode !== 'export') problems.push(`shownMode reads "${on.shownMode}" with the box ON, expected "export"`);
+    if (on.liveTris !== null) problems.push(`liveTris reads ${on.liveTris} with the preview ON — an export-mode count under a live label; it must be null`);
+    if (on.hub !== owner.exportHub) problems.push(`hub radius ${on.hub} with the preview ON is not footRing()'s export answer ${owner.exportHub}`);
+    if (owner.exportHub === owner.liveHub) problems.push(`the floor does not bind on this row (live and export hub both ${owner.liveHub}) — the route is measuring nothing`);
+    if (!/PRINT PREVIEW/.test(on.first)) problems.push(`the read-out's first line with the box ON reads "${on.first}" and does not name PRINT PREVIEW`);
+    if (!on.printedMarked) problems.push('the PRINTED line does not carry the "← on screen" marker with the box ON');
+    if (on.liveMarked) problems.push('the live line still says "on screen" with the box ON');
+    if (drift.length) problems.push(`registry state moved with the box: ${drift.join('; ')}`);
+    if (!offBuf || !onBuf) problems.push('an export did not download');
+    else if (!offBuf.equals(onBuf)) problems.push(`the STL exported with the box ON differs from the one with it OFF (${onBuf.length} vs ${offBuf.length} bytes) — the toggle reached the export path`);
+    if (off.shownMode !== 'live') problems.push(`shownMode reads "${off.shownMode}" after turning the box OFF, expected "live"`);
+    if (off.hub !== owner.liveHub) problems.push(`hub radius ${off.hub} after OFF is not footRing()'s live answer ${owner.liveHub}`);
+    if (typeof off.liveTris !== 'number') problems.push(`liveTris reads ${off.liveTris} after OFF`);
+    if (!/LIVE/.test(off.first)) problems.push(`the read-out's first line after OFF reads "${off.first}" and does not name LIVE`);
+    if (problems.length) note(`${tag}: ${problems.join('; ')}`);
+    else ok.push(`${tag}: the box sits in the VIEW box, unchecked at load; ON on ALL THIN rebuilt (${before.builds} -> ${on.builds}), shownMode export, liveTris null, hub ${before.hub.toFixed(3)} -> ${on.hub.toFixed(3)} mm (= footRing's export answer), read-out "${on.first.slice(0, 40)}…", PRINTED line marked, 0 registry controls moved, STL ON == STL OFF byte for byte (${onBuf.length} bytes); OFF restored live (hub ${off.hub.toFixed(3)} mm)`);
+  }
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+/* ---------------- (j) THE INNER-RING LINE, BOTH DIRECTIONS ---------------- */
+for (const [label, sets, want] of [
+  ['defaults (no ring under a foot)', [], false],
+  ['6 layers x spread min (rings 4–5 under the floor, feet across the axis)', [{ id: 'layerCount', value: '6' }, { id: 'spread', value: '0.6' }], true],
+  ['ALL THIN x spread min x 3 layers (a shipped row already under the floor before the raise)', [{ id: 'layerCount', value: '3' }, { id: 'spread', value: '0.6' }, { id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }], true],
+  ['6 layers x spread max (deep, and wide enough that no ring is under a foot)', [{ id: 'layerCount', value: '6' }, { id: 'spread', value: '6' }], false],
+]) {
+  const tag = `[inner rings] ${label}`;
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    /* NEGATIVE CONTROL, route (j): the read-out never changes again — the
+       line cannot appear where it must, and where it must not appear the
+       row still reads clean, which is why the rows are checked in BOTH
+       directions and the control is seen to fire on the present ones. */
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {}, configurable: true }); });
+  }
+  const bad = await applyConfig(page, sets);
+  if (bad.length) { note(`${tag}: config did not take: ${bad.join('; ')}`); continue; }
+  const res = await page.evaluate(() => {
+    const m = window.__bloomMetrics();
+    return { anyUnder: m.rings.some((r) => r.underFootFloor === true), anyCross: m.rings.some((r) => r.crossesAxis === true),
+             shown: /RINGS NARROWER THAN A FOOT/.test(document.getElementById('readout').textContent),
+             crossSaid: /they cross the axis/.test(document.getElementById('readout').textContent),
+             inner: Math.min(...m.rings.map((r) => r.radius)) };
+  });
+  const problems = [];
+  if (res.anyUnder !== want) problems.push(`footRing() reports ${res.anyUnder ? 'a ring' : 'no ring'} under the ${FOOT_MIN_WIDTH_MM} mm foot floor (innermost ${res.inner.toFixed(3)} mm), this row expects ${want ? 'one' : 'none'} — the owner's flag disagrees with the measured state`);
+  if (res.shown !== res.anyUnder) problems.push(`the RINGS NARROWER THAN A FOOT line is ${res.shown ? 'SHOWN' : 'ABSENT'} while the owner reports ${res.anyUnder ? 'a ring under the floor' : 'none'}`);
+  if (res.crossSaid !== res.anyCross) problems.push(`the axis-crossing clause is ${res.crossSaid ? 'shown' : 'absent'} while the owner reports ${res.anyCross ? 'a ring inside its overhang' : 'none'}`);
+  if (problems.length) note(`${tag}: ${problems.join('; ')}`);
+  else ok.push(`${tag}: line ${res.shown ? 'shown' : 'absent'}, owner agrees (innermost ring ${res.inner.toFixed(3)} mm${res.anyCross ? ', feet cross the axis' : ''})`);
+}
+
 await browser.close();
 server.close();
 
@@ -1172,11 +1302,13 @@ if (NEGATIVE_CONTROL) {
     const sawVisibility = fail.some((f) => /^\[visibility\]/.test(f));
     const sawLabel = fail.some((f) => /^\[label\] .* summary reads/.test(f));
     const sawDepth = fail.some((f) => /^\[depth\] .*hiddenReason caption is/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth) { console.log('\nALL SIX ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}. All six must.`);
+    const sawPreview = fail.some((f) => /^\[preview\]: .*did not rebuild/.test(f));
+    const sawInner = fail.some((f) => /^\[inner rings\] .*line is ABSENT while the owner reports a ring under the floor/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner) { console.log('\nALL EIGHT ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}. All eight must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label and a frozen caption. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box and a frozen read-out. It is not measuring anything.');
   process.exit(1);
 }
 
