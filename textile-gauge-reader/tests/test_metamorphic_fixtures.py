@@ -173,6 +173,12 @@ def test_classifier_boundaries():
     assert _classify(15.6, 30.0, tol)[0] == "harmonic_flip"  # ratio 0.52
     assert _classify(55.5, 30.0, tol)[0] == "harmonic_flip"  # ratio 1.85
     assert _classify(34.5, 30.0, tol)[0] == "drift"          # +15%, not near 0.5x/2x
+    # Beyond 2.5x / below 0.4x the reading is a different structure, not a
+    # drifted one: "lost", exactly as when detection returns nothing.
+    assert _classify(76.0, 30.0, tol)[0] == "lost"           # ratio 2.53
+    assert _classify(11.7, 30.0, tol)[0] == "lost"           # ratio 0.39
+    assert _classify(69.0, 30.0, tol)[0] == "drift"          # ratio 2.30: above the 2x flip band, below lost
+    assert _classify(12.6, 30.0, tol)[0] == "drift"          # ratio 0.42: below the 0.5x flip band, above lost
 
 
 def test_half_roi_skips_below_five_periods():
