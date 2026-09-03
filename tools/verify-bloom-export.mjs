@@ -49,6 +49,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
@@ -123,6 +124,16 @@ for (const row of rows) {
      live build never floors, so no live metric can answer this. */
   const flr = await exportFloorAssertion(page);
   if (flr.length) { validity.push(`${row.label}: ${flr.join('; ')}`); continue; }
+  const stl = analyzeStl(buf);
+  /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the one thing
+     here that can see OVER-connection: 120 feet fused into one mass at the
+     base add no boundary edge and split no flood fill, so every other
+     measure in this file is green on it. Read from footRing()'s own
+     export-mode rings in the page and registered against THIS row's STL
+     header (R1); its five validity assertions are hard, the CROWDED mark is
+     not. See bloom-crowding.mjs for what it is blind to. */
+  const crowd = await footCrowding(page, row, stl);
+  if (crowd.bad.length) { validity.push(`${row.label}: ${crowd.bad.join('; ')}`); continue; }
   const fm = await page.evaluate(() => window.__bloomMetrics());
   results.push({
     label: row.label, capability: !!row.capability, bytes: buf.length,
@@ -153,7 +164,8 @@ for (const row of rows) {
         + `${fm.petalForm.rollClamped ? ' (CLAMPED)' : ''}`
         + ` · |dP/dv|/h ${fm.petalForm.metricMin.toFixed(4)}..${fm.petalForm.metricMax.toFixed(4)}`
       : null,
-    ...analyzeStl(buf),
+    crowding: crowd.r,
+    ...stl,
   });
 }
 await browser.close();
@@ -171,12 +183,19 @@ for (const r of results) {
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
+  console.log(`       ^ ${crowdingLine(r.crowding)}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
 console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
+const crowdedRows = results.filter((r) => r.crowding.crowded);
+console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
+/* THE FLAG IN BOTH DIRECTIONS, at matrix level: a matrix on which the flag
+   never raises has never shown the flag works, and one on which it always
+   raises has a stuck flag. Validity, not a row result. */
+if (!NEGATIVE_CONTROL) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
 
 let bad = false;
 if (validity.length) {
