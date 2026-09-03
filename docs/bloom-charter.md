@@ -2870,4 +2870,7 @@ exposure the ruling accepts in exchange for the minutes.
           **1,113 px worst case** (Petal 3 open at eight per side), because at one whorl the
           all-petals trio sits under the nine drop-downs — the ruling's "at every depth" means
           every one-whorl placement, the fan included, and that is the honest cost of it on the
-          tallest panel there is.
+          tallest panel there is. **The short labels Eva then ruled took 39 px of that back**:
+          "All curl / All cup / All tip" put "Petal roles" at one whorl at 505 px (from 544)
+          and the worst case at **1,074 px** (from 1,113), re-rendered and re-gated before the
+          merge — her reason for the ruling, measured.
