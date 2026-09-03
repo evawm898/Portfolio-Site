@@ -2252,6 +2252,8 @@ exposure the ruling accepts in exchange for the minutes.
     - **AFTER THE FAN, THE STANDING BOARD (Eva, Sep 2):** edge treatments, infill, per-petal
       sliders in the flower's fan UI pattern, and Eva's own presets. Recorded as direction,
       not as queued work; each needs its own ruling and its own evidence.
+      **PER-PETAL SLIDERS CAME OFF THIS BOARD ON Sep 3 — see the session 11 entry below.
+      Edge treatments, infill and Eva's own presets remain on it, unchanged.**
 
 - ~~Session 11 — per-petal sliders for the fan~~ **BUILT Sep 3. Every petal in the fan
   gets its own control group, the mirror-line petal is petal one, and per-petal roles
@@ -2486,3 +2488,78 @@ exposure the ruling accepts in exchange for the minutes.
       default already taught this matrix once. Keeping their SETS is the point: they are now
       the strongest inertness rows in the matrix, since every one drives controls that used to
       move geometry.
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **376/376** watertight, 0 degenerate, identical
+      live and export triangle counts, 1,087 s. Connectedness **376/376 one connected piece**,
+      828 s in CI. Panel gate PASS on all four routes, with `--negative-control` making all
+      four observe their own failure. `--verify-frozen` PASS on all nine frozen matrices,
+      phase9 included, in CI on every push.
+
+      **THE CLOSE IS AN EXACT PARTITION, NOT 0-MOVED — because this is a ruled behaviour
+      change, and the prediction was written down before the run.** phase9 (287 rows) on both
+      trees:
+
+      | partition | rows | predicted | measured |
+      |---|---|---|---|
+      | non-FAN, and FAN without slot-role controls | 278 | bit-identical | **278, 0 moved** |
+      | FAN **with** slot-role controls engaged | 9 | all move | **9, all 9 moved** |
+      | legacy + phase2..phase8 | 1,049 | cannot select FAN at all | **verified, 0 FAN rows** |
+
+      **"phase8 and earlier predate the fan" WAS VERIFIED RATHER THAN ASSUMED**, as the
+      ruling's own instruction required: every baseline before phase9 carries ZERO rows that
+      select FAN, and phase9 carries 41, of which exactly 9 engage a slot-role control. So the
+      whole historical suite IS the non-FAN partition and this change cannot reach it.
+
+      **AND EVERY MOVED ROW LANDS ON ITS NO-OVERRIDE COUNTERPART, which is the stronger
+      claim.** Seven of the nine are bit-identical to a plain fan row already in phase9; the
+      other two had no counterpart in the matrix at all, so it was BUILT FRESH — a 1/side
+      toggle-OFF fan with the ORCHID sets, with ALL SLOT MAX, and with nothing set export the
+      same sha. **None of the nine were equal before**; the ruling is what made them so.
+
+    - **THE FIRST FULL GATE RUN FAILED SEVEN ROWS, AND BOTH BUGS WERE IN THE NEW ASSERTIONS.**
+      This is session A's "Z1's first draft failed the shipped tree on 5 of 7 rows" and session
+      10's "six of eight probe rows fired on the SHIPPED tree", for the third time, and it is
+      the entire argument for running a control before trusting an assertion.
+        * **Z9 ASSERTED THE WRONG PROPERTY.** It said `hoodEmpty` is NEVER TRUE. It is not: the
+          predicate is a statement about STATE — a fan, toggle off, one per side — and that
+          state is the two-petal corner the whole junction analysis turned on. What the ruling
+          makes unreachable is its EFFECT. It now asserts the inertness itself: every control
+          mentioning the term must be visible exactly when slot roles are eligible, so removing
+          the term would change no outcome. That cannot be satisfied vacuously.
+        * **Z5 DID NOT ACCOUNT FOR EMPTY GROUPS.** `petal7Cup` at its maximum with one per side
+          is a control off its identity whose ROLE HAS NO MEMBERS — nothing resolves, no whorl
+          splits, and that is correct. `wantSplit` counts only roles the census says are
+          peopled. The GATED row for exactly that state is what failed the draft.
+        * **NEITHER FIX WEAKENED ANYTHING, and that was checked rather than assumed**: PP1, PP4
+          and PP6 were re-run against the corrected assertions and all three still fire. PP4's
+          witness SHARPENED to Z1 alone — its old Z5 firing was the bug.
+
+    - **AND CI FOUND A THIRD STALE EXPECTATION, IN THE PANEL GATE'S OWN TABLE.** Its
+      `ROLES_COMBOS` route declared FAN eligible for slot roles at every depth. On the first
+      push the DOM, the registry predicate AND the geometry all agreed on `false` and only the
+      table disagreed — the nine-matrix-rows defect, a third time, in a third file. It was not
+      merely flipped: each combo now declares BOTH axes, each is checked in all three of its
+      statements, and the route asserts that never both report eligible — so the supersession
+      is a measurement on states `buildMatrix()` does not cover rather than a sentence here.
+
+    - **THE PANEL GATE GAINED THE PRECONDITION MECHANISM SESSION A PREDICTED IT WOULD NEED.**
+      Session A warned that "a witness that has to set up its own precondition before it can
+      move anything is a witness that can quietly measure nothing", expecting a section that
+      ships with every control hidden; the `layerPhase` ruling spared session B. Per-petal
+      roles are FAN-only and the shipping placement is RADIAL, so all nine sections ship BOTH
+      collapsed and HIDDEN and this is the case that arrived. `pre` is applied through the same
+      real-events path, the `before` metrics are read AFTER it so the delta belongs to the
+      witness, and **the gate refuses a witness whose control is still hidden once the
+      precondition has run** — which is what stops the mechanism becoming the thing session A
+      warned about.
+
+    - **A SHEET HAD BEEN CARRYING THREE CAPTIONS THAT STOPPED MATCHING THEIR CELLS, and it was
+      found by reading the tool's own OUTPUT rather than by looking at the pictures.**
+      `tools/shot-bloom-fan.mjs`'s three "toggle OFF" cells INHERITED `fanCenterPetal` rather
+      than pinning it, so from the moment Eva moved that default to ON (Sep 2) they rendered a
+      seven-petal toggle-ON fan under captions describing a six-petal through-the-gap one, and
+      "fewest x widest" showed THREE petals under a caption about the two-petal empty-hood
+      corner. **The MATRIX was corrected for exactly this at the time and the SHEET was not**;
+      nothing reported it because every cell still rendered and every assertion still passed.
+      The `Spacing 60` caption expired the same day for the same reason. All four fixed.
+      **A cell that NAMES a state must SET it — the rule now exists in both places.**
