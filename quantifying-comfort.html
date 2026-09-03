@@ -34,6 +34,8 @@
   .qc-sim__ctl input[type="range"]:focus-visible { outline: none; }
   .qc-sim__ctl input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--petrol-bright); }
   .qc-sim__svg { display: block; width: 100%; height: auto; font-family: var(--mono); }
+  .qc-sim__canvas { display: block; width: 100%; aspect-ratio: 5 / 2; cursor: pointer; outline: none; }
+  .qc-sim__canvas:focus-visible { box-shadow: inset 0 0 0 1px var(--petrol-bright); }
   .qc-svg-k { font-size: 9px; letter-spacing: 0.14em; fill: var(--ink-faint); text-anchor: middle; }
   .qc-svg-v { font-size: 12px; fill: var(--ink); text-anchor: middle; }
   .qc-sim__cap { padding: 0.75rem 1.25rem 1rem; font-size: 11px; line-height: 1.6; color: var(--ink-dim); border-top: 1px solid var(--line); }
@@ -167,7 +169,65 @@
         <p>The instrument is the <strong>sweating guarded hotplate</strong>, which everyone in the room called the <strong>skin model</strong>. A metal plate held at skin temperature, 35&nbsp;&deg;C, fed with water from underneath so it can &ldquo;sweat,&rdquo; with guard heaters round the edge so heat only leaves through the top. You lay the fabric on it, run conditioned air across at a fixed speed, and measure how much power the plate needs to hold its temperature. The method is <strong>ISO 11092</strong>.</p>
         <p><strong>Rct, thermal resistance, in m&sup2;&middot;K/W.</strong> Dry plate. How hard is it for heat to get through the fabric? Higher Rct is warmer. This is the number behind insulation claims and, with a conversion, behind the clo and tog values on the label.</p>
         <p>Before the second number, a word I had to look up properly afterwards. <strong>Diffusion</strong> is the net movement of anything from where there is more of it to where there is less, driven by nothing but the random motion of the molecules themselves. No pump, no fan. Water vapor next to sweating skin is dense; the air a few millimetres out is dry; so vapor moves outward on its own, and a fabric either gets out of its way or does not.</p>
-        <!-- B: diffusion canvas goes here -->
+        <figure class="qc-sim" id="qcDiff" aria-labelledby="qcDiffCap">
+          <canvas class="qc-sim__canvas" id="qcDiffC" role="img" aria-label="Two hundred particles start dense on the left and sparse on the right, and random motion alone spreads them evenly. Click to reset."></canvas>
+          <figcaption class="qc-sim__cap" id="qcDiffCap">Left <span id="qcDiffL">170</span> &middot; right <span id="qcDiffR">30</span>. Nothing pushes them; each one just wanders. Click to reset.</figcaption>
+        </figure>
+        <script>
+        (() => {
+          // Diffusion as it actually happens: 200 walkers, no force, no flow.
+          // Dense on the left, sparse on the right, and the counts even out
+          // because more of them happen to wander right than left.
+          const c = document.getElementById('qcDiffC'), ctx = c.getContext('2d');
+          const outL = document.getElementById('qcDiffL'), outR = document.getElementById('qcDiffR');
+          const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const N = 200, P = new Float32Array(N * 2);
+          let w = 0, h = 0, visible = true, running = false;
+          function fit() {
+            const r = c.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+            w = Math.round(r.width); h = Math.round(r.height);
+            if (c.width !== w * d || c.height !== h * d) { c.width = w * d; c.height = h * d; }
+            ctx.setTransform(d, 0, 0, d, 0, 0);
+          }
+          function seed(even) {
+            fit();
+            for (let i = 0; i < N; i++) {
+              const left = even ? i % 2 === 0 : i < 170;             // 170 : 30, or a flat spread for the static end state
+              P[2 * i] = even ? Math.random() * w : left ? Math.random() * w * 0.3 : w * 0.3 + Math.random() * w * 0.7;
+              P[2 * i + 1] = Math.random() * h;
+            }
+          }
+          function step() {
+            const s = w / 50;                                            // step scales with the canvas: ~15 s to even out at any width
+            for (let k = 0; k < 5; k++) for (let i = 0; i < N; i++) {
+              let x = P[2 * i] + (Math.random() - 0.5) * 2 * s, y = P[2 * i + 1] + (Math.random() - 0.5) * 2 * s;
+              if (x < 2) x = 4 - x; else if (x > w - 2) x = 2 * (w - 2) - x;   // walls reflect
+              if (y < 2) y = 4 - y; else if (y > h - 2) y = 2 * (h - 2) - y;
+              P[2 * i] = x; P[2 * i + 1] = y;
+            }
+          }
+          function draw() {
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = 'rgba(139,148,148,0.35)'; ctx.setLineDash([3, 4]);
+            ctx.beginPath(); ctx.moveTo(w / 2 + 0.5, 0); ctx.lineTo(w / 2 + 0.5, h); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = '#2fa3a3';
+            let l = 0;
+            for (let i = 0; i < N; i++) {
+              const x = P[2 * i], y = P[2 * i + 1]; if (x < w / 2) l++;
+              ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
+            }
+            outL.textContent = l; outR.textContent = N - l;
+          }
+          function loop() { if (!running) return; if (visible) { fit(); step(); draw(); } requestAnimationFrame(loop); }
+          function start() { seed(still); draw(); if (still) return; running = true; requestAnimationFrame(loop); }
+          c.addEventListener('click', () => { running = false; start(); });
+          c.addEventListener('keydown', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); running = false; start(); } });
+          c.tabIndex = 0;
+          if ('IntersectionObserver' in window) new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(c);
+          window.addEventListener('resize', () => { fit(); draw(); });
+          start();
+        })();
+        </script>
         <p><strong>Ret, water vapor resistance, in m&sup2;&middot;Pa/W.</strong> Wet plate. The plate sweats, the vapor has to cross the fabric, and the plate&rsquo;s power draw tells you how much evaporation the fabric is allowing. Lower Ret is more breathable. This is the number that breathability claims should be quoting, and often are not.</p>
         <p>Hohenstein adds three of its own, because Rct and Ret describe vapor and heat at steady state and a real body does neither:</p>
         <ul class="project__list">
