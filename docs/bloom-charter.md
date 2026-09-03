@@ -2987,7 +2987,7 @@ exposure the ruling accepts in exchange for the minutes.
       the plane, so beneath it is the one place the roots are unoccluded. The picture is the
       LIVE render and the caption is the EXPORT number, stated on every cell.
 
-    - **THE GATES: §GATES§.** Byte identity is A PRIORI here — no geometry file is touched,
+    - **THE GATES: in CI on the head that wired them, the export gate **402/402 watertight**, 402/402 identical live and export triangle counts, 0 degenerate, and the connectedness gate **402/402 ONE piece** — with **8 of 402 rows FLAGGED CROWDED in each**, the mum row among them (it exports 149,568 triangles, boundary 0, one component: over-connection, exactly as claimed), and 394 unflagged, so the flag is exercised in both directions; the live matrix's D_max histogram on the shipped tree peaks at 2 (171 of 287 rows before the matrix grew) with 22 at 1, 60 at 3, and a tail from 4 to 32 at the ALL THIN × spread min corners where feet cross the axis.** Byte identity is A PRIORI here — no geometry file is touched,
       so the export handler builds the same bytes — and it was measured anyway on the
       charter's retention ruling (newest baseline on both trees plus the live partition, not
       the whole suite; the brief said "every frozen baseline" and was corrected to the
