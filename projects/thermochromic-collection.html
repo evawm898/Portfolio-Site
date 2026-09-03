@@ -12,6 +12,38 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles.css">
+<style>
+  /* Process footage: two portrait phone clips side by side, click-to-play.
+     Same per-page figure pattern as skirt.html (.skirt-figure). */
+  .thermo-figure {
+    margin: 1.75rem 0 0;
+  }
+  .thermo-figure__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .thermo-figure video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 9 / 16;
+    background: var(--black-raised);
+    border: 1px solid var(--line-strong);
+  }
+  .thermo-figure__caption {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-dim);
+    margin: 0.75rem 0 0;
+    line-height: 1.6;
+  }
+  @media (max-width: 480px) {
+    .thermo-figure__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
 </head>
 <body id="top">
 
@@ -81,6 +113,23 @@
           <li><strong>Technology Integration:</strong> This phase involved carefully embedding the heating elements and configuring a microcontroller to ensure the thermochromic pigments responded accurately to temperature changes.</li>
           <li><strong>Prototyping and Testing:</strong> Through multiple iterations, the garments were refined to achieve the desired balance of visual impact and user comfort, ensuring reliable performance during wear.</li>
         </ul>
+        <figure class="thermo-figure">
+          <div class="thermo-figure__grid">
+            <video controls muted playsinline loop preload="metadata"
+                   poster="../assets/thermochromic/laser-cut-squares-poster.jpg"
+                   aria-label="Laser cutter tracing a grid of square tiles into violet thermochromic TPU film">
+              <source src="../assets/thermochromic/laser-cut-squares.webm" type="video/webm">
+              <source src="../assets/thermochromic/laser-cut-squares.mp4" type="video/mp4">
+            </video>
+            <video controls muted playsinline loop preload="metadata"
+                   poster="../assets/thermochromic/laser-cut-rings-poster.jpg"
+                   aria-label="Laser cutter tracing a cluster of ring tiles into teal thermochromic TPU film">
+              <source src="../assets/thermochromic/laser-cut-rings.webm" type="video/webm">
+              <source src="../assets/thermochromic/laser-cut-rings.mp4" type="video/mp4">
+            </video>
+          </div>
+          <figcaption class="thermo-figure__caption">Laser-cutting the pigment-coated TPU film into tile patterns, March 2018 &mdash; squares in the violet film, rings in the teal. Both clips are silent.</figcaption>
+        </figure>
       </div>
     </section>
 
