@@ -153,7 +153,14 @@ const asSet = (o) => Object.entries(o).map(([id, value]) => ({ id, value: String
 const FAN_ON = { placement: 'FAN', fanCenterPetal: 'ON' };
 const FAN_OFF = { placement: 'FAN', fanCenterPetal: 'OFF' };
 const P1 = { petal1Size: 1.6, petal1Tilt: -25, petal1Cup: 0.5, petal1Curl: -60 };
-const LAB = { labellumSize: 1.6, labellumTilt: -25, labellumCup: 0.5, labellumCurl: -60 };
+/* THE BEFORE SET CARRIES `labellumTipBreadth` AND THE PER-PETAL SET CANNOT,
+   which is the whole point of the pair. Every other value here has an exact
+   per-petal counterpart (P1 above uses the identical four), so without the
+   tip-breadth row the BEFORE cell and the PETAL 1 cell would be the same
+   picture — true, and useful, but it would show the ruling costing NOTHING.
+   The tip breadth is the one capability the supersession actually removes, so
+   it is the one thing the pair should differ by. */
+const LAB = { labellumSize: 1.6, labellumTilt: -25, labellumCup: 0.5, labellumCurl: -60, labellumTipBreadth: 0.5 };
 const ORCHID = { labellumSize: 1.6, labellumTilt: -25, labellumCup: 0.5, labellumCurl: -60, labellumTipBreadth: 0.25, hoodSize: 1.15, hoodTilt: 40, hoodCup: -0.3 };
 
 const cells = [];
@@ -192,7 +199,7 @@ if (HAVE_BASE) {
   cells.push(await cell({ label: 'BEFORE — the same fan shaped by labellum*, on the base tree', set: asSet({ ...FAN_ON, ...LAB }), onBase: true, assertSelf: false,
     note: 'THIS IS THE ONLY CELL ON THIS SHEET NOT BUILT BY THE CODE UNDER REVIEW. It is rendered from a git worktree of this branch’s base commit, where `labellum*` still applied to a fan, and it is here because Eva asked for the superseded behaviour to be photographed rather than only recorded. Its assertions are NOT run — that tree predates Z7, Z8 and Z9, so running them would report an absence as a failure. Read it against the cell beside it.' }));
   cells.push(await cell({ label: 'AFTER — the identical sliders, on this tree', set: asSet({ ...FAN_ON, ...LAB }),
-    note: 'THE SAME FOUR LABELLUM SLIDERS AT THE SAME VALUES, on the shipped tree: the fan is UNDIFFERENTIATED, because per-petal roles supersede slot roles here and those controls are hidden and inert. Measured rather than described — this export is BIT-IDENTICAL to the fan with no overrides at all (sha c9c686d9 on both). What the ruling costs is visible in the pair: the shape in the BEFORE cell is reachable again through petal 1 (four cells up), with one exception — the per-petal set ships without a TIP BREADTH row, so `labellumTipBreadth` has no per-petal counterpart and that one capability is gone from the fan until a row is added to two tables. Stated at both ends, and this is the picture of it.' }));
+    note: 'THE SAME FIVE LABELLUM SLIDERS AT THE SAME VALUES, on the shipped tree: the fan is UNDIFFERENTIATED, because per-petal roles supersede slot roles here and those controls are hidden and inert. Measured rather than described — this export is BIT-IDENTICAL to the fan with no overrides at all (sha c9c686d9 on both). What the ruling costs is visible in the pair: the shape in the BEFORE cell is reachable again through petal 1 (four cells up), with ONE EXCEPTION, and the pair is built so you can see exactly what it is: four of the five sliders have exact per-petal counterparts (petal 1 four cells up uses the identical values), so the ONLY difference between the BEFORE cell and that one is the broadened TIP. The per-petal set ships without a tip-breadth row, so `labellumTipBreadth` has no counterpart and that one capability is gone from the fan until a row is added to two tables. Stated at both ends, and this is the picture of it.' }));
 } else {
   console.error(`NOTE: no base tree at ${BASE_ROOT} — the BEFORE/AFTER pair is omitted. Create it with: git worktree add ${BASE_ROOT} <base sha>`);
 }

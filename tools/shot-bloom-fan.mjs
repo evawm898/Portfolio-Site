@@ -192,6 +192,22 @@ async function cell({ label, set = [], note = '', expectFan = true }) {
 
 fs.mkdirSync(outDir, { recursive: true });
 const asSet = (o) => Object.entries(o).map(([id, value]) => ({ id, value: String(value) }));
+/* A CELL THAT NAMES A STATE MUST SET IT — and three cells here did not,
+   found by session 11 reading this tool's own OUTPUT rather than by looking
+   at the pictures. `fanCenterPetal` defaulted to OFF when this sheet was
+   written and Eva moved it to ON on Sep 2; the three cells whose LABELS say
+   'toggle OFF' INHERITED it, so from that day they rendered a seven-petal
+   toggle-ON fan under a caption describing a six-petal through-the-gap one,
+   and 'fewest x widest' showed THREE petals under a caption about the
+   two-petal empty-hood corner. The MATRIX was corrected for exactly this at
+   the time (FAN_ON / FAN_OFF beside the inheriting FAN) and the SHEET was
+   not — nothing reported it, because every cell still rendered and every
+   assertion still passed. The `Spacing 60` caption expired the same day for
+   the same reason: with a mirror-line petal the outermost petal sits three
+   steps out rather than 2.5, so the arc limit now bites where the caption
+   said it did not. Both are fixed; the history is kept because a caption
+   that outlives its cell is this project's most repeated defect and this is
+   the second place it has now been found. */
 const FAN = { placement: 'FAN' };
 /* THE PER-PETAL SET THE TWO DIFFERENTIATED CELLS DRIVE. It is the old LAB set
    with `labellumTipBreadth` DROPPED, because the per-petal control set ships
@@ -203,7 +219,7 @@ const cells = [];
 cells.push(await cell({ label: 'CONTROL — a radial bloom, unmoved', set: [], expectFan: false,
   note: 'The reference every other cell is read against, and the fourth placement\'s own regression test in a picture: RADIAL, SPIRAL and CONTINUOUS are unmoved by this change — a sheet is where an eye catches what a number would otherwise have to be asked for. THE BYTE RESULT IS NOT RESTATED HERE ON PURPOSE: the frozen matrices are its one owner (tools/diff-bloom-bytes.mjs --compare), and a caption carrying a row total would be a second copy of a measurement this tool does not make — which is how a figure ends up outliving the run that produced it. Eight petals, an even 45° step, no mirror line to draw because a radially symmetric bloom does not have one it prefers.' }));
 
-cells.push(await cell({ label: 'THE FAN — toggle OFF, the line runs through the gap', set: asSet(FAN),
+cells.push(await cell({ label: 'THE FAN — toggle OFF, the line runs through the gap', set: asSet({ ...FAN, fanCenterPetal: 'OFF' }),
   note: 'THE SHIPPING DEFAULT, and half the headline pair. Three petals each side, 45° apart, no petal on the line — so the mirror runs through the GAP between the two inner petals and the pairing is i <-> n-1-i, which has NO fixed point. Every GROUP is therefore a PAIR: petal 1 is the inner pair (slots 0 and 5), petal 2 the middle pair (1 and 4), petal 3 the outer pair (2 and 3) — three groups rather than four, because there is no mirror-line petal to be petal one on its own. This is the involution session B derived while correcting session A\'s SPIRAL premise, a session before anyone knew what it was for.' }));
 
 cells.push(await cell({ label: 'THE FAN — toggle ON, a petal on the line', set: asSet({ ...FAN, fanCenterPetal: 'ON' }),
@@ -214,7 +230,7 @@ cells.push(await cell({ label: 'Spacing 15° — the fan closed', set: asSet({ .
 cells.push(await cell({ label: 'Spacing 30°', set: asSet({ ...FAN, fanSpacing: '30' }),
   note: 'The middle of the sweep.' }));
 cells.push(await cell({ label: 'Spacing 60° — the fan open', set: asSet({ ...FAN, fanSpacing: '60' }),
-  note: 'The widest the slider goes at three per side: a 300° arc with a 60° notch. The arc limit does not bite here — it needs more petals per side before it does (see the last cell).' }));
+  note: 'The widest the slider goes at three per side — and the arc limit ALREADY BITES. With a mirror-line petal the outermost petal sits three full steps out, so the 170° limit caps the step at 56.67° against the 60° asked for and the read-out says so. A 340° arc with a 20° notch. Under the pre-Sep-2 default, with no mirror-line petal, the outermost petal sat 2.5 steps out and 60° was reachable uncapped — this caption said exactly that until the default moved underneath it, which is why a cell that NAMES a state must SET it.' }));
 
 /* ===================================================================
    THESE TWO CELLS CHANGED AXIS, NOT SUBJECT (session 11). They used to drive
@@ -228,10 +244,10 @@ cells.push(await cell({ label: 'Spacing 60° — the fan open', set: asSet({ ...
    renders the identical config on the base tree beside this one. */
 cells.push(await cell({ label: 'FAN x PETAL 1 — toggle ON, one big lip below', set: asSet({ ...FAN, fanCenterPetal: 'ON', ...P1 }),
   note: 'PETAL ONE IS THE MIRROR-LINE PETAL, which is Eva\'s founding fan principle stated as a control group. Larger, tipped toward horizontal, cupped and curled forward — and every other group is untouched. Identical arrangement and identical triangle count to the fan two cells up; the only difference is which state each slot was built from. Until session 11 this cell drove `labellumSize` and friends; per-petal roles SUPERSEDE slot roles on the fan now, so the same petal is reached through a slider that says which petal it is.' }));
-cells.push(await cell({ label: 'FAN x PETAL 1 — toggle OFF, the INNER PAIR', set: asSet({ ...FAN, ...P1 }),
+cells.push(await cell({ label: 'FAN x PETAL 1 — toggle OFF, the INNER PAIR', set: asSet({ ...FAN, fanCenterPetal: 'OFF', ...P1 }),
   note: 'THE SAME SLIDERS ON THE OTHER INVOLUTION, and the cell that shows what the numbering ruling actually costs: with no petal on the line there is no fixed point, so petal 1 is TWO petals — the pair straddling the mirror. One control drives both and the area rule multiplies that group by 2 rather than by 1. It also means the group COUNT drops by one and every pair shifts up a number: what is petal 2 in the cell above is petal 1 here. Ruled deliberately (Eva, ruling 3, Sep 3) so that petal one is always the group nearest the line.' }));
 
-cells.push(await cell({ label: 'Fewest x widest — 1 per side, 60°, toggle OFF', set: asSet({ ...FAN, fanPerSide: '1', fanSpacing: '60' }),
+cells.push(await cell({ label: 'Fewest x widest — 1 per side, 60°, toggle OFF', set: asSet({ ...FAN, fanCenterPetal: 'OFF', fanPerSide: '1', fanSpacing: '60' }),
   note: 'THE CORNER THE CONNECTEDNESS ARGUMENT HAD TO SURVIVE, and the state that produced this session\'s one design ruling. Two petals, which under the through-gap pairing is a SINGLE mirror orbit — so the whole bloom is petal 1, and groups 2 through 9 have no members at all. Their sliders HIDE, and the gate asserts in both directions that a group\'s controls are visible if and only if the group has members. That clause was written for session 10\'s empty HOOD at this very corner; per-petal roles inherited it unchanged and it now polices the numbering itself, which is the strongest thing a generalised assertion can turn out to do.' }));
 
 cells.push(await cell({ label: 'The arc limit — 8 per side, 60°, toggle ON', set: asSet({ ...FAN, fanCenterPetal: 'ON', fanPerSide: '8', fanSpacing: '60' }),
