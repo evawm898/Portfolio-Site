@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Color Change — Field Notes — Eva Maskalenko</title>
+<meta name="description" content="Field Notes: Color Change — seven colour-change mechanisms animated at the material or cellular level, grouped by principle: pigment moving, pigment changing chemically, structure changing. Apply heat, voltage or UV and watch why the colour changes.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="color-change.css">
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link is-active">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="field-notes.html" class="project-header__back">&larr; Field Notes</a>
+  <div class="project-header__index">No. 07 / 07</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag">
+      <span class="project__year">Field Notes</span>
+      <span>Interactive</span>
+    </div>
+    <h1 class="project__title">Color Change</h1>
+    <p class="project__lede">Seven ways a material or an animal changes colour, each animated at the level where the change actually happens. Apply heat, voltage or UV, fire a nerve, stretch a lattice, and watch why the colour moves &mdash; not just that it does.</p>
+  </div>
+
+  <nav class="cc__index" aria-label="The three principles">
+    <a href="#principle-1"><span class="cc__index-num">01</span><span class="cc__index-title">Pigment moving</span><span class="cc__index-desc">The colourant is unchanged; it is carried to where you can see it, or spread out, or hidden.</span></a>
+    <a href="#principle-2"><span class="cc__index-num">02</span><span class="cc__index-title">Pigment changing chemically</span><span class="cc__index-desc">A molecule is switched between two forms that absorb light differently.</span></a>
+    <a href="#principle-3"><span class="cc__index-num">03</span><span class="cc__index-title">Structure changing</span><span class="cc__index-desc">There is no colourant at all; a nanoscale spacing selects which wavelength reflects.</span></a>
+  </nav>
+
+  <section class="cc__principle" id="principle-1">
+    <div class="cc__principle-head">
+      <h2 class="cc__principle-title"><span>01</span>Pigment moving</h2>
+      <p class="cc__principle-lede">Nothing about the pigment changes. What changes is where it is: driven across a capsule by a field, or pulled into a disc by muscle. The colour was always there; the mechanism decides whether you see it.</p>
+    </div>
+    
+    <article class="cc__mech" id="mech-ephoretic">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">1.1</span>
+          <h3 class="cc__mech-title">Electrophoretic ink</h3>
+          <span class="cc__mech-sub">e-paper · pigment moving</span>
+        </div>
+        <canvas class="cc__canvas" id="cv-ephoretic" aria-label="Electrophoretic ink: animated cross-section"></canvas>
+        <div class="cc__controls"><span class="cc__controls-label">Apply a voltage pulse</span><button type="button" class="cc__btn" data-pulse="1">Top electrode &minus;V &middot; white up</button><button type="button" class="cc__btn" data-pulse="-1">Top electrode +V &middot; black up</button></div>
+      </div>
+      <div class="cc__text">
+        <p>Each microcapsule holds a clear fluid and two pigments that carry opposite charges: <strong>white titanium dioxide, positive</strong>, and <strong>black carbon, negative</strong>. A voltage across the capsule is a field through the fluid, and the pigments migrate along it. Whichever pigment reaches the transparent top is the colour you see; the other is hidden behind it.</p><p>The point of the mechanism is what happens when the field is removed: nothing. The particles stay where they were driven, held by the fluid&rsquo;s viscosity, so the pixel keeps its image with no power at all. That bistability is why e-readers last weeks on a charge and why the display cannot refresh quickly &mdash; every change is a physical migration.</p>
+        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="ephoretic:state"></dd></div><div><dt>Pixel</dt><dd data-ro="ephoretic:pixel"></dd></div><div><dt>Field</dt><dd data-ro="ephoretic:field"></dd></div></dl>
+      </div>
+    </article>
+    <article class="cc__mech" id="mech-chromatophore">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">1.2</span>
+          <h3 class="cc__mech-title">Cephalopod chromatophores</h3>
+          <span class="cc__mech-sub">octopus, squid, cuttlefish · pigment moving</span>
+        </div>
+        <canvas class="cc__canvas" id="cv-chromatophore" aria-label="Cephalopod chromatophores: animated cross-section"></canvas>
+        <div class="cc__controls"><span class="cc__controls-label">Fire the motor neurons</span><button type="button" class="cc__btn" data-hold="chromatophore">Hold to contract</button></div>
+      </div>
+      <div class="cc__text">
+        <p>A chromatophore is a tiny elastic sac of pigment with a ring of <strong>radial muscle fibres</strong> attached to its rim. Firing the nerve contracts the muscles, and they pull the sac out into a flat disc many times its resting diameter. The same pigment, spread thin over a wide area, is now what the skin shows. Cut the signal and the sac&rsquo;s own elasticity snaps it back to a dot.</p><p>Nothing about the pigment changes; only its area does. Because muscle is fast, the whole patch can switch in tens of milliseconds, and because each cell has its own nerve, the animal paints patterns rather than flat colours. Beneath the pigment cells sit reflective iridophores, which show through whenever the sacs are retracted.</p>
+        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="chromatophore:state"></dd></div><div><dt>Coverage</dt><dd data-ro="chromatophore:coverage"></dd></div><div><dt>Switch time</dt><dd data-ro="chromatophore:time"></dd></div></dl>
+      </div>
+    </article>
+  </section>
+  <section class="cc__principle" id="principle-2">
+    <div class="cc__principle-head">
+      <h2 class="cc__principle-title"><span>02</span>Pigment changing chemically</h2>
+      <p class="cc__principle-lede">A molecule with two stable forms, one coloured and one not, and a stimulus that pushes it from one to the other: heat unbinding a dye from its developer, ions turning an oxide into a bronze, a photon breaking one bond. The reverse reaction sets how the colour comes back.</p>
+    </div>
+    
+    <article class="cc__mech" id="mech-thermo">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">2.1</span>
+          <h3 class="cc__mech-title">Thermochromic leuco dye</h3>
+          <span class="cc__mech-sub">colour-change inks and textiles · chemistry changing</span>
+        </div>
+        <canvas class="cc__canvas" id="cv-thermo" aria-label="Thermochromic leuco dye: animated cross-section"></canvas>
+        <div class="cc__controls"><span class="cc__controls-label">Apply heat</span><button type="button" class="cc__btn" data-hold="thermo">Hold to heat</button></div>
+      </div>
+      <div class="cc__text">
+        <p>A thermochromic microcapsule holds three things: a <strong>leuco dye</strong>, a weak-acid <strong>developer</strong>, and a waxy <strong>solvent</strong> with a sharp melting point. Below that point the solvent is solid and the dye and developer sit bonded together. The developer donates a proton, the dye&rsquo;s ring opens, and the open form absorbs light: the fabric is coloured.</p><p>Warm the capsule past the melt and the solvent turns liquid. Dye and developer dissolve apart, the ring closes, and the closed form is colourless. Cool it and the solvent re-solidifies a few degrees lower than it melted, forcing the pairs back together &mdash; that lag is the hysteresis you can see in the thermometer. The threshold is set entirely by the solvent, which is why the same dye can be made to switch at 15&nbsp;&deg;C or 45&nbsp;&deg;C.</p>
+        <dl class="cc__ro"><div><dt>Temperature</dt><dd data-ro="thermo:T"></dd></div><div><dt>Solvent</dt><dd data-ro="thermo:solvent"></dd></div><div><dt>Dye</dt><dd data-ro="thermo:dye"></dd></div></dl>
+      </div>
+    </article>
+    <article class="cc__mech" id="mech-echromic">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">2.2</span>
+          <h3 class="cc__mech-title">Electrochromic tungsten oxide</h3>
+          <span class="cc__mech-sub">smart windows, dimmable visors · chemistry changing</span>
+        </div>
+        <canvas class="cc__canvas" id="cv-echromic" aria-label="Electrochromic tungsten oxide: animated cross-section"></canvas>
+        <div class="cc__controls"><span class="cc__controls-label">Apply a voltage</span><button type="button" class="cc__btn" data-echromic="color" aria-pressed="false">Colour (&minus;V)</button><button type="button" class="cc__btn" data-echromic="bleach" aria-pressed="false">Bleach (+V)</button><button type="button" class="cc__btn is-active" data-echromic="off" aria-pressed="true">Open circuit</button></div>
+      </div>
+      <div class="cc__text">
+        <p>An electrochromic stack is a thin-film battery whose charging is visible. Between two transparent conductors sit a layer of <strong>tungsten oxide</strong>, an electrolyte carrying <strong>lithium ions</strong>, and a counter electrode. Apply a small voltage and ions move into the tungsten oxide while electrons arrive through the external circuit; together they convert it to a tungsten bronze, Li<sub>x</sub>WO<sub>3</sub>, which absorbs across the visible and turns deep blue.</p><p>Reverse the voltage and the ions leave, bleaching it. Open the circuit and the film simply holds its state, because there is no path for the ions to return &mdash; a window stays tinted for hours on no power. It is slow, seconds to minutes for a large pane, because every ion has to physically diffuse into the solid.</p>
+        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="echromic:state"></dd></div><div><dt>Transmission</dt><dd data-ro="echromic:transmission"></dd></div><div><dt>Composition</dt><dd data-ro="echromic:x"></dd></div></dl>
+      </div>
+    </article>
+    <article class="cc__mech" id="mech-photo">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">2.3</span>
+          <h3 class="cc__mech-title">Photochromic spiropyran</h3>
+          <span class="cc__mech-sub">self-darkening lenses · chemistry changing</span>
+        </div>
+        <canvas class="cc__canvas" id="cv-photo" aria-label="Photochromic spiropyran: animated cross-section"></canvas>
+        <div class="cc__controls"><span class="cc__controls-label">Apply UV</span><button type="button" class="cc__btn" data-hold="photo">Hold for UV</button></div>
+      </div>
+      <div class="cc__text">
+        <p>A spiropyran molecule is two ring systems joined at a single carbon and held at right angles, so their electrons cannot communicate and the molecule is colourless. A UV photon has enough energy to <strong>break the carbon&ndash;oxygen bond</strong> at that junction. Freed, the two halves rotate flat into one planar, conjugated chain, the merocyanine, which absorbs visible light strongly.</p><p>Nothing holds it there. Thermal energy alone re-forms the bond, so in the dark the population drifts back to the closed form over seconds. That asymmetry is the whole experience of a photochromic lens: it darkens in a second or two in sunlight and takes noticeably longer to clear indoors, and it cannot darken behind a windscreen that filters UV.</p>
+        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="photo:state"></dd></div><div><dt>Converted</dt><dd data-ro="photo:converted"></dd></div><div><dt>Form</dt><dd data-ro="photo:form"></dd></div></dl>
+      </div>
+    </article>
+  </section>
+  <section class="cc__principle" id="principle-3">
+    <div class="cc__principle-head">
+      <h2 class="cc__principle-title"><span>03</span>Structure changing</h2>
+      <p class="cc__principle-lede">No colourant at all. A regular nanostructure reflects only the wavelength that fits its spacing, so changing a distance by tens of nanometres changes the colour. Structural colours are saturated, angle-dependent, and vanish when the structure is disturbed &mdash; the tells that separate them from pigment.</p>
+    </div>
+    
+    <article class="cc__mech" id="mech-chameleon">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">3.1</span>
+          <h3 class="cc__mech-title">Chameleon guanine lattice</h3>
+          <span class="cc__mech-sub">panther chameleon · structure changing</span>
+        </div>
+        <canvas class="cc__canvas" id="cv-chameleon" aria-label="Chameleon guanine lattice: animated cross-section"></canvas>
+        <div class="cc__controls"><span class="cc__controls-label">Excite the animal</span><button type="button" class="cc__btn" data-hold="chameleon">Hold to excite</button></div>
+      </div>
+      <div class="cc__text">
+        <p>Chameleons carry no blue or green pigment. Beneath a layer of yellow pigment cells lies a sheet of iridophores packed with <strong>guanine nanocrystals in a regular lattice</strong>. The lattice is a Bragg reflector: white light goes in, and only the wavelength that fits the crystal spacing reflects back. At rest the crystals sit close together and reflect blue, which through the yellow layer reads as green.</p><p>When the animal is excited it <strong>stretches the skin</strong>, and with it the lattice. The spacing widens, the reflected wavelength lengthens through green to yellow and orange, and the same yellow overlay now reads orange or red. No pigment is made or moved; a distance changes by a few tens of nanometres. Read the spacing and the wavelength together and the whole mechanism is one equation.</p>
+        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="chameleon:state"></dd></div><div><dt>Reflected λ</dt><dd data-ro="chameleon:lambda"></dd></div><div><dt>Lattice spacing</dt><dd data-ro="chameleon:d"></dd></div></dl>
+      </div>
+    </article>
+    <article class="cc__mech" id="mech-morpho">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">3.2</span>
+          <h3 class="cc__mech-title">Morpho butterfly lamellae</h3>
+          <span class="cc__mech-sub">Morpho wing scale · structure changing</span>
+        </div>
+        <canvas class="cc__canvas" id="cv-morpho" aria-label="Morpho butterfly lamellae: animated cross-section"></canvas>
+        <div class="cc__controls"><label class="cc__slider" for="ctlMorphoAngle">Viewing angle <input class="cc__range" type="range" id="ctlMorphoAngle" min="0" max="60" step="1" value="0"><output id="valMorphoAngle">0°</output></label><button type="button" class="cc__btn" data-hold="morpho">Hold to wet with alcohol</button></div>
+      </div>
+      <div class="cc__text">
+        <p>The scales of a Morpho wing are ridged, and each ridge carries a stack of <strong>chitin lamellae</strong> separated by air, a nanometre-scale Christmas tree. Light reflects from every lamella, and the reflections from successive layers travel different distances. At one wavelength those path differences are whole wavelengths, the reflections add, and that colour comes back strongly: about 450&nbsp;nm, an intense blue from a brown material.</p><p>Two things prove it is structure. Tilt the wing and the path through the stack shortens, so the peak shifts bluer &mdash; the iridescence. Wet it with alcohol and the air gaps fill with a fluid of higher refractive index; the optical path lengthens and the wing turns green until the alcohol evaporates. A pigment would do neither.</p>
+        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="morpho:state"></dd></div><div><dt>Reflected λ</dt><dd data-ro="morpho:lambda"></dd></div><div><dt>Gap index</dt><dd data-ro="morpho:gap"></dd></div></dl>
+      </div>
+    </article>
+  </section>
+
+  <div class="project__body">
+    <section class="project__section project__section--disclaimer">
+      <h2 class="project__section-title"><span>04</span>What the illustrations are, and aren&rsquo;t</h2>
+      <div class="project__section-body">
+        <p>Each animation is a mechanistic sketch, not a simulation. Particle counts, layer thicknesses and rates are representative: a chromatophore expands in tens of milliseconds, a photochromic lens clears over seconds, an electrochromic pane over seconds to minutes. Where colour is set by structure it is computed from wavelength &mdash; a Bragg spacing for the chameleon, a two-layer interference condition for the Morpho &mdash; and converted to screen RGB, so the readouts show a wavelength rather than a chosen swatch. Real reflectance peaks are broader, angle effects involve refraction the sketch omits, and real chameleons combine several cell layers and a second, deeper lattice that reflects near-infrared.</p>
+      </div>
+    </section>
+  </div>
+
+  <nav class="project__nav">
+    <a href="conductive-trace-resistance.html" class="project__nav-link">&larr; Previous note</a>
+    <a href="field-notes.html" class="project__nav-link">Back to Field Notes</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script src="color-change.js"></script>
+</body>
+</html>

@@ -1,0 +1,397 @@
+/* ---------------------------------------------------
+   Textile Stretch Simulator — Field Notes No. 05
+   Loads after styles.css and only adds the simulator band; the page
+   chrome (nav, header, hero, sections, footer) is the shared
+   Field Notes layout from styles.css, untouched.
+--------------------------------------------------- */
+
+:root {
+  --rust:        #a56b2e;
+  --rust-bright: #e8b06e;
+}
+
+.sim {
+  border-bottom: 1px solid var(--line);
+}
+
+.sim__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr) minmax(0, 20rem);
+}
+
+.sim__controls,
+.sim__readouts {
+  padding: 1.75rem 1.5rem 2rem;
+}
+
+.sim__controls {
+  border-right: 1px solid var(--line);
+  margin-left: 6vw;
+}
+
+.sim__readouts {
+  border-left: 1px solid var(--line);
+  margin-right: 6vw;
+}
+
+.sim__stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---------- labels shared by both side panels */
+
+.sim__eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  margin-bottom: 1.25rem;
+}
+
+.sim__eyebrow + .sim__eyebrow { margin-top: 2rem; }
+
+.sim__block { margin-bottom: 1.5rem; }
+.sim__block:last-child { margin-bottom: 0; }
+
+.sim__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 0.5rem;
+}
+
+.sim__value {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink);
+  text-align: right;
+}
+
+.sim__hint {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  margin-top: 0.5rem;
+}
+
+/* ---------- controls */
+
+.sim__segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line-strong);
+}
+
+.sim__segbtn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--line-strong);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.7rem 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.sim__segbtn:last-child { border-right: 0; }
+.sim__segbtn:hover { color: var(--ink); }
+.sim__segbtn.is-active {
+  background: var(--petrol);
+  color: var(--black);
+  font-weight: 500;
+}
+.sim__segbtn:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: -3px; }
+
+.sim__range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  margin: 0;
+  cursor: pointer;
+}
+.sim__range::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--line-strong);
+}
+.sim__range::-moz-range-track {
+  height: 1px;
+  background: var(--line-strong);
+}
+.sim__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -5.5px;
+  background: var(--black);
+  border: 1px solid var(--petrol-bright);
+  border-radius: 0;
+  transition: background-color 0.15s ease;
+}
+.sim__range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--black);
+  border: 1px solid var(--petrol-bright);
+  border-radius: 0;
+}
+.sim__range:hover::-webkit-slider-thumb,
+.sim__range:focus-visible::-webkit-slider-thumb { background: var(--petrol-bright); }
+.sim__range:hover::-moz-range-thumb,
+.sim__range:focus-visible::-moz-range-thumb { background: var(--petrol-bright); }
+.sim__range:focus-visible { outline: none; }
+
+.sim__ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 0.15rem;
+}
+
+.sim__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.sim__chip,
+.sim__btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.sim__chip:hover,
+.sim__btn:hover { color: var(--petrol-bright); border-color: var(--petrol-bright); }
+.sim__chip.is-active { color: var(--black); background: var(--petrol-bright); border-color: var(--petrol-bright); }
+.sim__chip:focus-visible,
+.sim__btn:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
+
+.sim__btn--wide { width: 100%; padding: 0.7rem; }
+
+/* ---------- stage */
+
+.sim__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  background: var(--black-raised);
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+}
+.sim__canvas:focus-visible { box-shadow: inset 0 0 0 1px var(--petrol-bright); }
+body.is-pulling .sim__canvas { cursor: grabbing; }
+
+.sim__stagebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.sim__stagebar-hint { line-height: 1.5; }
+.sim__stagebar-hint strong { color: var(--ink-dim); font-weight: 500; }
+
+.sim__pulls { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.sim__pull {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.sim__pull:hover { color: var(--petrol-bright); border-color: var(--petrol-bright); }
+.sim__pull.is-active { background: var(--petrol-bright); color: var(--black); border-color: var(--petrol-bright); }
+.sim__pull:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
+
+/* ---------- readouts */
+
+.sim__figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.sim__figure-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.3rem;
+}
+
+.sim__figure-value {
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sim__figure-sub {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 0.35rem;
+  line-height: 1.4;
+}
+
+.sim__caption {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+  margin-top: 1rem;
+  line-height: 1.5;
+}
+.sim__caption + .sim__inset,
+.sim__caption + .sim__chart { margin-top: 0.4rem; }
+
+.sim__line {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+}
+.sim__line strong { color: var(--ink); font-weight: 500; }
+.sim__line .sim__k {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.15rem;
+}
+.sim__line.is-warn strong { color: var(--rust-bright); }
+
+.sim__bar {
+  position: relative;
+  height: 4px;
+  background: var(--line);
+  margin: 0.4rem 0 0.3rem;
+}
+.sim__bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--petrol-bright);
+  transition: width 0.08s linear;
+}
+.sim__bar-fill.is-warn { background: var(--rust-bright); }
+
+.sim__inset,
+.sim__chart {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  margin-top: 0.75rem;
+}
+.sim__inset { aspect-ratio: 4 / 3; }
+.sim__chart { aspect-ratio: 16 / 10; }
+
+.sim__legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  margin-top: 0.6rem;
+}
+.sim__legend span::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+  background: var(--petrol-bright);
+}
+.sim__legend span.is-rust::before { background: var(--rust-bright); }
+.sim__legend span.is-ghost::before { background: none; border-top: 1px dashed var(--ink-dim); height: 0; }
+
+/* ---------- key in the notes body */
+
+.sim-key {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  vertical-align: -0.05em;
+  margin-right: 0.35em;
+  background: var(--petrol-bright);
+}
+.sim-key--rust { background: var(--rust-bright); }
+
+/* ---------- responsive */
+
+@media (max-width: 1150px) {
+  .sim__grid {
+    grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+  }
+  .sim__readouts {
+    grid-column: 1 / -1;
+    margin: 0 6vw;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 3rem;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .sim__readouts > .sim__eyebrow { grid-column: 1 / -1; }
+  .sim__readouts > .sim__eyebrow + .sim__eyebrow { margin-top: 0; }
+}
+
+@media (max-width: 800px) {
+  .sim__grid { grid-template-columns: 1fr; }
+  .sim__stage { order: -1; }
+  .sim__controls {
+    margin: 0 6vw;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .sim__readouts { grid-template-columns: 1fr; }
+  .sim__canvas { aspect-ratio: 1 / 1; }
+}

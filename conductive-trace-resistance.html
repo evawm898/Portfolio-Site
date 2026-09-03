@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conductive Trace Resistance — Field Notes — Eva Maskalenko</title>
+<meta name="description" content="Field Notes: Conductive Trace Resistance — an interactive model of how a stretched conductive trace changes resistance. Drag to stretch a printed, laminated or conductive-yarn trace and watch the electrons, the path and the resistance respond.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="conductive-trace-resistance.css">
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link is-active">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="field-notes.html" class="project-header__back">&larr; Field Notes</a>
+  <div class="project-header__index">No. 06 / 07</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag">
+      <span class="project__year">Field Notes</span>
+      <span>Interactive</span>
+    </div>
+    <h1 class="project__title">Conductive Trace Resistance</h1>
+    <p class="project__lede">Drag to stretch a conductive trace and watch its resistance change as the electrons find their way through it. A printed ink cracks, a laminated copper serpentine straightens and then snaps, and a conductive yarn loses the contact points that carry its current.</p>
+  </div>
+
+  <section class="ctr" aria-label="Conductive trace simulator">
+    <div class="ctr__grid">
+
+      <aside class="ctr__controls">
+        <p class="ctr__eyebrow">Trace</p>
+
+        <div class="ctr__block">
+          <div class="ctr__label"><span>Structure</span></div>
+          <div class="ctr__segment" role="group" aria-label="Trace structure">
+            <button type="button" class="ctr__segbtn" data-type="printed" aria-pressed="true">Printed</button>
+            <button type="button" class="ctr__segbtn" data-type="laminated" aria-pressed="false">Laminated</button>
+            <button type="button" class="ctr__segbtn" data-type="yarn" aria-pressed="false">Yarn</button>
+          </div>
+          <p class="ctr__spec" id="ro-spec"></p>
+          <p class="ctr__hint"><span class="ctr-typed" data-printed="Silver flakes in a stretchable binder. Conduction needs the flakes to touch; stretch pulls them apart and, past a threshold, opens cracks from the edges." data-laminated="An etched copper serpentine laminated on TPU. The meander opens like a spring so the copper stays unstrained &mdash; until it is straight." data-yarn="A silver-plated multifilament yarn. Current crosses between filaments only where they touch; each contact holds up to its own strain."></span></p>
+        </div>
+
+        <div class="ctr__block">
+          <button type="button" class="ctr__btn ctr__btn--wide" id="ctlNew">New sample</button>
+          <p class="ctr__hint">A fresh, undamaged specimen of the same structure. Crack sites and contact strengths are redrawn, so two samples never fail quite alike.</p>
+        </div>
+
+        <p class="ctr__eyebrow">Drive</p>
+        <div class="ctr__block">
+          <p class="ctr__hint">Constant voltage across the clamps. The electrons&rsquo; speed is the current: it collapses as resistance climbs and stops when the circuit opens.</p>
+        </div>
+      </aside>
+
+      <div class="ctr__stage">
+        <canvas class="ctr__canvas" id="traceCanvas" tabindex="0" aria-label="Conductive trace between two clamps. Drag right to stretch it; use the stretch button for a keyboard alternative."></canvas>
+        <div class="ctr__stagebar">
+          <p class="ctr__stagebar-hint"><strong>Drag right</strong> anywhere on the trace to stretch it; let go and the substrate springs back. The dashed line marks the rest length.</p>
+          <div class="ctr__pulls">
+            <button type="button" class="ctr__pull" id="ctlStretch">Hold to stretch &rarr;</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="ctr__readouts">
+        <p class="ctr__eyebrow">Readouts</p>
+        <div class="ctr__figures">
+          <div><div class="ctr__figure-label">Resistance</div><div class="ctr__figure-value" id="ro-r">0.60 Ω</div></div>
+          <div><div class="ctr__figure-label">R / R&#8320;</div><div class="ctr__figure-value" id="ro-ratio">×1.00</div></div>
+          <div><div class="ctr__figure-label">Strain</div><div class="ctr__figure-value" id="ro-strain">0%</div></div>
+          <div><div class="ctr__figure-label">Peak strain</div><div class="ctr__figure-value" id="ro-peak">0%</div></div>
+        </div>
+        <div class="ctr__line"><span class="ctr__k">State</span><strong id="ro-regime">intact network</strong></div>
+        <div class="ctr__line"><span class="ctr__k">Structure</span><span id="ro-structure"></span></div>
+        <div class="ctr__line"><span class="ctr__k">Current</span><span id="ro-current"></span>
+          <div class="ctr__bar"><div class="ctr__bar-fill" id="ro-currentBar"></div></div>
+        </div>
+
+        <p class="ctr__caption">Resistance vs strain &middot; R / R&#8320;, log scale &middot; all three structures, this one solid</p>
+        <canvas class="ctr__chart" id="chartCanvas" aria-label="Resistance ratio against strain on a log scale, with reference curves for printed, laminated and yarn traces, and this sample's loading history"></canvas>
+        <div class="ctr__legend">
+          <span>printed</span>
+          <span class="is-copper">laminated</span>
+          <span class="is-silver">yarn</span>
+          <span class="is-history">this sample&rsquo;s path</span>
+        </div>
+      </aside>
+
+    </div>
+  </section>
+
+  <div class="project__body">
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>01</span>How to read it</h2>
+      <div class="project__section-body">
+        <p>The specimen is a 20&nbsp;mm gauge length of trace held between two clamps on a stretchable substrate. Drag to move the right clamp; the strain is read against the dashed rest line. Lengths are to scale. The widths of the serpentine and the yarn are exaggerated so their structure can be seen, and the scale bar says by how much.</p>
+        <p>The moving dots are the current. A constant voltage sits across the clamps, so the electrons&rsquo; speed is proportional to <em>1/R</em>: as the resistance climbs the current slows, and an open circuit stops it. The path they take is the real one for that structure &mdash; around a crack tip, along the meander, across a filament contact.</p>
+        <p>The chart plots <em>R/R&#8320;</em> against strain on a log scale, with all three structures for comparison and a faint trace of the path this particular sample has actually taken, loading and unloading. Where that path fails to return along the reference curve, the sample is damaged.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>02</span>Printed: a percolating network</h2>
+      <div class="project__section-body">
+        <p>A stretchable printed conductor is not a continuous metal. It is a dense population of silver flakes in an elastomer binder, and it conducts because enough flakes overlap to form connected paths from one end to the other. Stretch the binder and the flakes, which are rigid, move apart. Paths break, the survivors get longer and more tortuous, and resistance rises roughly exponentially with strain before anything you could call a crack has appeared.</p>
+        <p>Past a threshold the film cracks from its edges. A crack is a hole in the network: the current must go round its tip through whatever conductor remains, and a few deep cracks can raise the resistance by orders of magnitude. Release the strain and the cracks close to hairlines but not to nothing, so a printed trace remembers its peak strain. That is the retained-damage figure in the readouts, and the reason a printed track that has been over-stretched once reads high forever after.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>03</span>Laminated: geometry stretches, metal does not</h2>
+      <div class="project__section-body">
+        <p>Copper extends by a few percent before it fails, so a straight copper trace on a stretchable substrate is not a stretchable interconnect. A serpentine one is: laminated onto TPU film, the meander opens like a spring, taking the substrate&rsquo;s strain in bending while the copper&rsquo;s length, and so its resistance, stays exactly what it was. Watch the readout while the meander straightens &mdash; it does not move.</p>
+        <p>Once the serpentine is straight the copper itself has to strain, and it does so with a gauge factor of about two: a 1% strain reads as a 2% resistance change, small enough to be nearly invisible on a log chart. Then it fractures. There is no gradual failure and no recovery: the trace goes from a few tens of milliohms to an open circuit, and a new sample is the only way back. The design lesson is that the meander&rsquo;s amplitude and pitch set the strain budget, and the copper is only ever safe inside it.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>04</span>Yarn: contacts, not conductors</h2>
+      <div class="project__section-body">
+        <p>A silver-plated nylon yarn is a bundle of filaments, each conductive along its length but insulated from its neighbours except where they physically touch. Its resistance is set as much by those contact points as by the silver. A little strain aligns the filaments and presses them together, which is why the resistance dips slightly first &mdash; a well-known and often unwelcome feature of yarn-based strain sensors.</p>
+        <p>With more strain the contacts begin to open, each at its own threshold, and every one that goes removes a path between filaments. The electrons have to run further along a single filament to find the next crossing, so resistance rises steadily and then steeply as the network thins. Unlike the printed film, this is reversible: relax the yarn and the contacts re-form, with some hysteresis, and the resistance comes back down. It is why conductive yarn tolerates stretch a printed trace cannot, and why its resistance is never quite stable.</p>
+      </div>
+    </section>
+
+    <section class="project__section project__section--disclaimer">
+      <h2 class="project__section-title"><span>05</span>What the model is, and isn&rsquo;t</h2>
+      <div class="project__section-body">
+        <p>This is a mechanistic sketch built for teaching. The printed film uses a geometric term, an exponential percolation term and a quadratic crack term with retained damage; the serpentine straightens at constant copper length and fractures at a fixed metal strain; the yarn draws its contact strengths from an exponential distribution and sets resistance by the intact count. Rest resistances and thresholds are plausible for the materials named, not measured from them. Electron speed is a cue for current, not a drift-velocity calculation. Temperature, contact resistance at the clamps, cyclic fatigue and the substrate&rsquo;s own viscoelasticity are not modelled.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="project__nav">
+    <a href="textile-stretch-simulator.html" class="project__nav-link">&larr; Previous note</a>
+    <a href="color-change.html" class="project__nav-link">Next note &rarr;</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script src="conductive-trace-resistance.js"></script>
+</body>
+</html>
