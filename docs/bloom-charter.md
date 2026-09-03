@@ -2991,7 +2991,7 @@ exposure the ruling accepts in exchange for the minutes.
       so the export handler builds the same bytes — and it was measured anyway on the
       charter's retention ruling (newest baseline on both trees plus the live partition, not
       the whole suite; the brief said "every frozen baseline" and was corrected to the
-      ruling): §BYTES§. Cost: under a second per row, dominated by the two in-page builds
+      ruling): **phase10 (376 rows frozen at 4f39118, the newest baseline) 376/376 bit-identical, 0 moved, and the live matrix (402 rows, the mum row included) 402/402 bit-identical, 0 moved**, each against a worktree at 09c395b, defaults bit-identical on both. Cost: under a second per row, dominated by the two in-page builds
       rather than the raster (a fixed grid of ~2,400 cells across the hub, floored at 5 µm;
       the first draft capped the pitch instead, which made the LARGEST blooms the finest
       sampled at 37 million cells for no gain).
