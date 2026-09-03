@@ -131,6 +131,12 @@ a { color: var(--ink); text-decoration: none; }
   background: var(--paper-raised);
 }
 
+/* Each numbered section is a <details>. Native disclosure: keyboard and
+   screen-reader behaviour come free, and no JS owns the open/closed state —
+   which matters because the font picker inside 03 uses an IntersectionObserver,
+   and a closed <details> genuinely hides its rows, so no font is fetched for a
+   section nobody has opened. */
+
 .cd-panel__section {
   padding: 1.75rem 1.75rem;
   border-bottom: 1px solid var(--line);
@@ -138,6 +144,9 @@ a { color: var(--ink); text-decoration: none; }
 
 .cd-panel__section:last-child { border-bottom: none; }
 
+/* The summary IS the old .cd-panel__label — same type, same petrol number —
+   plus a disclosure marker. A collapsed section keeps its label flush with the
+   section padding, so the closed panel reads as a stack of numbered rules. */
 .cd-panel__label {
   font-family: var(--mono);
   font-size: 11px;
@@ -148,6 +157,62 @@ a { color: var(--ink); text-decoration: none; }
 }
 
 .cd-panel__label span { color: var(--petrol-bright); margin-right: 0.6em; }
+
+summary.cd-panel__label {
+  display: flex;
+  align-items: baseline;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+summary.cd-panel__label::-webkit-details-marker { display: none; }
+
+summary.cd-panel__label:hover { color: var(--ink); }
+
+summary.cd-panel__label:focus-visible {
+  outline: 1px solid var(--petrol);
+  outline-offset: 3px;
+}
+
+/* A section whose current value is worth reading while it is CLOSED can put it
+   here — today that is 03 Font, so the selected family is visible without
+   opening the picker. Same type as .cd-field__value, so it reads as the same
+   kind of readout it would be inside the section. */
+.cd-panel__label__value {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--petrol-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The marker sits at the far right of the summary row, on the panel's own
+   hairline grid rather than as an icon. A closed section reads "+", an open
+   one "–" — the same two characters the numbered index language already uses. */
+summary.cd-panel__label::after {
+  content: "+";
+  margin-left: auto;
+  padding-left: 0.75rem;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--petrol-bright);
+}
+
+/* With a value readout present it, not the marker, takes the free space. */
+summary.cd-panel__label:has(.cd-panel__label__value)::after { margin-left: 0; }
+
+details[open] > summary.cd-panel__label::after { content: "\2013"; }
+
+/* No bottom gap under a collapsed section's label — the margin belongs to the
+   gap between the label and the content it discloses. */
+details:not([open]) > summary.cd-panel__label { margin-bottom: 0; }
 
 /* Suit upload rows */
 
@@ -294,7 +359,13 @@ a { color: var(--ink); text-decoration: none; }
   cursor: pointer;
 }
 
-.cd-select {
+/* Font picker — replaces the old five-entry <select>. Search + category
+   chips over a scrolling list of the whole Google Fonts catalog, plus the
+   uploaded-font path. Each row previews in its own family, but only once it
+   has actually scrolled into view (cards.js) — the catalog is never
+   preloaded. */
+
+.cd-font-search {
   display: block;
   width: 100%;
   margin-top: 0.5rem;
@@ -304,8 +375,149 @@ a { color: var(--ink); text-decoration: none; }
   background: var(--paper);
   border: 1px solid var(--line-strong);
   padding: 0.5rem 0.6rem;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
+.cd-font-search:focus {
+  outline: none;
+  border-color: var(--petrol);
+}
+
+.cd-font-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.cd-font-cat {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 0.3rem 0.45rem;
   cursor: pointer;
 }
+
+.cd-font-cat:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+.cd-font-cat[aria-pressed="true"] {
+  color: var(--paper-raised);
+  background: var(--petrol);
+  border-color: var(--petrol);
+}
+
+.cd-font-list {
+  margin-top: 0.5rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+}
+
+.cd-font-list:focus-visible { outline: 1px solid var(--petrol); outline-offset: -1px; }
+
+.cd-font-group {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--paper-raised);
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+}
+
+.cd-font-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+
+.cd-font-row:last-child { border-bottom: none; }
+.cd-font-row:hover { background: var(--paper-raised); }
+
+.cd-font-row[aria-selected="true"] {
+  background: var(--petrol);
+  color: var(--paper-raised);
+}
+
+.cd-font-row[aria-selected="true"] .cd-font-row__meta { color: var(--paper-raised); opacity: 0.75; }
+
+.cd-font-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Overridden inline, per row, once that row's family has loaded. */
+}
+
+.cd-font-row__meta {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.cd-font-empty {
+  font-size: 11px;
+  color: var(--ink-faint);
+  padding: 1rem 0.6rem;
+  text-align: center;
+}
+
+.cd-font-count {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 0.4rem;
+}
+
+.cd-font-upload {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.cd-font-upload .cd-file-btn { flex: none; }
+
+.cd-font-upload__note {
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+.cd-font-status {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  margin-top: 0.5rem;
+  min-height: 1.4em;
+}
+
+.cd-font-status--error { color: #a3372f; }
 
 /* Export buttons */
 
@@ -360,20 +572,82 @@ a { color: var(--ink); text-decoration: none; }
    Preview grid
 --------------------------------------------------- */
 
+/* The preview sticks beside the control panel, so the cards stay in view while
+   the panel is scrolled past. Two things make it behave rather than fight the
+   page:
+     - .cd-body sets align-items:start, so this grid item is content-height and
+       its grid area is as tall as the row — that area is what sticky travels
+       inside. A collapsed panel makes the area short and the preview simply
+       stops moving, which is the correct nothing-to-do.
+     - a zoomed grid can be taller than the viewport, and a sticky box taller
+       than its viewport pins its TOP and hides its bottom. So the sticky box
+       is capped to the viewport and scrolls internally instead.
+   Both are undone at the stacking breakpoint below. */
+.cd-preview {
+  position: sticky;
+  top: 2rem;
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cd-preview__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  /* The head rides along inside the scrolling sticky box so the zoom control
+     is reachable at any scroll position within it. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper);
+  padding-bottom: 0.5rem;
+}
+
 .cd-preview__label {
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-dim);
-  margin-bottom: 1.25rem;
 }
 
 .cd-preview__label span { color: var(--petrol-bright); margin-right: 0.6em; }
 
+/* Same language as the panel's sliders: mono uppercase label, petrol readout,
+   petrol accent on the track. */
+.cd-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cd-zoom__label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.cd-zoom__range {
+  width: 8rem;
+  accent-color: var(--petrol);
+  cursor: pointer;
+}
+
+.cd-zoom .cd-field__value { min-width: 3em; text-align: right; }
+
+/* --cd-card-min is the only thing zoom changes. auto-fill re-flows the columns
+   around it and .cd-card's aspect-ratio keeps the proportions, so nothing
+   distorts and no canvas is touched. */
 .cd-preview-grid {
+  --cd-card-min: 120px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--cd-card-min), 1fr));
   gap: 1rem;
 }
 
@@ -402,6 +676,19 @@ a { color: var(--ink); text-decoration: none; }
 
 @media (max-width: 900px) {
   .cd-body { grid-template-columns: 1fr; }
+
+  /* Single column: there is no side-by-side layout left to preserve, and a
+     sticky preview here would pin a viewport-tall box over the controls the
+     user came to reach. So it scrolls with the page like everything else, and
+     the internal scroller is removed with it — a nested scroll region inside
+     a normal page scroll is the other half of the same problem. */
+  .cd-preview {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .cd-preview__head { position: static; padding-bottom: 0; }
 }
 
 @media (max-width: 600px) {

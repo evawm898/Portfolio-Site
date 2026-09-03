@@ -76,12 +76,18 @@ const SECONDARY_RGB = [0xb2, 0x3b, 0x3b];
 // Style configs to sweep the full 52-card deck at, chosen to bracket every
 // slider's range (not just its default) — see CLAUDE.md working-agreement
 // item 1: state cost/risk before implying a feature is fine, so this
-// deliberately includes both extremes of each control from PR #117/#118.
+// deliberately includes both extremes of each control, and CROSSES the three
+// independent scale sliders rather than only moving them together.
 const STYLE_CONFIGS = [
-  { label: 'defaults', style: { cornerInsetPct: 4.5, cornerFontId: 'plex-mono', glyphScale: 1, glyphOffsetPct: 30 } },
-  { label: 'tightest (min inset, min scale, no offset, mono)', style: { cornerInsetPct: 2, cornerFontId: 'space-mono', glyphScale: 0.5, glyphOffsetPct: 0 } },
-  { label: 'loosest (max inset, max scale, max offset, serif)', style: { cornerInsetPct: 10, cornerFontId: 'fraunces', glyphScale: 1.5, glyphOffsetPct: 100 } },
-  { label: 'playfair mid', style: { cornerInsetPct: 6, cornerFontId: 'playfair', glyphScale: 1.2, glyphOffsetPct: 60 } },
+  { label: 'defaults', style: { cornerInsetPct: 4.5, cornerFontId: 'plex-mono', glyphScale: 1, glyphOffsetPct: 30, cornerFontScale: 1, courtPlateScale: 1, courtLetterScale: 1 } },
+  { label: 'tightest (min inset, min scale, no offset, mono)', style: { cornerInsetPct: 2, cornerFontId: 'space-mono', glyphScale: 0.5, glyphOffsetPct: 0, cornerFontScale: 0.5, courtPlateScale: 0.5, courtLetterScale: 0.5 } },
+  { label: 'loosest (max inset, max scale, max offset, serif)', style: { cornerInsetPct: 10, cornerFontId: 'fraunces', glyphScale: 1.5, glyphOffsetPct: 100, cornerFontScale: 1.5, courtPlateScale: 1.5, courtLetterScale: 1.5 } },
+  { label: 'playfair mid', style: { cornerInsetPct: 6, cornerFontId: 'playfair', glyphScale: 1.2, glyphOffsetPct: 60, cornerFontScale: 1.2, courtPlateScale: 0.8, courtLetterScale: 1.3 } },
+  // The scale sliders are independent of each other, so their extremes have to
+  // be crossed, not just moved together: a big plate around a small letter and
+  // the reverse are both reachable and both have to render.
+  { label: 'big plate, small letter, big corner', style: { cornerInsetPct: 4.5, cornerFontId: 'plex-sans', glyphScale: 1, glyphOffsetPct: 30, cornerFontScale: 1.5, courtPlateScale: 1.5, courtLetterScale: 0.5 } },
+  { label: 'small plate, big letter, small corner', style: { cornerInsetPct: 8, cornerFontId: 'fraunces', glyphScale: 1.3, glyphOffsetPct: 10, cornerFontScale: 0.5, courtPlateScale: 0.5, courtLetterScale: 1.5 } },
 ];
 
 let failures = 0;

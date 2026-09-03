@@ -11,10 +11,12 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Fraunces + IBM Plex Mono are the site's own display/body pair, already
-     loaded above; the rest of this family only serves the corner-index
-     font dropdown in "04 Style" (cards/card-template.js CORNER_FONT_OPTIONS)
-     and is loaded the same way — no build step. -->
+<!-- Fraunces + IBM Plex Mono are the site's own display/body pair; the rest
+     of this request serves the five built-in options in the "03 Font"
+     picker (cards/font-manager.js BUILTIN_FONTS), so the default corner index
+     paints real type on first frame with no extra round trip. Every OTHER
+     family in the picker — the whole 1,891-family Google Fonts catalog — is
+     fetched one at a time, only when selected. Nothing else is preloaded. -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;600&family=Playfair+Display:wght@600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="cards.css">
 
@@ -42,13 +44,13 @@
   <section class="cd-panel" aria-labelledby="controls-heading">
     <h2 id="controls-heading" class="sr-only" hidden>Deck controls</h2>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>01</span>Suit Glyphs</div>
+    <details class="cd-panel__section" id="section-01" open>
+      <summary class="cd-panel__label"><span>01</span>Suit Glyphs</summary>
       <div id="suitRows"></div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>02</span>Palette</div>
+    <details class="cd-panel__section" id="section-02" open>
+      <summary class="cd-panel__label"><span>02</span>Palette</summary>
       <div class="cd-color-row">
         <input type="color" id="colorPrimary" value="#1c6b6b">
         <div>
@@ -63,10 +65,35 @@
           <span class="cd-color-row__sub">Hearts &amp; Diamonds</span>
         </div>
       </div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>03</span>Style</div>
+    <details class="cd-panel__section" id="section-03">
+      <summary class="cd-panel__label"><span>03</span>Font<output class="cd-panel__label__value" id="fontCurrentName" for="fontSearch">IBM Plex Mono</output></summary>
+
+      <input type="search" id="fontSearch" class="cd-font-search" autocomplete="off" spellcheck="false"
+             placeholder="Search fonts&hellip;" aria-describedby="fontCount" aria-label="Search fonts">
+
+      <div class="cd-font-cats" id="fontCategories" role="group" aria-label="Filter fonts by category"></div>
+
+      <div class="cd-font-list" id="fontList" role="listbox" tabindex="0" aria-label="Fonts"></div>
+      <div class="cd-font-count" id="fontCount" role="status" aria-live="polite"></div>
+
+      <div class="cd-font-upload">
+        <label class="cd-file-btn">Upload font
+          <!-- accept is set from CUSTOM_FONT_ACCEPT in cards/font-manager.js,
+               next to the extension check that enforces it. -->
+          <input type="file" id="fontUpload">
+        </label>
+        <span class="cd-font-upload__note">.ttf &middot; .otf &middot; .woff &middot; .woff2. You are responsible for holding print/commercial rights to any font you upload.</span>
+      </div>
+
+      <div id="fontStatus" class="cd-font-status" role="status" aria-live="polite"></div>
+
+      <span class="cd-field__sub">Sets the corner rank letter and the large centre letter on court cards — one font, both places. The chosen font is fully loaded before any card is drawn, in the preview and in both exports.</span>
+    </details>
+
+    <details class="cd-panel__section" id="section-04">
+      <summary class="cd-panel__label"><span>04</span>Style</summary>
 
       <div class="cd-field">
         <div class="cd-field__row">
@@ -78,9 +105,30 @@
       </div>
 
       <div class="cd-field">
-        <label class="cd-field__label" for="styleCornerFont">Corner index font</label>
-        <select id="styleCornerFont" class="cd-select"></select>
-        <span class="cd-field__sub">Also sets the large center letter on court cards — one font, both places.</span>
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleCornerFontScale">Corner letter scale</label>
+          <output class="cd-field__value" id="styleCornerFontScaleValue" for="styleCornerFontScale">100%</output>
+        </div>
+        <input type="range" id="styleCornerFontScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the corner rank letter only. Its mini suit glyph keeps its own size, and the two are held apart at every setting.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleCourtPlateScale">Court plate scale</label>
+          <output class="cd-field__value" id="styleCourtPlateScaleValue" for="styleCourtPlateScale">100%</output>
+        </div>
+        <input type="range" id="styleCourtPlateScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the bordered box on J/Q/K. The letter inside it does not move with it.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleCourtLetterScale">Court letter scale</label>
+          <output class="cd-field__value" id="styleCourtLetterScaleValue" for="styleCourtLetterScale">100%</output>
+        </div>
+        <input type="range" id="styleCourtLetterScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the J/Q/K inside the plate. Stays centred on the letter's own ink at every size and in every font.</span>
       </div>
 
       <div class="cd-field">
@@ -100,23 +148,33 @@
         <input type="range" id="styleGlyphOffset" min="0" max="100" step="5" value="30">
         <span class="cd-field__sub">Gap between the corner letter and its mini suit glyph — 0% is the tightest non-touching gap; slides the glyph toward the card's center.</span>
       </div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>04</span>Export</div>
+    <details class="cd-panel__section" id="section-05" open>
+      <summary class="cd-panel__label"><span>05</span>Export</summary>
       <button id="btnExportPdf" class="cd-export-btn">Download PDF (52 pages)</button>
       <button id="btnExportZip" class="cd-export-btn cd-export-btn--secondary">Download PNGs (ZIP)</button>
       <div id="exportStatus" class="cd-status" role="status" aria-live="polite"></div>
-    </div>
+    </details>
 
-    <div class="cd-panel__section">
-      <div class="cd-panel__label"><span>05</span>Print Spec</div>
+    <details class="cd-panel__section" id="section-06">
+      <summary class="cd-panel__label"><span>06</span>Print Spec</summary>
       <div class="cd-spec" id="specText"></div>
-    </div>
+    </details>
   </section>
 
-  <section aria-labelledby="preview-heading">
-    <h2 id="preview-heading" class="cd-preview__label"><span>06</span>Preview</h2>
+  <section class="cd-preview" aria-labelledby="preview-heading">
+    <div class="cd-preview__head">
+      <h2 id="preview-heading" class="cd-preview__label"><span>07</span>Preview</h2>
+      <div class="cd-zoom">
+        <label class="cd-zoom__label" for="previewZoom">Zoom</label>
+        <input type="range" id="previewZoom" class="cd-zoom__range" min="100" max="400" step="25" value="100">
+        <output class="cd-field__value" id="previewZoomValue" for="previewZoom">100%</output>
+      </div>
+    </div>
+    <!-- Screen size only. The zoom slider drives a CSS custom property on the
+         grid below; every canvas keeps its 825x1125 backing store, which is
+         what the PDF and PNG exports read. Nothing here re-renders a card. -->
     <div id="previewGrid" class="cd-preview-grid"></div>
   </section>
 

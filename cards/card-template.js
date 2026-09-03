@@ -9,35 +9,97 @@
 // is the whole point of this file's shape.
 
 import { PRINT_SPEC, getSafeRect, SUIT_GROUP } from './deck-builder.js';
+import { resolveFont, fontShorthand, DEFAULT_FONT_ID } from './font-manager.js';
 
 // ---------------------------------------------------------------------
-// Deck-wide style controls — "04 Style" panel on cards.html. Global only
+// Deck-wide style controls — the "04 Style" panel on cards.html (the font
+// itself is its own section, "03 Font"). Global only
 // (no per-suit variants in this pass): corner-index inset + font, and a
 // suit-glyph scale applied relative to each context's own base size.
+//
+// The font is no longer a five-entry list here — cards/font-manager.js owns
+// the whole font system (the Google Fonts catalog, uploaded files, and the
+// loading contract). This file only asks it "what do I set ctx.font to?".
 // ---------------------------------------------------------------------
-
-// Curated, print-safe corner-index fonts spanning the site's Fraunces
-// (serif display) / IBM Plex Mono (mono body) pairing plus a couple of
-// siblings, so the dropdown offers real variety without free-text risk.
-// `family` is the full canvas font-family value, fallback stack included.
-export const CORNER_FONT_OPTIONS = [
-  { id: 'plex-mono', label: 'IBM Plex Mono', family: '"IBM Plex Mono", "SFMono-Regular", Consolas, monospace' },
-  { id: 'plex-sans', label: 'IBM Plex Sans', family: '"IBM Plex Sans", Helvetica, Arial, sans-serif' },
-  { id: 'fraunces', label: 'Fraunces', family: '"Fraunces", "Iowan Old Style", Georgia, serif' },
-  { id: 'playfair', label: 'Playfair Display', family: '"Playfair Display", Georgia, serif' },
-  { id: 'space-mono', label: 'Space Mono', family: '"Space Mono", "SFMono-Regular", monospace' },
-];
 
 export const DEFAULT_STYLE = {
   cornerInsetPct: 4.5, // % of the safe-rect width, from the corner
-  cornerFontId: 'plex-mono', // drives both the corner rank letter and the court-card center letter
+  cornerFontId: DEFAULT_FONT_ID, // drives both the corner rank letter and the court-card center letter
   glyphScale: 1, // 0.5–1.5, relative to each context's own base size
   glyphOffsetPct: 30, // 0–100% of one glyph-height of extra travel, on top of the anti-overlap floor
+  // The three scale sliders below are deliberately INDEPENDENT of each other
+  // and of glyphScale — each multiplies a base derived from the safe rect, not
+  // from another control's output. A letter sized as a fraction of the SCALED
+  // plate would move when the plate moved, which is not what "independent"
+  // buys you: a big plate with a small letter has to be reachable.
+  courtPlateScale: 1, // 0.5–1.5, the court-card centre plate
+  courtLetterScale: 1, // 0.5–1.5, the J/Q/K inside it
+  cornerFontScale: 1, // 0.5–1.5, the corner rank letter (NOT its mini suit glyph)
 };
 
-export function getCornerFontFamily(id) {
-  const opt = CORNER_FONT_OPTIONS.find((f) => f.id === id);
-  return (opt || CORNER_FONT_OPTIONS[0]).family;
+// Base sizes, before any scale slider. Named because three call sites and the
+// verification gate all have to agree on what "100%" means.
+const BASE = {
+  cornerFont: 0.11, // x safe.w
+  cornerGlyph: 0.9, // x the UNSCALED corner font size
+  plateW: 0.62, // x safe.w
+  plateH: 0.42, // x safe.h
+  courtLetter: 0.62, // x the UNSCALED plate height
+  courtGlyph: 0.24, // x safe.w
+};
+
+// The court-card centre plate, as a rect. Exported because the plate is the
+// box the letter is centred IN — a claim only checkable against the same
+// numbers the drawing code uses, so tools/verify-cards-fonts.mjs reads it
+// from here instead of re-deriving it and agreeing with itself.
+export function getCourtPlateRect(safe, style) {
+  const s = { ...DEFAULT_STYLE, ...style };
+  const w = safe.w * BASE.plateW * s.courtPlateScale;
+  const h = safe.h * BASE.plateH * s.courtPlateScale;
+  return { cx: safe.x + safe.w / 2, cy: safe.y + safe.h / 2, w, h };
+}
+
+// Centre `text` on its TRUE INK bounding box at (targetX, targetY), and draw
+// it there. ctx.font, fillStyle and text* state must already be set.
+//
+// WHY NOT textBaseline 'middle' + textAlign 'center': those centre the EM BOX,
+// which is a property of the font's design metrics, not of the glyph. A face
+// with tall ascenders and deep descenders (most script faces) has its em box
+// centred well above its ink, so the letter reads low; a heavy display face
+// with almost no descender reads high. With five curated fonts that drift was
+// a fixed fudge factor. With the whole Google Fonts catalog selectable it is
+// unbounded, so the offset has to be measured per font, per glyph, per size.
+function fillTextInkCentered(ctx, text, targetX, targetY) {
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  const m = ctx.measureText(text);
+
+  // actualBoundingBox* are all distances OUT from the alignment point:
+  // Left/Ascent grow leftward/upward, Right/Descent rightward/downward. So the
+  // ink centre relative to the draw origin is half the difference of each pair.
+  const hasInk = Number.isFinite(m.actualBoundingBoxLeft) && Number.isFinite(m.actualBoundingBoxRight)
+    && Number.isFinite(m.actualBoundingBoxAscent) && Number.isFinite(m.actualBoundingBoxDescent);
+  if (!hasInk) {
+    // No glyph metrics at all (a face that reports nothing, or whitespace):
+    // fall back to em-box centring rather than drawing at a NaN offset.
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, targetX, targetY);
+    return;
+  }
+  const inkOffsetX = (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+  const inkOffsetY = (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2;
+  ctx.fillText(text, targetX - inkOffsetX, targetY - inkOffsetY);
+}
+
+// The ONE place a card's text font is turned into a ctx.font string. Both the
+// corner rank letter and the court-card centre letter call it, so "one font,
+// both places" is structural rather than a convention two call sites have to
+// remember. The weight comes from the resolved spec, not a literal: asking a
+// family for a weight it does not ship is how you get a synthesised bold that
+// the preview and the export can disagree about.
+function cardFont(style, sizePx) {
+  return fontShorthand(resolveFont(style.cornerFontId), Math.round(sizePx));
 }
 
 // ---------------------------------------------------------------------
@@ -195,14 +257,20 @@ function suitColor(suit, palette) {
 // glyph, top-left; the same thing rotated 180deg, bottom-right).
 function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
   const color = suitColor(suit, palette);
-  const fontSize = Math.round(safe.w * 0.11);
-  const glyphSize = fontSize * 0.9 * style.glyphScale;
+  const baseFontSize = safe.w * BASE.cornerFont;
+  const fontSize = Math.round(baseFontSize * style.cornerFontScale);
+  // The mini glyph is sized from the UNSCALED font size on purpose. Deriving it
+  // from the scaled one would make "corner font scale" silently a second suit-
+  // glyph scale, and the panel already has one of those.
+  const glyphSize = baseFontSize * BASE.cornerGlyph * style.glyphScale;
   const pad = safe.w * (style.cornerInsetPct / 100);
-  const fontFamily = getCornerFontFamily(style.cornerFontId);
+  const cornerFont = cardFont(style, fontSize);
 
-  // Fixed floor between the letter's true bottom edge and the top of the
-  // mini glyph below it, so the two never touch regardless of font or
-  // scale — also the zero point the glyph-offset slider travels from.
+  // Floor between the letter's true bottom edge and the top of the mini glyph
+  // below it, so the two never touch regardless of font or scale — also the
+  // zero point the glyph-offset slider travels from. Proportional to the
+  // DRAWN font size, so it grows with the corner-font slider rather than
+  // staying a fixed gap under a letter that has doubled.
   const MIN_LETTER_GLYPH_GAP = fontSize * 0.08;
 
   // Mirrored corner pair: top-left as drawn, bottom-right as the same
@@ -217,7 +285,7 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
       ctx.translate(safe.x + pad, safe.y + pad);
     }
     ctx.fillStyle = color;
-    ctx.font = `600 ${fontSize}px ${fontFamily}`;
+    ctx.font = cornerFont;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'hanging';
     ctx.fillText(rank, 0, 0);
@@ -225,8 +293,9 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
     // Measured, not assumed: actualBoundingBoxDescent (relative to the
     // hanging baseline set above) is the real distance down to the
     // glyph's bottom edge for whichever font is selected, so the gap
-    // stays correct across every option in CORNER_FONT_OPTIONS instead
-    // of only the one font this used to be tuned for.
+    // stays correct across every family the picker can select — the whole
+    // Google Fonts catalog and any uploaded file — instead of only the one
+    // font this used to be tuned for.
     const metrics = ctx.measureText(rank);
     const letterBottom = metrics.actualBoundingBoxDescent || fontSize * 0.8;
 
@@ -278,34 +347,46 @@ const COURT_LETTERS = { J: 'J', Q: 'Q', K: 'K' };
 function drawCourtCard(ctx, rank, suit, palette, safe, suitImages, style) {
   const color = suitColor(suit, palette);
   const other = SUIT_GROUP[suit] === 'primary' ? palette.secondary : palette.primary;
-  const cx = safe.x + safe.w / 2;
-  const cy = safe.y + safe.h / 2;
 
   // Plate: a simple bordered panel behind the letter, in the "other"
   // palette color so a court card visually distinguishes itself from a
   // pip card at a glance.
-  const plateW = safe.w * 0.62;
-  const plateH = safe.h * 0.42;
+  const plate = getCourtPlateRect(safe, style);
+  const { cx, cy } = plate;
   ctx.save();
   ctx.strokeStyle = other;
   ctx.lineWidth = Math.max(2, safe.w * 0.012);
-  ctx.strokeRect(cx - plateW / 2, cy - plateH / 2, plateW, plateH);
+  ctx.strokeRect(cx - plate.w / 2, cy - plate.h / 2, plate.w, plate.h);
   ctx.restore();
 
   // Same corner-index font drives the big center-plate letter too — one
-  // control, not two settings that could drift apart.
-  const letterSize = plateH * 0.62;
+  // control, not two settings that could drift apart. Its SIZE, though, is its
+  // own slider, measured off the unscaled plate height so the plate can grow
+  // or shrink without dragging the letter with it.
+  const letterSize = safe.h * BASE.plateH * BASE.courtLetter * style.courtLetterScale;
   ctx.save();
   ctx.fillStyle = other;
-  ctx.font = `600 ${letterSize}px ${getCornerFontFamily(style.cornerFontId)}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(COURT_LETTERS[rank], cx, cy - plateH * 0.08);
+  ctx.font = cardFont(style, letterSize);
+  // Centred on the letter's real ink, not on the font's em box — see
+  // fillTextInkCentered(). This is what makes an arbitrary Google face land in
+  // the middle of the plate instead of somewhere near it.
+  fillTextInkCentered(ctx, COURT_LETTERS[rank], cx, cy);
   ctx.restore();
 
-  const glyphSize = safe.w * 0.24 * style.glyphScale;
-  drawSuitGlyph(ctx, suit, cx, cy + plateH / 2 + glyphSize * 0.55, glyphSize, color, 0, suitImages);
-  drawSuitGlyph(ctx, suit, cx, cy - plateH / 2 - glyphSize * 0.55, glyphSize, color, 180, suitImages);
+  const glyphSize = safe.w * BASE.courtGlyph * style.glyphScale;
+  const gap = glyphSize * 0.55;
+  // The glyphs sit outside the plate, so a large plate pushes them outward —
+  // far enough, at combined slider extremes, to leave the safe rect and risk
+  // being clipped by the cutter (PRINT_SPEC.SAFE_MARGIN_IN exists for exactly
+  // that). Clamped so the glyph's outer edge stays inside the safe rect: at
+  // the extremes it crowds the plate, which prints, rather than running off
+  // the card, which does not.
+  const maxCentre = safe.y + safe.h - glyphSize / 2;
+  const minCentre = safe.y + glyphSize / 2;
+  const belowY = Math.min(cy + plate.h / 2 + gap, maxCentre);
+  const aboveY = Math.max(cy - plate.h / 2 - gap, minCentre);
+  drawSuitGlyph(ctx, suit, cx, belowY, glyphSize, color, 0, suitImages);
+  drawSuitGlyph(ctx, suit, cx, aboveY, glyphSize, color, 180, suitImages);
 }
 
 // ---------------------------------------------------------------------
