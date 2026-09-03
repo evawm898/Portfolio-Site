@@ -2676,17 +2676,20 @@ exposure the ruling accepts in exchange for the minutes.
           the fan beside it for the comparison the ruling was made from. Measured heights from
           the sheet's own captions: 569 px at first load; 730 px with Petal roles and the
           rosette's Petal 1 open (five sliders); 592 px with its Petal 5 open (three); 894 px
-          under FAN at eight per side with Petal roles and the fan's Petal 1 open, and 907 px
-          with its Petal 3 open — the sheet's worst case, the nine-summary extreme, thirteen
-          pixels taller than Petal 1's cell because its four read-outs wrap one line more.
+          under FAN at eight per side with Petal roles and the fan's Petal 1 open, and 933 px
+          with its Petal 3 open — the sheet's worst case, the nine-summary extreme, taller
+          than Petal 1's cell because "the pair 2 out from the line" wraps one line more in
+          each of four read-outs (these are the re-render's numbers, after the gap below).
           **And the first render of the fixed sheet showed a defect this branch had made**:
           "Sizesame as the rest — the hood pair, opposite the line" — a control's label and
           its read-out flush against each other, because the label row is `space-between`
           with no `gap` and had nothing to stand apart on once read-outs grew long enough to
           wrap, which they did the day they began naming their group. One line of CSS
           (`gap: 10px` on `.bl-ctrl label`), every control row in the panel, no geometry,
-          no visibility — and the sheet re-rendered after it; if the gap moved any of the heights
-          above, the commit that records the byte diff carries the re-render's numbers.
+          no visibility — and the sheet re-rendered after it: the gap moved Petal shape from 615
+          to 628 px and the fan's Petal 3–8 cells from 907 to 933 px, because a read-out that
+          now stands 10 px further from its label wraps a line sooner. The heights above are
+          the re-render's.
 
           **WHAT THIS DID NOT TOUCH, measured rather than asserted.** No `visibleWhen` changed
           (deep-equal on all 75 controls across the two trees), `DEFAULTS` is deep-equal, the
