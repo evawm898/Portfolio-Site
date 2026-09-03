@@ -6,10 +6,13 @@
        argument for the toggle: the run Eva ruled a fused mass has 120 feet
        floored at 1.60 mm on a 3.63 mm ring live and a 4.69 mm ring printed,
        and until today the viewport could only show the former. Both cells
-       are the SAME page, the SAME __bloomFrame call and the SAME base crop
-       from below at hub magnification (the crowding sheet's rule: a camera
-       close enough to read the base stands inside the canopy from every
-       other side); only the real #printPreview box differs between them.
+       are the SAME page, the SAME __bloomFrame call with the SAME numbers
+       (sized once from the LIVE hub — the first render sized each mode from
+       its own hub and the larger printed hub came out pulled back to the
+       same apparent size) and the SAME base crop from below at hub
+       magnification (the crowding sheet's rule: a camera close enough to
+       read the base stands inside the canopy from every other side); only
+       the real #printPreview box differs between them.
        If the two look the same, the caption says so in numbers rather than
        the sheet pretending otherwise: the ring radius, the foot and the
        hub-plane D_max are printed for each, from the app's own metrics for
@@ -106,12 +109,20 @@ async function cell({ label, set: sets = [], modes = ['live'], views = ['base', 
   if (cb.length) await die(`${label}: ${cb.join('; ')}`);
   const bad0 = await stillFrame(page);
   if (bad0.length) await die(`${label}: ${bad0.join('; ')}`);
+  /* THE CAMERA IS FIXED FROM THE LIVE GEOMETRY, ONCE PER CONFIGURATION. The
+     first render of the mum pair framed each mode from its own hub radius,
+     and the 29% larger printed hub was pulled back by exactly 29% — two
+     cells that looked the same size and were not. Both modes are shot with
+     the same numbers, so what differs on the sheet is the object. */
+  const m0 = await page.evaluate(() => window.__bloomMetrics());
+  if (m0.shownMode !== 'live') await die(`${label}: the frame was about to be sized from a ${m0.shownMode} build`);
+  const frameHub = m0.hubRadius, frameFit = m0.fitRadius;
   const out = [];
   for (const mode of modes) {
     await setPreview(mode === 'export');
     const m = await page.evaluate(() => window.__bloomMetrics());
     const shots = {};
-    for (const view of views) shots[view] = await shoot(path.join(outDir, `${slug(label)}-${mode}-${view}.png`), view, m.hubRadius, m.fitRadius);
+    for (const view of views) shots[view] = await shoot(path.join(outDir, `${slug(label)}-${mode}-${view}.png`), view, frameHub, frameFit);
     out.push({
       label, mode, tag: modeTag(m), ruling, note, shots, r,
       shownTris: m.shownTris, hub: m.hubRadius, foot: m.ringWidth, maxDim: m.maxDimMm,
