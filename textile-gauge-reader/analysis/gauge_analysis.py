@@ -133,12 +133,14 @@ MIN_PLAUSIBLE_SPACING_PX = 3.0   # ignore periodicities finer than this (likely 
 # this tolerance only ever discards refinements that look like exactly
 # that failure, never ordinary sub-pixel jitter. log(1.20) =~ 0.18.
 SPACING_REFINEMENT_MAX_LOG_DEVIATION = 0.18
-# A half-lag autocorrelation peak at >= this fraction of the seed peak's
-# height counts as a T-vs-2T near-tie worth resolving with 2D template
-# evidence (see _prefer_fundamental_seed). Calibrated before commit:
-# genuine ties measured >= 0.969 (including the leg-harmonic trap, which
-# is why strength alone can NOT decide the winner), legitimate
-# non-ties <= 0.64 (garter ridge pairs) and <= 0.47 (clean sub-features).
+# A double-lag autocorrelation peak at >= this fraction of the seed peak's
+# height counts as a near-tie worth resolving with 2D template evidence
+# (the ASCENT in _prefer_fundamental_seed; the DESCENT used this too until
+# the sub-repeat test replaced it with SEED_HALF_MIN_STRENGTH_RATIO below).
+# Calibrated before commit: genuine ties measured >= 0.969 (including the
+# leg-harmonic trap, which is why strength alone can NOT decide the
+# winner), legitimate non-ties <= 0.64 (garter ridge pairs) and <= 0.47
+# (clean sub-features).
 AUTOCORR_SUBHARMONIC_PREFERENCE = 0.95
 # Template-walk acceptance for switching the seed to its half-lag: must
 # exceed _template_match_consistency_score's 0.5 "couldn't measure"
@@ -150,6 +152,35 @@ SEED_HALF_TEMPLATE_MIN = 0.55
 # seed is a false repeat (crisp leg lattices measured 0.0), far below
 # the 0.5 "couldn't measure" neutral. See _prefer_fundamental_seed.
 SEED_ASCEND_TEMPLATE_FAIL_MAX = 0.05
+# Descending (seed -> its half) is the SUB-REPEAT test (see
+# _subrepeat_walk_score): the seed is a doubled period whenever its
+# half-lag is itself a genuine repeat by 2D evidence. The half-lag must
+# first be a real autocorrelation peak at >= this fraction of the seed's
+# own -- a pre-filter that keeps sub-features out of the template check,
+# NOT the decider (strength alone cannot separate a doubled row period
+# from a leg lattice; the walk does). Measured on the course axis at
+# native scale, pinned ROIs: the two doubled seeds sit at 0.92
+# (knit_sample_05, T 50px vs 2T 100px) and 0.82-0.90 (knit_sample_08, T
+# 48-51px vs 2T 102-105px, rotated/unrotated signal); the genuine
+# near-tie the old 0.95 gate was built for is 0.96 (jersey). Below it:
+# garter's legitimate ridge-pair double (half-peak ratios 0.52-0.64) and
+# clean sub-features (<= 0.47) from the original calibration, and every
+# 1x course signal whose half-lag is anti-correlated (no peak at all:
+# teal, knit 01/06/09 all read ac <= -0.15 at T/2). 0.75 sits between
+# the two populations.
+SEED_HALF_MIN_STRENGTH_RATIO = 0.75
+# The sub-repeat walk uses a band this many candidate periods wide along
+# the orthogonal axis, instead of TEMPLATE_MATCH_HEIGHT_FRACTION's 1.6.
+# A course-row template 1.6 course pitches wide spans barely one wale,
+# and on knit_sample_05 the adjacent-row correlation of such a patch
+# measured 0.24-0.31 -- just under the 0.35 match floor, so the walk at
+# the TRUE row pitch failed outright (0.0) while the doubled pitch
+# walked at 0.71. Widening the band to 3-8 pitches lifted the true-pitch
+# walk to 0.67-0.70 on every fixture with a recorded course truth
+# (jersey, teal, knit 05/06/08/09), and the crisp leg lattices a rotated
+# course axis sees (jersey, knit 01/05/08/09) still fail at 0.00 at
+# every width. 4.0 is the middle of the measured-good range.
+SUBREPEAT_TEMPLATE_HEIGHT_FRACTION = 4.0
 SMOOTHING_WINDOW_PX = 3          # 1D smoothing window applied to projection signals
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_TILE_GRID = (8, 8)
@@ -576,12 +607,14 @@ def analyze_gauge(
     # repeat — see the module docstring.
     p0_wale, _ = _autocorrelation_spacing(wale_signal_for_period)
     p0_course, _ = _autocorrelation_spacing(course_signal_for_period)
-    # T-vs-2T near-tie resolution for the COURSE seed only (see
-    # _prefer_fundamental_seed): the course path deliberately takes its
-    # seed as-is (no v3 candidate family to rescue a doubled seed — see
-    # the course comment below), so the seed itself must land on the
-    # fundamental. The wale seed is left alone: its 0.5x/1x/2x family +
-    # evidence scoring already resolves harmonic seeds either way.
+    # Harmonic-seed resolution for the COURSE seed only (see
+    # _prefer_fundamental_seed: the sub-repeat test against a doubled
+    # seed, the template-gated ascent against a leg-lattice seed): the
+    # course path deliberately takes its seed as-is (no v3 candidate
+    # family to rescue a doubled seed — see the course comment below),
+    # so the seed itself must land on the fundamental. The wale seed is
+    # left alone: its 0.5x/1x/2x family + evidence scoring already
+    # resolves harmonic seeds either way.
     # Checked on the UNROTATED signal/2D pair so template-walk anchors
     # stay coordinate-consistent with `normalized`.
     p0_course = _prefer_fundamental_seed(
@@ -831,6 +864,54 @@ def _autocorrelation_spacing(signal: np.ndarray) -> Tuple[Optional[float], float
     return spacing, strength
 
 
+def _subrepeat_walk_score(
+    normalized_2d: Optional[np.ndarray],
+    signal: np.ndarray,
+    half_lag: float,
+    lag_dx: bool,
+) -> float:
+    """
+    The course axis's structural test against a DOUBLED period -- the
+    mirror image of what the template walk does for the wale axis.
+
+    For wales the walk discriminates a fundamental from its HALF: a leg
+    lattice alternates between mirror-image patches, so walking at the
+    leg spacing fails outright (0.0) while the true stitch pitch walks
+    (~0.7). A doubled course period is the opposite failure, and the
+    walk cannot see it from the candidate itself: a true row pitch T is
+    also a repeat at 2T, 3T, ..., so the walk at 2T succeeds just as
+    well (measured 0.68-0.71 at both T and 2T on every fixture with a
+    course truth). What separates them is the candidate's own half-lag.
+    The true period's half is not a repeat at all -- adjacent half-rows
+    are anti-correlated (every 1x course signal here reads ac <= -0.15
+    at T/2, no peak) -- so T is REWARDED: nothing below it walks. The
+    doubled period's half IS a genuine repeat (it is T), so 2T SCORES 0:
+    a period whose half walks is not the fundamental.
+
+    This function is that half-lag walk. `half_lag` is the candidate's
+    half (an actual autocorrelation peak lag, per _prefer_fundamental_
+    seed), and the return value is _template_match_consistency_score at
+    it, with one deliberate difference: the band is
+    SUBREPEAT_TEMPLATE_HEIGHT_FRACTION periods wide rather than the 1.6
+    the user-anchored path was tuned with. A row template 1.6 course
+    pitches wide spans barely one wale, and on knit_sample_05 that patch
+    correlated with the adjacent row at 0.24-0.31 -- under the 0.35
+    match floor, so the true row pitch failed the walk (0.0) while its
+    double walked at 0.71, exactly backwards. Several wales of context
+    (0.67-0.70 measured at 3-8 pitches wide, every course truth here)
+    fix that; the crisp leg lattices this must NOT reward (what a
+    rotated course axis sees) still fail at 0.00 at every width.
+
+    Same return contract as _template_match_consistency_score: 0.5 is
+    "couldn't measure", 0.0 is measured negative evidence. A caller
+    treats >= SEED_HALF_TEMPLATE_MIN as "the half-lag is a genuine
+    repeat, so the candidate is doubled".
+    """
+    return _template_match_consistency_score(
+        normalized_2d, signal, half_lag, lag_dx, height_fraction=SUBREPEAT_TEMPLATE_HEIGHT_FRACTION
+    )
+
+
 def _prefer_fundamental_seed(
     signal: np.ndarray,
     normalized_2d: Optional[np.ndarray],
@@ -866,10 +947,28 @@ def _prefer_fundamental_seed(
     "couldn't measure" neutral, so the seed only ever switches on
     POSITIVE 2D evidence, never on absence of evidence.
 
-    Single step (never chains to a quarter-lag), and a no-op whenever
-    there is no half-lag peak at >= AUTOCORR_SUBHARMONIC_PREFERENCE of
-    the seed's own peak strength — garter's legitimate ridge-pair
-    double (half-peak ratios 0.52–0.64) and clean signals' minor
+    That near-tie gate turned out to be the reason two doubled course
+    seeds at NATIVE scale never descended (knit_sample_05 and 08 on
+    their pinned ROIs, -52% / -48% on the scorecard): a doubled seed on
+    real fabric is not a near-tie. Alternate rows differ a little
+    (rowing-out), so the exact two-row repeat correlates a shade better
+    than the one-row one -- half/seed strength ratios 0.92 and
+    0.82-0.90 measured, under 0.95, above every legitimate non-tie. The
+    descent is therefore the SUB-REPEAT test now (_subrepeat_walk_
+    score): the half-lag need only be a real peak above SEED_HALF_MIN_
+    STRENGTH_RATIO, and the 2D walk at it -- with a band several wales
+    wide, the one-wale default having failed the true row pitch on 05
+    outright -- decides. A candidate whose half walks is doubled; the
+    true pitch's half is anti-correlated and never walks.
+
+    Single step (never chains to a quarter-lag). Measured, not shipped:
+    on knit_sample_05's 70% metamorphic box the seed sits at 4x, one
+    step lands at 2x (98px), and a chained descent would land on the
+    true 49px -- see README, "Re-run after the sub-repeat test landed".
+    The descent is a no-op whenever there is no half-lag peak at all
+    (every 1x course signal with a recorded truth reads ac <= -0.15 at
+    T/2) or that peak is under the floor -- garter's legitimate ridge-
+    pair double (half-peak ratios 0.52-0.64) and clean signals' minor
     sub-features (<= 0.47) never reach the template check at all.
     """
     if p0 is None or p0 <= 2 * MIN_PLAUSIBLE_SPACING_PX:
@@ -900,11 +999,23 @@ def _prefer_fundamental_seed(
     if at_seed is None:
         return p0
 
-    # DESCENT: the seed may be the 2x of a near-tie fundamental below it.
+    # DESCENT: the seed may be a doubled period -- the sub-repeat test
+    # (see _subrepeat_walk_score). Originally gated on a T-vs-2T NEAR-
+    # TIE (>= AUTOCORR_SUBHARMONIC_PREFERENCE of the seed's strength),
+    # which caught the resize coin-flip (0.977-0.996) and the jersey's
+    # 0.96 but never reached the two doubled course seeds at native
+    # scale: knit_sample_05 (T 50px at 0.449 vs 2T 100px at 0.486,
+    # ratio 0.92) and knit_sample_08 (48px at 0.437 vs 105px at 0.532,
+    # 0.82) -- a doubled seed on real fabric is NOT a near-tie, because
+    # alternate rows genuinely differ a little (rowing-out), so the
+    # exact 2-row repeat correlates a shade better than the 1-row one.
+    # Strength was never the decider (see the docstring); the half-lag
+    # need only be a real peak above SEED_HALF_MIN_STRENGTH_RATIO, and
+    # the 2D walk at it carries the decision.
     at_half = _strength_near(p0 / 2.0, max(2.0, 0.12 * (p0 / 2.0)))
-    if at_half is not None and at_half[1] >= AUTOCORR_SUBHARMONIC_PREFERENCE * at_seed[1]:
+    if at_half is not None and at_half[1] >= SEED_HALF_MIN_STRENGTH_RATIO * at_seed[1]:
         half_lag = at_half[0]
-        if _template_match_consistency_score(normalized_2d, signal, half_lag, lag_dx) >= SEED_HALF_TEMPLATE_MIN:
+        if _subrepeat_walk_score(normalized_2d, signal, half_lag, lag_dx) >= SEED_HALF_TEMPLATE_MIN:
             return half_lag
 
     # ASCENT: the seed may itself BE a false half-period (a leg lattice)
@@ -3259,6 +3370,7 @@ def _template_match_consistency_score(
     signal: np.ndarray,
     candidate_period: float,
     lag_dx: bool,
+    height_fraction: Optional[float] = None,
 ) -> float:
     """
     Automatic, self-anchored sibling of count_repeats_by_template_match:
@@ -3290,6 +3402,11 @@ def _template_match_consistency_score(
     else matched anywhere nearby: genuine negative evidence that this
     candidate's spacing doesn't correspond to a real recurring patch of
     texture, not a "couldn't measure" case.
+
+    `height_fraction` overrides TEMPLATE_MATCH_HEIGHT_FRACTION for the
+    band's extent along the orthogonal axis; every existing caller leaves
+    it at the default (see _subrepeat_walk_score for the one that does
+    not, and why).
     """
     if normalized_2d is None or candidate_period < TEMPLATE_MATCH_MIN_PERIOD_PX:
         return 0.5
@@ -3297,9 +3414,11 @@ def _template_match_consistency_score(
     if not peaks:
         return 0.5
 
+    if height_fraction is None:
+        height_fraction = TEMPLATE_MATCH_HEIGHT_FRACTION
     work = normalized_2d if lag_dx else normalized_2d.T
     template_w = int(round(candidate_period))
-    template_h = int(round(candidate_period * TEMPLATE_MATCH_HEIGHT_FRACTION))
+    template_h = int(round(candidate_period * height_fraction))
     template_h = max(int(TEMPLATE_MATCH_MIN_PERIOD_PX), min(template_h, work.shape[0]))
     if template_w <= 0 or template_h <= 0 or work.shape[1] < template_w:
         return 0.5

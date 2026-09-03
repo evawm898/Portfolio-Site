@@ -55,7 +55,11 @@ The regression contract, two-sided:
     number moving in a log nobody reads.
 
 Baseline pinned 2026-09-03 against main 7974ad9 (detector unchanged since
-PR #109). Run this file directly to print the current table:
+PR #109); the two course rows re-pinned the same day when the sub-repeat
+test (_subrepeat_walk_score / _prefer_fundamental_seed's descent) brought
+knit_05 and knit_08 course inside the bar (-51.7 -> -6.7, -47.8 -> -2.2)
+with every other row byte-identical. Run this file directly to print the
+current table:
 
     python tests/test_ground_truth_scorecard.py
 """
@@ -129,11 +133,11 @@ BASELINE: Dict[Tuple[str, str], float] = {
     ("knit_01", "course"): -1.8,
     ("knit_02", "wale"): 120.4,
     ("knit_05", "wale"): 103.4,
-    ("knit_05", "course"): -51.7,
+    ("knit_05", "course"): -6.7,
     ("knit_06", "wale"): -3.3,
     ("knit_06", "course"): 0.4,
     ("knit_08", "wale"): 2.0,
-    ("knit_08", "course"): -47.8,
+    ("knit_08", "course"): -2.2,
     ("knit_09", "wale"): -2.9,
     ("knit_09", "course"): 7.6,
 }
@@ -151,17 +155,18 @@ KNOWN_BEYOND_BAR: Dict[Tuple[str, str], str] = {
         "documented under 'Seed lands directly on the leg lattice'; unrotated, the wale candidate "
         "family is supposed to climb back up and here it does not at this ROI"
     ),
-    ("knit_05", "course"): (
-        "-52%: doubled course period (98.9px vs the ~47.8px row pitch) -- the 2x family, the course "
-        "path's seed-as-is design gap documented under 'v3 halves rotated course structure'"
-    ),
-    ("knit_08", "course"): (
-        "-48%: doubled course period (96.0px vs the ~50.1px row pitch, transposed calibration) -- "
-        "same 2x family as knit_05's course; knit_08's WALE axis, by contrast, reads +2.0% at this "
-        "ROI (the confidently-reported ~2x wale harmonic recorded in the README came from a "
-        "different, hand-picked crop)"
-    ),
 }
+
+# Rows that USED to be beyond the bar, kept so the fix has a name when the
+# table is read later. knit_05 course (-51.7%, 98.9px vs the ~47.8px row
+# pitch) and knit_08 course (-47.8%, 96.0px vs ~50.1px) were the same
+# doubled-period family: the course seed's T-vs-2T descent was gated on a
+# >= 0.95 near-tie that a doubled seed on real fabric never reaches (0.92
+# and 0.82-0.90 measured -- alternate rows differ a little, so the exact
+# 2-row repeat correlates a shade better than the 1-row one), and the
+# narrow 1.6-pitch template band failed the walk at the TRUE pitch on
+# knit_05 (0.0) while walking the double (0.71). Fixed by the sub-repeat
+# test -- see _subrepeat_walk_score in analysis/gauge_analysis.py.
 
 
 def _roi_for(case: Case, img) -> Tuple[int, int, int, int]:

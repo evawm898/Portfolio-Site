@@ -1860,6 +1860,61 @@ showed half-period flips under rotation on five (ratios pinned at
    selection confidently took the 2× family at this large pitch —
    reserved for its own PR.
 
+**The two doubled course periods at native scale (05/08) were the
+descent's own gate, not a missing evidence stream — measured before
+anything changed.** The scorecard below recorded knit_05 course at
+98.9px (−51.7%) and knit_08 at 96.0px (−47.8%), both ~2× the true row
+pitch, unrotated, unresized. The premise going in was that the course
+axis had no structural test to correct a doubled seed. It did:
+`_prefer_fundamental_seed`'s descent already resolved T-vs-2T with the
+template walk at the half-lag — but only inside a ≥ 0.95 near-tie,
+because that is what the resize coin-flip (0.977–0.996) and the jersey
+(0.96) looked like. Both course signals carry the true pitch as a real
+autocorrelation peak: on 05, 50px at 0.449 beside 100px at 0.486
+(ratio 0.92); on 08, 48px at 0.437 beside 105px at 0.532 (0.82; 51px at
+0.448 vs 102px at 0.500 unrotated). A doubled seed on real fabric is
+therefore *not* a near-tie — alternate rows genuinely differ a little
+(rowing-out), so the exact two-row repeat correlates a shade better
+than the one-row one, and the gate never opened. A second, independent
+failure sat behind it: with the walk's default band (1.6 course
+pitches wide, barely one wale) the adjacent-row correlation on 05
+measured 0.24–0.31, just under the 0.35 match floor, so the walk at
+the TRUE pitch failed outright (0.0) while the doubled pitch walked at
+0.71 — exactly backwards. Widening the band to 3–8 pitches lifted the
+true-pitch walk to 0.67–0.70 on every fixture with a course truth
+(jersey, teal, 05/06/08/09), and the crisp leg lattices a rotated
+course axis sees (jersey, 01/05/08/09) still failed at 0.00 at every
+width.
+
+The landed change is the **sub-repeat test** (`_subrepeat_walk_score`):
+a course candidate is a doubled period whenever its *half-lag* is
+itself a genuine repeat by 2D evidence. The true pitch is rewarded
+because nothing below it walks — its half is anti-correlated (every 1×
+course signal here reads ac ≤ −0.15 at T/2, no peak at all); the
+doubled pitch scores zero because its half is T, which walks. The walk
+itself cannot see doubling from the candidate (a true T is also a
+repeat at 2T; both walk at 0.68–0.71), which is why the wale's leg
+test — a half that *fails* — is the mirror image of this one. The
+descent's gate became a real-peak floor (`SEED_HALF_MIN_STRENGTH_RATIO`
+= 0.75, between the calibrated non-ties at ≤ 0.64 and the doubled seeds
+at ≥ 0.82) with the wide-band walk (`SUBREPEAT_TEMPLATE_HEIGHT_FRACTION`
+= 4.0) as the decider; the ascent is untouched, and the descent is
+still a single step. Result: 05 course 98.9 → 51.2px (−6.7%), 08 course
+96.0 → 51.3px (−2.2%), every other scorecard row byte-identical, both
+former strict xfails flipped green and re-pinned. Mechanism pinned on
+the real signals in `tests/test_course_subrepeat.py`.
+
+**Checked and left alone: knit_05's wale (+103%, 33.5px legs vs ~68px)
+is a different mechanism.** The wale never uses the seed rule; its v0.3
+scorer sees the same template-walk verdict (legs 0.000, true pitch
+0.699) but at weight 0.10, and picks the legs on phase consistency
+(0.606 vs 0.175 at weight 0.378), regional consensus (0.96 vs 0.43,
+the term already documented as untrustworthy for exactly this) and
+fold consistency (0.86 vs 0.84 — fooled too). A scorer-weighting
+failure, not the descent gate from the other side; reserved for its
+own pass. knit_02's wale is ruler contamination in the pinned ROI,
+also untouched.
+
 ### Recorded baselines — what to diff the next run against
 
 Both tables below are the detector's actual output on 2026-09-03 against
@@ -1915,6 +1970,28 @@ ROI — the confidently-reported ~2× wale harmonic recorded earlier came
 from a different, hand-picked crop, which is the ROI-dependence finding
 again, not a contradiction.
 
+**Re-run after the sub-repeat test landed** (same day, same ROIs, same
+command; the two course rows are the only cells that moved, and the
+baseline column now carries their re-pinned values):
+
+| fixture | axis | ROI (x,y,w,h) | true /in | predicted /in | spacing px | signed error | baseline | status |
+|---|---|---|---|---|---|---|---|---|
+| jersey | wale | (241, 121, 242, 242) | 5.0 | 4.72 | 35.2 | -5.5% | -5.5% | ok |
+| jersey | course | (241, 121, 242, 242) | 7.2 | 6.86 | 24.222 | -4.7% | -4.7% | ok |
+| teal | wale | (300, 450, 600, 600) | 4.0 | 3.50 | 77.833 | -12.4% | -12.4% | ok |
+| teal | course | (300, 450, 600, 600) | 5.0 | 5.14 | 53.111 | +2.7% | +2.7% | ok |
+| knit_01 | wale | (550, 431, 862, 862) | 3.8 | 3.97 | 83.875 | +4.5% | +4.5% | ok |
+| knit_01 | course | (550, 431, 862, 862) | 5.7 | 5.60 | 59.5 | -1.8% | -1.8% | ok |
+| knit_02 | wale | (1308, 654, 1308, 1308) | 4.0 | 8.81 | 134.667 | +120.4% | +120.4% | xfail (>20%) |
+| knit_05 | wale | (469, 504, 937, 937) | 4.7 | 9.56 | 33.481 | +103.4% | +103.4% | xfail (>20%) |
+| knit_05 | course | (469, 504, 937, 937) | 6.7 | 6.25 | 51.214 | -6.7% | -6.7% | ok |
+| knit_06 | wale | (609, 328, 656, 656) | 3.8 | 3.67 | 127.5 | -3.3% | -3.3% | ok |
+| knit_06 | course | (609, 328, 656, 656) | 5.2 | 5.22 | 83.0 | +0.4% | +0.4% | ok |
+| knit_08 | wale | (502, 252, 504, 504) | 4.5 | 4.59 | 75.4 | +2.0% | +2.0% | ok |
+| knit_08 | course | (502, 252, 504, 504) | 6.9 | 6.75 | 51.25 | -2.2% | -2.2% | ok |
+| knit_09 | wale | (374, 270, 539, 539) | 5.1 | 4.95 | 37.75 | -2.9% | -2.9% | ok |
+| knit_09 | course | (374, 270, 539, 539) | 7.6 | 8.18 | 22.867 | +7.6% | +7.6% | ok |
+
 **Metamorphic invariants, every real fixture** — the CLI's default ROI
 (centred 70% box), orientation `vertical`, 10 outcomes per photo, with
 `lost` as redefined above (ratio beyond 2.5× / below 0.4×). Before that
@@ -1949,6 +2026,44 @@ fixture's pytest pin uses a different, ruler-free ROI
 with resize/course as its strict xfail; the 9/10 here is a different
 skip (half_roi course, too few periods) with resize/course passing at
 the 70% crop.
+
+**Re-run after the sub-repeat test landed** (same command). Nine of the
+eleven photos are cell-for-cell identical; two moved, and in both the
+cell that turned red is the OTHER axis's known-wrong reading being
+compared against a course reading that moved toward the truth — the
+invariants measure co-variance, not correctness, and a pair of paths
+that agreed on the wrong answer counted as `ok`:
+
+| fixture | ROI (x,y,w,h) | ok | drift | harmonic_flip | lost | skipped |
+|---|---|---|---|---|---|---|
+| knit_sample_03 | (570, 462, 2660, 2158) | 3 | 1 | 2 (rotate90 wale, rotate90 course) | 3 (resize wale, resize course, half_roi course) | 1 |
+| knit_sample_05 | (281, 292, 1312, 1362) | 7 | 0 | 2 (rotate90 wale, half_roi wale) | 1 (half_roi course) | 0 |
+
+* **03, rotate90 course** (was `ok` at 287.3 vs 287.3; now 145.0 vs
+  287.3, ratio 0.505): the rotated course path sees the wale structure,
+  and the sub-repeat test descends its 2× seed (287px, peak 0.48) to
+  the fundamental (145px, peak 0.40, ratio 0.83, walks at 0.69) — the
+  ~142px the photo's own tape measure supports, per mechanism 3 above.
+  The unrotated wale path still reads 287 (its own open item), so the
+  two now disagree. This cell was green only because both were wrong
+  together.
+* **05, the 70% box** (not the pinned ROI): the course seed there sat at
+  4× the true row pitch (193.2px vs ~47.8 true), agreeing with the
+  rotated wale path's equally-wrong 193.2, which counted as `ok`. The
+  single-step descent takes it to 2× (98.3px: peak ratio above the
+  floor, walks) — closer, still doubled. rotate90/wale therefore reads
+  1.966× the new baseline (the rotated wale path is unchanged at 4×),
+  and half_roi/course is now evaluated (7 periods, no longer skipped
+  at 3.5) and reads the 25.5px sub-feature it always did. Measured, not
+  shipped: letting the descent CHAIN (re-test the half of the half)
+  lands this box on 49.2px, the true pitch — and leaves the invariants
+  at the same 7/10, because the comparators are still the rotated wale
+  path at 4× and the half-box sub-feature. A correct course reading
+  cannot turn those two cells green; only the wale path can.
+
+Every other fixture — 01, 02, 04, 06, 07, 08, 09, jersey, teal — is
+unchanged to the pixel, including 06/08's documented rotate90 course
+flips and the jersey's pytest pins.
 
 ## Deploying the backend to Render
 
