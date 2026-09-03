@@ -572,20 +572,82 @@ details:not([open]) > summary.cd-panel__label { margin-bottom: 0; }
    Preview grid
 --------------------------------------------------- */
 
+/* The preview sticks beside the control panel, so the cards stay in view while
+   the panel is scrolled past. Two things make it behave rather than fight the
+   page:
+     - .cd-body sets align-items:start, so this grid item is content-height and
+       its grid area is as tall as the row — that area is what sticky travels
+       inside. A collapsed panel makes the area short and the preview simply
+       stops moving, which is the correct nothing-to-do.
+     - a zoomed grid can be taller than the viewport, and a sticky box taller
+       than its viewport pins its TOP and hides its bottom. So the sticky box
+       is capped to the viewport and scrolls internally instead.
+   Both are undone at the stacking breakpoint below. */
+.cd-preview {
+  position: sticky;
+  top: 2rem;
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cd-preview__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  /* The head rides along inside the scrolling sticky box so the zoom control
+     is reachable at any scroll position within it. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper);
+  padding-bottom: 0.5rem;
+}
+
 .cd-preview__label {
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-dim);
-  margin-bottom: 1.25rem;
 }
 
 .cd-preview__label span { color: var(--petrol-bright); margin-right: 0.6em; }
 
+/* Same language as the panel's sliders: mono uppercase label, petrol readout,
+   petrol accent on the track. */
+.cd-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cd-zoom__label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.cd-zoom__range {
+  width: 8rem;
+  accent-color: var(--petrol);
+  cursor: pointer;
+}
+
+.cd-zoom .cd-field__value { min-width: 3em; text-align: right; }
+
+/* --cd-card-min is the only thing zoom changes. auto-fill re-flows the columns
+   around it and .cd-card's aspect-ratio keeps the proportions, so nothing
+   distorts and no canvas is touched. */
 .cd-preview-grid {
+  --cd-card-min: 120px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--cd-card-min), 1fr));
   gap: 1rem;
 }
 
@@ -614,6 +676,19 @@ details:not([open]) > summary.cd-panel__label { margin-bottom: 0; }
 
 @media (max-width: 900px) {
   .cd-body { grid-template-columns: 1fr; }
+
+  /* Single column: there is no side-by-side layout left to preserve, and a
+     sticky preview here would pin a viewport-tall box over the controls the
+     user came to reach. So it scrolls with the page like everything else, and
+     the internal scroller is removed with it — a nested scroll region inside
+     a normal page scroll is the other half of the same problem. */
+  .cd-preview {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .cd-preview__head { position: static; padding-bottom: 0; }
 }
 
 @media (max-width: 600px) {

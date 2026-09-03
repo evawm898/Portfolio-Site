@@ -434,7 +434,21 @@ it. Any NEW render path inherits the same obligation.
   fetches nothing for a section nobody opened. The gate drives a slider while
   `04 Style` is COLLAPSED and asserts the preview still rebuilds — the failure
   the bloom panel already shipped once.
-- **Verify with `node tools/verify-cards-fonts.mjs`** (103 checks;
+- **The preview is sticky, and the zoom slider is presentation-only.** `.cd-preview`
+  sticks beside the panel (which is what `align-items: start` on `.cd-body`
+  buys — the grid item is content-height, and its grid area is the travel), and
+  is capped to `calc(100vh - 4rem)` with its own scroller, because a sticky box
+  taller than the viewport pins its TOP and hides the rest. Both are undone at
+  the 900px stacking breakpoint: with no side-by-side layout left, a
+  viewport-tall sticky box over the controls, and a nested scroll region inside
+  the page scroll, are both worse than not sticking. The zoom slider writes ONE
+  thing — `--cd-card-min` on the grid — so `auto-fill` re-flows and
+  `.cd-card`'s `aspect-ratio` holds the proportions. It must never reach a
+  render path: every canvas keeps its 825x1125 backing store, which is what the
+  exports read. The gate asserts that by tagging a live canvas and requiring
+  the SAME element to survive every zoom step, with a real style slider as the
+  control that proves the tag does get replaced by an actual re-render.
+- **Verify with `node tools/verify-cards-fonts.mjs`** (135 checks;
   `--negative-control` required before quoting a pass from a changed harness;
   `--shots <dir>` writes a contact sheet). It refuses to accept the preview
   canvas as evidence: every claim is measured against the BYTES OF AN EXPORTED

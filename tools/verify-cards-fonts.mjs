@@ -608,6 +608,154 @@ check(await page.$eval('#fontList', (e) => e.getBoundingClientRect().height > 0)
   'the font list has layout once 03 Font is open');
 
 // ---------------------------------------------------------------------
+section('2b. Preview — sticky beside the panel, and zoom that is screen-only');
+// ---------------------------------------------------------------------
+// The claim that matters here is a NEGATIVE one: the zoom control must not
+// change what the exports rasterise. A zoom wired into the render path would
+// look identical on screen and quietly redefine "300 DPI".
+
+const WIDE = { width: 1280, height: 900 };
+const NARROW = { width: 700, height: 900 };
+
+async function previewMetrics() {
+  return page.evaluate(() => {
+    const sec = document.querySelector('.cd-preview');
+    const grid = document.getElementById('previewGrid');
+    const card = grid.querySelector('.cd-card');
+    const canvas = card && card.querySelector('canvas');
+    const cs = getComputedStyle(sec);
+    const r = card ? card.getBoundingClientRect() : null;
+    return {
+      position: cs.position,
+      top: cs.top,
+      overflowY: cs.overflowY,
+      maxHeight: cs.maxHeight,
+      cardMin: getComputedStyle(grid).getPropertyValue('--cd-card-min').trim(),
+      cardW: r ? r.width : 0,
+      cardH: r ? r.height : 0,
+      canvasW: canvas ? canvas.width : 0,
+      canvasH: canvas ? canvas.height : 0,
+      gridTop: grid.getBoundingClientRect().top,
+      secTop: sec.getBoundingClientRect().top,
+      viewportH: window.innerHeight,
+    };
+  });
+}
+
+await page.setViewportSize(WIDE);
+await page.waitForTimeout(200);
+
+// --- sticky, side-by-side ---------------------------------------------
+{
+  const m = await previewMetrics();
+  check(m.position === 'sticky', `the preview is position: ${m.position} in the two-column layout`);
+  check(m.overflowY === 'auto' && m.maxHeight !== 'none',
+    `it is capped to the viewport and scrolls internally (max-height ${m.maxHeight}, overflow-y ${m.overflowY}) — a sticky box taller than the viewport would pin its top and hide the rest`);
+
+  // Expand every section so the panel is far taller than the preview, which
+  // is the only situation where sticky has anywhere to travel.
+  await page.evaluate(() => {
+    for (const d of document.querySelectorAll('details.cd-panel__section')) d.open = true;
+  });
+  await page.waitForTimeout(300);
+  const panelH = await page.$eval('.cd-panel', (e) => e.getBoundingClientRect().height);
+  check(panelH > WIDE.height, `with all sections expanded the panel is ${Math.round(panelH)}px, taller than the ${WIDE.height}px viewport`);
+
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await page.waitForTimeout(300);
+  const after = await previewMetrics();
+  check(after.secTop >= 0 && after.secTop < 120,
+    `scrolled 1200px down, the preview is still parked near the top of the viewport (top ${Math.round(after.secTop)}px)`);
+  check(after.cardW > 0 && after.gridTop < after.viewportH,
+    `and its cards are still on screen (first card ${Math.round(after.cardW)}x${Math.round(after.cardH)}px)`);
+
+  // Collapsed sections make the panel SHORT — sticky then has no travel, and
+  // must simply sit still rather than break the layout.
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    for (const d of document.querySelectorAll('details.cd-panel__section')) {
+      d.open = ['section-01', 'section-02', 'section-05'].includes(d.id);
+    }
+  });
+  await page.waitForTimeout(300);
+  const collapsed = await previewMetrics();
+  check(collapsed.position === 'sticky' && collapsed.cardW > 0 && collapsed.secTop >= 0,
+    `with the panel collapsed the preview still lays out normally (top ${Math.round(collapsed.secTop)}px, card ${Math.round(collapsed.cardW)}px)`);
+}
+
+// --- NOT sticky once the layout stacks ---------------------------------
+{
+  await page.setViewportSize(NARROW);
+  await page.waitForTimeout(300);
+  const m = await previewMetrics();
+  check(m.position === 'static',
+    `at ${NARROW.width}px, where .cd-body stacks to one column, the preview is position: ${m.position} — a viewport-tall sticky box over the controls is worse than no sticky at all`);
+  check(m.overflowY === 'visible' && m.maxHeight === 'none',
+    `and its internal scroller is gone with it (max-height ${m.maxHeight}, overflow-y ${m.overflowY}) — no nested scroll region inside the page scroll`);
+  await page.setViewportSize(WIDE);
+  await page.waitForTimeout(200);
+}
+
+// --- zoom ---------------------------------------------------------------
+{
+  const base = await previewMetrics();
+  const baseRatio = base.cardW / base.cardH;
+  check(base.cardMin === '120px', `zoom starts at the declared base (--cd-card-min ${base.cardMin})`);
+
+  // Tag the live canvas. If zoom re-rendered, renderPreview() would replace
+  // the element and the tag would be gone — which is how "screen-only" is
+  // checked rather than assumed.
+  await page.evaluate(() => {
+    document.querySelector('#previewGrid .cd-card canvas').dataset.zoomProbe = 'kept';
+  });
+
+  const widths = [];
+  for (const pct of [100, 200, 400]) {
+    await driveSlider('previewZoom', pct);
+    await page.waitForTimeout(250);
+    const m = await previewMetrics();
+    widths.push(m.cardW);
+    check(m.cardMin === `${(120 * pct) / 100}px`,
+      `zoom ${pct}%: --cd-card-min is ${m.cardMin}`);
+    check(m.canvasW === 825 && m.canvasH === 1125,
+      `zoom ${pct}%: the canvas backing store is STILL ${m.canvasW}x${m.canvasH} — export resolution untouched`);
+    const ratio = m.cardW / m.cardH;
+    check(Math.abs(ratio - baseRatio) < 0.01,
+      `zoom ${pct}%: aspect ratio ${ratio.toFixed(4)} matches the unzoomed ${baseRatio.toFixed(4)} — no distortion`);
+    check(await page.$eval('#previewZoomValue', (e) => e.textContent.trim()) === `${pct}%`,
+      `zoom ${pct}%: the readout says ${pct}%`);
+  }
+  check(widths[0] < widths[1] && widths[1] < widths[2],
+    `on-screen card width grows with zoom (${widths.map((w) => Math.round(w)).join(' < ')} px)`);
+
+  const probeKept = await page.$eval('#previewGrid .cd-card canvas', (e) => e.dataset.zoomProbe === 'kept');
+  check(probeKept, 'the same canvas element survived every zoom step — zoom never re-rendered a card');
+
+  // A slider change in the panel DOES re-render, so the probe must go: this is
+  // the control that proves the check above is not just always true.
+  await driveSlider('styleGlyphScale', 130);
+  await page.waitForTimeout(400);
+  const probeGone = await page.$eval('#previewGrid .cd-card canvas', (e) => e.dataset.zoomProbe !== 'kept');
+  check(probeGone, 'CONTROL: a real style slider DID replace the canvas — so the survival check above has teeth');
+  await driveSlider('styleGlyphScale', 100);
+  await driveSlider('previewZoom', 100);
+  await page.waitForTimeout(300);
+}
+
+// This section toggles sections to test sticky against a tall and a short
+// panel, so it must hand the page back with everything OPEN — later sections
+// drive the font search box and the sliders through real clicks and typing,
+// which a collapsed <details> makes impossible. Leaving 03 shut here cost a
+// run: page.fill('#fontSearch') sat waiting 30s on an element with no layout.
+await page.evaluate(() => {
+  window.scrollTo(0, 0);
+  for (const d of document.querySelectorAll('details.cd-panel__section')) d.open = true;
+});
+await page.waitForTimeout(300);
+check(await page.$eval('#fontSearch', (e) => e.getBoundingClientRect().height > 0),
+  'the font search box has layout again for the sections that follow');
+
+// ---------------------------------------------------------------------
 section('3. Custom uploads — .woff2 and .ttf through the real file input');
 // ---------------------------------------------------------------------
 const customSigs = {};

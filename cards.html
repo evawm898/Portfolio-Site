@@ -163,8 +163,18 @@
     </details>
   </section>
 
-  <section aria-labelledby="preview-heading">
-    <h2 id="preview-heading" class="cd-preview__label"><span>07</span>Preview</h2>
+  <section class="cd-preview" aria-labelledby="preview-heading">
+    <div class="cd-preview__head">
+      <h2 id="preview-heading" class="cd-preview__label"><span>07</span>Preview</h2>
+      <div class="cd-zoom">
+        <label class="cd-zoom__label" for="previewZoom">Zoom</label>
+        <input type="range" id="previewZoom" class="cd-zoom__range" min="100" max="400" step="25" value="100">
+        <output class="cd-field__value" id="previewZoomValue" for="previewZoom">100%</output>
+      </div>
+    </div>
+    <!-- Screen size only. The zoom slider drives a CSS custom property on the
+         grid below; every canvas keeps its 825x1125 backing store, which is
+         what the PDF and PNG exports read. Nothing here re-renders a card. -->
     <div id="previewGrid" class="cd-preview-grid"></div>
   </section>
 

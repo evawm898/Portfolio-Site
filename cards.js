@@ -97,6 +97,35 @@ function buildStyleControls() {
 }
 
 // ---------------------------------------------------------------------
+// Preview zoom (07) — on-screen size only
+// ---------------------------------------------------------------------
+// The base minimum card column width, matching --cd-card-min's declared value
+// in cards.css. Zoom multiplies it and nothing else: auto-fill re-flows the
+// columns, .cd-card's aspect-ratio holds the proportions, and every canvas
+// keeps the 825x1125 backing store the exports read.
+//
+// Deliberately NOT a render path. It never calls requestPreview() — a zoom is
+// a CSS variable write, so re-rasterising 8 cards for it would be waste, and
+// wiring it to the renderer is how "preview zoom" quietly becomes "export
+// resolution" for whoever reads this next.
+const CARD_MIN_PX = 120;
+
+function buildZoomControl() {
+  const input = document.getElementById('previewZoom');
+  const output = document.getElementById('previewZoomValue');
+  const grid = document.getElementById('previewGrid');
+
+  const apply = () => {
+    const pct = parseFloat(input.value);
+    output.textContent = `${pct}%`;
+    grid.style.setProperty('--cd-card-min', `${Math.round((CARD_MIN_PX * pct) / 100)}px`);
+  };
+
+  apply();
+  input.addEventListener('input', apply);
+}
+
+// ---------------------------------------------------------------------
 // Font picker — search + category filter over the whole Google Fonts
 // catalog, the five site fonts, and anything uploaded this session.
 // ---------------------------------------------------------------------
@@ -428,6 +457,8 @@ async function drawPreviewNow() {
 
   const palette = getPalette();
   const grid = document.getElementById('previewGrid');
+  // Clears the CARDS, not the grid's own inline --cd-card-min, so the zoom
+  // setting survives every re-render without this path knowing about it.
   grid.innerHTML = '';
   for (const spec of PREVIEW_SPECS) {
     const canvas = renderCardToCanvas(spec, palette, suitImages, style);
@@ -518,6 +549,7 @@ function init() {
   buildSuitRows();
   buildStyleControls();
   buildFontPicker();
+  buildZoomControl();
   renderSpecText();
   // Not awaited — init() runs synchronously so the page is interactive
   // immediately; the first paint waits on the default font inside
