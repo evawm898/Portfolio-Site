@@ -20,6 +20,24 @@
   .qc-table td { color: var(--ink); }
   .qc-table td:last-child, .qc-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
   .qc-placeholder { color: var(--ink-faint); font-style: italic; }
+  /* Interactive figures: hairline box, mono labels, the site's range thumb. */
+  .qc-sim { margin: 1.5rem 0; border: 1px solid var(--line); background: var(--black-raised); }
+  .qc-sim__controls { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.5rem; padding: 1rem 1.25rem 0.5rem; }
+  .qc-sim__ctl { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+  .qc-sim__ctl span { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.25rem; }
+  .qc-sim__ctl output { color: var(--ink); letter-spacing: 0.02em; text-transform: none; text-align: right; }
+  .qc-sim__ctl input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer; }
+  .qc-sim__ctl input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--line-strong); }
+  .qc-sim__ctl input[type="range"]::-moz-range-track { height: 1px; background: var(--line-strong); }
+  .qc-sim__ctl input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5.5px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+  .qc-sim__ctl input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+  .qc-sim__ctl input[type="range"]:focus-visible { outline: none; }
+  .qc-sim__ctl input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--petrol-bright); }
+  .qc-sim__svg { display: block; width: 100%; height: auto; font-family: var(--mono); }
+  .qc-svg-k { font-size: 9px; letter-spacing: 0.14em; fill: var(--ink-faint); text-anchor: middle; }
+  .qc-svg-v { font-size: 12px; fill: var(--ink); text-anchor: middle; }
+  .qc-sim__cap { padding: 0.75rem 1.25rem 1rem; font-size: 11px; line-height: 1.6; color: var(--ink-dim); border-top: 1px solid var(--line); }
+  @media (max-width: 480px) { .qc-sim__controls { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body id="top">
@@ -69,7 +87,76 @@
         <p>Gain has to equal loss. When it does, core temperature holds. When it does not, the body starts spending its reserves to fix it.</p>
         <p>The controller is the <strong>hypothalamus</strong>. Its effectors are the <strong>sweat glands</strong> (open the evaporation channel), <strong>skeletal muscle</strong> (shiver, which is metabolism on demand) and the <strong>skin arterioles</strong> (dilate to push warm blood to the surface, constrict to keep it in the core). Everything a garment does, it does by changing how easily those five loss channels work.</p>
         <p>The part that reframed it for me: at rest in a mild room, most of the loss is convection and radiation, and evaporation is a small share. Turn up the temperature or the effort and those two channels shrink toward nothing, because the air is no longer cooler than the skin. Evaporation is the only channel left. That is why breathability is not a nice-to-have in a hot garment. It is the whole budget.</p>
-        <!-- A: heat-balance seesaw goes here -->
+        <figure class="qc-sim" id="qcSeesaw" aria-labelledby="qcSeesawCap">
+          <div class="qc-sim__controls">
+            <label class="qc-sim__ctl" for="qcTemp"><span>Ambient <output id="qcTempOut">70 &deg;F</output></span><input type="range" id="qcTemp" min="50" max="104" step="1" value="70"></label>
+            <label class="qc-sim__ctl" for="qcAct"><span>Activity <output id="qcActOut">resting</output></span><input type="range" id="qcAct" min="0" max="3" step="1" value="0"></label>
+          </div>
+          <svg class="qc-sim__svg" viewBox="0 0 360 250" role="img" aria-label="Heat-balance seesaw: heat gain on the left pan, the five loss channels on the right; the beam tips when they differ">
+            <g id="qcBeamG">
+              <line id="qcBeam" x1="40" y1="70" x2="320" y2="70" stroke="var(--ink-dim)" stroke-width="2" stroke-linecap="round"/>
+              <g id="qcPanL"><rect x="40" y="52" width="70" height="1" fill="var(--ink-dim)"/><text x="75" y="44" class="qc-svg-k">GAIN</text><text id="qcGainT" x="75" y="66" class="qc-svg-v">100 W</text></g>
+              <g id="qcPanR"><rect x="250" y="52" width="70" height="1" fill="var(--ink-dim)"/><text x="285" y="44" class="qc-svg-k">LOSS</text><text id="qcLossT" x="285" y="66" class="qc-svg-v">100 W</text></g>
+            </g>
+            <path d="M180 70 L170 92 L190 92 Z" fill="var(--black-raised)" stroke="var(--ink-dim)"/>
+            <line x1="40" y1="92" x2="320" y2="92" stroke="var(--line)"/>
+            <g id="qcBars" font-size="10"></g>
+          </svg>
+          <figcaption class="qc-sim__cap" id="qcSeesawCap">Balanced &mdash; core temperature holds.</figcaption>
+        </figure>
+        <script>
+        (() => {
+          // A qualitative heat balance. Skin sits near 93 °F; the dry channels
+          // (conduction, convection, radiation) scale with how much cooler the
+          // air is than the skin, and reverse into a gain when it is hotter.
+          // Evaporation is whatever is left to close the gap, between an
+          // insensible floor and a sweating ceiling; the beam tips when it
+          // cannot close it.
+          const T = document.getElementById('qcTemp'), A = document.getElementById('qcAct');
+          const tOut = document.getElementById('qcTempOut'), aOut = document.getElementById('qcActOut');
+          const bars = document.getElementById('qcBars'), beam = document.getElementById('qcBeamG'), cap = document.getElementById('qcSeesawCap');
+          const gainT = document.getElementById('qcGainT'), lossT = document.getElementById('qcLossT');
+          const ACT = [['resting', 100], ['walking', 250], ['running', 500], ['sprinting', 800]];
+          const SKIN = 93, FLOOR = 25;   // insensible perspiration never stops
+          // W per °F of skin-to-air difference, clothed and at rest: they sum so that 70 °F at rest balances
+          const CH = [['conduction', 0.15], ['convection', 1.5], ['radiation', 1.15], ['evaporation', 0], ['respiration', 0]];
+          function model() {
+            const t = +T.value, [name, met] = ACT[+A.value], dT = SKIN - t;
+            const dry = CH.slice(0, 3).map(([k, c]) => [k, Math.max(0, c * dT)]);
+            const envGain = dT < 0 ? -dT * 2.8 * 0.55 : 0;                    // hot air and surfaces push heat in
+            const ceil = 850 - 6 * Math.max(0, t - 80);                       // sweating capacity, and it falls as the air warms
+            const resp = 8 + 0.03 * met;
+            const gain = met + envGain;
+            const need = gain - dry.reduce((s, d) => s + d[1], 0) - resp;
+            const evap = Math.min(ceil, Math.max(FLOOR, need));
+            const loss = dry.reduce((s, d) => s + d[1], 0) + resp + evap;
+            return { name, t, met, envGain, gain, loss, rows: [...dry, ['evaporation', evap], ['respiration', resp]] };
+          }
+          function render() {
+            const m = model();
+            tOut.textContent = m.t + ' \u00b0F \u00b7 ' + Math.round((m.t - 32) * 5 / 9) + ' \u00b0C';
+            aOut.textContent = m.name;
+            const diff = m.gain - m.loss, tilt = Math.max(-11, Math.min(11, diff / 8));
+            beam.setAttribute('transform', 'rotate(' + tilt.toFixed(1) + ' 180 70)');
+            gainT.textContent = Math.round(m.gain) + ' W';
+            lossT.textContent = Math.round(m.loss) + ' W';
+            const max = 900, x0 = 112, w = 208;
+            bars.innerHTML = m.rows.map(([k, v], i) => {
+              const y = 112 + i * 26, bw = Math.max(1.5, w * v / max), teal = k === 'evaporation';
+              return '<text x="104" y="' + (y + 9) + '" text-anchor="end" fill="var(--ink-dim)">' + k + '</text>' +
+                '<rect x="' + x0 + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="12" fill="' + (teal ? 'var(--petrol-bright)' : 'var(--ink-faint)') + '"/>' +
+                '<text x="' + (x0 + bw + 6).toFixed(1) + '" y="' + (y + 9) + '" fill="var(--ink)">' + Math.round(v) + ' W</text>';
+            }).join('');
+            let msg;
+            if (Math.abs(diff) < 3) msg = 'Balanced \u2014 core temperature holds.' + (m.rows[3][1] > FLOOR + 5 ? ' Evaporation is closing the gap.' : '');
+            else if (diff > 0) msg = 'Gain exceeds loss by ' + Math.round(diff) + ' W \u2014 sweating at capacity and still short. Core temperature rises.';
+            else msg = 'Loss exceeds gain by ' + Math.round(-diff) + ' W \u2014 shivering, vasoconstriction. Core temperature falls.';
+            if (m.envGain > 0) msg += ' Air is warmer than skin: the dry channels have reversed into gain.';
+            cap.textContent = msg;
+          }
+          T.addEventListener('input', render); A.addEventListener('input', render); render();
+        })();
+        </script>
       </div>
     </section>
 
