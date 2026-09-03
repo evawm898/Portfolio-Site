@@ -111,6 +111,12 @@ body {
 .bl-ctrl { margin-bottom: 12px; }
 .bl-ctrl label {
   display: flex; justify-content: space-between; align-items: baseline;
+  /* The gap is what keeps a long read-out off its label. space-between
+     gives the two nothing to stand apart on once the read-out is long enough
+     to wrap — "Sizesame as the rest — the hood pair, opposite the line" was
+     the panel sheet's own picture of it the day the read-outs began naming
+     their group (Sep 3). */
+  gap: 10px;
   font-size: 11px; color: var(--bl-dim); letter-spacing: .04em; margin-bottom: 4px;
 }
 .bl-val { color: var(--bl-ink); }
