@@ -3166,4 +3166,10 @@ exposure the ruling accepts in exchange for the minutes.
       preview, same page, same camera, same base crop from below; the depth cell at 4 / 5 / 6
       with its numbers; the mum at six turns; the defaults and the three-deep cell as
       controls; every caption carrying the app's own mode tag and the export's crowding
-      number registered against a real STL. «SHEET».
+      number registered against a real STL. **The pair does not look the same, and the first render said it did — an instrument
+      error caught by looking:** the base crop had been framed from each mode's own hub
+      radius, so the 29% larger printed hub was pulled back by 29% and the two cells came out
+      the same apparent size. Framed once from the LIVE hub, the print preview shows the hub
+      disc visibly larger in the same frame, the rim band taller (1.00 mm against 0.60) and
+      every root leaving it thicker; the caption carries hub 3.63 → 4.69 mm, the same 120
+      feet, D_max 17 live against 11 printed.
