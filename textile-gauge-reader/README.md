@@ -1663,6 +1663,11 @@ pip install pytest
 pytest tests/
 ```
 
+CI runs this suite on every pull request and push to `main` that touches
+`textile-gauge-reader/` (`.github/workflows/textile-gauge-tests.yml`).
+The strict xfails are part of the contract: an unexpected pass fails
+the run, so a fix cannot land without its documentation catching up.
+
 ### Test harness: synthetic ground truth + metamorphic invariants
 
 Two complementary additions that test the detector in ways hand-labeled
@@ -1720,7 +1725,13 @@ legitimately unstable, and either pass or fail would be a lie); a
 quality-60 JPEG round-trip moves the result <5%. Outcomes are
 classified, not just pass/failed: `harmonic_flip` (ratio near 0.5×/2×)
 is its own status regardless of tolerance, and `lost` another, because
-a 6% drift and a 2× flip are different bugs. Runnable on any photo
+a 6% drift and a 2× flip are different bugs. `lost` covers two cases:
+detection vanished under the transform, or the ratio is beyond 2.5× /
+below 0.4× — at that distance the reading is a different structure
+(a ruler edge, a stray sub-feature), not a drifted version of the
+baseline, and calling an 80× ratio "drift" buried it behind the same
+word as a 4% wobble (it did, until the baseline tables below were
+recorded). `drift` is the band in between. Runnable on any photo
 without writing a test:
 
 ```bash
@@ -1848,6 +1859,96 @@ showed half-period flips under rotation on five (ratios pinned at
    ~5.7 WPI and the 287px reading is an implausible ~2.8 WPI. The
    selection confidently took the 2× family at this large pitch —
    reserved for its own PR.
+
+### Recorded baselines — what to diff the next run against
+
+Both tables below are the detector's actual output on 2026-09-03 against
+`main` at `7974ad9` (detector code unchanged since PR #109), recorded so
+a future run has a number to diff against instead of prose to reinterpret.
+Neither is a target. Regenerate with the commands shown and paste the new
+table next to the old one, never over it.
+
+**Ground-truth scorecard** — signed % error at native scale,
+`(predicted − true) / true`, positive = reads too fine (half-period
+lock-on lands near +100%), negative = reads too coarse (a doubled period
+lands near −50%). Pinned as a regression baseline in
+`tests/test_ground_truth_scorecard.py`: a row inside 20% fails the suite
+if its absolute error worsens by more than 2 points; a row beyond 20% is
+a strict xfail asserting the 20% bar, so a fix shows up as a green flip.
+ROIs are the `ROI_XX` constants pinned in `knit_sample_ground_truth.py`
+(central square, 50% of the shorter side, one mechanical rule, never
+nudged); the jersey and teal fixtures have no pinned ROI of their own,
+so the same rule is applied to them. Truths: jersey 5.0 WPI / 7.2 CPI and
+teal 4.0 WPI / 5.0 CPI are hand counts (the "teal 3.8 WPI" quoted once
+in the harness write-up above has no derivation anywhere in the repo;
+the direct hand count under "A real second photo" and every existing
+test say 4.0, which is what is used); the knit samples are AI-estimated,
+human-verified, a step below. 03/04/07 have no usable truth and are absent.
+
+```bash
+python tests/test_ground_truth_scorecard.py
+```
+
+| fixture | axis | ROI (x,y,w,h) | true /in | predicted /in | spacing px | signed error | baseline | status |
+|---|---|---|---|---|---|---|---|---|
+| jersey | wale | (241, 121, 242, 242) | 5.0 | 4.72 | 35.2 | -5.5% | -5.5% | ok |
+| jersey | course | (241, 121, 242, 242) | 7.2 | 6.86 | 24.222 | -4.7% | -4.7% | ok |
+| teal | wale | (300, 450, 600, 600) | 4.0 | 3.50 | 77.833 | -12.4% | -12.4% | ok |
+| teal | course | (300, 450, 600, 600) | 5.0 | 5.14 | 53.111 | +2.7% | +2.7% | ok |
+| knit_01 | wale | (550, 431, 862, 862) | 3.8 | 3.97 | 83.875 | +4.5% | +4.5% | ok |
+| knit_01 | course | (550, 431, 862, 862) | 5.7 | 5.60 | 59.5 | -1.8% | -1.8% | ok |
+| knit_02 | wale | (1308, 654, 1308, 1308) | 4.0 | 8.81 | 134.667 | +120.4% | +120.4% | xfail (>20%) |
+| knit_05 | wale | (469, 504, 937, 937) | 4.7 | 9.56 | 33.481 | +103.4% | +103.4% | xfail (>20%) |
+| knit_05 | course | (469, 504, 937, 937) | 6.7 | 3.24 | 98.857 | -51.7% | -51.7% | xfail (>20%) |
+| knit_06 | wale | (609, 328, 656, 656) | 3.8 | 3.67 | 127.5 | -3.3% | -3.3% | ok |
+| knit_06 | course | (609, 328, 656, 656) | 5.2 | 5.22 | 83.0 | +0.4% | +0.4% | ok |
+| knit_08 | wale | (502, 252, 504, 504) | 4.5 | 4.59 | 75.4 | +2.0% | +2.0% | ok |
+| knit_08 | course | (502, 252, 504, 504) | 6.9 | 3.60 | 96.0 | -47.8% | -47.8% | xfail (>20%) |
+| knit_09 | wale | (374, 270, 539, 539) | 5.1 | 4.95 | 37.75 | -2.9% | -2.9% | ok |
+| knit_09 | course | (374, 270, 539, 539) | 7.6 | 8.18 | 22.867 | +7.6% | +7.6% | ok |
+
+Two things the table says that the prose above did not: the four rows
+beyond the bar are two half-period wale lock-ons (02 on its ruler, 05
+on its legs) and two doubled course periods (05, 08 — the course path's
+seed-as-is family), and knit_08's **wale** reads +2.0% at the pinned
+ROI — the confidently-reported ~2× wale harmonic recorded earlier came
+from a different, hand-picked crop, which is the ROI-dependence finding
+again, not a contradiction.
+
+**Metamorphic invariants, every real fixture** — the CLI's default ROI
+(centred 70% box), orientation `vertical`, 10 outcomes per photo, with
+`lost` as redefined above (ratio beyond 2.5× / below 0.4×). Before that
+redefinition every `lost` cell here read `drift`.
+
+```bash
+for f in tests/fixtures/*.jpg; do python tests/metamorphic.py "$f"; done
+```
+
+| fixture | ROI (x,y,w,h) | ok | drift | harmonic_flip | lost | skipped |
+|---|---|---|---|---|---|---|
+| knit_sample_01 | (294, 259, 1373, 1207) | 7 | 1 | 1 (rotate90 wale) | 1 (half_roi course) | 0 |
+| knit_sample_02 | (589, 393, 2747, 1831) | 8 | 0 | 0 | 2 (resize wale, half_roi course) | 0 |
+| knit_sample_03 | (570, 462, 2660, 2158) | 4 | 1 | 1 (rotate90 wale) | 3 (resize wale, resize course, half_roi course) | 1 |
+| knit_sample_04 | (287, 221, 1338, 1029) | 9 | 0 | 1 (rotate90 wale) | 0 | 0 |
+| knit_sample_05 | (281, 292, 1312, 1362) | 8 | 0 | 1 (half_roi wale) | 0 | 1 |
+| knit_sample_06 | (281, 197, 1312, 918) | 6 | 3 | 1 (rotate90 course) | 0 | 0 |
+| knit_sample_07 | (278, 162, 1297, 755) | 6 | 1 | 0 | 3 (resize course, rotate90 wale, jpeg60 course) | 0 |
+| knit_sample_08 | (226, 151, 1055, 705) | 5 | 1 | 2 (resize wale, rotate90 course) | 0 | 2 |
+| knit_sample_09 | (193, 162, 901, 755) | 10 | 0 | 0 | 0 | 0 |
+| real_jersey_sample | (109, 73, 506, 338) | 9 | 0 | 0 | 0 | 1 |
+| sarahmaker-knitting-gauge | (180, 225, 840, 1050) | 9 | 0 | 1 (resize wale) | 0 | 0 |
+
+The rotate90 flips (01/03/04 wale, 06/08 course, 05 fixed) are exactly
+the five the mechanism write-up above records, so nothing moved between
+that run and this one. The `lost` column is new information: nine
+outcomes across 01/02/03/07 that previously hid inside `drift` are
+readings of something else entirely — 03's resize pair (ratios 0.014 and
+0.134) and 02's half_roi course (80×) among them. Note the jersey
+fixture's pytest pin uses a different, ruler-free ROI
+(`JERSEY_ROI` in `test_metamorphic_fixtures.py`) and reads 9/10 there
+with resize/course as its strict xfail; the 9/10 here is a different
+skip (half_roi course, too few periods) with resize/course passing at
+the 70% crop.
 
 ## Deploying the backend to Render
 
