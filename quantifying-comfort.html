@@ -13,33 +13,53 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <style>
-  /* Page-local: styles.css has no table rule. Same hairlines and mono as the rest of the note. */
+  /* Page-local styles. Everything below uses the site's custom properties;
+     strokes are --ink at reduced opacity and each figure has one thing in teal. */
   .qc-table { border-collapse: collapse; width: 100%; max-width: 22rem; margin: 1.25rem 0; font-size: 13px; }
   .qc-table th, .qc-table td { text-align: left; padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
   .qc-table th { font-weight: 500; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
   .qc-table td { color: var(--ink); }
   .qc-table td:last-child, .qc-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
   .qc-placeholder { color: var(--ink-faint); font-style: italic; }
-  /* Interactive figures: hairline box, mono labels, the site's range thumb. */
-  .qc-sim { margin: 1.5rem 0; border: 1px solid var(--line); background: var(--black-raised); }
-  .qc-sim__controls { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.5rem; padding: 1rem 1.25rem 0.5rem; }
-  .qc-sim__ctl { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
-  .qc-sim__ctl span { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.25rem; }
-  .qc-sim__ctl output { color: var(--ink); letter-spacing: 0.02em; text-transform: none; text-align: right; }
-  .qc-sim__ctl input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer; }
-  .qc-sim__ctl input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--line-strong); }
-  .qc-sim__ctl input[type="range"]::-moz-range-track { height: 1px; background: var(--line-strong); }
-  .qc-sim__ctl input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5.5px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
-  .qc-sim__ctl input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
-  .qc-sim__ctl input[type="range"]:focus-visible { outline: none; }
-  .qc-sim__ctl input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--petrol-bright); }
-  .qc-sim__svg { display: block; width: 100%; height: auto; font-family: var(--mono); }
-  .qc-sim__canvas { display: block; width: 100%; aspect-ratio: 5 / 2; cursor: pointer; outline: none; }
-  .qc-sim__canvas:focus-visible { box-shadow: inset 0 0 0 1px var(--petrol-bright); }
-  .qc-svg-k { font-size: 9px; letter-spacing: 0.14em; fill: var(--ink-faint); text-anchor: middle; }
-  .qc-svg-v { font-size: 12px; fill: var(--ink); text-anchor: middle; }
-  .qc-sim__cap { padding: 0.75rem 1.25rem 1rem; font-size: 11px; line-height: 1.6; color: var(--ink-dim); border-top: 1px solid var(--line); }
-  @media (max-width: 480px) { .qc-sim__controls { grid-template-columns: 1fr; } }
+  .qc-fig { margin: 1.5rem 0; border: 1px solid var(--line); background: var(--black-raised); }
+  .qc-fig__controls { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.5rem; padding: 1rem 1.25rem 0.5rem; }
+  .qc-fig__controls--row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center; }
+  .qc-fig__ctl { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+  .qc-fig__ctl span { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.25rem; }
+  .qc-fig__ctl output { color: var(--ink); letter-spacing: 0.02em; text-transform: none; text-align: right; }
+  .qc-fig input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer; }
+  .qc-fig input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--line-strong); }
+  .qc-fig input[type="range"]::-moz-range-track { height: 1px; background: var(--line-strong); }
+  .qc-fig input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5.5px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+  .qc-fig input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+  .qc-fig input[type="range"]:focus-visible { outline: none; }
+  .qc-fig input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--petrol-bright); }
+  .qc-toggle { display: inline-flex; border: 1px solid var(--line-strong); }
+  .qc-toggle__k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin-right: 0.5rem; }
+  .qc-toggle button { appearance: none; background: transparent; border: 0; border-right: 1px solid var(--line-strong); color: var(--ink-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.45rem 0.7rem; cursor: pointer; }
+  .qc-toggle button:last-child { border-right: 0; }
+  .qc-toggle button:hover { color: var(--ink); }
+  .qc-toggle button[aria-pressed="true"] { background: var(--petrol); color: var(--black); }
+  .qc-toggle button:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: -3px; }
+  .qc-fig__svg { display: block; width: 100%; height: auto; font-family: var(--mono); }
+  .qc-fig__canvas { display: block; width: 100%; aspect-ratio: 5 / 2; cursor: pointer; outline: none; }
+  .qc-fig__canvas:focus-visible { box-shadow: inset 0 0 0 1px var(--petrol-bright); }
+  .qc-fig__canvas--tall { aspect-ratio: 16 / 9; cursor: default; }
+  .qc-k--tight { letter-spacing: 0.04em; }
+  .qc-fig__cap { padding: 0.75rem 1.25rem 1rem; font-size: 11px; line-height: 1.6; color: var(--ink-dim); border-top: 1px solid var(--line); min-height: 2.6em; }
+  .qc-fig__cap strong { color: var(--ink); font-weight: 500; }
+  .qc-k { font-size: 9px; letter-spacing: 0.14em; fill: var(--ink-faint); text-anchor: middle; }
+  .qc-v { font-size: 12px; fill: var(--ink); text-anchor: middle; }
+  .qc-t { font-size: 9.5px; fill: var(--ink-dim); }
+  .qc-chain__node { cursor: pointer; outline: none; }
+  .qc-chain__node circle { fill: var(--black-raised); stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 1.2; transition: stroke 0.2s, fill 0.2s, stroke-opacity 0.2s; }
+  .qc-chain__node text { font-size: 9px; letter-spacing: 0.08em; fill: var(--ink-dim); text-anchor: middle; text-transform: uppercase; }
+  .qc-chain__node.is-on circle, .qc-chain__node:focus-visible circle { stroke: var(--petrol-bright); stroke-opacity: 1; fill: var(--petrol); }
+  .qc-chain__node.is-on text { fill: var(--ink); }
+  .qc-chain__node, .qc-chain__wire { opacity: 0; transition: opacity 0.45s ease; }
+  .qc-chain.is-in .qc-chain__node, .qc-chain.is-in .qc-chain__wire { opacity: 1; }
+  @media (max-width: 480px) { .qc-fig__controls { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .qc-chain__node, .qc-chain__wire { opacity: 1; transition: none; } }
 </style>
 </head>
 <body id="top">
@@ -69,42 +89,84 @@
     <section class="project__section">
       <h2 class="project__section-title"><span>01</span>The problem</h2>
       <div class="project__section-body">
-        <p>&ldquo;Comfortable&rdquo; is not a measurement. Ask ten people to rate the same shirt and you get ten numbers, and none of them tells you what to change in the fabric.</p>
-        <p>So the lab does not measure comfort. It splits it. Three buckets came up in the talk, and I have seen the same three everywhere since:</p>
+        <p>&ldquo;Comfortable&rdquo; is subjective. The lab does not try to measure it whole. It splits it into three:</p>
         <ul class="project__list">
-          <li><strong>Thermo-physiological</strong> &mdash; heat and moisture. Does the garment let the body stay in balance, dry and at temperature, while it does whatever it is doing?</li>
-          <li><strong>Skin-sensorial</strong> &mdash; touch. Scratchy, clammy, clingy, stiff. The signals the skin sends before you have thought about them.</li>
-          <li><strong>Ergonomic</strong> &mdash; fit. Can you move, and does the garment move with you or against you?</li>
+          <li><strong>Thermo-physiological</strong> &mdash; heat and moisture.</li>
+          <li><strong>Skin-sensorial</strong> &mdash; touch.</li>
+          <li><strong>Ergonomic</strong> &mdash; fit.</li>
         </ul>
-        <p>Each bucket has its own instruments. The first one has the most, and it is the one the rest of these notes are about.</p>
-        <p>The other thing I wrote down and underlined: the factors that set comfort run in a chain, and every link can undo the one before it. <strong>Fiber &rarr; yarn &rarr; fabric &rarr; finishing &rarr; garment and fit &rarr; layering.</strong> A wicking fiber in a dense yarn in a tight weave with a water-repellent finish worn under a shell is not a wicking garment. You have to measure at the level you are actually wearing.</p>
+        <p>The influencing factors run in a chain: <strong>fiber &rarr; yarn &rarr; fabric &rarr; finishing &rarr; garment and fit &rarr; layering.</strong></p>
+        <figure class="qc-fig qc-chain" id="qcChain" aria-labelledby="qcChainCap">
+          <svg class="qc-fig__svg" viewBox="0 0 360 96" role="img" aria-label="Six nodes in a row: fiber, yarn, fabric, finishing, garment and fit, layering. Each one can undo the one before it.">
+            <line class="qc-chain__wire" id="qcChainWire" x1="30" y1="40" x2="330" y2="40" stroke="var(--ink)" stroke-opacity="0.35" stroke-width="1"/>
+            <g id="qcChainNodes"></g>
+          </svg>
+          <figcaption class="qc-fig__cap" id="qcChainCap">Hover or tap a link in the chain.</figcaption>
+        </figure>
+        <script>
+        (() => {
+          // The factor chain. Draws in left to right when scrolled into view;
+          // a node lights up on hover, tap or focus and says what it controls.
+          const NODES = [
+            ['fiber', 'Fiber sets what is physically possible: whether it absorbs, wicks, insulates, or feels like anything at all.'],
+            ['yarn', 'Yarn decides how those fibers are packed: twist and bulk make the same fiber trap air or shed water.'],
+            ['fabric', 'Fabric structure sets the pores: knit or woven, tight or open, thick or thin. Most of Rct and Ret live here.'],
+            ['finishing', 'Finishing can add or delete a property after the fact: a repellent coating on a wicking fabric stops it wicking.'],
+            ['garment', 'Garment and fit: seams, openings and the air gap next to the skin. A loose shell breathes; a tight one does not.'],
+            ['layering', 'Layering: whatever you wear over it. The outer layer sets the ceiling for everything underneath.'],
+          ];
+          const g = document.getElementById('qcChainNodes'), cap = document.getElementById('qcChainCap'), fig = document.getElementById('qcChain');
+          const wire = document.getElementById('qcChainWire');
+          const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          g.innerHTML = NODES.map(([k], i) => {
+            const x = 30 + i * 60;
+            return '<g class="qc-chain__node" tabindex="0" role="button" data-i="' + i + '" style="transition-delay:' + (still ? 0 : 0.25 + i * 0.22) + 's">' +
+              '<rect x="' + (x - 28) + '" y="24" width="56" height="50" fill="transparent"/><circle cx="' + x + '" cy="40" r="7"/><text x="' + x + '" y="66">' + k + '</text></g>';
+          }).join('');
+          const nodes = [...g.querySelectorAll('.qc-chain__node')];
+          function light(i) {
+            nodes.forEach((n, k) => n.classList.toggle('is-on', k === i));
+            cap.innerHTML = i == null ? 'Hover or tap a link in the chain.' : '<strong>' + NODES[i][0] + '</strong> — ' + NODES[i][1];
+          }
+          nodes.forEach((n, i) => {
+            n.addEventListener('pointerenter', () => light(i)); n.addEventListener('focus', () => light(i));
+            n.addEventListener('click', () => light(i)); n.addEventListener('blur', () => light(null));
+          });
+          g.addEventListener('pointerleave', () => { if (!g.contains(document.activeElement)) light(null); });
+          // the wire draws itself once, then the nodes fade in along it
+          const len = 300; wire.setAttribute('stroke-dasharray', len); wire.setAttribute('stroke-dashoffset', still ? 0 : len);
+          const reveal = () => {
+            fig.classList.add('is-in');
+            if (!still) { wire.style.transition = 'stroke-dashoffset 1.4s ease, opacity 0.3s'; requestAnimationFrame(() => wire.setAttribute('stroke-dashoffset', 0)); }
+          };
+          if ('IntersectionObserver' in window && !still) { const io = new IntersectionObserver(es => { if (es[0].isIntersecting) { reveal(); io.disconnect(); } }, { threshold: 0.4 }); io.observe(fig); }
+          else reveal();
+        })();
+        </script>
       </div>
     </section>
 
     <section class="project__section">
       <h2 class="project__section-title"><span>02</span>The system</h2>
       <div class="project__section-body">
-        <p>The model the lab works from has three parts: the <strong>body</strong>, the <strong>climate</strong> around it, and the <strong>clothing</strong> in between. Clothing is not the point of the system. It is the resistance in the middle of it.</p>
-        <p>The body gains heat two ways: it makes it (metabolism, and a lot more of it when you move) and it can take it from a hot environment. It loses heat five ways: <strong>conduction</strong> into whatever it touches, <strong>convection</strong> into moving air, <strong>radiation</strong> to cooler surfaces, <strong>evaporation</strong> of sweat, and <strong>respiration</strong>, the warm wet air you breathe out.</p>
-        <p>Gain has to equal loss. When it does, core temperature holds. When it does not, the body starts spending its reserves to fix it.</p>
-        <p>The controller is the <strong>hypothalamus</strong>. Its effectors are the <strong>sweat glands</strong> (open the evaporation channel), <strong>skeletal muscle</strong> (shiver, which is metabolism on demand) and the <strong>skin arterioles</strong> (dilate to push warm blood to the surface, constrict to keep it in the core). Everything a garment does, it does by changing how easily those five loss channels work.</p>
-        <p>The part that reframed it for me: at rest in a mild room, most of the loss is convection and radiation, and evaporation is a small share. Turn up the temperature or the effort and those two channels shrink toward nothing, because the air is no longer cooler than the skin. Evaporation is the only channel left. That is why breathability is not a nice-to-have in a hot garment. It is the whole budget.</p>
-        <figure class="qc-sim" id="qcSeesaw" aria-labelledby="qcSeesawCap">
-          <div class="qc-sim__controls">
-            <label class="qc-sim__ctl" for="qcTemp"><span>Ambient <output id="qcTempOut">70 &deg;F</output></span><input type="range" id="qcTemp" min="50" max="104" step="1" value="70"></label>
-            <label class="qc-sim__ctl" for="qcAct"><span>Activity <output id="qcActOut">resting</output></span><input type="range" id="qcAct" min="0" max="3" step="1" value="0"></label>
+        <p>Three parts: <strong>body</strong>, <strong>climate</strong>, <strong>clothing</strong>.</p>
+        <p>Heat gain is metabolic plus whatever the environment adds. It has to balance heat loss, which leaves five ways: <strong>conduction</strong>, <strong>convection</strong>, <strong>radiation</strong>, <strong>evaporation</strong>, <strong>respiration</strong>.</p>
+        <figure class="qc-fig" id="qcSeesaw" aria-labelledby="qcSeesawCap">
+          <div class="qc-fig__controls">
+            <label class="qc-fig__ctl" for="qcTemp"><span>Ambient <output id="qcTempOut">70 &deg;F</output></span><input type="range" id="qcTemp" min="50" max="104" step="1" value="70"></label>
+            <label class="qc-fig__ctl" for="qcAct"><span>Activity <output id="qcActOut">resting</output></span><input type="range" id="qcAct" min="0" max="3" step="1" value="0"></label>
           </div>
-          <svg class="qc-sim__svg" viewBox="0 0 360 250" role="img" aria-label="Heat-balance seesaw: heat gain on the left pan, the five loss channels on the right; the beam tips when they differ">
+          <svg class="qc-fig__svg" viewBox="0 0 360 250" role="img" aria-label="Heat-balance seesaw: heat gain on the left pan, the five loss channels on the right; the beam tips when they differ">
             <g id="qcBeamG">
-              <line id="qcBeam" x1="40" y1="70" x2="320" y2="70" stroke="var(--ink-dim)" stroke-width="2" stroke-linecap="round"/>
-              <g id="qcPanL"><rect x="40" y="52" width="70" height="1" fill="var(--ink-dim)"/><text x="75" y="44" class="qc-svg-k">GAIN</text><text id="qcGainT" x="75" y="66" class="qc-svg-v">100 W</text></g>
-              <g id="qcPanR"><rect x="250" y="52" width="70" height="1" fill="var(--ink-dim)"/><text x="285" y="44" class="qc-svg-k">LOSS</text><text id="qcLossT" x="285" y="66" class="qc-svg-v">100 W</text></g>
+              <line x1="40" y1="70" x2="320" y2="70" stroke="var(--ink)" stroke-opacity="0.6" stroke-width="2" stroke-linecap="round"/>
+              <g><rect x="40" y="52" width="70" height="1" fill="var(--ink)" fill-opacity="0.5"/><text x="75" y="44" class="qc-k">GAIN</text><text id="qcGainT" x="75" y="66" class="qc-v">100 W</text></g>
+              <g><rect x="250" y="52" width="70" height="1" fill="var(--ink)" fill-opacity="0.5"/><text x="285" y="44" class="qc-k">LOSS</text><text id="qcLossT" x="285" y="66" class="qc-v">100 W</text></g>
             </g>
-            <path d="M180 70 L170 92 L190 92 Z" fill="var(--black-raised)" stroke="var(--ink-dim)"/>
+            <path d="M180 70 L170 92 L190 92 Z" fill="var(--black-raised)" stroke="var(--ink)" stroke-opacity="0.6"/>
             <line x1="40" y1="92" x2="320" y2="92" stroke="var(--line)"/>
             <g id="qcBars" font-size="10"></g>
           </svg>
-          <figcaption class="qc-sim__cap" id="qcSeesawCap">Balanced &mdash; core temperature holds.</figcaption>
+          <figcaption class="qc-fig__cap" id="qcSeesawCap">Balanced &rarr; core temp holds.</figcaption>
         </figure>
         <script>
         (() => {
@@ -113,50 +175,134 @@
           // air is than the skin, and reverse into a gain when it is hotter.
           // Evaporation is whatever is left to close the gap, between an
           // insensible floor and a sweating ceiling; the beam tips when it
-          // cannot close it.
+          // cannot close it. 70 °F at rest balances by construction.
           const T = document.getElementById('qcTemp'), A = document.getElementById('qcAct');
           const tOut = document.getElementById('qcTempOut'), aOut = document.getElementById('qcActOut');
           const bars = document.getElementById('qcBars'), beam = document.getElementById('qcBeamG'), cap = document.getElementById('qcSeesawCap');
           const gainT = document.getElementById('qcGainT'), lossT = document.getElementById('qcLossT');
-          const ACT = [['resting', 100], ['walking', 250], ['running', 500], ['sprinting', 800]];
+          const ACT = [['resting', 100], ['walking', 250], ['running', 500], ['hard effort', 800]];
           const SKIN = 93, FLOOR = 25;   // insensible perspiration never stops
-          // W per °F of skin-to-air difference, clothed and at rest: they sum so that 70 °F at rest balances
-          const CH = [['conduction', 0.15], ['convection', 1.5], ['radiation', 1.15], ['evaporation', 0], ['respiration', 0]];
+          // W per °F of skin-to-air difference, clothed and at rest
+          const CH = [['conduction', 0.15], ['convection', 1.5], ['radiation', 1.15]];
           function model() {
             const t = +T.value, [name, met] = ACT[+A.value], dT = SKIN - t;
-            const dry = CH.slice(0, 3).map(([k, c]) => [k, Math.max(0, c * dT)]);
-            const envGain = dT < 0 ? -dT * 2.8 * 0.55 : 0;                    // hot air and surfaces push heat in
-            const ceil = 850 - 6 * Math.max(0, t - 80);                       // sweating capacity, and it falls as the air warms
+            const dry = CH.map(([k, c]) => [k, Math.max(0, c * dT)]);
+            const envGain = dT < 0 ? -dT * 2.8 * 0.55 : 0;              // hot air and surfaces push heat in
+            const ceil = 850 - 6 * Math.max(0, t - 80);                 // sweating capacity, falling as the air warms
             const resp = 8 + 0.03 * met;
             const gain = met + envGain;
-            const need = gain - dry.reduce((s, d) => s + d[1], 0) - resp;
-            const evap = Math.min(ceil, Math.max(FLOOR, need));
-            const loss = dry.reduce((s, d) => s + d[1], 0) + resp + evap;
-            return { name, t, met, envGain, gain, loss, rows: [...dry, ['evaporation', evap], ['respiration', resp]] };
+            const drySum = dry.reduce((s, d) => s + d[1], 0);
+            const evap = Math.min(ceil, Math.max(FLOOR, gain - drySum - resp));
+            return { name, t, envGain, gain, loss: drySum + resp + evap, rows: [...dry, ['evaporation', evap], ['respiration', resp]] };
           }
           function render() {
             const m = model();
-            tOut.textContent = m.t + ' \u00b0F \u00b7 ' + Math.round((m.t - 32) * 5 / 9) + ' \u00b0C';
+            tOut.textContent = m.t + ' °F · ' + Math.round((m.t - 32) * 5 / 9) + ' °C';
             aOut.textContent = m.name;
             const diff = m.gain - m.loss, tilt = Math.max(-11, Math.min(11, diff / 8));
             beam.setAttribute('transform', 'rotate(' + tilt.toFixed(1) + ' 180 70)');
-            gainT.textContent = Math.round(m.gain) + ' W';
-            lossT.textContent = Math.round(m.loss) + ' W';
+            gainT.textContent = Math.round(m.gain) + ' W'; lossT.textContent = Math.round(m.loss) + ' W';
             const max = 900, x0 = 112, w = 208;
             bars.innerHTML = m.rows.map(([k, v], i) => {
               const y = 112 + i * 26, bw = Math.max(1.5, w * v / max), teal = k === 'evaporation';
               return '<text x="104" y="' + (y + 9) + '" text-anchor="end" fill="var(--ink-dim)">' + k + '</text>' +
-                '<rect x="' + x0 + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="12" fill="' + (teal ? 'var(--petrol-bright)' : 'var(--ink-faint)') + '"/>' +
+                '<rect x="' + x0 + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="12" fill="' + (teal ? 'var(--petrol-bright)' : 'var(--ink)') + '"' + (teal ? '' : ' fill-opacity="0.35"') + '/>' +
                 '<text x="' + (x0 + bw + 6).toFixed(1) + '" y="' + (y + 9) + '" fill="var(--ink)">' + Math.round(v) + ' W</text>';
             }).join('');
-            let msg;
-            if (Math.abs(diff) < 3) msg = 'Balanced \u2014 core temperature holds.' + (m.rows[3][1] > FLOOR + 5 ? ' Evaporation is closing the gap.' : '');
-            else if (diff > 0) msg = 'Gain exceeds loss by ' + Math.round(diff) + ' W \u2014 sweating at capacity and still short. Core temperature rises.';
-            else msg = 'Loss exceeds gain by ' + Math.round(-diff) + ' W \u2014 shivering, vasoconstriction. Core temperature falls.';
+            let msg = Math.abs(diff) < 3 ? 'Balanced → core temp holds.' + (m.rows[3][1] > FLOOR + 5 ? ' Evaporation is closing the gap.' : '')
+              : diff > 0 ? 'Surplus of ' + Math.round(diff) + ' W → core temp rising. Sweating at capacity and still short.'
+              : 'Deficit of ' + Math.round(-diff) + ' W → core temp falling. Shivering, vasoconstriction.';
             if (m.envGain > 0) msg += ' Air is warmer than skin: the dry channels have reversed into gain.';
             cap.textContent = msg;
           }
           T.addEventListener('input', render); A.addEventListener('input', render); render();
+        })();
+        </script>
+        <p>The controller is the <strong>hypothalamus</strong>. The effectors are the <strong>sweat glands</strong>, <strong>skeletal muscle</strong> and the <strong>skin arterioles</strong>.</p>
+        <figure class="qc-fig" id="qcLoop" aria-labelledby="qcLoopCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Environment</span>
+            <div class="qc-toggle" role="group" aria-label="Environment"><button type="button" data-loop="hot" aria-pressed="true">Hot</button><button type="button" data-loop="cold" aria-pressed="false">Cold</button></div>
+          </div>
+          <svg class="qc-fig__svg" viewBox="0 0 360 170" role="img" aria-label="Thermoregulation loop: pulses run from skin and core sensors to the hypothalamus, then out to sweat glands, skeletal muscle and skin arterioles">
+            <g transform="translate(30 0)">
+            <g stroke="var(--ink)" stroke-opacity="0.5" fill="none" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="120" cy="24" r="12"/>
+              <path d="M120 36 V96 M96 48 H144 M96 48 L84 88 M144 48 L156 88 M120 96 L106 146 M120 96 L134 146"/>
+            </g>
+            <g fill="none" stroke="var(--ink)" stroke-opacity="0.18" stroke-width="1" stroke-dasharray="2 3">
+              <path id="qcPathSkin" d="M84 88 L96 48 L120 36 L120 24"/>
+              <path id="qcPathCore" d="M120 66 L120 24"/>
+              <path id="qcPathSweat" d="M120 24 L120 36 L144 48 L156 88"/>
+              <path id="qcPathMuscle" d="M120 24 L120 96 L106 146"/>
+              <path id="qcPathArt" d="M120 24 L120 36 L144 48 L150 68"/>
+            </g>
+            <circle cx="120" cy="24" r="3" fill="var(--petrol-bright)"/>
+            <text x="138" y="20" class="qc-t">hypothalamus</text>
+            <circle cx="84" cy="88" r="2.5" fill="var(--ink)" fill-opacity="0.7"/><text x="76" y="102" class="qc-t" text-anchor="end">skin sensor</text>
+            <circle cx="120" cy="66" r="2.5" fill="var(--ink)" fill-opacity="0.7"/><text x="112" y="70" class="qc-t" text-anchor="end">core sensor</text>
+            <g id="qcEffSweat"><circle cx="156" cy="88" r="4" fill="none" stroke="var(--ink)" stroke-opacity="0.6"/><text x="166" y="92" class="qc-t">sweat glands &middot; <tspan id="qcSweatT">on</tspan></text></g>
+            <g id="qcEffMuscle"><circle cx="106" cy="146" r="4" fill="none" stroke="var(--ink)" stroke-opacity="0.6"/><text x="116" y="150" class="qc-t">muscle &middot; <tspan id="qcMuscleT">quiet</tspan></text></g>
+            <g id="qcEffArt"><circle id="qcArtRing" cx="150" cy="68" r="6" fill="none" stroke="var(--ink)" stroke-opacity="0.6"/><text x="166" y="72" class="qc-t">arterioles &middot; <tspan id="qcArtT">dilated</tspan></text></g>
+            <g id="qcPulses" fill="var(--petrol-bright)"></g>
+            </g>
+          </svg>
+          <figcaption class="qc-fig__cap" id="qcLoopCap">Sensors report in, the hypothalamus compares against its set point, and the effectors answer. About four seconds round the loop.</figcaption>
+        </figure>
+        <script>
+        (() => {
+          // The control loop, drawn as it runs: afferent pulses from the two
+          // sensors reach the hypothalamus in the first half of the cycle,
+          // efferent pulses reach the three effectors in the second. Hot
+          // recruits sweat and dilation; cold recruits shivering and constriction.
+          const P = id => document.getElementById(id);
+          const paths = { skin: P('qcPathSkin'), core: P('qcPathCore'), sweat: P('qcPathSweat'), muscle: P('qcPathMuscle'), art: P('qcPathArt') };
+          const pulses = P('qcPulses'), ring = P('qcArtRing');
+          const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          let mode = 'hot', t0 = performance.now(), visible = true;
+          function setMode(m) {
+            mode = m;
+            document.querySelectorAll('[data-loop]').forEach(b => b.setAttribute('aria-pressed', b.dataset.loop === m ? 'true' : 'false'));
+            P('qcSweatT').textContent = m === 'hot' ? 'on' : 'off';
+            P('qcMuscleT').textContent = m === 'hot' ? 'quiet' : 'shivering';
+            P('qcArtT').textContent = m === 'hot' ? 'dilated' : 'constricted';
+            const on = { sweat: m === 'hot', muscle: m === 'cold', art: true };
+            for (const k of ['sweat', 'muscle', 'art']) {
+              const c = P(k === 'sweat' ? 'qcEffSweat' : k === 'muscle' ? 'qcEffMuscle' : 'qcEffArt').querySelector('circle');
+              c.setAttribute('stroke', on[k] ? 'var(--petrol-bright)' : 'var(--ink)'); c.setAttribute('stroke-opacity', on[k] ? 1 : 0.6);
+            }
+            ring.setAttribute('r', m === 'hot' ? 7 : 3.5);
+            if (still) drawStatic();
+          }
+          const at = (path, f) => { const L = path.getTotalLength(); return path.getPointAtLength(Math.max(0, Math.min(1, f)) * L); };
+          function dot(pt, r) { return '<circle cx="' + pt.x.toFixed(1) + '" cy="' + pt.y.toFixed(1) + '" r="' + r + '"/>'; }
+          function frame(now) {
+            if (visible) {
+              const t = ((now - t0) / 4000) % 1;   // one loop every four seconds
+              let out = '';
+              if (t < 0.45) { const f = t / 0.45; out += dot(at(paths.skin, f), 2.6) + dot(at(paths.core, f), 2.6); }
+              else if (t > 0.5 && t < 0.95) {
+                const f = (t - 0.5) / 0.45;
+                if (mode === 'hot') out += dot(at(paths.sweat, f), 2.6);
+                if (mode === 'cold') out += dot(at(paths.muscle, f), 2.6);
+                out += dot(at(paths.art, f), 2.6);
+              }
+              pulses.innerHTML = out;
+              const shiver = mode === 'cold' ? Math.sin(now / 40) * 1.2 : 0;
+              P('qcEffMuscle').setAttribute('transform', 'translate(' + shiver.toFixed(2) + ' 0)');
+            }
+            requestAnimationFrame(frame);
+          }
+          function drawStatic() {   // reduced motion: every active path shown with its pulse parked at the effector
+            let out = dot(at(paths.skin, 1), 2.6);
+            if (mode === 'hot') out += dot(at(paths.sweat, 1), 2.6); else out += dot(at(paths.muscle, 1), 2.6);
+            out += dot(at(paths.art, 1), 2.6);
+            pulses.innerHTML = out;
+          }
+          document.querySelectorAll('[data-loop]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.loop)));
+          if ('IntersectionObserver' in window) new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(P('qcLoop'));
+          setMode('hot');
+          if (!still) requestAnimationFrame(frame);
         })();
         </script>
       </div>
@@ -165,13 +311,12 @@
     <section class="project__section">
       <h2 class="project__section-title"><span>03</span>What gets measured</h2>
       <div class="project__section-body">
-        <p>Two numbers do most of the work, and both come off the same instrument.</p>
-        <p>The instrument is the <strong>sweating guarded hotplate</strong>, which everyone in the room called the <strong>skin model</strong>. A metal plate held at skin temperature, 35&nbsp;&deg;C, fed with water from underneath so it can &ldquo;sweat,&rdquo; with guard heaters round the edge so heat only leaves through the top. You lay the fabric on it, run conditioned air across at a fixed speed, and measure how much power the plate needs to hold its temperature. The method is <strong>ISO 11092</strong>.</p>
-        <p><strong>Rct, thermal resistance, in m&sup2;&middot;K/W.</strong> Dry plate. How hard is it for heat to get through the fabric? Higher Rct is warmer. This is the number behind insulation claims and, with a conversion, behind the clo and tog values on the label.</p>
-        <p>Before the second number, a word I had to look up properly afterwards. <strong>Diffusion</strong> is the net movement of anything from where there is more of it to where there is less, driven by nothing but the random motion of the molecules themselves. No pump, no fan. Water vapor next to sweating skin is dense; the air a few millimetres out is dry; so vapor moves outward on its own, and a fabric either gets out of its way or does not.</p>
-        <figure class="qc-sim" id="qcDiff" aria-labelledby="qcDiffCap">
-          <canvas class="qc-sim__canvas" id="qcDiffC" role="img" aria-label="Two hundred particles start dense on the left and sparse on the right, and random motion alone spreads them evenly. Click to reset."></canvas>
-          <figcaption class="qc-sim__cap" id="qcDiffCap">Left <span id="qcDiffL">170</span> &middot; right <span id="qcDiffR">30</span>. Nothing pushes them; each one just wanders. Click to reset.</figcaption>
+        <p>Two numbers: <strong>Rct</strong>, thermal resistance, in m&sup2;&middot;K/W, and <strong>Ret</strong>, water vapor resistance &mdash; breathability &mdash; in m&sup2;&middot;Pa/W.</p>
+        <p>Both come from the <strong>sweating guarded hotplate</strong>, the &ldquo;skin model,&rdquo; under <strong>ISO 11092</strong>.</p>
+        <p>Before Ret, a primer. Diffusion:</p>
+        <figure class="qc-fig" id="qcDiff" aria-labelledby="qcDiffCap">
+          <canvas class="qc-fig__canvas" id="qcDiffC" role="img" aria-label="Two hundred particles start dense on the left and sparse on the right, and random motion alone spreads them evenly. Click to reset."></canvas>
+          <figcaption class="qc-fig__cap" id="qcDiffCap">Left <span id="qcDiffL">170</span> &middot; right <span id="qcDiffR">30</span>. Nothing pushes them; each one just wanders. <strong>Breathability is just this, through fabric.</strong> Click to reset.</figcaption>
         </figure>
         <script>
         (() => {
@@ -192,13 +337,13 @@
           function seed(even) {
             fit();
             for (let i = 0; i < N; i++) {
-              const left = even ? i % 2 === 0 : i < 170;             // 170 : 30, or a flat spread for the static end state
+              const left = i < 170;   // 170 : 30, or a flat spread for the static end state
               P[2 * i] = even ? Math.random() * w : left ? Math.random() * w * 0.3 : w * 0.3 + Math.random() * w * 0.7;
               P[2 * i + 1] = Math.random() * h;
             }
           }
           function step() {
-            const s = w / 50;                                            // step scales with the canvas: ~15 s to even out at any width
+            const s = w / 50;   // step scales with the canvas: ~20 s to even out at any width
             for (let k = 0; k < 5; k++) for (let i = 0; i < N; i++) {
               let x = P[2 * i] + (Math.random() - 0.5) * 2 * s, y = P[2 * i + 1] + (Math.random() - 0.5) * 2 * s;
               if (x < 2) x = 4 - x; else if (x > w - 2) x = 2 * (w - 2) - x;   // walls reflect
@@ -208,9 +353,9 @@
           }
           function draw() {
             ctx.clearRect(0, 0, w, h);
-            ctx.strokeStyle = 'rgba(139,148,148,0.35)'; ctx.setLineDash([3, 4]);
+            ctx.strokeStyle = 'rgba(233,236,236,0.25)'; ctx.setLineDash([3, 4]);
             ctx.beginPath(); ctx.moveTo(w / 2 + 0.5, 0); ctx.lineTo(w / 2 + 0.5, h); ctx.stroke(); ctx.setLineDash([]);
-            ctx.fillStyle = '#2fa3a3';
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--petrol-bright').trim() || '#2fa3a3';
             let l = 0;
             for (let i = 0; i < N; i++) {
               const x = P[2 * i], y = P[2 * i + 1]; if (x < w / 2) l++;
@@ -228,22 +373,104 @@
           start();
         })();
         </script>
-        <p><strong>Ret, water vapor resistance, in m&sup2;&middot;Pa/W.</strong> Wet plate. The plate sweats, the vapor has to cross the fabric, and the plate&rsquo;s power draw tells you how much evaporation the fabric is allowing. Lower Ret is more breathable. This is the number that breathability claims should be quoting, and often are not.</p>
-        <p>Hohenstein adds three of its own, because Rct and Ret describe vapor and heat at steady state and a real body does neither:</p>
-        <ul class="project__list">
-          <li><strong>F<sub>d</sub>, buffering</strong> &mdash; how much of a sudden burst of vapor the fabric can take up before the microclimate next to the skin turns humid.</li>
-          <li><strong>K<sub>f</sub>, sweat absorption</strong> &mdash; what happens once sweat is liquid: how much the fabric takes in.</li>
-          <li><strong>F, sweat transport</strong> &mdash; and whether it then moves that liquid away from the skin, or holds it there against you.</li>
-        </ul>
-        <p>All of that is flat fabric. A garment has seams, layers, openings, and air gaps that change with every movement, so whole garments go on <strong>thermal and sweating manikins</strong>: a heated, sweating body-shaped instrument that measures the same resistances for the assembled thing, sometimes while walking.</p>
-        <!-- C: skin-model cross-section (only if A and B land) -->
+        <p>Ret is that, through a fabric, on the skin model:</p>
+        <figure class="qc-fig" id="qcSkin" aria-labelledby="qcSkinCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Fabric</span>
+            <div class="qc-toggle" role="group" aria-label="Water vapour resistance"><button type="button" data-ret="low" aria-pressed="true">Low Ret</button><button type="button" data-ret="high" aria-pressed="false">High Ret</button></div>
+            <div class="qc-toggle" role="group" aria-label="Thermal resistance"><button type="button" data-rct="low" aria-pressed="true">Thin &middot; low Rct</button><button type="button" data-rct="high" aria-pressed="false">Thick &middot; high Rct</button></div>
+          </div>
+          <canvas class="qc-fig__canvas qc-fig__canvas--tall" id="qcSkinC" role="img" aria-label="Cross-section of the sweating guarded hotplate: water supply, heated plate, fabric sample, air stream. Vapour rises from the plate and either passes through the sample into the air or piles up beneath it."></canvas>
+          <figcaption class="qc-fig__cap" id="qcSkinCap">Vapour through the sample: <strong id="qcSkinPass">&mdash;</strong>. Ret <strong id="qcSkinRet">&mdash;</strong>. Heat through the sample: <strong id="qcSkinHeat">&mdash;</strong>.</figcaption>
+        </figure>
+        <script>
+        (() => {
+          // The skin model in section. Vapour particles rise off the plate; at
+          // the sample each one gets through with a probability set by Ret,
+          // and the rest are turned back to pile up in the microclimate under
+          // it. Heat lines climb through the sample at a speed set by Rct.
+          const c = document.getElementById('qcSkinC'), ctx = c.getContext('2d');
+          const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const teal = getComputedStyle(document.documentElement).getPropertyValue('--petrol-bright').trim() || '#2fa3a3';
+          let ret = 'low', rct = 'low', w = 0, h = 0, visible = true, t = 0, passed = 0, blocked = 0;
+          const V = []; for (let i = 0; i < 70; i++) V.push({ x: Math.random(), y: 1, vy: 0, state: 'wait', wait: Math.random() * 2 });
+          const H = []; for (let i = 0; i < 5; i++) H.push({ x: 0.15 + i * 0.175, y: 0 });
+          function fit() {
+            const r = c.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+            w = Math.round(r.width); h = Math.round(r.height);
+            if (c.width !== w * d || c.height !== h * d) { c.width = w * d; c.height = h * d; }
+            ctx.setTransform(d, 0, 0, d, 0, 0);
+          }
+          const geo = () => { const th = rct === 'high' ? 0.16 : 0.07; return { plateY: h * 0.72, sampleY: h * (0.44 - th), sampleH: h * th, airY: h * 0.12 }; };
+          function step(dt) {
+            const g = geo(), pPass = ret === 'low' ? 0.85 : 0.12;
+            for (const v of V) {
+              if (v.state === 'wait') { v.wait -= dt; if (v.wait <= 0) { v.state = 'up'; v.x = 0.05 + Math.random() * 0.9; v.y = g.plateY - 2; } continue; }
+              if (v.state === 'up') {
+                v.y -= dt * h * 0.28;
+                if (v.y <= g.sampleY + g.sampleH) { if (Math.random() < pPass) { v.state = 'through'; passed++; } else { v.state = 'back'; blocked++; } }
+              } else if (v.state === 'through') {
+                v.y -= dt * h * 0.12; v.x += dt * 0.02;
+                if (v.y <= g.sampleY) { v.state = 'air'; }
+              } else if (v.state === 'air') {
+                v.x += dt * 0.55; v.y -= dt * h * 0.02;
+                if (v.x > 1.02) { v.state = 'wait'; v.wait = Math.random() * 1.5; }
+              } else if (v.state === 'back') {   // turned back: drifts in the microclimate under the sample, then is reabsorbed
+                v.y += dt * h * 0.05; v.x += (Math.random() - 0.5) * dt * 0.3;
+                if (v.y > g.plateY - 6) { v.state = 'wait'; v.wait = 0.4 + Math.random() * 1.6; }
+              }
+            }
+            const speed = rct === 'high' ? 0.05 : 0.14;
+            for (const l of H) { l.y += dt * speed; if (l.y > 1) l.y -= 1; }
+          }
+          function draw() {
+            const g = geo();
+            ctx.clearRect(0, 0, w, h);
+            // water supply, plate, guard, sample, air
+            ctx.fillStyle = 'rgba(233,236,236,0.06)'; ctx.fillRect(0, g.plateY + 10, w, h - g.plateY - 10);
+            ctx.fillStyle = 'rgba(233,236,236,0.18)'; ctx.fillRect(w * 0.04, g.plateY, w * 0.92, 10);
+            ctx.strokeStyle = 'rgba(233,236,236,0.5)'; ctx.lineWidth = 1;
+            ctx.strokeRect(w * 0.04 + 0.5, g.plateY + 0.5, w * 0.92, 10);
+            ctx.fillStyle = 'rgba(233,236,236,0.12)'; ctx.fillRect(w * 0.04, g.sampleY, w * 0.92, g.sampleH);
+            ctx.strokeRect(w * 0.04 + 0.5, g.sampleY + 0.5, w * 0.92, g.sampleH);
+            for (let x = w * 0.06; x < w * 0.95; x += 7) { ctx.beginPath(); ctx.moveTo(x, g.sampleY + 2); ctx.lineTo(x + 3, g.sampleY + g.sampleH - 2); ctx.strokeStyle = 'rgba(233,236,236,0.18)'; ctx.stroke(); }
+            ctx.font = '9.5px ' + (getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace');
+            ctx.fillStyle = 'rgba(139,148,148,0.95)'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+            ctx.fillText('water supply', w * 0.05, g.plateY + 22);
+            ctx.fillText('heated plate · 35 °C', w * 0.05, g.plateY - 8);
+            ctx.fillText('fabric sample', w * 0.05, g.sampleY + g.sampleH / 2);
+            ctx.fillText('air stream →', w * 0.05, g.airY);
+            // heat lines: wavy strokes climbing from the plate through the sample
+            for (const l of H) {
+              const y0 = g.plateY - (g.plateY - g.sampleY + 10) * l.y, x0 = l.x * w;
+              ctx.beginPath(); for (let k = 0; k <= 12; k++) ctx.lineTo(x0 + Math.sin(k * 0.9 + t * 3) * 2.5, y0 + k * 1.6);
+              ctx.strokeStyle = 'rgba(233,236,236,' + (0.45 * (1 - l.y) + 0.1).toFixed(2) + ')'; ctx.stroke();
+            }
+            ctx.fillStyle = teal;
+            for (const v of V) { if (v.state === 'wait') continue; ctx.beginPath(); ctx.arc(v.x * w, v.y, 2, 0, Math.PI * 2); ctx.fill(); }
+            const tot = passed + blocked, frac = tot ? passed / tot : 0;
+            document.getElementById('qcSkinPass').textContent = tot ? Math.round(frac * 100) + '%' : '—';
+            document.getElementById('qcSkinRet').textContent = ret === 'low' ? 'low · breathable' : 'high ↑ · ' + Math.min(99, V.filter(v => v.state === 'back').length) + ' piling up';
+            document.getElementById('qcSkinHeat').textContent = rct === 'high' ? 'slow · warm' : 'fast · cool';
+          }
+          function bind(attr, set) { document.querySelectorAll('[data-' + attr + ']').forEach(b => b.addEventListener('click', () => { set(b.dataset[attr]); passed = blocked = 0; document.querySelectorAll('[data-' + attr + ']').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); if (still) settle(); })); }
+          bind('ret', v => { ret = v; }); bind('rct', v => { rct = v; });
+          function settle() { fit(); for (let i = 0; i < 600; i++) step(1 / 60); draw(); }   // reduced motion: a settled frame
+          let last = 0;
+          function loop(now) { const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now; if (visible) { fit(); t += dt; step(dt); draw(); } requestAnimationFrame(loop); }
+          if ('IntersectionObserver' in window) new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(c);
+          if (still) settle(); else requestAnimationFrame(loop);
+        })();
+        </script>
+        <p>Hohenstein&rsquo;s additions: <strong>F<sub>d</sub></strong> buffering, <strong>K<sub>f</sub></strong> sweat absorption, <strong>F</strong> sweat transport.</p>
+        <p>Whole garments go on thermal and sweating manikins.</p>
       </div>
     </section>
 
     <section class="project__section">
       <h2 class="project__section-title"><span>04</span>Scale</h2>
       <div class="project__section-body">
-        <p>One slide put the volumes on the table, and they are worth keeping because they set the size of the problem a fabric is being asked to solve.</p>
+        <p>Sweat per activity, from the slides:</p>
         <table class="qc-table">
           <thead><tr><th scope="col">Activity</th><th scope="col">Sweat</th></tr></thead>
           <tbody>
@@ -254,19 +481,131 @@
             <tr><td>Ironman</td><td>20&nbsp;L</td></tr>
           </tbody>
         </table>
-        <p>Two litres over a tennis match is a two-litre bottle poured through your clothes. The garment&rsquo;s job is to get most of that to evaporate at the surface instead of pooling against the skin. See the corrections below on the last two rows before quoting them.</p>
+        <figure class="qc-fig" id="qcSweat" aria-labelledby="qcSweatCap">
+          <svg class="qc-fig__svg" viewBox="0 0 360 200" role="img" aria-label="Five vessels filled against a two-litre reference: sprint 0.1 L, tennis 2 L, soccer 3 L, marathon 4.6 L, and Ironman 20 L, which needs ten of the reference vessels."></svg>
+          <figcaption class="qc-fig__cap" id="qcSweatCap">Each dashed outline is the same 2-litre bottle. The Ironman column is ten of them.</figcaption>
+        </figure>
+        <script>
+        (() => {
+          // The sweat table as volume. Everything is drawn against one 2 L
+          // reference outline; fills and numbers count up when scrolled in.
+          const svg = document.querySelector('#qcSweat svg'); svg.setAttribute('viewBox', '0 0 360 210');
+          const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const ROWS = [['sprint|100 m', 0.1], ['tennis|90 min', 2.0], ['soccer|90 min', 3.0], ['marathon|42 km', 4.6], ['Ironman|10–17 h', 20]];
+          const H2 = 30, base = 150, colW = 60, vw = 30;   // 2 L = 30 units tall
+          let out = '', fills = [];
+          ROWS.forEach(([name, L], i) => {
+            const cx = 30 + i * colW + colW / 2 + (i === 4 ? 6 : 0);
+            if (i < 4) {
+              const hh = L / 2 * H2, y = base - hh, x = cx - vw / 2;
+              out += '<rect x="' + x + '" y="' + (base - Math.max(hh, H2)) + '" width="' + vw + '" height="' + Math.max(hh, H2) + '" fill="none" stroke="var(--ink)" stroke-opacity="0.35"/>';
+              out += '<rect x="' + x + '" y="' + (base - H2) + '" width="' + vw + '" height="' + H2 + '" fill="none" stroke="var(--ink)" stroke-opacity="0.7" stroke-dasharray="2 2"/>';
+              out += '<rect class="qc-fill" data-h="' + hh + '" x="' + x + '" y="' + base + '" width="' + vw + '" height="0" fill="var(--petrol-bright)"/>';
+            } else {   // ten 2 L vessels, two columns of five
+              for (let k = 0; k < 10; k++) {
+                const col = k % 2, row = Math.floor(k / 2), sw = 14, sh = 14, x = cx - 16 + col * 18, y = base - sh - row * 17;
+                out += '<rect x="' + x + '" y="' + y + '" width="' + sw + '" height="' + sh + '" fill="none" stroke="var(--ink)" stroke-opacity="0.7" stroke-dasharray="2 2"/>';
+                out += '<rect class="qc-fill" data-h="' + sh + '" data-k="' + k + '" x="' + x + '" y="' + (y + sh) + '" width="' + sw + '" height="0" fill="var(--petrol-bright)"/>';
+              }
+            }
+            const [n1, n2] = name.split('|');
+            out += '<text x="' + cx + '" y="' + (base + 14) + '" class="qc-k qc-k--tight">' + n1 + '</text><text x="' + cx + '" y="' + (base + 25) + '" class="qc-k qc-k--tight" fill-opacity="0.7">' + n2 + '</text>';
+            out += '<text x="' + cx + '" y="' + (base + 42) + '" class="qc-v qc-num" data-v="' + L + '">0 L</text>';
+          });
+          out += '<line x1="20" y1="' + base + '" x2="340" y2="' + base + '" stroke="var(--line)"/>';
+          svg.innerHTML = out;
+          fills = [...svg.querySelectorAll('.qc-fill')]; const nums = [...svg.querySelectorAll('.qc-num')];
+          function set(p) {   // p: 0..1 progress of the fill-in
+            fills.forEach(r => {
+              const full = +r.dataset.h, k = r.dataset.k;
+              const f = k == null ? p : Math.max(0, Math.min(1, p * 10 - +k));   // the ten small ones fill one after another
+              const hh = full * f, y0 = +r.getAttribute('y') + +r.getAttribute('height');
+              r.setAttribute('height', hh.toFixed(2)); r.setAttribute('y', (y0 - hh).toFixed(2));
+            });
+            nums.forEach(n => { const v = +n.dataset.v * p; n.textContent = (v < 1 ? v.toFixed(1) : v < 10 ? v.toFixed(1) : Math.round(v)) + ' L'; });
+          }
+          function run() {
+            if (still) return set(1);
+            const t0 = performance.now(), D = 1800;
+            const tick = now => { const p = Math.min(1, (now - t0) / D); set(1 - Math.pow(1 - p, 3)); if (p < 1) requestAnimationFrame(tick); };
+            requestAnimationFrame(tick);
+          }
+          set(0);
+          if ('IntersectionObserver' in window && !still) { const io = new IntersectionObserver(es => { if (es[0].isIntersecting) { run(); io.disconnect(); } }, { threshold: 0.4 }); io.observe(svg); }
+          else run();
+        })();
+        </script>
       </div>
     </section>
 
     <section class="project__section">
       <h2 class="project__section-title"><span>05</span>What I checked</h2>
       <div class="project__section-body">
-        <p>Talk notes are hearsay until checked. What held up, and what did not:</p>
         <ul class="project__list">
-          <li><strong>Verified.</strong> The definition of diffusion, the thermoregulation loop (hypothalamus and its three effectors), the heat-balance model with its five loss channels, and the description of ISO 11092 all match the sources I could find.</li>
-          <li><strong>Sweat table: right order, high top end.</strong> Published endurance rates run roughly 0.5&ndash;2.5&nbsp;L/hr; a marathon measures around 2.5&nbsp;L median, with individual losses up to about 6.8&nbsp;L. So 4.6&nbsp;L is inside the range but above typical. The Ironman figure of 20&nbsp;L is gross sweat production over a 10&ndash;17&nbsp;hour day, not net loss &mdash; finishers typically lose 1&ndash;6% of body weight, and they drink throughout. I found no primary source for the slide&rsquo;s numbers. Treat the table as illustrative.</li>
-          <li><strong>Core-temperature graphic: half right.</strong> The slide claimed severe damage or death at &plusmn;4&nbsp;&deg;F from normal. The hot side is close: heat stroke is defined at about 104&nbsp;&deg;F. The cold side is badly understated. 94.6&nbsp;&deg;F is only mild hypothermia; the life-threatening range starts below roughly 82&ndash;92&nbsp;&deg;F. Symmetric limits make a tidy diagram and a wrong one.</li>
+          <li><strong>Diffusion definition, thermoregulation, heat-balance model, ISO 11092 description:</strong> verified accurate.</li>
+          <li><strong>Sweat table:</strong> consistent with published ranges (0.5&ndash;2.5&nbsp;L/hr endurance; marathon ~2.5&nbsp;L median, up to ~6.8&nbsp;L) but marathon and Ironman run high. Ironman 20&nbsp;L is gross production over 10&ndash;17&nbsp;h, not net loss (finishers lose ~1&ndash;6% bodyweight). No primary source found; illustrative.</li>
+          <li><strong>Core-temp graphic</strong> claimed severe damage/death at &plusmn;4&nbsp;&deg;F. Hot side is close (heat stroke &asymp; 104&nbsp;&deg;F). Cold side understated: 94.6&nbsp;&deg;F is only mild hypothermia; life-threatening is below ~82&ndash;92&nbsp;&deg;F.</li>
         </ul>
+        <figure class="qc-fig" id="qcCore" aria-labelledby="qcCoreCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Core temperature</span>
+            <div class="qc-toggle" role="group" aria-label="Which limits"><button type="button" data-core="slide" aria-pressed="true">As presented</button><button type="button" data-core="clinical" aria-pressed="false">Clinical</button></div>
+          </div>
+          <svg class="qc-fig__svg" viewBox="0 0 360 240" role="img" aria-label="A vertical scale from 80 to 108 °F. As presented: a narrow safe band, 94.6 to 102.6, with danger on both sides. Clinical: heat danger from about 104, but cold danger not until roughly 82 to 92."></svg>
+          <figcaption class="qc-fig__cap" id="qcCoreCap">Danger hatched, safe in teal. Toggle and watch the cold edge move.</figcaption>
+        </figure>
+        <script>
+        (() => {
+          // The slide's symmetric ±4 °F band against the clinical picture.
+          // Both are drawn on one scale; the toggle animates the band edges
+          // so the cold-side gap is the thing that moves.
+          const svg = document.querySelector('#qcCore svg');
+          const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const T0 = 80, T1 = 108, top = 18, bot = 200, X = 120;
+          const y = T => bot - (T - T0) / (T1 - T0) * (bot - top);
+          // lo/hi: the teal band; mild: where cold danger starts (mild hypothermia sits between mild and lo); hot: heat danger
+          const STATE = { slide: { lo: 94.6, hi: 102.6, mild: 94.6, hot: 102.6, note: ['as presented: severe damage or death', 'beyond ±4 °F, both ways'] },
+                          clinical: { lo: 95, hi: 104, mild: 90, hot: 104, note: ['clinical: heat stroke ≈ 104 °F · mild hypothermia < 95 °F', 'life-threatening only below ~82–92 °F'] } };
+          let cur = { ...STATE.slide }, target = STATE.slide, raf = null;
+          let ticks = '';
+          for (let T = T0; T <= T1; T += 2) ticks += '<line x1="' + (X - (T % 10 ? 4 : 8)) + '" y1="' + y(T) + '" x2="' + X + '" y2="' + y(T) + '" stroke="var(--ink)" stroke-opacity="0.5"/>' + (T % 10 ? '' : '<text x="' + (X - 12) + '" y="' + (y(T) + 3) + '" class="qc-t" text-anchor="end">' + T + ' °F</text>');
+          svg.innerHTML = '<defs><pattern id="qcHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink)" stroke-opacity="0.45"/></pattern></defs>' +
+            '<line x1="' + X + '" y1="' + top + '" x2="' + X + '" y2="' + bot + '" stroke="var(--ink)" stroke-opacity="0.6"/>' + ticks +
+            '<rect id="qcHot" x="' + (X + 8) + '" width="60" fill="url(#qcHatch)"/><rect id="qcCold" x="' + (X + 8) + '" width="60" fill="url(#qcHatch)"/>' +
+            '<rect id="qcMild" x="' + (X + 8) + '" width="60" fill="var(--ink)" fill-opacity="0.14"/>' +
+            '<rect id="qcSafe" x="' + (X + 8) + '" width="60" fill="var(--petrol-bright)" fill-opacity="0.75"/>' +
+            '<line x1="' + (X + 4) + '" y1="' + y(98.6) + '" x2="' + (X + 72) + '" y2="' + y(98.6) + '" stroke="var(--ink)" stroke-dasharray="2 2"/>' +
+            '<text x="' + (X + 76) + '" y="' + (y(98.6) + 3) + '" class="qc-t">98.6 normal</text>' +
+            '<text id="qcHotT" x="' + (X + 76) + '" class="qc-t"></text><text id="qcColdT" x="' + (X + 76) + '" class="qc-t"></text><text id="qcMildT" x="' + (X + 76) + '" class="qc-t" fill-opacity="0.8"></text>' +
+            '<text id="qcNote" x="' + (X - 100) + '" y="' + (bot + 16) + '" class="qc-t"></text><text id="qcNote2" x="' + (X - 100) + '" y="' + (bot + 28) + '" class="qc-t"></text>';
+          const R = id => document.getElementById(id);
+          function render(s) {
+            const band = (el, a, b) => { el.setAttribute('y', y(b)); el.setAttribute('height', Math.max(0, y(a) - y(b))); };
+            band(R('qcSafe'), s.lo, s.hi); band(R('qcHot'), s.hot, T1); band(R('qcCold'), T0, s.mild); band(R('qcMild'), s.mild, s.lo);
+            R('qcHotT').setAttribute('y', y(s.hot) - 4); R('qcHotT').textContent = 'danger above ' + s.hot.toFixed(1);
+            R('qcColdT').setAttribute('y', y(s.mild) + 11); R('qcColdT').textContent = 'danger below ' + s.mild.toFixed(1);
+            const hasMild = s.lo - s.mild > 0.5;
+            R('qcMildT').setAttribute('y', y(s.lo) + 11); R('qcMildT').textContent = hasMild ? 'mild hypothermia below ' + s.lo.toFixed(0) : '';
+            R('qcNote').textContent = s.note[0]; R('qcNote2').textContent = s.note[1];
+          }
+          function go(name) {
+            target = STATE[name];
+            document.querySelectorAll('[data-core]').forEach(b => b.setAttribute('aria-pressed', b.dataset.core === name ? 'true' : 'false'));
+            if (still) { cur = { ...target }; render(cur); return; }
+            const from = { ...cur }, t0 = performance.now(), D = 700;
+            cancelAnimationFrame(raf);
+            const tick = now => {
+              const p = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - p, 3);
+              const mixv = (a, b) => a + (b - a) * e;
+              cur = { lo: mixv(from.lo, target.lo), hi: mixv(from.hi, target.hi), hot: mixv(from.hot, target.hot), mild: mixv(from.mild, target.mild), note: p > 0.5 ? target.note : from.note };
+              render(cur); if (p < 1) raf = requestAnimationFrame(tick);
+            };
+            raf = requestAnimationFrame(tick);
+          }
+          document.querySelectorAll('[data-core]').forEach(b => b.addEventListener('click', () => go(b.dataset.core)));
+          render(cur);
+        })();
+        </script>
       </div>
     </section>
 
