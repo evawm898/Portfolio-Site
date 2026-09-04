@@ -3165,8 +3165,11 @@ exposure the ruling accepts in exchange for the minutes.
       | RADIAL × 40 × spread 0.60 (unruled) | 13 | 12 | 11 | 15 |
 
       The ruled-clean maximum is still 5 and the ruled-bad minimum still 11, so the numbers
-      do not move the line; the depth cell at 4/5/6 sits unruled at 4–5 just under it, which
-      is why those three are on the sheet. **Held at 11 (Eva, Sep 3), pending her look.**
+      do not move the line; the depth cell at 4/5/6 sat unruled at 4–5 just under it, which
+      is why those three went on the sheet. **RULED FROM THE SHEET (Eva, Sep 4): the depth cell
+      at 4 / 5 / 6 reads CLEAN, the mum stays BAD, the defaults and the three-deep cell stay
+      clean, and the threshold HOLDS at 11.** The ruled-clean set now reaches 5 at depth (the
+      five-layer cell), which is exactly where it already stood; nothing moves.
 
     - **THE INSTRUMENT FAILED ITS OWN VALIDITY ON TINY RINGS, AND THE FIX SHIPS IN THE SAME
       PR AS THE ROWS THAT NEED IT (Eva's instruction).** R5 refused six deep rows whose
@@ -3192,4 +3195,6 @@ exposure the ruling accepts in exchange for the minutes.
       the same apparent size. Framed once from the LIVE hub, the print preview shows the hub
       disc visibly larger in the same frame, the rim band taller (1.00 mm against 0.60) and
       every root leaving it thicker; the caption carries hub 3.63 → 4.69 mm, the same 120
-      feet, D_max 17 live against 11 printed.
+      feet, D_max 17 live against 11 printed. **Eva looked at the pair directly (Sep 4): the
+      print-preview hub is visibly bigger with a taller rim band, so the toggle earns its
+      place. Merged on that ruling.**.

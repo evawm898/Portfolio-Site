@@ -69,7 +69,8 @@ ruled-clean blooms. **It is BLIND to blade-to-blade crowding above the root**
 ring, whose exit width IS the foot width) — that second instrument is
 recorded, not built, and a clean D_max is a clean BASE, never a clean bloom.
 The threshold was re-derived when the cap went to six and HELD at 11 (Eva,
-Sep 3, pending the depth sheet); D_max is resolved by a local fine pass
+Sep 3, confirmed from the depth sheet Sep 4: the depth cell at 4/5/6 reads
+clean, the mum stays bad); D_max is resolved by a local fine pass
 (`refineDepth()`) because the hub-pitch raster under-resolves a deep base.
 
 **THE PRINT-PREVIEW TOGGLE IS VIEW CHROME, AND `shownMode()` IN bloom.js IS
