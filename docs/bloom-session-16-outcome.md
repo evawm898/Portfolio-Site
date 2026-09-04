@@ -260,3 +260,38 @@ The pair Eva asked to look at rather than read: the incurve target at bias 1 (th
 re-opened) and at start 0.95 (23.1% uncovered, bald cap 5.78 mm, CLAMPED on 120 of 120 rings,
 25.6° built of 150° asked), with the seat line reading 1.88 mm printed. Held for her ruling;
 merge is released by it.
+
+**The byte-identity claim in its most checkable form, from the sheet itself (Eva, Sep 4):**
+the shipping default exports to STL sha `0c377b21350d` on the base tree (6b8e94b) and on the
+head, and the pinned incurve target (rise 0.50, bias 0, start 0) to `cd46ad682fd3` on both.
+The sheet tool REQUIRES those two pairs equal and refuses to write the sheet otherwise; they
+are recorded here so the claim is readable without a render.
+
+### Known weakness of the sheet tool: the bracketed verdict does not discriminate
+
+Found by Eva on the sheet, ruled docs-only, to be fixed the next time the sheet tool is
+touched — not worth a render and another ten-job CI round now. The bracketed label at the end
+of every coverage caption reads **identically on a closed crown and an open one**: the pinned
+control (0.0% uncovered, bald cap 0.08 mm, crown closed) and INCURVE TARGET × bias 1 (16.0%
+uncovered, bald cap 4.59 mm, crown visibly open) both print
+`[BLADE/CURL ALREADY CLOSING MOST OF IT (bald cap well under the foot stub reference)]`. The
+per-cell numbers are correct; the label is the problem. It is the same class as J1 being
+INDISCRIMINATE rather than blind (session 15): a summary that says the same thing about the
+state it should flag and the state it should pass.
+
+Where it lives and why it fails: the label is produced by `coverageLine()` in
+`tools/bloom-plan-coverage.mjs` — one owner, printed by the sheet's captions AND by the export
+gate's per-row line — and its middle arm fires whenever the blade closed more than 0.5 mm
+further in than the bare foot stub would (`bladeReach > 0.5`). On the incurve target the foot
+stub reaches 5.95 mm; a crown at 0.08 mm has closed 5.87 mm and a crown at 4.59 mm has closed
+1.36 mm, and both clear a 0.5 mm bar by a wide margin. The reference is the wrong one: the
+foot stub says how much the BLADE contributed, not whether the crown is CLOSED.
+
+The discriminator it should use instead: the bald cap against the PINNED ASSERTION — the
+`coverage: { maxBald: 0.09 }` the two gated rows already carry, the one number this session
+established as "closed" — never against the foot-stub reference. A cap at or under that bound
+is a closed crown; a cap over it is an open one, however much the blade helped; and the
+foot-stub comparison can stay as the SECOND clause (how it closed), never the verdict. When it
+is fixed, photograph the two cells above with the corrected labels on one sheet, and add the
+pair to the sheet tool's assertions so the label is measured to differ on them — a label
+nobody has seen disagree is the failure being fixed.
