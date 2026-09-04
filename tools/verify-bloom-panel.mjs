@@ -1388,7 +1388,12 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
   await step('curl 360 x start 0.5 (the tip lands on its own mid-blade)', [{ id: 'petalSpineCurl', value: '360' }, { id: 'curlStart', value: '0.5' }], { clamped: false, contact: true });
   await step('curl 360 x bias 1 x start 0 (winds inside itself)', [{ id: 'curlBias', value: '1' }, { id: 'curlStart', value: '0' }], { clamped: false, contact: false });
   await step('back to curl 0 (bias and start disappear, the line goes)', [{ id: 'petalSpineCurl', value: '0' }, { id: 'curlBias', value: '0' }], { clamped: false, contact: false });
-  await step('6 whorls x curl 360 (the shipped uniform arc under the floor on the innermost whorl — told, not clamped)', [{ id: 'petalSpineCurl', value: '360' }, { id: 'layerCount', value: '6' }], { clamped: false, contact: true, under: true });
+  /* A STEP THAT NAMES A STATE SETS IT: the clamp step above left the page at
+     petalLength 20 x sheet 0.60, where the sixth whorl's 3.9 mm blade has a
+     0.62 mm spine radius against a 0.60 mm floor — NOT under it. The first
+     run of this step read false for exactly that reason. The shipping blade
+     and sheet are set back explicitly. */
+  await step('6 whorls x curl 360 on the shipping blade and sheet (the uniform arc under the floor on the innermost whorl — told, not clamped)', [{ id: 'petalSpineCurl', value: '360' }, { id: 'layerCount', value: '6' }, { id: 'petalLength', value: '35' }, { id: 'sheetThickness', value: '1.2' }], { clamped: false, contact: true, under: true });
   await step('back to one whorl, curl 0', [{ id: 'layerCount', value: '1' }, { id: 'petalSpineCurl', value: '0' }], { clamped: false, contact: false });
   await step('roll 90 (taper appears)', [{ id: 'petalRoll', value: '90' }], { clamped: false, contact: false });
   await step('back to roll 0 (taper disappears)', [{ id: 'petalRoll', value: '0' }], { clamped: false, contact: false });
