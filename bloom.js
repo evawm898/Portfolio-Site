@@ -421,7 +421,8 @@ let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-l
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
 let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false };
-let lastCenter = { style: 'NONE', tris: 0 };
+let lastCenter = { style: 'NONE', tris: 0, seat: null };
+let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
 /* THE BUILDER'S OWN TALLY of buildPetalInto calls — Z1's independent
@@ -474,7 +475,7 @@ function buildGeometry({ exportMode, record = false }) {
     lastShownMode = exportMode ? 'export' : 'live';
     lastPlacement = uiForBuild.placement;
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
-    lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals;
+    lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
@@ -646,12 +647,47 @@ function footFloorLine(rings) {
    footRing()'s own telemetry; this only names them. Absent when no ring is
    under the floor, so the line simply is not there rather than saying
    "none". The panel gate asserts it in both directions. */
-function innerRingLine(rings) {
+function innerRingLine(rings, fr) {
   const under = clampedRingsPhrase(rings, (r) => r.underFootFloor);
   if (!under) return '';
   const cross = clampedRingsPhrase(rings, (r) => r.crossesAxis);
+  /* On the dome the foot runs along the ARC and the thing it crosses is the
+     apex — footRing() decides that (the flag is arc-based there); this only
+     names it. */
   return `RINGS NARROWER THAN A FOOT on ${under} — under ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm, so the feet on them overlap each other`
-       + (cross ? `; on ${cross} they cross the axis` : '') + `\n`;
+       + (cross ? `; on ${cross} they cross the ${fr && fr.dome ? 'apex' : 'axis'}` : '') + `\n`;
+}
+
+/* THE DOME LINE (Sep 4) — the head rise, told in the numbers a visitor cannot
+   set: the cap's radius and apex height in the shown mode, the surface-to-plan
+   ratio over the feet, and THE LOCAL RELIEF at the rim and at the innermost
+   ring. That last pair carries the finding this session would otherwise lose
+   by session 16: the dome's extra area sits at the RIM where the slope is
+   steep, while a tight bloom's feet stack at the INNER rings where the cap is
+   nearly flat — so the relief is greatest where the crowding is least (the
+   mum's peak is at r 2.1–2.8 mm on a 4.69 mm hub, local relief 1.1–1.2x under a
+   whole-annulus 2.0x; a hemisphere takes it from D_max 11 to 9, not to 5).
+   Both numbers are footRing()'s own per-ring `relief`; this only prints them.
+   "(CLAMPED)" is the apex floor binding, the roll floor's own discipline:
+   the rise asked and the rise built are both printed, from the owner. Absent
+   when flat, so the line simply is not there. */
+function domeLine(rings, fr, mode) {
+  const d = fr.dome;
+  if (!d) return '';
+  const rim = rings[0], inner = rings.reduce((a, r) => (r.radius < a.radius ? r : a), rings[0]);
+  const rel = (x) => (isFinite(x) ? `${x.toFixed(2)}x` : 'vertical');
+  return `HEAD RISE ${d.rise.toFixed(2)}x · dome radius ${d.Rd.toFixed(2)} mm, apex ${d.H.toFixed(2)} mm above the rim (${mode})`
+       + ` · surface ${d.surfaceToPlan.toFixed(2)}x plan over the feet · local relief ${rel(rim.relief)} at the rim, ${rel(inner.relief)} at the innermost ring — the dome relieves radial stacking most where the slope is steepest, least near the apex`
+       + (d.clamped ? ` · (CLAMPED: rise ${d.rise.toFixed(2)} asked, ${d.riseBuilt.toFixed(2)} built — the shell's inner face would invert under a ${d.floorRadius.toFixed(2)} mm dome radius)` : '') + `\n`;
+}
+
+/* THE SEAT LINE — where the designed centre sits on the dome, and what that
+   costs (Eva, Sep 4: photographed, not fixed). Absent when flat or RING. */
+function seatLine(center) {
+  const s = center && center.seat;
+  if (!s) return '';
+  return `centre seated on the apex: ${s.fullFootprint ? 'its whole footprint' : `a ${s.patchRadius.toFixed(2)} mm patch of its ${s.footprint.toFixed(2)} mm footprint`} overlaps the shell`
+       + (s.hover > 0 ? ` · its rim hovers ${s.hover.toFixed(2)} mm above the shell` : '') + `\n`;
 }
 
 /* THE SLOT-ROLE LINE — what the mirror plane actually did, and where the
@@ -747,7 +783,7 @@ function fanLine(fr) {
        + `\n`;
 }
 
-function summarise(ui, acc, mode, rings, fr) {
+function summarise(ui, acc, mode, rings, fr, center) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
   const layers = Number(ui.layerCount);
@@ -787,7 +823,9 @@ function summarise(ui, acc, mode, rings, fr) {
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
        + footFloorLine(rings)
-       + innerRingLine(rings)
+       + innerRingLine(rings, fr)
+       + domeLine(rings, fr, mode)
+       + seatLine(center)
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -860,7 +898,7 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot) + `\n${materialLines(ui, mode)}`;
+  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.center) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 
@@ -1026,7 +1064,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
      an index into a variable-length list is a bug waiting for the first
      multi-layer export — it would have printed the ring radii under the word
      "exported". The tris/max-dim line is always last, so ask for that. */
-  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot).split('\n');
+  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.center).split('\n');
   readout.textContent = `${shownSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
@@ -1125,6 +1163,28 @@ window.__bloomMetrics = () => ({
      from an incorrect one. J3 below is the assertion that can. */
   hubRadius: lastHub.radius,
   hubThickness: lastHub.thickness,
+  /* THE DOME (Sep 4) — footRing()'s own cap, null under the guard: the rise
+     asked and built, the cap's radius and centre, the apex floor's clamp, and
+     the surface-to-plan ratio over the feet's annulus. J1 places every foot
+     against this sphere; the read-out names it. */
+  hubDome: lastHub.dome ? { ...lastHub.dome } : null,
+  /* WHAT THE HUB BUILDER ACTUALLY BUILT — reported by buildHubInto from the
+     sphere it used, never copied from footRing(). J3 compares the feet
+     against THIS: a hub that ignored the owner and stayed flat under lifted
+     feet (the wrong-hub mutation under a dome, measured Sep 4: watertight,
+     one voxel piece on every row tried, J1 indiscriminate) is caught only by
+     the feet not lying on the sphere the hub says it built. */
+  hubBuilt: { dome: lastHubBuilt.dome ? { ...lastHubBuilt.dome } : null, tris: lastHubBuilt.tris },
+  /* THE CENTRE'S SEAT on the dome — overlap patch radius against its own
+     footprint, and the rim's hover above the shell. Photographed, not fixed
+     (Eva, Sep 4). Null when flat or RING. */
+  centerSeat: lastCenter.seat ? { ...lastCenter.seat } : null,
+  /* THE DOME GUARD'S RESIDUAL — exactly 0 on every flat build, null on a
+     domed one; both gates assert it. */
+  petalDomeGuardResidual: lastPetal ? lastPetal.domeGuardResidual : null,
+  /* THE ROOT ROW per descriptor's representative petal — the first BLADE row
+     as emitted, J8's input against the rigid tilt of the foot's own frame. */
+  petalRingRootRows: lastPetals.map((p) => (p ? { C: p.rootRow.C, N: p.rootRow.N, flat: p.rootRow.flat, tiltRad: p.rootRow.tiltRad, u: p.rootRow.u, curlRad: p.rootRow.curlRad, ringC: p.rootRow.ringC, azimuth: p.azimuth } : null)),
   /* RENAMED FROM `ringLayers` WITH THE CONTINUOUS ARM, because under it a
      descriptor is not a layer — it is a ring carrying exactly one petal, and
      there are up to 120 of them. A key naming a thing that is not the thing
@@ -1147,6 +1207,10 @@ window.__bloomMetrics = () => ({
        asserts that line against the owner in both directions. */
     underFootFloor: r.underFootFloor,
     crossesAxis: r.crossesAxis,
+    /* WHERE ON THE DOME THIS RING LANDS (Sep 4) — height, slope, arc from the
+       apex and the local relief factor, footRing()'s own. 0 / 0 / radius / 1
+       when flat. */
+    z: r.z, slope: r.slope, arc: r.arc, relief: r.relief,
     /* THE ROLE AND ITS RECORD, footRing()'s OWN answer. Z1 reads roleCount to
        check the partition; Z2 reads role and overrides against what the
        builder reported it actually used. A gate deriving either from

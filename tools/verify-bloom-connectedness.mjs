@@ -154,7 +154,14 @@ const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed
    the same margin 160M gave the old one; the next largest row is 50.3M
    (ALL MAX x DISC max). Cost, measured on that row: see the charter's
    session-13 entry. */
-const MAX_VOXELS = 256e6;
+/* RAISED AGAIN 256M -> 448M (Sep 4, the domed hub): ALL MAX now resolves
+   `headRise` to 1, so the ALL MAX x DOME max row carries a hemisphere of the
+   118 mm hub under a 142 mm boss — 700x700x743 cells, 364.1M, measured in
+   Node before the gate ran. Same rule as both raises before it: a row that
+   used to be measured and would now be skipped is coverage lost to a change,
+   so the ceiling moves, ~23% over the new worst case; the next largest row is
+   ALL MAX x DISC max at 207.3M. */
+const MAX_VOXELS = 448e6;
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
 function voxelComponents(buf, cell) {

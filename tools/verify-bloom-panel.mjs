@@ -1271,7 +1271,7 @@ for (const [label, sets, want] of [
     const m = window.__bloomMetrics();
     return { anyUnder: m.rings.some((r) => r.underFootFloor === true), anyCross: m.rings.some((r) => r.crossesAxis === true),
              shown: /RINGS NARROWER THAN A FOOT/.test(document.getElementById('readout').textContent),
-             crossSaid: /they cross the axis/.test(document.getElementById('readout').textContent),
+             crossSaid: /they cross the (axis|apex)/.test(document.getElementById('readout').textContent),
              inner: Math.min(...m.rings.map((r) => r.radius)) };
   });
   const problems = [];
@@ -1280,6 +1280,53 @@ for (const [label, sets, want] of [
   if (res.crossSaid !== res.anyCross) problems.push(`the axis-crossing clause is ${res.crossSaid ? 'shown' : 'absent'} while the owner reports ${res.anyCross ? 'a ring inside its overhang' : 'none'}`);
   if (problems.length) note(`${tag}: ${problems.join('; ')}`);
   else ok.push(`${tag}: line ${res.shown ? 'shown' : 'absent'}, owner agrees (innermost ring ${res.inner.toFixed(3)} mm${res.anyCross ? ', feet cross the axis' : ''})`);
+}
+
+/* ---------------- (k) THE DOME LINE, THE APEX CLAMP AND THE SEAT, BOTH DIRECTIONS ---------------- */
+/* The head-rise control's read-out (Sep 4): the HEAD RISE line is shown iff
+   footRing() declares a dome, which is iff the control is off zero; the
+   "(CLAMPED" clause iff the owner's apex floor bound; the seat line iff the
+   centre reports a seat. Each asserted in both directions against the OWNER'S
+   flags, never against this tool's idea of the geometry — the sub-8 spiral
+   precedent, and route (j)'s. The rows: flat; a mid rise; the one reachable
+   corner where the floor binds (a 1.15 mm hub under a 2.40 mm sheet); a
+   hemisphere on the defaults where it does not; and RING, which seats no
+   flat-based button and must print no seat. */
+for (const [label, sets, wantDome, wantClamp, wantSeat] of [
+  ['defaults (flat)', [], false, false, false],
+  ['head rise 0.50 on the defaults', [{ id: 'headRise', value: '0.5' }], true, false, true],
+  ['ALL MIN x sheet 2.40 x spread min x rise 1 (the apex floor binds)', [{ id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'headRise', value: '1' }], true, true, true],
+  ['head rise 1 on the defaults (a hemisphere, no clamp)', [{ id: 'headRise', value: '1' }], true, false, true],
+  ['head rise 0.50 x RING (no flat-based seat)', [{ id: 'headRise', value: '0.5' }, { id: 'centerStyle', value: 'RING' }], true, false, false],
+]) {
+  const tag = `[dome] ${label}`;
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    /* NEGATIVE CONTROL, route (k): the read-out never changes again — the
+       HEAD RISE line cannot appear where the owner declares a dome. */
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {}, configurable: true }); });
+  }
+  const bad = await applyConfig(page, sets);
+  if (bad.length) { note(`${tag}: config did not take: ${bad.join('; ')}`); continue; }
+  const res = await page.evaluate(() => {
+    const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
+    return { rise: Number(ui.headRise), hasDome: m.hubDome !== null, clamped: !!(m.hubDome && m.hubDome.clamped), riseBuilt: m.hubDome ? m.hubDome.riseBuilt : null,
+             shown: /HEAD RISE/.test(txt), clampSaid: /\(CLAMPED: rise/.test(txt), seat: m.centerSeat !== null, seatSaid: /centre seated on the apex/.test(txt),
+             reliefSaid: /local relief .* at the rim, .* at the innermost ring/.test(txt), hubBuiltDome: !!(m.hubBuilt && m.hubBuilt.dome), hubTris: m.hubBuilt ? m.hubBuilt.tris : null };
+  });
+  const problems = [];
+  if (res.hasDome !== wantDome) problems.push(`footRing() ${res.hasDome ? 'declares a dome' : 'declares none'}, this row expects ${wantDome ? 'one' : 'none'}`);
+  if (res.hasDome !== (res.rise !== 0)) problems.push(`the owner ${res.hasDome ? 'declares a dome' : 'declares none'} while the control reads ${res.rise} — the guard and the control disagree`);
+  if (res.hubBuiltDome !== res.hasDome) problems.push(`the hub builder ${res.hubBuiltDome ? 'built a shell' : 'built the disc'} while the owner ${res.hasDome ? 'declares a dome' : 'declares none'}`);
+  if (res.hubTris !== (res.hasDome ? 3456 : 192)) problems.push(`the hub built ${res.hubTris} triangles, expected ${res.hasDome ? 3456 : 192} — the count is a branch on the dome, not a ramp`);
+  if (res.shown !== res.hasDome) problems.push(`the HEAD RISE line is ${res.shown ? 'SHOWN' : 'ABSENT'} while the owner ${res.hasDome ? 'declares a dome' : 'declares none'}`);
+  if (res.hasDome && !res.reliefSaid) problems.push('the HEAD RISE line does not print the local relief at the rim and at the innermost ring');
+  if (res.clamped !== wantClamp) problems.push(`the owner reports clamped ${res.clamped}, this row expects ${wantClamp}`);
+  if (res.clampSaid !== res.clamped) problems.push(`the (CLAMPED clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports clamped ${res.clamped}`);
+  if (res.seat !== wantSeat) problems.push(`the centre reports ${res.seat ? 'a seat' : 'no seat'}, this row expects ${wantSeat ? 'one' : 'none'}`);
+  if (res.seatSaid !== res.seat) problems.push(`the seat line is ${res.seatSaid ? 'shown' : 'absent'} while the centre reports ${res.seat ? 'a seat' : 'none'}`);
+  if (problems.length) note(`${tag}: ${problems.join('; ')}`);
+  else ok.push(`${tag}: HEAD RISE line ${res.shown ? 'shown' : 'absent'}, owner agrees (rise ${res.rise}${res.clamped ? ' CLAMPED to ' + res.riseBuilt.toFixed(2) : ''}, hub ${res.hubTris} tris${res.seat ? ', seat line shown' : ''})`);
 }
 
 await browser.close();
@@ -1304,11 +1351,12 @@ if (NEGATIVE_CONTROL) {
     const sawDepth = fail.some((f) => /^\[depth\] .*hiddenReason caption is/.test(f));
     const sawPreview = fail.some((f) => /^\[preview\]: .*did not rebuild/.test(f));
     const sawInner = fail.some((f) => /^\[inner rings\] .*line is ABSENT while the owner reports a ring under the floor/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner) { console.log('\nALL EIGHT ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}. All eight must.`);
+    const sawDome = fail.some((f) => /^\[dome\] .*HEAD RISE line is ABSENT while the owner declares a dome/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome) { console.log('\nALL NINE ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}. All nine must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box and a frozen read-out. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out and a frozen dome line. It is not measuring anything.');
   process.exit(1);
 }
 

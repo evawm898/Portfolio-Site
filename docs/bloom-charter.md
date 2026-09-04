@@ -3198,3 +3198,290 @@ exposure the ruling accepts in exchange for the minutes.
       feet, D_max 17 live against 11 printed. **Eva looked at the pair directly (Sep 4): the
       print-preview hub is visibly bigger with a taller rim band, so the toggle earns its
       place. Merged on that ruling.**.
+
+- ~~The domed hub~~ **BUILT Sep 4 (session 14): `headRise`, the whorl primitive's
+  `height` argument completed — the junction slab bent into a spherical cap through
+  the rim, every foot landing ON it at its own height with its normal, the shell
+  following the feet, and the designed centre seated on the apex. For the INCURVE
+  MUM (Eva's ruling: the class this serves), not a prettier spider.**
+
+    - **WHAT WAS ON `main` WHEN THE SESSION OPENED, and the brief's account was
+      right.** 7ffcbff, #145: the print-preview toggle, `MAX_LAYERS` six with no
+      clamp and the two read-out flags, the crowding instrument as a flag at D_max
+      11 with the local fine pass; its neighbour set is NONE by design (an
+      exhaustive depth field, all-pairs NN as a diagnostic). The shipping default
+      read D_max 2 / D_mean 1.12 and the mum 11 / 4.97 printed, 17 / 7.49 live,
+      reproduced on the standalone run before anything was touched. The one thing
+      the brief's first version had wrong and its amendment fixed: `centerStyle`
+      already had a DOME value — the designed ornament on the flat hub, untouched.
+
+    - **THE BRIEF'S 4.75x DID NOT RECONCILE WITH THE METRIC, and the disagreement
+      was in the brief's inputs, resolved before anything was built.** 192 mm² of
+      foot over a 40.4 mm² annulus multiplies the export THICKNESS floor (1.00 mm)
+      as the foot's plan depth; the plan depth is the overhang, 1.50 mm live and
+      1.50–1.88 mm printed. The 0.55 mm inner radius matches neither mode, and the
+      3.63 mm ring is the LIVE hub while the metric reads the printed one at
+      4.69 mm. Redone with the owner's numbers: live 288 mm² over 41.0 mm², 7.02x
+      (the metric's live D_mean 7.49); printed 299.9 mm² over 66.5 mm², 4.51x
+      (the metric's 4.97). The brief landed within five percent of the printed
+      metric by two errors cancelling. The metric stands on its own validity
+      assertions; neither number was adopted.
+
+    - **THE DOCTRINE (Eva, Sep 4). A JUNCTION CHANGE, NEVER A CENTRE OPTION; AN
+      EXPOSED CONTROL, NOT A CURVATURE DERIVED FROM CROWDING OR DEPTH.** The
+      deciding reason was the third of the session's four: a metric consumed as a
+      geometric input becomes a target — the A_k lesson made structural. The
+      crowding instrument stays an OBSERVER of the geometry, never an input to it.
+      The other reasons, measured: a crowding-keyed rule gives no dome on the
+      incurve target (D_max 5–6, in the clean band) and none in the brief's own
+      spread-2.5 neighbourhood (3–4); a depth-keyed one moves the session-7
+      layered control (5 → 4 at a hemisphere); and the byte-identity argument is
+      the SAME mechanism either way (a guard plus a residual), so "derived holds
+      structurally, a control by a flag" was not a difference. `headRise` is
+      `role: 'arrangement'`, because what it owns is where the FEET sit in z —
+      the whorl primitive's `height` argument, handed the literal 0 since session
+      1 because a foot lifted off a FLAT slab is joined to nothing at |h| ≥ t. The
+      "height is not a control" ruling was a measurement about the slab, not
+      about height; with the slab following the feet the whole range is usable,
+      and the registry comment says so, so the next session reads a completed
+      primitive rather than a new axis. The junction itself stays control-free,
+      which keeps the registry header's "no junction role, ever" literally true.
+      **Ring-radius / spread exposure was NOT reopened**: its phase-2 parking was
+      conditioned on a new designed centre, and this session introduced none.
+
+    - **THE FOOT ON THE DOME, and the seam measured three ways before one was
+      chosen.** A single flat box tangent at the ring reaches 0.70 mm off the cap
+      at the default and 1.07 mm at ALL MIN — past t/2 at every corner. Rows
+      along the meridian with straight chords across leave the row ENDS floating
+      by hw²/2Rd, 0.58 mm on a default-width foot at a hemisphere. Rows built as
+      GREAT-CIRCLE ARCS across (radius Rd about the cap's centre — the roll law's
+      own cross-section, with the apex floor as the roll floor) lie IN the cap,
+      and the only seam left is the mesh's NV = 10 faceting, 0.007 mm worst case.
+      That is what shipped: the ring row placed from `ring.radius` and `ring.z`
+      directly (so J1's equality is exact), the two inner rows from the arc law,
+      the overhang an ARC length — the same foot laid on a curved surface. What
+      remains is a CREASE where the straight first blade row meets the curved last
+      foot row, hw²/2Rd: 0.03 mm on the incurve target, 0.06 on the mum, 0.46 on a
+      domed default. Blending it is petal-form work; it is photographed, not built.
+      **The blade frame rotates rigidly with the foot**: the tilt is measured from
+      the tangent plane's outward direction, which points DOWN the slope, so an
+      outer floret on a steep cap leans out and an inner one stands at its authored
+      tilt — the ball. `petalForm.frameAt` gained an optional `up` (a BRANCH, not
+      `up = Z` with a general expression: `-R[0]*sin(phi) + 0*cos(phi)` turns a -0
+      into a +0 at petalTilt 0, and that is a byte); the curl arc lives in the
+      foot's own (Rs, Up) plane.
+
+    - **THE HUB IS THE FLAT SLAB BENT — A SHELL, NOT A SOLID BOSS** (Eva's ruling
+      from the recommendation). Concentric spheres Rd ± t/2 about the cap's centre,
+      the rim a band at the rim's polar angle, an explicit apex fan (the centre
+      DOME's own construction, which found 48 degenerate triangles per dome when
+      a ring was shrunk to zero). Thickness t everywhere, so J4a stays an EQUALITY;
+      the feet sit inside it with their faces coincident with its faces exactly as
+      in the slab; from below it reads as a bowl, which is what lets the sheet tell
+      a domed base from a flat one — a solid dome's underside is the flat disc's.
+      **The hub's triangle count is the FIRST in this codebase that depends on a
+      slider: 3,456 at any rise above 0 against 192 flat** — a branch, not a ramp;
+      the panel gate asserts exactly those two numbers, and the export gate's
+      live-equals-export count still holds on every row.
+
+    - **THE APEX: capped by the OUTPUT.** The shell's inner face inverts under
+      half a thickness of radius — the roll floor's own failure, watertight and
+      connected and invisible to both STL gates — so the cap's radius is floored
+      at one sheet thickness (`HEAD_RISE_MIN_RADIUS_FACTOR`, asserted equal to
+      `ROLL_MIN_RADIUS_FACTOR` at module load, BELOW both definitions on the
+      hoisting-trap rule). Since Rd ≥ R0 always, it binds only where the hub is
+      narrower than the sheet: ONE reachable corner, ALL MIN × sheet 2.40 × spread
+      min (a 1.149 mm hub), where the rise saturates at 0.25 and the read-out
+      says "(CLAMPED: rise 1.00 asked, 0.25 built)". Measured across the domed
+      matrix rows: 0 degenerate, 0 non-manifold, boundary 0.
+
+    - **THE DEPTH CEILING ON THE DOME — re-derived, not inherited, and there was
+      no clamp to inherit.** Session 13 rejected the derived clamp and shipped two
+      flags; those flags are PRODUCERS of a boundary and moved with the owner:
+      `underFootFloor` is a circumference claim and needs no second arm;
+      `crossesAxis` becomes arc distance from the apex against the overhang.
+      Measured across 24 (depth × spread × placement) states: no ring is under
+      the floor at spread 2.00 to depth six in either placement, flat or domed, so
+      the ceiling stays six; at spread 0.60 the flagged counts are unchanged
+      except continuous × depth 4, 8 flat against 7 on the dome — because the arc
+      to plan ratio is 1.2–2.9 over the whole ring span and nearly 1 at the
+      innermost rings, where the apex is flat.
+
+    - **PRE-REGISTERED CROWDING, AND THE PREDICTION WAS WRONG IN A WAY WORTH
+      MORE THAN A CLEAN NUMBER.** Predictions were written to a file from the
+      area-ratio rule before the surface raster ran; the raster was validated
+      first (at rise 0 it equals the shipped flat raster to the bit on five
+      configurations, D_max and D_mean alike). Printed mode:
+
+      | config | flat | predicted at rise 0.5 / 1.0 | measured at rise 0.5 / 1.0 |
+      |---|---|---|---|
+      | Eva's mum | 11 / 4.97 | 9 / 3.94 and 5 / 2.44 | **10 / 4.11 and 9 / 3.14** |
+      | shipping default | 2 / 1.12 | 1 / 0.82 and 1 / 0.45 | 2 / 1.11 and 1 / 1.01 |
+      | session-7 bloom | 5 / 2.53 | 4 / 2.01 and 2 / 1.23 | 5 / 2.10 and 4 / 1.69 |
+      | depth cell | 3 / 1.62 | 2 / 1.23 and 1 / 0.71 | 3 / 1.38 and 2 / 1.06 |
+      | the incurve target (pre-registered after the four above, before the instrument ran) | 6 / 2.47 | 5 / 1.89 | **5 / 2.06** |
+
+      **THE DOME RELIEVES THE MUM'S CROWDING; IT DOES NOT FIX IT, AND THAT IS THE
+      RESULT, NOT A FAILURE.** The area-ratio rule over-stated the relief every
+      time, for one reason: the cap's extra surface sits at the RIM where the
+      slope is steep, while a tight bloom's feet stack at the INNER rings where
+      the cap is nearly flat. The mum's peak sits at r 2.1–2.8 mm on a 4.69 mm hub,
+      where a hemisphere's local relief is 1.1–1.2x under a whole-annulus 2.0x;
+      it takes the mum from D_max 11 to 9, not to 5. Still over-subscribed at 120 florets. The
+      incurve target's D_max landed exactly (5) and its D_mean missed by 8% in
+      the same direction (local relief 1.24x at its peak against 1.67x at the
+      rim) — a second data point on the same finding. **Carried into the
+      read-out** (Eva's instruction): the HEAD RISE line prints the surface-to-
+      plan ratio over the feet AND the local relief at the rim and at the
+      innermost ring, from `footRing()`'s own per-ring `relief`; the crowding
+      line prints the relief at the D_max point beside the rim's. Where the
+      flags live, because it is the same kind of fact: a number a visitor cannot
+      set that decides what the dome did.
+
+    - **THE INCURVE TARGET.** The brief's 15 mm is below the petal-length
+      slider's floor of 20 (kept for this session, Eva's ruling); its spread-2.5
+      neighbourhood gives a 20–28 mm hub around 20 mm florets, ratio 0.4–0.8, a
+      daisy. The class ratio (floret length ÷ head radius 1.0–1.5) is reached
+      only with the existing spine-curl control engaged: continuous 40/turn × 3,
+      spread 1.60, length 20, width 8, shrink 0.90, tilt 75, tilt step 5, curl
+      150, sheet 0.60, delicacy 0.25, rise 0.50 — ratio 1.36 by length over the
+      larger of plan reach and height reach. Its flat twin at the same sliders
+      folds into a closed bud with its tips 2.8 mm off the plate, so the pair is
+      the argument.
+
+    - **THE CENTRE SEAT — PHOTOGRAPHED, NOT FIXED (Eva, Sep 4).** Left at the
+      flat seat the designed centre DETACHES under a domed hub: two voxel
+      components on the session-7 bloom at rise 0.5, the second being the DISC
+      button, surviving at a 0.3 mm cell (its sibling mutant stayed one piece only
+      because a horizontal foot happened to brush the button's top). Re-seated on
+      the apex slab — the same eighth below the same underside, measured from the
+      cap's apex — the overlap is a central PATCH of the footprint and the rim
+      HOVERS: on the incurve target, printed, a 5.92 mm patch of a 9.38 mm
+      footprint and 1.88 mm of hover; on the mum the whole footprint. RING lifts
+      its tube onto the cap and is intersected all round. `buildCenterInto`
+      reports the patch and the hover, the read-out prints them, and the sheet
+      has a low three-quarter and a profile of the button at readable
+      magnification for Eva's eye. A button that follows the cap's curvature is a
+      phase-2 centre question, not a junction one.
+
+    - **THE POSITIVE CONTROLS, RUN AGAINST THE SHIPPED INSTRUMENTS FIRST, in
+      throwaway worktrees.** Three mutants at a hard-coded rise 0.5: D1 feet on a
+      cap over a hub left flat; D2 a shell under feet kept horizontal; D3 correct
+      feet under a blade that did not rotate. Every one exported watertight at
+      identical live and export triangle counts. The voxel gate read ONE piece on
+      every row of D1 and D2 — the mum included, whose inner feet sit 1.8 mm above
+      a flat hub — and on D3 two pieces only where the centre detached. **The
+      shipped J1 fired on all three, and that is the finding: it was
+      INDISCRIMINATE, not blind.** It asserted the flat ruling itself (z = 0
+      exactly, the hub plane's own normal), so it rejected a correct dome and a
+      wrong one alike and could police nothing once the right build shipped. That
+      distinction is in the gate's header.
+
+    - **SO THE JUNCTION ASSERTIONS WERE RE-DERIVED, red then green on the same
+      mutants rebuilt on the new tree.** J1: each foot row lies on the cap the
+      owner declares (its centre at the cap's radius from the cap's centre,
+      within 1e-9) with the cap's normal there, the ring row at the owner's
+      radius and height EXACTLY; flat rows keep the pre-dome clauses verbatim.
+      J3: the hub BUILDER's own sphere — reported by `buildHubInto` from what it
+      built, never copied from `footRing()` — is the owner's to the bit, and
+      exists iff the owner declares a dome. J8: the spine's first chord leaves the
+      ring row in the foot's own meridian plane at tilt plus half that row's curl
+      (every row; exact for a circular arc, and the centreline is curl's alone),
+      and on flat-form rows the first blade row's normal is the rigid tilt of the
+      foot's frame. Plus the dome guard (exactly 0 on flat builds, absent on domed
+      ones) and the guard-versus-control biconditional.
+
+      | mutant | boundary / degen | voxel pieces | after the re-derivation |
+      |---|---|---|---|
+      | shipped tree | 0 / 0 | 1 | **0 of 13 rows** |
+      | P1 hub ignores the owner's dome | 0 / 0 | 1 on every row | **J3 only**, every domed row, flat rows clean |
+      | P2 feet lifted but horizontal | 0 / 0 | 1 on every row | **J1 + crowding R4**, every domed row |
+      | P3 blade not rotated with its foot | 0 / 0 | 1 | **J8 only** — and its first probe was SILENT on the curled incurve target |
+      | P4 the flat path is the general law at zero curvature | 0 / 0 | 1 | bit-identical (0 positions moved), residual 0 |
+
+      **P3's first silence is the entry that matters.** J8's first draft compared
+      the root NORMAL on flat-form rows only, and the acceptance config is curled,
+      so the mutation this session is most likely to ship passed the row the
+      session is for. The chord clause exists because a positive control was run
+      before the assertion was trusted — session A's "Z1 failed the shipped tree
+      on 5 of 7 rows", the fan's "six of eight probe rows fired on the shipped
+      tree", again. **P4 corrected a premise the other way:** the general dome
+      law at zero curvature reproduces the flat foot BIT FOR BIT on the default,
+      at petalTilt 0 and on the mum, so the guard is a construction on top of an
+      identity rather than a cover for a difference. It stays, because a branch is
+      a construction and an identity is an argument; the residual is what polices
+      the law.
+
+    - **THE CROWDING INSTRUMENT READS ON THE CAP.** Membership in the cap's own
+      geometry (a geodesic strip about the foot's meridian), the union a SURFACE
+      area, R4 placing every emitted row on the owner's cap at the strip model's
+      arc position. Its first draft weighted each occupied cell by the relief at
+      its centre and R5 refused every hemisphere row at 0.5%: the sampling was
+      measuring the 1/cos singularity at a vertical rim, not the surface. Each
+      cell now carries the cap's exact area between its inner and outer plan
+      radii, and the hemisphere rows converge. The relief at a vertical rim
+      prints as "vertical", never as 1.3e151x — which the first draft printed.
+
+    - **THE MATRIX GREW 434 → 466**, and **`phase12Matrix()` — the 434 rows
+      frozen at 7ffcbff — is the twelfth baseline and now the strongest**, proved
+      deep-equal to that commit's own `buildMatrix()`. The 32 new rows: the
+      blanket sweep's `headRise min` (0, the default, pinned) and `max` (1); the
+      dome crossed with spread min / default / max in both placements; rise 0.5
+      at petal counts 3 / 8 / 40; the mum at 0.5 and at a hemisphere; the incurve
+      target flat and domed; six deep at spread min in both placements (the arc
+      flag); the APEX CORNER; a hemisphere under every centre style; ALL FORM
+      MAX, petalTilt 0 and the 135°-effective tilt on a hemisphere; FAN, SPIRAL,
+      the two-whorl ORCHID and a per-petal fan on a dome; ALL THIN × spread min ×
+      3 layers (feet across the apex); the 0.18 mm blade six deep on a
+      hemisphere; and a pinned rise-0 row. **Predicted before the run: exactly the
+      four ALL MAX rows move**, because `SWEEPABLE()` now resolves `headRise` to
+      1 there (its only consumer is block 4), and every frozen matrix pins
+      nothing about it. The connectedness ceiling moved 256M → 448M because
+      `ALL MAX × DOME max` is now a hemisphere of the 118 mm hub under a 142 mm
+      boss, 700×700×743 cells, 364.1M — measured in Node before the gate ran.
+
+    - **THE PANEL GATE'S ROUTE (k)** asserts the HEAD RISE line, the "(CLAMPED"
+      clause and the seat line in both directions against the owner's flags on
+      five states, plus the hub's triangle count as the two-valued branch it is;
+      the negative control freezes the read-out and requires all NINE routes to
+      fire, and does.
+
+    - **THE SHEET: `node tools/shot-bloom-dome.mjs <dir>`** — every cell PRINT
+      PREVIEW ON, read back from the app's own `shownMode`; the incurve target
+      flat beside domed with one camera sized from the flat twin; the base of
+      each from a LOW PROFILE at the rim (Eva, Sep 4 — a domed shell hides the
+      inner roots from below, and the flat disc and the shell are
+      indistinguishable from there) and from below; the mum flat / 0.50 /
+      hemisphere; the two controls at rise 0; the centre seat, low three-quarter
+      and profile. The profile camera WIDENS in bounded steps when the decoded
+      frame comes back all content (the mum's canopy swallowed the first one at
+      hub magnification) and says so in the caption.
+
+    - **THE CLOSE-OUT, on the retention ruling (the newest baseline on both
+      trees plus the live partition, not the whole suite).**
+        * **phase12 (434 rows frozen at 7ffcbff) on a worktree at 7ffcbff and on
+          the branch head: 434/434 bit-identical, 0 moved, defaults bit-identical.**
+          The live matrix (466 rows) against the base tree's phase12 export by
+          label: **430 shared rows bit-identical, exactly the 4 predicted ALL MAX
+          rows moved, 32 rows new; the pinned rise-0 row and `headRise min` are
+          bit-identical to the default on the new tree.** The prediction held in
+          both directions. Runtimes: ~20 min per byte export of 434–466 rows.
+        * Export gate **466/466 watertight, 466/466 identical live and export
+          triangle counts, 0 degenerate, 23 rows flagged CROWDED, no validity
+          failure, 1,579 s** — after two runs that were NOT clean, recorded
+          because each found a real defect in the new instruments: the first
+          (12 validity failures) was the plan raster's D_mean refusing every
+          hemisphere row and R4's tolerance at a rim whose radius was a rounding
+          residue above the hub's; the second (1) was J8's chord clause comparing
+          angles without a wrap, on the 225°-effective sixth whorl. Both fixed
+          on the mechanism, not the tolerance.
+        * Connectedness gate **466/466 ONE connected piece, no row skipped at the
+          raised 448M ceiling, 1,345 s.**
+        * Panel gate PASS with route (k); the negative control fired on all nine
+          routes. `--verify-frozen --phase12` PASS against a worktree at 7ffcbff.
+        * The shipped tree on the thirteen probe rows: 0 of 13 fired; P3 rebuilt
+          on the final tree fires J8 on all 7 domed rows and none of the 6 flat.
+        * The default bloom is **11,136 tris live and export alike, unchanged**;
+          the incurve target is 152,832 at rise 0.5 (149,568 flat, the shell's
+          3,264 on top); the mum at rise 0.5 the same 152,832.
+

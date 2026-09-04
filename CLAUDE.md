@@ -100,6 +100,51 @@ threshold must be re-derived with it. `layerSize` stays capped at 0.90: in
 CONTINUOUS mode 1.00 is mesh-clean (measured: 0 non-manifold) but J5 fires on
 every continuous row there, so the cap is load-bearing for an instrument.
 
+**THE HUB CAN BE A DOME, AND `headRise` IS THE WHORL PRIMITIVE'S `height`
+ARGUMENT COMPLETED** (Eva, Sep 4). `headRise` (ARRANGEMENT, `role:
+'arrangement'`, 0.00–1.00 of the hub radius, default 0) bends the junction
+slab into a spherical cap through the rim; `footRing()` is the ONE OWNER of
+the cap (`dome`: radius, apex, centre, the apex-floor clamp) and of every
+ring's `z` / `slope` / `arc` / `relief`; `buildPetalInto` lays each foot ON the
+cap (rows along the meridian arc, great-circle arcs across — the roll law at
+the cap's radius), rotates the blade frame rigidly with it, and reads nothing
+else; `buildHubInto` builds the slab as a SHELL of thickness t on the same
+cap (3,456 triangles at any rise above 0 against 192 flat — the first
+slider-dependent count here, a branch not a ramp); `buildCenterInto` seats
+the designed centre on the apex slab and REPORTS its overlap patch and rim
+hover (photographed on `node tools/shot-bloom-dome.mjs <dir>`, not fixed — a
+button that follows the cap is a phase-2 centre question). NOT derived from
+crowding or depth: a metric consumed as a geometric input becomes a target;
+the crowding instrument observes the geometry and is never an input to it.
+Default 0 is byte-identical by the GUARD `domeIsFlat()` (every consumer's
+pre-dome expression verbatim) with `domeGuardResidual` asserted exactly 0 by
+both gates; the apex floor is one sheet thickness (asserted equal to the roll
+floor's factor at module load) and binds on one reachable corner, where the
+rise saturates and the read-out says "(CLAMPED)". The instruments: J1
+re-derived to "each foot lies on the cap the owner declares, with its
+normal" (the shipped J1 was INDISCRIMINATE, not blind — it asserted the flat
+ruling and fired on right and wrong domes alike), J3 generalised to the hub
+BUILDER's own sphere against the feet (the only witness for a flat hub under
+lifted feet, which the voxel gate reads as one piece on every row), J8 the
+root (the spine's first chord at tilt plus half its curl, in the foot's own
+meridian plane — the only witness for a blade that did not rotate with its
+foot, and silent on the curled incurve target until the chord clause
+existed), and `tools/bloom-crowding.mjs` rasterising ON THE CAP's surface
+(validated to the bit against the flat raster at rise 0) with the LOCAL
+RELIEF at D_max printed beside the rim's. **The dome relieves the mum's
+crowding, it does not fix it, and the read-out's HEAD RISE line says why:**
+the cap's extra surface sits at the rim where the slope is steep, while a
+tight bloom's feet stack at the inner rings where the cap is nearly flat —
+the mum's peak sits at r 2.1–2.8 mm on a 4.69 mm hub, where a hemisphere's
+local relief is 1.1–1.2x under a whole-annulus 2.0x, and it takes the mum from
+D_max 11 to 9. The
+panel gate's route (k) asserts the HEAD RISE line, the clamp and the seat
+line in both directions. The sheet is
+`node tools/shot-bloom-dome.mjs <dir>` — the incurve target flat beside
+domed, print preview ON, the base from a low profile at the rim and from
+below, the mum flat / 0.50 / hemisphere, the two controls, and the centre
+seat for Eva's eye.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

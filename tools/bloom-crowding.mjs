@@ -65,6 +65,29 @@
        purpose (Aug 31: the area rule is a reference, not a cage); a spider
        mum may want a fused base. That is why this flags and does not gate.
 
+   ON THE DOME (Sep 4) THE FEET LIE ON A SPHERICAL CAP, AND THE RASTER
+   MEASURES ON THAT SURFACE. Membership is decided in the cap's own geometry
+   — a foot is a geodesic strip about its meridian, `width` wide across and
+   `overhang` long along the arc from its ring, exactly what buildPetalInto
+   emits (rows along the meridian, great-circle arcs across) — and the union
+   is a SURFACE area (each occupied plan cell weighted by 1 / cos of the
+   local slope). D_max is an exact integer either way; D_mean is the surface
+   figure. At zero rise every expression reduces to the flat rectangle, and
+   that was VALIDATED rather than assumed: the surface raster at rise 0
+   equals the shipped flat raster to the bit on five configurations (D_max
+   and D_mean alike) before either was trusted with a dome. R4 places every
+   emitted foot row on the owner's cap; the reading itself is registered
+   against the owner's per-ring `arc` and `slope`, never a re-derivation.
+
+   WHAT THE DOME DOES AND DOES NOT DO — measured Sep 4, and the reason the
+   local relief factor is printed beside D_max: the cap's extra surface sits
+   at the RIM where the slope is steep, and a tight bloom's feet stack at the
+   INNER rings where the cap is nearly flat. On the mum a hemisphere's
+   whole-annulus area ratio is 2.0x, the local relief at its peak (r 2.1–2.8 mm
+   on a 4.69 mm hub) is 1.1–1.2x, and D_max goes 11 -> 9, not 11 -> 5. The
+   crowding instrument OBSERVES the geometry and is never an input to it
+   (Eva, Sep 4).
+
    NEIGHBOURS: NONE ARE CHOSEN, AND THAT IS THE JUSTIFICATION. The golden
    angle puts the tightest approaches at FIBONACCI index gaps, not adjacent
    ones: on Eva's run the closest pair of feet is slots 98 and 119 — gap 21 —
@@ -148,14 +171,147 @@ export const CROWDING_SCOPE =
    sampling is approximate, and R5 measures that. A foot that crosses the
    axis (spread 0.60 at two petals ALL THIN reaches -0.894 mm) is handled by
    the cartesian raster with no special case. */
-export function stackDepth(feet, R, cell) {
+/* MEMBERSHIP, one owner for both passes. Flat: the rectangle, verbatim. On
+   the dome: the point's arc position along the foot's meridian and its
+   geodesic distance from that meridian, from the cap's own sphere. A foot
+   longer than its arc to the apex continues past it (atan2 goes negative),
+   exactly as a flat foot that crosses the axis. */
+export function footMembership(dome) {
+  if (!dome) {
+    return (f, x, y) => {
+      const sr = x * f.c + y * f.s - f.radius;   // along the foot: 0 at the ring, -overhang at the inner end
+      const v = -x * f.s + y * f.c;              // across the foot
+      return sr <= 0 && sr >= -f.overhang && Math.abs(v) <= f.hw;
+    };
+  }
+  const Rd = dome.Rd;
+  return (f, x, y) => {
+    const r2 = x * x + y * y;
+    if (r2 > Rd * Rd) return false;
+    const zc = Math.sqrt(Rd * Rd - r2);
+    const proj = x * f.c + y * f.s, v = -x * f.s + y * f.c;
+    const along = Rd * Math.atan2(proj, zc) - f.arc;
+    const across = Rd * Math.asin(Math.max(-1, Math.min(1, v / Rd)));
+    return along <= 0 && along >= -f.overhang && Math.abs(across) <= f.hw;
+  };
+}
+/* The local surface-to-plan factor at plan radius r — 1 flat, INFINITE at a
+   vertical rim (a hemisphere's outermost ring), never a large finite number
+   wearing a factor's clothes. */
+export function reliefAt(dome, r) {
+  if (!dome) return 1;
+  const d2 = dome.Rd * dome.Rd - r * r;
+  return d2 <= 1e-9 * dome.Rd * dome.Rd ? Infinity : dome.Rd / Math.sqrt(d2);
+}
+/* THE SURFACE AREA OF ONE PLAN CELL ON THE CAP — the cap's own area between
+   the cell's inner and outer plan radii, divided by the plan annulus between
+   them and multiplied by the cell. Exact in r, so a cell touching a vertical
+   rim carries the FINITE area the cap actually has there rather than a
+   sampled 1 / cos that diverges: the first draft weighted each cell by the
+   relief at its centre and R5 refused every hemisphere row at 0.5% (the
+   sampling was measuring the singularity, not the surface). */
+function cellSurfaceArea(dome, r, cell) {
+  const Rd = dome.Rd;
+  const r1 = Math.max(0, r - cell / 2), r2 = Math.min(Rd, r + cell / 2);
+  if (r2 <= r1) return cell * cell;
+  const surf = 2 * Math.PI * Rd * (Math.sqrt(Rd * Rd - r1 * r1) - Math.sqrt(Math.max(0, Rd * Rd - r2 * r2)));
+  const plan = Math.PI * (r2 * r2 - r1 * r1);
+  return cell * cell * (surf / plan);
+}
+
+/* ---------------------------------------------------------------------
+   THE SURFACE RASTER (the dome). Cells in the cap's OWN coordinates — arc
+   from the apex along the meridian, and azimuth — with the cell's area
+   ds * r(s) * dtheta exact and regular everywhere, the vertical rim of a
+   hemisphere included. A plan raster cannot do this: at rise 1 the outer
+   ring's foot stands on a vertical wall whose plan footprint is a line, and
+   the cap's area per plan cell there goes like 1/sqrt(distance to the rim),
+   so a plan D_mean converges like sqrt(cell) and R5 refused every hemisphere
+   row at 0.5% — measured, twice (once weighting cells by the relief at
+   their centre, once by the exact cap area between their radii). Membership
+   is the same exact test the plan pass uses, evaluated at the cell's plan
+   point; only the sampling lattice changes, which is what R5 compares.
+   Per-foot bounds in (s, theta): the foot's arc range, and the azimuth
+   half-width a geodesic strip of half-width hw subtends at its smallest polar
+   angle (sin(dtheta) = sin(hw/Rd) / sin(phi)); a foot that crosses the apex
+   also covers the far side about az + pi, and near the apex every azimuth. */
+export function surfaceDepth(feet, R, cell, dome) {
+  const Rd = dome.Rd;
+  const sRim = Rd * Math.asin(Math.min(1, R / Rd));
+  const Ns = Math.max(1, Math.ceil(sRim / cell)), Nt = Math.max(8, Math.ceil((2 * Math.PI * R) / cell));
+  const ds = sRim / Ns, dt = (2 * Math.PI) / Nt;
+  const depth = new Uint16Array(Ns * Nt);
+  const inside = footMembership(dome);
+  let sumArea = 0;
+  const halfAt = (s) => { const phi = Math.max(s, 0.5 * ds) / Rd; const q = Math.sin(Math.min(Math.PI / 2, (feetHw) / Rd)) / Math.sin(Math.min(phi, Math.PI / 2)); return q >= 1 ? Math.PI : Math.asin(q) + dt; };
+  let feetHw = 0;
+  for (const f0 of feet) {
+    const f = { ...f0, c: Math.cos(f0.az), s: Math.sin(f0.az), hw: f0.width / 2, arc: f0.arc ?? f0.radius };
+    feetHw = f.hw;
+    sumArea += f.width * f.overhang;
+    const lo = f.arc - f.overhang, hi = f.arc;
+    const sides = lo >= 0 ? [[lo, hi, f.az]] : [[0, hi, f.az], [0, -lo, f.az + Math.PI]];
+    for (const [sLo, sHi, azC] of sides) {
+      const i0 = Math.max(0, Math.floor(sLo / ds)), i1 = Math.min(Ns - 1, Math.ceil(sHi / ds));
+      for (let i = i0; i <= i1; i++) {
+        const s = (i + 0.5) * ds;
+        const r = Rd * Math.sin(s / Rd);
+        const hwT = halfAt(s);
+        const jc = Math.round(azC / dt);
+        const span = hwT >= Math.PI ? Math.floor(Nt / 2) : Math.ceil(hwT / dt) + 1;
+        for (let dj = -span; dj <= span; dj++) {
+          const j = ((jc + dj) % Nt + Nt) % Nt;
+          const th = (j + 0.5) * dt;
+          if (inside(f, r * Math.cos(th), r * Math.sin(th))) depth[i * Nt + j]++;
+        }
+      }
+    }
+  }
+  /* A cell touched by two sides of one apex-crossing foot is counted once
+     per membership test above only if the two loops never visit the same
+     cell; they can, near the apex. Membership is exact, so re-test the
+     over-counted cells: any cell whose count exceeds the number of feet
+     that actually contain it is corrected here. */
+  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, arc: f.arc ?? f.radius, overhang: f.overhang, radius: f.radius }));
+  let dmax = 0, at = -1, union = 0, occ = 0;
+  const cellArea = (i) => ds * Rd * Math.sin(((i + 0.5) * ds) / Rd) * dt;
+  for (let k = 0; k < depth.length; k++) {
+    let d = depth[k];
+    if (!d) continue;
+    if (d > 1) {
+      const i = Math.floor(k / Nt), j = k % Nt; const s = (i + 0.5) * ds, r = Rd * Math.sin(s / Rd), th = (j + 0.5) * dt;
+      const x = r * Math.cos(th), y = r * Math.sin(th);
+      let dd = 0; for (const f of pre) if (inside(f, x, y)) dd++;
+      d = dd; depth[k] = dd;
+      if (!d) continue;
+    }
+    occ++; union += cellArea(Math.floor(k / Nt));
+    if (d > dmax) { dmax = d; at = k; }
+  }
+  const planOf = (k) => { const i = Math.floor(k / Nt), j = k % Nt; const s = (i + 0.5) * ds, r = Rd * Math.sin(s / Rd), th = (j + 0.5) * dt; return [r * Math.cos(th), r * Math.sin(th)]; };
+  let dmaxAt = null, dmaxXY = null;
+  if (at >= 0) { const [x, y] = planOf(at); dmaxAt = { r: Math.hypot(x, y), thetaDeg: (Math.atan2(y, x) * 180) / Math.PI }; dmaxXY = [x, y]; }
+  const candidates = [];
+  for (let k = 0; k < depth.length; k++) if (depth[k] >= dmax - 2 && depth[k] > 0) candidates.push(k);
+  candidates.sort((a, b) => depth[b] - depth[a]);
+  const top = candidates.slice(0, 96).map((k) => ({ c: planOf(k), d: depth[k] }));
+  return { dmax, dmaxAt, dmaxXY, dmean: union > 0 ? sumArea / union : 0, dmeanRaster: 0, union, sumArea, cell, N: Ns, Nt, candidates: top };
+}
+
+export function stackDepth(feet, R, cell, dome = null) {
+  if (dome) return surfaceDepth(feet, R, cell, dome);
   const half = R + 2;
   const N = Math.ceil((2 * half) / cell);
   const depth = new Uint16Array(N * N);
+  const inside = footMembership(dome);
   let sumArea = 0;
-  for (const f of feet) {
+  for (const f0 of feet) {
+    const f = { ...f0, c: Math.cos(f0.az), s: Math.sin(f0.az), hw: f0.width / 2, arc: f0.arc ?? f0.radius };
     sumArea += f.width * f.overhang;
-    const c = Math.cos(f.az), s = Math.sin(f.az), hw = f.width / 2;
+    const c = f.c, s = f.s, hw = f.hw;
+    /* The plan bounding box of the FLAT rectangle contains the domed strip's
+       plan footprint (foreshortened along, and |v| <= hw across), so one box
+       serves both. */
     const corners = [[f.radius, hw], [f.radius, -hw], [f.radius - f.overhang, hw], [f.radius - f.overhang, -hw]]
       .map(([rr, v]) => [rr * c - v * s, rr * s + v * c]);
     const xs = corners.map((p) => p[0]), ys = corners.map((p) => p[1]);
@@ -165,20 +321,19 @@ export function stackDepth(feet, R, cell) {
       const x = -half + (i + 0.5) * cell;
       for (let j = j0; j <= j1; j++) {
         const y = -half + (j + 0.5) * cell;
-        const sr = x * c + y * s - f.radius;   // along the foot: 0 at the ring, -overhang at the inner end
-        const v = -x * s + y * c;              // across the foot
-        if (sr <= 0 && sr >= -f.overhang && Math.abs(v) <= hw) depth[i * N + j]++;
+        if (inside(f, x, y)) depth[i * N + j]++;
       }
     }
   }
-  let dmax = 0, occ = 0, tot = 0, at = -1;
+  let dmax = 0, occ = 0, tot = 0, at = -1, unionSurf = 0;
   for (let k = 0; k < depth.length; k++) {
     const d = depth[k];
     if (!d) continue;
     occ++; tot += d;
+    if (dome) { const x = -half + (Math.floor(k / N) + 0.5) * cell, y = -half + ((k % N) + 0.5) * cell; unionSurf += cellSurfaceArea(dome, Math.min(Math.hypot(x, y), dome.Rd), cell); }
     if (d > dmax) { dmax = d; at = k; }
   }
-  const union = occ * cell * cell;
+  const union = dome ? unionSurf : occ * cell * cell;
   const centreOf = (k) => [-half + (Math.floor(k / N) + 0.5) * cell, -half + ((k % N) + 0.5) * cell];
   let dmaxAt = null, dmaxXY = null;
   if (at >= 0) {
@@ -205,23 +360,19 @@ export function stackDepth(feet, R, cell) {
    read lower than the cell it was centred on). Membership is the same exact
    test stackDepth() uses; only the sampling changes, which is the whole
    point of comparing two of these. */
-export function refineDepth(feet, base, pitch) {
+export function refineDepth(feet, base, pitch, dome = null) {
   let dmax = 0, dmaxAt = null;
   const half = 1.5 * base.cell;
   const n = 2 * Math.ceil(half / pitch) + 1;
-  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, radius: f.radius, overhang: f.overhang }));
+  const inside = footMembership(dome);
+  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, radius: f.radius, overhang: f.overhang, arc: f.arc ?? f.radius }));
   for (const cand of base.candidates) {
     for (let i = 0; i < n; i++) {
       const x = cand.c[0] + (i - (n - 1) / 2) * pitch;
       for (let j = 0; j < n; j++) {
         const y = cand.c[1] + (j - (n - 1) / 2) * pitch;
         let d = 0;
-        for (const f of pre) {
-          const sr = x * f.c + y * f.s - f.radius;
-          if (sr > 0 || sr < -f.overhang) continue;
-          const v = -x * f.s + y * f.c;
-          if (Math.abs(v) <= f.hw) d++;
-        }
+        for (const f of pre) if (inside(f, x, y)) d++;
         if (d > dmax) { dmax = d; dmaxAt = { r: Math.hypot(x, y), thetaDeg: (Math.atan2(y, x) * 180) / Math.PI }; }
       }
     }
@@ -273,17 +424,18 @@ export async function readFeet(page, capability = null) {
       const built = mod.buildBloomInto(acc, ui, { below: null, capability: cap });
       const fr = built.foot;
       const feet = [];
+      const rec = (d, az, layer, slot) => ({ radius: d.radius, overhang: d.overhang, width: d.width, az, ring: d.index, layer, slot, z: d.z, slope: d.slope, arc: d.arc });
       if (fr.continuousMode) {
-        fr.rings.forEach((r, k) => feet.push({ radius: r.radius, overhang: r.overhang, width: r.width, az: built.slotAzimuths[0][k], ring: r.index, layer: 0, slot: k }));
+        fr.rings.forEach((r, k) => feet.push(rec(r, built.slotAzimuths[0][k], 0, k)));
       } else {
         for (let L = 0; L < fr.layerCount; L++) {
           const row = fr.slotRings[L];
-          for (let i = 0; i < row.length; i++) { const d = row[i]; feet.push({ radius: d.radius, overhang: d.overhang, width: d.width, az: built.slotAzimuths[L][i], ring: d.index, layer: L, slot: i }); }
+          for (let i = 0; i < row.length; i++) feet.push(rec(row[i], built.slotAzimuths[L][i], L, i));
         }
       }
       out[mode] = {
         feet,
-        hub: { radius: fr.hub.radius, thickness: fr.hub.thickness },
+        hub: { radius: fr.hub.radius, thickness: fr.hub.thickness, dome: fr.hub.dome ? { rise: fr.hub.dome.rise, riseBuilt: fr.hub.dome.riseBuilt, Rd: fr.hub.dome.Rd, H: fr.hub.dome.H, centreZ: fr.hub.dome.centreZ, clamped: fr.hub.dome.clamped } : null },
         tris: acc.triangleCount,
         petalsBuilt: built.petalsBuilt,
         continuousMode: fr.continuousMode,
@@ -337,6 +489,27 @@ export async function footCrowding(page, row, stl = null) {
          projection onto the builder's R = [cos az, sin az] is the quantity
          the emitted row actually is, and the cross-component must be zero. */
       const cs = Math.cos(f.az), sn = Math.sin(f.az);
+      const dome = M.hub.dome;
+      if (dome) {
+        /* ON THE DOME: each emitted row sits on the owner's cap at the arc
+           position the strip model puts it — the ring row at the ring's own
+           arc, the inner rows an overhang/2 and an overhang along the
+           meridian toward the apex — with no cross-component. */
+        const wantArc = [f.arc - f.overhang, f.arc - f.overhang / 2, f.arc];
+        rep.frames.forEach((fr, k) => {
+          const proj = fr.C[0] * cs + fr.C[1] * sn;
+          const across = -fr.C[0] * sn + fr.C[1] * cs;
+          const dz = fr.C[2] - dome.centreZ;
+          const dist = Math.hypot(proj, across, dz);
+          if (Math.abs(dist - dome.Rd) > 1e-9) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} is ${dist} mm from the cap's centre, the cap's radius is ${dome.Rd} — the foot is not on the surface this metric rasterises`);
+          const arc = dome.Rd * Math.atan2(proj, dz);
+          if (Math.abs(arc - wantArc[k]) > 1e-9) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} sits ${arc} mm along its meridian, the strip model puts it at ${wantArc[k]} — the foot is not where footRing() says it lands`);
+          if (Math.abs(across) > 1e-9) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} is ${across} mm off its slot's meridian — the emitted foot and the recorded azimuth disagree`);
+          if (k === 2 && fr.C[2] !== f.z) bad.push(`crowding R4 (${name}): descriptor ${i} ring row is at z = ${fr.C[2]}, footRing() puts the ring at ${f.z}`);
+          if (fr.h !== f.width / 2) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} half-width ${fr.h} is not width/2 = ${f.width / 2}`);
+        });
+        return;
+      }
       const wantS = [f.radius - f.overhang, f.radius - f.overhang / 2, f.radius];
       rep.frames.forEach((fr, k) => {
         const along = fr.C[0] * cs + fr.C[1] * sn;
@@ -351,8 +524,9 @@ export async function footCrowding(page, row, stl = null) {
 
   /* THE NUMBERS, export first, then live for the divergence line. */
   const cell = cellFor(E.hub.radius);
-  const fine = stackDepth(E.feet, E.hub.radius, cell);
-  const coarse = stackDepth(E.feet, E.hub.radius, cell * 2);
+  const domeE = E.hub.dome, domeL = Lv.hub.dome;
+  const fine = stackDepth(E.feet, E.hub.radius, cell, domeE);
+  const coarse = stackDepth(E.feet, E.hub.radius, cell * 2, domeE);
   /* THE LOCAL RESOLUTION OF D_MAX — see the header's R5 note. The hub pass
      locates the candidates; the two local passes decide the number. */
   /* The coarse pass's own maximum cell is seeded into the candidates: on a
@@ -360,8 +534,8 @@ export async function footCrowding(page, row, stl = null) {
      otherwise leave the coarse pass's peak outside every window, which
      would trip the "a window missed the cell" clause for a sampling reason. */
   const seeded = { ...fine, candidates: [...fine.candidates, ...(coarse.dmaxXY ? [{ c: coarse.dmaxXY, d: coarse.dmax }] : [])] };
-  const r8 = refineDepth(E.feet, seeded, cell / 8);
-  const r16 = refineDepth(E.feet, seeded, cell / 16);
+  const r8 = refineDepth(E.feet, seeded, cell / 8, domeE);
+  const r16 = refineDepth(E.feet, seeded, cell / 16, domeE);
   /* R5 */
   if (r8.dmax !== r16.dmax) bad.push(`crowding R5: D_max reads ${r8.dmax} at cell ${cell / 8} mm and ${r16.dmax} at ${cell / 16} mm around the hub pass's candidates (hub pass ${fine.dmax} / ${coarse.dmax}) — the reading depends on the sampling, so it is not a reading`);
   if (r16.dmax < fine.dmax || r16.dmax < coarse.dmax) bad.push(`crowding R5: the local passes read D_max ${r16.dmax} but the hub pass read ${fine.dmax} / ${coarse.dmax} — a window missed the cell it was centred on`);
@@ -375,15 +549,16 @@ export async function footCrowding(page, row, stl = null) {
      live one and is reused; only a row where the floor moved the ring pays
      for a second raster. */
   const sameFeet = Lv.hub.radius === E.hub.radius && Lv.feet.length === E.feet.length
-    && Lv.feet.every((f, i) => f.radius === E.feet[i].radius && f.overhang === E.feet[i].overhang && f.width === E.feet[i].width && f.az === E.feet[i].az);
+    && ((domeL === null) === (domeE === null)) && (!domeE || (domeL.Rd === domeE.Rd && domeL.centreZ === domeE.centreZ))
+    && Lv.feet.every((f, i) => f.radius === E.feet[i].radius && f.overhang === E.feet[i].overhang && f.width === E.feet[i].width && f.az === E.feet[i].az && f.arc === E.feet[i].arc);
   const live = sameFeet
     ? { dmax: resolved.dmax, dmean: fine.dmean }
     : (() => {
         /* Resolved the same way as the export reading, so the divergence line
            compares like with like; not asserted, because it is a diagnostic
            and the export number is the reading. */
-        const lf = stackDepth(Lv.feet, Lv.hub.radius, cellFor(Lv.hub.radius));
-        return { dmax: refineDepth(Lv.feet, lf, cellFor(Lv.hub.radius) / 16).dmax, dmean: lf.dmean };
+        const lf = stackDepth(Lv.feet, Lv.hub.radius, cellFor(Lv.hub.radius), domeL);
+        return { dmax: refineDepth(Lv.feet, lf, cellFor(Lv.hub.radius) / 16, domeL).dmax, dmean: lf.dmean };
       })();
   const nn = nearestFeet(E.feet);
 
@@ -399,6 +574,12 @@ export async function footCrowding(page, row, stl = null) {
     crowded: resolved.dmax >= CROWDED_DMAX,
     registered,
     exportTris: E.tris,
+    /* THE DOME'S READING beside the number: the rise built, and the local
+       relief at the point D_max was found — the factor the dome actually
+       delivered where the crowding is, against the rim's, where it is not. */
+    dome: domeE ? { rise: domeE.rise, riseBuilt: domeE.riseBuilt, Rd: domeE.Rd, clamped: domeE.clamped,
+      reliefAtDmax: resolved.dmaxAt ? reliefAt(domeE, Math.min(resolved.dmaxAt.r, domeE.Rd)) : null,
+      reliefAtRim: reliefAt(domeE, Math.min(E.hub.radius, domeE.Rd)) } : null,
   };
   return { bad, r };
 }
@@ -412,6 +593,7 @@ export function crowdingLine(r) {
     + ` · foot ${r.footW.toFixed(2)} mm on hub ${r.hubR.toFixed(2)} mm`
     + ` · NN ${isFinite(r.nn.q) ? r.nn.q.toFixed(2) + ' w (gap ' + r.nn.gap + ')' : 'n/a'}`
     + (diverges ? ` · live reads D_max ${r.liveDmax} · D_mean ${r.liveDmean.toFixed(2)} (ring ${r.hubRLive.toFixed(2)} mm)` : '')
+    + (r.dome ? ` · DOME rise ${r.dome.riseBuilt.toFixed(2)}${r.dome.clamped ? ' (CLAMPED from ' + r.dome.rise.toFixed(2) + ')' : ''} · local relief at D_max ${isFinite(r.dome.reliefAtDmax) ? r.dome.reliefAtDmax.toFixed(2) + 'x' : 'vertical'}, at the rim ${isFinite(r.dome.reliefAtRim) ? r.dome.reliefAtRim.toFixed(2) + 'x' : 'vertical'}` : '')
     + (r.crowded ? ` · CROWDED (D_max >= ${CROWDED_DMAX}, Eva Sep 3)` : '');
 }
 
@@ -437,6 +619,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     ['CONTINUOUS headline, 40/turn x 3, spread 1.55 (ruled clean, merged)', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.55 }],
     ['RADIAL x 40 (unruled)', { petalCount: 40 }],
     ['RADIAL x 40 x spread 0.60 (unruled)', { petalCount: 40, spread: 0.6 }],
+    ['MUM x head rise 0.50 (the dome, Sep 4)', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 0.6, petalLength: 60, petalWidth: 8, layerSize: 0.8, layerTilt: 11, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 0.5 }],
+    ['MUM x head rise 1.00 (a hemisphere)', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 0.6, petalLength: 60, petalWidth: 8, layerSize: 0.8, layerTilt: 11, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 1 }],
+    ['INCURVE target, flat', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25 }],
+    ['INCURVE target x head rise 0.50', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 0.5 }],
   ];
   const { server, port } = await serveRepo();
   const { browser, page } = await launchPage();

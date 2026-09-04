@@ -1019,6 +1019,46 @@ export const CONTROLS = [
     visibleWhen: { all: [] } },
 
   /* ===================================================================
+     HEAD RISE — the whorl primitive's `height` argument, COMPLETED (Eva,
+     Sep 4). buildWhorlInto has carried `height` since session 1 and been
+     handed the literal 0, because a foot lifted off a FLAT slab is joined to
+     nothing at |h| >= t — "height is not a control" was a measurement about
+     the slab, not about height. The domed hub is that argument getting a
+     value: the junction slab is bent into a spherical cap through the rim
+     and every ring's foot lands ON it, at its own height, with the cap's own
+     normal, the shell following the feet exactly as the flat slab did. So
+     the whole range is usable, and a later reader should see a completed
+     primitive rather than a new axis.
+
+     ONE INPUT — the cap's rise as a fraction of the hub radius, 0 flat, 1 a
+     hemisphere. footRing() derives everything else (the cap's radius, every
+     ring's height / slope / arc, the local relief) and every consumer reads
+     it; the junction itself stays control-free and this row is
+     role: 'arrangement' because what it owns is where the FEET sit in z.
+
+     NOT DERIVED FROM CROWDING OR DEPTH (Eva, Sep 4): a metric consumed as a
+     geometric input becomes a target. The crowding instrument observes the
+     geometry and is never an input to it.
+
+     DEFAULT 0 IS BYTE-IDENTICAL BY A GUARD, not by an IEEE-754 argument —
+     domeIsFlat() short-circuits every consumer to its pre-dome expression
+     verbatim, and domeGuardResidual measures the zero-curvature law against
+     the flat one on every flat build (both gates assert it exactly 0).
+
+     WHAT SATURATES: the cap's radius is floored at one sheet thickness (the
+     roll floor's own argument — the shell's inner face inverts below it),
+     which binds only when the hub is narrower than the sheet; the read-out
+     says "(CLAMPED)" and prints the rise that built. WHAT IT COSTS, told
+     rather than hidden: the designed centre sits on the apex and its rim
+     hovers above the shell (the read-out prints the overlap patch and the
+     hover); the hub's triangle count is 3,456 at any rise above 0 against
+     192 flat — the first slider-dependent count here, a branch not a ramp. */
+  { id: 'headRise', section: 'arrangement', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0,
+    label: 'Head rise', fmt: (v) => (Number(v) === 0 ? 'flat hub' : `${Number(v).toFixed(2)}x hub radius · domed`),
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { all: [] } },
+
+  /* ===================================================================
      PLACEMENT — where slot i sits around the axis. The whorl primitive's one
      genuinely computed quantity, exposed as a choice (Sep 1).
 
