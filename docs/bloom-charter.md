@@ -3127,7 +3127,19 @@ exposure the ruling accepts in exchange for the minutes.
       D_max 130, every foot across the axis), the coincidence corner six deep, 6 × 40 × spread
       min in both placements (15 / 25), 6 × ALL FORM MAX, the six-deep BARE bloom, 6 × SPIRAL,
       the 225° effective tilt, ZYGO 6 × ALL INNER MAX, the depth cell taken to six, and a
-      clefted petal six whorls deep. Gates: «GATES».
+      clefted petal six whorls deep. Gates, in CI on the first push and again locally: **the export gate 434/434 watertight,
+      434/434 identical live and export triangle counts, 0 degenerate, 19 of 434 flagged
+      CROWDED (the mum, its six-turn state, and the deep spread-min and shrink-min corners),
+      932 s; the panel gate PASS and its negative control firing on all eight routes; the
+      frozen-matrices job proving phase11 deep-equal to 174cc2f.** The connectedness gate
+      came back **433/434 ONE piece with ONE ROW SKIPPED — `ALL MAX x DOME max`, whose grid
+      grew from 605x605x421 (131.8M) to 706x706x421 (209.8M) because ALL MAX now means six
+      layers of forty petals, the area rule sums 240 feet, and the DOME scales with the hub to
+      a 234 mm centre.** A row that used to be measured and is now skipped is coverage lost to
+      a change, so the gate's ceiling moved as its own note prescribes: `MAX_VOXELS` 160M →
+      256M (~22% over the new worst case; the next largest row is 50.3M), and that row
+      flood-fills to ONE component in 14.5 s at 629 MB peak RSS. With the ceiling raised the
+      gate reads 434/434.
 
     - **SHRINK 1.00 IN CONTINUOUS — MEASURED, NOT CHANGED (the brief asked).** Not
       degenerate: 0 non-manifold, 0 boundary, 0 degenerate at 8 and 40 per turn, with and
