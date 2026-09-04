@@ -3029,7 +3029,10 @@ exposure the ruling accepts in exchange for the minutes.
       `lastRings`/`lastTris` on `!exportMode`, which was the same as "the build on screen"
       only while nothing but regenerate() built live. Now the CALLER says which build is on
       screen (`record: true`, only from regenerate()), so an export click during a preview
-      can never overwrite the viewport's numbers. Measured anyway: «BYTES».
+      can never overwrite the viewport's numbers. Measured anyway, on the retention ruling: **phase11 (402 rows, the newest baseline) on a
+      worktree at 174cc2f and on the branch head: 402/402 bit-identical, 0 moved, defaults
+      bit-identical** — with the depth raise in the same tree, so this one run carries both
+      changes' byte claims.
 
     - **THE POSITIVE CONTROL, run against the shipped instruments BEFORE a new assertion was
       written, with `autoRotate` standing in for the not-yet-existing box.** T1, an export
