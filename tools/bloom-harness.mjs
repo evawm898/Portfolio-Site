@@ -3372,6 +3372,29 @@ export function buildMatrix() {
   for (const [name, sets] of domeCorners) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
+
+  /* 20. DOME LEAN (Eva, Sep 4, the crown-coverage session) — two named
+         configs, the region THIS change is for.
+
+         EVA_CONFIG is the screenshot the whole session turned on: 40 petals,
+         6 turns, spread 1.15, centre DISC, headRise the thing being asked
+         about. Its bald-cap gap is HEADRISE-INDEPENDENT (measured: ~1.15mm
+         from rise 0 through rise 1 alike, tools/bloom-plan-coverage.mjs) —
+         domeLean is a dome-derived term and correctly does not move it,
+         which is a claim worth a permanent row rather than a one-off
+         measurement: GATED — rise 0 and rise 1 must read the SAME bald-cap
+         story, not "fixed," on this recipe. The INCURVE TARGET rows above
+         already carry the opposite case (domeLean closes a real dome-caused
+         regression); this is its counterpart, so the mechanism's SCOPE is a
+         row, not only a paragraph. */
+  const EVA_CONFIG = { placement: 'CONTINUOUS', petalCount: 40, layerCount: 6, spread: 1.15, centerStyle: 'DISC' };
+  rows.push({ label: 'DOME LEAN: EVA_CONFIG flat (the headRise-independent baseline the lean must not touch)', set: Object.entries(EVA_CONFIG).map(([id, value]) => ({ id, value: String(value) })) });
+  rows.push({ label: 'DOME LEAN: EVA_CONFIG x rise 1 (GATED — bald-cap unmoved by domeLean; a shortfall the dome did not cause)', set: Object.entries({ ...EVA_CONFIG, headRise: 1 }).map(([id, value]) => ({ id, value: String(value) })) });
+  /* THE LEVER THAT ACTUALLY CLOSES EVA_CONFIG'S GAP (measured Sep 4:
+     layerTilt 16-18 against the shipped 12, at rise 1) is Eva's own
+     ruling's next question, not this mechanism's — named here only so the
+     corner is not lost, at the depth this session's own sweep used. */
+  rows.push({ label: 'DOME LEAN: EVA_CONFIG x rise 1 x layerTilt 18 (closes the gap via the EXISTING ramp, not domeLean)', set: Object.entries({ ...EVA_CONFIG, headRise: 1, layerTilt: 18 }).map(([id, value]) => ({ id, value: String(value) })) });
   return rows;
 }
 
