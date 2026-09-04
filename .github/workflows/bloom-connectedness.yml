@@ -41,14 +41,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      # playwright alone: it pins the exact playwright-core it needs and npm hoists it,
-      # so the harness's `import 'playwright-core'` and the browser that
-      # `npx playwright install` downloads can never disagree. Installing both
-      # unpinned raced npm: on Sep 4 playwright-core 1.63.0 published nineteen seconds
-      # before a run while the playwright CLI was still 1.62.1, and every job
-      # that launches a browser died at launch (build 1243 wanted, 1234 installed).
+      # playwright alone, at an exact version. It pins the exact playwright-core it
+      # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
+      # browser that `npx playwright install` downloads can never disagree. Both
+      # unpinned raced npm on Sep 4: playwright-core 1.63.0 published nineteen
+      # seconds before a run while the playwright CLI was still 1.62.1, and every job
+      # that launches a browser died at launch (build 1243 wanted, 1234 installed);
+      # two minutes later the registry listed playwright 1.63.0 as latest with its
+      # tarball still 404, and an unpinned install could not fetch it at all. Bump
+      # the pin by hand, in every workflow at once, with playwright-core's twin in
+      # bloom-frozen-matrices.yml.
       - name: Install render deps (pinned three + playwright)
-        run: npm i --no-save three@0.161.0 playwright
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
       - name: Every row must export as a single connected body

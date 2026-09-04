@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install the harness's own deps (no browser download)
-        run: npm i --no-save three@0.161.0 playwright-core
+        run: npm i --no-save three@0.161.0 playwright-core@1.62.1
       - name: Every frozen matrix must equal its base commit's buildMatrix()
         run: |
           set -euo pipefail
