@@ -38,8 +38,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      # playwright alone: it pins the exact playwright-core it needs and npm hoists it,
+      # so the harness's `import 'playwright-core'` and the browser that
+      # `npx playwright install` downloads can never disagree. Installing both
+      # unpinned raced npm: on Sep 4 playwright-core 1.63.0 published nineteen seconds
+      # before a run while the playwright CLI was still 1.62.1, and every job
+      # that launches a browser died at launch (build 1243 wanted, 1234 installed).
       - name: Install render deps (pinned three + playwright)
-        run: npm i --no-save three@0.161.0 playwright-core playwright
+        run: npm i --no-save three@0.161.0 playwright
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
       - name: Every config must export watertight (boundary edges = 0)
