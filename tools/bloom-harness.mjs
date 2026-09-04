@@ -974,9 +974,26 @@ export async function thicknessAssertions(page, row) {
      plus the dome guard: exactly 0 on every flat build (the zero-curvature
           law reproduces the flat law), absent on every domed one; and the
           owner's dome exists iff the row's headRise is non-zero.
+     J9   DOME LEAN (Sep 4, crown coverage): domeLean is 0 flat and exactly
+          this ring's own slope in degrees domed — a per-ring correction
+          that keeps a domed ring's authored tilt pointing at the same
+          global direction (and the same plan tip-radius) a flat ring's
+          would at the same tilt, derived from buildPetalInto's own
+          (Rs, Up) frame, never a fitted constant. It is a SEPARATE addend
+          from tiltExtra (footRing()'s own note on that ring field explains
+          why: folding it in broke tiltExtra's own monotonicity and
+          quantizer-identity claims under CONTINUOUS), summed with it only
+          at the one place buildPetalInto forms the angle — so a lean
+          computed but never summed in is invisible to J8 (its own
+          "expected" angle is built from `tiltRad`, read from that same
+          build, so a lean missing from both sides of it agrees with
+          itself) and is J9's alone to catch, by reconstructing the
+          expected angle from the OTHER owners (footRing()'s tiltExtra and
+          domeLean, the builder's own applied petalTilt) rather than from
+          tiltRad itself.
    =================================================================== */
 export const JUNCTION_SCOPE =
-  "junction claims read footRing()'s own per-RING answer, the hub builder's own report and the emitted foot and root frames, NOT the STL; a green connectedness run does not endorse them (the wrong-hub mutation passes it, measured — under CONTINUOUS the quantizer mutation passes the export gate, the connectedness gate, the triangle count AND J1-J4, which is why J5/J6 exist; and under a DOME a flat hub beneath lifted feet, horizontal feet on a shell and an un-rotated blade all pass both STL gates, which is why J1 reads the owner's cap, J3 the builder's sphere and J8 the root)";
+  "junction claims read footRing()'s own per-RING answer, the hub builder's own report and the emitted foot and root frames, NOT the STL; a green connectedness run does not endorse them (the wrong-hub mutation passes it, measured — under CONTINUOUS the quantizer mutation passes the export gate, the connectedness gate, the triangle count AND J1-J4, which is why J5/J6 exist; and under a DOME a flat hub beneath lifted feet, horizontal feet on a shell and an un-rotated blade all pass both STL gates, which is why J1 reads the owner's cap, J3 the builder's sphere and J8 the root; a dome-lean computed but never summed into the built angle passes J8 too, since J8's own expectation is read from that same built angle — which is why J9 exists, reconstructing the expectation from footRing()'s own tiltExtra and domeLean instead)";
 
 /* The guard residual is a difference of two square roots that are the same
    number in algebra and not in IEEE-754 (`a*(b+c)` vs `a*b + a*c`, firing on
@@ -996,7 +1013,8 @@ export async function junctionAssertions(page, row) {
      non-zero (the registry's value against footRing()'s guard), and the hub
      builder built one iff the owner declared it, on the owner's sphere. */
   const dome = m.hubDome || null;
-  const rise = Number((await page.evaluate(() => window.__bloomUIState())).headRise);
+  const ui0 = await page.evaluate(() => window.__bloomUIState());
+  const rise = Number(ui0.headRise);
   if ((rise === 0) !== (dome === null)) bad.push(`DOME: head rise reads ${rise} and footRing() ${dome ? 'declares a dome' : 'declares none'} — the guard and the control disagree`);
   const built = (m.hubBuilt && m.hubBuilt.dome) || null;
   if (dome && !built) bad.push(`J3: footRing() declares a dome (rise ${dome.rise}, Rd ${dome.Rd}) but the hub was built FLAT — every lifted foot is joined to nothing (the feet-on-a-flat-hub mutation, measured Sep 4: watertight, ONE voxel piece on every row, invisible to everything but this clause)`);
@@ -1188,13 +1206,44 @@ export async function junctionAssertions(page, row) {
     });
   }
 
-  /* THE PLACEMENT COMPONENTS THAT ARE EXACTLY IDENTITY AT ONE LAYER, asserted
-     on their own rather than folded into the residual bound. Math.pow(x, 0)
-     is exactly 1, `0 * layerTilt` is +0 over layerTilt's range, and
-     `(0 * layerPhase * TAU) / count` is +0 — so byte-identity for scale, tilt
-     and phase is structural and an EQUALITY is the honest assertion. Only the
-     area-rule radius needs a tolerance, and keeping the two apart is what
-     stops the tolerance covering for a leak in the other three. */
+  /* ===================================================================
+     J9 — DOME LEAN (Sep 4, the crown-coverage session), footRing()'s own
+     per-ring cap correction, never a fitted constant. Two separate clauses,
+     because a lean computed correctly in its own telemetry field but never
+     summed into the angle buildPetalInto actually uses would still export
+     watertight, at an identical triangle count, and pass J8 too — J8's own
+     "expected" angle is built from `q.tiltRad`, which is READ FROM THE
+     BUILD, so a lean missing from BOTH sides of that one variable agrees
+     with itself while being wrong relative to intent (the reworked foot
+     assertion's own lesson: a record that never reaches the blade needs a
+     witness that reconstructs the expected value from OTHER owners, not
+     from the same variable the bug would also be missing from). */
+  layers.forEach((r, L) => {
+    const wantLean = dome ? (r.slope * 180) / Math.PI : 0;
+    if (r.domeLean !== wantLean) bad.push(`J9: ring ${L}: domeLean is ${r.domeLean}, expected exactly ${wantLean} (0 flat; this ring's own slope in degrees, domed) — a fitted or missing constant, not the owner's cap`);
+    const rep = roots[L];
+    if (rep) {
+      /* EFFECTIVE petalTilt, not the base control: petalTilt is itself
+         overridable per role (labellumTilt/hoodTilt) and per petal
+         (petalNTilt), so reconstructing "expected" from the raw UI value
+         would false-fire on any orchid or fan-per-petal row — read the
+         builder's own applied value instead (petalStateFor's answer, the
+         same one this ring's blade was actually built from). */
+      const wantTilt = (rep.petalTiltApplied + r.tiltExtra + wantLean) * (Math.PI / 180);
+      if (Math.abs(rep.tiltRad - wantTilt) > 1e-9) bad.push(`J9: ring ${L}: the built tilt (tiltRad ${rep.tiltRad}) does not equal petalTilt + tiltExtra + domeLean (${wantTilt}) — domeLean was computed but did not reach buildPetalInto's angle`);
+    }
+  });
+
+  /* THE PLACEMENT COMPONENTS THAT ARE EXACTLY IDENTITY AT ONE LAYER — J9
+     above is domeLean's own claim, and this block is unchanged by it:
+     `tiltExtra` never carries the lean (see footRing()'s own note on that
+     ring field), so "no layering" is still exactly what it always was,
+     independent of whether the hub is domed. Math.pow(x, 0) is exactly 1,
+     `0 * layerTilt` is +0 over layerTilt's range, and
+     `(0 * layerPhase * TAU) / count` is +0 — so byte-identity for scale,
+     tilt and phase is structural and an EQUALITY is the honest assertion.
+     Only the area-rule radius needs a tolerance, and keeping the two apart
+     is what stops the tolerance covering for a leak in the other three. */
   if (!cont && m.layerCount === 1) {
     const r0 = layers[0];
     if (r0.scale !== 1) bad.push(`guard: layerCount 1 but ring 0 scale is ${r0.scale}, not exactly 1`);

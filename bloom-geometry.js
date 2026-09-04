@@ -1680,9 +1680,63 @@ export function footRing(state, acc) {
          HIDDEN there by its own registry predicate and inert here — and that
          is exactly what lets slotRolesEligible() admit a fan at any depth. */
       phase: (continuousMode || fanMode) ? 0 : (p.lambda * state.layerPhase * TAU) / state.petalCount,
-      /* THE AFFINE ANGLE, at this ring's own lambda. In the ringed arm
-         `p.lambda` IS the integer L, so this is `L * state.layerTilt`
-         character for character on the same doubles. */
+      /* ===================================================================
+         DOME LEAN (Sep 4, the crown-coverage session) — a boost DERIVED FROM
+         THE DOME, never a control, never a default. Zero and byte-identical
+         at headRise 0 by the same `dome ? X : 0` construction every other
+         dome-derived quantity here uses (`slope` itself is 0 there), so it
+         needs no guard of its own beyond the one `slope` already carries.
+
+         WHY +slope EXACTLY, not a tuned constant: buildPetalInto's domed path
+         builds the blade frame from (Rs, Up), and algebraically
+         (Rs, Up) = (R, Z) rotated by -slope in the ring's own meridian plane
+         (Rs = [R cos(slope), -sin(slope)], Up = [R sin(slope), cos(slope)] in
+         (radial, z) — a rotation by -slope of (R, Z), verified against the
+         domeGuardResidual precedent: at slope 0 this is the identity and the
+         flat expression comes back verbatim). So a domed ring's blade at
+         authored tilt T points where a FLAT ring's blade would point at tilt
+         (T - slope) — dir_dome(T) = dir_flat(T - slope) — and its tip lands
+         at the same PLAN RADIUS a flat ring's would at (T - slope), since
+         Rs/Up carry no tangential component (no azimuth drift). Adding
+         +slope is therefore the value, and the only value, that makes a
+         domed ring's tilt T behave like the SAME flat tilt T: solving
+         dir_dome(T') = dir_flat(T) gives T' = T + slope exactly, not a fitted
+         approximation.
+
+         WHAT THIS DOES NOT CLAIM. It restores ONE ring's own aim to its flat
+         equivalent; crown COVERAGE is an ENSEMBLE property of every ring's
+         swept footprint together, which is why it is verified against
+         tools/bloom-plan-coverage.mjs's raster rather than asserted
+         sufficient from the algebra alone. And it is a function of THIS
+         RING'S OWN SLOPE, not of whether the arrangement's CROWN reads bare
+         in the first place: a recipe whose crown is already uncovered at
+         headRise 0 (measured Sep 4: a zero-curl, moderate-tilt continuous
+         recipe can read ~1.15mm bald at rise 0 AND at rise 1 alike, nearly
+         unchanged) has a shortfall this term was never aimed at and does not
+         move — the dome did not cause that gap, so a term derived from the
+         dome does not owe it a fix. That is scope, not an oversight; see
+         docs/bloom-charter.md's crown-coverage entry for the measurement.
+
+         IT IS A SEPARATE FIELD, NEVER FOLDED INTO tiltExtra — measured, not
+         merely preferred. `tiltExtra` is the layered ramp's own law and nine
+         existing clauses already police it as exactly that: J5 asserts it is
+         MONOTONE in depth under CONTINUOUS, J6 asserts it passes EXACTLY
+         through the ringed law at every quantized point, and the
+         layerCount-1 guard asserts it is EXACTLY 0 there. domeLean is a
+         function of a ring's own PLAN RADIUS, which for a CONTINUOUS spiral
+         runs the OPPOSITE way from depth — the rim (shallow, large slope)
+         sits at low lambda and the apex (deep, slope near 0) at high lambda
+         — so folding it into `tiltExtra` breaks J5's monotonicity on real
+         rows and J6's identity by exactly `domeLean` at every quantized
+         point: MEASURED on this branch before this field was split out,
+         firing both on the mum, the incurve target and Eva's own screenshot
+         config alike. `buildPetalInto` reads `ring.domeLean` and
+         `slot.tiltExtra` separately and sums three terms
+         (`petalTilt + tiltExtra + domeLean`) at the one place the angle is
+         actually used, so the layered law's own five existing assertions
+         need not change a character, and this field's own correctness is
+         J9's alone to state. */
+      domeLean: dome ? (slope * 180) / Math.PI : 0,
       tiltExtra: p.lambda * state.layerTilt,
       /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the
          read-out and the gates can say WHERE a floor started binding instead
@@ -2754,7 +2808,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      which is the defect this project repeats most. One object, one petal. */
   const ps = petalStateFor(state, ring);
   const length = ps.petalLength * slot.scale;
-  const tilt = ((ps.petalTilt + slot.tiltExtra) * Math.PI) / 180;
+  /* THE AFFINE ANGLE, PLUS THE DOME'S OWN LEAN (Sep 4) — three terms, read
+     from three owners: `ps.petalTilt` the base control, `slot.tiltExtra` the
+     layered ramp footRing() computed per this descriptor, `ring.domeLean`
+     the SAME owner's per-ring cap correction, kept a separate field rather
+     than folded into `tiltExtra` (see footRing()'s own note on that ring
+     field: folding it in broke two existing assertions about the LAYERED
+     term's own shape). `ring.domeLean` is 0 at every flat build by the same
+     construction `ring.slope` already is, so this line is byte-identical to
+     its pre-Sep-4 form whenever headRise is 0. */
+  const tilt = ((ps.petalTilt + slot.tiltExtra + ring.domeLean) * Math.PI) / 180;
   const halfW = (ps.petalWidth * slot.scale) / 2;
   const footHalf = ring.width / 2;
 
