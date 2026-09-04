@@ -1184,7 +1184,13 @@ window.__bloomMetrics = () => ({
   petalDomeGuardResidual: lastPetal ? lastPetal.domeGuardResidual : null,
   /* THE ROOT ROW per descriptor's representative petal — the first BLADE row
      as emitted, J8's input against the rigid tilt of the foot's own frame. */
-  petalRingRootRows: lastPetals.map((p) => (p ? { C: p.rootRow.C, N: p.rootRow.N, flat: p.rootRow.flat, tiltRad: p.rootRow.tiltRad, u: p.rootRow.u, curlRad: p.rootRow.curlRad, ringC: p.rootRow.ringC, azimuth: p.azimuth } : null)),
+  petalRingRootRows: lastPetals.map((p) => (p ? { C: p.rootRow.C, N: p.rootRow.N, flat: p.rootRow.flat, tiltRad: p.rootRow.tiltRad, u: p.rootRow.u, curlRad: p.rootRow.curlRad, ringC: p.rootRow.ringC, azimuth: p.azimuth,
+    /* THE EFFECTIVE petalTilt this petal was actually built from (Sep 4,
+       J9's own input) — read from `p.applied`, never the base UI control:
+       petalTilt is itself overridable per role (labellumTilt/hoodTilt) and
+       per petal (petalNTilt), so a check reconstructing "expected tilt" from
+       the raw slider would false-fire on any orchid or fan-per-petal row. */
+    petalTiltApplied: p.applied.petalTilt } : null)),
   /* RENAMED FROM `ringLayers` WITH THE CONTINUOUS ARM, because under it a
      descriptor is not a layer — it is a ring carrying exactly one petal, and
      there are up to 120 of them. A key naming a thing that is not the thing
@@ -1196,6 +1202,16 @@ window.__bloomMetrics = () => ({
     index: r.index, radius: r.radius, derivedRadius: r.derivedRadius,
     width: r.width, thickness: r.thickness,
     overhang: r.overhang, scale: r.scale, phase: r.phase, tiltExtra: r.tiltExtra,
+    /* DOME LEAN (Sep 4) — footRing()'s own per-ring cap correction, a
+       SEPARATE addend from tiltExtra above, never folded into it (see
+       footRing()'s own note on this field: folding it in broke tiltExtra's
+       own monotonicity and quantizer-identity claims under CONTINUOUS).
+       buildPetalInto sums petalTilt + tiltExtra + domeLean at the one place
+       the angle is used; this is that third term, reported on the same
+       doctrine as every other telemetry field here (widthClamped,
+       underFootFloor, …): the owner's own answer, never a second
+       derivation. */
+    domeLean: r.domeLean,
     authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
