@@ -3119,7 +3119,12 @@ exposure the ruling accepts in exchange for the minutes.
       as when ALL MAX first meant three. Every frozen matrix pins the literal 3. **phase11 is
       frozen at 174cc2f (402 rows, the crowding instrument's own head and the first baseline
       that carries the mum as a named row)**; the retention close ran it on both trees plus
-      the live matrix: «CLOSE».
+      the live matrix (434 rows on the branch head, compared by label against the parent
+      tree's phase11 export): **379 shared rows bit-identical; exactly 4 MOVED — `ALL MAX
+      (centre off)` and `ALL MAX x DOME/DISC/RING max`, the rows that resolve `layerCount` to
+      the slider's maximum; 19 block-7 rows relabelled from "3 layers x …" to "6 layers x …"
+      (new states, no counterpart on the parent); 32 DEPTH rows new. 4 + 19 = the 23 movers
+      predicted before the raise, and nothing outside them.**
 
     - **THE NEW ROWS: 32** — depth 4/5/6 × spread min/default/max × RADIAL/CONTINUOUS
       (18), then the corners: the mum at six turns (D_max 19), 6 × ALL THIN × spread min (28),
