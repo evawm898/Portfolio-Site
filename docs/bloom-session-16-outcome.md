@@ -215,5 +215,48 @@ always did and hands the sum to the law.
 
 ## Verification retention
 
-The close ran the newest baseline plus the live partition, on the charter's retention ruling:
-see the charter's session-16 entry for the counts.
+The close ran the newest baseline plus the live partition, on the charter's retention ruling.
+
+- **Both STL gates, full:** export 499/499 watertight, 0 degenerate, identical live and export
+  triangle counts, 1961 s; connectedness 499/499 one piece, 1977 s. Coverage measured on 372
+  rows, 127 split-whorl rows SKIPPED with the label, 2 ASSERTED (the pinned incurve rows: 0.0%
+  uncovered, bald cap 0.08 mm under a 0.09 mm bound). 56 rows flag SELF-CONTACT; 3 six-whorl
+  rows carry the shipped uniform arc under one sheet thickness on the innermost whorl (told,
+  not clamped); 24 CROWDED.
+- **Panel gate** PASS, negative control fires on all ten routes. `--verify-frozen --phase13`
+  PASS. CI on af2cd99: all six verify jobs green.
+- **phase13 on both trees:** 469/469 bit-identical between a worktree of 6b8e94b and head.
+- **The live partition, by label:** 467 shared, 459 bit-identical, **8 moved = the eight
+  predeclared ALL MIN / ALL MAX rows, none outside the prediction** (each keeps its byte length
+  and triangle count), 32 new, 2 absent because relabelled — the pinned incurve rows are
+  bit-identical under their new labels (4b250b664500 flat, cd46ad682fd3 at rise 0.50).
+
+## The positive controls on the final tree
+
+The Phase A table above was measured against the SHIPPED instruments. The same four mutants
+were rebuilt as full-tree copies of the final tree and driven through the final harness on
+seven rows (the pinned control, bias 1, start 0.95 clamped, the flat incurve target at start
+0.5, default x curl 90 x bias 1 x start 0.5, the fiddlehead, the flat default). Every row on
+every tree: watertight, 0 degenerate, identical live and export triangle counts — the STL
+gates see none of it.
+
+| tree | where it is BIT-IDENTICAL to a correct build | what fires |
+|---|---|---|
+| A — spine keeps the arc | the pinned control's sha on bias 1 and start 0.95 | **C1 on every ring** of every bias/start row, and the re-derived J8 with it; silent on control, hoop, flat |
+| B — start reaches the foot rows | every row with start 0 | crowding R4 on every start row (x480 on the incurve target) |
+| C — Euler integrator at the row pitch | the uniform rows (control, fiddlehead) | **C2 on those uniform rows**; C1 at 1e-2 mm on the bias/start rows |
+| D — no spine floor | every row the floor does not bind (bias 1, start 0.5, curl 90) | on start 0.95: **C3 both ways** (0.38 mm spine radius told under the floor while the owners' inputs say clamped) and C1 at 3.7e-1 mm |
+
+Every tree is silent and bit-identical on the flat default.
+
+## The sheet
+
+`node tools/shot-bloom-curl.mjs <dir> [base-tree]` rendered 33 cells across 26 rows, every one
+PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted. The two BEFORE cells are exported
+from a worktree of 6b8e94b with their sha required equal to the head's controls, and the
+taper-under-roll-0 cell is required equal to the pinned control. Each sweep shares one camera
+framed from its widest cell, with a 12 px clear margin asserted on every whole-bloom view.
+The pair Eva asked to look at rather than read: the incurve target at bias 1 (the crown
+re-opened) and at start 0.95 (23.1% uncovered, bald cap 5.78 mm, CLAMPED on 120 of 120 rings,
+25.6° built of 150° asked), with the seat line reading 1.88 mm printed. Held for her ruling;
+merge is released by it.

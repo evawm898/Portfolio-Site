@@ -90,16 +90,30 @@ async function shoot(file, view, frame) {
   let scale = 1;
   for (let attempt = 0; attempt < 5; attempt++) {
     if (VIEWS[view]) { const f = VIEWS[view](frame.hub, frame); f.r *= scale; await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), f); }
-    else await page.evaluate((rr) => window.__bloomFrame(rr, 0.15), frame.fit);
+    else await page.evaluate((rr) => window.__bloomFrame(rr, 0.15), frame.fit * scale);
     await page.waitForTimeout(260);
     await page.screenshot({ path: file, clip: { x: 0, y: 0, width: 800, height: 800 } });
     const { width, height, data } = decodePNG(fs.readFileSync(file));
     let content = 0;
     for (let o = 0; o < data.length; o += 4) if (Math.abs(data[o] - 0x0c) > 10 || Math.abs(data[o + 1] - 0x0f) > 10 || Math.abs(data[o + 2] - 0x0e) > 10) content++;
     const frac = content / (width * height);
-    if (frac >= 0.02 && frac <= 0.98) return { file: path.basename(file), scale };
-    if (frac < 0.02 || !VIEWS[view]) await die(`${path.basename(file)}: the frame is ${(frac * 100).toFixed(1)}% content — not a picture anyone should rule from`);
-    scale *= 1.6;
+    /* A WHOLE-BLOOM FRAME MUST CLEAR ITS EDGES (the fan sheet's own rule): a
+       straight-based petal reaches far past the arc it replaces, and the
+       first render of this sheet framed start 0.95 inside its own canopy at
+       a content fraction the 2-98% check was happy with. Decoded: 12 px
+       clear on all four edges, or widen and go again. */
+    let edgeHit = false;
+    if (!VIEWS[view]) {
+      const M = 12;
+      const isBg = (o) => Math.abs(data[o] - 0x0c) <= 10 && Math.abs(data[o + 1] - 0x0f) <= 10 && Math.abs(data[o + 2] - 0x0e) <= 10;
+      for (let y = 0; y < height && !edgeHit; y++) for (let x = 0; x < width; x++) {
+        if (y >= M && y < height - M && x >= M && x < width - M) { x = width - M - 1; continue; }
+        if (!isBg((y * width + x) * 4)) { edgeHit = true; break; }
+      }
+    }
+    if (frac >= 0.02 && frac <= 0.98 && !edgeHit) return { file: path.basename(file), scale };
+    if (frac < 0.02) await die(`${path.basename(file)}: the frame is ${(frac * 100).toFixed(1)}% content — not a picture anyone should rule from`);
+    scale *= VIEWS[view] ? 1.6 : 1.25;
   }
   await die(`${path.basename(file)}: still inside the model after four widenings`);
 }
@@ -155,51 +169,77 @@ async function cell({ label, set: sets = [], views = ['whole'], note = '', frame
   return rec;
 }
 
+/* THE SHARED CAMERA OF A SWEEP IS SIZED FROM ITS WIDEST CELL — a probe pass
+   over the sweep's configs reads each one's own fit radius (live geometry,
+   nothing shot) and the sweep is then shot at the largest, so the three
+   cells share one camera AND every one of them fits. Sizing from the
+   default cell framed start 0.95 inside its own canopy on the first render. */
+async function sweepFrame(configs) {
+  let fit = 0, first = null;
+  for (const sets of configs) {
+    await openBloom(page, port);
+    const bad = await applyConfig(page, sets);
+    if (bad.length) await die(`sweep frame probe: ${bad.join('; ')}`);
+    const m = await page.evaluate(() => window.__bloomMetrics());
+    if (m.shownMode !== 'live') await die('sweep frame probe: not a live build');
+    if (!first) first = { hub: m.hubRadius, apexZ: m.hubDome ? m.hubDome.H : 0 };
+    fit = Math.max(fit, m.fitRadius);
+  }
+  return { ...first, fit };
+}
+
 const INCURVE = { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25 };
 const INC = { ...INCURVE, headRise: 0.5 };
 const QUILL = { petalRoll: 330, petalWidth: 8, sheetThickness: 0.6 };
 
 console.log('THE CURL SHEET — every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted.\n');
 
+/* The shared cameras, from the widest cell of each sweep. */
+const incFrame = await sweepFrame([set(INC), set({ ...INC, curlBias: 1 }), set({ ...INC, curlStart: 0.95 }), set({ ...INC, curlBias: 1, curlStart: 0.95 }), set({ ...INC, petalCupGradient: 1.2 }), set({ ...INC, petalCupGradient: -0.8 })]);
+const curlFrame = await sweepFrame([set({ petalSpineCurl: 150 }), set({ petalSpineCurl: 150, curlBias: 0.5 }), set({ petalSpineCurl: 150, curlBias: 1 }), set({ petalSpineCurl: 150, curlStart: 0.5 }), set({ petalSpineCurl: 150, curlStart: 0.95 })]);
+const taperFrame = await sweepFrame([set(QUILL), set({ ...QUILL, petalRollTaper: 1 }), set({ ...QUILL, petalRollTaper: -1 })]);
+const gradFrame = await sweepFrame([set({ petalWidth: 30 }), set({ petalWidth: 30, petalCupGradient: 1.2 }), set({ petalWidth: 30, petalCupGradient: -0.8 })]);
+const flagFrame = await sweepFrame([set({ petalSpineCurl: 360, curlStart: 0.5 }), set({ petalSpineCurl: 360, curlBias: 1 })]);
+
 /* (6) controls, before/after */
 const ctlDefault = await cell({ label: 'CONTROL — shipping default', set: [], views: ['whole'], note: 'Byte-identical to the base commit: every new control defaults to its identity and the guards take the shipped paths verbatim.' });
-const ctlIncurve = await cell({ label: 'CONTROL — the incurve target x head rise 0.50 (pinned: bias 0, start 0)', set: set(INC), views: ['whole', 'crown'],
+const ctlIncurve = await cell({ label: 'CONTROL — the incurve target x head rise 0.50 (pinned: bias 0, start 0)', set: set(INC), views: ['whole', 'crown'], frame: incFrame,
   note: 'The pinned row the export gate asserts coverage on: 0.0% of the hub disc uncovered, bald-cap 0.08 mm. Crown closure here is EMERGENT — curl 150 x tilt x domeLean landing every tip within 0.3-1.3 mm of the axis — never designed, no margin.' });
 let beforeDefault = null, beforeIncurve = null;
 if (before) {
   beforeDefault = await cell({ label: 'BEFORE — shipping default on the base tree', set: [], views: ['whole'], tree: 'before', frame: ctlDefault.own, coverage: false });
-  beforeIncurve = await cell({ label: 'BEFORE — the incurve target x head rise 0.50 on the base tree', set: set(INC), views: ['whole', 'crown'], tree: 'before', frame: ctlIncurve.own, coverage: false });
+  beforeIncurve = await cell({ label: 'BEFORE — the incurve target x head rise 0.50 on the base tree', set: set(INC), views: ['whole', 'crown'], tree: 'before', frame: incFrame, coverage: false });
   if (beforeDefault.sha !== ctlDefault.sha) await die(`the shipping default exports sha ${ctlDefault.sha} on this tree and ${beforeDefault.sha} on the base tree — the controls did not land byte-identical`);
   if (beforeIncurve.sha !== ctlIncurve.sha) await die(`the incurve target exports sha ${ctlIncurve.sha} on this tree and ${beforeIncurve.sha} on the base tree — the pinned row moved`);
 }
 
 /* (1) each control alone at min / default / max, one camera per sweep */
-const b0 = await cell({ label: 'BIAS 0 (uniform, a hoop) — default bloom x spine curl 150', set: set({ petalSpineCurl: 150 }), note: 'The shipped arc: constant curvature, spine radius 13.4 mm.' });
-const b5 = await cell({ label: 'BIAS 0.50 — default bloom x spine curl 150', set: set({ petalSpineCurl: 150, curlBias: 0.5 }), frame: b0.own, note: 'The same 150 degrees, redistributed toward the tip (p = 2): the base runs straighter, the tip turns harder.' });
-const b1 = await cell({ label: 'BIAS 1 (tip-loaded, a crozier) — default bloom x spine curl 150', set: set({ petalSpineCurl: 150, curlBias: 1 }), frame: b0.own, note: 'p = 4: nearly straight through the base, the whole turn in the last third.' });
+const b0 = await cell({ label: 'BIAS 0 (uniform, a hoop) — default bloom x spine curl 150', set: set({ petalSpineCurl: 150 }), frame: curlFrame, note: 'The shipped arc: constant curvature, spine radius 13.4 mm.' });
+const b5 = await cell({ label: 'BIAS 0.50 — default bloom x spine curl 150', set: set({ petalSpineCurl: 150, curlBias: 0.5 }), frame: curlFrame, note: 'The same 150 degrees, redistributed toward the tip (p = 2): the base runs straighter, the tip turns harder.' });
+const b1 = await cell({ label: 'BIAS 1 (tip-loaded, a crozier) — default bloom x spine curl 150', set: set({ petalSpineCurl: 150, curlBias: 1 }), frame: curlFrame, note: 'p = 4: nearly straight through the base, the whole turn in the last third.' });
 const s0 = b0;
-const s5 = await cell({ label: 'START 0.50 — default bloom x spine curl 150', set: set({ petalSpineCurl: 150, curlStart: 0.5 }), frame: b0.own, note: 'A dead-straight base half, then the whole 150 degrees as a true arc through the tip half — one kink at the threshold, as the flower describes it. Tightest spine radius 6.7 mm: the floor does not bind.' });
-const s95 = await cell({ label: 'START 0.95 — default bloom x spine curl 150 (the spine floor binds)', set: set({ petalSpineCurl: 150, curlStart: 0.95 }), frame: b0.own, note: 'The law asks 150 degrees inside the last 5% of a 35 mm blade — a 0.67 mm spine radius against a 1.20 mm floor (one sheet thickness). CLAMPED: the curvature is held at the floor and the turn that built is printed beside the turn asked. Full range, clamped, told (Eva, Sep 4).' });
-const t0 = await cell({ label: 'TAPER 0 — the QUILL (roll 330 x width 8 x sheet 0.60)', set: set(QUILL), note: 'The roll clamp corner: the one state where roll\'s own floor binds. Even along the length.' });
-const tp = await cell({ label: 'TAPER +1 — the QUILL opens toward the tip', set: set({ ...QUILL, petalRollTaper: 1 }), frame: t0.own, note: 'The roll\'s curvature fades to zero at the tip (smootherstep): a tube at the base, a spoon at the tip.' });
-const tm = await cell({ label: 'TAPER -1 — the QUILL opens toward the base', set: set({ ...QUILL, petalRollTaper: -1 }), frame: t0.own, note: 'The mirror: open at the base, a tube at the tip.' });
-const g0 = await cell({ label: 'CUP GRADIENT 0 — widest petal (30 mm), cup 0', set: set({ petalWidth: 30 }), note: 'Flat across the width.' });
-const gp = await cell({ label: 'CUP GRADIENT +1.2 — widest petal', set: set({ petalWidth: 30, petalCupGradient: 1.2 }), frame: g0.own, note: 'The flower\'s "edge curve — profile" under the name the geometry earns: the same v-squared lift cup is, growing linearly to the tip. Renamed on the 28% RMS residual against the best-fitting cup.' });
-const gm = await cell({ label: 'CUP GRADIENT -0.8 — widest petal', set: set({ petalWidth: 30, petalCupGradient: -0.8 }), frame: g0.own, note: 'Reflexing more toward the tip.' });
+const s5 = await cell({ label: 'START 0.50 — default bloom x spine curl 150', set: set({ petalSpineCurl: 150, curlStart: 0.5 }), frame: curlFrame, note: 'A dead-straight base half, then the whole 150 degrees as a true arc through the tip half — one kink at the threshold, as the flower describes it. Tightest spine radius 6.7 mm: the floor does not bind.' });
+const s95 = await cell({ label: 'START 0.95 — default bloom x spine curl 150 (the spine floor binds)', set: set({ petalSpineCurl: 150, curlStart: 0.95 }), frame: curlFrame, note: 'The law asks 150 degrees inside the last 5% of a 35 mm blade — a 0.67 mm spine radius against a 1.20 mm floor (one sheet thickness). CLAMPED: the curvature is held at the floor and the turn that built is printed beside the turn asked. Full range, clamped, told (Eva, Sep 4).' });
+const t0 = await cell({ label: 'TAPER 0 — the QUILL (roll 330 x width 8 x sheet 0.60)', set: set(QUILL), frame: taperFrame, note: 'The roll clamp corner: the one state where roll\'s own floor binds. Even along the length.' });
+const tp = await cell({ label: 'TAPER +1 — the QUILL opens toward the tip', set: set({ ...QUILL, petalRollTaper: 1 }), frame: taperFrame, note: 'The roll\'s curvature fades to zero at the tip (smootherstep): a tube at the base, a spoon at the tip.' });
+const tm = await cell({ label: 'TAPER -1 — the QUILL opens toward the base', set: set({ ...QUILL, petalRollTaper: -1 }), frame: taperFrame, note: 'The mirror: open at the base, a tube at the tip.' });
+const g0 = await cell({ label: 'CUP GRADIENT 0 — widest petal (30 mm), cup 0', set: set({ petalWidth: 30 }), frame: gradFrame, note: 'Flat across the width.' });
+const gp = await cell({ label: 'CUP GRADIENT +1.2 — widest petal', set: set({ petalWidth: 30, petalCupGradient: 1.2 }), frame: gradFrame, note: 'The flower\'s "edge curve — profile" under the name the geometry earns: the same v-squared lift cup is, growing linearly to the tip. Renamed on the 28% RMS residual against the best-fitting cup.' });
+const gm = await cell({ label: 'CUP GRADIENT -0.8 — widest petal', set: set({ petalWidth: 30, petalCupGradient: -0.8 }), frame: gradFrame, note: 'Reflexing more toward the tip.' });
 
 /* (2) the flag, both sides */
-const fContact = await cell({ label: 'SELF-CONTACT — curl 360 x start 0.50', set: set({ petalSpineCurl: 360, curlStart: 0.5 }), note: 'A full hoop in the outer half: the tip lands on the blade\'s own mid-row at 0.000 mm. The SELF-CONTACT flag is raised — a flag, never a gate, because the shipped hoop (curl 360 alone, tip on root) raises it too.' });
-const fClean = await cell({ label: 'NO SELF-CONTACT — curl 360 x bias 1', set: set({ petalSpineCurl: 360, curlBias: 1 }), frame: fContact.own, note: 'A crozier winds inside itself: 360 degrees, tip-loaded, and the blade never comes within a sheet of itself (2.7 mm clear). The floor clamps it very slightly (358.8 of 360 degrees built).' });
+const fContact = await cell({ label: 'SELF-CONTACT — curl 360 x start 0.50', set: set({ petalSpineCurl: 360, curlStart: 0.5 }), frame: flagFrame, note: 'A full hoop in the outer half: the tip lands on the blade\'s own mid-row at 0.000 mm. The SELF-CONTACT flag is raised — a flag, never a gate, because the shipped hoop (curl 360 alone, tip on root) raises it too.' });
+const fClean = await cell({ label: 'NO SELF-CONTACT — curl 360 x bias 1', set: set({ petalSpineCurl: 360, curlBias: 1 }), frame: flagFrame, note: 'A crozier winds inside itself: 360 degrees, tip-loaded, and the blade never comes within a sheet of itself (2.7 mm clear). The floor clamps it very slightly (358.8 of 360 degrees built).' });
 
 /* (3) the incurve target at every new control's extremes, coverage + crowding in the caption */
-const iBias = await cell({ label: 'INCURVE TARGET x bias 1', set: set({ ...INC, curlBias: 1 }), views: ['whole', 'crown'], frame: ctlIncurve.own,
+const iBias = await cell({ label: 'INCURVE TARGET x bias 1', set: set({ ...INC, curlBias: 1 }), views: ['whole', 'crown'], frame: incFrame,
   note: 'DOCUMENTED BEHAVIOUR, not a failure: the same 150 degrees redistributed to the tip moves every tip 5-11 mm out from the axis, and the crown re-opens. The controls relocate the tip; that is them working (Eva, Sep 4).' });
-const iStart = await cell({ label: 'INCURVE TARGET x start 0.95', set: set({ ...INC, curlStart: 0.95 }), views: ['whole', 'crown'], frame: ctlIncurve.own,
+const iStart = await cell({ label: 'INCURVE TARGET x start 0.95', set: set({ ...INC, curlStart: 0.95 }), views: ['whole', 'crown'], frame: incFrame,
   note: 'The other honest picture: the base 95% of every floret runs straight at its launch angle, the floor clamps the hook (150 asked, 96 built), and the crown is open.' });
-const iBoth = await cell({ label: 'INCURVE TARGET x bias 1 x start 0.95', set: set({ ...INC, curlBias: 1, curlStart: 0.95 }), views: ['whole', 'crown'], frame: ctlIncurve.own, note: 'Both at their ends: CLAMPED to 50 degrees built.' });
-const iGradP = await cell({ label: 'INCURVE TARGET x cup gradient +1.2', set: set({ ...INC, petalCupGradient: 1.2 }), views: ['whole', 'crown'], frame: ctlIncurve.own, note: 'A cross-width deformation: the crown stays closed (0.0%, 0.08 mm).' });
-const iGradM = await cell({ label: 'INCURVE TARGET x cup gradient -0.8', set: set({ ...INC, petalCupGradient: -0.8 }), views: ['whole', 'crown'], frame: ctlIncurve.own, note: 'Likewise.' });
-const iTaper = await cell({ label: 'INCURVE TARGET x taper +1 (inert: roll is 0)', set: set({ ...INC, petalRollTaper: 1 }), views: ['whole', 'crown'], frame: ctlIncurve.own, note: 'Roll is 0 on this recipe, so taper is hidden and inert: this cell must export the pinned row\'s own sha.' });
+const iBoth = await cell({ label: 'INCURVE TARGET x bias 1 x start 0.95', set: set({ ...INC, curlBias: 1, curlStart: 0.95 }), views: ['whole', 'crown'], frame: incFrame, note: 'Both at their ends: CLAMPED to 50 degrees built.' });
+const iGradP = await cell({ label: 'INCURVE TARGET x cup gradient +1.2', set: set({ ...INC, petalCupGradient: 1.2 }), views: ['whole', 'crown'], frame: incFrame, note: 'A cross-width deformation: the crown stays closed (0.0%, 0.08 mm).' });
+const iGradM = await cell({ label: 'INCURVE TARGET x cup gradient -0.8', set: set({ ...INC, petalCupGradient: -0.8 }), views: ['whole', 'crown'], frame: incFrame, note: 'Likewise.' });
+const iTaper = await cell({ label: 'INCURVE TARGET x taper +1 (inert: roll is 0)', set: set({ ...INC, petalRollTaper: 1 }), views: ['whole', 'crown'], frame: incFrame, note: 'Roll is 0 on this recipe, so taper is hidden and inert: this cell must export the pinned row\'s own sha.' });
 if (iTaper.sha !== ctlIncurve.sha) await die(`taper +1 on the incurve target (roll 0) exports sha ${iTaper.sha}, the pinned row ${ctlIncurve.sha} — an inert control moved bytes`);
 
 /* (5) the base: curl start at the foot */

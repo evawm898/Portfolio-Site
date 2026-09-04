@@ -3676,3 +3676,55 @@ exposure the ruling accepts in exchange for the minutes.
       equal on the sheet itself.
 
     - **THE EVIDENCE — filled at the close-out below this line.**
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **499/499** watertight, 0 degenerate,
+      identical live and export triangle counts on every row, 1961 s; plan
+      coverage measured on 372 rows, **127 SKIPPED** as split whorls (labelled,
+      never silent), **2 ASSERTED** (the pinned incurve rows: 0.0% uncovered,
+      bald cap 0.08 mm against a 0.09 mm bound); 56 rows flag SELF-CONTACT, 3
+      rows carry the shipped uniform arc under one sheet thickness on the
+      innermost of six whorls (told, not clamped), 24 CROWDED. Connectedness
+      **499/499** one piece, 1977 s. Panel gate PASS on all ten routes with the
+      curl route's under-floor step on the shipping blade and sheet set
+      explicitly; the negative control fires on **ALL TEN ROUTES**.
+      `--verify-frozen --phase13` PASS. CI on af2cd99: six verify jobs green.
+    - **THE RETENTION CLOSE — the newest baseline plus the live partition,
+      EXACT.** `phase13Matrix()` exported from a worktree of 6b8e94b and from
+      head: **469/469 bit-identical** (the base tree reads "6b8e94b+dirty" from
+      the gitignored node_modules symlink, nothing else). Head's live matrix
+      against that export by label: 467 shared, **459 bit-identical, 8 moved =
+      exactly the eight predeclared ALL MIN / ALL MAX rows, 0 outside the
+      prediction**, 32 new (block 21's 28 plus block 1's cup-gradient sweep and
+      the relabelled pair), 2 labels absent because they were relabelled — the
+      two pinned incurve rows at 4b250b664500 (flat) and cd46ad682fd3 (rise
+      0.50) bit-identical under their new labels and their four identity sets.
+      The moved ALL rows keep their byte lengths and triangle counts and change
+      shape only.
+    - **THE POSITIVE CONTROLS ON THE FINAL TREE — four full-tree copies, seven
+      rows each, every row watertight, 0 degenerate, identical live and export
+      counts on every tree; the STL gates see none of it.** Read as: what the
+      curl instruments fire, and where each mutant is bit-identical to a
+      correct build so that NOTHING ELSE could:
+      A (bias/start read, spine keeps the arc) — bit-identical to the PINNED
+      CONTROL on bias 1 and start 0.95 (sha cd46ad682f, the mutant that leaves
+      no byte to diff); **C1 fires on every ring** of every bias/start row and
+      the re-derived J8 with it; silent on the control, the hoop and the flat
+      default. B (start reaches the foot rows) — crowding R4 fires on every
+      start row (x480 on the incurve target), silent where start is 0. C
+      (Euler integrator at the row pitch) — **C2 fires on the uniform rows**
+      (the pinned control and the fiddlehead, where the bytes are identical to
+      a correct build) and C1 at 1e-2 mm on the bias/start rows. D (no spine
+      floor) — bit-identical to the correct build on every row the floor does
+      not bind, and on start 0.95 **C3 fires both ways** (a 0.38 mm spine
+      radius told as under the floor while the owners' inputs say clamped) with
+      C1 at 3.7e-1 mm. Every tree is silent and bit-identical on DEFAULT (flat).
+    - **THE SHEET, RENDERED AND HELD FOR EVA'S EYE:** 33 cells across 26 rows,
+      every one PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted; the
+      two BEFORE cells exported from the 6b8e94b worktree with their sha
+      required equal to the head's controls (0c377b21350d, cd46ad682fd3) and
+      the taper-under-roll-0 cell required equal to the pinned control. Each
+      sweep shares one camera framed from its widest cell with a 12 px clear
+      margin asserted, so a canopy at start 0.95 no longer crops. The honest
+      pair: the incurve target at bias 1 (crown re-opened) and at start 0.95
+      (23.1% uncovered, bald cap 5.78 mm, CLAMPED on 120 of 120 rings, 25.6°
+      built of 150° asked), with the seat line reading 1.88 mm printed.
