@@ -1,6 +1,9 @@
 /* ===================================================================
-   bloom-plan-coverage.mjs — a MEASUREMENT TOOL, committed Sep 4, NOT YET a
-   gate. Built during Phase A discovery to answer one question for Eva's
+   bloom-plan-coverage.mjs — a MEASUREMENT TOOL, committed Sep 4, and SINCE
+   SESSION 16 (Eva, Sep 4) WIRED INTO THE EXPORT GATE: its line prints on every
+   row and its numbers are ASSERTED on the rows that declare `coverage` (the
+   pinned incurve rows) — see coverageAssert() and the WIRED note below. Was
+   "NOT YET a gate". Built during Phase A discovery to answer one question for Eva's
    dome-apex brief: at centerStyle NONE x CONTINUOUS, is the bare crown a
    PLACEMENT gap (nothing rooted near the axis) or a COVERAGE gap (something
    rooted there, pointed the wrong way)? It answered that (a dome-vs-tilt
@@ -82,6 +85,19 @@
    A raster is an approximation of an area; R4 is what says the approximation
    held for THIS reading, never assumed.
 
+   WIRED (session 16). Crown closure on the incurve target is an EMERGENT
+   property of curl 150 x tilt x domeLean landing every tip within 0.3-1.3 mm
+   of the axis; it was never designed and has no margin, and a future session
+   changing tilt, curl or domeLean re-opens it silently unless coverage is
+   asserted on the pinned rows — which is what the export gate now does, on
+   those rows only (0.0% uncovered, bald-cap <= 0.09 mm: the measured 0.08 mm
+   plus one part in ten). A non-default curl bias or curl start opening the
+   crown is DOCUMENTED BEHAVIOUR, not a gate failure: those controls move the
+   tip, which is them working. A SPLIT WHORL (slot roles or per-petal roles
+   engaged) is out of R3's scope and is reported as a LABELLED, LOUD SKIP —
+   never INVALID, never silent (Eva's instruction); a row that asserts
+   coverage and is skipped is a validity failure.
+
    RUN: node tools/bloom-plan-coverage.mjs           the three Phase-A configs
         node tools/bloom-plan-coverage.mjs --ascii   plus a same-run ASCII coverage
                                                map per config, for a fast own
@@ -134,6 +150,13 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     mod.buildCenterInto(accHC, ui, frHC.hub);
 
     const fr = mod.footRing(ui, accFull);
+    /* THE LABELLED SKIP (session 16): a split whorl is out of R3's scope —
+       reported as such, loudly, before a petal is built. */
+    if (!fr.continuousMode) {
+      const split = [];
+      for (let L = 0; L < fr.layerCount; L++) { const s = fr.slotRings[L]; if (!s.every((d) => d === s[0])) split.push(L); }
+      if (split.length) return { bad, r: null, skipped: `split whorl (layer${split.length > 1 ? 's' : ''} ${split.join(', ')} carry slot-role or per-petal records): the plan raster's R3 identifies slots by rigid rotation and cannot check a split whorl — RECORDED, NOT BUILT` };
+    }
     const petalAccs = [];
     let petalsBuilt = 0;
     const rot = (p, dth) => { const c = Math.cos(dth), s = Math.sin(dth); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
@@ -329,6 +352,15 @@ export function footStubInnerReach(r) {
   return Math.max(0, radius - overhang);
 }
 
+/* THE ASSERTION, on rows that declare `coverage: { maxUncovered, maxBald }`
+   — ONE owner of what "the crown stayed closed" means in numbers. */
+export function coverageAssert(r, want) {
+  const bad = [];
+  if (!(r.uncoveredFraction <= want.maxUncovered)) bad.push(`COVERAGE: ${(r.uncoveredFraction * 100).toFixed(2)}% of the hub disc is uncovered, this row allows ${(want.maxUncovered * 100).toFixed(2)}% — the crown re-opened (tilt, curl or domeLean moved; crown closure is emergent and has no margin)`);
+  if (!(r.baldCapRadius <= want.maxBald)) bad.push(`COVERAGE: the bald-cap radius is ${r.baldCapRadius.toFixed(3)} mm, this row allows ${want.maxBald.toFixed(3)} mm — the crown re-opened`);
+  return bad;
+}
+
 export function coverageLine(r) {
   const stub = footStubInnerReach(r);
   const bladeReach = stub - r.baldCapRadius; // how much FURTHER IN curl/tilt reached, past the bare foot stub
@@ -369,8 +401,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (bad0.length) { validity.push(`${label}: ${bad0.join('; ')}`); continue; }
     const drift = await fullStateDrift(page, set(cfg));
     if (drift.length) { validity.push(`${label}: ${drift.join('; ')}`); continue; }
-    const { bad, r } = await measure(page, { wantMask });
+    const { bad, r, skipped } = await measure(page, { wantMask });
     if (bad.length) { validity.push(`${label}: ${bad.join('; ')}`); continue; }
+    if (skipped) { console.log(`  ${label}\n    COVERAGE: SKIPPED — ${skipped}`); continue; }
     console.log(`  ${label}\n    ${coverageLine(r)}`);
     if (wantMask && r.mask) console.log(asciiMask(r.mask).split('\n').map((l) => '    ' + l).join('\n') + '\n');
   }

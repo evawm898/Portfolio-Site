@@ -30,7 +30,7 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
-import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount } from './bloom-geometry.js';
+import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
    Empty today, structurally present from day one: when the first control is
@@ -367,6 +367,17 @@ export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
   { id: 'shape', label: 'Petal shape', open: false },
   { id: 'form', label: 'Petal form', open: false },
+  /* PETAL CURL — the spine's own controls (Eva's ruling, Sep 4, from the
+     session-16 Phase A proposal): petal tilt, spine curl, curl bias, curl
+     start, twist. Tilt moves WITH curl rather than to Arrangement, because
+     the Sep 1 ruling put it beside spine curl (`phi(u) = petalTilt + curl*u`,
+     two terms of one angle function) and considered and rejected exactly the
+     Arrangement alternative; twist is in on the ordering law in petalForm's
+     header (it rotates about the CURLED length direction, so it follows the
+     spine). PETAL FORM keeps the cross-width family: cup, cup gradient, roll,
+     roll taper. Presentation only — `section` is never persisted, no role
+     changed, zero geometry, asserted by the retention run. */
+  { id: 'curl', label: 'Petal curl', open: false },
   { id: 'center', label: 'Center', open: false },
   /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
      WITH THE LABEL on purpose. An id that contradicts its label is a stored
@@ -851,6 +862,33 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
+  /* CUP GRADIENT (session 16) — the flower's "Edge curve — profile", RENAMED
+     for what the geometry says it is (Eva, Sep 4). Measured before it was
+     named: the flower's law is the SAME v^2 lift along the row normal that
+     cup is, with an envelope growing linearly to the tip where cup carries
+     the onset ramp; the best-fitting cup leaves a 28% RMS residual at every
+     amplitude (0.91 mm max on a 16 mm petal at the top of the range). So it
+     is neither a second cup nor an independent edge treatment — it is a cup
+     that GROWS toward the tip, and the flower's label is now known to be
+     wrong there too. Same units and sign as cup, always visible (a
+     deformation of its own, unlike the two curl modifiers), and the one
+     member of the family that joins petalFormIsFlat()'s guard.
+
+     Edge curve — TOP-DOWN was DECLINED (Eva, Sep 4, on the measurement): it
+     is a width MULTIPLIER, reproducible by petal width x base taper x tip
+     taper to 0.32 mm max billow and 0.59 mm max pinch on an 8 mm half-width,
+     so shipping it makes a second producer of the width profile and breaks
+     the registration rule. Do not re-propose it as a form control; it is a
+     Petal shape question, and one the shape terms already answer. */
+  { id: 'petalCupGradient', section: 'form', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
+    label: 'Cup gradient', tier: 'standard', role: 'petal',
+    fmt: (v) => {
+      const c = Number(v);
+      if (c === 0) return 'even along the length';
+      return `${c > 0 ? '+' : ''}${c.toFixed(2)} · ${c > 0 ? 'cups' : 'reflexes'} more toward the tip`;
+    },
+    visibleWhen: { all: [] } },
+
   /* PETAL TILT SITS HERE, BESIDE SPINE CURL — Eva's ruling (Sep 1), and the
      reason is the one the charter already states: `phi(u) = petalTilt +
      curl*u`. They are the two terms of ONE affine angle function about the
@@ -867,11 +905,11 @@ export const CONTROLS = [
      reading and a later session should find the ruling rather than re-open it
      from the code. `role` is UNCHANGED at 'petal' either way — see the ROLE
      note above; a section is not a role. */
-  { id: 'petalTilt', section: 'form', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
+  { id: 'petalTilt', section: 'curl', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
     label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 
-  { id: 'petalSpineCurl', section: 'form', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
+  { id: 'petalSpineCurl', section: 'curl', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Spine curl', tier: 'standard', role: 'petal',
     /* Prints the DERIVED spine radius, which is the quantity that tells a
        bend apart from a tilt — Petal tilt above prints an angle and has no
@@ -885,6 +923,57 @@ export const CONTROLS = [
       return `${d > 0 ? '+' : ''}${d}° · spine radius ${(L / Math.abs(d * Math.PI / 180)).toFixed(1)} mm`;
     },
     visibleWhen: { all: [] } },
+
+  /* ===================================================================
+     THE CURL FAMILY (session 16, Eva Sep 4) — curl bias and curl start are
+     MODIFIERS on spine curl, never deformations of their own: they
+     redistribute the same total turn along the length, so they are hidden
+     AND inert while spine curl is 0 (`awayFrom 0 by 2.5`, half of curl's own
+     5-degree step, admits every reachable non-zero value and nothing else).
+     The flower ships both ungated, as dead sliders at curl 0; that is the
+     part of its behaviour deliberately not reproduced.
+
+     WHAT THEY DO TO THE INCURVE TARGET, recorded so it is not re-derived as a
+     defect: crown closure there is an EMERGENT property of curl 150 x tilt x
+     domeLean landing every tip within 0.3-1.3 mm of the axis. Bias and start
+     preserve the tip's DIRECTION and move its POSITION — bias 0.5 puts the
+     tips 3-8 mm out and re-opens 5.4% of the disc, start 0.95 puts them
+     9-17 mm out and re-opens 23% — and that is the controls working, not
+     failing (Eva, Sep 4, withdrawing the criterion that demanded otherwise).
+     The incurve rows PIN both at 0 and coverage is asserted on those rows
+     only; a non-default value opening the crown is documented behaviour.
+
+     FULL RANGES, CLAMPED, TOLD (Eva). The flower's bias power 4 and start
+     to 0.95 are LACE constants; on a printed sheet the spine curvature floor
+     (one sheet thickness of radius, the roll floor's own constant) binds
+     over most of that range — at curl 150 on a 20 mm blade, start above
+     0.87 in export, and at bias 1 start above 0.35 — and where it binds the
+     BUILT turn collapses (150 asked, 33-58 built). The input is not trimmed
+     to hide that cliff; the read-out's SPINE line prints the tightest spine
+     radius, "(CLAMPED)", and the turn asked beside the turn built. */
+  { id: 'curlBias', section: 'curl', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0,
+    label: 'Curl bias', tier: 'standard', role: 'petal',
+    /* uniform (a hoop, the shipped arc) to tip-loaded (a crozier). */
+    fmt: (v) => {
+      const b = Number(v);
+      return b === 0 ? 'uniform · a hoop' : `${b.toFixed(2)} toward the tip${b === 1 ? ' · a crozier' : ''}`;
+    },
+    visibleWhen: { id: 'petalSpineCurl', awayFrom: 0, by: 2.5 } },
+  { id: 'curlStart', section: 'curl', kind: 'slider', min: 0, max: 0.95, step: 0.01, default: 0,
+    label: 'Curl start', tier: 'standard', role: 'petal',
+    /* 0 = the whole petal curls (the shipped law); higher = only the outer
+       portion. FLOORED AT ONE BLADE ROW (Eva, Sep 4): a non-zero start below
+       1/NU is built as 1/NU so the root chord is always straight where start
+       is engaged, and the read-out says so. Reads CURL_START_MIN from the
+       geometry rather than restating 1/28. */
+    fmt: (v) => {
+      const s = Number(v);
+      if (s === 0) return 'whole petal curls';
+      const floored = s < CURL_START_MIN;
+      const eff = floored ? CURL_START_MIN : s;
+      return `outer ${((1 - eff) * 100).toFixed(0)}% curls${floored ? ' (floored to the first blade row)' : ''}`;
+    },
+    visibleWhen: { id: 'petalSpineCurl', awayFrom: 0, by: 2.5 } },
 
   { id: 'petalRoll', section: 'form', kind: 'slider', min: -330, max: 330, step: 5, default: 0,
     label: 'Cross-section roll', tier: 'standard', role: 'petal',
@@ -912,7 +1001,21 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'petalTwist', section: 'form', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
+  /* CROSS-SECTION TAPER (session 16) — an envelope on the ROLL's curvature
+     along the length, so a quill can open into a spoon toward the tip (+)
+     or toward the base (-). Hidden and inert while roll is 0, on the same
+     grounds as curl bias. The roll floor is unchanged: the envelope only
+     ever reduces the curvature, so the clamp the roll read-out reports is
+     the clamp this control lives under. */
+  { id: 'petalRollTaper', section: 'form', kind: 'slider', min: -1, max: 1, step: 0.01, default: 0,
+    label: 'Cross-section taper', tier: 'standard', role: 'petal',
+    fmt: (v) => {
+      const d = Number(v);
+      return d === 0 ? 'even along the length' : `${d > 0 ? '+' : ''}${d.toFixed(2)} · opens toward the ${d > 0 ? 'tip' : 'base'}`;
+    },
+    visibleWhen: { id: 'petalRoll', awayFrom: 0, by: 2.5 } },
+
+  { id: 'petalTwist', section: 'curl', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
     label: 'Twist', tier: 'standard', role: 'petal',
     fmt: (v) => {
       const d = Number(v);

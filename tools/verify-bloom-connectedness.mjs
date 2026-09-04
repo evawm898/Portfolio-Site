@@ -121,7 +121,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
@@ -163,6 +163,11 @@ const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed
    ALL MAX x DISC max at 207.3M. */
 const MAX_VOXELS = 448e6;
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
+/* `--only <regex>` (session 16): run the rows whose LABEL matches, for a
+   smoke pass on a wiring change before the full matrix. The summary still
+   counts what actually ran; a filtered run is never quoted as a pass of the
+   matrix. */
+const ONLY = process.argv.includes('--only') ? new RegExp(process.argv[process.argv.indexOf('--only') + 1]) : null;
 
 function voxelComponents(buf, cell) {
   const n = buf.readUInt32LE(80);
@@ -228,6 +233,7 @@ const results = [];
 const validity = [];
 const t0 = Date.now();
 for (const row of rows) {
+  if (ONLY && !ONLY.test(row.label)) continue;
   await openBloom(page, port);   // fresh page per row
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -251,6 +257,16 @@ for (const row of rows) {
      everywhere because the junction is everywhere. */
   const frm = await formAssertions(page, row);
   if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
+  /* THE CURL FAMILY (C1-C3, session 16) — read from the builder's own
+     emitted spine rows against the law rebuilt from OTHER owners. Both STL
+     gates, J1-J9, form, thickness and Z1-Z9 are all blind to a spine that
+     keeps the arc while curl bias / curl start are wired: that state is
+     BIT-IDENTICAL to the un-biased bloom (Mutant A, measured Sep 4). C1 is
+     its only witness; C2 is the integrator's own validity; C3 the spine
+     floor in both directions. The SELF-CONTACT clearance is a flag, printed,
+     never asserted. */
+  const crl = await curlAssertions(page, row);
+  if (crl.length) { validity.push(`${row.label}: ${crl.join('; ')}`); continue; }
   /* THE THICKNESS ASSERTIONS, on EVERY row for the same reason as the form
      ones: the foot is everywhere, the guard's both-directions read-back is
      what byte-identity rests on, and both of this gate's own measures are
@@ -362,7 +378,7 @@ console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
-if (!NEGATIVE_CONTROL) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
 
 let bad = false;
 if (validity.length) {

@@ -171,6 +171,11 @@ const WITNESS = {
              the material across the width, and the metric ratio is what says
              so: 1.0000 flat, above 1 at any cup. */
           read: (m) => m.petalForm && m.petalForm.metricMax, what: 'petalForm.metricMax' },
+  /* PETAL CURL (session 16) — the spine's own section, collapsed at first
+     load; witnessed by spine curl through the builder's own spine record. */
+  curl: { id: 'petalSpineCurl', value: '150',
+          read: (m) => (m.petalSpine ? `${m.petalSpine.curlRad}/${m.petalSpine.peakRadiusMm.toFixed(6)}` : 'no spine record'),
+          what: "the spine record's curl and tightest spine radius" },
   center: { id: 'centerStyle', value: 'RING',
             /* A style change rebuilds the centre; both the reported style and
                its own triangle count move off DISC's. */
@@ -1329,6 +1334,62 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
   else ok.push(`${tag}: HEAD RISE line ${res.shown ? 'shown' : 'absent'}, owner agrees (rise ${res.rise}${res.clamped ? ' CLAMPED to ' + res.riseBuilt.toFixed(2) : ''}, hub ${res.hubTris} tris${res.seat ? ', seat line shown' : ''})`);
 }
 
+/* ===================================================================
+   ROUTE (l) — THE CURL FAMILY (session 16), on ONE page, in BOTH directions.
+   Route (d) drives a slider driver to its two ends only, and both ends of
+   spine curl (-180, 360) are away from 0 — so it asserts that curl bias and
+   curl start APPEAR and never that they DISAPPEAR again. This route drives
+   curl 0 -> 150 -> 0 (and roll 0 -> 90 -> 0 for the taper) on one page and
+   asserts both, every wrapper against its own predicate at each step; the
+   SPINE CURL line shown iff the owner reports a curl; its "(CLAMPED"
+   clause iff the owner's floor bound; SELF-CONTACT iff the owner's flag;
+   each against the builder's own spine record, never this tool's idea of
+   the geometry (routes (j) and (k)'s discipline). */
+{
+  const tag = '[curl]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    /* NEGATIVE CONTROL, route (l): the read-out never changes again — the
+       SPINE CURL line cannot appear where the owner reports a curl. */
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets, want) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
+      const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
+      const sp = m.petalSpine;
+      return { curl: Number(ui.petalSpineCurl), roll: Number(ui.petalRoll), biasHidden: hid('curlBias'), startHidden: hid('curlStart'), taperHidden: hid('petalRollTaper'), gradHidden: hid('petalCupGradient'),
+               hasCurl: !!(sp && sp.curlRad !== 0), clamped: !!(sp && sp.clamped), contact: !!(sp && sp.clearance.selfContact), turnBuilt: sp ? sp.turnBuiltDeg : null, turnAsked: sp ? sp.turnAskedDeg : null,
+               shown: /SPINE CURL/.test(txt), clampSaid: /\(CLAMPED at one sheet thickness/.test(txt), contactSaid: /SELF-CONTACT/.test(txt), builtSaid: /° asked, [-\d.]+° built/.test(txt) };
+    });
+    const p = [];
+    const wantHidden = !(Math.abs(res.curl) >= 2.5);
+    if (res.biasHidden !== wantHidden || res.startHidden !== wantHidden) p.push(`curl ${res.curl}: bias hidden ${res.biasHidden}, start hidden ${res.startHidden}; the registry predicate says hidden ${wantHidden}`);
+    if (res.taperHidden !== !(Math.abs(res.roll) >= 2.5)) p.push(`roll ${res.roll}: taper hidden ${res.taperHidden}; the registry predicate says hidden ${!(Math.abs(res.roll) >= 2.5)}`);
+    if (res.gradHidden) p.push('cup gradient is hidden — it is always visible');
+    if (res.hasCurl !== (res.curl !== 0)) p.push(`the owner reports ${res.hasCurl ? 'a curl' : 'no curl'} while the control reads ${res.curl}`);
+    if (res.shown !== res.hasCurl) p.push(`the SPINE CURL line is ${res.shown ? 'SHOWN' : 'ABSENT'} while the owner reports ${res.hasCurl ? 'a curl of ' + res.curl : 'no curl'}`);
+    if (res.clamped !== want.clamped) p.push(`the owner reports clamped ${res.clamped}, this step expects ${want.clamped}`);
+    if (res.clampSaid !== res.clamped) p.push(`the (CLAMPED clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports clamped ${res.clamped}`);
+    if (res.clamped && !res.builtSaid) p.push('the clamped line does not print the turn asked beside the turn built');
+    if (res.clamped && !(Math.abs(res.turnBuilt) < Math.abs(res.turnAsked))) p.push(`clamped but the turn built (${res.turnBuilt}) is not short of the turn asked (${res.turnAsked})`);
+    if (res.contact !== want.contact) p.push(`the owner reports self-contact ${res.contact}, this step expects ${want.contact}`);
+    if (res.contactSaid !== res.contact) p.push(`SELF-CONTACT is ${res.contactSaid ? 'said' : 'absent'} while the owner reports ${res.contact}`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: bias/start ${res.biasHidden ? 'hidden' : 'shown'}, taper ${res.taperHidden ? 'hidden' : 'shown'}, SPINE CURL line ${res.shown ? 'shown' : 'absent'}${res.clamped ? ' (CLAMPED: ' + res.turnAsked + ' asked, ' + res.turnBuilt.toFixed(1) + ' built)' : ''}${res.contact ? ', SELF-CONTACT' : ''}`);
+  };
+  await step('defaults', [], { clamped: false, contact: false });
+  await step('curl 150 (bias and start appear)', [{ id: 'petalSpineCurl', value: '150' }], { clamped: false, contact: false });
+  await step('curl 150 x start 0.95 x length 20 x sheet 0.6 (the spine floor binds)', [{ id: 'curlStart', value: '0.95' }, { id: 'petalLength', value: '20' }, { id: 'sheetThickness', value: '0.6' }], { clamped: true, contact: false });
+  await step('curl 360 x start 0.5 (the tip lands on its own mid-blade)', [{ id: 'petalSpineCurl', value: '360' }, { id: 'curlStart', value: '0.5' }], { clamped: false, contact: true });
+  await step('curl 360 x bias 1 x start 0 (winds inside itself)', [{ id: 'curlBias', value: '1' }, { id: 'curlStart', value: '0' }], { clamped: false, contact: false });
+  await step('back to curl 0 (bias and start disappear, the line goes)', [{ id: 'petalSpineCurl', value: '0' }, { id: 'curlBias', value: '0' }], { clamped: false, contact: false });
+  await step('roll 90 (taper appears)', [{ id: 'petalRoll', value: '90' }], { clamped: false, contact: false });
+  await step('back to roll 0 (taper disappears)', [{ id: 'petalRoll', value: '0' }], { clamped: false, contact: false });
+}
+
 await browser.close();
 server.close();
 
@@ -1352,8 +1413,9 @@ if (NEGATIVE_CONTROL) {
     const sawPreview = fail.some((f) => /^\[preview\]: .*did not rebuild/.test(f));
     const sawInner = fail.some((f) => /^\[inner rings\] .*line is ABSENT while the owner reports a ring under the floor/.test(f));
     const sawDome = fail.some((f) => /^\[dome\] .*HEAD RISE line is ABSENT while the owner declares a dome/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome) { console.log('\nALL NINE ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}. All nine must.`);
+    const sawCurl = fail.some((f) => /^\[curl\] .*SPINE CURL line is ABSENT while the owner reports a curl/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl) { console.log('\nALL TEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}. All nine must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out and a frozen dome line. It is not measuring anything.');

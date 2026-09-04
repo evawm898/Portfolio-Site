@@ -48,10 +48,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
+import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
+import { spineLine, curlCoverage } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
+/* `--only <regex>` (session 16): run the rows whose LABEL matches, for a
+   smoke pass on a wiring change before the full matrix. The summary still
+   counts what actually ran; a filtered run is never quoted as a pass of the
+   matrix. */
+const ONLY = process.argv.includes('--only') ? new RegExp(process.argv[process.argv.indexOf('--only') + 1]) : null;
 
 const rows = buildMatrix();
 if (NEGATIVE_CONTROL) {
@@ -68,6 +75,7 @@ const results = [];
 const validity = [];
 const t0 = Date.now();
 for (const row of rows) {
+  if (ONLY && !ONLY.test(row.label)) continue;
   await openBloom(page, port);   // fresh page per row — isolation by reload, not by a clear-list
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -95,6 +103,16 @@ for (const row of rows) {
      everywhere because the junction is everywhere. */
   const frm = await formAssertions(page, row);
   if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
+  /* THE CURL FAMILY (C1-C3, session 16) — read from the builder's own
+     emitted spine rows against the law rebuilt from OTHER owners. Both STL
+     gates, J1-J9, form, thickness and Z1-Z9 are all blind to a spine that
+     keeps the arc while curl bias / curl start are wired: that state is
+     BIT-IDENTICAL to the un-biased bloom (Mutant A, measured Sep 4). C1 is
+     its only witness; C2 is the integrator's own validity; C3 the spine
+     floor in both directions. The SELF-CONTACT clearance is a flag, printed,
+     never asserted. */
+  const crl = await curlAssertions(page, row);
+  if (crl.length) { validity.push(`${row.label}: ${crl.join('; ')}`); continue; }
   /* THE THICKNESS ASSERTIONS, on EVERY row for the same reason as the form
      ones: the foot is everywhere, the guard's both-directions read-back is
      what byte-identity rests on, and both of this gate's own measures are
@@ -143,6 +161,19 @@ for (const row of rows) {
      not. See bloom-crowding.mjs for what it is blind to. */
   const crowd = await footCrowding(page, row, stl);
   if (crowd.bad.length) { validity.push(`${row.label}: ${crowd.bad.join('; ')}`); continue; }
+  /* PLAN COVERAGE (session 16, Eva Sep 4) — printed on EVERY row, ASSERTED
+     only on rows that declare `coverage` (the pinned incurve rows): crown
+     closure there is emergent, curl 150 x tilt x domeLean landing tips
+     within 0.3-1.3 mm of the axis, with no margin, and nothing else here
+     would see it re-open. A split whorl is out of the raster's scope and is
+     a LABELLED, LOUD skip; a row that asserts coverage and is skipped fails. */
+  const cov = await planCoverage(page, { capability: row.capability || null });
+  if (cov.bad.length) { validity.push(`${row.label}: ${cov.bad.join('; ')}`); continue; }
+  if (cov.skipped && row.coverage) { validity.push(`${row.label}: this row ASSERTS coverage but the raster skipped it — ${cov.skipped}`); continue; }
+  if (!cov.skipped && row.coverage) {
+    const ca = coverageAssert(cov.r, row.coverage);
+    if (ca.length) { validity.push(`${row.label}: ${ca.join('; ')}`); continue; }
+  }
   const fm = await page.evaluate(() => window.__bloomMetrics());
   results.push({
     label: row.label, capability: !!row.capability, bytes: buf.length,
@@ -174,6 +205,8 @@ for (const row of rows) {
         + ` · |dP/dv|/h ${fm.petalForm.metricMin.toFixed(4)}..${fm.petalForm.metricMax.toFixed(4)}`
       : null,
     crowding: crowd.r,
+    coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage,
+    spine: fm.petalSpine, selfContact: !!(fm.petalSpine && fm.petalSpine.clearance.selfContact),
     ...stl,
   });
 }
@@ -193,6 +226,8 @@ for (const r of results) {
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
+  console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
+  if (r.spine && r.spine.curlRad !== 0) console.log(`       ^ ${spineLine(r.spine)}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
@@ -204,7 +239,17 @@ console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a 
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level: a matrix on which the flag
    never raises has never shown the flag works, and one on which it always
    raises has a stuck flag. Validity, not a row result. */
-if (!NEGATIVE_CONTROL) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
+/* MATRIX-LEVEL claims (a flag raised somewhere, an asserted row somewhere)
+   are claims about the MATRIX, so a filtered `--only` run does not make them. */
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
+/* THE SELF-CONTACT FLAG, both directions at matrix level (session 16). */
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) => ({ selfContact: r.selfContact }))));
+{
+  const skipped = results.filter((r) => r.coverageSkipped), asserted = results.filter((r) => r.coverageAsserted);
+  console.log(`${results.length - skipped.length}/${results.length} rows plan-coverage measured; ${skipped.length} SKIPPED (split whorls — labelled, never silent); ${asserted.length} rows coverage-ASSERTED (the pinned incurve rows); ${results.filter((r) => r.selfContact).length} rows flag SELF-CONTACT`);
+  for (const r of skipped) console.log(`  skipped: ${r.label}`);
+  if (asserted.length === 0 && !NEGATIVE_CONTROL && !ONLY) validity.push('coverage coverage: no row in this matrix asserts plan coverage — the pinned incurve rows are missing');
+}
 
 let bad = false;
 if (validity.length) {

@@ -145,6 +145,36 @@ domed, print preview ON, the base from a low profile at the rim and from
 below, the mum flat / 0.50 / hemisphere, the two controls, and the centre
 seat for Eva's eye.
 
+**THE PETAL CURL FAMILY SHIPS AS SHEET GEOMETRY, AND ITS ONE WITNESS IS C1**
+(Eva, Sep 4, session 16). `curlBias` / `curlStart` (PETAL CURL, hidden AND
+inert at spine curl 0), `petalRollTaper` (PETAL FORM, hidden and inert at
+roll 0) and `petalCupGradient` (PETAL FORM, the flower's "edge curve —
+profile" renamed for what it is: a cup that grows toward the tip, 28% RMS off
+the best-fitting cup) — see `docs/bloom-session-16-outcome.md`. Edge curve —
+top-down was DECLINED as a second producer of the width profile. Bias and
+start redistribute spine curl's total along the length through `spineLaw()`
+in bloom-geometry.js, the ONE owner read by `buildPetalInto` and by the
+gate's C1; a build with the controls wired and the spine still on the arc
+is BIT-IDENTICAL to the un-biased bloom and passes both STL gates, J1–J9,
+form, thickness and Z1–Z9 (Mutant A, measured), so C1 rebuilds the law in
+the gate from OTHER owners and compares against the emitted rows. The spine
+curvature is FLOORED at one sheet thickness of radius (the roll floor's
+constant), full ranges, clamped, told: the read-out's SPINE CURL line prints
+the tightest radius, "(CLAMPED …)" and the turn asked beside the turn built;
+the flower's bias power 4 and start 0.95 are lace constants that saturate
+over most of their range on a printed sheet. SELF-CONTACT (blade rows three
+sheet thicknesses apart along the spine within one thickness, or the blade
+against its own foot) is a FLAG, never a gate — it fires on the shipped hoop.
+Curl start is floored at one blade row. **Crown closure on the incurve target
+is EMERGENT** (curl 150 × tilt × domeLean landing tips within 0.3–1.3 mm of
+the axis), never designed, no margin: `tools/bloom-plan-coverage.mjs` now
+prints on every export-gate row and is ASSERTED on the two pinned incurve
+rows only (0.0% uncovered, bald-cap ≤ 0.09 mm); a split whorl is a labelled,
+loud skip. A non-default bias or start opening that crown is documented
+behaviour (bias 0.5 re-opens 5.4%, start 0.95 23.1%), not a gate failure.
+`phase13Matrix()` (469 rows at 6b8e94b) paid the baseline session 15 left
+unfrozen. The sheet is `node tools/shot-bloom-curl.mjs <dir> [base-tree]`.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

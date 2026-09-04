@@ -681,6 +681,34 @@ function domeLine(rings, fr, mode) {
        + (d.clamped ? ` · (CLAMPED: rise ${d.rise.toFixed(2)} asked, ${d.riseBuilt.toFixed(2)} built — the shell's inner face would invert under a ${d.floorRadius.toFixed(2)} mm dome radius)` : '') + `\n`;
 }
 
+/* THE SPINE LINE (session 16, the curl family) — what the spine curvature
+   floor did and how near the blade came to itself, in numbers a visitor
+   cannot set. Two facts, one line, from slot 0's own spine record:
+     (CLAMPED)      the tightest spine radius the law asked for fell under one
+                    sheet thickness (the roll floor's own constant), the
+                    curvature was held there, and the turn that BUILT is
+                    printed beside the turn ASKED — Eva's ruling (Sep 4):
+                    full ranges, clamped, told; never an input trimmed to
+                    hide a cliff.
+     SELF-CONTACT   the blade comes within one sheet thickness of itself
+                    (blade rows three thicknesses apart along the spine, or
+                    the blade against its own foot). A FLAG, never a gate:
+                    it fires on the shipped, photographed hoop.
+   Absent when spine curl is 0, so the line simply is not there. The panel
+   gate asserts both clauses in both directions against the builder's own
+   flags (route l). */
+function spineLine(petal) {
+  const sp = petal && petal.spine;
+  if (!sp || sp.curlRad === 0) return '';
+  const c = sp.clearance;
+  const near = Math.min(c.minMm, c.minToFootMm);
+  return `SPINE CURL ${sp.turnAskedDeg}° · bias ${Number(sp.bias).toFixed(2)} · start ${Number(sp.start).toFixed(2)}${sp.startFloored !== sp.start ? ` (floored to the first blade row, ${sp.startFloored.toFixed(3)})` : ''}`
+       + ` · tightest spine radius ${sp.peakRadiusMm.toFixed(2)} mm`
+       + (sp.clamped ? ` (CLAMPED at one sheet thickness, ${sp.floorRadius.toFixed(2)} mm: ${sp.turnAskedDeg}° asked, ${sp.turnBuiltDeg.toFixed(1)}° built — the sheet's inner face would invert under a tighter spine)` : '')
+       + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${c.sheetT.toFixed(2)} mm sheet`
+       + (c.selfContact ? ' · SELF-CONTACT (the blade touches itself — a flag, never a gate)' : '') + `\n`;
+}
+
 /* THE SEAT LINE — where the designed centre sits on the dome, and what that
    costs (Eva, Sep 4: photographed, not fixed). Absent when flat or RING. */
 function seatLine(center) {
@@ -783,7 +811,7 @@ function fanLine(fr) {
        + `\n`;
 }
 
-function summarise(ui, acc, mode, rings, fr, center) {
+function summarise(ui, acc, mode, rings, fr, center, petal) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
   const layers = Number(ui.layerCount);
@@ -826,6 +854,7 @@ function summarise(ui, acc, mode, rings, fr, center) {
        + innerRingLine(rings, fr)
        + domeLine(rings, fr, mode)
        + seatLine(center)
+       + spineLine(petal)
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -898,7 +927,7 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.center) + `\n${materialLines(ui, mode)}`;
+  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.center, built.petal) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 
@@ -1064,7 +1093,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
      an index into a variable-length list is a bug waiting for the first
      multi-layer export — it would have printed the ring radii under the word
      "exported". The tris/max-dim line is always last, so ask for that. */
-  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.center).split('\n');
+  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.center, built.petal).split('\n');
   readout.textContent = `${shownSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
@@ -1182,6 +1211,13 @@ window.__bloomMetrics = () => ({
   /* THE DOME GUARD'S RESIDUAL — exactly 0 on every flat build, null on a
      domed one; both gates assert it. */
   petalDomeGuardResidual: lastPetal ? lastPetal.domeGuardResidual : null,
+  /* THE SPINE per descriptor's representative petal (session 16) — every
+     blade row's centre AS EMITTED, plus the law's inputs and what the floor
+     did. The gate's C1 rebuilds the law from OTHER owners and compares
+     against `rows`; a spine that kept the arc while the controls were wired
+     is bit-identical to the un-biased bloom and this is its only witness. */
+  petalSpine: lastPetal ? lastPetal.spine : null,
+  petalRingSpine: lastPetals.map((p) => (p ? p.spine : null)),
   /* THE ROOT ROW per descriptor's representative petal — the first BLADE row
      as emitted, J8's input against the rigid tilt of the foot's own frame. */
   petalRingRootRows: lastPetals.map((p) => (p ? { C: p.rootRow.C, N: p.rootRow.N, flat: p.rootRow.flat, tiltRad: p.rootRow.tiltRad, u: p.rootRow.u, curlRad: p.rootRow.curlRad, ringC: p.rootRow.ringC, azimuth: p.azimuth,
