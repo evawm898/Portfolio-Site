@@ -3526,7 +3526,15 @@ exposure the ruling accepts in exchange for the minutes.
       the incurve target, 50° at bias 1 × start 0.95). At curl 150 on a 20 mm
       blade the floor binds from start 0.87 in export and, at bias 1, from
       start 0.35. Trimming the input to hide that cliff is an input proxy; the
-      roll floor and FOOT WIDTH FLOORED are the precedents. The flower's bias
+      roll floor and FOOT WIDTH FLOORED are the precedents. **The floor is the
+      MODIFIERS' floor: a uniform curl is the shipped arc and is never clamped
+      — and the first full gate run found it already UNDER one sheet thickness
+      on three shipped rows** (six deep × curl 360: the innermost whorl's
+      6.8 mm blade has a 1.08 mm spine radius against 1.20), a pre-existing
+      state on the session-13 precedent: told by `underFloor` and the read-out's
+      UNDER ONE SHEET THICKNESS clause, never clamped, C3 asserting the flag
+      against the law both ways. The claim that the uniform arc never reaches
+      the floor was true of one whorl and false of six. The flower's bias
       also doubles the total turn (360° → 720° at bias 1): NOT reproduced —
       the total is spine curl's alone, one owner. **Curl start is floored at
       one blade row** (1/NU, told), so the root chord is straight wherever

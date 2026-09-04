@@ -293,9 +293,14 @@ export async function measure(page, { capability = null, wantMask = false } = {}
       return { total, unc, uncoveredFraction: total ? unc / total : 1, baldCapRadius: unc === total ? R0 : baldR, cell, mask };
     };
 
-    const fine = raster(220);
-    const coarse = raster(110);
-    /* R4 */
+    /* R4 — CONVERGED, refining before refusing (session 16): the first full
+       matrix run refused six rows at 220 x 220 — the spread-6 plates (a 53 mm
+       hub, 0.24 mm cells, 1.4% apart) and the coincidence corner — where the
+       cell is coarse against the petal edges. The lattice is doubled up to
+       twice, and R4 refuses only a reading that still does not converge; a
+       validity check loosened to pass is a log line. */
+    let fine = raster(220), coarse = raster(110), n = 220;
+    while (Math.abs(fine.uncoveredFraction - coarse.uncoveredFraction) > 0.01 && n < 880) { n *= 2; coarse = fine; fine = raster(n); }
     if (Math.abs(fine.uncoveredFraction - coarse.uncoveredFraction) > 0.01) {
       bad.push(`coverage R4: uncoveredFraction reads ${fine.uncoveredFraction.toFixed(4)} at cell ${fine.cell.toFixed(4)} mm and ${coarse.uncoveredFraction.toFixed(4)} at ${coarse.cell.toFixed(4)} mm — more than 1% apart`);
     }
@@ -328,6 +333,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
         ratio: innermost.radius > 0 ? fine.baldCapRadius / innermost.radius : null,
         dome: hub.dome ? { rise: hub.dome.rise, riseBuilt: hub.dome.riseBuilt, Rd: hub.dome.Rd, clamped: hub.dome.clamped } : null,
         cell: fine.cell,
+        refinedTo: n,
         mask: wantMask ? fine.mask : null,
       },
     };

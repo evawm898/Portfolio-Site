@@ -206,7 +206,7 @@ for (const row of rows) {
       : null,
     crowding: crowd.r,
     coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage,
-    spine: fm.petalSpine, selfContact: !!(fm.petalSpine && fm.petalSpine.clearance.selfContact),
+    spine: fm.petalRingSpine, selfContact: (fm.petalRingSpine || []).some((s) => s && s.clearance.selfContact), underFloor: (fm.petalRingSpine || []).some((s) => s && s.underFloor),
     ...stl,
   });
 }
@@ -227,7 +227,7 @@ for (const r of results) {
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
-  if (r.spine && r.spine.curlRad !== 0) console.log(`       ^ ${spineLine(r.spine)}`);
+  if (r.spine && r.spine.some((s) => s && s.curlRad !== 0)) console.log(`       ^ ${spineLine(r.spine)}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
@@ -246,7 +246,7 @@ if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) => ({ selfContact: r.selfContact }))));
 {
   const skipped = results.filter((r) => r.coverageSkipped), asserted = results.filter((r) => r.coverageAsserted);
-  console.log(`${results.length - skipped.length}/${results.length} rows plan-coverage measured; ${skipped.length} SKIPPED (split whorls — labelled, never silent); ${asserted.length} rows coverage-ASSERTED (the pinned incurve rows); ${results.filter((r) => r.selfContact).length} rows flag SELF-CONTACT`);
+  console.log(`${results.length - skipped.length}/${results.length} rows plan-coverage measured; ${skipped.length} SKIPPED (split whorls — labelled, never silent); ${asserted.length} rows coverage-ASSERTED (the pinned incurve rows); ${results.filter((r) => r.selfContact).length} rows flag SELF-CONTACT; ${results.filter((r) => r.underFloor).length} rows carry a shipped uniform arc UNDER ONE SHEET THICKNESS (told, not clamped)`);
   for (const r of skipped) console.log(`  skipped: ${r.label}`);
   if (asserted.length === 0 && !NEGATIVE_CONTROL && !ONLY) validity.push('coverage coverage: no row in this matrix asserts plan coverage — the pinned incurve rows are missing');
 }

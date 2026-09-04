@@ -1361,8 +1361,8 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
       const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
       const sp = m.petalSpine;
       return { curl: Number(ui.petalSpineCurl), roll: Number(ui.petalRoll), biasHidden: hid('curlBias'), startHidden: hid('curlStart'), taperHidden: hid('petalRollTaper'), gradHidden: hid('petalCupGradient'),
-               hasCurl: !!(sp && sp.curlRad !== 0), clamped: !!(sp && sp.clamped), contact: !!(sp && sp.clearance.selfContact), turnBuilt: sp ? sp.turnBuiltDeg : null, turnAsked: sp ? sp.turnAskedDeg : null,
-               shown: /SPINE CURL/.test(txt), clampSaid: /\(CLAMPED at one sheet thickness/.test(txt), contactSaid: /SELF-CONTACT/.test(txt), builtSaid: /° asked, [-\d.]+° built/.test(txt) };
+               hasCurl: !!(sp && sp.curlRad !== 0), clamped: (m.petalRingSpine || []).some((s) => s && s.clamped), contact: (m.petalRingSpine || []).some((s) => s && s.clearance.selfContact), under: (m.petalRingSpine || []).some((s) => s && s.underFloor), turnBuilt: sp ? sp.turnBuiltDeg : null, turnAsked: sp ? sp.turnAskedDeg : null,
+               shown: /SPINE CURL/.test(txt), clampSaid: /\(CLAMPED at one sheet thickness/.test(txt), contactSaid: /SELF-CONTACT/.test(txt), underSaid: /UNDER ONE SHEET THICKNESS/.test(txt), builtSaid: /° asked, [-\d.]+° built/.test(txt) };
     });
     const p = [];
     const wantHidden = !(Math.abs(res.curl) >= 2.5);
@@ -1376,6 +1376,8 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
     if (res.clamped && !res.builtSaid) p.push('the clamped line does not print the turn asked beside the turn built');
     if (res.clamped && !(Math.abs(res.turnBuilt) < Math.abs(res.turnAsked))) p.push(`clamped but the turn built (${res.turnBuilt}) is not short of the turn asked (${res.turnAsked})`);
     if (res.contact !== want.contact) p.push(`the owner reports self-contact ${res.contact}, this step expects ${want.contact}`);
+    if (res.under !== !!want.under) p.push(`the owner reports a uniform arc under the floor on some ring: ${res.under}, this step expects ${!!want.under}`);
+    if (res.underSaid !== res.under) p.push(`UNDER ONE SHEET THICKNESS is ${res.underSaid ? 'said' : 'absent'} while the owner reports ${res.under}`);
     if (res.contactSaid !== res.contact) p.push(`SELF-CONTACT is ${res.contactSaid ? 'said' : 'absent'} while the owner reports ${res.contact}`);
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
     else ok.push(`${tag} ${label}: bias/start ${res.biasHidden ? 'hidden' : 'shown'}, taper ${res.taperHidden ? 'hidden' : 'shown'}, SPINE CURL line ${res.shown ? 'shown' : 'absent'}${res.clamped ? ' (CLAMPED: ' + res.turnAsked + ' asked, ' + res.turnBuilt.toFixed(1) + ' built)' : ''}${res.contact ? ', SELF-CONTACT' : ''}`);
@@ -1386,6 +1388,8 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
   await step('curl 360 x start 0.5 (the tip lands on its own mid-blade)', [{ id: 'petalSpineCurl', value: '360' }, { id: 'curlStart', value: '0.5' }], { clamped: false, contact: true });
   await step('curl 360 x bias 1 x start 0 (winds inside itself)', [{ id: 'curlBias', value: '1' }, { id: 'curlStart', value: '0' }], { clamped: false, contact: false });
   await step('back to curl 0 (bias and start disappear, the line goes)', [{ id: 'petalSpineCurl', value: '0' }, { id: 'curlBias', value: '0' }], { clamped: false, contact: false });
+  await step('6 whorls x curl 360 (the shipped uniform arc under the floor on the innermost whorl — told, not clamped)', [{ id: 'petalSpineCurl', value: '360' }, { id: 'layerCount', value: '6' }], { clamped: false, contact: true, under: true });
+  await step('back to one whorl, curl 0', [{ id: 'layerCount', value: '1' }, { id: 'petalSpineCurl', value: '0' }], { clamped: false, contact: false });
   await step('roll 90 (taper appears)', [{ id: 'petalRoll', value: '90' }], { clamped: false, contact: false });
   await step('back to roll 0 (taper disappears)', [{ id: 'petalRoll', value: '0' }], { clamped: false, contact: false });
 }

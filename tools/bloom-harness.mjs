@@ -780,13 +780,17 @@ export async function formAssertions(page, row) {
        1e-14 mm; asserted 1e-9), reported by slot 0's petal and REQUIRED to
        be reported there; a non-uniform row reporting one is a claim nothing
        can make. Mutant C (an Euler integrator at the row pitch) reads 5e-3.
-   C3  THE SPINE FLOOR, both directions: the tightest spine radius is never
-       under one sheet thickness; `clamped` agrees with the law from the
-       owners' inputs, and with the built turn being short of the asked one;
-       and a UNIFORM curl never clamps on the shipped ranges (petalLength 20
-       at 360 degrees is 3.18 mm against the thickest 2.40 mm sheet) —
-       asserted, not trusted. Mutant D (no floor) builds a 0.03 mm spine
-       radius, watertight, and nothing else here sees it.
+   C3  THE SPINE FLOOR, both directions, ON THE MODIFIERS: a non-uniform
+       spine's tightest radius is never under one sheet thickness; `clamped`
+       agrees with the law from the owners' inputs, and with the built turn
+       being short of the asked one. A UNIFORM curl is the shipped arc and
+       is never clamped — and it DOES go under the floor on shrunk inner
+       whorls (six deep x curl 360: 1.08 mm against 1.20, three shipped
+       rows, found by this clause's first draft on the first full run, a
+       pre-existing state told by `underFloor` and the read-out, never
+       clamped, on the session-13 precedent). C3 asserts the flag agrees with
+       the law in both directions. Mutant D (no floor) builds a 0.03 mm
+       spine radius, watertight, and nothing else here sees it.
 
    WHAT IS NOT ASSERTED: the SELF-CONTACT clearance. It fires on the shipped,
    photographed hoop (curl 360, tip on root), so it is a FLAG (Eva, Sep 4),
@@ -851,11 +855,13 @@ export async function curlAssertions(page, row) {
     if (inp.curlRad !== 0 && inp.uniform) {
       if (L === 0 && typeof g !== 'number') bad.push(`C2: uniform curled row reports integration residual ${JSON.stringify(g)} on ring 0 — not measured`);
       if (typeof g === 'number' && !(g <= 1e-9)) bad.push(`C2: ring ${L}: the spine table departs from the closed-form arc by ${g.toExponential(2)} mm on a uniform curl — the integrator has drifted from the law it tabulates`);
-      if (sp.clamped) bad.push(`C3: ring ${L}: a UNIFORM curl reports the spine floor binding (tightest radius ${sp.peakRadiusMm} mm) — the shipped arc never reaches one sheet thickness on the shipped ranges`);
+      if (sp.clamped) bad.push(`C3: ring ${L}: a UNIFORM curl reports the spine floor binding (tightest radius ${sp.peakRadiusMm} mm) — the shipped arc is never clamped; under the floor it is TOLD (underFloor), not floored`);
     } else if (g !== null) bad.push(`C2: ring ${L}: a ${inp.curlRad === 0 ? 'straight' : 'non-uniform'} row reports an integration residual ${g} — a claim nothing can make must read as absent`);
     /* C3 — the floor, both directions. */
     if (inp.curlRad !== 0) {
-      if (!(sp.peakRadiusMm >= inp.floorRadius - 1e-12)) bad.push(`C3: ring ${L}: the tightest spine radius ${sp.peakRadiusMm} mm is under the floor ${inp.floorRadius} mm — the sheet's inner face inverts along the length`);
+      if (!inp.uniform && !(sp.peakRadiusMm >= inp.floorRadius - 1e-12)) bad.push(`C3: ring ${L}: the tightest spine radius ${sp.peakRadiusMm} mm is under the floor ${inp.floorRadius} mm — the sheet's inner face inverts along the length`);
+      if (sp.underFloor !== law.underFloor) bad.push(`C3: ring ${L}: underFloor reads ${sp.underFloor} while the law from the owners' inputs says ${law.underFloor} (tightest radius ${sp.peakRadiusMm} mm against ${inp.floorRadius} mm)`);
+      if (sp.underFloor && !inp.uniform) bad.push(`C3: ring ${L}: a NON-uniform spine reports underFloor — the floor was not applied`);
       if (sp.clamped !== law.clamped) bad.push(`C3: ring ${L}: clamped reads ${sp.clamped} while the law from the owners' inputs says ${law.clamped}`);
       const short = Math.abs(sp.turnBuiltDeg) < Math.abs(sp.turnAskedDeg) - 1e-9;
       if (sp.clamped !== short) bad.push(`C3: ring ${L}: clamped reads ${sp.clamped} but the turn asked (${sp.turnAskedDeg}°) and built (${sp.turnBuiltDeg}°) ${short ? 'differ' : 'agree'} — the read-out's CLAMPED and the built turn disagree`);
@@ -879,15 +885,19 @@ export function curlCoverage(reports) {
 
 /* One line per row, the crowding line's twin: what the floor did and how
    near the blade came to itself. Read from slot 0's spine record. */
-export function spineLine(sp) {
-  if (!sp) return 'SPINE: not measured';
-  const c = sp.clearance;
-  const near = Math.min(c.minMm, c.minToFootMm);
+export function spineLine(spines) {
+  const sps = (Array.isArray(spines) ? spines : [spines]).filter((s) => s && s.curlRad !== 0);
+  if (!sps.length) return 'SPINE: straight';
+  const sp = sps[0];
+  const tight = sps.reduce((a, s) => (s.peakRadiusMm < a.peakRadiusMm ? s : a), sp);
+  const clamped = sps.filter((s) => s.clamped).length, under = sps.filter((s) => s.underFloor).length, contact = sps.filter((s) => s.clearance.selfContact).length;
+  const near = sps.reduce((a, s) => Math.min(a, s.clearance.minMm, s.clearance.minToFootMm), Infinity);
   return `SPINE: curl ${sp.turnAskedDeg}° · bias ${sp.bias} · start ${sp.start}${sp.startFloored !== sp.start ? ` (floored to ${sp.startFloored.toFixed(3)})` : ''}`
-    + ` · tightest spine radius ${isFinite(sp.peakRadiusMm) ? sp.peakRadiusMm.toFixed(2) + ' mm' : 'straight'}`
-    + (sp.clamped ? ` (CLAMPED at ${sp.floorRadius.toFixed(2)} mm: ${sp.turnAskedDeg}° asked, ${sp.turnBuiltDeg.toFixed(1)}° built)` : '')
-    + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${c.sheetT.toFixed(2)} mm sheet`
-    + (c.selfContact ? ' · SELF-CONTACT (the blade touches itself — a flag, never a gate)' : '');
+    + ` · tightest spine radius ${isFinite(tight.peakRadiusMm) ? tight.peakRadiusMm.toFixed(2) + ' mm' : 'straight'} (ring ${sps.indexOf(tight)} of ${sps.length})`
+    + (clamped ? ` (CLAMPED at ${tight.floorRadius.toFixed(2)} mm on ${clamped} ring${clamped === 1 ? '' : 's'}: ${tight.turnAskedDeg}° asked, ${tight.turnBuiltDeg.toFixed(1)}° built at the tightest)` : '')
+    + (under ? ` · UNDER ONE SHEET THICKNESS on ${under} ring${under === 1 ? '' : 's'} (the shipped uniform arc, told, not clamped)` : '')
+    + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${sp.clearance.sheetT.toFixed(2)} mm sheet`
+    + (contact ? ` · SELF-CONTACT on ${contact} ring${contact === 1 ? '' : 's'} (the blade touches itself — a flag, never a gate)` : '');
 }
 
 /* ===================================================================

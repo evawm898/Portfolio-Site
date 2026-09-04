@@ -697,16 +697,22 @@ function domeLine(rings, fr, mode) {
    Absent when spine curl is 0, so the line simply is not there. The panel
    gate asserts both clauses in both directions against the builder's own
    flags (route l). */
-function spineLine(petal) {
-  const sp = petal && petal.spine;
-  if (!sp || sp.curlRad === 0) return '';
-  const c = sp.clearance;
-  const near = Math.min(c.minMm, c.minToFootMm);
-  return `SPINE CURL ${sp.turnAskedDeg}° · bias ${Number(sp.bias).toFixed(2)} · start ${Number(sp.start).toFixed(2)}${sp.startFloored !== sp.start ? ` (floored to the first blade row, ${sp.startFloored.toFixed(3)})` : ''}`
-       + ` · tightest spine radius ${sp.peakRadiusMm.toFixed(2)} mm`
-       + (sp.clamped ? ` (CLAMPED at one sheet thickness, ${sp.floorRadius.toFixed(2)} mm: ${sp.turnAskedDeg}° asked, ${sp.turnBuiltDeg.toFixed(1)}° built — the sheet's inner face would invert under a tighter spine)` : '')
-       + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${c.sheetT.toFixed(2)} mm sheet`
-       + (c.selfContact ? ' · SELF-CONTACT (the blade touches itself — a flag, never a gate)' : '') + `\n`;
+function spineLine(petals) {
+  const sps = (petals || []).map((p) => p && p.spine).filter((sp) => sp && sp.curlRad !== 0);
+  if (!sps.length) return '';
+  /* EVERY RING'S PETAL, because the floor binds and the flags fire on the
+     SHRUNK inner whorls first: the line names the worst ring, not slot 0's. */
+  const sp0 = sps[0];
+  const tight = sps.reduce((a, s) => (s.peakRadiusMm < a.peakRadiusMm ? s : a), sp0);
+  const clamped = sps.filter((s) => s.clamped), under = sps.filter((s) => s.underFloor), contact = sps.filter((s) => s.clearance.selfContact);
+  const near = sps.reduce((a, s) => Math.min(a, s.clearance.minMm, s.clearance.minToFootMm), Infinity);
+  const of = (arr) => `${arr.length} of ${sps.length} ring${sps.length === 1 ? '' : 's'}`;
+  return `SPINE CURL ${sp0.turnAskedDeg}° · bias ${Number(sp0.bias).toFixed(2)} · start ${Number(sp0.start).toFixed(2)}${sp0.startFloored !== sp0.start ? ` (floored to the first blade row, ${sp0.startFloored.toFixed(3)})` : ''}`
+       + ` · tightest spine radius ${tight.peakRadiusMm.toFixed(2)} mm`
+       + (clamped.length ? ` (CLAMPED at one sheet thickness, ${tight.floorRadius.toFixed(2)} mm, on ${of(clamped)}: ${tight.turnAskedDeg}° asked, ${clamped.reduce((a, s) => Math.min(a, Math.abs(s.turnBuiltDeg)), Infinity).toFixed(1)}° built at the tightest — the sheet's inner face would invert under a tighter spine)` : '')
+       + (under.length ? ` · UNDER ONE SHEET THICKNESS (${tight.floorRadius.toFixed(2)} mm) on ${of(under)} — the shipped uniform arc on a shrunk whorl, told, not clamped` : '')
+       + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${sp0.clearance.sheetT.toFixed(2)} mm sheet`
+       + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
 }
 
 /* THE SEAT LINE — where the designed centre sits on the dome, and what that
@@ -811,7 +817,7 @@ function fanLine(fr) {
        + `\n`;
 }
 
-function summarise(ui, acc, mode, rings, fr, center, petal) {
+function summarise(ui, acc, mode, rings, fr, center, petals) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
   const layers = Number(ui.layerCount);
@@ -854,7 +860,7 @@ function summarise(ui, acc, mode, rings, fr, center, petal) {
        + innerRingLine(rings, fr)
        + domeLine(rings, fr, mode)
        + seatLine(center)
-       + spineLine(petal)
+       + spineLine(petals)
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -927,7 +933,7 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.center, built.petal) + `\n${materialLines(ui, mode)}`;
+  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.center, built.petals) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 
@@ -1093,7 +1099,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
      an index into a variable-length list is a bug waiting for the first
      multi-layer export — it would have printed the ring radii under the word
      "exported". The tris/max-dim line is always last, so ask for that. */
-  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.center, built.petal).split('\n');
+  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.center, built.petals).split('\n');
   readout.textContent = `${shownSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });

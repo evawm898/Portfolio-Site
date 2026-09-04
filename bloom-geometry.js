@@ -2644,10 +2644,11 @@ export function petalFormIsFlat(state) {
    printed sheet the floor binds over most of their range, and the read-out
    is what tells a visitor where.
 
-   The uniform arc never reaches the floor on the shipped ranges: the
-   tightest uniform spine is petalLength 20 at 360 degrees, 3.18 mm, against
-   the thickest sheet's 2.40 mm floor — the gate's C3 asserts it row by row
-   rather than trusting this sentence.
+   The uniform arc is NOT floored — it is the shipped geometry, byte for
+   byte — and it does reach under one sheet thickness on shrunk inner
+   whorls (six deep x curl 360: 1.08 mm against 1.20), a pre-existing state
+   on three shipped rows that C3 found on the first full run. It is TOLD
+   (`underFloor`) and never clamped; see the note at kMax.
 
    INTEGRATION. Curvature is sampled at SPINE_SUBSTEPS substeps per blade row
    and each substep is an EXACT circular arc at that curvature, so the
@@ -2679,7 +2680,20 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
      midpoints and built 149.9998 of 150 degrees, which C3 then read as a
      clamp that was not there). */
   const Phi = (u) => (s0 !== 0 && u <= s0 ? 0 : curlRad * Math.pow(remap(u), p + 1));
-  const kMax = 1 / floorRadius;
+  /* THE FLOOR IS THE MODIFIERS' FLOOR. A UNIFORM curl is the shipped arc,
+     built verbatim by buildPetalInto for byte identity, and it is NOT
+     clamped here either — measured on the first full gate run: under LAYERS
+     the blade shrinks by layerSize per whorl, and at six deep x curl 360 the
+     innermost whorl's 6.8 mm blade has a 1.08 mm spine radius against a
+     1.20 mm floor. Three SHIPPED rows sit there (6 layers x innerCurl 360,
+     DEPTH 6 x ALL FORM MAX, ZYGO 6 x ALL INNER MAX) — a PRE-EXISTING state
+     found by C3, not damage it caused, on the session-13 precedent: a clamp
+     could not be byte-identical, so it is TOLD (`underFloor`, the read-out's
+     UNDER ONE SHEET THICKNESS clause) and never applied. The claim that the
+     uniform arc never reaches the floor was true of one whorl and false of
+     six, and the gate found it before this sentence did. */
+  const uniform = bias === 0 && s0 === 0;
+  const kMax = uniform ? Infinity : 1 / floorRadius;
   const N = NU * SPINE_SUBSTEPS, ds = length / N;
   const dR = new Float64Array(N + 1), dZ = new Float64Array(N + 1), phi = new Float64Array(N + 1);
   phi[0] = tilt;
@@ -2715,6 +2729,10 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
     at(s) { const i = Math.round(s / ds); return { dR: dR[i], dZ: dZ[i], phi: phi[i] }; },
     peakRadius: peakK === 0 ? Infinity : 1 / peakK,
     clamped,
+    /* A UNIFORM curl whose arc sits under one sheet thickness — told, never
+       clamped (see the note at kMax). Exactly false wherever the floor was
+       applied, since the clamped peak IS the floor. */
+    underFloor: peakK * floorRadius > 1,
     turnBuilt: phi[N] - tilt,
     turnAsked: curlRad,
     startFloored: s0,
@@ -3240,6 +3258,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     uniform: form ? form.curlUniform : true,
     peakRadiusMm: law ? law.peakRadius : Infinity,
     clamped: law ? law.clamped : false,
+    underFloor: law ? law.underFloor : false,
     turnAskedDeg: ps.petalSpineCurl,
     turnBuiltDeg: law ? law.turnBuilt / D2R : 0,
     startFloored: law ? law.startFloored : 0,

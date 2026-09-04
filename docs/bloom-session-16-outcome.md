@@ -78,6 +78,19 @@ Trimming the input to hide that cliff is an input proxy; the roll floor and the 
 FLOORED line are the precedents. The read-out's SPINE CURL line prints the tightest spine
 radius, "(CLAMPED at one sheet thickness …)" and the turn asked beside the turn built.
 
+**The uniform arc is never clamped, and it already sits under the floor on three shipped
+rows.** The first full gate run fired C1, C2 and C3 on `6 layers x innerCurl max (360)`,
+`DEPTH: 6 layers x ALL FORM MAX` and `DEPTH: ZYGO 6 layers x ALL INNER MAX`: under layers
+the blade shrinks by `layerSize` per whorl, and at six deep × curl 360 the innermost
+whorl's 6.8 mm blade is a 1.08 mm spine radius against the 1.20 mm floor. The shipped
+closed-form arc builds it; the law had clamped it, so the two disagreed by 0.69 mm at the
+tip. A pre-existing state found by the instrument, not damage it caused — a clamp could
+not be byte-identical (the session-13 precedent), so the floor is the MODIFIERS' floor: a
+uniform curl is never clamped, `underFloor` is stamped on the ring, the read-out says
+"UNDER ONE SHEET THICKNESS on 1 of 6 rings — the shipped uniform arc on a shrunk whorl,
+told, not clamped", and C3 asserts the flag against the law in both directions. The claim
+that the uniform arc never reaches the floor was true of one whorl and false of six.
+
 ## Orthogonality, measured
 
 - **Edge profile against cup**: same v² law along the row normal, envelope `u` against cup's
