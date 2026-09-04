@@ -119,6 +119,60 @@ export const FOOT_MAX_WIDTH_MM = 10;
    crowding threshold must be re-derived with it (bloom-crowding.mjs). */
 export const MAX_LAYERS = 6;
 
+/* ===================================================================
+   HEAD RISE — the whorl primitive's `height` argument, COMPLETED (Eva,
+   Sep 4). Since session 1 buildWhorlInto has carried a `height` argument
+   and been handed the literal 0, because a foot lifted off a FLAT slab is
+   joined to nothing at |h| >= t (measured Sep 1: 1.20 mm at the shipping
+   sheet — a range nobody can see, which is why "height is not a control"
+   was ruled). The domed hub is that argument finally getting a value: the
+   junction slab is bent into a spherical cap through the rim, every ring's
+   foot lands ON the cap at its own height with the cap's own normal, and
+   the shell follows the feet exactly as the flat slab did — so the height
+   is usable across its whole range. `headRise` (0.00–1.00 of the hub
+   radius, default 0, role: 'arrangement') is the ONE input; footRing()
+   derives the cap (radius, apex, per-ring height / slope / arc) and every
+   consumer reads it. The junction stays control-free.
+
+   NOT DERIVED FROM CROWDING OR DEPTH (Eva, Sep 4, on the session's third
+   reason): a metric consumed as a geometric input becomes a target — the
+   A_k lesson made structural. The crowding instrument stays an OBSERVER of
+   the geometry, never an input to it. And measured before the ruling: a
+   crowding-keyed rule gives no dome on the incurve target (D_max 5–6, in the
+   clean band) and a depth-keyed one moves the session-7 layered control.
+
+   THE APEX FLOOR — cap the OUTPUT, never an input proxy. The shell's inner
+   face is the mid-surface offset inward by t/2, so it INVERTS when the cap's
+   radius falls below t/2: the same failure as the roll floor's, and it stays
+   watertight and connected, so neither STL gate can see it. The floor is one
+   full sheet thickness (asserted equal to ROLL_MIN_RADIUS_FACTOR at module
+   load, below that constant's definition — the two are one argument). It
+   binds on exactly one reachable corner, measured: ALL MIN x spread min x
+   sheet 2.40 has a 1.149 mm hub against a 2.40 mm sheet, and the rise
+   saturates at 0.25 and reads "(CLAMPED)". Everywhere else Rd >= R0 >= t. */
+export const HEAD_RISE_MIN_RADIUS_FACTOR = 1.0;
+/* Rings on the shell's two caps — the SAME constant the designed DOME centre
+   uses, so a domed junction and a domed ornament facet alike. Fixed: topology
+   depends on no slider, and the export gate's live-equals-export triangle
+   count still holds. WHAT IS NEW, stated loudly: at rise 0 the hub is the
+   192-triangle disc verbatim and at any rise above 0 it is this shell, so the
+   hub's triangle count is the FIRST in this codebase that depends on where a
+   slider sits (3,456 against 192). It is a BRANCH, not a ramp — there is no
+   rise at which the count is anything but one of those two numbers. */
+export const HUB_DOME_RINGS = 18;
+
+/* THE GUARD's predicate — exported so the app, the builder, the gates and the
+   read-out all ask the same question. Exact: the default IS 0 and a range
+   input at its default yields it. When it holds, footRing() stamps no dome,
+   every consumer takes its pre-dome expression VERBATIM, and byte-identity at
+   the shipping default is a construction rather than a measurement — the
+   petalFormIsFlat precedent, chosen over an IEEE-754 argument for the same
+   reason: the rotated radial vector is [cos a, sin a, -sin(0)] = [.., -0] at
+   zero slope, and -0 + 0 is +0, so a "the law at zero rise IS the flat law"
+   argument is true of the NUMBERS and false of the BYTES. domeGuardResidual
+   in buildPetalInto measures the law; the byte diff measures the bytes. */
+export function domeIsFlat(state) { return state.headRise === 0; }
+
 /* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
    pi*(3 - sqrt(5)) rather than a decimal literal so the constant IS the
    definition instead of a rounding of it.
@@ -1541,8 +1595,52 @@ export function footRing(state, acc) {
   const guardResidual = guarded ? Math.abs(generalDerived - derivedRadius) : null;
 
   const R0 = derivedRadius * state.spread;         // the ONLY use of spread
+  /* ===================================================================
+     THE DOME (Sep 4) — a spherical cap through the rim (R0, z = 0) rising
+     H = headRise * R0 at the axis: Rd = (R0^2 + H^2) / 2H, centre on the axis
+     at H - Rd. ONE OWNER: every ring's height, slope and arc from the apex
+     are stamped here; the petal builder, the hub builder and the centre read
+     them and compute nothing. Null under the guard, so the flat path below is
+     character for character what it was.
+
+     THE APEX FLOOR binds when Rd would fall under one sheet thickness (see
+     HEAD_RISE_MIN_RADIUS_FACTOR): Rd is held at the floor, the rise that
+     actually built is reported beside the one asked for, and the read-out
+     says "(CLAMPED)". Since Rd >= R0 always, this can only bind when the hub
+     itself is narrower than the sheet — one reachable corner.
+
+     WHAT THE DOME DOES TO CROWDING, measured before it was built and kept
+     here because it will be forgotten: the surface the feet lie on is larger
+     than its plan by 1 / cos(slope), and that factor is LARGEST AT THE RIM and
+     1 at the apex — so the relief is greatest where the slope is steepest and
+     least where a tight bloom's feet actually stack. The mum's peak sits at
+     r 2.1–2.8 mm on a 4.69 mm hub, where a hemisphere's slope is 26–36 degrees
+     and the local relief 1.1–1.2x; the whole-annulus area ratio there is 2.0x.
+     A hemisphere takes the mum from D_max 11 to 9, not to 5. `relief` on every
+     ring and `surfaceToPlan` on the dome carry that reading to the read-out. */
+  const dome = domeIsFlat(state) ? null : (() => {
+    const rise = state.headRise;
+    const floor = HEAD_RISE_MIN_RADIUS_FACTOR * thickness;
+    let H = rise * R0;
+    /* AT RISE 1 THE CAP IS A HEMISPHERE AND Rd IS R0 EXACTLY — written so,
+       not left to (2 R0^2) / (2 R0), which rounds a ULP either side of R0
+       and puts the rim ring's height at sqrt(a rounding residue) instead of
+       0: a 2e-7 mm "height" that made the gate's arc position of the rim
+       row disagree with the owner's by 4e-9 (measured on the orchid row). */
+    let Rd = rise === 1 ? R0 : (R0 * R0 + H * H) / (2 * H);
+    let clamped = false;
+    if (Rd < floor) { clamped = true; Rd = floor; H = floor - Math.sqrt(floor * floor - R0 * R0); }
+    return { rise, riseBuilt: H / R0, H, Rd, centreZ: H - Rd, clamped, floorRadius: floor, surfaceToPlan: null };
+  })();
   const rings = raw.map((p, L) => {
     const radius = R0 * p.scale;
+    /* WHERE ON THE DOME THIS RING LANDS — height, slope (the polar angle from
+       the apex, which is also the tangent plane's tilt) and arc distance from
+       the apex, all from the one sphere above. Flat: 0 / 0 / the plan radius.
+       Containment (J2) is what makes radius <= Rd: Rd >= R0 by AM-GM. */
+    const slope = dome ? Math.asin(Math.min(1, radius / dome.Rd)) : 0;
+    const z = dome ? Math.sqrt(dome.Rd * dome.Rd - radius * radius) + dome.centreZ : 0;
+    const arc = dome ? dome.Rd * slope : radius;
     /* How far inside the ring each foot continues, so foot–hub overlap is a
        solid annulus, not a hairline touch. A FRACTION of this layer's own
        radius with an absolute floor, so the guarantee is scale-free per
@@ -1651,16 +1749,36 @@ export function footRing(state, acc) {
          so the read-out says WHERE rather than a clamp deciding silently.
          Telemetry only: nothing geometric may read these. */
       underFootFloor: radius < FOOT_MIN_WIDTH_MM,
-      crossesAxis: radius < overhang,
+      /* ON THE DOME the foot runs inward along the ARC, so it crosses the
+         apex when the arc distance is shorter than the overhang — the flat
+         expression is kept verbatim on the flat path. A circumference does
+         not change on a dome, so `underFootFloor` needs no second arm. */
+      crossesAxis: dome ? arc < overhang : radius < overhang,
+      /* THE DOME'S PER-RING TELEMETRY, and the one thing consumers READ:
+         z / slope / arc place the foot; `relief` is the local surface-to-
+         plan factor 1 / cos(slope), the number the read-out prints at the
+         rim and at the innermost ring so the relief finding is legible. */
+      z, slope, arc,
+      relief: dome ? (slope >= Math.PI / 2 - 1e-9 ? Infinity : 1 / Math.cos(slope)) : 1,
+      dome,
     };
   });
+  /* THE SURFACE-TO-PLAN RATIO OVER THE FEET'S OWN ANNULUS — the whole-annulus
+     figure, beside which the per-ring relief shows how uneven it is. Telemetry
+     only; nothing geometric reads it. */
+  if (dome) {
+    const rIn = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
+    const plan = Math.PI * (R0 * R0 - rIn * rIn);
+    const surf = 2 * Math.PI * dome.Rd * (Math.sqrt(dome.Rd * dome.Rd - rIn * rIn) - Math.sqrt(Math.max(0, dome.Rd * dome.Rd - R0 * R0)));
+    dome.surfaceToPlan = plan > 0 ? surf / plan : 1;
+  }
 
   /* THE HUB the junction is built on. Its radius is R0, which is
      layers[0].radius exactly — not a `Math.max` over the layers, because a max
      would be a SECOND derivation that merely happens to agree, and the
      one-owner rule is about which is which. Containment is asserted (J2/J3)
      rather than achieved by picking the largest. */
-  const hub = { radius: R0, thickness, derivedRadius };
+  const hub = { radius: R0, thickness, derivedRadius, dome };
 
   /* THE QUANTIZER IDENTITY, CROSS-VALIDATED IN THE OWNER — the continuous
      arm's answer to `guardResidual`, and it exists for the same reason: a
@@ -1778,6 +1896,8 @@ export function footRing(state, acc) {
 
   return {
     rings, hub, derivedRadius, guardResidual, layerCount,
+    /* THE DOME, footRing()'s own — null under the guard. */
+    dome,
     continuousMode, sequenceLength, quantizerResiduals, zygoGuardResidual,
     slotRings,
     /* WHETHER SLOT ROLES APPLY IN THIS STATE, and whether a whorl actually
@@ -2419,6 +2539,12 @@ export const FORM_ONSET_END = 0.30;
    of degenerating. Like every structural number in this project family this
    is an ASSUMPTION with a number attached, not a printed result. */
 export const ROLL_MIN_RADIUS_FACTOR = 1.0;
+/* The domed hub's apex floor is this same argument (a shell's inner offset
+   inverts under half a thickness of radius), so the two constants are
+   asserted equal here — below both definitions, because a top-level
+   `const A = B` reading a later `const` is the hoisting trap this project has
+   fired twice. */
+if (HEAD_RISE_MIN_RADIUS_FACTOR !== ROLL_MIN_RADIUS_FACTOR) throw new Error(`HEAD_RISE_MIN_RADIUS_FACTOR ${HEAD_RISE_MIN_RADIUS_FACTOR} is not ROLL_MIN_RADIUS_FACTOR ${ROLL_MIN_RADIUS_FACTOR} — the two floors are one argument and have diverged`);
 
 const D2R = Math.PI / 180;
 
@@ -2458,7 +2584,24 @@ export function petalForm(state, halfW, t) {
      contact sheet's framing alike — under twist the width direction is not
      the ring tangent any more, so a consumer recomputing it would not
      merely be a second owner, it would be wrong. */
-  const frameAt = (R, T, phi, u) => {
+  /* `up` (Sep 4, the domed hub): the direction the blade's tilt is measured
+     toward. Absent, it is the axis and every expression below is the
+     pre-dome one verbatim — a foot on a dome passes the tangent plane's own
+     normal instead, and the frame rotates rigidly with the foot. Written as
+     a BRANCH rather than as `up = Z` with a general expression, because
+     `-R[0]*sin(phi) + 0*cos(phi)` turns a -0 into a +0 at petalTilt 0 and
+     that is a byte. */
+  const frameAt = (R, T, phi, u, up = null) => {
+    if (up !== null) {
+      const N0 = [-R[0] * Math.sin(phi) + up[0] * Math.cos(phi), -R[1] * Math.sin(phi) + up[1] * Math.cos(phi), -R[2] * Math.sin(phi) + up[2] * Math.cos(phi)];
+      const tau = twistRad * u;
+      const ct = Math.cos(tau), st = Math.sin(tau);
+      return {
+        D: [R[0] * Math.cos(phi) + up[0] * Math.sin(phi), R[1] * Math.cos(phi) + up[1] * Math.sin(phi), R[2] * Math.cos(phi) + up[2] * Math.sin(phi)],
+        T: [T[0] * ct + N0[0] * st, T[1] * ct + N0[1] * st, T[2] * ct + N0[2] * st],
+        N: [-T[0] * st + N0[0] * ct, -T[1] * st + N0[1] * ct, -T[2] * st + N0[2] * ct],
+      };
+    }
     const N0 = [-R[0] * Math.sin(phi), -R[1] * Math.sin(phi), Math.cos(phi)];
     const tau = twistRad * u;
     const ct = Math.cos(tau), st = Math.sin(tau);
@@ -2667,14 +2810,71 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      before any curve exists. That is the whole junction argument, and
      `node tools/diff-bloom-bytes.mjs --region foot` is what measures it. */
   const footS = [-ring.overhang, -ring.overhang / 2, 0];
-  for (const s of footS) {
-    const C = [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z];
-    rows.push({ C, N: Z, T, h: footHalf, u: 0, sect: flatSect(C, Z, footHalf) });
+  /* ON THE DOME (Sep 4) the same three rows lie ON the cap footRing() owns:
+     spaced along the meridian ARC by the same offsets (the overhang is arc
+     length — the same foot, laid on a curved surface), each row a great-
+     circle arc across of radius Rd (the roll law's own cross-section, with
+     the sphere's centre on the row's normal), so the foot's mid-surface is
+     IN the shell's mid-surface with no seam beyond the mesh's own faceting
+     (0.007 mm worst case at NV 10). The alternatives were measured and
+     rejected: a single tangent box reaches 0.70 mm off the surface at the
+     default and 1.07 mm at ALL MIN, past t/2; rows along the arc with
+     straight chords across leave the row ENDS floating by hw^2 / 2Rd,
+     0.58 mm on a default-width foot at a hemisphere.
+     THE RING ROW is placed from ring.radius and ring.z DIRECTLY, so J1's
+     equality against the owner is exact; the two inner rows come from the
+     arc law. A foot longer than its arc to the apex crosses it (phi < 0, a
+     negative plan radius) exactly as a flat foot crosses the axis. */
+  const dome = ring.dome;
+  const domeRows = (kappa) => {
+    /* THE DOME LAW AT A CURVATURE — kappa = 1 / Rd, and kappa === 0 is a
+       legitimate input whose every branch is the flat expression. That is
+       what makes the guard residual below a measurement of the LAW rather
+       than of the guard: the residual calls this at kappa 0 and compares. */
+    const out = [];
+    for (const s of footS) {
+      let C, N;
+      if (kappa === 0) { C = [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z]; N = [0, 0, 1]; }
+      else if (s === 0) { C = [R[0] * ring.radius, R[1] * ring.radius, ring.z]; N = [R[0] * Math.sin(ring.slope), R[1] * Math.sin(ring.slope), Math.cos(ring.slope)]; }
+      else {
+        const phi = ring.slope + s * kappa, rr = Math.sin(phi) / kappa;
+        C = [R[0] * rr, R[1] * rr, Math.cos(phi) / kappa + ring.dome.centreZ];
+        N = [R[0] * Math.sin(phi), R[1] * Math.sin(phi), Math.cos(phi)];
+      }
+      const sect = (v) => {
+        const a = footHalf * v * kappa;
+        if (kappa === 0) return { P: [C[0] + T[0] * footHalf * v, C[1] + T[1] * footHalf * v, C[2] + T[2] * footHalf * v], n: N };
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const n = [N[0] * ca + T[0] * sa, N[1] * ca + T[1] * sa, N[2] * ca + T[2] * sa];
+        return { P: [C[0] + (n[0] - N[0]) / kappa, C[1] + (n[1] - N[1]) / kappa, C[2] + (n[2] - N[2]) / kappa], n };
+      };
+      out.push({ C, N, T, h: footHalf, u: 0, sect });
+    }
+    return out;
+  };
+  if (dome === null) {
+    for (const s of footS) {
+      const C = [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z];
+      rows.push({ C, N: Z, T, h: footHalf, u: 0, sect: flatSect(C, Z, footHalf) });
+    }
+  } else {
+    for (const row of domeRows(1 / dome.Rd)) rows.push(row);
   }
 
-  const dir = [R[0] * Math.cos(tilt), R[1] * Math.cos(tilt), Math.sin(tilt)];       // blade direction
-  const nrm = [-R[0] * Math.sin(tilt), -R[1] * Math.sin(tilt), Math.cos(tilt)];     // blade sheet normal
-  const base = [ring.radius * R[0], ring.radius * R[1], slot.z];
+  /* THE BLADE FRAME ROTATES RIGIDLY WITH THE FOOT: on the dome the tilt is
+     measured from the tangent plane's outward direction (which points DOWN
+     the slope) toward its normal, so an outer floret on a steep cap leans
+     out and an inner one stands at its authored tilt — the ball. The flat
+     path is verbatim. */
+  const Rs = dome === null ? R : [R[0] * Math.cos(ring.slope), R[1] * Math.cos(ring.slope), -Math.sin(ring.slope)];
+  const Up = dome === null ? Z : [R[0] * Math.sin(ring.slope), R[1] * Math.sin(ring.slope), Math.cos(ring.slope)];
+  const dir = dome === null
+    ? [R[0] * Math.cos(tilt), R[1] * Math.cos(tilt), Math.sin(tilt)]       // blade direction
+    : [Rs[0] * Math.cos(tilt) + Up[0] * Math.sin(tilt), Rs[1] * Math.cos(tilt) + Up[1] * Math.sin(tilt), Rs[2] * Math.cos(tilt) + Up[2] * Math.sin(tilt)];
+  const nrm = dome === null
+    ? [-R[0] * Math.sin(tilt), -R[1] * Math.sin(tilt), Math.cos(tilt)]     // blade sheet normal
+    : [-Rs[0] * Math.sin(tilt) + Up[0] * Math.cos(tilt), -Rs[1] * Math.sin(tilt) + Up[1] * Math.cos(tilt), -Rs[2] * Math.sin(tilt) + Up[2] * Math.cos(tilt)];
+  const base = dome === null ? [ring.radius * R[0], ring.radius * R[1], slot.z] : [ring.radius * R[0], ring.radius * R[1], ring.z];
 
   /* THE SPINE. Straight when there is no curl — the same expression as
      before — and a constant-curvature arc when there is. The arc is the
@@ -2688,11 +2888,17 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       C: [base[0] + dir[0] * s, base[1] + dir[1] * s, base[2] + dir[2] * s],
       phi: tilt,
     })
-    : (s) => {
+    : dome === null ? (s) => {
       const phi = tilt + kC * s;
       const dR = (Math.sin(phi) - Math.sin(tilt)) / kC;
       const dZ = (Math.cos(tilt) - Math.cos(phi)) / kC;
       return { C: [base[0] + R[0] * dR, base[1] + R[1] * dR, base[2] + dZ], phi };
+    } : (s) => {
+      /* The same arc in the foot's own (Rs, Up) plane. */
+      const phi = tilt + kC * s;
+      const dR = (Math.sin(phi) - Math.sin(tilt)) / kC;
+      const dZ = (Math.cos(tilt) - Math.cos(phi)) / kC;
+      return { C: [base[0] + Rs[0] * dR + Up[0] * dZ, base[1] + Rs[1] * dR + Up[1] * dZ, base[2] + Rs[2] * dR + Up[2] * dZ], phi };
     };
 
   for (let i = 1; i <= NU; i++) {
@@ -2707,7 +2913,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        repeated defect starts. Twist follows the spine because frameAt
        rotates about the CURRENT length direction; see the ordering
        argument in petalForm's header. */
-    const f = form.frameAt(R, T, phi, u);
+    const f = form.frameAt(Rs, T, phi, u, dome === null ? null : Up);
     rows.push({ C, N: f.N, T: f.T, D: f.D, h, u, sect: form.sectAt(C, f.T, f.N, h, u) });
   }
 
@@ -2752,7 +2958,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     const dev = (a, b) => { for (let k = 0; k < 3; k++) guardResidual = Math.max(guardResidual, Math.abs(a[k] - b[k])); };
     for (let i = footS.length; i < rows.length; i++) {
       const row = rows[i];
-      const zf = zero.frameAt(R, T, tilt, row.u);
+      const zf = zero.frameAt(Rs, T, tilt, row.u, dome === null ? null : Up);
       dev(zf.T, T); dev(zf.N, nrm);
       const zs = zero.sectAt(row.C, row.T, row.N, row.h, row.u);
       for (let j = 0; j < NV; j++) {
@@ -2772,7 +2978,33 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      curl and twist would also be WRONG, since neither is constant along the
      blade any more. */
   const midU = 0.5;
-  const midFrame = form ? form.frameAt(R, T, midRow.phi, midU) : { T, N: nrm };
+  const midFrame = form ? form.frameAt(Rs, T, midRow.phi, midU, dome === null ? null : Up) : { T, N: nrm };
+  /* THE DOME GUARD'S OWN CHECK — the dome law evaluated at ZERO curvature
+     against the flat rows the guard just emitted, on flat (rise 0) builds,
+     slot 0 only: every foot row's centre, normal and every cross-section
+     column, plus the blade frame at the root. Asserted EXACTLY 0 by both
+     gates — the kappa-0 branches ARE the flat expressions — and it measures
+     the LAW, never the bytes: the rotated radial at zero slope carries a -0
+     where the flat one carries +0, |(-0) - 0| is 0, and the byte diff is
+     the instrument for that. Null on domed builds: a claim nothing can make
+     reads as absent, never as a passing 0. */
+  let domeGuardResidual = null;
+  if (dome === null && slot.index === 0) {
+    domeGuardResidual = 0;
+    const dev = (a, b) => { for (let k = 0; k < 3; k++) domeGuardResidual = Math.max(domeGuardResidual, Math.abs(a[k] - b[k])); };
+    const zeroRows = domeRows(0);
+    for (let i = 0; i < footS.length; i++) {
+      dev(zeroRows[i].C, rows[i].C); dev(zeroRows[i].N, rows[i].N);
+      for (let j = 0; j < NV; j++) {
+        const v = -1 + (2 * j) / (NV - 1);
+        const A = zeroRows[i].sect(v), B = rows[i].sect(v);
+        dev(A.P, B.P); dev(A.n, B.n);
+      }
+    }
+    const Rs0 = [R[0] * Math.cos(0), R[1] * Math.cos(0), -Math.sin(0)], Up0 = [R[0] * Math.sin(0), R[1] * Math.sin(0), Math.cos(0)];
+    dev([Rs0[0] * Math.cos(tilt) + Up0[0] * Math.sin(tilt), Rs0[1] * Math.cos(tilt) + Up0[1] * Math.sin(tilt), Rs0[2] * Math.cos(tilt) + Up0[2] * Math.sin(tilt)], dir);
+    dev([-Rs0[0] * Math.sin(tilt) + Up0[0] * Math.cos(tilt), -Rs0[1] * Math.sin(tilt) + Up0[1] * Math.cos(tilt), -Rs0[2] * Math.sin(tilt) + Up0[2] * Math.cos(tilt)], nrm);
+  }
   return {
     /* Row half-widths, FOOT ROWS INCLUDED — a claw is narrower than both
        its foot and its blade, so the foot rows are part of the evidence. */
@@ -2856,6 +3088,13 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        `t` is what makes a thickness leak onto the foot observable at all:
        until this layer nothing read the foot's cross-section back. */
     footFrames: rows.slice(0, footS.length).map((r) => ({ C: r.C, N: r.N, T: r.T, h: r.h, t: r.tUsed })),
+    /* THE ROOT — the first BLADE row as emitted, beside the frame the builder
+       leaves the foot with. J8 compares the emitted normal against the rigid
+       tilt of the foot's own frame, built from the owner's slope: the blade
+       that forgot to rotate with its foot (measured, Sep 4) exports
+       watertight and as one piece and passes everything else. */
+    rootRow: { C: rows[footS.length].C, N: rows[footS.length].N, flat: form === null, tiltRad: tilt, u: rows[footS.length].u, curlRad: form ? form.curlRad : 0, ringC: rows[footS.length - 1].C },
+    domeGuardResidual,
     /* THICKNESS TELEMETRY — the properties neither STL gate can show. Both
        are structurally blind here for the same reason they are blind to the
        form layer: thickness is pure vertex offset on a fixed-topology grid,
@@ -2966,6 +3205,43 @@ function emitPanel(acc, rows, panel, tAt) {
 export function buildHubInto(acc, state, ring) {
   const t = acc.floorThickness(ring.thickness);
   const N = 48;
+  /* THE DOMED SHELL (Sep 4) — the flat slab BENT, not a solid boss: the
+     mid-surface is footRing()'s cap, the two faces are its normal offsets
+     by t/2 (concentric spheres of radius Rd +/- t/2), the rim is the band
+     between them at the rim's polar angle. Thickness t everywhere, so J4a's
+     hub-thickness-equals-foot-thickness stays an EQUALITY; the feet sit
+     inside it with their faces coincident with its faces exactly as they
+     sit in the slab today; and from below it reads as a bowl, which is what
+     lets the crowding sheet tell a domed base from a flat one. A solid dome
+     was costed and set aside: it would be the loudest thing under a tight
+     mum and its underside is indistinguishable from the flat disc.
+     Rings and apex: the designed DOME centre's own construction — the apex
+     is an explicit fan, never a ring shrunk to radius 0 (that emitted 48
+     degenerate triangles per dome, measured). The flat path below is
+     verbatim. Returns what it built, so J3 can compare the hub's OWN sphere
+     against the feet rather than trusting that the builder read the owner. */
+  const dome = ring.dome;
+  if (dome) {
+    const Rd = dome.Rd, cz = dome.centreZ, K = HUB_DOME_RINGS;
+    const phiRim = Math.asin(Math.min(1, ring.radius / Rd));
+    const ringAt = (rad, phi) => Array.from({ length: N }, (_, k) => { const th = (k * TAU) / N; return [rad * Math.sin(phi) * Math.cos(th), rad * Math.sin(phi) * Math.sin(th), cz + rad * Math.cos(phi)]; });
+    const cap = (rad, outward) => {
+      let lower = ringAt(rad, phiRim);
+      for (let i = 1; i < K; i++) {
+        const upper = ringAt(rad, phiRim * (1 - i / K));
+        for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.quad(lower[k], lower[k2], upper[k2], upper[k]); else acc.quad(lower[k2], lower[k], upper[k], upper[k2]); }
+        lower = upper;
+      }
+      const apex = [0, 0, cz + rad];
+      for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.tri(lower[k], lower[k2], apex); else acc.tri(lower[k2], lower[k], apex); }
+    };
+    const before = acc.triangleCount;
+    cap(Rd + t / 2, true);
+    cap(Rd - t / 2, false);
+    const top = ringAt(Rd + t / 2, phiRim), bot = ringAt(Rd - t / 2, phiRim);
+    for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(top[k], bot[k], bot[k2], top[k2]); }
+    return { dome: { Rd, centreZ: cz, H: dome.H, rimPhi: phiRim, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before };
+  }
   const r = ring.radius;
   const zTop = t / 2, zBot = -t / 2;
   const pt = (k, z) => [r * Math.cos((k * TAU) / N), r * Math.sin((k * TAU) / N), z];
@@ -2976,6 +3252,7 @@ export function buildHubInto(acc, state, ring) {
     acc.tri(cBot, pt(k2, zBot), pt(k, zBot));                      // bottom fan (down)
     acc.quad(pt(k, zTop), pt(k, zBot), pt(k2, zBot), pt(k2, zTop)); // rim
   }
+  return { dome: null, tris: N * 4 };
 }
 
 /* ===================================================================
@@ -3043,7 +3320,21 @@ export function buildCenterInto(acc, state, ring) {
      unexplained number in a gate's output is how a false belief starts here.
      Dropping the base also strengthens clause (2): the centre now spans the
      slab outright instead of sharing its boundary plane. */
-  const zBase = -t / 2 - t / 8;
+  /* ON THE DOME (Sep 4) the seat moves to the APEX slab: the same eighth
+     below the same underside, measured from the cap's apex — so a flat-based
+     button sits on the top of the ball. What that costs, measured and
+     photographed rather than fixed (Eva, Sep 4: a button that follows the
+     shell's curvature is a phase-2 centre question, not a junction one): the
+     overlap with the shell is a central DISC of radius `seat.patchRadius`
+     (where the shell's outer face is still above the seat), not the full
+     footprint, and outside it the button's rim HOVERS above the shell by up
+     to `seat.hover` — 1.2 mm under a 7.0 mm button on the incurve target.
+     Connected, since the patch is a solid region rather than a band; not
+     resolved. Left at the flat seat, the centre DETACHES on a big hub
+     (measured: two voxel components on the session-7 bloom at rise 0.5).
+     The flat expression is verbatim. */
+  const dome = ring.dome;
+  const zBase = dome ? dome.H - t / 2 - t / 8 : -t / 2 - t / 8;
   /* Outer radius: a fraction of the foot ring, floored on its DIAMETER so a
      tiny centre is printable rather than a sliver. The floor can never push
      it past the ring: the smallest reachable ring radius is 1.149 mm
@@ -3054,9 +3345,21 @@ export function buildCenterInto(acc, state, ring) {
   const before = acc.triangleCount;
   if (style === 'DOME') domeInto(acc, state, rC, zBase, t);
   else if (style === 'DISC') discInto(acc, state, rC, zBase, t);
-  else if (style === 'RING') torusInto(acc, state, rC);
+  else if (style === 'RING') torusInto(acc, state, rC, dome);
   else throw new Error(`unknown centerStyle "${style}" — the registry and the builder have diverged`);
-  return { style, rC, tris: acc.triangleCount - before };
+  /* THE SEAT'S OWN NUMBERS, for the read-out, the gates and the sheet. The
+     overlap patch: plan radius where the shell's OUTER face (radius Rd + t/2
+     about the cap's centre) is still above the seat plane zBase. */
+  let seat = null;
+  if (dome && style !== 'RING') {
+    const ro = dome.Rd + t / 2;
+    const dz = zBase - dome.centreZ;
+    const patchRadius = dz >= ro ? 0 : Math.sqrt(ro * ro - dz * dz);
+    const outerAt = (r) => dome.centreZ + Math.sqrt(Math.max(0, ro * ro - r * r));
+    const hover = Math.max(0, zBase - outerAt(Math.min(rC, ro)));
+    seat = { zBase, patchRadius: Math.min(patchRadius, rC), footprint: rC, fullFootprint: patchRadius >= rC, hover };
+  }
+  return { style, rC, tris: acc.triangleCount - before, seat };
 }
 
 const ringPts = (n, r, z) => Array.from({ length: n }, (_, k) => [r * Math.cos((k * TAU) / n), r * Math.sin((k * TAU) / n), z]);
@@ -3138,14 +3441,18 @@ function discInto(acc, state, rC, zBase, t) {
    sits over the hub disc at every setting.
    Clause (2): the tube spans z ∈ [−r, +r] about z = 0, the slab's mid-plane,
    so it crosses the slab for any r > 0. */
-function torusInto(acc, state, rC) {
+function torusInto(acc, state, rC, dome = null) {
   const r = acc.floorFeature(rC * (1 - state.centerBore)) / 2;
   const R = Math.max(rC - r, 1.2 * r);
   const NS = CENTER_SEG, NM = RING_SEG_MINOR;
+  /* ON THE DOME the tube's centre circle is lifted onto the cap's
+     mid-surface at its own plan radius, so the shell passes through the
+     tube all the way round — a solid ring of overlap. Flat is verbatim. */
+  const z0 = dome ? Math.sqrt(Math.max(0, dome.Rd * dome.Rd - R * R)) + dome.centreZ : 0;
   const P = (i, j) => {
     const th = (i % NS) * TAU / NS, ph = (j % NM) * TAU / NM;
     const rr = R + r * Math.cos(ph);
-    return [rr * Math.cos(th), rr * Math.sin(th), r * Math.sin(ph)];
+    return [rr * Math.cos(th), rr * Math.sin(th), dome ? r * Math.sin(ph) + z0 : r * Math.sin(ph)];
   };
   for (let i = 0; i < NS; i++) {
     for (let j = 0; j < NM; j++) acc.quad(P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1));
@@ -3304,7 +3611,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     for (const d of fr.rings) if (d.lambda === L) petals.push(perDescriptor.get(d) ?? null);
   }
   }
-  buildHubInto(acc, state, fr.hub);          // unconditional — the invariant's plumbing
+  const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
   const center = buildCenterInto(acc, state, fr.hub);   // optional — the designed mass
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, foot: fr, center, petal: petals[0], petals, petalsBuilt, slotAzimuths };
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, center, petal: petals[0], petals, petalsBuilt, slotAzimuths };
 }
