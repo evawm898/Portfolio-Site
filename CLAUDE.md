@@ -55,6 +55,9 @@ on the mirror line, a middle group against its neighbours, the extreme, and a
 BEFORE/AFTER pair rendered from a git worktree of the base commit, because the
 fan's slot roles were superseded and a removed capability is photographed
 rather than only recorded.
+DEPTH AND THE PRINT PREVIEW have one too:
+`node tools/shot-bloom-depth.mjs <dir>` — the mum live beside print preview
+on one camera, the depth cell at 4/5/6, the mum at six turns, the controls.
 FOOT CROWDING has its own instrument and sheet, and it is a FLAG, not a gate
 (Eva, Sep 3): `tools/bloom-crowding.mjs` measures how many feet stack on the
 most crowded point of the base, in EXPORT mode, from `footRing()`'s own rings;
@@ -65,7 +68,37 @@ ruled-clean blooms. **It is BLIND to blade-to-blade crowding above the root**
 (the feet sit inside the hub slab; what the eye sees is the roots leaving the
 ring, whose exit width IS the foot width) — that second instrument is
 recorded, not built, and a clean D_max is a clean BASE, never a clean bloom.
-Re-derive the threshold when the depth cap is raised.
+The threshold was re-derived when the cap went to six and HELD at 11 (Eva,
+Sep 3, confirmed from the depth sheet Sep 4: the depth cell at 4/5/6 reads
+clean, the mum stays bad); D_max is resolved by a local fine pass
+(`refineDepth()`) because the hub-pitch raster under-resolves a deep base.
+
+**THE PRINT-PREVIEW TOGGLE IS VIEW CHROME, AND `shownMode()` IN bloom.js IS
+THE ONE OWNER OF WHICH GEOMETRY IS ON SCREEN** (Eva, Sep 3, unparked).
+`#printPreview` sits beside Auto-rotate: not a registry row, invisible to
+`readUI()` and every gate's read-back. Checked, the viewport renders the
+export-floored geometry; the STL handler never reads it (it builds from
+`readUI()` alone) and the panel gate's route (i) proves the exports on either
+side of the box byte-identical. `__bloomMetrics().liveTris` is NULL while the
+preview is on — never an export count under a live label — and BOTH STL gates
+fail the run if a row is measured with the preview on. Every canvas sheet's
+caption carries `modeTag(m)` from the harness, read from the app's own
+`shownMode`; a sheet that toggles captions from `shownTris`.
+
+**DEPTH IS SIX, WITHOUT A CLAMP** (Eva, Sep 3). The ring-versus-foot-floor
+formula the brief expected to cap depth does not hold (ring₀ grows with depth
+through the area rule) and the collision it names is not a buildability limit
+(every depth to eight exports watertight, one piece, all assertions clean).
+A derived clamp was rejected: eleven reachable depth-2/3 states already sit
+under the floor, three of them shipped gate rows — **a pre-existing fact found
+by session 13, not damage it caused** — and a clamp would gate the state the
+Aug 31 spread ruling made reachable. The read-out's `RINGS NARROWER THAN A
+FOOT` line says where instead (footRing()'s `underFootFloor` / `crossesAxis`,
+telemetry only; panel gate route (j), both directions). Raising the cap is
+`MAX_LAYERS` plus the registry twin plus gate rows, and the crowding
+threshold must be re-derived with it. `layerSize` stays capped at 0.90: in
+CONTINUOUS mode 1.00 is mesh-clean (measured: 0 non-manifold) but J5 fires on
+every continuous row there, so the cap is load-bearing for an instrument.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a

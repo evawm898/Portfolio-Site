@@ -11,8 +11,9 @@
    checked against the PICTURE rather than against the metric.
 
    THE PICTURE IS LIVE, THE NUMBER IS THE EXPORT, AND EVERY CAPTION SAYS SO.
-   The app renders the live build (the print-preview toggle is parked in the
-   charter), and the flag is about the artefact — footRing's area rule reads
+   The app renders the live build here (the print-preview toggle exists since
+   Sep 3 and stays OFF on this sheet; tools/shot-bloom-depth.mjs is where the
+   two renders sit side by side), and the flag is about the artefact — footRing's area rule reads
    the export floor, so on the mum the ring is 3.63 mm live and 4.69 mm
    printed and the depth reads 17 live against 11 exported. Both are printed
    wherever they differ, on the print-truth line's discipline.
@@ -36,7 +37,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { decodePNG } from './pngdec.mjs';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, exportStl, analyzeStl, junctionAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, exportStl, analyzeStl, junctionAssertions, modeTag } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, CROWDED_DMAX, CROWDING_SCOPE } from './bloom-crowding.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-crowding';
@@ -107,7 +108,7 @@ async function cell({ label, set: sets = [], ruling, note = '' }) {
     shots[view] = path.basename(file);
   }
   console.log(`  ${label.padEnd(58)} ${crowdingLine(r)}`);
-  return { label, ruling, note, shots, r, liveTris: m.liveTris };
+  return { label, ruling, note, shots, r, liveTris: m.liveTris, mode: modeTag(m) };
 }
 
 const MUM = { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 0.6, petalLength: 60, petalWidth: 8, layerSize: 0.8, layerTilt: 11, sheetThickness: 0.6, footDelicacy: 0.25 };
@@ -134,7 +135,7 @@ const num = (c) => {
     + (r.crowded ? ` · <b class="flag">CROWDED (D_max &ge; ${CROWDED_DMAX})</b>` : '');
 };
 const fig = (c, view) => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b> <i>(${view === 'base' ? 'base from below, low oblique' : view === 'rim' ? 'the rim, close' : 'whole bloom'})</i><br>`
-  + `<small>${esc(c.ruling)} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live)</small><br>${num(c)}`
+  + `<small>${esc(c.ruling)} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live) · ${esc(c.mode)}</small><br>${num(c)}`
   + (view === 'base' ? `<p>${esc(c.note)}</p>` : '') + `</figcaption></figure>`;
 const html = `<title>Foot crowding — the base, close up</title>
 <style>body{background:#0c0f0e;color:#dfe9e3;font:14px/1.5 system-ui,sans-serif;margin:24px}

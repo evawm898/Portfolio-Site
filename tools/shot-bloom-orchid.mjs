@@ -62,7 +62,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
          junctionAssertions, zygoAssertions, ZYGO_SCOPE, DEFAULTS, ROLE_OVERRIDES,
-         LAW_IDENTITY, SLOT_ROLE_ORDER, SLOT_LABELLUM, SLOT_HOOD } from './bloom-harness.mjs';
+         LAW_IDENTITY, SLOT_ROLE_ORDER, SLOT_LABELLUM, SLOT_HOOD, modeTag } from './bloom-harness.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-orchid';
 /* THE BASE TREE FOR THE BEFORE CELL — a worktree of the commit before the
@@ -134,7 +134,7 @@ async function cell({ label, set = [], note = '', expectSplit = true, onBase = f
     shots[view] = path.basename(file);
   }
   console.log(`  ${label.padEnd(46)} rings=${m.rings.length} split=${m.slotRolesSplit} tris(live)=${m.liveTris} ${roleLine}${onBase ? '  [base tree]' : ''}`);
-  return { label, note, shots, roleLine, liveTris: m.liveTris, rings: m.rings.length };
+  return { label, note, shots, roleLine, liveTris: m.liveTris, rings: m.rings.length, mode: modeTag(m) };
 }
 
 fs.mkdirSync(outDir, { recursive: true });
@@ -175,7 +175,7 @@ if (HAVE_BASE) {
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-const fig = (c, view) => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b>${view === 'profile' ? ' <i>(profile)</i>' : ''}<br><small>${esc(c.roleLine || 'no slot roles')} · ${c.rings} descriptor${c.rings === 1 ? '' : 's'} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live)</small><p>${esc(c.note)}</p></figcaption></figure>`;
+const fig = (c, view) => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b>${view === 'profile' ? ' <i>(profile)</i>' : ''}<br><small>${esc(c.roleLine || 'no slot roles')} · ${c.rings} descriptor${c.rings === 1 ? '' : 's'} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live) · ${esc(c.mode)}</small><p>${esc(c.note)}</p></figcaption></figure>`;
 const html = `<title>The orchid — slot roles and the mirror plane</title>
 <style>body{background:#0c0f0e;color:#dfe9e3;font:14px/1.5 system-ui,sans-serif;margin:24px}
 h1{font-size:22px;margin:0 0 6px}p.note{color:#9fb3a9;max-width:110ch}

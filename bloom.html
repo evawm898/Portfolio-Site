@@ -53,6 +53,19 @@
     <label for="autoRotate">Auto-rotate</label>
     <input type="checkbox" id="autoRotate" checked>
   </div>
+  <!-- PRINT PREVIEW (Eva, Sep 3 — unparked from the charter). A VIEW
+       control, never a geometry control: checked, the viewport renders the
+       EXPORT-FLOORED geometry (sheet, tip and foot floored at 1.00 mm, and
+       the ring the area rule derives from those floored feet) — the object
+       the printer will make, at three-figure petal counts the difference
+       between a render with visible gaps and a print with none. The Get STL
+       button never reads it: the export builds from readUI() alone, so the
+       bytes cannot move with this box. `shownMode()` in bloom.js is the ONE
+       owner of which geometry is on screen; the read-out names it. -->
+  <div class="bl-toggle">
+    <label for="printPreview" title="Render the geometry as it will PRINT: the 1.00 mm export floor applied to the sheet, tip and foot, and the ring re-derived from the floored feet. Never changes the STL.">Print preview</label>
+    <input type="checkbox" id="printPreview">
+  </div>
 </aside>
 
 <header class="bl-header">

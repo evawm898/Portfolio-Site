@@ -380,7 +380,42 @@ resize();
 
 /* ---------------- build ---------------- */
 const readout = document.getElementById('readout');
-let liveSummary = '';
+let shownSummary = '';   // the read-out for whatever geometry is on screen, in that geometry's mode
+
+/* ===================================================================
+   THE PRINT-PREVIEW TOGGLE (Eva, Sep 3 — unparked from the charter, where it
+   sat since the thickness layer), and `shownMode()` is THE ONE OWNER of
+   "which geometry is on screen".
+
+   A VIEW CONTROL, NEVER A GEOMETRY CONTROL. It is a raw DOM reference in the
+   VIEW box exactly like `autoRotate` and `viewPreset`: not in `inputs`, not a
+   CONTROLS row, invisible to readUI(), DEFAULTS, reset, fullStateDrift and
+   every gate that reads UI state. Checked, regenerate() builds the viewport
+   from an EXPORT-mode accumulator — the sheet, tip and foot floored at
+   MIN_FEATURE_MM and the ring re-derived by the area rule from the floored
+   feet — which is the object the printer will make. At three-figure petal
+   counts that is the difference between a render with visible gaps and a
+   print with none (Eva's mum run: 120 feet at 1.60 mm on a 3.63 mm ring live
+   against 4.69 mm printed).
+
+   THE EXPORT BYTES CANNOT MOVE WITH IT, and the argument is structural rather
+   than a measurement that happened to come out clean: the Get STL handler
+   builds `buildGeometry({ exportMode: true })` from readUI(), and this box is
+   not in readUI(). There is no branch in the export path that can observe
+   it. What the toggle DOES change is the telemetry cache — see
+   buildGeometry's `record` — so an export click can never overwrite what is
+   on screen and the export build can never be mistaken for the live one.
+   Both STL gates assert the shown mode is LIVE on every row (every "(live)"
+   label they print depends on it), and the panel gate flips the real box and
+   requires the exports on either side of it byte-identical.
+
+   EVERY CONSUMER READS THIS FUNCTION: regenerate(), the read-out's first
+   line, the print-truth pair's on-screen marker, and __bloomMetrics()'s
+   `shownMode`. A second reading of the checkbox anywhere would be a second
+   owner of the one boundary this control is about. */
+const printPreviewInput = document.getElementById('printPreview');
+function shownMode() { return printPreviewInput && printPreviewInput.checked ? 'export' : 'live'; }
+let lastShownMode = 'live';
 
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
@@ -421,11 +456,22 @@ let lastFitCenter = [0, 0, 0];
    capability rows carry their OWN read-back assertion. */
 let capability = null;
 
-function buildGeometry({ exportMode }) {
+/* `record` — whether this build is THE ONE ON SCREEN, and therefore the one
+   the telemetry cache, the read-out and __bloomMetrics() describe. Until the
+   print-preview toggle this was `!exportMode`, which was the same thing while
+   only regenerate() built live and only the export handler built floored.
+   It is not the same thing any more: a previewed build is export-mode AND on
+   screen, and an export click during a preview is export-mode and NOT. Keying
+   the cache off the mode would let the Get STL build overwrite what the
+   viewport shows — the mislabelled-telemetry mutant (T2) the crowding
+   instrument's R2 catches on every floor-binding row — so the caller says
+   which build it is making, and only regenerate() says `record: true`. */
+function buildGeometry({ exportMode, record = false }) {
   const acc = new MeshBuilder({ exportMode });
   const uiForBuild = readUI();
   const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
-  if (!exportMode) {
+  if (record) {
+    lastShownMode = exportMode ? 'export' : 'live';
     lastPlacement = uiForBuild.placement;
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
     lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals;
@@ -474,8 +520,14 @@ function buildGeometry({ exportMode }) {
 
    footRing() is asked the same question twice rather than anything
    re-deriving a radius: two throwaway accumulators differing only in mode,
-   emitting no triangles. The one owner answers both. */
-function materialLines(ui) {
+   emitting no triangles. The one owner answers both.
+
+   THE TOGGLE IS BUILT NOW (Sep 3) AND THIS PAIR STAYS: the two lines are the
+   two geometries and the toggle only decides which one the viewport renders.
+   So the marker moves rather than the lines duplicating — `← on screen`
+   lands on whichever line `shownMode()` names, and the other keeps its own
+   label. One owner for the choice, two labelled numbers as before. */
+function materialLines(ui, mode) {
   /* Ring 0 — the outermost, which is the ring this line has always reported
      and the one the hub is built on (hub.radius IS rings[0].radius in every
      placement). The inner rings' radii are on the arrangement line, where the
@@ -490,7 +542,18 @@ function materialLines(ui) {
          + ` · ring ${r.radius.toFixed(2)} mm`;
   };
   const a = say(live), b = say(printed);
-  return a === b ? a : `${a}   ← live\nPRINTED (export floor ${MIN_FEATURE_MM.toFixed(2)} mm): ${b}`;
+  return a === b ? a
+    : `${a}   ← live${mode === 'live' ? ', on screen' : ''}\nPRINTED (export floor ${MIN_FEATURE_MM.toFixed(2)} mm): ${b}${mode === 'export' ? '   ← on screen' : ''}`;
+}
+
+/* THE FIRST LINE OF THE READ-OUT names the geometry on screen, always — in
+   live mode too, because a state that is only ever implied is a state the
+   reader has to infer, and the toggle's whole reason to exist is that live
+   and printed are different objects now. Reads shownMode(); owns nothing. */
+function showingLine(mode) {
+  return mode === 'export'
+    ? `on screen: PRINT PREVIEW — export floor ${MIN_FEATURE_MM.toFixed(2)} mm applied to sheet, tip and foot, ring re-derived from the floored feet\n`
+    : 'on screen: LIVE geometry, as authored (the print-truth line below says where the print differs)\n';
 }
 
 /* THE LOW-COUNT SPIRAL FLAG — the whole of how phyllotaxis below eight petals
@@ -568,6 +631,27 @@ function footFloorLine(rings) {
   const hi = clampedRingsPhrase(rings, (r) => r.widthClampedHigh);
   return (lo ? `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${lo} — the blade keeps shrinking, the root does not\n` : '')
        + (hi ? `FOOT WIDTH CAPPED at ${FOOT_MAX_WIDTH_MM.toFixed(2)} mm on ${hi} — the blade keeps widening, the ring does not\n` : '');
+}
+
+/* THE INNER-RING LINE (Eva, Sep 3) — the read-out that stands where a derived
+   depth clamp was proposed and rejected. The depth slider reaches six now and
+   nothing caps it against the foot floor, because the "collision" a clamp
+   would have enforced is not a buildability limit (every depth to eight
+   exports watertight and as one piece) and because it is already reachable
+   at depth 1..3 on shipped rows — so a clamp could not be byte-identical and
+   would gate a state ruled reachable on purpose. What a visitor needs instead
+   is to be TOLD, in the FOOT WIDTH FLOORED discipline: WHICH rings are
+   narrower than one foot (the feet on them overlap each other), and which
+   are inside their own overhang (the feet cross the axis). Both flags are
+   footRing()'s own telemetry; this only names them. Absent when no ring is
+   under the floor, so the line simply is not there rather than saying
+   "none". The panel gate asserts it in both directions. */
+function innerRingLine(rings) {
+  const under = clampedRingsPhrase(rings, (r) => r.underFootFloor);
+  if (!under) return '';
+  const cross = clampedRingsPhrase(rings, (r) => r.crossesAxis);
+  return `RINGS NARROWER THAN A FOOT on ${under} — under ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm, so the feet on them overlap each other`
+       + (cross ? `; on ${cross} they cross the axis` : '') + `\n`;
 }
 
 /* THE SLOT-ROLE LINE — what the mirror plane actually did, and where the
@@ -703,6 +787,7 @@ function summarise(ui, acc, mode, rings, fr) {
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
        + footFloorLine(rings)
+       + innerRingLine(rings)
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -740,7 +825,11 @@ function regenerate() {
   const ui = readUI();
   refreshLabels(ui);
   const wasPlacement = lastPlacement;   // captured before buildGeometry() below overwrites it
-  const { geo, acc, built } = buildGeometry({ exportMode: false });
+  /* THE MODE ON SCREEN, decided once per build by the one owner. `record`
+     marks this as the build the telemetry describes; the export handler's
+     build never carries it. */
+  const mode = shownMode();
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true });
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
   else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
   /* The bounding SPHERE is the framing quantity (the accumulator's bounding
@@ -771,8 +860,8 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  liveSummary = summarise(ui, acc, 'live', built.rings, built.foot) + `\n${materialLines(ui)}`;
-  readout.textContent = liveSummary;
+  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot) + `\n${materialLines(ui, mode)}`;
+  readout.textContent = shownSummary;
 }
 
 /* rAF-coalesced rebuild: many input events per frame, one build. */
@@ -787,6 +876,10 @@ for (const c of CONTROLS) {
   inputs[c.id].addEventListener('input', () => { applyVisibility(); scheduleRegen(); });
   inputs[c.id].addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
 }
+/* The print-preview box rebuilds through the same rAF coalescer every
+   registry control uses — no visibility pass, because it is not a control
+   and no predicate reads it. */
+if (printPreviewInput) printPreviewInput.addEventListener('change', scheduleRegen);
 
 /* ---------------------------------------------------
    VIEW PRESETS — the VIEW box's dropdown. Pure camera chrome: reads
@@ -904,6 +997,10 @@ function recenterFanView() {
 /* ---------------- STL export ---------------- */
 document.getElementById('exportStl').addEventListener('click', () => {
   const ui = readUI();
+  /* ALWAYS EXPORT MODE, NEVER RECORDED, AND shownMode() IS NOT READ HERE —
+     the three clauses the print-preview toggle's byte argument rests on
+     (see shownMode's note). The panel gate flips the box and requires the
+     STL on either side of it byte-identical. */
   const { geo, acc, built } = buildGeometry({ exportMode: true });
   const exportTris = acc.triangleCount;   // the accumulator owns the count, in both modes
   if (exportTris > EXPORT_TRI_BUDGET) {
@@ -930,7 +1027,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
      multi-layer export — it would have printed the ring radii under the word
      "exported". The tris/max-dim line is always last, so ask for that. */
   const exportLines = summarise(ui, acc, 'export', built.rings, built.foot).split('\n');
-  readout.textContent = `${liveSummary}\n`
+  readout.textContent = `${shownSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
 
@@ -944,7 +1041,17 @@ window.__bloomMetrics = () => ({
   derivedRadius: lastRing.derivedRadius,
   centerStyle: lastCenter.style,
   centerTris: lastCenter.tris,
-  liveTris: lastTris,
+  /* WHICH GEOMETRY EVERY NUMBER BELOW DESCRIBES (Sep 3, the print-preview
+     toggle). `shownTris` is the count of the build on screen in whatever
+     mode it was built. `liveTris` keeps its name and its meaning — the LIVE
+     build's count — and is therefore NULL while the preview is on, never the
+     export count wearing a live label: a caption that prints it then prints
+     "null" loudly rather than a number that is not the number. Both STL
+     gates assert `shownMode === 'live'` on every row; a sheet that toggles
+     captions from `shownTris` and `shownMode`. */
+  shownMode: lastShownMode,
+  shownTris: lastTris,
+  liveTris: lastShownMode === 'live' ? lastTris : null,
   maxDimMm: lastMaxDim,
   fitRadius: lastFitRadius,
   fitCenter: [...lastFitCenter],
@@ -1035,6 +1142,11 @@ window.__bloomMetrics = () => ({
        slider - with the blade widening and the area-ruled ring standing
        still, and nothing reported it. See FOOT_MAX_WIDTH_MM. */
     widthClampedHigh: r.widthClampedHigh,
+    /* THE DEPTH TELEMETRY (Sep 3) — footRing()'s own two flags behind the
+       read-out's RINGS NARROWER THAN A FOOT line, exposed so the panel gate
+       asserts that line against the owner in both directions. */
+    underFootFloor: r.underFootFloor,
+    crossesAxis: r.crossesAxis,
     /* THE ROLE AND ITS RECORD, footRing()'s OWN answer. Z1 reads roleCount to
        check the partition; Z2 reads role and overrides against what the
        builder reported it actually used. A gate deriving either from

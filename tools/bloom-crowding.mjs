@@ -37,9 +37,14 @@
    ruled clean reads 5 or below and the one she ruled bad reads 11, so 6..10
    are UNRULED and print without a mark rather than being called CROWDED
    before she has looked at one. The number prints on every row regardless,
-   so the printout carries the sensitivity. RE-DERIVE THIS CONSTANT WHEN THE
-   DEPTH CAP IS RAISED: a depth of 6 adds rings at small radii, which lifts
-   every reading, so an inherited threshold would be wrong in both directions.
+   so the printout carries the sensitivity.
+   RE-DERIVED WHEN THE DEPTH CAP WAS RAISED TO SIX (Sep 3, the same day) and
+   HELD AT 11 by Eva's second ruling, pending the depth sheet: measured at
+   depths 4/5/6 the mum reads 13/15/19 (bad, and flagged), the defaults
+   2/2/2, the ruled-clean depth cell 4/5/4 and RADIAL x 40 x spread 0.60
+   12/11/15 — so the ruled-clean maximum is still 5 and the ruled-bad
+   minimum still 11, and the deeper depth-cell states sit unruled just under
+   the line, on tools/shot-bloom-depth.mjs for her eye.
 
    WHAT IT IS BLIND TO — read before quoting a clean reading:
      - BLADE-TO-BLADE CROWDING ABOVE THE ROOT. In the artefact the feet are
@@ -88,10 +93,20 @@
          petal, all 120 under CONTINUOUS) lies exactly where the rectangle
          built from that descriptor's numbers puts it — J1's expected-from-
          owner check, pointed at this model;
-     R5  the raster is CONVERGED: D_max is identical and D_mean within 0.5%
-         at twice the cell. A depth reading that moves with the cell is a
-         sampling artefact wearing a geometry costume (the flower's lesson),
-         and it is refused rather than reported.
+     R5  the raster is CONVERGED: D_max is identical at two pitches and
+         D_mean within 0.5% at twice the cell. A depth reading that moves
+         with the cell is a sampling artefact wearing a geometry costume
+         (the flower's lesson), and it is refused rather than reported.
+         D_MAX IS RESOLVED LOCALLY (Sep 3, the depth raise): the hub-pitch
+         raster alone wobbled by one on six deep rows whose innermost ring
+         is a few hundredths of a millimetre — 29 vs 28 on the mum at seven
+         turns, 40 vs 38 at depth 8 x shrink 0.35 — because the deepest
+         stack there is a sliver narrower than a hub-scale cell. So the
+         reading is taken by refineDepth(): windows around every hub cell
+         within two of the hub maximum, re-rastered at 1/8 and 1/16 of the
+         hub pitch, and R5 requires THOSE two to agree. Same cell budget
+         order as the hub pass; the six rows converge; every shipped row's
+         number is unchanged (checked on the standalone run below).
    This is also why it survives per-petal work for free: a per-petal
    descriptor still arrives through `slotRings`, and Z6 already asserts a
    role never differentiates the foot.
@@ -164,12 +179,54 @@ export function stackDepth(feet, R, cell) {
     if (d > dmax) { dmax = d; at = k; }
   }
   const union = occ * cell * cell;
-  let dmaxAt = null;
+  const centreOf = (k) => [-half + (Math.floor(k / N) + 0.5) * cell, -half + ((k % N) + 0.5) * cell];
+  let dmaxAt = null, dmaxXY = null;
   if (at >= 0) {
-    const x = -half + (Math.floor(at / N) + 0.5) * cell, y = -half + ((at % N) + 0.5) * cell;
+    const [x, y] = centreOf(at);
     dmaxAt = { r: Math.hypot(x, y), thetaDeg: (Math.atan2(y, x) * 180) / Math.PI };
+    dmaxXY = [x, y];
   }
-  return { dmax, dmaxAt, dmean: union > 0 ? sumArea / union : 0, dmeanRaster: occ ? tot / occ : 0, union, sumArea, cell, N };
+  /* THE CANDIDATE CELLS for the local passes: every cell within two of the
+     maximum, deepest first, capped so the cost stays bounded on a fused base
+     where thousands of cells share the top reading. A sliver of depth D is
+     bordered by faces of depth D-1 (one rectangle fewer), which the hub
+     raster does see, so centring windows on D-1 and D-2 cells is what lets
+     the fine pass find a maximum the coarse pass could not resolve. */
+  const candidates = [];
+  for (let k = 0; k < depth.length; k++) if (depth[k] >= dmax - 2 && depth[k] > 0) candidates.push(k);
+  candidates.sort((a, b) => depth[b] - depth[a]);
+  const top = candidates.slice(0, 96).map((k) => ({ c: centreOf(k), d: depth[k] }));
+  return { dmax, dmaxAt, dmaxXY, dmean: union > 0 ? sumArea / union : 0, dmeanRaster: occ ? tot / occ : 0, union, sumArea, cell, N, candidates: top };
+}
+
+/* THE LOCAL PASS. Around each candidate cell of a hub-pitch raster, a window
+   of three hub cells on a side is re-rastered at `pitch`, with an odd sample
+   count so the candidate's own centre is a sample (the window can then never
+   read lower than the cell it was centred on). Membership is the same exact
+   test stackDepth() uses; only the sampling changes, which is the whole
+   point of comparing two of these. */
+export function refineDepth(feet, base, pitch) {
+  let dmax = 0, dmaxAt = null;
+  const half = 1.5 * base.cell;
+  const n = 2 * Math.ceil(half / pitch) + 1;
+  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, radius: f.radius, overhang: f.overhang }));
+  for (const cand of base.candidates) {
+    for (let i = 0; i < n; i++) {
+      const x = cand.c[0] + (i - (n - 1) / 2) * pitch;
+      for (let j = 0; j < n; j++) {
+        const y = cand.c[1] + (j - (n - 1) / 2) * pitch;
+        let d = 0;
+        for (const f of pre) {
+          const sr = x * f.c + y * f.s - f.radius;
+          if (sr > 0 || sr < -f.overhang) continue;
+          const v = -x * f.s + y * f.c;
+          if (Math.abs(v) <= f.hw) d++;
+        }
+        if (d > dmax) { dmax = d; dmaxAt = { r: Math.hypot(x, y), thetaDeg: (Math.atan2(y, x) * 180) / Math.PI }; }
+      }
+    }
+  }
+  return { dmax, dmaxAt, pitch };
 }
 
 /* All-pairs nearest neighbour — centre to centre, in mean foot widths — and
@@ -296,9 +353,22 @@ export async function footCrowding(page, row, stl = null) {
   const cell = cellFor(E.hub.radius);
   const fine = stackDepth(E.feet, E.hub.radius, cell);
   const coarse = stackDepth(E.feet, E.hub.radius, cell * 2);
+  /* THE LOCAL RESOLUTION OF D_MAX — see the header's R5 note. The hub pass
+     locates the candidates; the two local passes decide the number. */
+  /* The coarse pass's own maximum cell is seeded into the candidates: on a
+     fused base hundreds of cells share the top readings and the cap could
+     otherwise leave the coarse pass's peak outside every window, which
+     would trip the "a window missed the cell" clause for a sampling reason. */
+  const seeded = { ...fine, candidates: [...fine.candidates, ...(coarse.dmaxXY ? [{ c: coarse.dmaxXY, d: coarse.dmax }] : [])] };
+  const r8 = refineDepth(E.feet, seeded, cell / 8);
+  const r16 = refineDepth(E.feet, seeded, cell / 16);
   /* R5 */
-  if (fine.dmax !== coarse.dmax) bad.push(`crowding R5: D_max reads ${fine.dmax} at cell ${cell} mm and ${coarse.dmax} at ${cell * 2} mm — the reading depends on the sampling, so it is not a reading`);
+  if (r8.dmax !== r16.dmax) bad.push(`crowding R5: D_max reads ${r8.dmax} at cell ${cell / 8} mm and ${r16.dmax} at ${cell / 16} mm around the hub pass's candidates (hub pass ${fine.dmax} / ${coarse.dmax}) — the reading depends on the sampling, so it is not a reading`);
+  if (r16.dmax < fine.dmax || r16.dmax < coarse.dmax) bad.push(`crowding R5: the local passes read D_max ${r16.dmax} but the hub pass read ${fine.dmax} / ${coarse.dmax} — a window missed the cell it was centred on`);
   if (fine.dmean > 0 && Math.abs(fine.dmean - coarse.dmean) > 0.005 * fine.dmean) bad.push(`crowding R5: D_mean reads ${fine.dmean.toFixed(4)} at cell ${cell} mm and ${coarse.dmean.toFixed(4)} at ${cell * 2} mm — more than 0.5% apart`);
+  /* The reading is the resolved one; where the hub pass already had it (every
+     shipped row) the two are equal and `dmaxPass` says so. */
+  const resolved = { dmax: r16.dmax, dmaxAt: r16.dmaxAt, pass: r16.dmax === fine.dmax ? 'hub' : 'local' };
   /* THE LIVE READING, for the divergence line only. Whenever the export
      floor does not bind the two geometries are the same feet on the same hub
      (the same doubles — asserted, not assumed), so the export raster IS the
@@ -306,18 +376,27 @@ export async function footCrowding(page, row, stl = null) {
      for a second raster. */
   const sameFeet = Lv.hub.radius === E.hub.radius && Lv.feet.length === E.feet.length
     && Lv.feet.every((f, i) => f.radius === E.feet[i].radius && f.overhang === E.feet[i].overhang && f.width === E.feet[i].width && f.az === E.feet[i].az);
-  const live = sameFeet ? fine : stackDepth(Lv.feet, Lv.hub.radius, cellFor(Lv.hub.radius));
+  const live = sameFeet
+    ? { dmax: resolved.dmax, dmean: fine.dmean }
+    : (() => {
+        /* Resolved the same way as the export reading, so the divergence line
+           compares like with like; not asserted, because it is a diagnostic
+           and the export number is the reading. */
+        const lf = stackDepth(Lv.feet, Lv.hub.radius, cellFor(Lv.hub.radius));
+        return { dmax: refineDepth(Lv.feet, lf, cellFor(Lv.hub.radius) / 16).dmax, dmean: lf.dmean };
+      })();
   const nn = nearestFeet(E.feet);
 
   const r = {
     n: E.feet.length,
     hubR: E.hub.radius, hubRLive: Lv.hub.radius,
     footW: E.feet[0].width, footWLive: Lv.feet[0].width,
-    dmax: fine.dmax, dmaxAt: fine.dmaxAt, dmean: fine.dmean, union: fine.union, sumArea: fine.sumArea, cell,
+    dmax: resolved.dmax, dmaxAt: resolved.dmaxAt, dmaxPass: resolved.pass, hubPassDmax: fine.dmax,
+    dmean: fine.dmean, union: fine.union, sumArea: fine.sumArea, cell,
     liveDmax: live.dmax, liveDmean: live.dmean,
     nn: { q: nn.all.q, d: nn.all.d, gap: nn.all.gap, a: nn.all.a && `${nn.all.a.layer}/${nn.all.a.slot}`, b: nn.all.b && `${nn.all.b.layer}/${nn.all.b.slot}` },
     nnAdjacent: { q: nn.adjacent.q, d: nn.adjacent.d },
-    crowded: fine.dmax >= CROWDED_DMAX,
+    crowded: resolved.dmax >= CROWDED_DMAX,
     registered,
     exportTris: E.tris,
   };
@@ -329,7 +408,7 @@ export async function footCrowding(page, row, stl = null) {
 export function crowdingLine(r) {
   const at = r.dmaxAt ? ` at r ${r.dmaxAt.r.toFixed(2)} mm` : '';
   const diverges = r.liveDmax !== r.dmax || Math.abs(r.liveDmean - r.dmean) > 0.005;
-  return `CROWDING (export): feet ${r.n} · stack D_max ${r.dmax}${at} · D_mean ${r.dmean.toFixed(2)}`
+  return `CROWDING (export): feet ${r.n} · stack D_max ${r.dmax}${at}${r.dmaxPass === 'local' ? ` (resolved locally; hub-pitch raster read ${r.hubPassDmax})` : ''} · D_mean ${r.dmean.toFixed(2)}`
     + ` · foot ${r.footW.toFixed(2)} mm on hub ${r.hubR.toFixed(2)} mm`
     + ` · NN ${isFinite(r.nn.q) ? r.nn.q.toFixed(2) + ' w (gap ' + r.nn.gap + ')' : 'n/a'}`
     + (diverges ? ` · live reads D_max ${r.liveDmax} · D_mean ${r.liveDmean.toFixed(2)} (ring ${r.hubRLive.toFixed(2)} mm)` : '')

@@ -426,8 +426,10 @@ any of them.
   convertible; and the state has its own cell on `tools/shot-bloom-thickness.mjs`'s
   divergence sheet.
 
-- **PARKED, and deliberately not built: a "print preview" toggle** rendering the
-  export-floored geometry live. The reasoning that parks it is the same reasoning that
+- ~~**PARKED, and deliberately not built: a "print preview" toggle**~~ **BUILT Sep 3
+  (Eva's ruling: the parking is spent at three-figure petal counts) — see the session-13
+  entry at the end of this document. The parking note is kept below as written.** It
+  proposed rendering the export-floored geometry live. The reasoning that parks it is the same reasoning that
   would eventually build it: a preview that silently shows an arrangement the print will not
   produce is the same lie as an unlabelled triangle count — a labelled one is honest, and a
   second, rendered one would be better still. It is a second rendering path with its own
@@ -2935,7 +2937,9 @@ exposure the ruling accepts in exchange for the minutes.
       them marked before she has looked at one. The number prints on every row either way,
       so the printout carries the sensitivity and the threshold carries only the claim. **RE-
       DERIVE IT WHEN THE DEPTH CAP IS RAISED** — depth 6 adds rings at small radii and lifts
-      every reading, so an inherited threshold would be wrong in both directions. The flag
+      every reading, so an inherited threshold would be wrong in both directions. **RE-DERIVED
+      Sep 3 with the raise to six and HELD AT 11 (Eva's second ruling), pending the depth
+      sheet — the numbers are in the session-13 entry at the end of this document.** The flag
       is asserted in BOTH directions at matrix level (the sub-8 spiral precedent): the mum
       is a named row so the raised state is exercised by a ruling rather than by a corner.
 
@@ -2995,3 +2999,202 @@ exposure the ruling accepts in exchange for the minutes.
       rather than the raster (a fixed grid of ~2,400 cells across the hub, floored at 5 µm;
       the first draft capped the pitch instead, which made the LARGEST blooms the finest
       sampled at 37 million cells for no gain).
+
+- ~~Session 13 — the three preconditions for a domed hub~~ **BUILT Sep 3: the print-preview
+  toggle (unparked), the depth cap raised to SIX with a read-out line and NO derived clamp,
+  and the crowding threshold re-derived and HELD at 11. No collar, no dome, no junction edit.**
+
+    - **WHAT WAS ON `main` WHEN THE SESSION OPENED, and the brief was stale on it.** The
+      brief's item 3 — the foot-crowding instrument, its four-config separation, its
+      Fibonacci-gap neighbour argument and the flag-versus-gate ruling — had already shipped
+      as #144 the same afternoon. Nothing of it was rebuilt; the one line that entry left open
+      (re-derive `CROWDED_DMAX` when the depth cap is raised) is answered below. Items 1 and 2
+      were open, exactly as the brief said.
+
+    - **THE TOGGLE, and its one owner.** `#printPreview` sits in the VIEW box beside
+      Auto-rotate and is view chrome in every sense `viewPreset` is: not a registry row,
+      invisible to `readUI()`, DEFAULTS, reset and `fullStateDrift`. `shownMode()` in bloom.js
+      is the ONE OWNER of "which geometry is on screen": `regenerate()` builds the viewport
+      in that mode, the read-out's first line names it (`on screen: LIVE geometry, as
+      authored` / `on screen: PRINT PREVIEW — export floor 1.00 mm applied …`), the
+      print-truth pair keeps BOTH its lines and only its `← on screen` marker moves, and
+      `__bloomMetrics()` reports `shownMode` and `shownTris` while `liveTris` reads NULL
+      whenever the preview is on — never an export count under a live label, on the
+      `f3(undefined)` doctrine that a wrong number must be loud.
+
+    - **THE BYTES CANNOT MOVE, AND THE ARGUMENT IS STRUCTURAL.** The Get STL handler builds
+      `buildGeometry({ exportMode: true })` from `readUI()`, and the box is not in `readUI()`;
+      there is no branch in the export path that can observe it. What the toggle changes is
+      the telemetry cache, and that needed a real change: `buildGeometry` used to cache
+      `lastRings`/`lastTris` on `!exportMode`, which was the same as "the build on screen"
+      only while nothing but regenerate() built live. Now the CALLER says which build is on
+      screen (`record: true`, only from regenerate()), so an export click during a preview
+      can never overwrite the viewport's numbers. Measured anyway, on the retention ruling: **phase11 (402 rows, the newest baseline) on a
+      worktree at 174cc2f and on the branch head: 402/402 bit-identical, 0 moved, defaults
+      bit-identical** — with the depth raise in the same tree, so this one run carries both
+      changes' byte claims.
+
+    - **THE POSITIVE CONTROL, run against the shipped instruments BEFORE a new assertion was
+      written, with `autoRotate` standing in for the not-yet-existing box.** T1, an export
+      path that reads view chrome: in the gates' own state (chrome untouched) **8 of 8 rows
+      byte-identical to the base tree, every shipped check green** — so a toggle-dependent
+      export was invisible to everything the project owned, because no gate ever flips view
+      chrome. T2, an export build whose telemetry is cached as if live: the crowding
+      instrument's R2 fires on **5 of 8 rows** (every row where the floor binds — mum hub
+      3.633 vs 4.691) and is blind on the rest, where live and export share every double.
+      So the new coverage is aimed at T1's hole: the panel gate's route (i) flips the REAL
+      box on ALL THIN, requires a counted rebuild, `shownMode` export, `liveTris` null, the
+      hub radius equal to `footRing()`'s own export answer, the read-out naming the mode, the
+      PRINTED line marked, zero registry drift, and **the STL exported with the box ON
+      byte-identical to the one exported with it OFF on the same page**; then OFF restoring
+      live. Its negative control is the listener-less clone. And BOTH STL gates now assert
+      `shownMode === 'live'` on every row as a validity failure, because every "(live)" label
+      they print depends on it. Re-run with the real box on a mutant copy (`exportMode:
+      shownMode() === 'live'`, correct with the box OFF and wrong with it ON): the gate fails on exactly one clause, `the STL exported with the box ON
+      differs from the one with it OFF (556884 vs 556884 bytes) — the toggle reached the
+      export path`, with every other assertion in the run green; the same gate passes on the
+      real tree, and its negative control (the listener-less clone) fires on the rebuild
+      clause. Red on the mutant, green on the fix: the route measures the property.
+
+    - **THE CAPTION CONVENTION: every contact-sheet cell states its mode, from the app.**
+      `modeTag(m)` in the harness reads `__bloomMetrics().shownMode` and returns
+      `shown: LIVE (as authored)` or `shown: PRINT PREVIEW (export floor 1.00 mm applied)`;
+      a tree that predates the toggle says so rather than defaulting to LIVE (the before/after
+      sheets render base worktrees). Every canvas sheet appends it to its `<small>` line — one
+      helper, no second code path, and a caption that can only ever disagree with its frame
+      if the app disagrees with itself. The panel sheet photographs the panel, whose read-out
+      now carries the mode on its own first line.
+
+    - **THE DEPTH CAP: THE FORMULA WAS CHECKED AND DOES NOT HOLD, for a structural reason.**
+      The brief's hypothesis, `L_max = floor(ln(footFloor / ring0) / ln(shrink))`, predicted
+      6 for the shipping defaults and 3 for the mum. Measured on a worktree with the cap at 8,
+      8 configurations × RADIAL/CONTINUOUS × depths 1..8 (128 rows): **ring0 is not a property
+      of the configuration — the area rule sums every foot, so R0 grows with depth**, 8.85 mm
+      at one layer, 13.23 at three, 15.65 at six on the defaults, and the defaults' innermost
+      ring is still 1.69 mm at depth 8. The brief's 13.23 was the three-layer figure.
+
+      | configuration | formula, R0 at depth 3 | formula, R0 at depth 1 | measured: deepest depth whose innermost EXPORT ring is ≥ 1.60 mm |
+      |---|---|---|---|
+      | defaults, RADIAL | 6.43 → 6 | 5.20 → 5 | 8 |
+      | defaults, CONTINUOUS | 6.22 → 6 | 4.99 → 4 | 7 |
+      | the mum | 4.82 → 4 | 2.36 → 2 | 6 |
+      | the depth cell, 3 × 0.90 | 20.96 | 16.23 | beyond 8 |
+
+    - **AND THE COLLISION IT NAMES IS NOT A BUILDABILITY LIMIT.** All 128 rows export
+      watertight, as ONE piece, with 0 degenerate and 0 non-manifold triangles, and every
+      J1–J6, Z, form and thickness assertion clean — a 0.01 mm blade at depth 8 × shrink
+      0.35 included. Nothing collides. What deepens with depth is crowding, which the
+      instrument from #144 already flags.
+
+    - **A DERIVED CLAMP WAS PROPOSED BY THE BRIEF AND REJECTED (Eva, Sep 3), on two
+      measurements.** First, it could not be byte-identical at depth ≤ 3: eleven reachable
+      depth-2/3 states already have an innermost ring under 1.60 mm. **THREE OF THEM ARE
+      SHIPPED GATE ROWS, AND THEY ARE A PRE-EXISTING FACT DISCOVERED BY THIS SESSION, NOT
+      DAMAGE IT CAUSED** (recorded on Eva's instruction so a later session does not read them
+      as new): `LAYERS: 3 x ALL THIN x spread min` (innermost export ring 1.087 mm), `3 layers
+      x layerSize min (0.35)` (1.370 mm) and `CONT: 3 turns x layerSize min x petalCount 40`
+      (0.470 mm at eight petals; the forty-petal row is the same region). They have exported
+      watertight and as one piece since they were written; a ring narrower than a foot is
+      feet overlapping each other, which is the state the Aug 31 spread ruling made reachable
+      on purpose. Second, a clamp would be a GATE on exactly the property #144 ruled a FLAG
+      the same day. So the slider reaches six and nothing caps it against the floor; the
+      read-out SAYS instead, in the FOOT WIDTH FLOORED discipline: `RINGS NARROWER THAN A
+      FOOT on rings 4–5 (2 of 6) — under 1.60 mm, so the feet on them overlap each other; on
+      rings 4–5 (2 of 6) they cross the axis`, from two telemetry flags footRing() stamps on
+      every ring (`underFootFloor`, `crossesAxis`), asserted in both directions by the panel
+      gate's route (j) against the owner's own flags.
+
+    - **WHY SIX AND NOT EIGHT.** At the shipping defaults six is the last depth at which the
+      deepest blade is still wider than its own root in BOTH placements (3.10 mm RADIAL,
+      2.32 mm CONTINUOUS against the 1.60 mm foot; at eight it is 1.60 and 1.20 — the
+      "blade narrower than its root" the old MAX_LAYERS note named as the binding constraint)
+      and the last at which the default base still reads D_max 2 (3 and 5 at seven and
+      eight). Export cost at 6 × 40 petals: 297,888 triangles, 20% of the budget. Byte
+      identity at depth ≤ 3 is by construction — the layer loop is unchanged and the constant
+      is a validation bound and a slider range.
+
+    - **WHAT MOVED IN THE LIVE MATRIX, predicted before the raise: exactly 23 rows**, all
+      resolving `layerCount` to the slider's maximum (`layerCount max`, the four ALL MAX rows,
+      and block 7's eighteen `N layers × sub-control` rows) — the same predeclared consequence
+      as when ALL MAX first meant three. Every frozen matrix pins the literal 3. **phase11 is
+      frozen at 174cc2f (402 rows, the crowding instrument's own head and the first baseline
+      that carries the mum as a named row)**; the retention close ran it on both trees plus
+      the live matrix (434 rows on the branch head, compared by label against the parent
+      tree's phase11 export): **379 shared rows bit-identical; exactly 4 MOVED — `ALL MAX
+      (centre off)` and `ALL MAX x DOME/DISC/RING max`, the rows that resolve `layerCount` to
+      the slider's maximum; 19 block-7 rows relabelled from "3 layers x …" to "6 layers x …"
+      (new states, no counterpart on the parent); 32 DEPTH rows new. 4 + 19 = the 23 movers
+      predicted before the raise, and nothing outside them.**
+
+    - **THE NEW ROWS: 32** — depth 4/5/6 × spread min/default/max × RADIAL/CONTINUOUS
+      (18), then the corners: the mum at six turns (D_max 19), 6 × ALL THIN × spread min (28),
+      6 × shrink min (the 0.18 mm blade, 24), 6 turns × shrink min × 40 (a 240-foot base at
+      D_max 130, every foot across the axis), the coincidence corner six deep, 6 × 40 × spread
+      min in both placements (15 / 25), 6 × ALL FORM MAX, the six-deep BARE bloom, 6 × SPIRAL,
+      the 225° effective tilt, ZYGO 6 × ALL INNER MAX, the depth cell taken to six, and a
+      clefted petal six whorls deep. Gates, in CI on the first push and again locally: **the export gate 434/434 watertight,
+      434/434 identical live and export triangle counts, 0 degenerate, 19 of 434 flagged
+      CROWDED (the mum, its six-turn state, and the deep spread-min and shrink-min corners),
+      932 s; the panel gate PASS and its negative control firing on all eight routes; the
+      frozen-matrices job proving phase11 deep-equal to 174cc2f.** The connectedness gate
+      came back **433/434 ONE piece with ONE ROW SKIPPED — `ALL MAX x DOME max`, whose grid
+      grew from 605x605x421 (131.8M) to 706x706x421 (209.8M) because ALL MAX now means six
+      layers of forty petals, the area rule sums 240 feet, and the DOME scales with the hub to
+      a 234 mm centre.** A row that used to be measured and is now skipped is coverage lost to
+      a change, so the gate's ceiling moved as its own note prescribes: `MAX_VOXELS` 160M →
+      256M (~22% over the new worst case; the next largest row is 50.3M), and that row
+      flood-fills to ONE component in 14.5 s at 629 MB peak RSS. With the ceiling raised the
+      gate reads 434/434.
+
+    - **SHRINK 1.00 IN CONTINUOUS — MEASURED, NOT CHANGED (the brief asked).** Not
+      degenerate: 0 non-manifold, 0 boundary, 0 degenerate at 8 and 40 per turn, with and
+      without tilt step, while RADIAL and SPIRAL at 1.00 × offset 0 × tilt 0 reproduce the
+      14,832 exactly (and RADIAL at 1.00 with the default offset 0.5 and tilt 12 reads 0 —
+      the coincidence needs the offset too). But **J5 fires on every continuous row at 1.00**
+      ("rings 0 and 1 do not step"): a zero-step continuum is indistinguishable from the
+      ring-building mutation J5 exists to catch. The 0.90 cap is load-bearing for an
+      instrument, not for the mesh. It stays; anyone raising it owes J5 a new witness.
+
+    - **THE CROWDING THRESHOLD, RE-DERIVED AND HELD.** D_max in export mode across the raise:
+
+      | configuration | d3 | d4 | d5 | d6 |
+      |---|---|---|---|---|
+      | the mum (ruled bad) | 11 | 13 | 15 | 19 |
+      | defaults (ruled clean) | 2 | 2 | 2 | 2 |
+      | the depth cell, 3 × 0.90 (ruled clean at 3) | 3 | 4 | 5 | 4 |
+      | RADIAL × 40 × spread 0.60 (unruled) | 13 | 12 | 11 | 15 |
+
+      The ruled-clean maximum is still 5 and the ruled-bad minimum still 11, so the numbers
+      do not move the line; the depth cell at 4/5/6 sat unruled at 4–5 just under it, which
+      is why those three went on the sheet. **RULED FROM THE SHEET (Eva, Sep 4): the depth cell
+      at 4 / 5 / 6 reads CLEAN, the mum stays BAD, the defaults and the three-deep cell stay
+      clean, and the threshold HOLDS at 11.** The ruled-clean set now reaches 5 at depth (the
+      five-layer cell), which is exactly where it already stood; nothing moves.
+
+    - **THE INSTRUMENT FAILED ITS OWN VALIDITY ON TINY RINGS, AND THE FIX SHIPS IN THE SAME
+      PR AS THE ROWS THAT NEED IT (Eva's instruction).** R5 refused six deep rows whose
+      innermost ring is a few hundredths of a millimetre — D_max 29 vs 28 on the mum at seven
+      turns, 40 vs 38 at depth 8 × shrink 0.35 — because the raster pitch is set from the
+      HUB radius and the deepest stack there is a sliver narrower than a hub-scale cell. None
+      of the 402 shipped rows hit it; `DEPTH: 6 layers x layerSize min` would have, and a row
+      the instrument cannot converge on is a row that gets quietly dropped. So `refineDepth()`
+      re-rasters windows of three hub cells around every hub cell within two of the maximum
+      at 1/8 and 1/16 of the hub pitch, R5 requires THOSE two to agree, and the reading is the
+      resolved one (the line says `resolved locally` when the hub pass had not). Every
+      previously failing row converges; **every one of the six ruled configurations reads
+      exactly what it read before** (11 / 2 / 3 / 5 / 4 / 10); one row moved by one where
+      the hub pass had under-resolved a sliver (shrink min × CONTINUOUS × depth 5, 24 → 25).
+
+    - **THE SHEET:** `node tools/shot-bloom-depth.mjs <dir>` — the mum live beside print
+      preview, same page, same camera, same base crop from below; the depth cell at 4 / 5 / 6
+      with its numbers; the mum at six turns; the defaults and the three-deep cell as
+      controls; every caption carrying the app's own mode tag and the export's crowding
+      number registered against a real STL. **The pair does not look the same, and the first render said it did — an instrument
+      error caught by looking:** the base crop had been framed from each mode's own hub
+      radius, so the 29% larger printed hub was pulled back by 29% and the two cells came out
+      the same apparent size. Framed once from the LIVE hub, the print preview shows the hub
+      disc visibly larger in the same frame, the rim band taller (1.00 mm against 0.60) and
+      every root leaving it thicker; the caption carries hub 3.63 → 4.69 mm, the same 120
+      feet, D_max 17 live against 11 printed. **Eva looked at the pair directly (Sep 4): the
+      print-preview hub is visibly bigger with a taller rim band, so the toggle earns its
+      place. Merged on that ruling.**.

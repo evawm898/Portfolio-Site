@@ -81,19 +81,43 @@ export const FOOT_MIN_WIDTH_MM = 1.6;
    A slider that has stopped moving must say so. */
 export const FOOT_MAX_WIDTH_MM = 10;
 
-/* HOW MANY WHORLS THE ARRANGEMENT MAY STACK. Three, and the binding
-   constraint is THE PETAL, not the triangle count — which was the surprise.
-   Measured Sep 1: three layers at petalCount 40 is 149,568 export triangles,
-   10% of EXPORT_TRI_BUDGET (1.5 M), so the budget is nowhere near binding and
-   a cap justified by triangles would have been a made-up number. What binds
-   is that the blade shrinks by `layerSize` per layer: at the shipping ratio
-   0.72 the third layer is an 18.1 mm blade, a fourth would be 13.0 mm, and at
-   `layerSize` <= 0.50 the deepest foot hits FOOT_MIN_WIDTH_MM and becomes a
-   floored stub with a blade narrower than its own root.
-   Raising this is a range change in the registry plus gate rows, not a
-   rewrite — `layerCount.max` is asserted equal to it by the harness so the
-   two cannot drift. */
-export const MAX_LAYERS = 3;
+/* HOW MANY WHORLS THE ARRANGEMENT MAY STACK. SIX (Eva, Sep 3, raised from
+   three), and the number is argued from a measurement rather than from a
+   formula — the formula was checked and does not hold.
+
+   THE HYPOTHESIS THAT WAS CHECKED: L_max = floor(ln(footFloor / ring0) /
+   ln(shrink)), the depth at which the innermost ring falls under one
+   FOOT_MIN_WIDTH_MM foot. It predicted 6 for the shipping defaults and 3 for
+   Eva's mum run. Measured on a worktree with this cap at 8, every
+   configuration x RADIAL/CONTINUOUS x depth 1..8: ring0 is NOT a property of
+   the configuration. The area rule sums every foot, so R0 GROWS WITH DEPTH —
+   8.85 mm at one layer, 13.23 at three, 15.65 at six on the defaults — and the
+   defaults' innermost ring is still 1.69 mm at depth 8. The formula
+   underestimates everywhere because its input moves under it.
+
+   AND THE COLLISION IT NAMES IS NOT A BUILDABILITY LIMIT. All 128 rows
+   export watertight, as ONE piece, with 0 degenerate and 0 non-manifold
+   triangles and every J/Z/form/thickness assertion clean — including a
+   0.01 mm blade at depth 8 x shrink 0.35. What deepens with depth is foot
+   CROWDING, which tools/bloom-crowding.mjs already flags, and which Eva
+   ruled a flag rather than a gate. A derived clamp on ring-versus-floor was
+   proposed and REJECTED (Eva, Sep 3): eleven reachable depth-2/3 states
+   already sit under the floor, three of them shipped gate rows, so the clamp
+   could not be byte-identical at depth <= 3 — and it would gate the state
+   the Aug 31 spread ruling made reachable on purpose. The read-out SAYS
+   where rings fall under the floor instead (`underFootFloor` /
+   `crossesAxis` below, telemetry only).
+
+   WHY SIX AND NOT EIGHT: at the shipping defaults, six is the last depth at
+   which the deepest blade is still wider than its own root in BOTH
+   placements (3.10 mm RADIAL, 2.32 mm CONTINUOUS against the 1.60 mm foot;
+   at eight it is 1.60 and 1.20) and the last at which the default base still
+   reads D_max 2 (3 and 5 at seven and eight). Export cost at 6 x 40 petals is
+   297,888 triangles, 20% of EXPORT_TRI_BUDGET. Raising this further is a
+   range change here and in the registry plus gate rows — `layerCount.max`
+   is asserted equal to it by the harness so the two cannot drift — and the
+   crowding threshold must be re-derived with it (bloom-crowding.mjs). */
+export const MAX_LAYERS = 6;
 
 /* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
    pi*(3 - sqrt(5)) rather than a decimal literal so the constant IS the
@@ -1519,14 +1543,17 @@ export function footRing(state, acc) {
   const R0 = derivedRadius * state.spread;         // the ONLY use of spread
   const rings = raw.map((p, L) => {
     const radius = R0 * p.scale;
+    /* How far inside the ring each foot continues, so foot–hub overlap is a
+       solid annulus, not a hairline touch. A FRACTION of this layer's own
+       radius with an absolute floor, so the guarantee is scale-free per
+       layer exactly as it was for the single ring. Named once here — the
+       same expression on the same double as the field it has always been —
+       so the axis-crossing flag below reads it rather than restating it. */
+    const overhang = Math.max(1.5, radius * 0.4);
     return {
       index: L,
       radius, derivedRadius, width: p.width, thickness,
-      /* How far inside the ring each foot continues, so foot–hub overlap is a
-         solid annulus, not a hairline touch. A FRACTION of this layer's own
-         radius with an absolute floor, so the guarantee is scale-free per
-         layer exactly as it was for the single ring. */
-      overhang: Math.max(1.5, radius * 0.4),
+      overhang,
       /* THE LAYER'S PLACEMENT, owned here so no consumer computes it. All
          three are EXACTLY the pre-layer constants at L = 0: Math.pow(x, 0) is
          1, `0 * layerTilt` is +0 for layerTilt >= 0 (its range starts at 0),
@@ -1615,6 +1642,16 @@ export function footRing(state, acc) {
       /* A statement about the EXPORT, true in either mode — the read-out has
          to warn about a floor it is not currently applying. */
       thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
+      /* THE DEPTH TELEMETRY (Eva, Sep 3) — the two facts a derived depth
+         clamp would have acted on, REPORTED instead of enforced, in the
+         FOOT WIDTH FLOORED discipline: a ring narrower than one foot means
+         the feet on it overlap each other; a ring inside its own overhang
+         means they cross the axis. Both are reachable on purpose (the Aug 31
+         spread ruling) and both already occur at depth 1..3 on shipped rows,
+         so the read-out says WHERE rather than a clamp deciding silently.
+         Telemetry only: nothing geometric may read these. */
+      underFootFloor: radius < FOOT_MIN_WIDTH_MM,
+      crossesAxis: radius < overhang,
     };
   });
 

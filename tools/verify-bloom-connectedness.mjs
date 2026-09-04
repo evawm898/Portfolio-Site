@@ -121,7 +121,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
@@ -144,7 +144,17 @@ const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed
    itself is 132 MB) against a 331 s whole-gate run — about 2.5%. If a future
    control pushes the worst case past this, the honest move is the same one:
    measure the new maximum and raise it, or shrink what the row reaches. */
-const MAX_VOXELS = 160e6;
+/* RAISED 160M -> 256M (Sep 3), because the depth raise made it bind again, in
+   exactly the way this note predicted. `ALL MAX` now means SIX layers of forty
+   petals; the area rule sums 240 feet, the hub grows, and the DOME scales
+   with the hub — so `ALL MAX x DOME max` went from 605x605x360 (131.8M) to
+   706x706x421 (209.8M, measured) and CI reported it SKIPPED on the first
+   push. A row that used to be measured and is now skipped is coverage lost
+   to a change, so the ceiling moves: 256M is ~22% over the new worst case,
+   the same margin 160M gave the old one; the next largest row is 50.3M
+   (ALL MAX x DISC max). Cost, measured on that row: see the charter's
+   session-13 entry. */
+const MAX_VOXELS = 256e6;
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 
 function voxelComponents(buf, cell) {
@@ -216,6 +226,15 @@ for (const row of rows) {
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   const drift = await fullStateDrift(page, row.set);
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }
+  /* THE VIEWPORT MUST BE SHOWING LIVE GEOMETRY (Sep 3, the print-preview
+     toggle). The toggle is view chrome and invisible to the registry
+     read-back above, yet every "(live)" number this gate prints — liveTris,
+     the hub radius, the rings the J and Z assertions read — is the build on
+     screen. A row measured with the preview on would be a row measuring a
+     design it does not name, so the mode is read back from the app's own
+     metrics and a mismatch fails the RUN. */
+  const shown = await shownModeAssertion(page, 'live');
+  if (shown.length) { validity.push(`${row.label}: ${shown.join('; ')}`); continue; }
   const cap = await applyCapability(page, row);
   if (cap.length) { validity.push(`${row.label}: ${cap.join('; ')}`); continue; }
   /* THE FORM ASSERTIONS, on EVERY row rather than only the form rows. Both

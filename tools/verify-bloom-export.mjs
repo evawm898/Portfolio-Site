@@ -48,7 +48,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
@@ -73,6 +73,15 @@ for (const row of rows) {
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   const drift = await fullStateDrift(page, row.set);
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }
+  /* THE VIEWPORT MUST BE SHOWING LIVE GEOMETRY (Sep 3, the print-preview
+     toggle). The toggle is view chrome and invisible to the registry
+     read-back above, yet every "(live)" number this gate prints — liveTris,
+     the hub radius, the rings the J and Z assertions read — is the build on
+     screen. A row measured with the preview on would be a row measuring a
+     design it does not name, so the mode is read back from the app's own
+     metrics and a mismatch fails the RUN. */
+  const shown = await shownModeAssertion(page, 'live');
+  if (shown.length) { validity.push(`${row.label}: ${shown.join('; ')}`); continue; }
   /* The capability is invisible to fullStateDrift (it is not a registry
      control), so it carries its own read-back AND its structural assertion.
      This also asserts the NEGATIVE on every ordinary row: no capability may

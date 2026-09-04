@@ -42,7 +42,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { decodePNG } from './pngdec.mjs';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
-         junctionAssertions, zygoAssertions, JUNCTION_SCOPE, mirrorPartner } from './bloom-harness.mjs';
+         junctionAssertions, zygoAssertions, JUNCTION_SCOPE, mirrorPartner, modeTag } from './bloom-harness.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-per-petal';
 /* THE BASE TREE FOR THE BEFORE CELL. A git worktree of this branch's base
@@ -145,7 +145,7 @@ async function cell({ label, set = [], note = '', expectFan = true, onBase = fal
     shots[view] = path.basename(file);
   }
   console.log(`  ${label.padEnd(56)} petals=${m.slotCount} groups=${groups ?? '-'} ${arc}${roleLine ? '  ' + roleLine : ''}`);
-  return { label, note, shots, arc, roleLine, groups, petals: m.slotCount, liveTris: m.liveTris, isFan: Boolean(m.fan), onBase };
+  return { label, note, shots, arc, roleLine, groups, petals: m.slotCount, liveTris: m.liveTris, isFan: Boolean(m.fan), onBase, mode: modeTag(m) };
 }
 
 fs.mkdirSync(outDir, { recursive: true });
@@ -207,7 +207,7 @@ if (HAVE_BASE) {
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const fig = (c, view) => `<figure><div class="frame${view === 'face' && c.isFan ? ' mirror' : ''}${c.onBase ? ' base' : ''}"><img src="${c.shots[view]}"></div>`
   + `<figcaption><b>${esc(c.label)}</b>${view === 'profile' ? ' <i>(profile)</i>' : ''}${c.onBase ? ' <i>(base tree)</i>' : ''}<br>`
-  + `<small>${esc(c.arc)} · ${c.petals} petals${c.groups ? ` · ${c.groups} per-petal group${c.groups === 1 ? '' : 's'}` : ''} · ${esc(c.roleLine || 'no groups engaged')} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live)</small>`
+  + `<small>${esc(c.arc)} · ${c.petals} petals${c.groups ? ` · ${c.groups} per-petal group${c.groups === 1 ? '' : 's'}` : ''} · ${esc(c.roleLine || 'no groups engaged')} · ${Number(c.liveTris).toLocaleString('en-US')} tris (live) · ${esc(c.mode)}</small>`
   + `<p>${esc(c.note)}</p></figcaption></figure>`;
 const html = `<title>Per-petal sliders for the fan</title>
 <style>body{background:#0c0f0e;color:#dfe9e3;font:14px/1.5 system-ui,sans-serif;margin:24px}

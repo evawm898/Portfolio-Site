@@ -78,7 +78,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
          formAssertions, thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, CONTROLS, DEFAULTS,
-         MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM } from './bloom-harness.mjs';
+         MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, modeTag } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -105,7 +105,7 @@ const numbers = (m) => {
   if (!m.petalThickness) {
     return `sheet 1.20 mm — the CONSTANT, at both call sites, no control`
       + `<br>ring ${m.ringRadius.toFixed(2)} mm (live = printed: this tree cannot cross the export floor)`
-      + `<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`;
+      + `<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm · ${modeTag(m)}`;
   }
   const th = m.petalThickness;
   const printedTip = Math.max(th.tipEmitted, MIN_FEATURE_MM);
@@ -126,7 +126,7 @@ const numbers = (m) => {
     + `${m.ringWidthClamped ? ` (width CLAMPED at the assumed ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm floor)` : ''}`
     + ` · ring ${m.ringRadius.toFixed(2)} mm (live)`
     + capLine
-    + `<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm`;
+    + `<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · max dim (live) ${m.maxDimMm.toFixed(1)} mm · ${modeTag(m)}`;
 };
 
 /* `legacy` marks a cell rendered from the BEFORE tree. It is an explicit

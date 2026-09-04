@@ -47,7 +47,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, applyCapability,
-         CONTROLS, DEFAULTS, CAPABILITY_CLAW, CAPABILITY_CLEFT, CAPABILITY_SCOPE } from './bloom-harness.mjs';
+         CONTROLS, DEFAULTS, CAPABILITY_CLAW, CAPABILITY_CLEFT, CAPABILITY_SCOPE, modeTag } from './bloom-harness.mjs';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
@@ -113,7 +113,7 @@ async function cell({ label, set = [], capability = null, views = ['petal'], not
     shots[v] = await page.locator('#bloom-canvas').screenshot();
   }
 
-  const caption = `${silCaption(want)}<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · panels ${JSON.stringify(m.petalPanels)} · tip spans ${m.petalTipSpans}`
+  const caption = `${silCaption(want)}<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · panels ${JSON.stringify(m.petalPanels)} · tip spans ${m.petalTipSpans} · ${modeTag(m)}`
     + (note ? `<br>${note}` : '');
   console.log(`  ${label.padEnd(44)} ${silCaption(want)} · tris(live) ${m.liveTris}`);
   return { label, caption, ...shots };
