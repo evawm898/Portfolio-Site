@@ -24,8 +24,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StemRig, CONTROL_S } from './print-stem.js';
 import { LineArt, detailToAngleDeg, CURATION, INTERIOR_WEIGHT_RATIO } from './print-lines.js';
-import { Infill, INFILL_MODES, LAYER_THRESHOLDS, HATCH_OFFSETS_DEG, INFILL_LIMITS,
-         toneAt, toneRadius, centroidOf } from './print-infill.js';
+import { Infill, LAYER_THRESHOLDS, HATCH_OFFSETS_DEG, INFILL_LIMITS,
+         toneAt, toneRadius } from './print-infill.js';
 
 const BUNDLE = 'assets/print-test/flower-test-bundle.glb';
 

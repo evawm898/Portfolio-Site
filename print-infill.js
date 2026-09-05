@@ -125,7 +125,6 @@ export const INFILL_LIMITS = {
   maxSegmentsPerPart: 24000,   // emitted line segments; beyond this a part truncates
   flowStepPx: 2.6,             // streamline integration step
   flowMaxSteps: 420,           // per direction
-  hashCellPx: 18,              // spatial hash cell for the segment-crossing test
 };
 
 // A cheap, stable per-index hash in [0,1). Used for the jitter that keeps a
@@ -138,9 +137,11 @@ export function hash01(i) {
 }
 
 // The tone field: 1 at the anchor, 0 at `reach` away from it, with `gamma`
-// bending the ramp between. The ONE owner of "how dark is it here" — the
-// analytic radii below are derived from this and must agree with it, which is
-// what `toneRadius` exists to guarantee.
+// bending the ramp between. The statement of "how dark is it here". The
+// clipper never evaluates it — because the field is radial it works in the
+// inverse, `toneRadius`, and clips to a circle instead of sampling — so
+// `tone/radius-inverts-tone` asserts the two are exact inverses. If they ever
+// drift, the picture and the read-out stop describing the same thing.
 export function toneAt(dist, reach, gamma) {
   if (!(reach > 0)) return 0;
   const u = dist / reach;
@@ -703,6 +704,12 @@ export function centroidOf(mesh) {
 // rotated by (ca, sa). Returned as a flat [u0, u1, u0, u1, ...] of the runs
 // where the WINDING NUMBER is non-zero — exact at concavities, and correct
 // where a fold puts a second loop inside the outline.
+//
+// This is the PLAIN scan, over every edge. ScanIndex does the same thing after
+// bucketing by row, and is what the clipper actually runs; this stays as the
+// unoptimised statement of the rule, and `index/agrees-with-the-plain-scan`
+// requires the two to return the same spans at two angles over 420 rows. A
+// deliberate duplicate with a check holding it shut, not a stray copy.
 export function scanSpans(f, ca, sa, v) {
   if (!f.ok) return [];
   const hits = [];
@@ -762,9 +769,11 @@ export function subtractSpans(A, B) {
   return out;
 }
 
-// Non-zero winding test for a single point, by casting along +x. The same rule
-// the scanline uses, so a seed and a hatch span can never disagree about what
-// is inside.
+// Non-zero winding test for a single point, by casting along +x. The REFERENCE
+// definition of "inside" for this file: nothing here calls it — the clipper
+// goes through ScanIndex, which is the same rule made fast — and it exists so
+// the rule can be stated in one obvious place and checked against the indexed
+// one. `index/contains-matches-winding` pins the two together.
 export function insideWinding(f, x, y) {
   if (!f.ok) return false;
   let wind = 0;
