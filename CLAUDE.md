@@ -384,10 +384,11 @@ it as line art, and (later) arrange and sparkle it. It is `noindex`, it does
 NOT touch the flower or bloom generators, and it exports nothing — the real
 generators own geometry and STL, and this page is downstream of both.
 
-Stages shipped so far, one PR each: the **scaffold** (#150 — viewport, glTF
-load, the pivot node's `extras` round-tripping through GLTFLoader), the
-**pose** (#151 — a posable stem and a hinged bloom), and the **line art**
-(this one — silhouette and crease edges, three sliders).
+Stages shipped so far: the **scaffold** (#150 — viewport, glTF load, the pivot
+node's `extras` round-tripping through GLTFLoader), the **pose** (#151 — a
+posable stem and a hinged bloom), and the **line art** (#153 — silhouette and
+crease edges, three sliders, then chained/curated/smoothed into drawn contours
+in two weights).
 
 **The bundle is the input contract.** `assets/print-test/flower-test-bundle.glb`
 carries a `pivot` node whose glTF `extras` declare the junction position, the
@@ -429,13 +430,65 @@ the weld every edge is a boundary edge, there are no creases at all, and the
 page still draws a plausible silhouette-only picture. `topology/welded` is the
 one check that sees it.
 
+**THE EXTRACTION IS NOT THE DRAWING, AND THE POST-PROCESS IS WHERE THE PICTURE
+COMES FROM.** Raw extraction hands back triangle edges; drawn as literal
+straight polylines they read as a faceted mesh outline, and turning the detail
+slider down cannot fix it — at detail 0, the most conservative setting there
+is, this bundle still yields ~19,100 silhouette edges. The pipeline downstream
+of extraction is chain → curate → simplify → smooth → draw, and each step is
+load-bearing:
+
+- **RDP ALONE DOES NOT SMOOTH ANYTHING.** A zigzag is not near-collinear, so
+  nothing collapses and the staircase survives into the curve. Measured: with
+  simplification but no Laplacian pass the contour still turned a mean of 37°
+  per join, 5,946 of 15,669 joins over 30°. The Laplacian pass BEFORE the
+  simplification is what removes facet noise; it runs in WORLD units because
+  the zigzag's amplitude is a property of the mesh, not of the zoom, while
+  every curation threshold is in SCREEN pixels because what should be pruned
+  is what would be illegible.
+- **Six Laplacian iterations is the knee, measured** (mean turn / % of joins
+  over 30° / cost): 0 → 33.3° / 33.7% / 6.8 ms, 2 → 27.3° / 21.9%, 6 → 23.6° /
+  13.8% / 9.4 ms, 8 → 21.2° / 12.7% / 9.9 ms, 12 → 18.7° / 10.9% / 11.4 ms.
+- **Silhouette and crease chain SEPARATELY and junctions are cut points.** A
+  vertex where an outline meets an interior fold is on both sets; chaining
+  through it hands the smoother a corner it should keep, and puts a contour
+  stroke and an interior stroke in one primitive that the two-tier weight
+  cannot then draw differently.
+- **Turn angles are measured per chain, on the points about to be drawn** —
+  never across the emitted buffer, where the end of one chain and the start of
+  the next share a junction position and read as one 180° fake turn. Measured
+  that way first; it reported a 180° max on every run.
+- **LENGTH CURATION PRUNES NOISE, NOT DENSITY** (measured, Sep 5). Raising the
+  contour bar from 5 px to 45 px takes contour chains 1,425 → 610 but stroke
+  segments only 14,614 → 10,054: most of the bloom's ink is in a few long
+  chains, because a 40-petal bloom's density is ~40 real overlapping petal
+  rims, each a genuine silhouette. The lever for that is per-chain visibility,
+  not length, and it is not built.
+
+**TWO TIERS, ONE SLIDER, A FIXED RATIO** (`INTERIOR_WEIGHT_RATIO`, 0.45). The
+contour/interior ratio is a property of the STYLE rather than of the artwork,
+and an independent interior slider makes the one state that stops reading as
+line art — interior heavier than contour — reachable by accident. Promoting it
+to a second slider is one line plus a registry row.
+
+**THE POST-PROCESS IS SKIPPED WHEN THE VIEW HAS NOT MOVED HALF A PIXEL, and an
+exact float comparison does NOT work.** OrbitControls runs with damping, whose
+easing has a multi-second half-life, so the camera matrix keeps changing
+microscopically long after the hand stops and an exact skip never fires
+(measured: still ~17 px per poll six seconds after a drag, headless). The
+criterion is the honest one — would the drawing move by less than a twentieth
+of a pixel? `skip/idle-is-free` asks it in ONE tick (two identical updates, the
+second must skip, a pose change must un-skip) because waiting for stillness is
+not something this harness can do.
+
 **ONE EXTRACTION, TWO CONSUMERS.** Pointillism is not a second algorithm over
 the model: at blend *b* an edge is drawn as dots when its own hash is below *b*
 and as a stroke otherwise, so the segment set is identical at both ends of the
 slider (`blend/same-extraction`) and the transition is stable under orbit
-because the hash is on the EDGE, not on the frame. The detail slider runs
-BACKWARDS on purpose — `detailToAngleDeg()` in `print-lines.js` is its one
-owner, read by the app, the read-out and the gate.
+because the hash is on the CHAIN's first welded vertex, not on the frame. The
+detail slider runs BACKWARDS on purpose — `detailToAngleDeg()` in
+`print-lines.js` is its one owner, read by the app, the read-out and the gate,
+and `CURATION` is the same for every curation number.
 
 **Each slider is asserted on what it must LEAVE ALONE as well as on what it
 changes.** Weight widens strokes without changing which lines exist; detail
@@ -445,10 +498,10 @@ extraction. A single slider wired to "make it look different" satisfies the
 first half of any of those on its own.
 
 **Verify with `node tools/verify-print-scaffold.mjs [shots-dir]`** — one gate
-for all three stages, every claim measured against mesh state, the extracted
+for every stage, every claim measured against mesh state, the extracted
 segment counts, or the SCREENSHOT BYTES, never against the control that was
 just written. **`--mutants` is the negative control and is not optional before
-quoting a pass from a changed harness**: it re-serves ten deliberately broken
+quoting a pass from a changed harness**: it re-serves sixteen deliberately broken
 copies of `print.js` / `print-lines.js` through the gate's own HTTP server, and
 fails if a mutation does not apply, if a check the mutant NAMES stays green, or
 if a check it did not name goes red (which is how a mutation that just breaks
@@ -483,9 +536,23 @@ for that reason. Note the corollary that caught a mutant: a mutation that ADDS
 to the crease threshold neutralises itself there, because 88 deg + anything
 passes 90 and no crease survives at either end of the slider.
 
+**A GATE ASSERTION KEYED TO A SEGMENT COUNT IS A LIABILITY HERE.** Chaining,
+curation and resampling all legitimately move every count, and they moved
+`blend/strokes-at-0` (`strokes === segments`) the day the post-process landed.
+Assert the structural property instead — at blend 0 everything is a stroke and
+nothing is a dot — and reserve counts for the RAW edge set, which the
+post-process does not touch. Likewise `smooth/contour-is-not-faceted` is a
+COMPARISON of the same camera with and without the smoothing pass, never a
+threshold: the mean turn angle depends on how large the model is on screen, so
+an absolute bar had the shipped value at 31.1° against a bar of 32 with the
+unsmoothed baseline at 37 — a flake, not a measurement.
+
 Contact sheets: `node tools/shot-print-pose.mjs <dir>` (the pose stage) and
-`node tools/shot-print-lines.mjs <dir>` (the line art — the switch, detail x
-weight, the pointillism blend, and the linework under a LIVE pose change).
+`node tools/shot-print-lines.mjs <dir> [base-tree]` (the line art — the switch,
+detail x weight, the pointillism blend, the curation sweep, and the linework
+under a LIVE pose change; with a base-tree it renders the same cells from a git
+worktree of that commit so a before/after pair is a real render of the old code
+rather than a remembered one).
 Every cell on both is produced by a real pointer drag, wheel or slider input;
 a picture of a configuration the hand cannot reach is not evidence about the
 tool.
