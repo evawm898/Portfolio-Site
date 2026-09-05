@@ -1,5 +1,12 @@
 // print-stem.js — axial (curve) deformation of the stem mesh.
 //
+// THE DEFORMATION APPROACH IS THE RULING, NOT A PROPOSAL (Eva, Sep 5). The
+// position-stage brief scoped the simple re-loft and asked for the trade-off
+// to be named; the measurement below reversed that scope, and Eva ruled to
+// KEEP the deformation. Do not "simplify" this back into a swept tube — that
+// is not a smaller version of this file, it is the object-losing behaviour
+// this one exists to avoid. Replacing it is a new ruling, not a refactor.
+//
 // WHY NOT A RE-LOFT. The obvious way to make a stem bend is to sweep a fresh
 // tube along the new curve. Measured on this bundle, that is not a lossy
 // version of the goal — it is a different object: 12,060 of the stem's 14,472
