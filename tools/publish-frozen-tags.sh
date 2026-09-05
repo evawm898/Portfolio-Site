@@ -57,5 +57,69 @@ for pair in $PAIRS; do
 done
 [ "$missing" -eq 0 ] || { echo "REFUSING to push a partial set — resolve the base(s) above first."; exit 1; }
 
-git push origin --tags
+git push origin --tags || echo "  (the push reported a failure — the verification below decides)"
+
+# VERIFY THE OUTCOME, NOT THE MECHANISM'S OWN SUCCESS. A `git push --tags` is
+# NOT atomic: refs are accepted or rejected individually, so a push can report
+# failure having published most of the set — which is exactly what happened on
+# the first run (eleven of twelve landed). Checking the exit code alone would
+# have said "failed" while eleven tags existed, and checking nothing would have
+# said "done" while one did not. So the published set is read back from the
+# REMOTE and compared against the declared one.
+#
+# `--atomic` was considered and rejected: it would have made that first run
+# publish NOTHING, including frozen/phase10 — the one tag the whole exercise
+# existed to create, for the only base commit not reachable from `main`. A
+# partial set that is fully NAMED is more useful than no set at all; a partial
+# set that is silent is the defect.
+echo
+echo "verifying against the remote…"
+published=$(git ls-remote --tags origin | sed -n 's|.*refs/tags/\(frozen/[^^]*\)$|\1|p')
+missing=0
+for pair in $PAIRS; do
+  name="${pair%%:*}"
+  if printf '%s\n' "$published" | grep -qx "frozen/$name"; then
+    printf '  frozen/%-8s published\n' "$name"
+  else
+    printf '  frozen/%-8s **NOT PUBLISHED**\n' "$name"
+    missing=1
+  fi
+done
+
+if [ "$missing" -ne 0 ]; then
+  cat <<'WHY'
+
+NOT EVERY TAG WAS PUBLISHED. Before assuming a transient failure, know the one
+cause already diagnosed (session 17), because it CANNOT be fixed from a
+workflow and nobody should re-derive it:
+
+  ! [remote rejected] frozen/phase5 -> frozen/phase5 (refusing to allow a
+    GitHub App to create or update workflow `.github/workflows/...` without
+    `workflows` permission)
+
+GitHub refuses to let a GitHub App token — which includes a workflow's own
+GITHUB_TOKEN — push a ref whose .github/workflows content differs from the
+DEFAULT branch's. A tag on an older commit does exactly that whenever a
+workflow file has changed since. **GITHUB_TOKEN cannot be granted `workflow`
+scope at all**, so no `permissions:` block fixes it: raising the job's
+permissions is not an option that exists. Publish it from a clone whose
+credentials are a USER's: `git push origin refs/tags/frozen/<name>`.
+
+DO NOT ADD A PAT WITH `workflow` SCOPE AS A REPO SECRET (Eva, Sep 5). THE
+REMEDY IS BRANCH PROTECTION ON `main`. The risk a frozen/* tag defends
+against is an orphaned base commit, and the only thing that can orphan a
+commit in main's history is a force-push; `main` is not protected here, and
+that is the actual hole. Protecting it closes the risk for ELEVEN of the
+twelve bases outright, because they are commits in main's history. A standing
+credential that can rewrite any workflow in the repo, forever, to defend one
+tag against a hypothetical, is the wrong trade.
+
+THE ASYMMETRY: eleven bases are in main's history, so protection covers them
+and their tags are belt-and-braces. phase10's base was NEVER on main — a
+mid-PR commit whose only ref was a feature branch — so no protection of main
+could reach it and its tag is the ONLY thing keeping it alive. That is the
+load-bearing one, and it publishes fine.
+WHY
+  exit 1
+fi
 echo "done — every frozen baseline now has a permanent ref."
