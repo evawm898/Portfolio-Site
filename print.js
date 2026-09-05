@@ -103,19 +103,27 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
   } else {
     const x = pivot.userData || {};
     log(`<b>pivot node</b>  "${pivot.name}"  at ${vec(pivot.position.toArray())}`);
+    log(`  children            ${pivot.children.map(c => c.name || '(unnamed)').join(', ') || '(none)'}`);
     if (!Object.keys(x).length) {
-      fail('extras  EMPTY — the node exists but carried no extras through the loader');
+      fail('  extras  EMPTY — the node exists but carried no extras through the loader');
     } else {
-      log(`  junction            ${x.junction === undefined ? '(absent)' : vec(x.junction)}`);
-      log(`  tangent             ${x.tangent === undefined ? '(absent)' : vec(x.tangent)}`);
-      const rl = x.rotation_limits_deg;
-      if (rl === undefined) log('  rotation_limits_deg (absent)');
-      else if (rl && typeof rl === 'object' && !Array.isArray(rl)) {
-        log('  rotation_limits_deg');
-        for (const [k, v] of Object.entries(rl)) log(`    ${k.padEnd(6)} ${vec(v)}`);
-      } else log(`  rotation_limits_deg ${vec(rl)}`);
-      log('');
-      log(`  raw extras          ${JSON.stringify(x)}`);
+      // Printed STRUCTURALLY, not against an assumed shape. This session's
+      // only claim is that the metadata round-trips; the exporter owns the
+      // schema, and a debug panel that hardcoded one would quietly report
+      // "(absent)" the first time that schema moved.
+      log('  extras');
+      (function dump(v, indent) {
+        for (const [k, val] of Object.entries(v)) {
+          if (val && typeof val === 'object' && !Array.isArray(val)) {
+            log(`${indent}${k}`);
+            dump(val, indent + '  ');
+          } else if (typeof val === 'string') {
+            log(`${indent}${k.padEnd(20 - indent.length + 4)} ${val}`);
+          } else {
+            log(`${indent}${k.padEnd(20 - indent.length + 4)} ${vec(val)}`);
+          }
+        }
+      })(x, '    ');
     }
   }
 

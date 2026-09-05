@@ -14,7 +14,8 @@
 // readPixels — the context has no preserveDrawingBuffer, so a readPixels after
 // the frame returns a cleared buffer and scores 100% "non-background" for a
 // completely empty scene), a drag on the canvas moves the camera, and the
-// pivot node's extras round-trip through GLTFLoader with all three keys.
+// pivot node's extras round-trip through GLTFLoader with the junction position,
+// the junction tangent and a non-empty rotation_limits_deg.
 //
 // Verified falsifiable — each of these turns it red, on the check that names
 // the behaviour: not adding gltf.scene to the scene, disabling OrbitControls,
@@ -133,7 +134,9 @@ console.log('console:\n' + logs.join('\n'));
 await browser.close(); server.close();
 
 const ok = info.ready && info.meshes >= 1 && info.pivotExtras
-  && info.pivotExtras.junction && info.pivotExtras.tangent && info.pivotExtras.rotation_limits_deg
+  && info.pivotExtras.junction && Array.isArray(info.pivotExtras.junction.position)
+  && Array.isArray(info.pivotExtras.junction.tangent) && info.pivotExtras.rotation_limits_deg
+  && Object.keys(info.pivotExtras.rotation_limits_deg).length > 0
   && drawn > 0.01 && drawn < 0.9 && moved > 1 && errs.length === 0;
 console.log(ok ? '\nPASS' : '\nFAIL');
 process.exit(ok ? 0 : 1);
