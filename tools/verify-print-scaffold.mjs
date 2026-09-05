@@ -150,23 +150,40 @@ const MUTANTS = [
     breaks: ['simplify/reduces-points'] },
 
   { id: 'curation-off', file: 'print-lines.js',
-    from: '  minChainPx: 5,', to: '  minChainPx: 0,',
-    breaks: ['curate/prunes-by-length'] },
+    from: '  minChainPx: 5,      // a chain shorter than this on screen is noise, not line\n  minCreasePx: 16,',
+    to: '  minChainPx: 0,\n  minCreasePx: 0,',
+    // NOT curate/prunes-by-length: that check drives curation itself, so it
+    // passes whatever the default is. Measured — zeroing the bar left it green.
+    breaks: ['curate/default-prunes-something'] },
 
   { id: 'interior-same-weight-as-contour', file: 'print-lines.js',
     from: 'get interiorWeight() { return this.weight * INTERIOR_WEIGHT_RATIO; }',
     to: 'get interiorWeight() { return this.weight; }',
     breaks: ['weight/material', 'tier/two-weights'] },
 
+  // Both tiers chained from the SILHOUETTE set. The interior tier then draws
+  // contour chains, so it stops tracking the detail slider — which is the only
+  // thing that sees it. The first attempt at this mutation edited one of five
+  // `wantKind` tests and changed almost nothing; it stayed green everywhere.
   { id: 'tiers-chained-together', file: 'print-lines.js',
-    from: '      if (K[i] !== wantKind) continue;\n      vis[i] = 0;',
-    to: '      if (K[i] !== wantKind && wantKind === 1) continue;\n      vis[i] = 0;',
-    breaks: ['chain/both-tiers-populated'] },
+    from: '        chainMs += this._drawTier(u, tier, wpp, b, view, measureTurns);',
+    to: '        chainMs += this._drawTier(u, { ...tier, kind: 1 }, wpp, b, view, measureTurns);',
+    breaks: ['tier/interior-tracks-detail'] },
 
+  // A camera move never recomputes. NOT skip/idle-is-free: a pose change bumps
+  // the geometry version, which fails the guard before this line is reached,
+  // so that check still sees its un-skip. Measured, and the claim corrected.
   { id: 'skip-never-recomputes', file: 'print-lines.js',
     from: '      if (movedPx < 0.05) { this.skipped = true; this.skippedPx = movedPx; return this.stats; }',
     to: '      { this.skipped = true; this.skippedPx = movedPx; return this.stats; }',
-    breaks: ['skip/idle-is-free', 'live/orbit-moves-silhouette', 'pose/lines-follow-bend'] },
+    breaks: ['live/orbit-moves-silhouette', 'pose/lines-follow-bend'] },
+
+  // ...and the other direction, which is what actually negative-controls the
+  // skip: it never fires, so two identical updates both recompute.
+  { id: 'skip-always-recomputes', file: 'print-lines.js',
+    from: '      if (movedPx < 0.05) { this.skipped = true;',
+    to: '      if (movedPx < -1) { this.skipped = true;',
+    breaks: ['skip/idle-is-free'] },
 
   { id: 'stylize-resets-pose', file: 'print.js',
     from: '    function readStyle() {\n      art.setOptions({',
@@ -679,6 +696,26 @@ async function run({ mutant = null, shots = false } = {}) {
   // ...and it prunes STROKES, not just the counter
   check('curate/prunes-the-drawing', curAfter.strokes < curBefore.strokes,
     `${curBefore.strokes} -> ${curAfter.strokes} stroke segments`);
+  // AT THE SHIPPED DEFAULTS. The two checks above drive curation themselves,
+  // so they pass whatever the shipped constants are — measured: zeroing
+  // `minChainPx` in the source left both of them green. This one is the only
+  // thing that sees the default.
+  check('curate/default-prunes-something',
+    curBefore.dropped > curBefore.chains * 0.3,
+    `${curBefore.dropped} dropped vs ${curBefore.chains} kept at the shipped ${cur.minChainPx}px / ${cur.minCreasePx}px`);
+
+  // The interior tier is CREASES, and creases are what the detail slider
+  // makes more of. If the two tiers were chained from the same edge set they
+  // would move together; only the interior may track detail.
+  await setStyle({ detail: 0 }); await settle();
+  const tierLow = await stats();
+  await setStyle({ detail: 100 }); await settle();
+  const tierHigh = await stats();
+  await setStyle({ detail: 45 }); await settle();
+  const contourDrift = Math.abs(tierHigh.contourChains - tierLow.contourChains) / Math.max(tierLow.contourChains, 1);
+  check('tier/interior-tracks-detail',
+    tierHigh.interiorChains > tierLow.interiorChains * 2 && contourDrift < 0.2,
+    `interior ${tierLow.interiorChains} -> ${tierHigh.interiorChains}, contour ${tierLow.contourChains} -> ${tierHigh.contourChains} (${(contourDrift * 100).toFixed(1)}%)`);
   // The post-process is skipped when the view has not moved by even a
   // twentieth of a pixel — and a pose change has to un-skip it, or the
   // optimisation would freeze the drawing.
