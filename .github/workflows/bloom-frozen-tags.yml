@@ -1,0 +1,52 @@
+# Publish the frozen baselines' permanent refs. MANUAL ONLY — this workflow
+# has no push or pull_request trigger and does nothing until someone clicks
+# "Run workflow".
+#
+# WHY IT EXISTS. Every frozen baseline is verified against its own base
+# commit, and a base commit is only kept alive by something pointing at it.
+# Eleven of the twelve live on `main`; phase10's is a mid-PR commit of #140,
+# which was reachable only while that PR's BRANCH existed. The branch was
+# deleted and `bloom-frozen-matrices` went red at
+# `fatal: invalid reference: 4f39118`. `main` is not a protected branch here
+# either, so a force-push would orphan every other base the same way.
+# Tagging converts twelve implicit dependencies on branch reachability into
+# twelve explicit permanent refs, which closes the class rather than the one
+# instance. The charter carries the rule this produced: a frozen baseline is
+# taken at a commit on `main`, never at a branch head, and is tagged at
+# freeze time.
+#
+# WHY A WORKFLOW RATHER THAN A LOCAL PUSH. tools/publish-frozen-tags.sh is
+# the one owner of what this does and can be run from any clone that can
+# push tags. Session 17 could not: the agent proxy it runs behind returns
+# HTTP 403 on a tag ref push (as `--tags` and as a single explicit refspec)
+# while ordinary branch pushes from the same session succeed, and no
+# create-ref API was exposed to it. A runner has neither limit. This
+# workflow adds no second copy of anything — it runs that script.
+#
+# IT IS SAFE TO RUN TWICE. The script refuses to push a partial set, and
+# `git push --tags` does not move a tag that already exists on the remote.
+name: bloom-frozen-tags
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write        # creating refs is the whole job; nothing else is needed
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # every base commit must be resolvable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # The script reads FROZEN_BASE_COMMITS from the harness rather than
+      # restating it, and the harness imports playwright-core at module load.
+      # No browser is launched.
+      - name: Install the harness's own deps (no browser download)
+        run: npm i --no-save three@0.161.0 playwright-core@1.62.1
+      - name: Tag every frozen baseline's base commit
+        run: bash tools/publish-frozen-tags.sh
