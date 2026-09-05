@@ -87,6 +87,12 @@ arm is a branch). What decides it is the face-pole crop on the sheet: if the fac
 reads reflexed and bald under lean 0, the fade is the lever; if it reads as a crown, lean
 0 stands.
 
+**RULED (Eva, Sep 5, from the sheet): Q1b is CLOSED at lean 0, not deferred.** The face
+pole closes as a tight crown with a few-millimetre eye — not reflexed, not bald — so the
+faded lean is not needed and does not carry into session two. **Lean 0 is the SPHERE law**,
+not a baseline awaiting a picture; J9's `wantLean` 0 arm is that law's witness. The costing
+above stays as the record of what was weighed.
+
 ## S1–S4, and the mutant table
 
 | assertion | what it reads | first family to fire, on the smoke SPHERE rows |
@@ -134,6 +140,16 @@ sized from a foot rather than the hub) is the phase-2 centre question the dome s
 already recorded, and it is now visible on the sheet for Eva's ruling rather than quietly
 shrunk.
 
+**RULED (Eva, Sep 5): the DISC face-pole plate is DEFERRED to the phase-2 centre work,
+explicitly.** The centre is NOT constrained under SPHERE in this session. The phase-2 centre
+question now reads, in full: (dome session) a button that follows the cap's curvature —
+the DISC seats on the apex slab and hovers at the rim, 1.88 mm on the incurve target; (this
+session) under SPHERE the DISC is sized from the hub radius, which IS the sphere radius, so
+it plates the whole face pole — **24.5 mm across on the 40 × 6 row (240 feet, sphere radius
+32.72 mm)** — and a centre that follows the sphere, or is sized from a foot rather than the
+hub, is the open design. **The mum on a sphere reading as a dandelion clock is NOTED, not a
+defect** — it is what a long-blade preset does on a ball; no action.
+
 ## A pre-existing defect in the `--conn` path, found by running it
 
 `node tools/bloom-smoke.mjs --conn` — REQUIRED for a new geometry mode (session 17's
@@ -180,4 +196,4 @@ byte claim on the sheet itself (Head rise 1 under SPHERE REQUIRED to export the 
 sha; SPHERE stored under RADIAL REQUIRED to export the default's). Held for Eva's ruling;
 merge is released by it.
 
-WAITING ON EVA: the sheet ruling
+Sheet approved (Eva, Sep 5). Merged by the session as its final step; `frozen/phase14` tagged from `main`.

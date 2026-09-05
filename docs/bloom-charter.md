@@ -4028,3 +4028,13 @@ matters should be measured this way.
       row); on the incurve sphere the tips close it as a tight crown with a few-millimetre
       eye. A centre that follows the sphere, or is sized from a foot, is the phase-2 centre
       question the dome session recorded — on the sheet for Eva, not shrunk quietly.
+
+    - **THE SHEET RULING (Eva, Sep 5).** Approved. Q1b CLOSED at lean 0 — the crown with
+      its eye is not reflexed and not bald, so the faded lean does not carry into session
+      two; **lean 0 is the SPHERE law**, not a baseline awaiting a picture. The DISC
+      face-pole plate is DEFERRED to the phase-2 centre work explicitly — the centre is not
+      constrained under SPHERE here; the phase-2 centre question is now the dome session's
+      button-that-follows-the-cap PLUS the sphere's plate, **24.5 mm on the 240-foot row**,
+      recorded so it is found rather than rediscovered. The mum as a dandelion clock is
+      noted, not a defect. Close-out: the four bloom gates green on the head, merged by the
+      session, `frozen/phase14` tagged from `main`.

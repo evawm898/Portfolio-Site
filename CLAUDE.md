@@ -199,8 +199,8 @@ and `sphereMode()` are the two statements; the harness checks them). `footRing()
 continuous arm keys the sphere's descriptors on polar angle (cos φ linear in
 the slot index, 2/K a step — the equal-area lattice), Rd = R0 with the equator
 on the flat hub's plane, the sequence from the RESERVED pole to the face pole,
-lean 0 (Eva's ruling; the faded lean is costed in
-`docs/bloom-session-18-outcome.md`, not built). The hub is two concentric
+lean 0 — **the SPHERE law, Q1b CLOSED from the sheet** (the faded lean is
+costed in `docs/bloom-session-18-outcome.md`, not built, and does not carry forward). The hub is two concentric
 spheres with an explicit apex fan at each pole — 6,720 triangles, the third
 value of a branch that was two. S1–S4 in both gates: equal-area pole to pole,
 the hub CLOSED iff declared (from the builder's own report), the reserved pole
@@ -211,7 +211,9 @@ into the disc from below — a false clean): SPHERE rows are a labelled skip and
 the export gate FAILS if one emits a number; the solid-angle instrument is
 session two. The crowding raster evaluates membership in (arc, azimuth) over
 the full arc on a sphere and prints the depth within one step of each pole.
-Sheet: `node tools/shot-bloom-sphere.mjs <dir>`. #106 and #108 are FLOWER
+Under SPHERE the DISC centre plates the face pole (24.5 mm on the 240-foot
+row) — DEFERRED to the phase-2 centre question, explicitly; do not constrain the
+centre under SPHERE ahead of it. Sheet: `node tools/shot-bloom-sphere.mjs <dir>`. #106 and #108 are FLOWER
 issues, whatever a kickoff prompt says.
 
 **A green connectedness run does NOT endorse the junction under layers** —
