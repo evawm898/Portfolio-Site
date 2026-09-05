@@ -189,6 +189,31 @@ behaviour (bias 0.5 re-opens 5.4%, start 0.95 23.1%), not a gate failure.
 `phase13Matrix()` (469 rows at 6b8e94b) paid the baseline session 15 left
 unfrozen. The sheet is `node tools/shot-bloom-curl.mjs <dir> [base-tree]`.
 
+**THE HEAD IS A CAP OR A FULL SPHERE, AND THE SPHERE IS THE CONTINUOUS SPIRAL
+RE-KEYED ON POLAR ANGLE** (Eva, Sep 5, session 18). `hubShape` (HEAD section,
+CAP / SPHERE, default CAP) with `headRise` as the cap's own sub-control — two
+values, not three, because a FLAT / DOMED / SPHERICAL enum would have moved
+the 35 phase13 rows that pin `headRise` with no hub-shape value. SPHERE shows
+under CONTINUOUS only and is hidden AND inert elsewhere (`PREDICATES.sphereMode`
+and `sphereMode()` are the two statements; the harness checks them). `footRing()`'s
+continuous arm keys the sphere's descriptors on polar angle (cos φ linear in
+the slot index, 2/K a step — the equal-area lattice), Rd = R0 with the equator
+on the flat hub's plane, the sequence from the RESERVED pole to the face pole,
+lean 0 (Eva's ruling; the faded lean is costed in
+`docs/bloom-session-18-outcome.md`, not built). The hub is two concentric
+spheres with an explicit apex fan at each pole — 6,720 triangles, the third
+value of a branch that was two. S1–S4 in both gates: equal-area pole to pole,
+the hub CLOSED iff declared (from the builder's own report), the reserved pole
+clear of feet AND within one step (both directions), the rise inert under
+SPHERE. J5 steps in polar angle there, J6 is nulled with a clause, J9 wants
+lean 0. **Plan coverage cannot read a sphere** (the far hemisphere projects
+into the disc from below — a false clean): SPHERE rows are a labelled skip and
+the export gate FAILS if one emits a number; the solid-angle instrument is
+session two. The crowding raster evaluates membership in (arc, azimuth) over
+the full arc on a sphere and prints the depth within one step of each pole.
+Sheet: `node tools/shot-bloom-sphere.mjs <dir>`. #106 and #108 are FLOWER
+issues, whatever a kickoff prompt says.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

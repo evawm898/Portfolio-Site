@@ -176,6 +176,14 @@ const WITNESS = {
   curl: { id: 'petalSpineCurl', value: '150',
           read: (m) => (m.petalSpine ? `${m.petalSpine.curlRad}/${m.petalSpine.peakRadiusMm.toFixed(6)}` : 'no spine record'),
           what: "the spine record's curl and tightest spine radius" },
+  /* HEAD (session 18) — collapsed at first load; witnessed by Head rise
+     through the HUB BUILDER's own report, which reaches past the slider into
+     the junction: the flat 192-triangle disc becomes the 3,456-triangle
+     shell and footRing() declares a cap of its own radius. The enum's own
+     transitions (CAP / SPHERE, the 6,720-triangle sphere, the hidden rise)
+     are route (m)'s, on one page, in both directions. */
+  head: { id: 'headRise', value: '0.5',
+          read: (m) => `${m.hubBuilt ? m.hubBuilt.tris : 'no hub'}/${m.hubDome ? m.hubDome.Rd.toFixed(6) : 'flat'}`, what: "the hub builder's triangle count / the cap's radius" },
   center: { id: 'centerStyle', value: 'RING',
             /* A style change rebuilds the centre; both the reported style and
                its own triangle count move off DISC's. */

@@ -3939,3 +3939,82 @@ matters should be measured this way.
       pair: the incurve target at bias 1 (crown re-opened) and at start 0.95
       (23.1% uncovered, bald cap 5.78 mm, CLAMPED on 120 of 120 rings, 25.6°
       built of 150° asked), with the seat line reading 1.88 mm printed.
+
+- ~~The full sphere — "what if I wanted the bottom half of the sphere as well?"~~ **BUILT
+  Sep 5 (session 18): the CAP / SPHERE head. `hubShape` (Head section, CAP default) with
+  `headRise` as the cap's own sub-control; SPHERE is the CONTINUOUS spiral RE-KEYED ON
+  POLAR ANGLE — one equal-area sequence pole to pole on a closed shell, lean 0, the far pole
+  reserved. Numbers and the mutant table in `docs/bloom-session-18-outcome.md`.**
+
+    - **THE RULINGS (Eva, Sep 5), all three from Phase A's ranked list.** Q1: candidate (a),
+      which turned out to be (c) built through the existing primitive — the descriptor's
+      KEY moves from plan radius (not injective past the equator) to polar angle; no second
+      whorl, no reflection, no latitude bands (rejected: rings wearing spiral azimuths, the
+      look ruled out Sep 1). Q5: TWO values, not three — a FLAT / DOMED / SPHERICAL enum with
+      `headRise` as DOMED's sub-control would have resolved 35 phase13 and 42 live rows to a
+      FLAT default and built them flat; CAP carries the rise, so the move is 0 moved. The
+      two guarantees are stated APART in the outcome doc: the geometry one (SPHERE is a value
+      nothing pre-existing selects) and the UI one (`headRise`'s predicate true on every
+      existing row). Q1b: LEAN 0 is the baseline — the cap's restore-the-flat-aim lean
+      continued past the equator aims every far-side petal back into the bloom; the faded
+      lean is costed, not built, and the sheet decides. Q4: the reserved pole is the pole
+      opposite the arc origin, clear of feet by construction, covered by converging blade
+      tips, a stem exiting through that canopy later — asserted as S3 in arc, both directions.
+      Q6: #106 and #108 are FLOWER issues; the kickoff prompt was wrong about them; neither
+      was touched.
+
+    - **SPHERE IS CONTINUOUS-ONLY, HIDDEN AND INERT ELSEWHERE — the `layerPhase` treatment.**
+      Under RADIAL / SPIRAL / FAN a sphere would be latitude bands, so the enum shows under
+      CONTINUOUS only, a stored SPHERE builds the cap there, and `headRise` stays live (its
+      predicate is `not sphereMode`, not `hubShape oneOf CAP`, on purpose). The registry's
+      `PREDICATES.sphereMode` and the geometry's `sphereMode()` are the two statements; the
+      harness checks them at module load over every placement × shape × rise and per row.
+
+    - **THE SPHERE IS THE RISE-1 CAP CONTINUED PAST ITS OWN RIM.** Rd = R0, the equator on
+      the flat hub's plane, `H` still the face pole's height so the centre's apex seat reads
+      it unchanged; the apex floor binds on the same one corner and holds the SPHERE at one
+      sheet (told). The sequence runs from the RESERVED pole (k = 0, the largest petal, scale
+      1) to the face pole, so `layerSize`, `layerTilt` and `layerCount` keep their meanings
+      over the whole sphere. Feet run toward the face pole, blades leave toward the reserved
+      one. The hub is two concentric spheres closed by an explicit apex fan at each pole —
+      the cap arm at 180° collapses its rim band onto 48 coincident points, the DOME centre's
+      own defect — so the hub count is a THREE-VALUED branch, 192 / 3,456 / 6,720.
+
+    - **WHAT THE INSTRUMENTS COULD AND COULD NOT SEE, measured before the assertions were
+      written and again after.** Everything written in slope terms held for slope in
+      [0°, 180°] untouched: the arc-law foot rows, the great-circle cross-sections, the rigid
+      frame, J1, J3, C1 — and crowding's R4 (its `atan2(proj, dz)` is signed) needed ONE
+      clause, not the rewrite Phase A expected. What could not: the crowding raster's
+      membership went through a plan point lifted onto the UPPER sheet, so every far-side
+      cell would have been tested against the wrong hemisphere — it evaluates in (s, θ) now,
+      over the full arc, the cap path a verbatim branch; the plan-coverage raster cannot
+      read a sphere at all (the far hemisphere projects into the disc from below: a FALSE
+      CLEAN), so SPHERE rows are a LABELLED, LOUD skip and the export gate FAILS THE RUN if
+      one ever emits a number, decided against the app's own `sphereMode` and asserted in
+      both directions at matrix level; J5's "radius strictly decreasing" is false on a sphere
+      (it rises to the equator and falls) and steps in polar angle there; J6 is NULLED (no
+      ringed twin exists for a spherical sequence; a claim nothing can make reads as absent).
+      S1 (equal-area, pole to pole, mirror-symmetric, the sphere's own functions of φ), S2
+      (the hub is CLOSED iff declared, from the builder's own report), S3 (the reserved pole,
+      both directions) and S4 (the rise inert under SPHERE — GATED rows for the bit-identity,
+      a per-row owner check for the mechanism) carry the rest. The mutant table is in the
+      outcome doc: <<MUTANT_SUMMARY>>
+
+    - **THE SPHERE SPREADS THE FEET.** The incurve sliders read D_max 5 / D_mean 2.06 on the
+      cap at rise 0.5 and **2 / 1.00 on the sphere**, depth 1 within one equal-area step of
+      either pole; 240 feet on a 32.72 mm sphere read 2 / 1.01. Four times the surface of the
+      equatorial disc, and every foot owns the same patch. The instrument's blind spot is
+      unchanged and is exactly the face pole's question: root-exit stacking, never the blades.
+
+    - **BYTE-IDENTICAL ON THE RETENTION RULING'S TERMS**: phase14 (499 rows frozen at
+      5312845, a commit on `main`, the strongest baseline — the only one carrying the curl
+      family's rows) <<PHASE14>>; the live partition <<LIVE>>. The predeclared must-not-touch
+      list (every flower file and tool, `chromium-harness`, cards, the tracker, the twelve
+      older frozen functions) verified by `sha1sum -c` at close; eleven `frozen/*` tags on the
+      remote as session 17 left them; `frozen/phase14` is OWED from `main` after the merge.
+
+    - **THE SHEET: `node tools/shot-bloom-sphere.mjs <dir>`** — the incurve sliders on a
+      sphere beside the same sliders on a cap at a hemisphere, one camera; the FACE-POLE crop
+      (for Q1b) and the RESERVED pole from below; the 240-foot row, the sparse and mum cases;
+      and the byte claim on the sheet itself (two GATED pairs REQUIRED equal by sha). Held for
+      Eva's ruling.
