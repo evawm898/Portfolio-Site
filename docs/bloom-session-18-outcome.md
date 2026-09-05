@@ -121,6 +121,20 @@ one half-step from the pole — 1.62 mm at 120 feet on a 12.51 mm sphere, 2.99 m
 it is a solid-angle question the sheet answers by eye until session two's instrument exists:
 <<RESERVED_FINDING>>.
 
+## A pre-existing defect in the `--conn` path, found by running it
+
+`node tools/bloom-smoke.mjs --conn` — REQUIRED for a new geometry mode (session 17's
+ruling) — could not pass before this session: the connectedness gate's VALIDITY 2 (the
+petalCount 3 / 40 triangle pair) and VALIDITY 3 (the DEFAULT row against the three
+foot-response rows) are matrix-level claims with no `--only` guard, so every filtered run
+reported HARNESS INVALID with "rows missing from results" while all 33 rows read one piece.
+The crowding-coverage claim one line below them already carried the guard, and the export
+gate suppresses all of its matrix-level claims under `--only`. Session 17's own `--conn`
+measurement (21/21 one piece on the dome mutants) was therefore quotable only as the voxel
+verdict with the run self-reporting invalid — which is how the charter records it. Both
+checks now carry the same guard; per-row validity is untouched, and a filtered run is still
+never a pass of the matrix.
+
 ## What this session did not touch, verified at close
 
 The predeclared list, byte-identical to 5312845 by `sha1sum -c`: every `flower*` file and
