@@ -515,6 +515,31 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
       // feed both renderers rather than trusting a count
       strokeSample: (n = 8) => Array.from(art.units[0].buf.array.slice(0, n * 6)),
       artText: () => artState.textContent,
+      // The stem's line set at rest and at the CURRENT bend, both extracted at
+      // the SAME camera inside one tick. The gate needs this because "the
+      // camera did not move" is not observable here: headless runs on software
+      // GL at ~2 fps, so OrbitControls' damping has a ~4 second half-life and a
+      // drag that MISSES a handle falls through to the orbit and changes the
+      // silhouette all by itself. Comparing rest against bent at one camera
+      // removes the camera from the question entirely. The bend is restored
+      // before this returns, and the caller is handed the restored count so it
+      // can say so.
+      stemLinesRestVsBent: () => {
+        if (!rig || !art) return null;
+        const u = art.units.find(x => x.mesh === stemMesh);
+        if (!u) return null;
+        const size = [canvas.clientWidth, canvas.clientHeight], pr = renderer.getPixelRatio();
+        const saved = rig.points.map(p => p.clone());
+        art.update(camera, size, pr);
+        const bent = u.ex.segmentCount;
+        rig.resetPose(); repose();
+        art.update(camera, size, pr);
+        const rest = u.ex.segmentCount;
+        saved.forEach((p, i) => { if (i) rig.setPoint(i, p); });
+        repose();
+        art.update(camera, size, pr);
+        return { bent, rest, restored: u.ex.segmentCount };
+      },
       // the widget path and the model path, kept apart for the same reason the
       // pose stage keeps them apart
       setWeightWidget: (v) => { weightIn.value = String(v); weightIn.dispatchEvent(new Event('input')); },

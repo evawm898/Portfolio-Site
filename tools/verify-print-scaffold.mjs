@@ -56,7 +56,10 @@ import { decodePNG } from './pngdec.mjs';
 
 const ROOT = '/home/user/Portfolio-Site';
 const args = process.argv.slice(2);
-const WITH_MUTANTS = args.includes('--mutants');
+const WITH_MUTANTS = args.includes('--mutants') || args.some(a => a.startsWith('--mutant='));
+// --mutant=<id>[,<id>] runs just those, so a claim can be corrected in two
+// minutes instead of in a thirty-five minute full sweep.
+const ONLY = (args.find(a => a.startsWith('--mutant=')) || '').split('=')[1];
 const OUT = args.find(a => !a.startsWith('--')) || '/tmp/print-shots';
 mkdirSync(OUT, { recursive: true });
 const TYPES = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css',
@@ -91,7 +94,11 @@ const MUTANTS = [
 
   { id: 'weight-adds-lines', file: 'print-lines.js',
     from: 'const creaseCos = Math.cos(THREE.MathUtils.degToRad(this.creaseAngleDeg));',
-    to: 'const creaseCos = Math.cos(THREE.MathUtils.degToRad(this.creaseAngleDeg + this.weight * 6));',
+    // SUBTRACTS on purpose. The weight check is measured at detail 0 (88 deg),
+    // and adding to that threshold pushes it past 90 deg, where cos goes
+    // negative and no crease passes at either end of the slider — the mutation
+    // neutralises itself. Measured: it stayed green until this sign flipped.
+    to: 'const creaseCos = Math.cos(THREE.MathUtils.degToRad(this.creaseAngleDeg - this.weight * 8));',
     breaks: ['weight/segments-unchanged'] },
 
   { id: 'detail-ignored', file: 'print-lines.js',
@@ -107,12 +114,11 @@ const MUTANTS = [
   { id: 'no-weld', file: 'print-lines.js',
     from: '      const k = `${Math.round(pos.getX(i) * inv)},${Math.round(pos.getY(i) * inv)},${Math.round(pos.getZ(i) * inv)}`;',
     to: '      const k = `v${i}`;',
-    breaks: ['topology/welded', 'detail/creases-grow', 'detail/pixels', 'detail/readout',
-             'blend/dots-at-100', 'blend/mixed', 'pose/lines-follow-bend'] },
+    breaks: ['topology/welded', 'weight/pixels', 'detail/creases-grow', 'detail/pixels'] },
 
   { id: 'dots-never-drawn', file: 'print-lines.js',
     from: '        if (hash01(EI[i]) >= b) {', to: '        if (true) {',
-    breaks: ['blend/strokes-at-0', 'blend/dots-at-100', 'blend/mixed', 'blend/pixels'] },
+    breaks: ['blend/dots-at-100', 'blend/mixed', 'blend/pixels'] },
 
   { id: 'dots-are-a-second-extraction', file: 'print-lines.js',
     from: '      const n = u.ex.extract(camLocal, creaseCos);',
@@ -127,24 +133,26 @@ const MUTANTS = [
   { id: 'stylize-freezes-pose-controls', file: 'print.js',
     from: '  canvas.addEventListener(\'pointerdown\', (ev) => {\n    if (!rig) return;',
     to: '  canvas.addEventListener(\'pointerdown\', (ev) => {\n    if (!rig || (art && art.enabled)) return;',
-    breaks: ['stylized/bend-drag-still-works', 'pose/lines-follow-bend'] },
+    breaks: ['stylized/bend-drag-still-works', 'pose/lines-follow-bend',
+             'pose/panel-reflects-state'] },
 
   { id: 'lines-frozen-after-first-frame', file: 'print.js',
     from: '    frameStats = art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());',
     to: '    frameStats = frameStats || art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());',
-    breaks: ['live/orbit-moves-silhouette', 'pose/lines-follow-bend', 'weight/pixels',
-             'weight/material', 'detail/creases-grow', 'detail/pixels',
-             'blend/strokes-at-0', 'blend/dots-at-100', 'blend/mixed', 'blend/pixels',
-             'blend/same-extraction'] },
+    breaks: ['live/orbit-moves-silhouette', 'weight/material', 'weight/pixels',
+             'detail/creases-grow', 'detail/pixels', 'detail/readout',
+             'blend/dots-at-100', 'blend/mixed', 'blend/pixels'] },
 ];
 
 // ===========================================================================
 async function run({ mutant = null, shots = false } = {}) {
   const checks = new Map();
+  const details = new Map();
   const say = [];
   const out = (s) => { say.push(s); if (!mutant) console.log(s); };
   const check = (name, ok, detail = '') => {
     checks.set(name, !!ok);
+    details.set(name, detail);
     out(`  [${ok ? 'ok  ' : 'FAIL'}] ${name}${detail ? '  ' + detail : ''}`);
     return !!ok;
   };
@@ -169,8 +177,20 @@ async function run({ mutant = null, shots = false } = {}) {
   page.on('requestfailed', r => logs.push('REQFAIL ' + r.url()));
   page.on('response', r => { if (r.status() >= 400) logs.push('HTTP ' + r.status() + ' ' + r.url()); });
 
-  const finish = async (ok) => { await browser.close(); return { ok, checks, errs, logs, say }; };
+  const finish = async (ok) => { await browser.close(); return { ok, checks, details, errs, logs, say }; };
   const call = (expr) => page.evaluate(expr);
+  let settleResidual = Infinity;
+  const settleCamera = async () => {
+    let prev = await call(() => window.__printScaffold.cameraPosition());
+    for (let i = 0; i < 60; i++) {
+      await page.waitForTimeout(100);
+      const p = await call(() => window.__printScaffold.cameraPosition());
+      settleResidual = Math.hypot(p[0]-prev[0], p[1]-prev[1], p[2]-prev[2]);
+      prev = p;
+      if (settleResidual < 1e-4) return p;
+    }
+    return prev;
+  };
   const shot = async (name) => { if (shots) await page.screenshot({ path: path.join(OUT, name) }); };
 
   // hit the CLEAN url, no .html
@@ -311,7 +331,7 @@ async function run({ mutant = null, shots = false } = {}) {
   const [hx, hy] = await call(() => window.__printScaffold.handleScreenPos(2));
   await page.mouse.move(hx, hy);
   await page.mouse.down();
-  for (let i = 1; i <= 10; i++) await page.mouse.move(hx + i * 6, hy);
+  for (let i = 1; i <= 16; i++) await page.mouse.move(hx + i * 8, hy);
   await page.mouse.up();
   await page.waitForTimeout(300);
   const bendPts = await call(() => window.__printScaffold.bendPoints());
@@ -319,7 +339,11 @@ async function run({ mutant = null, shots = false } = {}) {
   const vtxAfter = await call(() => window.__printScaffold.stemVertex(7000));
   const nowBent = !(await call(() => window.__printScaffold.isRest()));
   const vtxMoved = Math.hypot(vtxAfter[0]-vtxBefore[0], vtxAfter[1]-vtxBefore[1], vtxAfter[2]-vtxBefore[2]);
-  const bboxMoved = Math.abs(bbAfter[1][0] - bbBefore[1][0]) + Math.abs(bbAfter[0][0] - bbBefore[0][0]);
+  // ALL THREE AXES. The x extent alone is a function of where the camera
+  // happens to be, so the same drag reads 3.79 from one azimuth and 0.31 from
+  // another — measured, and it flaked the check before this summed the box.
+  let bboxMoved = 0;
+  for (let k = 0; k < 3; k++) bboxMoved += Math.abs(bbAfter[1][k] - bbBefore[1][k]) + Math.abs(bbAfter[0][k] - bbBefore[0][k]);
   check('stylized/bend-drag-still-works', nowBent && vtxMoved > 0.5 && bboxMoved > 0.5,
     `bent=${nowBent} vertex ${vtxMoved.toFixed(2)} bbox ${bboxMoved.toFixed(2)}`);
 
@@ -331,9 +355,22 @@ async function run({ mutant = null, shots = false } = {}) {
 
   // ...and the LINEWORK followed it. The stem is re-extracted because its
   // vertices moved; if it were not, the segment set would be bit-identical.
+  //
+  // MEASURED AT ONE CAMERA. "The segment count changed after the drag" is NOT
+  // enough on its own: a drag that misses the handle falls through to
+  // OrbitControls, and the orbit changes the silhouette by itself — measured,
+  // the mutant that freezes the pose controls while stylized passed the naive
+  // version on the orbit its own failure caused. Nor can it be fixed by
+  // asserting the camera held still: headless runs on software GL at ~2 fps,
+  // so OrbitControls' damping has a ~4 SECOND half-life and the camera is
+  // never still (measured: 12.3 units per 300 ms immediately after a drag,
+  // still 4.4 six seconds later). So the page extracts rest and bent at the
+  // SAME camera inside one tick and hands back both, which removes the camera
+  // from the question instead of trying to hold it.
+  const rvb = await call(() => window.__printLineArt.stemLinesRestVsBent());
   const stemSegAfter = (await call(() => window.__printLineArt.topology()))[0].segments;
-  check('pose/lines-follow-bend', stemSegAfter !== stemSegBefore,
-    `stem segments ${stemSegBefore} -> ${stemSegAfter}`);
+  check('pose/lines-follow-bend', !!rvb && rvb.bent !== rvb.rest && rvb.restored === rvb.bent,
+    `at one camera: rest ${rvb && rvb.rest} vs bent ${rvb && rvb.bent} (restored ${rvb && rvb.restored}); across the drag ${stemSegBefore} -> ${stemSegAfter}`);
   await shot('04-bent-stylized.png');
 
   // the anchored root cannot be dragged, by the picker OR by the rig
@@ -404,10 +441,13 @@ async function run({ mutant = null, shots = false } = {}) {
   const camAfter = await call(() => window.__printScaffold.cameraPosition());
   const camMoved = Math.hypot(camAfter[0]-camBefore[0], camAfter[1]-camBefore[1], camAfter[2]-camBefore[2]);
   const silAfter = (await call(() => window.__printLineArt.stats())).silhouette;
+  const poseAfterOrbit = await call(() => window.__printScaffold.bendPoints());
+  const dAfterOrbit = await call(() => window.__printScaffold.droop());
+  const tAfterOrbit = await call(() => window.__printScaffold.twist());
   check('pose/survives-orbit',
-    JSON.stringify(poseBeforeOrbit) === JSON.stringify(await call(() => window.__printScaffold.bendPoints()))
-    && dBefore === await call(() => window.__printScaffold.droop())
-    && tBefore === await call(() => window.__printScaffold.twist()), `camera moved ${camMoved.toFixed(1)}`);
+    JSON.stringify(poseBeforeOrbit) === JSON.stringify(poseAfterOrbit)
+    && dBefore === dAfterOrbit && tBefore === tAfterOrbit,
+    `camera moved ${camMoved.toFixed(1)}; bend ${JSON.stringify(poseBeforeOrbit) === JSON.stringify(poseAfterOrbit) ? 'held' : 'MOVED ' + JSON.stringify(poseBeforeOrbit[2]) + ' -> ' + JSON.stringify(poseAfterOrbit[2])}; droop ${dBefore}->${dAfterOrbit} twist ${tBefore}->${tAfterOrbit}`);
   // THE silhouette is the outline FROM THE CURRENT CAMERA. If it does not move
   // when the camera does, it is not a silhouette — it is a fixed edge set.
   check('live/orbit-moves-silhouette', camMoved > 1 && silBefore !== silAfter,
@@ -419,7 +459,8 @@ async function run({ mutant = null, shots = false } = {}) {
   check('pose/panel-reflects-state',
     /BENT/.test(poseTxt)
     && new RegExp(`droop\\s+${dNow.toFixed(1)}`).test(poseTxt)
-    && new RegExp(`twist\\s+${tNow.toFixed(1)}`).test(poseTxt));
+    && new RegExp(`twist\\s+${tNow.toFixed(1)}`).test(poseTxt),
+    `stem ${/BENT/.test(poseTxt) ? 'BENT' : 'REST'}, droop ${dNow.toFixed(1)} twist ${tNow.toFixed(1)}`);
 
   // ===================== STYLIZE ========================================
   // Three sliders, three DIFFERENT jobs. Each is asserted on what it must
@@ -551,7 +592,9 @@ console.log(`\n${main.checks.size} checks, ${failed.length} failed${failed.lengt
 let mutantsOK = true;
 if (WITH_MUTANTS) {
   console.log('\n=== mutants ===');
+  const wanted = ONLY ? ONLY.split(',') : null;
   for (const m of MUTANTS) {
+    if (wanted && !wanted.includes(m.id)) continue;
     const src = readFileSync(path.join(ROOT, m.file), 'utf8');
     if (!src.includes(m.from)) {
       console.log(`  [FAIL] ${m.id}: mutation did not apply — the source it edits has moved`);
@@ -568,6 +611,7 @@ if (WITH_MUTANTS) {
     console.log(`  [${ok ? 'ok  ' : 'FAIL'}] ${m.id.padEnd(34)} red: ${red.length ? red.join(', ') : '(none)'}`);
     if (missed.length) console.log(`         MISSED (stayed green): ${missed.join(', ')}`);
     if (extra.length) console.log(`         UNCLAIMED (also red): ${extra.join(', ')}`);
+    if (!ok) for (const k of [...missed, ...extra]) console.log(`           ${k}: ${r.details.get(k) || '(no detail)'}`);
   }
 } else {
   console.log('\n(mutants not run — pass --mutants to negative-control every assertion above)');
