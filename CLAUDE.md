@@ -448,16 +448,40 @@ first half of any of those on its own.
 for all three stages, every claim measured against mesh state, the extracted
 segment counts, or the SCREENSHOT BYTES, never against the control that was
 just written. **`--mutants` is the negative control and is not optional before
-quoting a pass from a changed harness**: it re-serves deliberately broken
+quoting a pass from a changed harness**: it re-serves ten deliberately broken
 copies of `print.js` / `print-lines.js` through the gate's own HTTP server, and
 fails if a mutation does not apply, if a check the mutant NAMES stays green, or
 if a check it did not name goes red (which is how a mutation that just breaks
-the page gets caught pretending to be a negative control).
+the page gets caught pretending to be a negative control). `--mutant=<id>` runs
+one, in two minutes rather than thirty-five.
+
+**THE FIRST SWEEP FAILED SIX OF TEN AND WAS MOSTLY RIGHT TO — three of the
+findings were in the GATE, not the mutations, and two of those were in checks
+that shipped with #150/#151 and had been green all along.** Do not repeat them:
+
+- **A drag whose pointerdown lands on a control panel never reaches the
+  canvas.** The "pose survives an orbit" drag started at 0.75 of the canvas
+  width, which is inside the right-hand column, on a slider — so the orbit
+  under test was never performed, and the check passed on `camera moved 21.2`,
+  which was OrbitControls' damping still easing from the PREVIOUS orbit
+  against a bar of `> 1`. Start canvas drags in the gap between the panels'
+  real bounding boxes, and set movement bars only a real orbit can clear.
+- **"The camera did not move" is NOT observable in this harness.** Headless
+  runs on software GL at ~2 fps, so damping has a **~4 second half-life**
+  (measured: 12.3 units of drift per 300 ms right after a drag, still 4.4 six
+  seconds later). A settle loop measures the easing. Where a check needs the
+  camera out of the question, extract both states at the SAME camera inside
+  one tick — `stemLinesRestVsBent()` is that shape.
+- **One axis of a bounding box is a function of camera azimuth.** The same
+  bend drag moved the stem's x extent 3.79 from one angle and 0.31 from
+  another, straddling the threshold. Sum all three.
 
 **Ink fraction saturates — read the weight check's comment before retuning it.**
 Coverage is not width: at detail 100 the bloom is already a solid mass, so a 5x
 stroke barely moves the pixel count. The weight check is measured at detail 0
-for that reason.
+for that reason. Note the corollary that caught a mutant: a mutation that ADDS
+to the crease threshold neutralises itself there, because 88 deg + anything
+passes 90 and no crease survives at either end of the slider.
 
 Contact sheets: `node tools/shot-print-pose.mjs <dir>` (the pose stage) and
 `node tools/shot-print-lines.mjs <dir>` (the line art — the switch, detail x
