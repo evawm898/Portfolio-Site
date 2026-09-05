@@ -171,7 +171,18 @@ export const HUB_DOME_RINGS = 18;
    zero slope, and -0 + 0 is +0, so a "the law at zero rise IS the flat law"
    argument is true of the NUMBERS and false of the BYTES. domeGuardResidual
    in buildPetalInto measures the law; the byte diff measures the bytes. */
-export function domeIsFlat(state) { return state.headRise === 0; }
+/* THE FULL SPHERE (session 18, Eva Sep 5) — the twin of the registry's
+   `PREDICATES.sphereMode`: the registry HIDES `headRise` and the `hubShape`
+   control on this condition, this makes them INERT, and the harness asserts
+   the two statements agree at module load (the slotRolesEligible precedent).
+   CONTINUOUS only: the sphere is the continuous spiral re-keyed on polar
+   angle; under any other placement a stored SPHERE is hidden and inert and
+   the head is the cap `headRise` builds. */
+export function sphereMode(state) { return state.placement === 'CONTINUOUS' && state.hubShape === 'SPHERE'; }
+/* Flat iff no sphere and no rise. The second clause is the pre-session-18
+   expression verbatim; the first is a branch, so every cap and flat build
+   takes exactly the doubles it took before SPHERE existed. */
+export function domeIsFlat(state) { return !sphereMode(state) && state.headRise === 0; }
 
 /* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
    pi*(3 - sqrt(5)) rather than a decimal literal so the constant IS the
@@ -1342,6 +1353,30 @@ export function footRing(state, acc) {
      golden-angle sequence at all and reports `petalCount`, which is what the
      flag's predicate already ignores. */
   const sequenceLength = continuousMode ? layerCount * n : n;
+  /* ===================================================================
+     THE SPHERE'S OWN KEY (session 18) — POLAR ANGLE FROM THE FACE POLE, as
+     a closure, for the same reason `lambdaAt` is one: the ring map below
+     evaluates it and nothing else restates it. Equal-area: cos(phi) is
+     LINEAR in the slot index, one step of 2/K per slot, so every foot owns
+     the same patch of the sphere — the Fibonacci sphere, which is the one
+     lattice with no seam and no privileged band, expressed through the
+     continuous arm's existing descriptor-per-petal shape rather than by
+     replacing it (Phase A, Q1: candidates (a) and (c) are the same build).
+
+     THE SEQUENCE RUNS FROM THE RESERVED POLE TO THE FACE POLE: k = 0 (the
+     largest petal, scale 1, the same lambda-0 petal the cap arm puts at its
+     rim) sits one half-step from the far pole (cos phi = -1 + 1/K), and
+     k = K-1 (the smallest, deepest) one half-step from the face pole. So
+     `layerSize` is still the shrink per turn, `layerTilt` the tilt gain per
+     turn and `layerCount` the number of turns — over the whole sphere. Feet
+     run toward the face pole along the meridian (the arc origin, exactly as
+     they run toward the cap's apex) and blades leave toward the far pole,
+     which is what leaves the far pole clear of feet BY CONSTRUCTION and
+     covered by converging blade tips (Eva's Q4 reading, asserted as S3 in
+     arc, both directions). The far pole is the STEM's someday; `below` is
+     still null. */
+  const phiAt = (k) => Math.acos(-1 + (2 * (k + 0.5)) / sequenceLength);
+  const sphere = sphereMode(state);
   /* Foot width follows the petal it feeds — a fraction of blade width, scaled
      by `footDelicacy`, with a floor so very narrow petals keep a printable
      root. THIS IS THE ONLY PLACE `footDelicacy` EXISTS, exactly as spread is
@@ -1618,7 +1653,23 @@ export function footRing(state, acc) {
      and the local relief 1.1–1.2x; the whole-annulus area ratio there is 2.0x.
      A hemisphere takes the mum from D_max 11 to 9, not to 5. `relief` on every
      ring and `surfaceToPlan` on the dome carry that reading to the read-out. */
-  const dome = domeIsFlat(state) ? null : (() => {
+  /* THE SPHERE IS THE RISE-1 CAP CONTINUED PAST ITS OWN RIM: Rd = R0, the
+     equator at z = 0 (the flat hub's plane, where the cap's rim always was),
+     the face pole at +Rd and the reserved pole at -Rd. `H` keeps its meaning
+     — the face pole's height above z = 0 — so the centre's apex seat and the
+     seat's patch/hover expressions read it unchanged. THE APEX FLOOR still
+     binds where R0 is narrower than one sheet (the same one reachable corner
+     the cap has): the sphere is then held at the floor radius and every
+     ring's plan radius follows Rd, not R0, so containment (J2) holds by
+     construction; the read-out says "(CLAMPED)". `closed` is what the hub
+     builder branches on and what S2 asserts against the builder's own
+     report. `headRise` is NOT read here: hidden and inert under SPHERE. */
+  const dome = sphere ? (() => {
+    const floor = HEAD_RISE_MIN_RADIUS_FACTOR * thickness;
+    const clamped = R0 < floor;
+    const Rd = clamped ? floor : R0;
+    return { rise: 1, riseBuilt: 1, H: Rd, Rd, centreZ: 0, clamped, floorRadius: floor, surfaceToPlan: null, closed: true, K: sequenceLength, stepCos: 2 / sequenceLength, reserved: null, faceReach: null };
+  })() : domeIsFlat(state) ? null : (() => {
     const rise = state.headRise;
     const floor = HEAD_RISE_MIN_RADIUS_FACTOR * thickness;
     let H = rise * R0;
@@ -1633,13 +1684,19 @@ export function footRing(state, acc) {
     return { rise, riseBuilt: H / R0, H, Rd, centreZ: H - Rd, clamped, floorRadius: floor, surfaceToPlan: null };
   })();
   const rings = raw.map((p, L) => {
-    const radius = R0 * p.scale;
+    /* ON THE SPHERE THE KEY IS THE POLAR ANGLE (session 18): under the
+       continuous arm `L` IS the slot index k, so `phiAt(L)` places this
+       ring and its plan radius is DERIVED, Rd sin(phi) — plan radius is not
+       injective past the equator, which is exactly why the cap's key cannot
+       be continued there and this arm exists. Cap and flat: verbatim. */
+    const polar = sphere ? phiAt(L) : null;
+    const radius = sphere ? dome.Rd * Math.sin(polar) : R0 * p.scale;
     /* WHERE ON THE DOME THIS RING LANDS — height, slope (the polar angle from
        the apex, which is also the tangent plane's tilt) and arc distance from
        the apex, all from the one sphere above. Flat: 0 / 0 / the plan radius.
        Containment (J2) is what makes radius <= Rd: Rd >= R0 by AM-GM. */
-    const slope = dome ? Math.asin(Math.min(1, radius / dome.Rd)) : 0;
-    const z = dome ? Math.sqrt(dome.Rd * dome.Rd - radius * radius) + dome.centreZ : 0;
+    const slope = sphere ? polar : dome ? Math.asin(Math.min(1, radius / dome.Rd)) : 0;
+    const z = sphere ? dome.Rd * Math.cos(polar) + dome.centreZ : dome ? Math.sqrt(dome.Rd * dome.Rd - radius * radius) + dome.centreZ : 0;
     const arc = dome ? dome.Rd * slope : radius;
     /* How far inside the ring each foot continues, so foot–hub overlap is a
        solid annulus, not a hairline touch. A FRACTION of this layer's own
@@ -1736,7 +1793,18 @@ export function footRing(state, acc) {
          actually used, so the layered law's own five existing assertions
          need not change a character, and this field's own correctness is
          J9's alone to state. */
-      domeLean: dome ? (slope * 180) / Math.PI : 0,
+      /* LEAN 0 ON THE SPHERE (Eva's ruling, Sep 5, Phase A Q1b): the cap's
+         +slope restores a flat ring's GLOBAL aim, which assumes a privileged
+         up; continued past the equator it aims every far-side petal back up
+         into the bloom (at the far pole, minus the local direction), and the
+         mirror alternative puts a jump of twice the tilt across the equator.
+         So on the sphere the blade leaves the surface at its authored tilt
+         from the local tangent, heading away from the face pole, everywhere
+         — the primitive's own frame, no fitted constant. The FADED lean
+         (slope x cos^2(phi/2)) is costed in the session-18 outcome doc and
+         deliberately not built; the sheet decides. The cap arm is verbatim:
+         `dome && !sphere` is `dome` on every cap. */
+      domeLean: dome && !sphere ? (slope * 180) / Math.PI : 0,
       tiltExtra: p.lambda * state.layerTilt,
       /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the
          read-out and the gates can say WHERE a floor started binding instead
@@ -1813,14 +1881,40 @@ export function footRing(state, acc) {
          plan factor 1 / cos(slope), the number the read-out prints at the
          rim and at the innermost ring so the relief finding is legible. */
       z, slope, arc,
-      relief: dome ? (slope >= Math.PI / 2 - 1e-9 ? Infinity : 1 / Math.cos(slope)) : 1,
+      /* On the sphere the factor is against the EQUATORIAL plane's plan and
+         is symmetric about the equator (|cos|), vertical AT the equator. The
+         cap expression is kept verbatim on its own arm. */
+      relief: sphere ? (Math.abs(Math.cos(slope)) < 1e-9 ? Infinity : 1 / Math.abs(Math.cos(slope))) : dome ? (slope >= Math.PI / 2 - 1e-9 ? Infinity : 1 / Math.cos(slope)) : 1,
       dome,
     };
   });
+  /* THE SPHERE'S TELEMETRY (session 18), stamped on the dome after the rings
+     exist and read by the read-out, S1 and S3 — never re-derived there:
+       reserved   the far pole's clearance: the arc from the pole to the
+                  nearest foot's RING row (feet run the other way, toward
+                  the face pole, so the ring row is the nearest point). The
+                  reservation is structural — a future `below: 'stem'` value
+                  attaches here — and S3 asserts it > 0 AND within one
+                  equal-area step of the pole, so a sequence that stopped
+                  short cannot pass it vacuously.
+       faceReach  the nearest any foot's inner end comes to the FACE pole
+                  along its meridian (negative: feet cross it — the same
+                  `crossesAxis` flag the cap already carries).
+       surfaceToPlan  4, exactly: a sphere over its own equatorial disc. */
+  if (sphere) {
+    let near = 0;
+    for (let k = 1; k < rings.length; k++) if (rings[k].arc > rings[near].arc) near = k;
+    const reservedMm = Math.PI * dome.Rd - rings[near].arc;
+    dome.reserved = { mm: reservedMm, deg: (reservedMm / dome.Rd) * (180 / Math.PI), ring: near, stepMm: (dome.Rd * Math.acos(1 - dome.stepCos)) };
+    let reach = Infinity;
+    for (const r of rings) if (r.arc - r.overhang < reach) reach = r.arc - r.overhang;
+    dome.faceReach = { mm: reach, crossing: rings.filter((r) => r.crossesAxis).length };
+    dome.surfaceToPlan = 4;
+  }
   /* THE SURFACE-TO-PLAN RATIO OVER THE FEET'S OWN ANNULUS — the whole-annulus
      figure, beside which the per-ring relief shows how uneven it is. Telemetry
      only; nothing geometric reads it. */
-  if (dome) {
+  if (dome && !sphere) {
     const rIn = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
     const plan = Math.PI * (R0 * R0 - rIn * rIn);
     const surf = 2 * Math.PI * dome.Rd * (Math.sqrt(dome.Rd * dome.Rd - rIn * rIn) - Math.sqrt(Math.max(0, dome.Rd * dome.Rd - R0 * R0)));
@@ -1832,7 +1926,10 @@ export function footRing(state, acc) {
      would be a SECOND derivation that merely happens to agree, and the
      one-owner rule is about which is which. Containment is asserted (J2/J3)
      rather than achieved by picking the largest. */
-  const hub = { radius: R0, thickness, derivedRadius, dome };
+  /* ON THE SPHERE THE HUB'S RADIUS IS THE SPHERE'S — the equator, which
+     every ring's plan radius is under by construction (Rd sin phi <= Rd).
+     Cap and flat: R0, verbatim. */
+  const hub = { radius: sphere ? dome.Rd : R0, thickness, derivedRadius, dome };
 
   /* THE QUANTIZER IDENTITY, CROSS-VALIDATED IN THE OWNER — the continuous
      arm's answer to `guardResidual`, and it exists for the same reason: a
@@ -1857,7 +1954,14 @@ export function footRing(state, acc) {
      copy of the ringed law living inside the instrument built to police it.
      Null under the ringed arm — there is no second law there to agree with. */
   let quantizerResiduals = null;
-  if (continuousMode) {
+  /* NULL ON THE SPHERE (session 18, Eva's ruling: J6 nulled with a clause).
+     The identity states that the continuous sequence passes through every
+     RINGED layer's scale and tilt; no ringed placement has a sphere arm, so
+     there is no ringed twin for a spherical sequence to agree with, and a
+     claim nothing can make reads as absent. (The scale and tilt laws are
+     unchanged on the sphere, so the numbers would still agree — which is
+     precisely why asserting them would be an assertion about nothing.) */
+  if (continuousMode && !sphere) {
     quantizerResiduals = [];
     /* ONE PAST THE END, and that bound is a POSITIVE-CONTROL FINDING rather
        than a flourish. Checking only m < layerCount leaves layerCount 1 with
@@ -1952,6 +2056,10 @@ export function footRing(state, acc) {
     rings, hub, derivedRadius, guardResidual, layerCount,
     /* THE DOME, footRing()'s own — null under the guard. */
     dome,
+    /* WHETHER THE HEAD IS THE FULL SPHERE (session 18) — this file's own
+       answer, cross-checked against the registry's `sphereMode` predicate by
+       the harness on every row. */
+    sphereMode: sphere,
     continuousMode, sequenceLength, quantizerResiduals, zygoGuardResidual,
     slotRings,
     /* WHETHER SLOT ROLES APPLY IN THIS STATE, and whether a whorl actually
@@ -3519,6 +3627,39 @@ export function buildHubInto(acc, state, ring) {
      verbatim. Returns what it built, so J3 can compare the hub's OWN sphere
      against the feet rather than trusting that the builder read the owner. */
   const dome = ring.dome;
+  /* THE CLOSED SPHERE (session 18) — two concentric spheres, Rd +/- t/2,
+     each closed by an EXPLICIT apex fan at BOTH poles, and NO rim band. The
+     cap arm's rim band at a rim angle of 180 degrees would be 48 coincident
+     points — the DOME centre's 48-degenerate-triangle defect (watertight and
+     wrong, measured Sep 1) — which is why this is an arm and not the cap arm
+     handed pi. Latitude steps: twice the cap's ring count over the whole
+     sphere, so a hemisphere of it facets exactly as the cap does. Thickness
+     t everywhere, so J4a stays an equality; the feet sit inside it with
+     their faces coincident with its faces exactly as in the cap. Triangle
+     count: 2N(M-1) per sphere, 6,720 for the pair at N 48, M 36 — the hub's
+     count is a three-valued branch now (192 flat / 3,456 cap / 6,720
+     sphere), asserted by the panel gate, never a ramp. Returns what it
+     built, `closed` included, so S2 compares the owner's declaration
+     against the builder's own report rather than trusting the read. */
+  if (dome && dome.closed) {
+    const Rd = dome.Rd, cz = dome.centreZ, M = 2 * HUB_DOME_RINGS;
+    const ringAt = (rad, phi) => Array.from({ length: N }, (_, k) => { const th = (k * TAU) / N; return [rad * Math.sin(phi) * Math.cos(th), rad * Math.sin(phi) * Math.sin(th), cz + rad * Math.cos(phi)]; });
+    const sphereInto = (rad, outward) => {
+      const apexN = [0, 0, cz + rad], apexS = [0, 0, cz - rad];
+      let upper = ringAt(rad, Math.PI / M);
+      for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.tri(upper[k], upper[k2], apexN); else acc.tri(upper[k2], upper[k], apexN); }
+      for (let i = 2; i < M; i++) {
+        const lower = ringAt(rad, (i * Math.PI) / M);
+        for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.quad(lower[k], lower[k2], upper[k2], upper[k]); else acc.quad(lower[k2], lower[k], upper[k], upper[k2]); }
+        upper = lower;
+      }
+      for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.tri(upper[k2], upper[k], apexS); else acc.tri(upper[k], upper[k2], apexS); }
+    };
+    const before = acc.triangleCount;
+    sphereInto(Rd + t / 2, true);
+    sphereInto(Rd - t / 2, false);
+    return { dome: { Rd, centreZ: cz, H: dome.H, closed: true, rimPhi: Math.PI, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before };
+  }
   if (dome) {
     const Rd = dome.Rd, cz = dome.centreZ, K = HUB_DOME_RINGS;
     const phiRim = Math.asin(Math.min(1, ring.radius / Rd));
@@ -3538,7 +3679,7 @@ export function buildHubInto(acc, state, ring) {
     cap(Rd - t / 2, false);
     const top = ringAt(Rd + t / 2, phiRim), bot = ringAt(Rd - t / 2, phiRim);
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(top[k], bot[k], bot[k2], top[k2]); }
-    return { dome: { Rd, centreZ: cz, H: dome.H, rimPhi: phiRim, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before };
+    return { dome: { Rd, centreZ: cz, H: dome.H, closed: false, rimPhi: phiRim, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before };
   }
   const r = ring.radius;
   const zTop = t / 2, zBot = -t / 2;

@@ -169,6 +169,17 @@ for (const row of rows) {
      a LABELLED, LOUD skip; a row that asserts coverage and is skipped fails. */
   const cov = await planCoverage(page, { capability: row.capability || null });
   if (cov.bad.length) { validity.push(`${row.label}: ${cov.bad.join('; ')}`); continue; }
+  /* THE SPHERE MUST BE A LOUD SKIP (session 18, Eva's hard requirement): a
+     plan raster reads a full sphere as a FALSE CLEAN (the far hemisphere
+     projects into the disc from below), so a SPHERE row that emits ANY
+     plan-coverage number fails the RUN. Decided against the APP's own
+     sphereMode (footRing()'s flag through the metrics hook), never against
+     the tool's answer alone — a tool that forgot to skip would also forget
+     to say `sphere`. And in the other direction: a row the app says is not a
+     sphere may not be skipped as one. */
+  const isSphere = await page.evaluate(() => window.__bloomMetrics().sphereMode === true);
+  if (isSphere && (cov.r !== null || !cov.skipped || cov.sphere !== true)) { validity.push(`${row.label}: COVERAGE: a FULL-SPHERE row emitted a plan-coverage reading (${JSON.stringify(cov.r)}) — a plan raster reads a sphere as a FALSE CLEAN; SPHERE rows must be a labelled skip`); continue; }
+  if (!isSphere && cov.sphere === true) { validity.push(`${row.label}: COVERAGE: the raster skipped this row as a sphere while the app reports sphereMode false`); continue; }
   if (cov.skipped && row.coverage) { validity.push(`${row.label}: this row ASSERTS coverage but the raster skipped it — ${cov.skipped}`); continue; }
   if (!cov.skipped && row.coverage) {
     const ca = coverageAssert(cov.r, row.coverage);
@@ -205,7 +216,7 @@ for (const row of rows) {
         + ` · |dP/dv|/h ${fm.petalForm.metricMin.toFixed(4)}..${fm.petalForm.metricMax.toFixed(4)}`
       : null,
     crowding: crowd.r,
-    coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage,
+    coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage, sphere: isSphere,
     spine: fm.petalRingSpine, selfContact: (fm.petalRingSpine || []).some((s) => s && s.clearance.selfContact), underFloor: (fm.petalRingSpine || []).some((s) => s && s.underFloor),
     ...stl,
   });
@@ -249,6 +260,16 @@ if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) =>
   console.log(`${results.length - skipped.length}/${results.length} rows plan-coverage measured; ${skipped.length} SKIPPED (split whorls — labelled, never silent); ${asserted.length} rows coverage-ASSERTED (the pinned incurve rows); ${results.filter((r) => r.selfContact).length} rows flag SELF-CONTACT; ${results.filter((r) => r.underFloor).length} rows carry a shipped uniform arc UNDER ONE SHEET THICKNESS (told, not clamped)`);
   for (const r of skipped) console.log(`  skipped: ${r.label}`);
   if (asserted.length === 0 && !NEGATIVE_CONTROL && !ONLY) validity.push('coverage coverage: no row in this matrix asserts plan coverage — the pinned incurve rows are missing');
+  /* THE SPHERE SKIP IN BOTH DIRECTIONS, at matrix level (session 18): at
+     least one SPHERE row was skipped as one (the skip has been seen to
+     happen), and at least one non-sphere row was measured (the skip is not
+     stuck on). */
+  const spheres = results.filter((r) => r.sphere);
+  console.log(`${spheres.length}/${results.length} rows are FULL-SPHERE heads — every one a labelled coverage skip (a plan raster reads a sphere as a false clean; the solid-angle instrument is session two)`);
+  if (!NEGATIVE_CONTROL && !ONLY) {
+    if (spheres.length === 0) validity.push('coverage coverage: no row in this matrix is a FULL-SPHERE head — the loud skip is unexercised (a default is not coverage; block 22 is missing)');
+    if (results.length - skipped.length === 0) validity.push('coverage coverage: every row was skipped — the raster measured nothing');
+  }
 }
 
 let bad = false;

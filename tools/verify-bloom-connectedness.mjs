@@ -320,8 +320,18 @@ await browser.close();
 server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
 
-/* VALIDITY 2 — pairwise triangle comparison (see header). */
-if (!NEGATIVE_CONTROL) {
+/* VALIDITY 2 — pairwise triangle comparison (see header).
+   MATRIX-LEVEL, SO NOT MADE ON A FILTERED RUN (session 18): this check and
+   VALIDITY 3 below need the petalCount 3 / 40 rows, the DEFAULT row and the
+   three foot-response rows, and a `--only` run that does not select them
+   reported HARNESS INVALID on every smoke pass — which is why session 17's
+   `--conn` measurement could only ever be quoted as "the voxel verdict, with
+   the run self-reporting invalid". Suppressed under --only exactly as the
+   crowding-coverage claim below already is and as the export gate suppresses
+   its own matrix-level claims; the per-row validity (fresh page, read-back,
+   every J / Z / C family) is untouched, and a filtered run is still never a
+   pass of the matrix. */
+if (!NEGATIVE_CONTROL && !ONLY) {
   const r3 = results.find((r) => r.label === 'petalCount 3');
   const r40 = results.find((r) => r.label === 'petalCount 40');
   if (!r3 || !r40) validity.push('pairwise check: petalCount 3 / 40 rows missing from results');

@@ -128,6 +128,26 @@ export const PREDICATES = {
   allPetalsEligible: { not: { id: 'layerCount', min: 2 } },
 
   /* ===================================================================
+     THE FULL-SPHERE HEAD (session 18, Eva Sep 5) — the twin of
+     bloom-geometry.js's `sphereMode()`. The registry HIDES `headRise` here
+     and the geometry makes it INERT here; the harness checks the two agree
+     at module load over the states that decide it, and the junction
+     assertions check it per row against the real page.
+
+     WHY IT READS `placement` AS WELL AS `hubShape`: the sphere IS the
+     continuous spiral re-keyed on polar angle (Q1, ruled) — one unbroken
+     sequence pole to pole. Under RADIAL, SPIRAL or FAN "a sphere" would be
+     latitude BANDS, the very look Eva ruled against on Sep 1, so the
+     `hubShape` control is visible only under CONTINUOUS and a stored SPHERE
+     is HIDDEN AND INERT elsewhere — the `layerPhase` treatment, never a
+     reinterpretation. Under those placements this predicate is false, so
+     `headRise` shows and the head is the cap it always was. */
+  sphereMode: { all: [
+    { id: 'placement', oneOf: ['CONTINUOUS'] },
+    { id: 'hubShape', oneOf: ['SPHERE'] },
+  ] },
+
+  /* ===================================================================
      WHERE PER-PETAL ROLES APPLY — the fan, and only the fan (Eva's ruling 4,
      Sep 3). The counterpart of `slotRolesEligible` above, and MUTUALLY
      EXCLUSIVE with it: per-petal SUPERSEDES slot roles on the fan, so a fan
@@ -365,6 +385,26 @@ const SLOT_ROLES_BEHIND_OFFSET = {
 
 export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
+  /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
+     on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
+     A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
+     placement (Eva's ruling): Arrangement is how petals distribute in the
+     plane, Center is the ornament at the pole, and neither is "is the head
+     flat, domed or a sphere". `headRise` moved here from ARRANGEMENT —
+     presentation only, `section` is never persisted — as the cap's own
+     sub-control, on session 16's PETAL FORM / PETAL CURL precedent (a
+     registry-driven section move asserted 0 moved).
+
+     TWO VALUES, NOT THREE, and the reason is a measurement (Phase A, Q5):
+     a FLAT / DOMED / SPHERICAL enum with `headRise` as DOMED's sub-control
+     would resolve 35 phase13 rows and 42 live rows that pin `headRise`
+     above zero with no hub-shape value to a FLAT default and build them
+     flat — a predeclared partition of 35, or a hidden-and-not-inert slider.
+     CAP carries `headRise` and is the default, so its predicate is TRUE on
+     every pre-existing row and the move is 0 moved by construction. Neither
+     value is called "dome", which is what dissolves the collision with
+     `centerStyle`'s DOME (the ornament). */
+  { id: 'head', label: 'Head', open: false },
   { id: 'shape', label: 'Petal shape', open: false },
   { id: 'form', label: 'Petal form', open: false },
   /* PETAL CURL — the spine's own controls (Eva's ruling, Sep 4, from the
@@ -1156,10 +1196,60 @@ export const CONTROLS = [
      hovers above the shell (the read-out prints the overlap patch and the
      hover); the hub's triangle count is 3,456 at any rise above 0 against
      192 flat — the first slider-dependent count here, a branch not a ramp. */
-  { id: 'headRise', section: 'arrangement', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0,
+  /* ===================================================================
+     HUB SHAPE (session 18, Eva Sep 5) — CAP or a full SPHERE. The sphere is
+     the CONTINUOUS spiral re-keyed on polar angle: radius Rd sin(phi), height
+     Rd cos(phi), Rd the area rule's own R0, one equal-area sequence (cos phi
+     linear in the slot index, the golden angle in azimuth) from the RESERVED
+     pole to the face pole. No second whorl, no reflection, no latitude bands
+     — footRing()'s continuous arm carries it as a BRANCH, and everything
+     already written in slope terms (the arc-law foot rows, the great-circle
+     cross-sections, the rigid blade frame, J1, J3, C1) is untouched.
+
+     VISIBLE UNDER CONTINUOUS ONLY, hidden AND inert elsewhere (the
+     `layerPhase` treatment): under RADIAL / SPIRAL / FAN a sphere would be
+     latitude bands wearing spiral azimuths, the look Eva ruled against on
+     Sep 1. `PREDICATES.sphereMode` is the one owner of that condition for the
+     panel; bloom-geometry.js's `sphereMode()` is its twin for the geometry,
+     and the harness asserts the two agree.
+
+     WHAT SPHERE MAKES INERT: `headRise` (the sphere has no rise — it is a
+     hemisphere continued past its own rim, so Rd is R0 and the slider is
+     hidden by `sphereMode` and inert by the guard; S4 rows assert
+     bit-identity across its range under SPHERE) and `domeLean` (0 in this
+     mode, Eva's ruling: the blade leaves the surface at its authored tilt
+     from the local tangent, heading away from the face pole, everywhere —
+     the seam-free law; the cap's restore-the-flat-aim lean would aim every
+     far-side petal back up into the bloom). The FADED lean is costed in the
+     session-18 outcome doc and not built; the sheet decides.
+
+     DEFAULT CAP IS A GEOMETRY GUARANTEE, stated apart from the UI move:
+     SPHERE is a value nothing pre-existing selects, so every earlier export
+     is bit-identical (the CONTINUOUS and FAN precedent) — and separately,
+     `headRise`'s predicate is true on every pre-existing row, so its move
+     into this section is 0 moved as a pure UI event. */
+  { id: 'hubShape', section: 'head', kind: 'choice', default: 'CAP',
+    options: [
+      { value: 'CAP', label: 'Cap (flat to a hemisphere)' },
+      { value: 'SPHERE', label: 'Full sphere (pole to pole)' },
+    ],
+    label: 'Hub shape',
+    fmt: (v, ui) => (v === 'SPHERE'
+      ? `a full sphere · ${Math.round(Number(ui.petalCount)) * Math.round(Number(ui.layerCount))} petals pole to pole, one pole reserved`
+      : (Number(ui.headRise) === 0 ? 'a flat plate — Head rise lifts it into a cap' : `a cap, ${Number(ui.headRise).toFixed(2)}x hub radius`)),
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'placement', oneOf: ['CONTINUOUS'] } },
+
+  { id: 'headRise', section: 'head', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0,
     label: 'Head rise', fmt: (v) => (Number(v) === 0 ? 'flat hub' : `${Number(v).toFixed(2)}x hub radius · domed`),
     tier: 'standard', role: 'arrangement',
-    visibleWhen: { all: [] } },
+    /* THE CAP'S OWN SUB-CONTROL: shown whenever the head is a cap, which is
+       every state but CONTINUOUS x SPHERE. `not sphereMode` rather than
+       `hubShape oneOf CAP` on purpose: under RADIAL the `hubShape` control is
+       hidden and inert, so a stored SPHERE there must still show the rise the
+       cap is actually built with — hidden means inert, and inert means the
+       cap's slider is live. */
+    visibleWhen: { not: { ref: 'sphereMode' } } },
 
   /* ===================================================================
      PLACEMENT — where slot i sits around the axis. The whorl primitive's one
