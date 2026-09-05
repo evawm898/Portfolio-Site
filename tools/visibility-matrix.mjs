@@ -50,6 +50,8 @@ export const RESET = [
   { id: 'receptacleType', value: 'none', evt: 'change' },
   { id: 'receptProfile', value: 'flare', evt: 'change' },
   { id: 'receptConstruction', value: 'solid', evt: 'change' },
+  { id: 'bloomBase', value: 'none', evt: 'change' },   // BLOOM BASE off is the baseline; the DOME row flips it
+
   { id: 'sepalsType', value: 'none', evt: 'change' },
   { id: 'sepalTipStyle', value: 'clean', evt: 'change' },
   { id: 'stemType', value: 'none', evt: 'change' },
@@ -115,6 +117,10 @@ export const MATRIX = [
   { label: 'receptacle CORED construction (recept-open + recept-ribbed true), cont-margin OFF', set: [{ id: 'stemType', value: 'stem', evt: 'change' }, { id: 'continuousMargin', value: 'off', evt: 'change' }, { id: 'receptConstruction', value: 'cored', evt: 'change' }] },
 
   // ---- sepals: data-sepal, data-sepal-tip ----------------------------------------
+  // BLOOM BASE (the petal-origin surface, Phase A): the four sliders are gated on the
+  // select — without this row their driver is never varied and uncoveredDrivers()
+  // rightly reports the matrix incomplete.
+  { label: 'bloom base DOME (bloomBase sliders shown)', set: [{ id: 'bloomBase', value: 'dome', evt: 'change' }] },
   { label: 'sepals ON, tip CLEAN (sepal-tip false)', set: [{ id: 'sepalsType', value: 'sepals', evt: 'change' }] },
   { label: 'sepals ON, tip SERRATED (sepal-tip true)', set: [{ id: 'sepalsType', value: 'sepals', evt: 'change' }, { id: 'sepalTipStyle', value: 'jagged', evt: 'change' }] },
 
