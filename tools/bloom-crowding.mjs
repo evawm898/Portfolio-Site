@@ -88,6 +88,23 @@
    crowding instrument OBSERVES the geometry and is never an input to it
    (Eva, Sep 4).
 
+   ON THE FULL SPHERE (session 18) THE RASTER RUNS POLE TO POLE IN THE
+   SURFACE'S OWN COORDINATES, and membership is evaluated THERE, never
+   through a plan point: a plan point names TWO points on a sphere, one on
+   each side of the equator, so the cap's membership (which lifts the plan
+   point onto the UPPER sheet) would test every far-side cell against the
+   wrong hemisphere and read the reserved pole as the face pole's own feet.
+   `surfaceMembership()` takes (arc from the face pole, azimuth) directly —
+   the same along/across formulae the cap uses, with cos(phi) signed rather
+   than a positive square root — and the fine pass windows in (s, theta) as
+   well. The CAP path is a branch and is verbatim; the sphere arm is used
+   only when the owner declares `closed`. R4 needed ONE clause, not a
+   rewrite: `atan2(proj, dz)` already reads a far-side row's arc correctly
+   (dz is signed), so the clause added is that no foot row lies at or past
+   the reserved pole. The pole readings (the deepest cell within one
+   equal-area step of each pole) are printed for the sheet, because the face
+   pole is where the sphere's crowding question lives.
+
    NEIGHBOURS: NONE ARE CHOSEN, AND THAT IS THE JUSTIFICATION. The golden
    angle puts the tightest approaches at FIBONACCI index gaps, not adjacent
    ones: on Eva's run the closest pair of feet is slots 98 and 119 — gap 21 —
@@ -195,6 +212,24 @@ export function footMembership(dome) {
     return along <= 0 && along >= -f.overhang && Math.abs(across) <= f.hw;
   };
 }
+/* MEMBERSHIP IN THE SURFACE'S OWN COORDINATES (session 18) — arc from the
+   face pole `s` and azimuth `th`. The same two quantities the plan form
+   computes, with cos(phi) SIGNED so the far side of the equator is the far
+   side: `along` is the arc position of the point's projection onto the
+   foot's meridian great circle, `across` its geodesic distance from that
+   circle. A foot crossing the face pole reads exactly as it does on the cap
+   (a negative `along` past the origin); no foot reaches the reserved pole
+   (S3), so the meridian never wraps. */
+export function surfaceMembership(dome) {
+  const Rd = dome.Rd;
+  return (f, s, th) => {
+    const phi = s / Rd, sinP = Math.sin(phi), cosP = Math.cos(phi);
+    const dth = th - f.az;
+    const along = Rd * Math.atan2(sinP * Math.cos(dth), cosP) - f.arc;
+    const across = Rd * Math.asin(Math.max(-1, Math.min(1, sinP * Math.sin(dth))));
+    return along <= 0 && along >= -f.overhang && Math.abs(across) <= f.hw;
+  };
+}
 /* The local surface-to-plan factor at plan radius r — 1 flat, INFINITE at a
    vertical rim (a hemisphere's outermost ring), never a large finite number
    wearing a factor's clothes. */
@@ -237,13 +272,22 @@ function cellSurfaceArea(dome, r, cell) {
    also covers the far side about az + pi, and near the apex every azimuth. */
 export function surfaceDepth(feet, R, cell, dome) {
   const Rd = dome.Rd;
-  const sRim = Rd * Math.asin(Math.min(1, R / Rd));
+  /* POLE TO POLE on a closed sphere; apex to rim on a cap (verbatim). */
+  const closed = dome.closed === true;
+  const sRim = closed ? Math.PI * Rd : Rd * Math.asin(Math.min(1, R / Rd));
   const Ns = Math.max(1, Math.ceil(sRim / cell)), Nt = Math.max(8, Math.ceil((2 * Math.PI * R) / cell));
   const ds = sRim / Ns, dt = (2 * Math.PI) / Nt;
   const depth = new Uint16Array(Ns * Nt);
   const inside = footMembership(dome);
+  const insideS = closed ? surfaceMembership(dome) : null;
   let sumArea = 0;
-  const halfAt = (s) => { const phi = Math.max(s, 0.5 * ds) / Rd; const q = Math.sin(Math.min(Math.PI / 2, (feetHw) / Rd)) / Math.sin(Math.min(phi, Math.PI / 2)); return q >= 1 ? Math.PI : Math.asin(q) + dt; };
+  /* The azimuth half-width a geodesic strip subtends at polar angle phi:
+     sin(dtheta) = sin(hw/Rd) / sin(phi). On the closed sphere sin(phi) falls
+     again past the equator, so the strip widens toward BOTH poles; the cap
+     expression is kept verbatim on its own arm. */
+  const halfAt = closed
+    ? (s) => { const phi = Math.min(Math.max(s, 0.5 * ds), sRim - 0.5 * ds) / Rd; const q = Math.sin(Math.min(Math.PI / 2, (feetHw) / Rd)) / Math.max(Math.sin(phi), 1e-12); return q >= 1 ? Math.PI : Math.asin(q) + dt; }
+    : (s) => { const phi = Math.max(s, 0.5 * ds) / Rd; const q = Math.sin(Math.min(Math.PI / 2, (feetHw) / Rd)) / Math.sin(Math.min(phi, Math.PI / 2)); return q >= 1 ? Math.PI : Math.asin(q) + dt; };
   let feetHw = 0;
   for (const f0 of feet) {
     const f = { ...f0, c: Math.cos(f0.az), s: Math.sin(f0.az), hw: f0.width / 2, arc: f0.arc ?? f0.radius };
@@ -262,7 +306,7 @@ export function surfaceDepth(feet, R, cell, dome) {
         for (let dj = -span; dj <= span; dj++) {
           const j = ((jc + dj) % Nt + Nt) % Nt;
           const th = (j + 0.5) * dt;
-          if (inside(f, r * Math.cos(th), r * Math.sin(th))) depth[i * Nt + j]++;
+          if (closed ? insideS(f, s, th) : inside(f, r * Math.cos(th), r * Math.sin(th))) depth[i * Nt + j]++;
         }
       }
     }
@@ -272,30 +316,50 @@ export function surfaceDepth(feet, R, cell, dome) {
      cell; they can, near the apex. Membership is exact, so re-test the
      over-counted cells: any cell whose count exceeds the number of feet
      that actually contain it is corrected here. */
-  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, arc: f.arc ?? f.radius, overhang: f.overhang, radius: f.radius }));
+  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, arc: f.arc ?? f.radius, overhang: f.overhang, radius: f.radius, az: f.az }));
   let dmax = 0, at = -1, union = 0, occ = 0;
   const cellArea = (i) => ds * Rd * Math.sin(((i + 0.5) * ds) / Rd) * dt;
+  /* THE POLE READINGS (session 18, for the sheet): the deepest cell within
+     `poleArc` of each pole — one equal-area step, handed in by the caller
+     from the owner's own stepCos. Null on a cap (one pole, and the apex
+     reading is the innermost ring's, already printed). */
+  const poleArc = closed && dome.stepCos ? Rd * Math.acos(1 - dome.stepCos) : null;
+  let faceD = 0, reservedD = 0;
   for (let k = 0; k < depth.length; k++) {
     let d = depth[k];
     if (!d) continue;
     if (d > 1) {
       const i = Math.floor(k / Nt), j = k % Nt; const s = (i + 0.5) * ds, r = Rd * Math.sin(s / Rd), th = (j + 0.5) * dt;
       const x = r * Math.cos(th), y = r * Math.sin(th);
-      let dd = 0; for (const f of pre) if (inside(f, x, y)) dd++;
+      let dd = 0; for (const f of pre) if (closed ? insideS(f, s, th) : inside(f, x, y)) dd++;
       d = dd; depth[k] = dd;
       if (!d) continue;
     }
     occ++; union += cellArea(Math.floor(k / Nt));
     if (d > dmax) { dmax = d; at = k; }
+    if (poleArc !== null) {
+      const s = (Math.floor(k / Nt) + 0.5) * ds;
+      if (s <= poleArc && d > faceD) faceD = d;
+      if (sRim - s <= poleArc && d > reservedD) reservedD = d;
+    }
   }
-  const planOf = (k) => { const i = Math.floor(k / Nt), j = k % Nt; const s = (i + 0.5) * ds, r = Rd * Math.sin(s / Rd), th = (j + 0.5) * dt; return [r * Math.cos(th), r * Math.sin(th)]; };
-  let dmaxAt = null, dmaxXY = null;
-  if (at >= 0) { const [x, y] = planOf(at); dmaxAt = { r: Math.hypot(x, y), thetaDeg: (Math.atan2(y, x) * 180) / Math.PI }; dmaxXY = [x, y]; }
+  const stOf = (k) => { const i = Math.floor(k / Nt), j = k % Nt; return [(i + 0.5) * ds, (j + 0.5) * dt]; };
+  const planOf = (k) => { const [s, th] = stOf(k); const r = Rd * Math.sin(s / Rd); return [r * Math.cos(th), r * Math.sin(th)]; };
+  let dmaxAt = null, dmaxXY = null, dmaxST = null;
+  if (at >= 0) {
+    const [x, y] = planOf(at); const [s, th] = stOf(at);
+    dmaxAt = { r: Math.hypot(x, y), thetaDeg: (Math.atan2(y, x) * 180) / Math.PI, polarDeg: closed ? ((s / Rd) * 180) / Math.PI : null, arcMm: s };
+    dmaxXY = [x, y]; dmaxST = [s, th];
+  }
   const candidates = [];
   for (let k = 0; k < depth.length; k++) if (depth[k] >= dmax - 2 && depth[k] > 0) candidates.push(k);
   candidates.sort((a, b) => depth[b] - depth[a]);
-  const top = candidates.slice(0, 96).map((k) => ({ c: planOf(k), d: depth[k] }));
-  return { dmax, dmaxAt, dmaxXY, dmean: union > 0 ? sumArea / union : 0, dmeanRaster: 0, union, sumArea, cell, N: Ns, Nt, candidates: top };
+  /* CANDIDATES IN (s, theta) ON THE CLOSED SPHERE — a plan point would name
+     two cells there — and in plan on the cap, verbatim, where refineDepth's
+     plan windows are what was validated. */
+  const top = candidates.slice(0, 96).map((k) => ({ c: closed ? stOf(k) : planOf(k), d: depth[k] }));
+  return { dmax, dmaxAt, dmaxXY, dmaxST, dmean: union > 0 ? sumArea / union : 0, dmeanRaster: 0, union, sumArea, cell, N: Ns, Nt, candidates: top, closed,
+    poles: poleArc !== null ? { face: faceD, reserved: reservedD, withinMm: poleArc } : null };
 }
 
 export function stackDepth(feet, R, cell, dome = null) {
@@ -365,7 +429,28 @@ export function refineDepth(feet, base, pitch, dome = null) {
   const half = 1.5 * base.cell;
   const n = 2 * Math.ceil(half / pitch) + 1;
   const inside = footMembership(dome);
-  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, radius: f.radius, overhang: f.overhang, arc: f.arc ?? f.radius }));
+  const pre = feet.map((f) => ({ c: Math.cos(f.az), s: Math.sin(f.az), hw: f.width / 2, radius: f.radius, overhang: f.overhang, arc: f.arc ?? f.radius, az: f.az }));
+  /* THE CLOSED SPHERE'S WINDOWS ARE IN (s, theta): `pitch` along the arc,
+     and the angular pitch that is `pitch` of arc length at the window's own
+     latitude (bounded at the poles, where a cell is a wedge). Membership is
+     the surface form; the cap keeps its validated plan windows below. */
+  if (dome && dome.closed) {
+    const Rd = dome.Rd, insideS = surfaceMembership(dome);
+    for (const cand of base.candidates) {
+      for (let i = 0; i < n; i++) {
+        const s = cand.c[0] + (i - (n - 1) / 2) * pitch;
+        if (s < 0 || s > Math.PI * Rd) continue;
+        const dth = pitch / Math.max(Rd * Math.sin(s / Rd), pitch);
+        for (let j = 0; j < n; j++) {
+          const th = cand.c[1] + (j - (n - 1) / 2) * dth;
+          let d = 0;
+          for (const f of pre) if (insideS(f, s, th)) d++;
+          if (d > dmax) { dmax = d; dmaxAt = { r: Rd * Math.sin(s / Rd), thetaDeg: (th * 180) / Math.PI, polarDeg: ((s / Rd) * 180) / Math.PI, arcMm: s }; }
+        }
+      }
+    }
+    return { dmax, dmaxAt, pitch };
+  }
   for (const cand of base.candidates) {
     for (let i = 0; i < n; i++) {
       const x = cand.c[0] + (i - (n - 1) / 2) * pitch;
@@ -383,14 +468,21 @@ export function refineDepth(feet, base, pitch, dome = null) {
 /* All-pairs nearest neighbour — centre to centre, in mean foot widths — and
    the same statistic restricted to index-adjacent slots of one whorl, which
    is what a neighbour-picking metric would have read. Diagnostics. */
-export function nearestFeet(feet) {
-  const centre = (f) => { const rc = f.radius - f.overhang / 2; return [rc * Math.cos(f.az), rc * Math.sin(f.az)]; };
+export function nearestFeet(feet, dome = null) {
+  /* ON THE CLOSED SPHERE the foot's centre is a point ON the sphere (the
+     meridian at arc minus half the overhang) and the distance is the chord —
+     a plan centre would fold the far side onto the near side. Cap and flat:
+     the plan centre, verbatim. */
+  const closed = dome && dome.closed === true;
+  const centre = closed
+    ? (f) => { const ph = (f.arc - f.overhang / 2) / dome.Rd; const rr = dome.Rd * Math.sin(ph); return [rr * Math.cos(f.az), rr * Math.sin(f.az), dome.Rd * Math.cos(ph)]; }
+    : (f) => { const rc = f.radius - f.overhang / 2; return [rc * Math.cos(f.az), rc * Math.sin(f.az), 0]; };
   const C = feet.map(centre);
   let all = { q: Infinity, d: Infinity, a: null, b: null, gap: null };
   let adj = { q: Infinity, d: Infinity, a: null, b: null, gap: 1 };
   for (let i = 0; i < feet.length; i++) {
     for (let j = i + 1; j < feet.length; j++) {
-      const d = Math.hypot(C[i][0] - C[j][0], C[i][1] - C[j][1]);
+      const d = Math.hypot(C[i][0] - C[j][0], C[i][1] - C[j][1], C[i][2] - C[j][2]);
       const q = d / ((feet[i].width + feet[j].width) / 2);
       if (q < all.q) all = { q, d, a: feet[i], b: feet[j], gap: Math.abs(feet[i].slot - feet[j].slot) };
       if (feet[i].layer === feet[j].layer && Math.abs(feet[i].slot - feet[j].slot) === 1 && q < adj.q) adj = { q, d, a: feet[i], b: feet[j], gap: 1 };
@@ -435,7 +527,10 @@ export async function readFeet(page, capability = null) {
       }
       out[mode] = {
         feet,
-        hub: { radius: fr.hub.radius, thickness: fr.hub.thickness, dome: fr.hub.dome ? { rise: fr.hub.dome.rise, riseBuilt: fr.hub.dome.riseBuilt, Rd: fr.hub.dome.Rd, H: fr.hub.dome.H, centreZ: fr.hub.dome.centreZ, clamped: fr.hub.dome.clamped } : null },
+        hub: { radius: fr.hub.radius, thickness: fr.hub.thickness, dome: fr.hub.dome ? { rise: fr.hub.dome.rise, riseBuilt: fr.hub.dome.riseBuilt, Rd: fr.hub.dome.Rd, H: fr.hub.dome.H, centreZ: fr.hub.dome.centreZ, clamped: fr.hub.dome.clamped,
+          /* THE SPHERE'S OWN (session 18): closed, the equal-area step (for
+             the pole readings' window) and the reserved clearance. */
+          closed: fr.hub.dome.closed === true, stepCos: fr.hub.dome.stepCos ?? null, reserved: fr.hub.dome.reserved ? { ...fr.hub.dome.reserved } : null, faceReach: fr.hub.dome.faceReach ? { ...fr.hub.dome.faceReach } : null } : null },
         tris: acc.triangleCount,
         petalsBuilt: built.petalsBuilt,
         continuousMode: fr.continuousMode,
@@ -504,6 +599,11 @@ export async function footCrowding(page, row, stl = null) {
           if (Math.abs(dist - dome.Rd) > 1e-9) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} is ${dist} mm from the cap's centre, the cap's radius is ${dome.Rd} — the foot is not on the surface this metric rasterises`);
           const arc = dome.Rd * Math.atan2(proj, dz);
           if (Math.abs(arc - wantArc[k]) > 1e-9) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} sits ${arc} mm along its meridian, the strip model puts it at ${wantArc[k]} — the foot is not where footRing() says it lands`);
+          /* THE RESERVED POLE (session 18): on the closed sphere no emitted
+             foot row may lie at or past the far pole — a row there would be
+             a foot on the point a stem is reserved for, and `atan2` would
+             read it as the far side of another meridian. */
+          if (dome.closed && !(arc < Math.PI * dome.Rd - 1e-9)) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} sits ${arc} mm along its meridian, at or past the reserved pole (${Math.PI * dome.Rd} mm)`);
           if (Math.abs(across) > 1e-9) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} is ${across} mm off its slot's meridian — the emitted foot and the recorded azimuth disagree`);
           if (k === 2 && fr.C[2] !== f.z) bad.push(`crowding R4 (${name}): descriptor ${i} ring row is at z = ${fr.C[2]}, footRing() puts the ring at ${f.z}`);
           if (fr.h !== f.width / 2) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} half-width ${fr.h} is not width/2 = ${f.width / 2}`);
@@ -533,7 +633,7 @@ export async function footCrowding(page, row, stl = null) {
      fused base hundreds of cells share the top readings and the cap could
      otherwise leave the coarse pass's peak outside every window, which
      would trip the "a window missed the cell" clause for a sampling reason. */
-  const seeded = { ...fine, candidates: [...fine.candidates, ...(coarse.dmaxXY ? [{ c: coarse.dmaxXY, d: coarse.dmax }] : [])] };
+  const seeded = { ...fine, candidates: [...fine.candidates, ...(fine.closed ? (coarse.dmaxST ? [{ c: coarse.dmaxST, d: coarse.dmax }] : []) : (coarse.dmaxXY ? [{ c: coarse.dmaxXY, d: coarse.dmax }] : []))] };
   const r8 = refineDepth(E.feet, seeded, cell / 8, domeE);
   const r16 = refineDepth(E.feet, seeded, cell / 16, domeE);
   /* R5 */
@@ -560,7 +660,7 @@ export async function footCrowding(page, row, stl = null) {
         const lf = stackDepth(Lv.feet, Lv.hub.radius, cellFor(Lv.hub.radius), domeL);
         return { dmax: refineDepth(Lv.feet, lf, cellFor(Lv.hub.radius) / 16, domeL).dmax, dmean: lf.dmean };
       })();
-  const nn = nearestFeet(E.feet);
+  const nn = nearestFeet(E.feet, domeE);
 
   const r = {
     n: E.feet.length,
@@ -579,7 +679,12 @@ export async function footCrowding(page, row, stl = null) {
        delivered where the crowding is, against the rim's, where it is not. */
     dome: domeE ? { rise: domeE.rise, riseBuilt: domeE.riseBuilt, Rd: domeE.Rd, clamped: domeE.clamped,
       reliefAtDmax: resolved.dmaxAt ? reliefAt(domeE, Math.min(resolved.dmaxAt.r, domeE.Rd)) : null,
-      reliefAtRim: reliefAt(domeE, Math.min(E.hub.radius, domeE.Rd)) } : null,
+      reliefAtRim: reliefAt(domeE, Math.min(E.hub.radius, domeE.Rd)),
+      /* THE SPHERE (session 18): the pole readings from the hub pass (the
+         deepest cell within one equal-area step of each pole), the reserved
+         clearance from the owner, and where D_max sits in polar angle. */
+      closed: domeE.closed === true, poles: fine.poles, reserved: domeE.reserved, faceReach: domeE.faceReach,
+      dmaxPolarDeg: resolved.dmaxAt && resolved.dmaxAt.polarDeg != null ? resolved.dmaxAt.polarDeg : null } : null,
   };
   return { bad, r };
 }
@@ -593,7 +698,11 @@ export function crowdingLine(r) {
     + ` · foot ${r.footW.toFixed(2)} mm on hub ${r.hubR.toFixed(2)} mm`
     + ` · NN ${isFinite(r.nn.q) ? r.nn.q.toFixed(2) + ' w (gap ' + r.nn.gap + ')' : 'n/a'}`
     + (diverges ? ` · live reads D_max ${r.liveDmax} · D_mean ${r.liveDmean.toFixed(2)} (ring ${r.hubRLive.toFixed(2)} mm)` : '')
-    + (r.dome ? ` · DOME rise ${r.dome.riseBuilt.toFixed(2)}${r.dome.clamped ? ' (CLAMPED from ' + r.dome.rise.toFixed(2) + ')' : ''} · local relief at D_max ${isFinite(r.dome.reliefAtDmax) ? r.dome.reliefAtDmax.toFixed(2) + 'x' : 'vertical'}, at the rim ${isFinite(r.dome.reliefAtRim) ? r.dome.reliefAtRim.toFixed(2) + 'x' : 'vertical'}` : '')
+    + (r.dome && r.dome.closed
+      ? ` · SPHERE radius ${r.dome.Rd.toFixed(2)} mm${r.dome.clamped ? ' (CLAMPED at one sheet)' : ''} · D_max at polar ${r.dome.dmaxPolarDeg != null ? r.dome.dmaxPolarDeg.toFixed(1) + '°' : 'n/a'}`
+        + (r.dome.poles ? ` · within one step (${r.dome.poles.withinMm.toFixed(2)} mm) of the FACE pole D ${r.dome.poles.face}, of the RESERVED pole D ${r.dome.poles.reserved}` : '')
+        + (r.dome.reserved ? ` · reserved pole clear by ${r.dome.reserved.mm.toFixed(2)} mm` : '')
+      : r.dome ? ` · DOME rise ${r.dome.riseBuilt.toFixed(2)}${r.dome.clamped ? ' (CLAMPED from ' + r.dome.rise.toFixed(2) + ')' : ''} · local relief at D_max ${isFinite(r.dome.reliefAtDmax) ? r.dome.reliefAtDmax.toFixed(2) + 'x' : 'vertical'}, at the rim ${isFinite(r.dome.reliefAtRim) ? r.dome.reliefAtRim.toFixed(2) + 'x' : 'vertical'}` : '')
     + (r.crowded ? ` · CROWDED (D_max >= ${CROWDED_DMAX}, Eva Sep 3)` : '');
 }
 
@@ -623,6 +732,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     ['MUM x head rise 1.00 (a hemisphere)', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 0.6, petalLength: 60, petalWidth: 8, layerSize: 0.8, layerTilt: 11, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 1 }],
     ['INCURVE target, flat', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25 }],
     ['INCURVE target x head rise 0.50', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 0.5 }],
+    ['INCURVE sliders on a FULL SPHERE (session 18)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25 }],
+    ['40 per turn x 6 turns on a FULL SPHERE (240 feet)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 40, layerCount: 6 }],
   ];
   const { server, port } = await serveRepo();
   const { browser, page } = await launchPage();

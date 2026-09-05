@@ -420,7 +420,7 @@ let lastShownMode = 'live';
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false, sphereMode: false };
 let lastCenter = { style: 'NONE', tris: 0, seat: null };
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 let lastPetal = null;                             // layer 0's petal — likewise
@@ -655,7 +655,7 @@ function innerRingLine(rings, fr) {
      apex — footRing() decides that (the flag is arc-based there); this only
      names it. */
   return `RINGS NARROWER THAN A FOOT on ${under} — under ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm, so the feet on them overlap each other`
-       + (cross ? `; on ${cross} they cross the ${fr && fr.dome ? 'apex' : 'axis'}` : '') + `\n`;
+       + (cross ? `; on ${cross} they cross the ${fr && fr.dome ? (fr.dome.closed ? 'face pole' : 'apex') : 'axis'}` : '') + `\n`;
 }
 
 /* THE DOME LINE (Sep 4) — the head rise, told in the numbers a visitor cannot
@@ -671,9 +671,27 @@ function innerRingLine(rings, fr) {
    "(CLAMPED)" is the apex floor binding, the roll floor's own discipline:
    the rise asked and the rise built are both printed, from the owner. Absent
    when flat, so the line simply is not there. */
+/* THE SPHERE LINE (session 18) — the same line's other arm, for the closed
+   head: the sphere's radius, the sequence pole to pole, THE RESERVED POLE's
+   clearance (the arc from the far pole to the nearest foot, and the
+   equal-area step it sits inside — a future stem attaches there, and S3
+   asserts it in both directions), how near the feet come to the FACE pole
+   (negative: they cross it), and the apex floor's clamp on the same
+   "(CLAMPED)" discipline. Absent unless the head is a sphere; the panel gate
+   asserts the line and its clauses against the owner's own flags. */
+function sphereLine(rings, fr, mode) {
+  const d = fr.dome;
+  if (!d || !d.closed) return '';
+  const near = rings[d.reserved.ring];
+  return `HEAD: FULL SPHERE · radius ${d.Rd.toFixed(2)} mm (${mode}) · ${d.K} petals pole to pole, equal-area step ${(Math.acos(1 - d.stepCos) * 180 / Math.PI).toFixed(2)}° at the equator`
+       + ` · RESERVED POLE clear: nearest foot ${d.reserved.mm.toFixed(2)} mm (${d.reserved.deg.toFixed(2)}°) from it, ring ${d.reserved.ring} at ${(near.slope * 180 / Math.PI).toFixed(2)}° — blades converge over it, feet run the other way`
+       + ` · face pole: nearest foot end ${d.faceReach.mm.toFixed(2)} mm along the meridian${d.faceReach.crossing ? ` (${d.faceReach.crossing} of ${rings.length} feet cross it)` : ''}`
+       + (d.clamped ? ` · (CLAMPED: the area rule's ${fr.derivedRadius.toFixed(2)} mm ring is under one sheet, the sphere is held at ${d.floorRadius.toFixed(2)} mm — the shell's inner face would invert)` : '') + `\n`;
+}
+
 function domeLine(rings, fr, mode) {
   const d = fr.dome;
-  if (!d) return '';
+  if (!d || d.closed) return '';
   const rim = rings[0], inner = rings.reduce((a, r) => (r.radius < a.radius ? r : a), rings[0]);
   const rel = (x) => (isFinite(x) ? `${x.toFixed(2)}x` : 'vertical');
   return `HEAD RISE ${d.rise.toFixed(2)}x · dome radius ${d.Rd.toFixed(2)} mm, apex ${d.H.toFixed(2)} mm above the rim (${mode})`
@@ -859,6 +877,7 @@ function summarise(ui, acc, mode, rings, fr, center, petals) {
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
        + domeLine(rings, fr, mode)
+       + sphereLine(rings, fr, mode)
        + seatLine(center)
        + spineLine(petals)
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
@@ -1348,6 +1367,10 @@ window.__bloomMetrics = () => ({
      it answered "how many petals does a ring carry" with one number, which a
      split whorl does not have. */
   slotRolesEligible: lastFoot.slotRolesEligible,
+  /* THE FULL SPHERE (session 18) — footRing()'s own answer, cross-checked
+     against the registry's `sphereMode` predicate by both gates on every
+     row, exactly as the two eligibility flags beside it are. */
+  sphereMode: lastFoot.sphereMode === true,
   /* THE FAN'S OWN POSITION AXIS (session 11). Cross-checked against the
      registry's `perPetalEligible` predicate by both gates, exactly as its
      slot-role twin is: bloom-geometry.js makes the controls INERT and the

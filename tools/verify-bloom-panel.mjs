@@ -1399,6 +1399,75 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
   await step('back to roll 0 (taper disappears)', [{ id: 'petalRoll', value: '0' }], { clamped: false, contact: false });
 }
 
+/* ===================================================================
+   ROUTE (m) — THE HEAD: CAP / SPHERE (session 18), on ONE page, in BOTH
+   directions. `hubShape` is visible under CONTINUOUS only; SPHERE hides
+   `headRise` AND makes it inert; the read-out's HEAD: FULL SPHERE line, its
+   RESERVED POLE clause and its (CLAMPED) clause are asserted against the
+   OWNER'S own flags (routes (k) and (l)'s discipline); the hub's triangle
+   count is the three-valued branch it now is (192 / 3,456 / 6,720); and a
+   stored SPHERE under RADIAL builds the cap with the enum hidden. The
+   inertness clause is BEHAVIOURAL: Head rise is driven to 1 while hidden
+   under SPHERE and the build's triangle count and hub radius must not move
+   (the byte identity itself is the matrix's GATED rows; this is the same
+   claim on the DOM path). The negative control freezes the read-out so the
+   sphere line cannot appear where the geometry builds a sphere. */
+{
+  const tag = '[sphere]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    /* NEGATIVE CONTROL, route (m): the read-out never changes again — the
+       HEAD: FULL SPHERE line cannot appear where the geometry builds one. */
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets, want = {}) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
+      const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
+      return { placement: String(ui.placement), hubShape: String(ui.hubShape), rise: Number(ui.headRise),
+               shapeHidden: hid('hubShape'), riseHidden: hid('headRise'),
+               sphere: m.sphereMode === true, hasDome: m.hubDome !== null, closed: !!(m.hubDome && m.hubDome.closed), built: !!(m.hubBuilt && m.hubBuilt.dome && m.hubBuilt.dome.closed),
+               hubTris: m.hubBuilt ? m.hubBuilt.tris : null, hubR: m.hubRadius, shownTris: m.shownTris,
+               reserved: m.hubDome && m.hubDome.reserved ? m.hubDome.reserved.mm : null, clamped: !!(m.hubDome && m.hubDome.clamped),
+               sphereSaid: /HEAD: FULL SPHERE/.test(txt), riseSaid: /HEAD RISE/.test(txt),
+               reservedSaid: (txt.match(/RESERVED POLE clear: nearest foot ([\d.]+) mm/) || [])[1],
+               clampSaid: /\(CLAMPED: the area rule/.test(txt) };
+    });
+    const p = [];
+    const wantSphere = res.placement === 'CONTINUOUS' && res.hubShape === 'SPHERE';
+    if (res.sphere !== wantSphere) p.push(`the geometry reports sphereMode ${res.sphere} while the controls read ${res.placement} x ${res.hubShape} (the registry predicate says ${wantSphere})`);
+    if (res.shapeHidden !== (res.placement !== 'CONTINUOUS')) p.push(`hubShape is ${res.shapeHidden ? 'hidden' : 'shown'} under ${res.placement}`);
+    if (res.riseHidden !== wantSphere) p.push(`headRise is ${res.riseHidden ? 'hidden' : 'shown'} while the head ${wantSphere ? 'is a sphere (the slider is inert and must hide)' : 'is a cap (the slider is live and must show)'}`);
+    if (res.closed !== wantSphere) p.push(`the owner ${res.closed ? 'declares a closed sphere' : 'declares none'} while the controls say ${wantSphere}`);
+    if (res.built !== wantSphere) p.push(`the hub builder ${res.built ? 'built a closed sphere' : 'built no closed sphere'} while the owner ${wantSphere ? 'declares one' : 'declares none'}`);
+    const wantTris = wantSphere ? 6720 : (res.hasDome ? 3456 : 192);
+    if (res.hubTris !== wantTris) p.push(`the hub built ${res.hubTris} triangles, expected ${wantTris} — a three-valued branch (flat / cap / sphere), never a ramp`);
+    if (res.sphereSaid !== wantSphere) p.push(`the HEAD: FULL SPHERE line is ${res.sphereSaid ? 'SHOWN' : 'ABSENT'} while the geometry ${wantSphere ? 'builds a sphere' : 'builds a cap'}`);
+    if (res.riseSaid !== (!wantSphere && res.hasDome)) p.push(`the HEAD RISE line is ${res.riseSaid ? 'SHOWN' : 'ABSENT'} while the head is ${wantSphere ? 'a sphere' : res.hasDome ? 'a cap' : 'flat'}`);
+    if (wantSphere) {
+      if (res.reservedSaid === undefined) p.push('the sphere line does not print the RESERVED POLE clearance');
+      else if (Math.abs(Number(res.reservedSaid) - res.reserved) > 0.005) p.push(`the read-out says the reserved pole is clear by ${res.reservedSaid} mm, the owner says ${res.reserved}`);
+      if (res.clampSaid !== res.clamped) p.push(`the (CLAMPED clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports clamped ${res.clamped}`);
+      if (want.clamped !== undefined && res.clamped !== want.clamped) p.push(`the owner reports clamped ${res.clamped}, this step expects ${want.clamped}`);
+    }
+    if (want.tris !== undefined && res.shownTris !== want.tris) p.push(`the build has ${res.shownTris} triangles where the previous step had ${want.tris} — the hidden Head rise reached the geometry`);
+    if (want.hubR !== undefined && res.hubR !== want.hubR) p.push(`the hub radius is ${res.hubR} where the previous step had ${want.hubR} — the hidden Head rise reached the sphere`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: hubShape ${res.shapeHidden ? 'hidden' : 'shown'}, headRise ${res.riseHidden ? 'hidden' : 'shown'}, hub ${res.hubTris} tris, ${res.sphereSaid ? 'HEAD: FULL SPHERE line shown (reserved pole clear by ' + res.reservedSaid + ' mm)' : res.riseSaid ? 'HEAD RISE line shown' : 'flat'}${res.clamped ? ', CLAMPED' : ''}`);
+    return res;
+  };
+  await step('defaults (RADIAL: the enum is hidden, the rise shown, flat)', []);
+  await step('CONTINUOUS x CAP (the enum appears, the rise stays)', [{ id: 'placement', value: 'CONTINUOUS' }]);
+  const sph = await step('hubShape SPHERE (the rise hides, the closed hub, the sphere line)', [{ id: 'hubShape', value: 'SPHERE' }], { clamped: false });
+  if (sph) await step('Head rise 1 under SPHERE (hidden AND inert: the build must not move)', [{ id: 'headRise', value: '1' }], { tris: sph.shownTris, hubR: sph.hubR, clamped: false });
+  await step('back to CAP at rise 1 (a hemisphere; the rise line returns)', [{ id: 'hubShape', value: 'CAP' }]);
+  await step('RADIAL with SPHERE stored (the enum hides, the cap stays a cap)', [{ id: 'hubShape', value: 'SPHERE' }, { id: 'placement', value: 'RADIAL' }]);
+  await step('back to CONTINUOUS (the sphere returns)', [{ id: 'placement', value: 'CONTINUOUS' }]);
+  await step('the APEX CORNER on the sphere — ALL MIN x sheet 2.40 x spread min (held at one sheet, CLAMPED, told)', [{ id: 'headRise', value: '0' }, { id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }], { clamped: true });
+}
+
 await browser.close();
 server.close();
 
@@ -1423,11 +1492,12 @@ if (NEGATIVE_CONTROL) {
     const sawInner = fail.some((f) => /^\[inner rings\] .*line is ABSENT while the owner reports a ring under the floor/.test(f));
     const sawDome = fail.some((f) => /^\[dome\] .*HEAD RISE line is ABSENT while the owner declares a dome/.test(f));
     const sawCurl = fail.some((f) => /^\[curl\] .*SPINE CURL line is ABSENT while the owner reports a curl/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl) { console.log('\nALL TEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}. All nine must.`);
+    const sawSphere = fail.some((f) => /^\[sphere\] .*HEAD: FULL SPHERE line is ABSENT while the geometry builds a sphere/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere) { console.log('\nALL ELEVEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}. All eleven must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out and a frozen dome line. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line and a frozen sphere line. It is not measuring anything.');
   process.exit(1);
 }
 
