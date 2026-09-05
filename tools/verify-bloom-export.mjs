@@ -51,6 +51,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
+import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
 import { spineLine, curlCoverage } from './bloom-harness.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
@@ -74,6 +75,17 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-export-'));
 const results = [];
 const validity = [];
 const t0 = Date.now();
+
+/* R6 — THE SOLID-ANGLE MEASURE'S CALIBRATION, once per run before any row
+   (session 19, Eva): the cells sum to 4 pi, a closed sphere reads 0 sr open,
+   three known cones read their analytic solid angle. A failure here is a
+   failure of the RUN — every pin below is stated in steradians. */
+{
+  await openBloom(page, port);
+  const { bad: cb, cal } = await solidCalibrate(page);
+  console.log(`SOLID-ANGLE CALIBRATION (R6)\n    ${calibrationLine(cal)}`);
+  if (cb.length) validity.push(`solid-angle calibration: ${cb.join('; ')}`);
+}
 for (const row of rows) {
   if (ONLY && !ONLY.test(row.label)) continue;
   await openBloom(page, port);   // fresh page per row — isolation by reload, not by a clear-list
@@ -185,6 +197,27 @@ for (const row of rows) {
     const ca = coverageAssert(cov.r, row.coverage);
     if (ca.length) { validity.push(`${row.label}: ${ca.join('; ')}`); continue; }
   }
+  /* SOLID-ANGLE COVERAGE (session 19, Eva's ruling) — the sphere's own
+     instrument, a sibling of the plan raster: rays from footRing()'s own
+     sphere centre. Printed on every row with a centre (a FLAT row is its
+     labelled skip, the mirror of the plan raster's sphere skip — and R5,
+     the parallel-ray identity against the plan raster, runs on flat rows
+     too); ASSERTED on the rows that declare `solidCoverage` (block 22, the
+     rows Eva pinned); a SPHERE row this instrument skips is a validity
+     failure, because a sphere row with no coverage instrument is the hole
+     the loud skip was cut for. The plan raster's sphere skip above STAYS:
+     a plan raster cannot read a sphere. The mapped comparison is not run
+     here (a reported number of the standalone tool, ruled ill-posed). */
+  const sol = await solidCoverage(page, { capability: row.capability || null, plan: cov.r, mapped: false });
+  if (sol.bad.length) { validity.push(`${row.label}: ${sol.bad.join('; ')}`); continue; }
+  if (isSphere && (sol.skipped || !sol.r)) { validity.push(`${row.label}: SOLID COVERAGE: a FULL-SPHERE row was not read by the solid-angle instrument — ${sol.skipped || 'no reading'}`); continue; }
+  if (sol.skipped && row.solidCoverage) { validity.push(`${row.label}: this row ASSERTS solid coverage but the instrument skipped it — ${sol.skipped}`); continue; }
+  let solidHead = null;
+  if (!sol.skipped && row.solidCoverage) {
+    const sa = solidAssert(sol.r, row.solidCoverage);
+    if (sa.length) { validity.push(`${row.label}: ${sa.join('; ')}`); continue; }
+    solidHead = solidHeadroom(sol.r, row.solidCoverage);
+  }
   const fm = await page.evaluate(() => window.__bloomMetrics());
   results.push({
     label: row.label, capability: !!row.capability, bytes: buf.length,
@@ -217,6 +250,7 @@ for (const row of rows) {
       : null,
     crowding: crowd.r,
     coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage, sphere: isSphere,
+    solid: sol.r, solidSkipped: sol.skipped || null, solidAsserted: !!row.solidCoverage, solidHead, solidR5: sol.r ? sol.r.r5 : (sol.r5 || null),
     spine: fm.petalRingSpine, selfContact: (fm.petalRingSpine || []).some((s) => s && s.clearance.selfContact), underFloor: (fm.petalRingSpine || []).some((s) => s && s.underFloor),
     ...stl,
   });
@@ -238,6 +272,7 @@ for (const r of results) {
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
+  console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
   if (r.spine && r.spine.some((s) => s && s.curlRad !== 0)) console.log(`       ^ ${spineLine(r.spine)}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
@@ -265,10 +300,13 @@ if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) =>
      happen), and at least one non-sphere row was measured (the skip is not
      stuck on). */
   const spheres = results.filter((r) => r.sphere);
-  console.log(`${spheres.length}/${results.length} rows are FULL-SPHERE heads — every one a labelled coverage skip (a plan raster reads a sphere as a false clean; the solid-angle instrument, tools/bloom-solid-angle-coverage.mjs, is built and NOT wired pending Eva's ruling)`);
+  const solidMeasured = results.filter((r) => r.solid), solidAsserted = results.filter((r) => r.solidAsserted);
+  console.log(`${spheres.length}/${results.length} rows are FULL-SPHERE heads — every one a labelled PLAN-coverage skip (a plan raster reads a sphere as a false clean) and every one READ by the solid-angle instrument; ${solidMeasured.length}/${results.length} rows solid-angle measured (the rest FLAT, labelled), ${solidAsserted.length} rows solid-coverage-ASSERTED (the rows Eva pinned, session 19), R5 mismatches across every row: ${results.reduce((a, r) => a + ((r.solidR5 && r.solidR5.mismatch) || 0), 0)}`);
   if (!NEGATIVE_CONTROL && !ONLY) {
     if (spheres.length === 0) validity.push('coverage coverage: no row in this matrix is a FULL-SPHERE head — the loud skip is unexercised (a default is not coverage; block 22 is missing)');
     if (results.length - skipped.length === 0) validity.push('coverage coverage: every row was skipped — the raster measured nothing');
+    if (solidAsserted.length === 0) validity.push('coverage coverage: no row in this matrix asserts SOLID coverage — the pinned SPHERE rows are missing');
+    if (solidMeasured.length === 0) validity.push('coverage coverage: no row was solid-angle measured — the instrument read nothing');
   }
 }
 

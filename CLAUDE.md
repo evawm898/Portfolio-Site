@@ -210,12 +210,18 @@ lean 0. **Plan coverage cannot read a sphere** (the far hemisphere projects
 into the disc from below — a false clean): SPHERE rows are a labelled skip and
 the export gate FAILS if one emits a number. **The solid-angle instrument is
 `tools/bloom-solid-angle-coverage.mjs` (session 19)** — a SIBLING of the plan raster,
-rays from `footRing()`'s own sphere centre, validated by R5 (the parallel-ray identity
-against the plan raster, exact) and NOT wired: which SPHERE rows pin it is Eva's ruling
-(`docs/bloom-session-19-outcome.md`), and the loud skip stands until she makes it. The crowding raster evaluates membership in (arc, azimuth) over
+rays from `footRing()`'s own sphere centre, WIRED into the export gate on Eva's ruling:
+its line on every row, ASSERTED on the four block-22 rows that declare `solidCoverage`
+(the incurve sphere's face pole closed and its reserved-pole hole pinned at its measured
+0.95 mm with headroom; the reserved pole closed on the defaults, the mum and the 240-foot
+row), a sphere row it skips a validity failure. **R5 — the parallel-ray identity against
+the plan raster, exact, on every row including flat ones — is its validity standard; R6
+calibrates the measure in closed form once per run; the "mapped through the sphere"
+comparison is ILL-POSED (two ray families, coinciding only on the axis) and is never a
+check** (`docs/bloom-session-19-outcome.md`). The plan raster's own sphere skip stays. The crowding raster evaluates membership in (arc, azimuth) over
 the full arc on a sphere and prints the depth within one step of each pole.
-Under SPHERE the DISC centre plates the face pole (24.5 mm on the 240-foot
-row) — DEFERRED to the phase-2 centre question, explicitly; do not constrain the
+Under SPHERE the DISC centre plates the face pole (a 24.5 mm RADIUS, 49 mm
+across, on the 240-foot row) — DEFERRED to the phase-2 centre question, explicitly; do not constrain the
 centre under SPHERE ahead of it. Sheet: `node tools/shot-bloom-sphere.mjs <dir>`. #106 and #108 are FLOWER
 issues, whatever a kickoff prompt says.
 

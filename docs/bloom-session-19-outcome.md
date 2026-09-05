@@ -1,11 +1,19 @@
-# The solid-angle coverage instrument, session 19 — built, validated, NOT wired; the numbers Eva's ruling needs, and the two pieces of session-18 debt
+# The solid-angle coverage instrument, session 19 — built, validated, calibrated, and WIRED on Eva's ruling; the pins with their headroom, and the two pieces of session-18 debt
 
 Session 19 built `tools/bloom-solid-angle-coverage.mjs` as a SIBLING of
 `tools/bloom-plan-coverage.mjs`, ran its validity checks and controls, measured the rows
-the ruling is about, and STOPPED. Nothing is wired into a gate, the plan raster's loud
-SPHERE skip stands exactly as session 18 left it, and no geometry file was touched
-(verified by diff at close — see the end). Everything below is the EXPORT reading in the
-page's own export-mode build.
+the ruling was about, STOPPED for the ruling, and then — on it — added a closed-form
+calibration of the measure (R6), a witness table for the negative control, and WIRED the
+instrument into the export gate with the four pins Eva ruled. The plan raster's own
+SPHERE skip stays (a plan raster cannot read a sphere); what is lifted is that a sphere
+row had no coverage instrument. No geometry file was touched (verified by diff at close —
+see the end). Everything below is the EXPORT reading in the page's own export-mode build.
+
+**Two sizing misses, for Eva's estimates:** Phase A put the sibling at ~250 lines and it
+came in at 666 before the ruling and ~900 after it (the header, R0, R5, R6 and the
+negative control are more than half); Phase A put the cost at 1–3 s a row and the sphere
+rows read 2.5–3.7 s, cap rows 2–8 s with the mapped comparison (which the gate does not
+run).
 
 ## What was on `main` when the session opened — confirmed from source, not the brief
 
@@ -49,10 +57,10 @@ parallel-ray limit of this instrument). Sampling is uniform in φ and θ (0.5°,
 (φ, θ) by each triangle's enclosing spherical cap. The kernel is the scalar-triple-product
 cone test plus a t > 0 clause, and the SAME function serves the parallel-ray case.
 
-**The real numbers against Phase A's estimate:** 666 lines against ~250 (a third of it
-the header and the validity checks, which are the point); **2.0–8.2 s a row on this box,
-the sphere rows 2.5–3.7 s** against the estimated 1–3 s — the raster at both grids is
-0.4–2.0 s, R5 1.2–1.7 s, and the mapped comparison (cap rows only) 1.2–5.4 s.
+**The real numbers against Phase A's estimate:** 666 lines against ~250 at the first
+stop, ~900 after the ruling's additions; **2.0–8.2 s a row on this box, the sphere rows
+2.5–3.7 s** against the estimated 1–3 s — the raster at both grids is 0.4–2.0 s, R5
+1.2–1.7 s, and the mapped comparison (cap rows only, standalone only) 1.2–5.4 s.
 
 ### Validity — the load-bearing part
 
@@ -67,8 +75,38 @@ the sphere rows 2.5–3.7 s** against the estimated 1–3 s — the raster at bo
   reproduce the plan raster's flag on EVERY cell: (a) against a verbatim copy of its 2D
   test, and (b) on rows the shipped `bloom-plan-coverage.mjs` measures, against its
   RETURNED `uncoveredFraction` and `baldCapRadius` to the bit. **Measured: 0 of 38,024
-  cells differ on all eight rows with a centre, and (b) holds to the bit on all four cap
-  rows.** The sphere rows have (a) only, because the shipped tool skips them by design.
+  cells differ on every row, and (b) holds to the bit on every row the shipped plan
+  raster measures.** The sphere rows have (a) only, because the shipped tool skips them
+  by design. **R5 has NO scope limit on rows without a centre** (Eva asked): it needs no
+  centre — it is vertical rays against the plan raster's own grid — and since the ruling
+  it runs on FLAT rows too, BEFORE the flat skip is decided; the skip line carries its
+  count (`R5 still ran here: 0 of 38024 cells differ, equal to the shipped plan raster to
+  the bit` on the shipping default and the flat incurve target). "All eight rows with a
+  centre" in the first report was a description of the run as it then was, not a limit.
+- **R6, the closed-form calibration of the MEASURE** (added on the ruling — R5 says
+  nothing about bin resolution, the sin φ weighting, the θ seam or the poles, and every
+  pin is in steradians). Once per process, before any row, through the same installed
+  kernel and the same grids the rows use; tolerances stated, actual errors printed:
+
+  | clause | fixture | tolerance | measured |
+  |---|---|---|---|
+  | R6a cells sum to 4π | the 360×720 and 720×1440 grids | 1e-5 relative | **3.17e-6 and 7.93e-7** |
+  | R6b a closed sphere reads 0 open | a 48×24 UV sphere, 2,208 triangles, radius 5 | **0 sr, exactly** | **0 sr** |
+  | R6c a known cone, +z pole | 360-triangle disc fan, half-angle 20°, distance 10 | 0.5% of the exact Van Oosterom–Strackee sum | **0.005%** (0.37892 vs 0.37890 sr) |
+  | R6c a known cone, the θ = ±π seam | 12-triangle fan, one triangle CENTRED on the seam | 0.5% | **0.369%** (0.36194 vs 0.36328 sr — a coarse polygon's boundary at 0.25° sampling; the headroom is 26% of the tolerance) |
+  | R6c a known cone, 45° off-axis | 360-triangle fan | 0.5% | **0.058%** |
+  | R6c each cone's axis reads covered and its antipode uncovered | all three | exact | **holds on all three** |
+
+  **The calibration failed its first run, and the failure was in the FIXTURE — reported
+  here rather than quietly repaired.** The first UV sphere emitted the degenerate triangle
+  at each pole ring and skipped the real one, leaving both 7.5° polar caps open. R6b read
+  **0.107507 sr** open; two caps of half-angle 7.5° are analytically 4π(1 − cos 7.5°) =
+  **0.107507 sr**. The measure read a fixture defect to six significant figures, which is a
+  fourth calibration datum, and the fixture was corrected (the two conditions were
+  swapped). The seam cone is COARSE on purpose: a 360-triangle fan has no triangle that
+  straddles the seam by more than half a degree, so a lost wrap changed its reading by
+  0.011% and witnessed nothing; a 30° triangle centred on the seam loses 15° of azimuth to
+  the mutation and reads short by 3.7%.
 
 ### Eva's named validity check — measured exactly as asked, and it DISAGREES
 
@@ -104,15 +142,26 @@ instrument as specified (rays from the centre) cannot satisfy it on any cap with
 that lean, and a different instrument (parallel rays through the sphere) would be a
 second plan raster, not a solid-angle one.
 
-### The negative control (`--negative-control`) — PASS
+### The negative control (`--negative-control`) — PASS, with witnesses
 
-Three kernel mutations, each caught by R0 on the one cheap hemisphere row: **antipode**
-(the t clause dropped AND the antipodal cap binned — the central version of the false
-clean), **inward** (rays cast toward the centre), **no-wrap** (the θ seam lost). A finding
-on the way: dropping the t clause ALONE changes nothing, because a planar triangle that
-does not contain the centre subtends less than a hemisphere and its bins never contain
-its antipode — the binning already encodes direction, so the clause is redundant for
-central rays and the mutation had to break both. R5 is a LINE test by construction and
+Three kernel mutations — **antipode** (the t clause dropped AND the antipodal cap binned:
+the central version of the false clean), **inward** (rays cast toward the centre),
+**no-wrap** (the θ seam lost) — each run three ways on the one cheap hemisphere row, as
+Eva asked (a check that fails shows the gate fails, not that the clause aimed at is
+load-bearing; session 18 suppressed S1 to make S3 a witness):
+
+| mutation | every check on: first to fire | R0 SUPPRESSED, on the row | witness with no R0 at all (`calibrate()`) |
+|---|---|---|---|
+| antipode | R0 | **silent** — the row reads 62.95% open, face 67.13° | **R6c**: the seam cone's and the off-axis cone's ANTIPODE read covered |
+| inward | R0 | **silent** — reads 81.48% open, face 90.13° (the whole-sphere fraction is invariant under the flip; the poles swap) | **R6c**: all three cones' own AXIS reads uncovered |
+| no-wrap | R0 | **silent** — reads 81.49% open | **R6c**: the seam cone reads 3.7% short |
+
+The second column is the honest one: on a real row a broken kernel changes the READING,
+not a validity check — which is exactly why R6 runs before any row and why the gate
+fails the whole run on it. A finding on the way: dropping the t clause ALONE changes
+nothing, because a planar triangle that does not contain the centre subtends less than a
+hemisphere and its bins never contain its antipode — the binning already encodes
+direction, so the mutation had to break both. R5 is a LINE test by construction and
 cannot see the sign of t either way; the header says so.
 
 ### The positive control, in a throwaway worktree — the instrument moves, the gate does not
@@ -166,12 +215,33 @@ the axis. Not a defect (the reserved pole is the STEM's someday, and a stem exit
 exactly that spot); it is the difference between a picture and a measurement, and it is
 on the table for Eva's eye before any reserved-pole claim is pinned.
 
-## The pinning proposal — Eva's ruling, with the numbers
+## The pins — RULED (Eva, Sep 5) and WIRED, with the headroom of every one
 
-Assertion shape (in the tool, not wired): a row declares
-`solidCoverage: { maxUncovered, maxFaceBaldDeg, maxFaceRegionSr, maxReservedBaldDeg }`,
-each optional, checked by `solidAssert()`, on the plan raster's own precedent (measured
-plus one part in ten).
+Approved as proposed with one change: the incurve sphere's reserved pole is PINNED AT ITS
+MEASURED HOLE with headroom rather than left unpinned — "an unpinned measured hole is one
+that can grow silently"; 0.95 mm is the known value, recorded with the phase-2 stem
+work, and the bound trips on growth. A row in block 22 declares
+`solidCoverage: { maxUncovered, maxFaceBaldDeg, maxFaceRegionSr, maxReservedBaldDeg,
+maxReservedRegionSr }` (each optional), `solidAssert()` checks it, and the gate prints
+`solidHeadroom()` on every asserted row so the margin is visible on every run:
+
+| row | pin | reading | threshold | headroom |
+|---|---|---|---|---|
+| SPHERE: the incurve sliders | uncovered share of 4π | 4.20% | 4.6% | 8.7% |
+| | face-pole bald cone | 0.1250° (one sample cell; closed) | 0.3° | 58.3% |
+| | face-pole connected open region | 0.0000 sr | 0.001 sr | 100% |
+| | **reserved-pole bald cone (the 0.95 mm hole)** | **4.3750°** | **5.0°** | **12.5%** |
+| | **reserved-pole connected open region** | **0.2205 sr** | **0.25 sr** | **11.8%** |
+| SPHERE: defaults (8 feet) | reserved-pole bald cone (closed) | 0.1250° | 0.3° | 58.3% |
+| SPHERE: the mum sliders | reserved-pole bald cone (closed) | 0.1250° | 0.3° | 58.3% |
+| SPHERE: 40 × 6 (240 feet) | reserved-pole bald cone (closed) | 0.1250° | 0.3° | 58.3% |
+| SPHERE: 40 × 6 (240 feet) | face pole | 2.58 sr open | **not pinned** — open by design; phase 2's number | — |
+
+(These are the figures the gate itself printed on the asserted rows, `--only` on the four pinned rows plus the two pinned cap rows and the shipping default: 7/7 watertight, 4 asserted, R5 mismatches 0 across every row, 389 s.)
+A closed pole reads one sample cell (0.125° at the fine grid), so 0.3° is "closed within
+two cells"; the bounds on the incurve total and its reserved hole are the plan raster's
+precedent, measured plus roughly one part in ten. The proposal as it stood before the
+ruling is kept below for the record.
 
 1. **PIN the incurve sphere's FACE-POLE CLOSURE** — the same emergent-crown claim the two
    pinned cap rows already carry, now on the sphere: `maxFaceBaldDeg: 0.3` (measured 0.13°,
@@ -189,12 +259,26 @@ plus one part in ten).
 5. The mum sphere reads 0.00% — pinnable as a curiosity, not proposed: it is a preset's
    behaviour, not a claim anyone made.
 
-Wiring, when ruled: the tool's `measure()` beside `planCoverage()` in the export gate,
-its line on every row with a centre (a FLAT row a labelled skip, mirroring the sphere
-skip), asserted on the declared rows only, and the plan raster's SPHERE skip KEPT loud —
-the two skips are complementary and a row is read by exactly one of them. Cost ~3 s a
-sphere row and ~2–8 s a cap row, the mapped comparison the expensive half on caps (it can
-be dropped from the gate and kept in the standalone tool). ~150 lines in the gate.
+**Wired as ruled:** R6 once per gate run before any row (a failure fails the RUN); the
+tool's `measure()` beside `planCoverage()` on every row, its line printed under the plan
+raster's, R5 on every row including flat ones; a FLAT row a labelled skip; asserted on the
+four declared rows with the headroom line; **a SPHERE row the instrument skips is a
+validity failure**, and at matrix level at least one row must assert solid coverage and
+at least one must be measured. The plan raster's sphere skip and its fail-if-emits clause
+STAY — a plan raster cannot read a sphere — and the summary line now says every sphere
+row was READ by the solid-angle instrument. The mapped comparison is not run in the gate
+(ruled ill-posed; a reported number of the standalone tool only). ~40 lines in the gate,
+~25 in the harness.
+
+## The validity ruling — R5 is the standard; the mapped check is ILL-POSED (Eva, Sep 5)
+
+Recorded so no future session re-proposes it as a bug: the brief's "solid-angle reading
+must agree with the plan raster mapped through the sphere on a rise-1 hemisphere" asks
+two DIFFERENT RAY FAMILIES to agree — a vertical line through a rim point and the radial
+ray through it coincide only on the axis — so the 100% agreement inside the crown and the
+divergence at 75–90° are both instruments being correct. R5, the same rays through both
+formulations, exact and without tolerance, is the validity standard for this instrument;
+R6 calibrates the measure the pins are stated in.
 
 ## Session-18 debt 1 — the `bloom-frozen-tags` run, read from its log
 
@@ -240,8 +324,11 @@ prevent; session 19 will hit the same wall at its own close.
   across such a window twice.
 
 **Proposed amendment — (b), targeted at the Sep 5 session-17 ruling "NO DOCS-ONLY COMMITS
-ON A GATED PR HEAD" in the charter's CI conventions, as its one exception, in these
-words:**
+ON A GATED PR HEAD" in the charter's CI conventions, as its one exception — APPROVED
+(Eva, Sep 5) with one condition: the docs-only PR is opened AND merged by the same
+session, before it reports DONE; a ruling that depends on a future session to record it
+is not recorded. Recorded in the charter by this session's own docs-only PR, which is the
+amendment's first use. The proposal as put:**
 
 > *EXCEPTION, ruled ___ (Eva): a RULING made from a sheet after the code has run its gates
 > is recorded in a DOCS-ONLY PR of its own, opened and merged by the session as its last
@@ -251,9 +338,9 @@ words:**
 > outcome doc and the charter entry still go in the CODE commit, written to the point of
 > "held for Eva's ruling", so the docs-only PR is the ruling and nothing else.*
 
-The amendment is Eva's to make; this session records the proposal and, pending it,
-followed the standing rule as far as it can be followed — one code commit carrying the
-tool and every doc written to "held for the ruling", one push.
+The first use is this session: the code PR carries the tool, the gate, the pins and this
+document; the docs-only PR that follows its merge carries the charter's ruling text and
+the two merge shas.
 
 ## What this session did not touch — predeclared, verified at close
 
@@ -262,21 +349,45 @@ Predeclared before a line was written, as a sha1 manifest taken from a worktree 
 `flower*` file, `tools/chromium-harness.mjs`, the flower gates, the cards and tracker
 files and their gates, `tools/bloom-crowding.mjs`, the connectedness and panel gates,
 `tools/diff-bloom-bytes.mjs`, `tools/publish-frozen-tags.sh`, every workflow file — 51
-files. Touched: the new tool, one wording change in `bloom-plan-coverage.mjs`'s skip
-message and one in `verify-bloom-export.mjs`'s summary line (both said "session two —
-RECORDED, NOT BUILT", which stopped being true; no behaviour, no clause, no threshold),
-this document, the charter entry and the CLAUDE.md pointer. **Verification is at the end
-of this document.**
+files. Touched: the new tool; `verify-bloom-export.mjs` (the wiring: calibration once,
+the line on every row, the assertion on declared rows, the sphere-row and matrix-level
+clauses, and the summary line); `bloom-harness.mjs` (four `solidCoverage` pins in block
+22 — labels verbatim, so the smoke subset's drift guard is unmoved); one wording change
+in `bloom-plan-coverage.mjs`'s skip message; this document; the session-18 outcome doc
+and the charter where the "24.5 mm" was recorded as if a diameter; and the CLAUDE.md
+pointer. **Verification is at the end of this document.**
 
-## Verification
+**No new frozen tag is owed** (stated rather than left ambiguous): the matrix's ROW SET
+and every row's SET are unchanged — four rows gained a `solidCoverage` field, nothing
+moved a byte — so `phase14` (499 rows at 5312845) remains the newest baseline and
+`frozen/phase14` is already on the remote. The next baseline freezes at the next
+geometry change, from `main`, tagged at freeze time.
 
-- `node tools/bloom-solid-angle-coverage.mjs`: 10 configs, 8 measured (2 FLAT skips), R0–R5
-  clean on every row, R5 0 of 38,024 cells on all eight and bit-equal to the shipped plan
-  raster on the four cap rows. `--negative-control`: PASS, three of three caught by R0.
+## Corrections carried
+
+- Session 18's outcome doc and charter recorded the DISC footprint on the 240-foot row as
+  "24.5 mm across". It is the RADIUS (`rC = 0.75 × 32.72 mm = 24.54 mm`, from the
+  builder's own report); the lid is 49 mm across. Corrected at both sites and in CLAUDE.md
+  so phase 2 does not inherit a figure half the real one.
+- The sizing miss is at the top of this document.
+
+## Verification (the final tree, after the ruling)
+
+- `node tools/bloom-solid-angle-coverage.mjs`: R6 calibration PASS (the table above); 10
+  configs, 8 measured (2 FLAT skips, each still carrying R5), R0–R5 clean on every row, R5
+  0 of 38,024 cells on all ten and bit-equal to the shipped plan raster on every row it
+  measures. `--negative-control`: PASS — three of three caught with every check on, and
+  each naming its own R6c witness with R0 suppressed (the table above).
+- `node tools/verify-bloom-export.mjs --only` on the four pinned SPHERE rows, the two
+  pinned cap rows and the shipping default: 7/7 watertight, calibration PASS, 5/7
+  solid-angle measured (2 FLAT, labelled, R5 0 mismatches on them too), 4 rows asserted
+  with the headroom lines quoted in the pins table, R5 mismatches 0 across every row,
+  389 s.
 - The smoke subset (`node tools/bloom-smoke.mjs`, export-only — no new geometry mode this
-  session): 33/33 watertight, 0 degenerate, identical counts, every family green, 4 SPHERE
-  rows a labelled coverage skip, 4 CROWDED, 224 s; re-run on the final tree with the
-  wording change in place: 33/33, clean, 248 s.
+  session) on the final tree: 33/33 watertight, 0 degenerate, identical counts, every
+  family green, 4 SPHERE rows each a labelled PLAN skip AND read by the solid-angle
+  instrument, 6/33 solid-angle measured, 2 asserted (the pinned rows in the subset),
+  218 s. (Before the ruling, the same subset on the first tree: 33/33, 224 s and 248 s.)
 - The retention close: `phase14Matrix()` (499 rows frozen at 5312845, the newest baseline)
   exported from a worktree of `dddd934` and from the head: **499/499 byte-identical, 0
   moved, defaults bit-identical** (both trees read "dddd934+dirty" from the gitignored
@@ -286,8 +397,11 @@ of this document.**
   criterion, not run locally (session 17's ruling).
 
 - The predeclared untouched list: all 51 files byte-identical to `dddd934` by
-  `sha1sum -c` at close; all fourteen frozen matrix functions (legacy, phase2–phase14) and
-  `FROZEN_BASE_COMMITS` deep-equal to the base tree's by a JSON comparison of their output;
+  `sha1sum -c` at close, re-verified after the ruling's edits (the harness and the export
+  gate were never on the list; the three geometry files, `bloom.html` and every flower,
+  cards and tracker file were); all fourteen frozen matrix functions (legacy,
+  phase2–phase14) and `FROZEN_BASE_COMMITS` deep-equal to the base tree's by a JSON
+  comparison of their output (sha1 `0f5fab7c…` on both trees);
   `git ls-remote --tags origin` reads twelve `frozen/*` tags (phase2–phase4, phase6–phase14).
 - CI on the pushed head: the four bloom gates plus the two flower gates (path-filtered on
   `tools/**`, testing flower geometry — not evidence about this instrument). The full

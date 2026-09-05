@@ -4038,7 +4038,7 @@ matters should be measured this way.
       incurve sphere, a starburst on the mum, forty closing blades on the 240-foot row — no
       bald spot, nothing patched. The FACE pole carries the centre question: the designed
       centre seats at 75% of the hub radius, and on a sphere the hub radius IS the sphere
-      radius, so the DISC becomes a lid over the whole face pole (24.5 mm on the 240-foot
+      radius, so the DISC becomes a lid over the whole face pole (a 24.5 mm RADIUS — 49 mm across — on the 240-foot
       row); on the incurve sphere the tips close it as a tight crown with a few-millimetre
       eye. A centre that follows the sphere, or is sized from a foot, is the phase-2 centre
       question the dome session recorded — on the sheet for Eva, not shrunk quietly.
@@ -4048,16 +4048,20 @@ matters should be measured this way.
       two; **lean 0 is the SPHERE law**, not a baseline awaiting a picture. The DISC
       face-pole plate is DEFERRED to the phase-2 centre work explicitly — the centre is not
       constrained under SPHERE here; the phase-2 centre question is now the dome session's
-      button-that-follows-the-cap PLUS the sphere's plate, **24.5 mm on the 240-foot row**,
+      button-that-follows-the-cap PLUS the sphere's plate, **a 24.5 mm RADIUS (49 mm across) on the 240-foot row**,
       recorded so it is found rather than rediscovered. The mum as a dandelion clock is
       noted, not a defect. Close-out: the four bloom gates green on the head, merged by the
       session, `frozen/phase14` tagged from `main`.
 
 - ~~The solid-angle coverage instrument — "session two"~~ **BUILT Sep 5 (session 19) as
-  `tools/bloom-solid-angle-coverage.mjs`, a SIBLING of the plan raster, validated, measured,
-  and NOT WIRED — the plan raster's loud SPHERE skip stands, and which SPHERE rows pin it
-  and at what thresholds is Eva's ruling, proposed with numbers in
-  `docs/bloom-session-19-outcome.md`.** Covered iff a ray from `footRing()`'s own sphere
+  `tools/bloom-solid-angle-coverage.mjs`, a SIBLING of the plan raster, validated,
+  CALIBRATED in closed form, and WIRED into the export gate on Eva's ruling with four
+  pins in block 22 — every reading, threshold and headroom in
+  `docs/bloom-session-19-outcome.md`. The plan raster's own SPHERE skip stays (a plan
+  raster cannot read a sphere); what is lifted is that a sphere row had no coverage
+  instrument. The rulings themselves (R5 as the validity standard, the mapped check
+  ill-posed, the pins, the docs-only-PR amendment) are recorded by this session's
+  docs-only PR, the amendment's first use — see the entry that follows this one.** Covered iff a ray from `footRing()`'s own sphere
   centre in direction (φ, θ) hits any petal triangle; a (φ, θ)-binned triangle index; 0.5°
   refined to 0.25°, sin φ weighted so the sums are steradians; the hub and the designed
   centre never in the soup, as the plan raster leaves them out. A FLAT hub is its labelled
@@ -4116,8 +4120,32 @@ matters should be measured this way.
       ~250; 2.5–3.7 s a sphere row and 2–8 s a cap row (the mapped comparison the expensive
       half) against the estimated 1–3 s.
 
+    - **R6 — THE MEASURE CALIBRATED IN CLOSED FORM (Eva's condition before any pin):** the
+      sample cells sum to 4π (3.2e-6 and 7.9e-7 relative on the two grids, tolerance
+      1e-5), a closed synthetic sphere reads EXACTLY 0 sr open (tolerance 0), and three
+      known cones — at the pole, centred on the θ seam, and 45° off-axis — read their
+      exact Van Oosterom–Strackee solid angle to 0.005% / 0.369% / 0.058% (tolerance
+      0.5%), each with its axis covered and its antipode open. Once per process, before
+      any row; a failure fails the RUN. **Its first run FAILED, in the FIXTURE:** the
+      synthetic sphere had both 7.5° polar caps missing and the measure read them at
+      0.107507 sr against an analytic 0.107507 sr — recorded rather than repaired
+      quietly, because a fixture is a claim too. And the negative control now has
+      WITNESSES, not failures: with R0 suppressed each kernel mutation is silent on a
+      real row (it changes the READING, not a check) and each names its own R6c clause.
+
+    - **THE PINS, wired (Eva, Sep 5):** the incurve sphere's face pole CLOSED (bald ≤ 0.3°,
+      region ≤ 0.001 sr) and its total ≤ 4.6% of 4π; the reserved pole CLOSED (≤ 0.3°) on
+      the defaults, the mum and the 240-foot row; and — Eva's one change to the proposal
+      — **the incurve sphere's reserved-pole hole PINNED AT ITS MEASURED VALUE with
+      headroom, not closed and not left unpinned** (bald ≤ 5.0° against 4.375°, region
+      ≤ 0.25 sr against 0.2205): 0.95 mm is the known value, recorded with the phase-2
+      stem work, and the bound trips on growth. The 240-foot face pole is not pinned —
+      open by design, phase 2's number. R5 runs on flat rows too, so it has no scope
+      limit on rows without a centre. **No new frozen tag is owed**: no row's set moved,
+      no byte moved; phase14 remains the newest baseline.
+
     - **THE TWO PIECES OF SESSION-18 DEBT:** the frozen-tags run is recorded above, in the
-      CI conventions, as red by design until phase5; and the docs-only collision has a
-      PROPOSED amendment in the outcome doc, targeted at the Sep 5 session-17 ruling as its
-      one exception — rulings recorded in a docs-only PR of the session's own, after the
-      code PR merges, since a docs-only PR runs no bloom gate. Eva's to make; not made.
+      CI conventions, as red by design until phase5; and the docs-only collision's
+      amendment — rulings recorded in a docs-only PR of the session's own, opened and
+      merged by the same session before it reports DONE — was APPROVED and is recorded at
+      the Sep 5 session-17 ruling by this session's docs-only PR.
