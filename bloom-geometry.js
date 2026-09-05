@@ -2607,7 +2607,136 @@ const D2R = Math.PI / 180;
    defaults IS exactly 0, and a range input at its default yields it. */
 export function petalFormIsFlat(state) {
   return state.petalCup === 0 && state.petalSpineCurl === 0
-      && state.petalRoll === 0 && state.petalTwist === 0;
+      && state.petalRoll === 0 && state.petalTwist === 0
+      /* CUP GRADIENT (session 16) is the one member of the curl family that
+         is a deformation of its own: bias and start multiply the curl, roll
+         taper multiplies the roll, and all three are inert by construction
+         where their base is 0, so only this one joins the guard. */
+      && state.petalCupGradient === 0;
+}
+
+/* ===================================================================
+   THE SPINE LAW (session 16, the petal curl family) — ONE OWNER of where the
+   curled centreline goes, read by buildPetalInto AND by the gate's C1.
+
+   The shipped spine is a constant-curvature arc, `phi(s) = tilt + kC*s`,
+   in closed form. Curl bias and curl start REDISTRIBUTE that same total
+   turn along the length (the flower's parameterisation, re-derived for a
+   sheet): cumulative turn `curlRad * remap(u)^(p+1)` with `p = CURL_BIAS_
+   POWER * bias` (0 = uniform, the arc verbatim; 1 = tip-loaded, a crozier)
+   and `remap` a hard threshold at `start` (u below it dead straight, the
+   whole turn squeezed into what remains). What the flower does NOT get to
+   keep: its bias doubles the total turn (360 to 720 degrees at bias 1),
+   which would be a second owner of the total — here the total is spine
+   curl's alone and the modifiers only move it.
+
+   THE FLOOR — cap the OUTPUT, never an input proxy. The sheet's inner face
+   inverts under half a thickness of SPINE radius exactly as it does under
+   roll, and the modifiers concentrate curvature far past the roll floor's
+   reach: bias 1 multiplies the peak by (p+1) = 5, start 0.95 by 20. The
+   curvature is floored pointwise at one sheet thickness of radius (the roll
+   floor's own constant, `ROLL_MIN_RADIUS_FACTOR * t`), the control
+   SATURATES, and the read-out says "(CLAMPED)" with the turn that actually
+   built beside the turn asked — 150 degrees asked can build 33 at the worst
+   reachable corner. Eva, Sep 4: full ranges, clamped, told; trimming the
+   input to hide a cliff is an input proxy. The flower's constants (power 4,
+   start to 0.95) are LACE constants with no thickness behind them; on a
+   printed sheet the floor binds over most of their range, and the read-out
+   is what tells a visitor where.
+
+   The uniform arc is NOT floored — it is the shipped geometry, byte for
+   byte — and it does reach under one sheet thickness on shrunk inner
+   whorls (six deep x curl 360: 1.08 mm against 1.20), a pre-existing state
+   on three shipped rows that C3 found on the first full run. It is TOLD
+   (`underFloor`) and never clamped; see the note at kMax.
+
+   INTEGRATION. Curvature is sampled at SPINE_SUBSTEPS substeps per blade row
+   and each substep is an EXACT circular arc at that curvature, so the
+   uniform law reproduces the closed-form arc to floating-point summation
+   (measured 1e-14 mm; C2 asserts 1e-9) and the tabulated law is what both
+   the builder and the gate read. CURL START IS FLOORED AT ONE BLADE ROW
+   (Eva, Sep 4): any non-zero start is at least 1/NU, so the root chord is
+   straight wherever start is engaged and J8's normal clause applies there.
+   =================================================================== */
+export const SPINE_SUBSTEPS = 32;
+export const CURL_BIAS_POWER = 4;
+/* RED-THEN-GREEN (session 16, Eva's instruction: build Mutant A's witness
+   before the controls). With this false the controls are read, the law is
+   evaluated and reported, and the spine keeps the arc — the four-dead-
+   sliders state that is bit-identical to the un-biased bloom and invisible
+   to every instrument that existed. C1 must fire on it before it is true. */
+const SPINE_WIRED = true;
+export const CURL_START_MIN = 1 / NU;
+export function curlIsUniform(state) { return state.curlBias === 0 && state.curlStart === 0; }
+export function curlStartFloored(start) { return start === 0 ? 0 : Math.max(start, CURL_START_MIN); }
+export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
+  const p = CURL_BIAS_POWER * bias;
+  const s0 = curlStartFloored(start);
+  const remap = (u) => (s0 === 0 ? u : Math.max(0, (u - s0) / (1 - s0)));
+  /* The CUMULATIVE turn at u — the law in closed form, before the floor.
+     Each substep's curvature is the exact mean of the law over it, so the
+     unclamped total is Phi(1) = curlRad to the last bit rather than a
+     quadrature of the derivative (the first draft sampled the derivative at
+     midpoints and built 149.9998 of 150 degrees, which C3 then read as a
+     clamp that was not there). */
+  const Phi = (u) => (s0 !== 0 && u <= s0 ? 0 : curlRad * Math.pow(remap(u), p + 1));
+  /* THE FLOOR IS THE MODIFIERS' FLOOR. A UNIFORM curl is the shipped arc,
+     built verbatim by buildPetalInto for byte identity, and it is NOT
+     clamped here either — measured on the first full gate run: under LAYERS
+     the blade shrinks by layerSize per whorl, and at six deep x curl 360 the
+     innermost whorl's 6.8 mm blade has a 1.08 mm spine radius against a
+     1.20 mm floor. Three SHIPPED rows sit there (6 layers x innerCurl 360,
+     DEPTH 6 x ALL FORM MAX, ZYGO 6 x ALL INNER MAX) — a PRE-EXISTING state
+     found by C3, not damage it caused, on the session-13 precedent: a clamp
+     could not be byte-identical, so it is TOLD (`underFloor`, the read-out's
+     UNDER ONE SHEET THICKNESS clause) and never applied. The claim that the
+     uniform arc never reaches the floor was true of one whorl and false of
+     six, and the gate found it before this sentence did. */
+  const uniform = bias === 0 && s0 === 0;
+  const kMax = uniform ? Infinity : 1 / floorRadius;
+  const N = NU * SPINE_SUBSTEPS, ds = length / N;
+  const dR = new Float64Array(N + 1), dZ = new Float64Array(N + 1), phi = new Float64Array(N + 1);
+  phi[0] = tilt;
+  let peakK = 0, clamped = false;
+  /* sin(x)/x, stable at the small x a tip-loaded law has near the root. The
+     exact-arc form (sin p1 - sin p0) / k CANCELS there: measured, a one-ULP
+     difference in Math.sin between Node's V8 and Chromium's V8 became
+     1.4e-3 mm of spine on the incurve target's ring 0, because k at the
+     first substep of a bias-1 law is ~1e-13. The product form below is the
+     same arc, algebraically, and it is portable. */
+  const sinc = (x) => (Math.abs(x) < 1e-4 ? 1 - (x * x) / 6 : Math.sin(x) / x);
+  for (let i = 0; i < N; i++) {
+    const u1 = (i + 1) / N;
+    const kRaw = (Phi(u1) - Phi(i / N)) / ds;
+    const over = Math.abs(kRaw) > kMax;
+    const k = over ? Math.sign(kRaw) * kMax : kRaw;
+    if (over) clamped = true;
+    if (Math.abs(k) > peakK) peakK = Math.abs(k);
+    const p0 = phi[i];
+    /* Exact where nothing has clamped yet, accumulated once something has. */
+    const p1 = clamped ? p0 + k * ds : tilt + Phi(u1);
+    phi[i + 1] = p1;
+    if (k === 0) { dR[i + 1] = dR[i] + Math.cos(p0) * ds; dZ[i + 1] = dZ[i] + Math.sin(p0) * ds; }
+    else {
+      const pm = (p0 + p1) / 2, sc = ds * sinc((p1 - p0) / 2);
+      dR[i + 1] = dR[i] + Math.cos(pm) * sc;
+      dZ[i + 1] = dZ[i] + Math.sin(pm) * sc;
+    }
+  }
+  return {
+    /* Position and angle at arc length s, in the foot's own (Rs, Up) plane:
+       dR along the rotated radial, dZ along the rotated up. */
+    at(s) { const i = Math.round(s / ds); return { dR: dR[i], dZ: dZ[i], phi: phi[i] }; },
+    peakRadius: peakK === 0 ? Infinity : 1 / peakK,
+    clamped,
+    /* A UNIFORM curl whose arc sits under one sheet thickness — told, never
+       clamped (see the note at kMax). Exactly false wherever the floor was
+       applied, since the clamped peak IS the floor. */
+    underFloor: peakK * floorRadius > 1,
+    turnBuilt: phi[N] - tilt,
+    turnAsked: curlRad,
+    startFloored: s0,
+  };
 }
 
 /* THE ONE OWNER of the four curves. Always returns the law (it is the
@@ -2631,6 +2760,31 @@ export function petalForm(state, halfW, t) {
   const kMax = 1 / (ROLL_MIN_RADIUS_FACTOR * t);
   const kappa = Math.sign(kReq) * Math.min(Math.abs(kReq), kMax);
   const clamped = Math.abs(kReq) > kMax;
+
+  /* THE CURL FAMILY (session 16). Bias and start are read here and handed
+     to spineLaw() by the builder (the spine needs tilt and length, which are
+     the builder's). Roll TAPER is an envelope on the roll's curvature along
+     the length — smootherstep from 1 to 1-|taper|, opening toward the tip
+     for a positive value and toward the base for a negative one (the
+     flower's own sign convention). CUP GRADIENT is the flower's "edge curve
+     — profile" under the name the geometry earns: the SAME v^2 lift along
+     the row normal that cup is, with an envelope that grows linearly to the
+     tip instead of cup's onset ramp — measured 28% RMS residual against the
+     best-fitting cup at every amplitude, so it is a cup that grows toward
+     the tip, not a second cup. The flower's cup-damping-under-roll is NOT
+     ported: roll is isometric here (|dP/dv| ratio exactly 1) and cup
+     composes onto it without the two fighting for one plane.
+
+     EVERY identity takes the shipped expression by a BRANCH, on the form
+     guard's own doctrine: `kappa * r` and `cup * r` verbatim at taper 0 and
+     gradient 0, never `x * 1` or `x + 0` argued exact. */
+  const bias = state.curlBias, start = state.curlStart;
+  const rollTaper = state.petalRollTaper, cupGrad = state.petalCupGradient;
+  const curlUniform = curlIsUniform(state);
+  const smoother = (x) => x * x * x * (x * (x * 6 - 15) + 10);
+  const rollEnv = (u) => 1 - Math.abs(rollTaper) * smoother(rollTaper > 0 ? u : 1 - u);
+  const kAt = (u, r) => (rollTaper === 0 ? kappa * r : kappa * r * rollEnv(u));
+  const cAt = (u, r) => (cupGrad === 0 ? cup * r : cup * r + cupGrad * u);
 
   const ramp = (u) => (u >= FORM_ONSET_END ? 1 : u / FORM_ONSET_END);
 
@@ -2677,8 +2831,8 @@ export function petalForm(state, halfW, t) {
      plane, which keeps the offset a true constant-thickness shell. */
   const sectAt = (C, T1, N1, h, u) => {
     const r = ramp(u);
-    const k = kappa * r;
-    const c = cup * r;
+    const k = kAt(u, r);
+    const c = cAt(u, r);
     return (v) => {
       const a = h * v;
       const aT = k === 0 ? a : Math.sin(k * a) / k;
@@ -2695,7 +2849,7 @@ export function petalForm(state, halfW, t) {
   };
 
   return {
-    curlRad, twistRad, kappa, frameAt, sectAt,
+    curlRad, twistRad, kappa, frameAt, sectAt, curlUniform,
     /* WHAT THE EXPORT CANNOT SHOW. Watertightness and connectedness are
        measured on the STL; these are the properties a pure-displacement
        change can break while leaving both of those green, so they are read
@@ -2706,7 +2860,7 @@ export function petalForm(state, halfW, t) {
       for (let i = footRows; i < rows.length; i++) {
         const row = rows[i];
         const rr = ramp(row.u);
-        const k = kappa * rr, c = cup * rr;
+        const k = kAt(row.u, rr), c = cAt(row.u, rr);
         for (let j = 0; j < NV; j++) {
           const v = -1 + (2 * j) / (NV - 1);
           const a = row.h * v;
@@ -2730,7 +2884,7 @@ export function petalForm(state, halfW, t) {
       for (let i = footRows; i < rows.length; i++) {
         const row = rows[i];
         const rr = ramp(row.u);
-        const k = kappa * rr, c = cup * rr;
+        const k = kAt(row.u, rr), c = cAt(row.u, rr);
         const pt = (v) => {
           const a = row.h * v;
           return [k === 0 ? a : Math.sin(k * a) / k,
@@ -2752,6 +2906,11 @@ export function petalForm(state, halfW, t) {
         polylineMin: pMin, polylineMax: pMax,
         rollRadiusMm: kappa === 0 ? Infinity : 1 / Math.abs(kappa),
         rollClamped: clamped,
+        /* THE CURL FAMILY's own numbers travel with the form telemetry; the
+           spine's (floor, clamp, built turn, clearance) are the builder's,
+           under `spine`, because they need tilt and length. */
+        curlBias: bias, curlStart: start, curlUniform,
+        rollTaper, cupGradient: cupGrad,
         /* THE FLOOR THIS BUILD ACTUALLY USED, reported rather than left for a
            consumer to recompute. Until the thickness layer the harness held
            `ROLL_MIN_RADIUS_FACTOR * SHEET_THICKNESS_MM` as a module constant
@@ -2946,7 +3105,25 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      moves the TIP, never the attachment. That is why curl cannot disturb
      the foot even though it acts on the frame the foot's neighbour uses. */
   const kC = form ? form.curlRad / length : 0;
-  const spineAt = kC === 0
+  /* THE CURL FAMILY (session 16): with bias or start engaged the spine is
+     spineLaw()'s table — the same turn, redistributed, floored at one sheet
+     thickness of radius in the foot's own (Rs, Up) plane. The two arc
+     branches below are the shipped closed form, character for character,
+     and they are what a UNIFORM curl still builds from: `curlUniform` is a
+     BRANCH, not an argument that `Math.pow(u, 1)` is `u`. The law is
+     evaluated on every curled row regardless, because the gate's C1 reads
+     its inputs from other owners and compares against the emitted rows,
+     and C2 compares the table against the closed form on uniform rows —
+     the integrator's own validity, never assumed. */
+  const floorRadius = ROLL_MIN_RADIUS_FACTOR * t;
+  const law = form && kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: ps.curlBias, start: ps.curlStart, length, tilt, floorRadius }) : null;
+  const generalSpine = SPINE_WIRED && law !== null && !form.curlUniform;
+  const spineAt = generalSpine
+    ? (s) => {
+      const q = law.at(s);
+      return { C: [base[0] + Rs[0] * q.dR + Up[0] * q.dZ, base[1] + Rs[1] * q.dR + Up[1] * q.dZ, base[2] + Rs[2] * q.dR + Up[2] * q.dZ], phi: q.phi };
+    }
+    : kC === 0
     ? (s) => ({
       C: [base[0] + dir[0] * s, base[1] + dir[1] * s, base[2] + dir[2] * s],
       phi: tilt,
@@ -3016,7 +3193,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      the first place. Both gates assert this below 1e-9 on every row. */
   let guardResidual = null;
   if (!form && slot.index === 0) {
-    const zero = petalForm({ petalCup: 0, petalSpineCurl: 0, petalRoll: 0, petalTwist: 0 }, halfW, t);
+    const zero = petalForm({ petalCup: 0, petalSpineCurl: 0, petalRoll: 0, petalTwist: 0, curlBias: 0, curlStart: 0, petalRollTaper: 0, petalCupGradient: 0 }, halfW, t);
     guardResidual = 0;
     const dev = (a, b) => { for (let k = 0; k < 3; k++) guardResidual = Math.max(guardResidual, Math.abs(a[k] - b[k])); };
     for (let i = footS.length; i < rows.length; i++) {
@@ -3031,6 +3208,63 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       }
     }
   }
+
+  /* THE SPINE'S OWN TELEMETRY (session 16) — what the curl family can break
+     that neither STL gate can see. `rows` is every blade row's centre AS
+     EMITTED; the gate's C1 rebuilds the law from OTHER owners (the effective
+     controls, the ring's tilt terms, the ring's thickness) and compares,
+     because a spine that keeps the arc while the controls are wired is
+     bit-identical to the un-biased bloom — Mutant A, measured before this
+     existed, invisible to every other instrument. `integrationResidual` is
+     the table against the closed form on UNIFORM curled rows (slot 0): the
+     integrator's validity, C2. `clearance` is the SELF-CONTACT FLAG (never a
+     gate, Eva Sep 4 — it fires on the shipped, photographed hoop): the
+     nearest approach between blade rows at least three sheet thicknesses
+     apart ALONG the spine, and between the blade and its own foot, against
+     one sheet thickness. Row pitch is not contact: the shrink-0.35 blade
+     is 0.88 mm long and every row is within a sheet of its neighbours. */
+  const spineRows = rows.slice(footS.length).map((r) => r.C);
+  let integrationResidual = null;
+  if (law !== null && form.curlUniform && slot.index === 0) {
+    integrationResidual = 0;
+    for (let i = 1; i <= NU; i++) {
+      const s = (i / NU) * length, q = law.at(s), c = spineAt(s).C;
+      const g = [base[0] + Rs[0] * q.dR + Up[0] * q.dZ, base[1] + Rs[1] * q.dR + Up[1] * q.dZ, base[2] + Rs[2] * q.dR + Up[2] * q.dZ];
+      for (let k = 0; k < 3; k++) integrationResidual = Math.max(integrationResidual, Math.abs(g[k] - c[k]));
+    }
+  }
+  const clearance = (() => {
+    const f0 = footS.length, ds = length / NU;
+    const minSep = Math.max(1, Math.ceil((3 * t) / ds));
+    let minMm = Infinity, rowsAt = [-1, -1];
+    for (let i = f0; i < rows.length; i++) for (let j = i + minSep; j < rows.length; j++) {
+      const a = rows[i].C, b = rows[j].C;
+      const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      if (d < minMm) { minMm = d; rowsAt = [i - f0 + 1, j - f0 + 1]; }
+    }
+    let minToFootMm = Infinity, footRowAt = -1;
+    for (let i = f0 + minSep; i < rows.length; i++) for (let j = 0; j < f0; j++) {
+      const a = rows[i].C, b = rows[j].C;
+      const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      if (d < minToFootMm) { minToFootMm = d; footRowAt = i - f0 + 1; }
+    }
+    const nearest = Math.min(minMm, minToFootMm);
+    return { minMm, rows: rowsAt, minToFootMm, footRow: footRowAt, sheetT: t, minSepRows: minSep, selfContact: nearest < t };
+  })();
+  const spine = {
+    rows: spineRows,
+    tiltRad: tilt, length, curlRad: form ? form.curlRad : 0,
+    bias: ps.curlBias, start: ps.curlStart, floorRadius,
+    uniform: form ? form.curlUniform : true,
+    peakRadiusMm: law ? law.peakRadius : Infinity,
+    clamped: law ? law.clamped : false,
+    underFloor: law ? law.underFloor : false,
+    turnAskedDeg: ps.petalSpineCurl,
+    turnBuiltDeg: law ? law.turnBuilt / D2R : 0,
+    startFloored: law ? law.startFloored : 0,
+    integrationResidual,
+    clearance,
+  };
 
   const midS = 0.5 * length;
   const midRow = spineAt(midS);
@@ -3158,6 +3392,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        watertight and as one piece and passes everything else. */
     rootRow: { C: rows[footS.length].C, N: rows[footS.length].N, flat: form === null, tiltRad: tilt, u: rows[footS.length].u, curlRad: form ? form.curlRad : 0, ringC: rows[footS.length - 1].C },
     domeGuardResidual,
+    spine,
     /* THICKNESS TELEMETRY — the properties neither STL gate can show. Both
        are structurally blind here for the same reason they are blind to the
        form layer: thickness is pure vertex offset on a fixed-topology grid,

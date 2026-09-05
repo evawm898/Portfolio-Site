@@ -3485,3 +3485,246 @@ exposure the ruling accepts in exchange for the minutes.
           the incurve target is 152,832 at rise 0.5 (149,568 flat, the shell's
           3,264 on top); the mum at rise 0.5 the same 152,832.
 
+
+- ~~The petal curl family~~ **BUILT Sep 4 (session 16): curl bias, curl start,
+  cross-section taper and — renamed — cup gradient, as sheet geometry on the
+  domed hub. The flower's PARAMETERISATION came over; its geometry code and
+  its constants' reasons did not. Full numbers in
+  `docs/bloom-session-16-outcome.md`.**
+
+    - **THE ACCEPTANCE CRITERION WAS WITHDRAWN BY EVA, AND WHY IS THE ENTRY.**
+      The brief demanded the incurve target read 0.0% uncovered and bald-cap
+      ≤ 0.08 mm at every new control's min, default and max. Phase A measured
+      that curl bias and curl start preserve the total TURN and move the TIP
+      — bias 0.5 puts the incurve tips 3–8 mm from the axis and re-opens 5.4%
+      of the disc, start 0.95 puts them 9–17 mm out and re-opens 23.1% — and
+      coverage is a tip-position property. Eva's ruling: the criterion demanded
+      that controls which relocate the tip not relocate the tip; a non-default
+      bias or start opening the crown is the controls WORKING, documented, not
+      a gate failure. **Crown closure on the incurve target is an EMERGENT
+      property of curl 150 × tilt × `domeLean` landing tips within 0.3–1.3 mm
+      of the axis. It was never designed and has no margin. A future session
+      changing tilt, curl or `domeLean` re-opens it silently unless coverage is
+      asserted on the pinned rows** — so the two DOME rows naming the incurve
+      target now PIN the four new controls at identity and carry a `coverage`
+      assertion, and `tools/bloom-plan-coverage.mjs` is WIRED INTO THE EXPORT
+      GATE: its line on every row, its numbers asserted on those two rows only
+      (0.0%, ≤ 0.09 mm — the measured 0.08 plus one part in ten), a split whorl
+      reported as a LABELLED, LOUD skip and a coverage-asserting row that is
+      skipped a validity failure. Cost measured before the ruling: 0.2–1.2 s a
+      row in-page.
+
+    - **THE FLOWER'S CONSTANTS ARE LACE CONSTANTS WITH NO THICKNESS BEHIND
+      THEM, and the ranges ship FULL, CLAMPED, TOLD (Eva).** Bias power 4 and
+      start to 0.95 concentrate curvature past the roll floor's reach by 5× and
+      20×; the sheet's inner face inverts under half a thickness of SPINE
+      radius exactly as it does under roll, so the spine curvature is floored
+      pointwise at one sheet thickness (`ROLL_MIN_RADIUS_FACTOR * t`, the same
+      constant), the control saturates, and the read-out's SPINE CURL line
+      prints the tightest spine radius, "(CLAMPED at one sheet thickness …)"
+      and the turn asked beside the turn built (150° asks 96° at start 0.95 on
+      the incurve target, 50° at bias 1 × start 0.95). At curl 150 on a 20 mm
+      blade the floor binds from start 0.87 in export and, at bias 1, from
+      start 0.35. Trimming the input to hide that cliff is an input proxy; the
+      roll floor and FOOT WIDTH FLOORED are the precedents. **The floor is the
+      MODIFIERS' floor: a uniform curl is the shipped arc and is never clamped
+      — and the first full gate run found it already UNDER one sheet thickness
+      on three shipped rows** (six deep × curl 360: the innermost whorl's
+      6.8 mm blade has a 1.08 mm spine radius against 1.20), a pre-existing
+      state on the session-13 precedent: told by `underFloor` and the read-out's
+      UNDER ONE SHEET THICKNESS clause, never clamped, C3 asserting the flag
+      against the law both ways. The claim that the uniform arc never reaches
+      the floor was true of one whorl and false of six. The flower's bias
+      also doubles the total turn (360° → 720° at bias 1): NOT reproduced —
+      the total is spine curl's alone, one owner. **Curl start is floored at
+      one blade row** (1/NU, told), so the root chord is straight wherever
+      start is engaged and J8's normal clause applies there.
+
+    - **RENAMED AND DECLINED, on measurement, so neither is re-proposed.** The
+      flower's "Edge curve — profile" is the SAME v² lift along the row normal
+      that cup is, with a linear-to-the-tip envelope where cup carries the
+      onset ramp; the best-fitting cup leaves a 28% RMS residual at every
+      amplitude (0.91 mm max on a 16 mm petal at +1), so it ships as **Cup
+      gradient**, the name the geometry earns, and the flower's label is now
+      known to be wrong there too. "Edge curve — top-down" is a width
+      MULTIPLIER reproducible by petal width × base taper × tip taper to
+      0.32 mm max billow and 0.59 mm max pinch on an 8 mm half-width: shipping
+      it makes a second producer of the width profile and breaks the
+      registration rule — DECLINED. The flower's cup-damping-under-roll is
+      declined on the isometry measurement (roll holds |dP/dv| at exactly 1;
+      cup composes onto it). The flower's ungated dead sliders are declined:
+      bias and start are `visibleWhen: { id: 'petalSpineCurl', awayFrom: 0,
+      by: 2.5 }`, taper likewise on roll, hidden AND inert.
+
+    - **MUTANT A IS THE ONE THAT MATTERS, AND ITS WITNESS WAS BUILT FIRST, RED
+      THEN GREEN (Eva's instruction).** A build with the controls wired —
+      registry rows, telemetry, read-out — and the spine still on the arc is
+      BIT-IDENTICAL to the un-biased bloom (same sha on every probe row): it
+      exports watertight, as one piece, at the identical triangle count and
+      byte length, and passes J1–J9, formAssertions, thicknessAssertions and
+      Z1–Z9. Four dead sliders through every gate. `spineLaw()` in
+      bloom-geometry.js is the ONE owner of the curled centreline, read by
+      `buildPetalInto` and by the gate; **C1** rebuilds it in the gate from
+      OTHER owners (bias/start from the registry, the applied curl and length,
+      J9's three tilt terms, the ring's thickness) and compares against the
+      EMITTED blade-row centres, requiring the builder's own spine record to
+      agree with the reconstruction. With `SPINE_WIRED = false` C1 fired on
+      every ring of every bias/start row (120 on the incurve target) and was
+      silent on the control, flat and hoop rows; wiring the spine turned it
+      green with nothing else changing. **C2** is the integrator's own validity
+      (the table against the closed-form arc on uniform rows, 1e-14 measured,
+      1e-9 asserted; an Euler integrator at the row pitch reads 5e-3); **C3**
+      the spine floor in both directions (a floorless spine builds a 0.03 mm
+      radius, watertight, and nothing else sees it). Both in both gates on
+      every row.
+
+    - **TWO SHIPPED INSTRUMENTS WERE INDISCRIMINATE, session 15's class again,
+      and one was blind.** J8's chord clause ("tilt plus half this row's
+      curl") is the chord of a CIRCULAR arc: it fired on all 120 rings of every
+      CORRECT bias/start build and did not separate the correct build from the
+      un-integrated mutant beside it. Re-derived: the expectation is the law's
+      own first-row direction from C1's inputs, the closed form kept verbatim
+      as a second clause on uniform rows, and the normal clause extended to
+      every untwisted row whose start is engaged (the root is straight there
+      by construction). formAssertions' isometry clause scoped on `cup === 0`
+      fired on a correct cup-gradient build; it scopes on cup OR gradient now.
+      And **J1 is blind to a foot SHORTENED by a modifier, flat and domed**
+      (Mutant B): the foot rows still lie on the plane or the cap, and J1 reads
+      that, not the overhang length; the crowding instrument's R4 is the
+      witness, a validity assertion in both gates. Recorded, not fixed.
+
+    - **A NUMERICAL FINDING ON THE WAY TO GREEN, worth more than the clean
+      run.** At the tiny curvature a tip-loaded law has near the root, the
+      exact-arc substep `(sin p1 − sin p0) / k` cancels catastrophically, and a
+      one-ULP difference in `Math.sin` between Node's V8 and Chromium's V8
+      became 1.4e-3 mm of spine on the incurve target's ring 0 — the gate and
+      the page disagreeing about the same law with the same inputs. The
+      substep is the same arc in its product form, `ds · cos(pm) ·
+      sinc((p1 − p0)/2)`, portable; and the cumulative turn is taken from the
+      closed-form `Phi(u)` so the unclamped total is exact — the first draft's
+      midpoint quadrature built 149.9998 of 150 degrees, which C3 read as a
+      clamp that was not there.
+
+    - **SELF-INTERSECTION IS A PROPERTY OF THE PETAL ALONE — measured on 243
+      combinations, not derived.** The spine self-contact reading was identical
+      across all nine rise × shrink states of every (curl, bias, start): the
+      brief's corner "curl max × rise max × the innermost rings" does not
+      enter it, and what rise and shrink change is blade-into-shell
+      interpenetration, allowed since Aug 31. The only single-petal contacts
+      are the shipped hoop (curl 360, tip on root) and curl 360 × start 0.5
+      (the tip landing on its own mid-blade at 0.000 mm); bias winds the
+      spiral inside itself and never touches. **SELF-CONTACT is a FLAG, never
+      a gate (Eva)** — it fires on the shipped, photographed hoop — from the
+      builder's own rows: the nearest approach between blade rows at least
+      three sheet thicknesses apart ALONG THE SPINE, or the blade against its
+      own foot, within one thickness. The first draft compared rows three
+      apart by INDEX and read every 0.88 mm shrink-0.35 blade as touching —
+      row pitch, not contact. Exercised in both directions at matrix level
+      (`curlCoverage()`), the crowding flag's own precedent.
+
+    - **THE PANEL: PETAL CURL (Eva's ruling, the session's version over her
+      own).** Petal tilt, spine curl, curl bias, curl start, twist. Tilt moves
+      WITH curl rather than to Arrangement, because the Sep 1 ruling put it
+      beside spine curl and considered and rejected exactly the Arrangement
+      alternative; twist is in on `petalForm`'s ordering law. PETAL FORM keeps
+      cup, cup gradient, roll, roll taper. Zero geometry. The panel gate's
+      route (l) drives curl 0 → 150 → 0 and roll 0 → 90 → 0 on ONE page — route
+      (d) drives a slider driver to its two ends only, and both ends of spine
+      curl are away from 0, so it could assert that bias and start APPEAR and
+      never that they DISAPPEAR — and asserts the SPINE CURL line, "(CLAMPED"
+      and SELF-CONTACT in both directions against the builder's record; the
+      negative control freezes the read-out and requires all TEN routes to
+      fire, and does. `tools/shot-bloom-panel.mjs` gained the two cells.
+
+    - **THE MATRIX GREW 469 → 499, and `phase13Matrix()` — the 469 rows frozen
+      at 6b8e94b — is the thirteenth baseline. THE DEBT SESSION 15 LEFT, called
+      out on Eva's instruction:** it grew the live matrix 466 → 469 and froze
+      nothing, so the newest baseline stayed phase12 at 434 while 35 live rows
+      — the domed corners and the crown-coverage rows, exactly the region this
+      family disturbs — had no baseline. Paid; proved deep-equal in CI. The
+      three gated controls are excluded from block 1's sweep as hidden-at-
+      defaults (`CURL_SUBS`, derived from `predicateDrivers` and
+      `evalPredicate` at DEFAULTS — the latent trap #124 closed, from a SIXTH
+      direction) and swept in block 21 at a curl or roll that shows them; they
+      JOIN `SWEEPABLE`, so **the eight ALL rows move, predeclared** (ALL MAX by
+      bias 1 / start 0.95 / taper +1 / gradient 1.2; ALL MIN by taper −1 under
+      roll −330 and gradient −0.8). Block 1 sweeps cup gradient on its own. The
+      two pinned incurve rows are relabelled and gain four identity sets, which
+      move no byte. Both STL gates gained `--only <regex>` for a smoke pass
+      on a wiring change; the summary counts what ran and matrix-level claims
+      are not made on a filtered run.
+
+    - **THE CENTRE RIM HOVER HAS ONE OWNER NOW.** Session 14's 1.88 mm and
+      Phase A's 1.67 mm on the incurve target are the same configuration in
+      two MODES — printed (the export floor moves the hub from 9.69 to 12.51 mm
+      and the button with it) and live; the read-out prints the seat line in
+      whichever mode is on screen. No configuration reads 1.2 mm. The hover is
+      a centre-versus-shell number and no curl control moves it.
+
+    - **FIELDS: nothing folded.** `domeLean` and `tiltExtra` are untouched;
+      the four new controls are separate ids; `spineLaw()` is a separate owner
+      handed the three-term tilt the builder always summed.
+
+    - **THE SHEET: `node tools/shot-bloom-curl.mjs <dir> [base-tree]`** — every
+      cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted; each
+      control swept alone at min/default/max on one camera per sweep; the spine
+      floor and the self-contact flag both sides; the incurve target at every
+      new control's extremes with coverage and crowding in the caption, bias 1
+      beside start 0.95 as the honest picture; a crown crop of the pinned row;
+      the foot from a low profile at start 0 and 0.50; and the two controls
+      exported from a worktree of the base commit with their sha REQUIRED
+      equal on the sheet itself.
+
+    - **THE EVIDENCE — filled at the close-out below this line.**
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **499/499** watertight, 0 degenerate,
+      identical live and export triangle counts on every row, 1961 s; plan
+      coverage measured on 372 rows, **127 SKIPPED** as split whorls (labelled,
+      never silent), **2 ASSERTED** (the pinned incurve rows: 0.0% uncovered,
+      bald cap 0.08 mm against a 0.09 mm bound); 56 rows flag SELF-CONTACT, 3
+      rows carry the shipped uniform arc under one sheet thickness on the
+      innermost of six whorls (told, not clamped), 24 CROWDED. Connectedness
+      **499/499** one piece, 1977 s. Panel gate PASS on all ten routes with the
+      curl route's under-floor step on the shipping blade and sheet set
+      explicitly; the negative control fires on **ALL TEN ROUTES**.
+      `--verify-frozen --phase13` PASS. CI on af2cd99: six verify jobs green.
+    - **THE RETENTION CLOSE — the newest baseline plus the live partition,
+      EXACT.** `phase13Matrix()` exported from a worktree of 6b8e94b and from
+      head: **469/469 bit-identical** (the base tree reads "6b8e94b+dirty" from
+      the gitignored node_modules symlink, nothing else). Head's live matrix
+      against that export by label: 467 shared, **459 bit-identical, 8 moved =
+      exactly the eight predeclared ALL MIN / ALL MAX rows, 0 outside the
+      prediction**, 32 new (block 21's 28 plus block 1's cup-gradient sweep and
+      the relabelled pair), 2 labels absent because they were relabelled — the
+      two pinned incurve rows at 4b250b664500 (flat) and cd46ad682fd3 (rise
+      0.50) bit-identical under their new labels and their four identity sets.
+      The moved ALL rows keep their byte lengths and triangle counts and change
+      shape only.
+    - **THE POSITIVE CONTROLS ON THE FINAL TREE — four full-tree copies, seven
+      rows each, every row watertight, 0 degenerate, identical live and export
+      counts on every tree; the STL gates see none of it.** Read as: what the
+      curl instruments fire, and where each mutant is bit-identical to a
+      correct build so that NOTHING ELSE could:
+      A (bias/start read, spine keeps the arc) — bit-identical to the PINNED
+      CONTROL on bias 1 and start 0.95 (sha cd46ad682f, the mutant that leaves
+      no byte to diff); **C1 fires on every ring** of every bias/start row and
+      the re-derived J8 with it; silent on the control, the hoop and the flat
+      default. B (start reaches the foot rows) — crowding R4 fires on every
+      start row (x480 on the incurve target), silent where start is 0. C
+      (Euler integrator at the row pitch) — **C2 fires on the uniform rows**
+      (the pinned control and the fiddlehead, where the bytes are identical to
+      a correct build) and C1 at 1e-2 mm on the bias/start rows. D (no spine
+      floor) — bit-identical to the correct build on every row the floor does
+      not bind, and on start 0.95 **C3 fires both ways** (a 0.38 mm spine
+      radius told as under the floor while the owners' inputs say clamped) with
+      C1 at 3.7e-1 mm. Every tree is silent and bit-identical on DEFAULT (flat).
+    - **THE SHEET, RENDERED AND HELD FOR EVA'S EYE:** 33 cells across 26 rows,
+      every one PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted; the
+      two BEFORE cells exported from the 6b8e94b worktree with their sha
+      required equal to the head's controls (0c377b21350d, cd46ad682fd3) and
+      the taper-under-roll-0 cell required equal to the pinned control. Each
+      sweep shares one camera framed from its widest cell with a 12 px clear
+      margin asserted, so a canopy at start 0.95 no longer crops. The honest
+      pair: the incurve target at bias 1 (crown re-opened) and at start 0.95
+      (23.1% uncovered, bald cap 5.78 mm, CLAMPED on 120 of 120 rings, 25.6°
+      built of 150° asked), with the seat line reading 1.88 mm printed.

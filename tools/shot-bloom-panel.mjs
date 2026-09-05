@@ -241,6 +241,26 @@ for (const n of [3, 8, 40]) {
   cells.numbering.push(await shoot(`FAN · 3 per side, mirror-line petal · drop-downs: ${got.kids}`,
     `The comparison the ruling was made from: under FAN every orbit has its own group and there is no gap. Petal 1 open; its read-out says "${got.said}".`));
 }
+/* ---- PETAL CURL (session 16): the modifiers appear with a curl, and the read-out tells the floor ---- */
+{
+  await openBloom(page, port);
+  await drive([{ id: 'petalSpineCurl', value: '150' }]);
+  await openSection('curl');
+  const got = await page.evaluate(() => ({
+    own: [...document.querySelectorAll('#sec-curl > .bl-ctrl')].filter((w) => !w.hidden).map((w) => w.querySelector('label').firstChild.textContent).join(', '),
+    bias: document.querySelector('#curlBias').closest('.bl-ctrl').querySelector('.bl-val').textContent,
+    line: (document.getElementById('readout').textContent.split('\n').find((l) => /SPINE CURL/.test(l)) || 'no SPINE CURL line'),
+  }));
+  cells.numbering.push(await shoot(`PETAL CURL · spine curl 150° · ${got.own}`,
+    `Spine curl driven to 150 through real events, then the section opened: Curl bias and Curl start are on screen only now (hidden and inert at curl 0, by their own predicate). Bias reads "${got.bias}". The read-out's SPINE CURL line: "${got.line}".`));
+  await drive([{ id: 'curlStart', value: '0.95' }, { id: 'petalLength', value: '20' }, { id: 'sheetThickness', value: '0.6' }]);
+  const got2 = await page.evaluate(() => ({
+    start: document.querySelector('#curlStart').closest('.bl-ctrl').querySelector('.bl-val').textContent,
+    line: (document.getElementById('readout').textContent.split('\n').find((l) => /SPINE CURL/.test(l)) || 'no SPINE CURL line'),
+  }));
+  cells.numbering.push(await shoot('PETAL CURL · start 0.95 on a 20 mm blade, 0.60 mm sheet · the spine floor binds',
+    `Curl start reads "${got2.start}". The floor (one sheet thickness of spine radius) binds and the read-out says so, with the turn asked beside the turn built: "${got2.line}". Full range, clamped, told (Eva, Sep 4).`));
+}
 /* ---- one whorl: Petal roles IS the all-petals group; two whorls out of step: the caption ---- */
 {
   await openBloom(page, port);
