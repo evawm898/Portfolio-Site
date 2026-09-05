@@ -1,5 +1,5 @@
-// AUTHORED INFILL — cross-hatch and line-flow, drawn INSIDE a solid's 2D
-// silhouette.
+// AUTHORED INFILL — cross-hatch, line-flow and TONAL FILL, drawn INSIDE a
+// solid's 2D silhouette.
 //
 // THIS MODULE NEVER LOOKS AT THE SURFACE. It reads one thing off the geometry
 // — the projected silhouette, which the line-art extractor has already
@@ -89,13 +89,91 @@
 // consistent with the clipper is the point: a membership test that disagreed
 // with the clipper would report failures nobody could act on.
 //
+// ============================ TONAL FILL ===================================
+// The third family, and a DIFFERENT VOCABULARY from the other two rather than
+// a tuning of them. Hatch and flow make tone out of line density; the
+// reference this was built against makes it out of FILLED MASS — leaves that
+// are solid black shapes with their veins left as white lines through the
+// ink, light petals with dark cores, and depth that comes from a dark shape
+// sitting next to a light one. No amount of respacing a hatch produces that.
+// So `tone` fills the silhouette, and the three things it adds are:
+//
+//   1. THE FILL. A scanline at a sub-pixel pitch, emitting one segment per
+//      span. That is the SAME row-span membership rule the other two families
+//      clip with — the fill is not a new notion of "inside", it is the
+//      existing one drawn solid. Which matters here more than anywhere else:
+//      a filled shape shows a leak as a bar of ink running off across the
+//      paper, where a hatch line shows it as one stray stroke.
+//
+//   2. RESERVED LINES. A vein is not stroked over the fill, it is WITHHELD
+//      from it: the vein path is thickened into a capsule, the capsule's
+//      interval on each row is computed in closed form, and that interval is
+//      SUBTRACTED from the row's spans. So a vein is unfilled paper with ink
+//      on both sides of it, which is what makes the reference's leaves read as
+//      leaves. It reuses subtractSpans() — the same operation that already
+//      takes a nearer part's silhouette out of a farther one's.
+//
+//   3. PER-PART DARKNESS. The reference's depth is contrast BETWEEN adjacent
+//      shapes, so a single global tone slider cannot express it at all: what
+//      is needed is "this part fills dark, that one stays light". Darkness is
+//      therefore per part, one number each, and it is the control that makes
+//      the effect legible rather than a refinement of it.
+//
+// WHERE THE VEINS COME FROM. Nowhere near the surface — this module's one rule
+// still holds, and a vein here is authored 2D illustration, not a crease and
+// not a ridge. The construction is: the principal axis of the projected
+// silhouette gives the shape's length; the midrib is sampled along it and each
+// sample is snapped to the MIDPOINT OF THE CROSS-SPAN at that station, so the
+// rib follows the shape's own medial line instead of a straight line through
+// its centroid; the laterals branch off at a sweep toward the tip and are
+// scaled by the measured half-width on their own side. All of it is read off
+// the silhouette, exactly like everything else in this file.
+//
+// THE GRADIENT IS AN ORDERED DITHER ON THE ROWS, which falls out of the same
+// gift the tone field already gives: because the field is radial, every
+// threshold is a CIRCLE. Each fill row is assigned one of TONE_LEVELS levels
+// by a bit-reversal permutation (so the drawn rows spread evenly instead of
+// banding into stripes), and a row of level L is drawn only where the coverage
+// exceeds L / TONE_LEVELS. Coverage is `darkness * (1 - g + g * tone)`, so
+// inverting it for the threshold radius is closed form and the whole ramp
+// stays an interval clip — no per-pixel sampling anywhere. At gradient 0 every
+// row passes at full darkness and the shape is solid, which is the default,
+// and which is the reference leaf.
+//
+// WHAT IT COSTS, MEASURED, because a fill is not a hatch. A hatch at 7 px
+// spacing lays ~200 rows; a solid fill lays one row every 0.88 px, and the work
+// is rows x edges-crossed-per-row. On the shipped bundles, headless Chromium at
+// 1100x800, all parts filled:
+//
+//   2-part bundle, default framing ......................  20 ms  (hatch 4.8)
+//   3-part bundle, default framing ......................  30 ms
+//   3-part bundle, camera in close on the leaf .......... 1300 ms
+//     ... with the 301k-triangle bloom at darkness 0 .....  284 ms
+//     ... at a 3 px nib instead of 1.1 ................... ~1/3 of the above
+//
+// The 1.3 second figure is the honest worst case and it is not comfortable: a
+// 301,152-triangle fused bloom filling the viewport is 45,000 silhouette edges
+// crossed by 1,461 rows. Three things bound it and all three are in this file:
+// the row range is clamped to the VIEWPORT (ink off the canvas is not ink), the
+// scan index is built once per part per frame and shared with the parts it
+// occludes, and `toneMaxRows` caps the rows outright. The artist's own levers
+// are the nib (rows scale as 1/nib) and a part at darkness 0, which returns
+// before an index is built. THE REAL FIX IS AN ACTIVE-EDGE-TABLE SWEEP —
+// carrying the crossing set from row to row instead of re-testing candidates
+// per row — and it is deliberately NOT done here: it is a second implementation
+// of the membership rule, which is the one thing #157 says not to have two of,
+// so it wants its own session and its own agreement-with-spansAt check.
+//
 // ============================ WHAT IT DOES NOT DO ==========================
 // * SELF-OCCLUSION IS OUT OF SCOPE, BY DESIGN. The infill fills the solid's
 //   OUTLINE. A bloom whose petals overlap each other is one silhouette here,
 //   and hatching runs across the whole of it — which is what "shade inside the
 //   extracted silhouette" means, and is what an illustrator inking a filled
 //   outline does. Per-petal infill needs per-petal solids and waits on
-//   multi-part export.
+//   multi-part export. TONAL FILL MAKES THAT LIMIT LOUD rather than moving it:
+//   a fused bloom fills as ONE shape, so the reference's petal-against-petal
+//   contrast is not reachable on either shipped bundle. Per-PART contrast is,
+//   and is what `darkness` exists for.
 // * BETWEEN parts, occlusion IS handled, because without it the stem's
 //   hatching draws over the bloom in front of it and the result is unreadable.
 //   Parts are ordered by the distance from the camera to their origin and a
@@ -108,7 +186,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
-export const INFILL_MODES = ['off', 'hatch', 'flow'];
+export const INFILL_MODES = ['off', 'hatch', 'flow', 'tone'];
 
 // The secondary hatch angles, as offsets from the one the artist sets. NOT 90
 // degrees: a right-angled cross-hatch reads as a mechanical grid, and the
@@ -125,7 +203,30 @@ export const INFILL_LIMITS = {
   maxSegmentsPerPart: 24000,   // emitted line segments; beyond this a part truncates
   flowStepPx: 2.6,             // streamline integration step
   flowMaxSteps: 420,           // per direction
+  // Tonal fill. The row pitch is derived from the stroke WEIGHT rather than
+  // being its own slider: a fill is solid exactly when consecutive rows
+  // overlap, so the two numbers are not independent and exposing both would
+  // make "solid" a state the artist has to find by hand.
+  tonePitchFactor: 0.80,       // x the stroke weight
+  tonePitchMinPx: 0.5,
+  toneMaxRows: 4000,           // per part per frame; a guard, not a look
+  toneBucketPx: 6,             // scan-index bucket size; work only, never an answer
 };
+
+// How many discrete steps the gradient's ordered dither has, and the order the
+// rows take them in. The order is a BIT REVERSAL of 0..7, so that when only
+// the first n levels are drawn the surviving rows are spread evenly over the
+// shape rather than bunched into a band: at n = 1 every eighth row, at n = 2
+// every fourth, at n = 4 every other one.
+export const TONE_LEVELS = 8;
+export const TONE_ORDER = [0, 4, 2, 6, 1, 5, 3, 7];
+
+// Where a lateral vein leaves the midrib, measured from the cross axis toward
+// the tip, and how far along its side it reaches. Authored constants: they are
+// what a drawn leaf looks like, not anything measured off a surface.
+export const VEIN_SWEEP_DEG = 34;
+export const VEIN_REACH = 0.86;      // of the measured half-width on that side
+export const VEIN_INSET = 0.05;      // the rib stops short of both extremes
 
 // A cheap, stable per-index hash in [0,1). Used for the jitter that keeps a
 // tonal layer's edge from reading as a compass arc, and for the per-streamline
@@ -163,9 +264,22 @@ export function toneRadius(t, reach, gamma) {
 // once per part per angle per frame; without it every scanline walks all
 // 18,377 of the bloom's edges and the stage costs 30 ms a frame instead of 5.
 export class ScanIndex {
-  constructor(f, ca, sa, pitch) {
+  // `opts.bucketPitch` decouples the BUCKET size from the row pitch, and
+  // `opts.vLo`/`opts.vHi` clamp bucketing to a range of interest. Both exist
+  // because of the tonal fill and neither changes an answer — only the work.
+  // A row is still evaluated at exactly the v it asks for; the bucket only
+  // decides which edges are candidates. Measured on the three-part bundle with
+  // the camera close in on the leaf: at a 0.88 px row pitch the bloom's 45,000
+  // edges projected across tens of thousands of pixels, most of them off
+  // screen, and bucketing them one row at a time cost 1.5 SECONDS a frame.
+  // Coarser buckets cost nothing (the per-row candidate count is a function of
+  // edges per pixel, not of bucket size) and the clamp drops the off-screen
+  // extent entirely.
+  constructor(f, ca, sa, pitch, opts = {}) {
     this.f = f; this.ca = ca; this.sa = sa; this.pitch = pitch;
+    this.bucket = opts.bucketPitch > 0 ? opts.bucketPitch : pitch;
     this.rows = new Map();
+    this.openRows = 0;                 // rows the outline failed to close on
     if (!f.ok) { this.vMin = 0; return; }
     let vMin = Infinity, vMax = -Infinity;
     const v0 = new Float32Array(f.n), v1 = new Float32Array(f.n);
@@ -177,9 +291,11 @@ export class ScanIndex {
     }
     this.v0 = v0; this.v1 = v1;
     this.vMin = vMin; this.vMax = vMax;
+    const bLo = opts.vLo !== undefined ? Math.floor(opts.vLo / this.bucket) : -Infinity;
+    const bHi = opts.vHi !== undefined ? Math.floor(opts.vHi / this.bucket) : Infinity;
     for (let i = 0; i < f.n; i++) {
-      const a = Math.floor(Math.min(v0[i], v1[i]) / pitch);
-      const b = Math.floor(Math.max(v0[i], v1[i]) / pitch);
+      const a = Math.max(bLo, Math.floor(Math.min(v0[i], v1[i]) / this.bucket));
+      const b = Math.min(bHi, Math.floor(Math.max(v0[i], v1[i]) / this.bucket));
       for (let r = a; r <= b; r++) {
         let l = this.rows.get(r);
         if (!l) { l = []; this.rows.set(r, l); }
@@ -195,7 +311,7 @@ export class ScanIndex {
   spansAt(v) {
     const f = this.f;
     if (!f.ok) return [];
-    const row = Math.floor(v / this.pitch);
+    const row = Math.floor(v / this.bucket);
     const cand = this.rows.get(row);
     if (!cand || cand.length < 2) return [];
     const hits = [];
@@ -217,6 +333,7 @@ export class ScanIndex {
       if (was === 0 && wind !== 0) start = h.u;
       else if (was !== 0 && wind === 0) spans.push(start, h.u);
     }
+    if (wind !== 0) { spans.push(start, hits[hits.length - 1].u); this.openRows++; }
     return spans;
   }
 
@@ -281,6 +398,22 @@ export class Infill {
     this.jitter = 35;        // % perturbation of each layer's threshold radius
     this.weight = 1.1;
 
+    // --- tonal fill ------------------------------------------------------
+    // `gradient` 0 is a FLAT fill: the tone field is ignored entirely and the
+    // shape fills to its outline. That is the default because it is the
+    // reference — a leaf in these drawings is a solid black shape, and the
+    // gradient is the departure from it, not the starting point.
+    this.gradient = 0;       // % of the tone field mixed into the coverage
+    this.veins = 4;          // lateral vein PAIRS; the midrib is always there
+    this.veinWidth = 2.5;    // px of fill withheld along each vein path
+    // The nib the fill is laid down with. Its OWN control rather than the line
+    // work's `weight`, because it is the one number that sets both how solid
+    // the fill is and what it costs: the row pitch is derived from it (see
+    // tonePitch()), so rows scale as 1/fillWeight and so does the frame time.
+    // A fat nib is a legitimate mark — and it is also the lever for a bloom
+    // that fills the viewport.
+    this.fillWeight = 1.1;
+
     // The overlay. The infill is 2D, so it is drawn by its OWN orthographic
     // camera in PIXEL coordinates rather than being pushed back into the
     // scene: a hatch pattern that lived in the mesh's local space would rotate
@@ -290,6 +423,11 @@ export class Infill {
 
     this.frames = art.units.map(() => new PartFrame());
     this.anchors = art.units.map((u) => centroidOf(u.mesh));
+    // PER PART, like the anchor and for the same reason: the reference's depth
+    // is one shape reading dark against its neighbour reading light, and that
+    // is not something a single number for the whole picture can say. 100 is
+    // solid; 0 is a part left as outline only.
+    this.darkness = art.units.map(() => 100);
 
     const cap = INFILL_LIMITS.maxSegmentsPerPart;
     this.draws = art.units.map((u) => {
@@ -315,6 +453,10 @@ export class Infill {
     }));
     this._stamp = 0;
 
+    // Per-part tonal-fill bookkeeping, so the read-out and the gate can say
+    // how many rows were laid down and how many of them a vein cut into.
+    this.rowStats = art.units.map(() => ({ rows: 0, reservedRows: 0, veinPaths: 0, openRows: 0 }));
+
     this.stats = null;
     this.setEnabled(false);
   }
@@ -326,12 +468,18 @@ export class Infill {
   }
 
   setOptions(o = {}) {
-    for (const k of ['spacing', 'angleDeg', 'layers', 'curvature', 'reach', 'falloff', 'jitter', 'weight']) {
+    for (const k of ['spacing', 'angleDeg', 'layers', 'curvature', 'reach', 'falloff',
+                     'jitter', 'weight', 'gradient', 'veins', 'veinWidth', 'fillWeight']) {
       if (o[k] !== undefined) this[k] = o[k];
     }
     if (o.mode !== undefined && INFILL_MODES.includes(o.mode)) this.mode = o.mode;
     this.setEnabled(this.enabled);
   }
+
+  // The darkness of part `i`, 0..100. The one control that makes tonal
+  // contrast between two parts expressible at all.
+  darknessOf(i) { return this.darkness[i]; }
+  setDarkness(i, v) { this.darkness[i] = Math.max(0, Math.min(100, +v || 0)); }
 
   // The anchor of part `i`, in that part's LOCAL space.
   anchorLocal(i) { return this.anchors[i]; }
@@ -352,6 +500,7 @@ export class Infill {
   update(camera, sizePx, pixelRatio = 1) {
     const t0 = performance.now();
     const [W, H] = sizePx;
+    this._W = W; this._H = H;
     this.camera.left = 0; this.camera.right = W;
     this.camera.top = 0; this.camera.bottom = H;
     this.camera.updateProjectionMatrix();
@@ -364,6 +513,7 @@ export class Infill {
 
     const stamp = ++this._stamp;
     const units = this.art.units;
+    this._idxCache = new Map();          // per-frame, see getIdx() in _tonePart
 
     // --- project every part's silhouette into pixels -----------------------
     for (let i = 0; i < units.length; i++) this._projectPart(i, camera, W, H, stamp);
@@ -376,8 +526,8 @@ export class Infill {
     for (let rank = 0; rank < order.length; rank++) {
       const i = order[rank];
       const occluders = order.slice(0, rank);
-      const n = this.mode === 'hatch'
-        ? this._hatchPart(i, occluders)
+      const n = this.mode === 'hatch' ? this._hatchPart(i, occluders)
+        : this.mode === 'tone' ? this._tonePart(i, occluders)
         : this._flowPart(i, occluders);
       segs += n.segments; seeds += n.seeds; truncated = truncated || n.truncated;
     }
@@ -387,7 +537,7 @@ export class Infill {
       const d = this.draws[i];
       d.geo.instanceCount = d.count;
       d.buf.needsUpdate = true;
-      d.mat.linewidth = this.weight;
+      d.mat.linewidth = this.mode === 'tone' ? this.fillWeight : this.weight;
       d.mat.resolution.set(W, H);
     }
 
@@ -396,9 +546,17 @@ export class Infill {
       spacing: this.spacing, angleDeg: this.angleDeg,
       layers: this.mode === 'hatch' ? this.layers : 0,
       curvature: this.mode === 'flow' ? this.curvature : 0,
+      gradient: this.mode === 'tone' ? this.gradient : 0,
+      fillWeight: this.mode === 'tone' ? this.fillWeight : 0,
+      veins: this.mode === 'tone' ? this.veins : 0,
+      veinWidth: this.mode === 'tone' ? this.veinWidth : 0,
+      tonePitch: this.mode === 'tone' ? this.tonePitch() : 0,
       parts: this.frames.map((f, i) => ({
         name: units[i].mesh.name, silhouette: f.n, ok: f.ok,
         anchorPx: [f.ax, f.ay], reachPx: f.reach, segments: this.draws[i].count,
+        darkness: this.darkness[i],
+        rows: this.rowStats[i].rows, reservedRows: this.rowStats[i].reservedRows,
+        veinPaths: this.rowStats[i].veinPaths, openRows: this.rowStats[i].openRows,
       })),
       frameMs: performance.now() - t0,
     };
@@ -558,6 +716,137 @@ export class Infill {
   }
 
   // ------------------------------------------------------------------------
+  // The fill row pitch. Derived from the stroke weight rather than exposed:
+  // the fill is solid exactly when consecutive rows overlap, so a separate
+  // spacing slider would put "solid" — the whole point of this family — behind
+  // a coincidence of two numbers.
+  tonePitch() {
+    return Math.max(INFILL_LIMITS.tonePitchMinPx, this.fillWeight * INFILL_LIMITS.tonePitchFactor);
+  }
+
+  // The vein paths of part `i` for THIS frame, in pixels. Exposed so the panel
+  // read-out and the gate can see the same paths the fill reserved against,
+  // rather than re-deriving them and comparing two constructions.
+  veinPathsFor(i) {
+    const f = this.frames[i];
+    if (!f.ok || !(this.veinWidth > 0)) return [];
+    return veinPaths(f, this.veins);
+  }
+
+  // ------------------------------------------------------------------------
+  // TONAL FILL. The silhouette filled — solid, or ramped by the tone field —
+  // with vein paths WITHHELD from the fill rather than stroked over it.
+  //
+  // Three subtractions happen to every row, in this order and for three
+  // different reasons: the tone threshold (an interval clip against a circle,
+  // because the field is radial), every nearer part's silhouette (the same
+  // between-part occlusion the other two families do), and the reserved veins.
+  // The vein subtraction is LAST on purpose — a vein is negative space in the
+  // ink that actually got laid down, so it must not be able to "reserve"
+  // through a region that was never going to be filled and then appear to have
+  // done something.
+  _tonePart(i, occluders) {
+    const f = this.frames[i];
+    const d = this.draws[i];
+    const rs = this.rowStats[i];
+    rs.rows = 0; rs.reservedRows = 0; rs.veinPaths = 0; rs.openRows = 0;
+    const dst = d.buf.array;
+    const cap = INFILL_LIMITS.maxSegmentsPerPart;
+    const gamma = Math.max(0.05, this.falloff / 100);
+    const D = Math.max(0, Math.min(1, this.darkness[i] / 100));
+    const g = Math.max(0, Math.min(1, this.gradient / 100));
+    const pitch = this.tonePitch();
+    let count = 0, truncated = false;
+
+    const emit = (x0, y0, x1, y1) => {
+      if (count >= cap) { truncated = true; return; }
+      const o = count * 6;
+      dst[o] = x0; dst[o + 1] = y0; dst[o + 2] = 0;
+      dst[o + 3] = x1; dst[o + 4] = y1; dst[o + 5] = 0;
+      count++;
+    };
+
+    if (D <= 0) { d.count = 0; d.truncated = false; return { segments: 0, seeds: 0, truncated: false }; }
+
+    // The rows run along `angleDeg`, the same control the other two families
+    // use for direction. It is invisible on a solid fill and is what orients
+    // the gradient's dither once the shape stops being solid.
+    const ang = THREE.MathUtils.degToRad(this.angleDeg);
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const vOf = (x, y) => -x * sa + y * ca;
+    const uOf = (x, y) => x * ca + y * sa;
+
+    let vmin = Infinity, vmax = -Infinity;
+    for (const [cx, cy] of [[f.minX, f.minY], [f.maxX, f.minY], [f.minX, f.maxY], [f.maxX, f.maxY]]) {
+      const v = vOf(cx, cy);
+      if (v < vmin) vmin = v;
+      if (v > vmax) vmax = v;
+    }
+    // The overlay is drawn in PIXEL coordinates, so ink outside the canvas is
+    // not ink. Clamping the row range to the viewport is what keeps a part
+    // that is mostly off screen — the bloom, whenever the camera is in close
+    // on the leaf — from costing a second and a half a frame for marks nobody
+    // can see.
+    const W = this._W || 0, H = this._H || 0;
+    let cLo = Infinity, cHi = -Infinity;
+    for (const [cx, cy] of [[0, 0], [W, 0], [0, H], [W, H]]) {
+      const v = vOf(cx, cy);
+      if (v < cLo) cLo = v;
+      if (v > cHi) cHi = v;
+    }
+    const vLo = Math.max(vmin, cLo), vHi = Math.min(vmax, cHi);
+    if (!(vHi > vLo)) { d.count = 0; d.truncated = false; return { segments: 0, seeds: 0, truncated: false }; }
+    const first = Math.ceil(vLo / pitch);
+    const last = Math.min(Math.floor(vHi / pitch), first + INFILL_LIMITS.toneMaxRows);
+
+    // ONE INDEX PER PART PER FRAME. Every part in this family scans at the same
+    // angle and the same pitch, so a part's index is the same object whether it
+    // is being filled or is subtracting from something behind it — and without
+    // the cache the nearest part's index is rebuilt once for itself and once
+    // for every part behind it. Measured on the three-part bundle: the bloom's
+    // 45,000-edge index was being built three times a frame. The bucket range
+    // is the VIEWPORT's, not the part's, precisely so the cached index does not
+    // depend on which part asked for it.
+    const io = { vLo: cLo, vHi: cHi, bucketPitch: Math.max(pitch, INFILL_LIMITS.toneBucketPx) };
+    const getIdx = (j) => {
+      let ix = this._idxCache.get(j);
+      if (!ix) { ix = new ScanIndex(this.frames[j], ca, sa, pitch, io); this._idxCache.set(j, ix); }
+      return ix;
+    };
+    const idx = getIdx(i);
+    const occIdx = occluders.map(o => getIdx(o));
+    const au = uOf(f.ax, f.ay), av = vOf(f.ax, f.ay);
+
+    const paths = this.veinWidth > 0 ? veinPaths(f, this.veins) : [];
+    rs.veinPaths = paths.length;
+    const rot = rotatePaths(paths, ca, sa);
+    const halfVein = this.veinWidth / 2;
+
+    const ctx = { idx, occ: occIdx, rot, halfVein, pitch, au, av,
+      reach: f.reach, gamma, darkness: D, gradient: g, jitter: this.jitter / 100 };
+
+    for (let k = first; k <= last; k++) {
+      const v = k * pitch;
+      const row = toneRowSpans(ctx, k);
+      if (row.onOutline) rs.rows++;
+      if (row.reserved) rs.reservedRows++;
+      const spans = row.spans;
+
+      for (let q = 0; q + 1 < spans.length; q += 2) {
+        const a0 = spans[q], a1 = spans[q + 1];
+        if (a1 - a0 < 0.3) continue;                // narrower than a mark
+        emit(a0 * ca - v * sa, a0 * sa + v * ca, a1 * ca - v * sa, a1 * sa + v * ca);
+        if (truncated) break;
+      }
+      if (truncated) break;
+    }
+
+    rs.openRows = idx.openRows;
+    d.count = count; d.truncated = truncated;
+    return { segments: count, seeds: rs.rows, truncated };
+  }
+
+  // ------------------------------------------------------------------------
   // LINE-FLOW. Streamlines through a direction field, seeded on a grid and
   // integrated until they leave the silhouette, leave the tone field, or run
   // out of length. Clipped by intersecting each step against the silhouette
@@ -705,6 +994,24 @@ export function centroidOf(mesh) {
 // where the WINDING NUMBER is non-zero — exact at concavities, and correct
 // where a fold puts a second loop inside the outline.
 //
+// THE LAST LINE IS THE OPEN-OUTLINE CLOSURE, and it is not a tolerance. A
+// projected silhouette here is often NOT a closed curve (#157: the shipped
+// bloom is a fused STL split with 24 boundary and 324 non-manifold edges whose
+// third face is dropped), and on such a row the crossings do not balance: the
+// winding walks up and never comes back to zero, so no span is ever emitted
+// and the row draws NOTHING. That is invisible in a hatch — one missing line
+// among hundreds — and it is total in a fill. Measured on the separate leaf in
+// bloom-stem-leaf-bundle.glb, whose 84-triangle solid has 16 non-manifold
+// edges: THREE crossings on every row, and a fill that came out completely
+// empty. So a row whose winding never returns to zero is closed at its LAST
+// crossing, which is the outline's own outermost statement about where the
+// shape ends on that row.
+//
+// The repair is INERT on a closed outline — `wind` is exactly 0 there and the
+// line never runs — which is what lets it live in the shared rule instead of
+// in one family: `boundary/closure-is-inert-on-a-closed-outline` pins that in
+// both directions, and the hatch/flow gate is unmoved by it.
+//
 // This is the PLAIN scan, over every edge. ScanIndex does the same thing after
 // bucketing by row, and is what the clipper actually runs; this stays as the
 // unoptimised statement of the rule, and `index/agrees-with-the-plain-scan`
@@ -734,6 +1041,7 @@ export function scanSpans(f, ca, sa, v) {
     if (was === 0 && wind !== 0) start = h.u;
     else if (was !== 0 && wind === 0) { spans.push(start, h.u); }
   }
+  if (wind !== 0) spans.push(start, hits[hits.length - 1].u);
   return spans;
 }
 
@@ -785,4 +1093,282 @@ export function insideWinding(f, x, y) {
     }
   }
   return wind !== 0;
+}
+
+// ===========================================================================
+// TONAL FILL — the pure 2D geometry. All of it is driven directly by the gate
+// over shapes whose answers can be written down, for the same reason the
+// clipper is: on a nineteen-thousand-edge silhouette a wrong answer still
+// draws a plausible picture.
+
+// Merge a flat, unordered list of [lo, hi] pairs into a sorted, disjoint one.
+// Reserved veins overlap each other at the midrib by construction, and
+// subtractSpans() documents its inputs as sorted and non-overlapping.
+export function mergeSpans(spans) {
+  const pairs = [];
+  for (let i = 0; i + 1 < spans.length; i += 2) {
+    if (spans[i + 1] > spans[i]) pairs.push([spans[i], spans[i + 1]]);
+  }
+  if (!pairs.length) return [];
+  pairs.sort((a, b) => a[0] - b[0]);
+  const out = [pairs[0][0], pairs[0][1]];
+  for (let i = 1; i < pairs.length; i++) {
+    const [a, b] = pairs[i];
+    if (a <= out[out.length - 1]) out[out.length - 1] = Math.max(out[out.length - 1], b);
+    else out.push(a, b);
+  }
+  return out;
+}
+
+// The interval of u at which the horizontal line `v` meets the CAPSULE of
+// radius r around the segment (ua,va)-(ub,vb) — i.e. every point within r of
+// the segment. A capsule is convex, so the answer is a single interval and is
+// the min/max over its three convex pieces: the two end discs and the slab
+// between them. Closed form on purpose: this runs once per vein segment per
+// fill row, and a distance field sampled per pixel is the thing this whole
+// file is built to avoid.
+export function capsuleSpanAtRow(ua, va, ub, vb, r, v) {
+  if (!(r > 0)) return null;
+  let lo = Infinity, hi = -Infinity;
+  for (const [cu, cv] of [[ua, va], [ub, vb]]) {
+    const dy = v - cv;
+    if (Math.abs(dy) <= r) {
+      const w = Math.sqrt(r * r - dy * dy);
+      if (cu - w < lo) lo = cu - w;
+      if (cu + w > hi) hi = cu + w;
+    }
+  }
+  const du = ub - ua, dv = vb - va;
+  const len = Math.hypot(du, dv);
+  if (len > 1e-9) {
+    const nu = -dv / len * r, nv = du / len * r;
+    const quad = [[ua + nu, va + nv], [ub + nu, vb + nv], [ub - nu, vb - nv], [ua - nu, va - nv]];
+    for (let i = 0; i < 4; i++) {
+      const [x0, y0] = quad[i], [x1, y1] = quad[(i + 1) % 4];
+      if ((y0 <= v && y1 > v) || (y1 <= v && y0 > v)) {
+        const t = (v - y0) / (y1 - y0);
+        const u = x0 + (x1 - x0) * t;
+        if (u < lo) lo = u;
+        if (u > hi) hi = u;
+      }
+    }
+  }
+  return hi > lo ? [lo, hi] : null;
+}
+
+// Every reserved interval on row `v`, for a set of polylines already expressed
+// in the same (u, v) frame the fill rows run in. This is the whole of "a vein
+// is negative space": the result is handed to subtractSpans().
+export function reserveSpansAt(paths, v, halfWidth) {
+  if (!(halfWidth > 0)) return [];
+  const out = [];
+  for (const p of paths) {
+    for (let i = 0; i + 1 < p.length; i++) {
+      const s = capsuleSpanAtRow(p[i][0], p[i][1], p[i + 1][0], p[i + 1][1], halfWidth, v);
+      if (s) out.push(s[0], s[1]);
+    }
+  }
+  return mergeSpans(out);
+}
+
+// The principal axis of a projected silhouette: the mean of its endpoints and
+// the eigenvector of their 2x2 covariance with the larger eigenvalue, in
+// closed form. This is the shape's own "length", and it is the only thing the
+// vein construction takes from the outline's overall pose.
+export function principalAxis(f) {
+  if (!f || !f.ok || !f.n) return null;
+  let n = 0, mx = 0, my = 0;
+  for (let i = 0; i < f.n; i++) { mx += f.x0[i] + f.x1[i]; my += f.y0[i] + f.y1[i]; n += 2; }
+  mx /= n; my /= n;
+  let sxx = 0, sxy = 0, syy = 0;
+  for (let i = 0; i < f.n; i++) {
+    for (const [x, y] of [[f.x0[i], f.y0[i]], [f.x1[i], f.y1[i]]]) {
+      const dx = x - mx, dy = y - my;
+      sxx += dx * dx; sxy += dx * dy; syy += dy * dy;
+    }
+  }
+  sxx /= n; sxy /= n; syy /= n;
+  const tr = sxx + syy, det = sxx * syy - sxy * sxy;
+  const lam = tr / 2 + Math.sqrt(Math.max(tr * tr / 4 - det, 0));
+  let ex, ey;
+  if (Math.abs(sxy) > 1e-12) { ex = lam - syy; ey = sxy; }
+  else if (sxx >= syy) { ex = 1; ey = 0; }
+  else { ex = 0; ey = 1; }
+  const l = Math.hypot(ex, ey) || 1;
+  return { cx: mx, cy: my, ex: ex / l, ey: ey / l };
+}
+
+// The vein paths for one projected silhouette, in PIXELS: a midrib that
+// follows the shape's medial line, plus `pairs` lateral branches on each side.
+//
+// Every number here is measured off the silhouette. The midrib is not a
+// straight line through the centroid — it is sampled along the principal axis
+// and each sample is moved to the MIDPOINT of the cross-span that contains the
+// centroid at that station, which is what makes it bend with a curved leaf.
+// Each lateral's length is the measured half-width on its own side, so the
+// laterals shorten toward the tip without anything being told to taper.
+export function veinPaths(f, pairs, opts = {}) {
+  const ax = principalAxis(f);
+  if (!ax) return [];
+  const { cx, cy, ex, ey } = ax;
+  const qx = -ey, qy = ex;                       // the cross axis
+  const sweep = (opts.sweepDeg !== undefined ? opts.sweepDeg : VEIN_SWEEP_DEG) * Math.PI / 180;
+  const reach = opts.reach !== undefined ? opts.reach : VEIN_REACH;
+  const inset = opts.inset !== undefined ? opts.inset : VEIN_INSET;
+  const ribSamples = opts.ribSamples !== undefined ? opts.ribSamples : 11;
+
+  let t0 = Infinity, t1 = -Infinity;
+  for (let i = 0; i < f.n; i++) {
+    for (const [x, y] of [[f.x0[i], f.y0[i]], [f.x1[i], f.y1[i]]]) {
+      const t = (x - cx) * ex + (y - cy) * ey;
+      if (t < t0) t0 = t;
+      if (t > t1) t1 = t;
+    }
+  }
+  if (!(t1 - t0 > 1e-6)) return [];
+
+  // Rows perpendicular to the principal axis. With (ca, sa) = the cross axis,
+  // ScanIndex's u runs along it and its v is -(p . e), so a station t is the
+  // row at v = -(t + c.e).
+  const idx = new ScanIndex(f, qx, qy, 1);
+  const cdot = cx * ex + cy * ey;
+  const u0 = cx * qx + cy * qy;
+
+  // The cross-span at station t that the shape's own centre line falls in,
+  // falling back to the widest span on that row when the centre line is in a
+  // notch. Returns null where the row is empty.
+  const crossAt = (t) => {
+    const sp = idx.spansAt(-(t + cdot));
+    if (!sp.length) return null;
+    let best = null, widest = null;
+    for (let i = 0; i + 1 < sp.length; i += 2) {
+      if (u0 >= sp[i] && u0 <= sp[i + 1]) best = [sp[i], sp[i + 1]];
+      if (!widest || sp[i + 1] - sp[i] > widest[1] - widest[0]) widest = [sp[i], sp[i + 1]];
+    }
+    return best || widest;
+  };
+  const pt = (t, u) => [(t + cdot) * ex + u * qx, (t + cdot) * ey + u * qy];
+
+  const L = t1 - t0;
+  const a0 = t0 + L * inset, a1 = t1 - L * inset;
+  const rib = [];
+  for (let i = 0; i < ribSamples; i++) {
+    const t = a0 + (a1 - a0) * (i / (ribSamples - 1));
+    const sp = crossAt(t);
+    rib.push(pt(t, sp ? (sp[0] + sp[1]) / 2 : u0));
+  }
+  const paths = [rib];
+
+  const nPairs = Math.max(0, pairs | 0);
+  for (let j = 0; j < nPairs; j++) {
+    // Stations kept off both ends: a lateral at the very base or the very tip
+    // has no width to run into and reads as a nick in the outline.
+    const frac = 0.18 + 0.64 * (nPairs === 1 ? 0.5 : j / (nPairs - 1));
+    const t = a0 + (a1 - a0) * frac;
+    const sp = crossAt(t);
+    if (!sp) continue;
+    const um = (sp[0] + sp[1]) / 2;
+    const base = pt(t, um);
+    for (const side of [1, -1]) {
+      const half = side > 0 ? sp[1] - um : um - sp[0];
+      const len = half * reach;
+      if (!(len > 1.5)) continue;
+      // A quadratic bow: out across the shape first, then leaning toward the
+      // tip, which is how a pinnate vein actually runs.
+      const cU = um + side * len * 0.62, cT = t;
+      const eU = um + side * len * 0.86, eT = t + len * 0.45;
+      const c = pt(cT, cU), e = pt(eT, eU);
+      const seg = [];
+      for (let k = 0; k <= 4; k++) {
+        const s = k / 4, m = 1 - s;
+        seg.push([
+          m * m * base[0] + 2 * m * s * c[0] + s * s * e[0],
+          m * m * base[1] + 2 * m * s * c[1] + s * s * e[1],
+        ]);
+      }
+      paths.push(seg);
+    }
+  }
+  return paths;
+}
+
+// ONE FILL ROW, from the row index to the spans that get inked. Pulled out of
+// _tonePart so the gate drives THE SHIPPED FUNCTION over outlines whose answer
+// can be written down, instead of a second copy of the same arithmetic that
+// would only ever be tested against itself.
+//
+// The three subtractions happen in a fixed order and for three different
+// reasons: the tone threshold (an interval clip against a circle, because the
+// field is radial), every nearer part's silhouette, and finally the reserved
+// veins. The veins go LAST on purpose — a vein is negative space in the ink
+// that actually got laid down, so it must not be able to reserve through a
+// region that was never going to be filled and then look as though it had.
+export function toneRowSpans(ctx, k) {
+  const { idx, occ, rot, halfVein, pitch, au, av, reach, gamma, darkness, gradient, jitter } = ctx;
+  const v = k * pitch;
+  const L = TONE_ORDER[((k % TONE_LEVELS) + TONE_LEVELS) % TONE_LEVELS];
+  const out = { v, L, spans: [], onOutline: false, reserved: false, clipped: false };
+
+  const tau = levelThreshold(L, darkness, gradient);
+  if (tau >= 1) return out;                    // this row is lighter than its level
+
+  let spans = idx.spansAt(v);
+  if (!spans.length) return out;
+  out.onOutline = true;
+
+  if (tau >= 0) {
+    // The threshold is a circle, so the clip is an interval rather than a
+    // sample. Jittered per row for the reason the hatch layers are: an exact
+    // arc reads as a compass and not as a hand.
+    out.clipped = true;
+    const j = (hash01(k * 131 + L * 7919) * 2 - 1) * jitter;
+    const r = toneRadius(tau, reach, gamma) * (1 + j);
+    if (r <= 0) return out;
+    const dv = v - av;
+    if (Math.abs(dv) >= r) return out;
+    const half = Math.sqrt(r * r - dv * dv);
+    spans = clipSpans(spans, au - half, au + half);
+    if (!spans.length) return out;
+  }
+
+  for (let i = 0; i < occ.length; i++) {
+    if (!spans.length) return out;
+    spans = subtractSpans(spans, occ[i].spansAt(v));
+  }
+  if (!spans.length) return out;
+
+  if (halfVein > 0 && rot.length) {
+    const res = reserveSpansAt(rot, v, halfVein);
+    if (res.length) {
+      const before = spans;
+      spans = subtractSpans(spans, res);
+      if (spans.length !== before.length || spans.some((x, q) => x !== before[q])) out.reserved = true;
+    }
+  }
+  out.spans = spans;
+  return out;
+}
+
+// Rotate a set of pixel-space polylines into the frame the fill rows run in.
+export function rotatePaths(paths, ca, sa) {
+  return paths.map(p => p.map(([x, y]) => [x * ca + y * sa, -x * sa + y * ca]));
+}
+
+// How dark this stage wants a point to be: the per-part darkness, ramped by
+// the tone field in proportion to `g`. At g = 0 the answer is the darkness
+// everywhere and the shape fills solid.
+export function toneCoverage(darkness, g, tone) {
+  return darkness * (1 - g + g * tone);
+}
+
+// The inverse, and the reason the gradient costs nothing: the tone at which a
+// row of level `L` starts to be drawn. Returns <= 0 when the row is drawn all
+// the way to the outline, and >= 1 when it is never drawn at all — so the
+// caller clips to toneRadius() only in between. Exactly inverts toneCoverage,
+// which `tone/coverage-inverts-threshold` pins.
+export function levelThreshold(L, darkness, g) {
+  const need = L / TONE_LEVELS;
+  if (!(darkness > 0)) return 1;
+  if (g <= 0) return darkness > need ? -1 : 1;
+  return ((need / darkness) - (1 - g)) / g;
 }

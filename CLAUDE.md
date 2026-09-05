@@ -438,8 +438,33 @@ Stages shipped so far: the **scaffold** (#150 — viewport, glTF load, the pivot
 node's `extras` round-tripping through GLTFLoader), the **pose** (#151 — a
 posable stem and a hinged bloom), the **line art** (#153 — silhouette and
 crease edges, three sliders, then chained/curated/smoothed into drawn contours
-in two weights), and a **runtime bundle loader** (#156 — a `.glb` can be
-swapped in at any time, not only baked into the page at build time).
+in two weights), a **runtime bundle loader** (#156 — a `.glb` can be
+swapped in at any time, not only baked into the page at build time), the
+**authored infill** (#157 — cross-hatch and line-flow inside the silhouette),
+and the **tonal fill** (the silhouette inked solid or graded, veins reserved
+out of the fill, a darkness per part).
+
+**TWO BUNDLES SHIP, and the second one is why `/print` can now be judged on a
+LEAF.** `flower-test-bundle.glb` (5.7 MB, 78k triangles) is the default and is
+still what every gate loads first. `bloom-stem-leaf-bundle.glb` (21.7 MB,
+301,152-triangle bloom + a synthetic stem and leaf) is loaded on demand by
+`tools/verify-print-tone.mjs` and `tools/shot-print-tone.mjs`, and it is the
+first bundle with a LEAF as its own node and its own mesh. **Its bloom is a
+better solid and its leaf is a worse one, both measured:** the bloom has 0
+boundary edges and 0 non-manifold edges (against 12 and 15 for the old one),
+while the 84-triangle leaf has 16 of its 114 edges carrying a third face —
+which is what made the open-outline problem below unmissable. The 21.7 MB is
+committed as exported, undecimated; decimating someone's test export to save
+repo size is their call, not a session's.
+
+**MESH SELECTION IS NO LONGER A HARDCODED PAIR.** `print.js` used to draw
+`[stem, bloom]` by name, which was indistinguishable from finding them while
+every bundle had exactly two parts. It now traverses the loaded root and takes
+every mesh except the exporter's `pivot_marker`. Traversal order is the
+bundle's own node order, so the two-part bundle still yields exactly
+`[stem, bloom]` and every part index in the gates and sheets keeps its meaning.
+Under the old list the leaf was in the scene, posed with the stem, and drawn by
+nothing.
 
 **The bundle is the input contract.** `assets/print-test/flower-test-bundle.glb`
 carries a `pivot` node whose glTF `extras` declare the junction position, the
@@ -798,12 +823,124 @@ just under their thresholds. It now excludes the COLUMNS (`#print-left`,
 `#print-side`) and FAILS LOUDLY if either selector matches nothing, rather than
 silently skipping an exclusion.
 
-**The leaf, honestly:** the shipped bundle's leaves are part of the STEM solid,
-not separate parts, and there is no leaf bundle to load (runtime bundle loading
-is #156). So the sheet's leaf cells are the stem part's infill framed on a
-leaf, with that part's anchor dragged onto it. That demonstrates the stage
-works on whatever solid it is handed; it is NOT a demonstration of per-leaf
-infill.
+**The leaf, honestly — SUPERSEDED, and kept because the sheet still says it.**
+`shot-print-infill.mjs`'s leaf cells are the STEM part's infill framed on a
+leaf, because `flower-test-bundle.glb`'s leaves are part of the stem solid.
+That was the honest best available when #157 shipped. It is no longer the best
+available: `bloom-stem-leaf-bundle.glb` has a real separate leaf, and
+`shot-print-tone.mjs` uses it. Re-shooting the hatch/flow leaf cells on the
+real leaf is a one-line change to that sheet and has not been done — hatch and
+flow were explicitly out of scope for the tonal session.
+
+### Tonal fill (`print-infill.js`, mode `tone`) — tone out of MASS, not density
+
+The third family in the same module. Hatch and flow make tone by packing lines;
+the reference drawings this was built against make it out of FILLED MASS —
+leaves that are solid black shapes with their veins left as white lines through
+the ink, and depth that comes from a dark shape sitting beside a light one. That
+is a different vocabulary, not a mistuned hatch, so `tone` fills the silhouette.
+Three things, and each one reuses something rather than inventing it:
+
+1. **The fill is the existing row-span rule drawn solid** — a scanline at
+   `0.80 x the nib`, one emitted segment per span. Not a new notion of "inside".
+2. **A vein is WITHHELD, never stroked.** The path is thickened into a capsule,
+   `capsuleSpanAtRow()` gives its interval on each row in closed form, and
+   `subtractSpans()` — the same operation that already takes a nearer part's
+   silhouette out of a farther one's — removes it. The veins go LAST of the
+   three subtractions, so a vein cannot appear to reserve through ink that was
+   never going to be laid.
+3. **Darkness is PER PART**, one number each, beside the anchor and for the same
+   reason: contrast between adjacent shapes is not something one slider for the
+   whole picture can say. It is what makes the effect legible at all.
+
+**THE PROJECTED SILHOUETTE IS OPEN, AND A FILL IS WHERE THAT STOPS BEING
+SURVIVABLE.** #157 found the outline is not a closed curve; tonal fill found what
+that costs. On `bloom-stem-leaf-bundle.glb`'s leaf — 84 triangles, 16 of its 114
+edges carrying a third face that Topology drops — every row has THREE crossings,
+the winding walks up and never returns to zero, no span is ever emitted, and the
+leaf **filled to nothing at all**. In a hatch that is one missing line among
+hundreds and invisible. So `scanSpans()` and `ScanIndex.spansAt()` now close a
+row whose winding never returns to zero AT ITS LAST CROSSING. **The repair is
+INERT on a closed outline** — `wind` is exactly 0 there and the line never runs —
+which is what lets it live in the rule all three families share instead of in one
+of them; `boundary/closure-is-inert-on-a-closed-outline` pins that, and
+`boundary/closure-recovers-an-open-outline` models the actual defect (a wall left
+facing the wrong way, which is what a dropped third face does) rather than
+inventing a gap.
+
+**"INSIDE" IS DIRECTION-DEPENDENT WHEN THE OUTLINE IS OPEN**, measured, and it
+had a latent error in the #157 gate waiting behind it. The solid fill judged by a
+rule scanned at ITS OWN angle has **0 of 4194** points outside; the identical ink
+judged by a rule 35 degrees away has **33 of 5361, up to 20 px DEEP INSIDE the
+shape**. Both gates now match the scan direction to the clipper that drew each
+segment — a cross-hatch line is emitted along the direction its own scanline ran,
+so the segment's direction IS the rule; line-flow clips through the QUANTISED
+`contains()` and is judged there. Testing everything at 0 degrees was wrong all
+along and only the fill had enough points to trip it. The disagreement gets its
+own bounded, named measurement rather than a tolerance.
+
+**The veins are authored 2D and read nothing off the surface** — the module's one
+rule still holds. The principal axis of the projected silhouette gives the length;
+the midrib is sampled along it and each sample is snapped to the MIDPOINT OF THE
+CROSS-SPAN at that station, so the rib follows the shape's own medial line (on a
+bent leaf: 0.02 px off it, against 32.9 px for a straight line through the
+centroid); laterals branch at a sweep toward the tip and are scaled by the
+measured half-width on their own side, so a tapering leaf gets shorter laterals
+near the tip with nothing told to taper.
+
+**The gradient is an ordered dither on the ROWS**, which falls out of the gift the
+tone field already gives: the field is radial, so every threshold is a circle.
+Row levels come from a BIT REVERSAL of 0..7 (`TONE_ORDER`) so a half tone spreads
+evenly instead of banding — in source order the largest gap between inked rows
+collapses and `dither/rows-spread-rather-than-band` catches it. Coverage is
+`darkness * (1 - g + g*tone)` and `levelThreshold()` inverts it exactly, so the
+whole ramp is an interval clip and nothing is sampled per pixel. **Gradient 0 is
+the default and is a flat solid fill to the outline** — that is the reference
+leaf, and the anchor and its falloff are inert there, which the read-out says.
+
+**THE NIB IS THE MARK AND THE COST, ONE CONTROL.** Rows are laid at 0.80 x the
+nib, so a fatter nib is the same solid shape in a third of the rows. It is its own
+slider rather than the line work's `weight` precisely so the artist has that lever.
+Measured cost, headless at 1100x800, all parts filled: 2-part bundle at default
+framing **20 ms** (hatch 4.8); 3-part bundle at default framing **30 ms**; 3-part
+bundle with the camera in close on the leaf **1300 ms**, or **284 ms** with the
+301k-triangle bloom at darkness 0. The worst case is not comfortable and is
+bounded three ways in the file (rows clamped to the VIEWPORT, one scan index per
+part per frame shared with the parts it occludes, `toneMaxRows`). **The real fix
+is an active-edge-table sweep and it is deliberately not done here** — it is a
+second implementation of the membership rule, which is the one thing #157 says not
+to have two of.
+
+**THE BLOOM FILLS AS ONE SHAPE, AND THAT IS THE LIMIT, NOT A TUNING PROBLEM.**
+Both bundles' blooms are one fused solid, so the reference's petal-against-petal
+contrast is blocked on multi-part export. Per-PART contrast is reachable and is
+what `darkness` is for. The sheet photographs the limit rather than tuning around
+it.
+
+**Verify with `node tools/verify-print-tone.mjs`** (65 checks; `--negative-control`
+runs five mutants and is required before quoting a pass from a changed harness;
+`--skip-leaf` drops the 21 MB load). Part one drives the SHIPPED functions —
+`toneRowSpans()` was pulled out of the `Infill` class exactly so the gate tests the
+shipped arithmetic and not a copy — over shapes whose answer is written down, and
+compares filled area against ANALYTIC area. Part two measures emitted pixel
+coordinates in a real browser. The leaf's fill is additionally checked against its
+own PROJECTED TRIANGLES (`__printInfill.projectedTriangles()`), which owe the
+silhouette nothing — the only instrument that can say "the fill covers the shape"
+when the outline is the thing under test. `__printScaffold.partBox()` / `setView()`
+are test chrome in the same spirit as `handleScreenPos()`: there is no in-page
+control that puts the camera anywhere in particular, and a leaf at 20 px tells you
+nothing. `partBox()` deliberately does NOT use `Box3.setFromObject` — the line art
+parents its `LineSegments2` onto the source mesh with a placeholder bounding
+volume, and `setFromObject` reported a leaf stretching to the origin.
+
+**The sheet is `node tools/shot-print-tone.mjs <dir>`** — solid fill and
+reserved-vein fill on the separate leaf, the vein and gradient and nib sweeps, the
+CONTRAST PAIR both ways round (one of them alone is a picture; the pair is the
+argument), the fused bloom as the limit, and the panel with its per-part rows.
+The reference drawings are not in the repo, so the sheet says so and asks to be
+held beside them. **A hatch/flow-versus-tone row is NOT shot, for a measured
+reason:** at the zoom the leaf cells need, line-flow seeds its whole bounding box
+over the 301k-triangle bloom behind the leaf and ran over ten minutes on one cell.
 
 ## Artist Tracker (`artist-tracker.html`)
 

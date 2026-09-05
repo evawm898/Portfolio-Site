@@ -392,11 +392,50 @@ const outsideReport = async (mode) => {
     // The SAME rule the clipper uses: a point is inside when it lies in a span
     // of its own row. Rebuilt here from the silhouette the page handed back,
     // independently of the page's own index.
-    const idx = new ScanIndex(fr, 1, 0, 1);
+    //
+    // IN THE CLIPPER'S OWN SCAN DIRECTION, which is not a detail. "Inside" is
+    // direction-dependent when the outline is OPEN, and every outline here is
+    // (this bloom: 24 boundary edges, 324 whose third face is dropped). A
+    // cross-hatch line is emitted ALONG the direction its own scanline ran, so
+    // the segment's direction is the rule that drew it; line-flow clips at 0
+    // degrees and is judged there. Measured on the shipped bundle by the tonal
+    // gate: a fill judged at its own angle has 0 of 4194 points outside and the
+    // identical ink judged 35 degrees away has 33 of 5361, up to 20 px DEEP
+    // INSIDE the shape. Testing every family at 0 was a latent error in this
+    // check that the sparse hatch simply had too few points to trip.
+    const flat = new ScanIndex(fr, 1, 0, 1);
+    const byDir = new Map();
+    const idxFor = (x0, y0, x1, y1) => {
+      if (mode !== 'hatch') return { idx: flat, ca: 1, sa: 0 };
+      let a = Math.atan2(y1 - y0, x1 - x0);
+      a = ((a % Math.PI) + Math.PI) % Math.PI;
+      const key = Math.round(a * 1e4);
+      let e = byDir.get(key);
+      if (!e) {
+        const ca = Math.cos(a), sa = Math.sin(a);
+        e = { idx: new ScanIndex(fr, ca, sa, 1), ca, sa };
+        byDir.set(key, e);
+      }
+      return e;
+    };
+    const has = (e, x, y) => {
+      // LINE-FLOW'S clipper quantises to the row centre — it memoises one
+      // answer per pixel row, which is the whole reason it is affordable — so
+      // it is judged by that same quantised rule. Cross-hatch does not
+      // quantise, so it is judged at the exact v. Consistency with the clipper
+      // is the standard here; a membership test that disagreed with the
+      // clipper would report failures nobody could act on.
+      if (mode !== 'hatch') return e.idx.contains(x, y);
+      const sp = e.idx.spansAt(-x * e.sa + y * e.ca);
+      const u = x * e.ca + y * e.sa;
+      for (let i = 0; i + 1 < sp.length; i += 2) if (u >= sp[i] && u <= sp[i + 1]) return true;
+      return false;
+    };
     for (const [x0, y0, x1, y1] of segs) {
+      const e = idxFor(x0, y0, x1, y1);
       for (const [x, y] of [[x0, y0], [x1, y1]]) {
         total++;
-        if (!idx.contains(x, y)) {
+        if (!has(e, x, y)) {
           // an endpoint sits ON the outline by construction, so allow it to be
           // within a hair of it before calling it outside
           let d = Infinity;
