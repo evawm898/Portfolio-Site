@@ -177,7 +177,10 @@ const MUTANTS = [
   { id: 'tiers-chained-together', file: 'print-lines.js',
     from: '    ex.buildChains(tier.kind);',
     to: '    ex.buildChains(1);',
-    breaks: ['tier/interior-tracks-detail'] },
+    // ...and the detail slider stops adding ink, because it no longer adds
+    // interior lines to a tier that is drawing the silhouette (measured:
+    // 1.02x, against 1.10 required).
+    breaks: ['tier/interior-tracks-detail', 'detail/pixels'] },
 
   // A camera move never recomputes. NOT skip/idle-is-free: a pose change bumps
   // the geometry version, which fails the guard before this line is reached,
