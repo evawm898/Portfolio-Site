@@ -122,6 +122,31 @@
   #lineart-toggle input { accent-color: #6fb7ae; margin: 0; }
   /* the stylize read-outs carry a unit as well as a number */
   #print-stylize .pose-row { grid-template-columns: 3.4rem 1fr 4.4rem; }
+
+  /* INFILL shares the panel grammar; its rows carry a slightly wider label
+     column because "curvature" and "spacing" do not abbreviate well. */
+  #print-infill { font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
+    background: rgba(10, 12, 12, 0.9); border: 1px solid #2b3333;
+    padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1; }
+  #print-infill .pose-row { grid-template-columns: 4rem 1fr 4rem; }
+  #print-infill select {
+    background: #101414; color: #c8d2d1; border: 1px solid #2b3333;
+    font: inherit; padding: 0.15rem 0.3rem; border-radius: 2px; width: 100%;
+  }
+  #infill-anchor-toggle {
+    display: flex; align-items: center; gap: 0.45rem;
+    margin: 0.55rem 0 0.5rem; color: #96a2a1; cursor: pointer; user-select: none;
+  }
+  #infill-anchor-toggle input { accent-color: #6fb7ae; margin: 0; }
+  #resetAnchors {
+    background: none; border: 1px solid #2b3333; color: #96a2a1;
+    font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
+  }
+  #resetAnchors:hover { border-color: #6fb7ae; color: #c8d2d1; }
+  #print-infillstate {
+    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
+    white-space: pre-wrap; font: inherit; color: #96a2a1;
+  }
 </style>
 </head>
 <body>
@@ -194,6 +219,70 @@
   </div>
 
   <pre id="print-artstate"></pre>
+</details>
+
+<!-- INFILL. Authored shading INSIDE the silhouette: cross-hatch and line-flow.
+     Nothing here reads the surface — no creases, no normals, no light. The
+     anchor is the one thing that decides where the dark goes, and it is a
+     handle, not a rule; see the header of print-infill.js for why it is an
+     anchor rather than a fixed base-to-tip convention. -->
+<details id="print-infill" class="panel" open>
+  <summary>INFILL</summary>
+  <p class="panel-empty" id="infillEmpty" hidden>no drawable mesh in this bundle</p>
+
+  <div class="pose-row">
+    <label for="infillMode">shading</label>
+    <select id="infillMode">
+      <option value="off" selected>off</option>
+      <option value="hatch">cross-hatch</option>
+      <option value="flow">line-flow</option>
+    </select>
+    <output id="infillModeOut"></output>
+  </div>
+
+  <div class="pose-row">
+    <label for="infillSpacing">spacing</label>
+    <input type="range" id="infillSpacing" min="2" max="24" step="0.5" value="7">
+    <output id="infillSpacingOut">7.0 px</output>
+  </div>
+  <div class="pose-row">
+    <label for="infillAngle">angle</label>
+    <input type="range" id="infillAngle" min="0" max="180" step="1" value="35">
+    <output id="infillAngleOut">35°</output>
+  </div>
+  <div class="pose-row" id="row-infillLayers">
+    <label for="infillLayers">layers</label>
+    <input type="range" id="infillLayers" min="1" max="3" step="1" value="2">
+    <output id="infillLayersOut">2</output>
+  </div>
+  <div class="pose-row" id="row-infillCurvature">
+    <label for="infillCurvature">flow</label>
+    <input type="range" id="infillCurvature" min="-100" max="100" step="1" value="60">
+    <output id="infillCurvatureOut">60</output>
+  </div>
+
+  <div class="pose-hint">where the dark goes — drag the ring on each part</div>
+  <div class="pose-row">
+    <label for="infillReach">reach</label>
+    <input type="range" id="infillReach" min="20" max="200" step="1" value="85">
+    <output id="infillReachOut">85%</output>
+  </div>
+  <div class="pose-row">
+    <label for="infillFalloff">falloff</label>
+    <input type="range" id="infillFalloff" min="20" max="320" step="5" value="100">
+    <output id="infillFalloffOut">1.00</output>
+  </div>
+  <div class="pose-row">
+    <label for="infillJitter">jitter</label>
+    <input type="range" id="infillJitter" min="0" max="100" step="1" value="35">
+    <output id="infillJitterOut">35%</output>
+  </div>
+  <label id="infill-anchor-toggle">
+    <input type="checkbox" id="showAnchors" checked> show anchors
+  </label>
+  <button type="button" id="resetAnchors">reset anchors</button>
+
+  <pre id="print-infillstate"></pre>
 </details>
 </div>
 

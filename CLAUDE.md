@@ -591,6 +591,109 @@ needs no CDN egress.
 now load-bearing for three merged stages. Renaming it is a rename in three
 tools plus `print.js`; it has been deferred once per session so far.
 
+### Authored infill (`print-infill.js`) — 2D, and it never reads the surface
+
+Interior shading generated INSIDE a solid's already-extracted 2D silhouette:
+cross-hatch and line-flow. It is authored illustration, not a render. The
+module reads exactly one thing off the geometry — the projected silhouette the
+line-art extractor already computed for the frame — and everything after that
+is two-dimensional. No creases, no dihedral angles, no normals, no light, and
+no relationship between a hatch line and the surface under it.
+`infill/reads-no-surface` asserts that against the SOURCE (word-bounded, so
+`faceCanon` — topology, used to orient the silhouette — is allowed while
+`faceN` / `faceC` / `edgeDot` / `facing` are not), because no picture can show
+it. It knows nothing about petals, which is why it runs unchanged on the fused
+bloom, on the stem, and on anything else it is handed.
+
+**WHERE IS DARK IS AN AUTHORED ANCHOR, DEFAULTED TO THE CONVENTION** (session
+of Sep 5). There is no light anywhere in this pipeline, so the question cannot
+be computed and had to be decided. A fixed base-to-tip botanical rule was
+REJECTED: "base" and "tip" are properties of a PETAL, the bloom arrives as one
+fused solid with no petal-level granularity until multi-part export exists, so
+any such axis would have to be guessed from a bounding box — and a shading rule
+the artist cannot argue with is the wrong default for a tattoo-design tool.
+So the mechanism is a per-part anchor the artist drags, and the convention is
+only its STARTING VALUE: it initialises to the part's own vertex centroid,
+which on a radial bloom is where the petals overlap and where botanical
+illustration puts its darkest passage. The default picture is the conventional
+one; it is a handle, not a law. The anchor is stored in the part's LOCAL space
+and projected every frame, so it is camera-stable. Tone is
+`(1 - d/reach)^gamma`, and because it is radial EVERY threshold is a circle —
+which is what lets a hatch layer be clipped as an interval instead of sampled,
+and is why `jitter` exists (it perturbs each line's threshold radius so the
+edge of a tonal layer reads as a hand rather than a compass arc; set it to 0
+and the circles come back, photographed on the sheet).
+
+**BOTH FAMILIES SHARE ONE MEMBERSHIP RULE — THE SPANS OF A ROW — AND THAT WAS
+NOT THE FIRST DESIGN.** Cross-hatch rotates the silhouette into a frame where
+its lines are horizontal and runs a scanline, accumulating a WINDING NUMBER;
+the drawn spans are the runs where it is non-zero. Nonzero and not even-odd on
+purpose: even-odd punches a hole wherever a petal folds over itself and drops a
+second silhouette loop inside the outline (`clip/fold-over-is-not-a-hole` and
+`clip/opposite-winding-is-a-hole` assert both directions).
+Line-flow originally clipped differently — it tested each streamline step for an
+intersection against the silhouette SEGMENTS, which is exact and sounds
+stronger. **It leaked 43% of the bloom's emitted endpoints outside the outline,
+by a median of 12 px and as much as 48 px**, and the cause was not the test: a
+brute force over all 18,377 edges agreed there was no crossing. The bloom is a
+fused STL split with 24 boundary edges and 324 non-manifold edges whose third
+face is dropped, so **its projected silhouette is not a closed curve** — a
+streamline does not have to cross an open end, it can go around it, and the
+winding changes with no crossing to detect. Cross-hatch never saw this because a
+scanline is self-consistent along its own row. Do not "restore" a segment-
+intersection clipper for line-flow on the strength of it being exact.
+`ScanIndex` buckets edges by row so a scanline visits only the ones that can
+reach it — without it the stage costs ~30 ms a frame instead of ~5 — and
+`index/agrees-with-the-plain-scan` pins it to the unindexed answer at two
+angles.
+
+**SELF-OCCLUSION IS OUT OF SCOPE BY DESIGN**: the infill fills the SOLID'S
+OUTLINE, so a bloom whose petals overlap is one silhouette and the hatching
+runs across all of it — which is what an illustrator inking a filled outline
+does. Per-petal infill waits on multi-part export. BETWEEN parts occlusion is
+handled (a nearer part's spans subtract from a farther one's), ordered by
+camera distance to each part's origin; that ordering cannot express two parts
+that interleave in depth and is the only approximation in the file.
+
+The infill draws as its own 2D overlay pass — an orthographic camera in PIXEL
+coordinates, rendered after the scene with `autoClear` off — because a pattern
+that lived in the mesh's local space would rotate with the object, and this
+pattern belongs to the picture plane.
+
+**Verify with `node tools/verify-print-infill.mjs`** (44 checks;
+`--negative-control` required before quoting a pass from a changed harness —
+it makes every row report one span covering everything, so the page hatches the
+silhouette's BOUNDING BOX while still looking like a plausibly shaded flower,
+and 9 checks move). It runs in two halves on purpose: the clipper is driven as
+PURE FUNCTIONS in Node over outlines whose spans can be written down (a C, a
+star, a four-tooth comb, a serrated leaf, a fold-over), because on the real
+bloom's nineteen-thousand-edge silhouette a wrong clipper still draws a
+plausible picture and there is nothing to compare against; then the stage is
+driven in a real browser, where every claim is measured against the EMITTED
+SEGMENT COORDINATES the page hands back in pixels, never against a screenshot.
+**The gate's membership test is the clipper's own rule, deliberately** — a
+different rule would report failures nobody could act on.
+
+The sheet is `node tools/shot-print-infill.mjs <dir>` (24 cells + an
+`index.html`): both families on the bloom and on a leaf at two densities each,
+and an ANCHOR ROW that is the argument — the same bloom with the anchor in
+three places, the shading following it. Crops are read from each part's own
+measured silhouette bbox, never hardcoded, and the sheet renders at 2x because
+at 1x a cross-hatch and a scribble are the same grey. **The "where is dark" row
+turns the outline down to its thinnest and says so**: the bloom's projected
+silhouette is over nineteen thousand edges, so at any normal weight the line
+work is a dense scribble and a tonal gradient inside it cannot be read at all.
+That is the linework on this bundle, not the infill — it is what the contour
+curve-fitting session is queued for — but the row exists to let the shading
+decision be judged.
+
+**The leaf, honestly:** the shipped bundle's leaves are part of the STEM solid,
+not separate parts, and there is no leaf bundle to load (runtime bundle loading
+is #156). So the sheet's leaf cells are the stem part's infill framed on a
+leaf, with that part's anchor dragged onto it. That demonstrates the stage
+works on whatever solid it is handed; it is NOT a demonstration of per-leaf
+infill.
+
 ## Artist Tracker (`artist-tracker.html`)
 
 Private, single-file, client-side artist/tattoo-artist tracker for

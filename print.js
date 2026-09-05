@@ -24,6 +24,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StemRig, CONTROL_S } from './print-stem.js';
 import { LineArt, detailToAngleDeg, CURATION, INTERIOR_WEIGHT_RATIO } from './print-lines.js';
+import { Infill, INFILL_MODES, LAYER_THRESHOLDS, HATCH_OFFSETS_DEG, INFILL_LIMITS,
+         toneAt, toneRadius, centroidOf } from './print-infill.js';
 
 const BUNDLE = 'assets/print-test/flower-test-bundle.glb';
 
@@ -41,6 +43,29 @@ const resetBtn = document.getElementById('resetPose');
 const stylizeEl = document.getElementById('print-stylize');
 const poseEmpty = document.getElementById('poseEmpty');
 const stylizeEmpty = document.getElementById('stylizeEmpty');
+const infillEl = document.getElementById('print-infill');
+const infillEmpty = document.getElementById('infillEmpty');
+const infillState = document.getElementById('print-infillstate');
+const infillModeIn = document.getElementById('infillMode');
+const infillSpacingIn = document.getElementById('infillSpacing');
+const infillAngleIn = document.getElementById('infillAngle');
+const infillLayersIn = document.getElementById('infillLayers');
+const infillCurvatureIn = document.getElementById('infillCurvature');
+const infillReachIn = document.getElementById('infillReach');
+const infillFalloffIn = document.getElementById('infillFalloff');
+const infillJitterIn = document.getElementById('infillJitter');
+const infillModeOut = document.getElementById('infillModeOut');
+const infillSpacingOut = document.getElementById('infillSpacingOut');
+const infillAngleOut = document.getElementById('infillAngleOut');
+const infillLayersOut = document.getElementById('infillLayersOut');
+const infillCurvatureOut = document.getElementById('infillCurvatureOut');
+const infillReachOut = document.getElementById('infillReachOut');
+const infillFalloffOut = document.getElementById('infillFalloffOut');
+const infillJitterOut = document.getElementById('infillJitterOut');
+const showAnchorsBox = document.getElementById('showAnchors');
+const resetAnchorsBtn = document.getElementById('resetAnchors');
+const rowLayers = document.getElementById('row-infillLayers');
+const rowCurvature = document.getElementById('row-infillCurvature');
 // The panel's own contents, hidden as a group when the panel has nothing to
 // report — the PANEL itself is never hidden. `> :not(summary):not(.panel-empty)`
 // is deliberately not a CSS rule: which children a panel has is markup's
@@ -49,6 +74,7 @@ const bodyOf = (el) => [...el.children].filter(
   c => c.tagName !== 'SUMMARY' && !c.classList.contains('panel-empty'));
 const poseBody = bodyOf(poseEl);
 const stylizeBody = bodyOf(stylizeEl);
+const infillBody = bodyOf(infillEl);
 // A panel is ALWAYS on screen and always collapsible; only its body comes and
 // goes. `hidden` on the individual children, never on the <details>, so the
 // summary stays clickable and the panel keeps its place in the column.
@@ -61,6 +87,7 @@ function setPanelPopulated(empty, body, populated) {
 // reflowing the column under the pointer.
 setPanelPopulated(poseEmpty, poseBody, false);
 setPanelPopulated(stylizeEmpty, stylizeBody, false);
+setPanelPopulated(infillEmpty, infillBody, false);
 const artState = document.getElementById('print-artstate');
 const lineArtBox = document.getElementById('lineArt');
 const weightIn = document.getElementById('lineWeight');
@@ -109,6 +136,31 @@ resize();
 // the linework without either one having to know the other exists. `art` is
 // null until the bundle loads.
 let art = null, renderArtHook = null;
+// The infill is a SECOND consumer of the same extraction, drawn as its own 2D
+// overlay pass. It runs after art.update() because it reads that frame's
+// silhouette, and it renders after the scene because it is ink on the paper.
+let infill = null, renderInfillHook = null, infillStats = null, infillMs = 0;
+let anchorMarkers = [];
+// The anchor rings are UI, not model. They are kept facing the camera and at a
+// constant SCREEN size, so a ring stays grabbable whether the camera is on top
+// of the bloom or across the room from it, and they hide with the checkbox or
+// whenever the infill itself is off — a handle for a control that is not
+// running is just something else to click by accident.
+function syncAnchorMarkers() {
+  if (!infill || !anchorMarkers.length) return;
+  const show = !!(showAnchorsBox.checked && infill.enabled && art && art.enabled);
+  for (let i = 0; i < anchorMarkers.length; i++) {
+    const m = anchorMarkers[i];
+    m.visible = show;
+    if (!show) continue;
+    m.position.copy(infill.anchors[i]).applyMatrix4(art.units[i].mesh.matrixWorld);
+    m.quaternion.copy(camera.quaternion);
+    const dist = Math.max(camera.position.distanceTo(m.position), 1e-3);
+    const wpp = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+      / Math.max(canvas.clientHeight, 1);
+    m.scale.setScalar(Math.max(wpp * 11, 1e-6));
+  }
+}
 let frameStats = null, lastFrameMs = 0, frameSamples = 0, frameTotal = 0, lastReadout = 0;
 renderer.setAnimationLoop(() => {
   controls.update();
@@ -117,9 +169,27 @@ renderer.setAnimationLoop(() => {
     frameStats = art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());
     lastFrameMs = performance.now() - t0;
     if (frameStats) { frameTotal += lastFrameMs; frameSamples++; }
-    if (renderArtHook && t0 - lastReadout > 160) { lastReadout = t0; renderArtHook(); }
+    if (infill && infill.enabled && art.enabled) {
+      const t1 = performance.now();
+      infillStats = infill.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());
+      infillMs = performance.now() - t1;
+    } else if (infill) {
+      infill.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());
+      infillStats = null; infillMs = 0;
+    }
+    if (renderArtHook && t0 - lastReadout > 160) {
+      lastReadout = t0; renderArtHook(); if (renderInfillHook) renderInfillHook();
+    }
   }
+  syncAnchorMarkers();
   renderer.render(scene, camera);
+  // The overlay is 2D and sits ON TOP of the drawing, so it renders with its
+  // own orthographic camera in pixel space and must not clear what is there.
+  if (infill && infill.enabled && art && art.enabled) {
+    renderer.autoClear = false;
+    renderer.render(infill.scene, infill.camera);
+    renderer.autoClear = true;
+  }
 });
 
 // --- load the bundle -------------------------------------------------------
@@ -321,11 +391,15 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
   }
 
   canvas.addEventListener('pointerdown', (ev) => {
-    if (!rig) return;
+    if (!rig && !anchorMarkers.some(m => m.visible)) return;
     toNDC(ev);
     ray.setFromCamera(ndc, camera);
-    const picks = ray.intersectObjects(handles, false)
-      .filter(p => !p.object.userData.anchored);
+    // Anchor rings are picked FIRST and drawn over everything, so grabbing
+    // "where the dark goes" never turns into a stem bend by accident.
+    const anchorPicks = anchorMarkers.length
+      ? ray.intersectObjects(anchorMarkers.filter(m => m.visible), false) : [];
+    const picks = anchorPicks.length ? anchorPicks
+      : ray.intersectObjects(handles, false).filter(p => !p.object.userData.anchored);
     if (!picks.length) return;
     dragging = picks[0].object;
     // drag in the plane facing the camera through the handle
@@ -344,8 +418,18 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
     toNDC(ev);
     ray.setFromCamera(ndc, camera);
     if (!ray.ray.intersectPlane(dragPlane, hit)) return;
-    rig.setPoint(dragging.userData.bendIndex, hit.add(grabOffset));
-    repose();
+    hit.add(grabOffset);
+    if (dragging.userData.anchorIndex !== undefined) {
+      // back into the part's OWN local space, which is where the anchor lives
+      // so that it survives an orbit and a re-pose
+      const i = dragging.userData.anchorIndex;
+      const inv = new THREE.Matrix4().copy(art.units[i].mesh.matrixWorld).invert();
+      infill.setAnchorLocal(i, hit.clone().applyMatrix4(inv));
+      if (renderInfillHook) renderInfillHook();
+    } else {
+      rig.setPoint(dragging.userData.bendIndex, hit);
+      repose();
+    }
     ev.preventDefault();
   });
 
@@ -632,6 +716,195 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
       setDetailWidget: (v) => { detailIn.value = String(v); detailIn.dispatchEvent(new Event('input')); },
       setDotsWidget: (v) => { dotsIn.value = String(v); dotsIn.dispatchEvent(new Event('input')); },
     };
+
+  // ======================= INFILL ========================================
+  // Authored shading inside the silhouette. It reads the SAME extraction the
+  // line work does — nothing here touches the surface, and no part of it
+  // knows what a petal is, which is why it runs unchanged on the fused bloom
+  // and on the stem, and would run unchanged on a leaf handed in on its own.
+  infill = new Infill(art, { ink: 0x14181a });
+
+  // --- the anchors, as things you can grab --------------------------------
+  // The anchor IS the "where is dark" decision, so it is a handle rather than
+  // a number in a panel. Each part gets a ring at its own anchor, drawn on
+  // top of everything (like the bend points) and dragged in the plane facing
+  // the camera. It starts at the part's centroid — the botanical default —
+  // and dragging it is the only way the shading moves.
+  anchorMarkers = infill.anchors.map((_, i) => {
+    // A FILLED disc, with the ring only as its visible edge. An annulus reads
+    // better on screen but is the wrong pick target: a ray aimed at the middle
+    // of a ring goes through the hole, so grabbing the anchor where it plainly
+    // is would miss it. The disc is what gets picked; the ring is decoration.
+    const m = new THREE.Mesh(new THREE.CircleGeometry(1.24, 32), new THREE.MeshBasicMaterial({
+      color: 0xe0a03a, depthTest: false, transparent: true, opacity: 0.18, side: THREE.DoubleSide,
+    }));
+    const edge = new THREE.Mesh(new THREE.RingGeometry(1, 1.24, 32), new THREE.MeshBasicMaterial({
+      color: 0xe0a03a, depthTest: false, transparent: true, opacity: 0.95, side: THREE.DoubleSide,
+    }));
+    edge.renderOrder = 13;
+    m.add(edge);
+    m.renderOrder = 12;
+    m.name = `infillAnchor${i}`;
+    m.userData.anchorIndex = i;
+    scene.add(m);
+    return m;
+  });
+  // Sized against the part's own extent so a ring is grabbable on a stem and
+  // not a dinner plate on the bloom.
+  anchorMarkers.forEach((m, i) => {
+    const u = art.units[i];
+    u.mesh.geometry.computeBoundingBox();
+    const bb = u.mesh.geometry.boundingBox;
+    m.userData.radius = Math.max(bb.min.distanceTo(bb.max) * 0.035, 1e-3);
+  });
+
+  function readInfill() {
+    const mode = infillModeIn.value;
+    infill.setOptions({
+      mode,
+      spacing: parseFloat(infillSpacingIn.value),
+      angleDeg: parseFloat(infillAngleIn.value),
+      layers: parseInt(infillLayersIn.value, 10),
+      curvature: parseFloat(infillCurvatureIn.value),
+      reach: parseFloat(infillReachIn.value),
+      falloff: parseFloat(infillFalloffIn.value),
+      jitter: parseFloat(infillJitterIn.value),
+    });
+    // Only the controls that MEAN something in the chosen family are shown.
+    // Layers is a cross-hatch idea and flow curvature is a line-flow one;
+    // leaving both up would offer a slider that silently does nothing.
+    rowLayers.hidden = mode !== 'hatch';
+    rowCurvature.hidden = mode !== 'flow';
+    renderInfill();
+  }
+  [infillSpacingIn, infillAngleIn, infillLayersIn, infillCurvatureIn,
+   infillReachIn, infillFalloffIn, infillJitterIn].forEach(el => el.addEventListener('input', readInfill));
+  infillModeIn.addEventListener('change', readInfill);
+  showAnchorsBox.addEventListener('change', () => { renderInfill(); });
+  resetAnchorsBtn.addEventListener('click', () => {
+    infill.anchors.forEach((_, i) => infill.resetAnchor(i));
+    renderInfill();
+  });
+
+  function renderInfill() {
+    infillModeOut.textContent = '';
+    infillSpacingOut.textContent = `${infill.spacing.toFixed(1)} px`;
+    infillAngleOut.textContent = `${infill.angleDeg.toFixed(0)}°`;
+    infillLayersOut.textContent = `${infill.layers}`;
+    infillCurvatureOut.textContent = `${infill.curvature.toFixed(0)}`;
+    infillReachOut.textContent = `${infill.reach.toFixed(0)}%`;
+    infillFalloffOut.textContent = `${(infill.falloff / 100).toFixed(2)}`;
+    infillJitterOut.textContent = `${infill.jitter.toFixed(0)}%`;
+
+    const rows = [];
+    if (!infill.enabled) {
+      rows.push('infill            OFF');
+      rows.push('');
+      rows.push('WHERE IS DARK     an authored ANCHOR, not a light and not a');
+      rows.push('                  fixed base-to-tip rule. It starts at each');
+      rows.push('                  part’s own centroid — which on a radial');
+      rows.push('                  bloom is where the petals overlap, i.e. the');
+      rows.push('                  botanical convention — and is then yours to');
+      rows.push('                  drag. See print-infill.js for the argument.');
+    } else if (!art.enabled) {
+      rows.push('infill            waiting — line art is off');
+    } else {
+      const st = infillStats;
+      const gamma = infill.falloff / 100;
+      rows.push(`family            ${infill.mode === 'hatch' ? 'CROSS-HATCH' : 'LINE-FLOW'}`);
+      if (infill.mode === 'hatch') {
+        const angs = HATCH_OFFSETS_DEG.slice(0, infill.layers)
+          .map(o => `${(infill.angleDeg + o + 360) % 180 | 0}°`).join(' / ');
+        rows.push(`angles            ${angs}   (${infill.layers} layer${infill.layers > 1 ? 's' : ''})`);
+        rows.push(`layer thresholds  ${LAYER_THRESHOLDS.slice(0, infill.layers).map(t => t.toFixed(2)).join(' / ')} tone`);
+      } else {
+        const c = infill.curvature;
+        rows.push(`field             ${c > 15 ? 'CONCENTRIC about the anchor'
+          : c < -15 ? 'RADIAL from the anchor' : 'straight grain'}  (${c.toFixed(0)})`);
+        rows.push(`grain angle       ${infill.angleDeg.toFixed(0)}°`);
+      }
+      rows.push(`spacing           ${infill.spacing.toFixed(1)} px`);
+      rows.push('');
+      rows.push(`WHERE IS DARK     authored anchor, per part — no light source`);
+      rows.push(`  falloff         tone = (1 - d/reach)^${gamma.toFixed(2)}`);
+      rows.push(`  jitter          ±${infill.jitter.toFixed(0)}% on each line’s threshold radius`);
+      if (st) {
+        for (const p of st.parts) {
+          if (!p.ok) { rows.push(`  ${(p.name || '?').padEnd(14)} no silhouette this frame`); continue; }
+          rows.push(`  ${(p.name || '?').padEnd(14)} anchor ${p.anchorPx.map(v => v.toFixed(0)).join(',')} px`
+            + `  reach ${p.reachPx.toFixed(0)} px  ${p.segments} segs`);
+        }
+        rows.push('');
+        rows.push(`silhouette        ${st.parts.reduce((a, p) => a + p.silhouette, 0)} oriented edges (nonzero winding)`);
+        rows.push(`drawn             ${st.segments} segments from ${st.seeds} ${infill.mode === 'hatch' ? 'hatch lines' : 'seeds'}`
+          + `${st.truncated ? '  (TRUNCATED)' : ''}`);
+        rows.push(`infill pass       ${infillMs.toFixed(2)} ms  (line art ${lastFrameMs.toFixed(2)} ms of 16.7)`);
+      }
+    }
+    infillState.textContent = rows.join('\n');
+  }
+  renderInfillHook = renderInfill;
+  setPanelPopulated(infillEmpty, infillBody, true);
+  readInfill();
+
+  window.__printInfill = {
+    setMode: (m) => { infillModeIn.value = m; infillModeIn.dispatchEvent(new Event('change')); },
+    mode: () => infill.mode,
+    enabled: () => infill.enabled,
+    options: () => ({ spacing: infill.spacing, angleDeg: infill.angleDeg, layers: infill.layers,
+      curvature: infill.curvature, reach: infill.reach, falloff: infill.falloff, jitter: infill.jitter }),
+    setWidget: (id, v) => {
+      const el = { spacing: infillSpacingIn, angle: infillAngleIn, layers: infillLayersIn,
+        curvature: infillCurvatureIn, reach: infillReachIn, falloff: infillFalloffIn,
+        jitter: infillJitterIn }[id];
+      el.value = String(v); el.dispatchEvent(new Event('input'));
+    },
+    stats: () => infillStats,
+    limits: () => ({ ...INFILL_LIMITS }),
+    thresholds: () => LAYER_THRESHOLDS.slice(),
+    offsets: () => HATCH_OFFSETS_DEG.slice(),
+    infillText: () => infillState.textContent,
+    rowVisibility: () => ({ layers: !rowLayers.hidden, curvature: !rowCurvature.hidden }),
+
+    // The emitted geometry, in PIXELS, exactly as it is drawn. Everything the
+    // gate asserts about clipping is measured off this rather than off a
+    // screenshot: "no ink outside the outline" is a claim about coordinates,
+    // and a screenshot can only ever answer it to within an anti-aliased edge.
+    segments: (partIndex) => {
+      const d = infill.draws[partIndex];
+      const out = [];
+      for (let i = 0; i < d.count; i++) {
+        const o = i * 6;
+        out.push([d.buf.array[o], d.buf.array[o + 1], d.buf.array[o + 3], d.buf.array[o + 4]]);
+      }
+      return out;
+    },
+    partCount: () => infill.draws.length,
+    partNames: () => art.units.map(u => u.mesh.name),
+    // The projected silhouette of one part, oriented, as the clipper sees it.
+    silhouette: (partIndex) => {
+      const f = infill.frames[partIndex];
+      const out = [];
+      for (let i = 0; i < f.n; i++) out.push([f.x0[i], f.y0[i], f.x1[i], f.y1[i]]);
+      return out;
+    },
+    frame: (partIndex) => {
+      const f = infill.frames[partIndex];
+      return { ok: f.ok, n: f.n, ax: f.ax, ay: f.ay, reach: f.reach, depth: f.depth,
+        minX: f.minX, minY: f.minY, maxX: f.maxX, maxY: f.maxY };
+    },
+    anchorLocal: (i) => infill.anchors[i].toArray(),
+    setAnchorLocal: (i, a) => { infill.anchors[i].set(a[0], a[1], a[2]); renderInfill(); },
+    resetAnchors: () => { resetAnchorsBtn.click(); },
+    anchorScreenPos: (i) => {
+      const v = anchorMarkers[i].position.clone().project(camera);
+      const r = canvas.getBoundingClientRect();
+      return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - (v.y + 1) / 2) * r.height];
+    },
+    anchorsVisible: () => anchorMarkers.map(m => m.visible),
+    // tone is a pure function and is checked as one
+    toneAt, toneRadius,
+  };
   }
 
   // A handle for the headless gate — no app logic reads it.
