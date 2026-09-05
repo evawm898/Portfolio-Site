@@ -877,6 +877,62 @@ it. Any NEW render path inherits the same obligation.
   exact cdnjs URLs `cards.html` pins, and replays real Google Fonts responses
   fetched by Node, so it needs no browser egress and is offline after one run.
 
+## Print pose (`/print`) — runtime bundle loading
+
+The `/print` scaffold (`print.html`, `print.js`, `print-stem.js`) opens on a
+hardcoded default bundle (`assets/print-test/flower-test-bundle.glb`) so the
+page is never blank, but that default is a FALLBACK, not the only source: a
+`.glb` can be loaded at any time via the file input in the debug panel or by
+dropping it anywhere on the page, parsed straight from its bytes through
+`GLTFLoader.parse()` — no fetch, no URL. This exists so the posing stage can
+be tested against different exported bundles (a bloom+stem+leaf export, say)
+without editing source and redeploying.
+
+- **A new load always REPLACES the scene and resets pose state** — bend
+  points, droop, twist, the hinge sliders' min/max/value, all of it — because
+  a different bundle has no reason to share the old one's pivot position or
+  rotation limits. `clearCurrentBundle()` is the one place this reset happens,
+  called at the start of every SUCCESSFUL load (default, file-input, or drop)
+  so "swap bundles" and "start from nothing" are the same code path. The
+  one-time event wiring (drag handlers, hinge sliders, reset button, marker
+  toggle) is registered ONCE at module load against mutable module-level state
+  (`rig`, `pivot`, `handles`, …) — a swap reassigns that state and the
+  already-registered listeners just keep working, rather than needing to be
+  re-bound per bundle.
+- **A failed load changes NOTHING it didn't already own.** `GLTFLoader.parse()`
+  called directly (not through `.load(url)`) does NOT catch its own
+  exceptions — measured against three@0.161.0: garbage bytes, non-JSON text
+  and an empty buffer all throw SYNCHRONOUSLY out of `.parse()` rather than
+  reaching its error callback. `parseGltfBytes()` wraps the call in a
+  try/catch for exactly this reason. A failure — bad bytes, or a well-formed
+  glTF with no `pivot` node — is reported in the debug panel (appended, never
+  wiping what's already shown) and otherwise leaves the CURRENTLY DISPLAYED
+  bundle and its pose untouched; it never blanks the viewport and never
+  throws past the page's `pageerror` boundary.
+- **Verify with `node tools/verify-print-scaffold.mjs`.** Beyond the original
+  single-bundle assertions (pivot extras round-trip, marker toggle, pose
+  drag/hinge/orbit), it now drives the runtime loader end-to-end: a SECOND
+  bundle generated on the fly in-page (via `GLTFExporter`, from the same real
+  stem+bloom mesh as the default but with the pivot moved and different
+  `rotation_limits_deg`) is loaded through a REAL `setInputFiles` call and
+  through a REAL `File`/`DataTransfer`/dispatched `DragEvent` drop — not a
+  synthesized state hook — and asserts the swap, the pose reset, the
+  drop-hint overlay's show/hide, both failure modes (invalid bytes; valid
+  glTF with no pivot), and recovery with a good bundle afterward. Keep the
+  synthetic second bundle's pivot offset MODEST if you touch this test: a
+  large shift moves the bloom enough to change the re-framed camera's
+  projection of the bend-point handles, which can push one of them under the
+  debug panel's on-screen footprint and silently fail a drag that has nothing
+  to do with what's under test — measured, not hypothetical (this is exactly
+  what an early version of this gate did with a 12-unit offset).
+- No CI workflow covers `print.js` (nothing here is path-filtered to it), so
+  run the gate above and `node tools/shot-print-pose.mjs` by hand before
+  calling a print change done — same convention as cards and the tracker.
+- Out of scope so far, on purpose: multi-part bundles (several petals + leaves
+  + stem as separate pieces) are not handled — the pivot/pose logic assumes
+  one `stem` mesh and one `bloom`/`pivot` pair, and extending that is a real
+  change to how the bundle is read, not a loader change.
+
 ## Maintainability & performance (working agreement)
 
 As the project grows, keep it maintainable and performant. Flag these proactively —
