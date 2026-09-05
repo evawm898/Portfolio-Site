@@ -23,7 +23,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StemRig, CONTROL_S } from './print-stem.js';
-import { LineArt, detailToAngleDeg } from './print-lines.js';
+import { LineArt, detailToAngleDeg, CURATION, INTERIOR_WEIGHT_RATIO } from './print-lines.js';
 
 const BUNDLE = 'assets/print-test/flower-test-bundle.glb';
 
@@ -479,9 +479,16 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
         const st = frameStats || art.stats;
         rows.push(`crease threshold  ${art.creaseAngleDeg.toFixed(1)}\u00b0 dihedral  (detail ${art.detail.toFixed(0)})`);
         if (st) {
-          rows.push(`segments          ${st.segments}  = ${st.silhouette} silhouette + ${st.crease} crease`);
-          rows.push(`drawn as          ${st.strokes} strokes + ${st.dots} dots`);
-          rows.push(`extract           ${st.extractMs.toFixed(2)} ms/frame  (fill ${(st.frameMs - st.extractMs).toFixed(2)} ms)`);
+          rows.push(`raw edges         ${st.segments}  = ${st.silhouette} silhouette + ${st.crease} crease`);
+          rows.push(`chained           ${st.chains} strokes kept, ${st.dropped} dropped as too short`);
+          rows.push(`                  contour ${st.contourChains} / interior ${st.interiorChains}`);
+          rows.push(`simplified        ${st.ptsIn} \u2192 ${st.ptsOut} points (RDP ${CURATION.simplifyPx} px)`);
+          rows.push(`curation          drop < ${CURATION.minChainPx} px contour / ${CURATION.minCreasePx} px interior`);
+          rows.push(`weight            contour ${st.contourWeight.toFixed(2)} px, interior ${st.interiorWeight.toFixed(2)} px`);
+          rows.push(`                  fixed ratio ${INTERIOR_WEIGHT_RATIO} \u2014 one slider scales both`);
+          rows.push(`drawn as          ${st.strokes} stroke segs + ${st.dots} dots${st.truncated ? '  (TRUNCATED)' : ''}`);
+          rows.push(`extract           ${st.extractMs.toFixed(2)} ms   chain ${st.chainMs.toFixed(2)} ms`);
+          rows.push(`                  curate+smooth ${(st.frameMs - st.extractMs - st.chainMs).toFixed(2)} ms`);
           rows.push(`frame pass        ${lastFrameMs.toFixed(2)} ms of a 16.7 ms budget`);
         }
       }
@@ -507,13 +514,49 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
       })),
       perf: () => ({ lastFrameMs, meanFrameMs: frameSamples ? frameTotal / frameSamples : 0, frames: frameSamples }),
       resetPerf: () => { frameTotal = 0; frameSamples = 0; },
-      materialWidth: () => art.units.map(u => u.mat.linewidth),
-      dotSize: () => art.units.map(u => u.dotMat.size),
-      strokeInstances: () => art.units.map(u => u.lines.geometry.instanceCount),
-      dotInstances: () => art.units.map(u => u.dotGeo.drawRange.count),
-      // the first N stroke endpoints, so the gate can prove the SAME segments
-      // feed both renderers rather than trusting a count
-      strokeSample: (n = 8) => Array.from(art.units[0].buf.array.slice(0, n * 6)),
+      // per TIER now: [contour, interior] for each mesh
+      materialWidth: () => art.units.map(u => u.tiers.map(t => t.mat.linewidth)),
+      dotSize: () => art.units.map(u => u.tiers.map(t => t.dotMat.size)),
+      strokeInstances: () => art.units.map(u => u.tiers.map(t => t.lines.geometry.instanceCount)),
+      dotInstances: () => art.units.map(u => u.tiers.map(t => t.dotGeo.drawRange.count)),
+      curation: () => ({ ...CURATION, interiorWeightRatio: INTERIOR_WEIGHT_RATIO }),
+      // Curation is a CONSTANT in the shipped page, not a control — the panel
+      // has the three sliders the stage is specified to have. This reaches
+      // past that so the contact sheet can photograph the trade-off and the
+      // gate can drive it, without inventing a fourth slider to do it.
+      setCuration: (o) => { Object.assign(CURATION, o); },
+      // The maximum turn angle between consecutive drawn segments, over the
+      // contour tier. This is the SHAPE claim: a faceted staircase turns hard
+      // and often, a smoothed contour does not. Read off the emitted buffer,
+      // not off the smoother's intentions.
+      contourTurnAngles: () => {
+        const out = [];
+        for (const u of art.units) {
+          const t = u.tiers.find(x => x.kind === 1);
+          const A = t.buf.array, n = t.lines.geometry.instanceCount;
+          let prev = null, worst = 0, sum = 0, cnt = 0, over30 = 0;
+          for (let i = 0; i < n; i++) {
+            const o = i * 6;
+            const dx = A[o+3]-A[o], dy = A[o+4]-A[o+1], dz = A[o+5]-A[o+2];
+            const l = Math.hypot(dx, dy, dz);
+            if (l < 1e-9) { prev = null; continue; }
+            const d = [dx/l, dy/l, dz/l];
+            // consecutive only when this segment starts where the last ended
+            const joined = prev && Math.abs(A[o]-prev.ex) < 1e-6
+              && Math.abs(A[o+1]-prev.ey) < 1e-6 && Math.abs(A[o+2]-prev.ez) < 1e-6;
+            if (joined) {
+              const c = Math.max(-1, Math.min(1, d[0]*prev.d[0] + d[1]*prev.d[1] + d[2]*prev.d[2]));
+              const ang = Math.acos(c) * 180 / Math.PI;
+              worst = Math.max(worst, ang); sum += ang; cnt++;
+              if (ang > 30) over30++;
+            }
+            prev = { d, ex: A[o+3], ey: A[o+4], ez: A[o+5] };
+          }
+          out.push({ mesh: u.mesh.name, joins: cnt, maxTurnDeg: worst,
+                     meanTurnDeg: cnt ? sum / cnt : 0, over30 });
+        }
+        return out;
+      },
       artText: () => artState.textContent,
       // The stem's line set at rest and at the CURRENT bend, both extracted at
       // the SAME camera inside one tick. The gate needs this because "the
