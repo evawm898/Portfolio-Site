@@ -102,15 +102,23 @@ GITHUB_TOKEN — push a ref whose .github/workflows content differs from the
 DEFAULT branch's. A tag on an older commit does exactly that whenever a
 workflow file has changed since. **GITHUB_TOKEN cannot be granted `workflow`
 scope at all**, so no `permissions:` block fixes it: raising the job's
-permissions is not an option that exists. The two routes that DO work are a
-PAT carrying `workflow` scope, supplied as a secret, or a plain
-`git push origin refs/tags/frozen/<name>` from a clone whose credentials are
-a user's rather than an App's.
+permissions is not an option that exists. Publish it from a clone whose
+credentials are a USER's: `git push origin refs/tags/frozen/<name>`.
 
-A tag that is merely missing is a DURABILITY gap, not a broken check: its base
-commit is still reachable if it sits on `main`. It becomes a real loss only
-when something orphans that commit — a branch delete or a force-push — which
-is the whole reason these tags exist.
+DO NOT ADD A PAT WITH `workflow` SCOPE AS A REPO SECRET (Eva, Sep 5). THE
+REMEDY IS BRANCH PROTECTION ON `main`. The risk a frozen/* tag defends
+against is an orphaned base commit, and the only thing that can orphan a
+commit in main's history is a force-push; `main` is not protected here, and
+that is the actual hole. Protecting it closes the risk for ELEVEN of the
+twelve bases outright, because they are commits in main's history. A standing
+credential that can rewrite any workflow in the repo, forever, to defend one
+tag against a hypothetical, is the wrong trade.
+
+THE ASYMMETRY: eleven bases are in main's history, so protection covers them
+and their tags are belt-and-braces. phase10's base was NEVER on main — a
+mid-PR commit whose only ref was a feature branch — so no protection of main
+could reach it and its tag is the ONLY thing keeping it alive. That is the
+load-bearing one, and it publishes fine.
 WHY
   exit 1
 fi

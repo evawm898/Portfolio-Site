@@ -223,14 +223,30 @@ content differs from the DEFAULT branch's. Tagging an older commit does exactly 
 a workflow file has changed since, which is why this bit `phase5` (base `deacded`) and not the
 others. **`GITHUB_TOKEN` cannot be granted `workflow` scope at all**, so this is not a
 `permissions:` block anyone forgot: raising the job's permissions is not an available move.
-Only two routes work — a PAT carrying `workflow` scope supplied as a secret, or a plain
-`git push origin refs/tags/frozen/phase5` from a clone whose credentials are a user's rather
-than an App's.
+Publishing it needs credentials that are a user's rather than an App's: a plain
+`git push origin refs/tags/frozen/phase5` from someone's own clone.
 
-**Why it is not urgent.** `deacded` is a commit on `main`, so it stays reachable without a
-tag. The missing tag is a DURABILITY gap — it would be orphaned by a force-push to `main` —
-not a broken check. `frozen/phase10`, the only base NOT on `main` and the entire reason the
-tags exist, published successfully.
+**THE REMEDY IS BRANCH PROTECTION ON `main`, NOT A PAT (Eva, Sep 5), and the distinction is
+the point.** The risk a `frozen/*` tag defends against is an orphaned base commit, and the
+only thing that can orphan a commit in `main`'s history is a force-push. `main` is not a
+protected branch here — that is the actual hole. **Protecting it closes the risk for eleven
+of the twelve bases outright**, because they ARE commits in `main`'s history and protection
+is what keeps that history from being rewritten. Storing a PAT carrying `workflow` scope as
+a repository secret would instead put a standing credential — one that can rewrite any
+workflow in the repo, on any push, forever — in place to defend a single tag against a
+hypothetical. **That is the wrong trade**, and it is worth naming so nobody reaches for it
+as the obvious fix.
+
+**THE ASYMMETRY IS WHY phase10's TAG IS LOAD-BEARING AND phase5's IS NOT.** Eleven bases sit
+in `main`'s history, so branch protection covers them and their tags are belt-and-braces —
+a second lock on a door protection already holds. **phase10's base was NEVER on `main`**: it
+was a mid-PR commit whose only ref was a feature branch, so no protection of `main` could
+ever have reached it, and its tag is the only thing keeping it alive. That is the tag that
+had to publish, and it did. `frozen/phase5` missing is a belt-and-braces gap on a base that
+branch protection would cover anyway.
+
+**So the standing recommendation is: protect `main`.** Publish `frozen/phase5` from a user's
+clone when convenient; do not create a repo secret for it.
 
 **And it exposed a gap in the publishing script, now fixed.** `git push --tags` is not atomic:
 refs are accepted or rejected individually, so the push reported failure while eleven tags had

@@ -2006,6 +2006,18 @@ than inferred from the mechanism's own success** (`git ls-remote --tags origin` 
 which is the flower project's rule about a label naming a computation nobody performed, arriving
 in CI configuration. Verify a route by reaching it, never by reading it.
 
+**AND A RESTARTED BRANCH HAS A TRAP OF ITS OWN: A SQUASH-MERGED HEAD IS NEVER AN ANCESTOR OF
+`main` (session 17).** `main` squashes, so the merge creates a NEW commit and the branch head
+that merged cleanly is not in `main`'s history at all. The obvious safety check before
+restarting a branch — `git merge-base --is-ancestor <old head> origin/main`, "is the work I am
+about to discard already merged?" — therefore answers **NO on a branch that merged perfectly**,
+and answers it every single time, on every restarted branch. Read literally it says "stop"
+exactly when it is safe to proceed, which is the worst direction for a safety check to fail
+in. **Check the PR's MERGE STATE, not ancestry** (and note the branch is usually gone from the
+remote after a merge anyway, so no force-push is needed — a plain push recreates it). Recorded
+because it will recur on every restarted branch, and the next session should not have to
+work out why its own guard is shouting at it.
+
 **RULED Sep 5 (session 17). A FROZEN BASELINE IS TAKEN AT A COMMIT ON `main`, NEVER AT A
 BRANCH HEAD, AND IS TAGGED AT FREEZE TIME. phase10 is the case that produced the rule.**
 
