@@ -27,12 +27,14 @@
 </script>
 
 <style>
-  :root { --mono: "IBM Plex Mono", ui-monospace, monospace; }
+  :root { --mono: "IBM Plex Mono", ui-monospace, monospace; color-scheme: dark; }
   html, body { margin: 0; height: 100%; background: #0c0e0e; color: #d8dedd; }
   #print-canvas { display: block; width: 100vw; height: 100vh; }
 
-  /* Debug panel — this session's only job beyond the viewport: prove the
-     pivot node's extras survive GLTFLoader. It is scaffolding, not UI. */
+  /* Debug panel — reports whatever bundle is currently loaded (the pivot
+     node's extras survive GLTFLoader, and this proves it), and hosts the one
+     control that changes which bundle that is. Scaffolding with one real
+     control, not a full UI. */
   #print-debug {
     position: fixed; top: 0.9rem; left: 0.9rem; max-width: min(30rem, calc(100vw - 1.8rem));
     max-height: calc(100vh - 1.8rem); overflow: auto;
@@ -43,6 +45,27 @@
   #print-log { margin: 0; white-space: pre-wrap; font: inherit; }
   #print-debug b { color: #6fb7ae; font-weight: 500; }
   #print-debug .err { color: #e07a6a; }
+  /* Bundle picker — always visible, above the log it describes. The
+     drag-and-drop target is the whole page (see #print-dropzone-hint); this
+     input is the keyboard/click-reachable equivalent for the same action. */
+  #print-bundle-load {
+    display: flex; flex-direction: column; gap: 0.3rem;
+    margin-bottom: 0.7rem; padding-bottom: 0.65rem; border-bottom: 1px solid #222a2a;
+    color: #96a2a1;
+  }
+  #print-bundle-load input[type=file] {
+    display: block; margin-top: 0.3rem; max-width: 100%;
+    font: inherit; color: inherit;
+  }
+  #print-bundle-load .hint { color: #6b7776; font-size: 0.68rem; }
+  #print-dropzone-hint {
+    position: fixed; inset: 0.6rem; z-index: 10; pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px dashed #6fb7ae; border-radius: 4px;
+    background: rgba(12, 14, 14, 0.72);
+    font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.06em; color: #c8d2d1;
+  }
+  #print-dropzone-hint[hidden] { display: none; }
   #print-marker-toggle {
     display: flex; align-items: center; gap: 0.45rem;
     margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px solid #222a2a;
@@ -109,7 +132,14 @@
 <body>
 
 <canvas id="print-canvas"></canvas>
+<div id="print-dropzone-hint" hidden>drop a .glb to load it</div>
 <div id="print-debug">
+  <div id="print-bundle-load">
+    <label for="bundleFile">load bundle
+      <input type="file" id="bundleFile" accept=".glb,model/gltf-binary">
+    </label>
+    <span class="hint">or drop a .glb anywhere on the page</span>
+  </div>
   <pre id="print-log">loading…</pre>
   <!-- The bundle ships a `pivot_marker` sphere at the junction. It is the
        exporter's own diagnostic, not scene content, so it is hidden by

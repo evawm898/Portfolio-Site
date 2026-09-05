@@ -400,9 +400,10 @@ generators own geometry and STL, and this page is downstream of both.
 
 Stages shipped so far: the **scaffold** (#150 — viewport, glTF load, the pivot
 node's `extras` round-tripping through GLTFLoader), the **pose** (#151 — a
-posable stem and a hinged bloom), and the **line art** (#153 — silhouette and
+posable stem and a hinged bloom), the **line art** (#153 — silhouette and
 crease edges, three sliders, then chained/curated/smoothed into drawn contours
-in two weights).
+in two weights), and a **runtime bundle loader** (#156 — a `.glb` can be
+swapped in at any time, not only baked into the page at build time).
 
 **The bundle is the input contract.** `assets/print-test/flower-test-bundle.glb`
 carries a `pivot` node whose glTF `extras` declare the junction position, the
@@ -413,6 +414,43 @@ bundle's own numbers rather than merely existing. The bundle also ships a
 `pivot_marker` diagnostic sphere, hidden by default and restored by a toggle —
 hidden via `visible`, never removed, so the node counts still describe the
 bundle as shipped.
+
+**The bundle is swappable AT RUNTIME, not only baked in at build time.** A
+`.glb` dropped anywhere on the page, or chosen via the file input in the debug
+panel, is parsed straight from its bytes through `GLTFLoader.parse()` — no
+fetch, no URL — so a different test export (a bloom+stem+leaf bundle, say) can
+be tried without editing source and redeploying. `assets/print-test/flower-test-bundle.glb`
+is still loaded first via `.load()` so the page is never blank; it is the
+default, not the only source. A new load always REPLACES the scene and RESETS
+every piece of pose state (bend points, droop, twist, the hinge sliders'
+min/max/value) via one `clearCurrentBundle()` — a different bundle has no
+reason to share the old one's pivot position or rotation limits — but
+deliberately does NOT reset the STYLIZE sliders or the line-art on/off toggle:
+those are a rendering preference, not a property of any one bundle's geometry,
+and a "weight 3px, detail 60" look is exactly what someone comparing several
+test bundles wants carried from one to the next. The one-time event wiring
+(drag handlers, hinge sliders, the marker toggle, and the four STYLIZE
+listeners) is registered ONCE at module load against mutable module-level
+state, so a swap reassigns that state and the already-registered listeners
+just keep working rather than needing to be re-bound per bundle — the same
+"layer, never a mode" discipline the line-art stage already follows.
+**`GLTFLoader.parse()` called directly (not through `.load(url)`) does NOT
+catch its own exceptions** — measured against three@0.161.0: garbage bytes,
+non-JSON text and an empty buffer all throw SYNCHRONOUSLY out of `.parse()`
+rather than reaching its error callback, which `.load()` swallows internally
+but a direct `.parse()` call does not. `parseGltfBytes()` wraps the call in a
+try/catch for exactly this reason. A failure — bad bytes, or a well-formed
+glTF with no `pivot` node — is reported in the debug panel (appended, never
+wiping what's already shown) and otherwise leaves the CURRENTLY DISPLAYED
+bundle and its pose untouched; it never blanks the viewport and never throws
+past the page's `pageerror` boundary. **Keep the gate's synthetic second
+bundle's pivot offset MODEST if you touch this test:** it is generated on the
+fly via `GLTFExporter` (same real stem+bloom mesh, pivot moved, different
+`rotation_limits_deg`), and a large shift moves the bloom enough to change the
+re-framed camera's projection of the bend-point handles — which can push one
+of them under the debug panel's on-screen footprint and silently fail a drag
+that has nothing to do with what's under test. Measured, not hypothetical:
+this is exactly what an early version of this gate did with a 12-unit offset.
 
 **The stem deformation is a ruling, not a proposal** (Eva, Sep 5) — see the
 header of `print-stem.js`. Do not "simplify" it back into a swept tube: 83% of
@@ -523,7 +561,13 @@ copies of `print.js` / `print-lines.js` through the gate's own HTTP server, and
 fails if a mutation does not apply, if a check the mutant NAMES stays green, or
 if a check it did not name goes red (which is how a mutation that just breaks
 the page gets caught pretending to be a negative control). `--mutant=<id>` runs
-one, in two minutes rather than thirty-five.
+one, in two minutes rather than thirty-five. The runtime bundle loader has its
+own `bundle-swap/*` checks in the same gate — a second bundle generated on the
+fly (via `GLTFExporter`, in-page), loaded through a real `page.setInputFiles()`
+call and a real `File`/`DataTransfer`/dispatched `DragEvent` drop, never a
+synthesized state hook — skipped during `--mutants` since none of the sixteen
+mutations touch bundle-loading code and it is the single most expensive
+section in the file.
 
 **THE FIRST SWEEP FAILED SIX OF TEN AND WAS MOSTLY RIGHT TO — three of the
 findings were in the GATE, not the mutations, and two of those were in checks
@@ -590,6 +634,13 @@ needs no CDN egress.
 **Loose thread:** `assets/print-test/` still names itself a fixture, and it is
 now load-bearing for three merged stages. Renaming it is a rename in three
 tools plus `print.js`; it has been deferred once per session so far.
+
+**Out of scope so far, on purpose: multi-part bundles.** The runtime loader
+(#156) swaps in any single `.glb`, but several petals + leaves + stem as
+SEPARATE pieces is not handled — the pivot/pose logic still assumes one
+`stem` mesh and one `bloom`/`pivot` pair. Extending that is a real change to
+how the bundle is read, not a loader change, and belongs in its own session
+once there is an actual multi-part export to test against.
 
 ## Artist Tracker (`artist-tracker.html`)
 
