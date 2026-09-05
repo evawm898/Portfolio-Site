@@ -37,7 +37,7 @@ Everything below is the EXPORT reading unless it says live, registered against a
    SPHERICAL enum was rejected because it could not make this claim: 35 phase13 rows and 42
    live rows pin `headRise` above zero with no hub-shape value and would have built flat.
 
-The live partition, by label, against the base tree's phase14 export: <<LIVE>>.
+The live partition, by label, against the base tree's phase14 export: **499 shared rows bit-identical, 0 moved, 28 new (every one a SPHERE row), 0 absent** — and the GATED inertness pairs equal by sha256 on the head: Head rise 1 under SPHERE = the sphere at rise 0; Head rise 0.5 × the incurve sliders under SPHERE = the incurve sphere; SPHERE stored under RADIAL = the shipping default; under SPIRAL = SPIRAL × defaults; under FAN = FAN defaults; under RADIAL × rise 0.5 = DOME rise 0.5 × petalCount 8; CAP pinned under CONTINUOUS = the continuous one-turn default. S4, measured.
 
 ## The mode, in numbers
 
