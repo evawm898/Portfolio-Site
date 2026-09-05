@@ -463,7 +463,10 @@ load-bearing:
   segments only 14,614 → 10,054: most of the bloom's ink is in a few long
   chains, because a 40-petal bloom's density is ~40 real overlapping petal
   rims, each a genuine silhouette. The lever for that is per-chain visibility,
-  not length, and it is not built.
+  not length, and it is not built. **The default stays 5 px / 16 px** (Eva,
+  Sep 5, ruling from the sheet's 5 / 26 / 45 px cells): the tighter bars cost
+  the sepals' interior lines and barely thin the bloom, so they buy nothing
+  the density problem actually needs.
 
 **TWO TIERS, ONE SLIDER, A FIXED RATIO** (`INTERIOR_WEIGHT_RATIO`, 0.45). The
 contour/interior ratio is a property of the STYLE rather than of the artwork,
