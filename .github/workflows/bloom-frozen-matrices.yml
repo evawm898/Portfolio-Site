@@ -23,6 +23,7 @@ on:
       - bloom-geometry.js
       - tools/bloom-harness.mjs
       - tools/diff-bloom-bytes.mjs
+      - tools/bloom-smoke.mjs
       - .github/workflows/bloom-frozen-matrices.yml
   push:
     branches: [main]
@@ -31,7 +32,20 @@ on:
       - bloom-geometry.js
       - tools/bloom-harness.mjs
       - tools/diff-bloom-bytes.mjs
+      - tools/bloom-smoke.mjs
   workflow_dispatch: {}
+
+# A SUPERSEDED COMMIT'S GREEN RUN SHOULD NEVER HAVE BEEN QUOTABLE (Eva,
+# session 17). Two runs of this workflow on PR #149 started two minutes
+# apart and both ran to completion on a four-CPU runner; the older one was
+# already answering a question nobody was asking. The group is keyed to the
+# workflow AND the ref so it can never cancel across PRs, and the final head
+# always runs to completion — safe by construction. It also enforces a
+# discipline already agreed: a run on a commit that has been superseded is
+# not evidence about the head.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
@@ -45,6 +59,16 @@ jobs:
           node-version: '20'
       - name: Install the harness's own deps (no browser download)
         run: npm i --no-save three@0.161.0 playwright-core@1.62.1
+      # THE SMOKE SUBSET MUST STILL COVER THE MATRIX (session 17). Adding a
+      # matrix block without a smoke row silently narrows the iteration
+      # instrument while every run stays green — the flower's edge-treatment
+      # lesson, one owner for "is this station covered". The check LIVES IN
+      # tools/bloom-smoke.mjs and is called here; it is not restated, because
+      # two definitions of one predicate is the registration-rule violation
+      # this project keeps catching. Browser-free and seconds, like the rest
+      # of this workflow.
+      - name: The smoke subset must still cover every matrix block
+        run: node tools/bloom-smoke.mjs --check
       - name: Every frozen matrix must equal its base commit's buildMatrix()
         run: |
           set -euo pipefail

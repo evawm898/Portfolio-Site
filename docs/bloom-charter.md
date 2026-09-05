@@ -1880,6 +1880,116 @@ baseline is a superset in coverage of nearly everything older) and no such defec
 been observed in ten sessions — but "never observed" is not "impossible", and this is the
 exposure the ruling accepts in exchange for the minutes.
 
+**RULED Sep 5 (session 17). THE ITERATION LOOP IS THE SMOKE SUBSET; THE FULL MATRIX IS
+CI's JOB AND NOT ALSO THE SESSION'S.** This extends the retention ruling above rather
+than replacing it: retention decided WHICH BASELINES a close re-exports, this decides
+WHERE THE FULL MATRIX RUNS. Everything built for it is ADDITIVE — the full 499 rows on
+both STL gates, in CI, on the merge commit, remains the merge criterion, unchanged and
+byte-identical in what it checks.
+
+  * **ITERATE ON `node tools/bloom-smoke.mjs`.** 28 of 499 rows through the real export
+    gate's own `--only` flag. Measured on one machine in one session: the subset **85 s**
+    against the full export gate's **2,621 s** and the full connectedness gate's
+    **2,600 s** — **31x against one gate, 62x against both**. The subset, its derivation,
+    its path -> row table and the five things it is BLIND to are in the tool's own header,
+    which is where a reader needs them at the moment they read a green run.
+  * **`--conn` IS REQUIRED, NOT OPTIONAL, WHEN A SESSION INTRODUCES A NEW GEOMETRY MODE.**
+    Export-only is right for the modes that exist — the flood fill catches nothing because
+    J1-J9 fire first — but it is a BACKSTOP for failures the assertions do not model, and a
+    brand-new mode is exactly where they may not. Run `--conn` until the new mode's junction
+    assertions are established AND have been shown to fire on a mutant; then drop back.
+  * **PUSH, AND LET CI RUN THE FULL MATRIX. DO NOT ALSO RUN IT LOCALLY.** Run it locally at
+    a MILESTONE only, on the definition already above: before a production publish, or when
+    a change touches the area rule or the export path.
+  * **AND THE ARGUMENT IS NOT ONLY MINUTES — IT IS WHAT GETS CERTIFIED, verified from this
+    repo's own CI log rather than assumed.** `actions/checkout@v4` on a `pull_request`
+    event checks out the MERGE COMMIT: run 33927836353's own log reads
+    `git checkout --progress --force refs/remotes/pull/149/merge` /
+    `HEAD is now at c1cfd5a Merge 848ae962... into 6b8e94b...`. So CI certifies head-merged-
+    into-base — what actually merges. A local run certifies the working tree, which is
+    neither that nor the head, and on this repo reads `+dirty` from the gitignored
+    node_modules symlink. If `main` moves under a PR, CI covers it and a local run cannot.
+  * **WHAT THIS GIVES UP, said plainly.** A session loses its pre-push signal, and a red run
+    is now public on the PR where a red local run was not. The smoke subset is the
+    replacement for the iterating half of that and is 31x cheaper than what it replaces.
+  * **ONE CLOSE-OUT STEP DEPENDS ON A LOCAL FULL-MATRIX RUN AND IS NOT FOLDED IN: THE BYTE
+    PARTITION.** `tools/diff-bloom-bytes.mjs` exports the matrix on two trees and diffs
+    them; **CI does no byte diffs at all.** That stays local and this ruling does not touch
+    it. Everything else a close-out quotes from a gate run — row counts, CROWDED tallies,
+    coverage skips, self-contact counts — is in the CI log verbatim.
+
+**AND "SIX VERIFY JOBS GREEN" OVERSTATES THE BLOOM EVIDENCE — one line, so the sentence
+stops being misread.** Of the six jobs a bloom PR runs, **two are FLOWER gates**:
+`flower-export-watertight.yml` and `flower-geometry-quality.yml` are path-filtered on
+`'tools/**'`, so any bloom PR touching a tool runs them, and they test flower geometry. The
+bloom evidence is four jobs. **The filter is deliberately NOT changed** — it is a flower
+gate's trigger and belongs to that project.
+
+**RULED Sep 5 (session 17). NO DOCS-ONLY COMMITS ON A GATED PR HEAD — a convention,
+because the filter that would do it cannot be made to fail safe.**
+
+GitHub evaluates a workflow's `paths` filter on a `pull_request` event against the WHOLE PR
+DIFF, never the pushed commit. So once a PR's cumulative diff touches a gated file, every
+later commit re-runs everything, whatever it changed. Measured from the Actions API:
+
+| session | commit | files | export gate | connectedness gate |
+|---|---|---|---|---|
+| 14 (#146) | `5fe2656` outcome doc | 1 file, `docs/` only | 2,767 s | 2,456 s |
+| 16 (#149) | `848ae96` outcome doc | 1 file, `docs/` only | 4,170 s | 3,911 s |
+
+**13,304 s — 3 h 42 m of runner time on two commits that changed no gated byte**, and that
+is the two bloom gates alone. Session 13 (#145) is worse and was outside the window looked
+at: five charter-only commits (`5fa1bc9`, `0af7d4c`, `9ce49be`, `85fda0d`, `538b2f7`) each
+ran both gates, roughly another 13,500 s.
+
+**THE MACHINERY WAS COSTED AND DECLINED (Eva, Sep 5), and the reasoning is recorded so it is
+not re-proposed.** The risk is a commit that LOOKS docs-only landing on a head whose code has
+never been gated — which happens routinely here, since a session pushes code and docs as
+separate commits. `[skip ci]` skips the whole run and leaves the head with NO gate result:
+fails unsafe. `dorny/paths-filter` against `github.event.before` answers "did this push touch
+a gated path", which is not the question — the question is "has this exact gated content
+already passed", and a push range says nothing about whether the parent's run was green. The
+rule that WOULD fail safe is: skip only when the TREE HASH OF THE GATED PATHS equals that at
+a commit whose gate run concluded `success` — both halves, which needs a Checks-API lookup
+inside the workflow defaulting to RUN on any error, missing run or ambiguity. That is real
+machinery guarding a repo where a wrong skip merges ungated geometry, in a project whose
+oldest enemy is a label naming a computation nobody performed. **A convention that works
+beats a filter that might skip a gate.**
+
+So: **fold the charter and outcome-doc changes into the code commit, or push them BEFORE the
+code.** A close-out doc written after the gates are green is the common case, and the fix is
+to amend rather than to append.
+
+**AND `concurrency: cancel-in-progress` IS ON ALL FOUR BLOOM WORKFLOWS (Eva, Sep 5), keyed
+to `${{ github.workflow }}-${{ github.ref }}` so it can never cancel across PRs.** Safe by
+construction — it only ever cancels a run on a commit that has been SUPERSEDED, and the
+final head always runs to completion. It also enforces a discipline already agreed:
+**a superseded commit's green run should never have been quotable, and session 16 quoted
+one** (runs 84 and 85 started two minutes apart and both ran to completion on a four-CPU
+runner).
+
+**A GATE RUN NAMES THE FIRST FAMILY THAT FIRED, NEVER THE ONLY WITNESS (session 17, and it
+is a correction to how every prior outcome doc must be read).** Both STL gates abandon a row
+at the first failing assertion family, in the order form -> curl -> thickness -> junction ->
+zygo -> export floor -> crowding -> coverage. So session 14's P3 (a blade that did not rotate
+with its foot) and session 15's Q1 (a `domeLean` computed but never summed) BOTH report
+**C1** on today's head, not the J8 and J9 their own sessions record: session 16's C1
+reconstructs the whole spine — including `petalTilt + tiltExtra + domeLean` — from other
+owners, and silently became a SECOND witness for two mutations from earlier sessions.
+
+**J8 AND J9 DO DISCRIMINATE INDEPENDENTLY — measured, not assumed, because the alternative
+would have been a real finding.** With the curl family suppressed in a throwaway worktree and
+nothing else changed, P3 fires **J8 alone** (4 times across the two domed smoke rows) and Q1
+fires **J9 alone** (twice), each with the message it was written for. So the earlier records
+are IMPRECISE, not wrong, and neither assertion is being carried by C1.
+
+**The working rule that follows: establishing that a SPECIFIC assertion discriminates
+requires suppressing the families ahead of it.** A green-then-red positive control proves a
+witness EXISTS; it cannot name which one, and neither can any gate run. Attributions in prior
+outcome docs are to be read as "the first family that fired", and any new attribution that
+matters should be measured this way.
+
+
 - ~~Session 10 — the fan arrangement~~ **BUILT Sep 2. The fourth `placement` value ships:
   a symmetric arc across one axis, in the flower's own control vocabulary, with the
   zygomorphy roles composing onto it rather than being redone.** The ruling that queued it

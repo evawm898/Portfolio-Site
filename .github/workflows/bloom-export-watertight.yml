@@ -30,6 +30,18 @@ on:
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
 
+# A SUPERSEDED COMMIT'S GREEN RUN SHOULD NEVER HAVE BEEN QUOTABLE (Eva,
+# session 17). Two runs of this workflow on PR #149 started two minutes
+# apart and both ran to completion on a four-CPU runner; the older one was
+# already answering a question nobody was asking. The group is keyed to the
+# workflow AND the ref so it can never cancel across PRs, and the final head
+# always runs to completion — safe by construction. It also enforces a
+# discipline already agreed: a run on a commit that has been superseded is
+# not evidence about the head.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
