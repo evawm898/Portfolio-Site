@@ -25,6 +25,17 @@
 #
 # IT IS SAFE TO RUN TWICE. The script refuses to push a partial set, and
 # `git push --tags` does not move a tag that already exists on the remote.
+#
+# **PRECONDITION, AND IT IS THE ONE THAT WAS MISSED (session 17): A
+# `workflow_dispatch` WORKFLOW IS ONLY DISPATCHABLE ONCE ITS FILE IS ON THE
+# DEFAULT BRANCH.** GitHub registers workflows from `main`, so while this file
+# existed only on a PR branch it did not appear in the Actions UI at all and
+# there was nothing to click — `GET /actions/workflows/bloom-frozen-tags.yml/runs`
+# returned 404 and `list_workflows` returned sixteen workflows without it. That
+# is "shipped means reachable": the file parsed, the job was correct, and the
+# route could not be reached. It was caught only because the tags were checked
+# directly (`git ls-remote --tags origin`) rather than inferred from the
+# workflow's own success. Check the same way after running it.
 name: bloom-frozen-tags
 
 on:

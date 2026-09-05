@@ -78,7 +78,20 @@ jobs:
           PAIRS=$(node -e "import('./tools/bloom-harness.mjs').then(h=>console.log(Object.entries(h.FROZEN_BASE_COMMITS).map(([k,v])=>k+':'+v).join(' ')))")
           for pair in $PAIRS; do
             name="${pair%%:*}"; sha="${pair##*:}"
-            git worktree add -f "/tmp/base-$sha" "$sha"
+            # A BASE COMMIT THAT CANNOT BE RESOLVED IS AN UNREACHABLE OBJECT,
+            # NOT A MATRIX MISMATCH, and the two need telling apart by whoever
+            # reads this log. `fatal: invalid reference` alone does not say
+            # what to do about it. The message lives HERE rather than in
+            # diff-bloom-bytes.mjs on purpose: that file is what certifies the
+            # baselines, and the fix for this is a ref, never a looser check.
+            if ! git worktree add -f "/tmp/base-$sha" "$sha" 2>/dev/null; then
+              echo "::error::frozen baseline $name: its base commit $sha is UNREACHABLE in this clone."
+              echo "::error::That means nothing points at the object any more — a deleted branch or a force-push."
+              echo "::error::FIX THE REF, NOT THE CHECK: dispatch the 'bloom-frozen-tags' workflow (Actions -> bloom-frozen-tags -> Run workflow),"
+              echo "::error::which publishes the frozen/* tags that keep every base commit alive. Never make --verify-frozen skip"
+              echo "::error::an unresolvable base: that turns a lost proof into a silent pass."
+              exit 1
+            fi
             ln -sfn "$PWD/node_modules" "/tmp/base-$sha/node_modules"
             node tools/diff-bloom-bytes.mjs --verify-frozen "--$name" --base "/tmp/base-$sha"
           done

@@ -1984,6 +1984,28 @@ final head always runs to completion. It also enforces a discipline already agre
 one** (runs 84 and 85 started two minutes apart and both ran to completion on a four-CPU
 runner).
 
+**AND IT DESTROYS EVIDENCE IN EQUAL MEASURE, WHICH IS THE HALF NOBODY EXPECTS.** A cancelled
+run is not a cheaper run; it is NO run. **Three of this PR's own full-gate runs were
+superseded before finishing** — the STL gates on `46a72b4`, `550b793` and `8524109` were all
+cancelled by the next push, so a PR that had been open for half an hour had no completed gate
+result at all. **So: on a gated PR, push once and let it run.** That is the same discipline as
+"no docs-only commits on a gated PR head" arriving from the other side — the docs rule says
+do not make the gates run again for nothing, and this one says do not stop them proving the
+head you have. Batch the close-out into ONE commit; a series of small pushes leaves the final
+head unproven and every earlier one abandoned.
+
+**"SHIPPED MEANS REACHABLE" FIRED ON A WORKFLOW, AND THE CASE IS WORTH THE NAME (session 17).**
+`bloom-frozen-tags.yml` was written as a `workflow_dispatch` job so the tags could be published
+despite the proxy's 403, reported as ready to click, and it could not be clicked: **a
+`workflow_dispatch` workflow is only dispatchable once its file is on the DEFAULT branch.**
+GitHub registers workflows from `main`, so on a PR branch it did not appear in the Actions UI —
+`GET /actions/workflows/bloom-frozen-tags.yml/runs` returned 404 and `list_workflows` returned
+sixteen workflows without it. The file parsed, the YAML validated, the job was correct, and the
+route was unreachable. **It was caught only because the OUTCOME was checked directly rather
+than inferred from the mechanism's own success** (`git ls-remote --tags origin` → zero tags),
+which is the flower project's rule about a label naming a computation nobody performed, arriving
+in CI configuration. Verify a route by reaching it, never by reading it.
+
 **RULED Sep 5 (session 17). A FROZEN BASELINE IS TAKEN AT A COMMIT ON `main`, NEVER AT A
 BRANCH HEAD, AND IS TAGGED AT FREEZE TIME. phase10 is the case that produced the rule.**
 
