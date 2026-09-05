@@ -390,6 +390,207 @@ them as optional or experimental.
   before implementing** — explain the conflict and the options. Never ship a change
   that silently breaks export.
 
+## `/print` — the posing and stylizing stage
+
+`print.html` / `print.js` / `print-stem.js` / `print-lines.js` are a staged
+build of the print pipeline: take a flower that already exists, pose it, draw
+it as line art, and (later) arrange and sparkle it. It is `noindex`, it does
+NOT touch the flower or bloom generators, and it exports nothing — the real
+generators own geometry and STL, and this page is downstream of both.
+
+Stages shipped so far: the **scaffold** (#150 — viewport, glTF load, the pivot
+node's `extras` round-tripping through GLTFLoader), the **pose** (#151 — a
+posable stem and a hinged bloom), and the **line art** (#153 — silhouette and
+crease edges, three sliders, then chained/curated/smoothed into drawn contours
+in two weights).
+
+**The bundle is the input contract.** `assets/print-test/flower-test-bundle.glb`
+carries a `pivot` node whose glTF `extras` declare the junction position, the
+junction tangent and `rotation_limits_deg`. The page reads its hinge range from
+there and NEVER from a constant in the code: re-tuning the constraint is a
+re-export, not a code edit, and the gate asserts the slider bounds EQUAL the
+bundle's own numbers rather than merely existing. The bundle also ships a
+`pivot_marker` diagnostic sphere, hidden by default and restored by a toggle —
+hidden via `visible`, never removed, so the node counts still describe the
+bundle as shipped.
+
+**The stem deformation is a ruling, not a proposal** (Eva, Sep 5) — see the
+header of `print-stem.js`. Do not "simplify" it back into a swept tube: 83% of
+the stem's vertices are three LEAVES, and a re-loft deletes them at zero bend.
+
+**EACH STAGE IS A LAYER, NEVER A MODE YOU ENTER.** The line-art stage does not
+disable, pause or reset anything the pose stage does; bend points stay
+draggable and the hinge sliders stay live while stylized, and the linework
+re-extracts from whatever the geometry currently is. The gate asserts this in
+BOTH directions (`independence/*`, `stylized/bend-drag-still-works`,
+`pose/lines-follow-bend`) because it is the property that gets quietly lost
+when a later stage adds a switch.
+
+**Line extraction is a CPU pass, and that was measured, not assumed.** The work
+splits in two, and only one half is per-frame: face normals and per-edge
+dihedral angles are functions of GEOMETRY, so the bloom (posed by rotating a
+NODE) never re-reads them and the stem re-reads only when a bend point moves;
+facing is a function of the camera, and the camera is transformed into each
+mesh's LOCAL space rather than the geometry into the world. Measured on the
+shipped bundle (78,480 triangles, 117,408 welded edges, headless Chromium):
+**~2.2 ms/frame mean at blend 0, ~5.6 ms at blend 100**, against 16.7 ms, with
+a one-time ~150 ms adjacency build at load. A GPU edge pass would buy ~2 ms and
+cost the thing the stage is for — the segments would live in a texture, so the
+gate could not count them and the dot renderer could not consume them.
+
+**THE MESH IS NOT WELDED AND THE ADJACENCY HAS TO BE RECOVERED BY POSITION.**
+The bundle comes from an STL split, so its triangles share no vertices: without
+the weld every edge is a boundary edge, there are no creases at all, and the
+page still draws a plausible silhouette-only picture. `topology/welded` is the
+one check that sees it.
+
+**THE EXTRACTION IS NOT THE DRAWING, AND THE POST-PROCESS IS WHERE THE PICTURE
+COMES FROM.** Raw extraction hands back triangle edges; drawn as literal
+straight polylines they read as a faceted mesh outline, and turning the detail
+slider down cannot fix it — at detail 0, the most conservative setting there
+is, this bundle still yields ~19,100 silhouette edges. The pipeline downstream
+of extraction is chain → curate → simplify → smooth → draw, and each step is
+load-bearing:
+
+- **RDP ALONE DOES NOT SMOOTH ANYTHING.** A zigzag is not near-collinear, so
+  nothing collapses and the staircase survives into the curve. Measured: with
+  simplification but no Laplacian pass the contour still turned a mean of 37°
+  per join, 5,946 of 15,669 joins over 30°. The Laplacian pass BEFORE the
+  simplification is what removes facet noise; it runs in WORLD units because
+  the zigzag's amplitude is a property of the mesh, not of the zoom, while
+  every curation threshold is in SCREEN pixels because what should be pruned
+  is what would be illegible.
+- **Six Laplacian iterations is the knee, measured** (mean turn / % of joins
+  over 30° / cost): 0 → 33.3° / 33.7% / 6.8 ms, 2 → 27.3° / 21.9%, 6 → 23.6° /
+  13.8% / 9.4 ms, 8 → 21.2° / 12.7% / 9.9 ms, 12 → 18.7° / 10.9% / 11.4 ms.
+- **Silhouette and crease chain SEPARATELY and junctions are cut points.** A
+  vertex where an outline meets an interior fold is on both sets; chaining
+  through it hands the smoother a corner it should keep, and puts a contour
+  stroke and an interior stroke in one primitive that the two-tier weight
+  cannot then draw differently.
+- **Turn angles are measured per chain, on the points about to be drawn** —
+  never across the emitted buffer, where the end of one chain and the start of
+  the next share a junction position and read as one 180° fake turn. Measured
+  that way first; it reported a 180° max on every run.
+- **LENGTH CURATION PRUNES NOISE, NOT DENSITY** (measured, Sep 5). Raising the
+  contour bar from 5 px to 45 px takes contour chains 1,425 → 610 but stroke
+  segments only 14,614 → 10,054: most of the bloom's ink is in a few long
+  chains, because a 40-petal bloom's density is ~40 real overlapping petal
+  rims, each a genuine silhouette. The lever for that is per-chain visibility,
+  not length, and it is not built. **The default stays 5 px / 16 px** (Eva,
+  Sep 5, ruling from the sheet's 5 / 26 / 45 px cells): the tighter bars cost
+  the sepals' interior lines and barely thin the bloom, so they buy nothing
+  the density problem actually needs.
+
+**TWO TIERS, ONE SLIDER, A FIXED RATIO** (`INTERIOR_WEIGHT_RATIO`, 0.45). The
+contour/interior ratio is a property of the STYLE rather than of the artwork,
+and an independent interior slider makes the one state that stops reading as
+line art — interior heavier than contour — reachable by accident. Promoting it
+to a second slider is one line plus a registry row.
+
+**THE POST-PROCESS IS SKIPPED WHEN THE VIEW HAS NOT MOVED HALF A PIXEL, and an
+exact float comparison does NOT work.** OrbitControls runs with damping, whose
+easing has a multi-second half-life, so the camera matrix keeps changing
+microscopically long after the hand stops and an exact skip never fires
+(measured: still ~17 px per poll six seconds after a drag, headless). The
+criterion is the honest one — would the drawing move by less than a twentieth
+of a pixel? `skip/idle-is-free` asks it in ONE tick (two identical updates, the
+second must skip, a pose change must un-skip) because waiting for stillness is
+not something this harness can do.
+
+**ONE EXTRACTION, TWO CONSUMERS.** Pointillism is not a second algorithm over
+the model: at blend *b* an edge is drawn as dots when its own hash is below *b*
+and as a stroke otherwise, so the segment set is identical at both ends of the
+slider (`blend/same-extraction`) and the transition is stable under orbit
+because the hash is on the CHAIN's first welded vertex, not on the frame. The
+detail slider runs BACKWARDS on purpose — `detailToAngleDeg()` in
+`print-lines.js` is its one owner, read by the app, the read-out and the gate,
+and `CURATION` is the same for every curation number.
+
+**Each slider is asserted on what it must LEAVE ALONE as well as on what it
+changes.** Weight widens strokes without changing which lines exist; detail
+changes which creases exist without moving the silhouette (a silhouette is a
+function of the camera, full stop); pointillism changes the renderer, not the
+extraction. A single slider wired to "make it look different" satisfies the
+first half of any of those on its own.
+
+**Verify with `node tools/verify-print-scaffold.mjs [shots-dir]`** — one gate
+for every stage, every claim measured against mesh state, the extracted
+segment counts, or the SCREENSHOT BYTES, never against the control that was
+just written. **`--mutants` is the negative control and is not optional before
+quoting a pass from a changed harness**: it re-serves sixteen deliberately broken
+copies of `print.js` / `print-lines.js` through the gate's own HTTP server, and
+fails if a mutation does not apply, if a check the mutant NAMES stays green, or
+if a check it did not name goes red (which is how a mutation that just breaks
+the page gets caught pretending to be a negative control). `--mutant=<id>` runs
+one, in two minutes rather than thirty-five.
+
+**THE FIRST SWEEP FAILED SIX OF TEN AND WAS MOSTLY RIGHT TO — three of the
+findings were in the GATE, not the mutations, and two of those were in checks
+that shipped with #150/#151 and had been green all along.** Do not repeat them:
+
+- **A drag whose pointerdown lands on a control panel never reaches the
+  canvas.** The "pose survives an orbit" drag started at 0.75 of the canvas
+  width, which is inside the right-hand column, on a slider — so the orbit
+  under test was never performed, and the check passed on `camera moved 21.2`,
+  which was OrbitControls' damping still easing from the PREVIOUS orbit
+  against a bar of `> 1`. Start canvas drags in the gap between the panels'
+  real bounding boxes, and set movement bars only a real orbit can clear.
+- **"The camera did not move" is NOT observable in this harness.** Headless
+  runs on software GL at ~2 fps, so damping has a **~4 second half-life**
+  (measured: 12.3 units of drift per 300 ms right after a drag, still 4.4 six
+  seconds later). A settle loop measures the easing. Where a check needs the
+  camera out of the question, extract both states at the SAME camera inside
+  one tick — `stemLinesRestVsBent()` is that shape.
+- **One axis of a bounding box is a function of camera azimuth.** The same
+  bend drag moved the stem's x extent 3.79 from one angle and 0.31 from
+  another, straddling the threshold. Sum all three.
+
+**Ink fraction saturates — read the weight check's comment before retuning it.**
+Coverage is not width: at detail 100 the bloom is already a solid mass, so a 5x
+stroke barely moves the pixel count. The weight check is measured at detail 0
+for that reason. Note the corollary that caught a mutant: a mutation that ADDS
+to the crease threshold neutralises itself there, because 88 deg + anything
+passes 90 and no crease survives at either end of the slider.
+
+**A GATE ASSERTION KEYED TO A SEGMENT COUNT IS A LIABILITY HERE.** Chaining,
+curation and resampling all legitimately move every count, and they moved
+`blend/strokes-at-0` (`strokes === segments`) the day the post-process landed.
+Assert the structural property instead — at blend 0 everything is a stroke and
+nothing is a dot — and reserve counts for the RAW edge set, which the
+post-process does not touch. Likewise `smooth/contour-is-not-faceted` is a
+COMPARISON of the same camera with and without the smoothing pass, never a
+threshold: the mean turn angle depends on how large the model is on screen, so
+an absolute bar had the shipped value at 31.1° against a bar of 32 with the
+unsmoothed baseline at 37 — a flake, not a measurement.
+
+Contact sheets: `node tools/shot-print-pose.mjs <dir>` (the pose stage) and
+`node tools/shot-print-lines.mjs <dir> [base-tree]` (the line art — the switch,
+detail x weight, the pointillism blend, the curation sweep, and the linework
+under a LIVE pose change; with a base-tree it renders the same cells from a git
+worktree of that commit so a before/after pair is a real render of the old code
+rather than a remembered one).
+Every cell on both is produced by a real pointer drag, wheel or slider input;
+a picture of a configuration the hand cannot reach is not evidence about the
+tool.
+
+**Nothing here runs in CI.** Every GitHub Actions gate in this repo is
+path-filtered to `flower*` / `bloom*` files, so `print*` is covered by nothing —
+run the gate and the sheets by hand before calling a `/print` change done. Note
+the corollary the cards tool already hit: the flower workflows are path-filtered
+on `'tools/**'`, so ADDING A PRINT TOOL makes both flower gates run on a print
+PR. They still test flower geometry; two green `verify` jobs on a print PR are
+not evidence that anything about `/print` was checked.
+
+Dev-only deps, gitignored and not in `package.json` (same convention as the
+other gates): `npm i --no-save three@0.161.0 playwright-core`. Three is served
+from `node_modules` at the exact jsDelivr URLs `print.html` pins, so the gate
+needs no CDN egress.
+
+**Loose thread:** `assets/print-test/` still names itself a fixture, and it is
+now load-bearing for three merged stages. Renaming it is a rename in three
+tools plus `print.js`; it has been deferred once per session so far.
+
 ## Artist Tracker (`artist-tracker.html`)
 
 Private, single-file, client-side artist/tattoo-artist tracker for

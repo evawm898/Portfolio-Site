@@ -1,20 +1,29 @@
 // /print — 3D viewport and posing stage.
 //
-// Scope of this file: load a glTF bundle, light it just enough to read its
-// shape, orbit around it, report the `pivot` node's extras, and POSE the
-// flower — drag bend points to bend the stem, hinge the bloom at the junction
-// within the bundle's own declared limits. No stylization, no sparkles, no
-// multiple instances — those are later stages and none of them exist yet.
+// Scope of this file: load a glTF bundle, orbit around it, report the `pivot`
+// node's extras, POSE the flower — drag bend points to bend the stem, hinge
+// the bloom at the junction within the bundle's own declared limits — and
+// STYLIZE it as live line art. No sparkles, no multiple instances — those are
+// later stages and neither exists yet.
 //
-// The stem deformation itself lives in print-stem.js; this file is wiring.
+// The stem deformation lives in print-stem.js and the line extraction in
+// print-lines.js; this file is wiring.
 //
-// The lights here are THROWAWAY preview lights. The eventual renderer is
-// unlit line-art; nothing about this rig carries forward.
+// THE STYLIZE STAGE IS NOT A MODE YOU ENTER. It is a layer over the same live
+// scene: the bend handles stay draggable, the hinge sliders stay live, the
+// camera keeps orbiting, and the linework is re-extracted from whatever the
+// geometry currently is, every frame. Nothing here pauses, gates or resets the
+// pose controls, and the gate asserts that in both directions.
+//
+// The lights are the SHADED preview, kept as the line-art switch's other
+// position so the two can be compared; the line art itself uses no lighting
+// model at all.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StemRig, CONTROL_S } from './print-stem.js';
+import { LineArt, detailToAngleDeg, CURATION, INTERIOR_WEIGHT_RATIO } from './print-lines.js';
 
 const BUNDLE = 'assets/print-test/flower-test-bundle.glb';
 
@@ -29,6 +38,15 @@ const twistIn = document.getElementById('twist');
 const droopOut = document.getElementById('droopOut');
 const twistOut = document.getElementById('twistOut');
 const resetBtn = document.getElementById('resetPose');
+const stylizeEl = document.getElementById('print-stylize');
+const artState = document.getElementById('print-artstate');
+const lineArtBox = document.getElementById('lineArt');
+const weightIn = document.getElementById('lineWeight');
+const detailIn = document.getElementById('lineDetail');
+const dotsIn = document.getElementById('pointillism');
+const weightOut = document.getElementById('lineWeightOut');
+const detailOut = document.getElementById('lineDetailOut');
+const dotsOut = document.getElementById('pointillismOut');
 
 const lines = [];
 function log(html) { lines.push(html); debugEl.innerHTML = lines.join('\n'); }
@@ -64,7 +82,23 @@ function resize() {
 new ResizeObserver(resize).observe(canvas);
 resize();
 
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+// The line art is re-extracted EVERY frame, from the live camera and the live
+// geometry — that is what makes an orbit and a bend-point drag both show up in
+// the linework without either one having to know the other exists. `art` is
+// null until the bundle loads.
+let art = null, renderArtHook = null;
+let frameStats = null, lastFrameMs = 0, frameSamples = 0, frameTotal = 0, lastReadout = 0;
+renderer.setAnimationLoop(() => {
+  controls.update();
+  if (art) {
+    const t0 = performance.now();
+    frameStats = art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());
+    lastFrameMs = performance.now() - t0;
+    if (frameStats) { frameTotal += lastFrameMs; frameSamples++; }
+    if (renderArtHook && t0 - lastReadout > 160) { lastReadout = t0; renderArtHook(); }
+  }
+  renderer.render(scene, camera);
+});
 
 // --- load the bundle -------------------------------------------------------
 new GLTFLoader().load(BUNDLE, (gltf) => {
@@ -242,6 +276,10 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
     if (rig) rig.apply();
     syncHandles();
     applyHinge();
+    // The stem's vertices moved, so its face normals and dihedral angles are
+    // stale. The BLOOM's are not — it is posed by rotating a node — so only
+    // the stem is re-read. Measured below, and printed in the read-out.
+    if (art && stemMesh) art.refreshGeometry(stemMesh);
     renderPose();
   }
 
@@ -362,6 +400,217 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
     poseState.textContent = rows.join('\n');
   }
   renderPose();
+
+  // ======================= STYLIZE =======================================
+  // Line art over the SAME live scene. Nothing here touches `rig`, `setPose`,
+  // the handles or the controls — the linework is a consumer of the pose, not
+  // a competitor with it.
+
+  const artMeshes = [stemMesh, gltf.scene.getObjectByName('bloom')].filter(Boolean);
+  if (artMeshes.length) {
+    art = new LineArt(artMeshes, { ink: 0x14181a, paper: 0xf2f0ea });
+    stylizeEl.hidden = false;
+
+    // The handles are UI, not model: they keep their own flat material and
+    // stay on top of the paper so the pose is still grabbable while stylized.
+    // Explicitly restated here because the line art repaints everything else.
+    handles.forEach(h => { h.material.depthTest = false; });
+
+    function setStyle({ weight, detail, blend }) {
+      art.setOptions({ weight, detail, blend });
+      if (weight !== undefined) weightIn.value = String(weight);
+      if (detail !== undefined) detailIn.value = String(detail);
+      if (blend !== undefined) dotsIn.value = String(blend);
+      renderArt();
+    }
+    function readStyle() {
+      art.setOptions({
+        weight: parseFloat(weightIn.value),
+        detail: parseFloat(detailIn.value),
+        blend: parseFloat(dotsIn.value),
+      });
+      renderArt();
+    }
+    weightIn.addEventListener('input', readStyle);
+    detailIn.addEventListener('input', readStyle);
+    dotsIn.addEventListener('input', readStyle);
+
+    // The switch is VIEW CHROME, in the same sense as the pivot marker: it
+    // decides what is drawn and nothing else. Unchecking it puts the shaded
+    // preview back with the pose exactly as it was.
+    function setLineArt(on) {
+      art.setEnabled(on);
+      renderer.setClearColor(on ? 0xf2f0ea : 0x0c0e0e);
+      lineArtBox.checked = on;
+      renderArt();
+    }
+    lineArtBox.addEventListener('change', () => setLineArt(lineArtBox.checked));
+
+    art.setOptions({
+      weight: parseFloat(weightIn.value),
+      detail: parseFloat(detailIn.value),
+      blend: parseFloat(dotsIn.value),
+    });
+    setLineArt(lineArtBox.checked);
+
+    // --- live line-art read-out -----------------------------------------
+    // Everything on it is MEASURED, including the timings. The CPU-vs-GPU call
+    // for this stage was made on these numbers, so the page that made it keeps
+    // reporting them rather than quoting a comment. Driven from the frame loop
+    // at ~6 Hz as well as on every input, because the interesting numbers
+    // (segment counts, milliseconds) move when the CAMERA moves and nothing
+    // fires an event for that.
+    function renderArt() {
+      weightOut.textContent = `${art.weight.toFixed(1)} px`;
+      detailOut.textContent = `${art.detail.toFixed(0)}`;
+      dotsOut.textContent = `${art.blend.toFixed(0)}%`;
+      const rows = [];
+      const topo = art.units.map(u => u.ex.topo);
+      const tris = topo.reduce((a, t) => a + t.triCount, 0);
+      const edges = topo.reduce((a, t) => a + t.edgeCount, 0);
+      const bnd = topo.reduce((a, t) => a + t.boundaryCount, 0);
+      const nm = topo.reduce((a, t) => a + t.nonManifold, 0);
+      rows.push(`topology          ${tris} tri / ${edges} welded edges`);
+      rows.push(`                  ${bnd} boundary, ${nm} edges with >2 faces (3rd dropped)`);
+      rows.push(`build             ${art.units.map(u => u.ex.buildMs.toFixed(0)).join(' + ')} ms, ONCE at load`);
+      if (!art.enabled) {
+        rows.push('line art          OFF — shaded preview');
+      } else {
+        const st = frameStats || art.stats;
+        rows.push(`crease threshold  ${art.creaseAngleDeg.toFixed(1)}\u00b0 dihedral  (detail ${art.detail.toFixed(0)})`);
+        if (st) {
+          rows.push(`raw edges         ${st.segments}  = ${st.silhouette} silhouette + ${st.crease} crease`);
+          rows.push(`chained           ${st.chains} strokes kept, ${st.dropped} dropped as too short`);
+          rows.push(`                  contour ${st.contourChains} / interior ${st.interiorChains}`);
+          rows.push(`simplified        ${st.ptsIn} \u2192 ${st.ptsOut} points (RDP ${CURATION.simplifyPx} px)`);
+          rows.push(`curation          drop < ${CURATION.minChainPx} px contour / ${CURATION.minCreasePx} px interior`);
+          rows.push(`weight            contour ${st.contourWeight.toFixed(2)} px, interior ${st.interiorWeight.toFixed(2)} px`);
+          rows.push(`                  fixed ratio ${INTERIOR_WEIGHT_RATIO} \u2014 one slider scales both`);
+          rows.push(`drawn as          ${st.strokes} stroke segs + ${st.dots} dots${st.truncated ? '  (TRUNCATED)' : ''}`);
+          rows.push(`contour turn      mean ${st.contourTurnMean.toFixed(1)}\u00b0, ${st.contourTurnOver30}/${st.contourTurnJoins} joins over 30\u00b0`);
+          rows.push(`                  (sampled 1 frame in 8 \u2014 an acos per point is not free)`);
+          rows.push(`extract           ${st.extractMs.toFixed(2)} ms   chain ${st.chainMs.toFixed(2)} ms`);
+          rows.push(`                  curate+smooth ${(st.frameMs - st.extractMs - st.chainMs).toFixed(2)} ms`);
+          rows.push(`frame pass        ${lastFrameMs.toFixed(2)} ms of a 16.7 ms budget`);
+        }
+      }
+      artState.textContent = rows.join('\n');
+    }
+    renderArtHook = renderArt;
+    renderArt();
+
+    window.__printLineArt = {
+      setLineArt, setStyle,
+      enabled: () => art.enabled,
+      style: () => ({ weight: art.weight, detail: art.detail, blend: art.blend }),
+      creaseAngleDeg: () => art.creaseAngleDeg,
+      detailToAngleDeg,
+      stats: () => art.stats,
+      topology: () => art.units.map(u => ({
+        name: u.mesh.name, tris: u.ex.topo.triCount, verts: u.ex.topo.vertexCount,
+        edges: u.ex.topo.edgeCount, boundary: u.ex.topo.boundaryCount,
+        nonManifold: u.ex.topo.nonManifold, buildMs: u.ex.buildMs,
+        geometryMs: u.ex.geometryMs, extractMs: u.ex.extractMs,
+        silhouette: u.ex.silhouetteCount, crease: u.ex.creaseCount,
+        segments: u.ex.segmentCount,
+      })),
+      perf: () => ({ lastFrameMs, meanFrameMs: frameSamples ? frameTotal / frameSamples : 0, frames: frameSamples }),
+      resetPerf: () => { frameTotal = 0; frameSamples = 0; },
+      // per TIER now: [contour, interior] for each mesh
+      materialWidth: () => art.units.map(u => u.tiers.map(t => t.mat.linewidth)),
+      dotSize: () => art.units.map(u => u.tiers.map(t => t.dotMat.size)),
+      strokeInstances: () => art.units.map(u => u.tiers.map(t => t.lines.geometry.instanceCount)),
+      dotInstances: () => art.units.map(u => u.tiers.map(t => t.dotGeo.drawRange.count)),
+      curation: () => ({ ...CURATION, interiorWeightRatio: INTERIOR_WEIGHT_RATIO }),
+      // Curation is a CONSTANT in the shipped page, not a control — the panel
+      // has the three sliders the stage is specified to have. This reaches
+      // past that so the contact sheet can photograph the trade-off and the
+      // gate can drive it, without inventing a fourth slider to do it.
+      setCuration: (o) => { Object.assign(CURATION, o); },
+      measureTurnsNow: () => { art._forceTurns = true; },
+      skipped: () => !!art.skipped,
+      // Two identical updates in ONE tick. The second must be skipped, because
+      // nothing changed between them. Waiting for the camera to go still and
+      // watching for a skip does NOT work in this harness and was measured not
+      // to: headless runs at ~2 fps, so OrbitControls' damping is still moving
+      // the view by ~17 px per poll six seconds after a drag. This asks the
+      // question the skip actually answers.
+      skipRepeat: () => {
+        const size = [canvas.clientWidth, canvas.clientHeight], pr = renderer.getPixelRatio();
+        art.update(camera, size, pr); const first = !!art.skipped;
+        art.update(camera, size, pr); const second = !!art.skipped;
+        // ...and a pose change must un-skip it
+        if (rig) { rig.setPoint(2, rig.points[2].clone().addScalar(3)); repose(); }
+        art.update(camera, size, pr); const afterPose = !!art.skipped;
+        if (rig) { rig.setPoint(2, rig.points[2].clone().addScalar(-3)); repose(); }
+        art.update(camera, size, pr);
+        return { first, second, afterPose };
+      },
+      // The maximum turn angle between consecutive drawn segments, over the
+      // contour tier. This is the SHAPE claim: a faceted staircase turns hard
+      // and often, a smoothed contour does not. Read off the emitted buffer,
+      // not off the smoother's intentions.
+      contourTurnAngles: () => {
+        const out = [];
+        for (const u of art.units) {
+          const t = u.tiers.find(x => x.kind === 1);
+          const A = t.buf.array, n = t.lines.geometry.instanceCount;
+          let prev = null, worst = 0, sum = 0, cnt = 0, over30 = 0;
+          for (let i = 0; i < n; i++) {
+            const o = i * 6;
+            const dx = A[o+3]-A[o], dy = A[o+4]-A[o+1], dz = A[o+5]-A[o+2];
+            const l = Math.hypot(dx, dy, dz);
+            if (l < 1e-9) { prev = null; continue; }
+            const d = [dx/l, dy/l, dz/l];
+            // consecutive only when this segment starts where the last ended
+            const joined = prev && Math.abs(A[o]-prev.ex) < 1e-6
+              && Math.abs(A[o+1]-prev.ey) < 1e-6 && Math.abs(A[o+2]-prev.ez) < 1e-6;
+            if (joined) {
+              const c = Math.max(-1, Math.min(1, d[0]*prev.d[0] + d[1]*prev.d[1] + d[2]*prev.d[2]));
+              const ang = Math.acos(c) * 180 / Math.PI;
+              worst = Math.max(worst, ang); sum += ang; cnt++;
+              if (ang > 30) over30++;
+            }
+            prev = { d, ex: A[o+3], ey: A[o+4], ez: A[o+5] };
+          }
+          out.push({ mesh: u.mesh.name, joins: cnt, maxTurnDeg: worst,
+                     meanTurnDeg: cnt ? sum / cnt : 0, over30 });
+        }
+        return out;
+      },
+      artText: () => artState.textContent,
+      // The stem's line set at rest and at the CURRENT bend, both extracted at
+      // the SAME camera inside one tick. The gate needs this because "the
+      // camera did not move" is not observable here: headless runs on software
+      // GL at ~2 fps, so OrbitControls' damping has a ~4 second half-life and a
+      // drag that MISSES a handle falls through to the orbit and changes the
+      // silhouette all by itself. Comparing rest against bent at one camera
+      // removes the camera from the question entirely. The bend is restored
+      // before this returns, and the caller is handed the restored count so it
+      // can say so.
+      stemLinesRestVsBent: () => {
+        if (!rig || !art) return null;
+        const u = art.units.find(x => x.mesh === stemMesh);
+        if (!u) return null;
+        const size = [canvas.clientWidth, canvas.clientHeight], pr = renderer.getPixelRatio();
+        const saved = rig.points.map(p => p.clone());
+        art.update(camera, size, pr);
+        const bent = u.ex.segmentCount;
+        rig.resetPose(); repose();
+        art.update(camera, size, pr);
+        const rest = u.ex.segmentCount;
+        saved.forEach((p, i) => { if (i) rig.setPoint(i, p); });
+        repose();
+        art.update(camera, size, pr);
+        return { bent, rest, restored: u.ex.segmentCount };
+      },
+      // the widget path and the model path, kept apart for the same reason the
+      // pose stage keeps them apart
+      setWeightWidget: (v) => { weightIn.value = String(v); weightIn.dispatchEvent(new Event('input')); },
+      setDetailWidget: (v) => { detailIn.value = String(v); detailIn.dispatchEvent(new Event('input')); },
+      setDotsWidget: (v) => { dotsIn.value = String(v); dotsIn.dispatchEvent(new Event('input')); },
+    };
+  }
 
   // A handle for the headless gate — no app logic reads it.
   window.__printScaffold = {
