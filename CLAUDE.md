@@ -208,8 +208,11 @@ clear of feet AND within one step (both directions), the rise inert under
 SPHERE. J5 steps in polar angle there, J6 is nulled with a clause, J9 wants
 lean 0. **Plan coverage cannot read a sphere** (the far hemisphere projects
 into the disc from below — a false clean): SPHERE rows are a labelled skip and
-the export gate FAILS if one emits a number; the solid-angle instrument is
-session two. The crowding raster evaluates membership in (arc, azimuth) over
+the export gate FAILS if one emits a number. **The solid-angle instrument is
+`tools/bloom-solid-angle-coverage.mjs` (session 19)** — a SIBLING of the plan raster,
+rays from `footRing()`'s own sphere centre, validated by R5 (the parallel-ray identity
+against the plan raster, exact) and NOT wired: which SPHERE rows pin it is Eva's ruling
+(`docs/bloom-session-19-outcome.md`), and the loud skip stands until she makes it. The crowding raster evaluates membership in (arc, azimuth) over
 the full arc on a sphere and prints the depth within one step of each pole.
 Under SPHERE the DISC centre plates the face pole (24.5 mm on the 240-foot
 row) — DEFERRED to the phase-2 centre question, explicitly; do not constrain the

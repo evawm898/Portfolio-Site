@@ -156,13 +156,14 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        would report the face pole covered by petals that are on the other
        side of the ball — a FALSE CLEAN, which is the specific failure not to
        discover three sessions from now. The replacement is a SOLID-ANGLE
-       raster from the sphere's centre — session two's instrument, not
-       started here. The export gate FAILS THE RUN if a SPHERE row ever emits
+       raster from the sphere's centre — tools/bloom-solid-angle-coverage.mjs
+       (session 19), a sibling of this file, NOT WIRED into any gate until
+       Eva rules which rows pin it. The export gate FAILS THE RUN if a SPHERE row ever emits
        a plan-coverage number; `sphere: true` travels with the skip so that
        clause can be made against this tool's own answer as well as the
        app's. Decided BEFORE the split-whorl skip and before a petal is
        built, from the owner's own flag. */
-    if (fr.sphereMode) return { bad, r: null, sphere: true, skipped: 'FULL SPHERE (hubShape SPHERE): a plan raster cannot read a sphere — the far hemisphere projects into the same disc from below and would read as a false clean; the solid-angle instrument is session two — RECORDED, NOT BUILT' };
+    if (fr.sphereMode) return { bad, r: null, sphere: true, skipped: 'FULL SPHERE (hubShape SPHERE): a plan raster cannot read a sphere — the far hemisphere projects into the same disc from below and would read as a false clean; the solid-angle instrument is tools/bloom-solid-angle-coverage.mjs (session 19), NOT WIRED pending Eva\'s ruling on which rows pin it' };
     /* THE LABELLED SKIP (session 16): a split whorl is out of R3's scope —
        reported as such, loudly, before a petal is built. */
     if (!fr.continuousMode) {

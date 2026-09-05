@@ -2006,6 +2006,20 @@ than inferred from the mechanism's own success** (`git ls-remote --tags origin` 
 which is the flower project's rule about a label naming a computation nobody performed, arriving
 in CI configuration. Verify a route by reaching it, never by reading it.
 
+**`bloom-frozen-tags` IS RED BY DESIGN ON EVERY DISPATCH UNTIL `frozen/phase5` IS PUBLISHED
+FROM A USER'S CLONE — a red run of it is NOT new information (session 19, from the log).**
+Run 33983799670, dispatched from `main` at `dddd934` after #155 merged, was read through the
+GitHub API rather than inferred: it pushed `frozen/phase14`, read back twelve tags PUBLISHED,
+and failed on exactly one thing — `! [remote rejected] frozen/phase5 (refusing to allow a
+GitHub App to create or update workflow .github/workflows/bloom-frozen-matrices.yml without
+workflows permission)`, the phase5 refusal session 17 diagnosed and session 18 inferred. The
+only other content is a runner deprecation warning (the v4 actions target Node 20 and are
+forced onto Node 24), not an error. So: the job exits 1 by construction while phase5 is
+unpublishable from a workflow, the remote carries twelve of thirteen `frozen/*` tags, and
+the remedy stays what session 17 ruled — protect `main`; publish phase5 from a user's clone
+when convenient; no PAT. A future session that sees this workflow red checks the read-back
+list in its log for anything OTHER than phase5 before treating the run as a signal.
+
 **AND A RESTARTED BRANCH HAS A TRAP OF ITS OWN: A SQUASH-MERGED HEAD IS NEVER AN ANCESTOR OF
 `main` (session 17).** `main` squashes, so the merge creates a NEW commit and the branch head
 that merged cleanly is not in `main`'s history at all. The obvious safety check before
@@ -4038,3 +4052,72 @@ matters should be measured this way.
       recorded so it is found rather than rediscovered. The mum as a dandelion clock is
       noted, not a defect. Close-out: the four bloom gates green on the head, merged by the
       session, `frozen/phase14` tagged from `main`.
+
+- ~~The solid-angle coverage instrument — "session two"~~ **BUILT Sep 5 (session 19) as
+  `tools/bloom-solid-angle-coverage.mjs`, a SIBLING of the plan raster, validated, measured,
+  and NOT WIRED — the plan raster's loud SPHERE skip stands, and which SPHERE rows pin it
+  and at what thresholds is Eva's ruling, proposed with numbers in
+  `docs/bloom-session-19-outcome.md`.** Covered iff a ray from `footRing()`'s own sphere
+  centre in direction (φ, θ) hits any petal triangle; a (φ, θ)-binned triangle index; 0.5°
+  refined to 0.25°, sin φ weighted so the sums are steradians; the hub and the designed
+  centre never in the soup, as the plan raster leaves them out. A FLAT hub is its labelled
+  skip (no centre — the plan raster is this instrument's parallel-ray limit), the mirror of
+  the plan raster's sphere skip.
+
+    - **THE VALIDITY CHECK THAT IS EXACT BY CONSTRUCTION IS R5, THE PARALLEL-RAY IDENTITY:**
+      the same 3D kernel fed one vertical ray per cell of the plan raster's OWN grid must
+      reproduce its flag on EVERY cell, against a verbatim copy of its 2D test and against
+      the shipped tool's RETURNED numbers to the bit. Measured: 0 of 38,024 cells on all
+      eight rows with a centre, bit-equal on the four cap rows. Plus R0 (a kernel self-test
+      through the real binning, before a petal is built), R1–R3 (the capture, plan-coverage's
+      verbatim) and R4 (converged). Negative control PASS: antipode / inward / seam-lost,
+      each caught by R0. **A finding on the way: the (φ, θ) bins already encode direction,
+      so the kernel's t > 0 clause is REDUNDANT for central rays** — a planar triangle not
+      containing the centre subtends less than a hemisphere and its bins never hold its
+      antipode; the false-clean mutation had to break the binning too.
+
+    - **THE BRIEF'S NAMED VALIDITY CHECK WAS MEASURED EXACTLY AS ASKED AND DISAGREES, AND THE
+      SESSION STOPPED ON IT AS INSTRUCTED.** "On the rise-1 hemisphere the solid-angle
+      reading must agree with the plan raster mapped through the sphere": on the incurve
+      hemisphere they agree on 75.54% of the cap's solid angle (central 24.46% open, plan
+      0.00%), on the mum 74.02%, on the default 86.51%. **Banded by polar angle, the two
+      agree at 100% wherever the crown is (0–60° on the incurve target) and part company
+      only at the rim (75–90°: central 84.2% open, plan 0.0%).** The reason is the RAY: a
+      vertical line through a rim point runs up through the blades; the radial ray through
+      the same point is horizontal and leaves under the canopy between the roots. The
+      premise "there both instruments see the same surface" is true of the surface and
+      false of the rays through it. No tolerance was widened; the numbers are in the outcome
+      doc; whether R5 or the mapped check is load-bearing is the ruling the pinning proposal
+      waits on.
+
+    - **THE FACE-POLE NUMBER FOR PHASE 2, measured and not acted on:** on the 240-foot row
+      the petals leave a CONNECTED open region of **2.58 sr** around the face pole (bald
+      cone only 2.63°, a 1.50 mm chord — it is a network of gaps, not a cap). The DISC's
+      footprint from the builder's own report is **rC 24.54 mm = 0.75 × the sphere radius,
+      a 48.6° cone, 2.12 sr; 63.75% of it (1.35 sr) is open, and 1.79 sr of open sphere lies
+      outside it** — so session 18's "24.5 mm" is a RADIUS (a 49 mm lid). On the incurve
+      sphere the face pole is CLOSED (0.13°, one cell) — the cap rows' emergent crown, on
+      the ball — with 4.20% of 4π open in total; the mum sphere reads 0.00%.
+
+    - **A FINDING THE SHEET DID NOT HAVE: the incurve sphere's RESERVED pole is NOT closed
+      from the centre** — directions within 4.38° of it hit no petal, a 0.95 mm-radius bald
+      spot inside a 0.22 sr open region (the vertex bound agrees: no petal vertex within
+      1.05 mm of that half of the axis). Session 18 read it covered by eye from below; the
+      blades close over it in an off-axis projection without crossing the axis. Not a defect
+      (a stem exits there); on the table for Eva's eye before any reserved-pole claim is
+      pinned. The other three sphere rows read it closed (0.12°).
+
+    - **THE POSITIVE CONTROL, in a throwaway worktree:** blade rows narrowed to 15% of their
+      half-width for 0.05 < u < 0.6 (W2; a first mutant on the last row was caught by the
+      tip-cap validity, so the cap was left alone). On the incurve SPHERE row the export gate
+      is entirely green — watertight, every family, a labelled coverage skip — while the
+      instrument moves 4.20% → 27.23%; on the two pinned cap rows only the plan raster's own
+      assertion fires (4.34% / 4.22% against 0.05%). Cost, real: 666 lines against Phase A's
+      ~250; 2.5–3.7 s a sphere row and 2–8 s a cap row (the mapped comparison the expensive
+      half) against the estimated 1–3 s.
+
+    - **THE TWO PIECES OF SESSION-18 DEBT:** the frozen-tags run is recorded above, in the
+      CI conventions, as red by design until phase5; and the docs-only collision has a
+      PROPOSED amendment in the outcome doc, targeted at the Sep 5 session-17 ruling as its
+      one exception — rulings recorded in a docs-only PR of the session's own, after the
+      code PR merges, since a docs-only PR runs no bloom gate. Eva's to make; not made.

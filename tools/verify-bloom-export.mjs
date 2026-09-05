@@ -265,7 +265,7 @@ if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) =>
      happen), and at least one non-sphere row was measured (the skip is not
      stuck on). */
   const spheres = results.filter((r) => r.sphere);
-  console.log(`${spheres.length}/${results.length} rows are FULL-SPHERE heads — every one a labelled coverage skip (a plan raster reads a sphere as a false clean; the solid-angle instrument is session two)`);
+  console.log(`${spheres.length}/${results.length} rows are FULL-SPHERE heads — every one a labelled coverage skip (a plan raster reads a sphere as a false clean; the solid-angle instrument, tools/bloom-solid-angle-coverage.mjs, is built and NOT wired pending Eva's ruling)`);
   if (!NEGATIVE_CONTROL && !ONLY) {
     if (spheres.length === 0) validity.push('coverage coverage: no row in this matrix is a FULL-SPHERE head — the loud skip is unexercised (a default is not coverage; block 22 is missing)');
     if (results.length - skipped.length === 0) validity.push('coverage coverage: every row was skipped — the raster measured nothing');
