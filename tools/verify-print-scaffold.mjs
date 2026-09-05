@@ -108,7 +108,9 @@ const MUTANTS = [
   { id: 'detail-ignored', file: 'print-lines.js',
     from: 'get creaseAngleDeg() { return detailToAngleDeg(this.detail); }',
     to: 'get creaseAngleDeg() { return detailToAngleDeg(45); }',
-    breaks: ['detail/creases-grow', 'detail/pixels', 'detail/readout'] },
+    // ...and the interior tier cannot track a slider that does nothing.
+    breaks: ['detail/creases-grow', 'detail/pixels', 'detail/readout',
+             'tier/interior-tracks-detail'] },
 
   { id: 'detail-moves-silhouette', file: 'print-lines.js',
     from: '      } else if (a !== facing[f1]) {\n        kind = 1;                                          // silhouette',
@@ -117,7 +119,10 @@ const MUTANTS = [
     // the silhouette set leaves fragments rather than chains, and smoothing a
     // fragment cannot do much (measured under the mutant: 53.3 -> 52.4 deg,
     // against 44.0 -> 31.1 on the real code).
-    breaks: ['detail/silhouette-held', 'smooth/contour-is-not-faceted'] },
+    // It also makes the CONTOUR track detail (measured: 64% drift), which is
+    // the half of tier/interior-tracks-detail that says only the interior may.
+    breaks: ['detail/silhouette-held', 'smooth/contour-is-not-faceted',
+             'tier/interior-tracks-detail'] },
 
   { id: 'no-weld', file: 'print-lines.js',
     from: '      const k = `${Math.round(pos.getX(i) * inv)},${Math.round(pos.getY(i) * inv)},${Math.round(pos.getZ(i) * inv)}`;',
@@ -129,7 +134,7 @@ const MUTANTS = [
     // interior, ink 0.0014. All claimed rather than explained away.
     breaks: ['topology/welded', 'lineart/draws-something', 'weight/pixels',
              'detail/creases-grow', 'detail/pixels', 'chain/both-tiers-populated',
-             'smooth/contour-is-not-faceted'] },
+             'smooth/contour-is-not-faceted', 'tier/interior-tracks-detail'] },
 
   { id: 'dots-never-drawn', file: 'print-lines.js',
     // moved when the stroke/dot partition went per CHAIN instead of per edge
