@@ -1976,6 +1976,22 @@ So: **fold the charter and outcome-doc changes into the code commit, or push the
 code.** A close-out doc written after the gates are green is the common case, and the fix is
 to amend rather than to append.
 
+**EXCEPTION, RULED Sep 5 (Eva, session 19): A RULING MADE FROM A SHEET AFTER THE CODE HAS RUN
+ITS GATES IS RECORDED IN A DOCS-ONLY PR OF ITS OWN, OPENED AND MERGED BY THE SAME SESSION
+BEFORE IT REPORTS DONE — never as a docs commit on the gated head.** The collision the rule
+above could not hold against: Eva's ruling on a sheet arrives after the code is pushed and
+gated, always; session 18 recorded three rulings as a docs-only commit on a gated head and
+paid two cancelled full-matrix runs for it. A docs-only PR touches no gated path, so no bloom
+gate runs (the filters read the PR diff) — it is free; its commit message names the code PR
+it rules on; the session's `DONE` line carries BOTH shas. The outcome doc and the charter
+entry still go in the CODE commit, written to the point of "held for Eva's ruling", so the
+docs-only PR is the ruling and nothing else. **The condition is the point: a ruling that
+depends on a future session to record it is not recorded.** The alternatives weighed — a
+docs commit that deliberately re-triggers the gates (~1 h of runner time per session to
+certify the same bytes twice), or leaving the ruling to the next kickoff prompt (a
+session-long window in which `main` does not carry it, which has already bitten twice) — are
+in `docs/bloom-session-19-outcome.md`. First use: session 19's own docs-only PR, this one.
+
 **AND `concurrency: cancel-in-progress` IS ON ALL FOUR BLOOM WORKFLOWS (Eva, Sep 5), keyed
 to `${{ github.workflow }}-${{ github.ref }}` so it can never cancel across PRs.** Safe by
 construction — it only ever cancels a run on a commit that has been SUPERSEDED, and the
@@ -4149,3 +4165,49 @@ matters should be measured this way.
       amendment — rulings recorded in a docs-only PR of the session's own, opened and
       merged by the same session before it reports DONE — was APPROVED and is recorded at
       the Sep 5 session-17 ruling by this session's docs-only PR.
+
+- **SESSION 19'S RULINGS (Eva, Sep 5), recorded by the docs-only PR after the code merged —
+  the amendment's first use.**
+
+    - **R5 IS THE VALIDITY STANDARD FOR THE SOLID-ANGLE INSTRUMENT, AND THE "MAPPED THROUGH
+      THE SPHERE" CHECK IS ILL-POSED. Do not re-propose it as a bug.** Eva's brief asked that
+      on a rise-1 hemisphere the solid-angle reading agree with the plan raster mapped through
+      the sphere, because "there both instruments see the same surface". Measured (outcome
+      doc): they agree at 100% wherever the crown is and part company only at the rim — on
+      the incurve hemisphere 75–90° reads 84.2% open from the centre and 0.0% from above. The
+      reason is the RAY, not either instrument: a vertical line through a rim point runs up
+      through the blades; the radial ray from the centre through the same point is horizontal
+      and leaves under the canopy between the roots. The two ray families coincide only on
+      the axis, so the premise was true of the surface and false of the rays through it, and
+      the divergence is both instruments being correct. **Ruled: R5 — the same rays through
+      both formulations, the shipped plan raster's own grid, no tolerance — is the standard;
+      the mapped comparison stays a reported number of the standalone tool and is never a
+      check.** Two conditions were set before any pin, both met: a closed-form calibration of
+      the MEASURE (R6: cells to 4π, a closed sphere at 0 sr, three known cones at 0.005% /
+      0.369% / 0.058% of their exact solid angle, tolerances stated) and a negative control
+      with WITNESSES (each kernel mutation naming its own clause with R0 suppressed, the way
+      session 18 suppressed S1 for S3). R5 has no scope limit on rows without a centre: it
+      runs on flat rows too.
+
+    - **THE PINS, as ruled:** the incurve sphere's face pole closed (bald ≤ 0.3°, region
+      ≤ 0.001 sr) and total ≤ 4.6% of 4π; the reserved pole closed (≤ 0.3°) on the defaults,
+      the mum and the 240-foot row; the 240-foot face pole NOT pinned (open by design; phase
+      2's number: 2.58 sr connected open region, the DISC's 48.6° cone covering 0.77 sr of
+      it); and — the one change to the proposal — **the incurve sphere's reserved-pole hole
+      PINNED AT ITS MEASURED VALUE with headroom (bald ≤ 5.0° against 4.375°, region ≤ 0.25 sr
+      against 0.2205), not closed and not left unpinned:** "a 0.95 mm hole at the point
+      reserved for a stem is the least consequential hole on the object, but an unpinned
+      measured hole is one that can grow silently." 0.95 mm is the known value, recorded with
+      the phase-2 stem work. Every pin's reading, bound and headroom is printed by the gate on
+      every run and tabulated in the outcome doc.
+
+    - **CORRECTIONS CARRIED:** session 18's "24.5 mm" DISC footprint is a RADIUS (49 mm
+      across), fixed where recorded; the sibling's Phase A estimate of ~250 lines came in at
+      666 before the ruling and ~900 after it — noted for sizing.
+
+    - **CLOSE-OUT.** The four bloom gates green on `163a8ad`'s head; the retention close
+      phase14 499/499 bit-identical, 0 moved; the 51 predeclared files and all fourteen
+      frozen matrix functions byte-identical to `dddd934`, re-verified against `main` after
+      the merge. **No new frozen tag is owed** — no row's set and no byte moved; phase14 stays
+      the newest baseline. Merged by the session as `163a8ad` (#158); the rulings as
+      `this docs-only PR (its own squash sha is in session 19's final report)` (the docs-only PR).
