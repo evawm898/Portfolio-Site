@@ -157,6 +157,13 @@ export class LineExtractor {
     this.selA = new Int32Array(E);
     this.selB = new Int32Array(E);
     this.selKind = new Uint8Array(E);        // 1 = silhouette, 2 = crease
+    // The FRONT-FACING face of each selected edge. Recorded here because the
+    // infill needs the projected silhouette ORIENTED: the filled region is
+    // the one with nonzero winding, and the winding is only meaningful if
+    // every boundary edge is traversed the way it appears in its front face.
+    // Even-odd instead of nonzero would punch holes wherever a petal folds
+    // over itself and puts a second silhouette loop inside the outline.
+    this.selF = new Int32Array(E);
 
     // Chain scratch. `head`/`nxt`/`adj` are a per-vertex linked list of
     // incident selected edges; they are reset per build over the edges of the
@@ -233,6 +240,7 @@ export class LineExtractor {
       }
       if (!kind) continue;
       A[n] = edgeA[e]; B[n] = edgeB[e]; K[n] = kind;
+      this.selF[n] = a ? f0 : f1;
       if (kind === 1) sil++; else cre++;
       n++;
     }

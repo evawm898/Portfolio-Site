@@ -346,10 +346,17 @@ async function run({ mutant = null, shots = false } = {}) {
   // Both overlay panels are excluded by their REAL bounding boxes rather than
   // by a hardcoded rectangle: the right-hand column grew a second panel this
   // session, and a stale rectangle would have measured chrome as ink.
+  // The two fixed COLUMNS, not the individual panels inside them: the left
+  // column holds LOAD BUNDLE and BUNDLE as separate boxes now, so measuring
+  // '#print-debug' alone leaves the other one's chrome counted as ink — which
+  // is the stale-rectangle failure this comment already warns about, and it
+  // duly happened. A missing selector is a hard failure rather than a silently
+  // skipped exclusion, for the same reason.
   const panels = [];
-  for (const sel of ['#print-debug', '#print-side']) {
+  for (const sel of ['#print-left', '#print-side']) {
     const b = await page.locator(sel).boundingBox();
-    if (b) panels.push(b);
+    if (!b) { check('harness/panel-rect-' + sel, false, 'selector matched nothing — ink would count chrome'); }
+    else panels.push(b);
   }
   function inkFraction(png, bg) {
     const { width, height, data } = decodePNG(png);
@@ -373,6 +380,51 @@ async function run({ mutant = null, shots = false } = {}) {
   out('\n--- line art, shipped state ---');
   check('lineart/on-by-default', await call(() => window.__printLineArt.enabled()));
   check('lineart/panel-visible', !(await page.locator('#print-stylize').isHidden()));
+
+  // --- the panels are ALWAYS present, and each collapses on its own --------
+  // The old contract showed POSE and STYLIZE only once a bundle had produced
+  // a rig / a drawable mesh, so "the panel is missing" and "the stage is
+  // broken" looked identical. Now the panel is on screen from the first paint
+  // and reports its own emptiness. `hidden` is asserted on the ELEMENT, not
+  // inferred from a screenshot, because a panel scrolled out of the column
+  // would read as absent either way.
+  const panelIds = ['print-debug', 'print-pose', 'print-stylize'];
+  const panelsPresent = [];
+  for (const id of panelIds) panelsPresent.push(!(await page.locator('#' + id).isHidden()));
+  check('panel/all-present', panelsPresent.every(Boolean),
+    panelIds.map((id, i) => `${id}=${panelsPresent[i]}`).join(' '));
+  check('panel/all-are-details',
+    await page.evaluate(ids => ids.every(id => document.getElementById(id).tagName === 'DETAILS'), panelIds),
+    'native <details>, so no JS owns open/closed');
+
+  // Collapsing one must not collapse or hide the others.
+  await page.click('#print-stylize > summary');
+  const afterCollapse = await page.evaluate(ids => ids.map(id => ({
+    id, open: document.getElementById(id).open,
+    present: !document.getElementById(id).hidden,
+  })), panelIds);
+  check('panel/collapse-is-individual',
+    afterCollapse.find(p => p.id === 'print-stylize').open === false
+      && afterCollapse.filter(p => p.id !== 'print-stylize').every(p => p.open && p.present),
+    JSON.stringify(afterCollapse));
+
+  // THE TRAP THE CARDS PANEL ALREADY SHIPPED ONCE: a control inside a
+  // COLLAPSED section must still read, write and rebuild. Driven through the
+  // widget while STYLIZE is shut, and measured on the extracted segment set —
+  // not on the read-out, which is inside the collapsed section and would
+  // agree with itself.
+  const collapsedBefore = await call(() => window.__printLineArt.stats());
+  await call(() => window.__printLineArt.setDetailWidget(88));
+  await page.waitForTimeout(260);
+  const collapsedAfter = await call(() => window.__printLineArt.stats());
+  const collapsedStillShut = await page.evaluate(() => !document.getElementById('print-stylize').open);
+  check('panel/control-works-while-collapsed',
+    collapsedStillShut && collapsedBefore && collapsedAfter
+      && collapsedBefore.crease !== collapsedAfter.crease,
+    `shut=${collapsedStillShut} crease ${collapsedBefore && collapsedBefore.crease} -> ${collapsedAfter && collapsedAfter.crease}`);
+  await page.click('#print-stylize > summary');       // leave it open for what follows
+  await call(() => window.__printLineArt.setDetailWidget(45));
+  await page.waitForTimeout(260);
   const topo = await call(() => window.__printLineArt.topology());
   if (!mutant) console.log('topology:', JSON.stringify(topo, null, 1));
   const totalEdges = topo.reduce((a, t) => a + t.edges, 0);
@@ -1006,7 +1058,15 @@ async function run({ mutant = null, shots = false } = {}) {
     });
     await page.waitForFunction(() => window.__printScaffold && window.__printScaffold.source === 'no-pivot.glb', { timeout: 15000 });
     const noPivotExtras = await call(() => window.__printScaffold.pivotExtras);
-    const noPivotPoseHidden = await page.locator('#print-pose').isHidden();
+      // The POSE panel is ALWAYS on screen now; what a bundle with no rig changes
+  // is its BODY, which is replaced by the panel's own empty note. Asserting
+  // the panel itself is hidden would be asserting the old contract.
+  const noPivotPoseHidden = await page.evaluate(() => {
+    const p = document.getElementById('print-pose');
+    const empty = document.getElementById('poseEmpty');
+    const body = [...p.children].filter(c => c.tagName !== 'SUMMARY' && c !== empty);
+    return !p.hidden && !empty.hidden && body.every(c => c.hidden);
+  });
     const noPivotMeshes = await call(() => window.__printScaffold.meshes);
     const logAfterNoPivot = await page.textContent('#print-log');
     out(`no-pivot file: swapped=true extras=${JSON.stringify(noPivotExtras)} poseHidden=${noPivotPoseHidden} meshes=${noPivotMeshes}`);
