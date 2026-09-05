@@ -89,7 +89,11 @@ const base = `http://127.0.0.1:${server.address().port}`;
 // is the set of check names that MUST go red; everything else must stay green.
 const MUTANTS = [
   { id: 'weight-ignored', file: 'print-lines.js',
-    from: 'u.mat.linewidth = this.weight;', to: 'u.mat.linewidth = 1.6;',
+    // The line this edits MOVED when the weight went two-tier, and the sweep
+    // said so rather than reporting a green mutant: "mutation did not apply".
+    // That guard is the reason a stale mutant cannot quietly stop testing.
+    from: 'tier.mat.linewidth = tier.kind === 1 ? this.contourWeight : this.interiorWeight;',
+    to: 'tier.mat.linewidth = tier.kind === 1 ? 2.2 : 2.2 * INTERIOR_WEIGHT_RATIO;',
     breaks: ['weight/material', 'weight/pixels'] },
 
   { id: 'weight-adds-lines', file: 'print-lines.js',
@@ -109,7 +113,11 @@ const MUTANTS = [
   { id: 'detail-moves-silhouette', file: 'print-lines.js',
     from: '      } else if (a !== facing[f1]) {\n        kind = 1;                                          // silhouette',
     to: '      } else if (a !== facing[f1] && D[e] < creaseCos * 0.999) {\n        kind = 1;                                          // silhouette',
-    breaks: ['detail/silhouette-held'] },
+    // It also breaks the smoothing comparison, and legitimately: decimating
+    // the silhouette set leaves fragments rather than chains, and smoothing a
+    // fragment cannot do much (measured under the mutant: 53.3 -> 52.4 deg,
+    // against 44.0 -> 31.1 on the real code).
+    breaks: ['detail/silhouette-held', 'smooth/contour-is-not-faceted'] },
 
   { id: 'no-weld', file: 'print-lines.js',
     from: '      const k = `${Math.round(pos.getX(i) * inv)},${Math.round(pos.getY(i) * inv)},${Math.round(pos.getZ(i) * inv)}`;',
