@@ -432,10 +432,23 @@ async function run({ mutant = null, shots = false } = {}) {
   const tBefore = await call(() => window.__printScaffold.twist());
   const camBefore = await call(() => window.__printScaffold.cameraPosition());
   const silBefore = (await call(() => window.__printLineArt.stats())).silhouette;
+  // THE DRAG MUST START ON BARE CANVAS. At 0.75 of the width this landed
+  // INSIDE the right-hand panel — on a slider — so the pointerdown was
+  // captured by the panel and the canvas never saw the drag. Everything still
+  // looked green: "camera moved 21.2" was OrbitControls' damping still easing
+  // from the previous orbit, not this one, and the reported orbit was never
+  // performed at all. It surfaced only because a mutant that resets the pose
+  // from a style slider then reddened THIS check instead of the independence
+  // check that names it. Start in the gap between the two panels, and demand
+  // a movement only a real orbit produces.
+  const gapX = Math.max(...panels.map(p => p.x)) - 40;   // just left of the side panel
+  const gapY = Math.max(...panels.map(p => p.y + p.height)) + 20;
   const cbox = await page.locator('#print-canvas').boundingBox();
-  await page.mouse.move(cbox.x + cbox.width * 0.75, cbox.y + cbox.height * 0.75);
+  const ox = Math.min(Math.max(gapX, cbox.x + 40), cbox.x + cbox.width - 40);
+  const oy = Math.min(gapY, cbox.y + cbox.height - 40);
+  await page.mouse.move(ox, oy);
   await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(cbox.x + cbox.width * 0.75 - i * 16, cbox.y + cbox.height * 0.75 - i * 4);
+  for (let i = 1; i <= 12; i++) await page.mouse.move(ox - i * 16, oy - i * 4);
   await page.mouse.up();
   await page.waitForTimeout(500);
   const camAfter = await call(() => window.__printScaffold.cameraPosition());
@@ -450,8 +463,10 @@ async function run({ mutant = null, shots = false } = {}) {
     `camera moved ${camMoved.toFixed(1)}; bend ${JSON.stringify(poseBeforeOrbit) === JSON.stringify(poseAfterOrbit) ? 'held' : 'MOVED ' + JSON.stringify(poseBeforeOrbit[2]) + ' -> ' + JSON.stringify(poseAfterOrbit[2])}; droop ${dBefore}->${dAfterOrbit} twist ${tBefore}->${tAfterOrbit}`);
   // THE silhouette is the outline FROM THE CURRENT CAMERA. If it does not move
   // when the camera does, it is not a silhouette — it is a fixed edge set.
-  check('live/orbit-moves-silhouette', camMoved > 1 && silBefore !== silAfter,
-    `${silBefore} -> ${silAfter}`);
+  // > 100, not > 1. Damping alone drifts ~21 units in this window, so a bar of
+  // 1 was met by a drag that never reached the canvas.
+  check('live/orbit-moves-silhouette', camMoved > 100 && silBefore !== silAfter,
+    `camera moved ${camMoved.toFixed(1)} from (${ox.toFixed(0)}, ${oy.toFixed(0)}); silhouette ${silBefore} -> ${silAfter}`);
   await shot('05-posed-orbited.png');
 
   const poseTxt = await call(() => window.__printScaffold.poseText());
