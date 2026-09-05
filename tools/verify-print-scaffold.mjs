@@ -235,8 +235,14 @@ const MUTANTS = [
   { id: 'stylize-freezes-pose-controls', file: 'print.js',
     from: 'canvas.addEventListener(\'pointerdown\', (ev) => {\n  if (!rig) return;',
     to: 'canvas.addEventListener(\'pointerdown\', (ev) => {\n  if (!rig || (art && art.enabled)) return;',
+    // The three swap checks are here because they DRAG A BEND POINT too — on
+    // the swapped-in bundle, before the drop, and before comparing the stem's
+    // line set at rest against bent. A mutation that freezes the drag has to
+    // take them with it; the sweep reported them as unclaimed until this list
+    // caught up with the checks that were ported into run().
     breaks: ['stylized/bend-drag-still-works', 'pose/lines-follow-bend',
-             'pose/panel-reflects-state'] },
+             'pose/panel-reflects-state', 'swap/still-posable', 'swap/drop',
+             'swap/lineart-live-on-new-bundle'] },
 
   { id: 'lines-frozen-after-first-frame', file: 'print.js',
     from: '    frameStats = art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());',
