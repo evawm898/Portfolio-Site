@@ -91,14 +91,23 @@ reads reflexed and bald under lean 0, the fade is the lever; if it reads as a cr
 
 | assertion | what it reads | first family to fire, on the smoke SPHERE rows |
 |---|---|---|
-| S1 | polar angle strictly decreasing; cos φ steps by exactly 2/K; mirror-symmetric about the equator; reaches both poles within one step; arc / height / radius are the sphere's own functions of φ | <<MS1>> |
-| S2 | the hub builder's own report says `closed` iff the owner declares a sphere | <<MS2>> |
-| S3 | no emitted foot row at or past the reserved pole; the clearance is positive AND at most one equal-area step; the read-out's number is the geometry's | <<MS3>> |
+| S1 | polar angle strictly decreasing; cos φ steps by exactly 2/K; mirror-symmetric about the equator; reaches both poles within one step; arc / height / radius are the sphere's own functions of φ | **S1** (M-S1) |
+| S2 | the hub builder's own report says `closed` iff the owner declares a sphere | **S2** (M-S2) |
+| S3 | no emitted foot row at or past the reserved pole; the clearance is positive AND at most one equal-area step; the read-out's number is the geometry's | S1 first, **S3 alone with S1 suppressed** (M-S3) |
 | S4 | under SPHERE the rise is inert (rise 1 / built 1, hub radius = sphere radius, centre on the equator); the bit-identity across the slider's range is the GATED rows | the byte diff and route (m) |
-| J9 (sphere arm) | `domeLean` exactly 0 on every ring | <<MJ9>> |
-| the loud coverage skip | a SPHERE row that emits a plan number fails the RUN | <<MCOV>> |
+| J9 (sphere arm) | `domeLean` exactly 0 on every ring | **J9** (M-J9) |
+| the loud coverage skip | a SPHERE row that emits a plan number fails the RUN | **the run fails** (M-COV: a false clean of 0.0% / 0.08 mm on the incurve sphere) |
 
-<<MUTANT_TABLE>>
+| mutant (a throwaway copy of the tree, the five smoke SPHERE rows) | boundary / degen | live = export | RADIAL control row | first family to fire | with S1 suppressed |
+|---|---|---|---|---|---|
+| shipped tree | 0 / 0 | yes | clean | **silent, 5 of 5** | — |
+| M-S1 the sequence stops at the equator (cos φ runs −1..0) | 0 / 0 | yes | clean | **S1**, 4 of 4 sphere rows (the step is half of 2/K; rings 0 and K−1 are not mirror images; the last foot is 0.94 in cos φ from the face pole) | — |
+| M-S2 the hub builds the cap arm under a sphere | 0 / 0 | yes | clean | **S2**, 4 of 4 ("the hub builder reports an open cap") | — |
+| M-S3 the sequence shifted half a step onto the reserved pole | 0 / 0 | yes | clean | S1's mirror clause, then S3 | **S3 alone**, 4 of 4 ("0 mm past the reserved pole"; "a foot row at polar angle 180°") |
+| M-J9 the cap's lean continued onto the sphere (`domeLean = slope`) | 0 / 0 | yes | clean | **J9**, 4 of 4 (lean 151° on the defaults' first ring, 172.6° on the incurve sphere's — the built tilt past 180°) | — |
+| M-COV the plan raster forgets to skip the sphere | 0 / 0 | yes | clean | **the loud skip**, 4 of 4 — and the number it emitted on the incurve sphere was 0.0% uncovered, bald cap 0.08 mm: THE FALSE CLEAN, read from below | — |
+
+Every mutant exports watertight (boundary 0, 0 degenerate) at identical live and export counts on every row; the STL gates see none of it. M-S3 is the session-17 case: a red-then-green control names a witness EXISTS, and S3 is named its own witness only because S1 was suppressed and it fired alone.
 
 Every mutant exports watertight with zero degenerate triangles at identical live and export
 triangle counts — the STL gates see none of it, which is why the assertions exist.
@@ -117,7 +126,7 @@ it is a solid-angle question the sheet answers by eye until session two's instru
 The predeclared list, byte-identical to 5312845 by `sha1sum -c`: every `flower*` file and
 flower tool, `tools/chromium-harness.mjs`, cards, the tracker, and the twelve frozen matrix
 functions phase2–phase13 with `FROZEN_BASE_COMMITS`'s twelve entries above phase14. Eleven
-`frozen/*` tags on the remote, as session 17 left them. <<UNTOUCHED>>
+`frozen/*` tags on the remote, as session 17 left them. Verified at close: `git diff --stat 5312845 HEAD` over every flower file and tool, the cards and tracker files and `tools/chromium-harness.mjs` is EMPTY; all 13 older frozen functions (legacy, phase2–phase13) deep-equal to 5312845's by a JSON comparison of their output; `FROZEN_BASE_COMMITS` phase2–phase13 identical; `git ls-remote --tags origin` reads 11 `frozen/*` tags, as session 17 left them.
 
 **Owed after the merge:** `frozen/phase14` (base 5312845, a commit on `main`) is published
 by dispatching the `bloom-frozen-tags` workflow from `main`; until it is, the base is kept

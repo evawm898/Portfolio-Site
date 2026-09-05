@@ -3998,7 +3998,7 @@ matters should be measured this way.
       (the hub is CLOSED iff declared, from the builder's own report), S3 (the reserved pole,
       both directions) and S4 (the rise inert under SPHERE — GATED rows for the bit-identity,
       a per-row owner check for the mechanism) carry the rest. The mutant table is in the
-      outcome doc: <<MUTANT_SUMMARY>>
+      outcome doc: five mutants, each caught by the family written for it (S1, S2, S3 with S1 suppressed, J9, the loud skip) on all four sphere smoke rows, every one silent on the RADIAL control and watertight with identical counts — and M-COV's emitted number on the incurve sphere was 0.0% uncovered, bald cap 0.08 mm, the false clean exactly as predicted.
 
     - **THE SPHERE SPREADS THE FEET.** The incurve sliders read D_max 5 / D_mean 2.06 on the
       cap at rise 0.5 and **2 / 1.00 on the sphere**, depth 1 within one equal-area step of

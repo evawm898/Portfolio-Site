@@ -56,8 +56,15 @@ const sha = (buf) => crypto.createHash('sha1').update(buf).digest('hex').slice(0
 const VIEWS = {
   whole: null,
   profile: (R) => ({ r: Math.max(R * 3.2, 8), at: [0, 0, 0], dir: [0.12, -0.99, 0.06] }),
-  face: (R) => ({ r: Math.max(R * 1.35, 5), at: [0, 0, R], dir: [0.3, -0.3, 0.9] }),
-  faceDown: (R) => ({ r: Math.max(R * 1.35, 5), at: [0, 0, R], dir: [0.03, -0.03, 1] }),
+  /* THE FACE-POLE CAMERAS STAND OUTSIDE THE CANOPY: the incurve florets are
+     20 mm long and curl 150 degrees at the pole, so a camera at 1.35 R (the
+     reserved pole's magnification) sits INSIDE them and photographs blade
+     sides — the first render did exactly that and passed the content check.
+     2.8 R clears a 20 mm blade on a 12.5 mm sphere with the pole still the
+     subject; the reserved pole keeps the tighter frame because its blades
+     point AWAY from the camera there. */
+  face: (R) => ({ r: Math.max(R * 2.8, 10), at: [0, 0, R], dir: [0.3, -0.3, 0.9] }),
+  faceDown: (R) => ({ r: Math.max(R * 2.8, 10), at: [0, 0, R], dir: [0.03, -0.03, 1] }),
   reserved: (R) => ({ r: Math.max(R * 1.35, 5), at: [0, 0, -R], dir: [0.3, -0.3, -0.9] }),
 };
 
