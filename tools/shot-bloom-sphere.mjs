@@ -138,11 +138,11 @@ const MUM = { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 0.
 const SPH = { placement: 'CONTINUOUS', hubShape: 'SPHERE' };
 
 console.log('THE SPHERE SHEET — every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted.\n');
-const incSph = await cell({ label: 'INCURVE sliders — FULL SPHERE', set: set({ ...INCURVE, ...SPH }), ruling: 'THE HEADLINE — rule Q1b from the face-pole crop',
+const incSph = await cell({ label: 'INCURVE sliders — FULL SPHERE', set: set({ ...INCURVE, ...SPH }), views: ['whole', 'profile', 'face', 'faceDown', 'reserved'], ruling: 'THE HEADLINE — rule Q1b from the face-pole crop',
   note: '40 per turn x 3 turns pole to pole (120 feet, equal-area), spread 1.60, 20 mm florets, tilt 75, curl 150, ALL THIN feet. Lean 0: every blade leaves the surface at its authored tilt from the local tangent, heading away from the face pole. The reserved pole is clear of feet by construction; whether the blades COVER it, and whether the face pole reads bald or reflexed, is what this cell is for.' });
 const incCap = await cell({ label: 'INCURVE sliders — CAP at Head rise 1 (the control)', set: set({ ...INCURVE, headRise: 1 }), frame: incSph.own, views: ['whole', 'profile', 'face'], ruling: 'THE CONTROL — the hemisphere the sphere continues past its own rim, same camera',
   note: 'The same sliders on the cap at a hemisphere: the same sphere radius, the upper half only, with the cap\'s restore-the-flat-aim lean (domeLean = slope). What differs from the cell beside it is the far half of the ball and the lean.' });
-const dense = await cell({ label: '40 per turn x 6 turns — FULL SPHERE (240 feet)', set: set({ ...SPH, petalCount: 40, layerCount: 6 }), ruling: 'THE HIGH-K ROW — the face pole at its densest',
+const dense = await cell({ label: '40 per turn x 6 turns — FULL SPHERE (240 feet)', set: set({ ...SPH, petalCount: 40, layerCount: 6 }), views: ['whole', 'profile', 'face', 'faceDown', 'reserved'], ruling: 'THE HIGH-K ROW — the face pole at its densest',
   note: 'The densest reachable pole: 240 feet, the nearest 1.14 mm from each pole on a hub this size, feet crossing the face pole. The caption carries the crowding at the face pole and at the reserved pole within one equal-area step of each.' });
 const dflt = await cell({ label: 'shipping sliders — FULL SPHERE (eight feet)', set: set(SPH), views: ['whole', 'profile', 'reserved'], ruling: 'the sparse case', note: 'Eight petals on one turn, pole to pole: what the mode does with the shipping sliders. Each foot owns an eighth of the sphere.' });
 const mum = await cell({ label: 'the mum sliders — FULL SPHERE', set: set({ ...MUM, ...SPH }), ruling: 'the ruled-bad base on a sphere',
@@ -165,7 +165,8 @@ const num = (c) => {
     + (r.crowded ? ` · <b class="flag">CROWDED (D_max &ge; ${CROWDED_DMAX})</b>` : '')
     + (c.seat ? `<br>SEAT: ${c.seat.fullFootprint ? 'the whole footprint' : `a ${c.seat.patchRadius.toFixed(2)} mm patch of the ${c.seat.footprint.toFixed(2)} mm footprint`} overlaps the shell · rim hovers ${c.seat.hover.toFixed(2)} mm` : '');
 };
-const fig = (c, view, cap) => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b> <i>(${cap}${c.widened[view] > 1 ? `, camera widened ${c.widened[view].toFixed(2)}x to clear the canopy` : ''})</i><br><small>${esc(c.ruling)} · read-out: "${esc(c.readoutFirst)}"</small><br>${num(c)}`
+const fig = (c, view, cap) => { if (!c.shots[view]) throw new Error(`${c.label}: the page references a "${view}" frame this cell never shot — a blank figure is a picture nobody should rule from`); return figHtml(c, view, cap); };
+const figHtml = (c, view, cap) => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b> <i>(${cap}${c.widened[view] > 1 ? `, camera widened ${c.widened[view].toFixed(2)}x to clear the canopy` : ''})</i><br><small>${esc(c.ruling)} · read-out: "${esc(c.readoutFirst)}"</small><br>${num(c)}`
   + (c.headLine ? `<br><small>${esc(c.headLine)}</small>` : '') + (c.note ? `<p>${esc(c.note)}</p>` : '') + `</figcaption></figure>`;
 const html = `<title>The full-sphere head</title>
 <style>body{background:#0c0f0e;color:#dfe9e3;font:14px/1.5 system-ui,sans-serif;margin:24px}

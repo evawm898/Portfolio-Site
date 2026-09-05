@@ -4018,3 +4018,13 @@ matters should be measured this way.
       (for Q1b) and the RESERVED pole from below; the 240-foot row, the sparse and mum cases;
       and the byte claim on the sheet itself (two GATED pairs REQUIRED equal by sha). Held for
       Eva's ruling.
+
+    - **WHAT THE SHEET SHOWS (findings, not patches).** The RESERVED pole is COVERED on
+      every sphere cell — roofed by the overlapping bases of the first rings' blades on the
+      incurve sphere, a starburst on the mum, forty closing blades on the 240-foot row — no
+      bald spot, nothing patched. The FACE pole carries the centre question: the designed
+      centre seats at 75% of the hub radius, and on a sphere the hub radius IS the sphere
+      radius, so the DISC becomes a lid over the whole face pole (24.5 mm on the 240-foot
+      row); on the incurve sphere the tips close it as a tight crown with a few-millimetre
+      eye. A centre that follows the sphere, or is sized from a foot, is the phase-2 centre
+      question the dome session recorded — on the sheet for Eva, not shrunk quietly.

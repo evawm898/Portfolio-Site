@@ -119,7 +119,20 @@ by construction (feet run toward the face pole along the meridian; the nearest r
 one half-step from the pole — 1.62 mm at 120 feet on a 12.51 mm sphere, 2.99 mm at 240 on a
 32.72 mm one), and S3 holds that in both directions. Whether the converging blade tips COVER
 it is a solid-angle question the sheet answers by eye until session two's instrument exists:
-<<RESERVED_FINDING>>.
+**covered, on every sphere cell shot.** On the incurve sphere the reserved pole is roofed
+by the overlapping BASES of the first rings' blades — the feet sit one half-step from the
+pole and the blades lean toward it as they curl — with no bald spot; on the mum it reads as
+a covered starburst; on the 240-foot row the first ring's forty blades close it the same
+way. Nothing was patched to get there. **The face pole is a different finding:** the
+designed centre is seated on the apex slab at 75% of the hub radius, and on a sphere the
+hub radius IS the sphere radius, so the DISC centre becomes a plate over the whole face pole
+— 24.5 mm across on the 240-foot row, reading as a lid on a sea urchin (the `faceDown`
+frame). On the incurve sphere the converging tips close the face pole as a tight crown, the
+same emergent closure the incurve target has on the cap, with a few-millimetre eye where the
+thin blade edges meet. Neither is patched here: a centre that follows the sphere (or is
+sized from a foot rather than the hub) is the phase-2 centre question the dome session
+already recorded, and it is now visible on the sheet for Eva's ruling rather than quietly
+shrunk.
 
 ## A pre-existing defect in the `--conn` path, found by running it
 
