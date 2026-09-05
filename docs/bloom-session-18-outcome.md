@@ -149,7 +149,7 @@ alive by `main`'s history alone.
 ## Verification
 
 - Smoke subset with the flood fill (`node tools/bloom-smoke.mjs --conn`, 33 rows over 20
-  blocks — block 22's five rows derived by the guard's own method): <<SMOKE>>.
+  blocks — block 22's five rows derived by the guard's own method): clean — export gate 33/33 watertight, 0 degenerate, identical counts, every family green, 4 SPHERE rows a labelled coverage skip (299 s); connectedness 33/33 ONE piece (271 s), on this box under load, timings anecdotal.
 - Export gate on all 28 block-22 rows: 28/28 watertight, 0 degenerate, identical counts,
   every family green, 28/28 labelled coverage skips, 295 s on this box.
 - Panel gate: PASS — the Head section's path-route witness drives `headRise` to 0.5 inside the collapsed section and the hub builder's own count moves 192 → 3,456; route (m) walks CAP → SPHERE → rise 1 hidden (the build does not move) → CAP → RADIAL with SPHERE stored → CONTINUOUS → the apex corner (CLAMPED), asserting the hidden rise, the closed hub, the three hub counts and the HEAD: FULL SPHERE line with its reserved-pole number against the owner; negative control: PASS, 1,392 deliberate breaks caught, ALL ELEVEN ROUTES fired (the sphere line frozen is what route (m) sees).
