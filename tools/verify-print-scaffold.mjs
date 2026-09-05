@@ -168,11 +168,15 @@ const MUTANTS = [
 
   // Both tiers chained from the SILHOUETTE set. The interior tier then draws
   // contour chains, so it stops tracking the detail slider — which is the only
-  // thing that sees it. The first attempt at this mutation edited one of five
-  // `wantKind` tests and changed almost nothing; it stayed green everywhere.
+  // thing that sees it. TWO earlier attempts at this mutation were wrong and
+  // the sweep said so: the first edited one of five `wantKind` tests and
+  // changed almost nothing (green everywhere); the second passed a SPREAD COPY
+  // of the tier, so the stats were written to the copy and the page drew
+  // nothing at all — a broken page pretending to be a negative control, which
+  // is exactly what the "unclaimed check went red" rule exists to catch.
   { id: 'tiers-chained-together', file: 'print-lines.js',
-    from: '        chainMs += this._drawTier(u, tier, wpp, b, view, measureTurns);',
-    to: '        chainMs += this._drawTier(u, { ...tier, kind: 1 }, wpp, b, view, measureTurns);',
+    from: '    ex.buildChains(tier.kind);',
+    to: '    ex.buildChains(1);',
     breaks: ['tier/interior-tracks-detail'] },
 
   // A camera move never recomputes. NOT skip/idle-is-free: a pose change bumps
