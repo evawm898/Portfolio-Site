@@ -446,16 +446,47 @@ out of the fill, a darkness per part).
 
 **TWO BUNDLES SHIP, and the second one is why `/print` can now be judged on a
 LEAF.** `flower-test-bundle.glb` (5.7 MB, 78k triangles) is the default and is
-still what every gate loads first. `bloom-stem-leaf-bundle.glb` (21.7 MB,
-301,152-triangle bloom + a synthetic stem and leaf) is loaded on demand by
-`tools/verify-print-tone.mjs` and `tools/shot-print-tone.mjs`, and it is the
-first bundle with a LEAF as its own node and its own mesh. **Its bloom is a
-better solid and its leaf is a worse one, both measured:** the bloom has 0
-boundary edges and 0 non-manifold edges (against 12 and 15 for the old one),
-while the 84-triangle leaf has 16 of its 114 edges carrying a third face —
-which is what made the open-outline problem below unmissable. The 21.7 MB is
-committed as exported, undecimated; decimating someone's test export to save
-repo size is their call, not a session's.
+still what every gate loads first. `bloom-stem-leaf-bundle.glb` (1.9 MB) is
+loaded on demand by `tools/verify-print-tone.mjs` and `tools/shot-print-tone.mjs`,
+and it is the first bundle with a LEAF as its own node and its own mesh. **Its
+bloom is a better solid and its leaf is a worse one, both measured:** the bloom
+has 0 boundary edges (against 12 for the old one) and 5 non-manifold (15), while
+the 84-triangle leaf has 16 of its 114 edges carrying a third face — which is
+what made the open-outline problem below unmissable.
+
+**IT SHIPS SHRUNK, AND WHAT WAS DONE TO IT IS A COMMITTED TOOL, NOT A MEMORY**
+(Eva, Sep 5): `node tools/shrink-print-bundle.mjs <in> <out> [--ratio]`. It
+arrived as a 21.7 MB export — 301,152 triangles, NON-INDEXED, a per-face NORMAL
+beside every position — and a bundle committed to `main` is permanent, because
+this repo forbids history rewriting. Two steps, and only the second loses
+anything. **WELD + INDEX IS EXACTLY LOSSLESS** and does most of the work: the
+mesh is an STL split, welding by exact position is the same operation
+`print-lines.js`'s Topology does at load, and the topology is IDENTICAL before
+and after (301,152 tri / 151,060 verts / 451,728 edges / 0 boundary / 0
+non-manifold) — 21.7 MB to 5.4 MB. It only works because NORMAL is dropped
+first: with a per-face normal on every vertex nothing merges. **DECIMATION** is
+meshoptimizer with LockBorder, at 0.25: 75,288 triangles, relative error 3.96e-4
+(~0.04 mm on a 95 mm bloom), border still closed, 5 non-manifold edges. What is
+given up is the exported bloom's "0 non-manifold" property, which was a
+documented fixture virtue and is asserted by no gate. Normals are regenerated
+per vertex (smooth, not the export's flat) so the mesh still renders when the
+line-art toggle is off and the glTF's own lit material comes back; nothing in
+`/print` reads the bloom's normals — only `print-stem.js` reads a normal
+attribute, and only from the stem. **Running the tool on its own output
+decimates twice** — point it at the original.
+
+**THE PIPELINE ASSUMES TIGHTLY-PACKED VERTEX BUFFERS, AND THAT IS A LATENT
+FRAGILITY, NOT A CHOICE ANYONE MADE.** `print-lines.js`'s Topology,
+`print-infill.js`'s `_projectPart` and the tone gate's `projectedTriangles()`
+hook all read `geometry.getAttribute('position').array` and index it directly —
+which is exactly why the extraction is affordable, and which is WRONG against an
+INTERLEAVED buffer, where that array is the whole vertex block. Measured, not
+hypothetical: gltf-transform interleaves by default, and the first shrunk bundle
+came back with the 84-triangle leaf reading as 168 triangles, 2 silhouette edges
+and a fill of nothing. `tools/shrink-print-bundle.mjs` therefore writes
+`VertexLayout.SEPARATE`. **Any interleaved `.glb` a visitor drops on the page
+today would misbehave the same way** — making the extractor interleave-safe is
+its own change to a hot path and has not been done.
 
 **MESH SELECTION IS NO LONGER A HARDCODED PAIR.** `print.js` used to draw
 `[stem, bloom]` by name, which was indistinguishable from finding them while
@@ -688,9 +719,13 @@ PR. They still test flower geometry; two green `verify` jobs on a print PR are
 not evidence that anything about `/print` was checked.
 
 Dev-only deps, gitignored and not in `package.json` (same convention as the
-other gates): `npm i --no-save three@0.161.0 playwright-core`. Three is served
-from `node_modules` at the exact jsDelivr URLs `print.html` pins, so the gate
-needs no CDN egress.
+other gates): `npm i --no-save three@0.161.0 playwright-core`, plus
+`@gltf-transform/core @gltf-transform/functions meshoptimizer` for
+`tools/shrink-print-bundle.mjs` only. Three is served from `node_modules` at the
+exact jsDelivr URLs `print.html` pins, so the gate needs no CDN egress.
+**Install them in ONE `npm i --no-save` line** — a second `--no-save` install
+prunes the first one's packages, which is how `playwright-core` went missing
+mid-session.
 
 **Loose thread:** `assets/print-test/` still names itself a fixture, and it is
 now load-bearing for three merged stages. Renaming it is a rename in three
@@ -901,15 +936,35 @@ leaf, and the anchor and its falloff are inert there, which the read-out says.
 **THE NIB IS THE MARK AND THE COST, ONE CONTROL.** Rows are laid at 0.80 x the
 nib, so a fatter nib is the same solid shape in a third of the rows. It is its own
 slider rather than the line work's `weight` precisely so the artist has that lever.
-Measured cost, headless at 1100x800, all parts filled: 2-part bundle at default
-framing **20 ms** (hatch 4.8); 3-part bundle at default framing **30 ms**; 3-part
-bundle with the camera in close on the leaf **1300 ms**, or **284 ms** with the
-301k-triangle bloom at darkness 0. The worst case is not comfortable and is
-bounded three ways in the file (rows clamped to the VIEWPORT, one scan index per
-part per frame shared with the parts it occludes, `toneMaxRows`). **The real fix
-is an active-edge-table sweep and it is deliberately not done here** — it is a
-second implementation of the membership rule, which is the one thing #157 says not
-to have two of.
+
+**MEASURE THE FRAME COST SETTLED — THIS WAS GOT WRONG ONCE AND THE NUMBERS
+SHIPPED.** `stats.frameMs` is one frame's CPU time in the pass; polling it a
+fixed 1.2 s after moving the camera reads an EARLIER, cheaper frame when the new
+one takes seconds. The first cost table said 30 ms where the settled answer is
+1373, and 1300 ms where it is 6721. Poll until consecutive samples agree.
+Headless Chromium, 1100x800, software GL, all parts filled, tonal fill:
+
+| | 2-part | 3-part 301k | 3-part 75k (ships) | 3-part 36k |
+|---|---|---|---|---|
+| default framing | 7 ms | 1373 ms | 791 ms | 388 ms |
+| camera close on the leaf | — | 6721 ms | 4277 ms | 1999 ms |
+| … bloom at darkness 0 | — | 1161 ms | 729 ms | 336 ms |
+| CROSS-HATCH, same close-up | — | 2942 ms | 2402 ms | 2160 ms |
+
+**THE FIXTURE'S TRIANGLE COUNT WAS NOT THE CLIFF.** The fill is roughly linear
+in silhouette edges where the per-part segment cap does not bind (31k → 67k
+edges is x2.12 edges for x2.14 time) and bends over above it. But CROSS-HATCH
+pays 2.2–2.9 s at the same camera *whatever* the bloom's resolution, against
+4 ms at default framing on the small bundle — so most of the close-up cost is
+not the fill's and not the triangle count's, it is what the whole infill stage
+costs a three-part scene at extreme zoom. Decimating 301k → 75k bought 1.6x at
+the worst case and 1.7x at default framing: real, and not the cliff. Three
+things bound the fill and all three are in the file (rows clamped to the
+VIEWPORT, one scan index per part per frame shared with the parts it occludes,
+`toneMaxRows`). **The real fix is an active-edge-table sweep and it is
+deliberately not done here** — it is a second implementation of the membership
+rule, which is the one thing #157 says not to have two of, and it would help
+cross-hatch and line-flow too.
 
 **THE BLOOM FILLS AS ONE SHAPE, AND THAT IS THE LIMIT, NOT A TUNING PROBLEM.**
 Both bundles' blooms are one fused solid, so the reference's petal-against-petal

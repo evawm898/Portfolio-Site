@@ -140,29 +140,50 @@
 // row passes at full darkness and the shape is solid, which is the default,
 // and which is the reference leaf.
 //
-// WHAT IT COSTS, MEASURED, because a fill is not a hatch. A hatch at 7 px
-// spacing lays ~200 rows; a solid fill lays one row every 0.88 px, and the work
-// is rows x edges-crossed-per-row. On the shipped bundles, headless Chromium at
-// 1100x800, all parts filled:
+// WHAT IT COSTS, MEASURED — AND MEASURE IT SETTLED, WHICH IS THE FIRST THING
+// TO GET WRONG HERE. `stats.frameMs` is one frame's CPU time in this pass; poll
+// it 1.2 s after changing the view and, on a frame that takes seconds, you read
+// an EARLIER, cheaper frame. That is exactly what the first pass at this table
+// did — it reported 30 ms where the settled answer is 1373, and 1300 ms where
+// the settled answer is 6721. Poll until consecutive samples agree.
 //
-//   2-part bundle, default framing ......................  20 ms  (hatch 4.8)
-//   3-part bundle, default framing ......................  30 ms
-//   3-part bundle, camera in close on the leaf .......... 1300 ms
-//     ... with the 301k-triangle bloom at darkness 0 .....  284 ms
-//     ... at a 3 px nib instead of 1.1 ................... ~1/3 of the above
+// A hatch at 7 px spacing lays ~200 rows; a solid fill lays one every 0.88 px,
+// and the work is rows x edges-crossed-per-row. Headless Chromium, 1100x800,
+// software GL, all parts filled, tonal fill:
 //
-// The 1.3 second figure is the honest worst case and it is not comfortable: a
-// 301,152-triangle fused bloom filling the viewport is 45,000 silhouette edges
-// crossed by 1,461 rows. Three things bound it and all three are in this file:
-// the row range is clamped to the VIEWPORT (ink off the canvas is not ink), the
-// scan index is built once per part per frame and shared with the parts it
-// occludes, and `toneMaxRows` caps the rows outright. The artist's own levers
-// are the nib (rows scale as 1/nib) and a part at darkness 0, which returns
-// before an index is built. THE REAL FIX IS AN ACTIVE-EDGE-TABLE SWEEP —
-// carrying the crossing set from row to row instead of re-testing candidates
-// per row — and it is deliberately NOT done here: it is a second implementation
-// of the membership rule, which is the one thing #157 says not to have two of,
-// so it wants its own session and its own agreement-with-spansAt check.
+//                                     2-part    3-part bundle, bloom at:
+//                                     19k sil   301k tri   75k tri   36k tri
+//                                               275k sil   67k sil   31k sil
+//   default framing ................    7 ms     1373 ms    791 ms    388 ms
+//   camera in close on the leaf ....      —      6721 ms   4277 ms   1999 ms
+//     ... with the bloom at dark 0 ..      —      1161 ms    729 ms    336 ms
+//   CROSS-HATCH, same close-up .....      —      2942 ms   2402 ms   2160 ms
+//
+// TWO THINGS THAT TABLE SAYS, and the second one is why decimating the fixture
+// was not the fix:
+//
+//   * The fill IS roughly linear in silhouette edges over the range where the
+//     per-part segment cap does not bind — 31k -> 67k edges is x2.12 edges for
+//     x2.14 time. Above that `maxSegmentsPerPart` truncates and the curve bends
+//     over, which is why x4.1 the edges only costs x1.57 the time.
+//   * But CROSS-HATCH pays 2.2-2.9 SECONDS at the same camera whatever the
+//     bloom's resolution, against 4 ms at default framing on the small bundle.
+//     So most of the close-up cost is not the fill's and not the triangle
+//     count's: it is what the whole infill stage costs a three-part scene at
+//     extreme zoom. Reducing the fixture from 301k to 75k triangles bought 1.6x
+//     at the worst case and 1.7x at default framing — real, and not the cliff.
+//
+// Three things bound the fill and all three are in this file: the row range is
+// clamped to the VIEWPORT (ink off the canvas is not ink), the scan index is
+// built once per part per frame and shared with the parts it occludes, and
+// `toneMaxRows` caps the rows outright. The artist's own levers are the nib
+// (rows scale as 1/nib) and a part at darkness 0, which returns before an index
+// is built. THE REAL FIX IS AN ACTIVE-EDGE-TABLE SWEEP — carrying the crossing
+// set from row to row instead of re-testing candidates per row — and it is
+// deliberately NOT done here: it is a second implementation of the membership
+// rule, which is the one thing #157 says not to have two of, so it wants its
+// own session and its own agreement-with-spansAt check. Note it would help
+// cross-hatch and line-flow too, which is the other thing the table says.
 //
 // ============================ WHAT IT DOES NOT DO ==========================
 // * SELF-OCCLUSION IS OUT OF SCOPE, BY DESIGN. The infill fills the solid's
