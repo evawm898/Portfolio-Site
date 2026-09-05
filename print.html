@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Print Preview — Eva Maskalenko</title>
+<meta name="description" content="3D viewport scaffold for the print pipeline: loads a glTF bundle and orbits around it.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Three.js via ES-module import map, pinned to the SAME version bloom.html
+     already pins (0.161.0) so the two pages share one cached copy and any
+     headless CDN intercept has one URL to fulfil. No bundler, no build step —
+     the same no-build convention as the cards tool's jsPDF/JSZip tags. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  :root { --mono: "IBM Plex Mono", ui-monospace, monospace; }
+  html, body { margin: 0; height: 100%; background: #0c0e0e; color: #d8dedd; }
+  #print-canvas { display: block; width: 100vw; height: 100vh; }
+
+  /* Debug panel — this session's only job beyond the viewport: prove the
+     pivot node's extras survive GLTFLoader. It is scaffolding, not UI. */
+  #print-debug {
+    position: fixed; top: 0.9rem; left: 0.9rem; max-width: min(30rem, calc(100vw - 1.8rem));
+    max-height: calc(100vh - 1.8rem); overflow: auto;
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.65;
+    background: rgba(10, 12, 12, 0.86); border: 1px solid #2b3333;
+    padding: 0.75rem 0.9rem; white-space: pre-wrap; border-radius: 2px;
+  }
+  #print-debug b { color: #6fb7ae; font-weight: 500; }
+  #print-debug .err { color: #e07a6a; }
+</style>
+</head>
+<body>
+
+<canvas id="print-canvas"></canvas>
+<pre id="print-debug">loading…</pre>
+
+<script type="module" src="print.js"></script>
+</body>
+</html>
