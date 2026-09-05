@@ -29,6 +29,20 @@ deliberately not repeated here. Its invariant is one connected watertight
 solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 `node tools/verify-bloom-connectedness.mjs` (voxel flood-fill, one region) —
 both run in CI and both must pass before any bloom geometry change is done.
+**Iterate on `node tools/bloom-smoke.mjs`** — 28 of the 499 matrix rows through
+the real export gate, ~2 min against ~44 for one full gate (about 20x — the
+first-reported 31x mixed machine states and is withdrawn; see the charter); `--conn` adds the
+flood fill and is REQUIRED while a new geometry mode's junction assertions are
+still being established. It is for iteration, never for merge: the full matrix
+on both gates, in CI, is the merge criterion, and what the subset is BLIND to is
+in that tool's own header. Do not also run the full matrix locally except at a
+milestone (charter, "the iteration loop"). Note two of the six CI jobs on a bloom
+PR are FLOWER gates (`'tools/**'` filtered), so "six verify jobs green" overstates
+the bloom evidence — it is four.
+**Frozen baselines are frozen at commits on `main`, never at a branch head, and
+are tagged at freeze time** — `tools/publish-frozen-tags.sh` pins all twelve
+(`frozen/phase2`..`frozen/phase13`) so a branch delete or a force-push cannot
+orphan one; phase10 is the case that produced the rule (charter, Sep 5).
 Control-panel changes have their own gate: `node tools/verify-bloom-panel.mjs`
 (every registry control renders exactly once in its declared section, a control
 inside a collapsed section still reads, writes and rebuilds, every

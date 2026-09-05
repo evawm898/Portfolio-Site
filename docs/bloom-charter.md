@@ -1880,6 +1880,205 @@ baseline is a superset in coverage of nearly everything older) and no such defec
 been observed in ten sessions — but "never observed" is not "impossible", and this is the
 exposure the ruling accepts in exchange for the minutes.
 
+**RULED Sep 5 (session 17). THE ITERATION LOOP IS THE SMOKE SUBSET; THE FULL MATRIX IS
+CI's JOB AND NOT ALSO THE SESSION'S.** This extends the retention ruling above rather
+than replacing it: retention decided WHICH BASELINES a close re-exports, this decides
+WHERE THE FULL MATRIX RUNS. Everything built for it is ADDITIVE — the full 499 rows on
+both STL gates, in CI, on the merge commit, remains the merge criterion, unchanged and
+byte-identical in what it checks.
+
+  * **ITERATE ON `node tools/bloom-smoke.mjs`.** 28 of 499 rows through the real export
+    gate's own `--only` flag. Measured on one machine in one session: the subset **134 s**
+    (three runs, 4.2% spread) against the full export gate's **2,621 s** and the full
+    connectedness gate's **2,600 s** — **about 20x against one gate, 40x against both**.
+    The subset, its derivation, its path -> row table and the five things it is BLIND to
+    are in the tool's own header, which is where a reader needs them at the moment they
+    read a green run.
+
+    **THE FIRST RATIO REPORTED FOR THIS WAS 31x AND IT WAS WRONG, in exactly the way this
+    session's own brief warned about — recorded because the correction is the useful
+    part.** An earlier 23-row version of the subset measured 85 s; the five rows that
+    close the block-coverage gap were added; the 28-row set measured 134 s. The 49 s gap
+    did not reconcile with those five rows' own timings (30 s including five browser
+    starts), so the 23-row set was RE-RUN in the later machine state rather than the
+    arithmetic being explained away: **99.8 s, against 84.4 s for the same 23 rows
+    earlier — this box drifted about 17% slower across the session.** The only pair
+    measured in one state is 23-vs-28 rows (1.34x), which is what pins the added rows at
+    ~34 s. The full-gate numbers were taken in the FAST state and the shipped subset in
+    the SLOW one, so 2621/134 understates and 2621/113 (the fast-state 28-row estimate)
+    overstates; **about 20x is the honest floor**. Runner variance is not a measurement,
+    on a laptop as much as on a CI runner — the same workflow on two heads of PR #149
+    measured 2,579 s and 4,170 s, a 62% spread.
+  * **`--conn` IS REQUIRED, NOT OPTIONAL, WHEN A SESSION INTRODUCES A NEW GEOMETRY MODE.**
+    Export-only is right for the modes that exist — the flood fill catches nothing because
+    J1-J9 fire first — but it is a BACKSTOP for failures the assertions do not model, and a
+    brand-new mode is exactly where they may not. Run `--conn` until the new mode's junction
+    assertions are established AND have been shown to fire on a mutant; then drop back.
+  * **PUSH, AND LET CI RUN THE FULL MATRIX. DO NOT ALSO RUN IT LOCALLY.** Run it locally at
+    a MILESTONE only, on the definition already above: before a production publish, or when
+    a change touches the area rule or the export path.
+  * **AND THE ARGUMENT IS NOT ONLY MINUTES — IT IS WHAT GETS CERTIFIED, verified from this
+    repo's own CI log rather than assumed.** `actions/checkout@v4` on a `pull_request`
+    event checks out the MERGE COMMIT: run 33927836353's own log reads
+    `git checkout --progress --force refs/remotes/pull/149/merge` /
+    `HEAD is now at c1cfd5a Merge 848ae962... into 6b8e94b...`. So CI certifies head-merged-
+    into-base — what actually merges. A local run certifies the working tree, which is
+    neither that nor the head, and on this repo reads `+dirty` from the gitignored
+    node_modules symlink. If `main` moves under a PR, CI covers it and a local run cannot.
+  * **WHAT THIS GIVES UP, said plainly.** A session loses its pre-push signal, and a red run
+    is now public on the PR where a red local run was not. The smoke subset is the
+    replacement for the iterating half of that and is 31x cheaper than what it replaces.
+  * **ONE CLOSE-OUT STEP DEPENDS ON A LOCAL FULL-MATRIX RUN AND IS NOT FOLDED IN: THE BYTE
+    PARTITION.** `tools/diff-bloom-bytes.mjs` exports the matrix on two trees and diffs
+    them; **CI does no byte diffs at all.** That stays local and this ruling does not touch
+    it. Everything else a close-out quotes from a gate run — row counts, CROWDED tallies,
+    coverage skips, self-contact counts — is in the CI log verbatim.
+
+**AND "SIX VERIFY JOBS GREEN" OVERSTATES THE BLOOM EVIDENCE — one line, so the sentence
+stops being misread.** Of the six jobs a bloom PR runs, **two are FLOWER gates**:
+`flower-export-watertight.yml` and `flower-geometry-quality.yml` are path-filtered on
+`'tools/**'`, so any bloom PR touching a tool runs them, and they test flower geometry. The
+bloom evidence is four jobs. **The filter is deliberately NOT changed** — it is a flower
+gate's trigger and belongs to that project.
+
+**RULED Sep 5 (session 17). NO DOCS-ONLY COMMITS ON A GATED PR HEAD — a convention,
+because the filter that would do it cannot be made to fail safe.**
+
+GitHub evaluates a workflow's `paths` filter on a `pull_request` event against the WHOLE PR
+DIFF, never the pushed commit. So once a PR's cumulative diff touches a gated file, every
+later commit re-runs everything, whatever it changed. Measured from the Actions API:
+
+| session | commit | files | export gate | connectedness gate |
+|---|---|---|---|---|
+| 14 (#146) | `5fe2656` outcome doc | 1 file, `docs/` only | 2,767 s | 2,456 s |
+| 16 (#149) | `848ae96` outcome doc | 1 file, `docs/` only | 4,170 s | 3,911 s |
+
+**13,304 s — 3 h 42 m of runner time on two commits that changed no gated byte**, and that
+is the two bloom gates alone. Session 13 (#145) is worse and was outside the window looked
+at: five charter-only commits (`5fa1bc9`, `0af7d4c`, `9ce49be`, `85fda0d`, `538b2f7`) each
+ran both gates, roughly another 13,500 s.
+
+**THE MACHINERY WAS COSTED AND DECLINED (Eva, Sep 5), and the reasoning is recorded so it is
+not re-proposed.** The risk is a commit that LOOKS docs-only landing on a head whose code has
+never been gated — which happens routinely here, since a session pushes code and docs as
+separate commits. `[skip ci]` skips the whole run and leaves the head with NO gate result:
+fails unsafe. `dorny/paths-filter` against `github.event.before` answers "did this push touch
+a gated path", which is not the question — the question is "has this exact gated content
+already passed", and a push range says nothing about whether the parent's run was green. The
+rule that WOULD fail safe is: skip only when the TREE HASH OF THE GATED PATHS equals that at
+a commit whose gate run concluded `success` — both halves, which needs a Checks-API lookup
+inside the workflow defaulting to RUN on any error, missing run or ambiguity. That is real
+machinery guarding a repo where a wrong skip merges ungated geometry, in a project whose
+oldest enemy is a label naming a computation nobody performed. **A convention that works
+beats a filter that might skip a gate.**
+
+So: **fold the charter and outcome-doc changes into the code commit, or push them BEFORE the
+code.** A close-out doc written after the gates are green is the common case, and the fix is
+to amend rather than to append.
+
+**AND `concurrency: cancel-in-progress` IS ON ALL FOUR BLOOM WORKFLOWS (Eva, Sep 5), keyed
+to `${{ github.workflow }}-${{ github.ref }}` so it can never cancel across PRs.** Safe by
+construction — it only ever cancels a run on a commit that has been SUPERSEDED, and the
+final head always runs to completion. It also enforces a discipline already agreed:
+**a superseded commit's green run should never have been quotable, and session 16 quoted
+one** (runs 84 and 85 started two minutes apart and both ran to completion on a four-CPU
+runner).
+
+**AND IT DESTROYS EVIDENCE IN EQUAL MEASURE, WHICH IS THE HALF NOBODY EXPECTS.** A cancelled
+run is not a cheaper run; it is NO run. **Three of this PR's own full-gate runs were
+superseded before finishing** — the STL gates on `46a72b4`, `550b793` and `8524109` were all
+cancelled by the next push, so a PR that had been open for half an hour had no completed gate
+result at all. **So: on a gated PR, push once and let it run.** That is the same discipline as
+"no docs-only commits on a gated PR head" arriving from the other side — the docs rule says
+do not make the gates run again for nothing, and this one says do not stop them proving the
+head you have. Batch the close-out into ONE commit; a series of small pushes leaves the final
+head unproven and every earlier one abandoned.
+
+**"SHIPPED MEANS REACHABLE" FIRED ON A WORKFLOW, AND THE CASE IS WORTH THE NAME (session 17).**
+`bloom-frozen-tags.yml` was written as a `workflow_dispatch` job so the tags could be published
+despite the proxy's 403, reported as ready to click, and it could not be clicked: **a
+`workflow_dispatch` workflow is only dispatchable once its file is on the DEFAULT branch.**
+GitHub registers workflows from `main`, so on a PR branch it did not appear in the Actions UI —
+`GET /actions/workflows/bloom-frozen-tags.yml/runs` returned 404 and `list_workflows` returned
+sixteen workflows without it. The file parsed, the YAML validated, the job was correct, and the
+route was unreachable. **It was caught only because the OUTCOME was checked directly rather
+than inferred from the mechanism's own success** (`git ls-remote --tags origin` → zero tags),
+which is the flower project's rule about a label naming a computation nobody performed, arriving
+in CI configuration. Verify a route by reaching it, never by reading it.
+
+**RULED Sep 5 (session 17). A FROZEN BASELINE IS TAKEN AT A COMMIT ON `main`, NEVER AT A
+BRANCH HEAD, AND IS TAGGED AT FREEZE TIME. phase10 is the case that produced the rule.**
+
+**HOW IT SURFACED.** `bloom-frozen-matrices` went red on a PR that touches no geometry,
+at `fatal: invalid reference: 4f39118` — phase10's declared base. The same workflow had
+passed on `main` three hours earlier. Of the TWELVE entries in `FROZEN_BASE_COMMITS`
+(`legacyMatrix()` declares none), **phase10's is the only one that is not a commit on
+`main`**: it is a mid-PR commit of #140, and `fetch-depth: 0` fetches BRANCHES, so it was
+reachable only while `claude/fan-per-petal-sliders-iwbkb6` existed. Branch deletes are one
+of Eva's two recurring actions. Everything else about the incident follows from that one
+fact, which is why the rule is about WHERE a baseline is frozen and not about the gate.
+
+**THE BASELINE WAS RECOVERED, AND A PREMISE ABOUT HOW WAS CORRECTED ON THE WAY.**
+`refs/pull/<N>/head` is a permanent ref on GitHub and survives branch deletion. The
+obvious test — "is `refs/pull/140/head` equal to the frozen sha?" — FAILS here: #140 kept
+committing afterwards, so its head is `2ea3e19`. **The conclusion that would follow from
+that ("the head ref points elsewhere, so this does not recover it") is FALSE, and the
+correction is the useful part: fetching a ref brings its HISTORY.** `4f39118` is the sixth
+commit back from `refs/pull/140/head`, and fetching that ref restores the object. The
+commit immediately AFTER it is `805a191` ("the all-petals group at one whorl; Petal 1 /
+Petal N hidden and inert there") — exactly what phase10 is documented as being frozen
+BEFORE, so it is the right object and not one that merely resolves. **Proven rather than
+asserted: `--verify-frozen --phase10` against a worktree of the recovered commit PASSES,
+376 rows deep-equal.** phase10 is intact; nothing was retired and nothing demoted.
+
+**THE FIX IS A PERMANENT REF, NOT A FETCH TWEAK, AND NOT A LOOSER GATE.** Twelve
+lightweight tags (`frozen/phase2` .. `frozen/phase13`) pin every declared base. A tag
+survives branch deletion AND a force-push to `main` — and `main` is not protected here, so
+a force-push would orphan every base that lives only in its history. Tagging converts
+twelve implicit dependencies on branch reachability into twelve explicit permanent refs,
+which closes the CLASS rather than the instance. **The sha in `FROZEN_BASE_COMMITS` stays
+the one owner of WHICH commit a baseline is**; the tag exists only to keep the object
+alive, so no second identifier for one thing is introduced and `--verify-frozen` needs no
+change — `actions/checkout@v4` at `fetch-depth: 0` fetches tags, so the existing
+`git worktree add "$sha"` resolves unchanged.
+
+**AND `--verify-frozen` MUST NEVER SKIP AN UNRESOLVABLE BASE.** The tempting repair — treat
+a missing base as a skip — turns a lost proof into a silent pass, which is the one thing
+this project never ships. A baseline whose base cannot be resolved is UNVERIFIABLE and must
+say so loudly; if that ever becomes the real state, the honest move is a labelled
+unverifiable tier and a correction to the claim that CI "proves every one deep-equal on
+every push", never a quiet green.
+
+**BLOCKED, AND RECORDED AS AN ENVIRONMENT LIMIT RATHER THAN A REPO ONE:** this session
+created all twelve tags locally and could not publish them. The agent proxy returns
+**HTTP 403 on a tag ref push** — both as `git push --tags` and as a single explicit
+`refs/tags/...` refspec — while ordinary branch pushes to `refs/heads/...` succeed from the
+same session, the same 403 that already refuses branch deletes here. No create-ref API is
+exposed either. **The tags are still owed**, and until they exist `bloom-frozen-matrices`
+is red on every bloom PR.
+
+**A GATE RUN NAMES THE FIRST FAMILY THAT FIRED, NEVER THE ONLY WITNESS (session 17, and it
+is a correction to how every prior outcome doc must be read).** Both STL gates abandon a row
+at the first failing assertion family, in the order form -> curl -> thickness -> junction ->
+zygo -> export floor -> crowding -> coverage. So session 14's P3 (a blade that did not rotate
+with its foot) and session 15's Q1 (a `domeLean` computed but never summed) BOTH report
+**C1** on today's head, not the J8 and J9 their own sessions record: session 16's C1
+reconstructs the whole spine — including `petalTilt + tiltExtra + domeLean` — from other
+owners, and silently became a SECOND witness for two mutations from earlier sessions.
+
+**J8 AND J9 DO DISCRIMINATE INDEPENDENTLY — measured, not assumed, because the alternative
+would have been a real finding.** With the curl family suppressed in a throwaway worktree and
+nothing else changed, P3 fires **J8 alone** (4 times across the two domed smoke rows) and Q1
+fires **J9 alone** (twice), each with the message it was written for. So the earlier records
+are IMPRECISE, not wrong, and neither assertion is being carried by C1.
+
+**The working rule that follows: establishing that a SPECIFIC assertion discriminates
+requires suppressing the families ahead of it.** A green-then-red positive control proves a
+witness EXISTS; it cannot name which one, and neither can any gate run. Attributions in prior
+outcome docs are to be read as "the first family that fired", and any new attribution that
+matters should be measured this way.
+
+
 - ~~Session 10 — the fan arrangement~~ **BUILT Sep 2. The fourth `placement` value ships:
   a symmetric arc across one axis, in the flower's own control vocabulary, with the
   zygomorphy roles composing onto it rather than being redone.** The ruling that queued it
