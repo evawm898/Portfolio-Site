@@ -15,7 +15,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const BUNDLE = 'assets/print-test/flower-test-bundle.glb';
 
 const canvas = document.getElementById('print-canvas');
-const debugEl = document.getElementById('print-debug');
+const debugEl = document.getElementById('print-log');
+const markerToggle = document.getElementById('print-marker-toggle');
+const markerBox = document.getElementById('showPivotMarker');
 
 const lines = [];
 function log(html) { lines.push(html); debugEl.innerHTML = lines.join('\n'); }
@@ -92,18 +94,36 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
   // The point of this session: does the pivot node's `extras` survive the
   // loader? GLTFLoader puts glTF `extras` on Object3D.userData verbatim.
   // Names are sanitized by the loader (slashes stripped), so match loosely.
-  let pivot = null;
+  // The bundle carries TWO nodes whose name contains "pivot" — the transform
+  // node and the `pivot_marker` sphere that is its child. Match the marker
+  // first and the transform node exactly, so this does not depend on the
+  // order traverse() happens to visit them in.
+  let pivot = null, marker = null;
   gltf.scene.traverse((o) => {
-    if (pivot) return;
-    if ((o.name || '').toLowerCase().includes('pivot')) pivot = o;
+    const n = (o.name || '').toLowerCase();
+    if (!n.includes('pivot')) return;
+    if (n.includes('marker')) { if (!marker) marker = o; }
+    else if (!pivot) pivot = o;
   });
+
+  // The marker is the exporter's own diagnostic sphere sitting at the
+  // junction, not scene content — hidden by default, with view chrome to
+  // bring it back. Hiding is `visible`, never a removal: it stays in the
+  // tree so the node counts and the extras above still describe the bundle
+  // as shipped rather than as displayed.
+  if (marker) {
+    marker.visible = false;
+    markerBox.checked = false;
+    markerToggle.hidden = false;
+    markerBox.addEventListener('change', () => { marker.visible = markerBox.checked; });
+  }
 
   if (!pivot) {
     fail('pivot   NOT FOUND — no node whose name contains "pivot"');
   } else {
     const x = pivot.userData || {};
     log(`<b>pivot node</b>  "${pivot.name}"  at ${vec(pivot.position.toArray())}`);
-    log(`  children            ${pivot.children.map(c => c.name || '(unnamed)').join(', ') || '(none)'}`);
+    log(`  children            ${pivot.children.map(c => (c.name || '(unnamed)') + (c === marker ? ' (hidden)' : '')).join(', ') || '(none)'}`);
     if (!Object.keys(x).length) {
       fail('  extras  EMPTY — the node exists but carried no extras through the loader');
     } else {
@@ -137,6 +157,9 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
     meshes, tris,
     nodeNames: named,
     pivotExtras: pivot ? pivot.userData : null,
+    markerFound: !!marker,
+    markerVisible: () => !!marker && marker.visible,
+    markerInTree: () => { let hit = false; gltf.scene.traverse(o => { if (o === marker) hit = true; }); return hit; },
     cameraPosition: () => camera.position.toArray(),
   };
 }, undefined, (err) => {

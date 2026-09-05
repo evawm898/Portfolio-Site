@@ -15,12 +15,15 @@
 // the frame returns a cleared buffer and scores 100% "non-background" for a
 // completely empty scene), a drag on the canvas moves the camera, and the
 // pivot node's extras round-trip through GLTFLoader with the junction position,
-// the junction tangent and a non-empty rotation_limits_deg.
+// the junction tangent and a non-empty rotation_limits_deg. It also asserts
+// the exporter's pivot_marker sphere is found, still in the tree, and hidden
+// by default, and that its toggle shows and re-hides it.
 //
 // Verified falsifiable — each of these turns it red, on the check that names
 // the behaviour: not adding gltf.scene to the scene, disabling OrbitControls,
 // looking for a pivot node that does not exist, removing every light, and
-// stripping `extras` from the bundle at generation time.
+// stripping `extras` from the bundle at generation time, leaving the marker
+// visible, and REMOVING the marker from the tree instead of hiding it.
 
 import { chromium } from 'playwright-core';
 import http from 'node:http';
@@ -89,7 +92,33 @@ if (!ready) {
 
 const info = await page.evaluate(() => ({ ...window.__printScaffold, cameraPosition: window.__printScaffold.cameraPosition() }));
 console.log('scaffold:', JSON.stringify(info, null, 2));
-console.log('debug panel:\n' + await page.textContent('#print-debug'));
+console.log('debug panel:\n' + await page.textContent('#print-log'));
+
+// The pivot_marker is the exporter's diagnostic sphere, hidden by default.
+// Asserted as three separate facts, because "not on screen" has more than one
+// cause and only one of them is the intended one: the node is FOUND, it is
+// still IN THE TREE (hidden, not removed — so the node count and the extras
+// keep describing the bundle as shipped), and it is NOT VISIBLE.
+const markerFound = info.markerFound;
+const markerInTree = await page.evaluate(() => window.__printScaffold.markerInTree());
+const hiddenByDefault = !(await page.evaluate(() => window.__printScaffold.markerVisible()));
+console.log(`pivot marker: found=${markerFound} inTree=${markerInTree} hiddenByDefault=${hiddenByDefault}`);
+
+// and the toggle brings it back, in BOTH directions. Offered is checked
+// FIRST: a hidden toggle makes page.check() sit there for its full timeout,
+// which is a slow, unnamed failure rather than a stated one.
+const toggleOffered = !(await page.locator('#print-marker-toggle').isHidden());
+if (!toggleOffered) {
+  console.log('marker toggle: offered=false — no visible toggle to drive');
+  console.log('\nFAIL');
+  await browser.close(); server.close();
+  process.exit(1);
+}
+await page.check('#showPivotMarker');
+const shownAfterCheck = await page.evaluate(() => window.__printScaffold.markerVisible());
+await page.uncheck('#showPivotMarker');
+const hiddenAfterUncheck = !(await page.evaluate(() => window.__printScaffold.markerVisible()));
+console.log(`marker toggle: offered=${toggleOffered} shows=${shownAfterCheck} re-hides=${hiddenAfterUncheck}`);
 
 await page.screenshot({ path: path.join(OUT, '01-loaded.png') });
 
@@ -137,6 +166,8 @@ const ok = info.ready && info.meshes >= 1 && info.pivotExtras
   && info.pivotExtras.junction && Array.isArray(info.pivotExtras.junction.position)
   && Array.isArray(info.pivotExtras.junction.tangent) && info.pivotExtras.rotation_limits_deg
   && Object.keys(info.pivotExtras.rotation_limits_deg).length > 0
-  && drawn > 0.01 && drawn < 0.9 && moved > 1 && errs.length === 0;
+  && drawn > 0.01 && drawn < 0.9 && moved > 1
+  && markerFound && markerInTree && hiddenByDefault
+  && toggleOffered && shownAfterCheck && hiddenAfterUncheck && errs.length === 0;
 console.log(ok ? '\nPASS' : '\nFAIL');
 process.exit(ok ? 0 : 1);
