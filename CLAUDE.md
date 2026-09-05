@@ -30,7 +30,8 @@ solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 `node tools/verify-bloom-connectedness.mjs` (voxel flood-fill, one region) —
 both run in CI and both must pass before any bloom geometry change is done.
 **Iterate on `node tools/bloom-smoke.mjs`** — 28 of the 499 matrix rows through
-the real export gate, ~2 min against ~44 for one full gate; `--conn` adds the
+the real export gate, ~2 min against ~44 for one full gate (about 20x — the
+first-reported 31x mixed machine states and is withdrawn; see the charter); `--conn` adds the
 flood fill and is REQUIRED while a new geometry mode's junction assertions are
 still being established. It is for iteration, never for merge: the full matrix
 on both gates, in CI, is the merge criterion, and what the subset is BLIND to is

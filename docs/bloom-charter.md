@@ -1888,11 +1888,27 @@ both STL gates, in CI, on the merge commit, remains the merge criterion, unchang
 byte-identical in what it checks.
 
   * **ITERATE ON `node tools/bloom-smoke.mjs`.** 28 of 499 rows through the real export
-    gate's own `--only` flag. Measured on one machine in one session: the subset **85 s**
-    against the full export gate's **2,621 s** and the full connectedness gate's
-    **2,600 s** — **31x against one gate, 62x against both**. The subset, its derivation,
-    its path -> row table and the five things it is BLIND to are in the tool's own header,
-    which is where a reader needs them at the moment they read a green run.
+    gate's own `--only` flag. Measured on one machine in one session: the subset **134 s**
+    (three runs, 4.2% spread) against the full export gate's **2,621 s** and the full
+    connectedness gate's **2,600 s** — **about 20x against one gate, 40x against both**.
+    The subset, its derivation, its path -> row table and the five things it is BLIND to
+    are in the tool's own header, which is where a reader needs them at the moment they
+    read a green run.
+
+    **THE FIRST RATIO REPORTED FOR THIS WAS 31x AND IT WAS WRONG, in exactly the way this
+    session's own brief warned about — recorded because the correction is the useful
+    part.** An earlier 23-row version of the subset measured 85 s; the five rows that
+    close the block-coverage gap were added; the 28-row set measured 134 s. The 49 s gap
+    did not reconcile with those five rows' own timings (30 s including five browser
+    starts), so the 23-row set was RE-RUN in the later machine state rather than the
+    arithmetic being explained away: **99.8 s, against 84.4 s for the same 23 rows
+    earlier — this box drifted about 17% slower across the session.** The only pair
+    measured in one state is 23-vs-28 rows (1.34x), which is what pins the added rows at
+    ~34 s. The full-gate numbers were taken in the FAST state and the shipped subset in
+    the SLOW one, so 2621/134 understates and 2621/113 (the fast-state 28-row estimate)
+    overstates; **about 20x is the honest floor**. Runner variance is not a measurement,
+    on a laptop as much as on a CI runner — the same workflow on two heads of PR #149
+    measured 2,579 s and 4,170 s, a 62% spread.
   * **`--conn` IS REQUIRED, NOT OPTIONAL, WHEN A SESSION INTRODUCES A NEW GEOMETRY MODE.**
     Export-only is right for the modes that exist — the flood fill catches nothing because
     J1-J9 fire first — but it is a BACKSTOP for failures the assertions do not model, and a
