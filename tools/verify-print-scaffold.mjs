@@ -122,15 +122,23 @@ const MUTANTS = [
   { id: 'no-weld', file: 'print-lines.js',
     from: '      const k = `${Math.round(pos.getX(i) * inv)},${Math.round(pos.getY(i) * inv)},${Math.round(pos.getZ(i) * inv)}`;',
     to: '      const k = `v${i}`;',
-    breaks: ['topology/welded', 'weight/pixels', 'detail/creases-grow', 'detail/pixels'] },
+    // Every edge becomes a boundary edge, so: no creases at all (the interior
+    // tier is empty), every "chain" is one edge long (no interior points, so
+    // no turn joins to measure), and what survives curation barely marks the
+    // page. Measured under the mutant: 24,789 one-edge contour chains, 0
+    // interior, ink 0.0014. All claimed rather than explained away.
+    breaks: ['topology/welded', 'lineart/draws-something', 'weight/pixels',
+             'detail/creases-grow', 'detail/pixels', 'chain/both-tiers-populated',
+             'smooth/contour-is-not-faceted'] },
 
   { id: 'dots-never-drawn', file: 'print-lines.js',
-    from: '        if (hash01(EI[i]) >= b) {', to: '        if (true) {',
+    // moved when the stroke/dot partition went per CHAIN instead of per edge
+    from: '      if (hash01(chainV[s0]) >= blend) {', to: '      if (true) {',
     breaks: ['blend/dots-at-100', 'blend/mixed', 'blend/pixels'] },
 
   { id: 'dots-are-a-second-extraction', file: 'print-lines.js',
-    from: '      const n = u.ex.extract(camLocal, creaseCos);',
-    to: '      const n = u.ex.extract(camLocal, Math.cos(THREE.MathUtils.degToRad(this.creaseAngleDeg * (1 - this.blend / 200))));',
+    from: '      u.ex.extract(camLocal, creaseCos);',
+    to: '      u.ex.extract(camLocal, Math.cos(THREE.MathUtils.degToRad(this.creaseAngleDeg * (1 - this.blend / 200))));',
     breaks: ['blend/same-extraction'] },
 
   { id: 'smoothing-off', file: 'print-lines.js',
