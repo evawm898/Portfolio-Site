@@ -3820,6 +3820,27 @@ export function buildMatrix() {
              CONTINUOUS (bit-identical to CONTINUOUS x defaults). S4 is what
              these rows are. */
   const SPH = { placement: 'CONTINUOUS', hubShape: 'SPHERE' };
+  /* THE SOLID-ANGLE PINS (Eva's ruling, session 19 — see
+     docs/bloom-session-19-outcome.md for every reading, threshold and
+     headroom). Measured plus headroom, the plan raster's own precedent:
+       INCURVE sphere — the FACE pole CLOSED (bald <= 0.3 deg, one sample
+       cell is 0.125 deg; region <= 0.001 sr), the total <= 4.6% of 4 pi
+       (measured 4.20%), and the RESERVED pole pinned AT ITS MEASURED HOLE
+       with headroom, not closed: bald <= 5.0 deg (measured 4.38 deg, a
+       0.95 mm chord — the known value, recorded with the phase-2 stem
+       work), region <= 0.25 sr (measured 0.2205). A hole that is measured
+       and unpinned is one that can grow silently.
+       defaults / the mum / the 240-foot row — the RESERVED pole CLOSED
+       (bald <= 0.3 deg; measured 0.12 deg on all three). The 240-foot
+       row's FACE pole is NOT pinned: open by design, phase 2's number. */
+  const SOLID_INCURVE = { maxUncovered: 0.046, maxFaceBaldDeg: 0.3, maxFaceRegionSr: 0.001, maxReservedBaldDeg: 5.0, maxReservedRegionSr: 0.25 };
+  const SOLID_RESERVED_CLOSED = { maxReservedBaldDeg: 0.3 };
+  const SOLID_PINS = {
+    'SPHERE: defaults (8 per turn x 1 turn — eight feet on a sphere)': SOLID_RESERVED_CLOSED,
+    'SPHERE: the INCURVE sliders (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) — the sheet\'s headline': SOLID_INCURVE,
+    'SPHERE: 40 per turn x 6 turns (240 feet — the densest reachable pole)': SOLID_RESERVED_CLOSED,
+    'SPHERE: the mum sliders (120 floored feet at spread 0.60)': SOLID_RESERVED_CLOSED,
+  };
   for (const [name, sets] of [
     ['SPHERE: defaults (8 per turn x 1 turn — eight feet on a sphere)', { ...SPH }],
     ['SPHERE: the INCURVE sliders (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) — the sheet\'s headline', { ...INCURVE, ...SPH }],
@@ -3850,8 +3871,13 @@ export function buildMatrix() {
     ['SPHERE: GATED — SPHERE stored under FAN (hidden and inert)', { hubShape: 'SPHERE', ...FAN_ON }],
     ['SPHERE: GATED — CAP pinned under CONTINUOUS (bit-identical to CONTINUOUS x defaults)', { placement: 'CONTINUOUS', hubShape: 'CAP' }],
   ]) {
-    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+    const row = { label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) };
+    if (SOLID_PINS[name]) row.solidCoverage = SOLID_PINS[name];   // the label stays verbatim: the smoke subset's drift guard anchors on it
+    rows.push(row);
   }
+  /* Every pin must have found its row — a pin on a label that drifted is a
+     pin on nothing. */
+  for (const k of Object.keys(SOLID_PINS)) if (!rows.some((r) => r.label.startsWith(k))) throw new Error(`SOLID_PINS names a row that does not exist: ${k}`);
   return rows;
 }
 

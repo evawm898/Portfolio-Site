@@ -132,7 +132,7 @@ a covered starburst; on the 240-foot row the first ring's forty blades close it 
 way. Nothing was patched to get there. **The face pole is a different finding:** the
 designed centre is seated on the apex slab at 75% of the hub radius, and on a sphere the
 hub radius IS the sphere radius, so the DISC centre becomes a plate over the whole face pole
-— 24.5 mm across on the 240-foot row, reading as a lid on a sea urchin (the `faceDown`
+— 24.5 mm in RADIUS on the 240-foot row (a lid 49 mm ACROSS; session 19 corrected this figure, which was first written as "across"), reading as a lid on a sea urchin (the `faceDown`
 frame). On the incurve sphere the converging tips close the face pole as a tight crown, the
 same emergent closure the incurve target has on the cap, with a few-millimetre eye where the
 thin blade edges meet. Neither is patched here: a centre that follows the sphere (or is
@@ -145,7 +145,7 @@ explicitly.** The centre is NOT constrained under SPHERE in this session. The ph
 question now reads, in full: (dome session) a button that follows the cap's curvature —
 the DISC seats on the apex slab and hovers at the rim, 1.88 mm on the incurve target; (this
 session) under SPHERE the DISC is sized from the hub radius, which IS the sphere radius, so
-it plates the whole face pole — **24.5 mm across on the 40 × 6 row (240 feet, sphere radius
+it plates the whole face pole — **a 24.5 mm RADIUS, 49 mm across, on the 40 × 6 row (240 feet, sphere radius
 32.72 mm)** — and a centre that follows the sphere, or is sized from a foot rather than the
 hub, is the open design. **The mum on a sphere reading as a dandelion clock is NOTED, not a
 defect** — it is what a long-blade preset does on a ball; no action.
