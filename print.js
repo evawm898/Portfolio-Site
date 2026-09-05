@@ -487,6 +487,8 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
           rows.push(`weight            contour ${st.contourWeight.toFixed(2)} px, interior ${st.interiorWeight.toFixed(2)} px`);
           rows.push(`                  fixed ratio ${INTERIOR_WEIGHT_RATIO} \u2014 one slider scales both`);
           rows.push(`drawn as          ${st.strokes} stroke segs + ${st.dots} dots${st.truncated ? '  (TRUNCATED)' : ''}`);
+          rows.push(`contour turn      mean ${st.contourTurnMean.toFixed(1)}\u00b0, ${st.contourTurnOver30}/${st.contourTurnJoins} joins over 30\u00b0`);
+          rows.push(`                  (sampled 1 frame in 8 \u2014 an acos per point is not free)`);
           rows.push(`extract           ${st.extractMs.toFixed(2)} ms   chain ${st.chainMs.toFixed(2)} ms`);
           rows.push(`                  curate+smooth ${(st.frameMs - st.extractMs - st.chainMs).toFixed(2)} ms`);
           rows.push(`frame pass        ${lastFrameMs.toFixed(2)} ms of a 16.7 ms budget`);
@@ -525,6 +527,25 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
       // past that so the contact sheet can photograph the trade-off and the
       // gate can drive it, without inventing a fourth slider to do it.
       setCuration: (o) => { Object.assign(CURATION, o); },
+      measureTurnsNow: () => { art._forceTurns = true; },
+      skipped: () => !!art.skipped,
+      // Two identical updates in ONE tick. The second must be skipped, because
+      // nothing changed between them. Waiting for the camera to go still and
+      // watching for a skip does NOT work in this harness and was measured not
+      // to: headless runs at ~2 fps, so OrbitControls' damping is still moving
+      // the view by ~17 px per poll six seconds after a drag. This asks the
+      // question the skip actually answers.
+      skipRepeat: () => {
+        const size = [canvas.clientWidth, canvas.clientHeight], pr = renderer.getPixelRatio();
+        art.update(camera, size, pr); const first = !!art.skipped;
+        art.update(camera, size, pr); const second = !!art.skipped;
+        // ...and a pose change must un-skip it
+        if (rig) { rig.setPoint(2, rig.points[2].clone().addScalar(3)); repose(); }
+        art.update(camera, size, pr); const afterPose = !!art.skipped;
+        if (rig) { rig.setPoint(2, rig.points[2].clone().addScalar(-3)); repose(); }
+        art.update(camera, size, pr);
+        return { first, second, afterPose };
+      },
       // The maximum turn angle between consecutive drawn segments, over the
       // contour tier. This is the SHAPE claim: a faceted staircase turns hard
       // and often, a smoothed contour does not. Read off the emitted buffer,

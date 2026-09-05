@@ -125,6 +125,33 @@ const MUTANTS = [
     to: '      const n = u.ex.extract(camLocal, Math.cos(THREE.MathUtils.degToRad(this.creaseAngleDeg * (1 - this.blend / 200))));',
     breaks: ['blend/same-extraction'] },
 
+  { id: 'smoothing-off', file: 'print-lines.js',
+    from: '  smoothIters: 6,', to: '  smoothIters: 0,',
+    breaks: ['smooth/contour-is-not-faceted'] },
+
+  { id: 'simplify-off', file: 'print-lines.js',
+    from: '  simplifyPx: 1.1,', to: '  simplifyPx: 0,',
+    breaks: ['simplify/reduces-points'] },
+
+  { id: 'curation-off', file: 'print-lines.js',
+    from: '  minChainPx: 5,', to: '  minChainPx: 0,',
+    breaks: ['curate/prunes-by-length'] },
+
+  { id: 'interior-same-weight-as-contour', file: 'print-lines.js',
+    from: 'get interiorWeight() { return this.weight * INTERIOR_WEIGHT_RATIO; }',
+    to: 'get interiorWeight() { return this.weight; }',
+    breaks: ['weight/material', 'tier/two-weights'] },
+
+  { id: 'tiers-chained-together', file: 'print-lines.js',
+    from: '      if (K[i] !== wantKind) continue;\n      vis[i] = 0;',
+    to: '      if (K[i] !== wantKind && wantKind === 1) continue;\n      vis[i] = 0;',
+    breaks: ['chain/both-tiers-populated'] },
+
+  { id: 'skip-never-recomputes', file: 'print-lines.js',
+    from: '      if (movedPx < 0.05) { this.skipped = true; this.skippedPx = movedPx; return this.stats; }',
+    to: '      { this.skipped = true; this.skippedPx = movedPx; return this.stats; }',
+    breaks: ['skip/idle-is-free', 'live/orbit-moves-silhouette', 'pose/lines-follow-bend'] },
+
   { id: 'stylize-resets-pose', file: 'print.js',
     from: '    function readStyle() {\n      art.setOptions({',
     to: '    function readStyle() {\n      if (rig) { rig.resetPose(); repose(); }\n      art.setOptions({',
@@ -501,8 +528,17 @@ async function run({ mutant = null, shots = false } = {}) {
   const fatStats = await stats();
   const fatInk = await inkNow('07-weight-5.0.png', PAPER);
   const fatMat = await call(() => window.__printLineArt.materialWidth());
-  check('weight/material', thinMat.every(v => v === 1.0) && fatMat.every(v => v === 5.0),
-    `${JSON.stringify(thinMat)} -> ${JSON.stringify(fatMat)}`);
+  // Per TIER: [contour, interior] for each mesh. The contour carries the
+  // slider, the interior carries the fixed ratio, and BOTH have to move —
+  // a build that scaled only the contour would still pass a "weight changed"
+  // check that looked at one number.
+  const ratio = (await call(() => window.__printLineArt.curation())).interiorWeightRatio;
+  const tiersOK = (mats, w) => mats.every(m => Math.abs(m[0] - w) < 1e-6 && Math.abs(m[1] - w * ratio) < 1e-6);
+  check('weight/material', tiersOK(thinMat, 1.0) && tiersOK(fatMat, 5.0),
+    `${JSON.stringify(thinMat)} -> ${JSON.stringify(fatMat)} (ratio ${ratio})`);
+  check('tier/two-weights',
+    thinMat.every(m => m[1] < m[0]) && fatMat.every(m => m[1] < m[0]) && ratio > 0 && ratio < 1,
+    `interior is ${ratio} of contour, on every mesh and at both ends of the slider`);
   check('weight/pixels', fatInk > thinInk * 1.25, `ink ${thinInk.toFixed(4)} -> ${fatInk.toFixed(4)} (x${(fatInk / thinInk).toFixed(2)})`);
   // ...and it is the WIDTH that changed, not the number of lines. A "weight"
   // slider that quietly admitted more creases would also darken the frame.
@@ -544,8 +580,12 @@ async function run({ mutant = null, shots = false } = {}) {
   await setStyle({ blend: 100 }); await settle();
   const b100 = await stats();
   const ink100 = await inkNow('11-dots-100.png', PAPER);
-  check('blend/strokes-at-0', b0.strokes === b0.segments && b0.dots === 0,
-    `${b0.strokes} strokes / ${b0.dots} dots of ${b0.segments}`);
+  // NOT `strokes === segments` any more. That held when one raw edge was one
+  // drawn segment; chaining, curation and resampling all legitimately move
+  // that number, so the structural claim is what is asserted instead: at
+  // blend 0 everything is drawn as strokes and nothing as dots.
+  check('blend/strokes-at-0', b0.strokes > 0 && b0.dots === 0,
+    `${b0.strokes} stroke segs / ${b0.dots} dots (from ${b0.segments} raw edges)`);
   check('blend/dots-at-100', b100.strokes === 0 && b100.dots > 0,
     `${b100.strokes} strokes / ${b100.dots} dots`);
   check('blend/mixed', b50.strokes > 0 && b50.dots > 0 && b50.strokes < b0.strokes,
@@ -557,6 +597,79 @@ async function run({ mutant = null, shots = false } = {}) {
   const bDrift = Math.abs(b100.segments - b0.segments) / b0.segments;
   check('blend/same-extraction', bDrift < 0.02 && Math.abs(b100.crease - b0.crease) / Math.max(b0.crease, 1) < 0.02,
     `${b0.segments} -> ${b100.segments} segments (${(bDrift * 100).toFixed(2)}%)`);
+
+  // -- chain / curate / smooth --------------------------------------------
+  // The claims here are SHAPE and STRUCTURE, never a segment count: curation
+  // parameters legitimately move every count in this section, which is the
+  // whole reason the assertions are written this way.
+  await setStyle({ detail: 45, weight: 2.4, blend: 0 }); await settle();
+  const cur = await call(() => window.__printLineArt.curation());
+  const sm = await stats();
+  if (!mutant) console.log('curation:', JSON.stringify(cur), '\nstats:', JSON.stringify(sm, null, 1));
+
+  check('chain/edges-become-strokes', sm.chains > 0 && sm.chains < sm.segments / 3,
+    `${sm.segments} raw edges -> ${sm.chains} chained strokes`);
+  check('chain/both-tiers-populated',
+    sm.contourChains > 0 && sm.interiorChains > 0 && sm.contourStrokes > 0 && sm.interiorStrokes > 0,
+    `contour ${sm.contourChains} chains / ${sm.contourStrokes} segs, interior ${sm.interiorChains} / ${sm.interiorStrokes}`);
+  check('simplify/reduces-points', sm.ptsOut > 0 && sm.ptsOut < sm.ptsIn * 0.7,
+    `${sm.ptsIn} -> ${sm.ptsOut} points (${(100 * sm.ptsOut / sm.ptsIn).toFixed(1)}%)`);
+
+  // THE SHAPE CLAIM, measured as a COMPARISON rather than against a bar.
+  // A faceted staircase turns hard at nearly every join; a smoothed contour
+  // does not. An absolute threshold looked tempting and was wrong: the mean
+  // turn depends on how big the model is on screen (short chains turn more),
+  // so the shipped number sat at 31.1 deg against a bar of 32 with the
+  // unsmoothed baseline at 37 — a flake, not a measurement. This runs BOTH
+  // states at the same camera and pose instead, so the claim is "the pass
+  // does something", which is what the mutant has to break.
+  //
+  // Turn statistics are sampled 1 frame in 8, so each side is demanded and
+  // waited for; reading them straight would read the previous state's numbers.
+  const turnsAt = async (iters) => {
+    await call(`window.__printLineArt.setCuration({ smoothIters: ${iters} })`);
+    await settle();
+    await call(() => window.__printLineArt.measureTurnsNow());
+    await page.waitForTimeout(900);
+    const t = await stats();
+    return { mean: t.contourTurnMean, over: t.contourTurnOver30, joins: t.contourTurnJoins };
+  };
+  const smoothOn = await turnsAt(cur.smoothIters);
+  const smoothOff = await turnsAt(0);
+  await call(`window.__printLineArt.setCuration({ smoothIters: ${cur.smoothIters} })`);
+  await settle();
+  const fracOn = smoothOn.over / Math.max(smoothOn.joins, 1);
+  const fracOff = smoothOff.over / Math.max(smoothOff.joins, 1);
+  check('smooth/contour-is-not-faceted',
+    smoothOn.joins > 100 && smoothOff.joins > 100
+    && smoothOn.mean < smoothOff.mean * 0.85 && fracOn < fracOff * 0.7,
+    `mean ${smoothOff.mean.toFixed(1)}° -> ${smoothOn.mean.toFixed(1)}°, joins over 30° ${(fracOff * 100).toFixed(1)}% -> ${(fracOn * 100).toFixed(1)}%`);
+
+  // Curation is a real filter, and it is DRIVEN here rather than assumed:
+  // raising the bar must drop more chains and keep fewer, at an unchanged
+  // camera and pose. `setCuration` reaches past the panel on purpose — the
+  // stage ships three sliders and curation is not one of them.
+  const curBefore = await stats();
+  await call(() => window.__printLineArt.setCuration({ minChainPx: 60, minCreasePx: 120 }));
+  await settle();
+  const curAfter = await stats();
+  await call(`window.__printLineArt.setCuration(${JSON.stringify({ minChainPx: cur.minChainPx, minCreasePx: cur.minCreasePx })})`);
+  await settle();
+  const restored = await stats();
+  check('curate/prunes-by-length',
+    curAfter.chains < curBefore.chains && curAfter.dropped > curBefore.dropped
+    && Math.abs(restored.chains - curBefore.chains) / curBefore.chains < 0.1,
+    `${curBefore.chains} chains -> ${curAfter.chains} at a 60px bar, back to ${restored.chains}`);
+  // ...and it prunes STROKES, not just the counter
+  check('curate/prunes-the-drawing', curAfter.strokes < curBefore.strokes,
+    `${curBefore.strokes} -> ${curAfter.strokes} stroke segments`);
+  // The post-process is skipped when the view has not moved by even a
+  // twentieth of a pixel — and a pose change has to un-skip it, or the
+  // optimisation would freeze the drawing.
+  const sk = await call(() => window.__printLineArt.skipRepeat());
+  check('skip/idle-is-free', sk.second === true && sk.afterPose === false,
+    `repeat update skipped=${sk.second}, after a pose change skipped=${sk.afterPose}`);
+  await shot('13-smoothed.png');
 
   // -- the two axes do not touch each other -------------------------------
   out('');

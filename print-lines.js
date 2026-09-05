@@ -355,6 +355,8 @@ export class LineExtractor {
 // does not.
 
 const MAX_DOTS = 60000;
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion();
 
 // ONE OWNER for every curation number, read by the app, the read-out and the
 // gate. See the PR for what this optimizes for and where it over-prunes.
@@ -568,6 +570,7 @@ export class LineArt {
   // the bloom is posed by rotating a node, and a rotation cannot change a
   // dihedral angle or a face normal expressed in the bloom's own local space.
   refreshGeometry(mesh) {
+    this._geomVersion = (this._geomVersion || 0) + 1;
     let ms = 0;
     for (const u of this.units) {
       if (mesh && u.mesh !== mesh) continue;
@@ -735,6 +738,49 @@ export class LineArt {
   // line material specifies its width in the same units as `resolution`.
   update(camera, sizePx, pixelRatio = 1) {
     if (!this.enabled) return null;
+
+    // NOTHING MOVED, NOTHING TO REDO — and "moved" is measured in PIXELS, not
+    // in floats. The post-process is the expensive half of this stage and it
+    // is a pure function of (camera, geometry, options), so when none of the
+    // three has changed the buffers on the GPU are already the right answer.
+    //
+    // An exact float comparison does not work here and was measured not to:
+    // OrbitControls runs with damping, whose easing has a multi-second
+    // half-life, so the camera matrix keeps changing microscopically long
+    // after the hand has stopped and the skip NEVER fired. The criterion that
+    // does work is the honest one — would the drawing move by less than a
+    // twentieth of a pixel? Then it is already drawn.
+    camera.updateWorldMatrix(true, false);
+    const camPos = camera.getWorldPosition(_v1);
+    const camQ = camera.getWorldQuaternion(_q1);
+    const optSig = this.weight * 1e4 + this.detail * 7 + this.blend * 13
+      + CURATION.minChainPx * 3 + CURATION.minCreasePx * 5 + CURATION.simplifyPx * 11
+      + CURATION.smoothIters * 17 + CURATION.smoothLambda * 23 + sizePx[0] + sizePx[1];
+    let poseSig = this._geomVersion || 0;
+    for (const u of this.units) {
+      u.mesh.updateWorldMatrix(true, false);
+      const m = u.mesh.matrixWorld.elements;
+      for (let i = 0; i < 16; i++) poseSig = (poseSig * 31 + m[i] * 1e6) % 2147483647;
+    }
+    const fovRad = THREE.MathUtils.degToRad(camera.fov);
+    // reference distance: the mean of the meshes' own origins, which is what
+    // the per-mesh world-per-pixel below is computed at
+    _v2.set(0, 0, 0);
+    for (const u of this.units) _v2.add(u.mesh.getWorldPosition(_v3));
+    _v2.divideScalar(this.units.length || 1);
+    const refDist = Math.max(camPos.distanceTo(_v2), 1e-3);
+    const wppRef = 2 * refDist * Math.tan(fovRad / 2) / Math.max(sizePx[1], 1);
+    if (this._last && poseSig === this._last.poseSig && optSig === this._last.optSig && !this._forceTurns) {
+      let d = Math.abs(this._last.quat.dot(camQ));
+      if (d > 1) d = 1;
+      const angRad = 2 * Math.acos(d);                       // angle between orientations
+      const movedPx = camPos.distanceTo(this._last.pos) / wppRef
+                    + angRad * (sizePx[1] / fovRad);          // screen px the view swung
+      if (movedPx < 0.05) { this.skipped = true; this.skippedPx = movedPx; return this.stats; }
+    }
+    this._last = { pos: camPos.clone(), quat: camQ.clone(), poseSig, optSig };
+    this.skipped = false;
+
     const t0 = performance.now();
     const creaseCos = Math.cos(THREE.MathUtils.degToRad(this.creaseAngleDeg));
     const b = Math.min(1, Math.max(0, this.blend / 100));
@@ -744,13 +790,17 @@ export class LineArt {
     const camLocal = new THREE.Vector3();
     const centre = new THREE.Vector3();
 
-    const measureTurns = (this._turnTick = (this._turnTick || 0) + 1) % 8 === 1;
+    // Sampled every 8th frame, or on demand. The demand path exists because
+    // this harness runs at ~2 fps on software GL, so "wait for the next
+    // sample" is up to four seconds — long enough that a gate reading turn
+    // statistics would be reading the ones from before the change it just made.
+    const measureTurns = this._forceTurns || (this._turnTick = (this._turnTick || 0) + 1) % 8 === 1;
+    this._forceTurns = false;
     let sil = 0, cre = 0, extractMs = 0, chainMs = 0;
     let strokes = 0, dots = 0, chains = 0, dropped = 0, ptsIn = 0, ptsOut = 0;
     let truncated = false;
 
     for (const u of this.units) {
-      u.mesh.updateWorldMatrix(true, false);
       inv.copy(u.mesh.matrixWorld).invert();
       camLocal.copy(camWorld).applyMatrix4(inv);
 
