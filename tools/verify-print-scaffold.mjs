@@ -24,6 +24,10 @@
 // looking for a pivot node that does not exist, removing every light, and
 // stripping `extras` from the bundle at generation time, leaving the marker
 // visible, and REMOVING the marker from the tree instead of hiding it.
+//
+// The POSE assertions are measured against mesh state and rendered pixels, not
+// against the control that was just written: a slider that moves a read-out and
+// nothing else passes none of them.
 
 import { chromium } from 'playwright-core';
 import http from 'node:http';
@@ -158,6 +162,166 @@ console.log('camera after :', after.map(n=>n.toFixed(1)).join(', '));
 console.log('camera moved by:', moved.toFixed(2));
 await page.screenshot({ path: path.join(OUT, '02-orbited.png') });
 
+// ===================== POSE =============================================
+// Every claim below is measured against MESH STATE or a rendered pixel, never
+// against the control value that was just written — a slider that updates a
+// read-out and nothing else would otherwise pass everything here.
+
+const S = () => page.evaluate(() => window.__printScaffold);
+const call = (expr) => page.evaluate(expr);
+
+const hasRig = await call(() => window.__printScaffold.hasRig);
+const stemVerts = await call(() => window.__printScaffold.stemVertexCount);
+const cleanSlabs = await call(() => window.__printScaffold.axisCleanSlabs);
+const leafVerts0 = await call(() => window.__printScaffold.leafVertexCount());
+console.log(`\nstem rig: present=${hasRig} verts=${stemVerts} axisCleanSlabs=${cleanSlabs} leafVerts=${leafVerts0}`);
+
+// The rest pose must be identity to within one float32 ULP.
+const axisOff = await call(() => window.__printScaffold.axisOffsets());
+const axisOnStem = axisOff.every(v => v !== null && v < 3);
+console.log(`axis fit: control-point offsets (x core radius) = [${axisOff.map(v => v === null ? 'null' : v.toFixed(2))}] onStem=${axisOnStem}`);
+const restUlps = await call(() => window.__printScaffold.restResidualUlps());
+const restsClean = await call(() => window.__printScaffold.isRest());
+console.log(`rest pose: isRest=${restsClean} residual=${restUlps.toFixed(3)} float32 ULP`);
+
+// --- dragging a bend point moves the MESH, not just the handle ------------
+const bbBefore = await call(() => window.__printScaffold.stemBBox());
+const vtxBefore = await call(() => window.__printScaffold.stemVertex(7000));
+const [hx, hy] = await call(() => window.__printScaffold.handleScreenPos(2));
+await page.mouse.move(hx, hy);
+await page.mouse.down();
+for (let i = 1; i <= 10; i++) await page.mouse.move(hx + i * 6, hy);
+await page.mouse.up();
+await page.waitForTimeout(300);
+const bendPts = await call(() => window.__printScaffold.bendPoints());
+const bbAfter = await call(() => window.__printScaffold.stemBBox());
+const vtxAfter = await call(() => window.__printScaffold.stemVertex(7000));
+const nowBent = !(await call(() => window.__printScaffold.isRest()));
+const vtxMoved = Math.hypot(vtxAfter[0]-vtxBefore[0], vtxAfter[1]-vtxBefore[1], vtxAfter[2]-vtxBefore[2]);
+const bboxMoved = Math.abs(bbAfter[1][0] - bbBefore[1][0]) + Math.abs(bbAfter[0][0] - bbBefore[0][0]);
+// the root must NOT have moved — it is the anchor
+const rootFixed = bendPts[0][0] === (await call(() => window.__printScaffold.bendPoints()))[0][0];
+const rootAtRest = Math.hypot(...bendPts[0]) > 0 && bendPts[0][1] < bendPts[3][1];
+console.log(`bend drag: bent=${nowBent} vertexMoved=${vtxMoved.toFixed(2)} bboxMoved=${bboxMoved.toFixed(2)}`);
+
+// the leaves must SURVIVE the bend — this is the whole reason for not re-lofting
+const leafVerts1 = await call(() => window.__printScaffold.leafVertexCount());
+const stemVerts1 = await call(() => window.__printScaffold.stemVertexCount);
+console.log(`leaves after bend: leafVerts=${leafVerts1} (was ${leafVerts0}), stemVerts=${stemVerts1} (was ${stemVerts})`);
+await page.screenshot({ path: path.join(OUT, '03-bent.png') });
+
+// --- the anchored root cannot be dragged ---------------------------------
+const rootBefore = (await call(() => window.__printScaffold.bendPoints()))[0];
+const [rx, ry] = await call(() => window.__printScaffold.handleScreenPos(0));
+await page.mouse.move(rx, ry);
+await page.mouse.down();
+for (let i = 1; i <= 8; i++) await page.mouse.move(rx + i * 8, ry - i * 3);
+await page.mouse.up();
+await page.waitForTimeout(200);
+const rootAfter = (await call(() => window.__printScaffold.bendPoints()))[0];
+const rootHeldByPicking = rootBefore.every((v, i) => v === rootAfter[i]);
+// ...and again past the pointer handler, straight at the rig. The pick filter
+// and the rig guard are two separate anchors; dragging only ever exercises the
+// first, so removing the second passed this check until forceRootMove existed.
+const rootMovedByModel = await call(() => window.__printScaffold.forceRootMove());
+const rootAfterForce = (await call(() => window.__printScaffold.bendPoints()))[0];
+const rootHeldByRig = !rootMovedByModel && rootBefore.every((v, i) => v === rootAfterForce[i]);
+console.log(`anchored root: heldAgainstDrag=${rootHeldByPicking} heldAgainstModel=${rootHeldByRig}`);
+
+// --- hinge sliders rotate the BLOOM and stay inside the bundle's limits ---
+const limitsFromBundle = await call(() => window.__printScaffold.limitsFromBundle());
+const lim = await call(() => window.__printScaffold.limits());
+// Not just "limits exist" — the slider bounds must EQUAL the bundle's own
+// numbers. A hardcoded [0,45]/[-30,30] would satisfy a mere existence check
+// and silently ignore a re-tuned export.
+const declared = (await S()).pivotExtras.rotation_limits_deg;
+const limitsMatchBundle =
+  JSON.stringify(lim.droop) === JSON.stringify(declared.droop) &&
+  JSON.stringify(lim.twist) === JSON.stringify(declared.twist);
+console.log(`hinge limits: sliders ${JSON.stringify(lim)} vs bundle ${JSON.stringify(declared)} -> match=${limitsMatchBundle}`);
+const qRest = await call(() => window.__printScaffold.bloomQuaternion());
+const cRest = await call(() => window.__printScaffold.bloomWorldCentroid());
+await call(() => window.__printScaffold.setDroop(30));
+await page.waitForTimeout(150);
+const qDroop = await call(() => window.__printScaffold.bloomQuaternion());
+const cDroop = await call(() => window.__printScaffold.bloomWorldCentroid());
+const droopVal = await call(() => window.__printScaffold.droop());
+await call(() => window.__printScaffold.setTwist(-20));
+await page.waitForTimeout(150);
+const qTwist = await call(() => window.__printScaffold.bloomQuaternion());
+const twistVal = await call(() => window.__printScaffold.twist());
+await page.screenshot({ path: path.join(OUT, '04-hinged.png') });
+
+const qDist = (a, b) => Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2], a[3]-b[3]);
+const bloomMovedByDroop = Math.hypot(cDroop[0]-cRest[0], cDroop[1]-cRest[1], cDroop[2]-cRest[2]);
+const droopTurned = qDist(qDroop, qRest) > 1e-3;
+const twistTurned = qDist(qTwist, qDroop) > 1e-3;
+console.log(`hinge: limitsFromBundle=${limitsFromBundle} droop=${lim.droop} twist=${lim.twist}`);
+console.log(`       droop30 -> ${droopVal}, quat moved=${droopTurned}, bloom centroid moved ${bloomMovedByDroop.toFixed(2)}`);
+console.log(`       twist-20 -> ${twistVal}, quat moved=${twistTurned}`);
+
+// Over-range writes must be refused BY THE MODEL. Going through the slider
+// proves nothing: an <input max=45> given "500" reads back "45" before any of
+// the page's code runs, so a build with no clamp at all passed this check
+// until it was driven through forcePose instead. Both paths are kept — the
+// widget path is what a user touches, the model path is what is under test.
+await call(() => window.__printScaffold.setDroop(500));
+await call(() => window.__printScaffold.setTwist(-999));
+const droopOverWidget = await call(() => window.__printScaffold.droop());
+const twistOverWidget = await call(() => window.__printScaffold.twist());
+await call(() => window.__printScaffold.forcePose(500, -999));
+const droopOver = await call(() => window.__printScaffold.droop());
+const twistOver = await call(() => window.__printScaffold.twist());
+await call(() => window.__printScaffold.forcePose(-500, 999));
+const droopUnder = await call(() => window.__printScaffold.droop());
+const twistUnder = await call(() => window.__printScaffold.twist());
+const inRange = (v, r) => v >= r[0] && v <= r[1];
+const clamped = inRange(droopOverWidget, lim.droop) && inRange(twistOverWidget, lim.twist)
+             && inRange(droopOver, lim.droop) && inRange(twistOver, lim.twist)
+             && inRange(droopUnder, lim.droop) && inRange(twistUnder, lim.twist);
+console.log(`       out-of-range via widget -> ${droopOverWidget}/${twistOverWidget}`);
+console.log(`       out-of-range via model  -> ${droopOver}/${twistOver} and ${droopUnder}/${twistUnder} -> ${clamped}`);
+await call(() => { window.__printScaffold.setDroop(30); window.__printScaffold.setTwist(-20); });
+await page.waitForTimeout(150);
+
+// --- pose SURVIVES a camera orbit ----------------------------------------
+const poseBeforeOrbit = await call(() => window.__printScaffold.bendPoints());
+const dBefore = await call(() => window.__printScaffold.droop());
+const tBefore = await call(() => window.__printScaffold.twist());
+const camBefore = await call(() => window.__printScaffold.cameraPosition());
+const cbox = await page.locator('#print-canvas').boundingBox();
+await page.mouse.move(cbox.x + cbox.width * 0.75, cbox.y + cbox.height * 0.75);
+await page.mouse.down();
+for (let i = 1; i <= 12; i++) await page.mouse.move(cbox.x + cbox.width * 0.75 - i * 16, cbox.y + cbox.height * 0.75 - i * 4);
+await page.mouse.up();
+await page.waitForTimeout(400);
+const poseAfterOrbit = await call(() => window.__printScaffold.bendPoints());
+const dAfter = await call(() => window.__printScaffold.droop());
+const tAfter = await call(() => window.__printScaffold.twist());
+const camAfter = await call(() => window.__printScaffold.cameraPosition());
+const camReallyMoved = Math.hypot(camAfter[0]-camBefore[0], camAfter[1]-camBefore[1], camAfter[2]-camBefore[2]);
+const poseHeld = JSON.stringify(poseBeforeOrbit) === JSON.stringify(poseAfterOrbit)
+              && dBefore === dAfter && tBefore === tAfter;
+console.log(`orbit over pose: camera moved ${camReallyMoved.toFixed(1)}, pose held=${poseHeld}`);
+await page.screenshot({ path: path.join(OUT, '05-posed-orbited.png') });
+
+// --- the panel REFLECTS the pose, read back from the DOM -----------------
+const poseTxt = await call(() => window.__printScaffold.poseText());
+const panelShowsBend = /BENT/.test(poseTxt);
+const panelShowsDroop = new RegExp(`droop\\s+${dAfter.toFixed(1)}`).test(poseTxt);
+const panelShowsTwist = new RegExp(`twist\\s+${tAfter.toFixed(1)}`).test(poseTxt);
+const panelShowsDelta = /\u0394 \[/.test(poseTxt) && !/^\s*\u0394 \[0, 0, 0\]/m.test(poseTxt.split('mid2')[1] || '');
+console.log(`panel: bent=${panelShowsBend} droop=${panelShowsDroop} twist=${panelShowsTwist}`);
+console.log('pose panel:\n' + poseTxt);
+
+const poseOK = hasRig && stemVerts > 0 && cleanSlabs >= 4 && restUlps <= 1 && axisOnStem
+  && nowBent && vtxMoved > 0.5 && bboxMoved > 0.5
+  && leafVerts1 === leafVerts0 && leafVerts0 > 0 && stemVerts1 === stemVerts
+  && rootHeldByPicking && rootHeldByRig
+  && limitsFromBundle && limitsMatchBundle && droopTurned && twistTurned && bloomMovedByDroop > 0.5 && clamped
+  && camReallyMoved > 1 && poseHeld
+  && panelShowsBend && panelShowsDroop && panelShowsTwist;
+
 console.log('\npage errors:', errs.length ? errs : 'none');
 console.log('console:\n' + logs.join('\n'));
 await browser.close(); server.close();
@@ -168,6 +332,7 @@ const ok = info.ready && info.meshes >= 1 && info.pivotExtras
   && Object.keys(info.pivotExtras.rotation_limits_deg).length > 0
   && drawn > 0.01 && drawn < 0.9 && moved > 1
   && markerFound && markerInTree && hiddenByDefault
-  && toggleOffered && shownAfterCheck && hiddenAfterUncheck && errs.length === 0;
+  && toggleOffered && shownAfterCheck && hiddenAfterUncheck
+  && poseOK && errs.length === 0;
 console.log(ok ? '\nPASS' : '\nFAIL');
 process.exit(ok ? 0 : 1);

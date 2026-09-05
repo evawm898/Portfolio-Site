@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Print Preview — Eva Maskalenko</title>
-<meta name="description" content="3D viewport scaffold for the print pipeline: loads a glTF bundle and orbits around it.">
+<title>Print Pose — Eva Maskalenko</title>
+<meta name="description" content="Posing stage for the print pipeline: drag bend points along the stem and hinge the bloom at its junction.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -54,6 +54,37 @@
      for a marker that is not in the bundle. Measured: the gate's
      "toggle never offered" mutation passed until this rule existed. */
   #print-marker-toggle[hidden] { display: none; }
+
+  /* POSE panel, bottom-left, deliberately a separate box from the read-out
+     above: that one reports the bundle as shipped, this one reports what the
+     session has done to it. */
+  #print-pose {
+    /* RIGHT side on purpose: the read-out panel is top-left and can grow to
+       the full viewport height, so a bottom-left pose box collided with its
+       marker toggle and swallowed the clicks (caught by the gate, not by eye). */
+    position: fixed; right: 0.9rem; top: 0.9rem;
+    width: min(23rem, calc(100vw - 1.8rem));
+    max-height: calc(100vh - 1.8rem); overflow: auto;
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
+    background: rgba(10, 12, 12, 0.9); border: 1px solid #2b3333;
+    padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1;
+  }
+  #print-pose[hidden] { display: none; }
+  .pose-title { color: #6fb7ae; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+  .pose-row { display: grid; grid-template-columns: 3.2rem 1fr 3.2rem; align-items: center; gap: 0.5rem; }
+  .pose-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; }
+  .pose-row output { text-align: right; color: #c8d2d1; }
+  .pose-hint { margin: 0.55rem 0 0.5rem; color: #6b7776; }
+  #resetPose {
+    background: none; border: 1px solid #2b3333; color: #96a2a1;
+    font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
+  }
+  #resetPose:hover { border-color: #6fb7ae; color: #c8d2d1; }
+  #print-posestate {
+    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
+    white-space: pre-wrap; font: inherit; color: #96a2a1;
+  }
+  #print-canvas.dragging { cursor: grabbing; }
 </style>
 </head>
 <body>
@@ -68,6 +99,29 @@
   <label id="print-marker-toggle" hidden>
     <input type="checkbox" id="showPivotMarker"> show pivot marker
   </label>
+</div>
+
+<!-- POSE. The hinge ranges are NOT written here — they are read from the
+     bundle's own rotation_limits_deg at load and stamped onto the inputs, so
+     the constraint has one owner (the exporter) and re-tuning it is a bundle
+     change, not a code change. -->
+<div id="print-pose" hidden>
+  <div class="pose-title">POSE</div>
+
+  <div class="pose-row">
+    <label for="droop">droop</label>
+    <input type="range" id="droop" min="0" max="45" step="0.5" value="0">
+    <output id="droopOut">0.0°</output>
+  </div>
+  <div class="pose-row">
+    <label for="twist">twist</label>
+    <input type="range" id="twist" min="-30" max="30" step="0.5" value="0">
+    <output id="twistOut">0.0°</output>
+  </div>
+
+  <div class="pose-hint" id="poseHint">drag the dots on the stem to bend it</div>
+  <button type="button" id="resetPose">reset pose</button>
+  <pre id="print-posestate"></pre>
 </div>
 
 <script type="module" src="print.js"></script>
