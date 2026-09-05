@@ -31,6 +31,10 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase14  `phase14Matrix()` — the 499 rows frozen at 5312845, the commit
+                carrying the curl family and session 17's gate efficiency
+                work. THE NEWEST baseline; the like-for-like baseline for the
+                full-sphere head (session 18).
      --phase13  `phase13Matrix()` — the 469 rows frozen at 6b8e94b, the commit
                 carrying dome lean and session 15's outcome doc (session 15
                 froze nothing; this is that debt, paid by session 16)
@@ -218,7 +222,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -322,7 +326,7 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 const FROZEN = {
   phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
   phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix, phase9: phase9Matrix, phase10: phase10Matrix,
-  phase11: phase11Matrix, phase12: phase12Matrix, phase13: phase13Matrix,
+  phase11: phase11Matrix, phase12: phase12Matrix, phase13: phase13Matrix, phase14: phase14Matrix,
 };
 const PHASE_NAMES = Object.keys(FROZEN);
 

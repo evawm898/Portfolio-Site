@@ -189,6 +189,33 @@ behaviour (bias 0.5 re-opens 5.4%, start 0.95 23.1%), not a gate failure.
 `phase13Matrix()` (469 rows at 6b8e94b) paid the baseline session 15 left
 unfrozen. The sheet is `node tools/shot-bloom-curl.mjs <dir> [base-tree]`.
 
+**THE HEAD IS A CAP OR A FULL SPHERE, AND THE SPHERE IS THE CONTINUOUS SPIRAL
+RE-KEYED ON POLAR ANGLE** (Eva, Sep 5, session 18). `hubShape` (HEAD section,
+CAP / SPHERE, default CAP) with `headRise` as the cap's own sub-control — two
+values, not three, because a FLAT / DOMED / SPHERICAL enum would have moved
+the 35 phase13 rows that pin `headRise` with no hub-shape value. SPHERE shows
+under CONTINUOUS only and is hidden AND inert elsewhere (`PREDICATES.sphereMode`
+and `sphereMode()` are the two statements; the harness checks them). `footRing()`'s
+continuous arm keys the sphere's descriptors on polar angle (cos φ linear in
+the slot index, 2/K a step — the equal-area lattice), Rd = R0 with the equator
+on the flat hub's plane, the sequence from the RESERVED pole to the face pole,
+lean 0 — **the SPHERE law, Q1b CLOSED from the sheet** (the faded lean is
+costed in `docs/bloom-session-18-outcome.md`, not built, and does not carry forward). The hub is two concentric
+spheres with an explicit apex fan at each pole — 6,720 triangles, the third
+value of a branch that was two. S1–S4 in both gates: equal-area pole to pole,
+the hub CLOSED iff declared (from the builder's own report), the reserved pole
+clear of feet AND within one step (both directions), the rise inert under
+SPHERE. J5 steps in polar angle there, J6 is nulled with a clause, J9 wants
+lean 0. **Plan coverage cannot read a sphere** (the far hemisphere projects
+into the disc from below — a false clean): SPHERE rows are a labelled skip and
+the export gate FAILS if one emits a number; the solid-angle instrument is
+session two. The crowding raster evaluates membership in (arc, azimuth) over
+the full arc on a sphere and prints the depth within one step of each pole.
+Under SPHERE the DISC centre plates the face pole (24.5 mm on the 240-foot
+row) — DEFERRED to the phase-2 centre question, explicitly; do not constrain the
+centre under SPHERE ahead of it. Sheet: `node tools/shot-bloom-sphere.mjs <dir>`. #106 and #108 are FLOWER
+issues, whatever a kickoff prompt says.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
@@ -400,9 +427,10 @@ generators own geometry and STL, and this page is downstream of both.
 
 Stages shipped so far: the **scaffold** (#150 — viewport, glTF load, the pivot
 node's `extras` round-tripping through GLTFLoader), the **pose** (#151 — a
-posable stem and a hinged bloom), and the **line art** (#153 — silhouette and
+posable stem and a hinged bloom), the **line art** (#153 — silhouette and
 crease edges, three sliders, then chained/curated/smoothed into drawn contours
-in two weights).
+in two weights), and a **runtime bundle loader** (#156 — a `.glb` can be
+swapped in at any time, not only baked into the page at build time).
 
 **The bundle is the input contract.** `assets/print-test/flower-test-bundle.glb`
 carries a `pivot` node whose glTF `extras` declare the junction position, the
@@ -413,6 +441,43 @@ bundle's own numbers rather than merely existing. The bundle also ships a
 `pivot_marker` diagnostic sphere, hidden by default and restored by a toggle —
 hidden via `visible`, never removed, so the node counts still describe the
 bundle as shipped.
+
+**The bundle is swappable AT RUNTIME, not only baked in at build time.** A
+`.glb` dropped anywhere on the page, or chosen via the file input in the debug
+panel, is parsed straight from its bytes through `GLTFLoader.parse()` — no
+fetch, no URL — so a different test export (a bloom+stem+leaf bundle, say) can
+be tried without editing source and redeploying. `assets/print-test/flower-test-bundle.glb`
+is still loaded first via `.load()` so the page is never blank; it is the
+default, not the only source. A new load always REPLACES the scene and RESETS
+every piece of pose state (bend points, droop, twist, the hinge sliders'
+min/max/value) via one `clearCurrentBundle()` — a different bundle has no
+reason to share the old one's pivot position or rotation limits — but
+deliberately does NOT reset the STYLIZE sliders or the line-art on/off toggle:
+those are a rendering preference, not a property of any one bundle's geometry,
+and a "weight 3px, detail 60" look is exactly what someone comparing several
+test bundles wants carried from one to the next. The one-time event wiring
+(drag handlers, hinge sliders, the marker toggle, and the four STYLIZE
+listeners) is registered ONCE at module load against mutable module-level
+state, so a swap reassigns that state and the already-registered listeners
+just keep working rather than needing to be re-bound per bundle — the same
+"layer, never a mode" discipline the line-art stage already follows.
+**`GLTFLoader.parse()` called directly (not through `.load(url)`) does NOT
+catch its own exceptions** — measured against three@0.161.0: garbage bytes,
+non-JSON text and an empty buffer all throw SYNCHRONOUSLY out of `.parse()`
+rather than reaching its error callback, which `.load()` swallows internally
+but a direct `.parse()` call does not. `parseGltfBytes()` wraps the call in a
+try/catch for exactly this reason. A failure — bad bytes, or a well-formed
+glTF with no `pivot` node — is reported in the debug panel (appended, never
+wiping what's already shown) and otherwise leaves the CURRENTLY DISPLAYED
+bundle and its pose untouched; it never blanks the viewport and never throws
+past the page's `pageerror` boundary. **Keep the gate's synthetic second
+bundle's pivot offset MODEST if you touch this test:** it is generated on the
+fly via `GLTFExporter` (same real stem+bloom mesh, pivot moved, different
+`rotation_limits_deg`), and a large shift moves the bloom enough to change the
+re-framed camera's projection of the bend-point handles — which can push one
+of them under the debug panel's on-screen footprint and silently fail a drag
+that has nothing to do with what's under test. Measured, not hypothetical:
+this is exactly what an early version of this gate did with a 12-unit offset.
 
 **The stem deformation is a ruling, not a proposal** (Eva, Sep 5) — see the
 header of `print-stem.js`. Do not "simplify" it back into a swept tube: 83% of
@@ -523,7 +588,13 @@ copies of `print.js` / `print-lines.js` through the gate's own HTTP server, and
 fails if a mutation does not apply, if a check the mutant NAMES stays green, or
 if a check it did not name goes red (which is how a mutation that just breaks
 the page gets caught pretending to be a negative control). `--mutant=<id>` runs
-one, in two minutes rather than thirty-five.
+one, in two minutes rather than thirty-five. The runtime bundle loader has its
+own `bundle-swap/*` checks in the same gate — a second bundle generated on the
+fly (via `GLTFExporter`, in-page), loaded through a real `page.setInputFiles()`
+call and a real `File`/`DataTransfer`/dispatched `DragEvent` drop, never a
+synthesized state hook — skipped during `--mutants` since none of the sixteen
+mutations touch bundle-loading code and it is the single most expensive
+section in the file.
 
 **THE FIRST SWEEP FAILED SIX OF TEN AND WAS MOSTLY RIGHT TO — three of the
 findings were in the GATE, not the mutations, and two of those were in checks
@@ -590,6 +661,13 @@ needs no CDN egress.
 **Loose thread:** `assets/print-test/` still names itself a fixture, and it is
 now load-bearing for three merged stages. Renaming it is a rename in three
 tools plus `print.js`; it has been deferred once per session so far.
+
+**Out of scope so far, on purpose: multi-part bundles.** The runtime loader
+(#156) swaps in any single `.glb`, but several petals + leaves + stem as
+SEPARATE pieces is not handled — the pivot/pose logic still assumes one
+`stem` mesh and one `bloom`/`pivot` pair. Extending that is a real change to
+how the bundle is read, not a loader change, and belongs in its own session
+once there is an actual multi-part export to test against.
 
 ### Authored infill (`print-infill.js`) — 2D, and it never reads the surface
 
@@ -686,6 +764,30 @@ work is a dense scribble and a tonal gradient inside it cannot be read at all.
 That is the linework on this bundle, not the infill — it is what the contour
 curve-fitting session is queued for — but the row exists to let the shading
 decision be judged.
+
+**THE INFILL IS REBUILT PER BUNDLE, AND IT IS TORN DOWN IN TWO PLACES.** It is
+built OVER the line art's extraction, its anchors live in the outgoing bundle's
+meshes' LOCAL space, its marks live in an overlay scene of its own and its
+anchor rings live in the main scene. So `clearCurrentBundle()` disposes the
+infill and removes the rings, and `buildInfill()` (called from the STYLIZE
+build, because the infill is a second consumer of the very extraction that
+build creates) makes new ones and re-applies whatever the panel says. The
+controls are wired ONCE at module load, like STYLIZE's, so a swap cannot stack
+a second set. `__printInfill` is DETACHED on teardown and re-attached on build,
+the same contract as `__printLineArt` — its accessors deref `infill`, so
+leaving it attached with nothing loaded would hand the gate an object that
+throws instead of an absence it can test. Five `swap/infill-*` checks carry all
+of this, including two leak witnesses (overlay children, rings in the scene)
+that are the ONLY things that would notice a rebuild which failed to tear the
+old one down: it still swaps, still poses and still draws.
+
+**A stale panel rectangle measures chrome as ink.** The scaffold gate excludes
+the fixed panel columns before computing an ink fraction, and it excluded
+`#print-debug` by name. Wrapping the left-hand panels in `#print-left` left the
+LOAD BUNDLE box counted as ink and turned three `*/pixels` checks red at ratios
+just under their thresholds. It now excludes the COLUMNS (`#print-left`,
+`#print-side`) and FAILS LOUDLY if either selector matches nothing, rather than
+silently skipping an exclusion.
 
 **The leaf, honestly:** the shipped bundle's leaves are part of the STEM solid,
 not separate parts, and there is no leaf bundle to load (runtime bundle loading

@@ -25,6 +25,26 @@
 // control that was just written: a slider that moves a read-out and nothing
 // else passes none of them.
 //
+// BUNDLE SWAP. The runtime loader (file input AND drag-and-drop) is exercised against a
+// SECOND bundle, generated on the fly (via GLTFExporter, in-page) from the
+// same real stem+bloom mesh as the default but with the pivot moved and a
+// DIFFERENT rotation_limits_deg — so a swap onto it is distinguishable from a
+// no-op reload of identical numbers, while still having a real stem so the
+// pose machinery (rig, leaves, handles) can be asserted exactly as above.
+// Nothing here is a synthesized state hook: the file-input path is driven
+// through Playwright's real `setInputFiles`, and drag-and-drop through a real
+// `File`/`DataTransfer` and dispatched `DragEvent`s — the actual browser
+// mechanism, not window.__printScaffold pretending a file arrived.
+//
+// It also asserts the two failure modes the session's brief calls out by
+// name: bytes that are not valid glTF at all (a raw byte soup — measured to
+// throw SYNCHRONOUSLY out of GLTFLoader.parse() rather than reach onError,
+// which is exactly the "unhandled error" this gate must prove does not reach
+// the page), and a well-formed glTF with no `pivot` node. Both must fail
+// VISIBLY in the debug panel and leave the CURRENTLY DISPLAYED bundle and its
+// pose untouched, never silently blank the viewport, and never throw an
+// error Playwright's `pageerror` listener catches.
+//
 // LINE ART. Same rule, one level up. Every claim is measured against either
 // the extracted segment set (which the page exposes as counts, not as a
 // picture) or the SCREENSHOT BYTES. The three sliders are asserted to do
@@ -198,13 +218,20 @@ const MUTANTS = [
     breaks: ['skip/idle-is-free'] },
 
   { id: 'stylize-resets-pose', file: 'print.js',
-    from: '    function readStyle() {\n      art.setOptions({',
-    to: '    function readStyle() {\n      if (rig) { rig.resetPose(); repose(); }\n      art.setOptions({',
+    // readStyle() is now wired up ONCE at module scope (a bundle swap reuses
+    // it rather than redefining it per load), so its body is at 0-indent with
+    // an `if (!art) return;` guard the single-bundle version never needed —
+    // the string this mutation matches moved for that reason, not a rewrite
+    // of the claim it tests.
+    from: 'function readStyle() {\n  if (!art) return;\n  art.setOptions({',
+    to: 'function readStyle() {\n  if (!art) return;\n  if (rig) { rig.resetPose(); repose(); }\n  art.setOptions({',
     breaks: ['independence/pose-survives-sliders'] },
 
   { id: 'stylize-freezes-pose-controls', file: 'print.js',
-    from: '  canvas.addEventListener(\'pointerdown\', (ev) => {\n    if (!rig) return;',
-    to: '  canvas.addEventListener(\'pointerdown\', (ev) => {\n    if (!rig || (art && art.enabled)) return;',
+    // Same reason as above: the drag handlers are hoisted to module scope
+    // (0-indent) instead of living inside the per-bundle load callback.
+    from: 'canvas.addEventListener(\'pointerdown\', (ev) => {\n  if (!rig) return;',
+    to: 'canvas.addEventListener(\'pointerdown\', (ev) => {\n  if (!rig || (art && art.enabled)) return;',
     breaks: ['stylized/bend-drag-still-works', 'pose/lines-follow-bend',
              'pose/panel-reflects-state'] },
 
@@ -319,10 +346,17 @@ async function run({ mutant = null, shots = false } = {}) {
   // Both overlay panels are excluded by their REAL bounding boxes rather than
   // by a hardcoded rectangle: the right-hand column grew a second panel this
   // session, and a stale rectangle would have measured chrome as ink.
+  // The two fixed COLUMNS, not the individual panels inside them: the left
+  // column holds LOAD BUNDLE and BUNDLE as separate boxes now, so measuring
+  // '#print-debug' alone leaves the other one's chrome counted as ink — which
+  // is the stale-rectangle failure this comment already warns about, and it
+  // duly happened. A missing selector is a hard failure rather than a silently
+  // skipped exclusion, for the same reason.
   const panels = [];
-  for (const sel of ['#print-debug', '#print-side']) {
+  for (const sel of ['#print-left', '#print-side']) {
     const b = await page.locator(sel).boundingBox();
-    if (b) panels.push(b);
+    if (!b) { check('harness/panel-rect-' + sel, false, 'selector matched nothing — ink would count chrome'); }
+    else panels.push(b);
   }
   function inkFraction(png, bg) {
     const { width, height, data } = decodePNG(png);
@@ -817,6 +851,249 @@ async function run({ mutant = null, shots = false } = {}) {
   check('independence/style-survives-pose', JSON.stringify(styleA) === JSON.stringify(styleB),
     `${JSON.stringify(styleA)} vs ${JSON.stringify(styleB)}`);
   await shot('12-both-axes.png');
+
+  // ===================== BUNDLE SWAP ======================================
+  // Exercises the runtime loader (file input AND drag-and-drop) against a
+  // SECOND bundle, generated on the fly (via GLTFExporter, in-page) from the
+  // same real stem+bloom mesh as the default but with the pivot moved and a
+  // DIFFERENT rotation_limits_deg — so a swap onto it is distinguishable from
+  // a no-op reload of identical numbers. Skipped during --mutants: none of
+  // the MUTANTS above touch bundle-loading code, and this is the single most
+  // expensive section in the file (it builds and re-parses a second ~5.6 MB
+  // bundle through several load cycles), so paying for it on every one of
+  // the mutant re-runs would slow the sweep down for zero added signal.
+  if (!mutant) {
+    const errsBeforeSwap = errs.length;
+    out('\n--- bundle swap: generating a second bundle in-page (GLTFExporter) ---');
+    const secondB64 = await page.evaluate(async () => {
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+      const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+      const gltf = await new Promise((res, rej) =>
+        new GLTFLoader().load(location.origin + '/assets/print-test/flower-test-bundle.glb', res, undefined, rej));
+      const root = gltf.scene;
+      let pivot = null;
+      root.traverse(o => { if ((o.name || '').toLowerCase() === 'pivot') pivot = o; });
+      if (!pivot) throw new Error('source bundle has no exact "pivot" node to relocate');
+      // A clearly DIFFERENT pivot position and rotation_limits_deg — a swap
+      // onto this must not read back as though the first bundle were still
+      // active. Kept modest (not e.g. +12 in X): a bigger shift moves the
+      // bloom enough to change the re-framed camera's projection of the
+      // bend-point handles, which can push one of them under the debug
+      // panel's on-screen footprint and produce a drag that silently hits
+      // the panel instead of the canvas — measured, and not what this
+      // section means to test.
+      pivot.position.set(pivot.position.x + 6, pivot.position.y + 2, pivot.position.z - 3);
+      pivot.userData = { ...pivot.userData,
+        junction: { ...(pivot.userData.junction || {}), position: pivot.position.toArray() },
+        rotation_limits_deg: { droop: [5, 20], twist: [-10, 10] } };
+      const buf = await new Promise((res, rej) => new GLTFExporter().parse(root, res, rej, { binary: true }));
+      const bytes = new Uint8Array(buf);
+      let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin);
+    });
+    const secondBundleBuf = Buffer.from(secondB64, 'base64');
+    out(`second bundle: ${secondBundleBuf.length} bytes, pivot moved, rotation_limits_deg=[5,20]/[-10,10]`);
+
+    // --- swap via the FILE INPUT ------------------------------------------
+    // The page is currently BENT and HINGED (left that way by the pose and
+    // independence checks above) — read live rather than assumed, so this
+    // stays correct regardless of what state precedes it.
+    const beforeInput = { isRest: await call(() => window.__printScaffold.isRest()),
+      droop: await call(() => window.__printScaffold.droop()), twist: await call(() => window.__printScaffold.twist()) };
+    out(`before file-input swap: isRest=${beforeInput.isRest} droop=${beforeInput.droop} twist=${beforeInput.twist}`);
+
+    await page.setInputFiles('#bundleFile', { name: 'second-test-bundle.glb', mimeType: 'model/gltf-binary', buffer: secondBundleBuf });
+    await page.waitForFunction(() => window.__printScaffold && window.__printScaffold.source === 'second-test-bundle.glb', { timeout: 15000 });
+
+    const afterInput = await page.evaluate(() => ({
+      source: window.__printScaffold.source,
+      isRest: window.__printScaffold.isRest(),
+      droop: window.__printScaffold.droop(),
+      twist: window.__printScaffold.twist(),
+      limits: window.__printScaffold.limits(),
+      limitsFromBundle: window.__printScaffold.limitsFromBundle(),
+      hasRig: window.__printScaffold.hasRig,
+      meshes: window.__printScaffold.meshes,
+      leafVerts: window.__printScaffold.leafVertexCount(),
+      pivotPos: window.__printScaffold.pivotExtras && window.__printScaffold.pivotExtras.junction.position,
+      markerFound: window.__printScaffold.markerFound,
+    }));
+    const logAfterInput = await page.textContent('#print-log');
+    out(`after file-input swap: ${JSON.stringify(afterInput)}`);
+
+    check('bundle-swap/file-input',
+      afterInput.source === 'second-test-bundle.glb'
+      && afterInput.isRest === true && afterInput.droop === 0 && afterInput.twist === 0
+      && afterInput.limitsFromBundle === true
+      && JSON.stringify(afterInput.limits) === JSON.stringify({ droop: [5, 20], twist: [-10, 10] })
+      && afterInput.hasRig === true && afterInput.meshes >= 1 && afterInput.leafVerts > 0
+      && afterInput.markerFound === true
+      && Math.abs(afterInput.pivotPos[0] - 6.09) < 0.1
+      && /second-test-bundle\.glb/.test(logAfterInput) && /\[5, 20\]/.test(logAfterInput),
+      `pose reset, limits ${JSON.stringify(afterInput.limits)}, pivot ${JSON.stringify(afterInput.pivotPos)}`);
+
+    // posing and orbiting the NEW bundle must still work — the same
+    // canvas-drag / slider machinery as the checks above, now run a second
+    // time against the swapped-in geometry. Checked against the CANVAS, not
+    // assumed: the re-framed camera puts the handle at a different screen
+    // position than on the first bundle, and if that ever lands under the
+    // debug panel the drag would silently hit the panel instead — see the
+    // comment on the pivot offset above, which is what keeps this clear.
+    const [ihx, ihy] = await call(() => window.__printScaffold.handleScreenPos(2));
+    const handle2OnCanvas = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return !!el && el.id === 'print-canvas';
+    }, [ihx, ihy]);
+    if (!handle2OnCanvas) out(`  WARNING: handle2 at (${ihx.toFixed(0)}, ${ihy.toFixed(0)}) is not over the canvas — drag below will not reach it`);
+    await page.mouse.move(ihx, ihy); await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(ihx + i * 6, ihy);
+    await page.mouse.up(); await page.waitForTimeout(200);
+    const newBundleBends = handle2OnCanvas && !(await call(() => window.__printScaffold.isRest()));
+    check('bundle-swap/new-bundle-still-posable', newBundleBends, `handleOnCanvas=${handle2OnCanvas}`);
+
+    await call(() => window.__printScaffold.forcePose(500, -999)); // out of range for [5,20]/[-10,10]
+    const clampDroop = await call(() => window.__printScaffold.droop());
+    const clampTwist = await call(() => window.__printScaffold.twist());
+    check('bundle-swap/new-bundle-clamps-to-own-limits', clampDroop === 20 && clampTwist === -10,
+      `droop=${clampDroop} twist=${clampTwist} (bundle limits [5,20]/[-10,10], not the first bundle's [0,45]/[-30,30])`);
+
+    const camBeforeNew = await call(() => window.__printScaffold.cameraPosition());
+    const nbox = await page.locator('#print-canvas').boundingBox();
+    await page.mouse.move(nbox.x + nbox.width / 2, nbox.y + nbox.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(nbox.x + nbox.width / 2 + i * 18, nbox.y + nbox.height / 2 + i * 5);
+    await page.mouse.up(); await page.waitForTimeout(400);
+    const camAfterNew = await call(() => window.__printScaffold.cameraPosition());
+    const newBundleOrbits = Math.hypot(...camAfterNew.map((v, i) => v - camBeforeNew[i])) > 1;
+    check('bundle-swap/new-bundle-orbits', newBundleOrbits);
+    await shot('06-swapped-file-input.png');
+
+    // --- swap via DRAG-AND-DROP -------------------------------------------
+    // Re-establish a non-rest pose (both the hinge AND a bend point this
+    // time), then drop the SAME bytes again through a REAL
+    // File/DataTransfer/DragEvent — proving the reset fires on ANY
+    // successful load, not only when the content happens to differ from
+    // what's already showing.
+    await call(() => { window.__printScaffold.setDroop(15); window.__printScaffold.setTwist(-8); });
+    const [dhx, dhy] = await call(() => window.__printScaffold.handleScreenPos(1));
+    await page.mouse.move(dhx, dhy); await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(dhx - i * 6, dhy);
+    await page.mouse.up(); await page.waitForTimeout(200);
+    const bentBeforeDrop = !(await call(() => window.__printScaffold.isRest()));
+
+    // the hint overlay must show WHILE dragging and hide again once it's
+    // gone, independent of whether the drop that follows succeeds
+    const hintHiddenIdle = await page.locator('#print-dropzone-hint').isHidden();
+    await page.evaluate((b64) => {
+      const bin = atob(b64); const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      window.__dropFile = new File([arr], 'dropped-bundle.glb', { type: 'model/gltf-binary' });
+      window.__dt = new DataTransfer(); window.__dt.items.add(window.__dropFile);
+      window.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: window.__dt }));
+      window.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: window.__dt }));
+    }, secondB64);
+    const hintShownWhileDragging = !(await page.locator('#print-dropzone-hint').isHidden());
+    await page.evaluate(() => {
+      window.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: window.__dt }));
+    });
+    await page.waitForFunction(() => window.__printScaffold && window.__printScaffold.source === 'dropped-bundle.glb', { timeout: 15000 });
+    const hintHiddenAfterDrop = await page.locator('#print-dropzone-hint').isHidden();
+
+    const afterDrop = await page.evaluate(() => ({
+      source: window.__printScaffold.source,
+      isRest: window.__printScaffold.isRest(),
+      droop: window.__printScaffold.droop(),
+      twist: window.__printScaffold.twist(),
+    }));
+    out(`hint overlay: hiddenIdle=${hintHiddenIdle} shownWhileDragging=${hintShownWhileDragging} hiddenAfterDrop=${hintHiddenAfterDrop}`);
+    out(`before drop: bent=${bentBeforeDrop}; after drop: ${JSON.stringify(afterDrop)}`);
+
+    check('bundle-swap/drop-hint-overlay', hintHiddenIdle && hintShownWhileDragging && hintHiddenAfterDrop,
+      `idle=${hintHiddenIdle} dragging=${hintShownWhileDragging} afterDrop=${hintHiddenAfterDrop}`);
+    check('bundle-swap/drop',
+      bentBeforeDrop === true && afterDrop.source === 'dropped-bundle.glb' && afterDrop.isRest === true
+      && afterDrop.droop === 0 && afterDrop.twist === 0,
+      `bentBeforeDrop=${bentBeforeDrop}, after=${JSON.stringify(afterDrop)}`);
+    await shot('07-swapped-drop.png');
+
+    // --- a file that is not valid glTF at all: fail VISIBLY, change NOTHING
+    // Posed first (non-rest droop/twist), so "untouched" is a real claim
+    // rather than a coincidence of the current bundle already being at rest.
+    await call(() => { window.__printScaffold.setDroop(12); window.__printScaffold.setTwist(-5); });
+    const sourceBeforeBad = await call(() => window.__printScaffold.source);
+    const poseBeforeBad = { isRest: await call(() => window.__printScaffold.isRest()),
+      droop: await call(() => window.__printScaffold.droop()), twist: await call(() => window.__printScaffold.twist()) };
+    const errsBeforeBad = errs.length;
+    await page.evaluate(() => {
+      const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]); // not JSON, not GLB magic
+      const file = new File([bytes], 'garbage.glb', { type: 'model/gltf-binary' });
+      const dt = new DataTransfer(); dt.items.add(file);
+      window.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    });
+    await page.waitForTimeout(400); // file.arrayBuffer() + parse are async
+    const sourceAfterBad = await call(() => window.__printScaffold.source);
+    const lastLoadErrorBad = await call(() => window.__printScaffold.lastLoadError);
+    const logAfterBad = await page.textContent('#print-log');
+    const poseAfterBad = { isRest: await call(() => window.__printScaffold.isRest()),
+      droop: await call(() => window.__printScaffold.droop()), twist: await call(() => window.__printScaffold.twist()) };
+    out(`invalid file: sceneUnchanged=${sourceAfterBad === sourceBeforeBad} lastLoadError="${lastLoadErrorBad}" newPageErrors=${errs.length - errsBeforeBad}`);
+    out(`             poseBefore=${JSON.stringify(poseBeforeBad)} poseAfter=${JSON.stringify(poseAfterBad)}`);
+
+    check('bundle-swap/invalid-file-handled',
+      sourceAfterBad === sourceBeforeBad                                 // scene NOT swapped
+      && typeof lastLoadErrorBad === 'string' && /garbage\.glb/.test(lastLoadErrorBad)
+      && /failed to load .garbage\.glb./.test(logAfterBad)
+      && /dropped-bundle\.glb/.test(logAfterBad)                         // prior bundle's info still shown, not wiped
+      && JSON.stringify(poseAfterBad) === JSON.stringify(poseBeforeBad)  // prior pose byte-for-byte untouched
+      && errs.length === errsBeforeBad,                                 // no unhandled page error
+      `lastLoadError="${lastLoadErrorBad}"`);
+
+    // --- a valid glTF with no pivot node: fail VISIBLY, still show what
+    // loaded --------------------------------------------------------------
+    await page.evaluate(() => {
+      const json = JSON.stringify({ asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name: 'root' }] });
+      const file = new File([new TextEncoder().encode(json)], 'no-pivot.glb', { type: 'model/gltf-binary' });
+      const dt = new DataTransfer(); dt.items.add(file);
+      window.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    });
+    await page.waitForFunction(() => window.__printScaffold && window.__printScaffold.source === 'no-pivot.glb', { timeout: 15000 });
+    const noPivotExtras = await call(() => window.__printScaffold.pivotExtras);
+      // The POSE panel is ALWAYS on screen now; what a bundle with no rig changes
+  // is its BODY, which is replaced by the panel's own empty note. Asserting
+  // the panel itself is hidden would be asserting the old contract.
+  const noPivotPoseHidden = await page.evaluate(() => {
+    const p = document.getElementById('print-pose');
+    const empty = document.getElementById('poseEmpty');
+    const body = [...p.children].filter(c => c.tagName !== 'SUMMARY' && c !== empty);
+    return !p.hidden && !empty.hidden && body.every(c => c.hidden);
+  });
+    const noPivotMeshes = await call(() => window.__printScaffold.meshes);
+    const logAfterNoPivot = await page.textContent('#print-log');
+    out(`no-pivot file: swapped=true extras=${JSON.stringify(noPivotExtras)} poseHidden=${noPivotPoseHidden} meshes=${noPivotMeshes}`);
+
+    check('bundle-swap/no-pivot-handled',
+      noPivotExtras === null && noPivotPoseHidden === true && noPivotMeshes === 0
+      && /pivot\s+NOT FOUND/.test(logAfterNoPivot) && errs.length === errsBeforeBad,
+      `extras=${JSON.stringify(noPivotExtras)} poseHidden=${noPivotPoseHidden}`);
+    await shot('08-no-pivot-file.png');
+
+    // --- recovery: a good drop after two bad ones must still work ---------
+    const defaultBundleBuf = readFileSync(path.join(ROOT, 'assets/print-test/flower-test-bundle.glb'));
+    await page.setInputFiles('#bundleFile', { name: 'flower-test-bundle.glb', mimeType: 'model/gltf-binary', buffer: defaultBundleBuf });
+    await page.waitForFunction(() => window.__printScaffold && window.__printScaffold.source === 'flower-test-bundle.glb', { timeout: 15000 });
+    const recovered = await page.evaluate(() => ({
+      hasRig: window.__printScaffold.hasRig, meshes: window.__printScaffold.meshes,
+      pivotFound: !!window.__printScaffold.pivotExtras, isRest: window.__printScaffold.isRest(),
+    }));
+    out(`recovery after bad drops: ${JSON.stringify(recovered)}`);
+    check('bundle-swap/recovers-after-bad-drops',
+      recovered.hasRig && recovered.meshes >= 1 && recovered.pivotFound && recovered.isRest === true,
+      JSON.stringify(recovered));
+    await shot('09-recovered.png');
+
+    check('bundle-swap/no-new-page-errors', errs.length === errsBeforeSwap,
+      `${errs.length - errsBeforeSwap} new error(s): ${errs.slice(errsBeforeSwap).join(' | ')}`);
+  }
 
   if (!mutant) {
     console.log('\nline-art read-out:\n' + await call(() => window.__printLineArt.artText()));

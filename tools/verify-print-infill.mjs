@@ -654,6 +654,63 @@ check('readout/names-the-decision',
   /WHERE IS DARK/.test(text) && /anchor/i.test(text) && /no light source|not a light/i.test(text),
   text.split('\n').find(l => /WHERE IS DARK/.test(l)) || '(missing)');
 
+// --- the infill ACROSS a bundle swap ---------------------------------------
+// These exist only because the runtime loader and the infill now ship
+// together. `infill` is built OVER the line art's extraction, its anchors live
+// in the outgoing bundle's meshes' local space, and its rings are in the main
+// scene while its marks are in an overlay scene of its own. A swap therefore
+// has to tear down two things in two places and build them again — and none of
+// it is visible to any check above: a rebuild that leaked the old overlay, or
+// left the hook detached, still swaps, still poses and still draws.
+await call(m => window.__printInfill.setMode(m), 'hatch');
+await call(() => window.__printInfill.setWidget('spacing', 9));
+await call(() => window.__printInfill.setWidget('angle', 115));
+await settle();
+const preSwap = await call(() => ({
+  overlay: window.__printInfill.overlayObjects(),
+  rings: window.__printInfill.anchorObjectsInScene(),
+  parts: window.__printInfill.partCount(),
+  opts: window.__printInfill.options(),
+  mode: window.__printInfill.mode(),
+}));
+
+const bundleBytes = readFileSync(path.join(ROOT, 'assets/print-test/flower-test-bundle.glb'));
+await page.setInputFiles('#bundleFile', {
+  name: 'reloaded-bundle.glb', mimeType: 'model/gltf-binary', buffer: bundleBytes });
+await page.waitForFunction(() => window.__printScaffold
+  && window.__printScaffold.source === 'reloaded-bundle.glb', { timeout: 20000 });
+await settle();
+
+check('swap/infill-hook-reattached', await call(() => !!window.__printInfill),
+  'detached on teardown, re-attached on build — the same contract as __printLineArt');
+
+const postSwap = await call(() => ({
+  overlay: window.__printInfill.overlayObjects(),
+  rings: window.__printInfill.anchorObjectsInScene(),
+  parts: window.__printInfill.partCount(),
+  opts: window.__printInfill.options(),
+  mode: window.__printInfill.mode(),
+  stats: window.__printInfill.stats(),
+}));
+check('swap/infill-no-leaked-overlay',
+  postSwap.overlay === preSwap.overlay && postSwap.rings === preSwap.rings
+    && postSwap.parts === preSwap.parts,
+  `overlay ${preSwap.overlay}->${postSwap.overlay}, rings ${preSwap.rings}->${postSwap.rings},`
+  + ` parts ${preSwap.parts}->${postSwap.parts}`);
+check('swap/infill-settings-survive',
+  postSwap.mode === preSwap.mode && JSON.stringify(postSwap.opts) === JSON.stringify(preSwap.opts),
+  `${preSwap.mode} ${JSON.stringify(preSwap.opts)} vs ${postSwap.mode} ${JSON.stringify(postSwap.opts)}`);
+check('swap/infill-draws-on-the-new-bundle',
+  !!postSwap.stats && postSwap.stats.segments > 50,
+  postSwap.stats ? `${postSwap.stats.segments} segments` : 'no stats');
+
+// And the marks are still INSIDE the new bundle's outline — the whole claim,
+// re-asserted on geometry that arrived after the clipper was built.
+const afterSwapIn = await outsideReport('hatch');
+check('swap/infill-still-clips-to-the-outline',
+  afterSwapIn.total > 200 && afterSwapIn.outside === 0,
+  `${afterSwapIn.total} endpoints, ${afterSwapIn.outside} outside`);
+
 check('page/no-errors', errs.length === 0, errs.join(' | '));
 
 if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'gate-final.png') });

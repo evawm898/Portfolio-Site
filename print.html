@@ -27,19 +27,36 @@
 </script>
 
 <style>
-  :root { --mono: "IBM Plex Mono", ui-monospace, monospace; }
+  :root { --mono: "IBM Plex Mono", ui-monospace, monospace; color-scheme: dark; }
   html, body { margin: 0; height: 100%; background: #0c0e0e; color: #d8dedd; }
   #print-canvas { display: block; width: 100vw; height: 100vh; }
 
-  /* Debug panel — this session's only job beyond the viewport: prove the
-     pivot node's extras survive GLTFLoader. It is scaffolding, not UI. */
-  #print-debug {
-    position: fixed; top: 0.9rem; left: 0.9rem; max-width: min(30rem, calc(100vw - 1.8rem));
+  /* Debug panel — reports whatever bundle is currently loaded (the pivot
+     node's extras survive GLTFLoader, and this proves it), and hosts the one
+     control that changes which bundle that is. Scaffolding with one real
+     control, not a full UI. */
+  /* The LEFT-HAND column, mirroring #print-side on the right. LOAD BUNDLE and
+     BUNDLE are siblings in it rather than one box with a divider: they are
+     different subjects — which artwork is loaded, and what that artwork turned
+     out to be — and each folds on its own. The column scrolls, not the panels,
+     so a collapsed LOAD BUNDLE actually gives its space back to the read-out. */
+  #print-left {
+    position: fixed; top: 0.9rem; left: 0.9rem;
+    max-width: min(30rem, calc(100vw - 1.8rem));
     max-height: calc(100vh - 1.8rem); overflow: auto;
+    display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  #print-debug, #print-bundle-load {
     font-family: var(--mono); font-size: 0.72rem; line-height: 1.65;
     background: rgba(10, 12, 12, 0.86); border: 1px solid #2b3333;
     padding: 0.75rem 0.9rem; border-radius: 2px;
   }
+  #print-bundle-load { color: #96a2a1; }
+  #print-bundle-load input[type=file] {
+    display: block; margin-top: 0.3rem; max-width: 100%;
+    font: inherit; color: inherit;
+  }
+  #print-bundle-load .hint { color: #6b7776; font-size: 0.68rem; display: block; margin-top: 0.3rem; }
   #print-log { margin: 0; white-space: pre-wrap; font: inherit; }
 
   /* PANELS ARE ALWAYS PRESENT, AND EACH ONE COLLAPSES ON ITS OWN.
@@ -62,6 +79,17 @@
   .panel-empty { color: #6b7776; margin: 0; }
   #print-debug b { color: #6fb7ae; font-weight: 500; }
   #print-debug .err { color: #e07a6a; }
+  /* Bundle picker — always visible, above the log it describes. The
+     drag-and-drop target is the whole page (see #print-dropzone-hint); this
+     input is the keyboard/click-reachable equivalent for the same action. */
+  #print-dropzone-hint {
+    position: fixed; inset: 0.6rem; z-index: 10; pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px dashed #6fb7ae; border-radius: 4px;
+    background: rgba(12, 14, 14, 0.72);
+    font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.06em; color: #c8d2d1;
+  }
+  #print-dropzone-hint[hidden] { display: none; }
   #print-marker-toggle {
     display: flex; align-items: center; gap: 0.45rem;
     margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px solid #222a2a;
@@ -152,6 +180,22 @@
 <body>
 
 <canvas id="print-canvas"></canvas>
+<div id="print-dropzone-hint" hidden>drop a .glb to load it</div>
+
+<div id="print-left">
+
+<!-- LOAD BUNDLE is its own panel, not a row inside the read-out. It is the one
+     control on this page that changes WHICH artwork you are looking at, and
+     burying it above a wall of diagnostics made it read as part of them. Like
+     every other panel it is always present and folds on its own. -->
+<details id="print-bundle-load" class="panel" open>
+  <summary>LOAD BUNDLE</summary>
+  <label for="bundleFile">load bundle
+    <input type="file" id="bundleFile" accept=".glb,model/gltf-binary">
+  </label>
+  <span class="hint">or drop a .glb anywhere on the page</span>
+</details>
+
 <details id="print-debug" class="panel" open>
   <summary>BUNDLE</summary>
   <pre id="print-log">loading…</pre>
@@ -163,6 +207,8 @@
     <input type="checkbox" id="showPivotMarker"> show pivot marker
   </label>
 </details>
+
+</div>
 
 <div id="print-side">
 

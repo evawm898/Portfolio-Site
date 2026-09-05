@@ -314,6 +314,35 @@ export const SMOKE_BLOCKS = [
         path: 'cup gradient composing onto cup, at the widest reachable petal' },
     ],
   },
+  {
+    n: 22,
+    anchor: 'SPHERE: defaults (8 per turn x 1 turn — eight feet on a sphere)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 18): the branches the mode
+       adds are footRing()'s sphere arm (the polar key, the equal-area step,
+       the reserved-pole telemetry), buildHubInto's closed-sphere arm, the
+       lean-0 frame, the apex floor's sphere arm, and the hidden-and-inert
+       paths in both directions; the families that need a witness are S1-S4,
+       J5's sphere arm, J6's null clause, J9's lean-0 clause, crowding's
+       (s, theta) raster with R4's far-pole clause, and the loud coverage
+       skip. Cheapest row per path; the GATED inertness rows are pinned
+       states, preferred over sweep rows; the 240-foot row and the mum sphere
+       are out (they carry no path the incurve sphere does not, and cost
+       more). The incurve sphere is the one row over ~15 s kept, because
+       nothing cheaper reaches a dense pole where the (s, theta) raster's
+       fine pass and R5 are actually exercised. */
+    rows: [
+      { label: 'SPHERE: defaults (8 per turn x 1 turn — eight feet on a sphere)',
+        path: 'the sphere arm at its cheapest — S1 (equal-area, pole to pole), S2 (the closed hub, 6,720 tris), S3 (the reserved pole), J5\'s polar-angle arm, J6 nulled, J9 lean 0, the coverage skip' },
+      { label: 'SPHERE: the INCURVE sliders (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) — the sheet\'s headline',
+        path: 'a dense pole: the (s, theta) raster and its fine pass, R4 on 120 far-side feet, R5 convergence, C1 on the lean-0 frame under curl' },
+      { label: 'SPHERE: the APEX CORNER — ALL MIN x sheet 2.40 x spread min (the sphere held at one sheet, CLAMPED)',
+        path: 'the apex floor\'s sphere arm — Rd held above R0, CLAMPED, told; S4\'s clamp clause' },
+      { label: 'SPHERE: GATED — Head rise 1 under SPHERE (hidden and inert; bit-identical to the sphere at rise 0)',
+        path: 'S4 — headRise hidden AND inert under SPHERE (the bit-identity itself is the byte diff\'s; this row proves the guard and the DOME clause on the state)' },
+      { label: 'SPHERE: GATED — SPHERE stored under RADIAL (hidden and inert; bit-identical to the default)',
+        path: 'the other direction — a stored SPHERE under a ringed placement builds the cap; sphereMode false in both statements, no closed hub, no reserved-pole telemetry' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
