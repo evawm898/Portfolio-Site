@@ -37,7 +37,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StemRig, CONTROL_S } from './print-stem.js';
 import { LineArt, detailToAngleDeg, CURATION, INTERIOR_WEIGHT_RATIO } from './print-lines.js';
 import { Infill, LAYER_THRESHOLDS, HATCH_OFFSETS_DEG, INFILL_LIMITS,
-         toneAt, toneRadius } from './print-infill.js';
+         TONE_LEVELS, TONE_ORDER,
+         toneAt, toneRadius, toneCoverage, levelThreshold } from './print-infill.js';
 
 const DEFAULT_BUNDLE = 'assets/print-test/flower-test-bundle.glb';
 
@@ -68,6 +69,10 @@ const infillCurvatureIn = document.getElementById('infillCurvature');
 const infillReachIn = document.getElementById('infillReach');
 const infillFalloffIn = document.getElementById('infillFalloff');
 const infillJitterIn = document.getElementById('infillJitter');
+const infillGradientIn = document.getElementById('infillGradient');
+const infillVeinsIn = document.getElementById('infillVeins');
+const infillVeinWidthIn = document.getElementById('infillVeinWidth');
+const infillFillWeightIn = document.getElementById('infillFillWeight');
 const infillModeOut = document.getElementById('infillModeOut');
 const infillSpacingOut = document.getElementById('infillSpacingOut');
 const infillAngleOut = document.getElementById('infillAngleOut');
@@ -76,10 +81,23 @@ const infillCurvatureOut = document.getElementById('infillCurvatureOut');
 const infillReachOut = document.getElementById('infillReachOut');
 const infillFalloffOut = document.getElementById('infillFalloffOut');
 const infillJitterOut = document.getElementById('infillJitterOut');
+const infillGradientOut = document.getElementById('infillGradientOut');
+const infillVeinsOut = document.getElementById('infillVeinsOut');
+const infillVeinWidthOut = document.getElementById('infillVeinWidthOut');
+const infillFillWeightOut = document.getElementById('infillFillWeightOut');
 const showAnchorsBox = document.getElementById('showAnchors');
 const resetAnchorsBtn = document.getElementById('resetAnchors');
+const rowSpacing = infillSpacingIn.closest('.pose-row');
 const rowLayers = document.getElementById('row-infillLayers');
 const rowCurvature = document.getElementById('row-infillCurvature');
+const rowGradient = document.getElementById('row-infillGradient');
+const rowVeins = document.getElementById('row-infillVeins');
+const rowVeinWidth = document.getElementById('row-infillVeinWidth');
+const rowFillWeight = document.getElementById('row-infillFillWeight');
+const infillPartsEl = document.getElementById('infillParts');
+// The per-part darkness sliders, rebuilt per bundle. Kept as a list so a
+// rebuild can be asserted not to have stacked a second set.
+let darknessRows = [];
 // The panel's own contents, hidden as a group when the panel has nothing to
 // report — the PANEL itself is never hidden. `> :not(summary):not(.panel-empty)`
 // is deliberately not a CSS rule: which children a panel has is markup's
@@ -534,16 +552,32 @@ function readInfill() {
     reach: parseFloat(infillReachIn.value),
     falloff: parseFloat(infillFalloffIn.value),
     jitter: parseFloat(infillJitterIn.value),
+    gradient: parseFloat(infillGradientIn.value),
+    veins: parseInt(infillVeinsIn.value, 10),
+    veinWidth: parseFloat(infillVeinWidthIn.value),
+    fillWeight: parseFloat(infillFillWeightIn.value),
   });
   // Only the controls that MEAN something in the chosen family are shown.
-  // Layers is a cross-hatch idea and flow curvature is a line-flow one;
-  // leaving both up would offer a slider that silently does nothing.
+  // Layers is a cross-hatch idea, flow curvature is a line-flow one, and the
+  // gradient/vein trio are tonal-fill ones; leaving any of them up would offer
+  // a slider that silently does nothing. `spacing` goes the other way — the
+  // tonal fill derives its row pitch from the stroke weight (see tonePitch()),
+  // so the spacing slider is the one that would lie in that family.
   rowLayers.hidden = mode !== 'hatch';
   rowCurvature.hidden = mode !== 'flow';
+  rowGradient.hidden = mode !== 'tone';
+  rowVeins.hidden = mode !== 'tone';
+  rowVeinWidth.hidden = mode !== 'tone';
+  rowFillWeight.hidden = mode !== 'tone';
+  rowSpacing.hidden = mode === 'tone';
+  // Per-part darkness is a tonal-fill idea too, and the block carries its own
+  // caption, so it hides as a block rather than row by row.
+  infillPartsEl.hidden = mode !== 'tone' || !darknessRows.length;
   renderInfill();
 }
 [infillSpacingIn, infillAngleIn, infillLayersIn, infillCurvatureIn,
- infillReachIn, infillFalloffIn, infillJitterIn].forEach(el => el.addEventListener('input', readInfill));
+ infillReachIn, infillFalloffIn, infillJitterIn,
+ infillGradientIn, infillVeinsIn, infillVeinWidthIn, infillFillWeightIn].forEach(el => el.addEventListener('input', readInfill));
 infillModeIn.addEventListener('change', readInfill);
 showAnchorsBox.addEventListener('change', () => { renderInfill(); });
 resetAnchorsBtn.addEventListener('click', () => {
@@ -561,6 +595,14 @@ function renderInfill() {
   infillReachOut.textContent = `${infill.reach.toFixed(0)}%`;
   infillFalloffOut.textContent = `${(infill.falloff / 100).toFixed(2)}`;
   infillJitterOut.textContent = `${infill.jitter.toFixed(0)}%`;
+  infillGradientOut.textContent = `${infill.gradient.toFixed(0)}%`;
+  infillVeinsOut.textContent = `${infill.veins} pair${infill.veins === 1 ? '' : 's'}`;
+  infillVeinWidthOut.textContent = infill.veinWidth > 0 ? `${infill.veinWidth.toFixed(1)} px` : 'off';
+  infillFillWeightOut.textContent = `${infill.fillWeight.toFixed(1)} px`;
+  darknessRows.forEach((r) => {
+    r.input.value = String(infill.darknessOf(r.index));
+    r.out.textContent = `${infill.darknessOf(r.index).toFixed(0)}%`;
+  });
 
   const rows = [];
   if (!infill.enabled) {
@@ -577,8 +619,21 @@ function renderInfill() {
   } else {
     const st = infillStats;
     const gamma = infill.falloff / 100;
-    rows.push(`family            ${infill.mode === 'hatch' ? 'CROSS-HATCH' : 'LINE-FLOW'}`);
-    if (infill.mode === 'hatch') {
+    rows.push(`family            ${infill.mode === 'hatch' ? 'CROSS-HATCH'
+      : infill.mode === 'tone' ? 'TONAL FILL' : 'LINE-FLOW'}`);
+    if (infill.mode === 'tone') {
+      rows.push(`fill              ${infill.gradient <= 0 ? 'SOLID to the outline'
+        : `graded — ${infill.gradient.toFixed(0)}% of the tone field`}`);
+      rows.push(`nib / row pitch   ${infill.fillWeight.toFixed(1)} px nib, rows ${infill.tonePitch().toFixed(2)} px apart`
+        + `  (${TONE_LEVELS} dither levels)`);
+      rows.push(`                  rows scale as 1/nib, and so does the cost.`);
+      rows.push(`reserved lines    ${infill.veinWidth > 0
+        ? `${infill.veinWidth.toFixed(1)} px withheld — midrib + ${infill.veins} lateral pair${infill.veins === 1 ? '' : 's'}`
+        : 'OFF'}`);
+      rows.push(`                  a vein is UNFILLED PAPER, never a stroke:`);
+      rows.push(`                  its capsule is subtracted from each row.`);
+      rows.push(`rows run at       ${infill.angleDeg.toFixed(0)}°`);
+    } else if (infill.mode === 'hatch') {
       const angs = HATCH_OFFSETS_DEG.slice(0, infill.layers)
         .map(o => `${(infill.angleDeg + o + 360) % 180 | 0}°`).join(' / ');
       rows.push(`angles            ${angs}   (${infill.layers} layer${infill.layers > 1 ? 's' : ''})`);
@@ -589,20 +644,33 @@ function renderInfill() {
         : c < -15 ? 'RADIAL from the anchor' : 'straight grain'}  (${c.toFixed(0)})`);
       rows.push(`grain angle       ${infill.angleDeg.toFixed(0)}°`);
     }
-    rows.push(`spacing           ${infill.spacing.toFixed(1)} px`);
+    if (infill.mode !== 'tone') rows.push(`spacing           ${infill.spacing.toFixed(1)} px`);
     rows.push('');
-    rows.push(`WHERE IS DARK     authored anchor, per part — no light source`);
-    rows.push(`  falloff         tone = (1 - d/reach)^${gamma.toFixed(2)}`);
-    rows.push(`  jitter          ±${infill.jitter.toFixed(0)}% on each line’s threshold radius`);
+    if (infill.mode === 'tone' && infill.gradient <= 0) {
+      rows.push(`WHERE IS DARK     the per-part DARKNESS below. The anchor and`);
+      rows.push(`                  its falloff are inert at gradient 0 — a`);
+      rows.push(`                  solid fill has no ramp to place.`);
+    } else {
+      rows.push(`WHERE IS DARK     authored anchor, per part — no light source`);
+      rows.push(`  falloff         tone = (1 - d/reach)^${gamma.toFixed(2)}`);
+      rows.push(`  jitter          ±${infill.jitter.toFixed(0)}% on each line’s threshold radius`);
+    }
     if (st) {
       for (const p of st.parts) {
         if (!p.ok) { rows.push(`  ${(p.name || '?').padEnd(14)} no silhouette this frame`); continue; }
+        if (infill.mode === 'tone') {
+          rows.push(`  ${(p.name || '?').padEnd(14)} darkness ${String(p.darkness.toFixed(0)).padStart(3)}%`
+            + `  ${p.rows} rows  ${p.reservedRows} cut by a vein  ${p.segments} segs`
+            + `${p.openRows ? `  ${p.openRows} CLOSED AT THE LAST CROSSING` : ''}`);
+          continue;
+        }
         rows.push(`  ${(p.name || '?').padEnd(14)} anchor ${p.anchorPx.map(v => v.toFixed(0)).join(',')} px`
           + `  reach ${p.reachPx.toFixed(0)} px  ${p.segments} segs`);
       }
       rows.push('');
       rows.push(`silhouette        ${st.parts.reduce((a, p) => a + p.silhouette, 0)} oriented edges (nonzero winding)`);
-      rows.push(`drawn             ${st.segments} segments from ${st.seeds} ${infill.mode === 'hatch' ? 'hatch lines' : 'seeds'}`
+      rows.push(`drawn             ${st.segments} segments from ${st.seeds} `
+        + `${infill.mode === 'hatch' ? 'hatch lines' : infill.mode === 'tone' ? 'fill rows' : 'seeds'}`
         + `${st.truncated ? '  (TRUNCATED)' : ''}`);
       rows.push(`infill pass       ${infillMs.toFixed(2)} ms  (line art ${lastFrameMs.toFixed(2)} ms of 16.7)`);
     }
@@ -653,6 +721,39 @@ function buildInfill() {
     m.userData.radius = Math.max(bb.min.distanceTo(bb.max) * 0.035, 1e-3);
   });
   
+  // --- per-part darkness, one row per part -------------------------------
+  // The ONE control that makes the reference's depth expressible: its tone
+  // comes from a dark shape sitting beside a light one, which no single
+  // slider for the whole picture can say. Built per bundle because the parts
+  // are the bundle's, and REPLACED wholesale each time — the old rows are
+  // removed from the DOM, so their listeners go with them and a swap cannot
+  // stack a second set. `swap/darkness-rows-do-not-stack` is the witness.
+  darknessRows.forEach(r => r.row.remove());
+  darknessRows = art.units.map((u, i) => {
+    const row = document.createElement('div');
+    row.className = 'pose-row';
+    row.dataset.part = String(i);
+    const id = `infillDarkness${i}`;
+    const label = document.createElement('label');
+    label.setAttribute('for', id);
+    label.textContent = (u.mesh.name || `part ${i}`).slice(0, 7);
+    const input = document.createElement('input');
+    input.type = 'range'; input.id = id;
+    input.min = '0'; input.max = '100'; input.step = '1';
+    input.value = String(infill.darknessOf(i));
+    const out = document.createElement('output');
+    out.id = `${id}Out`;
+    out.textContent = `${infill.darknessOf(i).toFixed(0)}%`;
+    input.addEventListener('input', () => {
+      if (!infill) return;
+      infill.setDarkness(i, parseFloat(input.value));
+      renderInfill();
+    });
+    row.append(label, input, out);
+    infillPartsEl.append(row);
+    return { index: i, row, input, out };
+  });
+
   renderInfillHook = renderInfill;
   setPanelPopulated(infillEmpty, infillBody, true);
   readInfill();
@@ -668,13 +769,37 @@ const INFILL_HOOK = {
   mode: () => infill.mode,
   enabled: () => infill.enabled,
   options: () => ({ spacing: infill.spacing, angleDeg: infill.angleDeg, layers: infill.layers,
-    curvature: infill.curvature, reach: infill.reach, falloff: infill.falloff, jitter: infill.jitter }),
+    curvature: infill.curvature, reach: infill.reach, falloff: infill.falloff, jitter: infill.jitter,
+    gradient: infill.gradient, veins: infill.veins, veinWidth: infill.veinWidth,
+    fillWeight: infill.fillWeight }),
   setWidget: (id, v) => {
     const el = { spacing: infillSpacingIn, angle: infillAngleIn, layers: infillLayersIn,
       curvature: infillCurvatureIn, reach: infillReachIn, falloff: infillFalloffIn,
-      jitter: infillJitterIn }[id];
+      jitter: infillJitterIn, gradient: infillGradientIn, veins: infillVeinsIn,
+      veinWidth: infillVeinWidthIn, fillWeight: infillFillWeightIn }[id];
     el.value = String(v); el.dispatchEvent(new Event('input'));
   },
+
+  // --- tonal fill --------------------------------------------------------
+  // Darkness goes through the REAL slider, so what the gate drives is what a
+  // hand drives. `darkness()` reads the module rather than the widget, which
+  // is what lets the two be compared.
+  darkness: (i) => infill.darknessOf(i),
+  setDarknessWidget: (i, v) => {
+    const r = darknessRows[i];
+    r.input.value = String(v); r.input.dispatchEvent(new Event('input'));
+  },
+  darknessRowCount: () => darknessRows.length,
+  darknessRowsInDom: () => infillPartsEl.querySelectorAll('.pose-row').length,
+  partsBlockVisible: () => !infillPartsEl.hidden,
+  tonePitch: () => infill.tonePitch(),
+  toneLevels: () => TONE_LEVELS,
+  toneOrder: () => TONE_ORDER.slice(),
+  // The vein paths the fill actually reserved against this frame, in pixels.
+  // Handed back rather than re-derived in the gate: comparing the ink to a
+  // second construction of the veins would test the two constructions against
+  // each other, not the reservation.
+  veinPaths: (i) => infill.veinPathsFor(i),
   stats: () => infillStats,
   limits: () => ({ ...INFILL_LIMITS }),
   thresholds: () => LAYER_THRESHOLDS.slice(),
@@ -697,6 +822,41 @@ const INFILL_HOOK = {
   },
   partCount: () => infill.draws.length,
   partNames: () => art.units.map(u => u.mesh.name),
+  // EVERY triangle of one part, projected to pixels, front-facing only. The
+  // one instrument in this file that does NOT go through the silhouette: it is
+  // how the gate can ask "does the fill cover the shape" without asking the
+  // outline, which is the thing under test when the outline is open. Capped,
+  // because the bloom is 301,152 triangles and this is a debugging hook, not a
+  // render path.
+  projectedTriangles: (partIndex, cap = 20000) => {
+    const u = art.units[partIndex];
+    const g = u.mesh.geometry;
+    const P = g.getAttribute('position').array;
+    const I = g.index ? g.index.array : null;
+    const triCount = I ? I.length / 3 : P.length / 9;
+    if (triCount > cap) return null;
+    u.mesh.updateWorldMatrix(true, false);
+    const m = new THREE.Matrix4().copy(camera.projectionMatrix)
+      .multiply(camera.matrixWorldInverse).multiply(u.mesh.matrixWorld);
+    const M = m.elements;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const out = [];
+    const p = [0, 0, 0];
+    for (let f = 0; f < triCount; f++) {
+      let ok = true;
+      for (let j = 0; j < 3; j++) {
+        const vi = (I ? I[f * 3 + j] : f * 3 + j) * 3;
+        const x = P[vi], y = P[vi + 1], z = P[vi + 2];
+        const cw = M[3] * x + M[7] * y + M[11] * z + M[15];
+        if (cw <= 1e-6) { ok = false; break; }
+        p[j] = [((M[0] * x + M[4] * y + M[8] * z + M[12]) / cw * 0.5 + 0.5) * W,
+                (0.5 - (M[1] * x + M[5] * y + M[9] * z + M[13]) / cw * 0.5) * H];
+      }
+      if (ok) out.push([p[0][0], p[0][1], p[1][0], p[1][1], p[2][0], p[2][1]]);
+    }
+    return out;
+  },
+
   // The projected silhouette of one part, oriented, as the clipper sees it.
   silhouette: (partIndex) => {
     const f = infill.frames[partIndex];
@@ -729,7 +889,7 @@ const INFILL_HOOK = {
     return n;
   },
   // tone is a pure function and is checked as one
-  toneAt, toneRadius,
+  toneAt, toneRadius, toneCoverage, levelThreshold,
 };
 
 // ======================= BUNDLE LOADING ====================================
@@ -804,6 +964,9 @@ function clearCurrentBundle() {
   anchorMarkers = [];
   setPanelPopulated(infillEmpty, infillBody, false);
   window.__printInfill = undefined;
+  darknessRows.forEach(r => r.row.remove());
+  darknessRows = [];
+  infillPartsEl.hidden = true;
 
   if (currentRoot) { scene.remove(currentRoot); disposeObject3D(currentRoot); }
   currentRoot = null;
@@ -992,7 +1155,23 @@ function onBundleLoaded(gltf, label) {
   // creates a fresh LineArt for the new geometry and re-applies whatever the
   // sliders currently say, exactly as a real user touching them would.
 
-  const artMeshes = [stemMesh, currentRoot.getObjectByName('bloom')].filter(Boolean);
+  // EVERY drawable mesh in the bundle, not a hardcoded stem+bloom pair.
+  // The first bundle had exactly two parts, so naming them was indistinguish-
+  // able from finding them; `bloom-stem-leaf-bundle.glb` has a leaf as its own
+  // node and mesh, and under the old list it was in the scene, posed with the
+  // stem, and drawn by nothing. The only exclusion is the exporter's own
+  // diagnostic marker, which is not artwork — it is matched by name here for
+  // the same reason it is matched by name above, and it is hidden anyway.
+  //
+  // Traversal order is the bundle's own node order, so the two-part bundle
+  // still yields exactly [stem, bloom] and every part index in the gates and
+  // the sheets keeps meaning what it meant.
+  const artMeshes = [];
+  currentRoot.traverse((o) => {
+    if (!o.isMesh || o === marker) return;
+    if ((o.name || '').toLowerCase().includes('marker')) return;
+    artMeshes.push(o);
+  });
   if (artMeshes.length) {
     art = new LineArt(artMeshes, { ink: 0x14181a, paper: 0xf2f0ea });
     setPanelPopulated(stylizeEmpty, stylizeBody, true);
@@ -1139,6 +1318,30 @@ function onBundleLoaded(gltf, label) {
     markerVisible: () => !!marker && marker.visible,
     markerInTree: () => { let hit = false; currentRoot.traverse(o => { if (o === marker) hit = true; }); return hit; },
     cameraPosition: () => camera.position.toArray(),
+    // Test chrome, in the same spirit as handleScreenPos() and stemBBox()
+    // below: there is no in-page control that puts the camera anywhere in
+    // particular — orbit and dolly belong to the hand — and a gate looking at
+    // ONE part of a multi-part bundle needs it at a usable size on screen.
+    // Driving OrbitControls' damping to a chosen pose headlessly is not
+    // something this harness can land, so it is placed directly.
+    // The named part's own GEOMETRY, in world space. Deliberately not
+    // Box3.setFromObject(): the line art parents its LineSegments2 onto the
+    // source mesh, and those carry a placeholder bounding volume around the
+    // origin, so setFromObject reported a leaf stretching from the leaf to
+    // (0,0,0) — measured, and it framed the camera on nothing.
+    partBox: (name) => {
+      const o = currentRoot && currentRoot.getObjectByName(name);
+      if (!o || !o.isMesh) return null;
+      o.updateWorldMatrix(true, false);
+      o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+      return { min: b.min.toArray(), max: b.max.toArray() };
+    },
+    setView: (pos, target) => {
+      camera.position.set(pos[0], pos[1], pos[2]);
+      controls.target.set(target[0], target[1], target[2]);
+      controls.update();
+    },
 
     // pose surface
     hasRig: !!rig,

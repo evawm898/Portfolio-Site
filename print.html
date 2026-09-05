@@ -282,6 +282,7 @@
       <option value="off" selected>off</option>
       <option value="hatch">cross-hatch</option>
       <option value="flow">line-flow</option>
+      <option value="tone">tonal fill</option>
     </select>
     <output id="infillModeOut"></output>
   </div>
@@ -307,6 +308,31 @@
     <output id="infillCurvatureOut">60</output>
   </div>
 
+  <!-- TONAL FILL. `gradient` 0 is a flat, solid fill out to the outline —
+       the reference's leaves — and the ramp is the departure from it. The
+       veins are RESERVED, i.e. fill withheld along a path, never a stroke
+       drawn over it: width 0 turns them off. -->
+  <div class="pose-row" id="row-infillGradient">
+    <label for="infillGradient">gradient</label>
+    <input type="range" id="infillGradient" min="0" max="100" step="1" value="0">
+    <output id="infillGradientOut">0%</output>
+  </div>
+  <div class="pose-row" id="row-infillVeins">
+    <label for="infillVeins">veins</label>
+    <input type="range" id="infillVeins" min="0" max="9" step="1" value="4">
+    <output id="infillVeinsOut">4 pairs</output>
+  </div>
+  <div class="pose-row" id="row-infillFillWeight">
+    <label for="infillFillWeight">nib</label>
+    <input type="range" id="infillFillWeight" min="0.6" max="4" step="0.1" value="1.1">
+    <output id="infillFillWeightOut">1.1 px</output>
+  </div>
+  <div class="pose-row" id="row-infillVeinWidth">
+    <label for="infillVeinWidth">reserve</label>
+    <input type="range" id="infillVeinWidth" min="0" max="9" step="0.5" value="2.5">
+    <output id="infillVeinWidthOut">2.5 px</output>
+  </div>
+
   <div class="pose-hint">where the dark goes — drag the ring on each part</div>
   <div class="pose-row">
     <label for="infillReach">reach</label>
@@ -323,6 +349,13 @@
     <input type="range" id="infillJitter" min="0" max="100" step="1" value="35">
     <output id="infillJitterOut">35%</output>
   </div>
+  <!-- PER-PART DARKNESS. Built per bundle, because the parts are the
+       bundle's — the reference's depth is one shape reading dark against its
+       neighbour, and no single slider for the whole picture can say that. -->
+  <div id="infillParts" hidden>
+    <div class="pose-hint">how dark each part fills</div>
+  </div>
+
   <label id="infill-anchor-toggle">
     <input type="checkbox" id="showAnchors" checked> show anchors
   </label>
