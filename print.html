@@ -41,6 +41,25 @@
     padding: 0.75rem 0.9rem; border-radius: 2px;
   }
   #print-log { margin: 0; white-space: pre-wrap; font: inherit; }
+
+  /* PANELS ARE ALWAYS PRESENT, AND EACH ONE COLLAPSES ON ITS OWN.
+     Native <details> — the same idiom the cards panel uses — so no JS owns
+     the open/closed state and a panel cannot be "missing" because the page
+     happened to be in the wrong state when it was looked for. A panel with
+     nothing to show says so (see .panel-empty) instead of disappearing:
+     a control that vanishes is indistinguishable from a control that was
+     never built, which is exactly the confusion this replaces. */
+  .panel > summary {
+    color: #6fb7ae; letter-spacing: 0.08em; cursor: pointer;
+    list-style: none; user-select: none; display: flex; align-items: center; gap: 0.4rem;
+  }
+  .panel > summary::-webkit-details-marker { display: none; }
+  .panel > summary::before { content: '\25be'; font-size: 0.85em; width: 0.7em; }
+  .panel:not([open]) > summary::before { content: '\25b8'; }
+  .panel > summary:hover { color: #8fd3ca; }
+  .panel[open] > summary { margin-bottom: 0.5rem; }
+  /* Everything a panel shows when it has nothing to report. */
+  .panel-empty { color: #6b7776; margin: 0; }
   #print-debug b { color: #6fb7ae; font-weight: 500; }
   #print-debug .err { color: #e07a6a; }
   #print-marker-toggle {
@@ -73,7 +92,6 @@
     background: rgba(10, 12, 12, 0.9); border: 1px solid #2b3333;
     padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1;
   }
-  #print-pose[hidden], #print-stylize[hidden] { display: none; }
   .pose-title { color: #6fb7ae; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
   .pose-row { display: grid; grid-template-columns: 3.2rem 1fr 3.2rem; align-items: center; gap: 0.5rem; }
   .pose-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; }
@@ -109,7 +127,8 @@
 <body>
 
 <canvas id="print-canvas"></canvas>
-<div id="print-debug">
+<details id="print-debug" class="panel" open>
+  <summary>BUNDLE</summary>
   <pre id="print-log">loading…</pre>
   <!-- The bundle ships a `pivot_marker` sphere at the junction. It is the
        exporter's own diagnostic, not scene content, so it is hidden by
@@ -118,7 +137,7 @@
   <label id="print-marker-toggle" hidden>
     <input type="checkbox" id="showPivotMarker"> show pivot marker
   </label>
-</div>
+</details>
 
 <div id="print-side">
 
@@ -126,8 +145,9 @@
      bundle's own rotation_limits_deg at load and stamped onto the inputs, so
      the constraint has one owner (the exporter) and re-tuning it is a bundle
      change, not a code change. -->
-<div id="print-pose" hidden>
-  <div class="pose-title">POSE</div>
+<details id="print-pose" class="panel" open>
+  <summary>POSE</summary>
+  <p class="panel-empty" id="poseEmpty" hidden>this bundle has no posable rig</p>
 
   <div class="pose-row">
     <label for="droop">droop</label>
@@ -143,14 +163,15 @@
   <div class="pose-hint" id="poseHint">drag the dots on the stem to bend it</div>
   <button type="button" id="resetPose">reset pose</button>
   <pre id="print-posestate"></pre>
-</div>
+</details>
 
 <!-- STYLIZE. Three sliders over ONE extraction: weight and pointillism are
      both how the extracted segments are drawn, detail is which of them exist.
      The line-art switch is view chrome in the same sense as the pivot marker —
      it changes what is drawn, never the pose. -->
-<div id="print-stylize" hidden>
-  <div class="pose-title">STYLIZE</div>
+<details id="print-stylize" class="panel" open>
+  <summary>STYLIZE</summary>
+  <p class="panel-empty" id="stylizeEmpty" hidden>no drawable mesh in this bundle</p>
 
   <label id="lineart-toggle">
     <input type="checkbox" id="lineArt" checked> line art
@@ -173,7 +194,7 @@
   </div>
 
   <pre id="print-artstate"></pre>
-</div>
+</details>
 </div>
 
 <script type="module" src="print.js"></script>

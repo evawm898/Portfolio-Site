@@ -39,6 +39,28 @@ const droopOut = document.getElementById('droopOut');
 const twistOut = document.getElementById('twistOut');
 const resetBtn = document.getElementById('resetPose');
 const stylizeEl = document.getElementById('print-stylize');
+const poseEmpty = document.getElementById('poseEmpty');
+const stylizeEmpty = document.getElementById('stylizeEmpty');
+// The panel's own contents, hidden as a group when the panel has nothing to
+// report — the PANEL itself is never hidden. `> :not(summary):not(.panel-empty)`
+// is deliberately not a CSS rule: which children a panel has is markup's
+// business, and a rule keyed on state would put the decision in two places.
+const bodyOf = (el) => [...el.children].filter(
+  c => c.tagName !== 'SUMMARY' && !c.classList.contains('panel-empty'));
+const poseBody = bodyOf(poseEl);
+const stylizeBody = bodyOf(stylizeEl);
+// A panel is ALWAYS on screen and always collapsible; only its body comes and
+// goes. `hidden` on the individual children, never on the <details>, so the
+// summary stays clickable and the panel keeps its place in the column.
+function setPanelPopulated(empty, body, populated) {
+  empty.hidden = !!populated;
+  body.forEach(c => { c.hidden = !populated; });
+}
+// Both start empty: the panels are on screen from the first paint, before any
+// bundle exists, saying they have nothing yet rather than appearing later and
+// reflowing the column under the pointer.
+setPanelPopulated(poseEmpty, poseBody, false);
+setPanelPopulated(stylizeEmpty, stylizeBody, false);
 const artState = document.getElementById('print-artstate');
 const lineArtBox = document.getElementById('lineArt');
 const weightIn = document.getElementById('lineWeight');
@@ -374,7 +396,7 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
     repose();
   });
 
-  poseEl.hidden = !rig && !pivot;
+  setPanelPopulated(poseEmpty, poseBody, !!(rig || pivot));
 
   // --- live pose read-out ------------------------------------------------
   function renderPose() {
@@ -409,7 +431,7 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
   const artMeshes = [stemMesh, gltf.scene.getObjectByName('bloom')].filter(Boolean);
   if (artMeshes.length) {
     art = new LineArt(artMeshes, { ink: 0x14181a, paper: 0xf2f0ea });
-    stylizeEl.hidden = false;
+    setPanelPopulated(stylizeEmpty, stylizeBody, true);
 
     // The handles are UI, not model: they keep their own flat material and
     // stay on top of the paper so the pose is still grabbable while stylized.
