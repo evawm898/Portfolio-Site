@@ -199,9 +199,14 @@ const MUTANTS = [
   { id: 'lines-frozen-after-first-frame', file: 'print.js',
     from: '    frameStats = art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());',
     to: '    frameStats = frameStats || art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());',
+    // Nothing responds to anything, so the curation and smoothing checks —
+    // which drive a parameter and look for a change — go red too. All of it
+    // measured, none of it explained away.
     breaks: ['live/orbit-moves-silhouette', 'weight/material', 'weight/pixels',
              'detail/creases-grow', 'detail/pixels', 'detail/readout',
-             'blend/dots-at-100', 'blend/mixed', 'blend/pixels'] },
+             'blend/dots-at-100', 'blend/mixed', 'blend/pixels',
+             'smooth/contour-is-not-faceted', 'curate/prunes-by-length',
+             'curate/prunes-the-drawing', 'tier/interior-tracks-detail'] },
 ];
 
 // ===========================================================================
