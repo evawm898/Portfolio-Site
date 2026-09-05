@@ -1,20 +1,29 @@
 // /print — 3D viewport and posing stage.
 //
-// Scope of this file: load a glTF bundle, light it just enough to read its
-// shape, orbit around it, report the `pivot` node's extras, and POSE the
-// flower — drag bend points to bend the stem, hinge the bloom at the junction
-// within the bundle's own declared limits. No stylization, no sparkles, no
-// multiple instances — those are later stages and none of them exist yet.
+// Scope of this file: load a glTF bundle, orbit around it, report the `pivot`
+// node's extras, POSE the flower — drag bend points to bend the stem, hinge
+// the bloom at the junction within the bundle's own declared limits — and
+// STYLIZE it as live line art. No sparkles, no multiple instances — those are
+// later stages and neither exists yet.
 //
-// The stem deformation itself lives in print-stem.js; this file is wiring.
+// The stem deformation lives in print-stem.js and the line extraction in
+// print-lines.js; this file is wiring.
 //
-// The lights here are THROWAWAY preview lights. The eventual renderer is
-// unlit line-art; nothing about this rig carries forward.
+// THE STYLIZE STAGE IS NOT A MODE YOU ENTER. It is a layer over the same live
+// scene: the bend handles stay draggable, the hinge sliders stay live, the
+// camera keeps orbiting, and the linework is re-extracted from whatever the
+// geometry currently is, every frame. Nothing here pauses, gates or resets the
+// pose controls, and the gate asserts that in both directions.
+//
+// The lights are the SHADED preview, kept as the line-art switch's other
+// position so the two can be compared; the line art itself uses no lighting
+// model at all.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StemRig, CONTROL_S } from './print-stem.js';
+import { LineArt, detailToAngleDeg } from './print-lines.js';
 
 const BUNDLE = 'assets/print-test/flower-test-bundle.glb';
 
@@ -29,6 +38,15 @@ const twistIn = document.getElementById('twist');
 const droopOut = document.getElementById('droopOut');
 const twistOut = document.getElementById('twistOut');
 const resetBtn = document.getElementById('resetPose');
+const stylizeEl = document.getElementById('print-stylize');
+const artState = document.getElementById('print-artstate');
+const lineArtBox = document.getElementById('lineArt');
+const weightIn = document.getElementById('lineWeight');
+const detailIn = document.getElementById('lineDetail');
+const dotsIn = document.getElementById('pointillism');
+const weightOut = document.getElementById('lineWeightOut');
+const detailOut = document.getElementById('lineDetailOut');
+const dotsOut = document.getElementById('pointillismOut');
 
 const lines = [];
 function log(html) { lines.push(html); debugEl.innerHTML = lines.join('\n'); }
@@ -64,7 +82,23 @@ function resize() {
 new ResizeObserver(resize).observe(canvas);
 resize();
 
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+// The line art is re-extracted EVERY frame, from the live camera and the live
+// geometry — that is what makes an orbit and a bend-point drag both show up in
+// the linework without either one having to know the other exists. `art` is
+// null until the bundle loads.
+let art = null, renderArtHook = null;
+let frameStats = null, lastFrameMs = 0, frameSamples = 0, frameTotal = 0, lastReadout = 0;
+renderer.setAnimationLoop(() => {
+  controls.update();
+  if (art) {
+    const t0 = performance.now();
+    frameStats = art.update(camera, [canvas.clientWidth, canvas.clientHeight], renderer.getPixelRatio());
+    lastFrameMs = performance.now() - t0;
+    if (frameStats) { frameTotal += lastFrameMs; frameSamples++; }
+    if (renderArtHook && t0 - lastReadout > 160) { lastReadout = t0; renderArtHook(); }
+  }
+  renderer.render(scene, camera);
+});
 
 // --- load the bundle -------------------------------------------------------
 new GLTFLoader().load(BUNDLE, (gltf) => {
@@ -242,6 +276,10 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
     if (rig) rig.apply();
     syncHandles();
     applyHinge();
+    // The stem's vertices moved, so its face normals and dihedral angles are
+    // stale. The BLOOM's are not — it is posed by rotating a node — so only
+    // the stem is re-read. Measured below, and printed in the read-out.
+    if (art && stemMesh) art.refreshGeometry(stemMesh);
     renderPose();
   }
 
@@ -362,6 +400,128 @@ new GLTFLoader().load(BUNDLE, (gltf) => {
     poseState.textContent = rows.join('\n');
   }
   renderPose();
+
+  // ======================= STYLIZE =======================================
+  // Line art over the SAME live scene. Nothing here touches `rig`, `setPose`,
+  // the handles or the controls — the linework is a consumer of the pose, not
+  // a competitor with it.
+
+  const artMeshes = [stemMesh, gltf.scene.getObjectByName('bloom')].filter(Boolean);
+  if (artMeshes.length) {
+    art = new LineArt(artMeshes, { ink: 0x14181a, paper: 0xf2f0ea });
+    stylizeEl.hidden = false;
+
+    // The handles are UI, not model: they keep their own flat material and
+    // stay on top of the paper so the pose is still grabbable while stylized.
+    // Explicitly restated here because the line art repaints everything else.
+    handles.forEach(h => { h.material.depthTest = false; });
+
+    function setStyle({ weight, detail, blend }) {
+      art.setOptions({ weight, detail, blend });
+      if (weight !== undefined) weightIn.value = String(weight);
+      if (detail !== undefined) detailIn.value = String(detail);
+      if (blend !== undefined) dotsIn.value = String(blend);
+      renderArt();
+    }
+    function readStyle() {
+      art.setOptions({
+        weight: parseFloat(weightIn.value),
+        detail: parseFloat(detailIn.value),
+        blend: parseFloat(dotsIn.value),
+      });
+      renderArt();
+    }
+    weightIn.addEventListener('input', readStyle);
+    detailIn.addEventListener('input', readStyle);
+    dotsIn.addEventListener('input', readStyle);
+
+    // The switch is VIEW CHROME, in the same sense as the pivot marker: it
+    // decides what is drawn and nothing else. Unchecking it puts the shaded
+    // preview back with the pose exactly as it was.
+    function setLineArt(on) {
+      art.setEnabled(on);
+      renderer.setClearColor(on ? 0xf2f0ea : 0x0c0e0e);
+      lineArtBox.checked = on;
+      renderArt();
+    }
+    lineArtBox.addEventListener('change', () => setLineArt(lineArtBox.checked));
+
+    art.setOptions({
+      weight: parseFloat(weightIn.value),
+      detail: parseFloat(detailIn.value),
+      blend: parseFloat(dotsIn.value),
+    });
+    setLineArt(lineArtBox.checked);
+
+    // --- live line-art read-out -----------------------------------------
+    // Everything on it is MEASURED, including the timings. The CPU-vs-GPU call
+    // for this stage was made on these numbers, so the page that made it keeps
+    // reporting them rather than quoting a comment. Driven from the frame loop
+    // at ~6 Hz as well as on every input, because the interesting numbers
+    // (segment counts, milliseconds) move when the CAMERA moves and nothing
+    // fires an event for that.
+    function renderArt() {
+      weightOut.textContent = `${art.weight.toFixed(1)} px`;
+      detailOut.textContent = `${art.detail.toFixed(0)}`;
+      dotsOut.textContent = `${art.blend.toFixed(0)}%`;
+      const rows = [];
+      const topo = art.units.map(u => u.ex.topo);
+      const tris = topo.reduce((a, t) => a + t.triCount, 0);
+      const edges = topo.reduce((a, t) => a + t.edgeCount, 0);
+      const bnd = topo.reduce((a, t) => a + t.boundaryCount, 0);
+      const nm = topo.reduce((a, t) => a + t.nonManifold, 0);
+      rows.push(`topology          ${tris} tri / ${edges} welded edges`);
+      rows.push(`                  ${bnd} boundary, ${nm} edges with >2 faces (3rd dropped)`);
+      rows.push(`build             ${art.units.map(u => u.ex.buildMs.toFixed(0)).join(' + ')} ms, ONCE at load`);
+      if (!art.enabled) {
+        rows.push('line art          OFF — shaded preview');
+      } else {
+        const st = frameStats || art.stats;
+        rows.push(`crease threshold  ${art.creaseAngleDeg.toFixed(1)}\u00b0 dihedral  (detail ${art.detail.toFixed(0)})`);
+        if (st) {
+          rows.push(`segments          ${st.segments}  = ${st.silhouette} silhouette + ${st.crease} crease`);
+          rows.push(`drawn as          ${st.strokes} strokes + ${st.dots} dots`);
+          rows.push(`extract           ${st.extractMs.toFixed(2)} ms/frame  (fill ${(st.frameMs - st.extractMs).toFixed(2)} ms)`);
+          rows.push(`frame pass        ${lastFrameMs.toFixed(2)} ms of a 16.7 ms budget`);
+        }
+      }
+      artState.textContent = rows.join('\n');
+    }
+    renderArtHook = renderArt;
+    renderArt();
+
+    window.__printLineArt = {
+      setLineArt, setStyle,
+      enabled: () => art.enabled,
+      style: () => ({ weight: art.weight, detail: art.detail, blend: art.blend }),
+      creaseAngleDeg: () => art.creaseAngleDeg,
+      detailToAngleDeg,
+      stats: () => art.stats,
+      topology: () => art.units.map(u => ({
+        name: u.mesh.name, tris: u.ex.topo.triCount, verts: u.ex.topo.vertexCount,
+        edges: u.ex.topo.edgeCount, boundary: u.ex.topo.boundaryCount,
+        nonManifold: u.ex.topo.nonManifold, buildMs: u.ex.buildMs,
+        geometryMs: u.ex.geometryMs, extractMs: u.ex.extractMs,
+        silhouette: u.ex.silhouetteCount, crease: u.ex.creaseCount,
+        segments: u.ex.segmentCount,
+      })),
+      perf: () => ({ lastFrameMs, meanFrameMs: frameSamples ? frameTotal / frameSamples : 0, frames: frameSamples }),
+      resetPerf: () => { frameTotal = 0; frameSamples = 0; },
+      materialWidth: () => art.units.map(u => u.mat.linewidth),
+      dotSize: () => art.units.map(u => u.dotMat.size),
+      strokeInstances: () => art.units.map(u => u.lines.geometry.instanceCount),
+      dotInstances: () => art.units.map(u => u.dotGeo.drawRange.count),
+      // the first N stroke endpoints, so the gate can prove the SAME segments
+      // feed both renderers rather than trusting a count
+      strokeSample: (n = 8) => Array.from(art.units[0].buf.array.slice(0, n * 6)),
+      artText: () => artState.textContent,
+      // the widget path and the model path, kept apart for the same reason the
+      // pose stage keeps them apart
+      setWeightWidget: (v) => { weightIn.value = String(v); weightIn.dispatchEvent(new Event('input')); },
+      setDetailWidget: (v) => { detailIn.value = String(v); detailIn.dispatchEvent(new Event('input')); },
+      setDotsWidget: (v) => { dotsIn.value = String(v); dotsIn.dispatchEvent(new Event('input')); },
+    };
+  }
 
   // A handle for the headless gate — no app logic reads it.
   window.__printScaffold = {

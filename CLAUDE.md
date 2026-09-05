@@ -376,6 +376,113 @@ them as optional or experimental.
   before implementing** — explain the conflict and the options. Never ship a change
   that silently breaks export.
 
+## `/print` — the posing and stylizing stage
+
+`print.html` / `print.js` / `print-stem.js` / `print-lines.js` are a staged
+build of the print pipeline: take a flower that already exists, pose it, draw
+it as line art, and (later) arrange and sparkle it. It is `noindex`, it does
+NOT touch the flower or bloom generators, and it exports nothing — the real
+generators own geometry and STL, and this page is downstream of both.
+
+Stages shipped so far, one PR each: the **scaffold** (#150 — viewport, glTF
+load, the pivot node's `extras` round-tripping through GLTFLoader), the
+**pose** (#151 — a posable stem and a hinged bloom), and the **line art**
+(this one — silhouette and crease edges, three sliders).
+
+**The bundle is the input contract.** `assets/print-test/flower-test-bundle.glb`
+carries a `pivot` node whose glTF `extras` declare the junction position, the
+junction tangent and `rotation_limits_deg`. The page reads its hinge range from
+there and NEVER from a constant in the code: re-tuning the constraint is a
+re-export, not a code edit, and the gate asserts the slider bounds EQUAL the
+bundle's own numbers rather than merely existing. The bundle also ships a
+`pivot_marker` diagnostic sphere, hidden by default and restored by a toggle —
+hidden via `visible`, never removed, so the node counts still describe the
+bundle as shipped.
+
+**The stem deformation is a ruling, not a proposal** (Eva, Sep 5) — see the
+header of `print-stem.js`. Do not "simplify" it back into a swept tube: 83% of
+the stem's vertices are three LEAVES, and a re-loft deletes them at zero bend.
+
+**EACH STAGE IS A LAYER, NEVER A MODE YOU ENTER.** The line-art stage does not
+disable, pause or reset anything the pose stage does; bend points stay
+draggable and the hinge sliders stay live while stylized, and the linework
+re-extracts from whatever the geometry currently is. The gate asserts this in
+BOTH directions (`independence/*`, `stylized/bend-drag-still-works`,
+`pose/lines-follow-bend`) because it is the property that gets quietly lost
+when a later stage adds a switch.
+
+**Line extraction is a CPU pass, and that was measured, not assumed.** The work
+splits in two, and only one half is per-frame: face normals and per-edge
+dihedral angles are functions of GEOMETRY, so the bloom (posed by rotating a
+NODE) never re-reads them and the stem re-reads only when a bend point moves;
+facing is a function of the camera, and the camera is transformed into each
+mesh's LOCAL space rather than the geometry into the world. Measured on the
+shipped bundle (78,480 triangles, 117,408 welded edges, headless Chromium):
+**~2.2 ms/frame mean at blend 0, ~5.6 ms at blend 100**, against 16.7 ms, with
+a one-time ~150 ms adjacency build at load. A GPU edge pass would buy ~2 ms and
+cost the thing the stage is for — the segments would live in a texture, so the
+gate could not count them and the dot renderer could not consume them.
+
+**THE MESH IS NOT WELDED AND THE ADJACENCY HAS TO BE RECOVERED BY POSITION.**
+The bundle comes from an STL split, so its triangles share no vertices: without
+the weld every edge is a boundary edge, there are no creases at all, and the
+page still draws a plausible silhouette-only picture. `topology/welded` is the
+one check that sees it.
+
+**ONE EXTRACTION, TWO CONSUMERS.** Pointillism is not a second algorithm over
+the model: at blend *b* an edge is drawn as dots when its own hash is below *b*
+and as a stroke otherwise, so the segment set is identical at both ends of the
+slider (`blend/same-extraction`) and the transition is stable under orbit
+because the hash is on the EDGE, not on the frame. The detail slider runs
+BACKWARDS on purpose — `detailToAngleDeg()` in `print-lines.js` is its one
+owner, read by the app, the read-out and the gate.
+
+**Each slider is asserted on what it must LEAVE ALONE as well as on what it
+changes.** Weight widens strokes without changing which lines exist; detail
+changes which creases exist without moving the silhouette (a silhouette is a
+function of the camera, full stop); pointillism changes the renderer, not the
+extraction. A single slider wired to "make it look different" satisfies the
+first half of any of those on its own.
+
+**Verify with `node tools/verify-print-scaffold.mjs [shots-dir]`** — one gate
+for all three stages, every claim measured against mesh state, the extracted
+segment counts, or the SCREENSHOT BYTES, never against the control that was
+just written. **`--mutants` is the negative control and is not optional before
+quoting a pass from a changed harness**: it re-serves deliberately broken
+copies of `print.js` / `print-lines.js` through the gate's own HTTP server, and
+fails if a mutation does not apply, if a check the mutant NAMES stays green, or
+if a check it did not name goes red (which is how a mutation that just breaks
+the page gets caught pretending to be a negative control).
+
+**Ink fraction saturates — read the weight check's comment before retuning it.**
+Coverage is not width: at detail 100 the bloom is already a solid mass, so a 5x
+stroke barely moves the pixel count. The weight check is measured at detail 0
+for that reason.
+
+Contact sheets: `node tools/shot-print-pose.mjs <dir>` (the pose stage) and
+`node tools/shot-print-lines.mjs <dir>` (the line art — the switch, detail x
+weight, the pointillism blend, and the linework under a LIVE pose change).
+Every cell on both is produced by a real pointer drag, wheel or slider input;
+a picture of a configuration the hand cannot reach is not evidence about the
+tool.
+
+**Nothing here runs in CI.** Every GitHub Actions gate in this repo is
+path-filtered to `flower*` / `bloom*` files, so `print*` is covered by nothing —
+run the gate and the sheets by hand before calling a `/print` change done. Note
+the corollary the cards tool already hit: the flower workflows are path-filtered
+on `'tools/**'`, so ADDING A PRINT TOOL makes both flower gates run on a print
+PR. They still test flower geometry; two green `verify` jobs on a print PR are
+not evidence that anything about `/print` was checked.
+
+Dev-only deps, gitignored and not in `package.json` (same convention as the
+other gates): `npm i --no-save three@0.161.0 playwright-core`. Three is served
+from `node_modules` at the exact jsDelivr URLs `print.html` pins, so the gate
+needs no CDN egress.
+
+**Loose thread:** `assets/print-test/` still names itself a fixture, and it is
+now load-bearing for three merged stages. Renaming it is a rename in three
+tools plus `print.js`; it has been deferred once per session so far.
+
 ## Artist Tracker (`artist-tracker.html`)
 
 Private, single-file, client-side artist/tattoo-artist tracker for

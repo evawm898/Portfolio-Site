@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Print Pose — Eva Maskalenko</title>
-<meta name="description" content="Posing stage for the print pipeline: drag bend points along the stem and hinge the bloom at its junction.">
+<title>Print Line Art — Eva Maskalenko</title>
+<meta name="description" content="Line-art stage for the print pipeline: silhouette and crease edges pulled live off the posed geometry.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -55,21 +55,25 @@
      "toggle never offered" mutation passed until this rule existed. */
   #print-marker-toggle[hidden] { display: none; }
 
-  /* POSE panel, bottom-left, deliberately a separate box from the read-out
-     above: that one reports the bundle as shipped, this one reports what the
-     session has done to it. */
-  #print-pose {
-    /* RIGHT side on purpose: the read-out panel is top-left and can grow to
-       the full viewport height, so a bottom-left pose box collided with its
-       marker toggle and swallowed the clicks (caught by the gate, not by eye). */
+  /* The right-hand column. POSE and STYLIZE are SIBLING panels in it, not one
+     box with two headings: the read-out top-left reports the bundle as
+     shipped, POSE reports what the session has done to its shape, and STYLIZE
+     reports how that shape is being drawn. Three different subjects.
+     RIGHT side on purpose: the read-out panel is top-left and can grow to the
+     full viewport height, so a bottom-left pose box collided with its marker
+     toggle and swallowed the clicks (caught by the gate, not by eye). */
+  #print-side {
     position: fixed; right: 0.9rem; top: 0.9rem;
     width: min(23rem, calc(100vw - 1.8rem));
     max-height: calc(100vh - 1.8rem); overflow: auto;
+    display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  #print-pose, #print-stylize {
     font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
     background: rgba(10, 12, 12, 0.9); border: 1px solid #2b3333;
     padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1;
   }
-  #print-pose[hidden] { display: none; }
+  #print-pose[hidden], #print-stylize[hidden] { display: none; }
   .pose-title { color: #6fb7ae; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
   .pose-row { display: grid; grid-template-columns: 3.2rem 1fr 3.2rem; align-items: center; gap: 0.5rem; }
   .pose-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; }
@@ -85,6 +89,21 @@
     white-space: pre-wrap; font: inherit; color: #96a2a1;
   }
   #print-canvas.dragging { cursor: grabbing; }
+
+  /* STYLIZE. Same row grammar as POSE on purpose — one panel style for the
+     whole stage — with a wider value column because these read-outs carry a
+     unit as well as a number. */
+  #print-artstate {
+    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
+    white-space: pre-wrap; font: inherit; color: #96a2a1;
+  }
+  #lineart-toggle {
+    display: flex; align-items: center; gap: 0.45rem;
+    margin-bottom: 0.6rem; color: #96a2a1; cursor: pointer; user-select: none;
+  }
+  #lineart-toggle input { accent-color: #6fb7ae; margin: 0; }
+  /* the stylize read-outs carry a unit as well as a number */
+  #print-stylize .pose-row { grid-template-columns: 3.4rem 1fr 4.4rem; }
 </style>
 </head>
 <body>
@@ -100,6 +119,8 @@
     <input type="checkbox" id="showPivotMarker"> show pivot marker
   </label>
 </div>
+
+<div id="print-side">
 
 <!-- POSE. The hinge ranges are NOT written here — they are read from the
      bundle's own rotation_limits_deg at load and stamped onto the inputs, so
@@ -122,6 +143,37 @@
   <div class="pose-hint" id="poseHint">drag the dots on the stem to bend it</div>
   <button type="button" id="resetPose">reset pose</button>
   <pre id="print-posestate"></pre>
+</div>
+
+<!-- STYLIZE. Three sliders over ONE extraction: weight and pointillism are
+     both how the extracted segments are drawn, detail is which of them exist.
+     The line-art switch is view chrome in the same sense as the pivot marker —
+     it changes what is drawn, never the pose. -->
+<div id="print-stylize" hidden>
+  <div class="pose-title">STYLIZE</div>
+
+  <label id="lineart-toggle">
+    <input type="checkbox" id="lineArt" checked> line art
+  </label>
+
+  <div class="pose-row">
+    <label for="lineWeight">weight</label>
+    <input type="range" id="lineWeight" min="0.5" max="6" step="0.1" value="1.6">
+    <output id="lineWeightOut">1.6 px</output>
+  </div>
+  <div class="pose-row">
+    <label for="lineDetail">detail</label>
+    <input type="range" id="lineDetail" min="0" max="100" step="1" value="45">
+    <output id="lineDetailOut">45</output>
+  </div>
+  <div class="pose-row">
+    <label for="pointillism">dots</label>
+    <input type="range" id="pointillism" min="0" max="100" step="1" value="0">
+    <output id="pointillismOut">0%</output>
+  </div>
+
+  <pre id="print-artstate"></pre>
+</div>
 </div>
 
 <script type="module" src="print.js"></script>
