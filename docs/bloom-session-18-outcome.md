@@ -30,7 +30,7 @@ Everything below is the EXPORT reading unless it says live, registered against a
 1. **The geometry guarantee.** SPHERE is a value nothing pre-existing selects, so every
    earlier export is bit-identical by construction — the CONTINUOUS and FAN precedent.
    Measured on the retention ruling's terms: phase14 (499 rows frozen at 5312845) on a
-   worktree of 5312845 and on the branch head — <<PHASE14>>.
+   worktree of 5312845 and on the branch head — **499/499 bit-identical, 0 moved, defaults bit-identical** (`tools/diff-bloom-bytes.mjs --compare`; the base tree reads "5312845+dirty" from the gitignored node_modules symlink, nothing else).
 2. **The UI move.** `headRise`'s predicate (`not sphereMode`) is TRUE on every pre-existing
    row, so its move from ARRANGEMENT into the Head section changes no predicate's value and
    no byte — session 16's PETAL FORM / PETAL CURL precedent. The three-value FLAT / DOMED /

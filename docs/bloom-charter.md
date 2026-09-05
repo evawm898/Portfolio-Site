@@ -4008,7 +4008,7 @@ matters should be measured this way.
 
     - **BYTE-IDENTICAL ON THE RETENTION RULING'S TERMS**: phase14 (499 rows frozen at
       5312845, a commit on `main`, the strongest baseline — the only one carrying the curl
-      family's rows) <<PHASE14>>; the live partition <<LIVE>>. The predeclared must-not-touch
+      family's rows) **499/499 bit-identical, 0 moved**; the live partition <<LIVE>>. The predeclared must-not-touch
       list (every flower file and tool, `chromium-harness`, cards, the tracker, the twelve
       older frozen functions) verified by `sha1sum -c` at close; eleven `frozen/*` tags on the
       remote as session 17 left them; `frozen/phase14` is OWED from `main` after the merge.

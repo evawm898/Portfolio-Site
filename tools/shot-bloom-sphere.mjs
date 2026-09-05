@@ -53,9 +53,15 @@ const sha = (buf) => crypto.createHash('sha1').update(buf).digest('hex').slice(0
    magnification set by the sphere's radius; `faceDown` straight down it;
    `reserved` up at the far pole from below; `profile` at the equator from
    the side, where a seam would show. */
+/* EVERY POLE CAMERA STANDS OUTSIDE THE CANOPY, and the canopy is the BLADES,
+   not the sphere: the mum's 60 mm florets on a 4.69 mm ball put a camera at
+   1.35 R deep inside them (the second render did exactly that). So each
+   frame is the larger of a multiple of the sphere's radius and a fraction of
+   the model's own bounding-sphere radius (`fit`, reported by the app), which
+   is what the blades reach. */
 const VIEWS = {
   whole: null,
-  profile: (R) => ({ r: Math.max(R * 3.2, 8), at: [0, 0, 0], dir: [0.12, -0.99, 0.06] }),
+  profile: (R, f) => ({ r: Math.max(R * 3.2, f.fit * 1.1, 8), at: [0, 0, 0], dir: [0.12, -0.99, 0.06] }),
   /* THE FACE-POLE CAMERAS STAND OUTSIDE THE CANOPY: the incurve florets are
      20 mm long and curl 150 degrees at the pole, so a camera at 1.35 R (the
      reserved pole's magnification) sits INSIDE them and photographs blade
@@ -63,9 +69,9 @@ const VIEWS = {
      2.8 R clears a 20 mm blade on a 12.5 mm sphere with the pole still the
      subject; the reserved pole keeps the tighter frame because its blades
      point AWAY from the camera there. */
-  face: (R) => ({ r: Math.max(R * 2.8, 10), at: [0, 0, R], dir: [0.3, -0.3, 0.9] }),
-  faceDown: (R) => ({ r: Math.max(R * 2.8, 10), at: [0, 0, R], dir: [0.03, -0.03, 1] }),
-  reserved: (R) => ({ r: Math.max(R * 1.35, 5), at: [0, 0, -R], dir: [0.3, -0.3, -0.9] }),
+  face: (R, f) => ({ r: Math.max(R * 2.8, f.fit * 0.8, 10), at: [0, 0, R], dir: [0.3, -0.3, 0.9] }),
+  faceDown: (R, f) => ({ r: Math.max(R * 2.8, f.fit * 0.8, 10), at: [0, 0, R], dir: [0.03, -0.03, 1] }),
+  reserved: (R, f) => ({ r: Math.max(R * 1.35, f.fit * 0.6, 5), at: [0, 0, -R], dir: [0.3, -0.3, -0.9] }),
 };
 
 async function setPreview(on) {
@@ -79,7 +85,7 @@ async function setPreview(on) {
 async function shoot(file, view, frame) {
   let scale = 1;
   for (let attempt = 0; attempt < 5; attempt++) {
-    if (VIEWS[view]) { const f = VIEWS[view](frame.R); f.r *= scale; await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), f); }
+    if (VIEWS[view]) { const f = VIEWS[view](frame.R, frame); f.r *= scale; await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), f); }
     else await page.evaluate((rr) => window.__bloomFrame(rr, 0.15), frame.fit);
     await page.waitForTimeout(260);
     await page.screenshot({ path: file, clip: { x: 0, y: 0, width: 800, height: 800 } });
