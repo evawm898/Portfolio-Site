@@ -1984,6 +1984,57 @@ final head always runs to completion. It also enforces a discipline already agre
 one** (runs 84 and 85 started two minutes apart and both ran to completion on a four-CPU
 runner).
 
+**RULED Sep 5 (session 17). A FROZEN BASELINE IS TAKEN AT A COMMIT ON `main`, NEVER AT A
+BRANCH HEAD, AND IS TAGGED AT FREEZE TIME. phase10 is the case that produced the rule.**
+
+**HOW IT SURFACED.** `bloom-frozen-matrices` went red on a PR that touches no geometry,
+at `fatal: invalid reference: 4f39118` — phase10's declared base. The same workflow had
+passed on `main` three hours earlier. Of the TWELVE entries in `FROZEN_BASE_COMMITS`
+(`legacyMatrix()` declares none), **phase10's is the only one that is not a commit on
+`main`**: it is a mid-PR commit of #140, and `fetch-depth: 0` fetches BRANCHES, so it was
+reachable only while `claude/fan-per-petal-sliders-iwbkb6` existed. Branch deletes are one
+of Eva's two recurring actions. Everything else about the incident follows from that one
+fact, which is why the rule is about WHERE a baseline is frozen and not about the gate.
+
+**THE BASELINE WAS RECOVERED, AND A PREMISE ABOUT HOW WAS CORRECTED ON THE WAY.**
+`refs/pull/<N>/head` is a permanent ref on GitHub and survives branch deletion. The
+obvious test — "is `refs/pull/140/head` equal to the frozen sha?" — FAILS here: #140 kept
+committing afterwards, so its head is `2ea3e19`. **The conclusion that would follow from
+that ("the head ref points elsewhere, so this does not recover it") is FALSE, and the
+correction is the useful part: fetching a ref brings its HISTORY.** `4f39118` is the sixth
+commit back from `refs/pull/140/head`, and fetching that ref restores the object. The
+commit immediately AFTER it is `805a191` ("the all-petals group at one whorl; Petal 1 /
+Petal N hidden and inert there") — exactly what phase10 is documented as being frozen
+BEFORE, so it is the right object and not one that merely resolves. **Proven rather than
+asserted: `--verify-frozen --phase10` against a worktree of the recovered commit PASSES,
+376 rows deep-equal.** phase10 is intact; nothing was retired and nothing demoted.
+
+**THE FIX IS A PERMANENT REF, NOT A FETCH TWEAK, AND NOT A LOOSER GATE.** Twelve
+lightweight tags (`frozen/phase2` .. `frozen/phase13`) pin every declared base. A tag
+survives branch deletion AND a force-push to `main` — and `main` is not protected here, so
+a force-push would orphan every base that lives only in its history. Tagging converts
+twelve implicit dependencies on branch reachability into twelve explicit permanent refs,
+which closes the CLASS rather than the instance. **The sha in `FROZEN_BASE_COMMITS` stays
+the one owner of WHICH commit a baseline is**; the tag exists only to keep the object
+alive, so no second identifier for one thing is introduced and `--verify-frozen` needs no
+change — `actions/checkout@v4` at `fetch-depth: 0` fetches tags, so the existing
+`git worktree add "$sha"` resolves unchanged.
+
+**AND `--verify-frozen` MUST NEVER SKIP AN UNRESOLVABLE BASE.** The tempting repair — treat
+a missing base as a skip — turns a lost proof into a silent pass, which is the one thing
+this project never ships. A baseline whose base cannot be resolved is UNVERIFIABLE and must
+say so loudly; if that ever becomes the real state, the honest move is a labelled
+unverifiable tier and a correction to the claim that CI "proves every one deep-equal on
+every push", never a quiet green.
+
+**BLOCKED, AND RECORDED AS AN ENVIRONMENT LIMIT RATHER THAN A REPO ONE:** this session
+created all twelve tags locally and could not publish them. The agent proxy returns
+**HTTP 403 on a tag ref push** — both as `git push --tags` and as a single explicit
+`refs/tags/...` refspec — while ordinary branch pushes to `refs/heads/...` succeed from the
+same session, the same 403 that already refuses branch deletes here. No create-ref API is
+exposed either. **The tags are still owed**, and until they exist `bloom-frozen-matrices`
+is red on every bloom PR.
+
 **A GATE RUN NAMES THE FIRST FAMILY THAT FIRED, NEVER THE ONLY WITNESS (session 17, and it
 is a correction to how every prior outcome doc must be read).** Both STL gates abandon a row
 at the first failing assertion family, in the order form -> curl -> thickness -> junction ->
