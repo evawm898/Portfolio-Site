@@ -61,10 +61,8 @@
                   real events while that section stayed shut. The section is
                   visibly closed in both frames and the readout — which lives
                   outside every section — has moved, sheet and ring alike.
-     gated centre the one-clear-choice-with-sub-panels pattern surviving the
-                  grouping: the Center section open at DISC (size + dish) and
-                  at RING (size + bore), the sub-controls swapping under one
-                  choice exactly as `visibleWhen` declares.
+     (the gated-centre row — the Center section open at DISC and at RING —
+                  went with the centre rig in session 20.)
 
    THE FRAME IS ASSERTED, NOT TRUSTED. A panel taller than its own scroll box
    would photograph CROPPED, and a cropped panel is the one picture that could
@@ -113,7 +111,7 @@ async function shoot(label, note) {
   return { label, note, caption, readout: box.readout, png };
 }
 
-const cells = { firstLoad: [], perSection: [], numbering: [], accordion: [], reactivity: [], centre: [] };
+const cells = { firstLoad: [], perSection: [], numbering: [], accordion: [], reactivity: [] };
 
 /* HOW TO REACH A SECTION THAT IS HIDDEN AT FIRST LOAD — the panel gate's
    WITNESS `pre` for the same sections, restated here because a sheet and a
@@ -323,22 +321,8 @@ if (Number(drove.state) !== 2.4) await die(`sheetThickness reads ${drove.state} 
 cells.reactivity.push(await shoot('AFTER · sheet 2.40 mm, section still shut',
   `sheetThickness driven 1.20 → 2.40 mm with real input/change events while Part thickness stayed shut. The section is still shut in this frame; the readout and the ring (${drove.ring.toFixed(2)} mm) moved.`));
 
-/* ---- the gated centre, inside its section ---- */
-for (const style of ['DISC', 'RING']) {
-  await openBloom(page, port);
-  await openSection('center');
-  await page.evaluate((st) => {
-    const el = document.getElementById('centerStyle');
-    el.value = st;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }, style);
-  await page.waitForTimeout(250);
-  const sub = await page.evaluate(() => [...document.querySelectorAll('#sec-center .bl-ctrl')]
-    .filter((w) => !w.hidden).map((w) => w.querySelector('label').firstChild.textContent).join(', '));
-  cells.centre.push(await shoot(`CENTER · ${style}`,
-    `One clear choice with sub-panels gated per choice, unchanged by the grouping. Visible here: ${sub}.`));
-}
+/* THE GATED-CENTRE CELLS stood here (CENTER · DISC / RING) and went with the
+   centre rig in session 20; there is no Center section to photograph. */
 
 await browser.close();
 server.close();
@@ -389,9 +373,6 @@ for (const [name, title, note, list, perRow] of [
   ['panel-reactivity', 'Bloom panel — a collapsed section is not a hidden control',
    'The assertion tools/verify-bloom-panel.mjs makes, photographed. sheetThickness lives in Part thickness, which is shut at first load. Driving it with real input/change events — the same route every gate uses — rebuilds the model and moves the readout, and the section stays shut. Collapse and the accordion are presentation; readUI, the export path and the gates cannot see either.',
    cells.reactivity, 2],
-  ['panel-centre', 'Bloom panel — the gated centre, inside its section',
-   'The centre keeps the pattern it had: one clear choice, sub-panels gated per choice by visibleWhen. Grouping did not change which controls appear or when — applyVisibility() is still the only thing that hides a control, and a section is hidden only when every control in it is.',
-   cells.centre, 2],
 ]) {
   const p2 = await b2.newPage({ viewport: { width: perRow * (CELL + 16) + 30, height: 900 } });
   await p2.setContent(sheet(title, note, list, perRow), { waitUntil: 'load' });

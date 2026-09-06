@@ -125,7 +125,7 @@ async function cell({ label, set: sets = [], views = ['whole', 'profile', 'face'
   const readout = await page.evaluate(() => document.getElementById('readout').textContent);
   await setPreview(false);
   const rec = { label, tag: modeTag(m), ruling, note, shots, widened, r, own, sha: sha(buf), bytes: buf.length,
-    shownTris: m.shownTris, hub: m.hubRadius, foot: m.ringWidth, maxDim: m.maxDimMm, dome: m.hubDome, seat: m.centerSeat, sphere: m.sphereMode === true,
+    shownTris: m.shownTris, hub: m.hubRadius, foot: m.ringWidth, maxDim: m.maxDimMm, dome: m.hubDome, sphere: m.sphereMode === true,
     rings: m.rings.length, readoutFirst: readout.split('\n')[0],
     headLine: (readout.split('\n').find((l) => /^HEAD/.test(l)) || '') };
   console.log(`  ${label.padEnd(60)} hub ${m.hubRadius.toFixed(2)} tris ${m.shownTris} sha ${rec.sha} · ${modeTag(m)}`);
@@ -163,7 +163,6 @@ const num = (c) => {
     + `<br>CROWDING (export, on the surface): D_max ${r.dmax}${r.dome && r.dome.dmaxPolarDeg != null ? ` at polar ${r.dome.dmaxPolarDeg.toFixed(1)}°` : r.dmaxAt ? ` at r ${r.dmaxAt.r.toFixed(2)} mm` : ''} · D_mean ${r.dmean.toFixed(2)} · ${r.n} feet`
     + (r.dome && r.dome.poles ? ` · <b>at the FACE pole D ${r.dome.poles.face}, at the RESERVED pole D ${r.dome.poles.reserved}</b> (within ${r.dome.poles.withinMm.toFixed(2)} mm, one equal-area step)` : '')
     + (r.crowded ? ` · <b class="flag">CROWDED (D_max &ge; ${CROWDED_DMAX})</b>` : '')
-    + (c.seat ? `<br>SEAT: ${c.seat.fullFootprint ? 'the whole footprint' : `a ${c.seat.patchRadius.toFixed(2)} mm patch of the ${c.seat.footprint.toFixed(2)} mm footprint`} overlaps the shell · rim hovers ${c.seat.hover.toFixed(2)} mm` : '');
 };
 const fig = (c, view, cap) => { if (!c.shots[view]) throw new Error(`${c.label}: the page references a "${view}" frame this cell never shot — a blank figure is a picture nobody should rule from`); return figHtml(c, view, cap); };
 const figHtml = (c, view, cap) => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b> <i>(${cap}${c.widened[view] > 1 ? `, camera widened ${c.widened[view].toFixed(2)}x to clear the canopy` : ''})</i><br><small>${esc(c.ruling)} · read-out: "${esc(c.readoutFirst)}"</small><br>${num(c)}`

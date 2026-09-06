@@ -49,7 +49,7 @@ if (!beforeRoot || !fs.existsSync(path.join(beforeRoot, 'bloom.html'))) {
 fs.mkdirSync(outDir, { recursive: true });
 
 const set = (o) => Object.entries(o).map(([id, value]) => ({ id, value: String(value) }));
-const EVA_CONFIG = { placement: 'CONTINUOUS', petalCount: 40, layerCount: 6, spread: 1.15, headRise: 1.00, centerStyle: 'DISC' };
+const EVA_CONFIG = { placement: 'CONTINUOUS', petalCount: 40, layerCount: 6, spread: 1.15, headRise: 1.00 };
 const INCURVE = { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 0.5 };
 
 const CELLS = [

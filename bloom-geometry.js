@@ -18,7 +18,8 @@
 
    THE INVARIANT: the model is always ONE connected watertight solid. The hub
    (the derived junction) is UNCONDITIONAL — built for every design, at every
-   slider position. It is plumbing, not the designed center (that is phase 2).
+   slider position. It is plumbing, not a designed centre (the reproductive
+   parts are phase 2, B2; the A/B rig that stood in for them is retired).
    =================================================================== */
 
 /* MIN_FEATURE_MM = 1.0 is an ASSUMPTION, not a measurement. Nothing in this
@@ -2449,7 +2450,7 @@ export function widthProfile(state, ring, halfW, cap, acc) {
           live (columns collapsing to one edge) with a floored face in export
           is two different meshes, and it would fail that assertion by
           construction.
-       2. IT IS THE DOME'S BUG. `domeInto` closed its cap on a ring of 48
+       2. IT IS THE (since-retired) CENTRE DOME'S BUG. `domeInto` closed its cap on a ring of 48
           vertices 6.1e-17 apart, because `cos(PI/2)` is not 0 — 48 degenerate
           triangles and 49 non-manifold edges on every dome, passing the gated
           criterion while being wrong. Collapsing NV columns onto one apex
@@ -3598,8 +3599,10 @@ function emitPanel(acc, rows, panel, tAt) {
 }
 
 /* ===================================================================
-   buildHubInto — the derived junction. PLUMBING, not the designed center
-   (phase 2 owns that; conflating them cost the flower several cycles).
+   buildHubInto — the derived junction. PLUMBING, not a designed centre
+   (phase 2 B2 owns the reproductive parts; conflating the two cost the
+   flower several cycles, and the A/B centre rig that stood in for them is
+   retired as of session 20).
 
    UNCONDITIONAL: built for every design. Derived, no controls. A sealed
    extruded polygon slab of the petals' own material — same thickness as the
@@ -3695,209 +3698,24 @@ export function buildHubInto(acc, state, ring) {
 }
 
 /* ===================================================================
-   buildCenterInto — THE DESIGNED CENTER. An A/B rig behind one choice
-   control: NONE / DOME / DISC / RING. Eva ruled the archetype by eye from a
-   contact sheet, Aug 31, after the form phase: **DISC is the default.** NONE
-   remains a reachable state and keeps EXPLICIT gate coverage — it stopped
-   being the default, which is exactly when a state stops being exercised for
-   free (see the matrix header in tools/bloom-harness.mjs).
+   THE DESIGNED CENTRE WAS HERE — buildCenterInto() with its DOME / DISC / RING
+   arms (domeInto, discInto, torusInto: 1,728 / 1,056 / 2,304 triangles, seated
+   an eighth of a slab below the hub's underside) — and it is RETIRED (session
+   20, Eva's ruling Sep 5, phase 2 B1). The centre is the reproductive parts and
+   nothing else; DISC and DOME were placeholders for a surface (HEAD's) and for
+   covering the junction (the junction's, never a control), and RING was a torus
+   standing in for a corona, which is a flared collar between petals and stamens
+   and will be its own group with its own controls. Its five control ids are
+   reserved in bloom-registry.js's RETIRED_IDS. The androecium and gynoecium
+   that replace it are phase 2 B2 and root through footRing() like the feet.
 
-   THIS IS NOT THE JUNCTION, and the separation is structural, not a naming
-   convention. buildHubInto above is derived plumbing that makes the model one
-   piece; this is user-chosen decoration that makes it look like something.
-   The proof they are separate: DELETE THIS FUNCTION AND THE BLOOM IS STILL
-   ONE CONNECTED SOLID. The centre contributes nothing to the invariant.
-
-   HOW IT READS THE FOOT RING. It never calls footRing() and never recomputes
-   a radius. It receives the same `ring` object footRing() produced once in
-   buildBloomInto — the object the petal builder and the hub builder are also
-   holding — and expresses every dimension as a FRACTION of `ring.radius`.
-   That is why the centre tracks `spread` with no code that mentions spread.
-   `ring.derivedRadius` is telemetry and is deliberately not read here.
-
-   CONNECTEDNESS BY CONSTRUCTION, not by measurement. The hub is a disc of
-   radius ring.radius spanning z ∈ [−t/2, +t/2], and it is already welded to
-   every foot. So a centre is joined to the whole model if two clauses hold:
-
-     (1) its radial footprint lies inside [0, ring.radius], and
-     (2) its z-span crosses [−t/2, +t/2].
-
-   Then centre ∩ hub is a solid region of the centre's FULL footprint — not a
-   band whose width has to be argued about, and not something the voxel gate
-   discovers. Each style satisfies both clauses by construction, and the
-   arithmetic is stated at each one. The `centerSize` ceiling of 1.00 is what
-   makes clause (1) unconditional; that is why it is 1.00 and not 1.25.
-
-   EXPORT CONTRACT. Every style is ONE individually closed solid — no bare
-   surface, no zero-thickness membrane, every perimeter edge shared by exactly
-   two triangles. Minimum dimensions go through the accumulator's floor in
-   export mode exactly as the sheets do.
-
-   TRIANGLE COST (fixed, independent of every slider): DOME 1,728 · DISC 1,056
-   · RING 2,304. Against the 10,080-tri default bloom that is +10% to +23%;
-   against the 49,632-tri petalCount-40 bloom, +2.1% to +4.6%.
+   WHAT THE DELETION PROVES, said in the builder's own old words: "DELETE THIS
+   FUNCTION AND THE BLOOM IS STILL ONE CONNECTED SOLID. The centre contributes
+   nothing to the invariant." The hub below is the whole junction. The byte
+   argument for every pre-existing export follows from the same fact and is
+   MEASURED at the close, row by row, against each row's centre-off twin on the
+   old tree (docs/bloom-session-20-outcome.md, "the comparison shape").
    =================================================================== */
-const CENTER_SEG = 48;   // segments around the axis — matches the hub's 48
-const DOME_RINGS = 18;
-const DISC_RINGS = 10;
-const RING_SEG_MINOR = 24;
-
-export function buildCenterInto(acc, state, ring) {
-  const style = state.centerStyle;
-  if (style === 'NONE') return { style, tris: 0 };
-
-  const t = acc.floorThickness(ring.thickness);   // the hub slab's thickness
-  /* The seated styles start an eighth of a slab BELOW the hub's underside,
-     not flush with it. Flush is exactly coincident: at centerSize 1.00 the
-     centre's outer radius equals ring.radius and its base fan shares the hub
-     bottom fan's centre vertex and all 48 rim vertices, so it emitted 48
-     triangles BIT-IDENTICAL to the hub's — measured, not guessed (DOME 48,
-     DISC 48, RING 0, and 0 at centerSize 0.99). That is duplicate geometry,
-     the known cause of non-manifold edges in this family, and it showed up as
-     nonManifold 96/192 on precisely the centerSize-max rows. The column is
-     unrated and the model was watertight and connected either way, but an
-     unexplained number in a gate's output is how a false belief starts here.
-     Dropping the base also strengthens clause (2): the centre now spans the
-     slab outright instead of sharing its boundary plane. */
-  /* ON THE DOME (Sep 4) the seat moves to the APEX slab: the same eighth
-     below the same underside, measured from the cap's apex — so a flat-based
-     button sits on the top of the ball. What that costs, measured and
-     photographed rather than fixed (Eva, Sep 4: a button that follows the
-     shell's curvature is a phase-2 centre question, not a junction one): the
-     overlap with the shell is a central DISC of radius `seat.patchRadius`
-     (where the shell's outer face is still above the seat), not the full
-     footprint, and outside it the button's rim HOVERS above the shell by up
-     to `seat.hover` — 1.2 mm under a 7.0 mm button on the incurve target.
-     Connected, since the patch is a solid region rather than a band; not
-     resolved. Left at the flat seat, the centre DETACHES on a big hub
-     (measured: two voxel components on the session-7 bloom at rise 0.5).
-     The flat expression is verbatim. */
-  const dome = ring.dome;
-  const zBase = dome ? dome.H - t / 2 - t / 8 : -t / 2 - t / 8;
-  /* Outer radius: a fraction of the foot ring, floored on its DIAMETER so a
-     tiny centre is printable rather than a sliver. The floor can never push
-     it past the ring: the smallest reachable ring radius is 1.149 mm
-     (ALL-MIN × spread 0.60) and the floor is 1.0 mm on the diameter, so
-     rC ≤ max(ring.radius, 0.5) = ring.radius. Clause (1) holds. */
-  const rC = acc.floorFeature(2 * ring.radius * state.centerSize) / 2;
-
-  const before = acc.triangleCount;
-  if (style === 'DOME') domeInto(acc, state, rC, zBase, t);
-  else if (style === 'DISC') discInto(acc, state, rC, zBase, t);
-  else if (style === 'RING') torusInto(acc, state, rC, dome);
-  else throw new Error(`unknown centerStyle "${style}" — the registry and the builder have diverged`);
-  /* THE SEAT'S OWN NUMBERS, for the read-out, the gates and the sheet. The
-     overlap patch: plan radius where the shell's OUTER face (radius Rd + t/2
-     about the cap's centre) is still above the seat plane zBase. */
-  let seat = null;
-  if (dome && style !== 'RING') {
-    const ro = dome.Rd + t / 2;
-    const dz = zBase - dome.centreZ;
-    const patchRadius = dz >= ro ? 0 : Math.sqrt(ro * ro - dz * dz);
-    const outerAt = (r) => dome.centreZ + Math.sqrt(Math.max(0, ro * ro - r * r));
-    const hover = Math.max(0, zBase - outerAt(Math.min(rC, ro)));
-    seat = { zBase, patchRadius: Math.min(patchRadius, rC), footprint: rC, fullFootprint: patchRadius >= rC, hover };
-  }
-  return { style, rC, tris: acc.triangleCount - before, seat };
-}
-
-const ringPts = (n, r, z) => Array.from({ length: n }, (_, k) => [r * Math.cos((k * TAU) / n), r * Math.sin((k * TAU) / n), z]);
-
-/* DOME — a rounded boss: an ellipsoidal cap on a flat base disc.
-   Clause (2): the base sits at z = −t/2 and the height is floored to at least
-   t, so the cap spans the whole slab rather than sitting inside it as a
-   sliver. Closed: base fan + cap quads + apex fan. */
-function domeInto(acc, state, rC, zBase, t) {
-  const h = Math.max(acc.floorFeature(state.centerRise * rC), t);
-  const N = CENTER_SEG;
-  const rings = [];
-  for (let i = 0; i <= DOME_RINGS; i++) {
-    const a = (i / DOME_RINGS) * (Math.PI / 2);
-    rings.push({ r: rC * Math.cos(a), z: zBase + h * Math.sin(a) });
-  }
-  const base = ringPts(N, rC, zBase);
-  const cBase = [0, 0, zBase];
-  for (let k = 0; k < N; k++) acc.tri(cBase, base[(k + 1) % N], base[k]);   // faces down
-  /* The apex is emitted EXPLICITLY, never discovered by a radius reaching
-     zero. `rC * Math.cos(Math.PI/2)` is 6.1e-17, not 0, so a `r <= 0` test
-     never fires: the cap closed on a ring of 48 vertices 6e-17 apart, which
-     welds to a point in any quantised edge census — boundary edges 0, and 48
-     degenerate triangles plus 49 non-manifold edges on EVERY dome. It passed
-     the gated criterion while being wrong, which is the exact shape of defect
-     this project keeps finding. The loop now stops one ring short and the
-     apex fan is unconditional. */
-  let lower = base;
-  for (let i = 1; i < DOME_RINGS; i++) {
-    const upper = ringPts(N, rings[i].r, rings[i].z);
-    for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(lower[k], lower[k2], upper[k2], upper[k]); }
-    lower = upper;
-  }
-  const apex = [0, 0, zBase + h];
-  for (let k = 0; k < N; k++) acc.tri(lower[k], lower[(k + 1) % N], apex);
-}
-
-/* DISC — a flat or dished button. Thickness is DERIVED (0.22 × radius, never
-   below the slab), so the style costs one control, not two.
-   The dish is a paraboloid depression whose residual wall is floored, so the
-   button can never be pierced or reduced to a knife edge: at centerDish 0.90
-   in export mode the centre still carries a full 1.0 mm of material.
-   Clause (2): the body runs from z = −t/2 upward by at least t.
-   Closed: base fan + cylindrical wall + dished top + centre fan. */
-function discInto(acc, state, rC, zBase, t) {
-  const N = CENTER_SEG;
-  const h = Math.max(acc.floorFeature(0.22 * rC), t);
-  const residual = Math.min(h, acc.floorFeature(h * (1 - state.centerDish)));
-  const dish = h - residual;
-  const zTopAt = (r) => zBase + h - dish * (1 - (r / rC) ** 2);
-
-  const base = ringPts(N, rC, zBase);
-  const rim = ringPts(N, rC, zBase + h);            // zTopAt(rC) === zBase + h
-  const cBase = [0, 0, zBase];
-  for (let k = 0; k < N; k++) acc.tri(cBase, base[(k + 1) % N], base[k]);                    // faces down
-  for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(base[k], base[k2], rim[k2], rim[k]); }  // wall
-  let outer = rim;
-  for (let i = 1; i <= DISC_RINGS; i++) {
-    const r = rC * (1 - i / DISC_RINGS);
-    if (r <= 0) {
-      const c = [0, 0, zTopAt(0)];
-      for (let k = 0; k < N; k++) acc.tri(outer[k], outer[(k + 1) % N], c);
-      return;
-    }
-    const inner = ringPts(N, r, zTopAt(r));
-    for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(outer[k], outer[k2], inner[k2], inner[k]); }
-    outer = inner;
-  }
-}
-
-/* RING — an open collar: a torus on the hub's mid-plane, closed by
-   construction (a torus has no boundary at all).
-   Tube diameter is floored, and the major radius is then held at ≥ 1.2× the
-   tube radius so the hole never pinches shut into a degenerate axis.
-   Clause (1): outer edge R + r = max(rC, 2.2·r). In live mode the guard never
-   binds and that is exactly rC ≤ ring.radius. In export mode the guard can
-   only bind when the tube was floored to r = 0.5, giving 2.2·r = 1.1 mm —
-   below the smallest reachable ring radius of 1.149 mm. So the whole torus
-   sits over the hub disc at every setting.
-   Clause (2): the tube spans z ∈ [−r, +r] about z = 0, the slab's mid-plane,
-   so it crosses the slab for any r > 0. */
-function torusInto(acc, state, rC, dome = null) {
-  const r = acc.floorFeature(rC * (1 - state.centerBore)) / 2;
-  const R = Math.max(rC - r, 1.2 * r);
-  const NS = CENTER_SEG, NM = RING_SEG_MINOR;
-  /* ON THE DOME the tube's centre circle is lifted onto the cap's
-     mid-surface at its own plan radius, so the shell passes through the
-     tube all the way round — a solid ring of overlap. Flat is verbatim. */
-  const z0 = dome ? Math.sqrt(Math.max(0, dome.Rd * dome.Rd - R * R)) + dome.centreZ : 0;
-  const P = (i, j) => {
-    const th = (i % NS) * TAU / NS, ph = (j % NM) * TAU / NM;
-    const rr = R + r * Math.cos(ph);
-    return [rr * Math.cos(th), rr * Math.sin(th), dome ? r * Math.sin(ph) + z0 : r * Math.sin(ph)];
-  };
-  for (let i = 0; i < NS; i++) {
-    for (let j = 0; j < NM; j++) acc.quad(P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1));
-  }
-}
-
 /* ===================================================================
    buildBloomInto — the whole model. `below` carries what sits beneath the
    bloom: 'stem' | 'branch' | null — a value, NEVER a boolean (flower lesson:
@@ -4051,6 +3869,8 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
   }
   }
   const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
-  const center = buildCenterInto(acc, state, fr.hub);   // optional — the designed mass
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, center, petal: petals[0], petals, petalsBuilt, slotAzimuths };
+  /* NO DESIGNED CENTRE IS BUILT HERE (session 20): the A/B rig that followed
+     the hub is retired, and the apex is bare until the androecium (phase 2,
+     B2) roots through footRing() beside the feet. */
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths };
 }

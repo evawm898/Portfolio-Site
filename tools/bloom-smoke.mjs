@@ -2,13 +2,13 @@
    bloom-smoke.mjs — THE NAMED SMOKE SUBSET. FOR ITERATION, NEVER FOR MERGE.
 
    WHAT THIS IS. A written-down, derived, auditable subset of
-   buildMatrix() — 28 of 499 rows — run through the REAL export gate with
+   buildMatrix() — a fixed subset (31 of 481 rows as of session 20) — run through the REAL export gate with
    its own `--only` flag. It exists so a session can find out in ~2 minutes
    whether it has broken something, instead of in ~44. It is ADDITIVE: it
    changes nothing about what certifies the work.
 
    **THE FULL MATRIX REMAINS THE MERGE CRITERION, UNCHANGED.** Both STL
-   gates on all 499 rows, in CI, on the merge commit. Nothing here may be
+   gates on every row, in CI, on the merge commit. Nothing here may be
    quoted as a pass of the matrix, and this tool prints a banner saying so
    on every run, because the gate's own summary line ("28/28 configs
    watertight") does not carry the scope of a filtered run.
@@ -84,7 +84,8 @@
    1. Enumerate the branches actually present in bloom-geometry.js:
       footRing()'s ringed / continuous / fan arms, roleForSlot,
       roleForLayer, ROLE_ALL, petalForm, spineLaw, buildHubInto's flat and
-      dome arms, the four centre styles, and every guard and floor.
+      dome arms, and every guard and floor (the four centre styles, until
+      session 20 retired them).
    2. Cross that with the assertion families that need a witness.
    3. For each path take the CHEAPEST matrix row that engages it, preferring
       a row that engages several at once, and preferring pinned / GATED /
@@ -127,7 +128,7 @@
    inside other blocks. The anchor scheme is what makes membership a
    measurement instead of a claim.
 
-   Note the block NUMBERS have gaps — 1..13 and 16..21, because sessions 11
+   Note the block NUMBERS have gaps — 1, 4..13 and 16..21, because sessions 11
    and 13 folded the per-petal sets into block 13. A block's identity here
    is its marker, never its position.
 
@@ -149,31 +150,18 @@ export const SMOKE_BLOCKS = [
     anchor: 'DEFAULT (the shipping configuration)',
     rows: [
       { label: 'DEFAULT (the shipping configuration)',
-        path: 'the shipping state; every guard OFF at once — petalFormIsFlat, domeIsFlat, thicknessIsUniform, curlIsUniform, one whorl, RADIAL, DISC' },
+        path: 'the shipping state; every guard OFF at once — petalFormIsFlat, domeIsFlat, thicknessIsUniform, curlIsUniform, one whorl, RADIAL, the bare apex (the centre rig is retired, session 20)' },
     ],
   },
-  {
-    n: 2,
-    anchor: 'NONE × spread min (0.6)',
-    rows: [
-      { label: 'RING × spread max (6)',
-        path: 'buildCenterInto RING arm (the open torus collar) against the widest hub plate' },
-    ],
-  },
-  {
-    n: 3,
-    anchor: 'DOME × centerSize min (0.25)',
-    rows: [
-      { label: 'DISC × centerDish max (0.9)',
-        path: 'the centre sub-controls — the DISC arm dished to its maximum' },
-    ],
-  },
+  /* Blocks 2 and 3 — the centre rig's style x spread and sub-control sweeps —
+     were retired with the rig in session 20; the block numbers keep their
+     gap, as 14, 15 and 22 already do. */
   {
     n: 4,
-    anchor: 'ALL MIN (centre off)',
+    anchor: 'ALL MIN',
     rows: [
-      { label: 'ALL MIN (centre off)',
-        path: 'the blanket minimum corner, centre off — the bare bloom the flower shipped in seven pieces for months' },
+      { label: 'ALL MIN',
+        path: 'the blanket minimum corner — the bare bloom the flower shipped in seven pieces for months; every row is bare now, and this is the one where the feet cross the axis' },
     ],
   },
   {
@@ -461,6 +449,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   console.log(failed
     ? 'SMOKE: FAILED — fix it, then run the full matrix before quoting anything.'
-    : 'SMOKE: clean. This is NOT a matrix pass — the full 499 rows on both gates, in CI, is the merge criterion.');
+    : `SMOKE: clean. This is NOT a matrix pass — the full ${buildMatrix().length} rows on both gates, in CI, is the merge criterion.`);
   process.exit(failed ? 1 : 0);
 }

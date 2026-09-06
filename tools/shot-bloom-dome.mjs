@@ -20,11 +20,9 @@
        relief sitting at the rim and the peak at the inner rings.
    (4) CONTROLS: the shipping default and the session-7 layered bloom, both
        at rise 0, unchanged, with their crowding numbers.
-   (5) THE CENTRE SEAT (Eva's new requirement, Sep 4): the DISC button on
-       the apex of the incurve target, low three-quarter and profile, at
-       readable magnification, printed mode — its rim hovers above the shell
-       and only a central patch of its footprint overlaps. Photographed, not
-       fixed: a button that follows the cap is a phase-2 centre question.
+   (5) THE CENTRE SEAT cells that stood here (the DISC button on the apex,
+       Eva's Sep 4 requirement) went with the centre rig in session 20; the
+       apex is bare until the androecium lands.
 
    EVERY CELL STATES ITS MODE from the app's own shownMode through the
    harness's modeTag(); the crowding number is the export's, registered
@@ -57,21 +55,10 @@ const slug = (s) => s.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
 /* The framings. `base` from below at hub magnification (the crowding sheet's
    rule); `profile` a low view from just above the rim plane, targeted on the
    rim, where a flat plate and a domed shell read differently and the roots
-   leaving the cap are the subject; `seat` a low three-quarter and `seatSide`
-   a profile on the centre's own footprint. */
+   leaving the cap are the subject. */
 const VIEWS = {
   base: (hubR) => ({ r: Math.max(hubR * 2.0, 5), at: [0, 0, 0], dir: [0.35, -0.9, -0.45] }),
   profile: (hubR) => ({ r: Math.max(hubR * 1.6, 5), at: [0, 0, hubR * 0.25], dir: [0.15, -0.98, 0.12] }),
-  /* The button sits INSIDE the crown of standing florets on an incurve head,
-     so no low camera sees it there: the two incurve seat cells look DOWN into
-     the crown from 45 and 75 degrees above the rim plane, targeted on the
-     button's own footprint. The true low three-quarter and profile of the seat
-     — the hover under the button's rim — are shot on a bloom sparse enough to
-     show them: the shipping default at the same rise. */
-  seat: (hubR, m) => ({ r: Math.max(m.centerRadius * 1.6, 4), at: [0, 0, m.apexZ], dir: [0.5, -0.5, 0.71] }),
-  seatSide: (hubR, m) => ({ r: Math.max(m.centerRadius * 1.6, 4), at: [0, 0, m.apexZ], dir: [0.2, -0.2, 0.96] }),
-  seatLow: (hubR, m) => ({ r: Math.max(m.centerRadius * 1.6, 4), at: [0, 0, m.apexZ], dir: [0.5, -0.75, 0.45] }),
-  seatProfile: (hubR, m) => ({ r: Math.max(m.centerRadius * 1.6, 4), at: [0, 0, m.apexZ], dir: [0.08, -0.99, 0.12] }),
   whole: null,
 };
 
@@ -127,7 +114,7 @@ async function cell({ label, set: sets = [], views = ['profile', 'base', 'whole'
      twin's — read before the preview goes on. */
   const m0 = await page.evaluate(() => window.__bloomMetrics());
   if (m0.shownMode !== 'live') await die(`${label}: the frame was about to be sized from a ${m0.shownMode} build`);
-  const own = { hub: m0.hubRadius, fit: m0.fitRadius, apexZ: m0.hubDome ? m0.hubDome.H : 0, centerRadius: m0.centerSeat ? m0.centerSeat.footprint : m0.hubRadius * 0.75 };
+  const own = { hub: m0.hubRadius, fit: m0.fitRadius, apexZ: m0.hubDome ? m0.hubDome.H : 0 };
   const fr = frame || own;
   await setPreview(true);
   const m = await page.evaluate(() => window.__bloomMetrics());
@@ -136,10 +123,10 @@ async function cell({ label, set: sets = [], views = ['profile', 'base', 'whole'
   const readout = await page.evaluate(() => document.getElementById('readout').textContent);
   await setPreview(false);
   const rec = { label, tag: modeTag(m), ruling, note, shots, widened, r, own,
-    shownTris: m.shownTris, hub: m.hubRadius, foot: m.ringWidth, maxDim: m.maxDimMm, dome: m.hubDome, seat: m.centerSeat,
+    shownTris: m.shownTris, hub: m.hubRadius, foot: m.ringWidth, maxDim: m.maxDimMm, dome: m.hubDome,
     rings: m.rings.length, inner: Math.min(...m.rings.map((x) => x.radius)),
     reliefRim: m.rings[0].relief, reliefInner: m.rings.reduce((a, x) => (x.radius < a.radius ? x : a), m.rings[0]).relief,
-    readoutFirst: readout.split('\n')[0], domeLine: (readout.split('\n').find((l) => /^HEAD RISE/.test(l)) || ''), seatLine: (readout.split('\n').find((l) => /^centre seated/.test(l)) || '') };
+    readoutFirst: readout.split('\n')[0], domeLine: (readout.split('\n').find((l) => /^HEAD RISE/.test(l)) || '') };
   console.log(`  ${label.padEnd(56)} hub ${m.hubRadius.toFixed(2)} tris ${m.shownTris} · ${modeTag(m)}${m.hubDome ? ` · rise ${m.hubDome.riseBuilt.toFixed(2)}` : ''}`);
   console.log(`  ${''.padEnd(56)} ${crowdingLine(r)}`);
   return rec;
@@ -161,10 +148,6 @@ const mumHemi = await cell({ label: 'THE MUM RUN — a hemisphere, head rise 1.0
   note: 'The most the dome can do for this run. The whole-annulus surface-to-plan ratio is 2.0x; the local relief at its peak is 1.1x.' });
 const ctlDefault = await cell({ label: 'CONTROL — shipping defaults, head rise 0', set: [], ruling: 'RULED CLEAN — unchanged', note: 'Byte-identical to main: the guard takes the flat path verbatim.' });
 const ctlS7 = await cell({ label: 'CONTROL — the session-7 layered bloom, head rise 0', set: set(S7), ruling: 'RULED CLEAN, merged — unchanged', note: '40 per turn x 3 at spread 1.55; the highest reading Eva has ruled clean, untouched by this session.' });
-const seat = await cell({ label: 'THE CENTRE SEAT — the DISC button on the apex of the incurve target', set: set({ ...INCURVE, headRise: 0.5 }), views: ['seat', 'seatSide'], ruling: 'FOR EVA\'S EYE — photographed, not fixed (Sep 4)',
-  note: 'The designed centre is seated on the apex slab exactly as it was seated on the flat one; a central patch of its footprint overlaps the shell and its rim hovers above it. On this head the crown of florets hides the button from every low camera, so these two look down into the crown. A button that follows the cap\'s curvature is a phase-2 centre question, not a junction one.' });
-const seatSparse = await cell({ label: 'THE CENTRE SEAT on a sparse bloom — the shipping default at head rise 0.50', set: set({ headRise: 0.5 }), views: ['seatLow', 'seatProfile'], ruling: 'FOR EVA\'S EYE — the hover, where a low camera can see it',
-  note: 'The same seat on eight petals, where a low three-quarter and a true profile reach the button: the rim of the button stands off the shell (the read-out prints the patch and the hover), and the shell falls away under it.' });
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const rel = (x) => (isFinite(x) ? `${x.toFixed(2)}x` : 'vertical');
@@ -174,8 +157,7 @@ const num = (c) => {
     + (c.dome ? `<br>DOME: rise ${c.dome.riseBuilt.toFixed(2)}${c.dome.clamped ? ` (CLAMPED from ${c.dome.rise.toFixed(2)})` : ''} · cap radius ${c.dome.Rd.toFixed(2)} mm · apex ${c.dome.H.toFixed(2)} mm above the rim · surface ${c.dome.surfaceToPlan.toFixed(2)}x plan over the feet · local relief ${rel(c.reliefRim)} at the rim, ${rel(c.reliefInner)} at the innermost ring` : '<br>flat hub')
     + `<br>CROWDING (export, on the surface): D_max ${r.dmax} at r ${r.dmaxAt.r.toFixed(2)} mm · D_mean ${r.dmean.toFixed(2)} · ${r.n} feet`
     + (r.dome ? ` · local relief at D_max ${rel(r.dome.reliefAtDmax)}` : '')
-    + (r.liveDmax !== r.dmax ? ` · live geometry reads D_max ${r.liveDmax}` : '') + (r.crowded ? ` · <b class="flag">CROWDED (D_max &ge; ${CROWDED_DMAX})</b>` : '')
-    + (c.seat ? `<br>SEAT: ${c.seat.fullFootprint ? 'the whole footprint' : `a ${c.seat.patchRadius.toFixed(2)} mm patch of the ${c.seat.footprint.toFixed(2)} mm footprint`} overlaps the shell · rim hovers ${c.seat.hover.toFixed(2)} mm` : '');
+    + (r.liveDmax !== r.dmax ? ` · live geometry reads D_max ${r.liveDmax}` : '') + (r.crowded ? ` · <b class="flag">CROWDED (D_max &ge; ${CROWDED_DMAX})</b>` : '');
 };
 const fig = (c, view, cap) => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b> <i>(${cap}${c.widened[view] > 1 ? `, camera widened ${c.widened[view].toFixed(2)}x to clear the canopy` : ''})</i><br><small>${esc(c.ruling)} · read-out: "${esc(c.readoutFirst)}"</small><br>${num(c)}`
   + (c.note ? `<p>${esc(c.note)}</p>` : '') + `</figcaption></figure>`;
@@ -199,9 +181,7 @@ figcaption{margin-top:8px}figcaption p{color:#9fb3a9;margin:6px 0 0}small{color:
 <h2>4. Controls — unchanged at head rise 0</h2>
 <main>${fig(ctlDefault, 'whole', 'whole bloom')}${fig(ctlS7, 'whole', 'whole bloom')}</main>
 <main>${fig(ctlDefault, 'base', 'base from below')}${fig(ctlS7, 'base', 'base from below')}</main>
-<h2>5. The centre seat on the apex — for Eva's eye</h2>
-<main>${fig(seat, 'seat', 'down into the crown, 45 deg above the rim plane')}${fig(seat, 'seatSide', 'down into the crown, 75 deg above the rim plane')}</main>
-<main>${fig(seatSparse, 'seatLow', 'low three-quarter on the button, 27 deg above the rim plane')}${fig(seatSparse, 'seatProfile', 'profile on the button, 7 deg above the rim plane')}</main>`;
+<p class="note">Section 5 of this sheet — the centre seat on the apex — went with the centre rig in session 20; the apex is bare.</p>`;
 fs.writeFileSync(path.join(outDir, 'index.html'), html);
 console.log(`\nwrote ${outDir}/index.html`);
 await browser.close(); server.close(); fs.rmSync(tmp, { recursive: true, force: true });
