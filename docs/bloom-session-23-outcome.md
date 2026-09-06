@@ -197,6 +197,13 @@ tried, and the figure appears nowhere in the record; it is a premise, not a spec
 and the instrument prints whatever the owner says on whatever hub is in front of it, which
 is what the brief asked for.
 
+**THE CORRECTION, RECORDED (Eva, Sep 6, at the close).** The 1.77x figure in the brief came
+from a read-out in a screenshot of ONE configuration and was wrongly described as the
+shipping hub's. It is in no record and is not the shipping hub's number. The real readings
+are this session's, on the shipping 8.84 mm hub, live: **5.61x at six on a ring, 1.25x at 120
+on the disc, 13.74x at one stamen.** Written down so nobody inherits the wrong number: a
+saturation quoted without its count, its layout and its hub is not a number.
+
 ## Verification
 
 - **Panel gate:** PASS, 159 assertions (21 sections, 87 controls, 5 retired ids). The path route drives `stamenCount` 0 → 6 through the SHUT container and the shut Androecium drop-down (free ends 0 → 6, the owner's disc radius none → 2.939388 mm, both sections still closed). Route (o) in both directions: the container shown at every cap state and hidden under SPHERE (and back); the kept clause on the count at 0 and absent at 1 / 6 / 120; the cap marked at 5.61x (six on a ring), 1.25x (120 on the disc, CLAMPED), 5.20x (six on a ring under CONTINUOUS), absent at one stamen (13.74x, past the range) and absent with the part off; the flag clause absent without a style, clear at 2.94 mm beside six straight, FILAMENT AGAINST STYLE at 0.05 mm at 8.7 mm up at curl 90, gone with the style. Route (p): the container both ways, the kept clause on the style at NONE (25 mm, 0° at the default; 40 mm, 180° with the sub-controls at maximum) and absent with a style. Route (r): the builder reports 0.049 mm against 1.20, the clause is on the line and the flag is on it. Route (n): five retired ids absent everywhere, the container holds no control of its own.
@@ -236,12 +243,39 @@ script. Verified on the FINAL tree, after the last edit: **375 of 375 held** (`s
 - **B2b's other instruments stay parked**: the crowding-raster extensions, the
   anther-against-blade instrument and the independent splay. This session built exactly the
   one flag the Sep 6 ruling named.
-- **The disc's innermost stamen against the style** (above) is now visible on every disc
-  with a style. Whether a Vogel disc should reserve its centre when a style is present is a
-  design question for Eva, not a defect: overlapping closed solids are legal.
+- **AN OPEN PLACEMENT QUESTION, NOT A DEFECT (Eva's ruling, Sep 6):** the Vogel disc's
+  innermost stamen stands at R √(0.5 / N) from the axis — 0.53 mm at 120 on the clamped
+  8.24 mm disc — and is therefore INSIDE the style's tube whenever a style is present (the
+  crossing threshold is one filament plus one style radius, 1.20 mm at the shipping sheet).
+  The disc law has no inner limit. The candidates are starting the spiral's index past zero,
+  or flooring the radius; **that is the next session's question, not this one's**, and nothing
+  here was tuned around it. The flag is what makes it visible, on every disc with a style.
+  Overlapping closed solids are legal, so no gate sees it and none should.
 - **`fmt`'s third argument exists for one row.** If a second read-out ever needs an owner's
   number the contract is already there; if none ever does, it is one argument, not a
   mechanism.
+
+## The ruling (Eva, Sep 6, from the sheet)
+
+- **The sheet approved; #169 merged as built.**
+- The two records above (the 1.77x correction; the disc's innermost stamen as an open
+  placement question) are hers, written down at the close.
+
+## The close (Sep 6)
+
+- The four bloom gates confirmed green on the PR head `73b4fea` by the session before the
+  merge: bloom-export-watertight and bloom-connectedness on the full 528-row matrix,
+  bloom-panel, bloom-frozen-matrices. The two flower gates (flower-export-watertight,
+  flower-geometry-quality) ran on the `tools/**` filter and passed, and are not bloom
+  evidence.
+- #169 undrafted first (GitHub refuses to merge a draft), then merged by the session (squash)
+  with the head sha read from the remote (`git ls-remote`, `73b4fea`), as
+  **`00dc4b2`**, the merge sha read back from `main` on the remote.
+- **No frozen tag is owed and none was published**: no row added, no byte moved; phase17
+  stays the newest baseline. Stated, not left silent.
+- The predeclared 375-file manifest re-verified against merged `main`: **375 of 375 held** (`sha1sum -c` on a worktree of `00dc4b2`); the nine files `main` moved since fd291b4 are exactly this session's nine predeclared movers, and no print file landed from another PR — `main` had not moved between fd291b4 and this merge.
+- The ruling and this close recorded in the docs-only PR, opened from a fresh branch off
+  `main` and merged by the session before reporting DONE.
 
 ## The sheet — `node tools/shot-bloom-panel.mjs <dir> <base-tree>`
 
