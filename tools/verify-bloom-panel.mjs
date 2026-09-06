@@ -31,8 +31,8 @@
          Route (a) evaluates every predicate at DEFAULTS only, which is ONE
          DIRECTION: a control gated on `layerCount >= 2` is hidden there and
          would pass route (a) even if it never appeared at all, and so would
-         `centerRise`, gated on DOME since the centre rig shipped and never
-         asserted to appear by this gate. So each DRIVER named by any
+         `centerRise` (retired in session 20), gated on DOME since the centre
+         rig shipped and never asserted to appear by this gate. So each DRIVER named by any
          predicate (derived from the registry, never listed) is driven through
          the real UI to every value that can change the dependent set, and
          EVERY control's `hidden` is re-checked against its own predicate at
@@ -184,10 +184,14 @@ const WITNESS = {
      are route (m)'s, on one page, in both directions. */
   head: { id: 'headRise', value: '0.5',
           read: (m) => `${m.hubBuilt ? m.hubBuilt.tris : 'no hub'}/${m.hubDome ? m.hubDome.Rd.toFixed(6) : 'flat'}`, what: "the hub builder's triangle count / the cap's radius" },
-  center: { id: 'centerStyle', value: 'RING',
-            /* A style change rebuilds the centre; both the reported style and
-               its own triangle count move off DISC's. */
-            read: (m) => `${m.centerStyle}/${m.centerTris}`, what: 'centerStyle/centerTris' },
+  /* NO `center` ENTRY (session 20): the CENTER section and its five controls
+     are retired. The witness that stood here (`centerStyle` -> RING, read as
+     centerStyle/centerTris) is REPLACED, not deleted silently, by route (n)
+     below — the retirement route, which asserts the section and the ids are
+     ABSENT from the DOM, the read-out and the metrics, and that no
+     executable bloom source still references a retired id. A section that
+     ships collapsed and is not in this table fails the path route by name,
+     so a resurrected `center` section could not pass quietly either. */
   /* PETAL ROLES — witnessed by the labellum's SIZE, and the witness needed NO
      PRECONDITION, which is worth recording because session A predicted it
      would. Session A reasoned that a "whorl differences" section would ship
@@ -765,8 +769,9 @@ for (const s of closed) {
    every predicate at DEFAULTS and asserts each wrapper's `hidden` agrees. That
    is ONE DIRECTION. A control gated on `layerCount >= 2` is hidden at DEFAULTS
    and would pass route (a) even if it NEVER APPEARED — and so would
-   centerRise, which has been gated on `centerStyle: DOME` since the centre rig
-   shipped and has never had its appearance asserted by this gate. Doesn't-show
+   centerRise (retired in session 20), which was gated on `centerStyle: DOME`
+   from the day the centre rig shipped and never had its appearance asserted by
+   this gate before this route existed. Doesn't-show
    -when-off and does-show-when-on are two properties, and the flower project
    paid for checking only one of them (Advanced silently stopped showing 25
    controls while every gate passed).
@@ -1295,22 +1300,21 @@ for (const [label, sets, want] of [
   else ok.push(`${tag}: line ${res.shown ? 'shown' : 'absent'}, owner agrees (innermost ring ${res.inner.toFixed(3)} mm${res.anyCross ? ', feet cross the axis' : ''})`);
 }
 
-/* ---------------- (k) THE DOME LINE, THE APEX CLAMP AND THE SEAT, BOTH DIRECTIONS ---------------- */
+/* ---------------- (k) THE DOME LINE AND THE APEX CLAMP, BOTH DIRECTIONS ---------------- */
 /* The head-rise control's read-out (Sep 4): the HEAD RISE line is shown iff
    footRing() declares a dome, which is iff the control is off zero; the
-   "(CLAMPED" clause iff the owner's apex floor bound; the seat line iff the
-   centre reports a seat. Each asserted in both directions against the OWNER'S
-   flags, never against this tool's idea of the geometry — the sub-8 spiral
-   precedent, and route (j)'s. The rows: flat; a mid rise; the one reachable
-   corner where the floor binds (a 1.15 mm hub under a 2.40 mm sheet); a
-   hemisphere on the defaults where it does not; and RING, which seats no
-   flat-based button and must print no seat. */
-for (const [label, sets, wantDome, wantClamp, wantSeat] of [
-  ['defaults (flat)', [], false, false, false],
-  ['head rise 0.50 on the defaults', [{ id: 'headRise', value: '0.5' }], true, false, true],
-  ['ALL MIN x sheet 2.40 x spread min x rise 1 (the apex floor binds)', [{ id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'headRise', value: '1' }], true, true, true],
-  ['head rise 1 on the defaults (a hemisphere, no clamp)', [{ id: 'headRise', value: '1' }], true, false, true],
-  ['head rise 0.50 x RING (no flat-based seat)', [{ id: 'headRise', value: '0.5' }, { id: 'centerStyle', value: 'RING' }], true, false, false],
+   "(CLAMPED" clause iff the owner's apex floor bound. Each asserted in both
+   directions against the OWNER'S flags, never against this tool's idea of
+   the geometry — the sub-8 spiral precedent, and route (j)'s. The rows:
+   flat; a mid rise; the one reachable corner where the floor binds (a
+   1.15 mm hub under a 2.40 mm sheet); a hemisphere on the defaults where it
+   does not. (The SEAT clauses and the RING row went with the centre rig in
+   session 20.) */
+for (const [label, sets, wantDome, wantClamp] of [
+  ['defaults (flat)', [], false, false],
+  ['head rise 0.50 on the defaults', [{ id: 'headRise', value: '0.5' }], true, false],
+  ['ALL MIN x sheet 2.40 x spread min x rise 1 (the apex floor binds)', [{ id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }, { id: 'headRise', value: '1' }], true, true],
+  ['head rise 1 on the defaults (a hemisphere, no clamp)', [{ id: 'headRise', value: '1' }], true, false],
 ]) {
   const tag = `[dome] ${label}`;
   await openBloom(page, port);
@@ -1324,7 +1328,7 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
   const res = await page.evaluate(() => {
     const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
     return { rise: Number(ui.headRise), hasDome: m.hubDome !== null, clamped: !!(m.hubDome && m.hubDome.clamped), riseBuilt: m.hubDome ? m.hubDome.riseBuilt : null,
-             shown: /HEAD RISE/.test(txt), clampSaid: /\(CLAMPED: rise/.test(txt), seat: m.centerSeat !== null, seatSaid: /centre seated on the apex/.test(txt),
+             shown: /HEAD RISE/.test(txt), clampSaid: /\(CLAMPED: rise/.test(txt),
              reliefSaid: /local relief .* at the rim, .* at the innermost ring/.test(txt), hubBuiltDome: !!(m.hubBuilt && m.hubBuilt.dome), hubTris: m.hubBuilt ? m.hubBuilt.tris : null };
   });
   const problems = [];
@@ -1336,10 +1340,8 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
   if (res.hasDome && !res.reliefSaid) problems.push('the HEAD RISE line does not print the local relief at the rim and at the innermost ring');
   if (res.clamped !== wantClamp) problems.push(`the owner reports clamped ${res.clamped}, this row expects ${wantClamp}`);
   if (res.clampSaid !== res.clamped) problems.push(`the (CLAMPED clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports clamped ${res.clamped}`);
-  if (res.seat !== wantSeat) problems.push(`the centre reports ${res.seat ? 'a seat' : 'no seat'}, this row expects ${wantSeat ? 'one' : 'none'}`);
-  if (res.seatSaid !== res.seat) problems.push(`the seat line is ${res.seatSaid ? 'shown' : 'absent'} while the centre reports ${res.seat ? 'a seat' : 'none'}`);
   if (problems.length) note(`${tag}: ${problems.join('; ')}`);
-  else ok.push(`${tag}: HEAD RISE line ${res.shown ? 'shown' : 'absent'}, owner agrees (rise ${res.rise}${res.clamped ? ' CLAMPED to ' + res.riseBuilt.toFixed(2) : ''}, hub ${res.hubTris} tris${res.seat ? ', seat line shown' : ''})`);
+  else ok.push(`${tag}: HEAD RISE line ${res.shown ? 'shown' : 'absent'}, owner agrees (rise ${res.rise}${res.clamped ? ' CLAMPED to ' + res.riseBuilt.toFixed(2) : ''}, hub ${res.hubTris} tris)`);
 }
 
 /* ===================================================================
@@ -1476,6 +1478,92 @@ for (const [label, sets, wantDome, wantClamp, wantSeat] of [
   await step('the APEX CORNER on the sphere — ALL MIN x sheet 2.40 x spread min (held at one sheet, CLAMPED, told)', [{ id: 'headRise', value: '0' }, { id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }], { clamped: true });
 }
 
+/* ===================================================================
+   ROUTE (n) — THE RETIREMENT (session 20). RETIRED_IDS is a reservation with
+   a check behind it, and the halves that need the DOM or the SOURCE live
+   here (the registry's verifySections() carries the halves that run at
+   module load: live ids, option values, DEFAULTS keys, section ids).
+
+     (i)   NO RETIRED ID RENDERS: no element carries a retired id, and there
+           is no `#sec-center` — the section went with its controls.
+     (ii)  THE READ-OUT NAMES NO CENTRE: its summary line printed
+           `center disc` on the shipping default while the rig existed; a
+           line naming a centre that does not exist is the label-lie this
+           project retires ids over.
+     (iii) THE METRICS CARRY NO CENTRE KEY: `centerStyle`, `centerTris`,
+           `centerSeat` are absent from __bloomMetrics(), never null under a
+           live-looking name.
+     (iv)  NO EXECUTABLE BLOOM SOURCE REFERENCES A RETIRED ID AS AN IDENTIFIER
+           — the flower's verify-registry-sync scan, ported. Comments and
+           string literals are stripped first and are exempt: the frozen
+           matrices name retired ids as ROW DATA (single- and double-quoted
+           strings) and must, since each is proved deep-equal to its base
+           commit. What survives the strip and still matches `\bid\b` is a
+           property access or a bare identifier, which is a consumer that
+           would silently read `undefined`. The file list is the coverage
+           and is printed; a retired id living in a file outside it is not
+           caught, which the flower's gate header says of its list too.
+
+   NEGATIVE CONTROL: a `<details id="sec-center">` holding an
+   `<input id="centerStyle">` is injected into the panel and the read-out's
+   first line is rewritten to carry `center disc`; (i) and (ii) must fire. */
+{
+  const tag = '[retired]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => {
+      const d = document.createElement('details'); d.id = 'sec-center';
+      const i = document.createElement('input'); i.id = 'centerStyle'; d.append(i);
+      document.getElementById('panelControls').append(d);
+      const r = document.getElementById('readout');
+      r.textContent = r.textContent.replace(/^(petals [^\n]*)/m, '$1 · center disc');
+    });
+  }
+  const retired = RETIRED_IDS.map((r) => r.id);
+  const res = await page.evaluate((ids) => {
+    const m = window.__bloomMetrics();
+    return {
+      rendered: ids.filter((id) => document.getElementById(id) !== null),
+      section: document.getElementById('sec-center') !== null,
+      /* THE SUMMARY LINE is the one that begins `petals` — the read-out's
+         first line is the on-screen MODE line (session 13), so line 0 would
+         be the wrong line to read. */
+      firstLine: (document.getElementById('readout').textContent.split('\n').find((l) => /^petals /.test(l)) || ''),
+      metricKeys: ['centerStyle', 'centerTris', 'centerSeat'].filter((k) => k in m),
+    };
+  }, retired);
+  const p = [];
+  if (res.rendered.length) p.push(`retired id(s) still render in the panel: ${res.rendered.join(', ')}`);
+  if (res.section) p.push('a #sec-center section is in the panel — the CENTER section was retired with its controls');
+  if (!/^petals /.test(res.firstLine)) p.push('the read-out carries no summary line beginning `petals` — nothing to check');
+  if (/\bcent(er|re)\b/i.test(res.firstLine)) p.push(`the read-out's summary line names a centre: "${res.firstLine}"`);
+  if (res.metricKeys.length) p.push(`__bloomMetrics() still carries ${res.metricKeys.join(', ')} — a number under a label naming a computation nobody performs`);
+  /* (iv) the source scan. */
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const files = ['bloom.js', 'bloom-geometry.js', 'bloom-registry.js', 'bloom.html', 'bloom-view-presets.js',
+    ...fs.readdirSync(path.join(root, 'tools')).filter((f) => /^(bloom-|verify-bloom-|shot-bloom|diff-bloom-bytes)/.test(f) && /\.mjs$/.test(f)).map((f) => 'tools/' + f)];
+  const strip = (src) => src
+    .replace(/export const RETIRED_IDS = \[[\s\S]*?\n\];/, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:\\])\/\/[^\n]*/g, '$1')
+    .replace(/`(?:\\[\s\S]|\$\{[^}]*\}|[^`\\])*`/g, '``')
+    .replace(/'(?:\\.|[^'\\\n])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\\n])*"/g, '""');
+  const refs = [];
+  for (const f of files) {
+    const src = strip(fs.readFileSync(path.join(root, f), 'utf8'));
+    for (const id of retired) {
+      const re = new RegExp(`\\b${id}\\b`, 'g');
+      let mm; while ((mm = re.exec(src))) { const line = src.slice(0, mm.index).split('\n').length; refs.push(`${f}:${line} ${id}`); }
+    }
+  }
+  if (refs.length) p.push(`retired id(s) still referenced as identifiers in executable bloom source: ${refs.slice(0, 12).join('; ')}${refs.length > 12 ? ` … and ${refs.length - 12} more` : ''}`);
+  if (p.length) note(`${tag}: ${p.join('; ')}`);
+  else ok.push(`${tag}: ${retired.length} retired ids (${retired.join(', ')}) absent from the DOM, the read-out's summary line, the metrics, and as identifiers in ${files.length} bloom source files`);
+}
+
 await browser.close();
 server.close();
 
@@ -1501,11 +1589,12 @@ if (NEGATIVE_CONTROL) {
     const sawDome = fail.some((f) => /^\[dome\] .*HEAD RISE line is ABSENT while the owner declares a dome/.test(f));
     const sawCurl = fail.some((f) => /^\[curl\] .*SPINE CURL line is ABSENT while the owner reports a curl/.test(f));
     const sawSphere = fail.some((f) => /^\[sphere\] .*HEAD: FULL SPHERE line is ABSENT while the geometry builds a sphere/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere) { console.log('\nALL ELEVEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}. All eleven must.`);
+    const sawRetired = fail.some((f) => /^\[retired\]: retired id\(s\) still render in the panel: centerStyle; a #sec-center section is in the panel/.test(f) && /names a centre/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired) { console.log('\nALL TWELVE ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}. All twelve must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line and a frozen sphere line. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line and a resurrected CENTER section. It is not measuring anything.');
   process.exit(1);
 }
 

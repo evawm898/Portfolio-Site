@@ -161,10 +161,9 @@ async function cell({ label, set: sets = [], views = ['whole'], note = '', frame
   const rec = { label, tag: modeTag(m), note, shots, widened, r, own, cov, sha, tree,
     shownTris: m.shownTris, tris: stl.tris, boundary: stl.boundary, degenerate: stl.degenerate, bytes: buf.length, hub: m.hubRadius,
     spine: m.petalSpine, spineLine: (readout.split('\n').find((l) => /^SPINE CURL/.test(l)) || ''),
-    seatLine: (readout.split('\n').find((l) => /^centre seated/.test(l)) || '') };
+  };
   console.log(`  ${label.padEnd(64)} ${tree.padEnd(6)} sha ${sha} tris ${stl.tris} B${stl.boundary} · ${modeTag(m)}`);
   if (rec.spineLine) console.log(`  ${''.padEnd(64)} ${rec.spineLine}`);
-  if (rec.seatLine) console.log(`  ${''.padEnd(64)} (${modeTag(m)}) ${rec.seatLine}`);
   console.log(`  ${''.padEnd(64)} ${crowdingLine(r)}${cov ? '\n' + ''.padEnd(66) + (cov.skipped ? 'COVERAGE: SKIPPED — ' + cov.skipped : coverageLine(cov)) : ''}`);
   return rec;
 }

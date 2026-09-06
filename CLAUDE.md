@@ -124,10 +124,9 @@ cap (rows along the meridian arc, great-circle arcs across — the roll law at
 the cap's radius), rotates the blade frame rigidly with it, and reads nothing
 else; `buildHubInto` builds the slab as a SHELL of thickness t on the same
 cap (3,456 triangles at any rise above 0 against 192 flat — the first
-slider-dependent count here, a branch not a ramp); `buildCenterInto` seats
-the designed centre on the apex slab and REPORTS its overlap patch and rim
-hover (photographed on `node tools/shot-bloom-dome.mjs <dir>`, not fixed — a
-button that follows the cap is a phase-2 centre question). NOT derived from
+slider-dependent count here, a branch not a ramp). (`buildCenterInto`, which
+seated the designed centre on the apex slab, is RETIRED — see the session-20
+pointer below.) NOT derived from
 crowding or depth: a metric consumed as a geometric input becomes a target;
 the crowding instrument observes the geometry and is never an input to it.
 Default 0 is byte-identical by the GUARD `domeIsFlat()` (every consumer's
@@ -152,12 +151,12 @@ tight bloom's feet stack at the inner rings where the cap is nearly flat —
 the mum's peak sits at r 2.1–2.8 mm on a 4.69 mm hub, where a hemisphere's
 local relief is 1.1–1.2x under a whole-annulus 2.0x, and it takes the mum from
 D_max 11 to 9. The
-panel gate's route (k) asserts the HEAD RISE line, the clamp and the seat
-line in both directions. The sheet is
+panel gate's route (k) asserts the HEAD RISE line and the clamp in both
+directions (the seat line went with the centre rig, session 20). The sheet is
 `node tools/shot-bloom-dome.mjs <dir>` — the incurve target flat beside
 domed, print preview ON, the base from a low profile at the rim and from
-below, the mum flat / 0.50 / hemisphere, the two controls, and the centre
-seat for Eva's eye.
+below, the mum flat / 0.50 / hemisphere, the two controls (the centre-seat
+cells went with the centre rig, session 20).
 
 **THE PETAL CURL FAMILY SHIPS AS SHEET GEOMETRY, AND ITS ONE WITNESS IS C1**
 (Eva, Sep 4, session 16). `curlBias` / `curlStart` (PETAL CURL, hidden AND
@@ -220,10 +219,32 @@ calibrates the measure in closed form once per run; the "mapped through the sphe
 comparison is ILL-POSED (two ray families, coinciding only on the axis) and is never a
 check** (`docs/bloom-session-19-outcome.md`). The plan raster's own sphere skip stays. The crowding raster evaluates membership in (arc, azimuth) over
 the full arc on a sphere and prints the depth within one step of each pole.
-Under SPHERE the DISC centre plates the face pole (a 24.5 mm RADIUS, 49 mm
-across, on the 240-foot row) — DEFERRED to the phase-2 centre question, explicitly; do not constrain the
-centre under SPHERE ahead of it. Sheet: `node tools/shot-bloom-sphere.mjs <dir>`. #106 and #108 are FLOWER
+Under SPHERE the DISC centre plated the face pole (a 24.5 mm RADIUS, 49 mm
+across, on the 240-foot row) — the plate is gone with the centre rig (session 20) and the
+face pole's open region (2.58 sr on that row) is B2's number. Sheet: `node tools/shot-bloom-sphere.mjs <dir>`. #106 and #108 are FLOWER
 issues, whatever a kickoff prompt says.
+
+**THE CENTRE RIG IS RETIRED AND THE DEFAULT IS A BARE APEX** (Eva, Sep 5, session 20,
+phase 2 B1). `centerStyle` (NONE / DOME / DISC / RING, DISC the default since Aug 31), its
+four sub-sliders, the CENTER section and `buildCenterInto` with its three builders are gone:
+the centre is the reproductive parts and nothing else (androecium and gynoecium, phase 2 B2,
+each independently present or absent, hidden AND INERT under SPHERE); DISC and DOME were
+placeholders for a surface (HEAD's) and for covering the junction (the junction's, never a
+control); RING was a torus standing in for a CORONA, which is a flared collar between petals
+and stamens and will be its own group — the name is reserved, the object is not. The five
+ids are the first entries in `RETIRED_IDS` (`bloom-registry.js`), each with a `retiredAt`
+session and a `why`; `verifySections()` fails module load on a collision with a live id, an
+option value, a DEFAULTS key or a section id, and the panel gate's route (n) fails CI if a
+retired id renders, is named on the read-out's summary line, is a `__bloomMetrics()` key, or
+survives as an IDENTIFIER in executable bloom source (string literals exempt — the frozen
+matrices name them as row data). A ruled aesthetic retirement that moves the default is an
+EXACT PARTITION, predeclared: on `phase15Matrix()` (527 rows at 8524318) 509 move and 18
+hold, and the moved rows cannot be re-exported on the new tree, so the close is the
+THREE-CAPTURE construction in `tools/diff-bloom-bytes.mjs`'s retirement mode (old plain, old
+with `--override centerStyle=NONE`, new with `--strip`, `--compare … --retirement … --expect
+509/18`) with five vacuity guards — `docs/bloom-session-20-outcome.md`. The sheet is
+`node tools/shot-bloom-centre-retirement.mjs <dir> [base-tree]`: the bare apex beside
+today's DISC, rendered from a worktree of the base.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a

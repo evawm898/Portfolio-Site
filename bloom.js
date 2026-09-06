@@ -173,7 +173,7 @@ for (const c of CONTROLS) {
 
 /* Coercion is the REGISTRY's rule, imported — not re-decided here. A slider
    is a number and a choice is a string; a local `Number(...)` would turn
-   centerStyle into NaN, which reads back as a legitimate-looking value and is
+   `placement` into NaN, which reads back as a legitimate-looking value and is
    how a gate ends up measuring a design other than the one it names. */
 function readUI() {
   const out = {};
@@ -215,9 +215,8 @@ function refreshLabels(ui) {
    hidden. That adds no second gating mechanism — the decision is made from
    the same `ui` snapshot that decided those controls, so it cannot disagree
    with one — and it means a section can never render as a header opening onto
-   nothing. No section reaches that state today (Center always shows
-   centerStyle), which is exactly why it is derived rather than predicted: the
-   rule is written once, here, instead of being a claim about today's
+   nothing. The per-petal drop-downs reach that state under every placement
+   but FAN, which is the rule working rather than a claim about today's
    registry. Hiding a section is NOT collapsing it — `hidden` removes it; the
    `open` attribute is the visitor's, and this function never touches it. */
 function applyVisibility() {
@@ -421,7 +420,6 @@ let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-l
 let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
 let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false, sphereMode: false };
-let lastCenter = { style: 'NONE', tris: 0, seat: null };
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -475,7 +473,7 @@ function buildGeometry({ exportMode, record = false }) {
     lastShownMode = exportMode ? 'export' : 'live';
     lastPlacement = uiForBuild.placement;
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
-    lastCenter = built.center; lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
+    lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
@@ -733,15 +731,6 @@ function spineLine(petals) {
        + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
 }
 
-/* THE SEAT LINE — where the designed centre sits on the dome, and what that
-   costs (Eva, Sep 4: photographed, not fixed). Absent when flat or RING. */
-function seatLine(center) {
-  const s = center && center.seat;
-  if (!s) return '';
-  return `centre seated on the apex: ${s.fullFootprint ? 'its whole footprint' : `a ${s.patchRadius.toFixed(2)} mm patch of its ${s.footprint.toFixed(2)} mm footprint`} overlaps the shell`
-       + (s.hover > 0 ? ` · its rim hovers ${s.hover.toFixed(2)} mm above the shell` : '') + `\n`;
-}
-
 /* THE SLOT-ROLE LINE — what the mirror plane actually did, and where the
    envelope clamp bit. Two things a visitor cannot otherwise see: WHICH slots
    the labellum and hood came out as (the derivation is exact but it is not
@@ -835,7 +824,7 @@ function fanLine(fr) {
        + `\n`;
 }
 
-function summarise(ui, acc, mode, rings, fr, center, petals) {
+function summarise(ui, acc, mode, rings, fr, petals) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
   const layers = Number(ui.layerCount);
@@ -870,7 +859,13 @@ function summarise(ui, acc, mode, rings, fr, center, petals) {
        clampedRingsPhrase above: a split whorl's descriptors share a radius,
        so listing them would print the same number three times. */
     : (layers > 1 ? `layer rings (${mode}) ${[...new Map(rings.map((r) => [r.lambda, r])).values()].map((r) => r.radius.toFixed(2)).join(' / ')} mm\n` : '');
-  return `${petalsSaid} · ${ui.placement.toLowerCase()} · ${depth} · spread ${Number(ui.spread).toFixed(2)}x · center ${ui.centerStyle.toLowerCase()}`
+  /* NO CENTRE WORD ON THIS LINE (session 20): the summary printed
+     `center disc` on the shipping default while the A/B rig existed; the
+     rig is retired and the apex is bare until the androecium lands, and a
+     line naming a centre that does not exist is the label-lie this project
+     retires ids over. The panel gate's retirement route asserts the word is
+     ABSENT here. */
+  return `${petalsSaid} · ${ui.placement.toLowerCase()} · ${depth} · spread ${Number(ui.spread).toFixed(2)}x`
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
@@ -878,7 +873,6 @@ function summarise(ui, acc, mode, rings, fr, center, petals) {
        + innerRingLine(rings, fr)
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
-       + seatLine(center)
        + spineLine(petals)
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
@@ -952,7 +946,7 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.center, built.petals) + `\n${materialLines(ui, mode)}`;
+  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 
@@ -1118,7 +1112,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
      an index into a variable-length list is a bug waiting for the first
      multi-layer export — it would have printed the ring radii under the word
      "exported". The tris/max-dim line is always last, so ask for that. */
-  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.center, built.petals).split('\n');
+  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.petals).split('\n');
   readout.textContent = `${shownSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
@@ -1131,8 +1125,10 @@ document.getElementById('exportStl').addEventListener('click', () => {
 window.__bloomMetrics = () => ({
   ringRadius: lastRing.radius,
   derivedRadius: lastRing.derivedRadius,
-  centerStyle: lastCenter.style,
-  centerTris: lastCenter.tris,
+  /* NO centerStyle / centerTris / centerSeat (session 20): the designed
+     centre is retired, and a metric that reported 'NONE' / 0 / null for a
+     thing that no longer exists would be a number under a label naming a
+     computation nobody performs. Tools that read them died with the rig. */
   /* WHICH GEOMETRY EVERY NUMBER BELOW DESCRIBES (Sep 3, the print-preview
      toggle). `shownTris` is the count of the build on screen in whatever
      mode it was built. `liveTris` keeps its name and its meaning — the LIVE
@@ -1229,10 +1225,6 @@ window.__bloomMetrics = () => ({
      one voxel piece on every row tried, J1 indiscriminate) is caught only by
      the feet not lying on the sphere the hub says it built. */
   hubBuilt: { dome: lastHubBuilt.dome ? { ...lastHubBuilt.dome } : null, tris: lastHubBuilt.tris },
-  /* THE CENTRE'S SEAT on the dome — overlap patch radius against its own
-     footprint, and the rim's hover above the shell. Photographed, not fixed
-     (Eva, Sep 4). Null when flat or RING. */
-  centerSeat: lastCenter.seat ? { ...lastCenter.seat } : null,
   /* THE DOME GUARD'S RESIDUAL — exactly 0 on every flat build, null on a
      domed one; both gates assert it. */
   petalDomeGuardResidual: lastPetal ? lastPetal.domeGuardResidual : null,

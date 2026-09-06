@@ -33,15 +33,42 @@
 import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
-   Empty today, structurally present from day one: when the first control is
-   deleted, its entry goes here (id + why + the version it retired at), because
-   saved designs and shared links will carry old keys indefinitely and a
-   reclaimed name silently feeds a stale value into a control that means
-   something else. The bloom has no save/load or schema machinery yet — the
-   first feature that persists a design must add CURRENT_SCHEMA + migrations,
-   and retirement grows the extra steps the flower's registry documents
-   (schema bump + a migration that DELETES the key). Never remove an entry. */
-export const RETIRED_IDS = [];
+
+   Structurally present from day one and FIRST USED in session 20 (phase 2,
+   B1): when a control is deleted its VALUE stops mattering and its NAME
+   starts, because saved designs and shared links carry old keys indefinitely
+   and a reclaimed name silently feeds a stale value into a control that means
+   something else. The reservation is a structure with a check behind it, not
+   a sentence: verifySections() below FAILS MODULE LOAD if a retired id
+   collides with a live control id, a live option value, a DEFAULTS key or a
+   section id, and tools/verify-bloom-panel.mjs's retirement route fails CI if
+   one is still referenced as an identifier in executable bloom source (the
+   flower's verify-registry-sync.mjs set, ported; string literals are exempt
+   — the frozen matrices name retired ids as ROW DATA and must, since they
+   are proved deep-equal to their base commits).
+
+   EACH ENTRY: the id, the SESSION it retired in, and one line on why. The
+   flower keys `retiredAt` to the SCHEMA VERSION whose migration deletes the
+   key; the bloom persists no design yet and has no CURRENT_SCHEMA, so
+   `schema: null` says so explicitly rather than borrowing a number that
+   would mean something else. THE FIRST FEATURE THAT PERSISTS A DESIGN OWES
+   every entry here a migration that DELETES the key — the flower's
+   migrateDesign() preserves unknown keys verbatim on re-save, so without the
+   delete a retired value rides along forever under the very mechanism meant
+   to protect forward compatibility.
+
+   THE OPTION VALUES `DOME`, `DISC`, `RING` ARE NOT RESERVED, on the flower's
+   own precedent for `reliefMode`'s values: they were only ever meaningful as
+   values OF `centerStyle`, and reserving them would burn three common words.
+   The corona that RING stood in for is a phase-2 group of its own and will
+   carry its own ids (charter, session 20). Never remove an entry. */
+export const RETIRED_IDS = [
+  { id: 'centerStyle', retiredAt: 20, schema: null, why: 'The A/B centre rig (NONE / DOME / DISC / RING, DISC the shipping default since Aug 31). Retired whole on Eva\'s ruling (Sep 5, phase 2 B1): the centre is the reproductive parts and nothing else; DISC and DOME were placeholders doing two jobs that belong elsewhere (a surface is HEAD\'s, covering the junction is the junction\'s and never a control), and RING was torusInto with a bore slider standing in for a corona, which is a flared collar between petals and stamens and does not grow out of a torus. Single-valued once its three styles went, so the control and its section went with them.' },
+  { id: 'centerSize', retiredAt: 20, schema: null, why: 'The centre\'s outer radius as a fraction of the foot ring, shared by all three styles. Retired with centerStyle; the androecium\'s radial extent is its own control with its own derivation (Phase A Q1/Q5 rulings) and must not inherit this name.' },
+  { id: 'centerRise', retiredAt: 20, schema: null, why: 'DOME\'s rise. Retired with the DOME style. NOT to be confused with headRise (the HEAD section\'s cap), which is live and is the surface the retired ornament was standing in for.' },
+  { id: 'centerDish', retiredAt: 20, schema: null, why: 'DISC\'s paraboloid depression. Retired with the DISC style, which was the shipping default — 509 of 527 matrix rows moved (the predeclared partition in docs/bloom-session-20-outcome.md).' },
+  { id: 'centerBore', retiredAt: 20, schema: null, why: 'RING\'s bore fraction. Retired with the RING style; a real corona (held, not retired — charter session 20) gets its own group and ids.' },
+];
 
 /* VISIBILITY PREDICATES — the condition itself, never a name for one.
    Same structured grammar as the flower registry (kept introspectable rather
@@ -274,12 +301,13 @@ export function predicateDrivers(pred, out = new Set()) {
    SECTION IS NOT ROLE, and conflating them was the first thing this design
    had to refuse. `role` says which part of the MODEL a control owns (petal /
    arrangement / center; there is no 'junction' and never will be) and it is
-   load-bearing in the gates and the matrix builder — buildMatrix() skips
-   `role: 'center'` rows because they need a style. `section` says where a
+   load-bearing in the gates and the matrix builder — buildMatrix() skipped
+   `role: 'center'` rows while the centre rig existed, because they needed a
+   style; the role is vocabulary held for the androecium now. `section` says where a
    control SITS IN THE PANEL. They answer different questions and they
    genuinely disagree: `sheetThickness` is `role: 'petal'` because the
    junction derives from the petal, and it sits in MATERIAL because it also
-   governs the hub slab and the centre floors. Deriving sections from roles
+   governs the hub slab (and, while the centre rig existed, its floors). Deriving sections from roles
    would have forced a re-role the registry's own header calls a
    stop-and-raise, and would have produced one 14-control "Petal" section,
    which is the problem rather than the fix.
@@ -307,8 +335,9 @@ export function predicateDrivers(pred, out = new Set()) {
    control in it is at an identity default", exactly true of Petal form's four
    curves (all 0, the flat short-circuit) and Part thickness's three (all
    reproducing the old constant). It was already false of the panel that
-   shipped — CENTER's DISC / 0.75 / 0.35 are authored aesthetic defaults, not
-   identities, and Petal tilt (default 25 degrees) moved into Petal form — and
+   shipped — the then-CENTER's DISC / 0.75 / 0.35 were authored aesthetic
+   defaults, not identities (retired in session 20; Petal tilt's default of
+   25 degrees still is), and Petal tilt moved into Petal form — and
    the accordion now makes it incoherent as well, since at most one section
    can be open whatever its contents are at. Do not reintroduce it. Do not
    make `open` a predicate either: that would put collapse under `visibleWhen`
@@ -346,9 +375,10 @@ export function predicateDrivers(pred, out = new Set()) {
    `visibleWhen`. A section is hidden when, and only when, every control in it
    is hidden — derived by applyVisibility() from the same one state snapshot
    that decided those controls, so it adds no declaration and cannot disagree
-   with one. No section can reach that state today (Center always shows
-   centerStyle). If one ever needs a condition of its own, that is a
-   stop-and-raise, not a field to add quietly.
+   with one. The per-petal drop-downs reach that state whenever their
+   placement is not FAN, and that is the rule working. If a section ever
+   needs a condition of its own, that is a stop-and-raise, not a field to
+   add quietly.
    =================================================================== */
 /* WHY A SECTION IS HIDDEN, SAID IN THE PANEL — `hiddenReason` (Eva, Sep 3).
    A control or section that disappears for a reason a visitor could undo is a
@@ -402,8 +432,8 @@ export const SECTIONS = [
      flat — a predeclared partition of 35, or a hidden-and-not-inert slider.
      CAP carries `headRise` and is the default, so its predicate is TRUE on
      every pre-existing row and the move is 0 moved by construction. Neither
-     value is called "dome", which is what dissolves the collision with
-     `centerStyle`'s DOME (the ornament). */
+     value is called "dome", which is what dissolved the collision with the
+     since-retired `centerStyle`'s DOME (the ornament, gone in session 20). */
   { id: 'head', label: 'Head', open: false },
   { id: 'shape', label: 'Petal shape', open: false },
   { id: 'form', label: 'Petal form', open: false },
@@ -418,7 +448,12 @@ export const SECTIONS = [
      roll taper. Presentation only — `section` is never persisted, no role
      changed, zero geometry, asserted by the retention run. */
   { id: 'curl', label: 'Petal curl', open: false },
-  { id: 'center', label: 'Center', open: false },
+  /* NO CENTER SECTION (session 20, Eva's ruling Sep 5). The A/B rig's section
+     was retired with its three styles — the centre is the reproductive parts
+     and nothing else, and until the androecium lands (phase 2, B2) there is
+     nothing at the pole to control. The junction still never gets a section.
+     `center` is not a control id and sections are not persisted, so the
+     section id is not in RETIRED_IDS; the five control ids are. */
   /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
      WITH THE LABEL on purpose. An id that contradicts its label is a stored
      label-lie: it reads as a declaration, a later reader checks it and
@@ -669,7 +704,33 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
   for (const s of sections) {
     if (!used.has(s.id) && !hasChildren.has(s.id)) bad.push(`section "${s.id}" has neither controls nor child sections`);
   }
-  for (const id of RETIRED_IDS) if (controls.some((c) => c.id === id)) bad.push(`retired id "${id}" is a live control`);
+  /* RETIRED IDS — the reservation, checked (session 20; the flower's
+     verify-registry-sync set, the halves that can run at module load). A
+     retired name may come back as a live control id, as an OPTION VALUE of a
+     live choice (the same silent corruption one level down), as a DEFAULTS
+     key (defaultsOf() derives DEFAULTS from the controls, so this is the
+     same check stated at the consumer), or as a section id (a section id is
+     not persisted today; the day one is, a collision here is the same
+     defect). Each entry must carry an id, a retiredAt session and a why of
+     some length — a reservation nobody can evaluate is the permanentHidden
+     flag again. The executable-reference half needs the SOURCE and lives in
+     the panel gate's retirement route. */
+  const seenRetired = new Set();
+  const defaults = defaultsOf(controls);
+  for (const r of RETIRED_IDS) {
+    if (!r || typeof r.id !== 'string' || !r.id) { bad.push(`RETIRED_IDS entry ${JSON.stringify(r)} has no id`); continue; }
+    if (seenRetired.has(r.id)) bad.push(`RETIRED_IDS lists "${r.id}" more than once`);
+    seenRetired.add(r.id);
+    if (!Number.isInteger(r.retiredAt)) bad.push(`RETIRED_IDS "${r.id}": retiredAt must be the integer session it was retired in`);
+    if (!('schema' in r)) bad.push(`RETIRED_IDS "${r.id}": must state \`schema\` (null until a persisting feature exists; then the schema version whose migration deletes the key)`);
+    if (!r.why || String(r.why).trim().length < 20) bad.push(`RETIRED_IDS "${r.id}": needs a why — a reservation nobody can evaluate is a claim with no grounds`);
+    if (controls.some((c) => c.id === r.id)) bad.push(`retired id "${r.id}" is a live control — a retired id may never be reused; every design saved before it was retired still carries a value under this name`);
+    if (Object.prototype.hasOwnProperty.call(defaults, r.id)) bad.push(`retired id "${r.id}" is a DEFAULTS key`);
+    if (ids.has(r.id)) bad.push(`retired id "${r.id}" is a section id`);
+    for (const c of controls) {
+      for (const o of c.options || []) if (String(o.value) === r.id) bad.push(`retired id "${r.id}" collides with option value "${o.value}" on live control "${c.id}" — a retired name reused as a value is the same silent corruption`);
+    }
+  }
   if (bad.length) throw new Error(`bloom-registry: section declaration is broken:\n  - ${bad.join('\n  - ')}`);
   return true;
 }
@@ -729,34 +790,21 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
      no designs yet (see RETIRED_IDS above), so no saved value can be
      misread. The first feature that persists a design inherits that debt.
 
-   - `centerStyle` WAS an A/B rig and is now a shipped aesthetic: **DISC is the
-     default** (Eva, Aug 31, ruled after the form phase against petals with
-     real cup, curl, roll and twist). The deferral it replaces was correct and
-     is recorded in docs/bloom-charter.md with both halves — the session-2 note
-     that the archetypes were "visually indistinguishable" was measuring them
-     against FLAT PLACEHOLDER blades, and that subject no longer exists.
-     The default moved as a SECOND EVENT under the spread precedent: the rig
-     landed byte-identical, and the default changed later, on evidence, with a
-     partition report. Sub-control defaults are unchanged. The superseded
-     reasoning ran: the archetype decision is DEFERRED until after the
-     petal-shape phase, because the placeholder ovate petals are stand-ins and
-     a dome or a ring should be judged against the real silhouettes it will
-     sit among, not
-     against placeholders. Nothing is deleted and no style is promoted: the rig
-     stays in the codebase as a built, gated capability and the question
-     reopens when petals stop being placeholders.
+   - `centerStyle` WAS an A/B rig, then a shipped aesthetic (DISC the default,
+     Eva, Aug 31), and is RETIRED (session 20, Eva's ruling Sep 5, phase 2 B1)
+     with its three styles, its four sub-sliders and its section. Both halves
+     of the history are in docs/bloom-charter.md; the five ids are reserved in
+     RETIRED_IDS above. The centre is the reproductive parts and nothing else;
+     the shipping default is the bare hub apex until the androecium lands.
 
    Everything else about the whorl (height, sizeRamp, angleRamp, phase) is
-   still a derived value or a constant, per "derive, don't expose" — as are
-   every centre dimension not listed below: the DISC's own thickness, the
-   RING's tube diameter, the dish's residual floor, and all segment counts.
+   still a derived value or a constant, per "derive, don't expose".
 
    `visibleWhen: { all: [] }` is the explicit always-true predicate, stated
-   rather than omitted so every row declares its own visibility. The centre
-   sub-controls are gated on the style that enables them — the Lace pattern
-   (the flower calls the field `enabledWhen`; this registry has exactly one
-   gating field and it is `visibleWhen`, so there is one name, not two). */
-const CENTER_ON = { id: 'centerStyle', oneOf: ['DOME', 'DISC', 'RING'] };
+   rather than omitted so every row declares its own visibility. A sub-control
+   is gated on the choice that enables it — the Lace pattern (the flower calls
+   the field `enabledWhen`; this registry has exactly one gating field and it
+   is `visibleWhen`, so there is one name, not two). */
 
 /* THE UNIT WORD FOR THE DEPTH AXIS — one owner, read by the three read-outs
    that name it. A layered bloom stacks LAYERS; a continuous one winds TURNS,
@@ -1080,7 +1128,7 @@ export const CONTROLS = [
      that mentions either control.
 
      WHY `sheetThickness` CARRIES NO `petal` PREFIX. It governs the hub slab
-     and the centre's floors too (both read ring.thickness), so a petal
+     (and, until session 20, the designed centre's floors — both read ring.thickness), so a petal
      prefix would claim less than the control does. The role stays 'petal'
      because the junction derives from the petal — there is no 'material'
      role and inventing a fourth is a stop-and-raise, not a side effect of
@@ -1192,10 +1240,10 @@ export const CONTROLS = [
      roll floor's own argument — the shell's inner face inverts below it),
      which binds only when the hub is narrower than the sheet; the read-out
      says "(CLAMPED)" and prints the rise that built. WHAT IT COSTS, told
-     rather than hidden: the designed centre sits on the apex and its rim
-     hovers above the shell (the read-out prints the overlap patch and the
-     hover); the hub's triangle count is 3,456 at any rise above 0 against
-     192 flat — the first slider-dependent count here, a branch not a ramp. */
+     rather than hidden: the hub's triangle count is 3,456 at any rise above
+     0 against 192 flat — the first slider-dependent count here, a branch not
+     a ramp. (The designed centre's seat on the apex, and its rim hover, went
+     with the centre rig in session 20.) */
   /* ===================================================================
      HUB SHAPE (session 18, Eva Sep 5) — CAP or a full SPHERE. The sphere is
      the CONTINUOUS spiral re-keyed on polar angle: radius Rd sin(phi), height
@@ -1885,39 +1933,11 @@ export const CONTROLS = [
     ];
   }).flat(),
 
-  /* CENTER — the A/B rig. */
-  { id: 'centerStyle', section: 'center', kind: 'choice', default: 'DISC',
-    options: [
-      { value: 'NONE', label: 'None' },
-      { value: 'DOME', label: 'Dome' },
-      { value: 'DISC', label: 'Disc' },
-      { value: 'RING', label: 'Ring' },
-    ],
-    label: 'Center', tier: 'standard', role: 'center',
-    fmt: (v) => ({ NONE: 'none', DOME: 'dome', DISC: 'disc', RING: 'ring' }[v] ?? String(v)),
-    visibleWhen: { all: [] } },
-
-  /* Outer radius as a FRACTION OF THE FOOT RING — never millimetres. Reading
-     footRing() is what makes the centre track spread automatically, and the
-     1.00 ceiling is load-bearing: it puts the whole centre footprint inside
-     the hub disc, which is what makes centre-to-hub overlap a solid region of
-     the centre's full footprint at every setting rather than a thin band that
-     happens to be wider than a voxel. */
-  { id: 'centerSize', section: 'center', kind: 'slider', min: 0.25, max: 1, step: 0.01, default: 0.75,
-    label: 'Center size', fmt: (v) => `${(Number(v) * 100).toFixed(0)}% of ring`,
-    tier: 'standard', role: 'center', visibleWhen: CENTER_ON },
-
-  { id: 'centerRise', section: 'center', kind: 'slider', min: 0.15, max: 1.2, step: 0.01, default: 0.6,
-    label: 'Dome rise', fmt: (v) => `${Number(v).toFixed(2)}x radius`,
-    tier: 'standard', role: 'center', visibleWhen: { id: 'centerStyle', oneOf: ['DOME'] } },
-
-  { id: 'centerDish', section: 'center', kind: 'slider', min: 0, max: 0.9, step: 0.01, default: 0.35,
-    label: 'Disc dish', fmt: (v) => (Number(v) === 0 ? 'flat' : `${(Number(v) * 100).toFixed(0)}% dished`),
-    tier: 'standard', role: 'center', visibleWhen: { id: 'centerStyle', oneOf: ['DISC'] } },
-
-  { id: 'centerBore', section: 'center', kind: 'slider', min: 0.2, max: 0.75, step: 0.01, default: 0.45,
-    label: 'Ring bore', fmt: (v) => `${(Number(v) * 100).toFixed(0)}% open`,
-    tier: 'standard', role: 'center', visibleWhen: { id: 'centerStyle', oneOf: ['RING'] } },
+  /* THE CENTER ROWS WERE HERE (the A/B rig: centerStyle and its four
+     sub-sliders) and are RETIRED — see RETIRED_IDS at the top of this file
+     and the charter's session-20 entry. The `role: 'center'` vocabulary is
+     kept for the androecium and gynoecium that replace them (phase 2, B2);
+     no control carries it today. */
 ];
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));

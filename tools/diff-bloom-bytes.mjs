@@ -4,11 +4,32 @@
    THE CONVENTION IT ENFORCES: a new control defaults to current behaviour,
    verified by byte diff. Anything that cannot be byte-identical gets a schema
    bump, a migration and a per-design change report — never a silent shift.
-   For `spread` and `centerStyle` the byte-identity is a property of the code
+   For `spread` and `centerStyle` the byte-identity was a property of the code
    (spread multiplies by exactly 1.00, and IEEE-754 makes x * 1.0 === x; NONE
-   emits no triangles at all), so this tool CONFIRMS a construction rather
+   emitted no triangles at all), so this tool CONFIRMS a construction rather
    than establishing an empirical result. A single moved byte would mean the
    construction argument is wrong, which is a stop-and-report, not a migration.
+
+   THE RETIREMENT MODE (session 20) — a baseline whose rows CANNOT be
+   re-exported on the new tree. The centre rig was retired with `centerStyle`
+   and its four sub-sliders, so 509 of phase15's 527 rows name a control the
+   new registry does not declare and applyConfig refuses them by design. The
+   close runs THREE captures of the same rows and compares them by label:
+     1. old tree, plain                         --phase15 --root <old>
+     2. old tree, the centre-off TWIN           --phase15 --root <old> --override centerStyle=NONE
+     3. new tree, the retired ids STRIPPED      --phase15 --root <new> --strip centerStyle,centerSize,centerRise,centerDish,centerBore
+   then  --compare <twin.json> <new.json> --retirement <plain.json> --expect 509/18
+   asserts twin === new on EVERY row, and refuses to pass by comparing nothing:
+     V1  on every row the plain run resolves to a centre, the twin DIFFERS
+         from the plain export (fewer triangles) — the override reached the
+         geometry, so it is not old-versus-old;
+     V2  on every NONE row the twin EQUALS the plain export;
+     V3  the strip list is exactly the tool's own RETIRED_IDS and no stripped
+         id is a live control here; rows whose set became empty are named;
+     V4  the mover / holder counts equal the predeclared --expect;
+     V5  the three captures cover the same labels in order, runs 1 and 2 share
+         a head and differ in their override record, run 3 has another head.
+   Full construction and what makes it vacuous: docs/bloom-session-20-outcome.md.
 
    WHAT IT COMPARES. Either matrix, run against two trees, hashing the exact
    bytes the real Get STL button produced.
@@ -31,10 +52,14 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase15  `phase15Matrix()` — the 527 rows frozen at 8524318, the head
+                of main when session 20 opened. THE NEWEST baseline; the
+                like-for-like baseline for the centre retirement, and the
+                first that needs the retirement mode above to be compared.
      --phase14  `phase14Matrix()` — the 499 rows frozen at 5312845, the commit
                 carrying the curl family and session 17's gate efficiency
-                work. THE NEWEST baseline; the like-for-like baseline for the
-                full-sphere head (session 18).
+                work. The like-for-like baseline for the full-sphere head
+                (session 18).
      --phase13  `phase13Matrix()` — the 469 rows frozen at 6b8e94b, the commit
                 carrying dome lean and session 15's outcome doc (session 15
                 froze nothing; this is that debt, paid by session 16)
@@ -210,11 +235,12 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase12] --root <dir> --out <file.json>
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase15] --root <dir> --out <file.json> [--only <regex>] [--override <id>=<value>] [--strip <id,id,...>]
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --region foot
+         node tools/diff-bloom-bytes.mjs --compare <twin.json> <new.json> --retirement <plain.json> --expect <movers>/<holders>
    =================================================================== */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -222,7 +248,9 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { launchPage, openBloom, applyConfig, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix } from './bloom-harness.mjs';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix, phase15Matrix, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -265,6 +293,20 @@ function footRegionHash(buf, tHalf) {
 }
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null; };
+
+/* A TREE FINGERPRINT — sha1 over the three bloom sources a capture's bytes
+   depend on. The `head` string cannot tell two trees apart when both are
+   dirty checkouts of one commit (session 20: the base worktree reads
+   "8524318+dirty" from its node_modules symlink and the working tree reads
+   the same from its uncommitted edits), and the retirement mode's V5 exists
+   to refuse a tree compared with itself. Recorded at capture time; the
+   compare recomputes it from the recorded root only when a capture predates
+   this field, and SAYS so. */
+const treeFingerprint = (root) => {
+  const h = crypto.createHash('sha1');
+  for (const f of ['bloom.js', 'bloom-geometry.js', 'bloom-registry.js']) h.update(fs.readFileSync(path.join(root, f)));
+  return h.digest('hex').slice(0, 12);
+};
 
 /* ===================================================================
    --verify-frozen — THE CHECK THE HEADERS HAVE BEEN CITING SINCE #114,
@@ -326,7 +368,7 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.a
 const FROZEN = {
   phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
   phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix, phase9: phase9Matrix, phase10: phase10Matrix,
-  phase11: phase11Matrix, phase12: phase12Matrix, phase13: phase13Matrix, phase14: phase14Matrix,
+  phase11: phase11Matrix, phase12: phase12Matrix, phase13: phase13Matrix, phase14: phase14Matrix, phase15: phase15Matrix,
 };
 const PHASE_NAMES = Object.keys(FROZEN);
 
@@ -370,6 +412,9 @@ if (process.argv.includes('--compare')) {
   const i = process.argv.indexOf('--compare');
   const before = JSON.parse(fs.readFileSync(process.argv[i + 1], 'utf8'));
   const after = JSON.parse(fs.readFileSync(process.argv[i + 2], 'utf8'));
+  for (const [name, cap] of [['before', before], ['after', after]]) {
+    if (cap.complete === false) { console.error(`byte diff: INVALID — the ${name} capture is INCOMPLETE (a --resume checkpoint, ${cap.rows.length} rows so far); finish it before comparing.`); process.exit(1); }
+  }
   const labels = before.rows.map((r) => r.label);
   if (labels.join('|') !== after.rows.map((r) => r.label).join('|')) {
     console.error('byte diff: INVALID — the two runs do not cover the same rows.');
@@ -386,6 +431,63 @@ if (process.argv.includes('--compare')) {
   console.log(`byte diff: ${labels.length} configs compared`);
   console.log(`  before: ${before.root} @ ${before.head || 'unrecorded'}`);
   console.log(`  after:  ${after.root} @ ${after.head || 'unrecorded'}\n`);
+
+  /* THE RETIREMENT MODE — see the header. `before` is the old tree's TWIN
+     capture, `after` the new tree's STRIPPED capture, --retirement the old
+     tree's PLAIN capture. Dispatched first: every mode ends in process.exit. */
+  const rti = process.argv.indexOf('--retirement');
+  if (rti > 0) {
+    const plain = JSON.parse(fs.readFileSync(process.argv[rti + 1], 'utf8'));
+    if (plain.complete === false) { console.error('byte diff: INVALID — the plain capture is INCOMPLETE'); process.exit(1); }
+    const ei = process.argv.indexOf('--expect');
+    const expect = ei > 0 ? process.argv[ei + 1].split('/').map(Number) : null;
+    const twin = before, fresh = after;
+    const invalid = [];
+    /* V5 — three captures, one row list, two trees. */
+    if (plain.rows.map((r) => r.label).join('|') !== labels.join('|')) invalid.push('the plain capture does not cover the same rows in the same order');
+    if (!twin.override) invalid.push('the twin capture records no --override — it is not a twin');
+    if (plain.override) invalid.push('the plain capture records an --override — it is not plain');
+    if (fresh.override) invalid.push('the new-tree capture records an --override');
+    if (!fresh.strip || !fresh.strip.length) invalid.push('the new-tree capture records no --strip — the retired ids were not removed from its rows');
+    if (twin.strip && twin.strip.length) invalid.push('the twin capture records a --strip — the old tree must see the retired ids');
+    if (plain.head !== twin.head) invalid.push(`the plain and twin captures come from different trees (${plain.head} vs ${twin.head})`);
+    const fp = (cap, name) => { if (cap.treeSha) return cap.treeSha; const v = treeFingerprint(cap.root); console.log(`  (${name} capture predates treeSha; fingerprint ${v} computed from its recorded root ${cap.root} at compare time)`); return v; };
+    const fpPlain = fp(plain, 'plain'), fpTwin = fp(twin, 'twin'), fpFresh = fp(fresh, 'new-tree');
+    if (fpPlain !== fpTwin) invalid.push(`the plain and twin captures fingerprint different trees (${fpPlain} vs ${fpTwin})`);
+    if (fpFresh === fpPlain) invalid.push(`the new-tree capture fingerprints the SAME tree as the old one (${fpFresh}) — one tree compared with itself`);
+    console.log(`  trees: old ${fpPlain} (${plain.head}), new ${fpFresh} (${fresh.head})`);
+    if (plain.rows.length !== labels.length || plain.rows.some((r) => !r.state)) invalid.push('the plain capture is missing rows or per-row state');
+    /* V3 — the strip is exactly the reservation. */
+    const retired = RETIRED_IDS.map((r) => r.id);
+    const stripSet = new Set(fresh.strip || []);
+    for (const id of retired) if (!stripSet.has(id)) invalid.push(`retired id ${id} was not stripped on the new tree`);
+    for (const id of stripSet) { if (!retired.includes(id)) invalid.push(`stripped id ${id} is not in RETIRED_IDS`); if (CONTROLS.some((c) => c.id === id)) invalid.push(`stripped id ${id} is a LIVE control on this tree — stripping it hides a real control`); }
+    if (invalid.length) { console.error('byte diff: INVALID — the retirement comparison cannot be made:'); for (const v of invalid) console.error(`  - ${v}`); process.exit(1); }
+    const oid = twin.override.id, oval = twin.override.value;
+    const movers = [], holders = [], bad = [], emptied = [];
+    for (let k = 0; k < labels.length; k++) {
+      const p = plain.rows[k], t = twin.rows[k], n = fresh.rows[k];
+      const resolved = String(p.state[oid]);
+      const mover = resolved !== String(oval);
+      (mover ? movers : holders).push(labels[k]);
+      if (n.setEmptied) emptied.push(labels[k]);
+      /* THE CLAIM: twin === new, on every row. */
+      if (t.sha256 !== n.sha256) bad.push(`CLAIM ${labels[k]} [${oid}=${resolved}]: twin ${t.bytes}B/${t.tris}t ${t.sha256.slice(0, 12)} != new ${n.bytes}B/${n.tris}t ${n.sha256.slice(0, 12)}`);
+      /* V1 / V2 — the twin removed a centre exactly where there was one. */
+      if (mover && (p.sha256 === t.sha256 || !(p.tris > t.tris))) bad.push(`V1 ${labels[k]} [${oid}=${resolved}]: the twin did not remove the centre (plain ${p.tris}t ${p.sha256.slice(0, 12)}, twin ${t.tris}t ${t.sha256.slice(0, 12)}) — old versus old`);
+      if (!mover && p.sha256 !== t.sha256) bad.push(`V2 ${labels[k]} [${oid}=${resolved}]: the override changed a row that already resolved to ${oval}`);
+    }
+    console.log(`retirement of ${oid} (twin value ${oval}) on ${labels.length} rows: ${movers.length} MOVERS (resolved a centre on the old tree), ${holders.length} HOLDERS (already ${oval})`);
+    console.log(`  rows whose set became EMPTY once the retired ids were stripped (they build the new default): ${emptied.length}${emptied.length ? ' — ' + emptied.slice(0, 6).join('; ') + (emptied.length > 6 ? ' …' : '') : ''}`);
+    console.log(`  twin === new on ${labels.length - bad.filter((b) => b.startsWith('CLAIM')).length} of ${labels.length} rows; V1 fired ${bad.filter((b) => b.startsWith('V1')).length}, V2 fired ${bad.filter((b) => b.startsWith('V2')).length}`);
+    for (const b of bad.slice(0, 40)) console.error(`  ${b}`);
+    if (bad.length > 40) console.error(`  … and ${bad.length - 40} more`);
+    if (!expect) { console.error('\nbyte diff: REFUSED — the retirement mode needs the PREDECLARED partition on the command line: --expect <movers>/<holders> (the doc names it before the run; this tool does not invent it).'); process.exit(1); }
+    if (movers.length !== expect[0] || holders.length !== expect[1]) { console.error(`\nbyte diff: FAIL — V4: measured ${movers.length}/${holders.length} against the predeclared ${expect[0]}/${expect[1]}`); process.exit(1); }
+    if (bad.length) { console.error('\nbyte diff: FAIL — the retirement claim does not hold on every row (see above).'); process.exit(1); }
+    console.log(`\nbyte diff: PASS — every one of the ${movers.length} movers is BIT-IDENTICAL to its centre-off twin on the old tree, every one of the ${holders.length} holders is bit-identical outright, and the twin removed a centre on exactly the movers (V1–V5 held).`);
+    process.exit(0);
+  }
 
   if (region) {
     if (region !== 'foot') { console.error(`byte diff: unknown region "${region}" — only "foot" exists.`); process.exit(2); }
@@ -558,9 +660,57 @@ const MATRIX_FLAGS = [[FULL, 'full'],
 const chosen = MATRIX_FLAGS.filter(([on]) => on);
 if (chosen.length > 1) { console.error(`pick one matrix: ${MATRIX_FLAGS.map(([, n]) => '--' + n).join(' or ')}`); process.exit(2); }
 const MATRIX = chosen.length ? chosen[0][1] : 'legacy';
-const rows = [];
 const validity = [];
+/* The served tree's own control kinds — see kindsOf() in the harness. A base
+   tree that still declares a control this tree retired must be driven and
+   read back against ITS declaration, not the head's. */
+const treeKinds = await kindsOf(root);
+/* The recorded head must distinguish the two trees, and a COMMIT SHA ALONE
+   DOES NOT when one of them is a dirty working tree: a before/after pair
+   both reading "21d4602" looks exactly like a comparison of one tree with
+   itself, which is the shape of a result that proves nothing. The dirty
+   marker is therefore part of the identity, not a nicety. */
+const headOf = () => {
+  try {
+    const cp = require('node:child_process');
+    const sha = cp.execSync('git rev-parse --short HEAD', { cwd: root }).toString().trim();
+    const dirty = cp.execSync('git status --porcelain', { cwd: root }).toString().trim().length > 0;
+    return dirty ? `${sha}+dirty` : sha;
+  } catch { return null; }
+};
 const MATRIX_FN = { full: buildMatrix, ...FROZEN, legacy: legacyMatrix };
+/* --only <regex> filters rows by label (a smoke pass); --override <id>=<value>
+   pins one control on every row (the retirement mode's centre-off twin);
+   --strip <id,id,...> removes those ids from every row's set (the retirement
+   mode's new-tree capture). All three are RECORDED in the output so --compare
+   can refuse a capture that is not what it is being used as. */
+const onlyRe = arg('--only') ? new RegExp(arg('--only')) : null;
+const overrideArg = arg('--override');
+const override = overrideArg ? { id: overrideArg.split('=')[0], value: overrideArg.split('=').slice(1).join('=') } : null;
+const strip = arg('--strip') ? arg('--strip').split(',').filter(Boolean) : [];
+if (strip.length) {
+  const live = strip.filter((id) => CONTROLS.some((c) => c.id === id));
+  if (live.length) { console.error(`--strip names LIVE control(s) on this tree: ${live.join(', ')} — stripping a live control would hide it, not retire it`); process.exit(2); }
+}
+
+/* CHECKPOINTED CAPTURE (session 20). A 527-row capture is ~20 min, and the
+   session that first ran it lost three of them to container restarts. With
+   --resume the output file is read first, rows already captured are SKIPPED
+   by label, and the file is rewritten after EVERY row with `complete:false`
+   until the last one lands — so an interruption costs one row, not a run.
+   --compare refuses a capture whose `complete` is not true, so a partial
+   file can never be compared as if it were whole. */
+/* Declared AFTER --only / --override / --strip, which it reads — the const-hoisting trap the charter records firing twice. */
+const RESUME = process.argv.includes('--resume');
+const prior = RESUME && fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, 'utf8')) : null;
+if (prior && (prior.matrix !== undefined)) {
+  const same = prior.root === root && String(prior.only || null) === String(onlyRe ? String(onlyRe) : null)
+    && JSON.stringify(prior.override || null) === JSON.stringify(override) && JSON.stringify(prior.strip || []) === JSON.stringify(strip);
+  if (!same) { console.error(`--resume: ${out} was captured with different root/only/override/strip — refusing to continue it`); process.exit(2); }
+}
+const rows = prior ? prior.rows : [];
+const done = new Set(rows.map((r) => r.label));
+if (rows.length) console.log(`--resume: ${rows.length} rows already captured in ${out}; continuing`);
 /* ONE list decides the flag, the recorded LABEL and the rows. It used to be
    two — a flag list for the guard and a ternary chain for the rows — and the
    chain silently fell through for any flag the chain did not know. That is
@@ -569,14 +719,21 @@ const MATRIX_FN = { full: buildMatrix, ...FROZEN, legacy: legacyMatrix };
    (the flag was accepted, legacyMatrix() ran, and the record said so while
    nobody read it). The record was honest both times and the second copy was
    the defect, so there is now only one. */
+const checkpoint = (complete) => fs.writeFileSync(out, JSON.stringify({ root, head: headOf(), treeSha: treeFingerprint(root), matrix: MATRIX, only: onlyRe ? String(onlyRe) : null, override, strip, complete, footRegionRule: FOOT_REGION_RULE, rows }, null, 1));
 for (const row of MATRIX_FN[MATRIX]()) {
+  if (onlyRe && !onlyRe.test(row.label)) continue;
+  if (done.has(row.label)) continue;
+  let set = row.set;
+  if (strip.length) set = set.filter((s) => !strip.includes(s.id));
+  if (override) set = [...set.filter((s) => s.id !== override.id), { id: override.id, value: override.value }];
+  const setEmptied = row.set.length > 0 && set.length === 0;
   await openBloom(page, port);
-  const bad = await applyConfig(page, row.set);
+  const bad = await applyConfig(page, set, treeKinds);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   /* Legacy-id whole-state check — see LIMITS in the header. */
   const got = await page.evaluate(() => window.__bloomUIState());
   const want = { petalCount: 8, petalLength: 35, petalWidth: 16, petalTilt: 25 };
-  for (const s of row.set) want[s.id] = Number(s.value);
+  for (const s of set) want[s.id] = Number(s.value);
   for (const id of LEGACY_IDS) {
     if (Math.abs(Number(want[id]) - Number(got[id])) > 1e-9) validity.push(`${row.label}: ${id} expected ${want[id]}, live ${got[id]}`);
   }
@@ -590,7 +747,7 @@ for (const row of MATRIX_FN[MATRIX]()) {
      or its set — the region mode uses it to decide scope, and a row that
      inherits the default tilt must not be scoped by what its label omits. */
   rows.push({
-    label: row.label, pins: row.set.map((s) => s.id), tilt: Number(got.petalTilt),
+    label: row.label, pins: row.set.map((s) => s.id), tilt: Number(got.petalTilt), setEmptied,
     /* THE ROW'S RESOLVED STATE, from the app's own snapshot. `pins` answers
        "did this row set the control"; this answers "what value did it end up
        at", and those are different questions with different partitions. The
@@ -602,6 +759,7 @@ for (const row of MATRIX_FN[MATRIX]()) {
     sha256: crypto.createHash('sha256').update(buf).digest('hex'),
     footHash: foot.hash, footTris: foot.tris, footHalf,
   });
+  checkpoint(false);
 }
 await browser.close(); server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
@@ -611,17 +769,5 @@ if (validity.length) {
   for (const v of validity) console.error(`  - ${v}`);
   process.exit(1);
 }
-/* The recorded head must distinguish the two trees, and a COMMIT SHA ALONE
-   DOES NOT when one of them is a dirty working tree: a before/after pair
-   both reading "21d4602" looks exactly like a comparison of one tree with
-   itself, which is the shape of a result that proves nothing. The dirty
-   marker is therefore part of the identity, not a nicety. */
-let head = null;
-try {
-  const cp = await import('node:child_process');
-  const sha = cp.execSync('git rev-parse --short HEAD', { cwd: root }).toString().trim();
-  const dirty = cp.execSync('git status --porcelain', { cwd: root }).toString().trim().length > 0;
-  head = dirty ? `${sha}+dirty` : sha;
-} catch { /* not a checkout */ }
-fs.writeFileSync(out, JSON.stringify({ root, head, matrix: MATRIX, footRegionRule: FOOT_REGION_RULE, rows }, null, 1));
+checkpoint(true);
 console.log(`hashed ${rows.length} configs from ${root} -> ${out}`);

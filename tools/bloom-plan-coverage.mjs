@@ -37,7 +37,7 @@
    innermostFootRadius sits much smaller: rooted petals exist deep in the
    ring but their BLADES never sweep back over the gap they are next to.
 
-   READING footRing() / buildPetalInto() / buildHubInto() / buildCenterInto(),
+   READING footRing() / buildPetalInto() / buildHubInto() (and, until session 20, buildCenterInto()),
    NOT DUPLICATING THEM. Every geometric law (radius, azimuth, tilt, curl,
    the dome cap) is evaluated by the real exported functions with the real
    state; this file supplies only the SAME orchestration buildBloomInto()
@@ -125,7 +125,7 @@ export const CONFIGS = [
   /* THE ACTUAL COMPLAINT'S OWN COMBINATION — centerStyle is inert to this
      raster (see header), included anyway so nobody has to take that on
      faith: reported identical to its DISC twin below, by assertion. */
-  ['INCURVE target x head rise 0.50 x centerStyle NONE', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 0.5, centerStyle: 'NONE' }],
+  ['INCURVE target x head rise 0.50 (the bare apex — every row is bare since session 20)', { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, spread: 1.6, petalLength: 20, petalWidth: 8, layerSize: 0.9, petalTilt: 75, layerTilt: 5, petalSpineCurl: 150, sheetThickness: 0.6, footDelicacy: 0.25, headRise: 0.5 }],
 ];
 
 /* The whole measurement, done INSIDE the page: the raster runs over
@@ -147,7 +147,6 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     const accHC = new mod.MeshBuilder({ exportMode: true });
     const frHC = mod.footRing(ui, accHC);
     mod.buildHubInto(accHC, ui, frHC.hub);
-    mod.buildCenterInto(accHC, ui, frHC.hub);
 
     const fr = mod.footRing(ui, accFull);
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard

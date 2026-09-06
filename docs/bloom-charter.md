@@ -205,6 +205,12 @@ any of them.
 
 ## Rulings to park for phase boundaries
 
+- **THE A/B CENTRE RIG BELOW IS RETIRED (session 20, Sep 5) — see the session-20 entry at the
+  end of this document. Both archetype entries are kept as written, because the reversal has
+  to be legible: DISC was ruled the default on Aug 31 against real petals, and on Sep 5 Eva
+  ruled that DISC and DOME were placeholders doing two jobs that belong elsewhere and RING
+  was a torus standing in for a corona.**
+
 - ~~Phase 2 entry: what *is* the bloom center, visually?~~ **Built as an A/B rig, Aug 31;
   the ruling itself is still open.** Eva's ruling at phase-2 entry was that the question is
   not answered by argument: three archetypes ship behind one `centerStyle` choice —
@@ -4211,3 +4217,113 @@ matters should be measured this way.
       the merge. **No new frozen tag is owed** — no row's set and no byte moved; phase14 stays
       the newest baseline. Merged by the session as `163a8ad` (#158); the rulings as
       `this docs-only PR (its own squash sha is in session 19's final report)` (the docs-only PR).
+
+- ~~Phase 2, B1 — the centre retirement~~ **BUILT Sep 5 (session 20): `centerStyle`'s four
+  values, its four sub-sliders, the CENTER section and the three centre builders retired; the
+  shipping default is the bare hub apex; `RETIRED_IDS` first used; `phase15Matrix()` (527 rows
+  at 8524318) frozen. Numbers, the comparison shape and the partition in
+  `docs/bloom-session-20-outcome.md`. HELD FOR EVA'S RULING on the retirement sheet.**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, Sep 5, from Phase A's report and sheet).** The centre
+      is the REPRODUCTIVE PARTS and nothing else: an androecium (filaments and anthers) and a
+      gynoecium (style and stigma), each independently present or absent — four states
+      including none; correct botanical naming throughout, and "pistil" is the whole female
+      unit, not what the panel controls. DISC and DOME were placeholders doing two jobs that
+      belong elsewhere: a surface, which is HEAD's, and covering the junction, which is the
+      junction's and is never a control — Eva looked at the bare apex and it needs no lid.
+      **RING goes with them, and the reason is the entry:** she held it because a ring at the
+      centre is a corona; Phase A's finding was that what shipped is `torusInto` with a bore
+      slider, a placeholder. **A CORONA is a flared collar between the petals and the stamens
+      and will be its own group with its own controls — it does not grow out of a torus. The
+      NAME is reserved here so the idea survives without the object.** That makes
+      `centerStyle` single-valued, so the SECTION is retired, not only its values. SPHERE
+      means no centre: a full-sphere bloom is a flower head, and its reproductive parts belong
+      to its florets — CENTER is hidden AND INERT under SPHERE when it returns (B2), proved by
+      GATED rows on S4's pattern. The fused staminal column is parked; free stamens first.
+
+    - **B1 IS THE RETIREMENT ALONE, by ruling.** The androecium is B2 (its anthers and stigmas
+      are ruled from Phase A's sheet before B2 opens), the gynoecium and the default B3. Three
+      sessions in that order, the retirement first; if B2 grows past its estimate it is split
+      and said, on session 19's 2.7x sizing miss.
+
+    - **THE DEFAULT MOVES, AND IT IS AN EXACT PARTITION PREDECLARED, NOT A 0-MOVED CLAIM.** DISC
+      was the shipping default, so this is far larger than two non-default values, and it was
+      COUNTED before a byte was hashed by enumerating every matrix function: on the 527 live
+      rows at 8524318 (now `phase15Matrix()`), 487 resolve DISC (15 pin it, 472 inherit it), 11
+      DOME, 11 RING, 18 NONE — **509 move, 18 hold**; the whole frozen suite is 3,516 rows of
+      which 3,268 resolve a centre. The stronger claim, asserted ROW BY ROW rather than argued:
+      every moved row's export on the new tree is bit-identical to the same row's export on the
+      OLD tree with `centerStyle` forced to NONE, because the centre was one closed solid
+      appended after the hub, touching neither `footRing()` nor a petal nor the hub.
+
+    - **THE COMPARISON SHAPE WAS WRITTEN DOWN BEFORE IT RAN, WITH WHAT WOULD MAKE IT VACUOUS**
+      (Eva's condition). A moved row cannot be re-exported on the new tree — its set names a
+      control the registry no longer declares and read-back refuses it by design — so the close
+      is THREE captures of the same 527 rows: the old tree plain; the old tree with
+      `--override centerStyle=NONE` (the centre-off twin, built by the OLD code); the new tree
+      with the retired ids `--strip`ped from every set. `tools/diff-bloom-bytes.mjs --compare
+      <twin> <new> --retirement <plain> --expect 509/18` asserts twin === new on every row and
+      carries five vacuity guards: V1 on every mover the twin DIFFERS from the plain export with
+      fewer triangles (the override reached the geometry — otherwise old-versus-old); V2 on every
+      NONE row the twin equals the plain export; V3 the strip list is exactly `RETIRED_IDS` and
+      names no live control, with rows whose set became empty reported by name; V4 the counts are
+      the predeclared ones and the tool REFUSES to pass without them on the command line; V5 the
+      three captures cover the same labels in order, share a head where they should and differ
+      where they must. A comparison that passes because it compared nothing passes silently;
+      these are what stop it.
+
+    - **`RETIRED_IDS` IS USED FOR THE FIRST TIME, and the port from the flower is two parts of
+      three.** Five entries (`centerStyle`, `centerSize`, `centerRise`, `centerDish`,
+      `centerBore`), each with the SESSION it retired in and a why; `schema: null` states that
+      no persisting feature exists yet, rather than borrowing the flower's schema-version field
+      for a number that would mean something else — the first feature that persists a design
+      owes every entry a migration that DELETES the key. The load-time check grew to the
+      flower's set that can run at module load (a live control id, a live option value, a
+      DEFAULTS key, a section id), and the executable-reference scan — comments and string
+      literals stripped, so the frozen matrices may name the ids as ROW DATA — lives in the panel
+      gate's new route (n), which also asserts no retired id renders, no `#sec-center` exists,
+      the read-out's summary line names no centre, and `__bloomMetrics()` carries no centre key.
+      The option values DOME / DISC / RING are NOT reserved, on the flower's own `reliefMode`
+      precedent. **The panel gate's CENTER witness was REPLACED by that route, not deleted
+      silently**; its negative control resurrects a `#sec-center` with a `centerStyle` input and
+      writes `center disc` onto the read-out, and all TWELVE routes must fire.
+
+    - **WHAT WENT AND WHAT WAS RELABELLED.** `buildCenterInto` with `domeInto` / `discInto` /
+      `torusInto`; `seatLine` and the seat metrics; the summary line's `center <style>` word;
+      matrix blocks 2 and 3 and block 4's `× STYLE` corners (the block numbers keep their gap,
+      as 14, 15 and 22 already do); every "(centre off)" row — relabelled where it was the only
+      row carrying its state, dropped where the retirement made it a duplicate of a plain row
+      (the live matrix is 481 rows, 46 fewer); the dome and sphere sheets' centre-seat cells;
+      the panel sheet's gated-centre row; the original A/B sheet (`shot-bloom.mjs`) reduced to
+      spread × count on the bare apex. `bloom-plan-coverage` and the solid-angle instrument no
+      longer build a centre into their hub-only accumulator, and the DISC plate line is absent
+      rather than a number under a label naming nothing — the 240-foot sphere's face-pole open
+      region (2.58 sr) is B2's number.
+
+    - **THE SHEET: `node tools/shot-bloom-centre-retirement.mjs <dir> [base-tree]`** — the bare
+      apex beside today's DISC on the shipping default and on the incurve target at head rise
+      0.50, the DISC cells rendered from a git worktree of the base commit on the per-petal
+      sheet's pattern (a retired look is photographed, not only recorded), print preview ON,
+      chrome hidden, whole bloom and a hub crop. Merge is released by Eva's ruling on it.
+
+    - **THE EVIDENCE.** The retention close is the three-capture comparison and it is EXACT:
+      `phase15Matrix()` captured plain and twinned on a worktree of 8524318 and stripped on
+      the head, 527 rows each, **509 MOVERS every one BIT-IDENTICAL to its centre-off twin,
+      18 HOLDERS bit-identical outright, V1–V5 held** (12 rows' sets emptied by the strip,
+      named). Its positive control, a closed 12-triangle lid on the apex, FAILS the claim on
+      6 of 6 probe rows while both STL gates would see nothing of it. Route (n) fires on a
+      mutant that reads `ui.centerSize` in the app (one assertion, file and line) and is
+      silent on the head; the registry's load-time check catches a retired id as a control,
+      an option value and a section id at module load. Panel gate PASS, its negative control
+      PASS with all twelve routes fired; the smoke subset clean (31 of 481, export gate
+      PASS); `--verify-frozen --phase15` PASS against 8524318 and `--phase14` against
+      5312845; 68 predeclared files byte-identical by sha1 at close. The default bloom is
+      10,080 triangles live and export alike (192 hub), from 11,136. **Two bugs the close
+      found are in the outcome doc with what each would have let through**: the harness
+      validating a base-tree row against the HEAD registry (the captures could not be made
+      at all; a tool that skipped instead of refusing would have compared 18 of 527 rows),
+      and route (n)'s read-out clause reading the mode line rather than the summary line (a
+      `center disc` left on the summary line would have passed forever). The capture is
+      row-checkpointed now (`--resume`), because three background captures died to
+      container restarts before the foreground ones ran. The full matrix on both STL gates
+      is CI's on the merge commit.

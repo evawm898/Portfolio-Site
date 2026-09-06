@@ -129,7 +129,7 @@
    printed so the disagreement is on the record with its size, per the
    brief's instruction, and NO tolerance was widened to make it pass.
 
-   READING footRing() / buildPetalInto() / buildHubInto() / buildCenterInto()
+   READING footRing() / buildPetalInto() / buildHubInto() (and, until session 20, buildCenterInto())
    INSIDE THE PAGE, not duplicating them — the same module instance the app
    built from. The petal capture's orchestration is COPIED from
    bloom-plan-coverage.mjs (which copied it from buildBloomInto) rather than
@@ -341,7 +341,6 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     const accHC = new mod.MeshBuilder({ exportMode: true });
     const frHC = mod.footRing(ui, accHC);
     mod.buildHubInto(accHC, ui, frHC.hub);
-    mod.buildCenterInto(accHC, ui, frHC.hub);
     const fr = mod.footRing(ui, accFull);
 
     /* A FLAT hub is skipped — but AFTER the capture and R5 below, so the
@@ -441,11 +440,14 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        beside the bald cone so a reader can see the two agree in scale. */
     let nearFace = Infinity, nearRes = Infinity;
     for (let i = 0; i < P.length; i += 3) { const d = Math.hypot(P[i], P[i + 1]); if (P[i + 2] > 0) { if (d < nearFace) nearFace = d; } else if (d < nearRes) nearRes = d; }
-    /* THE DESIGNED CENTRE's footprint, from the builder's own report — its
-       cone half-angle from the centre and solid angle, so the face pole's
-       open region can be read beside the plate the phase-2 question is
-       about. Never in the soup; reported only. */
-    const rC = builtFull.center && builtFull.center.rC != null ? builtFull.center.rC : null;
+    /* THE DESIGNED CENTRE'S FOOTPRINT was read here from the builder's own
+       report (its cone half-angle and solid angle at the face pole, the
+       plate the phase-2 question was about — 24.5 mm radius on the 240-foot
+       row). The centre rig is retired (session 20) and the apex is bare, so
+       there is no plate to report; `rC` stays null and the plate line is
+       absent, never a number under a label naming nothing. The androecium's
+       footprint at the face pole is B2's number. */
+    const rC = null;
     const plateRad = rC != null && !flat ? Math.asin(Math.min(1, rC / Rd)) : null;
 
     /* ---------------- R5: THE PARALLEL-RAY IDENTITY ---------------- */
