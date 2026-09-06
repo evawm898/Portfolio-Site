@@ -205,13 +205,23 @@ would leave the law in place, and the sheet Eva asked for shows the six-filament
 A sha1 manifest of 74 files taken from the working tree at `a65d16d` before any edit (every
 `flower*` file and gate, cards, the tracker, print, every workflow, `bloom.html`,
 `bloom.css`, `bloom-view-presets.js`, `tools/bloom-crowding.mjs`, the shot tools, the
-frozen-tag script). **71 held by `sha1sum -c` at close. Three moved, each named with why:**
+frozen-tag script). **71 held by `sha1sum -c` at the first commit (`413208a`); 70 at the
+close-out commit (`eaa8b83`) — FOUR moved, each named with why:**
 `tools/bloom-plan-coverage.mjs` and `tools/bloom-solid-angle-coverage.mjs` (their R1 part
 census had to count a third part, or every stamen row failed the instrument's own validity
-check — the predeclaration did not foresee that R1 sums parts), and
+check — the predeclaration did not foresee that R1 sums parts),
 `tools/verify-bloom-connectedness.mjs` (the assertion family is wired into BOTH STL gates,
-which the predeclaration should have foreseen). Predeclared, verified by diff, the misses
-said: that is the rule doing its job.
+which the predeclaration should have foreseen), and `tools/diff-bloom-bytes.mjs` (the
+phase16 wiring — an import, a map entry and a doc line — in the close-out commit; the
+predeclaration listed the diff tool while the phase16 question was still open, and freezing
+a phase always wires it, so this is the miss it should have foreseen; it was found by the
+re-verify against `main` after the merge, because this paragraph was written at the first
+commit and not re-run at the second — the earlier "71 held, three moved" was true of
+`413208a` and stale at `eaa8b83`). Predeclared, verified by diff, the misses said: that is
+the rule doing its job. **Against `main` after the merge (`d1931b2`): 67 of 74** — the four
+above plus `print-infill.js`, `print.html` and `print.js`, moved on `main` by #163 between
+the manifest's base and the merge; #164 touched none of them (the squash's diff against its
+base `f990e2d` is empty on all three).
 
 ## The evidence
 
@@ -245,8 +255,10 @@ said: that is the rule doing its job.
 - **The live matrix is 507 rows** (481 + block 23's 24 + `stamenCount`'s two sweep rows);
   the smoke subset 35 over 19 blocks, its drift guard green. ALL MAX now carries 120 stamens
   on a ring with the sub-controls at their defaults — predeclared in `STAMEN_SUBS`'s note.
-- **The untouched manifest:** 71 of 74 predeclared files byte-identical by `sha1sum -c`; the
-  three that moved are named above with why.
+- **The untouched manifest:** 70 of 74 predeclared files byte-identical by `sha1sum -c` at
+  the close-out commit (71 at the first); the four that moved are named above with why, and
+  the count against `main` after the merge (67 of 74, #163's three `/print` files the rest)
+  is there too.
 - **The byte diff on the newest frozen baseline — EXACT.** `phase15Matrix()` (527 rows at
   8524318) captured on a worktree of `a65d16d` (the head of `main`) and on this tree, and
   compared row by row by label on the real Get STL bytes: **527 compared, 527 HELD, 0
@@ -331,6 +343,24 @@ in the registry plus three row labels and one sheet cell; 4.00 is the value that
 - **Noted for B2b, not built:** Head rise is currently the only way to change stamen splay,
   so HEAD does two unrelated jobs. The proposal, costed below.
 
+## The close (Sep 6)
+
+- All four bloom gates green on the PR head `eaa8b83`: bloom-export-watertight and
+  bloom-connectedness on the full 507-row matrix, bloom-panel, bloom-frozen-matrices. The
+  two flower gates ran too (`tools/**` filter) and are not bloom evidence.
+- #164 merged by the session (squash) as **`d1931b2`**, the head sha read from the remote
+  with `git ls-remote`, not guessed. `main` had moved once since `a65d16d` (#163, `/print`
+  only; the overlap with this branch was CLAUDE.md, no conflict).
+- **`frozen/phase16` → `a65d16d`**, published from `main` by the bloom-frozen-tags dispatch
+  (run 34012640385, red by design): its log names phase5 as the ONLY refusal, with the
+  diagnosed cause verbatim (a GitHub App token cannot push a ref whose `.github/workflows`
+  content differs from the default branch's), the other fourteen `published`; read back
+  with `git ls-remote --tags origin`, fourteen tags, phase16 at `a65d16dfc354`.
+- The predeclared manifest re-verified against `main` after the merge and corrected — the
+  paragraph above carries it: four of this session's own moved, three of #163's.
+- The ruling and this close recorded in the docs-only PR, opened and merged by the session
+  before reporting DONE, per the approved amendment.
+
 ## B2b: an independent splay on the androecium's own whorl — proposed and costed, not built
 
 `stamenSplay` (ANDROECIUM section, degrees from the surface normal, outward positive,
@@ -387,5 +417,6 @@ diameter across from its root at the hub's own height. Watertight, one piece, ev
 assertion clean — and whether ±180 is a range worth keeping, or the top end is ±120, is
 hers from these cells. The side camera sits 20° up so the tilted petals do not hide it.
 
-Merge is released by Eva's ruling on it; the ruling itself goes in the docs-only PR after the
-merge, per the approved amendment.
+Merge was released by Eva's ruling on it (Sep 6) and is recorded above under "The close";
+the ruling and the close went in the docs-only PR after the merge, per the approved
+amendment.
