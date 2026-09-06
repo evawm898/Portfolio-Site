@@ -118,7 +118,25 @@ body {
   font-size: 10.5px; line-height: 1.45; color: var(--bl-dim); letter-spacing: .02em;
 }
 
-.bl-ctrl { margin-bottom: 12px; }
+.bl-ctrl { margin-bottom: 12px; position: relative; }
+/* WHERE A SLIDER'S TRAVEL GOES DEAD ON THIS BLOOM — the cap mark (Eva, Sep 6,
+   session 23). bloom.js's applyCaps() puts `.bl-ctrl--capped` and `--bl-cap`
+   (the cap as a fraction of the slider's range) on a wrapper whose registry
+   row declares a `cap`; this overlay hatches the track from that point to
+   the right and draws a tick at it, so the visitor sees where the multiplier
+   stops moving the geometry BEFORE dragging into it. Chromium's default
+   range draws a 16 px thumb whose centre travels from 8 px to width − 8 px,
+   which is what the calc() maps the fraction onto. Pointer-events off: it
+   is a mark, not a control, and the range under it is untouched — the whole
+   travel stays reachable, it is only told. Light enough that a thumb sitting
+   in the dead zone still shows through it. */
+.bl-ctrl--capped::after {
+  content: ""; position: absolute; pointer-events: none;
+  left: calc(8px + var(--bl-cap, 1) * (100% - 16px)); right: 0; bottom: 0; height: 18px;
+  border-left: 2px solid var(--bl-accent);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bl-accent) 30%, transparent) 0 2px, transparent 2px 6px);
+  opacity: .55;
+}
 .bl-ctrl label {
   display: flex; justify-content: space-between; align-items: baseline;
   /* The gap is what keeps a long read-out off its label. space-between

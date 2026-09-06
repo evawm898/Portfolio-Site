@@ -4004,7 +4004,13 @@ export function buildStamenInto(acc, andro, s, slot) {
   const apex = pillInto(acc, tip.C, D, rod.T, a, Lc);
   /* WHAT WAS EMITTED, for the gate: the root axis (JS1), the surface point
      (JS2), the two root rings AS EMITTED (JS3), the apex (JS4). */
+  /* `stations` (session 23): every ring CENTRE the rod was revolved through
+     — inner root, outer root, then STAMEN_ROWS free stations to the tip —
+     the builder's own centreline, read by the filament-against-style flag
+     in buildBloomInto (the ROOTS FUSE pattern: the builder's record, never a
+     re-derivation). Telemetry; nothing geometric reads it. */
   return { index: slot.index, azimuth: slot.azimuth, root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, apex, tris: acc.triangleCount - rod.before,
+           stations: rod.stations.map((st) => st.C),
            law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: andro.diameter } };
 }
 
@@ -4033,7 +4039,11 @@ export function buildStyleInto(acc, G) {
   /* WHAT WAS EMITTED, for the gate: the root axis (JG1), the surface point
      (JG2), the two root rings AS EMITTED (JG3), the tip, its direction and
      every lobe's axis and apex (JG4 — the trifid as a PROPERTY). */
+  /* `stations` (session 23): the style's own centreline, inner root to tip
+     — the polyline the filament-against-style flag measures against, BELOW
+     the stigma (the lobes sit on the tip and are not in it). Telemetry. */
   return { root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, lobes, tris: acc.triangleCount - rod.before,
+           stations: rod.stations.map((st) => st.C),
            law: { turnAskedDeg: G.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: G.diameter } };
 }
 
@@ -4243,5 +4253,48 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      androecium's. */
   const styles = [];
   if (fr.gynoecium) styles.push(buildStyleInto(acc, fr.gynoecium));
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles };
+  /* THE FILAMENT-AGAINST-STYLE FLAG (session 23; B2b's family, built on
+     Eva's ruling of Sep 6 on the ±180 curl range: the crossing is not a
+     property of the range's ends, so what closes the question is an
+     instrument, not a narrowing). A FLAG, NEVER A GATE — a filament passing
+     through the style exports watertight and one piece, because overlapping
+     closed solids are legal by construction; both STL gates are blind to it
+     and must stay so. THE MEASUREMENT, on the ROOTS FUSE pattern (the
+     builder's own records, never a re-derivation): the nearest approach of
+     any filament's FREE station (the outer root surface and the STAMEN_ROWS
+     stations above it — the root inside the slab is excluded, since on the
+     on-axis corner every root shares the slab and that is told already) to
+     the style's centreline BELOW THE STIGMA (the style's own stations from
+     its outer root to its tip, as segments — the lobes are on the tip and
+     not in it), against one filament radius plus one style radius: under
+     that, the two tubes intersect. Null when either part is absent — a claim
+     nothing can make reads as absent, never as a passing distance. The
+     read-out's STAMENS line prints the distance, the height, and the flag;
+     the panel gate asserts all three against this record in both
+     directions. Session 22's own table from spineLaw() (six on the shipping
+     ring: 0.34 mm at 15° of curl, 0.00 at 20°, ≤ 0.11 to 180°) is what this
+     reproduces from the emitted stations. */
+  const filamentStyle = (() => {
+    if (!stamens.length || !styles.length) return null;
+    const threshold = fr.androecium.rFil + fr.gynoecium.rSty;
+    const axis = styles[0].stations.slice(1);
+    const segDist = (p, a, b) => {
+      const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
+      const l2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+      const t = l2 > 0 ? Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / l2)) : 0;
+      return Math.hypot(p[0] - (a[0] + ab[0] * t), p[1] - (a[1] + ab[1] * t), p[2] - (a[2] + ab[2] * t));
+    };
+    let best = { mm: Infinity, stamen: -1, station: -1, z: null };
+    for (const s of stamens) {
+      for (let k = 1; k < s.stations.length; k++) {
+        const p = s.stations[k];
+        for (let j = 0; j + 1 < axis.length; j++) {
+          const d = segDist(p, axis[j], axis[j + 1]);
+          if (d < best.mm) best = { mm: d, stamen: s.index, station: k, z: p[2] };
+        }
+      }
+    }
+    return { ...best, threshold, crossing: best.mm < threshold };
+  })();
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle };
 }

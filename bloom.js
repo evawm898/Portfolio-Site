@@ -195,8 +195,14 @@ window.__bloomUIState = () => readUI();
    taper prints the DERIVED widest point a/(a+b), which needs the other
    taper. Every other fmt ignores the second argument. A control for the
    widest point would be a second owner of a derived quantity. */
-function refreshLabels(ui) {
-  for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id], ui);
+/* `shown` (session 23) is the THIRD argument fmt may read: the build on
+   screen, as footRing()'s own descriptors plus the mode — `{ mode,
+   androecium, gynoecium }` — so a read-out can print an OWNER'S number (the
+   stamen spread's cap) rather than re-derive it. It is the record regenerate()
+   just built, never the export handler's, so a span can never carry an
+   export number under a live label. null at module load, before any build. */
+function refreshLabels(ui, shown = null) {
+  for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id], ui, shown);
   /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3): the
      rosette's hood group is "Petal N" where N is the last orbit's number,
      which moves with petalCount. Same snapshot, same pass, same owner
@@ -204,6 +210,36 @@ function refreshLabels(ui) {
      itself, which is cheaper than a second list of which sections vary. */
   for (const s of SECTIONS) summaryEls[s.id].textContent = sectionLabel(s, ui);
   for (const [reason, w] of whyEls) w.el.textContent = reason.text(ui);
+}
+
+/* THE CAP MARK (Eva, Sep 6, session 23) — where a slider's travel goes DEAD
+   on THIS bloom, drawn on the control itself. The registry row declares
+   `cap(shown)`, which names the owner's number (the stamen spread reads
+   footRing()'s `saturation`); this is the ONLY writer of the mark, and it
+   writes three things on the wrapper from that one number: the class that
+   turns the CSS overlay on, `data-cap` (the number, for the read-out's
+   twin and the gate), and `--bl-cap` (the number as a fraction of the
+   slider's own range, for the overlay's position). No mark when the row
+   declares no cap, when the owner has no number (the part is absent), or
+   when the cap is at or past the range's top — no dead travel there, and a
+   mark at the far end would say there was. The range itself is never
+   touched: not narrowed, not adaptive. */
+function applyCaps(shown) {
+  for (const c of CONTROLS) {
+    if (typeof c.cap !== 'function') continue;
+    const wrap = wrappers[c.id];
+    const at = c.cap(shown);
+    if (at === null || at === undefined || !(at < c.max)) {
+      wrap.classList.remove('bl-ctrl--capped');
+      delete wrap.dataset.cap;
+      wrap.style.removeProperty('--bl-cap');
+      continue;
+    }
+    const frac = Math.min(1, Math.max(0, (at - c.min) / (c.max - c.min)));
+    wrap.classList.add('bl-ctrl--capped');
+    wrap.dataset.cap = at.toFixed(2);
+    wrap.style.setProperty('--bl-cap', frac.toFixed(4));
+  }
 }
 
 /* The ONLY setter of a control wrapper's hidden — evaluates the registry's
@@ -442,6 +478,10 @@ let lastAndroecium = null, lastStamens = [], lastFreeEnds = 0, lastStamenNearest
    builder's own style record (root axis, root rings, tip, the three lobes)
    — the inputs of JG1-JG4 and of the read-out's STYLE line. */
 let lastGynoecium = null, lastStyles = [];
+/* THE FILAMENT-AGAINST-STYLE RECORD (session 23) — buildBloomInto's own
+   nearest approach of a filament station to the style's centreline, null
+   unless both parts are built; the STAMENS line's flag reads it. */
+let lastFilamentStyle = null;
 /* THE PLACEMENT THE BUILD WAS MADE FROM — the registry control's value, kept
    beside footRing()'s own `fan` record so J7 can cross-check the two. They
    are genuinely two owners of one boundary (the registry owns the option
@@ -485,6 +525,7 @@ function buildGeometry({ exportMode, record = false }) {
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
     lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
     lastGynoecium = built.gynoecium; lastStyles = built.styles;
+    lastFilamentStyle = built.filamentStyle;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
   const geo = new THREE.BufferGeometry();
@@ -843,7 +884,13 @@ function fanLine(fr) {
    spine floor told (never clamped). Then the SLENDERNESS line (Q7), verbatim
    tagged: telemetry, never a gate, until a coupon is printed. Absent when the
    androecium is absent, so the lines simply are not there. */
-function stamenLine(fr, stamens, near, mode) {
+/* THE FILAMENT-AGAINST-STYLE CLAUSE (session 23) rides on the same line, on
+   the ROOTS FUSE pattern: present exactly when both parts are built, the
+   builder's own nearest approach and the height it happens at, and the flag
+   when that distance is under one filament radius plus one style radius —
+   the two tubes intersect there. A FLAG, never a gate (Eva, Sep 6): the
+   crossing exports watertight and one piece, which is the invariant working. */
+function stamenLine(fr, stamens, near, mode, fs = null) {
   const A = fr.androecium;
   if (!A) return '';
   const under = stamens.filter((s) => s.law.underFloor).length;
@@ -853,6 +900,7 @@ function stamenLine(fr, stamens, near, mode) {
        + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
        + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}` : '')
        + (under ? ` · bend radius UNDER ONE FILAMENT DIAMETER on ${under} of ${A.count} (told, not clamped)` : '')
+       + (fs ? ` · nearest filament to the style ${fs.mm.toFixed(2)} mm at ${fs.z.toFixed(1)} mm up${fs.crossing ? ` (FILAMENT AGAINST STYLE: under ${fs.threshold.toFixed(2)} mm, the two tubes cross — a flag, never a refusal)` : ` (clear of it by more than ${fs.threshold.toFixed(2)} mm)`}` : '')
        + `\n`;
 }
 
@@ -937,7 +985,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + spineLine(petals)
-       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode) + styleLine(fr, built.styles, built.stamens, mode) + slendernessLine(fr, mode) : '')
+       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + styleLine(fr, built.styles, built.stamens, mode) + slendernessLine(fr, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -973,13 +1021,21 @@ window.__bloomBuildState = () => ({ count: buildCount, pending: regenQueued });
 function regenerate() {
   buildCount++;
   const ui = readUI();
-  refreshLabels(ui);
   const wasPlacement = lastPlacement;   // captured before buildGeometry() below overwrites it
   /* THE MODE ON SCREEN, decided once per build by the one owner. `record`
      marks this as the build the telemetry describes; the export handler's
      build never carries it. */
   const mode = shownMode();
   const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true });
+  /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
+     used to be refreshed before it, which was the same thing while no span
+     read a built number. One of them does now (the stamen spread's cap, an
+     owner's number), so both read the record THIS build produced; the span
+     is still written only from here, which is what the panel gate's path
+     route relies on (a changed span is proof a rebuild happened). */
+  const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium };
+  refreshLabels(ui, shown);
+  applyCaps(shown);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
   else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
   /* The bounding SPHERE is the framing quantity (the accumulator's bounding
@@ -1485,6 +1541,10 @@ window.__bloomMetrics = () => ({
      dropped for the same reason as the androecium's. */
   gynoecium: lastGynoecium ? { ...lastGynoecium, dome: undefined } : null,
   styles: lastStyles.map((s) => ({ ...s, lobes: s.lobes.map((l) => ({ ...l })) })),
+  /* THE FILAMENT-AGAINST-STYLE RECORD (session 23) — the builder's own
+     nearest approach, threshold and flag; null unless both parts are built.
+     The panel gate reads the STAMENS line's clause against it. */
+  filamentStyle: lastFilamentStyle ? { ...lastFilamentStyle } : null,
 });
 window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null, up = null) => { userMoved = true; fitCamera(radius, lift, at, dir, up); };
 

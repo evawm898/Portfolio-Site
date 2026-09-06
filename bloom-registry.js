@@ -3,7 +3,14 @@
    panel, from the very first control.
 
    One row per control: id / section / kind / range / default / label / fmt /
-   tier / visibleWhen. bloom.js GENERATES the panel DOM from this array and
+   tier / visibleWhen — and, on exactly one row today, `cap`. `fmt(v, ui,
+   shown)` receives the control's value, the whole state snapshot, and (since
+   session 23) the SHOWN build's record — `{ mode, androecium, gynoecium }`,
+   footRing()'s own descriptors — for the one read-out that must print an
+   OWNER'S number rather than a slider's: the stamen spread's cap. `cap(shown)`
+   on a row names where that number lives so the app can draw it on the
+   slider; the app evaluates both, and neither re-derives anything.
+   bloom.js GENERATES the panel DOM from this array and
    derives inputs, readUI, DEFAULTS, reset, labels and listeners from the same
    rows. The panel's GROUPING is registry data too — `section` on each control
    plus the SECTIONS array below (identity, order, first-load openness); see
@@ -463,6 +470,64 @@ export const SECTIONS = [
      value is called "dome", which is what dissolved the collision with the
      since-retired `centerStyle`'s DOME (the ornament, gone in session 20). */
   { id: 'head', label: 'Head', open: false },
+  /* ===================================================================
+     CENTER — A CONTAINER, NOT A CONTROL (Eva, Sep 6, session 23). The
+     reproductive parts are parts of ONE thing, and until this session they
+     sat at top level beside PETAL SHAPE as though they were peers of the
+     petals. They are now two drop-downs inside "Center", directly below
+     HEAD — the shape "Petal roles" already has: a parent holding only child
+     sections, no sliders of its own.
+
+     IT HAS NO VALUE AND NO `NONE`, on purpose. "No centre" is what a visitor
+     sees when both parts are off (stamens 0, style NONE), and that state is
+     already reachable through the parts themselves; a NONE on the container
+     would be a SECOND definition of the same state — the registration
+     failure this project has cleaned up twice (the receptacle condition, the
+     rim's two producers). So the container carries no control, no predicate
+     and no read-out of its own: it is HIDDEN when and only when both parts
+     are hidden (under SPHERE), by the one derived rule every section obeys —
+     applyVisibility() reads its children, adds no declaration, and the panel
+     gate asserts the derivation in both directions.
+
+     WHY THE PARTS ARE DECLARED HERE, DIRECTLY AFTER THEIR PARENT (the
+     session-21 note, carried): the generator appends a nested drop-down
+     inside its parent's element, so the DOM's document order is parent then
+     children, and the panel gate's census compares that order against THIS
+     array. A child declared anywhere but immediately after its parent reads
+     as out of order there (measured, session 21).
+
+     PRESENTATION ONLY, 0 MOVED BY CONSTRUCTION: `section` and `parent` are
+     never persisted and no geometry reads either; every control id, law,
+     predicate and default is unchanged. The precedent is session 16's PETAL
+     FORM / PETAL CURL split and session 18's Head move, both proved
+     byte-identical across the frozen baseline — the same two guarantees are
+     stated apart in docs/bloom-session-23-outcome.md.
+
+     WHAT "OFF" MEANS, said on the parts' own read-outs (Eva, Sep 6): setting
+     the count to 0 or the style to NONE HIDES the part's sub-controls and
+     makes them inert, and it KEEPS their values — turning the part back on
+     restores them. That behaviour already existed and nothing announced it,
+     so it read as destructive. The two read-outs now say so, with the kept
+     values, at the moment the visitor turns the part off. NOT a mute: a
+     control that is visible and not building is the mirror of the defect the
+     panel gate exists to catch, so the sub-controls stay hidden AND inert.
+
+     `open: false` — ARRANGEMENT holds the one first-load open. Inside the
+     container the accordion rule holds one level down: opening Gynoecium
+     closes Androecium and leaves Center open. */
+  { id: 'center', label: 'Center', open: false },
+  /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
+     reproductive parts the retired CENTER section was standing in for
+     (session 20). Correct botanical naming (Eva): the androecium is the
+     filaments and anthers; the gynoecium (style and stigma) is B3 and its
+     own drop-down beside this one. Hidden whole under SPHERE by every
+     control's predicate. */
+  { id: 'androecium', label: 'Androecium', open: false, parent: 'center' },
+  /* GYNOECIUM (session 22, phase 2 B3) — the style and its stigma, the
+     second reproductive part and the last piece of the centre. Its own
+     drop-down, on the session-21 note above: each part independently present
+     or absent. Hidden whole under SPHERE by every control's predicate. */
+  { id: 'gynoecium', label: 'Gynoecium', open: false, parent: 'center' },
   { id: 'shape', label: 'Petal shape', open: false },
   { id: 'form', label: 'Petal form', open: false },
   /* PETAL CURL — the spine's own controls (Eva's ruling, Sep 4, from the
@@ -476,12 +541,14 @@ export const SECTIONS = [
      roll taper. Presentation only — `section` is never persisted, no role
      changed, zero geometry, asserted by the retention run. */
   { id: 'curl', label: 'Petal curl', open: false },
-  /* NO CENTER SECTION (session 20, Eva's ruling Sep 5). The A/B rig's section
-     was retired with its three styles — the centre is the reproductive parts
-     and nothing else, and until the androecium lands (phase 2, B2) there is
-     nothing at the pole to control. The junction still never gets a section.
-     `center` is not a control id and sections are not persisted, so the
-     section id is not in RETIRED_IDS; the five control ids are. */
+  /* THE CENTER SECTION WAS RETIRED WITH THE A/B RIG (session 20, Eva's
+     ruling Sep 5: the centre is the reproductive parts and nothing else) and
+     is BACK AS A CONTAINER for exactly those parts (session 23), declared
+     below HEAD above. `center` was never a control id and sections are not
+     persisted, so the section id was never in RETIRED_IDS; the five control
+     ids are, and the panel gate's retirement route now asserts that the
+     container holds NO control of its own. The junction still never gets a
+     section. */
   /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
      WITH THE LABEL on purpose. An id that contradicts its label is a stored
      label-lie: it reads as a declaration, a later reader checks it and
@@ -629,22 +696,10 @@ export const SECTIONS = [
        avoid. */
     parent: 'roles',
   })),
-  /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
-     reproductive parts the retired CENTER section was standing in for
-     (session 20). Correct botanical naming (Eva): the androecium is the
-     filaments and anthers; the gynoecium (style and stigma) is B3 and will be
-     its own section. Hidden whole under SPHERE by every control's predicate.
-     LAST in this list on purpose: the generator renders a parent's nested
-     drop-downs directly after it, and the panel gate's census compares the
-     DOM order against this array — a top-level section declared between
-     "roles" and its children reads as out of order there (measured). */
-  { id: 'androecium', label: 'Androecium', open: false },
-  /* GYNOECIUM (session 22, phase 2 B3) — the style and its stigma, the
-     second reproductive part and the last piece of the centre. Its own
-     section, on the session-21 note above: each part independently present
-     or absent. Hidden whole under SPHERE by every control's predicate. Last
-     for the same reason the androecium is. */
-  { id: 'gynoecium', label: 'Gynoecium', open: false },
+  /* ANDROECIUM and GYNOECIUM stood here, LAST, as top-level sections
+     (sessions 21 and 22); since session 23 they are declared directly after
+     their parent, "Center", above — the same census rule that put them last
+     puts them there. */
 ];
 
 /* WHAT A SECTION'S SUMMARY SAYS, at a given state — THE ONE OWNER, used by
@@ -857,6 +912,11 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
    and need no reinterpretation. Three copies of this ternary would be three
    places for the two modes to drift apart in wording alone. */
 const perDepth = (ui) => (String(ui.placement) === 'CONTINUOUS' ? 'turn' : 'layer');
+
+/* THE TOP OF THE STAMEN SPREAD RANGE — one owner for the slider's `max` and
+   for its read-out's "is the cap within reach" test (session 23). Not
+   narrowed, not adaptive; see the row. */
+const STAMEN_SPREAD_MAX = 6;
 
 /* WHAT THE ROSETTE'S TWO SLOT-ROLE GROUPS CURRENTLY ARE — one owner per group,
    read by every read-out in the group, the fan's `said(ui)` precedent (Eva's
@@ -2001,7 +2061,14 @@ export const CONTROLS = [
      radius, where footRing() CLAMPS it and the read-out says so. A stamen
      standing inside the petal-root annulus is FLAGGED, never refused. */
   { id: 'stamenCount', section: 'androecium', kind: 'slider', min: 0, max: 120, step: 1, default: 0,
-    label: 'Stamens', fmt: (v) => (Number(v) === 0 ? 'none — the apex is bare' : `${v} stamen${Number(v) === 1 ? '' : 's'}, pill anthers`),
+    /* AT 0 THE READ-OUT SAYS WHAT HAPPENS TO THE REST OF THE PART (Eva, Sep 6,
+       session 23): the four sub-controls hide and go inert, and their values
+       are KEPT — printed here from the state itself, because hidden sliders
+       are sliders the visitor cannot read. The layout is the stored value's
+       own word. See the Center section's note in SECTIONS. */
+    label: 'Stamens', fmt: (v, ui) => (Number(v) === 0
+      ? `none — its settings are kept (${String(ui.stamenLayout).toLowerCase()}, spread ${Number(ui.stamenSpread).toFixed(2)}x, ${ui.stamenLength} mm, curl ${ui.stamenCurl}°) and return with the count`
+      : `${v} stamen${Number(v) === 1 ? '' : 's'}, pill anthers`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumEligible' } },
   { id: 'stamenLayout', section: 'androecium', kind: 'choice', default: 'RING',
     options: [
@@ -2011,8 +2078,36 @@ export const CONTROLS = [
     label: 'Layout',
     fmt: (v) => (v === 'DISC' ? 'every stamen at its own radius, r ∝ √i at the golden angle' : 'evenly around one ring'),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
-  { id: 'stamenSpread', section: 'androecium', kind: 'slider', min: 0.6, max: 6, step: 0.05, default: 2,
-    label: 'Stamen spread', fmt: (v) => `${Number(v).toFixed(2)}x the reference — out to the hub radius`,
+  /* THE DEAD TRAVEL IS SHOWN ON THE CONTROL, AND THE RANGE IS NOT TOUCHED
+     (Eva, Sep 6, session 23). On the shipping hub the multiplier saturates
+     at 1.77x with six on a ring in export mode (5.60x live — the floored
+     foot) and the slider runs to 6; the read-out below the buttons already
+     confessed it in prose. Now the control itself says it: `cap` names WHERE
+     the owner's number lives — footRing()'s own `saturation`, the hub radius
+     less a filament radius over the reference, (hub − r) / (r √N) — and the
+     app draws that point on the slider's track and prints it in this
+     read-out, from the SHOWN build's record (the third `fmt` argument), never
+     re-derived here. Two things this deliberately is NOT: the range is NOT
+     narrowed (the saturation is 13.7 at one stamen and 123 on the largest
+     hub — no static range is dead-free, and narrowing breaks the big cases),
+     and the maximum is NOT adaptive (a stored 4.00 that meant a different
+     radius on a different hub would break saved designs). Full range,
+     clamped, TOLD — the curl's ruling — with the telling moved onto the
+     slider. STAMEN_SPREAD_MAX is one owner for the range's top and the
+     read-out's "within reach" test. */
+  { id: 'stamenSpread', section: 'androecium', kind: 'slider', min: 0.6, max: STAMEN_SPREAD_MAX, step: 0.05, default: 2,
+    label: 'Stamen spread',
+    fmt: (v, ui, shown) => {
+      const x = Number(v).toFixed(2);
+      const A = shown && shown.androecium;
+      if (!A) return `${x}x the reference — out to the hub radius`;
+      const sat = A.saturation.toFixed(2);
+      if (A.onAxis) return `${x}x asked — ON THE AXIS (${shown.mode}): this hub is narrower than a filament radius, the whole slider is dead here`;
+      if (A.clamped) return `${x}x asked — CLAMPED at ${sat}x (${shown.mode}), as far as this hub goes; the travel above the mark is dead`;
+      if (A.saturation < STAMEN_SPREAD_MAX) return `${x}x the reference — this hub saturates at ${sat}x (${shown.mode}), the mark on the slider`;
+      return `${x}x the reference — out to the hub radius (no dead travel on this hub)`;
+    },
+    cap: (shown) => (shown && shown.androecium ? shown.androecium.saturation : null),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
   { id: 'stamenLength', section: 'androecium', kind: 'slider', min: 5, max: 40, step: 1, default: 20,
     label: 'Filament length', fmt: (v) => `${v} mm free, above the hub`,
@@ -2041,7 +2136,10 @@ export const CONTROLS = [
       { value: 'STYLE', label: 'A style, trifid stigma' },
     ],
     label: 'Style',
-    fmt: (v) => (v === 'STYLE' ? 'one style on the axis, one sheet thick, tipped with the trifid stigma' : 'none — the apex is bare'),
+    /* AT NONE THE READ-OUT SAYS THE TWO SUB-CONTROLS ARE KEPT, with their
+       values (Eva, Sep 6, session 23) — the stamen count's own clause. */
+    fmt: (v, ui) => (v === 'STYLE' ? 'one style on the axis, one sheet thick, tipped with the trifid stigma'
+      : `none — its settings are kept (${ui.styleLength} mm, curl ${ui.styleCurl}°) and return with the style`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'gynoeciumEligible' } },
   { id: 'styleLength', section: 'gynoecium', kind: 'slider', min: 5, max: 40, step: 1, default: 25,
     label: 'Style length', fmt: (v) => `${v} mm free, above the hub`,
