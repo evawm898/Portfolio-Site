@@ -314,6 +314,33 @@ the bare apex; moving it to a present centre is proposed with numbers there as i
 partition event and waits on Eva's ruling.** B2b (the crowding-raster extensions, the
 independent splay) stays parked.
 
+**THE CENTRE IS ONE SECTION, A CONTAINER, AND THE PANEL SAYS WHAT OFF MEANS** (Eva's rulings,
+session 23, from the brief). `center` (label "Center") sits directly below HEAD and holds
+ANDROECIUM and GYNOECIUM as nested drop-downs — the "Petal roles" shape: a parent with no
+control of its own, hidden when and only when both parts are (under SPHERE), by the derived
+rule every section already obeys. **No value, no NONE**: "no centre" is both parts off, already
+reachable, and a NONE on the container would be a second definition of one state. The two
+parts' read-outs SAY that turning a part off keeps its settings, with the kept values (`none —
+its settings are kept (ring, spread 2.00x, 20 mm, curl 0°) and return with the count`); the
+sub-controls stay hidden AND inert — not a mute. **The stamen spread's dead travel is shown ON
+the control**: the row declares `cap`, the app's `applyCaps()` draws footRing()'s own
+`saturation` as a tick on the track with the dead travel hatched and prints it in the
+read-out (`fmt`'s third argument is the SHOWN build's record); the range is NOT narrowed and
+the max is NOT adaptive. **The FILAMENT-AGAINST-STYLE flag** is on the STAMENS line — the
+nearest approach of any filament's free station to the style's centreline below the stigma
+(the builder's own `stations`, computed AFTER every solid is emitted), against one filament
+plus one style radius; never a gate, and both STL gates stay blind to it by design. It also
+sees what session 22's law table did not ask: a Vogel disc's innermost stamen stands inside
+the style's tube at the root. The panel gate carries all of it (route (q)'s clauses in (o)
+and (p), route (r) for the flag's own witness, the path route admitting a child's control as
+a control-less container's witness, route (n)(i) now "the container holds no control of its
+own"); the sheet is `node tools/shot-bloom-panel.mjs <dir> [base-tree]`, whose fifth sheet is
+the BEFORE/AFTER pairs from a worktree of fd291b4. **0 moved, no new frozen phase**: no row
+added, no byte moved, phase17 stays the newest baseline — the session 18/19 case, not the
+last three sessions'. `docs/bloom-session-23-outcome.md` has the numbers. B2b's other
+instruments (the crowding-raster extensions, anther-against-blade, the independent splay)
+stay parked.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

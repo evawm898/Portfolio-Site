@@ -93,7 +93,7 @@
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, CONTROLS, SECTIONS, DEFAULTS, MAX_FAN_GROUPS } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, settleBuild, CONTROLS, SECTIONS, DEFAULTS, MAX_FAN_GROUPS } from './bloom-harness.mjs';
 import { sectionLabel } from '../bloom-registry.js';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
@@ -168,6 +168,12 @@ async function drive(set) {
     return out;
   }, set);
   if (bad.length) await die(`precondition did not take: ${bad.join('; ')}`);
+  /* THE REAL SIGNAL, never only a sleep (session 23; the flower's rule): the
+     rebuild is rAF-coalesced, and a 120-stamen disc beside a style on a loaded
+     box outlasts a fixed wait — a cell would then be captioned with the
+     PREVIOUS build's read-out. settleBuild() waits on the app's own pending
+     flag; the short wait after it is for the paint. */
+  await settleBuild(page);
   await page.waitForTimeout(250);
 }
 

@@ -4684,3 +4684,96 @@ matters should be measured this way.
       against `main` after the merge: 99 of 102 held; the three that moved are `print-infill.js`, `print.html` and `print.js`, moved on `main` by #166 between the manifest's base and the merge (#167's own squash touched exactly the fifteen predeclared movers and none of the 102). `main` had moved once since
       `6335ac4` (#166, `/print` only; the overlap with this branch was CLAUDE.md, in different
       sections, no conflict).
+
+- **Session 23 (Sep 6): the centre panel reorganisation — CENTER as a CONTAINER below HEAD
+  holding ANDROECIUM and GYNOECIUM as drop-downs; the parts' read-outs saying OFF KEEPS
+  the settings; the stamen spread's dead travel shown ON the control; the
+  FILAMENT-AGAINST-STYLE flag on the STAMENS line. No geometry; 0 moved by construction and
+  measured on phase17 and the live matrix; NO new frozen phase owed. Numbers in
+  `docs/bloom-session-23-outcome.md`.**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, the session-23 brief, carried).** (1) A CENTER
+      section directly below HEAD with the two parts nested — they were peers of the petals
+      and are parts of one thing. (2) A CONTAINER, NOT A CONTROL: no value, no NONE. "No
+      centre" is both parts off, already reachable; a NONE on the container would be a second
+      definition of one state, the registration failure cleaned up twice before. (3) The
+      read-out says plainly that turning a part off preserves its settings; NOT a mute
+      mechanism — a visible control that does not build is the mirror of the defect the panel
+      gate catches. (4) The radius slider's dead travel SHOWN, its meaning unchanged: the range
+      is not narrowed (configuration-dependent dead zone; 13.7x at one stamen, 123x on the
+      largest hub) and the max is not adaptive (a stored value meaning a different radius on
+      a different hub breaks saved designs). (5) The filament-against-style flag, B2b's family,
+      never a gate. (6) 0 moved, provable by construction, the two guarantees stated apart the
+      way the Head move did; the untouched list predeclared and verified on the FINAL tree;
+      smoke subset export-only; one push; stop at the sheet.
+
+    - **THE CONTAINER NEEDED NO NEW MECHANISM, re-established from source rather than
+      assumed.** `applyVisibility()` derives a section's hidden state from its controls AND its
+      child sections, children first; a parent holding only drop-downs (the "Petal roles"
+      shape) is hidden exactly when every child is. So "if the nested-section logic cannot hide
+      an empty parent, say so and propose" is answered: it can, by the rule that already
+      existed, and the gate asserts it in both directions (hidden under SPHERE, shown at every
+      cap state). The two parts are declared IMMEDIATELY after their parent in `SECTIONS`,
+      the session-21 census rule carried; `section` and `parent` are never persisted, no
+      geometry reads either, every id / law / predicate / default is unchanged — session 16's
+      PETAL FORM / PETAL CURL precedent and session 18's Head move, cited, not re-derived.
+
+    - **THREE THINGS THE GATE HAD TO LEARN, each a real bound met.** The path route required
+      a collapsed section's witness control to declare THAT section — which a container
+      with no control of its own cannot satisfy; it now admits a CHILD'S control for a section
+      holding none of its own, and only then, so `center` is witnessed by `stamenCount`
+      driven through the shut container and the shut drop-down. Route (n)(i) asserted "there
+      is no `#sec-center`" since session 20; what it guards is a resurrected RIG, and a rig is
+      a control INSIDE the section, so the clause now reads "the container holds no control
+      of its own" and its negative control injects `centerStyle` INTO the real container. And
+      the flag's own assertion could not fire under route (o)'s frozen read-out (the clause is
+      absent there, so the flag test is never reached — measured: the negative control came
+      back INCOMPLETE on exactly that witness), so route (r) exists: a fresh page whose
+      negative control rewrites ONLY the flag away and keeps every other character.
+
+    - **THE KEPT CLAUSE PRINTS THE STATE'S OWN VALUES**, because hidden sliders are sliders the
+      visitor cannot read: `none — its settings are kept (disc, spread 6.00x, 40 mm, curl 180°)
+      and return with the count`, the layout as the stored value's own word (no second owner
+      of a name). Asserted equal to the state at count 0 / NONE and absent otherwise; the
+      negative control's frozen span fires on both directions.
+
+    - **THE CAP IS THE OWNER'S NUMBER, DRAWN.** The `stamenSpread` row declares `cap(shown)`
+      — WHERE the number lives (footRing()'s `saturation`, (hub − r)/(r √N)); `applyCaps()` in
+      bloom.js is the one writer of the mark (class, `data-cap`, `--bl-cap` as a fraction of
+      the row's own range), removed when the part is off or the cap is at or past the range
+      top; `fmt(v, ui, shown)` gained a third argument — the SHOWN build's record — for the
+      one read-out that must print an owner's number, and `refreshLabels()` moved AFTER the
+      build in `regenerate()` to read it. On the shipping hub: six on a ring 5.61x (marked),
+      120 on the disc 1.25x (marked, CLAMPED), one stamen 13.74x (past the range, no mark).
+      **The brief's "1.77x on the shipping hub" was NOT reproduced** at any shipping-default
+      state and is in no record — a premise, not a specification; the instrument prints the
+      owner's number on whatever hub is in front of it.
+
+    - **THE FLAG READS THE BUILDER'S STATIONS, AFTER EMISSION.** `buildStamenInto` and
+      `buildStyleInto` return `stations` (the ring centres the rod was revolved through);
+      `buildBloomInto` computes the nearest approach of any filament's FREE station to the
+      style's centreline BELOW THE STIGMA against one filament plus one style radius, null
+      unless both parts are built. It reproduces session 22's law table from the emitted
+      stations (six on the shipping ring: 2.94 mm straight and clear; 0.10 mm at curl 20; 0.05
+      mm at 8.7 mm up at curl 90 — the flag) and sees one thing the table did not ask: a
+      VOGEL DISC's innermost stamen stands at R √(0.5/N) — 0.53 mm at 120, 0.85 at one — so
+      with a style present the flag fires at the root, straight, a true intersection of two
+      closed tubes. Told, not tuned around. FLAG, NEVER GATE: both STL gates stay blind to it
+      by design, and the harness, both gates, both coverage instruments and the smoke tool are
+      on the untouched list.
+
+    - **NO NEW FROZEN PHASE**, stated explicitly as the brief asked: the row set is the same
+      528 (no matrix row was added — the flag is asserted on one page in both directions, the
+      ROOTS FUSE pattern), and no byte moved, so this is the session 18/19 case ("phase14 stays
+      the newest baseline"), not the last three sessions' (each changed the row set). phase17
+      stays the newest baseline.
+
+    - **AT THE PUSH (Sep 6), STOPPED AT THE SHEET.** Panel gate PASS (159 assertions, on the
+      exact tree), negative control PASS (1,500 breaks; all fifteen routes and the four
+      clauses fired); smoke subset export-only clean (39/39); phase17 507/507 and the live
+      matrix 528/528 bit-identical, 0 moved, defaults bit-identical, a worktree of fd291b4
+      against the head on one box in one run; the predeclared manifest 375/375 held on the
+      final tree, the movers exactly the nine declared. One push, docs folded in; the draft PR
+      on `claude/panel-centre-reorganisation-mk89d0` targets `main`. Merge is released by
+      Eva's ruling on `panel-centre.png` and is the session's own final step; the merge sha
+      and the ruling are recorded here by the close-out.
