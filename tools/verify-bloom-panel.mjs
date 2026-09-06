@@ -1557,14 +1557,54 @@ for (const [label, sets, wantDome, wantClamp] of [
            live-looking name.
      (iv)  NO EXECUTABLE BLOOM SOURCE REFERENCES A RETIRED ID AS AN IDENTIFIER
            — the flower's verify-registry-sync scan, ported. Comments and
-           string literals are stripped first and are exempt: the frozen
-           matrices name retired ids as ROW DATA (single- and double-quoted
-           strings) and must, since each is proved deep-equal to its base
-           commit. What survives the strip and still matches `\bid\b` is a
-           property access or a bare identifier, which is a consumer that
+           LITERALS are exempt: the frozen matrices name retired ids as ROW
+           DATA (single- and double-quoted strings) and must, since each is
+           proved deep-equal to its base commit; a regex literal's body is
+           literal text too, and this gate's own negative control names
+           `centerStyle` inside one. What survives and still matches
+           `\bid\b` is a property access or a bare identifier — including
+           one inside a `${…}`, which IS code — and that is a consumer that
            would silently read `undefined`. The file list is the coverage
            and is printed; a retired id living in a file outside it is not
            caught, which the flower's gate header says of its list too.
+
+           IT IS A CHARACTER WALK, NOT A STACK OF REGEXES (session 25, and
+           the session-22 finding closed). Five independent regexes cannot
+           see nesting: `\$\{[^}]*\}` stops at the FIRST `}`, so a `${…}`
+           holding a nested template literal ended the outer match at the
+           INNER literal's closing backtick and every backtick after it
+           paired off by one — the pass then matched the GAPS BETWEEN
+           literals rather than the literals. Measured at 888a506: 20 of the
+           35 scanned files left a stray backtick, the pass deleted 58,522
+           of THIS FILE's 98,906 post-comment characters, and across the set
+           it hid 45% of the executable source it was meant to scan. In that
+           state an apostrophe written inside a template literal survived to
+           the `'…'` pass, re-paired the quotes of the frozen matrices' own
+           label strings and exposed `centerSize` / `centerRise` /
+           `centerDish` inside them. Both directions were measured on this
+           tree: restoring the twenty-two possessives sessions 22 and 24 had
+           reworded away took the old pass to 48 false hits, every one
+           reported at `tools/bloom-harness.mjs:599` — a line reading
+           `const ar = document.getElementById('autoRotate')`, ~3,800 lines
+           from the labels that produced them; and on a PRISTINE 888a506
+           with two genuine references spliced in, it caught one of the two
+           and reported it 2,095 lines from where it lives. A scanner that
+           misses real references and misreports the ones it finds is how a
+           real hit gets waved through, so this is not only about noise.
+
+           THE WALK BLANKS TO SPACES IN PLACE AND KEEPS EVERY NEWLINE, so
+           the scanned text is the same length as the source and `file:line`
+           names the real line. Its own validity is asserted PER FILE —
+           same length, same line count, and the walk ends with nothing
+           open — and a file that fails that FAILS THE GATE rather than
+           being scanned in an unknown state. A `'` or `"` string ends at
+           its line's end if it is unterminated (JS forbids a raw newline in
+           one), so a mis-read costs one line and can never desync the file:
+           that is what makes an apostrophe in HTML prose harmless. A `/`
+           begins a regex only after `( , = : [ ! & | ? { } ;`, an arrow, a
+           keyword like `return`, or the start of a file, AND only if an
+           unescaped `/` closes it before the newline — so `</div>` is not
+           a regex and `a / b` is not either.
 
    NEGATIVE CONTROL: a `.bl-ctrl` holding an `<input id="centerStyle">` is
    injected INTO the real `#sec-center` and the read-out's first line is
@@ -1608,24 +1648,158 @@ for (const [label, sets, wantDome, wantClamp] of [
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
   const files = ['bloom.js', 'bloom-geometry.js', 'bloom-registry.js', 'bloom.html', 'bloom-view-presets.js',
     ...fs.readdirSync(path.join(root, 'tools')).filter((f) => /^(bloom-|verify-bloom-|shot-bloom|diff-bloom-bytes)/.test(f) && /\.mjs$/.test(f)).map((f) => 'tools/' + f)];
-  const strip = (src) => src
-    .replace(/export const RETIRED_IDS = \[[\s\S]*?\n\];/, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/(^|[^:\\])\/\/[^\n]*/g, '$1')
-    .replace(/`(?:\\[\s\S]|\$\{[^}]*\}|[^`\\])*`/g, '``')
-    .replace(/'(?:\\.|[^'\\\n])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\\n])*"/g, '""');
+  /* A `/` opens a regex only in these positions. `<` and `>` are deliberately
+     NOT here — `</div>` in bloom.html would otherwise open one — and the
+     arrow is admitted as the PAIR `=>`, which is how this gate's own
+     `fail.some((f) => /…centerStyle…/.test(f))` is exempted. */
+  const REGEX_OK = new Set(['', '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';']);
+  const REGEX_WORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+  /* Blanks every comment, string, template TEXT and regex body to spaces, in
+     place, keeping newlines — so an offset into the result is an offset into
+     the source. A `${…}` expression is left as CODE, because it is. The
+     stack holds 'tmpl' for template text and a NUMBER for a `${…}`, that
+     number being its own brace depth, so an object literal inside an
+     interpolation does not end it — the nesting the old regexes could not
+     see. */
+  const stripToCode = (src) => {
+    const out = src.split('');
+    const n = src.length;
+    const blank = (k) => { if (k < n && out[k] !== '\n') out[k] = ' '; };
+    const stack = [];
+    let prevChar = '', prevPrev = '', prevWord = '';
+    const after = (c) => { prevPrev = prevChar; prevChar = c; prevWord = ''; };
+    let i = 0;
+    while (i < n) {
+      const c = src[i];
+      if (stack[stack.length - 1] === 'tmpl') {
+        if (c === '\\') { blank(i); blank(i + 1); i += 2; continue; }
+        if (c === '`') { blank(i); stack.pop(); after(')'); i++; continue; }
+        if (c === '$' && src[i + 1] === '{') { blank(i); blank(i + 1); stack.push(0); after('{'); i += 2; continue; }
+        blank(i); i++; continue;
+      }
+      if (c === '/' && src[i + 1] === '/') { while (i < n && src[i] !== '\n') { blank(i); i++; } continue; }
+      if (c === '/' && src[i + 1] === '*') {
+        const end = src.indexOf('*/', i + 2), stop = end === -1 ? n : end + 2;
+        while (i < stop) { blank(i); i++; }
+        continue;
+      }
+      if (c === "'" || c === '"') {
+        /* unterminated stops at the newline — one line of damage, never the file */
+        let j = i + 1;
+        while (j < n && src[j] !== c && src[j] !== '\n') j += src[j] === '\\' ? 2 : 1;
+        const stop = (j < n && src[j] === c) ? j + 1 : j;
+        while (i < stop) { blank(i); i++; }
+        after(')');
+        continue;
+      }
+      if (c === '`') { blank(i); stack.push('tmpl'); i++; continue; }
+      if (c === '/' && (REGEX_OK.has(prevChar) || REGEX_WORDS.has(prevWord) || (prevChar === '>' && prevPrev === '='))) {
+        let j = i + 1, cls = false, close = -1;
+        while (j < n && src[j] !== '\n') {
+          const d = src[j];
+          if (d === '\\') { j += 2; continue; }
+          if (cls) { if (d === ']') cls = false; } else if (d === '[') cls = true;
+          else if (d === '/') { close = j; break; }
+          j++;
+        }
+        if (close !== -1) {
+          while (i <= close) { blank(i); i++; }
+          while (i < n && /[a-z]/.test(src[i])) { blank(i); i++; }   /* flags */
+          after(')');
+          continue;
+        }
+        /* nothing closed it before the newline, and a regex literal may not
+           span one — so this `/` is a division, and falls through. */
+      }
+      const top = stack[stack.length - 1];
+      if (typeof top === 'number') {
+        if (c === '{') stack[stack.length - 1]++;
+        else if (c === '}') { if (top === 0) { stack.pop(); blank(i); } else stack[stack.length - 1]--; }
+      }
+      if (!/\s/.test(c)) { prevPrev = prevChar; prevChar = c; prevWord = /[A-Za-z0-9_$]/.test(c) ? prevWord + c : ''; }
+      i++;
+    }
+    return { code: out.join(''), open: stack.length };
+  };
+  /* PART ONE — the walk over sources whose answer is WRITTEN DOWN, before it
+     is trusted on the tree. On 35 real files a walk that blanked EVERYTHING
+     would also report 0 hits, and the per-file validity check below cannot
+     see a mis-classified region: it only knows the text still lines up. So
+     each case declares the lines a retired id must be reported on, and the
+     fixtures use `centerStyle` — a genuinely retired id, so this table is
+     about the real names.
+
+     THE HISTORICAL BUG ITSELF IS NOT REPRODUCIBLE IN A FIXTURE, and that is
+     stated rather than faked: the phase shift is a WHOLE-FILE parity effect
+     (session 22 found that removing any ONE of thirteen messages cleared
+     it), so every small fixture re-aligns and the old chain passes them.
+     What the table pins is the set of properties that make it impossible,
+     and it was checked against seven mutations of this walk — the
+     interpolation blanked as the old pass did, `}` never closing one, a
+     string running past its newline, regex literals unrecognised, an escape
+     ignored inside a template, the arrow dropped as a regex position, and a
+     regex spanning a newline. Each turns at least one case red. */
+  const WALK_CASES = [
+    ['a bare identifier is a reference', 'if (centerStyle) x();', [1]],
+    ['a property access is a reference', 'const v = ui.centerStyle;', [1]],
+    ['a single-quoted label is row data', "const s = 'centerStyle';", []],
+    ['a double-quoted label is row data', 'const s = "DOME x centerStyle";', []],
+    ['a template literal TEXT is row data', 'const s = `the centerStyle rig`;', []],
+    ['an interpolation is CODE', 'const s = `x ${centerStyle} y`;', [1]],
+    ['a possessive inside a template does not re-pair the next label',
+      "const a = `the owner's limit`;\nconst b = 'centerStyle';\nconst c = centerStyle;", [3]],
+    ['code after a ternary whose nested template interpolates is still code',
+      "const s = `curl ${a}${b !== c ? ` (floored to ${d})` : ''}`;\nconst t = centerStyle;", [2]],
+    ['an interpolation holding an object literal does not end early',
+      'const s = `a ${f({ k: 1 })} b`;\nconst t = centerStyle;', [2]],
+    ['a regex body is literal text', 'const r = /centerStyle/.test(s);', []],
+    ['a regex after an arrow is literal text', 'const r = xs.some((f) => /centerStyle/.test(f));', []],
+    ['a division is not a regex', 'const q = a / b; const t = centerStyle;', [1]],
+    ['a block comment is exempt', '/* centerStyle went in session 20 */\nconst t = centerStyle;', [2]],
+    ['a line comment is exempt', '// centerStyle went in session 20\nconst t = centerStyle;', [2]],
+    ['an escaped backtick does not close a template',
+      'const s = `a \\` centerStyle b`;\nconst t = centerStyle;', [2]],
+    ['an escaped quote does not close a string',
+      "const s = 'a \\' centerStyle b';\nconst t = centerStyle;", [2]],
+    ['markup is not a regex', '</div>\nconst t = centerStyle;', [2]],
+    ['an unterminated quote in prose costs its own line, never the file',
+      "<!-- the flower's own vocabulary -->\nconst t = centerStyle;", [2]],
+    ['a slash with no closing slash on its line is a division',
+      'const r = { a: 1 } / 2;\nconst t = centerStyle / 4;', [2]],
+    ['the line reported is the line it is on', '\n\n\n\nconst t = centerStyle;', [5]],
+  ];
+  const linesOf = (code, id) => {
+    const out = [], re = new RegExp(`\\b${id}\\b`, 'g');
+    let mm; while ((mm = re.exec(code))) out.push(code.slice(0, mm.index).split('\n').length);
+    return out;
+  };
+  const caseBad = [];
+  for (const [label, fixture, want] of WALK_CASES) {
+    const { code, open } = stripToCode(fixture);
+    if (code.length !== fixture.length || open !== 0) { caseBad.push(`${label}: the walk did not vouch for its own fixture`); continue; }
+    const got = linesOf(code, 'centerStyle');
+    if (String(got) !== String(want)) caseBad.push(`${label}: reported ${got.length ? 'line(s) ' + got.join(',') : 'nothing'} where the fixture says ${want.length ? 'line(s) ' + want.join(',') : 'nothing'}`);
+  }
+  if (caseBad.length) p.push(`the source walk fails its own written-down cases, so its reading of the tree is unverified: ${caseBad.join('; ')}`);
+
   const refs = [];
   for (const f of files) {
-    const src = strip(fs.readFileSync(path.join(root, f), 'utf8'));
-    for (const id of retired) {
-      const re = new RegExp(`\\b${id}\\b`, 'g');
-      let mm; while ((mm = re.exec(src))) { const line = src.slice(0, mm.index).split('\n').length; refs.push(`${f}:${line} ${id}`); }
-    }
+    const raw = fs.readFileSync(path.join(root, f), 'utf8');
+    const { code, open } = stripToCode(raw);
+    /* VALIDITY, per file. A scan whose text no longer lines up with the
+       source cannot name a line, so this fails the gate rather than
+       reporting from an unknown state. */
+    const badWalk = [];
+    if (code.length !== raw.length) badWalk.push(`the walk returned ${code.length} chars for ${raw.length}`);
+    if (code.split('\n').length !== raw.split('\n').length) badWalk.push('the line count moved');
+    if (open !== 0) badWalk.push(`the walk ended with ${open} literal(s) still open`);
+    if (badWalk.length) { p.push(`HARNESS INVALID — the source walk cannot vouch for ${f}: ${badWalk.join('; ')}`); continue; }
+    const lines = raw.split('\n');
+    for (const id of retired) for (const line of linesOf(code, id)) refs.push(`${f}:${line} ${id} — ${lines[line - 1].trim().slice(0, 90)}`);
   }
   if (refs.length) p.push(`retired id(s) still referenced as identifiers in executable bloom source: ${refs.slice(0, 12).join('; ')}${refs.length > 12 ? ` … and ${refs.length - 12} more` : ''}`);
   if (p.length) note(`${tag}: ${p.join('; ')}`);
-  else ok.push(`${tag}: ${retired.length} retired ids (${retired.join(', ')}) absent from the DOM, the read-out's summary line, the metrics, and as identifiers in ${files.length} bloom source files; the Center container holds no control of its own`);
+  else ok.push(`${tag}: ${retired.length} retired ids (${retired.join(', ')}) absent from the DOM, the read-out's summary line, the metrics, and as identifiers in ${files.length} bloom source files — the walk passed its ${WALK_CASES.length} written-down cases and vouched for every file; the Center container holds no control of its own`);
 }
 
 /* ===================================================================
