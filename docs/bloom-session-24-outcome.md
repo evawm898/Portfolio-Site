@@ -44,16 +44,22 @@ stigma's. Session 2 is not to be compressed: a ruled byte event gets its own com
 - The read-out's `stamenLine()` in `bloom.js`, and `stamenAssertions()` (JS0–JS4) in
   `tools/bloom-harness.mjs`, whose DISC arm asserted the old law's `r² = (i+0.5) R²/N`.
 
-## The fact the record did not have
+## THE REASON THIS SHIPS — Eva's, from the sheet, and it supersedes the one in her own brief
 
 `R = rFil √N × spread` and `r_0 = R √(0.5/N)`, so **the N cancels**:
 
 > **r₀ = rFil × spread / √2 — 0.8485 mm on every UNCLAMPED disc at ANY count**, one stamen or
-> forty-five. It drops only when the hub clamp binds: 0.7526 mm at 60, **0.5322 mm at 120**.
+> forty-five. It drops only when the hub clamp binds: 0.7526 mm at 60, 0.5322 mm at 120.
 
-Session 23's two figures (0.53 at 120, 0.85 at one) both reproduce exactly; what was missing
-is that they are the same number at every count in between, so **the flag fires at the root at
-every spread below 2.83, and always once the disc clamps**. It was never a 120-stamen problem.
+**That is what decided it** (Eva, Sep 6, at the close): **the disc has started 0.85 mm from the
+axis at every count since it was built, so this is a CORRECTION, not a tuning for the dense
+case.** The brief framed the defect from the clamped 120 (0.5322 mm, the cushion, the row where
+the flag is loudest), and that framing is **superseded** — it makes the change read as relief
+for one crowded corner when it is in fact the disc's law having been wrong at every setting it
+has ever had. Session 23's two figures (0.53 at 120, 0.85 at one) both reproduce exactly; what
+was missing is that they are the same number at every count in between, so **the flag fires at
+the root at every spread below 2.83, and always once the disc clamps**. It was never a
+120-stamen problem, and the 120-stamen row is only where it was first noticed.
 
 ---
 
@@ -311,9 +317,24 @@ an unscoped change is most dangerous. **It is question 1 for Eva at the close.**
 
 ## Loose threads
 
-- **The panel gate's source scanner** — above. A real fix is a tokeniser rather than five
-  regexes, or scanning only for the ids as *bare identifiers* (`\bid\b` not preceded by a quote
-  on the same line), which would survive any string-stripping failure.
+- **THE PANEL GATE'S SOURCE SCANNER IS ITS OWN SESSION, RULED, AND IT COMES BEFORE SESSION 2**
+  (Eva, Sep 6) — not left recorded. It has now cost two sessions: session 22 reworded thirteen
+  assertion messages, session 24 nine, and `main`'s own session-22 commit message already says
+  *"the regex left for its own session"*. **The workaround relies on everyone remembering never
+  to type an apostrophe, and a gate that reports 48 false hits against the wrong file is how a
+  real hit gets waved through later.** Session 2 writes more new assertion messages than
+  anything so far, so fixing it afterwards would be a session too late. The session is small
+  and self-contained — the regex in route (n)(iv), nothing else — and **its positive control is
+  already written for it: apostrophes inside template literals scan clean, AND a genuinely
+  retired id is still caught.** It restores this session's nine reworded messages and session
+  22's thirteen as part of the same change. A real fix is a tokeniser rather than five regexes,
+  or scanning for the ids as *bare identifiers* (`\bid\b` not preceded by a quote on the same
+  line), which survives any string-stripping failure.
+- **THE STAMENS LINE IS GETTING CROWDED — noted, not acted on** (Eva, Sep 6). The inner-limit
+  clause is long, and that line has gained a clause most sessions for a while: the petal-root
+  annulus flag, the two distance flags, the spine floor, the CLAMPED cap, the
+  filament-against-style flag, now this. **Look at it when it is next touched for another
+  reason. It is not worth its own work now.**
 - **The parametric tip** is sessions 2–4, with all eight rulings above already made. Session 2
   is the primitive and the migration alone: zero new controls, 17 movers.
 - **B2b** (the crowding-raster extensions, anther-against-blade, the independent stamen splay)
