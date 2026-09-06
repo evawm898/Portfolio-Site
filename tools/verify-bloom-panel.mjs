@@ -194,6 +194,11 @@ const WITNESS = {
   androecium: { id: 'stamenCount', value: '6',
                 read: (m) => `${m.freeEnds}/${m.stamens.length}/${m.androecium ? m.androecium.radius.toFixed(6) : 'none'}`,
                 what: "the builder's free-end tally / stamens emitted / the owner's disc radius" },
+  /* THE GYNOECIUM (session 22) — the builder's style record and the owner's
+     descriptor; route (p)'s, on one page, in both directions. */
+  gynoecium: { id: 'gynoecium', value: 'STYLE',
+               read: (m) => `${m.styles.length}/${m.gynoecium ? m.gynoecium.length : 'none'}`,
+               what: "styles emitted / the owner's style length" },
   /* NO `center` ENTRY (session 20): the CENTER section and its five controls
      are retired. The witness that stood here (`centerStyle` -> RING, read as
      centerStyle/centerTris) is REPLACED, not deleted silently, by route (n)
@@ -1610,7 +1615,7 @@ for (const [label, sets, wantDome, wantClamp] of [
                fuse: !!(m.stamenNearest && m.androecium && m.stamenNearest.root.mm < m.androecium.diameter),
                lineSaid: (txt.match(/^STAMENS (\d+) on /m) || [])[1], clampSaid: /\(CLAMPED at the hub radius/.test(txt),
                annulusSaid: /STAND INSIDE THE PETAL-ROOT ANNULUS/.test(txt), fuseSaid: /\(ROOTS FUSE\)/.test(txt),
-               slenderSaid: /^SLENDERNESS L\/d [\d.]+ \((live|export)\) — UNMEASURED — no coupon has been printed$/m.test(txt) };
+               slenderSaid: /^SLENDERNESS L\/d (?:style [\d.]+ · )?filament [\d.]+(?: · style [\d.]+)? \((live|export)\) — UNMEASURED — no coupon has been printed$/m.test(txt) && /^SLENDERNESS L\/d (?:[^\n]* · )?filament [\d.]+/m.test(txt) };
     }, SUBS);
     const p = [];
     const wantPresent = !res.sphere && res.count >= 1;
@@ -1622,7 +1627,7 @@ for (const [label, sets, wantDome, wantClamp] of [
     if (res.emitted !== (wantPresent ? res.count : 0) || res.freeEnds !== (wantPresent ? res.count : 0)) p.push(`${res.emitted} stamens emitted / ${res.freeEnds} free ends for ${wantPresent ? res.count : 0} expected`);
     if ((res.lineSaid !== undefined) !== wantPresent) p.push(`the STAMENS line is ${res.lineSaid !== undefined ? 'SHOWN' : 'ABSENT'} while the owner ${wantPresent ? 'declares an androecium' : 'declares none'}`);
     else if (wantPresent && Number(res.lineSaid) !== res.count) p.push(`the STAMENS line says ${res.lineSaid}, the control says ${res.count}`);
-    if (res.slenderSaid !== wantPresent) p.push(`the SLENDERNESS line with its verbatim UNMEASURED tag is ${res.slenderSaid ? 'shown' : 'absent'} while the androecium is ${wantPresent ? 'present' : 'absent'}`);
+    if (res.slenderSaid !== wantPresent) p.push(`the SLENDERNESS line's filament part with its verbatim UNMEASURED tag is ${res.slenderSaid ? 'shown' : 'absent'} while the androecium is ${wantPresent ? 'present' : 'absent'}`);
     if (res.clampSaid !== res.clamped) p.push(`the (CLAMPED at the hub radius) clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports clamped ${res.clamped}`);
     /* THE DEAD TRAVEL IS TOLD, AND THE NUMBER IS THE OWNER'S (Eva, Sep 6): where
        the multiplier runs out on this bloom is printed in the clamp clause and
@@ -1648,6 +1653,76 @@ for (const [label, sets, wantDome, wantClamp] of [
   if (bare) await step('6 stamens asked for under SPHERE (hidden AND inert: the build must not move)', [{ id: 'stamenCount', value: '6' }], { tris: bare.shownTris });
   await step('back to CAP (the section and the six stamens return)', [{ id: 'hubShape', value: 'CAP' }]);
   if (dflt) await step('RADIAL x count 0 x every sub-control at MAXIMUM (hidden and inert: the default\'s own count)', [{ id: 'placement', value: 'RADIAL' }, { id: 'stamenCount', value: '0' }, { id: 'stamenLayout', value: 'DISC' }, { id: 'stamenSpread', value: '6' }, { id: 'stamenLength', value: '40' }, { id: 'stamenCurl', value: '180' }], { tris: dflt.shownTris });
+}
+
+/* ===================================================================
+   ROUTE (p) — THE GYNOECIUM (session 22), on ONE page, in BOTH directions,
+   route (o)'s discipline on the second part of the centre. The section is
+   hidden whole under SPHERE and the two sub-controls hide at NONE; the
+   read-out's STYLE line, its ABOVE / BELOW-the-anthers clause (against the
+   builder's own apexes), its WIDER THAN THE HUB flag and the SLENDERNESS
+   line's `style` part with the verbatim UNMEASURED tag are asserted against
+   the OWNER'S own record. The inertness clauses are BEHAVIOURAL: a style is
+   asked for under a SPHERE and the count must not move from the bare
+   sphere's; the sub-controls at maximum with NONE must not move from the
+   default's; and the WHOLE centre at maximum under SPHERE must not move
+   either. The negative control's frozen read-out makes the STYLE line
+   absent where the geometry builds one. */
+{
+  const tag = '[style]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const SUBS = CONTROLS.filter((c) => c.section === 'gynoecium' && c.id !== 'gynoecium').map((c) => c.id);
+  const step = async (label, sets, want = {}) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
+    const res = await page.evaluate((subs) => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
+      const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
+      const sec = document.getElementById('sec-gynoecium');
+      const stigmaTop = m.styles.length ? Math.max(...m.styles[0].lobes.map((l) => l.apex[2])) : null;
+      const antherTop = m.stamens.length ? Math.max(...m.stamens.map((a) => a.apex[2])) : null;
+      return { value: ui.gynoecium, sphere: m.sphereMode === true,
+               sectionHidden: sec ? sec.hidden : null, ctlHidden: hid('gynoecium'), subsHidden: subs.map((id) => hid(id)),
+               has: m.gynoecium !== null, emitted: m.styles.length, shownTris: m.shownTris,
+               wider: !!(m.gynoecium && m.gynoecium.widerThanHub), widerSaid: /WIDER THAN THE HUB/.test(txt),
+               above: stigmaTop !== null && antherTop !== null ? stigmaTop >= antherTop : null,
+               aboveSaid: (txt.match(/mm (ABOVE|BELOW) the highest anther/) || [])[1],
+               lineSaid: /^STYLE on the axis/m.test(txt),
+               slenderSaid: /^SLENDERNESS L\/d (?:filament [\d.]+ · )?style [\d.]+ \((live|export)\) — UNMEASURED — no coupon has been printed$/m.test(txt) };
+    }, SUBS);
+    const p = [];
+    const wantPresent = !res.sphere && res.value === 'STYLE';
+    if (res.sectionHidden === null) p.push('there is no #sec-gynoecium section in the panel');
+    else if (res.sectionHidden !== res.sphere) p.push(`the Gynoecium section is ${res.sectionHidden ? 'hidden' : 'shown'} while the head ${res.sphere ? 'is a SPHERE (hidden and inert)' : 'is a cap'}`);
+    if (res.ctlHidden !== res.sphere) p.push(`gynoecium is ${res.ctlHidden ? 'hidden' : 'shown'} under a ${res.sphere ? 'sphere' : 'cap'}`);
+    res.subsHidden.forEach((h, i) => { if (h !== !wantPresent) p.push(`${SUBS[i]} is ${h ? 'hidden' : 'shown'} while the gynoecium is ${wantPresent ? 'present' : 'absent'}`); });
+    if (res.has !== wantPresent) p.push(`the owner ${res.has ? 'declares a gynoecium' : 'declares none'} while the state says ${wantPresent ? 'present' : 'absent'}`);
+    if (res.emitted !== (wantPresent ? 1 : 0)) p.push(`${res.emitted} styles emitted for ${wantPresent ? 1 : 0} expected`);
+    if (res.lineSaid !== wantPresent) p.push(`the STYLE line is ${res.lineSaid ? 'SHOWN' : 'ABSENT'} while the owner ${wantPresent ? 'declares a gynoecium' : 'declares none'}`);
+    if (res.slenderSaid !== wantPresent) p.push(`the SLENDERNESS line's style part with its verbatim UNMEASURED tag is ${res.slenderSaid ? 'shown' : 'absent'} while the gynoecium is ${wantPresent ? 'present' : 'absent'}`);
+    if (res.widerSaid !== res.wider) p.push(`the WIDER THAN THE HUB flag is ${res.widerSaid ? 'shown' : 'absent'} while the owner reports ${res.wider}`);
+    if ((res.aboveSaid !== undefined) !== (res.above !== null)) p.push(`the ABOVE/BELOW-the-anthers clause is ${res.aboveSaid !== undefined ? 'shown' : 'absent'} while ${res.above !== null ? 'both parts are built' : 'both parts are not built'}`);
+    else if (res.above !== null && (res.aboveSaid === 'ABOVE') !== res.above) p.push(`the read-out says the stigma is ${res.aboveSaid} the highest anther, the builder's apexes say ${res.above ? 'ABOVE' : 'BELOW'}`);
+    for (const k of ['wider']) if (want[k] !== undefined && res[k] !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${res[k]}`);
+    if (want.above !== undefined && res.above !== want.above) p.push(`this step expects the stigma ${want.above ? 'ABOVE' : 'BELOW'} the anthers, the builder's apexes say ${res.above === null ? 'neither (a part is missing)' : res.above ? 'ABOVE' : 'BELOW'}`);
+    if (want.tris !== undefined && res.shownTris !== want.tris) p.push(`the build has ${res.shownTris} triangles where the reference step had ${want.tris} — a hidden gynoecium control reached the geometry`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: section ${res.sectionHidden ? 'hidden' : 'shown'}, ${res.emitted} style${res.emitted === 1 ? '' : 's'} emitted, ${res.lineSaid ? 'STYLE line shown' : 'no STYLE line'}${res.aboveSaid ? `, stigma ${res.aboveSaid} the anthers` : ''}${res.wider ? ', WIDER THAN THE HUB' : ''}`);
+    return res;
+  };
+  const dflt = await step('defaults (the section shows its choice at NONE, the sub-controls hide, no gynoecium)', []);
+  await step('a style on the bare apex (the sub-controls appear)', [{ id: 'gynoecium', value: 'STYLE' }], { wider: false });
+  await step('style x 6 stamens (both present: the stigma ABOVE the anthers at 25 over 20 mm)', [{ id: 'stamenCount', value: '6' }], { above: true });
+  await step('style length 5 x 6 stamens (the stigma BELOW the anthers)', [{ id: 'styleLength', value: '5' }], { above: false });
+  await step('the APEX CORNER — ALL MIN x sheet 2.40 x spread min (WIDER THAN THE HUB, told)', [{ id: 'styleLength', value: '25' }, { id: 'stamenCount', value: '0' }, { id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }], { wider: true });
+  const bare = await step('CONTINUOUS x SPHERE x NONE (the section hides whole)', [{ id: 'petalCount', value: '8' }, { id: 'petalWidth', value: '12' }, { id: 'sheetThickness', value: '1.2' }, { id: 'footDelicacy', value: '0.5' }, { id: 'spread', value: '2' }, { id: 'gynoecium', value: 'NONE' }, { id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }]);
+  if (bare) await step('a style asked for under SPHERE (hidden AND inert: the build must not move)', [{ id: 'gynoecium', value: 'STYLE' }], { tris: bare.shownTris });
+  if (bare) await step('the WHOLE centre at MAXIMUM under SPHERE (both parts hidden and inert: the build must not move)', [{ id: 'styleLength', value: '40' }, { id: 'styleCurl', value: '180' }, { id: 'stamenCount', value: '120' }, { id: 'stamenLayout', value: 'DISC' }, { id: 'stamenSpread', value: '6' }, { id: 'stamenLength', value: '40' }, { id: 'stamenCurl', value: '180' }], { tris: bare.shownTris });
+  await step('back to CAP (the section, the style and the stamens return)', [{ id: 'hubShape', value: 'CAP' }]);
+  if (dflt) await step('RADIAL x NONE x every sub-control at MAXIMUM (hidden and inert: the default\'s own count)', [{ id: 'placement', value: 'RADIAL' }, { id: 'stamenCount', value: '0' }, { id: 'stamenLayout', value: 'RING' }, { id: 'stamenSpread', value: '2' }, { id: 'stamenLength', value: '20' }, { id: 'stamenCurl', value: '0' }, { id: 'gynoecium', value: 'NONE' }, { id: 'styleLength', value: '40' }, { id: 'styleCurl', value: '180' }], { tris: dflt.shownTris });
 }
 
 await browser.close();
@@ -1677,11 +1752,12 @@ if (NEGATIVE_CONTROL) {
     const sawSphere = fail.some((f) => /^\[sphere\] .*HEAD: FULL SPHERE line is ABSENT while the geometry builds a sphere/.test(f));
     const sawRetired = fail.some((f) => /^\[retired\]: retired id\(s\) still render in the panel: centerStyle; a #sec-center section is in the panel/.test(f) && /names a centre/.test(f));
     const sawStamens = fail.some((f) => /^\[stamens\] .*STAMENS line is ABSENT while the owner declares an androecium/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens) { console.log('\nALL THIRTEEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}. All thirteen must.`);
+    const sawStyle = fail.some((f) => /^\[style\] .*STYLE line is ABSENT while the owner declares a gynoecium/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle) { console.log('\nALL FOURTEEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}. All fourteen must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a resurrected CENTER section and a frozen STAMENS line. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a resurrected CENTER section, a frozen STAMENS line and a frozen STYLE line. It is not measuring anything.');
   process.exit(1);
 }
 

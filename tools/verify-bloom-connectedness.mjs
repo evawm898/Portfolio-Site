@@ -122,7 +122,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
-         stamenAssertions, STAMEN_SCOPE } from './bloom-harness.mjs';
+         stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
@@ -291,6 +291,12 @@ for (const row of rows) {
      reads as one piece either way. */
   const stm = await stamenAssertions(page, row);
   if (stm.length) { validity.push(`${row.label}: ${stm.join('; ')}`); continue; }
+  /* THE GYNOECIUM (JG1-JG4, session 22) — see gynoeciumAssertions()'s
+     header. The same blindness as the androecium's: the style's rod and its
+     three lobes are each their own closed solid, so a style off the axis, a
+     hairline root or a missing lobe reads as watertight and one piece. */
+  const gyn = await gynoeciumAssertions(page, row);
+  if (gyn.length) { validity.push(`${row.label}: ${gyn.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z6) — see zygoAssertions()'s header. This gate is as blind
      to the layer as the export gate is: the foot is never written by anything
      a role may override, and the hub disc spans every ring, so no reachable
@@ -393,6 +399,7 @@ console.log('LIMITS: surface occupancy, not solid; cannot see free ends or sub-c
 console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under layers — the wrong-hub mutation passes this gate on every configuration tried.');
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
+console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */

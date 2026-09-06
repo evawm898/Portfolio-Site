@@ -2,7 +2,7 @@
    bloom-smoke.mjs — THE NAMED SMOKE SUBSET. FOR ITERATION, NEVER FOR MERGE.
 
    WHAT THIS IS. A written-down, derived, auditable subset of
-   buildMatrix() — a fixed subset (35 of 507 rows as of session 21) — run through the REAL export gate with
+   buildMatrix() — a fixed subset (39 of 528 rows as of session 22) — run through the REAL export gate with
    its own `--only` flag. It exists so a session can find out in ~2 minutes
    whether it has broken something, instead of in ~44. It is ADDITIVE: it
    changes nothing about what certifies the work.
@@ -349,6 +349,27 @@ export const SMOKE_BLOCKS = [
         path: 'spineLaw() at tilt 0 with a curl engaged — the filament off its normal beyond the outer face while the root stays on it' },
       { label: 'STAMENS: GATED — every control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)',
         path: 'the other direction — hidden AND inert under SPHERE: no descriptor, no stamen emitted, no free end tallied, the two-statement guard on the state' },
+    ],
+  },
+  {
+    n: 24,
+    anchor: 'GYNOECIUM: a style on the bare apex (the four states — style only)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 22): the branches the part
+       adds are footRing()'s gynoecium map (the apex record, the wider-than-
+       the-hub corner, the annulus flag), rodInto on the axis, the trifid's
+       three pills, spineLaw() at tilt 0 with a curl on the style, and the
+       hidden-and-inert path under SPHERE for the WHOLE centre; the families
+       that need a witness are JG1-JG4 in both directions. Cheapest row per
+       path; the four-state matrix's "both present" row is the second. */
+    rows: [
+      { label: 'GYNOECIUM: a style on the bare apex (the four states — style only)',
+        path: 'the style alone — JG1 (the root exactly on the axis, the normal exactly +z, through the full slab), JG2, JG3 (the root cylinder), JG4 (960 triangles, the trifid law on the emitted lobes)' },
+      { label: 'GYNOECIUM: style x 6 stamens on a RING (the four states — both present)',
+        path: 'both parts present — the two descriptors from one owner on one row, JS1-JS4 and JG1-JG4 together, the centre accumulator counting both in R1' },
+      { label: 'GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on',
+        path: 'spineLaw() with a curl on the filaments while the style stands on the axis they cross — the interaction the sheet is for; the rod helper on both parts' },
+      { label: 'GYNOECIUM: GATED — the WHOLE centre at MAXIMUM under SPHERE (both parts hidden and inert; bit-identical to the bare sphere)',
+        path: 'the other direction for BOTH parts — hidden AND inert under SPHERE: no descriptor of either kind, nothing emitted, both two-statement guards on the state' },
     ],
   },
 ];

@@ -4530,3 +4530,113 @@ matters should be measured this way.
       other three movers are `print-infill.js`, `print.html` and `print.js`, moved on `main`
       by #163 between the manifest's base and the merge; #164 touched none of them (the
       squash's diff against its base is empty on all three).
+
+- ~~Phase 2, B3 — the gynoecium~~ **BUILT Sep 6 (session 22): one style, one sheet thick,
+  rooted THROUGH the hub slab ON THE AXIS (count 1, radius 0 — the apex, where every cap's
+  normal is exactly +z), curved by `spineLaw()` at a curl of 0 as the identity through the
+  SAME rod the filament uses (`rodInto()` / `pillInto()`, extracted VERBATIM from the stamen
+  builder and measured byte-identical on block 23), tipped with the TRIFID (S2, FIXED — three
+  pills of the anther's own proportion sharing the tip at 40°); `fr.gynoecium` as
+  `footRing()`'s third descriptor kind; JG1–JG4 in both STL gates and fired on mutants; the
+  two-statement SPHERE guard with GATED rows for the style AND for the whole centre; the
+  style on the SLENDERNESS line beside the filament, tagged verbatim; block 24 with the
+  four-state matrix as its first rows; the sheet with all four centre states on one row, the
+  pill and the trifid TOGETHER at six and at a hundred and twenty, and the filament curl at
+  ±180 again. SHIPS ABSENT (`gynoecium` NONE), 0 moved. Numbers, the mutant table and the
+  present-centre default PROPOSAL (not done — her ruling) in
+  `docs/bloom-session-22-outcome.md`. `phase17Matrix()` is the 507 rows at `6335ac4`.**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, the B3 brief, carried).** S2 TRIFID fixed — one
+      shape, no enum, no sub-controls, on the pill's own argument (a fixed shape removes a
+      control, its sub-controls, its matrix rows and a panel route); **S4 BILOBED is retired
+      from the candidate set permanently**; S3 PAD is a later value addition; S1 KNOB is
+      dropped (easy to lose against 120 pills). Structure: the third descriptor kind from the
+      same owner, count 1, radius 0, the same surface law — the androecium's pattern and not a
+      second one. Curl: `spineLaw()` at curl 0 as the identity, reused. SPHERE: hidden and
+      inert, two statements, GATED rows. Telemetry: the style joins the slenderness line.
+      Default: ABSENT; the present centre proposed as its own partition event and stopped for
+      her ruling. Scope: the gynoecium and nothing else — B2b untouched.
+
+    - **THE TRIFID IS THREE PILLS SHARING THE TIP, and that is the whole of its geometry.**
+      Each lobe is the anther's own solid of revolution (one emitter, `pillInto`) whose lower
+      hemisphere is centred ON the style's tip — so the rod's last ring is inside every lobe
+      exactly as it is inside an anther — aimed `STIGMA_LOBE_SPREAD_DEG` (40°) off the tip
+      direction toward three azimuths a third of a turn apart; a lobe is
+      `ANTHER_DIAMETER_FACTOR` across the style and `ANTHER_LENGTH_FACTOR` of its own
+      diameter long, so the pill and the trifid read on ONE scale beside each other (1.92 ×
+      4.80 mm at the shipping sheet). Two constants of its own (`STIGMA_LOBES`, the spread),
+      never controls. A style is 960 triangles, fixed: the rod's 360 plus three lobes at 200.
+
+    - **THE CONTROL IS A CHOICE, NOT A COUNT.** `gynoecium` NONE / STYLE (default NONE) with
+      `styleLength` (5–40, default 25) and `styleCurl` (±180, default 0) hidden AND inert at
+      NONE. One style or none is the ruling; a 0..1 slider would have read as a count that
+      could grow, and a choice sweeps nothing in block 1, so ALL MAX carries no style and is
+      unmoved. Its own presence predicate (`gynoeciumPresent`), not one shared with the
+      androecium: each part is INDEPENDENTLY present or absent (Sep 5). "Pistil" names the
+      whole female unit and nothing in the panel.
+
+    - **THE STYLE IS ONE SHEET THICK, LIKE THE FILAMENT, AND THE ONE REACHABLE CORNER IS
+      TOLD.** Part thickness owns the material dimension, so on the apex corner where the
+      androecium goes on-axis (ALL MIN × sheet 2.40 × spread min) the style's root ring is
+      WIDER THAN THE HUB (1.20 mm against a 1.15 mm hub, live): a flag on the read-out and
+      JG2's own clause, never a refusal — the root still crosses the whole slab, so the
+      invariant holds and the row exports watertight and one piece.
+
+    - **THE INSTRUMENTS.** `gynoeciumAssertions()` — JG0 (the two statements per row; present
+      iff eligible and STYLE; nothing emitted when absent), JG1 (the root axis inner→outer
+      exactly t along the normal at the apex, EXACTLY on the axis with the normal EXACTLY
+      [0,0,1] flat and cap alike, on the owner's sphere at the owner's z on a cap, z = 0 flat),
+      JG2 (one style; the footprint inside the hub or WIDER THAN THE HUB said), JG3 (both root
+      rings as EMITTED, every point exactly one style radius from its centre in the face
+      plane), JG4 (emitted = declared = 1; the fixed 960; the TRIFID as a PROPERTY of the
+      emitted lobes — three unit axes exactly 40° off the tip direction and 120° apart, every
+      apex one lobe length along its axis, apexes distinct). Eight mutants, each fired first
+      on the assertion that names it (the table in the outcome doc), including the one that
+      keeps the triangle count (the lobes at twice the spread — only the law clause sees it)
+      and the sphere mutant that dies at HARNESS LOAD. **Doctrine 2 applied:** the coverage
+      instruments count the style in the centre's accumulator, and R1's blindness — it sees
+      the ORCHESTRATION of parts and never a defect inside a builder, because the check
+      shares the builder — is now declared in BOTH instruments' own headers, on the
+      connectedness gate's free-end convention; it had lived only in session 21's outcome
+      doc. Measured again: the style emitted twice and recorded once is silent on JG1–JG4
+      and RED on R1 (14,400 against 15,360).
+
+    - **THE SLENDERNESS LINE IS ONE LINE FOR EVERY ROD THE CENTRE CARRIES** — `SLENDERNESS
+      L/d filament 16.7 · style 20.8 (live) — UNMEASURED — no coupon has been printed` —
+      each over its floored diameter. What it reads now: the style at 20.8 (25 mm on a 1.20
+      sheet), 33.3 at the slider's top, 25.0 on the mum at export (the floor fattens it).
+      Phase A's "L/d above the six / above the cushion" (14.4 / 6.7) was a height over the
+      anthers wearing a slenderness's name; that height is now printed as what it is, on the
+      STYLE line, in millimetres, ABOVE or BELOW the highest anther.
+
+    - **THE STOPPING RULE.** 649 insertions on the eleven code files (the 507 generated
+      phase17 rows excluded; ~40% comment) when JG1–JG4 first ran — green on the first row
+      and on all 39 smoke rows on both gates. Nothing added past that point that a green run
+      did not need; no split owed; B2b stays parked.
+
+    - **phase17 IS OWED AND FROZEN** — the row set changed (507 → 528, block 24), the case
+      that made phase16 owed: `phase17Matrix()` is the 507 rows at `6335ac4` (the head of
+      `main` when the session opened), generated from that commit's own `buildMatrix()` in a
+      worktree, `--verify-frozen --phase17` PASS, `FROZEN_BASE_COMMITS.phase17 = '6335ac4'`,
+      the diff tool wired. The first baseline carrying the androecium's own rows, so the
+      first that can witness the rod helper's extraction on every future tree.
+      `frozen/phase17` is published from `main` after the merge (the bloom-frozen-tags
+      dispatch, red by design on phase5).
+
+    - **THE PRESENT-CENTRE DEFAULT, PROPOSED AND NOT DONE (her ruling).** Counted before a
+      byte is hashed: on the 528 live rows, 486 move and 42 hold (the 21 block-24 rows that
+      pin `gynoecium`, the 24 SPHERE rows where the centre is inert, 3 overlapping); on the
+      4,984-row frozen suite, 4,921 move and 63 hold — no frozen row pins `gynoecium`. The
+      close would be the retirement mode's three-capture shape with `--override
+      gynoecium=STYLE` on the old tree, predeclared with its vacuity guards. +960 triangles
+      on every default export (+3,360 with six stamens), and the bare apex loses its
+      default-is-coverage status and needs explicit rows by name.
+
+    - **THE SHEET: `node tools/shot-bloom-gynoecium.mjs <dir>`** — the four centre states on
+      one camera; the pill and the trifid together at six and at a hundred and twenty; the
+      filament curl at ±180 alone and beside the style (at +180 the filaments cross the axis
+      the style stands on — the cells are in front of her to close the range this time); the
+      style's own range; and the byte claims on the sheet (the style at maximum under SPHERE,
+      the WHOLE centre at maximum under SPHERE, under the incurve sphere, and the sub-controls
+      at maximum with NONE — required equal to the bare sphere's / the incurve sphere's / the
+      default's own sha, or no sheet). Merge is released by Eva's ruling on it.

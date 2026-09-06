@@ -280,6 +280,40 @@ is JS3/JS4's. `phase16Matrix()` is the 481 rows at `a65d16d`, the first post-ret
 baseline (a plain capture per tree closes the next session). An independent stamen SPLAY is
 proposed and costed for B2b in the outcome doc; today Head rise is the only splay.
 
+**THE GYNOECIUM IS BUILT AND SHIPS ABSENT; THE CENTRE IS COMPLETE** (Eva's rulings,
+session 22, phase 2 B3). `gynoecium` (GYNOECIUM section, a CHOICE: NONE / STYLE, default NONE
+— one style or none, never a count) with `styleLength` (5–40 mm, default 25) and `styleCurl`
+(−180..180°, default 0), both hidden AND inert at NONE. The style is `footRing()`'s THIRD
+descriptor kind (`fr.gynoecium`): count 1, radius 0, ON THE AXIS, reading `surfaceAt(0)` —
+the apex, where every cap's normal is exactly +z — and sharing the dome object with the rings
+and the androecium. It is ONE SHEET THICK (floored with the sheet at export, the filament's
+own rule) and rooted THROUGH the slab; `rodInto()` is the one rod both `buildStamenInto` and
+`buildStyleInto` call (spineLaw() at TILT 0, curl 0 the identity), `pillInto()` the one pill —
+both EXTRACTED VERBATIM from the stamen builder, and the block-23 rows on both trees are what
+measure that the stamens' bytes did not move. **The stigma is S2 TRIFID, FIXED** — three
+pills of the anther's own proportion (`ANTHER_DIAMETER_FACTOR` across the style,
+`ANTHER_LENGTH_FACTOR` long) sharing the style's tip at `STIGMA_LOBE_SPREAD_DEG` (40°), a
+third of a turn apart; S4 BILOBED is retired from the candidate set permanently, S3 PAD is a
+later value addition, S1 KNOB is dropped. **HIDDEN AND INERT UNDER SPHERE** —
+`gynoeciumEligible()` and `PREDICATES.gynoeciumEligible` are the two statements, checked at
+harness load, per row (JG0) and by GATED rows (the style at maximum under SPHERE, the WHOLE
+centre at maximum under SPHERE, the sub-controls at maximum with NONE). **JG1–JG4 in both STL
+gates** (`gynoeciumAssertions()`), each fired on a mutant: both gates are BLIND to a style off
+the axis or off the normal, a hairline root, a dropped lobe and a lobe off the trifid's law
+(every rod and lobe is its own closed solid). The STYLE line says where the stigma's top
+stands against the highest anther (ABOVE / BELOW, in mm), the WIDER THAN THE HUB corner and
+the petal-root annulus are FLAGS, and the style joins the SLENDERNESS line (`filament N ·
+style N`), verbatim `UNMEASURED — no coupon has been printed`. **R1 in both coverage
+instruments counts the style in the centre's accumulator and its blindness is declared in
+their own headers:** R1 sees the ORCHESTRATION of parts, never a defect inside a builder,
+because the check shares the builder. `phase17Matrix()` is the 507 rows at `6335ac4`. The
+four-state matrix (androecium × gynoecium, present × absent) is block 24's first rows and the
+sheet's first row: `node tools/shot-bloom-gynoecium.mjs <dir>`. Read
+`docs/bloom-session-22-outcome.md` before touching any of it. **The shipping default is still
+the bare apex; moving it to a present centre is proposed with numbers there as its own
+partition event and waits on Eva's ruling.** B2b (the crowding-raster extensions, the
+independent splay) stays parked.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

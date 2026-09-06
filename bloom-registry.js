@@ -202,6 +202,21 @@ export const PREDICATES = {
   androeciumPresent: { all: [{ ref: 'androeciumEligible' }, { id: 'stamenCount', min: 1 }] },
 
   /* ===================================================================
+     WHERE THE GYNOECIUM APPLIES (session 22, phase 2 B3) — the androecium's
+     ruling verbatim: everywhere but the FULL SPHERE. The registry HIDES the
+     whole Gynoecium section on this; bloom-geometry.js's `gynoeciumEligible()`
+     makes it INERT (a null descriptor); the harness asserts the two agree at
+     module load, both gates per row (JG0), and the GATED matrix rows prove a
+     maximal style under SPHERE byte-identical to the bare sphere.
+     `gynoeciumPresent` is the sub-controls' own gate: nothing to lengthen or
+     curl while the apex is bare. Two predicates and not one shared with the
+     androecium on purpose: each part is INDEPENDENTLY present or absent
+     (Eva, Sep 5 — four states including none), so each has its own
+     presence predicate and the eligibility is stated once per part. */
+  gynoeciumEligible: { not: { ref: 'sphereMode' } },
+  gynoeciumPresent: { all: [{ ref: 'gynoeciumEligible' }, { id: 'gynoecium', oneOf: ['STYLE'] }] },
+
+  /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
      it is a predicate rather than a special case (Eva, Sep 2).
 
@@ -624,6 +639,12 @@ export const SECTIONS = [
      DOM order against this array — a top-level section declared between
      "roles" and its children reads as out of order there (measured). */
   { id: 'androecium', label: 'Androecium', open: false },
+  /* GYNOECIUM (session 22, phase 2 B3) — the style and its stigma, the
+     second reproductive part and the last piece of the centre. Its own
+     section, on the session-21 note above: each part independently present
+     or absent. Hidden whole under SPHERE by every control's predicate. Last
+     for the same reason the androecium is. */
+  { id: 'gynoecium', label: 'Gynoecium', open: false },
 ];
 
 /* WHAT A SECTION'S SUMMARY SAYS, at a given state — THE ONE OWNER, used by
@@ -1999,6 +2020,35 @@ export const CONTROLS = [
   { id: 'stamenCurl', section: 'androecium', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
     label: 'Filament curl', fmt: (v) => (Number(v) === 0 ? 'straight, along the surface normal' : `${v}° — ${Number(v) > 0 ? 'bends in over the centre' : 'reflexes outward'}`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+
+  /* ===================================================================
+     THE GYNOECIUM (session 22, phase 2 B3 — Eva's rulings). Ships ABSENT:
+     `gynoecium` NONE is the shipping default, so every pre-existing export
+     is bit-identical by construction and the two sub-controls are hidden
+     AND inert there (`gynoeciumPresent`). A CHOICE and not a count: there is
+     one style or none (count 1, radius 0, on the axis — the ruling), and a
+     0..1 slider would have read as a count that could grow. The stigma is
+     ONE shape, the TRIFID (S2, FIXED) — no enum, no sub-controls; its lobe
+     count and spread are two constants in bloom-geometry.js beside the
+     anther's two. The style's diameter is the sheet thickness (Part
+     thickness owns the material dimension, the filament's own rule); its
+     curve is spineLaw() at a curl of 0 as the identity, the filament's own
+     rod. "Pistil" is the whole female unit and is not what this controls
+     (Eva, Sep 5): the section is the gynoecium, the control is the style. */
+  { id: 'gynoecium', section: 'gynoecium', kind: 'choice', default: 'NONE',
+    options: [
+      { value: 'NONE', label: 'None' },
+      { value: 'STYLE', label: 'A style, trifid stigma' },
+    ],
+    label: 'Style',
+    fmt: (v) => (v === 'STYLE' ? 'one style on the axis, one sheet thick, tipped with the trifid stigma' : 'none — the apex is bare'),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'gynoeciumEligible' } },
+  { id: 'styleLength', section: 'gynoecium', kind: 'slider', min: 5, max: 40, step: 1, default: 25,
+    label: 'Style length', fmt: (v) => `${v} mm free, above the hub`,
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'gynoeciumPresent' } },
+  { id: 'styleCurl', section: 'gynoecium', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
+    label: 'Style curl', fmt: (v) => (Number(v) === 0 ? 'straight, up the axis' : `${v}° — bends over the apex`),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'gynoeciumPresent' } },
 ];
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));

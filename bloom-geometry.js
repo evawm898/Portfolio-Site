@@ -228,6 +228,47 @@ export const ANTHER_CAP_RINGS = 5;
 export const STAMEN_TRIS = ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + ((2 * ANTHER_CAP_RINGS - 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES);
 export function androeciumEligible(state) { return !sphereMode(state); }
 
+/* ===================================================================
+   THE GYNOECIUM (session 22, phase 2 B3 — Eva's rulings, carried, not
+   re-derived). The style: ONE rod, one sheet thick, rooted THROUGH the hub
+   slab ON THE AXIS — count 1, radius 0, the apex, where every cap's normal
+   is exactly +z — curved by spineLaw() at a curl of 0 as the identity
+   exactly as the filament is (the rod is ONE helper both builders call,
+   rodInto, extracted VERBATIM from the stamen builder), tipped with ONE
+   stigma shape — the TRIFID (S2, FIXED: not an enum, not a control). S4
+   BILOBED is retired from the candidate set permanently; S3 PAD is a later
+   value addition if a second is ever wanted; S1 KNOB is dropped (Phase A:
+   easy to lose against 120 pills). The descriptor is footRing()'s THIRD
+   KIND (`fr.gynoecium`), sharing the dome object and surfaceAt() with the
+   rings and the androecium; the builder reads it and computes nothing.
+
+   THE TRIFID IS THREE PILLS SHARING THE TIP. Each lobe is the anther's own
+   solid of revolution (pillInto — one emitter, one vocabulary) whose lower
+   hemisphere is centred ON the style's tip, so the rod's last ring is
+   inside every lobe exactly as it is inside an anther, aimed
+   STIGMA_LOBE_SPREAD_DEG off the tip direction toward three azimuths a
+   third of a turn apart. A lobe's proportions are the anther's own two
+   factors (ANTHER_DIAMETER_FACTOR across the style, ANTHER_LENGTH_FACTOR of
+   its own diameter long), so the trifid and the pill read on ONE scale
+   beside each other — the pair the sheet puts in front of Eva. Two
+   constants of its own (the lobe count and the spread), never controls.
+
+   Ships ABSENT: `gynoecium` defaults to NONE, so 0 moved is by
+   construction. HIDDEN AND INERT UNDER SPHERE on the androecium's ruling,
+   verbatim (a full-sphere bloom is a flower head; its reproductive parts
+   belong to its florets): this function is the geometry's statement,
+   `PREDICATES.gynoeciumEligible` in the registry is the twin that HIDES,
+   the harness asserts the two agree at module load, the gates per row, and
+   the GATED matrix rows prove the style at maximum under SPHERE
+   byte-identical to the bare sphere. */
+export const STIGMA_LOBES = 3;
+export const STIGMA_LOBE_SPREAD_DEG = 40;
+/* Triangles per style, from the constants — the rod (a filament's tube)
+   plus STIGMA_LOBES pills (each an anther's). JG4's census compares every
+   emitted style against this. */
+export const STYLE_TRIS = ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + STIGMA_LOBES * ((2 * ANTHER_CAP_RINGS - 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES);
+export function gynoeciumEligible(state) { return !sphereMode(state); }
+
 /* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
    pi*(3 - sqrt(5)) rather than a decimal literal so the constant IS the
    definition instead of a rounding of it.
@@ -2064,6 +2105,37 @@ export function footRing(state, acc) {
     };
   })();
 
+  /* THE GYNOECIUM (session 22) — this owner's THIRD kind: ONE style on the
+     axis. Its surface point is the apex, surfaceAt(0): slope 0 (the cap's
+     normal there is exactly +z — cos 0 and sin 0 are exact), z the face
+     pole's height on a cap and 0 flat. The style is ONE SHEET THICK, floored
+     with it (Part thickness owns the material dimension), so on the one
+     reachable apex corner where the androecium goes on-axis (a hub narrower
+     than a filament radius) the style's root ring stands WIDER THAN THE HUB:
+     told, never refused — the root still crosses the whole slab, so the
+     invariant holds. A style foot reaching into a petal-root annulus is the
+     same FLAG the stamens carry. Null when absent or under SPHERE. */
+  const gynoecium = (() => {
+    if (!gynoeciumEligible(state)) return null;
+    if (state.gynoecium !== 'NONE' && state.gynoecium !== 'STYLE') throw new Error(`unknown gynoecium ${JSON.stringify(state.gynoecium)} — the registry and the builder have diverged`);
+    if (state.gynoecium === 'NONE') return null;
+    const diameter = thickness, rSty = diameter / 2;      // one sheet thick, floored with it
+    const s = surfaceAt(0, null);
+    const lobe = { count: STIGMA_LOBES, diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter, spreadRad: STIGMA_LOBE_SPREAD_DEG * D2R };
+    return {
+      count: 1, diameter, rSty, length: state.styleLength, curlDeg: state.styleCurl, curlRad: state.styleCurl * D2R,
+      radius: 0, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief,
+      hubRadius: hub.radius, widerThanHub: rSty > hub.radius,
+      inPetalRootAnnulus: rings.some((rg) => rSty > rg.radius - rg.overhang),
+      clearRadius: Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang))),
+      lobe, thickness, dome,
+      /* SLENDERNESS — free length over the FLOORED diameter, telemetry only
+         (Q7), on the same read-out line as the filament's: UNMEASURED — no
+         coupon has been printed. */
+      slenderness: state.styleLength / diameter,
+    };
+  })();
+
   /* THE QUANTIZER IDENTITY, CROSS-VALIDATED IN THE OWNER — the continuous
      arm's answer to `guardResidual`, and it exists for the same reason: a
      guard must not be somewhere a bug can sit unexercised.
@@ -2192,6 +2264,9 @@ export function footRing(state, acc) {
     /* THE ANDROECIUM, this owner's second kind — null when absent or under
        SPHERE (session 21). */
     androecium,
+    /* THE GYNOECIUM, this owner's third kind — null when absent or under
+       SPHERE (session 22). */
+    gynoecium,
     /* WHETHER THE HEAD IS THE FULL SPHERE (session 18) — this file's own
        answer, cross-checked against the registry's `sphereMode` predicate by
        the harness on every row. */
@@ -3870,9 +3945,16 @@ function revolveInto(acc, rings, south, north) {
   return pts;
 }
 
-export function buildStamenInto(acc, andro, s, slot) {
-  const t = andro.thickness, rf = andro.rFil;
-  const cosA = Math.cos(slot.azimuth), sinA = Math.sin(slot.azimuth);
+/* THE ROD — a filament's or a style's, ONE helper (session 22). The root
+   axis inner->outer on the owner's normal through the full slab, then the
+   free length along spineLaw() at TILT 0 in the (Up, -Rs) plane, the tube's
+   ring frame (T, D x T). EXTRACTED VERBATIM from buildStamenInto — the same
+   expressions on the same doubles in the same order — so every stamen takes
+   exactly the bytes it took in session 21; the block-23 live partition on
+   both trees is what MEASURES that, not this sentence. `s` is the owner's
+   surface record (radius, slope, z); `r` the rod's radius; `t` the slab. */
+function rodInto(acc, { t, r, curlRad, length, floorRadius }, s, azimuth) {
+  const cosA = Math.cos(azimuth), sinA = Math.sin(azimuth);
   const R = [cosA, sinA, 0], T = [-sinA, cosA, 0];
   /* The foot's own frame on the cap — buildPetalInto's (Rs, Up), verbatim. */
   const Rs = [R[0] * Math.cos(s.slope), R[1] * Math.cos(s.slope), -Math.sin(s.slope)];
@@ -3880,32 +3962,79 @@ export function buildStamenInto(acc, andro, s, slot) {
   const P = [R[0] * s.radius, R[1] * s.radius, s.z];                       // the owner's surface point
   const off = (h) => [P[0] + Up[0] * h, P[1] + Up[1] * h, P[2] + Up[2] * h];
   const inner = off(-t / 2), outer = off(t / 2);
-  const law = spineLaw({ curlRad: andro.curlRad, bias: 0, start: 0, length: andro.length, tilt: 0, floorRadius: andro.diameter });
+  const law = spineLaw({ curlRad, bias: 0, start: 0, length, tilt: 0, floorRadius });
   const at = (sArc) => {
     const q = law.at(sArc), c = Math.cos(q.phi), sn = Math.sin(q.phi);
     return { C: [outer[0] + Up[0] * q.dR - Rs[0] * q.dZ, outer[1] + Up[1] * q.dR - Rs[1] * q.dZ, outer[2] + Up[2] * q.dR - Rs[2] * q.dZ],
              D: [Up[0] * c - Rs[0] * sn, Up[1] * c - Rs[1] * sn, Up[2] * c - Rs[2] * sn] };
   };
-  const ring = (C, D, r) => ({ C, e1: T, e2: [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]], r });
-  const stations = [ring(inner, Up, rf), ring(outer, Up, rf)];
-  for (let k = 1; k <= STAMEN_ROWS; k++) { const q = at((k / STAMEN_ROWS) * andro.length); stations.push(ring(q.C, q.D, rf)); }
+  const ring = (C, D, rr) => ({ C, e1: T, e2: [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]], r: rr });
+  const stations = [ring(inner, Up, r), ring(outer, Up, r)];
+  for (let k = 1; k <= STAMEN_ROWS; k++) { const q = at((k / STAMEN_ROWS) * length); stations.push(ring(q.C, q.D, r)); }
   const before = acc.triangleCount;
   const tubePts = revolveInto(acc, stations, inner, stations[stations.length - 1].C);
-  /* THE PILL: lower hemisphere centred ON the tip (the tube's last ring is
-     inside it), a cylinder, the upper hemisphere, apex fans at both poles. */
-  const tip = stations[stations.length - 1], a = andro.anther.diameter / 2, Lc = andro.anther.length - 2 * a;
-  const D = at(andro.length).D;
-  const along = (h) => [tip.C[0] + D[0] * h, tip.C[1] + D[1] * h, tip.C[2] + D[2] * h];
+  return { P, Up, T, inner, outer, stations, tubePts, at, law, before };
+}
+
+/* THE PILL — an anther's, or ONE LOBE of the trifid stigma: a surface of
+   revolution about `D` with EXPLICIT apex fans at both poles, its lower
+   hemisphere centred ON `C` (a rod's tip), so the rod's last ring is inside
+   it. `e1` is any unit vector perpendicular to D — the rod's own T for an
+   anther, D x P for a lobe tilted toward P. Extracted VERBATIM from
+   buildStamenInto (session 22), byte-identical on the anther by the same
+   argument as rodInto. Returns the apex. */
+function pillInto(acc, C, D, e1, a, Lc) {
+  const ring = (Cc, r) => ({ C: Cc, e1, e2: [D[1] * e1[2] - D[2] * e1[1], D[2] * e1[0] - D[0] * e1[2], D[0] * e1[1] - D[1] * e1[0]], r });
+  const along = (h) => [C[0] + D[0] * h, C[1] + D[1] * h, C[2] + D[2] * h];
   const pill = [], K = ANTHER_CAP_RINGS;
-  for (let k = 1; k <= K; k++) { const al = (k / K) * (Math.PI / 2); pill.push(ring(along(-a * Math.cos(al)), D, a * Math.sin(al))); }
-  pill.push(ring(along(Lc), D, a));
-  for (let k = 1; k < K; k++) { const be = (k / K) * (Math.PI / 2); pill.push(ring(along(Lc + a * Math.sin(be)), D, a * Math.cos(be))); }
+  for (let k = 1; k <= K; k++) { const al = (k / K) * (Math.PI / 2); pill.push(ring(along(-a * Math.cos(al)), a * Math.sin(al))); }
+  pill.push(ring(along(Lc), a));
+  for (let k = 1; k < K; k++) { const be = (k / K) * (Math.PI / 2); pill.push(ring(along(Lc + a * Math.sin(be)), a * Math.cos(be))); }
   const apex = along(Lc + a);
   revolveInto(acc, pill, along(-a), apex);
+  return apex;
+}
+
+export function buildStamenInto(acc, andro, s, slot) {
+  const rod = rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: andro.length, floorRadius: andro.diameter }, s, slot.azimuth);
+  /* THE PILL: lower hemisphere centred ON the tip (the tube's last ring is
+     inside it), a cylinder, the upper hemisphere, apex fans at both poles. */
+  const tip = rod.stations[rod.stations.length - 1], a = andro.anther.diameter / 2, Lc = andro.anther.length - 2 * a;
+  const D = rod.at(andro.length).D;
+  const apex = pillInto(acc, tip.C, D, rod.T, a, Lc);
   /* WHAT WAS EMITTED, for the gate: the root axis (JS1), the surface point
      (JS2), the two root rings AS EMITTED (JS3), the apex (JS4). */
-  return { index: slot.index, azimuth: slot.azimuth, root: P, N: Up, inner, outer, rootRings: [tubePts[0], tubePts[1]], tip: tip.C, dir: D, apex, tris: acc.triangleCount - before,
-           law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: law.turnBuilt / D2R, peakRadiusMm: law.peakRadius, underFloor: law.underFloor, clamped: law.clamped, floorRadius: andro.diameter } };
+  return { index: slot.index, azimuth: slot.azimuth, root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, apex, tris: acc.triangleCount - rod.before,
+           law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: andro.diameter } };
+}
+
+/* THE STYLE (session 22): the same rod as a filament's, on the axis at
+   azimuth 0 (R = [1,0,0], T = [0,1,0] — exact), from the owner's apex
+   record, then the TRIFID: STIGMA_LOBES pills sharing the tip, each aimed
+   `spread` off the tip direction D toward a direction P in the (T, D x T)
+   plane at azimuths a third of a turn apart. P is unit and perpendicular to
+   D by construction, so the lobe axis D cos + P sin is unit, and D x P is
+   the lobe's own ring vector. Positive curl bends the style toward -Rs, the
+   filament's own sign (at azimuth 0 that is -x). */
+export function buildStyleInto(acc, G) {
+  const rod = rodInto(acc, { t: G.thickness, r: G.rSty, curlRad: G.curlRad, length: G.length, floorRadius: G.diameter }, G, 0);
+  const tip = rod.stations[rod.stations.length - 1], a = G.lobe.diameter / 2, Lc = G.lobe.length - 2 * a;
+  const D = rod.at(G.length).D, T = rod.T;
+  const B = [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]];
+  const cs = Math.cos(G.lobe.spreadRad), sn = Math.sin(G.lobe.spreadRad);
+  const lobes = [];
+  for (let k = 0; k < G.lobe.count; k++) {
+    const psi = (k * TAU) / G.lobe.count, cp = Math.cos(psi), sp = Math.sin(psi);
+    const P = [T[0] * cp + B[0] * sp, T[1] * cp + B[1] * sp, T[2] * cp + B[2] * sp];
+    const L = [D[0] * cs + P[0] * sn, D[1] * cs + P[1] * sn, D[2] * cs + P[2] * sn];
+    const e1 = [D[1] * P[2] - D[2] * P[1], D[2] * P[0] - D[0] * P[2], D[0] * P[1] - D[1] * P[0]];
+    lobes.push({ index: k, dir: L, apex: pillInto(acc, tip.C, L, e1, a, Lc) });
+  }
+  /* WHAT WAS EMITTED, for the gate: the root axis (JG1), the surface point
+     (JG2), the two root rings AS EMITTED (JG3), the tip, its direction and
+     every lobe's axis and apex (JG4 — the trifid as a PROPERTY). */
+  return { root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, lobes, tris: acc.triangleCount - rod.before,
+           law: { turnAskedDeg: G.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: G.diameter } };
 }
 
 /* ===================================================================
@@ -4108,5 +4237,11 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      the golden angle's tightest approaches sit at Fibonacci index gaps. */
   const nearest = (pts) => { let mm = Infinity, pair = null; for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) { const d = Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1], pts[i][2] - pts[j][2]); if (d < mm) { mm = d; pair = [i, j]; } } return { mm, pair }; };
   const stamenNearest = stamens.length > 1 ? { root: nearest(stamens.map((s) => s.root)), apex: nearest(stamens.map((s) => s.apex)) } : null;
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest };
+  /* THE GYNOECIUM (session 22) — one style on the axis, read from the third
+     descriptor; absent when it is null (NONE, or SPHERE where it is hidden
+     and inert). Its free end is its own census (JG4), never folded into the
+     androecium's. */
+  const styles = [];
+  if (fr.gynoecium) styles.push(buildStyleInto(acc, fr.gynoecium));
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles };
 }

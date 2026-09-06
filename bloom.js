@@ -438,6 +438,10 @@ let lastSlotAzimuths = [];
    per-stamen emission records, its free-end tally and the two distance
    flags — the inputs of JS1-JS4 and of the read-out's STAMENS line. */
 let lastAndroecium = null, lastStamens = [], lastFreeEnds = 0, lastStamenNearest = null;
+/* THE GYNOECIUM (session 22): footRing()'s third descriptor and the
+   builder's own style record (root axis, root rings, tip, the three lobes)
+   — the inputs of JG1-JG4 and of the read-out's STYLE line. */
+let lastGynoecium = null, lastStyles = [];
 /* THE PLACEMENT THE BUILD WAS MADE FROM — the registry control's value, kept
    beside footRing()'s own `fan` record so J7 can cross-check the two. They
    are genuinely two owners of one boundary (the registry owns the option
@@ -480,6 +484,7 @@ function buildGeometry({ exportMode, record = false }) {
     lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
     lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
+    lastGynoecium = built.gynoecium; lastStyles = built.styles;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
   const geo = new THREE.BufferGeometry();
@@ -848,7 +853,38 @@ function stamenLine(fr, stamens, near, mode) {
        + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
        + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}` : '')
        + (under ? ` · bend radius UNDER ONE FILAMENT DIAMETER on ${under} of ${A.count} (told, not clamped)` : '')
-       + `\nSLENDERNESS L/d ${A.slenderness.toFixed(1)} (${mode}) — UNMEASURED — no coupon has been printed\n`;
+       + `\n`;
+}
+
+/* THE STYLE LINE (session 22) — the gynoecium told in the owner's and the
+   builder's own numbers: the rod, the trifid's fixed proportions, where the
+   stigma's top stands (and, with an androecium, how far ABOVE or BELOW the
+   highest anther — the pair on the sheet, said in millimetres), the
+   wider-than-the-hub corner and the petal-root annulus as FLAGS, the spine
+   floor told. Absent when the gynoecium is absent. */
+function styleLine(fr, styles, stamens, mode) {
+  const G = fr.gynoecium;
+  if (!G || !styles.length) return '';
+  const s = styles[0];
+  const stigmaTop = Math.max(...s.lobes.map((l) => l.apex[2]));
+  const antherTop = stamens.length ? Math.max(...stamens.map((a) => a.apex[2])) : null;
+  return `STYLE on the axis · ${G.diameter.toFixed(2)} × ${G.length} mm${G.curlDeg !== 0 ? `, curl ${G.curlDeg}°` : ', straight'} · stigma TRIFID: ${G.lobe.count} lobes ${G.lobe.diameter.toFixed(2)} × ${G.lobe.length.toFixed(2)} mm at ${((G.lobe.spreadRad * 180) / Math.PI).toFixed(0)}°`
+       + ` · stigma top ${stigmaTop.toFixed(2)} mm (${mode})`
+       + (antherTop !== null ? `, ${Math.abs(stigmaTop - antherTop).toFixed(2)} mm ${stigmaTop >= antherTop ? 'ABOVE' : 'BELOW'} the highest anther` : '')
+       + (G.widerThanHub ? ` · WIDER THAN THE HUB (${G.hubRadius.toFixed(2)} mm — a flag, never a refusal)` : G.inPetalRootAnnulus ? ` · the root STANDS INSIDE THE PETAL-ROOT ANNULUS (clear disc ${G.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · inside the clear disc (${G.clearRadius.toFixed(2)} mm)`)
+       + (s.law.underFloor ? ' · bend radius UNDER ONE STYLE DIAMETER (told, not clamped)' : '')
+       + `\n`;
+}
+
+/* THE SLENDERNESS LINE (Q7) — ONE line for every rod the centre carries,
+   the filament's L/d and the style's, each over its FLOORED diameter,
+   verbatim tagged: telemetry, never a gate, until a coupon is printed.
+   Absent when neither part is. */
+function slendernessLine(fr, mode) {
+  const parts = [];
+  if (fr.androecium) parts.push(`filament ${fr.androecium.slenderness.toFixed(1)}`);
+  if (fr.gynoecium) parts.push(`style ${fr.gynoecium.slenderness.toFixed(1)}`);
+  return parts.length ? `SLENDERNESS L/d ${parts.join(' · ')} (${mode}) — UNMEASURED — no coupon has been printed\n` : '';
 }
 
 function summarise(ui, acc, mode, rings, fr, petals, built = null) {
@@ -901,7 +937,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + spineLine(petals)
-       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode) : '')
+       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode) + styleLine(fr, built.styles, built.stamens, mode) + slendernessLine(fr, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -1443,6 +1479,12 @@ window.__bloomMetrics = () => ({
   stamens: lastStamens.map((s) => ({ ...s })),
   freeEnds: lastFreeEnds,
   stamenNearest: lastStamenNearest,
+  /* THE GYNOECIUM (session 22) — the third descriptor (null when absent or
+     under SPHERE) and the style the builder EMITTED (root axis, root rings,
+     tip, the three lobes' axes and apexes — JG1-JG4's inputs). `dome`
+     dropped for the same reason as the androecium's. */
+  gynoecium: lastGynoecium ? { ...lastGynoecium, dome: undefined } : null,
+  styles: lastStyles.map((s) => ({ ...s, lobes: s.lobes.map((l) => ({ ...l })) })),
 });
 window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null, up = null) => { userMoved = true; fitCamera(radius, lift, at, dir, up); };
 
