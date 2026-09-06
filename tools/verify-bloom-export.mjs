@@ -49,7 +49,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
-         stamenAssertions, STAMEN_SCOPE } from './bloom-harness.mjs';
+         stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -158,6 +158,12 @@ for (const row of rows) {
      each tube and pill is its own closed solid. */
   const stm = await stamenAssertions(page, row);
   if (stm.length) { validity.push(`${row.label}: ${stm.join('; ')}`); continue; }
+  /* THE GYNOECIUM (JG1-JG4, session 22) — see gynoeciumAssertions()'s
+     header. The same blindness as the androecium's: the style's rod and its
+     three lobes are each their own closed solid, so a style off the axis, a
+     hairline root or a missing lobe reads as watertight and one piece. */
+  const gyn = await gynoeciumAssertions(page, row);
+  if (gyn.length) { validity.push(`${row.label}: ${gyn.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the
@@ -290,6 +296,7 @@ console.log(`${results.length - degenerates.length}/${results.length} configs em
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
+console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level: a matrix on which the flag

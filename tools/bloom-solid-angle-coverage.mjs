@@ -152,6 +152,14 @@
    (dropping the clause alone changed nothing), so the antipode mutation
    breaks BOTH the clause and the binning, and R0 is its witness; R5 is a
    LINE test by construction and cannot see the sign of t either way.
+   AND R1 SEES THE ORCHESTRATION OF PARTS, NOT THE BUILDER (session 22, the
+   plan raster's own declaration, verbatim in substance): the centre's
+   accumulator calls the SAME buildStamenInto / buildStyleInto the owner
+   calls, so a defect INSIDE a builder moves both sides of R1 equally and R1
+   stays green — those are JS3 / JS4 / JG3 / JG4's in the STL gates. R1 can
+   fail on the orchestration only: a part emitted twice and recorded once,
+   the wrong count or layout, the SPHERE gate ignored (measured on this
+   instrument, session 21: M-R1 red at 16,704 against 20,064 on a cap).
 
    RUN: node tools/bloom-solid-angle-coverage.mjs             the configs below
         node tools/bloom-solid-angle-coverage.mjs --ascii     plus an ASCII
@@ -352,6 +360,10 @@ export async function measure(page, { capability = null, wantMask = false, mutat
       mod.buildWhorlInto({ count: A.count, radius: (i) => A.stamens[i].radius, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
         placement: A.layout === 'DISC' ? 'SPIRAL' : 'RADIAL', blade: (slot) => { mod.buildStamenInto(accST, A, A.stamens[slot.index], slot); } });
     }
+    /* THE GYNOECIUM (session 22) — into the SAME accumulator: the centre's
+       parts are counted in R1 together and rasterised never (a stigma over
+       the disc is not crown closure either). */
+    if (frHC.gynoecium) mod.buildStyleInto(accST, frHC.gynoecium);
     const fr = mod.footRing(ui, accFull);
 
     /* A FLAT hub is skipped — but AFTER the capture and R5 below, so the
@@ -424,7 +436,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
       }
     }
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
-    if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) bad.push(`solid R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + stamens-only (${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a whole-bloom build has ${accFull.triangleCount}`);
+    if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) bad.push(`solid R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens and style: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a whole-bloom build has ${accFull.triangleCount}`);
     if (petalsBuilt !== builtFull.petalsBuilt) bad.push(`solid R2: captured ${petalsBuilt} petals but builtFull.petalsBuilt is ${builtFull.petalsBuilt}`);
     if (bad.length) return { bad };
 

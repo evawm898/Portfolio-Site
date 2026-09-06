@@ -84,6 +84,16 @@
    producer entirely (the charter's junction/centre split, one level up).
    A raster is an approximation of an area; R4 is what says the approximation
    held for THIS reading, never assumed.
+   AND R1 SEES THE ORCHESTRATION OF PARTS, NOT THE BUILDER (session 22, on
+   the connectedness gate's free-end convention: a blindness is declared in
+   the instrument's own header). The centre's accumulator calls the SAME
+   buildStamenInto / buildStyleInto the owner calls, so a defect INSIDE a
+   builder — a dropped pill, a hairline root, a missing lobe — moves both
+   sides of R1 equally and R1 stays green (measured, session 21: M-JS3 and
+   M-JS4 silent here, red on JS3 / JS4). What R1 CAN fail on is the
+   orchestration: a part emitted twice and recorded once, the wrong count,
+   the wrong layout, the SPHERE gate ignored (measured: M-R1 red at 13,440
+   against 16,800). JS1-JS4 and JG1-JG4 in the STL gates carry the builder.
 
    WIRED (session 16). Crown closure on the incurve target is an EMERGENT
    property of curl 150 x tilt x domeLean landing every tip within 0.3-1.3 mm
@@ -158,6 +168,10 @@ export async function measure(page, { capability = null, wantMask = false } = {}
       mod.buildWhorlInto({ count: A.count, radius: (i) => A.stamens[i].radius, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
         placement: A.layout === 'DISC' ? 'SPIRAL' : 'RADIAL', blade: (slot) => { mod.buildStamenInto(accST, A, A.stamens[slot.index], slot); } });
     }
+    /* THE GYNOECIUM (session 22) — into the SAME accumulator: the centre's
+       parts are counted in R1 together and rasterised never (a stigma over
+       the disc is not crown closure either). */
+    if (frHC.gynoecium) mod.buildStyleInto(accST, frHC.gynoecium);
 
     const fr = mod.footRing(ui, accFull);
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard
@@ -259,7 +273,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     /* R1 */
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
     if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
-      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + stamens-only (${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
+      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens and style: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }
     /* R2 */
     if (petalsBuilt !== builtFull.petalsBuilt) {
