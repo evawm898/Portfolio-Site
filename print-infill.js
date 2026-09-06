@@ -10,6 +10,16 @@
 // object. The same code therefore runs on a fused bloom, on a leaf, or on any
 // other solid it is handed, and knows nothing about petals.
 //
+// ONE THING WAS ADDED TO THAT LIST AND IT IS NOT A SURFACE READ. The shape
+// axis (see THE SHAPE AXIS, below) needs to know which end of a part is its
+// BASE, and no 2D outline can say. So `attachmentLocal()` reads vertex
+// POSITIONS — this part's, and the other parts' — ONCE per bundle, to find
+// where this part joins the rest of the model. Positions, never normals,
+// never dihedral angles, never facing: nothing about the SHAPE of the surface
+// enters, only where two solids are near each other, and it collapses to one
+// point per part before anything else sees it. `infill/reads-no-surface` is
+// unmoved by it and still holds.
+//
 // ============================ WHERE IS DARK ================================
 // There is no light in this pipeline, so "where does the shading go" cannot be
 // computed — it has to be DECIDED. Two candidates were on the table:
@@ -209,6 +219,22 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 export const INFILL_MODES = ['off', 'hatch', 'flow', 'tone'];
 
+// Where a stroke's direction comes from. 'global' is the shipped one angle for
+// the whole model; 'axis' is one direction PER PART, derived from that part's
+// own filled region. Not a replacement — a shape with no meaningful long axis
+// (and the fused bloom is exactly that, see the header) is better served by an
+// angle the artist sets.
+export const INFILL_DIRECTIONS = ['global', 'axis'];
+
+// How finely a warped span is chopped on its way back to pixels, and the cap.
+// A straight part needs ONE piece and is then identical to the unwarped stroke.
+// How finely the shape's own centre line is sampled for the shear. More than
+// the veins' 11 because a stroke follows it end to end where a vein only
+// starts on it, and it is 21 scanline queries per part per frame.
+export const WARP_SAMPLES = 21;
+export const WARP_PIECE_PX = 2;
+export const WARP_MAX_PIECES = 12;
+
 // The secondary hatch angles, as offsets from the one the artist sets. NOT 90
 // degrees: a right-angled cross-hatch reads as a mechanical grid, and the
 // engraver's habit is a narrow second pass and a wider third.
@@ -387,6 +413,8 @@ class PartFrame {
     this.x1 = new Float32Array(0); this.y1 = new Float32Array(0);
     this.n = 0;
     this.ax = 0; this.ay = 0;      // anchor, in pixels
+    this.atx = 0; this.aty = 0;    // attachment, in pixels
+    this.hasAttach = false;
     this.reach = 0;                // pixels
     this.minX = 0; this.minY = 0; this.maxX = 0; this.maxY = 0;
     this.depth = 0;                // camera distance, for the between-part order
@@ -419,6 +447,17 @@ export class Infill {
     this.jitter = 35;        // % perturbation of each layer's threshold radius
     this.weight = 1.1;
 
+    // --- direction -------------------------------------------------------
+    // 'global' is the shipped behaviour and stays the DEFAULT: one angle for
+    // the whole model, which is the right answer for a shape with no
+    // meaningful axis and is a mode this session did not get to remove.
+    // 'axis' derives a direction PER PART from that part's own filled region
+    // (see partAxis) and runs the strokes along it.
+    this.direction = 'global';
+    // The axial ramp — heavier at the base, thinner at the tip. Inert at 0,
+    // and inert in 'global', where there is no station to ramp along.
+    this.axialBias = 0;
+
     // --- tonal fill ------------------------------------------------------
     // `gradient` 0 is a FLAT fill: the tone field is ignored entirely and the
     // shape fills to its outline. That is the default because it is the
@@ -444,6 +483,13 @@ export class Infill {
 
     this.frames = art.units.map(() => new PartFrame());
     this.anchors = art.units.map((u) => centroidOf(u.mesh));
+    // ONCE PER BUNDLE, never per frame: where each part joins the rest of the
+    // model. Only used to decide which end of the derived axis is the base.
+    this.attachments = art.units.map((u, i) =>
+      attachmentLocal(u.mesh, art.units.filter((_, j) => j !== i).map(x => x.mesh)));
+    // Per-frame, filled in by update() when direction is 'axis'.
+    this.axes = art.units.map(() => null);
+    this.warps = art.units.map(() => null);
     // PER PART, like the anchor and for the same reason: the reference's depth
     // is one shape reading dark against its neighbour reading light, and that
     // is not something a single number for the whole picture can say. 100 is
@@ -493,6 +539,8 @@ export class Infill {
                      'jitter', 'weight', 'gradient', 'veins', 'veinWidth', 'fillWeight']) {
       if (o[k] !== undefined) this[k] = o[k];
     }
+    if (o.axialBias !== undefined) this.axialBias = Math.max(0, Math.min(100, +o.axialBias || 0));
+    if (o.direction !== undefined && INFILL_DIRECTIONS.includes(o.direction)) this.direction = o.direction;
     if (o.mode !== undefined && INFILL_MODES.includes(o.mode)) this.mode = o.mode;
     this.setEnabled(this.enabled);
   }
@@ -539,6 +587,19 @@ export class Infill {
     // --- project every part's silhouette into pixels -----------------------
     for (let i = 0; i < units.length; i++) this._projectPart(i, camera, W, H, stamp);
 
+    // --- and, in 'axis', derive each part's own direction from it ----------
+    // Per frame, because it is a property of the PROJECTED region: orbit the
+    // model and the axis follows, which is the whole claim.
+    for (let i = 0; i < units.length; i++) {
+      this.axes[i] = null; this.warps[i] = null;
+      if (this.direction !== 'axis' || !this.frames[i].ok) continue;
+      const f = this.frames[i];
+      const ax = partAxis(f, f.hasAttach ? [f.atx, f.aty] : null);
+      if (!ax) continue;
+      this.axes[i] = ax;
+      this.warps[i] = makeWarp(f, ax, { samples: WARP_SAMPLES, piecePx: WARP_PIECE_PX, maxPieces: WARP_MAX_PIECES });
+    }
+
     // Nearest first. A nearer part's silhouette subtracts from a farther one's.
     const order = this.frames.map((f, i) => i).filter(i => this.frames[i].ok)
       .sort((a, b) => this.frames[a].depth - this.frames[b].depth);
@@ -565,6 +626,8 @@ export class Infill {
     this.stats = {
       mode: this.mode, segments: segs, seeds, truncated,
       spacing: this.spacing, angleDeg: this.angleDeg,
+      direction: this.direction,
+      axialBias: this.direction === 'axis' ? this.axialBias : 0,
       layers: this.mode === 'hatch' ? this.layers : 0,
       curvature: this.mode === 'flow' ? this.curvature : 0,
       gradient: this.mode === 'tone' ? this.gradient : 0,
@@ -578,6 +641,20 @@ export class Infill {
         darkness: this.darkness[i],
         rows: this.rowStats[i].rows, reservedRows: this.rowStats[i].reservedRows,
         veinPaths: this.rowStats[i].veinPaths, openRows: this.rowStats[i].openRows,
+        // The derived axis, so the read-out, the gate and the contact sheet
+        // all point at the SAME two dots and the same angle. The scan angle is
+        // separate on purpose: it is the direction a segment of this part was
+        // clipped at, and judging ink at any other angle is the mistake #160
+        // measured (33 of 5361 points read as outside, up to 20 px deep in).
+        axis: this.axes[i] ? {
+          angleDeg: this.axes[i].angleDeg, basis: this.axes[i].basis,
+          base: this.axes[i].base.slice(), tip: this.axes[i].tip.slice(),
+          lengthPx: this.axes[i].t1 - this.axes[i].t0,
+          warpDeviationPx: this.warps[i] ? this.warps[i].deviationPx : 0,
+          warpPieces: this.warps[i] ? this.warps[i].K : 1,
+        } : null,
+        attachPx: f.hasAttach ? [f.atx, f.aty] : null,
+        scanAngleDeg: this.axes[i] ? this.axes[i].angleDeg : this.angleDeg,
       })),
       frameMs: performance.now() - t0,
     };
@@ -652,6 +729,16 @@ export class Infill {
     _v.copy(this.anchors[i]).applyMatrix4(u.mesh.matrixWorld).project(camera);
     f.ax = (_v.x * 0.5 + 0.5) * W;
     f.ay = (0.5 - _v.y * 0.5) * H;
+    // and the attachment, which orients the derived axis. Projected every
+    // frame for the same reason the anchor is: it is a point ON the part, so
+    // it must move with it.
+    const at = this.attachments[i];
+    f.hasAttach = !!at;
+    if (at) {
+      _v.copy(at).applyMatrix4(u.mesh.matrixWorld).project(camera);
+      f.atx = (_v.x * 0.5 + 0.5) * W;
+      f.aty = (0.5 - _v.y * 0.5) * H;
+    }
     // `reach` is a fraction of the part's own on-screen size, so the shading
     // keeps its proportions as the camera dollies instead of growing.
     const radius = 0.5 * Math.hypot(maxX - minX, maxY - minY);
@@ -664,7 +751,18 @@ export class Infill {
   // silhouette by an exact scanline in its own rotated frame, and to its
   // layer's tone threshold by an interval.
   _hatchPart(i, occluders) {
-    const f = this.frames[i];
+    const f0 = this.frames[i];
+    const A = this.axes[i];                 // null in 'global' — nothing below changes
+    const w = this.warps[i];
+    // In 'axis' the whole family is scanned in the SHEARED frame, where the
+    // part's own centre line is the x axis. So "along the shape" is angle 0
+    // there, the layer offsets are offsets from it, and the spans are sheared
+    // back to pixels on emit. One membership rule, in one place, either way.
+    const f = A ? warpFrame(w, f0) : f0;
+    const occF = occluders.map(o => A ? warpFrame(w, this.frames[o]) : this.frames[o]);
+    const baseDeg = A ? 0 : this.angleDeg;
+    const bias = A ? this.axialBias / 100 : 0;
+
     const d = this.draws[i];
     const dst = d.buf.array;
     const cap = INFILL_LIMITS.maxSegmentsPerPart;
@@ -680,9 +778,26 @@ export class Infill {
       count++;
     };
 
+    // The one place the shear is undone. In 'global' this is the same single
+    // segment the family has always emitted; in 'axis' the span is chopped
+    // into w.K pieces and each is put back through the shear, which is what
+    // makes the stroke follow the bend. K is 1 on a straight part.
+    const emitSpan = (a0, a1, v, ca, sa) => {
+      if (!A) { emit(a0 * ca - v * sa, a0 * sa + v * ca, a1 * ca - v * sa, a1 * sa + v * ca); return; }
+      const K = w.K;
+      let px = 0, py = 0;
+      for (let k = 0; k <= K; k++) {
+        const u = a0 + (a1 - a0) * (k / K);
+        const [x, y] = unwarpPoint(w, u * ca - v * sa, u * sa + v * ca);
+        if (k > 0) emit(px, py, x, y);
+        px = x; py = y;
+        if (truncated) return;
+      }
+    };
+
     const layers = Math.max(1, Math.min(HATCH_OFFSETS_DEG.length, this.layers | 0));
     for (let L = 0; L < layers; L++) {
-      const ang = THREE.MathUtils.degToRad(this.angleDeg + HATCH_OFFSETS_DEG[L]);
+      const ang = THREE.MathUtils.degToRad(baseDeg + HATCH_OFFSETS_DEG[L]);
       const ca = Math.cos(ang), sa = Math.sin(ang);
       // u runs along the hatch line, v across it
       const uOf = (x, y) => x * ca + y * sa;
@@ -696,10 +811,17 @@ export class Infill {
       }
       const first = Math.ceil(vmin / s), last = Math.floor(vmax / s);
       const idx = new ScanIndex(f, ca, sa, s);
-      const occIdx = occluders.map(o => new ScanIndex(this.frames[o], ca, sa, s));
+      const occIdx = occF.map(g => new ScanIndex(g, ca, sa, s));
       const tau = LAYER_THRESHOLDS[L];
       const baseR = toneRadius(tau, f.reach, gamma);
       const au = uOf(f.ax, f.ay), av = vOf(f.ax, f.ay);
+
+      // The axial ramp's share of this layer's coverage. Vacuous at bias 0 and
+      // in 'global'; in the sheared frame the station is x, so t = u*ca - v*sa
+      // and the surviving run of u is one interval.
+      const sMax = A ? axialStationAt(tau, bias) : Infinity;
+      if (sMax < 0) continue;
+      const tMax = A && isFinite(sMax) ? A.t0 + sMax * (A.t1 - A.t0) : Infinity;
 
       for (let k = first; k <= last; k++) {
         const v = k * s;
@@ -712,7 +834,13 @@ export class Infill {
         const dv = v - av;
         if (Math.abs(dv) >= r) continue;
         const half = Math.sqrt(r * r - dv * dv);
-        const tLo = au - half, tHi = au + half;
+        let tLo = au - half, tHi = au + half;
+        if (A) {
+          const cut = axialClip(tMax, ca, -sa, 0, v);
+          if (!cut) continue;
+          tLo = Math.max(tLo, cut[0]); tHi = Math.min(tHi, cut[1]);
+          if (!(tHi > tLo)) continue;
+        }
 
         // exact spans of the part at this v, minus every nearer part's spans
         const spans = idx.spansAt(v);
@@ -725,7 +853,7 @@ export class Infill {
         for (let q = 0; q + 1 < cut.length; q += 2) {
           const a0 = cut[q], a1 = cut[q + 1];
           if (a1 - a0 < 0.75) continue;               // shorter than a mark
-          emit(a0 * ca - v * sa, a0 * sa + v * ca, a1 * ca - v * sa, a1 * sa + v * ca);
+          emitSpan(a0, a1, v, ca, sa);
           if (truncated) break;
         }
         if (truncated) break;
@@ -790,9 +918,18 @@ export class Infill {
     if (D <= 0) { d.count = 0; d.truncated = false; return { segments: 0, seeds: 0, truncated: false }; }
 
     // The rows run along `angleDeg`, the same control the other two families
-    // use for direction. It is invisible on a solid fill and is what orients
-    // the gradient's dither once the shape stops being solid.
-    const ang = THREE.MathUtils.degToRad(this.angleDeg);
+    // use for direction — or, in 'axis', along the part's OWN axis. It is
+    // invisible on a solid fill and is what orients the gradient's dither and
+    // the axial ramp once the shape stops being solid.
+    //
+    // NO WARP HERE, DELIBERATELY. A solid fill has no legible stroke direction
+    // to curve: the shear would cost K times the segments — with the row pitch
+    // at 0.80 x the nib that is thousands of rows, straight into the per-part
+    // cap — to bend marks nobody can see the ends of. The direction still
+    // matters, because it is what the axial ramp and the dither are measured
+    // along, and both of those are what the reference's leaf actually shows.
+    const A = this.axes[i];
+    const ang = THREE.MathUtils.degToRad(A ? A.angleDeg : this.angleDeg);
     const ca = Math.cos(ang), sa = Math.sin(ang);
     const vOf = (x, y) => -x * sa + y * ca;
     const uOf = (x, y) => x * ca + y * sa;
@@ -820,18 +957,28 @@ export class Infill {
     const first = Math.ceil(vLo / pitch);
     const last = Math.min(Math.floor(vHi / pitch), first + INFILL_LIMITS.toneMaxRows);
 
-    // ONE INDEX PER PART PER FRAME. Every part in this family scans at the same
-    // angle and the same pitch, so a part's index is the same object whether it
-    // is being filled or is subtracting from something behind it — and without
-    // the cache the nearest part's index is rebuilt once for itself and once
-    // for every part behind it. Measured on the three-part bundle: the bloom's
-    // 45,000-edge index was being built three times a frame. The bucket range
-    // is the VIEWPORT's, not the part's, precisely so the cached index does not
-    // depend on which part asked for it.
+    // ONE INDEX PER PART PER SCAN ANGLE PER FRAME. In 'global' every part
+    // scans at the same angle and the same pitch, so a part's index is the
+    // same object whether it is being filled or is subtracting from something
+    // behind it — and without the cache the nearest part's index is rebuilt
+    // once for itself and once for every part behind it. Measured on the
+    // three-part bundle: the bloom's 45,000-edge index was being built three
+    // times a frame. The bucket range is the VIEWPORT's, not the part's,
+    // precisely so the cached index does not depend on which part asked.
+    //
+    // THE ANGLE IS PART OF THE KEY AND THAT IS NOT A REFINEMENT. In 'axis'
+    // each part scans at its OWN angle, so a bloom index cached while the
+    // LEAF was being filled would be handed back, at the leaf's angle, when
+    // the stem asked for it — and every span it subtracted would be wrong.
+    // Found by the cost table, not by any check here: a wrong occluder
+    // subtraction takes ink AWAY, so it leaves no mark outside any outline and
+    // every membership assertion in both gates stays green.
     const io = { vLo: cLo, vHi: cHi, bucketPitch: Math.max(pitch, INFILL_LIMITS.toneBucketPx) };
+    const key = (j) => `${j}@${ca.toFixed(9)},${sa.toFixed(9)}`;
     const getIdx = (j) => {
-      let ix = this._idxCache.get(j);
-      if (!ix) { ix = new ScanIndex(this.frames[j], ca, sa, pitch, io); this._idxCache.set(j, ix); }
+      const k = key(j);
+      let ix = this._idxCache.get(k);
+      if (!ix) { ix = new ScanIndex(this.frames[j], ca, sa, pitch, io); this._idxCache.set(k, ix); }
       return ix;
     };
     const idx = getIdx(i);
@@ -843,7 +990,14 @@ export class Infill {
     const rot = rotatePaths(paths, ca, sa);
     const halfVein = this.veinWidth / 2;
 
-    const ctx = { idx, occ: occIdx, rot, halfVein, pitch, au, av,
+    // The axial ramp, as the affine station map the row clip needs. With the
+    // rows running along the axis, (ca, sa) IS (ex, ey), so u - c.e is the
+    // station outright: du = 1, dv = 0.
+    const axial = (A && this.axialBias > 0)
+      ? { bias: this.axialBias / 100, t0: A.t0, tLen: A.t1 - A.t0, du: 1, dv: 0, c0: -A.cdot }
+      : null;
+
+    const ctx = { idx, occ: occIdx, rot, halfVein, pitch, au, av, axial,
       reach: f.reach, gamma, darkness: D, gradient: g, jitter: this.jitter / 100 };
 
     for (let k = first; k <= last; k++) {
@@ -896,7 +1050,10 @@ export class Infill {
     const idx = new ScanIndex(f, 1, 0, 1);
     const occIdx = occluders.map(o => new ScanIndex(this.frames[o], 1, 0, 1));
     const inside = (x, y) => idx.contains(x, y) && !occIdx.some(o => o.contains(x, y));
-    const ang = THREE.MathUtils.degToRad(this.angleDeg);
+    // The grain. In 'axis' it is the part's own axis rather than one angle for
+    // the whole model; the curvature field then bends it exactly as before.
+    const Ax = this.axes[i];
+    const ang = THREE.MathUtils.degToRad(Ax ? Ax.angleDeg : this.angleDeg);
     const gx = Math.cos(ang), gy = Math.sin(ang);
     const c = Math.max(-1, Math.min(1, this.curvature / 100));
 
@@ -1219,6 +1376,319 @@ export function principalAxis(f) {
   return { cx: mx, cy: my, ex: ex / l, ey: ey / l };
 }
 
+// ===========================================================================
+// THE SHAPE AXIS — a direction derived from the part's own filled region,
+// so that strokes describe the form instead of cutting across it.
+//
+// EVERYTHING HERE IS STILL 2D AND STILL READS NO SURFACE. The axis comes from
+// the projected silhouette's covariance and its own cross-spans; the only
+// thing that comes from outside the outline is WHICH END IS THE BASE, and
+// that is a single point per part (see attachmentLocal), fixed at load.
+//
+// WHAT IS SIMPLE HERE AND WHERE IT VISIBLY FAILS. The axis is a STRAIGHT
+// principal axis, not a medial axis — a real medial axis is a real algorithm
+// and is not what this session built. On a part whose long dimension curves,
+// the straight axis is a chord: it is right in the middle and increasingly
+// wrong toward the two ends, where the strokes drift off the margin. The
+// mitigation is the WARP below, which is not a medial axis either: it shears
+// the frame by the shape's own centre line so that a stroke at constant
+// cross-offset follows the bend. That is exact where the centre line is a good
+// stand-in for the medial axis (a leaf, a petal, a stem) and wrong where it is
+// not — a Y-shaped or a strongly re-entrant part has one centre line and two
+// arms, and the shear will pull strokes across the fork. Both failures are
+// photographed on the contact sheet rather than argued about.
+
+// The point on `mesh` that is nearest to any OTHER part of the bundle, in
+// mesh-LOCAL space — the part's attachment, read off the geometry rather than
+// declared. This is the only thing in this file that looks at another part,
+// it runs ONCE per bundle (not per frame), and its whole job is to answer
+// which end of the axis is the base.
+//
+// The shipped bundle declares a `pivot` junction but nothing about where the
+// LEAF joins the stem, so a declared attachment would only ever cover one of
+// the three parts. Nearest-point covers all of them, and it is honest about
+// what it means: "where this part meets the rest of the plant". On the stem
+// that is the BLOOM JUNCTION at the top, not the cut end at the bottom — a
+// defensible reading, and not the botanical one. Say it rather than tune it.
+export function attachmentLocal(mesh, others, opts = {}) {
+  const cap = opts.cap || 1500;
+  const P = mesh.geometry.getAttribute('position');
+  if (!P || !P.count || !others.length) return null;
+  const pts = [];
+  const v = new THREE.Vector3();
+  for (const o of others) {
+    const Q = o.geometry.getAttribute('position');
+    if (!Q || !Q.count) continue;
+    o.updateWorldMatrix(true, false);
+    const st = Math.max(1, Math.ceil(Q.count / cap));
+    for (let i = 0; i < Q.count; i += st) {
+      v.fromBufferAttribute(Q, i).applyMatrix4(o.matrixWorld);
+      pts.push(v.x, v.y, v.z);
+    }
+  }
+  if (!pts.length) return null;
+  mesh.updateWorldMatrix(true, false);
+  const st = Math.max(1, Math.ceil(P.count / cap));
+  let best = Infinity, bi = -1;
+  for (let i = 0; i < P.count; i += st) {
+    v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
+    for (let j = 0; j < pts.length; j += 3) {
+      const dx = v.x - pts[j], dy = v.y - pts[j + 1], dz = v.z - pts[j + 2];
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d < best) { best = d; bi = i; }
+    }
+  }
+  if (bi < 0) return null;
+  return new THREE.Vector3().fromBufferAttribute(P, bi);
+}
+
+// The cross-spans of `f` at station `t` along an oriented axis, using an index
+// already built across that axis. Factored out because three things now want
+// it: the width probe that orients the axis, the medial line, and the veins.
+export function crossSpansAt(idx, ax, t) {
+  return idx.spansAt(-(t + ax.cdot));
+}
+
+// The one cross-span at station `t` that the shape's own centre line falls in,
+// falling back to the widest span on that row when the centre line is in a
+// notch. Null where the row is empty.
+export function centreSpanAt(idx, ax, t) {
+  const sp = crossSpansAt(idx, ax, t);
+  if (!sp.length) return null;
+  let best = null, widest = null;
+  for (let i = 0; i + 1 < sp.length; i += 2) {
+    if (ax.u0 >= sp[i] && ax.u0 <= sp[i + 1]) best = [sp[i], sp[i + 1]];
+    if (!widest || sp[i + 1] - sp[i] > widest[1] - widest[0]) widest = [sp[i], sp[i + 1]];
+  }
+  return best || widest;
+}
+
+// The part's own long axis, ORIENTED base -> tip.
+//
+// The direction is the principal axis of the silhouette's endpoints — the
+// closed-form eigenvector that principalAxis() already computes for the veins,
+// so there is one statement of "which way is long" and not two. The ORIENTATION
+// is the new part, and it has two rules in priority order:
+//
+//   1. `attachPx`, the part's attachment projected to pixels: the base is
+//      whichever extreme of the axis is nearer to it.
+//   2. with no attachment (a single-part bundle), the WIDER end, measured from
+//      the shape's own cross-spans at 15% in from each extreme. A leaf, a
+//      petal and a stem all broaden toward where they are joined on.
+//
+// Returns null for a silhouette with no extent. `cdot` and `u0` are carried so
+// crossSpansAt/centreSpanAt can be driven off an index built at (qx, qy).
+export function partAxis(f, attachPx = null) {
+  const pa = principalAxis(f);
+  if (!pa) return null;
+  let ex = pa.ex, ey = pa.ey;
+  const cx = pa.cx, cy = pa.cy;
+  const extent = () => {
+    let t0 = Infinity, t1 = -Infinity;
+    for (let i = 0; i < f.n; i++) {
+      for (const [x, y] of [[f.x0[i], f.y0[i]], [f.x1[i], f.y1[i]]]) {
+        const t = (x - cx) * ex + (y - cy) * ey;
+        if (t < t0) t0 = t;
+        if (t > t1) t1 = t;
+      }
+    }
+    return [t0, t1];
+  };
+  let [t0, t1] = extent();
+  if (!(t1 - t0 > 1e-6)) return null;
+
+  let flip = false, basis;
+  if (attachPx) {
+    const ta = (attachPx[0] - cx) * ex + (attachPx[1] - cy) * ey;
+    flip = Math.abs(ta - t1) < Math.abs(ta - t0);
+    basis = 'attachment';
+  } else {
+    const mk = (X, Y) => ({ cx, cy, ex: X, ey: Y, qx: -Y, qy: X,
+      cdot: cx * X + cy * Y, u0: cx * -Y + cy * X });
+    const a = mk(ex, ey);
+    const L = t1 - t0;
+    const idx = new ScanIndex(f, a.qx, a.qy, 1, {
+      vLo: -(t1 + a.cdot) - L, vHi: -(t0 + a.cdot) + L, bucketPitch: Math.max(1, L / 8),
+    });
+    const w = (t) => { const sp = centreSpanAt(idx, a, t); return sp ? sp[1] - sp[0] : 0; };
+    flip = w(t0 + L * 0.15) < w(t1 - L * 0.15);
+    basis = 'width';
+  }
+  if (flip) { ex = -ex; ey = -ey; const s = t0; t0 = -t1; t1 = -s; }
+
+  const qx = -ey, qy = ex;
+  return {
+    cx, cy, ex, ey, qx, qy, t0, t1, basis, flipped: flip,
+    cdot: cx * ex + cy * ey,
+    u0: cx * qx + cy * qy,
+    angleDeg: Math.atan2(ey, ex) * 180 / Math.PI,
+    // base and tip, in pixels, so the read-out, the gate and the sheet can all
+    // point at the same two dots.
+    base: [cx + t0 * ex, cy + t0 * ey],
+    tip: [cx + t1 * ex, cy + t1 * ey],
+  };
+}
+
+// The shape's own centre line, sampled along the axis: `ts` are stations and
+// `us` the cross-coordinate of the middle of the cross-span at each. The ONE
+// owner — the veins' midrib and the stroke warp are both this list, so a
+// curved leaf's veins and its strokes can never bend differently.
+export function medialOffsets(f, ax, opts = {}) {
+  const n = Math.max(2, opts.samples !== undefined ? opts.samples : 11);
+  const t0 = opts.t0 !== undefined ? opts.t0 : ax.t0;
+  const t1 = opts.t1 !== undefined ? opts.t1 : ax.t1;
+  // The index is CLAMPED to the stations this actually asks about, and its
+  // buckets are one sample apart. Neither changes an answer — a row is still
+  // evaluated at exactly the v it asks for, and an edge crossing an in-range
+  // bucket is still registered for it — only the work, and the work is the
+  // whole story here: at the leaf's close-up camera the bloom projects across
+  // millions of pixels, and bucketing its 45,000 edges one pixel at a time to
+  // answer twenty-one questions was most of what 'axis' cost. Measured.
+  const spanV = Math.max(1, Math.abs(t1 - t0) / (n - 1));
+  const idx = opts.idx || new ScanIndex(f, ax.qx, ax.qy, 1, {
+    vLo: -(Math.max(t0, t1) + ax.cdot) - spanV,
+    vHi: -(Math.min(t0, t1) + ax.cdot) + spanV,
+    bucketPitch: spanV,
+  });
+  const ts = [], us = [];
+  for (let i = 0; i < n; i++) {
+    const t = t0 + (t1 - t0) * (i / (n - 1));
+    const sp = centreSpanAt(idx, ax, t);
+    ts.push(t);
+    us.push(sp ? (sp[0] + sp[1]) / 2 : ax.u0);
+  }
+  return { ts, us, idx };
+}
+
+// ===========================================================================
+// THE WARP — a shear that makes "a straight row" mean "a stroke that follows
+// the shape's centre line".
+//
+// The membership rule is NOT touched. The silhouette is sheared into (t, n)
+// coordinates — t along the axis, n the offset from the centre line at that t —
+// the SAME scanline runs there, and the spans it returns are sheared back on
+// the way to the screen. So a stroke curves with the shape while "inside" is
+// still decided by exactly one rule, which is the thing #157 says not to have
+// two of.
+//
+// What it approximates: a silhouette edge is straight in (t, n) too, where the
+// true image of a straight edge under a piecewise-linear shear is a polyline.
+// The edges are triangle edges — short — and the shear is smooth, so the error
+// is bounded by the centre line's slope change across one edge. Nothing else
+// here is approximate.
+export function makeWarp(f, ax, opts = {}) {
+  const med = medialOffsets(f, ax, opts);
+  const dev = med.us.map(u => u - ax.u0);
+  let lo = Infinity, hi = -Infinity;
+  for (const d of dev) { if (d < lo) lo = d; if (d > hi) hi = d; }
+  // How finely an emitted span is chopped on the way back to pixels. A shape
+  // whose centre line is straight needs ONE piece and is then byte-identical
+  // to the unwarped stroke, which is what makes the warp free on a straight
+  // part and is asserted by `axis/warp-is-inert-on-a-straight-part`.
+  const spanPx = Math.max(1e-6, hi - lo);
+  const K = Math.max(1, Math.min(opts.maxPieces || 12, Math.ceil(spanPx / (opts.piecePx || 2))));
+  return { ax, ts: med.ts, dev, lo, hi, K, deviationPx: spanPx };
+}
+
+// The centre line's offset at station t, clamped outside the sampled range.
+export function warpOffsetAt(w, t) {
+  const ts = w.ts, n = ts.length;
+  if (t <= ts[0]) return w.dev[0];
+  if (t >= ts[n - 1]) return w.dev[n - 1];
+  const span = (ts[n - 1] - ts[0]) / (n - 1);
+  let i = Math.min(n - 2, Math.max(0, Math.floor((t - ts[0]) / span)));
+  while (i + 1 < n - 1 && ts[i + 1] < t) i++;
+  while (i > 0 && ts[i] > t) i--;
+  const s = (t - ts[i]) / (ts[i + 1] - ts[i]);
+  return w.dev[i] + (w.dev[i + 1] - w.dev[i]) * s;
+}
+
+// pixels -> (t, n)
+export function warpPoint(w, x, y) {
+  const a = w.ax;
+  const t = (x - a.cx) * a.ex + (y - a.cy) * a.ey;
+  const u = (x - a.cx) * a.qx + (y - a.cy) * a.qy;
+  return [t, u - warpOffsetAt(w, t)];
+}
+
+// (t, n) -> pixels
+export function unwarpPoint(w, t, n) {
+  const a = w.ax;
+  const u = n + warpOffsetAt(w, t);
+  return [a.cx + t * a.ex + u * a.qx, a.cy + t * a.ey + u * a.qy];
+}
+
+// The whole silhouette, sheared. Same shape as a PartFrame so ScanIndex and
+// every span helper run on it unchanged.
+export function warpFrame(w, f) {
+  const out = { n: f.n, ok: false, x0: new Float32Array(f.n), y0: new Float32Array(f.n),
+    x1: new Float32Array(f.n), y1: new Float32Array(f.n),
+    minX: 0, minY: 0, maxX: 0, maxY: 0, ax: 0, ay: 0, reach: f.reach, depth: f.depth };
+  if (!f.ok) return out;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < f.n; i++) {
+    const [a, b] = warpPoint(w, f.x0[i], f.y0[i]);
+    const [c, d] = warpPoint(w, f.x1[i], f.y1[i]);
+    out.x0[i] = a; out.y0[i] = b; out.x1[i] = c; out.y1[i] = d;
+    if (a < minX) minX = a; if (a > maxX) maxX = a;
+    if (c < minX) minX = c; if (c > maxX) maxX = c;
+    if (b < minY) minY = b; if (b > maxY) maxY = b;
+    if (d < minY) minY = d; if (d > maxY) maxY = d;
+  }
+  out.minX = minX; out.minY = minY; out.maxX = maxX; out.maxY = maxY;
+  out.ok = f.n >= 3 && maxX > minX && maxY > minY;
+  const [ax, ay] = warpPoint(w, f.ax, f.ay);
+  out.ax = ax; out.ay = ay;
+  return out;
+}
+
+// ===========================================================================
+// THE AXIAL RAMP — the reference's "heavier at the base, thinner at the tip",
+// as an adjustable amount rather than a hardcoded convention.
+//
+// It is the SECOND component of the coverage the anchor already supplies, not
+// a second mechanism: coverage is `min(radial tone, axial factor)`, so both
+// are still closed-form INTERVAL clips on a row and neither is sampled. `min`
+// and not a product on purpose — a product of two fields is not a single
+// interval along a row, and this file's whole cost argument is that every clip
+// is an interval.
+//
+// AT bias 0 THE FACTOR IS 1 EVERYWHERE AND THE CLIP IS VACUOUS, so the ramp is
+// inert and the picture is bit-identical to axis mode without it. That is the
+// guard `axial/zero-bias-is-inert` pins.
+export function axialFactor(s, bias) {
+  const b = Math.max(0, Math.min(1, bias));
+  const u = Math.max(0, Math.min(1, s));
+  return 1 - b * u;
+}
+
+// The station fraction at which the axial factor falls to `tau`. Infinity when
+// the ramp never gets there (or is off), -1 when it is already below at the
+// base — i.e. the row is not drawn at all.
+export function axialStationAt(tau, bias) {
+  const b = Math.max(0, Math.min(1, bias));
+  if (b <= 0) return tau <= 1 ? Infinity : -1;
+  if (tau > 1) return -1;
+  const s = (1 - tau) / b;
+  return s >= 1 ? Infinity : s;
+}
+
+// The interval of `u` on a row that survives the axial ramp, in whatever
+// rotated frame the row is being scanned in. `tOf` maps (u, v) to a station,
+// and is affine in u, so the answer is one interval — that is the whole reason
+// the ramp costs nothing.
+//
+//   t(u, v) = u * du + v * dv + c0
+//
+// so `t <= tMax` is `u <= (tMax - v*dv - c0)/du` for du > 0, the other way for
+// du < 0, and all-or-nothing for du == 0.
+export function axialClip(tMax, du, dv, c0, v) {
+  if (!isFinite(tMax)) return [-Infinity, Infinity];
+  const rest = tMax - v * dv - c0;
+  if (Math.abs(du) < 1e-12) return rest >= 0 ? [-Infinity, Infinity] : null;
+  return du > 0 ? [-Infinity, rest / du] : [rest / du, Infinity];
+}
+
 // The vein paths for one projected silhouette, in PIXELS: a midrib that
 // follows the shape's medial line, plus `pairs` lateral branches on each side.
 //
@@ -1229,9 +1699,9 @@ export function principalAxis(f) {
 // Each lateral's length is the measured half-width on its own side, so the
 // laterals shorten toward the tip without anything being told to taper.
 export function veinPaths(f, pairs, opts = {}) {
-  const ax = principalAxis(f);
-  if (!ax) return [];
-  const { cx, cy, ex, ey } = ax;
+  const pa = principalAxis(f);
+  if (!pa) return [];
+  const { cx, cy, ex, ey } = pa;
   const qx = -ey, qy = ex;                       // the cross axis
   const sweep = (opts.sweepDeg !== undefined ? opts.sweepDeg : VEIN_SWEEP_DEG) * Math.PI / 180;
   const reach = opts.reach !== undefined ? opts.reach : VEIN_REACH;
@@ -1248,36 +1718,20 @@ export function veinPaths(f, pairs, opts = {}) {
   }
   if (!(t1 - t0 > 1e-6)) return [];
 
-  // Rows perpendicular to the principal axis. With (ca, sa) = the cross axis,
-  // ScanIndex's u runs along it and its v is -(p . e), so a station t is the
-  // row at v = -(t + c.e).
-  const idx = new ScanIndex(f, qx, qy, 1);
-  const cdot = cx * ex + cy * ey;
-  const u0 = cx * qx + cy * qy;
-
-  // The cross-span at station t that the shape's own centre line falls in,
-  // falling back to the widest span on that row when the centre line is in a
-  // notch. Returns null where the row is empty.
-  const crossAt = (t) => {
-    const sp = idx.spansAt(-(t + cdot));
-    if (!sp.length) return null;
-    let best = null, widest = null;
-    for (let i = 0; i + 1 < sp.length; i += 2) {
-      if (u0 >= sp[i] && u0 <= sp[i + 1]) best = [sp[i], sp[i + 1]];
-      if (!widest || sp[i + 1] - sp[i] > widest[1] - widest[0]) widest = [sp[i], sp[i + 1]];
-    }
-    return best || widest;
-  };
-  const pt = (t, u) => [(t + cdot) * ex + u * qx, (t + cdot) * ey + u * qy];
+  // The axis descriptor the shared cross-span helpers take. Built from the
+  // UNORIENTED principal axis on purpose: which end of a leaf the veins fan
+  // from is a property of the drawing that shipped in #160, and orienting it
+  // base->tip here would move every existing vein. partAxis() is the oriented
+  // one, and only the stroke direction reads it.
+  const ax = { cx, cy, ex, ey, qx, qy, t0, t1,
+    cdot: cx * ex + cy * ey, u0: cx * qx + cy * qy };
+  const pt = (t, u) => [(t + ax.cdot) * ex + u * qx, (t + ax.cdot) * ey + u * qy];
 
   const L = t1 - t0;
   const a0 = t0 + L * inset, a1 = t1 - L * inset;
-  const rib = [];
-  for (let i = 0; i < ribSamples; i++) {
-    const t = a0 + (a1 - a0) * (i / (ribSamples - 1));
-    const sp = crossAt(t);
-    rib.push(pt(t, sp ? (sp[0] + sp[1]) / 2 : u0));
-  }
+  const med = medialOffsets(f, ax, { samples: ribSamples, t0: a0, t1: a1 });
+  const idx = med.idx;
+  const rib = med.ts.map((t, i) => pt(t, med.us[i]));
   const paths = [rib];
 
   const nPairs = Math.max(0, pairs | 0);
@@ -1286,7 +1740,7 @@ export function veinPaths(f, pairs, opts = {}) {
     // has no width to run into and reads as a nick in the outline.
     const frac = 0.18 + 0.64 * (nPairs === 1 ? 0.5 : j / (nPairs - 1));
     const t = a0 + (a1 - a0) * frac;
-    const sp = crossAt(t);
+    const sp = centreSpanAt(idx, ax, t);
     if (!sp) continue;
     const um = (sp[0] + sp[1]) / 2;
     const base = pt(t, um);
@@ -1326,9 +1780,11 @@ export function veinPaths(f, pairs, opts = {}) {
 // region that was never going to be filled and then look as though it had.
 export function toneRowSpans(ctx, k) {
   const { idx, occ, rot, halfVein, pitch, au, av, reach, gamma, darkness, gradient, jitter } = ctx;
+  const axial = ctx.axial || null;
   const v = k * pitch;
   const L = TONE_ORDER[((k % TONE_LEVELS) + TONE_LEVELS) % TONE_LEVELS];
-  const out = { v, L, spans: [], onOutline: false, reserved: false, clipped: false };
+  const out = { v, L, spans: [], onOutline: false, reserved: false, clipped: false,
+    axialClipped: false };
 
   const tau = levelThreshold(L, darkness, gradient);
   if (tau >= 1) return out;                    // this row is lighter than its level
@@ -1336,6 +1792,23 @@ export function toneRowSpans(ctx, k) {
   let spans = idx.spansAt(v);
   if (!spans.length) return out;
   out.onOutline = true;
+
+  // THE AXIAL RAMP. A fourth clip, and like the other three an INTERVAL: this
+  // row's level needs `L / TONE_LEVELS` of coverage, the axial factor supplies
+  // `1 - bias * s`, so the run of stations that still qualifies is one
+  // interval and the run of u that maps to it is another. Absent (and so
+  // exactly inert) in 'global' and at bias 0 — which is the shipped picture.
+  if (axial && axial.bias > 0 && darkness > 0) {
+    const sMax = axialStationAt((L / TONE_LEVELS) / darkness, axial.bias);
+    if (sMax < 0) return out;
+    if (isFinite(sMax)) {
+      const cut = axialClip(axial.t0 + sMax * axial.tLen, axial.du, axial.dv, axial.c0, v);
+      if (!cut) return out;
+      spans = clipSpans(spans, cut[0], cut[1]);
+      if (!spans.length) return out;
+      out.axialClipped = true;
+    }
+  }
 
   if (tau >= 0) {
     // The threshold is a circle, so the clip is an interval rather than a

@@ -292,10 +292,23 @@
     <input type="range" id="infillSpacing" min="2" max="24" step="0.5" value="7">
     <output id="infillSpacingOut">7.0 px</output>
   </div>
-  <div class="pose-row">
+  <div class="pose-row" id="row-infillDirection">
+    <label for="infillDirection">direction</label>
+    <select id="infillDirection">
+      <option value="global" selected>global angle</option>
+      <option value="axis">shape axis</option>
+    </select>
+    <output id="infillDirectionOut"></output>
+  </div>
+  <div class="pose-row" id="row-infillAngle">
     <label for="infillAngle">angle</label>
     <input type="range" id="infillAngle" min="0" max="180" step="1" value="35">
     <output id="infillAngleOut">35°</output>
+  </div>
+  <div class="pose-row" id="row-infillAxial">
+    <label for="infillAxial">axial</label>
+    <input type="range" id="infillAxial" min="0" max="100" step="1" value="0">
+    <output id="infillAxialOut">0%</output>
   </div>
   <div class="pose-row" id="row-infillLayers">
     <label for="infillLayers">layers</label>
