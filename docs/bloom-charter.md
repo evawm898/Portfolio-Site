@@ -4397,8 +4397,8 @@ matters should be measured this way.
   two-statement SPHERE guard with GATED rows; the slenderness line tagged verbatim; the
   sheet with the pill at both count extremes and the six-filament curl range. SHIPS ABSENT
   (`stamenCount` 0), 0 moved. Numbers, the mutant table, the rise measurement and the
-  recommendation in `docs/bloom-session-21-outcome.md`. Merge waits on Eva's ruling on the
-  sheet.**
+  recommendation in `docs/bloom-session-21-outcome.md`. Merged Sep 6 as `d1931b2` on Eva's
+  ruling (the entry below); `frozen/phase16` published at `a65d16d`.**
 
     - **THE RULINGS THIS IMPLEMENTS (Eva, Phase A, carried).** A1 PILL fixed — one shape, no
       enum, no sub-controls; **A2 BILOBED is retired from the candidate set permanently**;
@@ -4501,3 +4501,32 @@ matters should be measured this way.
       55 retired-id rows needed the split shape in `tools/compare-bloom-captures.mjs`).
       `frozen/phase16` is published from `main` after the merge (the bloom-frozen-tags
       dispatch, red by design on phase5).
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** The pill at six and at a hundred and twenty
+      — approved, as chosen. The radius control as a MULTIPLIER, not millimetres — approved.
+      The curl range's placeholder (`<<±180 or ±120>>`) was left unfilled, so ±180 ships as
+      built and photographed; a narrowing to ±120 is one number in the registry plus the two
+      curl-extreme row labels and two sheet cells, and moves no byte (the default is 0) — it
+      is OPEN, not decided. NOTED FOR B2b, not built: Head rise is today the only stamen
+      splay, so HEAD does two jobs; an independent aim on the androecium's own whorl is
+      proposed and costed in the outcome doc (about 40 lines, 0 triangles, 0 moved by
+      construction). Her two questions before the merge are answered above, by measurement.
+
+    - **THE CLOSE (Sep 6).** All four bloom gates green on the PR head `eaa8b83` (both STL
+      gates on the full 507-row matrix, the panel gate, the frozen gate; the two flower gates
+      ran too, `tools/**` filter, and are not bloom evidence). #164 merged by the session as
+      `d1931b2`, the head sha read from the remote. `frozen/phase16` published from `main`
+      at `a65d16d` by the bloom-frozen-tags dispatch (run 34012640385): phase5 the ONLY
+      refusal, the diagnosed cause (a GitHub App token cannot push a ref whose workflow
+      files differ from `main`'s) verbatim in its log, fourteen published, read back with
+      `git ls-remote --tags`. **The predeclared manifest, re-verified against `main` after
+      the merge, and CORRECTED:** 67 of 74 held. FOUR of this session's own moved, not the
+      three the outcome doc first said — `tools/bloom-plan-coverage.mjs` and
+      `tools/bloom-solid-angle-coverage.mjs` (R1 counts a third part),
+      `tools/verify-bloom-connectedness.mjs` (the assertions wire into BOTH gates), and
+      `tools/diff-bloom-bytes.mjs`, which moved in the close-out commit when phase16 was
+      wired and was missed because the manifest paragraph was written at the first commit
+      and not re-run at the second — the re-verify found it, which is what it is for. The
+      other three movers are `print-infill.js`, `print.html` and `print.js`, moved on `main`
+      by #163 between the manifest's base and the merge; #164 touched none of them (the
+      squash's diff against its base is empty on all three).
