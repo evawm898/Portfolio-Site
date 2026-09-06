@@ -129,6 +129,33 @@
          chrome was invisible to every shipped instrument in the gates' own
          state (8/8 rows byte-identical), which is why this route exists.
 
+     (q) THE CENTER CONTAINER AND ITS THREE READ-OUT CLAUSES (session 23),
+         folded into routes (o) and (p) below rather than a route of their
+         own, because they are properties of the same two parts on the same
+         pages: the container "Center" is hidden iff BOTH parts are hidden
+         (under SPHERE) and shown otherwise — the derived section rule one
+         level up, asserted in both directions; the count's and the style's
+         read-out spans say the sub-controls are KEPT, with their values
+         equal to the state, exactly when the part is off and never when it
+         is on; the stamen spread's CAP MARK (data-cap, --bl-cap, the class)
+         sits at the owner's own `saturation` exactly when that is inside
+         the range and is absent when it is not or the part is off; and the
+         FILAMENT-AGAINST-STYLE flag on the STAMENS line is present iff both
+         parts are built, its distance and height equal to the builder's own
+         record, the flag iff the record says crossing. The negative control
+         freezes the container's `hidden`, both spans and the cap wrapper's
+         mark, and requires all four clauses to fire.
+
+     (r) THE FLAG'S OWN WITNESS (session 23). Route (o)'s negative control
+         freezes the WHOLE read-out, so on that page the clause is absent and
+         the flag's own assertion — the flag iff the builder says crossing —
+         is never reached. A read-out that prints the clause with the flag
+         stuck OFF is a different failure. On a fresh page, six at curl 90
+         beside the style must carry the flag while the builder reports the
+         crossing; the negative control replaces the read-out's setter with
+         one that rewrites only the flag away and keeps every other
+         character, so exactly that assertion fires.
+
      (j) THE INNER-RING LINE, BOTH DIRECTIONS (Sep 3). Where a derived depth
          clamp was proposed and rejected, the read-out SAYS which rings are
          narrower than one foot. Present iff footRing()'s own
@@ -194,6 +221,14 @@ const WITNESS = {
   androecium: { id: 'stamenCount', value: '6',
                 read: (m) => `${m.freeEnds}/${m.stamens.length}/${m.androecium ? m.androecium.radius.toFixed(6) : 'none'}`,
                 what: "the builder's free-end tally / stamens emitted / the owner's disc radius" },
+  /* CENTER (session 23) — the container for the two reproductive parts,
+     with no control of its own; witnessed through the androecium's count,
+     driven while the container AND the androecium drop-down are both shut
+     (the loop below admits a child's control for a section that holds none
+     of its own, and only then). */
+  center: { id: 'stamenCount', value: '6',
+            read: (m) => `${m.freeEnds}/${m.stamens.length}/${m.androecium ? m.androecium.radius.toFixed(6) : 'none'}`,
+            what: "the builder's free-end tally / stamens emitted / the owner's disc radius, driven through the shut container" },
   /* THE GYNOECIUM (session 22) — the builder's style record and the owner's
      descriptor; route (p)'s, on one page, in both directions. */
   gynoecium: { id: 'gynoecium', value: 'STYLE',
@@ -700,7 +735,15 @@ for (const s of closed) {
      an id that moved section, or a value a later range change put out of
      bounds, would otherwise make this assertion quietly measure nothing. */
   if (!c) { note(`WITNESS for "${s.id}" names control "${w.id}", which is not in the registry`); continue; }
-  if (c.section !== s.id) { note(`WITNESS for "${s.id}" names "${w.id}", which now declares section "${c.section}"`); continue; }
+  /* A CONTAINER IS WITNESSED THROUGH A CHILD (session 23). "Center" holds no
+     control of its own — only its two parts as drop-downs — so its witness is
+     a child's control, driven while the container and the child are BOTH
+     shut; the child's own row in this loop witnesses the child. A section
+     WITH controls of its own must still be witnessed by one of them, so a
+     witness that quietly moved into a child cannot pass here. */
+  const ownControls = CONTROLS.some((x) => x.section === s.id);
+  const inChild = SECTIONS.some((x) => x.id === c.section && x.parent === s.id);
+  if (c.section !== s.id && !(!ownControls && inChild)) { note(`WITNESS for "${s.id}" names "${w.id}", which now declares section "${c.section}"${ownControls ? '' : ' (a section without controls of its own is witnessed through a child section, and this is not one)'}`); continue; }
   if (c.kind === 'slider' && (Number(w.value) < c.min || Number(w.value) > c.max)) {
     note(`WITNESS for "${s.id}" drives ${w.id} to ${w.value}, outside its range ${c.min}..${c.max}`); continue;
   }
@@ -1499,8 +1542,12 @@ for (const [label, sets, wantDome, wantClamp] of [
    here (the registry's verifySections() carries the halves that run at
    module load: live ids, option values, DEFAULTS keys, section ids).
 
-     (i)   NO RETIRED ID RENDERS: no element carries a retired id, and there
-           is no `#sec-center` — the section went with its controls.
+     (i)   NO RETIRED ID RENDERS: no element carries a retired id, and the
+           `#sec-center` section — BACK since session 23 as the CONTAINER for
+           the two reproductive parts (Eva: a container, not a control) —
+           holds NO control wrapper of its own. Between sessions 20 and 23
+           this clause read "there is no #sec-center"; what it guards is a
+           resurrected RIG, and a rig is a control inside the section.
      (ii)  THE READ-OUT NAMES NO CENTRE: its summary line printed
            `center disc` on the shipping default while the rig existed; a
            line naming a centre that does not exist is the label-lie this
@@ -1519,17 +1566,17 @@ for (const [label, sets, wantDome, wantClamp] of [
            and is printed; a retired id living in a file outside it is not
            caught, which the flower's gate header says of its list too.
 
-   NEGATIVE CONTROL: a `<details id="sec-center">` holding an
-   `<input id="centerStyle">` is injected into the panel and the read-out's
-   first line is rewritten to carry `center disc`; (i) and (ii) must fire. */
+   NEGATIVE CONTROL: a `.bl-ctrl` holding an `<input id="centerStyle">` is
+   injected INTO the real `#sec-center` and the read-out's first line is
+   rewritten to carry `center disc`; (i) — both halves — and (ii) must fire. */
 {
   const tag = '[retired]';
   await openBloom(page, port);
   if (NEGATIVE_CONTROL) {
     await page.evaluate(() => {
-      const d = document.createElement('details'); d.id = 'sec-center';
-      const i = document.createElement('input'); i.id = 'centerStyle'; d.append(i);
-      document.getElementById('panelControls').append(d);
+      const w = document.createElement('div'); w.className = 'bl-ctrl';
+      const i = document.createElement('input'); i.id = 'centerStyle'; w.append(i);
+      document.getElementById('sec-center').append(w);
       const r = document.getElementById('readout');
       r.textContent = r.textContent.replace(/^(petals [^\n]*)/m, '$1 · center disc');
     });
@@ -1539,7 +1586,8 @@ for (const [label, sets, wantDome, wantClamp] of [
     const m = window.__bloomMetrics();
     return {
       rendered: ids.filter((id) => document.getElementById(id) !== null),
-      section: document.getElementById('sec-center') !== null,
+      centerMissing: document.getElementById('sec-center') === null,
+      centerOwnControls: [...(document.getElementById('sec-center')?.querySelectorAll(':scope > .bl-ctrl') || [])].map((w) => w.querySelector('input, select')?.id || '(no id)'),
       /* THE SUMMARY LINE is the one that begins `petals` — the read-out's
          first line is the on-screen MODE line (session 13), so line 0 would
          be the wrong line to read. */
@@ -1549,7 +1597,8 @@ for (const [label, sets, wantDome, wantClamp] of [
   }, retired);
   const p = [];
   if (res.rendered.length) p.push(`retired id(s) still render in the panel: ${res.rendered.join(', ')}`);
-  if (res.section) p.push('a #sec-center section is in the panel — the CENTER section was retired with its controls');
+  if (res.centerMissing) p.push('there is no #sec-center — the Center container (session 23) is missing from the panel');
+  if (res.centerOwnControls.length) p.push(`the Center container holds control(s) of its own: ${res.centerOwnControls.join(', ')} — a container, never a control, and never the retired rig`);
   if (!/^petals /.test(res.firstLine)) p.push('the read-out carries no summary line beginning `petals` — nothing to check');
   if (/\bcent(er|re)\b/i.test(res.firstLine)) p.push(`the read-out's summary line names a centre: "${res.firstLine}"`);
   if (res.metricKeys.length) p.push(`__bloomMetrics() still carries ${res.metricKeys.join(', ')} — a number under a label naming a computation nobody performs`);
@@ -1576,7 +1625,7 @@ for (const [label, sets, wantDome, wantClamp] of [
   }
   if (refs.length) p.push(`retired id(s) still referenced as identifiers in executable bloom source: ${refs.slice(0, 12).join('; ')}${refs.length > 12 ? ` … and ${refs.length - 12} more` : ''}`);
   if (p.length) note(`${tag}: ${p.join('; ')}`);
-  else ok.push(`${tag}: ${retired.length} retired ids (${retired.join(', ')}) absent from the DOM, the read-out's summary line, the metrics, and as identifiers in ${files.length} bloom source files`);
+  else ok.push(`${tag}: ${retired.length} retired ids (${retired.join(', ')}) absent from the DOM, the read-out's summary line, the metrics, and as identifiers in ${files.length} bloom source files; the Center container holds no control of its own`);
 }
 
 /* ===================================================================
@@ -1592,12 +1641,34 @@ for (const [label, sets, wantDome, wantClamp] of [
    move from the default's (the byte identity itself is the matrix's GATED
    rows; this is the same claim on the DOM path). The negative control
    freezes the read-out so the STAMENS line cannot appear where the geometry
-   builds one. */
+   builds one.
+
+   SESSION 23 ADDS FOUR CLAUSES TO EVERY STEP (route (q) in the header): the
+   Center CONTAINER hidden iff both parts are (SPHERE); the count's read-out
+   span carrying the KEPT clause with the state's own values exactly at
+   count 0; the stamen spread's CAP MARK at the owner's saturation exactly
+   when that is inside the range; and the FILAMENT-AGAINST-STYLE flag on the
+   STAMENS line against the builder's own record, present iff both parts
+   are built. Three steps are added for them: the style beside six straight
+   filaments (clear), six at curl 90 beside it (the flag), and one stamen (no
+   dead travel, no mark). The negative control also freezes the container's
+   `hidden`, the count's span and the spread wrapper's mark. */
 {
   const tag = '[stamens]';
   await openBloom(page, port);
   if (NEGATIVE_CONTROL) {
-    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+    await page.evaluate(() => {
+      const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} });
+      /* Session 23's clauses: the container never hides, the count's span
+         never changes, the cap mark never lands (writes to the wrapper's
+         dataset, style and class list are swallowed). */
+      const sec = document.getElementById('sec-center'); Object.defineProperty(sec, 'hidden', { get: () => false, set: () => {}, configurable: true });
+      const span = document.getElementById('stamenCount').closest('.bl-ctrl').querySelector('.bl-val'); const s0 = span.textContent; Object.defineProperty(span, 'textContent', { get: () => s0, set: () => {} });
+      const wrap = document.getElementById('stamenSpread').closest('.bl-ctrl');
+      Object.defineProperty(wrap, 'dataset', { value: new Proxy({}, { set: () => true, deleteProperty: () => true, get: () => undefined }), configurable: true });
+      wrap.style.setProperty = () => {}; wrap.style.removeProperty = () => {};
+      wrap.classList.add = () => {}; wrap.classList.remove = () => {};
+    });
   }
   const SUBS = CONTROLS.filter((c) => c.section === 'androecium' && c.id !== 'stamenCount').map((c) => c.id);
   const step = async (label, sets, want = {}) => {
@@ -1607,8 +1678,21 @@ for (const [label, sets, wantDome, wantClamp] of [
       const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
       const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
       const sec = document.getElementById('sec-androecium');
+      const centerSec = document.getElementById('sec-center');
+      const spreadWrap = document.getElementById('stamenSpread').closest('.bl-ctrl');
       return { count: Math.round(Number(ui.stamenCount)), sphere: m.sphereMode === true,
                sectionHidden: sec ? sec.hidden : null, countHidden: hid('stamenCount'), subsHidden: subs.map((id) => hid(id)),
+               /* session 23: the container, the kept clause, the cap mark, the flag */
+               center: centerSec ? centerSec.hidden : null,
+               countSaid: document.getElementById('stamenCount').closest('.bl-ctrl').querySelector('.bl-val').textContent,
+               kept: { layout: String(ui.stamenLayout).toLowerCase(), spread: Number(ui.stamenSpread).toFixed(2), length: String(ui.stamenLength), curl: String(ui.stamenCurl) },
+               spreadSaid: spreadWrap.querySelector('.bl-val').textContent,
+               capData: spreadWrap.dataset.cap ?? null, capVar: spreadWrap.style.getPropertyValue('--bl-cap') || null, capClass: spreadWrap.classList.contains('bl-ctrl--capped'),
+               spreadMin: Number(document.getElementById('stamenSpread').min), spreadMax: Number(document.getElementById('stamenSpread').max),
+               onAxis: !!(m.androecium && m.androecium.onAxis),
+               styles: m.styles.length, fs: m.filamentStyle,
+               fsSaid: (txt.match(/nearest filament to the style ([\d.]+) mm at (-?[\d.]+) mm up/) || []).slice(1),
+               crossSaid: /\(FILAMENT AGAINST STYLE:/.test(txt),
                has: m.androecium !== null, emitted: m.stamens.length, freeEnds: m.freeEnds, shownTris: m.shownTris,
                clamped: !!(m.androecium && m.androecium.clamped), annulus: m.androecium ? m.androecium.inPetalRootAnnulus : 0,
                saturation: m.androecium ? m.androecium.saturation : null, saturationSaid: (txt.match(/([\d.]+)x is as far as this hub goes, the slider above it is dead here/) || [])[1],
@@ -1641,14 +1725,57 @@ for (const [label, sets, wantDome, wantClamp] of [
     if (res.fuseSaid !== res.fuse) p.push(`the ROOTS FUSE flag is ${res.fuseSaid ? 'shown' : 'absent'} while the owner's nearest roots ${res.fuse ? 'are' : 'are not'} closer than a filament`);
     for (const k of ['clamped', 'annulusFlag', 'fuse']) if (want[k] !== undefined && (k === 'annulusFlag' ? res.annulus > 0 : res[k]) !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${k === 'annulusFlag' ? res.annulus > 0 : res[k]}`);
     if (want.tris !== undefined && res.shownTris !== want.tris) p.push(`the build has ${res.shownTris} triangles where the reference step had ${want.tris} — a hidden androecium control reached the geometry`);
+    /* ---- session 23, clause 1: THE CONTAINER, hidden iff both parts are ---- */
+    if (res.center === null) p.push('there is no #sec-center container in the panel');
+    else if (res.center !== res.sphere) p.push(`the Center container is ${res.center ? 'hidden while its parts are on screen (a cap)' : 'shown while both parts are hidden (SPHERE)'}`);
+    /* ---- clause 2: THE KEPT CLAUSE on the count, with the state's values, iff the part is off ---- */
+    const keptRe = /^none — its settings are kept \((\w+), spread ([\d.]+)x, (\d+) mm, curl (-?\d+)°\) and return with the count$/;
+    const keptSaid = keptRe.exec(res.countSaid);
+    if (res.count === 0) {
+      if (!keptSaid) p.push(`the kept clause is absent at count 0 — the count read-out says "${res.countSaid}"`);
+      else {
+        const [, layout, spread, length, curl] = keptSaid;
+        if (layout !== res.kept.layout || spread !== res.kept.spread || length !== res.kept.length || curl !== res.kept.curl) p.push(`the kept clause names (${layout}, ${spread}x, ${length} mm, ${curl}°) while the state holds (${res.kept.layout}, ${res.kept.spread}x, ${res.kept.length} mm, ${res.kept.curl}°)`);
+      }
+    } else if (/kept/.test(res.countSaid) || !new RegExp(`^${res.count} stamens?, pill anthers$`).test(res.countSaid)) p.push(`the kept clause is shown at ${res.count} stamens — the count read-out says "${res.countSaid}"`);
+    /* ---- clause 3: THE CAP MARK at the owner's saturation, iff inside the range ---- */
+    if (res.has) {
+      const capWant = res.saturation < res.spreadMax;
+      const frac = Math.min(1, Math.max(0, (res.saturation - res.spreadMin) / (res.spreadMax - res.spreadMin)));
+      if (res.capClass !== capWant || (res.capData !== null) !== capWant || (res.capVar !== null) !== capWant) p.push(`the cap mark is ${res.capClass || res.capData !== null || res.capVar !== null ? 'drawn' : 'absent'} (class ${res.capClass}, data-cap ${res.capData}, --bl-cap ${res.capVar}) while the owner saturates at ${res.saturation.toFixed(2)}x against a range top of ${res.spreadMax}`);
+      else if (capWant) {
+        if (Math.abs(Number(res.capData) - res.saturation) > 0.005) p.push(`the cap mark says ${res.capData}x, the owner says ${res.saturation.toFixed(2)}x`);
+        if (Math.abs(Number(res.capVar) - frac) > 0.001) p.push(`the cap mark sits at ${res.capVar} of the track, the owner puts it at ${frac.toFixed(4)}`);
+      }
+      const spanCap = (res.spreadSaid.match(/(?:CLAMPED at|saturates at) ([\d.]+)x/) || [])[1];
+      if (res.onAxis) { if (!/ON THE AXIS/.test(res.spreadSaid)) p.push(`the spread read-out does not say ON THE AXIS on the on-axis corner: "${res.spreadSaid}"`); }
+      else if (res.clamped) { if (!/CLAMPED at/.test(res.spreadSaid) || Math.abs(Number(spanCap) - res.saturation) > 0.005) p.push(`the spread read-out does not say CLAMPED at the owner's ${res.saturation.toFixed(2)}x: "${res.spreadSaid}"`); }
+      else if (capWant) { if (!/saturates at/.test(res.spreadSaid) || Math.abs(Number(spanCap) - res.saturation) > 0.005) p.push(`the spread read-out does not name the cap ${res.saturation.toFixed(2)}x inside the range: "${res.spreadSaid}"`); }
+      else if (!/no dead travel/.test(res.spreadSaid)) p.push(`the spread read-out names a cap while the owner saturates past the range top: "${res.spreadSaid}"`);
+      if (want.cap !== undefined && capWant !== want.cap) p.push(`this step expects a cap mark ${want.cap ? 'inside' : 'outside'} the range, the owner saturates at ${res.saturation.toFixed(2)}x`);
+    } else if (res.capClass || res.capData !== null || res.capVar !== null) p.push('the cap mark is still drawn with the androecium absent');
+    /* ---- clause 4: THE FILAMENT-AGAINST-STYLE FLAG, present iff both parts are built, against the builder's own record ---- */
+    const fsWant = res.emitted > 0 && res.styles > 0;
+    if ((res.fs !== null) !== fsWant) p.push(`the owner ${res.fs !== null ? 'reports a filament-to-style approach' : 'reports none'} while ${fsWant ? 'both parts are built' : 'a part is absent'} — a claim nothing can make must read as absent`);
+    if ((res.fsSaid.length > 0) !== fsWant) p.push(`the nearest-filament-to-the-style clause is ${res.fsSaid.length ? 'shown' : 'absent'} while ${fsWant ? 'both parts are built' : 'a part is absent'}`);
+    else if (fsWant && res.fs !== null) {
+      if (Math.abs(Number(res.fsSaid[0]) - res.fs.mm) > 0.005) p.push(`the read-out says the nearest filament is ${res.fsSaid[0]} mm from the style, the builder says ${res.fs.mm.toFixed(3)}`);
+      if (Math.abs(Number(res.fsSaid[1]) - res.fs.z) > 0.05) p.push(`the read-out puts the approach at ${res.fsSaid[1]} mm up, the builder at ${res.fs.z.toFixed(2)}`);
+      if (res.crossSaid !== res.fs.crossing) p.push(`the FILAMENT AGAINST STYLE flag is ${res.crossSaid ? 'shown' : 'absent'} while the owner reports ${res.fs.crossing ? 'a crossing' : 'no crossing'} (${res.fs.mm.toFixed(3)} mm against ${res.fs.threshold.toFixed(2)})`);
+    }
+    if (want.crossing !== undefined && (want.crossing === null ? res.fs !== null : !res.fs || res.fs.crossing !== want.crossing)) p.push(`this step expects ${want.crossing === null ? 'no approach record' : want.crossing ? 'a crossing' : 'clearance'}, the owner reports ${res.fs === null ? 'none' : `${res.fs.mm.toFixed(3)} mm, crossing ${res.fs.crossing}`}`);
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: section ${res.sectionHidden ? 'hidden' : 'shown'}, ${res.emitted} stamens emitted, ${res.lineSaid !== undefined ? 'STAMENS line shown' : 'no STAMENS line'}${res.clamped ? ', CLAMPED' : ''}${res.annulus ? `, ${res.annulus} in the petal-root annulus` : ''}${res.fuse ? ', ROOTS FUSE' : ''}`);
+    else ok.push(`${tag} ${label}: section ${res.sectionHidden ? 'hidden' : 'shown'}, container ${res.center ? 'hidden' : 'shown'}, ${res.emitted} stamens emitted, ${res.lineSaid !== undefined ? 'STAMENS line shown' : 'no STAMENS line'}${res.clamped ? ', CLAMPED' : ''}${res.annulus ? `, ${res.annulus} in the petal-root annulus` : ''}${res.fuse ? ', ROOTS FUSE' : ''}${res.count === 0 ? ', the kept clause on the count' : ''}${res.has ? `, cap ${res.capData !== null ? `marked at ${res.capData}x` : 'past the range'}` : ''}${res.fs ? `, nearest to the style ${res.fs.mm.toFixed(2)} mm${res.fs.crossing ? ' (FILAMENT AGAINST STYLE)' : ' (clear)'}` : ''}`);
     return res;
   };
-  const dflt = await step('defaults (the section shows its count, the sub-controls hide, no androecium)', []);
-  await step('6 stamens on a RING (the sub-controls appear; the six-stamen candidate)', [{ id: 'stamenCount', value: '6' }], { clamped: false, annulusFlag: false, fuse: false });
-  await step('120 on the DISC (CLAMPED at the hub; the petal-root annulus flag)', [{ id: 'stamenLayout', value: 'DISC' }, { id: 'stamenCount', value: '120' }], { clamped: true, annulusFlag: true });
-  await step('6 on a RING x spread 0.60 (the roots fuse — a flag)', [{ id: 'stamenLayout', value: 'RING' }, { id: 'stamenCount', value: '6' }, { id: 'stamenSpread', value: '0.6' }], { clamped: false, fuse: true });
+  const dflt = await step('defaults (the section shows its count, the sub-controls hide, no androecium; the kept clause on the count)', []);
+  await step('6 stamens on a RING (the sub-controls appear; the six-stamen candidate; the cap mark inside the range)', [{ id: 'stamenCount', value: '6' }], { clamped: false, annulusFlag: false, fuse: false, cap: true, crossing: null });
+  await step('a style beside six STRAIGHT filaments (nearest approach is the ring radius: clear, no flag)', [{ id: 'gynoecium', value: 'STYLE' }], { crossing: false });
+  await step('six at curl 90 beside the style (FILAMENT AGAINST STYLE — a flag, never a refusal)', [{ id: 'stamenCurl', value: '90' }], { crossing: true });
+  await step('back to straight, the style off (the clause goes with the style)', [{ id: 'stamenCurl', value: '0' }, { id: 'gynoecium', value: 'NONE' }], { crossing: null });
+  await step('1 stamen on a RING (the multiplier saturates past the range top on this hub: no cap mark)', [{ id: 'stamenCount', value: '1' }], { cap: false, clamped: false });
+  await step('120 on the DISC (CLAMPED at the hub; the petal-root annulus flag; the cap mark low on the track)', [{ id: 'stamenLayout', value: 'DISC' }, { id: 'stamenCount', value: '120' }], { clamped: true, annulusFlag: true, cap: true });
+  await step('6 on a RING x spread 0.60 (the roots fuse — a flag)', [{ id: 'stamenLayout', value: 'RING' }, { id: 'stamenCount', value: '6' }, { id: 'stamenSpread', value: '0.6' }], { clamped: false, fuse: true, cap: true });
   const bare = await step('CONTINUOUS x SPHERE x count 0 (the section hides whole)', [{ id: 'stamenSpread', value: '2' }, { id: 'stamenCount', value: '0' }, { id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }]);
   if (bare) await step('6 stamens asked for under SPHERE (hidden AND inert: the build must not move)', [{ id: 'stamenCount', value: '6' }], { tris: bare.shownTris });
   await step('back to CAP (the section and the six stamens return)', [{ id: 'hubShape', value: 'CAP' }]);
@@ -1667,12 +1794,20 @@ for (const [label, sets, wantDome, wantClamp] of [
    sphere's; the sub-controls at maximum with NONE must not move from the
    default's; and the WHOLE centre at maximum under SPHERE must not move
    either. The negative control's frozen read-out makes the STYLE line
-   absent where the geometry builds one. */
+   absent where the geometry builds one.
+
+   SESSION 23 ADDS TWO CLAUSES TO EVERY STEP: the Center CONTAINER hidden iff
+   both parts are (SPHERE), and the style read-out span carrying the KEPT
+   clause with the state's own values exactly at NONE. The negative control
+   also freezes that span. */
 {
   const tag = '[style]';
   await openBloom(page, port);
   if (NEGATIVE_CONTROL) {
-    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+    await page.evaluate(() => {
+      const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} });
+      const span = document.getElementById('gynoecium').closest('.bl-ctrl').querySelector('.bl-val'); const s0 = span.textContent; Object.defineProperty(span, 'textContent', { get: () => s0, set: () => {} });
+    });
   }
   const SUBS = CONTROLS.filter((c) => c.section === 'gynoecium' && c.id !== 'gynoecium').map((c) => c.id);
   const step = async (label, sets, want = {}) => {
@@ -1682,10 +1817,14 @@ for (const [label, sets, wantDome, wantClamp] of [
       const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
       const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
       const sec = document.getElementById('sec-gynoecium');
+      const centerSec = document.getElementById('sec-center');
       const stigmaTop = m.styles.length ? Math.max(...m.styles[0].lobes.map((l) => l.apex[2])) : null;
       const antherTop = m.stamens.length ? Math.max(...m.stamens.map((a) => a.apex[2])) : null;
       return { value: ui.gynoecium, sphere: m.sphereMode === true,
                sectionHidden: sec ? sec.hidden : null, ctlHidden: hid('gynoecium'), subsHidden: subs.map((id) => hid(id)),
+               center: centerSec ? centerSec.hidden : null,
+               styleSaid: document.getElementById('gynoecium').closest('.bl-ctrl').querySelector('.bl-val').textContent,
+               kept: { length: String(ui.styleLength), curl: String(ui.styleCurl) },
                has: m.gynoecium !== null, emitted: m.styles.length, shownTris: m.shownTris,
                wider: !!(m.gynoecium && m.gynoecium.widerThanHub), widerSaid: /WIDER THAN THE HUB/.test(txt),
                above: stigmaTop !== null && antherTop !== null ? stigmaTop >= antherTop : null,
@@ -1709,8 +1848,16 @@ for (const [label, sets, wantDome, wantClamp] of [
     for (const k of ['wider']) if (want[k] !== undefined && res[k] !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${res[k]}`);
     if (want.above !== undefined && res.above !== want.above) p.push(`this step expects the stigma ${want.above ? 'ABOVE' : 'BELOW'} the anthers, the builder's apexes say ${res.above === null ? 'neither (a part is missing)' : res.above ? 'ABOVE' : 'BELOW'}`);
     if (want.tris !== undefined && res.shownTris !== want.tris) p.push(`the build has ${res.shownTris} triangles where the reference step had ${want.tris} — a hidden gynoecium control reached the geometry`);
+    /* ---- session 23: the container, and the kept clause on the style ---- */
+    if (res.center === null) p.push('there is no #sec-center container in the panel');
+    else if (res.center !== res.sphere) p.push(`the Center container is ${res.center ? 'hidden while its parts are on screen (a cap)' : 'shown while both parts are hidden (SPHERE)'}`);
+    const keptSaid = /^none — its settings are kept \((\d+) mm, curl (-?\d+)°\) and return with the style$/.exec(res.styleSaid);
+    if (res.value === 'NONE') {
+      if (!keptSaid) p.push(`the kept clause is absent at NONE — the style read-out says "${res.styleSaid}"`);
+      else if (keptSaid[1] !== res.kept.length || keptSaid[2] !== res.kept.curl) p.push(`the kept clause names (${keptSaid[1]} mm, ${keptSaid[2]}°) while the state holds (${res.kept.length} mm, ${res.kept.curl}°)`);
+    } else if (/kept/.test(res.styleSaid)) p.push(`the kept clause is shown with a style present — the style read-out says "${res.styleSaid}"`);
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: section ${res.sectionHidden ? 'hidden' : 'shown'}, ${res.emitted} style${res.emitted === 1 ? '' : 's'} emitted, ${res.lineSaid ? 'STYLE line shown' : 'no STYLE line'}${res.aboveSaid ? `, stigma ${res.aboveSaid} the anthers` : ''}${res.wider ? ', WIDER THAN THE HUB' : ''}`);
+    else ok.push(`${tag} ${label}: section ${res.sectionHidden ? 'hidden' : 'shown'}, container ${res.center ? 'hidden' : 'shown'}, ${res.emitted} style${res.emitted === 1 ? '' : 's'} emitted, ${res.lineSaid ? 'STYLE line shown' : 'no STYLE line'}${res.aboveSaid ? `, stigma ${res.aboveSaid} the anthers` : ''}${res.wider ? ', WIDER THAN THE HUB' : ''}${res.value === 'NONE' ? ', the kept clause on the style' : ''}`);
     return res;
   };
   const dflt = await step('defaults (the section shows its choice at NONE, the sub-controls hide, no gynoecium)', []);
@@ -1723,6 +1870,43 @@ for (const [label, sets, wantDome, wantClamp] of [
   if (bare) await step('the WHOLE centre at MAXIMUM under SPHERE (both parts hidden and inert: the build must not move)', [{ id: 'styleLength', value: '40' }, { id: 'styleCurl', value: '180' }, { id: 'stamenCount', value: '120' }, { id: 'stamenLayout', value: 'DISC' }, { id: 'stamenSpread', value: '6' }, { id: 'stamenLength', value: '40' }, { id: 'stamenCurl', value: '180' }], { tris: bare.shownTris });
   await step('back to CAP (the section, the style and the stamens return)', [{ id: 'hubShape', value: 'CAP' }]);
   if (dflt) await step('RADIAL x NONE x every sub-control at MAXIMUM (hidden and inert: the default\'s own count)', [{ id: 'placement', value: 'RADIAL' }, { id: 'stamenCount', value: '0' }, { id: 'stamenLayout', value: 'RING' }, { id: 'stamenSpread', value: '2' }, { id: 'stamenLength', value: '20' }, { id: 'stamenCurl', value: '0' }, { id: 'gynoecium', value: 'NONE' }, { id: 'styleLength', value: '40' }, { id: 'styleCurl', value: '180' }], { tris: dflt.shownTris });
+}
+
+/* ===================================================================
+   ROUTE (r) — THE FILAMENT-AGAINST-STYLE FLAG'S OWN WITNESS (session 23).
+   See the header. Six on the shipping ring at curl 90 with the style is
+   session 22's own cell (0.05 mm at 8.7 mm up against 1.20): the builder
+   must report the crossing, the read-out must carry the clause, and the flag
+   must be on it. Negative control: the setter rewrites the flag into the
+   clear-of-it phrase and leaves the rest of the line intact. */
+{
+  const tag = '[flag]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => {
+      const el = document.getElementById('readout');
+      const desc = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+      Object.defineProperty(el, 'textContent', {
+        get() { return desc.get.call(this); },
+        set(v) { desc.set.call(this, String(v).replace(/ \(FILAMENT AGAINST STYLE:[^)]*\)/g, ' (clear of it by more than 1.20 mm)')); },
+      });
+    });
+  }
+  const bad = await applyConfig(page, [{ id: 'stamenCount', value: '6' }, { id: 'gynoecium', value: 'STYLE' }, { id: 'stamenCurl', value: '90' }]);
+  if (bad.length) note(`${tag}: config did not take: ${bad.join('; ')}`);
+  else {
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      return { fs: m.filamentStyle, crossSaid: /\(FILAMENT AGAINST STYLE:/.test(txt), clauseSaid: /nearest filament to the style/.test(txt) };
+    });
+    const p = [];
+    if (!res.fs) p.push('the builder reports no filament-to-style record with both parts built');
+    else if (!res.fs.crossing) p.push(`the builder reports no crossing at curl 90 (${res.fs.mm.toFixed(3)} mm against ${res.fs.threshold.toFixed(2)}) — the witness row no longer crosses`);
+    if (!res.clauseSaid) p.push('the read-out carries no nearest-filament-to-the-style clause');
+    if (res.fs && res.fs.crossing && res.clauseSaid && !res.crossSaid) p.push(`the FILAMENT AGAINST STYLE flag is absent while the owner reports a crossing (${res.fs.mm.toFixed(3)} mm against ${res.fs.threshold.toFixed(2)})`);
+    if (p.length) note(`${tag}: ${p.join('; ')}`);
+    else ok.push(`${tag}: six at curl 90 beside the style — the builder reports ${res.fs.mm.toFixed(3)} mm against ${res.fs.threshold.toFixed(2)}, the clause is on the line and the flag is on it`);
+  }
 }
 
 await browser.close();
@@ -1750,14 +1934,24 @@ if (NEGATIVE_CONTROL) {
     const sawDome = fail.some((f) => /^\[dome\] .*HEAD RISE line is ABSENT while the owner declares a dome/.test(f));
     const sawCurl = fail.some((f) => /^\[curl\] .*SPINE CURL line is ABSENT while the owner reports a curl/.test(f));
     const sawSphere = fail.some((f) => /^\[sphere\] .*HEAD: FULL SPHERE line is ABSENT while the geometry builds a sphere/.test(f));
-    const sawRetired = fail.some((f) => /^\[retired\]: retired id\(s\) still render in the panel: centerStyle; a #sec-center section is in the panel/.test(f) && /names a centre/.test(f));
+    const sawRetired = fail.some((f) => /^\[retired\]: retired id\(s\) still render in the panel: centerStyle; the Center container holds control\(s\) of its own: centerStyle/.test(f) && /names a centre/.test(f));
     const sawStamens = fail.some((f) => /^\[stamens\] .*STAMENS line is ABSENT while the owner declares an androecium/.test(f));
     const sawStyle = fail.some((f) => /^\[style\] .*STYLE line is ABSENT while the owner declares a gynoecium/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle) { console.log('\nALL FOURTEEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}. All fourteen must.`);
+    /* SESSION 23's five clauses (route (q) in the header), each required to
+       have seen its own frozen witness: the container that never hides, the
+       two spans that never change, the cap mark that never lands, the flag
+       the frozen read-out cannot show. */
+    const sawContainer = fail.some((f) => /^\[(stamens|style)\] .*Center container is shown while both parts are hidden/.test(f));
+    const sawKeptStamens = fail.some((f) => /^\[stamens\] .*kept clause (is shown|names)/.test(f));
+    const sawKeptStyle = fail.some((f) => /^\[style\] .*kept clause (is shown|names)/.test(f));
+    const sawCap = fail.some((f) => /^\[stamens\] .*cap mark is absent/.test(f));
+    const sawFlag = fail.some((f) => /^\[flag\]: .*FILAMENT AGAINST STYLE flag is absent while the owner reports a crossing/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL FIFTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a resurrected CENTER section, a frozen STAMENS line and a frozen STYLE line. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark and a flag rewritten away. It is not measuring anything.');
   process.exit(1);
 }
 

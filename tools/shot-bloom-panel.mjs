@@ -63,6 +63,21 @@
                   outside every section — has moved, sheet and ring alike.
      (the gated-centre row — the Center section open at DISC and at RING —
                   went with the centre rig in session 20.)
+     the centre  THE BEFORE / AFTER PAIRS (session 23, Eva's ruling is made
+                  from this sheet), rendered against a git worktree of the
+                  BASE commit when one is given — the per-petal and
+                  centre-retirement sheets' pattern, a real render of the old
+                  panel rather than a remembered one. Four pairs: the panel at
+                  first load; the parts opened (Androecium at top level BEFORE,
+                  inside "Center" AFTER); a part turned OFF with its settings
+                  moved off their defaults (the kept clause on the read-out);
+                  the stamen spread on the 120-stamen disc (the cap mark on
+                  the slider, the CLAMPED read-out); and the STAMENS line with
+                  six filaments at curl 90 beside the style (the
+                  FILAMENT-AGAINST-STYLE flag). Every caption carries the
+                  read-out lines, which are the other half of the ruling.
+                  Without a base tree these cells are NOT produced and the run
+                  says so loudly; they are never silently skipped.
 
    THE FRAME IS ASSERTED, NOT TRUSTED. A panel taller than its own scroll box
    would photograph CROPPED, and a cropped panel is the one picture that could
@@ -71,7 +86,10 @@
    if any frame is clipped. Same discipline as the canvas sheet's chrome and
    autoRotate read-backs, pointed at the failure this sheet can actually have.
 
-   RUN:  node tools/shot-bloom-panel.mjs <out-dir>
+   RUN:  node tools/shot-bloom-panel.mjs <out-dir> [base-tree]
+         (base-tree: a git worktree of the commit to render BEFORE from,
+          e.g. `git worktree add /tmp/base-main fd291b4`, with node_modules
+          linked into it so three serves from the same pinned copy)
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -81,14 +99,20 @@ import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-panel-sheets';
+const BASE_ROOT = process.argv[3] || null;
+if (BASE_ROOT && !fs.existsSync(path.join(BASE_ROOT, 'bloom.html'))) {
+  console.error(`HARNESS INVALID: no base tree at ${BASE_ROOT} — a base was named and is not there. Create it with: git worktree add ${BASE_ROOT} <base-sha>`);
+  process.exit(2);
+}
 
 const { server, port } = await serveRepo();
+const base = BASE_ROOT ? await serveRepo(BASE_ROOT) : null;
 /* Tall viewport so an ALL-EXPANDED panel fits inside its own max-height and
    the frame is a complete picture rather than a crop. The assertion below is
    what makes that a fact instead of a hope. */
 const { browser, page } = await launchPage({ viewport: { width: 1100, height: 1600 }, deviceScaleFactor: 2 });
 
-function die(msg) { console.error('HARNESS INVALID: ' + msg); return browser.close().then(() => { server.close(); process.exit(2); }); }
+function die(msg) { console.error('HARNESS INVALID: ' + msg); return browser.close().then(() => { server.close(); if (base) base.server.close(); process.exit(2); }); }
 
 async function shoot(label, note) {
   const box = await page.evaluate(() => {
@@ -111,7 +135,7 @@ async function shoot(label, note) {
   return { label, note, caption, readout: box.readout, png };
 }
 
-const cells = { firstLoad: [], perSection: [], numbering: [], accordion: [], reactivity: [] };
+const cells = { firstLoad: [], perSection: [], numbering: [], accordion: [], reactivity: [], centre: [] };
 
 /* HOW TO REACH A SECTION THAT IS HIDDEN AT FIRST LOAD — the panel gate's
    WITNESS `pre` for the same sections, restated here because a sheet and a
@@ -171,7 +195,11 @@ async function openSection(id) {
      which is the visitor's situation too: open the parent first, by the same
      real click. One level deep, as the registry enforces. */
   const parent = SECTIONS.find((x) => x.id === id)?.parent;
-  if (parent) await openSection(parent);
+  /* The parent is THIS tree's registry's answer; a BEFORE cell rendered from
+     a base tree that declares no such parent (Center, before session 23)
+     has nothing to open first and is not an error — the section is at top
+     level there. Checked against the served page, never assumed. */
+  if (parent && await page.evaluate((x) => !!document.getElementById(`sec-${x}`), parent)) await openSection(parent);
   const already = await page.evaluate((x) => document.getElementById(`sec-${x}`).open, id);
   if (!already) await page.click(`#sec-${id} > summary`);
   await page.waitForTimeout(180);
@@ -322,10 +350,62 @@ cells.reactivity.push(await shoot('AFTER · sheet 2.40 mm, section still shut',
   `sheetThickness driven 1.20 → 2.40 mm with real input/change events while Part thickness stayed shut. The section is still shut in this frame; the readout and the ring (${drove.ring.toFixed(2)} mm) moved.`));
 
 /* THE GATED-CENTRE CELLS stood here (CENTER · DISC / RING) and went with the
-   centre rig in session 20; there is no Center section to photograph. */
+   centre rig in session 20. */
+
+/* ---- THE CENTRE, BEFORE AND AFTER (session 23) — against the base tree ----
+   Each pair is the SAME driven state on both trees, the BEFORE cell from the
+   base worktree's own page (its own registry, its own generator, its own
+   read-out), the AFTER cell from this tree's. The read-out lines ride in
+   every caption. `open` is applied THROUGH REAL CLICKS on both, so a section
+   that the base tree does not have (Center) is simply not clicked there and
+   the caption says which sections were opened. */
+if (base) {
+  const bothTrees = async (label, note, { set = [], open = [], spans = [] }) => {
+    const pair = [];
+    for (const [tree, prt] of [['BEFORE', base.port], ['AFTER', port]]) {
+      await openBloom(page, prt);
+      if (set.length) await drive(set);
+      const opened = [];
+      for (const id of open) {
+        const has = await page.evaluate((x) => !!document.getElementById(`sec-${x}`), id);
+        if (!has) continue;
+        await openSection(id);
+        opened.push(id);
+      }
+      const said = await page.evaluate((ids) => ids.map((id) => {
+        const el = document.getElementById(id);
+        return el ? `${id}: "${el.closest('.bl-ctrl').querySelector('.bl-val').textContent}"` : `${id}: (not in this tree)`;
+      }), spans);
+      const cap = await page.evaluate(() => {
+        const w = document.getElementById('stamenSpread')?.closest('.bl-ctrl');
+        return w && w.dataset.cap ? `cap mark at ${w.dataset.cap}x (--bl-cap ${w.style.getPropertyValue('--bl-cap')})` : 'no cap mark';
+      });
+      const shot = await shoot(`${tree} · ${label}`, `${note} Opened: ${opened.join(' › ') || 'nothing'}.${said.length ? ` Read-outs — ${said.join('; ')}.` : ''}${/stamenSpread/.test(spans.join()) ? ` ${cap}.` : ''}`);
+      pair.push(shot);
+    }
+    cells.centre.push(...pair);
+  };
+  await bothTrees('first load', 'The panel as a visitor first finds it. BEFORE: Androecium and Gynoecium at top level beside the petal sections. AFTER: one Center section directly below Head, holding both as drop-downs.', {});
+  await bothTrees('the androecium opened', 'BEFORE: Androecium opened at top level. AFTER: Center opened, then Androecium inside it, by the same two clicks a visitor makes; Gynoecium sits beside it, shut.', { open: ['center', 'androecium'] });
+  await bothTrees('the gynoecium opened', 'BEFORE: Gynoecium opened at top level. AFTER: inside Center; opening it shut Androecium (the accordion one level down) and left Center open.', { open: ['center', 'gynoecium'] });
+  await bothTrees('a part turned OFF keeps its settings', 'Six stamens on the disc at spread 3.00x, 30 mm, curl 45, then the count set back to 0; the style set to 35 mm, curl 60, then NONE. The sub-controls hide and go inert in both trees. AFTER, the two read-outs say the values are KEPT and return with the count / the style; BEFORE they said only that the apex is bare.',
+    { set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenLayout', value: 'DISC' }, { id: 'stamenSpread', value: '3' }, { id: 'stamenLength', value: '30' }, { id: 'stamenCurl', value: '45' }, { id: 'gynoecium', value: 'STYLE' }, { id: 'styleLength', value: '35' }, { id: 'styleCurl', value: '60' }, { id: 'stamenCount', value: '0' }, { id: 'gynoecium', value: 'NONE' }],
+      open: ['center', 'androecium'], spans: ['stamenCount', 'gynoecium'] });
+  await bothTrees('the dead travel on the control · 120 on the disc, spread 2.00x', '120 stamens on the Vogel disc: the multiplier saturates at 1.25x on this hub and the slider runs to 6.00. BEFORE, only the read-out below the buttons confessed it. AFTER, the cap MARK sits on the track at 1.25x with the dead travel hatched to its right, and the control read-out says CLAMPED at 1.25x. The range is unchanged: 0.60 to 6.00 on both trees.',
+    { set: [{ id: 'stamenCount', value: '120' }, { id: 'stamenLayout', value: 'DISC' }], open: ['center', 'androecium'], spans: ['stamenSpread'] });
+  await bothTrees('the dead travel on the control · six on a ring, spread 5.80x', 'Six on a ring at spread 5.80x: this hub saturates at 5.61x, so the top of the travel is dead by 0.19 — the cap mark high on the track, the thumb in the hatched zone, the read-out CLAMPED. At one stamen the cap is 13.7x, past the range, and no mark is drawn (the panel gate asserts both).',
+    { set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenSpread', value: '5.8' }], open: ['center', 'androecium'], spans: ['stamenSpread'] });
+  await bothTrees('the STAMENS line · six at curl 90 beside the style', 'Six filaments at curl 90 with the style present — the state session 22 photographed and Eva ruled the ±180 range on. AFTER, the STAMENS line ends with the nearest filament to the style (0.05 mm at 8.7 mm up) and the FILAMENT AGAINST STYLE flag; BEFORE, nothing on the line could see the crossing. A flag, never a gate — both trees export it watertight and one piece.',
+    { set: [{ id: 'stamenCount', value: '6' }, { id: 'gynoecium', value: 'STYLE' }, { id: 'stamenCurl', value: '90' }], open: ['center', 'androecium'] });
+  await bothTrees('the STAMENS line · six straight beside the style', 'The same six straight: the nearest filament is the ring radius away (2.94 mm) and the clause says clear. Present iff both parts are built; absent with either off.',
+    { set: [{ id: 'stamenCount', value: '6' }, { id: 'gynoecium', value: 'STYLE' }], open: ['center', 'androecium'] });
+} else {
+  console.log('\nNO BASE TREE GIVEN — the centre BEFORE/AFTER sheet (session 23) was NOT produced. Pass a worktree of the base commit as the second argument to shoot it.');
+}
 
 await browser.close();
 server.close();
+if (base) base.server.close();
 
 /* THE WORST-CASE PANEL HEIGHT — the honest replacement for the old
    "all expanded" number. Under an accordion the tallest the panel can ever be
@@ -373,6 +453,9 @@ for (const [name, title, note, list, perRow] of [
   ['panel-reactivity', 'Bloom panel — a collapsed section is not a hidden control',
    'The assertion tools/verify-bloom-panel.mjs makes, photographed. sheetThickness lives in Part thickness, which is shut at first load. Driving it with real input/change events — the same route every gate uses — rebuilds the model and moves the readout, and the section stays shut. Collapse and the accordion are presentation; readUI, the export path and the gates cannot see either.',
    cells.reactivity, 2],
+  ...(cells.centre.length ? [['panel-centre', 'Bloom panel — the centre, before and after (session 23)',
+   `Left BEFORE (a real render of the base tree at ${BASE_ROOT}), right AFTER (this tree), the same driven state on both. Four things, each a pair: the Center container directly below Head holding Androecium and Gynoecium as drop-downs (a container, not a control — no value, no NONE; "no centre" is both parts off, already reachable); a part turned off with its settings moved off their defaults, the read-out saying they are KEPT and return; the stamen spread's dead travel shown ON the control — the cap mark at the owner's saturation, the range untouched (not narrowed, not adaptive); and the FILAMENT-AGAINST-STYLE flag on the STAMENS line, six at curl 90 beside the style. The read-out lines are in every caption. No geometry changed for this sheet: 0 moved on phase17 and on the live matrix, both trees.`,
+   cells.centre, 2]] : []),
 ]) {
   const p2 = await b2.newPage({ viewport: { width: perRow * (CELL + 16) + 30, height: 900 } });
   await p2.setContent(sheet(title, note, list, perRow), { waitUntil: 'load' });
