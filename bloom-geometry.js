@@ -2046,6 +2046,15 @@ export function footRing(state, acc) {
     return {
       count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
       derivedRadius, spread: state.stamenSpread, asked, radius, clamped, limit, onAxis, hubRadius: hub.radius, clearRadius, anther, thickness, dome,
+      /* WHERE THE MULTIPLIER RUNS OUT ON THIS BLOOM — the limit over the
+         reference, (hub - r) / (r sqrt N): 1.25 at 120 stamens on the shipping
+         hub, 13.7 at one, 123 on the largest hub, 0.03 on the smallest.
+         Telemetry, so the read-out can say how much of the slider is dead
+         HERE and the panel gate can assert it (Eva, Sep 6): a static range
+         cannot be narrowed to remove it, because it is a function of the
+         count and the hub, and the ruled answer to dead travel in this
+         codebase is the curl's — full ranges, clamped, TOLD. */
+      saturation: derivedRadius > 0 ? limit / derivedRadius : 0,
       stamens,
       inPetalRootAnnulus: stamens.filter((s) => s.inPetalRootAnnulus).length,
       /* SLENDERNESS — free length over the FLOORED diameter, telemetry only

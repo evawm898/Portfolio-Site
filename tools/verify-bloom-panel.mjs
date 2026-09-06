@@ -1606,6 +1606,7 @@ for (const [label, sets, wantDome, wantClamp] of [
                sectionHidden: sec ? sec.hidden : null, countHidden: hid('stamenCount'), subsHidden: subs.map((id) => hid(id)),
                has: m.androecium !== null, emitted: m.stamens.length, freeEnds: m.freeEnds, shownTris: m.shownTris,
                clamped: !!(m.androecium && m.androecium.clamped), annulus: m.androecium ? m.androecium.inPetalRootAnnulus : 0,
+               saturation: m.androecium ? m.androecium.saturation : null, saturationSaid: (txt.match(/([\d.]+)x is as far as this hub goes, the slider above it is dead here/) || [])[1],
                fuse: !!(m.stamenNearest && m.androecium && m.stamenNearest.root.mm < m.androecium.diameter),
                lineSaid: (txt.match(/^STAMENS (\d+) on /m) || [])[1], clampSaid: /\(CLAMPED at the hub radius/.test(txt),
                annulusSaid: /STAND INSIDE THE PETAL-ROOT ANNULUS/.test(txt), fuseSaid: /\(ROOTS FUSE\)/.test(txt),
@@ -1623,6 +1624,14 @@ for (const [label, sets, wantDome, wantClamp] of [
     else if (wantPresent && Number(res.lineSaid) !== res.count) p.push(`the STAMENS line says ${res.lineSaid}, the control says ${res.count}`);
     if (res.slenderSaid !== wantPresent) p.push(`the SLENDERNESS line with its verbatim UNMEASURED tag is ${res.slenderSaid ? 'shown' : 'absent'} while the androecium is ${wantPresent ? 'present' : 'absent'}`);
     if (res.clampSaid !== res.clamped) p.push(`the (CLAMPED at the hub radius) clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports clamped ${res.clamped}`);
+    /* THE DEAD TRAVEL IS TOLD, AND THE NUMBER IS THE OWNER'S (Eva, Sep 6): where
+       the multiplier runs out on this bloom is printed in the clamp clause and
+       must equal the owner's `saturation` — a static range cannot be narrowed to
+       remove dead travel that is a function of the count and the hub. */
+    if (res.clamped) {
+      if (res.saturationSaid === undefined) p.push('the clamp clause does not say where the multiplier runs out on this bloom');
+      else if (Math.abs(Number(res.saturationSaid) - res.saturation) > 0.005) p.push(`the read-out says the multiplier runs out at ${res.saturationSaid}x, the owner says ${res.saturation}`);
+    } else if (res.saturationSaid !== undefined) p.push('the read-out names a saturation point while the owner reports no clamp');
     if (res.annulusSaid !== (res.annulus > 0)) p.push(`the PETAL-ROOT ANNULUS flag is ${res.annulusSaid ? 'shown' : 'absent'} while the owner counts ${res.annulus} stamens in it`);
     if (res.fuseSaid !== res.fuse) p.push(`the ROOTS FUSE flag is ${res.fuseSaid ? 'shown' : 'absent'} while the owner's nearest roots ${res.fuse ? 'are' : 'are not'} closer than a filament`);
     for (const k of ['clamped', 'annulusFlag', 'fuse']) if (want[k] !== undefined && (k === 'annulusFlag' ? res.annulus > 0 : res[k]) !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${k === 'annulusFlag' ? res.annulus > 0 : res[k]}`);

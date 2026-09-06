@@ -40,8 +40,8 @@ milestone (charter, "the iteration loop"). Note two of the six CI jobs on a bloo
 PR are FLOWER gates (`'tools/**'` filtered), so "six verify jobs green" overstates
 the bloom evidence — it is four.
 **Frozen baselines are frozen at commits on `main`, never at a branch head, and
-are tagged at freeze time** — `tools/publish-frozen-tags.sh` pins all twelve
-(`frozen/phase2`..`frozen/phase13`) so a branch delete or a force-push cannot
+are tagged at freeze time** — `tools/publish-frozen-tags.sh` pins all fifteen
+(`frozen/phase2`..`frozen/phase16`) so a branch delete or a force-push cannot
 orphan one; phase10 is the case that produced the rule (charter, Sep 5).
 Control-panel changes have their own gate: `node tools/verify-bloom-panel.mjs`
 (every registry control renders exactly once in its declared section, a control
@@ -269,7 +269,16 @@ SLENDERNESS (L/d, floored diameter) is on every row, verbatim `UNMEASURED — no
 been printed`; ROOTS FUSE / ANTHERS TOUCH / the petal-root ANNULUS count are FLAGS. B2b owns
 the crowding-raster extensions and the anther-against-blade instrument (the stopping rule
 fired at the line). Read `docs/bloom-session-21-outcome.md` before touching any of it. The
-sheet is `node tools/shot-bloom-androecium.mjs <dir>`.
+sheet is `node tools/shot-bloom-androecium.mjs <dir>`. **`stamenSpread` is 0.60–6.00 and the
+dead travel above where it saturates is TOLD, not trimmed** (Eva, Sep 6): saturation is
+`(hub − r) / (r √N)` — 1.25 at 120 stamens on the shipping hub, 13.7 at one, 123 on the
+largest hub — so no static range is dead-free; the CLAMPED clause prints the number and the
+panel gate asserts it. **R1 in both coverage instruments counts the stamens through a third
+accumulator that EMITS** (it calls the same builder), so it sees the orchestration — a
+stamen emitted twice, recorded once, is R1's (measured red) and a defect inside the builder
+is JS3/JS4's. `phase16Matrix()` is the 481 rows at `a65d16d`, the first post-retirement
+baseline (a plain capture per tree closes the next session). An independent stamen SPLAY is
+proposed and costed for B2b in the outcome doc; today Head rise is the only splay.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a

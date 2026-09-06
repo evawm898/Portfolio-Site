@@ -4476,3 +4476,28 @@ matters should be measured this way.
       ends, one stamen, six on the disc, the absent default, and the byte claim on the sheet
       (the androecium at maximum under SPHERE exporting the bare sphere's own sha — required
       equal, or no sheet). Merge is released by Eva's ruling on it.
+
+    - **EVA'S TWO QUESTIONS BEFORE THE MERGE (Sep 6), ANSWERED BY MEASUREMENT.** (1) R1 CAN
+      still fail on stamens, and did: the third accumulator EMITS (it calls the same builder
+      through the same orchestration), so a stamen emitted twice and recorded once — JS1–JS4
+      silent, boundary 0 — goes RED on plan R1 through the real export gate (13,440 against
+      16,800) and on both plan and solid R1 driven directly on a cap (16,704 against 20,064),
+      green on the real tree; what R1 cannot see is a defect INSIDE the builder, which moves
+      both sides and is JS3/JS4's (measured). (2) The multiplier's saturation is
+      `(hub − r) / (r √N)`, a function of the count AND the hub — 1.25 at 120 stamens on the
+      shipping hub, 13.7 at one, 123 on the largest, 0.03 on the smallest — so NO static range
+      is dead-free and narrowing the top would delete live travel on every large hub. Not
+      narrowed, on the curl and foot-ceiling precedent: full range, clamped, TOLD — the clamp
+      clause prints where the multiplier runs out on this bloom and route (o) asserts the
+      number against the owner's `saturation`. The full table is in the outcome doc; 4.00 is
+      the value that would keep 1–12 stamens live on the shipping hub if a narrowing is ruled.
+
+    - **phase16 IS OWED AND FROZEN** — the row set changed (481 → 507), a different case from
+      session 19: `phase16Matrix()` is the 481 rows at `a65d16d` (the head of `main` when the
+      session opened), generated from that commit's own `buildMatrix()`, `--verify-frozen
+      --phase16` PASS, `FROZEN_BASE_COMMITS.phase16 = 'a65d16d'`. The first post-retirement
+      baseline: every row applies as written on any tree from `a65d16d` on, so the next
+      session closes with one plain capture per tree and the tool's own `--compare` (phase15's
+      55 retired-id rows needed the split shape in `tools/compare-bloom-captures.mjs`).
+      `frozen/phase16` is published from `main` after the merge (the bloom-frozen-tags
+      dispatch, red by design on phase5).

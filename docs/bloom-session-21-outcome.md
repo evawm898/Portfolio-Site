@@ -276,6 +276,97 @@ said: that is the rule doing its job.
   tilted petals hid the curl loops; it now sits 20° up (measured against the near tip:
   −0.3 mm at 8°, +6.8 mm at 20°).
 
+## Eva's two questions before the merge (Sep 6), answered by measurement
+
+**1. Is R1 still capable of failing on stamens?** Yes, and here is it firing. The third
+accumulator is handed no count: it calls the same `buildStamenInto` through the same
+orchestration `buildBloomInto` uses, and the accumulator counts what was EMITTED. So R1
+compares the copy's orchestration against the owner's. Mutant **M-R1** — every stamen
+emitted a SECOND time into the real build, recorded nowhere (duplicate closed solids: the
+defect class this codebase has a rule about) — through the real export gate on `STAMENS: 6
+on a RING`: JS1–JS4 silent (six records at 560 each, the tally 6), boundary 0, and then
+**`coverage R1: petals-only (9888) + hub-only (192) + stamens-only (3360) tris = 13440,
+but a normal whole-bloom build has 16800` — RED.** Driven directly on a cap (six stamens,
+rise 0.50): plan R1 red at 16,704 against 20,064 and **solid R1 red at the same numbers**.
+The real tree on the same row and the same drive: export gate PASS, plan clean, solid
+clean. **What R1 cannot see, said plainly:** a defect INSIDE `buildStamenInto` (a dropped
+pill, a hairline root) moves both sides equally, because the copy calls the same builder —
+those are JS3's and JS4's, which fired on exactly those mutants. R1's claim is the
+orchestration: the count, the layout, the SPHERE gate, and duplication.
+
+**2. Does the multiplier's declared range match where it saturates?** It cannot, on any
+static range, and the table is why. The saturation multiplier is `(hub − r) / (r √N)` —
+`saturation` on the descriptor now — a function of the COUNT and the HUB:
+
+| hub | N=1 | 6 | 12 | 20 | 40 | 120 |
+|---|---|---|---|---|---|---|
+| shipping (8.84 mm, d 1.20) | 13.7 | 5.61 | 3.97 | 3.07 | 2.17 | 1.25 |
+| the mum (4.69 mm printed, d 1.00) | 8.38 | 3.42 | 2.42 | 1.87 | 1.33 | 0.77 |
+| the largest (74.2 mm) | 123 | 50.0 | 35.4 | 27.4 | 19.4 | 11.2 |
+| the smallest (0.81 mm) | 0.35 | 0.14 | 0.10 | 0.08 | 0.06 | 0.03 |
+
+Against the declared 0.60–6.00: on the shipping hub the top is dead from six stamens up
+(7% of the travel at 6, 38% at 12, 88% at 120) and fully live below six; on the largest hub
+nothing is dead at any count; on the smallest hub everything is (the on-axis corner, told).
+**Narrowing was not done, and the reason is the table, not reluctance:** a max that removed
+the dead travel on the shipping hub at 120 (1.25) would delete the six-stamen candidate's
+whole useful range (its anthers clear at 2.07); a max that kept the common count band live
+(4.00) would still leave 69% dead at 120 and would delete reachable states on every large
+hub (six stamens on the 74 mm hub saturate at 50). The ruled answer to dead travel in this
+codebase — the spine curl, the foot ceiling — is full ranges, clamped, TOLD, and that is
+what ships: the CLAMPED clause now prints where the multiplier runs out on this bloom
+("1.25x is as far as this hub goes, the slider above it is dead here") and **route (o)
+asserts that number against the owner's `saturation`** in both directions, so the panel
+gate sees the extent, not only the state. If Eva still wants a narrowing, it is one number
+in the registry plus three row labels and one sheet cell; 4.00 is the value that keeps
+1–12 stamens live on the shipping hub.
+
+## The rulings (Eva, Sep 6)
+
+- **The pill at six and at 120 — approved, as chosen.**
+- **The radius control as a MULTIPLIER, not millimetres — approved**, for the reasons above.
+- **Curl range —** the ruling's placeholder was left unfilled (`<<±180 or ±120>>`). ±180 ships
+  as built and photographed; a narrowing to ±120 is one number in the registry plus the two
+  curl-extreme row labels and two sheet cells, and it moves no byte (the default is 0).
+- **Noted for B2b, not built:** Head rise is currently the only way to change stamen splay,
+  so HEAD does two unrelated jobs. The proposal, costed below.
+
+## B2b: an independent splay on the androecium's own whorl — proposed and costed, not built
+
+`stamenSplay` (ANDROECIUM section, degrees from the surface normal, outward positive,
+−45..+90, default 0). The mechanism already exists: `buildStamenInto` passes `spineLaw()`
+a `tilt` of 0, and that argument IS the aim at the root — the splay is `tilt: −splay` in
+the (Up, −Rs) frame, applied from the OUTER face exactly as the curl is, so the root axis
+stays on the owner's normal and JS1 is unchanged. On a flat hub it is the only splay; on a
+cap it ADDS to the normal fan, so HEAD keeps one job (the surface) and the androecium
+owns its aim. It is a different word from curl (the five-things-that-sound-like-curve
+table: a rigid aim at the root against a progressive bend along the length). **Cost:** one
+registry row; one descriptor field (`splayRad`); one line in the builder, guarded
+(`tilt: splay === 0 ? 0 : −splayRad`, so the shipping default takes the identical
+doubles); three matrix rows (min, max, 120-disc × max); one route (o) step whose witness
+is the nearest-apex distance growing (the splay costs zero triangles, so the count cannot
+witness it); one sheet cell beside the rise cell. About 40 lines, 0 triangles, 0 moved by
+construction. The splay interacts with the tip-to-tip flag and with the anther-against-blade
+instrument B2b already owns, which is the reason to build them in the same session.
+
+## phase16 — owed, frozen, why
+
+The row set changed (481 → 507: block 23's 24 rows and `stamenCount`'s two sweep rows),
+which is a different case from session 19, where nothing moved and nothing was added. So a
+new frozen phase is owed on the standing convention — the matrix as it stood at the head of
+`main` when the session opened, at a commit ON `main`, tagged at freeze time.
+`phase16Matrix()` is the 481 rows at `a65d16d`, generated from that commit's own
+`buildMatrix()` (10 capability rows, 2 coverage pins, 4 solid pins carried), proved
+deep-equal by `--verify-frozen --phase16 --base <worktree of a65d16d>` (PASS, 481 rows),
+`FROZEN_BASE_COMMITS.phase16 = 'a65d16d'`, the diff tool wired. It is the first
+post-retirement baseline: every row applies as written on any tree from `a65d16d` on, so
+the next session's retention close is one plain capture per tree and the tool's own
+`--compare`, not phase15's split shape. Expected to say 481 HOLD across the androecium, by
+construction — the claim phase15's 527 made for this session and measured. The tag
+`frozen/phase16` is published from `main` after the merge by dispatching the
+bloom-frozen-tags workflow (red by design on the phase5 refusal), verified with
+`git ls-remote`.
+
 ## The sheet — `node tools/shot-bloom-androecium.mjs <dir>`
 
 Every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, JS1–JS4 and the junction
