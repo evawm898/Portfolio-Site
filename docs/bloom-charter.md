@@ -4640,3 +4640,47 @@ matters should be measured this way.
       the WHOLE centre at maximum under SPHERE, under the incurve sphere, and the sub-controls
       at maximum with NONE — required equal to the bare sphere's / the incurve sphere's / the
       default's own sha, or no sheet). Merge is released by Eva's ruling on it.
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** The sheet approved; #167 merged as built —
+      the gynoecium ABSENT by default. **The present-centre default is NOT approved as part
+      of this:** 486 of 528 live rows and 4,921 of 4,984 frozen rows is a larger byte event
+      than the retirement was, and it gets its own session on the B1 pattern — the default
+      change alone, nothing else in the commit — if she decides she wants it at all.
+
+    - **THE FILAMENT CURL RANGE — ±180 STANDS, RULED FROM THE CELLS BESIDE THE STYLE, AND
+      NOT LEFT OPEN A SECOND TIME.** Her ground for narrowing was that at +180 the arcs pass
+      through the axis the style occupies and nothing in the gates can see a filament passing
+      through it. Both halves are true and the second is the point: **the crossing is not a
+      property of the range's ends, so ±120 would not remove it.** Measured from
+      `spineLaw()` itself (20 mm filaments, tilt 0, the style 25 mm on the axis): on the
+      shipping six-stamen ring (2.94 mm) a filament's nearest approach to the axis falls
+      inside one filament plus one style radius from **15° of curl** (0.34 mm at 20.4 mm up),
+      is 0.00 mm at 20°, and stays under 0.11 mm at every step to 180 — at 120° it crosses at
+      7.6 mm up, at 180° at 5.9 mm; with the ring clamped out at the hub (8.24 mm) the crossing
+      starts at 45° (0.78 mm at 18.6 mm up) and is 0.06 mm at 120°. A 20 mm filament on a
+      3 mm ring reaches the axis under almost any curl, so the narrowing would have deleted
+      two thirds of the range and kept the crossing. **What closes it is an instrument, and it
+      is B2b's**: a FILAMENT-AGAINST-STYLE flag on the STAMENS line (the nearest approach of
+      any filament station to the style's axis below the stigma, against one filament plus one
+      style radius — read from the builder's own stations, on the pattern of ROOTS FUSE), the
+      same family as the anther-against-blade instrument already parked there. Flag, never
+      gate: the crossing exports watertight and one piece, which is the invariant working.
+
+    - **ADDED TO THE FLOWER-PROJECT SKILL'S TRAP LIST (Eva's instruction):** the panel gate's
+      retirement scanner mis-pairs backticks when a template literal carries an odd number of
+      apostrophes and then blames the wrong file and line — the symptom (`bloom-harness.mjs:599
+      centerSize`, repeated, on a line number computed in the stripped text, in code the
+      session did not touch), the bisect, and the workaround (no apostrophes in assertion
+      messages until the regex is fixed; replicate the six `.replace` calls to confirm a
+      suspect). The regex fix is its own change to a shipped gate with a negative control.
+
+    - **THE CLOSE (Sep 6).** All four bloom gates green on the PR head `173d1ae`
+      (bloom-export-watertight and bloom-connectedness on the full 528-row matrix, bloom-panel,
+      bloom-frozen-matrices; the two flower gates ran too, `tools/**` filter, and are not bloom
+      evidence). #167 undrafted and merged by the session (squash) as **`a8a22f2`**, the head
+      sha read from the remote. `frozen/phase17` published from `main` at `6335ac4` by the
+      bloom-frozen-tags dispatch (red by design: phase5 the only refusal, the workflow-file
+      token rule), read back with `git ls-remote --tags`. The predeclared manifest re-verified
+      against `main` after the merge: 99 of 102 held; the three that moved are `print-infill.js`, `print.html` and `print.js`, moved on `main` by #166 between the manifest's base and the merge (#167's own squash touched exactly the fifteen predeclared movers and none of the 102). `main` had moved once since
+      `6335ac4` (#166, `/print` only; the overlap with this branch was CLAUDE.md, in different
+      sections, no conflict).

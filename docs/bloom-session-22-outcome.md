@@ -292,6 +292,56 @@ centre control, not what value they pin.
   explicit rows by name (the harness's own note at block 23's head says exactly this); and
   every preset-to-be inherits a centre. **Her ruling; nothing moved here.**
 
+## The rulings (Eva, Sep 6, from the sheet)
+
+- **The sheet approved; merge #167 as built — the gynoecium ABSENT by default.**
+- **The present-centre default is NOT approved as part of this.** 486 of 528 live rows and
+  4,921 of 4,984 frozen rows is a larger byte event than the retirement was; it gets its own
+  session on the B1 pattern — the default change alone, nothing else in the commit — if she
+  decides she wants it at all.
+- **The filament curl range — ruled from the cells beside the style, ±180 STANDS.** Her
+  ground: at +180 the arcs pass through the axis the style occupies, and nothing in the gates
+  can see a filament passing through it. Measured from `spineLaw()` (20 mm filaments, tilt 0,
+  the style 25 mm on the axis), the crossing is NOT a property of the range's ends:
+
+  | ring radius | curl 15 | 20 | 30 | 45 | 60 | 90 | 120 | 150 | 180 |
+  |---|---|---|---|---|---|---|---|---|---|
+  | 2.94 mm (six at the shipping spread): nearest approach to the axis, mm | 0.34 | 0.00 | 0.03 | 0.07 | 0.06 | 0.05 | 0.08 | 0.05 | 0.11 |
+  | … at height, mm | 20.4 | 18.7 | 15.2 | 12.6 | 10.7 | 8.7 | 7.6 | 6.6 | 5.9 |
+  | 8.24 mm (the ring clamped at the hub): nearest approach, mm | — | — | — | 0.78 | 0.01 | 0.09 | 0.06 | — | 0.03 |
+
+  Within one filament plus one style radius (1.20 mm) is a crossing: on the shipping ring
+  from 15° of curl, on the clamped ring from 45°. A 20 mm filament on a 3 mm ring reaches
+  the axis under almost any curl, so narrowing to ±120 would delete two thirds of the range
+  and keep the crossing. **What closes the question is an instrument, and it is B2b's:** a
+  FILAMENT-AGAINST-STYLE flag on the STAMENS line — the nearest approach of any filament
+  station to the style's axis below the stigma, against one filament plus one style radius,
+  read from the builder's own stations on the ROOTS FUSE pattern — beside the
+  anther-against-blade instrument already parked there. A flag and never a gate: the crossing
+  exports watertight and one piece, which is the invariant working as designed.
+- **Added to the flower-project skill's trap list** (her instruction, not only this doc): the
+  retirement scanner's backtick mis-pairing, with the symptom, the bisect and the workaround.
+  The synced copy on the session's box was edited and the skill re-packaged for the
+  Save-skill card, since a sync overwrites the local copy.
+
+## The close (Sep 6)
+
+- All four bloom gates green on the PR head `173d1ae`: bloom-export-watertight and
+  bloom-connectedness on the full 528-row matrix, bloom-panel, bloom-frozen-matrices. The two
+  flower gates ran too (`tools/**` filter) and are not bloom evidence.
+- #167 undrafted (GitHub refuses to merge a draft — B2's lost step) and merged by the session
+  (squash) as **`a8a22f2`**, the head sha read from the remote with `git ls-remote`, not
+  guessed. `main` had moved once since `6335ac4` (#166, `/print` only): the overlap with this
+  branch was CLAUDE.md, in different sections, and `git merge-tree` reported no conflict.
+- **`frozen/phase17` → `6335ac4`**, published from `main` by the bloom-frozen-tags dispatch
+  (red by design): its log names phase5 as the ONLY refusal (a GitHub App token cannot push a
+  ref whose `.github/workflows` content differs from the default branch's), the other sixteen
+  `published`; read back with `git ls-remote --tags origin`.
+- The predeclared manifest re-verified against `main` after the merge, on the merged tree:
+  99 of 102 held; the three that moved are `print-infill.js`, `print.html` and `print.js`, moved on `main` by #166 between the manifest's base and the merge (#167's own squash touched exactly the fifteen predeclared movers and none of the 102).
+- The rulings and this close recorded in the docs-only PR, opened and merged by the session
+  before reporting DONE.
+
 ## What this session predeclared it would not touch
 
 A sha1 manifest of 102 files taken from the working tree at `6335ac4` before any edit: every
